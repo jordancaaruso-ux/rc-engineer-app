@@ -4,7 +4,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  CATALOG_LINKS,
   MOBILE_NAV,
+  catalogLinksForUser,
   resolveActiveNavId,
   shouldShowLogRunFab,
 } from "@/components/layout/navConfig";
@@ -13,6 +15,38 @@ test("mobile dock is five pure destinations, in order, without add-run or settin
   assert.deepEqual(
     MOBILE_NAV.map((item) => item.id),
     ["dashboard", "analysis", "engineer", "assets", "teams"]
+  );
+});
+
+test("the Garage tab lands on the cars list, not a hub (2026-07-29)", () => {
+  const garage = MOBILE_NAV.find((item) => item.id === "assets");
+  assert.equal(garage?.href, "/cars");
+  assert.equal(garage?.label, "Garage");
+  // Legacy hub routes still light the tab — both redirect to /cars.
+  assert.equal(resolveActiveNavId("/assets"), "assets");
+  assert.equal(resolveActiveNavId("/garage"), "assets");
+});
+
+test("catalogs are Settings-only reference data, calibrations admin-gated", () => {
+  const hrefs = CATALOG_LINKS.map((l) => l.href);
+  assert.deepEqual(hrefs, [
+    "/setup-sheet-models",
+    "/tracks",
+    "/tires",
+    "/additives",
+    "/setup-calibrations",
+  ]);
+  // Tires are picker-only in the daily loop — one catalog entry, never a "my tires" asset.
+  assert.equal(hrefs.filter((h) => h === "/tires").length, 1);
+  assert.equal(hrefs.includes("/cars"), false);
+  assert.equal(hrefs.includes("/events"), false);
+  assert.equal(
+    catalogLinksForUser(false).some((l) => l.href === "/setup-calibrations"),
+    false
+  );
+  assert.equal(
+    catalogLinksForUser(true).some((l) => l.href === "/setup-calibrations"),
+    true
   );
 });
 

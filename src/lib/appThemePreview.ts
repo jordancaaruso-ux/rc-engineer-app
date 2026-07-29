@@ -6,7 +6,7 @@
  * `.page-bg*` layers and nothing else — card, glass and text tokens stay fixed
  * so switching compares backgrounds, not whole themes.
  *
- * The default (`black`) writes no attribute, so a fresh device gets the shipped
+ * The default (`graphite`) writes no attribute, so a fresh device gets the shipped
  * look with zero work. `bgPreviewBootstrapScript()` applies the stored choice in
  * `layout.tsx` before paint, so there is no flash of the wrong background.
  */
@@ -29,7 +29,7 @@ export type BgPreviewId =
   | "moss-tint";
 
 /** Shipped look. Written as "no attribute" so the CSS default is the fast path. */
-export const BG_PREVIEW_DEFAULT_ID: BgPreviewId = "black";
+export const BG_PREVIEW_DEFAULT_ID: BgPreviewId = "graphite";
 
 export type BgPreviewOption = {
   id: BgPreviewId;
@@ -43,9 +43,17 @@ export type BgPreviewOption = {
 
 export const BG_PREVIEW_OPTIONS: ReadonlyArray<BgPreviewOption> = [
   {
+    id: "graphite",
+    label: "Graphite wash",
+    hint: "Current default — charcoal with soft depth",
+    hex: "#121110",
+    swatchImage:
+      "radial-gradient(120% 120% at 50% 20%, rgba(255,214,10,0.16), transparent 60%), radial-gradient(120% 120% at 50% 120%, rgba(72,68,64,0.55), transparent 70%)",
+  },
+  {
     id: "black",
     label: "Black",
-    hint: "Current default — pure flat black",
+    hint: "Pure flat black, no gradients",
     hex: "#000000",
   },
   {
@@ -59,14 +67,6 @@ export const BG_PREVIEW_OPTIONS: ReadonlyArray<BgPreviewOption> = [
     label: "Dark grey",
     hint: "Neutral grey, no warm cast",
     hex: "#1C1D1F",
-  },
-  {
-    id: "graphite",
-    label: "Graphite wash",
-    hint: "Charcoal with soft depth gradients",
-    hex: "#121110",
-    swatchImage:
-      "radial-gradient(120% 120% at 50% 20%, rgba(255,214,10,0.16), transparent 60%), radial-gradient(120% 120% at 50% 120%, rgba(72,68,64,0.55), transparent 70%)",
   },
   {
     id: "photo",

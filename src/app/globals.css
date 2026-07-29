@@ -85,8 +85,8 @@
  *
  * `data-bg-preview` on <html> (written by BackgroundSection, applied pre-paint by
  * `bgPreviewBootstrapScript()` in layout.tsx, localStorage-only so it never syncs
- * or hits the DB) chooses what paints behind every page. No attribute = Black,
- * the shipped default since 2026-07-27.
+ * or hits the DB) chooses what paints behind every page. No attribute = Graphite
+ * wash, the shipped default since 2026-07-29.
  *
  * A mode moves ONLY the four `.page-bg*` layers plus the overscroll fallback.
  * Card, glass, border and text tokens are deliberately untouched, so switching
@@ -95,60 +95,14 @@
  *
  * The four knobs, front→back: `--page-bg-vignette` · `--page-bg-scrim` ·
  * `--page-bg-photo` · `--page-bg-wash` over `--page-bg-base`.
+ *
+ * Graphite wash (the default, so it lives in `:root`) — charcoal base plus the
+ * Technical v2 depth gradients (edge vignette, a yellow "lit-from-above" whisper,
+ * graphite lifts top + bottom, soft corner depth). Tuned subtle: richness in the
+ * gutters without fighting content.
  */
 :root {
-  --page-bg-base: #000;
-  --page-bg-wash: none;
-  --page-bg-photo: none;
-  --page-bg-scrim: none;
-  --page-bg-vignette: none;
-}
-
-/* Flat colour modes — base fill only, nothing layered over it. */
-html[data-bg-preview="black"] {
-  --page-bg-base: #000000;
-  --page-top-theme: #000000;
-}
-
-html[data-bg-preview="charcoal"] {
   --page-bg-base: #121110;
-  --page-top-theme: #121110;
-}
-
-html[data-bg-preview="dark-grey"] {
-  --page-bg-base: #1c1d1f;
-  --page-top-theme: #1c1d1f;
-}
-
-html[data-bg-preview="cool-slate"] {
-  --page-bg-base: #14161c;
-  --page-top-theme: #14161c;
-}
-
-html[data-bg-preview="ash-warm"] {
-  --page-bg-base: #1b1a17;
-  --page-top-theme: #1b1a17;
-}
-
-html[data-bg-preview="butter-cream"] {
-  --page-bg-base: #231f15;
-  --page-top-theme: #231f15;
-}
-
-html[data-bg-preview="moss-tint"] {
-  --page-bg-base: #131816;
-  --page-top-theme: #131816;
-}
-
-/*
- * Graphite wash — charcoal base plus the Technical v2 depth gradients (edge
- * vignette, a yellow "lit-from-above" whisper, graphite lifts top + bottom, soft
- * corner depth). Tuned subtle: richness in the gutters without fighting content.
- */
-html[data-bg-preview="graphite"],
-html[data-bg-preview="photo"] {
-  --page-bg-base: #121110;
-  --page-top-theme: #121110;
   --page-bg-wash:
     radial-gradient(120% 120% at 50% 42%, transparent 52%, rgba(0, 0, 0, 0.32) 100%),
     radial-gradient(150% 100% at 50% -10%, rgba(255, 214, 10, 0.13), transparent 62%),
@@ -157,6 +111,52 @@ html[data-bg-preview="photo"] {
     radial-gradient(75% 62% at 6% 4%, rgba(68, 64, 60, 0.10), transparent 60%),
     radial-gradient(95% 85% at 102% 104%, rgba(72, 68, 64, 0.14), transparent 64%),
     radial-gradient(72% 62% at 100% 100%, rgba(255, 214, 10, 0.10), transparent 60%);
+  --page-bg-photo: none;
+  --page-bg-scrim: none;
+  --page-bg-vignette: none;
+}
+
+/* Flat colour modes — base fill only; each clears the default wash. */
+html[data-bg-preview="black"] {
+  --page-bg-base: #000000;
+  --page-top-theme: #000000;
+  --page-bg-wash: none;
+}
+
+html[data-bg-preview="charcoal"] {
+  --page-bg-base: #121110;
+  --page-top-theme: #121110;
+  --page-bg-wash: none;
+}
+
+html[data-bg-preview="dark-grey"] {
+  --page-bg-base: #1c1d1f;
+  --page-top-theme: #1c1d1f;
+  --page-bg-wash: none;
+}
+
+html[data-bg-preview="cool-slate"] {
+  --page-bg-base: #14161c;
+  --page-top-theme: #14161c;
+  --page-bg-wash: none;
+}
+
+html[data-bg-preview="ash-warm"] {
+  --page-bg-base: #1b1a17;
+  --page-top-theme: #1b1a17;
+  --page-bg-wash: none;
+}
+
+html[data-bg-preview="butter-cream"] {
+  --page-bg-base: #231f15;
+  --page-top-theme: #231f15;
+  --page-bg-wash: none;
+}
+
+html[data-bg-preview="moss-tint"] {
+  --page-bg-base: #131816;
+  --page-top-theme: #131816;
+  --page-bg-wash: none;
 }
 
 /*
@@ -167,6 +167,8 @@ html[data-bg-preview="photo"] {
  * stay in CSS because they're viewport-relative and can't be baked into a
  * fixed-aspect image. Re-bake if the source photo changes: sharp(track-hero.jpg)
  *   .blur(12).modulate({saturation:0.6,brightness:0.92}) → track-hero-baked.jpg
+ * Base + wash come from `:root` (the graphite default) and show through while the
+ * JPEG loads; this block only adds the photo, scrim and vignette on top.
  */
 html[data-bg-preview="photo"] {
   --page-bg-photo: url("/brand/track-hero-baked.jpg") center / cover no-repeat;

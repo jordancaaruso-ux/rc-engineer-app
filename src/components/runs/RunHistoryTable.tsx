@@ -9,6 +9,11 @@ import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { formatLap } from "@/lib/runLaps";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import type { MatchReason } from "@/lib/runs/runHistoryFilters";
+import {
+  BACK_PARAM,
+  OPEN_GROUP_PARAM,
+  SESSIONS_RETURN_KEY,
+} from "@/lib/runs/sessionsReturn";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import { TirePrepStepsList, resolveTirePrepSteps } from "@/components/runs/TirePrepStepsList";
 import {
@@ -132,6 +137,7 @@ export function RunHistoryTable({
   showSessionColumn = true,
   dayRunNumberByRunId,
   matchReasonsById,
+  focusRunId = null,
 }: {
   runs: Run[];
   allRunsDescending: CompareRunShape[];
@@ -160,6 +166,11 @@ export function RunHistoryTable({
   dayRunNumberByRunId?: Record<string, number>;
   /** runId → why the run matched the active search/setup filters (search only). */
   matchReasonsById?: Record<string, MatchReason[]>;
+  /**
+   * Run being returned to from the run view (`?openGroup=`). Marks the row so the
+   * driver's eye lands back on it, and anchors the scroll (`SessionsFocusScroll`).
+   */
+  focusRunId?: string | null;
 }) {
   const router = useRouter();
   const [setupModalRunId, setSetupModalRunId] = useState<string | null>(null);
@@ -178,9 +189,37 @@ export function RunHistoryTable({
     setModalsPortalReady(true);
   }, []);
 
-  /** Rows navigate to the run view — the one place a run is looked at (Option A, 2026-07-29). */
+  /**
+   * Rows navigate to the run view — the one place a run is looked at (Option A, 2026-07-29).
+   *
+   * Before leaving we stamp the *current* Sessions URL with `openGroup=<runId>` via
+   * `history.replaceState` — a shallow rewrite, so no re-render and no second history
+   * entry. Browser back then returns to a URL that fully describes where the driver was
+   * (group expanded, filters and team scope intact) instead of a cold, collapsed list:
+   * the `<details open>` state they set by hand does *not* survive the remount. The same
+   * URL rides along as `?back=` so the run page still has a destination when history
+   * doesn't (shared link, cold launch, arrived from the dashboard).
+   */
   function openRun(runId: string) {
-    router.push(`/runs/${encodeURIComponent(runId)}`);
+    let backHref: string | null = null;
+    if (typeof window !== "undefined" && window.location.pathname === "/runs/history") {
+      const params = new URLSearchParams(window.location.search);
+      params.set(OPEN_GROUP_PARAM, runId);
+      backHref = `/runs/history?${params.toString()}`;
+      try {
+        // `null` state, per Next's shallow-routing contract: it patches
+        // replaceState to sync its own router tree, so back() restores *this* URL
+        // (openGroup and all) rather than the pre-rewrite one.
+        window.history.replaceState(null, "", backHref);
+        sessionStorage.setItem(SESSIONS_RETURN_KEY, runId);
+      } catch {
+        // Private mode / blocked storage — the `?back=` link below still works.
+      }
+    }
+    const target = `/runs/${encodeURIComponent(runId)}`;
+    router.push(
+      backHref ? `${target}?${BACK_PARAM}=${encodeURIComponent(backHref)}` : target
+    );
   }
 
   /** Newest-first across all loaded runs (crosses day/event group boundaries). */
@@ -367,11 +406,15 @@ export function RunHistoryTable({
                   openRun(run.id);
                 }
               }}
+              data-run-row={run.id}
               className={cn(
                 "border-b border-border/80 hover:bg-muted/50 cursor-pointer select-none",
                 // When the match-reason chips row follows, it carries the divider.
                 runMatchReasons && runMatchReasons.length > 0 && "border-b-0",
                 isDragging && "opacity-50",
+                // Returned-to row: a quiet inset rail, not yellow — yellow is actions only.
+                focusRunId === run.id &&
+                  "bg-muted/40 shadow-[inset_2px_0_0_0_rgb(var(--color-muted-foreground)/0.55)]",
                 showDropAbove && "shadow-[inset_0_2px_0_0_var(--color-primary,#2563eb)]",
                 showDropBelow && "shadow-[inset_0_-2px_0_0_var(--color-primary,#2563eb)]"
               )}

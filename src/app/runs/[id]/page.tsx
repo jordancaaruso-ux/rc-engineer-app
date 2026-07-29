@@ -10,6 +10,11 @@ import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { toCompareRunShape } from "@/lib/runCompareShape";
 import { viewerMayAccessRun } from "@/lib/teams/teamRunAccess";
+import {
+  BACK_PARAM,
+  SESSIONS_RETURN_KEY,
+  safeSessionsBackHref,
+} from "@/lib/runs/sessionsReturn";
 import { RunPageClient } from "@/components/runs/RunPageClient";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
@@ -108,15 +113,24 @@ const PICKER_RUNS_TAKE = 200;
 
 export default async function RunPage(props: {
   params: Promise<{ id: string }>;
+  /**
+   * `back=<sessions url>` is stamped on by the Sessions row that opened this run, and
+   * already carries that list's filters, team scope and `openGroup`. Anything else (a
+   * shared link, a dashboard "View run", a push notification) falls back to plain
+   * Sessions — the arrow always has somewhere to go.
+   */
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<ReactNode> {
   const { id } = await props.params;
+  const resolvedSearch = (await props.searchParams) ?? {};
+  const backHref = safeSessionsBackHref(resolvedSearch[BACK_PARAM]);
 
   if (!hasDatabaseUrl()) {
     return (
       <>
         <header className="page-header">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <PageBackLink href="/runs/history" />
+            <PageBackLink href={backHref} />
             <div>
               <h1 className="page-title">Run</h1>
               <p className="page-subtitle">Database not configured.</p>
@@ -171,7 +185,10 @@ export default async function RunPage(props: {
     <>
       <header className="page-header">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <PageBackLink href="/runs/history" />
+          <PageBackLink
+            href={backHref}
+            historyBackToken={{ key: SESSIONS_RETURN_KEY, value: run.id }}
+          />
           <div className="min-w-0">
             <h1 className="page-title truncate">{title}</h1>
             <p className="page-subtitle truncate">{subtitle}</p>

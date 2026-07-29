@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptics";
 import { HubRowTitle } from "@/components/ui/panel";
@@ -12,6 +12,14 @@ import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Collapse } from "@/components/ui/Collapse";
 
 type SetupSheetModelOption = { id: string; name: string; slug: string; isAuthorized?: boolean };
+
+/** One saved (library) setup on a car, shown inline under the car row. */
+export type CarInlineSetup = {
+  id: string;
+  name: string | null;
+  createdAtLabel: string;
+  usedInRuns: number;
+};
 
 type Car = {
   id: string;
@@ -37,14 +45,28 @@ export function CarList({
   setupSheetModels: initialSetupSheetModels = [],
   isAdmin = false,
   setupMetaById,
+  setupsByCarId,
+  defaultOpenCarId = null,
 }: {
   initialCars: Car[];
   setupSheetModels?: SetupSheetModelOption[];
   isAdmin?: boolean;
   /** Per-car setup line ("2 sheets · 20 setups · last run 19 Jul"), built server-side. */
   setupMetaById?: Record<string, string>;
+  /**
+   * Saved setups per car, listed inline so reading or editing one is a single tap from the Garage
+   * tab (founder call 2026-07-29 — this replaced the duplicate setup cards on the old hub).
+   */
+  setupsByCarId?: Record<string, CarInlineSetup[]>;
+  /** Car expanded on load — the one you ran most recently. */
+  defaultOpenCarId?: string | null;
 }) {
   const router = useRouter();
+  /** Collapsed by default; the last-run car starts open until you touch a row. */
+  const [openCarId, setOpenCarId] = useState<string | null>(defaultOpenCarId);
+  useEffect(() => {
+    setOpenCarId(defaultOpenCarId);
+  }, [defaultOpenCarId]);
   const [cars, setCars] = useState<Car[]>(initialCars);
   const [setupSheetModels, setSetupSheetModels] =
     useState<SetupSheetModelOption[]>(initialSetupSheetModels);
@@ -339,41 +361,115 @@ export function CarList({
             No cars yet. Add one above to log runs.
           </li>
         ) : (
-          cars.map((c) => (
-            /* The row IS the link — tapping a car opens it. It used to expand into
-               "Edit parameters" / "Open car →", which made opening a car a two-tap
-               detour (2026-07-22). Sheet parameters live on the car page. */
-            <li key={c.id}>
-              <Link
-                href={`/cars/${c.id}`}
-                prefetch
-                onClick={() => haptic("light")}
-                className="tap-active flex w-full items-center gap-3 px-3 py-3 text-left transition hover:bg-muted/50 sm:px-4"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block">
-                    <HubRowTitle as="span">{c.name}</HubRowTitle>
-                    {c.chassis ? (
-                      <span className="text-muted-foreground text-sm ml-2">({c.chassis})</span>
-                    ) : null}
-                  </span>
-                  <span className="ui-caption mt-0.5 block">
-                    {c.setupSheetModel?.name ?? (
-                      <span className="text-amber-700 dark:text-amber-400">
-                        setup sheet coming
+          cars.map((c) => {
+            const setups = setupsByCarId?.[c.id] ?? [];
+            const expanded = openCarId === c.id;
+            return (
+              /* The row IS the link — tapping a car opens it. It used to expand into
+                 "Edit parameters" / "Open car →", which made opening a car a two-tap
+                 detour (2026-07-22). Sheet parameters live on the car page. The setup
+                 count beside it is a separate control: it expands the saved setups in
+                 place so a baseline is one tap from the Garage tab. */
+              <li key={c.id}>
+                <div className="flex items-stretch">
+                  <Link
+                    href={`/cars/${c.id}`}
+                    prefetch
+                    onClick={() => haptic("light")}
+                    className="tap-active flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-left transition hover:bg-muted/50 sm:px-4"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block">
+                        <HubRowTitle as="span">{c.name}</HubRowTitle>
+                        {c.chassis ? (
+                          <span className="text-muted-foreground text-sm ml-2">({c.chassis})</span>
+                        ) : null}
                       </span>
-                    )}
-                  </span>
-                  {setupMetaById?.[c.id] ? (
-                    <span className="ui-caption mt-0.5 block truncate font-mono tabular-nums">
-                      {setupMetaById[c.id]}
+                      <span className="ui-caption mt-0.5 block">
+                        {c.setupSheetModel?.name ?? (
+                          <span className="text-amber-700 dark:text-amber-400">
+                            setup sheet coming
+                          </span>
+                        )}
+                      </span>
+                      {setupMetaById?.[c.id] ? (
+                        <span className="ui-caption mt-0.5 block truncate font-mono tabular-nums">
+                          {setupMetaById[c.id]}
+                        </span>
+                      ) : null}
                     </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  </Link>
+
+                  {setupsByCarId ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptic("light");
+                        setOpenCarId(expanded ? null : c.id);
+                      }}
+                      aria-expanded={expanded}
+                      aria-label={`${expanded ? "Hide" : "Show"} setups for ${c.name}`}
+                      className="tap-active flex shrink-0 items-center gap-1 border-l border-border px-3 text-muted-foreground transition hover:bg-muted/50 hover:text-foreground"
+                    >
+                      <span className="text-[11px] font-medium tabular-nums">{setups.length}</span>
+                      <ChevronDown
+                        className={cn("h-4 w-4 transition-transform", expanded && "rotate-180")}
+                        aria-hidden
+                      />
+                    </button>
                   ) : null}
-                </span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-              </Link>
-            </li>
-          ))
+                </div>
+
+                {setupsByCarId ? (
+                  <Collapse open={expanded}>
+                    <div className="border-t border-border/60 bg-muted/20 px-3 py-2 sm:px-4">
+                      {setups.length === 0 ? (
+                        <p className="py-1 text-xs text-muted-foreground">
+                          No saved setups yet — create one and you can pick it when you log a run.
+                        </p>
+                      ) : (
+                        <ul>
+                          {setups.map((s) => (
+                            <li key={s.id}>
+                              <Link
+                                href={`/cars/${c.id}/setups/${s.id}/edit`}
+                                onClick={() => haptic("light")}
+                                className="tap-active flex items-center gap-3 border-b border-border/50 py-2 last:border-0"
+                              >
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-sm text-foreground">
+                                    {s.name ?? "Untitled setup"}
+                                  </span>
+                                  <span className="block font-mono text-[11px] tabular-nums text-muted-foreground">
+                                    {s.createdAtLabel}
+                                    {s.usedInRuns > 0
+                                      ? ` · ${s.usedInRuns} run${s.usedInRuns === 1 ? "" : "s"}`
+                                      : ""}
+                                  </span>
+                                </span>
+                                <ChevronRight
+                                  className="h-4 w-4 shrink-0 text-muted-foreground"
+                                  aria-hidden
+                                />
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <Link
+                        href={`/cars/${c.id}/setups/new`}
+                        className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition hover:text-foreground"
+                      >
+                        <Plus className="h-3 w-3" aria-hidden />
+                        New setup
+                      </Link>
+                    </div>
+                  </Collapse>
+                ) : null}
+              </li>
+            );
+          })
         )}
       </ul>
     </SurfaceCard>

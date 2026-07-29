@@ -9,7 +9,9 @@ import { loadTeamMemberDisplays, memberDisplayLabelRecord } from "@/lib/teams/te
 import { RunHistoryTable } from "@/components/runs/RunHistoryTable";
 import { RunHistoryColGroup, RunHistoryMobileHeaderRow, RUN_HISTORY_ACTION_CELL_CLASS, computeRunHistoryColSpan } from "@/components/runs/runHistoryTableColumns";
 import { SessionGroupsPager } from "@/components/runs/SessionGroupsPager";
+import { SessionsFocusScroll } from "@/components/runs/SessionsFocusScroll";
 import { RunHistoryViewMore } from "@/components/runs/RunHistoryViewMore";
+import { OPEN_GROUP_PARAM } from "@/lib/runs/sessionsReturn";
 import { SessionsFilterBar } from "@/components/runs/SessionsFilterBar";
 import { buildDayRunNumberMap, buildRunHistoryGroups, type RunHistoryGroup } from "@/lib/runs/buildRunHistoryGroups";
 import {
@@ -211,8 +213,9 @@ export default async function RunHistoryPage({
   // `expandLatest=1` is set when the driver completes a run from the log
   // form. Pre-opens the most recent group so the just-completed run is
   // visible without an extra click.
-  // `focusRun=<runId>` opens the session group that contains the run and
-  // expands that row (e.g. from dashboard "View run").
+  // `openGroup=<runId>` opens the session group that contains the run, scrolls
+  // to it and marks the row — the back trip from the run view.
+  // `focusRun=<runId>` is the legacy deep link and redirects to the run view.
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<ReactNode> {
   const resolvedSearch = (await searchParams) ?? {};
@@ -261,12 +264,19 @@ export default async function RunHistoryPage({
 
   const rawFocus = resolvedSearch.focusRun;
   const focusRunRaw = Array.isArray(rawFocus) ? rawFocus[0] : rawFocus;
-  const focusRunParam =
+  const legacyFocusRun =
     typeof focusRunRaw === "string" && focusRunRaw.trim() ? focusRunRaw.trim() : null;
   // `?focusRun=` predates the run view: it expanded that run's row in place. The run view is
   // now the one place a run is looked at (Option A, 2026-07-29), so the deep link — still in
   // old push notifications and bookmarks — redirects there. Access is re-checked on the page.
-  if (focusRunParam) redirect(`/runs/${encodeURIComponent(focusRunParam)}`);
+  if (legacyFocusRun) redirect(`/runs/${encodeURIComponent(legacyFocusRun)}`);
+
+  // `?openGroup=` is the return trip *from* that view, so it must expand in place — which is
+  // why it can't reuse `focusRun` above (that one redirects, and has to keep redirecting).
+  const rawOpenGroup = resolvedSearch[OPEN_GROUP_PARAM];
+  const openGroupRaw = Array.isArray(rawOpenGroup) ? rawOpenGroup[0] : rawOpenGroup;
+  const openGroupParam =
+    typeof openGroupRaw === "string" && openGroupRaw.trim() ? openGroupRaw.trim() : null;
 
   let runs: RunInGroup[] = [];
   let totalRunCount = 0;
@@ -303,7 +313,7 @@ export default async function RunHistoryPage({
       const loaded = await loadRunHistoryPage({
         where: baseWhere,
         viewAll: effectiveViewAllRequested,
-        focusRunId: focusRunParam,
+        focusRunId: openGroupParam,
         takeWhenNotViewAll,
       });
       runs = loaded.runs;
@@ -319,7 +329,7 @@ export default async function RunHistoryPage({
     const loaded = await loadRunHistoryPage({
       where: baseWhere,
       viewAll: effectiveViewAllRequested,
-      focusRunId: focusRunParam,
+      focusRunId: openGroupParam,
       takeWhenNotViewAll: RUN_HISTORY_INITIAL_TAKE,
     });
     runs = loaded.runs;
@@ -427,7 +437,7 @@ export default async function RunHistoryPage({
   const allRunsDescending = [...runs].sort(compareRunTimestamp);
   const compareRunsDescending = allRunsDescending.map(toCompareRunShape);
   const focusRunId =
-    focusRunParam && runs.some((r) => r.id === focusRunParam) ? focusRunParam : null;
+    openGroupParam && runs.some((r) => r.id === openGroupParam) ? openGroupParam : null;
   const focusGroupIndex =
     focusRunId == null ? -1 : groups.findIndex((g) => g.runs.some((r) => r.id === focusRunId));
   const pagerInitial =
@@ -525,6 +535,7 @@ export default async function RunHistoryPage({
               showSessionColumn={showSessionColumn}
               dayRunNumberByRunId={dayRunNumberByRunId}
               matchReasonsById={matchReasonsById}
+              focusRunId={focusRunId}
             />
           </tbody>
         </table>
@@ -749,6 +760,7 @@ export default async function RunHistoryPage({
                 showSessionColumn={showSessionColumn}
                 dayRunNumberByRunId={dayRunNumberByRunId}
                 matchReasonsById={matchReasonsById}
+                focusRunId={focusRunId}
               />
             </tbody>
           </table>
@@ -760,7 +772,7 @@ export default async function RunHistoryPage({
 
   const filterQuery = filtersToSearchParams(filters, {
     ...(teamId ? { teamId } : {}),
-    ...(focusRunId ? { focusRun: focusRunId } : {}),
+    ...(focusRunId ? { [OPEN_GROUP_PARAM]: focusRunId } : {}),
     ...(viewAll ? { viewAll: "1" } : {}),
   }).toString();
 
@@ -799,6 +811,8 @@ export default async function RunHistoryPage({
         </div>
       </header>
       <section className="page-body min-w-0 max-w-full">
+        {/* Back from a run view: centre the row that was open, don't dump them at the top. */}
+        <SessionsFocusScroll runId={focusRunId} />
         <Suspense fallback={<div className="h-20 rounded-lg border border-border bg-card animate-pulse" />}>
           <SessionsFilterBar
             cars={filterCars}
@@ -808,7 +822,7 @@ export default async function RunHistoryPage({
             setupFields={filterSetupFields}
             teams={teamsForUser.map((t) => ({ id: t.id, name: t.name }))}
             teamId={teamId}
-            focusRun={focusRunId}
+            openGroup={focusRunId}
             viewAll={viewAll}
           />
         </Suspense>
@@ -833,7 +847,7 @@ export default async function RunHistoryPage({
               totalRunCount={totalRunCount}
               loadedRunCount={dbMatchedCount}
               teamId={teamId}
-              focusRun={focusRunId}
+              openGroup={focusRunId}
               filterQuery={filterQuery}
             />
           </div>
@@ -856,7 +870,7 @@ export default async function RunHistoryPage({
               totalRunCount={totalRunCount}
               loadedRunCount={dbMatchedCount}
               teamId={teamId}
-              focusRun={focusRunId}
+              openGroup={focusRunId}
               filterQuery={filterQuery}
             />
           </div>

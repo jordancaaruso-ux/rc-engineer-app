@@ -37,11 +37,12 @@ export default async function DashboardPage(): Promise<ReactNode> {
   // covers it once, then the "Get set up" card walks the real surfaces. Only a
   // car is required — docs/ONBOARDING_NORTH_STAR.md (reversal 2026-07-23).
   // Setups stay OUT of the cached model: that read is tagged `dashboardTag` with a 30s revalidate
-  // and setup edits don't bust it, so a change you just saved wouldn't show for half a minute.
+  // and setup writes don't bust it, so the "add a setup" card would linger for half a minute after
+  // the driver just added one.
   const [model, onboarding, setups] = await Promise.all([
     getCachedDashboardHomeModel(user.id, displayTimeZone),
     loadOnboardingView(user.id),
-    loadDashboardSetups(user.id, displayTimeZone),
+    loadDashboardSetups(user.id),
   ]);
 
   return (

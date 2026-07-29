@@ -36,9 +36,17 @@ export function DashboardNextOutingCard({
         <>
           <div className="eyebrow-root mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <span className="eyebrow-label">Next outing</span>
-            <span className="min-w-0 truncate text-[12px] text-muted-foreground">
+            <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
               {[event.name, event.trackLabel].filter(Boolean).join(" · ")}
             </span>
+            {/* Events left the Garage hub (2026-07-29) — this card is now the way in. */}
+            <Link
+              href="/events"
+              prefetch
+              className="tap-active shrink-0 text-[12px] font-semibold text-muted-foreground transition hover:text-foreground"
+            >
+              All events
+            </Link>
           </div>
 
           <Link

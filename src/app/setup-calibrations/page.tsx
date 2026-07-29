@@ -38,7 +38,7 @@ export default async function SetupCalibrationsPage(): Promise<ReactNode> {
       <>
         <header className="page-header">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <PageBackLink href="/assets" />
+            <PageBackLink href="/settings" />
             <div>
               <h1 className="page-title">Setup calibrations</h1>
               <p className="page-subtitle">Admin-only.</p>

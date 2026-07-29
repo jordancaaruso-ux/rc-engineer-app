@@ -22,7 +22,7 @@ type PrimaryNavContextValue = {
 const PrimaryNavContext = createContext<PrimaryNavContextValue | null>(null);
 
 /** Light shells only — Engineer / Sessions / garage hubs warm via Link hover. */
-const PREFETCH_ROUTES = ["/", "/analysis", "/assets", "/settings"] as const;
+const PREFETCH_ROUTES = ["/", "/analysis", "/cars", "/settings"] as const;
 
 /**
  * If a soft `<Link>` navigation hasn't committed within this window, we assume

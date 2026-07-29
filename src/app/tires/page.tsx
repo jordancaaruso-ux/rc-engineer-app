@@ -16,7 +16,7 @@ export default async function TiresPage(): Promise<ReactNode> {
       <>
         <header className="page-header">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <PageBackLink href="/assets" />
+            <PageBackLink href="/settings" />
             <div>
               <h1 className="page-title">Tires</h1>
               <p className="page-subtitle">Database not configured.</p>
@@ -51,7 +51,7 @@ export default async function TiresPage(): Promise<ReactNode> {
     <>
       <header className="page-header">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <PageBackLink href="/assets" />
+          <PageBackLink href="/settings" />
           <div>
             <h1 className="page-title">Tires</h1>
             <p className="page-subtitle">Tire type catalog.</p>

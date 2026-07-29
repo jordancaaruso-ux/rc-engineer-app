@@ -134,7 +134,12 @@ const ADD_RUN: PrimaryNavItem = {
   prefetch: false,
 };
 const ANALYSIS: PrimaryNavItem = { id: "analysis", href: "/analysis", label: "Analysis", icon: IconAnalysis };
-const ASSETS: PrimaryNavItem = { id: "assets", href: "/assets", label: "Garage", icon: IconGarage };
+/**
+ * Garage is the cars & setups list itself — there is no hub in between (founder call 2026-07-29).
+ * The old `/assets` hub duplicated `/cars` and listed a "My tires" row that pointed at the shared
+ * catalog; the catalogs now live under Settings and `/assets` + `/garage` redirect here.
+ */
+const ASSETS: PrimaryNavItem = { id: "assets", href: "/cars", label: "Garage", icon: IconGarage };
 const ENGINEER: PrimaryNavItem = { id: "engineer", href: "/engineer", label: "Engineer", icon: IconEngineer };
 const TEAMS: PrimaryNavItem = { id: "teams", href: "/teams", label: "Teams", icon: IconTeams };
 const SETTINGS: PrimaryNavItem = { id: "settings", href: "/settings", label: "Settings", icon: IconSettings };
@@ -203,65 +208,48 @@ export type NavHubSection = {
   links: NavHubLink[];
 };
 
-export const ASSETS_HUB_SECTIONS: NavHubSection[] = [
+/**
+ * Shared reference data, listed under Settings (founder call 2026-07-29). None of it is "yours" —
+ * you meet tires, tracks and additives in the run-form pickers, so these pages exist for browsing
+ * and cleanup, not for the daily loop. Events deliberately aren't here: they're reached from the
+ * dashboard's Next outing card, and move to a Competition surface later.
+ */
+export type CatalogLink = NavHubLink & { adminOnly?: boolean };
+
+export const CATALOG_LINKS: CatalogLink[] = [
   {
-    eyebrow: "My assets",
-    links: [
-      {
-        // Absorbed the old "My setups" entry (2026-07-22): a setup belongs to a car, so both
-        // questions get one answer. `/setup` redirects here.
-        href: "/cars",
-        label: "Cars & setups",
-        description: "Your cars and every setup on them.",
-        icon: "car",
-      },
-      {
-        href: "/tires",
-        label: "Tires",
-        description: "The tire compounds you can pick from.",
-        icon: "disc",
-      },
-    ],
+    href: "/setup-sheet-models",
+    label: "Chassis types",
+    description: "Shared chassis types and setup sheet models (e.g. Mugen MTC3).",
+    icon: "layers",
   },
   {
-    eyebrow: "Global assets",
-    links: [
-      {
-        href: "/setup-sheet-models",
-        label: "Chassis types",
-        description: "Shared chassis types and setup sheet models (e.g. Mugen MTC3).",
-        icon: "layers",
-      },
-      {
-        href: "/tracks",
-        label: "Tracks",
-        description: "Tracks, layouts, and grip tags.",
-        icon: "map-pin",
-      },
-      {
-        href: "/tires",
-        label: "Tire catalog",
-        description: "Shared tire compound catalog (e.g. Sweep D32).",
-        icon: "circle-dot",
-      },
-      {
-        href: "/additives",
-        label: "Additives",
-        description: "Shared tire additive catalog (e.g. Mighty Gripper - Yellow).",
-        icon: "flask",
-      },
-      {
-        href: "/setup-calibrations",
-        label: "Calibrations",
-        description: "Shared PDF-to-setup mapping profiles; auto-applied once verified.",
-        icon: "wrench",
-      },
-      {
-        href: "/events",
-        label: "Events",
-        description: "Race weekends and practice days.",
-        icon: "calendar",
-      },
-    ],
+    href: "/tracks",
+    label: "Tracks",
+    description: "Tracks, layouts, and grip tags.",
+    icon: "map-pin",
+  },
+  {
+    href: "/tires",
+    label: "Tire catalog",
+    description: "Shared tire compound catalog (e.g. Sweep D32).",
+    icon: "circle-dot",
+  },
+  {
+    href: "/additives",
+    label: "Additives",
+    description: "Shared tire additive catalog (e.g. Mighty Gripper - Yellow).",
+    icon: "flask",
+  },
+  {
+    href: "/setup-calibrations",
+    label: "Calibrations",
+    description: "Shared PDF-to-setup mapping profiles; auto-applied once verified.",
+    icon: "wrench",
+    adminOnly: true,
   },
 ];
+
+export function catalogLinksForUser(isAdmin: boolean): CatalogLink[] {
+  return isAdmin ? CATALOG_LINKS : CATALOG_LINKS.filter((link) => !link.adminOnly);
+}

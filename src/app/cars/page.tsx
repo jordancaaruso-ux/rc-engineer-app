@@ -5,10 +5,10 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { formatRunDateOnly } from "@/lib/formatDate";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
-import { CarList } from "@/components/cars/CarList";
-import { NewSetupUploadButton } from "@/components/setup/NewSetupUploadButton";
+import { CarList, type CarInlineSetup } from "@/components/cars/CarList";
+import { UploadSetupSheetBar, type UploadSetupCar } from "@/components/setup/UploadSetupSheetBar";
 import { CardPanel } from "@/components/ui/CardPanel";
-import { PageBackLink } from "@/components/ui/PageBackLink";
+import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAuthorizedCatalog";
 import { setupSheetModelIdsSupportingUpload } from "@/lib/setupCalibrations/carSupportsSheetUpload";
 import { getCachedCarManagerData } from "@/lib/cachedReads";
@@ -16,9 +16,11 @@ import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerMo
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 
 /**
- * Cars & setups — one index for both. A setup belongs to a car, so the first question is "which
- * car?", and everything that car has been set up with lives on the car page. This absorbed the old
- * "My setups" index (founder call 2026-07-22); `/setup` now redirects here.
+ * Garage — the cars & setups index, and the Garage tab's destination. A setup belongs to a car, so
+ * the first question is "which car?", and everything that car has been set up with lives on the car
+ * page. Absorbed the old "My setups" index (2026-07-22) and then the `/assets` hub itself
+ * (2026-07-29): the hub listed the same setups one tap deeper and mixed in shared catalogs, which
+ * now live under Settings. `/setup`, `/assets` and `/garage` all redirect here.
  *
  * Not cached at the page level: the setup counts and the upload gate move with every upload.
  */
@@ -42,12 +44,9 @@ export default async function CarManagerPage({
     return (
       <>
         <header className="page-header">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <PageBackLink href="/assets" />
-            <div>
-              <h1 className="page-title">Cars &amp; setups</h1>
-              <p className="page-subtitle">Database not configured.</p>
-            </div>
+          <div className="min-w-0">
+            <h1 className="page-title">Garage</h1>
+            <p className="page-subtitle">Database not configured.</p>
           </div>
         </header>
         <section className="page-body">
@@ -65,14 +64,20 @@ export default async function CarManagerPage({
   // Seed must run each load (it may create catalog rows) — keep it out of the cache.
   await ensureAuthorizedSetupSheetCatalog();
 
-  const [[allModels, cars], savedCounts, sheetCounts, unlinkedSheetCount, lastRunByCar] =
+  const [[allModels, cars], librarySetups, sheetCounts, unlinkedSheetCount, lastRunByCar] =
     await Promise.all([
       getCachedCarManagerData(user.id),
-      // One grouped count each instead of a query per car — the index stays flat as the garage grows.
-      prisma.setupSnapshot.groupBy({
-        by: ["carId"],
+      // Every saved setup in one query — it feeds both the per-car meta line and the inline list.
+      prisma.setupSnapshot.findMany({
         where: { userId: user.id, isLibrary: true, carId: { not: null } },
-        _count: { _all: true },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          createdAt: true,
+          carId: true,
+          _count: { select: { runs: true, derivedSnapshots: true } },
+        },
       }),
       prisma.setupDocument.groupBy({
         by: ["carId"],
@@ -105,13 +110,33 @@ export default async function CarManagerPage({
     isAuthorized: authById.get(m.id) ?? false,
   }));
 
-  const savedByCar = new Map(savedCounts.map((r) => [r.carId ?? "", r._count._all]));
+  const setupsByCarId: Record<string, CarInlineSetup[]> = {};
+  for (const s of librarySetups) {
+    const carId = s.carId ?? "";
+    (setupsByCarId[carId] ??= []).push({
+      id: s.id,
+      name: s.name,
+      createdAtLabel: formatRunCreatedAtDateTime(s.createdAt, displayTimeZone),
+      usedInRuns: s._count.runs + s._count.derivedSnapshots,
+    });
+  }
   const sheetsByCar = new Map(sheetCounts.map((r) => [r.carId ?? "", r._count._all]));
   const lastRunAt = new Map(lastRunByCar.map((r) => [r.carId ?? "", r._max.createdAt]));
 
+  // Expanded on load: the car you ran most recently — usually the one you came here to read.
+  let defaultOpenCarId: string | null = null;
+  let defaultOpenAt = 0;
+  for (const car of cars) {
+    const at = lastRunAt.get(car.id)?.getTime() ?? 0;
+    if (at > defaultOpenAt) {
+      defaultOpenAt = at;
+      defaultOpenCarId = car.id;
+    }
+  }
+
   const setupMetaById: Record<string, string> = {};
   for (const car of cars) {
-    const saved = savedByCar.get(car.id) ?? 0;
+    const saved = setupsByCarId[car.id]?.length ?? 0;
     const sheets = sheetsByCar.get(car.id) ?? 0;
     const last = lastRunAt.get(car.id) ?? null;
     const parts = [
@@ -122,43 +147,30 @@ export default async function CarManagerPage({
     if (parts.length > 0) setupMetaById[car.id] = parts.join(" · ");
   }
 
-  // Upload only reads values on a calibrated chassis, so drivers see it only when they own one.
-  // Admins always keep it — the chassis workbench sends them here to run test reads.
+  // Every car can CREATE a setup, so the bar lists them all; `supportsUpload` (a green-lit
+  // calibration) only decides which door a car opens — the sheet upload, or the create flow.
   const uploadableModelIds = await setupSheetModelIdsSupportingUpload(
     cars.map((c) => c.setupSheetModelId ?? null)
   );
-  const uploadableCars = cars.filter(
-    (c) => c.setupSheetModelId && uploadableModelIds.has(c.setupSheetModelId)
-  );
-  const showUploadButton = isAdmin || uploadableCars.length > 0;
-  const uploadPickerCars = isAdmin ? cars : uploadableCars;
-  const preselectModelId = preselectCarId
-    ? (cars.find((c) => c.id === preselectCarId)?.setupSheetModelId ?? null)
-    : null;
+  const uploadCars: UploadSetupCar[] = cars.map((c) => ({
+    id: c.id,
+    name: c.name,
+    chassisName: c.setupSheetModel?.name ?? null,
+    supportsUpload: Boolean(c.setupSheetModelId && uploadableModelIds.has(c.setupSheetModelId)),
+  }));
 
   return (
     <>
       <header className="page-header">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <PageBackLink href="/assets" />
-          <div>
-            <h1 className="page-title">Cars &amp; setups</h1>
-            <p className="page-subtitle">
-              Pick a car to see everything it has been set up with.
-            </p>
-          </div>
+        <div className="min-w-0">
+          <h1 className="page-title">Garage</h1>
+          <p className="page-subtitle">Your cars and every setup on them.</p>
         </div>
       </header>
       <section className="page-body">
         <div className="max-w-2xl space-y-4">
-          {showUploadButton ? (
-            <div className="flex justify-end">
-              <NewSetupUploadButton
-                defaultSetupSheetModelId={preselectModelId}
-                defaultCarId={preselectCarId}
-                cars={uploadPickerCars.map((c) => ({ id: c.id, name: c.name }))}
-              />
-            </div>
+          {uploadCars.length > 0 ? (
+            <UploadSetupSheetBar cars={uploadCars} preselectCarId={preselectCarId} />
           ) : null}
 
           <CarList
@@ -166,6 +178,8 @@ export default async function CarManagerPage({
             setupSheetModels={setupSheetModels}
             isAdmin={isAdmin}
             setupMetaById={setupMetaById}
+            setupsByCarId={setupsByCarId}
+            defaultOpenCarId={defaultOpenCarId}
           />
 
           <div className="flex flex-wrap items-center gap-2">

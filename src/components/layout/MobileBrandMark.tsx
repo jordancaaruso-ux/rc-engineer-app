@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { JrcMark } from "@/components/brand/JrcMark";
-import { useMobileBackHref } from "@/components/layout/MobileBackContext";
+import { useMobileBackAction, useMobileBackHref } from "@/components/layout/MobileBackContext";
 
 /**
  * Mobile-only top-left corner control, pinned to balance the account avatar
@@ -19,6 +19,7 @@ const PILL_CLASS =
 
 export function MobileBrandMark() {
   const backHref = useMobileBackHref();
+  const getBackAction = useMobileBackAction();
 
   if (backHref) {
     return (
@@ -26,6 +27,15 @@ export function MobileBrandMark() {
         href={backHref}
         prefetch
         aria-label="Back"
+        // The href stays the truth of *where* back goes; the action only changes
+        // *how* (history rather than a push), so the pill keeps working unhydrated.
+        onClick={(e) => {
+          const action = getBackAction();
+          if (!action) return;
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+          e.preventDefault();
+          action();
+        }}
         className={`${PILL_CLASS} w-[34px] text-foreground`}
         style={{ top: "var(--top-chrome-y)" }}
       >

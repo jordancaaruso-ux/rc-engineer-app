@@ -66,7 +66,7 @@ export default async function SettingsPage() {
             }}
           />
         </div>
-        <SettingsNavSection />
+        <SettingsNavSection isAdmin={isAuthAdminEmail(user.email)} />
         <BackgroundSection />
         <NotificationsSection />
         <ProfilePictureSection

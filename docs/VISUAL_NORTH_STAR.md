@@ -47,7 +47,7 @@ Use **Tailwind semantic tokens** (`bg-background`, `text-foreground`, `border-bo
 
 | Token | Hex | Tailwind / CSS | Use |
 |-------|-----|----------------|-----|
-| `bg` | `#121110` | `background`, `--color-background` | App background (flat) |
+| `bg` | `#121110` | `background`, `--color-background` | App background (charcoal base under the default graphite wash) |
 | `surface` | `#181716` | `card`, `--color-card` | Cards, panels |
 | `surface-inset` | `#151413` | `secondary`, `input`, `--color-secondary` | Inputs, inset areas |
 | `elevated` | `#1E1D1C` | `muted`, `--color-muted` | Hover, menus, raised |

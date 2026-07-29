@@ -1,8 +1,45 @@
 # Engineer feedback inbox
 
-Generated: 2026-07-29T07:00:17.386Z
+Generated: 2026-07-29T11:01:06.818Z
 
 Agent-readable rollup of founder (admin) 0–10 ratings. Canonical source is the database; regenerate via Settings → Export feedback or `npm run engineer:export-feedback`.
+
+## 2026-07-29T11:01:06.621Z — score 7/10
+
+- **User:** jordancaaruso@gmail.com
+- **Message:** `cms5z39gx00u3vl7csiuhsah2` · **Thread:** `cms5z39ek00tzvl7cozi5mkji`
+- **Run:** `cmqx5hna80003ky04tbsyyrhl`
+- **KB sections:** upper-link-geometry (vehicle-dynamics/upper-link-geometry.md), under-hub (vehicle-dynamics/under-hub.md), Toe gain (rear) (vehicle-dynamics/bump-steer-toe-gain.md), droop-downstop (vehicle-dynamics/droop-downstop.md)
+
+**Question:**
+
+how can i get some more rotation - feel like im missing some pace and the others' cars rotate more while still having rear grip
+
+**Answer:**
+
+I’d start by **freeing the front, not taking rear grip away**.
+
+Your car was decent and consistent, but you said it needed precision. Also your **front damper oil** — the silicone oil controlling how fast the front suspension moves — is **450 cSt**, while the A800RR low-grip asphalt community median is **300 cSt**. That’s a long way stiff on damping.
+
+**Try front damper oil 450 → 400 cSt first**.  
+Lighter oil means less damping force, so the front can move and take a set faster. The goal is to make the car rotate from the front rather than loosening the rear.  
+**Expect:** more willingness to point into/through the apex while keeping rear grip; if it just gets darty on entry or no better through mid-corner, front damping wasn’t the limiter.
+
+If that helps but not enough, then I’d go to the rear-stability lever:
+
+**Rear toe — static rear wheel angle — reduce 4.0 → 3.5.**  
+You’re at **4.0**, while the low-grip A800RR median is **2.5**, so you’re carrying a lot of rear security. A small reduction should free the car to rotate without throwing away all the rear grip.  
+**Expect:** more rotation mid-corner and less “stuck” feeling on exit; if it starts stepping out on power or feels loose on corner entry, go back to 4.0.
+
+I would **not** make a big rear spring / ARB change yet. Your rear spring side is already on the firm/high side — rear spring rate **119.6 vs 109.7 median**, rear spring gap **3.2 vs 2.5 median** — so chasing rotation by stiffening the rear further is a bigger-risk move for losing the rear grip you’re trying to keep.
+
+So my order would be:
+
+1. **Front oil 450 → 400**  
+2. If still not rotating: **rear toe 4.0 → 3.5**  
+3. Only after that, look at more aggressive balance changes.
+
+---
 
 ## 2026-07-29T07:00:17.261Z — score 6/10
 

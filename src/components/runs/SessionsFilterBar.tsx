@@ -10,6 +10,7 @@ import {
   runHistoryFiltersActive,
   type RunHistoryFilters,
 } from "@/lib/runs/runHistoryFilters";
+import { OPEN_GROUP_PARAM } from "@/lib/runs/sessionsReturn";
 import { Button } from "@/components/ui/Button";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { AnchoredMenu } from "@/components/ui/AnchoredMenu";
@@ -48,7 +49,8 @@ type SessionsFilterBarProps = {
   /** Teams the driver belongs to — drives the scope segment fused into the search bar. */
   teams: TeamOption[];
   teamId: string | null;
-  focusRun: string | null;
+  /** Run whose session group stays expanded while filters change. */
+  openGroup: string | null;
   viewAll: boolean;
 };
 
@@ -234,7 +236,7 @@ export function SessionsFilterBar({
   setupFields,
   teams,
   teamId,
-  focusRun,
+  openGroup,
   viewAll,
 }: SessionsFilterBarProps) {
   const router = useRouter();
@@ -256,7 +258,7 @@ export function SessionsFilterBar({
     (next: RunHistoryFilters, opts?: { replace?: boolean }) => {
       const base: Record<string, string> = {};
       if (teamId) base.teamId = teamId;
-      if (focusRun) base.focusRun = focusRun;
+      if (openGroup) base[OPEN_GROUP_PARAM] = openGroup;
       if (viewAll || runHistoryFiltersActive(next)) base.viewAll = "1";
       const sp = filtersToSearchParams(next, base);
       const q = sp.toString();
@@ -268,7 +270,7 @@ export function SessionsFilterBar({
         else router.push(url);
       });
     },
-    [router, pathname, teamId, focusRun, viewAll]
+    [router, pathname, teamId, openGroup, viewAll]
   );
 
   const patch = (partial: Partial<RunHistoryFilters>) => {

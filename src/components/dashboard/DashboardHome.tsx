@@ -3,14 +3,14 @@ import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel"
 import { DashboardDayVerdictCard } from "@/components/dashboard/DashboardDayVerdictCard";
 import { DashboardNextOutingCard } from "@/components/dashboard/DashboardNextOutingCard";
 import { DashboardStartRunCta } from "@/components/dashboard/DashboardStartRunCta";
-import { DashboardSetupsCard } from "@/components/dashboard/DashboardSetupsCard";
+import { DashboardAddSetupCard } from "@/components/dashboard/DashboardAddSetupCard";
 import { DashboardGetSetUpCard } from "@/components/dashboard/DashboardGetSetUpCard";
 import { DashboardSummaryCard } from "@/components/dashboard/DashboardSummaryCard";
 import { WelcomeScreen } from "@/components/onboarding/WelcomeScreen";
 import { PendingTeamInvitesCard } from "@/components/teams/PendingTeamInvitesCard";
 import type { OnboardingView } from "@/lib/onboarding/server";
 import { showGetSetUpCard } from "@/lib/onboarding/visibility";
-import type { DashboardSetups } from "@/lib/setup/dashboardSetups";
+import type { DashboardSetups } from "@/lib/setup/getDashboardSetups";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Reveal } from "@/components/ui/Reveal";
 
@@ -42,7 +42,7 @@ export function DashboardHome({
   displayTimeZone?: string;
   /** Guided-intro view; every card in it derives and self-retires. */
   onboarding?: OnboardingView;
-  /** One row per car with the setup it's running; null only when they have no cars. */
+  /** Cars for the "add a setup" ask + whether it's already satisfied; null when they have no cars. */
   setups?: DashboardSetups | null;
 }) {
   const {
@@ -110,13 +110,13 @@ export function DashboardHome({
           />
         </Reveal>
 
-        {/* Sits UNDER the run CTA on purpose: logging still leads. Permanent from
-            here on (2026-07-29) — it's the door to the setup each car is running,
-            and its empty state carries the old "add a setup" ask. Suppressed only
-            while the Get-set-up card is up, which owns that ask — one at a time. */}
-        {setups && !showGetSetUp ? (
+        {/* Sits UNDER the run CTA on purpose: logging still leads. The ask only, and it
+            retires for good once a setup exists — the per-car "what you're running" list
+            it briefly carried was retired 2026-07-29 (the Garage leads there directly).
+            Suppressed while the Get-set-up card is up, which owns the ask — one at a time. */}
+        {setups && !setups.hasAnySetup && !showGetSetUp ? (
           <Reveal index={1}>
-            <DashboardSetupsCard setups={setups} />
+            <DashboardAddSetupCard cars={setups.cars} />
           </Reveal>
         ) : null}
 

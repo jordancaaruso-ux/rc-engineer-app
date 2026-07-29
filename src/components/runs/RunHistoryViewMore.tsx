@@ -1,16 +1,19 @@
 import Link from "next/link";
 
+import { OPEN_GROUP_PARAM } from "@/lib/runs/sessionsReturn";
+
 export function buildRunHistoryHref(opts: {
   viewAll?: boolean;
   teamId?: string | null;
-  focusRun?: string | null;
+  /** Run whose session group stays expanded across this navigation. */
+  openGroup?: string | null;
   filterQuery?: string | null;
 }): string {
   const p = new URLSearchParams(opts.filterQuery ?? "");
   if (opts.teamId?.trim()) p.set("teamId", opts.teamId.trim());
   else p.delete("teamId");
-  if (opts.focusRun?.trim()) p.set("focusRun", opts.focusRun.trim());
-  else p.delete("focusRun");
+  if (opts.openGroup?.trim()) p.set(OPEN_GROUP_PARAM, opts.openGroup.trim());
+  else p.delete(OPEN_GROUP_PARAM);
   if (opts.viewAll) p.set("viewAll", "1");
   else p.delete("viewAll");
   const q = p.toString();
@@ -23,7 +26,7 @@ export function RunHistoryViewMore({
   totalRunCount,
   loadedRunCount,
   teamId,
-  focusRun,
+  openGroup,
   filterQuery,
 }: {
   viewAll: boolean;
@@ -31,14 +34,14 @@ export function RunHistoryViewMore({
   totalRunCount: number;
   loadedRunCount: number;
   teamId?: string | null;
-  focusRun?: string | null;
+  openGroup?: string | null;
   filterQuery?: string | null;
 }) {
   if (viewAll) {
     return (
       <div className="flex items-center justify-center pt-2">
         <Link
-          href={buildRunHistoryHref({ teamId, focusRun, filterQuery })}
+          href={buildRunHistoryHref({ teamId, openGroup, filterQuery })}
           className="rounded-lg border border-border bg-card px-4 py-2 text-xs font-medium text-foreground hover:bg-muted/60 transition"
         >
           Show recent only
@@ -53,7 +56,7 @@ export function RunHistoryViewMore({
   return (
     <div className="flex items-center justify-center pt-2">
       <Link
-        href={buildRunHistoryHref({ viewAll: true, teamId, focusRun, filterQuery })}
+        href={buildRunHistoryHref({ viewAll: true, teamId, openGroup, filterQuery })}
         className="rounded-lg border border-border bg-card px-4 py-2 text-xs font-medium text-foreground hover:bg-muted/60 transition"
       >
         View more · {olderRuns} older run{olderRuns === 1 ? "" : "s"}

@@ -37,7 +37,7 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
       <>
         <header className="page-header">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <PageBackLink href="/assets" />
+            <PageBackLink href="/settings" />
             <div>
               <h1 className="page-title">Chassis types</h1>
               <p className="page-subtitle">Database not configured.</p>
@@ -107,7 +107,7 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
     <>
       <header className="page-header">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <PageBackLink href="/assets" />
+          <PageBackLink href="/settings" />
           <div>
             <h1 className="page-title">Chassis types</h1>
             <p className="page-subtitle">

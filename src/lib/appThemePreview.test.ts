@@ -36,7 +36,30 @@ test("the default mode is the bare CSS default — it must not have its own bloc
   // keyed on it would never apply. Kept as its own test because the miss is quiet.
   const options = BG_PREVIEW_OPTIONS.map((o) => o.id);
   assert.ok(options.includes(BG_PREVIEW_DEFAULT_ID));
-  assert.equal(BG_PREVIEW_DEFAULT_ID, "black");
+  assert.equal(BG_PREVIEW_DEFAULT_ID, "graphite");
+  assert.ok(
+    !CSS.includes(`html[data-bg-preview="${BG_PREVIEW_DEFAULT_ID}"]`),
+    "the default mode's look must live in :root, not in an attribute block"
+  );
+});
+
+test("the default graphite wash lives in :root and flat modes clear it", () => {
+  // `--page-bg-wash` is now non-`none` by default, so every flat colour mode has
+  // to reset it or it would paint gradients over its flat base.
+  const rootWash = /:root\s*\{[^}]*--page-bg-wash:\s*\n?\s*radial-gradient/;
+  assert.match(CSS, rootWash, ":root must carry the graphite wash gradients");
+  for (const opt of BG_PREVIEW_OPTIONS) {
+    if (opt.id === BG_PREVIEW_DEFAULT_ID || opt.id === "photo") continue;
+    const block = CSS.match(
+      new RegExp(`html\\[data-bg-preview="${opt.id}"\\]\\s*\\{([^}]*)\\}`)
+    );
+    assert.ok(block, `no globals.css rule for background mode "${opt.id}"`);
+    assert.match(
+      block[1],
+      /--page-bg-wash:\s*none/,
+      `flat mode "${opt.id}" must clear --page-bg-wash`
+    );
+  }
 });
 
 test("the flat base of every mode is driven by --page-bg-base", () => {

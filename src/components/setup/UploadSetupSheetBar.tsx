@@ -63,10 +63,13 @@ export function UploadSetupSheetBar({
   cars,
   trigger = "bar",
   label = "Create / Upload setup sheet",
+  preselectCarId = null,
 }: {
   cars: UploadSetupCar[];
   trigger?: "bar" | "link";
   label?: string;
+  /** Car page sends `/cars?carId=…` when you tap "upload a sheet for this car" — skip step 1. */
+  preselectCarId?: string | null;
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -105,10 +108,11 @@ export function UploadSetupSheetBar({
     setError(null);
     setMismatch(null);
     setPendingFile(null);
-    if (cars.length === 1) {
-      // One car — the question answers itself; land straight on the doors, or on the create flow
-      // when that car can't be read from a sheet.
-      const only = cars[0]!;
+    const preselected = preselectCarId ? (cars.find((c) => c.id === preselectCarId) ?? null) : null;
+    if (preselected || cars.length === 1) {
+      // The question is already answered — land straight on the doors, or on the create flow when
+      // that car can't be read from a sheet.
+      const only = preselected ?? cars[0]!;
       if (!only.supportsUpload) {
         goToCreateSetup(only.id);
         return;
