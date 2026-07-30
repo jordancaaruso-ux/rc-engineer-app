@@ -20,3 +20,17 @@ lower ceiling — but both extremes hurt.
 **Per axle.** Front and rear each have their own bite/hold.
 
 **Caused by:** the speed of load transfer ([[load-transfer]]) — fast transfer → bite, slow → hold.
+
+**Physics (what sets the timing).** Lateral load reaches the outside tyres through two channels on
+different clocks: **geometric transfer** through the suspension links — immediate, its share grows
+as the roll centre rises ([[roll-center]]) — and **elastic transfer** through the springs and ARBs,
+which waits for the chassis to roll; its share grows as the roll centre drops, arrives faster the
+stiffer the end ([[roll-stiffness]]), and is shaped in between by damping ([[damping]]). The mix
+sets **when** an axle's grip arrives, and timing is not free of magnitude: grip that arrives
+earlier arrives with less roll taken, so camber and alignment are still nearer their static values
+when load peaks — an earlier peak tends to be a higher peak. The knobs shift the timing, they do
+not add load: roll-centre height moves the split itself; spring/ARB stiffness speeds or slows the
+elastic channel but also moves that end's steady-state share of transfer; damping acts only while
+the suspension is moving — a pure transient knob. Which part of the grip build the driver samples
+is the corner's regime ([[corner-regime]]): transient corners sample the early part, steady-state
+corners the late part.

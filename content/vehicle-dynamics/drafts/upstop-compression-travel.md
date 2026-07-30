@@ -12,4 +12,4 @@ What less compression travel does, mechanically:
 - **Protects against bottoming** — a hard cap on chassis-to-track contact when ride height is low.
 - Near the stop, the loaded corner behaves **much stiffer than its spring** — load transfer at that end rises sharply, which shifts balance away from that end's grip exactly at maximum load.
 
-**Founder guidance: the on-track effects are complex** — the same upstop change can read very differently depending on grip, kerb use, and how much of the travel the car actually uses. Do not predict a handling outcome with confidence; frame upstop changes as **tests**, state what to feel for (does the car touch the stop mid-corner? over kerbs? not at all?), and prefer springs/oil/ride height for conventional balance work.
+**Founder note: the on-track effects are complex.** An upstop only matters when the corner actually reaches it — mid-corner under roll, over kerbs, or never — so the same change reads very differently depending on grip, kerb use, and how much of the travel the car uses. Whether the stop is being touched, and where, decides everything the mechanism above can do.

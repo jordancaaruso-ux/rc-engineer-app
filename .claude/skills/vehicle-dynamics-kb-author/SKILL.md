@@ -147,6 +147,33 @@ the speed of load transfer ([[load-transfer]])`.
 Delete it; keep the mechanism in Physics only.
 
 ## Correction log (LIVING — append new patterns, newest first, with date)
+- 2026-07-30 — "**lower mount inboard** — not sure this line is right - doesnt moving it inboard do
+  the opposite?" **COLLAPSED OPPOSING STRANDS (instance of the one-way-chain pattern).** shock-geometry
+  stated "lower mount inboard lowers the motion ratio" flat, but an inboard mount move drives TWO
+  strands in opposite directions: shorter lever off the arm pivot (lower MR, softer) and a more
+  upright shock under a fixed tower top (higher MR, stiffer). Only the angle strand was
+  founder-confirmed; the flat net direction was agent composition. **Guard:** when one physical move
+  drives two geometric strands, the node states both strands and says the net is geometry-specific —
+  never a single direction, even when standard lore agrees with one side.
+- 2026-07-30 — "mm idk - thats not really physics imo" (on keeping symptom translations like
+  "front bites then washes out = bite without hold"). **SYMPTOM EQUATIONS ARE DIAGNOSIS TEMPLATES,
+  NOT DEFINITIONS.** A symptom→concept equation looks like vocabulary but is a canned diagnosis —
+  the same feel can have several causes, and the equation short-circuits the reasoning the KB
+  exists to enable. **Guard:** driver-language lives only in explicitly-labelled Feel tiers
+  (concepts/bite-hold.md's "Feel — not physics" section is the pattern); physics blocks carry
+  mechanisms only, never "when the driver says X it means Y" lines.
+- 2026-07-30 — "did we just go back to exactly the thing i didnt want about making assumptions?
+  this is just physics that cant be argued - saying more likely in higher grip is absolutely
+  arguable." **THE TRANSCRIPTION TRAP.** Jordan said in chat "it can free the rear in sweepers,
+  probably more so in higher grip — hard to say, not super predictable", and I pasted that INTO the
+  draft as an outcome-probability claim ("more likely to show in higher grip") with a founder-ruled
+  tag. Founder speech is raw material, not KB prose: his "probably more so in higher grip" is the
+  MECHANISM "less cornering force → less transfer to redistribute → the steady-state effect scales
+  with grip" — which the draft's Low grip section already derived. The correct edit was NOTHING.
+  **New stop-signals:** "founder-ruled: … predictability low", "more likely in", "probably more so",
+  any probability adverb attached to an outcome inside KB prose. **Guard:** before writing a founder
+  statement into a draft, translate it to the mechanism that produces it and check whether that
+  mechanism is already on the node — quote his words in banners/logs only, never as tendency lines.
 - 2026-07-28 — "wouldn't this mean the rear would slide more because it has less even load across
   rear tires?" **A ONE-WAY CHAIN IS USUALLY A MISSING TERM IN A NODE, NOT A SETTLED ANSWER.** I built
   "softer rear → runs deeper in travel → RC drops ~1:1 → smaller fast fraction → less rear bite → rear

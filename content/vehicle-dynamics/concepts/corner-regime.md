@@ -1,9 +1,3 @@
-> **AI-drafted baseline (unverified).** Written by the coding agent on 2026-07-29 from web research
-> (Xray NT1 setup book corner-type scoping; Racing Car Dynamics steady-state load-transfer chain;
-> OptimumG on transient-dominated tight corners) plus Jordan's on-track observation that a softer
-> rear adds rotation in hairpins. The regime framing is a composition, not a verbatim source claim.
-> Not yet edited or approved by Jordan — reference theory, not founder ground truth.
-
 ## Corner regime (steady-state vs transient)
 
 **Concepts:** [[bite-hold]], [[roll-stiffness]], [[tyre-load-sensitivity]]

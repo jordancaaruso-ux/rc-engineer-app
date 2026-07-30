@@ -42,12 +42,10 @@ Founder interview established (tap-to-answer, 2 rounds): **spring_gap** = Awesom
 
 | Draft | Covers | Open claims |
 |---|---|---|
-| `drafts/awesomatix-spring-gap-damper.md` | Spring gap (rate) + damper percent (damping/pack) | Does higher % also mean more pack? Primary-vs-trim relationship with oil |
-| `drafts/upstop-compression-travel.md` | Compression-travel limit; goes-solid mechanism; test-first framing | When (if ever) upstop is the first lever |
+| `awesomatix-spring-gap-damper.md` | Spring gap (rate) + damper percent (damping/pack) | ✅ **Promoted 2026-07-30.** Pack ruled: higher % = fewer holes = more pack (Awesomatix-specific) |
+| `drafts/upstop-compression-travel.md` | Compression-travel limit; goes-solid mechanism | When (if ever) upstop is the first lever |
 | `drafts/bodyshell-aero.md` | Rear body height (founder-confirmed aero direction); body position theory | Cost of raising rear shell; fore/aft position tendency |
-| `drafts/servo-horn-steering-response.md` | Servo speed / steering response; explicitly not bump steer | Mechanism confirmation; change-alone discipline |
-
-Known platform-specific keys deliberately NOT drafted (semantics need founder interview first): `spring_gap_*` (preload), `damper_percent_*`, `upstop_*`, `rear_hrb_setting`, `servo_horn_height`.
+| `servo-horn-steering-response.md` | Servo speed / steering response; explicitly not bump steer | ✅ **Promoted 2026-07-30** (recipe bullets cut in the unarguability audit) |
 
 ## Batch 3 (2026-07-08 — cross-platform breadth begins; interview-driven, prose-only)
 
@@ -55,7 +53,9 @@ Founder direction (interview 2026-07-08): breadth is the bottleneck, not depth; 
 
 | Draft | Covers | Status |
 |---|---|---|
-| `drafts/shock-geometry.md` | Motion ratio (position/angle), bump stops/packing, shock length/travel window | 🟡 Drafted — **first entry in the new Physics/Handling split**. Shock-angle→rate→progression direction **founder-confirmed** in interview; rest is hedged general theory (founder runs a lever damper, doesn't tune conventional shock position by feel). Awaiting claim-check/promote. |
+| `shock-geometry.md` | Motion ratio (position/angle), bump stops/packing, shock length/travel window | ✅ **Promoted 2026-07-30** after the motion-ratio section was decomposed into its two opposing strands (lever vs angle — founder caught the collapsed "inboard = softer" net direction). |
+
+Also promoted 2026-07-30: `concepts/corner-regime.md` (steady-state vs transient regime framing, drafted 2026-07-29 from the rear-spring/rotation feedback error; steady-state rear strand founder-reviewed) and the bite-hold physics channels (merged into `concepts/bite-hold.md`, draft deleted).
 
 **Cross-platform clusters still un-drafted** (interview-driven when founder has bandwidth): drivetrain variants (spool / gear diff / ball diff / one-way, belt tension) · steering system (bellcrank/rack position, servo-saver stiffness) · wheelbase + front kick-up (thin — fold into a geometry pass). Note: "roll centre / anti-geometry via eccentrics & inserts" is **not new physics** — the mechanism is already covered; other cars' hardware for it is Layer-3 vocabulary only.
 

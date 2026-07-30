@@ -5,7 +5,7 @@
 
 **Keys:** `wheel_spacer_front`, `wheel_spacer_rear` — spacers (or wheel offset) push the wheels outboard, widening the track at that end. Class rules cap overall width; the tuning space is usually the **front/rear split** within the legal maximum.
 
-**Mechanism.** For a given CoG height, an axle's **lateral load transfer is inversely proportional to its track width**. Widening one end reduces how much load shifts from inner to outer tire at that end in a corner — the tire pair stays more evenly loaded, and since tires give more total grip when evenly loaded, the widened end gains **cornering grip**. Front/rear track split is therefore a **balance lever**, the same family as roll-stiffness split (springs/ARBs — see **spring-rate**, **arb**) but achieved through geometry instead of stiffness.
+**Mechanism.** For a given CoG height, an axle's **lateral load transfer is inversely proportional to its track width**.
 
 ## What the mechanism pushes
 
