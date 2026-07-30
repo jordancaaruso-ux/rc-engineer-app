@@ -137,6 +137,50 @@ audits them per the stopgap rule._
 
 ## Correction log (LIVING — append new patterns, newest first, with date)
 
+**2026-07-30 — OVER-EXPLANATION, third occurrence — now an implemented prompt rule, not a note:**
+- Founder, on a general-mode lever survey (rear-exit levers: RC, toe/gain, diff, anti-squat,
+  damping, travel limits, each with its own both-ways paragraph plus a closing symptom→group
+  map): "all of this stuff is over explained a little still - if it were me id want shorter more
+  precise info, if i want more info i could ask to expand". Chat-only feedback — no DB rating.
+- Diagnosis worth keeping: **rule (3) inflates length structurally.** Honest both-ways framing is
+  cheap on one lever and ruinous across six — the survey shape, not the hedging, is the fault.
+  General mode also lacked the full prompt's "lead with the single highest-leverage move" line,
+  so nothing capped the lever count there.
+- Implemented (prompt only, `2026-07-30b`): CHAT_SYSTEM "say it once, then stop" bullet ·
+  CHAT_SYSTEM_GENERAL BREVITY block (one or two levers, one line each, rule 3 costs a clause not
+  a paragraph, ask-one-question instead of covering every branch) · rule 14 expectation-question
+  bullet with the cross-axle and question-framing failures named · bite/hold vocabulary added to
+  LOCK_VOCABULARY.
+- Deliberately NOT built: a "dig deeper" chip after every answer (his earlier idea). Chips are
+  reserved for one clarifying question; a per-reply expand button is a UI decision he should make.
+  Route: if brevity lands but he still wants the affordance, it is a UI item, not a prompt one.
+- Watch next batch for the overshoot: terseness that drops the expect / if-wrong prediction, or a
+  single lever offered where the honest answer is "two things could do this".
+
+**2026-07-30 — second batch review (2 ratings, 07:09 + 07:37 UTC, first `promptVersion`-stamped batch `2026-07-30+c8b5aee3`):**
+- **REAR-TRANSIENT SIGN INVERTED *AFTER* PROMOTION — the recurring stiffer-rear→rotation pattern
+  changed bucket.** `concepts/corner-regime.md` was approved-tier at answer time (promotion
+  commit 05:20 UTC precedes both answers; the stamp code shipped in the same push), and the
+  07:37 answer demonstrably read it (used "transient" / "samples more of the early/transient
+  behaviour"), quoted its premise ("rear takes load sooner"), then inverted the conclusion:
+  claimed stiffer rear → "sharper initial rotation" in hairpins where the file says it "resists
+  yaw from the first steering input". Same thread had stated the correct sign 28 min earlier
+  (07:09: softer rear → yaw develops entry-to-apex). The sign flips to match the question's
+  framing. Bucket is now **prompt/evidence misuse**, no longer kb-gap — stop routing this to KB.
+- **Jordan's note = the KB's own mechanism.** "If the rear had more initial grip it should be
+  planted in the rear sooner?" is corner-regime's transient chain verbatim-in-spirit; his mental
+  model and the approved file now agree. This effectively closes the first batch's
+  NOTE-vs-DRAFT CONFLICT (and he promoted the file himself).
+- **EXPECTATION QUESTIONS ESCAPE RULE 14.** "What should I expect from X in corner-type Y" is
+  not a recommendation, so the lead-lever phase-fit bullet never bound; regime placement must
+  govern predictions too. Prompt extension proposed, awaiting approval.
+- **Ungrounded feel words where bite/hold vocabulary exists** ("too immediate", "skatey") — his
+  note asked "what is 'too immediate'"; `concepts/bite-hold.md` carries the intended frame.
+- Landed fixes observed working: rate-vs-gap done right (compared in gf/mm, gap treated as
+  actuator, correctly reported no usable spread for the gap row); no median-as-justification.
+- Register: no toe-gain or damper-oil reversals in batch (n=2, neither lever discussed — weak
+  evidence); both locks kept.
+
 **2026-07-30 — drafts audit (founder-delegated: "is this physics that cannot be argued?"):**
 - Founder's articulation of the KB's purpose, verbatim: "the kb is the physics, its the
   knowledge that will allow the ai to reason to a great answer, not be given an answer." The
