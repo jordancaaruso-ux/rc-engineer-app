@@ -22,6 +22,10 @@ import path from "node:path";
 import { prisma } from "@/lib/prisma";
 import { runEngineerChatTurn } from "@/lib/engineerPhase5/engineerChatPipeline";
 import {
+  ENGINEER_DEFAULT_MODEL,
+  engineerReasoningEffort,
+} from "@/lib/engineerPhase5/openaiEngineer";
+import {
   judgeEngineerAnswer,
   judgeEngineerAnswerSampled,
   type CalibratedJudgeResult,
@@ -35,14 +39,20 @@ import type { BenchCase, BenchmarkSet } from "./build-benchmark-set";
 const PRICING: Record<string, { inPerM: number; outPerM: number }> = {
   "gpt-4o": { inPerM: 2.5, outPerM: 10 },
   "gpt-4o-mini": { inPerM: 0.15, outPerM: 0.6 },
+  "gpt-5": { inPerM: 1.25, outPerM: 10 },
+  "gpt-5.5": { inPerM: 1.25, outPerM: 10 },
+  // Longest-prefix match below, so this also prices "gpt-5.6-terra".
+  "gpt-5.6": { inPerM: 2.5, outPerM: 15 },
 };
 
 function priceFor(model: string): { inPerM: number; outPerM: number } | null {
   const m = model.trim().toLowerCase();
-  for (const key of Object.keys(PRICING)) {
-    if (m.startsWith(key)) return PRICING[key];
-  }
-  return null;
+  // Longest prefix wins — first-match order would price "gpt-5.6-terra" off the "gpt-5" row and
+  // report the 5.6 arm at half its real input cost.
+  const key = Object.keys(PRICING)
+    .filter((k) => m.startsWith(k))
+    .sort((a, b) => b.length - a.length)[0];
+  return key ? PRICING[key] : null;
 }
 
 type BenchResult = {
@@ -66,6 +76,8 @@ type BenchRun = {
   label: string;
   setPath: string;
   answerModel: string;
+  /** Resolved `ENGINEER_REASONING_EFFORT` (null = model default). Names the arm in a model×effort A/B. */
+  answerEffort: string | null;
   judgeModel: string;
   caseCount: number;
   summary: Record<string, unknown>;
@@ -174,12 +186,15 @@ async function main() {
 
   const userId = await resolveUserId();
   const anchorRunId = await latestRunId(userId);
-  const answerModel = process.env.ENGINEER_MODEL?.trim() || "gpt-4o";
+  // Default must track the pipeline's own default, not a hardcoded "gpt-4o" — the results file is
+  // the only record of which model wrote the answers, and a stale label silently mislabels an arm.
+  const answerModel = process.env.ENGINEER_MODEL?.trim() || ENGINEER_DEFAULT_MODEL;
+  const answerEffort = engineerReasoningEffort(answerModel);
   const judgeModel = process.env.ENGINEER_JUDGE_MODEL?.trim() || "gpt-4o";
   const exemplars: JudgeExemplar[] = set.exemplars ?? [];
 
   console.log(
-    `Bench "${args.label}": ${cases.length} cases · answer=${answerModel} · judge=${judgeModel} (${exemplars.length} exemplars) · user=${userId}`
+    `Bench "${args.label}": ${cases.length} cases · answer=${answerModel} (effort=${answerEffort ?? "model default"}) · judge=${judgeModel} (${exemplars.length} exemplars) · user=${userId}`
   );
 
   const results = await runPool(cases, args.concurrency, async (c, index): Promise<BenchResult> => {
@@ -310,6 +325,7 @@ async function main() {
     label: args.label,
     setPath: args.setPath,
     answerModel,
+    answerEffort,
     judgeModel,
     caseCount: results.length,
     summary,

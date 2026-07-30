@@ -29,6 +29,10 @@ const MODEL_RATES_USD_PER_MTOK: Record<string, { input: number; output: number }
   "gpt-4o-mini": { input: 0.15, output: 0.6 },
   "gpt-5": { input: 1.25, output: 10 },
   "gpt-5.5": { input: 1.25, output: 10 },
+  // gpt-5.6 ("terra") is 2x input / 1.5x output vs 5.5. The prefix match below prices the full
+  // "gpt-5.6-terra" id off this row; without it, 5.6 falls to UNKNOWN_MODEL_RATE and the daily
+  // cap bites ~4x early, which reads as a bug rather than as a budget.
+  "gpt-5.6": { input: 2.5, output: 15 },
 };
 
 /** Conservative (high) fallback: better to cap early than to under-count a model we don't know. */
