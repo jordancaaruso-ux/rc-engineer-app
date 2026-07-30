@@ -7,6 +7,8 @@ export type EngineerMessageContextSnapshot = {
   kbSections?: string[];
   source?: string;
   capturedAtIso?: string;
+  /** Engineer build that produced the answer — see engineerPhase5/promptVersion.ts. */
+  promptVersion?: string;
 };
 
 export type EngineerRatingInput = {

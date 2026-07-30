@@ -1,23 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Pencil } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { chipToggleClass } from "@/components/ui/chipToggle";
 import { Eyebrow } from "@/components/ui/panel";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
 import {
+  applyTireCountChip,
+  deriveTireStintForCompound,
+  isTireStintUnanswered,
+} from "@/lib/tires/deriveTireStint";
+import {
   activeTireCountChip,
-  deriveTireChoice,
-  isDifferentTires,
+  expandedTireCountChips,
+  tireAgeHint,
   tireAgeReadout,
-  tireCountLabel,
   TIRE_COUNT_CHIPS,
-  TIRE_COUNT_STEPPER_FLOOR,
-  type TireChoice,
   type TireCountChip,
 } from "@/lib/tires/tireAgeReadout";
-import type { TireStintValue } from "@/lib/tires/tireStintValue";
+import type { LastRunTires, TireAgeSource, TireStintValue } from "@/lib/tires/tireStintValue";
 
 /**
  * Tires are defined by how many runs are on them — not by a named set you point
@@ -25,14 +26,20 @@ import type { TireStintValue } from "@/lib/tires/tireStintValue";
  * only cares about runs 1-2-3; the club racer runs one set for two days and wants
  * a rough sense of tiredness around 10-14. Neither is asking which set they're on.
  *
- * So the driver answers one question — **same as the previous run, or a different
- * set?** — and a different set drops straight onto the count row, where "New" is
- * simply zero. Nothing counts up on its own: the +1 is written on the control the
- * driver taps, because a silent carry-over is invisible and a silent reset is the
- * bug the old `runsCompleted = 0` default caused.
+ * So the driver answers *one* question — which compound? — and the age answers
+ * itself from the car's last run: same compound means the same rubber went back
+ * on, so its stint comes forward one run older; anything else is a fresh set.
  *
- * A car's first run has nothing to be the same as, so the carry row is dropped
- * entirely and the panel is two taps: compound, then how many runs are on them.
+ * That carry-over is deliberately silent, reversing the earlier design where the
+ * driver had to tap "Same as previous run" or "Different set" before the count
+ * row even appeared. Three taps for the commonest case in the sport was the wrong
+ * trade. What replaces the question:
+ *
+ * - The count row is always on screen, so the guess is visible, not buried.
+ * - A grey hint line names where the number came from, so a carried count is
+ *   never mistaken for one the driver entered.
+ * - Fixing it is one tap on the row that is already showing it. `4+` grows the
+ *   row in place rather than handing off to a stepper.
  *
  * No numeral is shown for the state. "run 1" reads as an index, so a fresh set
  * says **New tires**; a carried set says how many runs are *on* them and promises
@@ -55,16 +62,15 @@ type Props = {
   value: TireStintValue;
   onChange: (next: TireStintValue) => void;
   /**
-   * Has this car been run before? False drops the same-vs-different row — there
-   * is no previous run to carry, so asking is noise.
+   * The tires on the car's last logged run — what the compound pick is compared
+   * against. `null` means the car has no history, so every compound reads as a
+   * fresh set.
    *
-   * `null` means the caller is still finding out (the per-car last-run fetch is
-   * in flight). The question rows wait rather than guess: picking a layout on an
-   * unloaded `false` renders the wrong question and then swaps it out from under
-   * the driver — and any tap made in that window is overwritten when the fetch
-   * lands. Undefined keeps the full question, for a caller that never knows.
+   * `undefined` means the caller is still finding out (the per-car last-run fetch
+   * is in flight). Nothing is derived in that window: guessing on an unloaded
+   * `null` writes "New tires" and then swaps it out from under the driver.
    */
-  hasPreviousRun?: boolean | null;
+  lastRunTires?: LastRunTires | null;
   /** Ranks the compound list by what you run on cars of this car's discipline. */
   carId?: string | null;
   /**
@@ -84,6 +90,26 @@ function valueKey(v: TireStintValue): string {
   return `${v.runsCompleted}|${v.ageKnown}|${v.stintId ?? ""}`;
 }
 
+/**
+ * How to describe a value that arrived from outside — a saved run, a draft, a
+ * copy-forward, a car swap. One that matches the last run exactly gets the
+ * carried hint; anything else already reflects a real decision, so it says
+ * nothing rather than claiming credit for it.
+ */
+function sourceForIncoming(value: TireStintValue, last: LastRunTires | null): TireAgeSource {
+  if (isTireStintUnanswered(value)) return null;
+  if (
+    last &&
+    value.stintId != null &&
+    value.stintId === last.tireStintId &&
+    value.runsCompleted === last.tireRunNumber &&
+    value.ageKnown === last.tireAgeKnown
+  ) {
+    return "carried";
+  }
+  return "manual";
+}
+
 export function RunTireSelectionPanel({
   tireTypeId,
   onTireTypeChange,
@@ -91,7 +117,7 @@ export function RunTireSelectionPanel({
   preferredTireType,
   value,
   onChange,
-  hasPreviousRun = true,
+  lastRunTires,
   carId,
   resetSignal,
   onUserTouched,
@@ -99,22 +125,21 @@ export function RunTireSelectionPanel({
   copyTireWarning,
   prefillFieldClass,
 }: Props) {
-  const [editing, setEditing] = useState(false);
-  const [choice, setChoice] = useState<TireChoice>(() => deriveTireChoice(value));
+  const [source, setSource] = useState<TireAgeSource>(() =>
+    sourceForIncoming(value, lastRunTires ?? null)
+  );
+  const [expanded, setExpanded] = useState(false);
   const specAppliedRef = useRef(false);
   const preferredAppliedRef = useRef(false);
 
-  // What "same tires" means: the stint as it arrived, before any tapping. Kept so
-  // tapping back after a mis-tap on "Different tires" restores it rather than
-  // leaving the driver to re-enter a count the form already knew.
-  const carriedRef = useRef<TireStintValue>(value);
-  // Mirrored in state because the carry row's visibility is a render decision and
-  // a ref read during render isn't one the renderer is allowed to trust.
-  const [carriedStint, setCarriedStint] = useState(value.stintId != null);
   // Our own last commit, so the sync effect below can ignore the echo of it.
   const committedKeyRef = useRef<string | null>(null);
 
   const incomingKey = valueKey(value);
+  // `undefined` (fetch in flight) and `null` (no history) mean different things to
+  // the derivation, but only the loaded flag decides whether to derive at all.
+  const historyLoaded = lastRunTires !== undefined;
+  const last = lastRunTires ?? null;
 
   // Re-read the value whenever it changes from outside — form hydration, dashboard
   // prefill, restoring a draft, switching car. Our own commits are skipped so a
@@ -122,26 +147,32 @@ export function RunTireSelectionPanel({
   useEffect(() => {
     if (committedKeyRef.current === incomingKey) return;
     committedKeyRef.current = null;
-    carriedRef.current = value;
-    setCarriedStint(value.stintId != null);
-    setChoice(deriveTireChoice(value));
-    setEditing(false);
+    setSource(sourceForIncoming(value, last));
+    setExpanded(false);
     // `value` is covered by `incomingKey`; listing it would re-run on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incomingKey, resetSignal]);
 
-  const readout = tireAgeReadout(choice, value);
-  const differentSelected = isDifferentTires(choice);
+  const readout = tireAgeReadout(source, value);
+  const hint = tireAgeHint(source, last);
   const locked = Boolean(specTireType);
-  // A carried stint means there *is* something to be the same as, whatever the
-  // caller says — so a value that arrived carried keeps the row even while the
-  // caller is still working out whether the car has history.
-  const showCarryRow = hasPreviousRun === true || carriedStint;
-  // Which question to ask isn't known until the car's history is. Until then the
-  // rows stay off screen — the readout above still says "Not set yet", so the
-  // section is never silently blank.
-  const historyKnown = hasPreviousRun != null || carriedStint;
-  const activeCountChip = activeTireCountChip(choice, value);
+  const activeChip = activeTireCountChip(source, value, expanded);
+  const chips: readonly TireCountChip[] = useMemo(
+    () => (expanded ? expandedTireCountChips(value.runsCompleted) : TIRE_COUNT_CHIPS),
+    [expanded, value.runsCompleted]
+  );
+
+  const commit = useCallback(
+    (next: TireStintValue, opts?: { auto?: boolean }) => {
+      committedKeyRef.current = valueKey(next);
+      if (!opts?.auto) {
+        onUserTouched?.();
+        onPrefillClear?.();
+      }
+      onChange(next);
+    },
+    [onChange, onPrefillClear, onUserTouched]
+  );
 
   // A spec tire is mandated, so it wins outright; a preferred compound only fills a gap.
   useEffect(() => {
@@ -157,78 +188,62 @@ export function RunTireSelectionPanel({
     onTireTypeChange(preferredTireType.id, preferredTireType.displayName);
   }, [preferredTireType, specTireType, tireTypeId, onTireTypeChange]);
 
-  const commit = useCallback(
-    (next: TireStintValue) => {
-      committedKeyRef.current = valueKey(next);
-      onUserTouched?.();
-      onPrefillClear?.();
-      onChange(next);
-    },
-    [onChange, onPrefillClear, onUserTouched]
-  );
-
-  const chooseSame = useCallback(() => {
-    const carried = carriedRef.current;
-    setChoice("same");
-    setEditing(false);
-    commit(
-      carried.stintId != null || carried.runsCompleted > 0
-        ? { ...carried }
-        : { runsCompleted: value.runsCompleted, ageKnown: true, stintId: value.stintId }
-    );
-  }, [commit, value.runsCompleted, value.stintId]);
+  /**
+   * Fill in the age for a compound that arrived without one — a mandated control
+   * tire, a preferred compound, a draft saved before the count was answered, or a
+   * compound picked while the last-run fetch was still in flight. Only ever runs
+   * over a value nobody has touched, which is what keeps it off saved runs.
+   */
+  useEffect(() => {
+    if (!historyLoaded || !tireTypeId) return;
+    if (source !== null || !isTireStintUnanswered(value)) return;
+    const derived = deriveTireStintForCompound(last, tireTypeId);
+    setSource(derived.source);
+    setExpanded(false);
+    commit(derived.value, { auto: true });
+    // Same reason as above: `value` is represented by `incomingKey`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyLoaded, tireTypeId, source, incomingKey, commit]);
 
   /**
-   * Different rubber, count not answered yet. Recorded as unknown age rather than
-   * guessed at, so a run saved without answering is honestly missing the count
-   * instead of inheriting the previous set's.
+   * Picking a compound decides the age too — that is the whole design.
+   *
+   * Only when the compound actually *changed*, though. `TireTypeCombobox` also
+   * reports the selection once it resolves the display name for a value it was
+   * handed, and on an edit or a copy-forward that echo would otherwise re-derive
+   * an age over the one already stored on the run.
    */
-  const chooseDifferent = useCallback(() => {
-    setChoice("different");
-    setEditing(false);
-    commit({ runsCompleted: 0, ageKnown: false, stintId: null });
-  }, [commit]);
-
-  /**
-   * One tap on the count row. Everything here means different rubber, so the
-   * stint is dropped and the server mints a fresh one on save.
-   */
-  const chooseCount = useCallback(
-    (chip: TireCountChip) => {
-      setChoice(chip.ageKnown && chip.runsCompleted === 0 ? "new" : "used");
-      if (chip.opensStepper) {
-        // Never walk an existing answer back down to 4 — 4+ opens the stepper at
-        // whatever the driver already had if that was higher.
-        setEditing(true);
-        commit({
-          runsCompleted: Math.max(TIRE_COUNT_STEPPER_FLOOR, value.runsCompleted),
-          ageKnown: true,
-          stintId: null,
-        });
+  const handleCompoundChange = useCallback(
+    (nextId: string, displayName: string | null) => {
+      const changed = nextId !== tireTypeId;
+      onTireTypeChange(nextId, displayName);
+      if (!changed) return;
+      setExpanded(false);
+      if (!historyLoaded) {
+        // Nothing to compare against yet; the effect above finishes the job once
+        // the fetch lands.
+        setSource(null);
         return;
       }
-      setEditing(false);
-      commit({ runsCompleted: chip.runsCompleted, ageKnown: chip.ageKnown, stintId: null });
+      const derived = deriveTireStintForCompound(last, nextId);
+      setSource(derived.source);
+      commit(derived.value);
     },
-    [commit, value.runsCompleted]
+    [commit, historyLoaded, last, onTireTypeChange, tireTypeId]
   );
 
-  const nudge = useCallback(
-    (delta: number) => {
-      const nextCompleted = Math.max(0, value.runsCompleted + delta);
-      // Hand-setting a count means different rubber went on: drop the stint and
-      // treat the number as known (the driver just told us what it is).
-      setChoice((c) => (c === null || c === "different" ? "used" : c));
-      commit({ runsCompleted: nextCompleted, ageKnown: true, stintId: null });
+  /** One tap on the count row, correcting whatever the compound implied. */
+  const chooseCount = useCallback(
+    (chip: TireCountChip) => {
+      const next = applyTireCountChip(chip, value, last, source);
+      setSource(next.source);
+      // Once the row is open it stays open — collapsing it under the driver's
+      // finger hides the answer they just gave.
+      if (next.expand) setExpanded(true);
+      commit(next.value);
     },
-    [commit, value.runsCompleted]
+    [commit, last, source, value]
   );
-
-  const chooseUnsure = useCallback(() => {
-    setChoice("used");
-    setEditing(false);
-    commit({ runsCompleted: 0, ageKnown: false, stintId: null });
-  }, [commit]);
 
   return (
     <div className="space-y-3">
@@ -245,9 +260,9 @@ export function RunTireSelectionPanel({
           <TireTypeCombobox
             value={tireTypeId}
             carId={carId}
-            onChange={(id) => onTireTypeChange(id, null)}
+            onChange={(id) => handleCompoundChange(id, null)}
             onSelectedTypeChange={(opt) => {
-              if (opt) onTireTypeChange(opt.id, opt.displayName);
+              if (opt) handleCompoundChange(opt.id, opt.displayName);
             }}
             className={prefillFieldClass}
             aria-label="Tire compound"
@@ -256,174 +271,68 @@ export function RunTireSelectionPanel({
       </div>
 
       <div className="space-y-2">
-        {historyKnown ? (
-          <Eyebrow>{showCarryRow ? "Tires on the car" : "Runs on these tires"}</Eyebrow>
-        ) : null}
+        <Eyebrow>Runs on these tires</Eyebrow>
 
-        {historyKnown && showCarryRow ? (
-          <div className="grid grid-cols-2 gap-2" role="group" aria-label="Tires on the car">
+        <div
+          className={cn(
+            "flex gap-1.5",
+            expanded ? "flex-nowrap overflow-x-auto pb-1" : "flex-wrap"
+          )}
+          role="group"
+          aria-label="Runs on these tires"
+        >
+          {chips.map((chip) => (
             <button
+              key={chip.key}
               type="button"
-              aria-pressed={choice === "same"}
-              onClick={chooseSame}
+              aria-pressed={activeChip === chip.key}
+              disabled={!tireTypeId}
+              onClick={() => chooseCount(chip)}
               className={cn(
-                chipToggleClass(choice === "same"),
-                "flex flex-col items-start gap-px px-3 py-2 text-left text-[13px]",
-                choice === null && "border-dashed"
+                chipToggleClass(activeChip === chip.key),
+                "shrink-0 px-3 py-2 text-xs",
+                !tireTypeId && "border-dashed opacity-50"
               )}
             >
-              <span>Same as previous run</span>
-              <span className="text-[10.5px] font-normal text-muted-foreground">+1 run</span>
+              {chip.label}
             </button>
-            <button
-              type="button"
-              aria-pressed={differentSelected}
-              onClick={chooseDifferent}
-              className={cn(
-                chipToggleClass(differentSelected),
-                "flex flex-col items-start gap-px px-3 py-2 text-left text-[13px]",
-                choice === null && "border-dashed"
-              )}
-            >
-              <span>Different set</span>
-              <span className="text-[10.5px] font-normal text-muted-foreground">
-                fresh or another used set
-              </span>
-            </button>
-          </div>
-        ) : null}
+          ))}
+        </div>
 
-        {/* The count row. Indented under "Different set" when it is that button's
-            follow-up; on a car with no history it is the whole question. */}
-        {historyKnown && (!showCarryRow || differentSelected) ? (
-          <div
-            className={cn(
-              showCarryRow &&
-                "ml-[calc(50%+0.25rem)] max-[460px]:ml-0 border-l-2 border-foreground/20 pl-2.5 space-y-1.5"
-            )}
-          >
-            {showCarryRow ? (
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Runs on them
-              </div>
-            ) : null}
-            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Runs on these tires">
-              {TIRE_COUNT_CHIPS.map((chip) => (
-                <button
-                  key={chip.key}
-                  type="button"
-                  aria-pressed={activeCountChip === chip.key}
-                  onClick={() => chooseCount(chip)}
-                  className={cn(
-                    chipToggleClass(activeCountChip === chip.key),
-                    "px-3 py-2 text-xs",
-                    choice === null && "border-dashed"
-                  )}
-                >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
+        <div className="text-[11px] leading-snug text-muted-foreground">
+          {tireTypeId ? hint : "Pick a compound and this fills itself in."}
+        </div>
 
         {/* The answer, not another option: raised off the card, its own label, the
             biggest type in the section, and a yellow rail — which reads as
             emphasis rather than an action, since a rail is never pressable. */}
         <div
           className={cn(
-            "flex items-start gap-2.5 rounded-xl border bg-muted py-3 pr-3 pl-[0.9375rem]",
+            "rounded-xl border bg-muted py-3 pr-3 pl-[0.9375rem]",
             "shadow-[inset_3px_0_0_0_rgb(var(--color-primary))]",
             readout.unresolved ? "border-dashed border-border" : "border-foreground/15"
           )}
         >
-          <div className="min-w-0 flex-1">
-            <div className="mb-[3px] text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              On the car now
-            </div>
-            <div
-              className={cn(
-                "text-[17px] tracking-tight",
-                readout.unresolved
-                  ? "font-medium text-muted-foreground"
-                  : "font-semibold text-foreground"
-              )}
-            >
-              {readout.title}
-            </div>
-            <div className="mt-0.5 text-[11.5px] text-muted-foreground">{readout.sub}</div>
+          <div className="mb-[3px] text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            On the car now
           </div>
-          <button
-            type="button"
-            className="btn-surface inline-flex shrink-0 items-center gap-1.5 self-center px-3 py-2 text-xs font-semibold"
-            aria-expanded={editing}
-            aria-label="Change how many runs are on these tires"
-            onClick={() => {
-              setEditing((v) => !v);
-              setChoice((c) => (c !== null ? c : showCarryRow ? "same" : "new"));
-            }}
+          <div
+            className={cn(
+              "text-[17px] tracking-tight",
+              readout.unresolved
+                ? "font-medium text-muted-foreground"
+                : "font-semibold text-foreground"
+            )}
           >
-            <Pencil className="h-3 w-3" aria-hidden />
-            {editing ? "Close" : "Change"}
-          </button>
+            {readout.title}
+          </div>
+          <div className="mt-0.5 text-[11.5px] text-muted-foreground">{readout.sub}</div>
         </div>
 
-        {editing ? (
-          <div className="space-y-3 rounded-xl border border-border bg-secondary/40 px-3 py-3">
-            <div
-              className="flex items-center justify-center gap-4"
-              role="group"
-              aria-label="Runs on these tires"
-            >
-              <button
-                type="button"
-                className="btn-surface h-10 w-10 text-base leading-none"
-                aria-label="One fewer run"
-                disabled={value.runsCompleted <= 0}
-                onClick={() => nudge(-1)}
-              >
-                −
-              </button>
-              <span className="min-w-[5.75rem] text-center text-[15px] font-semibold tabular-nums tracking-tight text-foreground">
-                {tireCountLabel(value.runsCompleted)}
-              </span>
-              <button
-                type="button"
-                className="btn-surface h-10 w-10 text-base leading-none"
-                aria-label="One more run"
-                onClick={() => nudge(1)}
-              >
-                +
-              </button>
-            </div>
-
-            <div className="text-center text-[11.5px] text-muted-foreground">
-              This log will be{" "}
-              <span className="font-semibold text-foreground">run {value.runsCompleted + 1}</span>.
-            </div>
-
-            {/* Only when the count row isn't on screen — it carries its own
-                "Not sure" chip, and two of them read as two different answers. */}
-            {showCarryRow && !differentSelected ? (
-              <button
-                type="button"
-                className={cn(
-                  chipToggleClass(!value.ageKnown),
-                  "w-full px-3 py-2 text-left text-xs"
-                )}
-                aria-pressed={!value.ageKnown}
-                onClick={chooseUnsure}
-              >
-                Not sure how many
-              </button>
-            ) : null}
-
-            {!value.ageKnown ? (
-              <div className="text-[11px] leading-snug text-muted-foreground">
-                I&apos;ll still track how they fade from here — I just can&apos;t tell you where in
-                their life they are.
-              </div>
-            ) : null}
+        {!value.ageKnown && source !== null ? (
+          <div className="text-[11px] leading-snug text-muted-foreground">
+            I&apos;ll still track how they fade from here — I just can&apos;t tell you where in their
+            life they are.
           </div>
         ) : null}
       </div>

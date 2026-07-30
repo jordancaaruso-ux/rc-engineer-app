@@ -8,6 +8,7 @@ import {
   adoptRowAsSlotsGroup,
   appendFieldToGroup,
   assignFieldToSlot,
+  autoGroupPlacedSingles,
   autoPlaceOnArrival,
   deleteSection,
   makeSlotsGroup,
@@ -520,4 +521,99 @@ test("unplaced parameters sort after the sheet and keep their relative order", (
 test("resequencing an already-correct schema returns it unchanged", () => {
   const once = resequenceSortOrderFromLayout(autoPlaceOnArrival(fromCalibration()).schema);
   assert.equal(resequenceSortOrderFromLayout(once), once);
+});
+
+/* ---------- auto-grouping rows already on the sheet (2026-07-30) ---------- */
+
+/**
+ * What one-at-a-time parameter creation leaves behind: a complete front/rear set, a complete corner
+ * set, a half set, and a loner — all placed as separate single rows, so the tray is empty and
+ * `placeMissingParameters` has nothing to work on.
+ */
+function placedAsSingles(): SetupSheetModelSchema {
+  const fields = [
+    field({ key: "camber_front", displayLabel: "Camber (Front)", sortOrder: 0 }),
+    field({ key: "camber_rear", displayLabel: "Camber (Rear)", sortOrder: 1 }),
+    field({ key: "total_weight", displayLabel: "Total weight", sortOrder: 2 }),
+    field({ key: "droop_ff", displayLabel: "Droop — FF", sortOrder: 3 }),
+    field({ key: "droop_fr", displayLabel: "Droop — FR", sortOrder: 4 }),
+    field({ key: "droop_rf", displayLabel: "Droop — RF", sortOrder: 5 }),
+    field({ key: "droop_rr", displayLabel: "Droop — RR", sortOrder: 6 }),
+    field({ key: "toe_front", displayLabel: "Toe (Front)", sortOrder: 7 }),
+  ];
+  return {
+    version: 1,
+    label: "Test",
+    fields,
+    structuredSections: [
+      {
+        id: "suspension",
+        title: "Suspension",
+        rows: fields.map((f) => ({ type: "single" as const, key: f.key, label: f.displayLabel })),
+      },
+    ],
+  };
+}
+
+test("auto-group merges the complete front/rear and corner sets already on the sheet", () => {
+  const res = autoGroupPlacedSingles(placedAsSingles());
+  assert.equal(res.groupedCount, 2);
+
+  const rows = rowsOf(res.schema, "suspension");
+  // camber pair · total weight · droop corners · toe front — 8 singles became 4 rows.
+  assert.equal(rows.length, 4);
+  assert.deepEqual(
+    rows.map((r) => r.type),
+    ["slots", "single", "slots", "single"]
+  );
+
+  const camber = rows[0]!;
+  if (camber.type !== "slots") return assert.fail("expected a slots row for the camber pair");
+  assert.deepEqual(camber.slots.map((s) => s.key), ["camber_front", "camber_rear"]);
+  assert.deepEqual(camber.slots.map((s) => s.label), ["Front", "Rear"]);
+  assert.equal(camber.label, "Camber");
+
+  const droop = rows[2]!;
+  if (droop.type !== "slots") return assert.fail("expected a slots row for the droop corners");
+  assert.deepEqual(droop.slots.map((s) => s.key), ["droop_ff", "droop_fr", "droop_rf", "droop_rr"]);
+  assert.deepEqual(droop.slots.map((s) => s.label), ["FF", "FR", "RF", "RR"]);
+  assert.equal(droop.label, "Droop");
+});
+
+test("a half set is left alone — grouping needs every location", () => {
+  const rows = rowsOf(autoGroupPlacedSingles(placedAsSingles()).schema, "suspension");
+  const toe = rows.find((r) => r.type === "single" && r.key === "toe_front");
+  assert.ok(toe, "toe_front has no rear partner, so it must stay a single row");
+});
+
+test("auto-group never touches a row the user arranged by hand", () => {
+  // Drag the loner to the top, the way ordering by importance works.
+  const moved = ok(moveRow(placedAsSingles(), "suspension", 2, "suspension", 0));
+  const res = autoGroupPlacedSingles(moved);
+  assert.equal(res.groupedCount, 2);
+
+  const rows = rowsOf(res.schema, "suspension");
+  const first = rows[0]!;
+  assert.equal(first.type, "single");
+  if (first.type !== "single") return;
+  assert.equal(first.key, "total_weight", "the hand-placed row must still be first");
+});
+
+test("auto-group is idempotent and reports nothing left to do", () => {
+  const once = autoGroupPlacedSingles(placedAsSingles()).schema;
+  const twice = autoGroupPlacedSingles(once);
+  assert.equal(twice.groupedCount, 0);
+  assert.equal(twice.schema, once, "expected the schema to come back untouched");
+});
+
+test("auto-group leaves an existing manual group intact", () => {
+  const grouped = ok(makeSlotsGroup(placedAsSingles(), ["camber_front", "total_weight"]));
+  const res = autoGroupPlacedSingles(grouped);
+  // Only the droop corners are still loose; camber is spoken for by the manual group.
+  assert.equal(res.groupedCount, 1);
+  const keys = rowsOf(res.schema, "suspension").flatMap((r) =>
+    r.type === "slots" ? r.slots.map((s) => s.key) : []
+  );
+  assert.ok(keys.includes("camber_front") && keys.includes("total_weight"));
+  assert.ok(!rowsOf(res.schema, "suspension").some((r) => r.type === "single" && r.key === "camber_front"));
 });

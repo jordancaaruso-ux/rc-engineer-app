@@ -22,6 +22,7 @@ import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { TrackCombobox } from "@/components/runs/TrackCombobox";
 import { RunLayoutPicker } from "@/components/runs/RunLayoutPicker";
 import { displayTireSelection } from "@/lib/tires/tireSelectionValue";
+import type { LastRunTires } from "@/lib/tires/tireStintValue";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
 import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
@@ -900,6 +901,26 @@ export function NewRunForm(props: {
     },
     [applyTireStint]
   );
+  /**
+   * The tires the panel compares a compound pick against: pick the same compound
+   * as last time and its stint comes forward a run older, pick anything else and
+   * it's a fresh set.
+   *
+   * `undefined` until `replicateLoaded` says the per-car fetch finished — `lastRun`
+   * is null both for "no history" and "not fetched yet", and the panel must not
+   * derive an age from the second one.
+   */
+  const lastRunTires = useMemo<LastRunTires | null | undefined>(() => {
+    if (!replicateLoaded) return undefined;
+    const typeId = lastRun?.tireTypeId ?? lastRun?.tireType?.id ?? "";
+    if (!lastRun || !typeId) return null;
+    return {
+      tireTypeId: typeId,
+      tireRunNumber: lastRun.tireRunNumber ?? 0,
+      tireAgeKnown: lastRun.tireAgeKnown ?? true,
+      tireStintId: lastRun.tireStintId ?? null,
+    };
+  }, [lastRun, replicateLoaded]);
   /**
    * True once the driver has explicitly chosen/imported/edited a setup since the
    * last copy-from-last-run or car change. Guards the `replicateLast`-armed
@@ -4860,13 +4881,11 @@ export function NewRunForm(props: {
             <RunTireSelectionPanel
               tireTypeId={tireTypeId}
               onTireTypeChange={(nextId, displayName) => {
-                const compoundChanged = nextId !== tireTypeIdRef.current;
                 setTireTypeId(nextId);
                 if (displayName != null) setTireTypeName(displayName);
-                // A different compound cannot be the same rubber, so the stint ends —
-                // but the count is left alone. Silently zeroing it is exactly the bug
-                // the old `runsCompleted = 0` default caused.
-                if (compoundChanged) setTireStintId(null);
+                // The count and the stint are the panel's call now — it derives both
+                // from the compound and commits them through `onChange`. Nulling the
+                // stint here as well would race that commit.
                 setCopyTireWarning(null);
               }}
               preferredTireType={preferredTireType}
@@ -4874,12 +4893,9 @@ export function NewRunForm(props: {
               value={{ runsCompleted, ageKnown: tireAgeKnown, stintId: tireStintId }}
               onChange={applyTireStint}
               carId={carId}
-              // No previous run on this car, nothing to be "the same" as — the
-              // panel drops the carry question and asks the count outright.
-              // `lastRun` is null both for "no history" and "not fetched yet", so
-              // it is only an answer once `replicateLoaded` says the per-car load
-              // finished; until then the panel is told we don't know.
-              hasPreviousRun={replicateLoaded ? lastRun != null : null}
+              // What a compound pick is measured against — same compound as the
+              // last run means the same rubber, one run older.
+              lastRunTires={lastRunTires}
               // Another car is another set of tires — an answer given for the old
               // one must not stand over the new car's value.
               resetSignal={carId}

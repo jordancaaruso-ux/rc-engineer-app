@@ -33,6 +33,26 @@ export function isPresetWithOtherCompanionKey(key: string): boolean {
   return isPresetWithOtherFieldKey(key.slice(0, -6));
 }
 
+/**
+ * Whether a *rendered* field should use the preset+free-text shape. Preset+other is an Awesomatix
+ * A800 sheet behaviour, not a property of the key name: a model-defined sheet may legitimately use
+ * `chassis` as a plain one-of-many (X-Ray: GRAPHITE / ALU / ALU 1.5mm). Applying the A800 shape there
+ * parsed the value against the A800 chip list ("C01B-RAF"…), matched nothing, selected no chip and
+ * dropped the value into a stray "custom text" box.
+ *
+ * `modelOptionLabels` is the field's OWN option list: `null` when the sheet has no model schema to
+ * ask (legacy A800 template — keep the shape), otherwise the labels, which declare an "Other" when
+ * the sheet really does have a free-text line.
+ */
+export function fieldUsesPresetWithOther(
+  key: string,
+  modelOptionLabels: readonly string[] | null | undefined
+): boolean {
+  if (!isPresetWithOtherFieldKey(key)) return false;
+  if (modelOptionLabels == null) return true;
+  return modelOptionLabels.some((o) => normToken(o) === "other");
+}
+
 function normToken(v: string): string {
   return v.trim().toLowerCase().replace(/\s+/g, " ");
 }

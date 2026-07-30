@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { buildEngineerResponseMetadata } from "@/lib/engineerFeedback/extractResponseMetadata";
+import { ENGINEER_PROMPT_VERSION } from "@/lib/engineerPhase5/openaiEngineer";
 import type { EngineerMessageContextSnapshot, PersistedChatExchange } from "@/lib/engineerFeedback/types";
 import {
   resolveThreadFocusForPersist,
@@ -83,6 +84,7 @@ export async function persistEngineerChatExchange(params: {
     runId: params.runId,
     compareRunId: params.compareRunId,
     source: params.source,
+    promptVersion: ENGINEER_PROMPT_VERSION,
   });
 
   const metadataJson: EngineerMessageContextSnapshot = ratingContext;

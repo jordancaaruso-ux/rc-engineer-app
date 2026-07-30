@@ -32,8 +32,12 @@ export function engineerChatIsLapHistoryQuestion(message: string | undefined): b
  *
  * The rule stays deliberately narrow and allow-listed: ONLY a recognised lap-history
  * question with no run in focus takes the lookup path. Anything unrecognised is `full`.
+ *
+ * `general` (2026-07-30) = the theory-only subject: KB + optional car identity, no
+ * personal data at all. It beats every other rule — including the lap-history allow-list,
+ * because a general thread deliberately has no run log to read from.
  */
-export type EngineerChatContextTier = "lookup" | "full";
+export type EngineerChatContextTier = "lookup" | "full" | "general";
 
 export function engineerChatContextTier(input: {
   lastUserMessage: string | undefined;
@@ -44,7 +48,10 @@ export function engineerChatContextTier(input: {
    * run id, and the lookup prompt knows nothing about anchors.
    */
   anchorPinned?: boolean;
+  /** Anchor kind when one is present; "general" forces the general tier. */
+  anchorKind?: "run" | "setup" | "event" | "general" | null;
 }): EngineerChatContextTier {
+  if (input.anchorKind === "general") return "general";
   if (input.anchorPinned) return "full";
   if (input.runId.trim() || input.compareRunId.trim()) return "full";
   return engineerChatIsLapHistoryQuestion(input.lastUserMessage) ? "lookup" : "full";
@@ -59,6 +66,7 @@ export function engineerChatNeedsDeepContext(input: {
   runId: string;
   compareRunId: string;
   anchorPinned?: boolean;
+  anchorKind?: "run" | "setup" | "event" | "general" | null;
 }): boolean {
   return engineerChatContextTier(input) === "full";
 }

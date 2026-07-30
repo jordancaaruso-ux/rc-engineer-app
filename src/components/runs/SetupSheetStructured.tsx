@@ -66,6 +66,7 @@ import {
 } from "@/lib/setupCalculations/springRateLookup";
 import {
   displayPresetWithOther,
+  fieldUsesPresetWithOther,
   getPresetWithOtherFromData,
   isEmptyPresetWithOther,
   isPresetWithOtherFieldKey,
@@ -488,6 +489,19 @@ function fieldOptionsForKey(
   return resolveFieldChipOptionsForKey(key, fieldChipOptionsByKey);
 }
 
+/**
+ * The field's own option labels, or `null` when this sheet has no model schema (legacy A800
+ * template). Feeds {@link fieldUsesPresetWithOther} — the sheet, not the key name, decides whether a
+ * free-text box belongs on the row.
+ */
+function modelOptionLabelsForKey(
+  key: string,
+  fieldChipOptionsByKey?: Record<string, SetupSheetFieldChipOptions> | null
+): readonly string[] | null {
+  if (fieldChipOptionsByKey == null) return null;
+  return fieldChipOptionsByKey[key]?.options ?? [];
+}
+
 function fieldDisplayValue(
   data: SetupSnapshotData,
   key: string,
@@ -899,7 +913,10 @@ function LegacyCompanionOtherChipEditor({
  * - Canonical preset+other fields: `{ selectedPreset, otherText }` on one key (see `presetWithOther.ts`).
  * - Legacy: `{key}_other` companion when catalog still exposes it.
  */
-function SingleSelectChipWithOptionalOther(props: {
+function SingleSelectChipWithOptionalOther({
+  presetWithOther,
+  ...props
+}: {
   fieldKey: string;
   value: SetupSnapshotData;
   baseline: SetupSnapshotData | null;
@@ -909,8 +926,10 @@ function SingleSelectChipWithOptionalOther(props: {
   options: string[];
   optionValues?: readonly string[] | null;
   chipAccent?: "sky" | "rose";
+  /** Decided by the sheet (see {@link fieldUsesPresetWithOther}), never by the key name. */
+  presetWithOther: boolean;
 }) {
-  if (isPresetWithOtherFieldKey(props.fieldKey)) {
+  if (presetWithOther) {
     return <PresetWithOtherChipEditor {...props} />;
   }
   return <LegacyCompanionOtherChipEditor {...props} />;
@@ -1054,6 +1073,10 @@ function EditableSingle({
   const { showDeltaSuffix } = useCompareUi();
   const compareSuffix = showDeltaSuffix ? formatSetupCompareDeltaSuffix(fieldCompare) : null;
   const options = fieldOptionsForKey(fieldKey, fieldChipOptionsByKey);
+  const presetWithOther = fieldUsesPresetWithOther(
+    fieldKey,
+    modelOptionLabelsForKey(fieldKey, fieldChipOptionsByKey)
+  );
   const vRaw = fieldValue(value, fieldKey);
   const v = fieldDisplayValue(value, fieldKey, fieldChipOptionsByKey);
   const bRaw = baseline ? fieldValue(baseline, fieldKey) : "";
@@ -1123,6 +1146,7 @@ function EditableSingle({
                 options={options.options}
                 optionValues={options.optionValues}
                 chipAccent={chipAccent}
+                presetWithOther={presetWithOther}
               />
             )
           ) : fieldKind === "bool" && !effectiveReadOnly ? (
@@ -1209,6 +1233,7 @@ function EditableSingle({
                 options={options.options}
                 optionValues={options.optionValues}
                 chipAccent={chipAccent}
+                presetWithOther={presetWithOther}
               />
             )}
           </div>
@@ -1396,6 +1421,10 @@ function PairSideCell({
   fieldChipOptionsByKey?: Record<string, SetupSheetFieldChipOptions> | null;
 }) {
   const options = fieldOptionsForKey(fieldKey, fieldChipOptionsByKey);
+  const presetWithOther = fieldUsesPresetWithOther(
+    fieldKey,
+    modelOptionLabelsForKey(fieldKey, fieldChipOptionsByKey)
+  );
   const vRaw = fieldValue(value, fieldKey);
   const v = fieldDisplayValue(value, fieldKey, fieldChipOptionsByKey);
   const bRaw = baseline ? fieldValue(baseline, fieldKey) : "";
@@ -1463,6 +1492,7 @@ function PairSideCell({
                 options={options.options}
                 optionValues={options.optionValues}
                 chipAccent={chipAccent}
+                presetWithOther={presetWithOther}
               />
             )
           ) : fk === "bool" && !readOnly ? (
@@ -1534,6 +1564,7 @@ function PairSideCell({
               options={options.options}
               optionValues={options.optionValues}
               chipAccent={chipAccent}
+              presetWithOther={presetWithOther}
             />
           )}
         </div>
@@ -2099,7 +2130,7 @@ export function SetupSheetStructured({
   const commit = useCallback(
     (key: string, raw: SetupSnapshotValue) => {
       if (isDerivedSetupKey(key)) return;
-      if (isPresetWithOtherFieldKey(key)) {
+      if (fieldUsesPresetWithOther(key, modelOptionLabelsForKey(key, fieldChipOptionsByKey))) {
         const opts = getSingleSelectChipOptions(key);
         const next = normalizePresetWithOtherFromUnknown(raw, undefined, opts);
         const nextData = { ...value };
@@ -2123,7 +2154,7 @@ export function SetupSheetStructured({
       }
       onChange({ ...value, [key]: nextValue });
     },
-    [value, onChange]
+    [value, onChange, fieldChipOptionsByKey]
   );
 
   const commitScrews = useCallback(

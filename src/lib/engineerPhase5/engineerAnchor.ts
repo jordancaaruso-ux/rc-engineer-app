@@ -5,17 +5,21 @@
  * Pure module (no prisma, no React) so every rule here is unit-testable:
  * - `parseChatAnchor` — validate the untrusted `anchor` field on the chat request body.
  * - `anchorToRunFocus` — collapse an anchor onto the legacy runId/compareRunId plumbing.
- * - `parseAnchorParam` / `formatAnchorParam` — the `?pin=run:<id>` URL channel.
+ * - `parseAnchorParam` / `formatAnchorParam` / `formatGeneralAnchorParam` — the `?pin=`
+ *   URL channel (`run:<id>`, `general`, `general:<carId>`).
  * - `resolveAnchorRunForRichContext` — the precedence that replaces the old
  *   `runId || latestRun.id` guess in the chat pipeline.
  *
  * Design record: docs/ENGINEER_NORTH_STAR.md (surfaces) + founder interview 2026-07-29 —
  * a pin is a hard subject (the model may not refocus away) with evidence tools left open.
+ * Founder interview 2026-07-30 added the general anchor: a theory-only hard subject that
+ * must never resolve a run, so answers stop being flavoured by the current setup.
  */
 
 export type EngineerAnchorKind = "run" | "setup" | "event";
 
-export type EngineerChatAnchor = {
+/** Run / saved-setup / event subject — the data-backed anchors. */
+export type EngineerDataAnchor = {
   kind: EngineerAnchorKind;
   id: string;
   /** kind=run only — second run of a compare pair. */
@@ -25,6 +29,20 @@ export type EngineerChatAnchor = {
   /** true = user pin (hard subject); false = Auto (visible guess, model may refocus). */
   pinned: boolean;
 };
+
+/**
+ * General-question subject: theory only — no runs, no setup values, no community data
+ * may enter the conversation. `carId` scopes theory to one car's identity (name/chassis/
+ * platform, never its data); null = pure theory. Always a hard subject, so `pinned` is
+ * fixed true.
+ */
+export type EngineerGeneralAnchor = {
+  kind: "general";
+  carId: string | null;
+  pinned: true;
+};
+
+export type EngineerChatAnchor = EngineerDataAnchor | EngineerGeneralAnchor;
 
 const ANCHOR_KINDS: ReadonlySet<string> = new Set(["run", "setup", "event"]);
 
@@ -41,6 +59,11 @@ function cleanId(value: unknown): string | null {
 export function parseChatAnchor(raw: unknown): EngineerChatAnchor | null {
   if (!raw || typeof raw !== "object") return null;
   const obj = raw as Record<string, unknown>;
+  if (obj.kind === "general") {
+    // Always a hard subject; a malformed carId degrades to pure theory rather than
+    // dropping the driver's chosen mode.
+    return { kind: "general", carId: cleanId(obj.carId), pinned: true };
+  }
   const kind = typeof obj.kind === "string" && ANCHOR_KINDS.has(obj.kind)
     ? (obj.kind as EngineerAnchorKind)
     : null;
@@ -79,8 +102,19 @@ export function formatAnchorParam(kind: EngineerAnchorKind, id: string): string 
   return `${kind}:${id}`;
 }
 
-export function parseAnchorParam(value: string | null | undefined): { kind: EngineerAnchorKind; id: string } | null {
+/** `?pin=general` / `?pin=general:<carId>` — the general-question URL channel. */
+export function formatGeneralAnchorParam(carId: string | null): string {
+  return carId ? `general:${carId}` : "general";
+}
+
+export function parseAnchorParam(
+  value: string | null | undefined
+): { kind: EngineerAnchorKind; id: string } | { kind: "general"; carId: string | null } | null {
   if (!value) return null;
+  if (value === "general" || value.startsWith("general:")) {
+    // Junk after the colon degrades to pure theory — keep the driver's chosen mode.
+    return { kind: "general", carId: cleanId(value.slice("general:".length)) };
+  }
   const sep = value.indexOf(":");
   if (sep <= 0) return null;
   const kind = value.slice(0, sep);
@@ -102,6 +136,9 @@ export function resolveAnchorRunForRichContext(input: {
   anchorDerivedRunId: string | null;
   latestRunId: string | null;
 }): string | null {
+  // A general anchor NEVER resolves a run — the latest-run fallback is exactly the
+  // leak general mode exists to close.
+  if (input.anchor?.kind === "general") return null;
   if (input.focusedRunId) return input.focusedRunId;
   if (input.anchor && input.anchor.kind !== "run" && input.anchorDerivedRunId) {
     return input.anchorDerivedRunId;

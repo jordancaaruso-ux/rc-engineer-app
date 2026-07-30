@@ -14,10 +14,17 @@ import { parseChoiceChipsFromReply } from "@/lib/engineerPhase5/engineerChoiceCh
 
 import {
   formatAnchorParam,
+  formatGeneralAnchorParam,
   parseAnchorParam,
   parseThreadFocusAnchor,
+  type EngineerAnchorKind,
   type EngineerChatAnchor,
 } from "@/lib/engineerPhase5/engineerAnchor";
+
+import {
+  readStoredGeneralCarId,
+  writeStoredGeneralCarId,
+} from "@/lib/engineerGeneralCarStorage";
 
 import {
   buildEventAnchorCandidate,
@@ -29,7 +36,7 @@ import {
 
 import { EngineerAnchorPicker } from "@/components/engineer/EngineerAnchorPicker";
 
-import { EngineerFocusChip } from "@/components/engineer/EngineerFocusChip";
+import { EngineerSubjectBar } from "@/components/engineer/EngineerSubjectBar";
 
 import { EngineerMessageRatingRow } from "@/components/engineer/EngineerMessageRatingRow";
 
@@ -321,19 +328,27 @@ export function EngineerChatPanel({
   // Run + saved setup combo ("would this sheet have helped here?") rides on a run pin.
   const pinSetupFromUrl = parseAnchorParam(searchParams.get("pinSetup"));
 
-  const pinnedAnchor: EngineerChatAnchor | null = pinFromUrl
-    ? {
-        kind: pinFromUrl.kind,
-        id: pinFromUrl.id,
-        compareRunId:
-          pinFromUrl.kind === "run" && pin2FromUrl?.kind === "run" && pin2FromUrl.id !== pinFromUrl.id
-            ? pin2FromUrl.id
-            : null,
-        setupId:
-          pinFromUrl.kind === "run" && pinSetupFromUrl?.kind === "setup" ? pinSetupFromUrl.id : null,
-        pinned: true,
-      }
-    : null;
+  const pinnedAnchor: EngineerChatAnchor | null = !pinFromUrl
+    ? null
+    : pinFromUrl.kind === "general"
+      ? { kind: "general", carId: pinFromUrl.carId, pinned: true }
+      : {
+          kind: pinFromUrl.kind,
+          id: pinFromUrl.id,
+          compareRunId:
+            pinFromUrl.kind === "run" && pin2FromUrl?.kind === "run" && pin2FromUrl.id !== pinFromUrl.id
+              ? pin2FromUrl.id
+              : null,
+          setupId:
+            pinFromUrl.kind === "run" && pinSetupFromUrl?.kind === "setup" ? pinSetupFromUrl.id : null,
+          pinned: true,
+        };
+
+  // General mode (founder interview 2026-07-30): theory-only subject — the data anchor
+  // states below don't apply, and the bar's General segment is lit instead.
+  const generalMode = pinnedAnchor?.kind === "general";
+  const generalCarId = pinnedAnchor?.kind === "general" ? pinnedAnchor.carId : null;
+  const dataAnchor = pinnedAnchor && pinnedAnchor.kind !== "general" ? pinnedAnchor : null;
 
 
 
@@ -368,6 +383,9 @@ export function EngineerChatPanel({
   const [candidatesErr, setCandidatesErr] = useState<string | null>(null);
 
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  // The General segment's car quick-ask — deterministic chips, no model round-trip.
+  const [cars, setCars] = useState<Array<{ id: string; name: string }>>([]);
 
   // Chip label for a pinned entity that isn't in the recent-candidates window —
   // restored threads carry a frozen label, and the server echoes one per reply.
@@ -468,6 +486,29 @@ export function EngineerChatPanel({
     void refreshCandidates();
   }, [refreshCandidates]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/cars");
+        const data = (await res.json().catch(() => ({}))) as {
+          cars?: Array<{ id?: string; name?: string }>;
+        };
+        if (!res.ok || cancelled) return;
+        setCars(
+          (Array.isArray(data.cars) ? data.cars : []).flatMap((c) =>
+            typeof c.id === "string" && typeof c.name === "string" ? [{ id: c.id, name: c.name }] : []
+          )
+        );
+      } catch {
+        // Car chips just won't render — General still works as pure theory.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Coming back from logging a run should surface the "new run logged — switch?"
   // affordance without needing to send a message first.
   useEffect(() => {
@@ -479,7 +520,7 @@ export function EngineerChatPanel({
   }, [refreshCandidates]);
 
   const candidateById = useCallback(
-    (kind: EngineerChatAnchor["kind"], id: string | null) =>
+    (kind: EngineerAnchorKind, id: string | null) =>
       id ? candidates.find((c) => c.kind === kind && c.id === id) ?? null : null,
     [candidates]
   );
@@ -487,7 +528,7 @@ export function EngineerChatPanel({
   /** One URL write for the whole pin state; pinning supersedes the Auto params. */
   const writePinParams = useCallback(
     (
-      primary: { kind: EngineerChatAnchor["kind"]; id: string } | null,
+      primary: { kind: EngineerAnchorKind; id: string } | null,
       compareRunId: string | null,
       setupId: string | null = null
     ) => {
@@ -503,6 +544,20 @@ export function EngineerChatPanel({
       else sp.delete("pin2");
       if (primary?.kind === "run" && setupId) sp.set("pinSetup", formatAnchorParam("setup", setupId));
       else sp.delete("pinSetup");
+      router.replace(`${pathname}?${sp.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
+
+  /** One URL write into (or within) General mode — theory subject, optional car scope. */
+  const writeGeneralPin = useCallback(
+    (carId: string | null) => {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("pin", formatGeneralAnchorParam(carId));
+      sp.delete("pin2");
+      sp.delete("pinSetup");
+      sp.delete("runId");
+      sp.delete("compareRunId");
       router.replace(`${pathname}?${sp.toString()}`, { scroll: false });
     },
     [pathname, router, searchParams]
@@ -598,7 +653,16 @@ export function EngineerChatPanel({
           const sp = new URLSearchParams(searchParams.toString());
           sp.set("threadId", id);
           const restored = parseThreadFocusAnchor(data.thread?.focusAnchor);
-          if (restored?.pinned) {
+          if (restored?.kind === "general") {
+            // A general thread comes back in general mode with its own car scope —
+            // the thread's anchor beats the remembered default.
+            sp.set("pin", formatGeneralAnchorParam(restored.carId));
+            sp.delete("pin2");
+            sp.delete("pinSetup");
+            sp.delete("runId");
+            sp.delete("compareRunId");
+            setPinLabelFallback(restored.label);
+          } else if (restored?.pinned) {
             sp.set("pin", formatAnchorParam(restored.kind, restored.id));
             if (restored.kind === "run" && restored.compareRunId) {
               sp.set("pin2", formatAnchorParam("run", restored.compareRunId));
@@ -1102,36 +1166,44 @@ export function EngineerChatPanel({
 
   const showNewChat = Boolean(threadId || messages.length > 0);
 
-  // ── Focus chip state ─────────────────────────────────────────────────────────
+  // ── Subject bar state ────────────────────────────────────────────────────────
   const latestRunCandidate = candidates.find((c) => c.kind === "run") ?? null;
-  const pinnedPrimaryCandidate = pinnedAnchor
-    ? candidateById(pinnedAnchor.kind, pinnedAnchor.id)
+  const pinnedPrimaryCandidate = dataAnchor
+    ? candidateById(dataAnchor.kind, dataAnchor.id)
     : null;
-  const pinnedCompareCandidate = pinnedAnchor?.compareRunId
-    ? candidateById("run", pinnedAnchor.compareRunId)
+  const pinnedCompareCandidate = dataAnchor?.compareRunId
+    ? candidateById("run", dataAnchor.compareRunId)
     : null;
-  const pinnedSetupCandidate = pinnedAnchor?.setupId
-    ? candidateById("setup", pinnedAnchor.setupId)
+  const pinnedSetupCandidate = dataAnchor?.setupId
+    ? candidateById("setup", dataAnchor.setupId)
     : null;
-  const pinnedChip = pinnedAnchor
+  const pinnedChip = dataAnchor
     ? {
         label: [
           pinnedPrimaryCandidate?.chipLabel ??
             pinLabelFallback ??
-            ({ run: "Run", setup: "Saved setup", event: "Event" } as const)[pinnedAnchor.kind],
-          pinnedAnchor.setupId ? `+ ${pinnedSetupCandidate?.chipLabel ?? "saved setup"}` : null,
+            ({ run: "Run", setup: "Saved setup", event: "Event" } as const)[dataAnchor.kind],
+          dataAnchor.setupId ? `+ ${pinnedSetupCandidate?.chipLabel ?? "saved setup"}` : null,
         ]
           .filter(Boolean)
           .join(" "),
-        compareLabel: pinnedAnchor.compareRunId
+        compareLabel: dataAnchor.compareRunId
           ? pinnedCompareCandidate?.chipLabel ?? "earlier run"
           : null,
+        // Setup/event pins arrive via deep links — badge the kind so the data segment
+        // says what it is holding without a separate segment for each.
+        kindBadge:
+          dataAnchor.kind === "setup" ? "Setup" : dataAnchor.kind === "event" ? "Event" : null,
       }
     : null;
   const autoFocusCandidate = runIdFromUrl ? candidateById("run", runIdFromUrl) : latestRunCandidate;
-  const autoLabel = pinnedAnchor
-    ? null
-    : autoFocusCandidate?.chipLabel ?? (runIdFromUrl ? "Run in focus" : null);
+  // Also shown (muted) inside the unlit data segment while General is lit, as the
+  // "what tapping back returns to" hint — so it is computed regardless of pin state.
+  const autoLabel = autoFocusCandidate?.chipLabel ?? (runIdFromUrl ? "Run in focus" : null);
+  const generalCarName = generalMode
+    ? cars.find((c) => c.id === generalCarId)?.name ??
+      (pinLabelFallback?.startsWith("General · ") ? pinLabelFallback.slice("General · ".length) : null)
+    : null;
   // Auto never jumps to a newly logged run mid-thread — it holds and offers.
   const switchOffer =
     !pinnedAnchor &&
@@ -1142,6 +1214,20 @@ export function EngineerChatPanel({
       ? { label: latestRunCandidate.chipLabel }
       : null;
 
+  const enterGeneral = () => {
+    setPinLabelFallback(null);
+    setPickerOpen(false);
+    writeGeneralPin(readStoredGeneralCarId());
+  };
+  const pickGeneralCar = (carId: string | null) => {
+    writeStoredGeneralCarId(carId);
+    setPinLabelFallback(null);
+    writeGeneralPin(carId);
+  };
+  const leaveGeneral = () => {
+    setPinLabelFallback(null);
+    writePinParams(null, null);
+  };
   const pickPrimary = (c: AnchorCandidate) => {
     setPinLabelFallback(c.chipLabel);
     writePinParams({ kind: c.kind, id: c.id }, null);
@@ -1330,22 +1416,29 @@ export function EngineerChatPanel({
 
       <div className="p-3 space-y-2">
 
-        <EngineerFocusChip
+        <EngineerSubjectBar
+          mode={generalMode ? "general" : "data"}
           pinned={pinnedChip}
           autoLabel={autoLabel}
           switchOffer={switchOffer}
+          generalCarName={generalCarName}
+          cars={cars}
+          selectedGeneralCarId={generalCarId}
           disabled={panelBusy}
-          onOpen={() => setPickerOpen((v) => !v)}
+          onOpenPicker={() => setPickerOpen((v) => !v)}
           onClearPin={clearPin}
           onSwitch={switchAutoToLatest}
+          onSelectData={leaveGeneral}
+          onSelectGeneral={enterGeneral}
+          onPickGeneralCar={pickGeneralCar}
         />
 
-        {pickerOpen ? (
+        {pickerOpen && !generalMode ? (
           <EngineerAnchorPicker
             candidates={candidates}
             loading={candidatesLoading}
             error={candidatesErr}
-            pinnedPrimaryRunId={pinnedAnchor?.kind === "run" ? pinnedAnchor.id : null}
+            pinnedPrimaryRunId={dataAnchor?.kind === "run" ? dataAnchor.id : null}
             disabled={panelBusy}
             onPickPrimary={pickPrimary}
             onPickCompare={pickCompare}

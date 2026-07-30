@@ -91,4 +91,39 @@ test("a pinned anchor forces full tier even for a lap-history question", () => {
   );
 });
 
+test("a general anchor beats every rule — including the lap-history allow-list", () => {
+  // A general thread deliberately has no run log to read from: even the allow-listed
+  // lookup shape must take the general tier, and never the deep personal path.
+  const generalInput = {
+    lastUserMessage: "what was my best lap at keilor?",
+    runId: "",
+    compareRunId: "",
+    anchorPinned: true,
+    anchorKind: "general" as const,
+  };
+  assert.equal(engineerChatContextTier(generalInput), "general");
+  assert.equal(engineerChatNeedsDeepContext(generalInput), false);
+  // Theory questions land there too, of course.
+  assert.equal(
+    engineerChatContextTier({
+      lastUserMessage: "what does rear toe actually do?",
+      runId: "",
+      compareRunId: "",
+      anchorPinned: true,
+      anchorKind: "general",
+    }),
+    "general"
+  );
+  // Data anchor kinds change nothing about the existing rules.
+  assert.equal(
+    engineerChatContextTier({
+      lastUserMessage: "what was my best lap at keilor?",
+      runId: "",
+      compareRunId: "",
+      anchorKind: null,
+    }),
+    "lookup"
+  );
+});
+
 console.log("engineerChatContextTier.test.ts OK");

@@ -229,14 +229,21 @@ export async function buildEngineerRichContextV1(params: {
     kbLimit?: number;
     /** Skip linked timing field-stats recompute. */
     skipFieldStats?: boolean;
+    /**
+     * General-question mode: the KB-only shape is the deliberate subject, not a
+     * zero-runs fallback — notes say so, and empty retrieval still returns the shape
+     * (the full-KB system block carries the corpus regardless).
+     */
+    mode?: "general";
   };
 }): Promise<EngineerRichContextV1 | null> {
   const spreadDepth = params.opts?.spreadDepth ?? "full";
   const kbLimit = params.opts?.kbLimit ?? 12;
   const skipFieldStats = params.opts?.skipFieldStats ?? spreadDepth === "none";
+  const generalMode = params.opts?.mode === "general";
   const detectedIntent = detectOutcomeIntent(params.lastUserMessage);
 
-  if (!params.anchorRunId?.trim()) {
+  if (generalMode || !params.anchorRunId?.trim()) {
     const parameterIntentMatches =
       detectedIntent != null
         ? buildParameterIntentMatches({
@@ -248,7 +255,9 @@ export async function buildEngineerRichContextV1(params: {
         : null;
     const kbQuery = kbSearchQueryForMessage(params.lastUserMessage, parameterIntentMatches);
     const kb = await searchVehicleDynamicsKb(kbQuery, kbLimit);
-    if (kb.length === 0) return null;
+    // General mode keeps the shape even with empty retrieval — the full-KB system
+    // block still carries the corpus, and the notes below are the mode's contract.
+    if (kb.length === 0 && !generalMode) return null;
     return {
       version: 1,
       generatedAtIso: new Date().toISOString(),
@@ -263,14 +272,16 @@ export async function buildEngineerRichContextV1(params: {
       importedSessionFieldStats: null,
       runPacingContext: null,
       setupVsSpread: {
-        note: "No run anchored — add ?runId= on the Engineer page or log a run for car/setup/track context.",
+        note: generalMode
+          ? "General question mode — no run, setup, or community data is attached by design; answer from vehicle-dynamics theory. Car identity, when the driver chose one, is in generalCarIdentity."
+          : "No run anchored — add ?runId= on the Engineer page or log a run for car/setup/track context.",
         siblingCarCount: 0,
         communitySpreadAvailable: false,
         communityContext: {
           setupSheetTemplate: null,
           trackSurface: null,
           gripLevel: "any",
-          label: "no run anchored",
+          label: generalMode ? "general question — theory only" : "no run anchored",
         },
         rows: [],
         truncated: false,
@@ -387,6 +398,7 @@ export async function buildEngineerRichContextV1(params: {
   const note =
     `${garageNote}${communityNote}` +
     " Only chassis/suspension tuning parameters are included (excludes motor, pinion, wing, ESC, etc.). Each row includes spreadSource: community_eligible_uploads vs your_garage vs base_setup when numeric bands apply." +
+    " spring_gap_front / spring_gap_rear rows deliberately carry the current value ONLY — no bands, no median, no positionBand. Gap is the Awesomatix actuator for spring rate and the same gap means a different effective rate on a different spring, so cross-setup gap comparisons are physically meaningless. Compare stiffness via the front/rear_spring_rate_gf_mm rows; when recommending a stiffness change, argue it in rate and voice the move as a gap change (the knob the driver actually turns)." +
     " spreadSource: base_setup means there is NO population data for that row—the band comes from the setups published against this chassis (baseSetupRef names them; spread.sampleCount is how many carried that parameter). One published sheet gives a window drawn around it, one step either side for mid and three steps out for the edges, sampleCount 1. Several give the actual range those sheets span: p10/p90 are the real min/max, so a value outside them is outside everything the chassis' own published setups do. Only sheets for THIS RUN'S SURFACE are included—a carpet setup and an asphalt setup are different cars and are never mixed (baseSetupRef.surfaceScope: matched = sheets tagged for this surface; untagged_only = no sheet claims this surface so untagged ones are standing in, treat loosely; mixed = the run has no track_surface so the range may span both, say so and ask which surface before leaning on it). baseSetupRef.conditionMatchName and the row's baseSetupConditionValue are the sheet written for this run's GRIP level and what it runs for this parameter—anchor a recommended VALUE on that sheet, and use the surrounding range only for how far out the driver currently is. Either way these are authored reference sheets, not measured runs: say \"outside the published baselines for this chassis\" and never \"wide of typical\" or \"most people run\". It still tells you which direction is further out, which is the point: a move that pushes an already-extreme parameter further out is a bigger call than one bringing it back, though it can still be the right answer." +
     " Rows with parameterKey starting with derived_: upper = upper outer − avg(upper inner L/R) per axle (larger = more angled upper in KB). Lower = avg(under-lower L/R) + under hub per axle (larger = more inner-lower+hub stack → higher RC on that end; not the same “angled” sign as upper—see camber-gain-gain). Balance = front − rear. When describing the user’s setup, prefer concrete shim values (inner+outer per link) over a derived mm headline; use derived rows for field position and balance. Not literal °." +
     " Community bands are NOT filtered by tire compound, race class, or upload recency—only template·surface·grip; name tires + sessionClass when citing “typical.” manufacturerBaseline (when present) is the official PDF reference—separate from community counts. Do not state absolute roll-centre height (mm); relative RC tendency only.";

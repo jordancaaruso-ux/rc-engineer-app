@@ -107,16 +107,14 @@ export function SetupFillFlow({
 
   // Commit the raw draft to the stored value, coercing once (not per keystroke). No-op for non-text
   // steps, so it's safe to call unconditionally before leaving any step.
+  //
+  // Number steps keep whatever was typed, exactly like the grid sheet: coerceSetupValue returns a
+  // number when the text parses as one and the raw string otherwise. Real setup values that live in
+  // "number" fields are often not numbers — spring codes ("2.7-blue"), ranges ("3-4"), notes — and
+  // silently blanking them on commit lost the entry with no error.
   const commitDraft = useCallback(() => {
     if (!step || (step.kind !== "text" && step.kind !== "number")) return;
-    const coerced = coerceSetupValue(draft);
-    // A number field must never keep a partial/garbage token ("-", ".", "abc"); coerceSetupValue
-    // returns those unchanged as strings, so clear the field instead of storing junk.
-    const next =
-      step.kind === "number" && typeof coerced === "string" && coerced.trim() !== ""
-        ? ""
-        : coerced;
-    setValue(step.key, next);
+    setValue(step.key, coerceSetupValue(draft));
   }, [step, draft, setValue]);
 
   const advance = useCallback(() => {

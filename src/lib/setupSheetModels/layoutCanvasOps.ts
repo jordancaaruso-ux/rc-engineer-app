@@ -914,6 +914,72 @@ export function autoPlaceOnArrival(schema: SetupSheetModelSchema): ArrivalPlacem
   return { schema: placeMissingParameters(schema), placedCount: missing.length };
 }
 
+export type AutoGroupResult = {
+  schema: SetupSheetModelSchema;
+  /** Rows created; 0 when nothing matched and `schema` is untouched. */
+  groupedCount: number;
+};
+
+/** Member keys of an inferred pair / corner row in slot order, with the label naming each slot. */
+function inferredSetFromRow(
+  row: SetupSheetModelLayoutRow
+): { keys: string[]; slotLabels: string[] } | null {
+  if (row.type === "pair") {
+    return { keys: [row.leftKey, row.rightKey], slotLabels: [...DEFAULT_PAIR_SLOT_LABELS] };
+  }
+  if (row.type === "corner4") {
+    return {
+      keys: [row.ff, row.fr, row.rf, row.rr],
+      slotLabels: DEFAULT_CORNER_SLOT_LABELS.slice(0, 4),
+    };
+  }
+  return null;
+}
+
+/**
+ * Re-group parameters that are **already on the sheet** as separate single rows: `_front` + `_rear`
+ * into one Front/Rear row, `_ff` + `_fr` + `_rf` + `_rr` into one corner row.
+ *
+ * This is the old "Auto-group" button minus what got it deleted. That one re-derived every section
+ * from scratch and threw away hand-made row order. This one only ever consumes single rows whose
+ * keys form a *complete* set, and lands each new row where its first member sat — every other row,
+ * every existing group, and the order of both come back untouched.
+ *
+ * Needed because {@link placeMissingParameters} only ever looks at the tray: a parameter created one
+ * at a time is placed as a single row the moment it exists, so by the time the sheet is arranged the
+ * pairing chance has already passed and there was no way to ask for it again.
+ *
+ * Detection goes through `inferSectionLayoutRows`, so the pairing rules live in one place shared
+ * with `placeMissingParameters` rather than a second copy that can drift.
+ */
+export function autoGroupPlacedSingles(schema: SetupSheetModelSchema): AutoGroupResult {
+  let next = schema;
+  let groupedCount = 0;
+
+  for (const sec of schema.structuredSections) {
+    // Singles only, and only ungrouped ones — a parameter already in a group is somebody's decision.
+    const candidates: SetupSheetModelFieldDef[] = [];
+    for (const row of sec.rows) {
+      if (row.type !== "single") continue;
+      const field = schema.fields.find((f) => f.key === row.key);
+      if (field && !field.layoutGroupId) candidates.push(field);
+    }
+    if (candidates.length < MIN_LAYOUT_SLOTS) continue;
+
+    for (const inferred of inferSectionLayoutRows(candidates)) {
+      const set = inferredSetFromRow(inferred);
+      if (!set) continue;
+      // Row label is left to makeSlotsGroup — its stem stripper also handles "Droop — Front".
+      const applied = makeSlotsGroup(next, set.keys, { slotLabels: set.slotLabels });
+      if ("error" in applied) continue;
+      next = applied;
+      groupedCount += 1;
+    }
+  }
+
+  return { schema: next, groupedCount };
+}
+
 /**
  * Renumber `sortOrder` to match the order things sit on the canvas — sections top to bottom, rows
  * within a section, slots within a row.

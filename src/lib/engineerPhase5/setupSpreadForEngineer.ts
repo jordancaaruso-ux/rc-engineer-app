@@ -49,6 +49,15 @@ import { baseSetupStatsFromValues } from "@/lib/engineerPhase5/baseSetupBands";
 const MAX_PARAMS = 52;
 
 /**
+ * Awesomatix spring gap is the ACTUATOR for spring rate, not a comparable quantity: the same
+ * gap lands on a different effective rate with a different spring, so cross-setup gap bands
+ * are physically meaningless (founder ruling 2026-07-30 — compare stiffness via the
+ * *_spring_rate_gf_mm rows, voice changes as gap moves). These rows keep currentDisplay so
+ * the Engineer can still name the knob, but never carry spread bands, position, or trends.
+ */
+const SPRING_GAP_ACTUATOR_KEYS = new Set(["spring_gap_front", "spring_gap_rear"]);
+
+/**
  * Aggregations are real data from many uploads, so they win whenever they exist; the base setup only
  * fills the hole they leave. Flip this to prefer the base setup even when an aggregation exists —
  * open question whether one internally coherent sheet beats a blend of many across conditions.
@@ -687,6 +696,24 @@ export async function buildSetupSpreadForEngineer(params: {
       isSetupGeometryDerivedKey(key) && typeof cur === "number" && Number.isFinite(cur)
         ? `${cur.toFixed(2)} ${setupGeometryDerivedUnit(key)}`
         : formatSetupVal(cur);
+
+    if (SPRING_GAP_ACTUATOR_KEYS.has(key)) {
+      rows.push({
+        parameterKey: key,
+        currentDisplay,
+        valueType: SetupAggregationValueType.NUMERIC,
+        spreadSource: "none",
+        baseSetupRef: null,
+        baseSetupConditionValue: null,
+        communityGripLevel: null,
+        spread: null,
+        gripTrend: null,
+        gripTrendSignal: null,
+        gripSpreadContrast: null,
+        positionBand: "no_spread_data",
+      });
+      continue;
+    }
 
     const comm = communityByKey.get(key);
     const garage = bestGarageByKey.get(key);

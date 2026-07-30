@@ -15,6 +15,7 @@ import {
   addSection,
   appendFieldToGroup,
   assignFieldToSlot,
+  autoGroupPlacedSingles,
   deleteSection,
   makeSlotsGroup,
   moveFieldToSection,
@@ -143,6 +144,14 @@ export function SetupSheetModelEditor(props: {
   }, [schema.fields]);
 
   const tray = useMemo(() => unplacedFields(schema), [schema]);
+  /**
+   * Run the op to *count* what it would do, so the button only appears when there is something to
+   * group and its label can't disagree with the click.
+   */
+  const autoGroup = useMemo(
+    () => (readOnly ? null : autoGroupPlacedSingles(schema)),
+    [schema, readOnly]
+  );
   const sectionOptions = useMemo(() => sectionChoicesForSheet(schema), [schema]);
   /** Default to the section last added into, else the first one on the sheet. */
   const effectiveSectionId = sectionId || sectionOptions[0]?.id || SETUP_SHEET_GROUPS[0]!.id;
@@ -364,14 +373,28 @@ export function SetupSheetModelEditor(props: {
             </ul>
           )}
 
-          {!readOnly && tray.length > 0 ? (
-            <button
-              type="button"
-              className="rounded border border-border bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
-              onClick={() => applySchema(placeMissingParameters(schema))}
-            >
-              Place all on sheet
-            </button>
+          {!readOnly && (tray.length > 0 || (autoGroup?.groupedCount ?? 0) > 0) ? (
+            <div className="flex flex-wrap gap-2">
+              {tray.length > 0 ? (
+                <button
+                  type="button"
+                  className="rounded border border-border bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+                  onClick={() => applySchema(placeMissingParameters(schema))}
+                >
+                  Place all on sheet
+                </button>
+              ) : null}
+              {autoGroup && autoGroup.groupedCount > 0 ? (
+                <button
+                  type="button"
+                  className="rounded border border-border bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+                  title="Front/Rear and FF/FR/RF/RR parameters sitting on the sheet as separate rows each become one row. Rows you arranged by hand are left where they are."
+                  onClick={() => applySchema(autoGroup.schema)}
+                >
+                  Auto-group {autoGroup.groupedCount} set{autoGroup.groupedCount === 1 ? "" : "s"}
+                </button>
+              ) : null}
+            </div>
           ) : null}
 
           {/* Add parameter */}

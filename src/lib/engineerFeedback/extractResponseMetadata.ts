@@ -50,6 +50,7 @@ export function buildEngineerResponseMetadata(opts: {
   runId?: string;
   compareRunId?: string;
   source?: string;
+  promptVersion?: string;
 }): EngineerMessageContextSnapshot {
   const ids = runIdsFromContext(
     opts.contextJson,
@@ -65,5 +66,6 @@ export function buildEngineerResponseMetadata(opts: {
     setupIds: [],
     kbSections: opts.contextJson ? kbSectionsFromContext(opts.contextJson) : [],
     source: opts.source,
+    promptVersion: opts.promptVersion,
   };
 }

@@ -6,7 +6,13 @@ import { buildEngineerRichContextV1 } from "@/lib/engineerPhase5/engineerRichCon
 import {
   engineerChatContextTier,
   engineerChatNeedsDeepContext,
+  type EngineerChatContextTier,
 } from "@/lib/engineerPhase5/engineerChatContextTier";
+import {
+  assembleGeneralChatContext,
+  generalAnchorLabel,
+} from "@/lib/engineerPhase5/engineerGeneralContext";
+import { loadGeneralCarIdentity } from "@/lib/engineerPhase5/generalCarIdentity";
 import { getOrComputeEngineerSummaryForLatestRun } from "@/lib/engineerPhase5/loadLatestEngineerSummary";
 import { getOrComputeEngineerSummaryForRun } from "@/lib/engineerPhase5/loadEngineerSummaryForRun";
 import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSummaryTypes";
@@ -77,7 +83,7 @@ export type BuiltEngineerChatContext =
       baseForMerge: Record<string, unknown>;
       lastUser: EngineerChatMessage | undefined;
       needsDeep: boolean;
-      contextTier: "lookup" | "full";
+      contextTier: EngineerChatContextTier;
       /** Human label for the effective anchor (chip / persistence); null when unresolvable. */
       anchorLabel: string | null;
     };
@@ -107,17 +113,50 @@ export async function buildEngineerChatContext(params: {
       compareRunId: params.compareRunId,
     });
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
+
+    // General question (founder interview 2026-07-30): theory-only hard subject. Built
+    // from KB + optional car identity ONLY — none of the packet/summary/priors/memory/
+    // brain builders below may run, so no latest-run context can leak in.
+    if (anchor?.kind === "general") {
+      onStage?.("context_kb");
+      const carIdentity = anchor.carId
+        ? await loadGeneralCarIdentity(userId, anchor.carId)
+        : null;
+      const richEngineerContext =
+        lastUser && typeof lastUser.content === "string"
+          ? await perfSpan("buildEngineerRichContextV1", () =>
+              buildEngineerRichContextV1({
+                userId,
+                anchorRunId: null,
+                lastUserMessage: lastUser.content,
+                opts: { spreadDepth: "none", kbLimit: 10, skipFieldStats: true, mode: "general" },
+              })
+            )
+          : null;
+      const contextJson = assembleGeneralChatContext({ carIdentity, richEngineerContext });
+      return {
+        contextJson,
+        baseForMerge: contextJson,
+        lastUser,
+        needsDeep: false,
+        contextTier: "general",
+        anchorLabel: generalAnchorLabel(carIdentity),
+      };
+    }
+
     const needsDeep = engineerChatNeedsDeepContext({
       lastUserMessage: lastUser?.content,
       runId,
       compareRunId,
       anchorPinned: anchor?.pinned,
+      anchorKind: anchor?.kind ?? null,
     });
     const contextTier = engineerChatContextTier({
       lastUserMessage: lastUser?.content,
       runId,
       compareRunId,
       anchorPinned: anchor?.pinned,
+      anchorKind: anchor?.kind ?? null,
     });
 
     onStage?.("context_runs");
