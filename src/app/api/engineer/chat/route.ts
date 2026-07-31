@@ -6,6 +6,7 @@ import type { EngineerChatMessage } from "@/lib/engineerPhase5/openaiEngineer";
 import {
   buildEngineerChatContext,
   buildMergeContextWithFocusedPair,
+  pinnedAnchorForModel,
 } from "@/lib/engineerPhase5/engineerChatPipeline";
 import { generateEngineerChatReplyWithTools } from "@/lib/engineerPhase5/openaiEngineer";
 import { tryAnswerLapHistoryQuery } from "@/lib/engineerPhase5/lapHistoryQuery";
@@ -15,7 +16,6 @@ import { persistEngineerChatExchange } from "@/lib/engineerFeedback/persistExcha
 import type { EngineerMessageContextSnapshot } from "@/lib/engineerFeedback/types";
 import { engineerOpenAiUserMessage } from "@/lib/openAiRetry";
 import { parseChatAnchor, type EngineerChatAnchor } from "@/lib/engineerPhase5/engineerAnchor";
-import type { EngineerPinnedAnchorForModel } from "@/lib/engineerPhase5/openaiEngineer";
 
 const MAX_MESSAGE_CHARS = 4096;
 
@@ -62,19 +62,6 @@ type EngineerChatFeedbackPayload = {
   assistantMessageId: string;
   ratingContext: EngineerMessageContextSnapshot;
 };
-
-function pinnedAnchorForModel(
-  anchor: EngineerChatAnchor | null,
-  anchorLabel: string | null
-): EngineerPinnedAnchorForModel | null {
-  if (!anchor?.pinned) return null;
-  return {
-    kind: anchor.kind,
-    label: anchorLabel,
-    primaryRunId: anchor.kind === "run" ? anchor.id : null,
-    compareRunId: anchor.kind === "run" ? anchor.compareRunId : null,
-  };
-}
 
 async function maybePersistEngineerReply(params: {
   userId: string;

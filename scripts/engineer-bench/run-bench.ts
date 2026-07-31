@@ -295,6 +295,14 @@ async function main() {
         userId,
         question: c.question,
         runId,
+        // Pin it the way the chat route does. Passing `runId` alone is only a SOFT focus — the
+        // context packet still carries the user's LATEST run and the model may answer about that
+        // instead, which it demonstrably did (a Boronia-anchored case answered about a TFTR run).
+        // The app always sends a pinned anchor, so without this the bench measures a path no user
+        // is on, and every arm is judged on answers worse than production.
+        anchor: runId
+          ? { kind: "run", id: runId, compareRunId: null, setupId: null, pinned: true }
+          : null,
       });
       const latencyMs = Date.now() - t0;
       const meta = buildEngineerResponseMetadata({

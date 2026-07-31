@@ -19,6 +19,7 @@ import type { EngineerRunSummaryV2 } from "@/lib/engineerPhase5/engineerRunSumma
 import {
   generateEngineerChatReplyWithTools,
   type EngineerChatMessage,
+  type EngineerPinnedAnchorForModel,
 } from "@/lib/engineerPhase5/openaiEngineer";
 import { buildRunCatalogV1 } from "@/lib/engineerPhase5/runCatalog";
 import { buildTireLifePriorsForChatContext } from "@/lib/engineerPhase5/tireLifePriors/computeTireLifePriors";
@@ -471,12 +472,40 @@ export function buildMergeContextWithFocusedPair(opts: {
   };
 }
 
+/**
+ * Collapse an anchor into the shape the model prompt consumes. Lives here rather than in the
+ * chat route because the route is no longer the only caller — the bench pins anchors too, and a
+ * second copy of this would drift the way the three model-pricing tables did.
+ *
+ * Only a PINNED anchor reaches the model: an Auto anchor is a visible guess the model is allowed
+ * to refocus away from, so handing it down as a hard subject would misrepresent it.
+ */
+export function pinnedAnchorForModel(
+  anchor: EngineerChatAnchor | null,
+  anchorLabel: string | null
+): EngineerPinnedAnchorForModel | null {
+  if (!anchor?.pinned) return null;
+  return {
+    kind: anchor.kind,
+    label: anchorLabel,
+    primaryRunId: anchor.kind === "run" ? anchor.id : null,
+    compareRunId: anchor.kind === "run" ? anchor.compareRunId : null,
+  };
+}
+
 export async function runEngineerChatTurn(params: {
   userId: string;
   question: string;
   runId?: string;
   compareRunId?: string;
   timeZone?: string | null;
+  /**
+   * Pinned subject, exactly as the chat route builds it. Without this the run is only a SOFT
+   * focus: `basePacket.latestRun` stays in context and the model may answer about that instead —
+   * observed in the bench answering about a TFTR run while anchored to a Boronia one. Callers
+   * that want `runId` to mean "this run and no other" must pass a pinned anchor.
+   */
+  anchor?: EngineerChatAnchor | null;
 }): Promise<{
   reply: string;
   contextJson: unknown;
@@ -487,6 +516,7 @@ export async function runEngineerChatTurn(params: {
   const compareRunId = params.compareRunId?.trim() ?? "";
   const messages: EngineerChatMessage[] = [{ role: "user", content: params.question.trim() }];
 
+  const anchor = params.anchor ?? null;
   const built = await buildEngineerChatContext({
     userId: params.userId,
     body: null,
@@ -494,6 +524,7 @@ export async function runEngineerChatTurn(params: {
     runId,
     compareRunId,
     timeZone: params.timeZone,
+    anchor,
   });
   if ("error" in built) {
     throw new Error(built.error);
@@ -513,6 +544,7 @@ export async function runEngineerChatTurn(params: {
     mergeContextWithFocusedPair,
     contextTier: built.contextTier,
     timeZone: params.timeZone,
+    pinnedAnchor: pinnedAnchorForModel(anchor, built.anchorLabel ?? null),
   });
 
   return {
