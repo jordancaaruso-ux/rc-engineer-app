@@ -23,6 +23,43 @@ audits them per the stopgap rule._
 
 ## Correction log (LIVING — append new patterns, newest first, with date)
 
+**2026-07-31 — founder interview after round-4 blind pairwise (prompt `2026-07-31a`):**
+- **DAMPER DOMINANCE DIAGNOSED — it is NOT recency.** Damper led or featured in **9 of 12** bench
+  answers across 6 unrelated runs. Only **1 of 6** anchor runs had a damper change vs its previous
+  run; two had zero changes. Cause: Jordan is a **permanent** outlier — damper oil `450/500` on all
+  20 recent runs, percent `100` (14) or `80` (6), vs field medians ~`300/350` and ~`60`. So the
+  largest median gap is *always* damper, on every question, forever. `positionBand:
+  "far above typical"` is the hook. Note `setupSpreadForEngineer.ts` does **not** rank — it sorts
+  alphabetically ([:565](../../src/lib/engineerPhase5/setupSpreadForEngineer.ts#L565)); the ranking
+  happens in the model's head.
+- **Founder REJECTED suppression and the whole "standing parameter" concept:** *"A standing outlier
+  shouldn't be suppressed, it could always be a reason for a handling problem… Perhaps outliers
+  shouldn't be ranked? Keep thinking"*. NOT IMPLEMENTED — open design item. Note this partially
+  **inverts** the 2026-07-30 ruling "median gap ranks, never justifies": he now questions the ranking
+  half too.
+- **BREVITY RULING — three things cut from every reply** (implemented in `CHAT_SYSTEM` ANSWER SHAPE):
+  (a) "what I would NOT do" lists, (b) evidence recaps of their own notes/laps/setup values,
+  (c) data-caveat hedging. Explicitly carved out: rule (3)'s genuine "can go either way" when KB
+  mechanisms disagree STAYS — that is a physics finding, not a data hedge.
+- **Multiple levers DEFERRED, not deleted:** *"Multiple levers is good - first answer should be
+  precise and short, then ask to expand after that"*. First reply names one move and closes with a
+  short offer; alternates come when pulled. (Supersedes "at most one or two ranked alternates".)
+- **PREDICTIONS MUST BE OBSERVABLE FROM THE DRIVER'S STAND** (implemented in PREDICTION DISCIPLINE).
+  His example of the failure: *"'freer rear movement' is irrelevant"* — the driver cannot see
+  suspension behaviour, only what the car does in a corner.
+- **VOCABULARY — three coinages banned** (implemented in `LOCK_VOCABULARY`): **"take a set"**
+  (*"still makes no sense"*), **"crisper"** (*"random"*), and **"long loaded corners"** as a regime
+  stand-in (*"can also apply to hairpins - that sounds like just sweepers"*).
+- **DAMPER % → GRIP: HELD, not written.** *"Not sure why it happens - perhaps because it's still
+  transition grip it's just slowing that down? 'More grip / less grip' is strictly against kb"*.
+  Confirms the standing KB principle: state mechanism, never a bare grip outcome — the same reason
+  `LOCK_DAMPER_OIL` and `LOCK_TOE_GAIN` both stop at mechanism.
+- KB WRITTEN THIS DAY (typed approval): `diff-and-driveline.md` rotation direction on/off power
+  (founder sign: more coupling restricts rotation off throttle, increases it on throttle), and
+  `awesomatix-spring-gap-damper.md` rate-is-an-output-of-gap. Both verified landing in round-4
+  answers. **Self-flagged debt:** the diff section invokes "the friction circle", which no KB concept
+  file defines — either add `concepts/friction-circle.md` or recompose that paragraph.
+
 **2026-07-31 — third batch (8 ratings, 2026-07-30 22:21–23:51 UTC, all `2026-07-30b+17619acd`; mean 5.9):**
 - **UNLOADED-WHEEL FALLACY — the batch's root pattern, two answers, one cause.** The model reasons
   about the wheel that is *pointed* at the corner instead of the wheel that is *carrying load*.

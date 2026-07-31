@@ -7,6 +7,17 @@ Because spring gap is a rate control, **all spring-rate reasoning applies**: rea
 faster, and a bigger share of that end's lateral load transfer; softer is the mirror. Those strands do
 not agree on an outcome, so compose them live rather than quoting a tendency. When comparing setups, treat a spring-gap change and a spring change as the same *family* of move — the sheet may carry both (`front_spring_rate_gf_mm`, `rear_spring_rate_gf_mm` alongside the gaps), so name **both** values when describing an end's stiffness.
 
+## Spring rate is an output of spring gap (Awesomatix)
+
+**Keys:** `front_spring_rate_gf_mm`, `rear_spring_rate_gf_mm` — derived values, not adjusters.
+
+The gf/mm figure is a lookup, not a knob: fitted spring (`std`/`s`) × SRS arrangement (I/II) ×
+**effective gap** (`spring_gap` − `lower_arm_extension`), in 0.2 mm steps. There is no continuous
+rate adjuster and no intermediate spring to fit, so with the same spring and SRS **a fixed gap is a
+fixed rate** — the two cannot move independently, and a given rate is only reachable at the gap step
+that produces it. A community median quoted in gf/mm is an average across setups and need not land
+on a reachable step at all.
+
 ## Damper percent (Awesomatix damping / pack)
 
 **Keys:** `damper_percent_front`, `damper_percent_rear` — the Awesomatix damping setting; behaves like **piston size** on a conventional damper. **Higher percent = more damping** (founder-confirmed).

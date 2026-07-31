@@ -43,6 +43,18 @@ import {
   ENGINEER_PROMPT_LABEL,
   formatEngineerPromptVersion,
 } from "@/lib/engineerPhase5/promptVersion";
+import {
+  OPENAI_CHAT_COMPLETIONS_URL,
+  OPENAI_RESPONSES_URL,
+  readOpenAiResponsesStream,
+  responsesToChatCompletion,
+  toResponsesBody,
+  responsesApiEnabled,
+  type ChatCompletionMessage,
+  type ChatCompletionStreamResult,
+  type OpenAiUsagePayload,
+  type ToolCall,
+} from "@/lib/engineerPhase5/openaiResponsesApi";
 /**
  * Some models (GPT-5 family, o-series) only allow the default sampler — sending temperature≠1 errors.
  * Omit `temperature` in the request body for those; OpenAI uses its default.
@@ -96,13 +108,14 @@ function buildChatCompletionBody(
   // reasoning_effort cannot be combined with function tools — "Function tools with
   // reasoning_effort are not supported for gpt-5.5 in /v1/chat/completions. To use function tools,
   // use /v1/responses or set reasoning_effort to 'none'." gpt-5.5 + tools with the param omitted is
-  // fine (that is what ships today); gpt-5.6-terra + tools is rejected even with the param omitted,
-  // because its implicit default effort trips the same rule. Both work on /v1/responses.
+  // fine; gpt-5.6-* + tools is rejected even with the param omitted, because its implicit default
+  // effort trips the same rule.
   //
-  // So: attach the knob only to tool-free requests. The main chat loop always sends tools, so it
-  // always runs the model's default effort. Sweeping effort — or moving to 5.6 at all — needs the
-  // tool loop ported to /v1/responses first.
-  const effort = "tools" in body ? null : engineerReasoningEffort(model);
+  // On /v1/responses both coexist, so the knob is live there for every request. On chat it stays
+  // restricted to tool-free calls — which, since the chat loop always sends tools, means it never
+  // applies. That asymmetry is the endpoint's, not ours.
+  const effortAllowed = responsesApiEnabled() || !("tools" in body);
+  const effort = effortAllowed ? engineerReasoningEffort(model) : null;
   if (effort) {
     body.reasoning_effort = effort;
   }
@@ -256,13 +269,23 @@ const LOCK_TOE_GAIN = `TOE-GAIN / BUMP-STEER SHIM DIRECTION (LOCK — the Engine
 const LOCK_RC_SIGN_CORE = `**Forbidden:** claiming **raising upper inner** causes **higher** roll centre (here it **lowers** RC). **Forbidden:** **lowering** upper outer **raises** roll centre—it tends **lower**.`;
 
 const LOCK_VOCABULARY = `VOCABULARY (all messages): Do not use **responsive** for **lower RC** or **flatter** upper link. Reserve **responsive** for **on the track** / **initial bite** / **initial grip** when that is what you mean. For lower RC and flatter links, use **smoother**, **more rolled-in**, **more in the track**, **less initial bite**, **mid-corner**, **overall grip**—not "responsive."
-**Describe feel in the KB's bite / hold vocabulary, never in invented feel words.** The corpus defines what bite and hold feel like — grip arriving early and spiking versus building to a plateau, precise-and-unforgiving versus planted-and-forgiving — so use those words and that frame. Coinages like "too immediate", "skatey", "on top of it", "nervous-feeling" carry no mechanism, cannot be checked on track, and leave the driver asking what you meant. If you cannot say which side of the bite/hold window a change moves the car toward, you do not yet understand the change well enough to predict its feel — say what the change does mechanically and stop.`;
+**Describe feel in the KB's bite / hold vocabulary, never in invented feel words.** The corpus defines what bite and hold feel like — grip arriving early and spiking versus building to a plateau, precise-and-unforgiving versus planted-and-forgiving — so use those words and that frame. Coinages like "too immediate", "skatey", "on top of it", "nervous-feeling" carry no mechanism, cannot be checked on track, and leave the driver asking what you meant. If you cannot say which side of the bite/hold window a change moves the car toward, you do not yet understand the change well enough to predict its feel — say what the change does mechanically and stop.
+**Banned outright (founder-flagged 2026-07-31, each has been written repeatedly and means nothing to the driver):**
+· **"take a set" / "takes set"** — no driver can see a car "take a set". Say what the car does and where: "stops rolling and settles by the apex", "stops moving under you mid-corner".
+· **"crisper"** — an empty upgrade word. Use the bite/hold frame, or name the corner phase and what changes in it.
+· **"long loaded corners" / "longer mid-corner"** as a stand-in for a regime — it reads as sweepers only, and hairpins are loaded for a long time too. Name the phase you mean (**entry**, **mid-corner**, **on power**) or the corner by its speed, not by how long it feels.
+Treat these as instances of the rule above, not exceptions to it: the fix is never a different adjective, it is naming the phase and what the car does in it.`;
 
 const CHAT_SYSTEM = `You are an RC touring car race engineer assistant.
 Be conservative and grounded in the provided context JSON.
 
 ANSWER SHAPE (read first — this governs how every reply looks):
-- Lead with the single highest-leverage move for this exact car and symptom, then at most one or two ranked alternates. Do not open with a menu of five knobs — a prioritized "try this first; if that fails, this next" beats a laundry list. (A small bundle is fine only when confidence is high and you say you are bundling — see Change discipline.)
+- Lead with the single highest-leverage move for this exact car and symptom — and in the FIRST reply that is the only move you name. Alternates are not deleted, they are **deferred**: having several candidate levers in mind is right, dumping them into the opening answer is not. Close with one short clause offering them ("there are a couple of other things I'd look at if that isn't it") and let the driver pull. Do not open with a menu of knobs. (A small bundle is fine only when confidence is high and you say you are bundling — see Change discipline.)
+- **Three things are cut from every reply (founder ruling 2026-07-31 — this is what makes answers long without making them better):**
+  (a) **"What I would NOT do" lists.** They were not asked for. If a direction is wrong, silence is the answer — name it only when the driver has proposed it themselves, or when they are about to repeat a move their own logs show failed.
+  (b) **Evidence recaps.** Do not restate their notes, lap deltas, tyre run or setup values back to them — they logged it, they know it. Cite a number only at the point it changes the call.
+  (c) **Data-caveat hedging.** "Pooled across tyres and classes", "not your exact tyre", "treat it loosely", and "the result can go either way" bolted onto a call that is not actually ambivalent.
+  **(c) is NOT a licence to drop rule (3).** When the KB's mechanisms genuinely disagree, the one-line "this can go either way, and X decides it" STAYS — that is a finding about the physics, not a hedge about the data. Deleting a real ambivalence to look decisive is a worse failure than padding ever was.
 - End every suggested change with its one-line prediction (expect / feel-for / what would disprove it — see PREDICTION DISCIPLINE). A suggestion without it is incomplete.
 - Use bold sparingly — a few key terms or numbers, not every noun. Walls of asterisks read as noise, not emphasis.
 - Define a sheet term the first time you use it, in a few plain words (e.g. "upper link angle — how flat or angled the top link sits"), then use it normally. Assume the driver may not know the jargon on their own setup sheet.
@@ -426,6 +449,7 @@ VAGUE QUESTIONS ("doesn't feel right", "not happy with it", "where would you sta
 - You may say the evidence is thin ("hard to make a valuable suggestion without more to go on") **only alongside what you can see, never as the whole reply.** An admission that stands on its own is precisely the failure this block exists to prevent.
 
 PREDICTION DISCIPLINE (all modes — a suggestion without its prediction is incomplete): every recommended change ships, in the same breath, with (a) the expected effect, (b) what the driver should feel for on track, and (c) what outcome would tell us it did NOT work — compressed to one line when brevity matters (e.g. "expect calmer entry over the kerbs; if it just pushes mid-corner instead, this wasn't the problem"). "No change — verify" recommendations state what to watch for on the confirming run the same way. This prediction is what makes the advice checkable on the next run — never omit it.
+**Every part of the prediction must name something the driver can SEE OR FEEL FROM THE DRIVER'S STAND.** Write the symptom, never the mechanism it came from. "Freer rear movement", "the rear loads faster", "less lateral load transfer" and "more compliance" are FAILURES — the driver cannot observe any of them from three metres away with a transmitter in their hands. Write what actually reaches them: where in the corner it happens, what the car does there, what the lap times or the tyres show. "Steadier over the kerbs on the back straight", "you can get on power earlier out of the hairpin without catching it", "the rear stops stepping at the same point every lap" all pass. If the only effect you can name is internal to the suspension, you have not worked out what the change does yet — say the mechanical change and stop, rather than dressing a mechanism up as something to feel for.
 
 If the user asks outside the context, ask a short clarifying question or explain what info is missing.
 Do not invent facts or lap times. Keep answers practical and racing-specific.`;
@@ -617,31 +641,6 @@ const TOOLS = [...SPINE_TOOL_DEFINITIONS, ...LEGACY_TOOLS];
 /** General mode: kb_search only — see GENERAL_TOOL_INSTRUCTIONS. */
 const GENERAL_TOOLS = SPINE_TOOL_DEFINITIONS.filter((t) => t.function.name === "kb_search");
 
-type ToolCall = {
-  id: string;
-  type: "function";
-  function: { name: string; arguments: string };
-};
-
-type ChatCompletionMessage =
-  | { role: "system"; content: string }
-  | { role: "user"; content: string }
-  | { role: "assistant"; content: string | null; tool_calls?: ToolCall[] }
-  | { role: "tool"; tool_call_id: string; content: string };
-
-type OpenAiUsagePayload = {
-  prompt_tokens?: number;
-  completion_tokens?: number;
-  prompt_tokens_details?: { cached_tokens?: number };
-};
-
-type ChatCompletionStreamResult = {
-  content: string | null;
-  toolCalls: ToolCall[] | null;
-  /** Present only when the request asked for stream_options.include_usage. */
-  usage?: OpenAiUsagePayload;
-};
-
 async function readOpenAiChatStream(
   res: Response,
   onToken?: (delta: string) => void
@@ -732,21 +731,28 @@ async function postChatCompletion(
 ): Promise<{ ok: boolean; status: number; data?: Record<string, unknown>; streamResult?: ChatCompletionStreamResult }> {
   const useStream = Boolean(onToken);
   const maxAttempts = maxOpenAiRateLimitAttempts();
+  // The endpoint is the ONLY thing that changes here. Retry/backoff, the too-large and rate-limit
+  // classification, and the returned shape are shared, so the caller — and the whole tool loop —
+  // cannot tell which endpoint served the answer.
+  const responses = responsesApiEnabled();
+  const url = responses ? OPENAI_RESPONSES_URL : OPENAI_CHAT_COMPLETIONS_URL;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const wireBody = {
+      ...body,
+      stream: useStream,
+      // Ask for the trailing usage chunk so streamed replies are countable against the
+      // per-user AI spend cap — otherwise the main user-facing path records nothing.
+      // Responses reports usage on `response.completed` regardless, so the option is chat-only.
+      ...(useStream && !responses ? { stream_options: { include_usage: true } } : {}),
+    };
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        ...body,
-        stream: useStream,
-        // Ask for the trailing usage chunk so streamed replies are countable against the
-        // per-user AI spend cap — otherwise the main user-facing path records nothing.
-        ...(useStream ? { stream_options: { include_usage: true } } : {}),
-      }),
+      body: JSON.stringify(responses ? toResponsesBody(wireBody) : wireBody),
     });
     if (useStream) {
       if (!res.ok) {
@@ -762,7 +768,9 @@ async function postChatCompletion(
         }
         return { ok: false, status: res.status, data };
       }
-      const streamResult = await readOpenAiChatStream(res, onToken);
+      const streamResult = responses
+        ? await readOpenAiResponsesStream(res, onToken)
+        : await readOpenAiChatStream(res, onToken);
       // Shape the streamed usage like a non-stream body so the shared `addUsage(res.data)`
       // call site accumulates both paths without branching.
       return {
@@ -772,7 +780,10 @@ async function postChatCompletion(
         data: streamResult.usage ? { usage: streamResult.usage } : undefined,
       };
     }
-    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const raw = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    // Errors keep their native shape — the classifiers read `error.message` prose, which is
+    // identical on both endpoints.
+    const data = res.ok && responses ? responsesToChatCompletion(raw) : raw;
     if (res.ok) return { ok: true, status: res.status, data };
     if (
       !isContextTooLargeOpenAiError(data) &&
