@@ -9,6 +9,9 @@
  * Args:  --set=path            (default scripts/engineer-bench/benchmark-set.json)
  *        --label=name          (required-ish; names the results file)
  *        --limit=N             (first N cases — cheap smoke runs)
+ *        --ids=a,b,c           (exact case ids — use this for model A/Bs, not --limit)
+ *        --run-id=cmr...       (pin ONE run that every runPolicy:"latest" case asks about)
+ *        --run-ids=r1,r2,r3    (one run PER CASE, positionally matched to --ids)
  *        --tag=trackside       (only cases carrying this tag)
  *        --concurrency=1       (parallel cases; keep low for TPM)
  *        --case-delay=18       (seconds between case starts, TPM spacing)
@@ -20,6 +23,16 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
+/**
+ * Pricing comes from `budgets.ts` — the same table the spend cap uses.
+ *
+ * This file used to keep its own copy, and the two drifted: the local table priced gpt-5.5 at
+ * gpt-5's 1.25/10 and reported the baseline at ~$0.116/answer when the real figure is ~4x that.
+ * One table, one source of truth. `estimateCostUsd` also applies the cached-input discount, which
+ * the old local maths ignored entirely — the Engineer resends a large stable prefix every tool-loop
+ * round, so ignoring it overstated cost by however much of the prompt was actually cache-served.
+ */
+import { estimateCostUsd } from "@/lib/aiUsage/budgets";
 import { runEngineerChatTurn } from "@/lib/engineerPhase5/engineerChatPipeline";
 import {
   ENGINEER_DEFAULT_MODEL,
@@ -35,26 +48,6 @@ import { buildEngineerResponseMetadata } from "@/lib/engineerFeedback/extractRes
 import { sleepMs } from "@/lib/openAiRetry";
 import type { BenchCase, BenchmarkSet } from "./build-benchmark-set";
 
-/** USD per 1M tokens (input, output). Estimates — update when models/prices move. */
-const PRICING: Record<string, { inPerM: number; outPerM: number }> = {
-  "gpt-4o": { inPerM: 2.5, outPerM: 10 },
-  "gpt-4o-mini": { inPerM: 0.15, outPerM: 0.6 },
-  "gpt-5": { inPerM: 1.25, outPerM: 10 },
-  "gpt-5.5": { inPerM: 1.25, outPerM: 10 },
-  // Longest-prefix match below, so this also prices "gpt-5.6-terra".
-  "gpt-5.6": { inPerM: 2.5, outPerM: 15 },
-};
-
-function priceFor(model: string): { inPerM: number; outPerM: number } | null {
-  const m = model.trim().toLowerCase();
-  // Longest prefix wins — first-match order would price "gpt-5.6-terra" off the "gpt-5" row and
-  // report the 5.6 arm at half its real input cost.
-  const key = Object.keys(PRICING)
-    .filter((k) => m.startsWith(k))
-    .sort((a, b) => b.length - a.length)[0];
-  return key ? PRICING[key] : null;
-}
-
 type BenchResult = {
   id: string;
   source: BenchCase["source"];
@@ -67,7 +60,21 @@ type BenchResult = {
   latencyMs: number;
   promptTokens: number | null;
   completionTokens: number | null;
+  /**
+   * Subset of `promptTokens` served from OpenAI's prompt cache, at 10% of the input rate.
+   * The pipeline has always returned this; the bench used to discard it and price every input
+   * token at full rate, which overstated cost per answer.
+   */
+  cachedPromptTokens: number | null;
   estCostUsd: number | null;
+  /**
+   * The run this case actually answered about. Recorded per case, not per bench, because
+   * `--run-ids=` lets every case sit on a different run — and "which run was this?" is the first
+   * thing anyone asks when reading two arms side by side.
+   */
+  anchorRunId: string | null;
+  /** Human-readable "date · car · track · notes" for the anchor run, for the comparison page. */
+  anchorRunLabel: string | null;
   error: string | null;
 };
 
@@ -96,6 +103,22 @@ function parseArgs(argv: string[]) {
     label: get("label") ?? "unlabeled",
     limit: get("limit") ? Math.floor(num("limit", Infinity)) : Infinity,
     tag: get("tag"),
+    // Exact case ids, comma-separated. --limit takes the FIRST N, which is fine for a smoke run
+    // but useless for a model A/B: every arm has to answer the same cases, and the ones worth
+    // comparing on aren't the first three in the file.
+    ids: get("ids")
+      ?.split(",")
+      .map((s) => s.trim())
+      .filter(Boolean) ?? null,
+    // Pin the run that runPolicy:"latest" cases answer about. Unset = newest run, which drifts.
+    runId: get("run-id"),
+    // One run PER CASE, positionally matched to --ids. One anchor run for every case makes an A/B
+    // measure "which model reads this one run better", which a single unlucky run can decide.
+    // Spreading the cases over different runs tests the models against different context instead.
+    runIds: get("run-ids")
+      ?.split(",")
+      .map((s) => s.trim())
+      .filter(Boolean) ?? null,
     concurrency: Math.floor(num("concurrency", 1)),
     // Full-context answers are ~23K prompt tokens; at a 30K TPM org limit one case
     // nearly fills the minute — default spacing keeps answer + judge under the cap.
@@ -121,6 +144,31 @@ async function resolveUserId(): Promise<string> {
   const latest = await prisma.run.findFirst({ orderBy: { sortAt: "desc" }, select: { userId: true } });
   if (!latest) throw new Error("No runs in DB — set ENGINEER_EVAL_USER_EMAIL or ENGINEER_EVAL_USER_ID");
   return latest.userId;
+}
+
+/** Pin an anchor run explicitly, refusing ids that aren't this user's. */
+async function resolveOwnedRun(userId: string, runId: string): Promise<{ id: string; label: string }> {
+  const r = await prisma.run.findFirst({
+    where: { id: runId, userId },
+    select: {
+      id: true,
+      sortAt: true,
+      notes: true,
+      tireRunNumber: true,
+      carNameSnapshot: true,
+      trackNameSnapshot: true,
+      car: { select: { name: true } },
+      track: { select: { name: true } },
+      event: { select: { name: true } },
+    },
+  });
+  if (!r) throw new Error(`run id ${runId} not found for the eval user (wrong id, or another user's run)`);
+  const when = r.sortAt ? r.sortAt.toISOString().slice(0, 10) : "?";
+  const car = r.car?.name ?? r.carNameSnapshot ?? "—";
+  const track = r.track?.name ?? r.trackNameSnapshot ?? r.event?.name ?? "—";
+  const note = (r.notes ?? "").replace(/\s+/g, " ").slice(0, 90);
+  const label = `${when} · ${car} · ${track} · tyre run ${r.tireRunNumber}${note ? ` · "${note}"` : " · (no notes)"}`;
+  return { id: r.id, label };
 }
 
 async function latestRunId(userId: string): Promise<string | null> {
@@ -180,12 +228,49 @@ async function main() {
   const setRaw = await fs.readFile(args.setPath, "utf8");
   const set = JSON.parse(setRaw) as BenchmarkSet;
   let cases = set.cases;
+  if (args.ids) {
+    const byId = new Map(cases.map((c) => [c.id, c]));
+    const missing = args.ids.filter((id) => !byId.has(id));
+    // Fail loudly. A typo'd id silently dropping a case would leave two arms answering different
+    // question sets, and the comparison would look fine right up until it meant nothing.
+    if (missing.length > 0) {
+      throw new Error(`--ids not found in the set: ${missing.join(", ")}`);
+    }
+    cases = args.ids.map((id) => byId.get(id)!);
+  }
   if (args.tag) cases = cases.filter((c) => c.tags.includes(args.tag!));
   if (Number.isFinite(args.limit)) cases = cases.slice(0, args.limit);
   if (cases.length === 0) throw new Error("No cases after filters");
 
   const userId = await resolveUserId();
-  const anchorRunId = await latestRunId(userId);
+  // Cases with runPolicy:"latest" answer about ONE run. Left to itself the bench picks whatever is
+  // newest, so the subject of the comparison drifts every time a run is logged — and a model A/B
+  // that silently changed the question halfway through would look fine and mean nothing. --run-id
+  // pins it. Ownership is checked because a run id belonging to someone else would otherwise pull a
+  // different driver's car into the answers without a word.
+  const anchorRun = args.runId ? await resolveOwnedRun(userId, args.runId) : null;
+  const anchorRunId = anchorRun?.id ?? (await latestRunId(userId));
+  if (anchorRun) console.log(`Anchor run pinned: ${anchorRun.id} — ${anchorRun.label}`);
+
+  // Per-case anchors. Positional against --ids, so an off-by-one would silently answer the wrong
+  // question about the wrong run; require the two lists to line up exactly rather than zipping
+  // whatever is there.
+  const runByCaseId = new Map<string, { id: string; label: string }>();
+  if (args.runIds) {
+    if (!args.ids) throw new Error("--run-ids requires --ids (they are matched positionally)");
+    if (args.runIds.length !== args.ids.length) {
+      throw new Error(
+        `--run-ids has ${args.runIds.length} entries but --ids has ${args.ids.length}; they are matched positionally and must be the same length`
+      );
+    }
+    console.log(`\nPer-case anchor runs:`);
+    for (let i = 0; i < args.ids.length; i++) {
+      const resolved = await resolveOwnedRun(userId, args.runIds[i]);
+      runByCaseId.set(args.ids[i], resolved);
+      console.log(`  ${args.ids[i].padEnd(30)} → ${resolved.id}  ${resolved.label}`);
+    }
+    console.log("");
+  }
   // Default must track the pipeline's own default, not a hardcoded "gpt-4o" — the results file is
   // the only record of which model wrote the answers, and a stale label silently mislabels an arm.
   const answerModel = process.env.ENGINEER_MODEL?.trim() || ENGINEER_DEFAULT_MODEL;
@@ -199,7 +284,10 @@ async function main() {
 
   const results = await runPool(cases, args.concurrency, async (c, index): Promise<BenchResult> => {
     if (index > 0 && args.caseDelayMs > 0) await sleepMs(args.caseDelayMs);
-    const runId = c.runPolicy === "latest" ? anchorRunId ?? undefined : undefined;
+    const perCase = runByCaseId.get(c.id) ?? null;
+    const runId =
+      c.runPolicy === "latest" ? (perCase?.id ?? anchorRunId ?? undefined) : undefined;
+    const anchorRunLabel = runId ? (perCase?.label ?? anchorRun?.label ?? null) : null;
     const t0 = Date.now();
     process.stdout.write(`[${index + 1}/${cases.length}] ${c.id} (${c.mode})… `);
     try {
@@ -240,17 +328,28 @@ async function main() {
               });
       }
 
-      const price = priceFor(answerModel);
-      const estCostUsd =
-        turn.usage && price
-          ? (turn.usage.promptTokens / 1e6) * price.inPerM +
-            (turn.usage.completionTokens / 1e6) * price.outPerM
+      const estCostUsd = turn.usage
+        ? estimateCostUsd({
+            model: answerModel,
+            promptTokens: turn.usage.promptTokens,
+            completionTokens: turn.usage.completionTokens,
+            cachedPromptTokens: turn.usage.cachedPromptTokens,
+          })
+        : null;
+
+      // Cache-hit share is the single biggest lever on cost per answer, so print it per case
+      // rather than leaving it to be reconstructed from the results file.
+      const cacheHitPct =
+        turn.usage && turn.usage.promptTokens > 0
+          ? Math.round((turn.usage.cachedPromptTokens / turn.usage.promptTokens) * 100)
           : null;
 
       console.log(
         `judge=${judge ? judge.score0to10 : "-"}/10 · ${Math.round(latencyMs / 1000)}s · ${
           turn.usage ? `${turn.usage.promptTokens}+${turn.usage.completionTokens}tok` : "usage n/a"
-        }${estCostUsd != null ? ` · ~$${estCostUsd.toFixed(3)}` : ""}`
+        }${cacheHitPct != null ? ` · ${cacheHitPct}% cached` : ""}${
+          estCostUsd != null ? ` · ~$${estCostUsd.toFixed(3)}` : ""
+        }`
       );
 
       return {
@@ -265,7 +364,10 @@ async function main() {
         latencyMs,
         promptTokens: turn.usage?.promptTokens ?? null,
         completionTokens: turn.usage?.completionTokens ?? null,
+        cachedPromptTokens: turn.usage?.cachedPromptTokens ?? null,
         estCostUsd,
+        anchorRunId: runId ?? null,
+        anchorRunLabel,
         error: null,
       };
     } catch (err) {
@@ -283,7 +385,10 @@ async function main() {
         latencyMs: Date.now() - t0,
         promptTokens: null,
         completionTokens: null,
+        cachedPromptTokens: null,
         estCostUsd: null,
+        anchorRunId: runId ?? null,
+        anchorRunLabel,
         error: msg,
       };
     }
@@ -299,6 +404,10 @@ async function main() {
   }
   const latencies = results.filter((r) => !r.error).map((r) => r.latencyMs).sort((a, b) => a - b);
   const costs = results.filter((r) => r.estCostUsd != null).map((r) => r.estCostUsd!);
+  // Cache-hit share across the whole run. This is what decides whether an answer costs the
+  // full-rate figure or a fraction of it, so it belongs in the summary, not just per case.
+  const totalPromptTokens = results.reduce((s, r) => s + (r.promptTokens ?? 0), 0);
+  const totalCachedTokens = results.reduce((s, r) => s + (r.cachedPromptTokens ?? 0), 0);
   const corrPairs: Array<[number, number]> = results
     .filter((r) => r.judge && typeof r.founderStars === "number")
     .map((r) => [r.founderStars!, r.judge!.score0to10]);
@@ -315,6 +424,9 @@ async function main() {
       costs.length > 0 ? Math.round((costs.reduce((s, c) => s + c, 0) / costs.length) * 10000) / 10000 : null,
     totalEstCostUsd:
       costs.length > 0 ? Math.round(costs.reduce((s, c) => s + c, 0) * 100) / 100 : null,
+    avgPromptTokens: results.length > 0 ? Math.round(totalPromptTokens / results.length) : null,
+    cachedPromptTokenPct:
+      totalPromptTokens > 0 ? Math.round((totalCachedTokens / totalPromptTokens) * 100) : null,
     judgeVsFounderPearson: corr != null ? Math.round(corr * 100) / 100 : null,
     judgeVsFounderPairs: corrPairs.length,
     elapsedMs: Date.now() - started,
@@ -346,6 +458,9 @@ async function main() {
   );
   console.log(
     `Cost (answer path): avg ~$${summary.avgEstCostUsd ?? "n/a"} · total ~$${summary.totalEstCostUsd ?? "n/a"} (estimates)`
+  );
+  console.log(
+    `Prompt:            avg ${summary.avgPromptTokens ?? "n/a"} tok · ${summary.cachedPromptTokenPct ?? "n/a"}% served from cache`
   );
   console.log(
     `Judge vs founder:  ${summary.judgeVsFounderPearson ?? "n/a"} Pearson over ${summary.judgeVsFounderPairs} rated cases`

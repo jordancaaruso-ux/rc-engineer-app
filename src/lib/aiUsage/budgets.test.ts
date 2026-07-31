@@ -28,6 +28,27 @@ test("dated snapshots price as their longest matching base model", () => {
   assert.deepEqual(modelRate("gpt-4o-2024-11-20"), { input: 2.5, output: 10 });
 });
 
+test("the shipping Engineer model prices at its real rate, not gpt-5's", () => {
+  // Regression: this row said 1.25/10 (gpt-5's rate) until 2026-07-31, so every Engineer answer
+  // was costed ~4x under and the daily cap let ~4x the intended spend through.
+  assert.deepEqual(modelRate("gpt-5.5"), { input: 5, output: 30 });
+  assert.deepEqual(modelRate("gpt-5"), { input: 1.25, output: 10 });
+  // gpt-5.5-pro is 6x gpt-5.5 — it must not price off the shorter "gpt-5.5" prefix.
+  assert.deepEqual(modelRate("gpt-5.5-pro"), { input: 30, output: 180 });
+});
+
+test("each gpt-5.6 tier prices off its own row", () => {
+  // The three tiers differ by 25x on input. Longest-prefix matching is what keeps them apart —
+  // a single bare "gpt-5.6" row would price luna at sol's rate and terra at neither's.
+  assert.deepEqual(modelRate("gpt-5.6-sol"), { input: 5, output: 30 });
+  assert.deepEqual(modelRate("gpt-5.6-terra"), { input: 2, output: 12 });
+  assert.deepEqual(modelRate("gpt-5.6-luna"), { input: 0.2, output: 1.2 });
+  // Dated snapshots still resolve to their tier, not to the bare 5.6 row.
+  assert.deepEqual(modelRate("gpt-5.6-luna-2026-07-09"), { input: 0.2, output: 1.2 });
+  // An untiered 5.6 must not fall through to the "gpt-5" prefix and under-count 4x.
+  assert.deepEqual(modelRate("gpt-5.6"), { input: 5, output: 30 });
+});
+
 test("unknown models fall back to the expensive rate, never to free", () => {
   const rate = modelRate("some-future-model");
   assert.equal(rate.input, 5);

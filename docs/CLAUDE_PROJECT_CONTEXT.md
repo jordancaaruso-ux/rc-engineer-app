@@ -127,6 +127,16 @@ or numbers go stale silently.
   Foundation built but inert behind a flag.
 - **Engineer cost** ~$0.12 per typical question; Standard break-even ≈ 75/month; a race weekend is
   20–40. **Video has zero AI cost** — its cost is stored GB forever, hence ~30-day retention.
+  - **MEASURED 2026-07-31 (gpt-5.5, 3 bench cases, real usage):** ~**$0.18/answer**, not $0.12.
+    Two errors cancelled out to roughly the right answer: `budgets.ts` priced gpt-5.5 at gpt-5's
+    $1.25/$10 when it is **$5/$30** (~4x under), while every harness ignored prompt caching, which
+    actually serves **~77–89% of input tokens** at 10% of rate. Both are fixed. Standard break-even
+    is therefore ≈ **55/month**, not 75 — tighter than documented but not underwater. Cost per
+    answer swings ~5.7x with tool-loop depth ($0.06 shallow → $0.36 deep).
+  - **Model choice is now the biggest cost lever, not the prompt.** Same 3 cases, medium effort,
+    normalised to 85% cache: gpt-5.5 $0.124 · gpt-5.6-sol $0.142 · gpt-5.6-terra $0.046 ·
+    **gpt-5.6-luna $0.0048 (26x cheaper than today)**. Quality is founder-judged blind and pairwise
+    (`npm run engineer:bench:model-pairwise`) — the gpt-4o judge saturates and cannot separate these.
 - **Catalog:** 149 touring rubber tyres / 25 brands extracted and imported unverified, awaiting
   review. Cars, additives and tracks reuse the same method.
 - **Asset access:** Jordan stays sole verifier, with a one-tap review queue and deliberately shrunk

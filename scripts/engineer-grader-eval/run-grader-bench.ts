@@ -31,27 +31,44 @@ import {
   type JudgeExemplar,
   type PairwiseVerdict,
 } from "@/lib/engineerFeedback/calibratedJudge";
+import { estimateCostUsd } from "@/lib/aiUsage/budgets";
 import { sleepMs } from "@/lib/openAiRetry";
 import type { Scenario } from "./types";
 import { loadScenariosFromDirs } from "./scenarioIo";
 import { assertGraderDb, purgeSynthetic, seedScenario } from "./seedBranch";
 
-/** USD per 1M tokens (input, output). Estimates — update when models/prices move. */
-const PRICING: Record<string, { inPerM: number; outPerM: number }> = {
-  "gpt-5.5": { inPerM: 5, outPerM: 15 },
-  "gpt-4o": { inPerM: 2.5, outPerM: 10 },
-  "gpt-4o-mini": { inPerM: 0.15, outPerM: 0.6 },
+/**
+ * USD per 1M tokens for providers `budgets.ts` doesn't know about.
+ *
+ * OpenAI models are priced by `estimateCostUsd` below — the same table the production spend cap
+ * uses. This file used to keep a full copy, and it had gpt-5.5 at 5/15 while the bench had 1.25/10
+ * and the truth is 5/30; three tables, three answers. Only xAI lives here now, because it is
+ * eval-only and has no business in the production cap table.
+ */
+const NON_OPENAI_PRICING: Record<string, { inPerM: number; outPerM: number }> = {
   grok: { inPerM: 3, outPerM: 15 },
 };
-function priceFor(model: string) {
+
+function estCost(
+  model: string,
+  usage:
+    | { promptTokens: number; completionTokens: number; cachedPromptTokens?: number }
+    | null
+    | undefined
+) {
+  if (!usage) return null;
   const m = model.trim().toLowerCase();
-  for (const key of Object.keys(PRICING)) if (m.startsWith(key)) return PRICING[key];
-  return null;
-}
-function estCost(model: string, usage: { promptTokens: number; completionTokens: number } | null | undefined) {
-  const p = priceFor(model);
-  if (!usage || !p) return null;
-  return (usage.promptTokens / 1e6) * p.inPerM + (usage.completionTokens / 1e6) * p.outPerM;
+  const nonOpenAi = Object.keys(NON_OPENAI_PRICING).find((k) => m.startsWith(k));
+  if (nonOpenAi) {
+    const p = NON_OPENAI_PRICING[nonOpenAi];
+    return (usage.promptTokens / 1e6) * p.inPerM + (usage.completionTokens / 1e6) * p.outPerM;
+  }
+  return estimateCostUsd({
+    model,
+    promptTokens: usage.promptTokens,
+    completionTokens: usage.completionTokens,
+    cachedPromptTokens: usage.cachedPromptTokens,
+  });
 }
 
 type EngineAnswer = {

@@ -28,11 +28,22 @@ const MODEL_RATES_USD_PER_MTOK: Record<string, { input: number; output: number }
   "gpt-4o": { input: 2.5, output: 10 },
   "gpt-4o-mini": { input: 0.15, output: 0.6 },
   "gpt-5": { input: 1.25, output: 10 },
-  "gpt-5.5": { input: 1.25, output: 10 },
-  // gpt-5.6 ("terra") is 2x input / 1.5x output vs 5.5. The prefix match below prices the full
-  // "gpt-5.6-terra" id off this row; without it, 5.6 falls to UNKNOWN_MODEL_RATE and the daily
-  // cap bites ~4x early, which reads as a bug rather than as a budget.
-  "gpt-5.6": { input: 2.5, output: 15 },
+  // CORRECTED 2026-07-31. This row said 1.25/10 — that is gpt-5's rate, not gpt-5.5's, so every
+  // Engineer answer was priced ~4x under its true cost and the daily cap let ~4x the intended
+  // spend through. The measured "~$0.116/answer" bench baseline came off the wrong number; the
+  // real figure at ~79K prompt + ~1.7K completion is ~$0.45 uncached.
+  "gpt-5.5": { input: 5, output: 30 },
+  "gpt-5.5-pro": { input: 30, output: 180 },
+  // gpt-5.6 tiers, priced after OpenAI's 2026-07-30 cut (terra 2.50/15 -> 2/12, luna 1/6 -> 0.2/1.2).
+  // Each tier needs its own row: modelRate does longest-prefix matching, so a single bare "gpt-5.6"
+  // row would price all three off one number and be wrong for two of them.
+  "gpt-5.6-sol": { input: 5, output: 30 },
+  "gpt-5.6-terra": { input: 2, output: 12 },
+  "gpt-5.6-luna": { input: 0.2, output: 1.2 },
+  // Untiered "gpt-5.6" isn't a real model id, but if one ever arrives it must not fall through to
+  // the "gpt-5" prefix and get priced at 1.25/10. Pin it to the dearest tier — over-counting caps
+  // early, which is visible; under-counting is not.
+  "gpt-5.6": { input: 5, output: 30 },
 };
 
 /** Conservative (high) fallback: better to cap early than to under-count a model we don't know. */
