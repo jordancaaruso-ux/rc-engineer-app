@@ -1,128 +1,14 @@
----
-name: engineer-response-review
-description: Reviewing Jordan's rated Engineer responses (the feedback inbox) and routing each problem to the right fix — KB draft, prompt change, data/context work, or calibration note. Use whenever he says "review the engineer feedback", "review the responses / the inbox", "analyze the ratings I just did", or pastes/exports rated Engineer answers and asks what's wrong. Report-only: this skill never edits the KB, the prompt, or code — it diagnoses and proposes. LIVING DOC: append new correction-patterns and rulings to the log at the bottom as they arise.
----
+# Engineer response corrections — observation log
 
-# Reviewing Engineer responses (feedback triage)
+What the Engineer actually got wrong, dated, in Jordan's words where quoted. Extracted from
+the engineer-response-review skill on 2026-07-31 when that skill was deleted: the methodology
+around it was instruction, this is observation. Seed the rebuilt eval from here and from
+inbox.jsonl — not from predicted cases.
 
-This skill exists because of one recurring failure: **misrouted fixes** — reaching for a prompt
-rule ("never say stiffer rear adds rotation") when the real problem is that the physics is
-missing from the KB. Jordan's 0–10 note on each answer IS the review; your job is not to
-re-review the answer from scratch, it is to read his note with his values and route every
-problem to the fix that actually belongs to it.
-
-## Non-negotiables — read first
-
-- **Report only.** No KB writes, no prompt edits, no code or backlog file changes. Propose;
-  he dispatches. The only file this skill ever writes is its own correction log below.
-- **Approved KB is founder-gated** (`AGENTS.md` hard rule 1) — even *proposed* KB fixes are
-  worded as draft topics for him to approve, never as edits you're about to make.
-- **`.env.local` is the live production DB** with real users. Read-only queries only, and only
-  when a routing verdict depends on a fact you can't get from the export.
-- **His note is ground truth for calibration.** When you honestly disagree — the physics was
-  right, or the note misdiagnoses the root cause — say so openly in the report, labelled as a
-  disagreement, with the physics argument and sources. Then route per his call anyway unless
-  he changes it. A disagreement is data (often the start of a KB interview), not a veto.
-- Never drive the app (`AGENTS.md`).
-
-## The philosophy (what Jordan values)
-
-- **KB-sufficiency principle — the core test.** The Engineer must be able to reason from the
-  KB's physics alone to a great conclusion. If the KB as written cannot carry a sound
-  symptom → mechanism → lever chain for the question asked, *the physics isn't good enough*,
-  and that is a KB finding — even when the visible symptom looks like a model mistake.
-  Rear-spring/rotation and front-toe-out/response were this: the KB was silent, the model
-  filled the gap with generic full-size-car lore that is wrong for RC touring.
-- **The prompt never carries physics.** A physics claim appearing in the prompt is proof of a
-  KB gap. The prompt owns *behaviour*: which evidence to trust, ordering, hedging, length,
-  presentation, subject discipline.
-  - **Stopgap exception:** a recurring physics error may get a temporary prompt guard, but it
-    must be explicitly marked as debt in the report and tracked in the stopgap register below;
-    every review checks whether the KB now covers it and recommends deleting the guard.
-- **Quantity vs actuator.** Reason and compare in the physical quantity; voice the change as
-  the sheet knob the driver actually turns. Awesomatix springs: compare in **spring rate**
-  ("68.4 vs 72.8 gf/mm — a bit soft"), recommend in **gap** ("add ~0.5 gap to firm it").
-  Comparing gap medians is the failure ("gap 0 vs 3.1 median") — the same gap means different
-  rates on different springs, so gap-space comparisons are physically meaningless.
-- **Revert-first is fine — if labelled.** Undoing the most recent change is a legitimate
-  cleanest-A/B first test. The failure mode is camouflage: reverting the last change while
-  dressing it up as fresh symptom-driven advice. Recommending a revert must say "this reverts
-  your 80→100 change — cleanest A/B", not pretend the median gap demanded it.
-- **A median gap is a ranking prior, never evidence.** Distance from the community median may
-  order candidate levers; it can never *justify* one. Justification is symptom → mechanism
-  from the KB. "You're at 100 vs 60 median" as the whole argument = evidence misuse.
-- **Uncommon combinations get named.** A suggestion that produces an unusual configuration
-  (e.g. a 0.2 front/rear ARB split) can still be right — but the driver should be told it's
-  uncommon so they can weigh it.
-- **Setup is ART, not a fixed method** (same ethos as the KB-author skill): predictions are
-  hedged, test-oriented, one-change-discipline; certainty language about outcomes is a smell.
-
-## Inputs
-
-- Primary: [docs/engineer-feedback/inbox.md](../../../docs/engineer-feedback/inbox.md) (+
-  `inbox.jsonl`) — usually already filtered by him
-  (`npm run engineer:export-feedback -- --limit N | --since D | --prompt-version V`; see
-  [docs/engineer-feedback/README.md](../../../docs/engineer-feedback/README.md)). Review the
-  file as given; don't re-export unless asked.
-- Each entry: question, answer, his **note** (read it first), score, `kbSections`, run ids,
-  and `promptVersion` on post-2026-07-30 answers.
-- Entries with a score but no note: still classify, flag as **low confidence — no note**, and
-  don't invent what he meant.
-- Advice-turn reality check: full-tier answers ship the **entire KB** (approved + concepts +
-  drafts behind a divider) as a system block — `kbSections` is a retrieval trace, not what the
-  model saw. Don't diagnose "retrieval missed the file"; if the file exists and the model
-  ignored it, that's prompt/evidence territory; if no file carries the mechanism, that's a KB
-  gap. See [fullKbInContext.ts](../../../src/lib/engineerPhase5/fullKbInContext.ts).
-
-## Method — per answer
-
-1. **Read his note first.** It steers the review. Quote it verbatim in the report.
-2. **Name the failure(s)** in one line each — what the answer did that earned the note.
-3. **Run the KB-sufficiency test on every physics-shaped failure:** open the actual KB files
-   (approved tier: [content/vehicle-dynamics/](../../../content/vehicle-dynamics/), concepts,
-   then drafts) and ask: could a great chain for this question have been built from what's
-   written? Name the files that should have carried it. Silence or a missing link = KB gap.
-   A mechanism that exists **only in a draft** is still a KB finding (needs promote/verify),
-   not a prompt finding.
-4. **Verify load-bearing hypotheses before asserting them.** If the routing verdict depends on
-   a factual claim about what the model saw — "damper % led because it was the changed key on
-   runs near the anchor" — check it read-only (run change history around the anchored
-   `runId`, the rating's context snapshot) instead of asserting it. Name in the report what
-   was verified vs what remains a hypothesis.
-5. **Route each failure into exactly one bucket** (below). One answer can produce findings in
-   several buckets, but one finding never sits in two.
-6. **Disagree openly where honest** — labelled, sourced, then route per his call.
-
-## The five buckets
-
-| Bucket | Test | Routed fix (proposed, never applied) |
-|---|---|---|
-| **kb-gap** | KB is silent or missing the link the chain needed | Propose the draft: file/slug, the mechanism chain it must contain, which feedback it fixes |
-| **kb-wrong / conflict** | KB states something false, or two tiers disagree (draft vs approved) | Flag for his typed approval with both texts quoted — never edit, never pick a winner |
-| **prompt / evidence misuse** | Physics was available; the model misweighted evidence or misbehaved (recency camouflage, median-as-evidence, unlabelled revert, quantity/actuator swap in presentation) | Propose the prompt diff in chat ([openaiEngineer.ts](../../../src/lib/engineerPhase5/openaiEngineer.ts)) and wait |
-| **context / data gap** | The needed information wasn't in context at all (e.g. before→after values missing from the pattern digest) | Name the backlog item + the code seam it lives at |
-| **calibration-to-Jordan** | Physically defensible, but not how he'd call it (style, aggression, what's worth mentioning) | Gold-set candidate note + log entry; explicitly *not* a KB or prompt change |
-
-## Report format
-
-Dot points, one line each (`AGENTS.md` comms style). Structure:
-
-- **Per answer:** timestamp/score → his note (verbatim) → finding(s), each with bucket +
-  one-line rationale + routed fix. Disagreements labelled `DISAGREE:` with the argument.
-- **Batch synthesis:** cross-answer patterns (same lever leading multiple answers, same
-  justification shape), score trend vs previous batch **by `promptVersion`** when stamped,
-  anything the notes converge on.
-- **Standing checks:** stopgap register audit (any guard now covered by KB → recommend
-  deletion) · KB hygiene on files the findings touched (duplicate slugs, draft-vs-approved
-  conflicts, stale roadmap rows) — flag only, never fix.
-- **Prioritized fix list:** ordered by his severity (wrong physics quoted to a driver >
-  evidence misuse > calibration > presentation), each item pre-routed so he can dispatch
-  one-by-one.
-- End by appending new patterns/rulings to the correction log below — the only write.
-
+The stopgap register below is the live debt list for the LOCK_* prompt guards.
 ## Stopgap register (prompt guards carrying physics as debt)
 
-- **2026-07-30 · `LOCK_TOE_GAIN`** ([openaiEngineer.ts](../../../src/lib/engineerPhase5/openaiEngineer.ts)) —
+- **2026-07-30 · `LOCK_TOE_GAIN`** ([openaiEngineer.ts](../../src/lib/engineerPhase5/openaiEngineer.ts)) —
   RETIRED TO POINTER SAME DAY: both signs (rear: fewer = more gain; front: more = more bump-in)
   are founder-confirmed and live in approved `bump-steer-toe-gain.md` "Sign" lines; the lock
   now points at the KB and keeps only the anti-reversal warning. Delete entirely once a
@@ -136,6 +22,55 @@ _Both locks were added by a parallel session on 2026-07-30; listed here so every
 audits them per the stopgap rule._
 
 ## Correction log (LIVING — append new patterns, newest first, with date)
+
+**2026-07-31 — third batch (8 ratings, 2026-07-30 22:21–23:51 UTC, all `2026-07-30b+17619acd`; mean 5.9):**
+- **UNLOADED-WHEEL FALLACY — the batch's root pattern, two answers, one cause.** The model reasons
+  about the wheel that is *pointed* at the corner instead of the wheel that is *carrying load*.
+  Front toe-out ("reduce toe-out for smoother turn-in") and Ackermann ("more Ackermann for hairpin
+  steering") both fail this way. Once lateral load has transferred, the inside front is nearly
+  unloaded — angle changes there mostly scrub; the loaded outer governs response.
+- **APPROVED-TIER CONFLICT #1 — `concepts/toe-and-scrub.md` first-instant paragraph** (promoted
+  ef07a30, 05:20 UTC, before all 8 answers) says with toe-out "the inside wheel already points
+  toward the corner and builds its slip angle first". Jordan, third time now: "more negative is
+  smoother", "more front toe out normally delays initial steering". The model followed approved KB
+  and still got his sign wrong — this is no longer a kb-gap, it is a **kb-wrong/conflict awaiting
+  his typed ruling**. Reconciliation to put to him: the first-instant inside wheel carries little
+  load, so its early slip does little; toe-out points the *loaded* outer wheel away, so response
+  builds later = smoother.
+- **APPROVED-TIER CONFLICT #2 — hairpin regime.** `concepts/corner-regime.md` classes a hairpin as
+  transient ("fails the second test… brake, apex and throttle keep the loads moving"); his note says
+  "for hairpins you would want more steady state, not transient. Something about our steady /
+  transient theory isn't working together well". But 64 min later he scored 7/10 and agreed with an
+  answer that treated hairpins as transient (stiffer rear flex → less rotation in hairpins). Both
+  can hold if a hairpin has a transient entry and a steady mid-phase at lock — needs his one-line
+  ruling before any KB move, because corner-regime is load-bearing for most balance answers.
+- **"GENERAL VEHICLE-DYNAMICS THEORY" AS A LICENCE.** On rim/wheel stiffness (KB silent) the model
+  answered confidently and labelled it "general vehicle-dynamics theory, not confirmed on every
+  touring car". His note: "Is this actually general vd knowledge?" The hedge laundered lore as
+  established theory — prompt needs "KB silent → say the KB is silent", distinct from an inference
+  hedge. Same shape as PHYSICS FROM LORE, but with a hedge attached, which is why it passed.
+- **INVENTED METRIC.** "loses the first 3–5 lap pace" — the app computes avgTop5 / avgTop10 /
+  avgTop15 / consistencyScore (`computeLapOutcomesForEngineer.ts`); there is no first-N-lap metric.
+  Rule (12) forbids invented *causes*; predictions may still invent *measurements*. Extend
+  PREDICTION DISCIPLINE: what disproves a change must be observable by the driver or computed by
+  the app.
+- **PROMPT-PRESCRIBED VOCABULARY REJECTED.** `LOCK_VOCABULARY` (openaiEngineer.ts:258) and the
+  on-in-track rule (:377) both instruct "more rolled-in"; his note: "'rolled in' isn't a thing".
+  Also rejected: "pair share load better" (a garbled compression of tyre-load-sensitivity),
+  "rotate more before the rear fully takes a set" (wants "rotate for longer"), "sharper load
+  timing / cleaner response" (too vague), "less clean" (wants "less predictable"). The prompt is
+  the source of one of these, so this is a clean prompt fix, not a model slip.
+- **BREVITY REWORK HELD.** Zero length complaints across 8 answers (previous three batches all had
+  one). The notes moved up the stack to vocabulary and physics — treat `2026-07-30b` as landed on
+  length, and do not trade terseness back for it.
+- **RECENCY CAMOUFLAGE ABSENT.** Damper % led no answer in this batch (one caveat mention only)
+  after leading 3 of 4 two batches ago. Rule 14's lead-lever phase fit looks to be working.
+- Register: `LOCK_TOE_GAIN` — rear sign quoted correctly ("fewer shims = more toe-in gained",
+  23:51), no reversal; keep the pointer. `LOCK_DAMPER_OIL` — oil not discussed in any of the 8,
+  no evidence either way; keep.
+- Method note: `--since today` exported 8 and overwrote the inbox; the four 07-29 ratings and the
+  two 07-30 morning ones are no longer in the file. Re-export unfiltered if older entries are
+  needed.
 
 **2026-07-30 — OVER-EXPLANATION, third occurrence — now an implemented prompt rule, not a note:**
 - Founder, on a general-mode lever survey (rear-exit levers: RC, toe/gain, diff, anti-squat,
@@ -276,11 +211,11 @@ audits them per the stopgap rule._
 - Pattern: **QUANTITY/ACTUATOR SWAP** — comparisons quoted in actuator space (gap medians)
   instead of quantity space (rate). Bucket: split — presentation rule is prompt; but note
   aggregations/spread expose gap keys, so a full fix may also be a data item (compare in
-  derived rate, [springRateLookup.ts](../../../src/lib/setupCalculations/springRateLookup.ts)
+  derived rate, [springRateLookup.ts](../../src/lib/setupCalculations/springRateLookup.ts)
   already derives it).
 
 **2026-07-29 — "more front toe out normally delays initial steering though"**
-- Pattern: PHYSICS FROM LORE again — [toe.md](../../../content/vehicle-dynamics/toe.md) and
+- Pattern: PHYSICS FROM LORE again — [toe.md](../../content/vehicle-dynamics/toe.md) and
   `concepts/toe-and-scrub.md` make no claim about toe-out vs initial response timing; model
   asserted the generic "toe-out = sharper entry". Bucket: kb-gap.
 

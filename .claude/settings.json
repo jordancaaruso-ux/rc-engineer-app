@@ -1,14 +1,47 @@
 {
   "permissions": {
-    "defaultMode": "bypassPermissions",
+    "defaultMode": "auto",
+    "deny": [
+      "Bash(npm run build)",
+      "Bash(npm run db:push)",
+      "Bash(npm run db:seed)",
+      "Bash(npm run db:migrate:deploy)",
+      "Bash(neonctl projects delete *)",
+      "Bash(neonctl branches delete *)",
+      "Bash(neonctl branches reset *)",
+      "Bash(neonctl databases delete *)",
+      "Bash(neonctl roles delete *)"
+    ],
     "allow": [
-      "Bash(node \"/c/Users/Jordan/AppData/Local/Temp/claude/c--Users-Jordan-Documents-rc-engineer-app/a634c754-cd81-44a6-8a22-62e38ba78d5d/scratchpad/strip-accent-dots.cjs\")",
-      "Bash(npx dotenv-cli *)",
+      "Read",
+      "Grep",
+      "Glob",
+      "Bash(npm run test:*)",
+      "Bash(npm run lint)",
+      "Bash(npx tsc *)",
+      "Bash(npx next build)",
+      "Bash(npx tsx *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git branch *)",
       "Skill(update-config)",
       "Skill(update-config:*)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Jordan\\.claude"
+    ]
+  },
+  "autoMode": {
+    "hard_deny": [
+      "$defaults",
+      "Running `prisma db push`, `prisma migrate deploy`, or any db:push / db:seed / db:migrate:deploy npm script. Every db:* script in this repo hardcodes `dotenv-cli -e .env.local`, and .env.local has pointed at the live production database with real user data. Reaching production is these commands' DEFAULT, not an opt-in. `db:migrate:reconcile` and `migrate resolve` are the sanctioned drift repair tools and are fine.",
+      "Running `npm run build`. That is the Vercel pipeline (scripts/vercel-build.cjs) and runs `prisma migrate deploy` first. A local production build is `npx next build`."
+    ],
+    "soft_deny": [
+      "$defaults",
+      "Writing to content/vehicle-dynamics/*.md (top level, not drafts/) or src/lib/engineerPhase5/parameterEffects/catalog.ts. This prose is quoted verbatim to paying users as ground truth. Allowed only when the user's most recent message names the file or asks for KB edits; otherwise propose a diff in chat first. Drafts under content/vehicle-dynamics/drafts/ are open."
     ]
   },
   "hooks": {
@@ -19,13 +52,13 @@
           {
             "type": "command",
             "command": "node",
-            "args": [".claude/hooks/db-push-guard.cjs"],
-            "statusMessage": "Checking for prisma db push"
+            "args": [".claude/hooks/prod-guard.cjs"],
+            "statusMessage": "Checking for production DB / deploy-pipeline commands"
           }
         ]
       },
       {
-        "matcher": "Edit|Write|MultiEdit",
+        "matcher": "Edit|Write|MultiEdit|Bash",
         "hooks": [
           {
             "type": "command",
