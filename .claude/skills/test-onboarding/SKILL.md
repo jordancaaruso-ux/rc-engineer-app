@@ -10,7 +10,13 @@ Onboarding is the one flow Jordan can't re-experience on his own account. The ad
 [src/lib/onboarding/visibility.ts](../../../src/lib/onboarding/visibility.ts) also read `hasCar` /
 `hasAnyRun`** — so on an account with data a reset shows him nothing. That's why this exists.
 
-**Never drive the app yourself** (AGENTS.md). Mint the link, hand it over, stop.
+**Drive it yourself when you are verifying your own work** — run the app, click through, screenshot,
+compare, fix, repeat until it passes. That loop is the point; a change you have not seen render is
+not finished. (This reverses the old "never drive the app" rule, deleted 2026-07-31 along with
+AGENTS.md: it was the single biggest thing stopping agents from checking their own output.)
+
+Still mint the link and hand it over when **Jordan** wants to review the experience himself — his
+judgement on how the first run *feels* is not something to automate away.
 
 ## The response
 

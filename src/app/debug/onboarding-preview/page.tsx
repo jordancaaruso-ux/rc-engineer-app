@@ -216,7 +216,10 @@ function OnboardingPreviewInner() {
         {STATES.map((s) => {
           const visible = showGetSetUpCard(s.facts);
           return (
-            <div key={s.label} className="space-y-2">
+            // Stable hook for the visual suite (e2e/onboarding-preview.spec.ts) — selecting
+            // these blocks by DOM position is fragile, because the wrapper shape differs
+            // between a rendered card and the "not shown" placeholder.
+            <div key={s.label} data-onboarding-state={s.label} className="space-y-2">
               <div className="space-y-1.5">
                 <p className="text-[13px] font-bold text-foreground">{s.label}</p>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">{s.note}</p>

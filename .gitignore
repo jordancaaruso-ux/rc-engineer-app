@@ -42,3 +42,9 @@ hardware/**/__pycache__/
 
 .vercel
 .env*
+
+# Playwright browser verification
+/test-results/
+/playwright-report/
+/blob-report/
+/e2e/.auth/
