@@ -19,6 +19,28 @@ lower ceiling — but both extremes hurt.
 
 **Per axle.** Front and rear each have their own bite/hold.
 
+## Feel vocabulary (the closed list)
+
+These are the **only** words available for describing how a change feels. The list is closed:
+anything outside it is not a feel word that needs replacing with a better adjective, it is a sign
+the change has not been understood well enough to predict its feel — in which case say what the
+change does **mechanically**, or name **where in the corner** and **what the car does there**, and
+stop.
+
+- **Grip arriving:** `bite`, `initial grip`, `overall grip`, `hold`
+- **Bite end of the window:** `precise`, `pointy`
+- **Hold end of the window:** `planted`, `forgiving`
+- **Too little bite:** `numb`, `vague`, `imprecise`
+- **Roll-centre / link language:** `smoother`, `more rolled-in`, `on the track`, `in the track`
+- **Phase:** `entry`, `mid-corner`, `on power`
+- `responsive` — reserved: only for **on the track** / **initial bite** / **initial grip**. Never for
+  a lower roll centre or a flatter upper link.
+
+Everything else is a coinage, however natural it sounds. `punchy`, `crisper`, `takes a set`,
+`lined up`, `skatey`, `on top of it`, `nervous-feeling`, `too immediate` are examples, not the
+boundary — the boundary is this list. A coinage carries no mechanism, cannot be checked on track,
+and leaves the driver asking what was meant.
+
 **Caused by:** the speed of load transfer ([[load-transfer]]) — fast transfer → bite, slow → hold.
 
 **Physics (what sets the timing).** Lateral load reaches the outside tyres through two channels on

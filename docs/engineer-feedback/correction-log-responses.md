@@ -23,6 +23,43 @@ audits them per the stopgap rule._
 
 ## Correction log (LIVING — append new patterns, newest first, with date)
 
+**2026-07-31 — prompt A/B judged 6-0, and the four notes attached to it (prompt `2026-07-31b`):**
+- **`2026-07-31a` WON 6 OF 6 BLIND PAIRS** against `2026-07-30b` — same model, cases, runs and KB,
+  only the prompt moved. Answers 25% shorter (1271 → 956 words), load-bearing comparisons intact,
+  banned coinages 2 → 0, and one answer *gained* a genuine rule-(3) ambivalence. First decisive
+  result in four rounds of judging; the model rounds were nearly all ties. **Shipped.**
+- **BANLISTS CANNOT WORK — founder: "limiting a word won't do anything, new ones will always pop
+  up."** Demonstrated numerically by the new `engineer:bench:vocab` lint: `2026-07-30b` scored 5
+  coinage failures, `2026-07-31a` scored 3 — but they were *different words* (`punchy`, `lined up`
+  replacing `take a set`, `crisper`). Root cause: `LOCK_VOCABULARY` told the Engineer to use "the
+  KB's bite/hold vocabulary" and **that vocabulary had never been enumerated anywhere**, so there
+  was no positive list to snap to. FIXED: closed list written into `concepts/bite-hold.md`, and the
+  prompt rule rewritten from a banlist into a **membership test** — a coinage never seen before
+  still fails, because the test is membership, not recognition. Lint's REVIEW column already names
+  the next wave (`lazy`, `lazier`, `pushy`).
+- **RULE 13 WAS ON AND WAS VIOLATED ANYWAY — the loophole was in its own wording.** The "more punch"
+  run changed **pinion, final drive ratio AND both damper percents**; the Engineer wrote "the only
+  chassis change was damper percent" — literally true — and then used a gearing-flavoured note as
+  evidence about the damper change. It narrowed "more than one tuning key" to *chassis* keys until
+  only one qualified. FIXED: rule 13 now says count EVERY key in the diff, drivetrain included, and
+  names this as the loophole. Gearing is not filtered from context
+  ([setupChangeNoise.ts:20](../../src/lib/setupCompare/setupChangeNoise.ts#L20) excludes only tyres,
+  tyre-prep and sheet headers), so this was never a data gap.
+- **RAW STATS READ BADLY — founder: "should be an easier to read 'you're a little softer than
+  most'".** FIXED in ANSWER SHAPE: say the position in words, spend digits only on what the driver
+  turns (the value now and the value to move to). Rule (10)'s thin-data honesty becomes words too.
+  Watch whether this also damps the damper-dominance problem — removing precise magnitudes removes
+  what makes an outlier scannable, while `positionBand` still serves rule (4) as a brake.
+- **HARNESS BUG, MINE — the bench never pinned a hard anchor.** `runEngineerChatTurn` took no
+  `anchor` param, so `--run-id=`/`--run-ids=` was only a SOFT focus and `basePacket.latestRun` stayed
+  in context. Observed: a **Boronia**-anchored case answered "if you mean the latest **TFTR**
+  comparison…". The app always sends a pinned anchor, so production never had this — but roughly 2 of
+  6 cases per judged round were answered about the wrong run, making the Engineer look worse than it
+  is. FIXED: `anchor` threaded through, bench pins `{kind:"run", pinned:true}`, and
+  `pinnedAnchorForModel` moved out of the chat route into the pipeline so there is one implementation
+  rather than two that can drift. Founder ruled no re-judging needed: both arms shared the
+  corruption, so the head-to-heads stand.
+
 **2026-07-31 — founder interview after round-4 blind pairwise (prompt `2026-07-31a`):**
 - **DAMPER DOMINANCE DIAGNOSED — it is NOT recency.** Damper led or featured in **9 of 12** bench
   answers across 6 unrelated runs. Only **1 of 6** anchor runs had a damper change vs its previous

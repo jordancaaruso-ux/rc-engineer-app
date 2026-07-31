@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
  * approving a KB draft, re-tiering the KB, changing retrieval. Edits to the prompt text
  * itself move the fingerprint even when the label is left alone.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-07-31a";
+export const ENGINEER_PROMPT_LABEL = "2026-07-31b";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);
