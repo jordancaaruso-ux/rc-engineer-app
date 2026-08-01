@@ -42,6 +42,8 @@ export default async function SetupSheetModelWorkbenchPage({
 
   const user = await requireCurrentUser();
   const isAdmin = isAuthAdminEmail(user.email);
+  // Release audit 2026-08-01: the chassis workbench is founder tooling — admin only.
+  if (!isAdmin) notFound();
   const { id } = await params;
 
   const model = await prisma.setupSheetModel.findUnique({

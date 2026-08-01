@@ -14,6 +14,8 @@ import {
   showLegacySetupSheetTemplateEdit,
 } from "@/components/cars/CarSetupSheetModelCard";
 import { CarSetupSheetTemplateEdit } from "@/components/cars/CarSetupSheetTemplateEdit";
+import { canEditSetupSheetModel } from "@/lib/setupSheetModels/modelAccess";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { CarSetupsCard } from "@/components/setup/CarSetupsCard";
 import { CarCurrentSetupCard } from "@/components/setup/CarCurrentSetupCard";
 import { CarSetupHistory } from "@/components/setup/CarSetupHistory";
@@ -77,7 +79,9 @@ export default async function CarDetailPage(props: {
         setupSheetTemplate: true,
         setupSheetModelId: true,
         createdAt: true,
-        setupSheetModel: { select: { id: true, name: true, slug: true } },
+        setupSheetModel: {
+          select: { id: true, name: true, slug: true, userId: true, isAuthorized: true },
+        },
       },
     }),
     prisma.run.count({ where: { userId: user.id, carId } }),
@@ -235,10 +239,14 @@ export default async function CarDetailPage(props: {
             truncated={setupHistory.truncated}
           />
 
-          {car.setupSheetModel ? (
+          {/* Authoring card (schema/calibration links) — admins, plus the creator of a
+              still-unauthorized model (the unknown-chassis hand-build path). Release audit
+              2026-08-01: plain drivers must not see workbench/schema doors. */}
+          {car.setupSheetModel && canEditSetupSheetModel(user, car.setupSheetModel) ? (
             <CarSetupSheetModelCard
               carId={car.id}
               model={car.setupSheetModel}
+              isAdmin={isAuthAdminEmail(user.email)}
               calibrationId={modelCalibration?.id ?? null}
               calibrationName={modelCalibration?.name ?? null}
               exampleDocumentId={modelCalibration?.exampleDocumentId ?? null}

@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -45,6 +45,9 @@ export default async function SetupSheetModelSchemaPage({ params, searchParams }
     where: { id },
     select: { id: true, name: true, slug: true, schemaJson: true, userId: true, isAuthorized: true },
   });
+  // Release audit 2026-08-01: schema viewing/editing is for admins and the creator of a
+  // still-unauthorized model (the unknown-chassis hand-build path). Everyone else: not found.
+  if (model && !canEditSetupSheetModel(user, model)) notFound();
   if (!model) {
     return (
       <>

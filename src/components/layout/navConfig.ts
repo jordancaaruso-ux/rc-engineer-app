@@ -258,6 +258,9 @@ export const CATALOG_LINKS: CatalogLink[] = [
     label: "Chassis types",
     description: "Shared chassis types and setup sheet models (e.g. Mugen MTC3).",
     icon: "layers",
+    // Release audit 2026-08-01: catalog/workbench is founder tooling; drivers pick a chassis
+    // inside the car wizard.
+    adminOnly: true,
   },
   {
     href: "/tracks",

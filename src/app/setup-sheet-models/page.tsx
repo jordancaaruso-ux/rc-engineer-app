@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { SetupSheetModelDeleteButton } from "@/components/setup-sheet-models/SetupSheetModelDeleteButton";
 import { SetupSheetModelAuthorizeToggle } from "@/components/setup-sheet-models/SetupSheetModelAuthorizeToggle";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -51,6 +52,9 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
   const user = await requireCurrentUser();
   await ensureAuthorizedSetupSheetCatalog();
   const isAdmin = isAuthAdminEmail(user.email);
+  // Release audit 2026-08-01: the chassis catalog + workbench are founder tooling. Drivers pick
+  // a chassis inside the car wizard; hand-builders reach THEIR schema from the car page.
+  if (!isAdmin) notFound();
 
   const rows = await prisma.setupSheetModel.findMany({
     orderBy: [{ isAuthorized: "desc" }, { name: "asc" }, { createdAt: "asc" }],

@@ -9,6 +9,7 @@
  */
 
 import { useRef, useState } from "react";
+import { notFound } from "next/navigation";
 
 const WINDOW_SEC = 2.0;
 const SPOTS = 8;
@@ -75,6 +76,8 @@ function fmtMs(n: number): string {
 }
 
 export default function VideoDecodeTestPage() {
+  // Dev-only feasibility rig — the only /debug page that lacked this (release audit 2026-08-01).
+  if (process.env.NODE_ENV === "production") notFound();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [status, setStatus] = useState<string>("Pick a heat video from your camera roll.");

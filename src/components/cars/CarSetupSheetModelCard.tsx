@@ -5,6 +5,10 @@ import { CardPanel } from "@/components/ui/CardPanel";
 type Props = {
   carId: string;
   model: { id: string; name: string; slug: string };
+  /** Calibration mapping + baseline-PDF doors are admin tooling; the schema link also serves
+   *  the creator of a still-unauthorized model (hand-build path) — the CALLER gates on
+   *  `canEditSetupSheetModel` and this card only renders for those two audiences. */
+  isAdmin: boolean;
   calibrationId: string | null;
   calibrationName: string | null;
   exampleDocumentId: string | null;
@@ -13,6 +17,7 @@ type Props = {
 export function CarSetupSheetModelCard({
   carId,
   model,
+  isAdmin,
   calibrationId,
   calibrationName,
   exampleDocumentId,
@@ -43,19 +48,21 @@ export function CarSetupSheetModelCard({
             Edit setup sheet
           </Link>
         </li>
-        {calibrationId ? (
-          <li>
-            <Link
-              href={`/setup-calibrations/${calibrationId}`}
-              className="text-accent hover:text-accent hover:underline"
-            >
-              Edit PDF calibration (map fields)
-            </Link>
-          </li>
-        ) : (
-          <li className="text-muted-foreground">No calibration yet — upload a baseline PDF in the car wizard.</li>
-        )}
-        {exampleDocumentId ? (
+        {isAdmin ? (
+          calibrationId ? (
+            <li>
+              <Link
+                href={`/setup-calibrations/${calibrationId}`}
+                className="text-accent hover:text-accent hover:underline"
+              >
+                Edit PDF calibration (map fields)
+              </Link>
+            </li>
+          ) : (
+            <li className="text-muted-foreground">No calibration yet — upload a baseline PDF in the car wizard.</li>
+          )
+        ) : null}
+        {isAdmin && exampleDocumentId ? (
           <li>
             <Link
               href={`/setup-documents/${exampleDocumentId}`}
