@@ -53,6 +53,10 @@ export async function POST(request: Request): Promise<Response> {
     // With a 100% code the first invoice is $0 — don't demand a card from a comped tester.
     // Anyone actually owing money still gets the normal card form.
     payment_method_collection: "if_required",
+    // New Stripe accounts enable Managed Payments (Stripe as merchant of record) by default,
+    // which rejects sessions unless every product carries a tax code — this 500'd the first
+    // live checkout (2026-08-01). Opt out per-session: classic Checkout, exactly as tested.
+    managed_payments: { enabled: false },
     ...(user
       ? {
           // Signed-in: behave like /api/billing/checkout so the webhook links by reference.

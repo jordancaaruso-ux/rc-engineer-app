@@ -48,6 +48,8 @@ export async function POST(request: Request): Promise<Response> {
     // Comped testers redeem 100% codes HERE post-flip (the shell gate sends them to /billing) —
     // don't demand a card for a $0 first invoice. Paying users still get the card form.
     payment_method_collection: "if_required",
+    // See public-checkout: opt out of Managed Payments (live-account default) per session.
+    managed_payments: { enabled: false },
   });
 
   return NextResponse.json({ url: session.url });
