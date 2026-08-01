@@ -50,6 +50,9 @@ export async function POST(request: Request): Promise<Response> {
     cancel_url: `${origin}/join?status=cancel`,
     // Testers redeem their 100%-off comp codes through this same door — one provisioning path.
     allow_promotion_codes: true,
+    // With a 100% code the first invoice is $0 — don't demand a card from a comped tester.
+    // Anyone actually owing money still gets the normal card form.
+    payment_method_collection: "if_required",
     ...(user
       ? {
           // Signed-in: behave like /api/billing/checkout so the webhook links by reference.

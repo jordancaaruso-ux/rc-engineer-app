@@ -2,7 +2,6 @@ import "server-only";
 import { cache } from "react";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { parseEnvAuthAllowlist } from "@/lib/authAllowlist";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { deriveSubscriptionTier, isBillingEnforced, type Tier } from "@/lib/entitlementLogic";
 
@@ -25,37 +24,33 @@ export type Entitlement = {
 const FULL_ACCESS: Entitlement = { tier: "pro", entitled: true, grandfathered: true };
 
 /**
- * Is this email one of the pre-paywall invited testers (or an admin)? They are grandfathered to
- * full access forever and never billed.
+ * Is this account exempt from billing entirely? ADMINS ONLY.
  *
- * IMPORTANT: this deliberately does NOT call `isEmailAuthAllowed` — that returns true for EVERYONE
- * once `AUTH_OPEN_SIGNUP=1`, which would hand every new self-signup free Pro and defeat the paywall.
- * Grandfathering is strictly the real invite list: admin emails, `AUTH_ALLOWED_EMAILS`, and
- * `AuthAllowedEmail` rows.
+ * RETIRED 2026-08-01 (MONETISATION_NORTH_STAR.md, Phase 5): allowlist rows and
+ * `AUTH_ALLOWED_EMAILS` no longer grandfather anyone. The founder decision is comps-via-codes —
+ * testers subscribe through the same checkout as everyone else with a 100%-off promo code, so
+ * their access can later expire or convert without touching code. The allowlist remains purely a
+ * SIGN-IN gate (who may authenticate), never an entitlement grant. Launch-day consequence: send
+ * the comp codes BEFORE flipping `BILLING_ENFORCED`, or testers land on /billing.
+ *
+ * Still deliberately independent of `isEmailAuthAllowed` — open signup must never grant access.
  */
 export async function isGrandfatheredEmail(email: string | null | undefined): Promise<boolean> {
   const normalized = email?.trim().toLowerCase();
   if (!normalized) return false;
-  if (isAuthAdminEmail(normalized)) return true;
-  if (parseEnvAuthAllowlist().has(normalized)) return true;
-  const row = await findAllowedEmailRow(normalized);
-  return row != null;
+  return isAuthAdminEmail(normalized);
 }
 
 /**
- * Per-request memoized DB reads.
+ * Per-request memoized DB read.
  *
- * Keyed on PRIMITIVES (an id / a normalized email), never on the `User` object — React `cache()`
- * memoizes by argument identity, and `getAuthenticatedApiUser` returns a fresh object per call, so
- * an object-keyed cache would miss on exactly the paths that call this most.
+ * Keyed on PRIMITIVES (an id), never on the `User` object — React `cache()` memoizes by argument
+ * identity, and `getAuthenticatedApiUser` returns a fresh object per call, so an object-keyed
+ * cache would miss on exactly the paths that call this most.
  *
  * In non-render contexts (route handlers, actions, unit tests) `cache()` is a passthrough — same
  * behaviour as `requireCurrentUser`, just without the dedupe.
  */
-const findAllowedEmailRow = cache(async function findAllowedEmailRow(email: string) {
-  return prisma.authAllowedEmail.findUnique({ where: { email } });
-});
-
 const findSubscription = cache(async function findSubscription(userId: string) {
   return prisma.subscription.findUnique({ where: { userId } });
 });

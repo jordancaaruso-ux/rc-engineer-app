@@ -50,8 +50,10 @@ const TIERS: TierDef[] = [
     tier: "pro",
     productName: "RC Engineer — Pro",
     prices: [
-      { envVar: "STRIPE_PRICE_PRO_MONTHLY", lookupKey: "rc_engineer_pro_monthly", interval: "month", unitAmount: 2499 },
-      { envVar: "STRIPE_PRICE_PRO_ANNUAL", lookupKey: "rc_engineer_pro_annual", interval: "year", unitAmount: 24990 },
+      // $27.99 (raised from the $24.99 sketch, founder-locked 2026-08-01) keeps ~40% margin over
+      // a fully drained 300-question Engineer pool — see MONETISATION_NORTH_STAR.md.
+      { envVar: "STRIPE_PRICE_PRO_MONTHLY", lookupKey: "rc_engineer_pro_monthly", interval: "month", unitAmount: 2799 },
+      { envVar: "STRIPE_PRICE_PRO_ANNUAL", lookupKey: "rc_engineer_pro_annual", interval: "year", unitAmount: 27990 },
     ],
   },
 ];
@@ -67,13 +69,23 @@ async function ensureProduct(tier: string, name: string): Promise<string> {
 
 async function ensurePrice(productId: string, def: PriceDef): Promise<string> {
   const existing = await stripe.prices.list({ lookup_keys: [def.lookupKey], limit: 1 });
-  if (existing.data[0]) return existing.data[0].id;
+  const current = existing.data[0];
+  if (current && current.unit_amount === def.unitAmount) return current.id;
+  // Stripe prices are immutable: a changed amount (e.g. Pro $24.99 → $27.99, 2026-08-01) means a
+  // NEW price that takes over the lookup key. The old price stays active so existing subscribers
+  // keep renewing at what they signed up for; only new checkouts see the new id.
+  if (current) {
+    console.log(
+      `  ${def.lookupKey}: amount changed ${current.unit_amount} → ${def.unitAmount}, creating replacement price`,
+    );
+  }
   const price = await stripe.prices.create({
     product: productId,
     currency: "aud",
     unit_amount: def.unitAmount,
     recurring: { interval: def.interval },
     lookup_key: def.lookupKey,
+    ...(current ? { transfer_lookup_key: true } : {}),
     metadata: { app: APP },
   });
   return price.id;

@@ -1,12 +1,14 @@
 /**
  * Run: `npm run test:entitlement`
  *
- * Locks the ZERO-REGRESSION guarantee for existing users on the auth email allowlist: a
- * grandfathered account (allowlisted email OR admin) always resolves to full Pro access and is
- * never walled — even when the paywall is enforced.
+ * Locks the Phase 5 grandfather RETIREMENT (MONETISATION_NORTH_STAR.md, 2026-08-01): billing
+ * exemption is ADMINS ONLY. Allowlist rows and `AUTH_ALLOWED_EMAILS` are a sign-in gate, never an
+ * entitlement grant — testers are comped via 100%-off promo codes through the normal checkout, so
+ * a mistakenly-generous grandfather here would silently hand out free Pro that outlives a
+ * cancelled comp.
  *
- * The admin + env-allowlist paths short-circuit BEFORE any Prisma query, so these assertions make
- * no database calls (dotenv only provides DATABASE_URL so the shared Prisma client can construct).
+ * The admin path short-circuits BEFORE any Prisma query, so these assertions make no database
+ * calls (dotenv only provides DATABASE_URL so the shared Prisma client can construct).
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -24,26 +26,17 @@ function resetAuthEnv() {
   delete process.env.AUTH_OPEN_SIGNUP;
 }
 
-test("admin email is grandfathered (case-insensitive, no DB)", async () => {
+test("admin email is exempt (case-insensitive, no DB)", async () => {
   resetAuthEnv();
   process.env.AUTH_ADMIN_EMAILS = "boss@example.com";
   assert.equal(await isGrandfatheredEmail("boss@example.com"), true);
   assert.equal(await isGrandfatheredEmail("  BOSS@Example.com  "), true);
 });
 
-test("env-allowlisted email is grandfathered (case/space-insensitive, no DB)", async () => {
+test("env-allowlisted email is NOT grandfathered — retired 2026-08-01, comps use codes", async () => {
   resetAuthEnv();
   process.env.AUTH_ALLOWED_EMAILS = "tester@example.com, other@example.com";
-  assert.equal(await isGrandfatheredEmail("tester@example.com"), true);
-  assert.equal(await isGrandfatheredEmail(" Tester@example.com "), true);
-});
-
-test("allowlisted user stays full Pro even with the paywall ENFORCED", async () => {
-  resetAuthEnv();
-  process.env.BILLING_ENFORCED = "1";
-  process.env.AUTH_ALLOWED_EMAILS = "tester@example.com";
-  const ent = await getEntitlement(fakeUser("tester@example.com"));
-  assert.deepEqual(ent, { tier: "pro", entitled: true, grandfathered: true });
+  assert.equal(await isGrandfatheredEmail("tester@example.com"), false);
 });
 
 test("admin stays full Pro even with the paywall ENFORCED", async () => {
@@ -61,12 +54,8 @@ test("paywall DARK (BILLING_ENFORCED unset) → everyone keeps full access", asy
   assert.equal(ent.tier, "pro");
 });
 
-test("grandfathering does NOT hinge on AUTH_OPEN_SIGNUP (allowlisted user still qualifies)", async () => {
+test("AUTH_OPEN_SIGNUP grants nothing here — open signup must never grant access", async () => {
   resetAuthEnv();
   process.env.AUTH_OPEN_SIGNUP = "1";
-  process.env.AUTH_ALLOWED_EMAILS = "tester@example.com";
-  // Open signup lets anyone authenticate, but grandfathering is decided only by the real invite
-  // list — isGrandfatheredEmail never consults isEmailAuthAllowed, so open signup can't silently
-  // grant or revoke it.
-  assert.equal(await isGrandfatheredEmail("tester@example.com"), true);
+  assert.equal(await isGrandfatheredEmail("anyone@example.com"), false);
 });

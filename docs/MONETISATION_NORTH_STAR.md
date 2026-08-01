@@ -67,11 +67,35 @@ strictly the invite list.
 | **0** | Founder interview → this doc | ✅ 2026-08-01 |
 | **1** | Paid door: `/join`, public checkout, webhook provisioning + magic link, paid-subscriber sign-in gate | ✅ built + driven end-to-end in Stripe test mode 2026-08-01 (real checkout w/ test card → signed webhook → provisioned user, no allowlist row → magic link → welcome overlay on a fresh account) |
 | **2** | Enforcement: shell gate (`requireCurrentUser` bounces unpaid → /billing; `/billing` uses `requireCurrentUserAllowUnpaid`), video + roll-center visible-but-locked via segment layouts + 402 API guards, Engineer caps (2/day · 300/mo pool, upsell cap-hit copy, body meter), lapsed-sub chat 402 | ✅ built + driven with `BILLING_ENFORCED=1` in dev 2026-08-01 (lapsed → /billing, Standard → locked panels + refused 3rd question, Pro → open + 300/mo meter) |
-| **3** | Demo: snapshot/anonymize script, public `/demo`, read-only guard, pre-baked threads, capped live asks | ⬜ |
-| **4** | Landing page in front of `/join` + demo | ⬜ |
-| **5** | Launch: test-mode end-to-end, comp codes to testers, retire grandfather branch, flip enforcement, open | ⬜ |
+| **3** | Demo: snapshot/anonymize script, public `/demo`, read-only guard, pre-baked threads, capped live asks | ⬜ **deferred** (founder call 2026-08-01 — phases 4–5 first) |
+| **4** | Landing page: public `/welcome` (brand treatment, value trio, live prices, Get started → `/join`); unauthenticated `/` lands there; no app chrome on public routes | ✅ built + driven 2026-08-01 |
+| **5** | Launch prep: grandfather retired to admins-only, price script → $27.99 (immutable-price replacement w/ lookup-key transfer), `payment_method_collection: if_required` for $0 comps, JRC-TESTER 100% code driven end-to-end in test mode ($0 checkout, no card → webhook → active sub) | ✅ code + test-mode 2026-08-01 — **live flip is the runbook below, founder-executed** |
 
 Update this table as work lands — a spec is intent, not shipped code (`docs/NOT_YET_BUILT.md`).
+
+## Launch runbook (founder-executed, in this order)
+
+The code side is done and driven in test mode; going live is configuration. Order matters —
+comp codes must reach testers BEFORE enforcement flips, or every tester lands on /billing.
+
+1. **Stripe live mode:** swap the `sk_test_` guard aside deliberately — run
+   `scripts/stripe-setup-prices.ts` against the LIVE key (edit the guard, or create the four
+   products/prices by hand at $14.99/$149.90 · $27.99/$279.90 AUD). Create the live 100%-off
+   "Founders comp" coupon + a promo code per tester (per-tester codes → per-tester revocation;
+   `max_redemptions: 1` each).
+2. **Vercel env:** `STRIPE_SECRET_KEY` (live), the four `STRIPE_PRICE_*` ids,
+   `STRIPE_WEBHOOK_SECRET` from a live webhook endpoint pointed at
+   `https://<prod>/api/stripe/webhook` (events: `checkout.session.completed`,
+   `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`). Leave
+   `BILLING_ENFORCED` unset for now.
+3. **Smoke the dark door:** visit `/welcome` and `/join` signed out on prod; buy Standard with a
+   real card, confirm the magic-link email arrives and the account provisions; refund yourself in
+   the Stripe dashboard.
+4. **Comp the testers:** send each their code + the `/join` link. Watch subscriptions appear.
+5. **Flip:** set `BILLING_ENFORCED=1`, redeploy. Spot-check: your admin account unaffected; a
+   tester account entitled; an incognito visit to `/` gets the landing.
+6. **Watch week one:** Stripe dashboard for failed payments/disputes, `topAiSpenders` for cap
+   behaviour, and the "paid but no email" support case (webhook logs + Stripe event retries).
 
 ## Non-goals
 

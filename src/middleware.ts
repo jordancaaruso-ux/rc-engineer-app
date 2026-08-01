@@ -58,6 +58,10 @@ export default auth((req) => {
   if (pathname === "/api/billing/public-checkout") {
     return NextResponse.next();
   }
+  // The landing page (the page itself bounces signed-in visitors back to the dashboard).
+  if (pathname === "/welcome") {
+    return NextResponse.next();
+  }
 
   const authed = Boolean(req.auth);
 
@@ -68,6 +72,11 @@ export default auth((req) => {
   if (!authed) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    // A stranger hitting the front door gets the pitch, not a sign-in form. Deep links keep
+    // going to /login so an existing user's bookmark works after their session expires.
+    if (pathname === "/") {
+      return NextResponse.redirect(new URL("/welcome", req.url));
     }
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("from", pathname);
