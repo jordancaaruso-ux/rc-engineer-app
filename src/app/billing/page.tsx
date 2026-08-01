@@ -1,4 +1,4 @@
-import { requireCurrentUser } from "@/lib/currentUser";
+import { requireCurrentUserAllowUnpaid } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { getEntitlement } from "@/lib/entitlement";
 import { isBillingEnforced } from "@/lib/entitlementLogic";
@@ -10,11 +10,12 @@ export const metadata = { title: "Subscription" };
 const TIER_LABEL: Record<string, string> = { standard: "Standard", pro: "Pro" };
 
 /**
- * Billing / plan picker. Uses `requireCurrentUser` (NOT `requireEntitledUser`) so an
- * authenticated-but-unpaid user can always reach it — this is where the paywall sends them.
+ * Billing / plan picker. Uses `requireCurrentUserAllowUnpaid` — `requireCurrentUser` now
+ * bounces unpaid users HERE (the shell gate), so this page must stay reachable without a
+ * subscription or the redirect would loop.
  */
 export default async function BillingPage() {
-  const user = await requireCurrentUser();
+  const user = await requireCurrentUserAllowUnpaid();
   const entitlement = await getEntitlement(user);
   const sub = await prisma.subscription.findUnique({ where: { userId: user.id } });
   const subscription = sub

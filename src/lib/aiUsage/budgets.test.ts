@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   aiUsageTimeZone,
+  applyEngineerTierBudget,
   estimateCostUsd,
   evaluateAiBudget,
   modelRate,
@@ -196,4 +197,32 @@ test("ledger day zone is fixed by default, env-overridable", () => {
     aiUsageTimeZone({ AI_USAGE_TIME_ZONE: "Europe/Berlin" }),
     "Europe/Berlin"
   );
+});
+
+test("Standard tier: 2 questions a day, and the cap-hit line sells Pro", () => {
+  const shaped = applyEngineerTierBudget(budget, "standard");
+  assert.equal(shaped.dailyCalls, 2);
+  assert.equal(shaped.monthlyCalls, undefined);
+  // Dollar brakes are untouched — the tier changes the allowance, not the abuse ceiling.
+  assert.equal(shaped.dailyCostUsd, budget.dailyCostUsd);
+  assert.equal(evaluateAiBudget({ ...clear, budget: shaped, featureCallsToday: 1 }).ok, true);
+  const v = evaluateAiBudget({ ...clear, budget: shaped, featureCallsToday: 2 });
+  assert.equal(v.ok === false && v.reason, "daily-calls");
+  if (v.ok === false) assert.match(v.message, /Pro/);
+});
+
+test("Pro tier: 300-a-month pool beside the base daily burst brake", () => {
+  const shaped = applyEngineerTierBudget(budget, "pro");
+  assert.equal(shaped.monthlyCalls, 300);
+  assert.equal(shaped.dailyCalls, budget.dailyCalls);
+  assert.equal(evaluateAiBudget({ ...clear, budget: shaped, featureCallsMonth: 299 }).ok, true);
+  const v = evaluateAiBudget({ ...clear, budget: shaped, featureCallsMonth: 300 });
+  assert.equal(v.ok === false && v.reason, "monthly-calls");
+  // Pro's cap-hit line must NOT upsell — there is nothing above Pro to sell.
+  if (v.ok === false) assert.doesNotMatch(v.message, /upgrade/i);
+});
+
+test("a Standard cap never widens an operator-tightened daily brake", () => {
+  const tightened: AiBudget = { ...budget, dailyCalls: 1 };
+  assert.equal(applyEngineerTierBudget(tightened, "standard").dailyCalls, 1);
 });

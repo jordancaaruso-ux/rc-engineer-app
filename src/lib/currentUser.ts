@@ -53,23 +53,48 @@ export async function getAuthenticatedApiUserId(): Promise<string | null> {
 }
 
 /**
- * Server Components / server actions — redirect to login if missing session.
+ * Server Components / server actions — redirect to login if missing session. NO entitlement
+ * check: this is the escape hatch for the few pages an UNPAID user must still reach — today
+ * that is exactly `/billing`, the page the paywall sends them to.
  *
  * Wrapped in React `cache()` so the `auth()` + user lookup is memoized per
  * request: pages that call it more than once (directly and via
  * `requireCurrentUserId`) no longer issue duplicate PK queries. In non-render
  * contexts (route handlers, actions) `cache()` is a no-op — still correct.
  */
+export const requireCurrentUserAllowUnpaid = cache(
+  async function requireCurrentUserAllowUnpaid(): Promise<User> {
+    requireDatabaseUrl();
+    const session = await auth();
+    const id = session?.user?.id;
+    if (!id) {
+      redirect("/login");
+    }
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      redirect("/login");
+    }
+    return user;
+  },
+);
+
+/**
+ * Server Components / server actions — the standard page guard: signed in AND entitled.
+ *
+ * This is the paywall's shell gate (MONETISATION_NORTH_STAR.md Phase 2): every page that calls
+ * `requireCurrentUser` — which is essentially every page — bounces an authenticated-but-unpaid
+ * user to /billing. While `BILLING_ENFORCED` is unset, `getEntitlement` short-circuits to full
+ * access with NO extra DB reads, so today's behaviour is byte-identical.
+ *
+ * The import is lazy to keep this module's static graph free of `entitlement.ts` (which pulls
+ * `server-only`); the dev scripts that import `currentUser` transitively keep working.
+ */
 export const requireCurrentUser = cache(async function requireCurrentUser(): Promise<User> {
-  requireDatabaseUrl();
-  const session = await auth();
-  const id = session?.user?.id;
-  if (!id) {
-    redirect("/login");
-  }
-  const user = await prisma.user.findUnique({ where: { id } });
-  if (!user) {
-    redirect("/login");
+  const user = await requireCurrentUserAllowUnpaid();
+  const { getEntitlement } = await import("@/lib/entitlement");
+  const entitlement = await getEntitlement(user);
+  if (!entitlement.entitled) {
+    redirect("/billing");
   }
   return user;
 });

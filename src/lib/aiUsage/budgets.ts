@@ -106,6 +106,12 @@ export type AiBudget = {
    * cap silently moves as prompt sizes and model rates change.
    */
   monthlyCalls?: number;
+  /**
+   * Cap-hit copy overrides for the visible allowances. The paywall decision
+   * (MONETISATION_NORTH_STAR.md): a cap hit must SELL the upgrade, never read as a limit error —
+   * generic "resets tomorrow" copy can't do that, so tier budgets carry their own lines.
+   */
+  messages?: { dailyCalls?: string; monthlyCalls?: string };
 };
 
 /**
@@ -188,14 +194,18 @@ export function evaluateAiBudget(input: {
     return {
       ok: false,
       reason: "monthly-calls",
-      message: "You've used this month's included questions. They reset next month.",
+      message:
+        budget.messages?.monthlyCalls ??
+        "You've used this month's included questions. They reset next month.",
     };
   }
   if (input.featureCallsToday >= budget.dailyCalls) {
     return {
       ok: false,
       reason: "daily-calls",
-      message: "You've used today's allowance for this feature. It resets tomorrow.",
+      message:
+        budget.messages?.dailyCalls ??
+        "You've used today's allowance for this feature. It resets tomorrow.",
     };
   }
   if (input.costTodayUsd >= budget.dailyCostUsd) {
@@ -213,6 +223,48 @@ export function evaluateAiBudget(input: {
     };
   }
   return { ok: true };
+}
+
+/**
+ * Tier allowances for Engineer chat (MONETISATION_NORTH_STAR.md, founder-locked 2026-08-01):
+ * Standard is the notebook with a taste of the Engineer — 2 questions a DAY; Pro is the real
+ * Engineer tier — a 300-a-MONTH pool, spent whenever ("2 a day" vs "300 a month" IS the pitch).
+ * At the terra chat rate (~$0.055/answer) even a fully drained pool stays profitable.
+ */
+export const STANDARD_ENGINEER_DAILY_QUESTIONS = 2;
+export const PRO_ENGINEER_MONTHLY_QUESTIONS = 300;
+
+/**
+ * Shape a feature budget for a paying tier. Only Engineer chat has tier allowances; every other
+ * feature keeps its base abuse brakes. Callers must NOT pass grandfathered users through here —
+ * comps and pre-paywall testers keep the base (untiered) budget.
+ *
+ * Standard: the 2/day allowance REPLACES the daily-call brake (the smaller number wins anyway);
+ * no monthly pool. Pro: the 300/month pool sits alongside the base daily brake, which stays as
+ * burst protection — 60 questions in one race day is legitimate Pro usage, 60 every day is not.
+ */
+export function applyEngineerTierBudget(
+  budget: AiBudget,
+  tier: "standard" | "pro",
+): AiBudget {
+  if (tier === "standard") {
+    return {
+      ...budget,
+      dailyCalls: Math.min(budget.dailyCalls, STANDARD_ENGINEER_DAILY_QUESTIONS),
+      messages: {
+        ...budget.messages,
+        dailyCalls: `You've used today's ${STANDARD_ENGINEER_DAILY_QUESTIONS} Engineer questions. Pro includes ${PRO_ENGINEER_MONTHLY_QUESTIONS} a month — upgrade any time on the Subscription page.`,
+      },
+    };
+  }
+  return {
+    ...budget,
+    monthlyCalls: PRO_ENGINEER_MONTHLY_QUESTIONS,
+    messages: {
+      ...budget.messages,
+      monthlyCalls: `You've used this month's ${PRO_ENGINEER_MONTHLY_QUESTIONS} Engineer questions. They reset next month.`,
+    },
+  };
 }
 
 /**

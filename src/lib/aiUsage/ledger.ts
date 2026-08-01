@@ -5,6 +5,7 @@ import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { todayYmdInTimeZone } from "@/lib/eventActive";
 import {
   aiUsageTimeZone,
+  applyEngineerTierBudget,
   estimateCostUsd,
   evaluateAiBudget,
   resolveAiBudget,
@@ -34,10 +35,20 @@ export async function checkAiBudget(input: {
   userId: string;
   userEmail?: string | null;
   feature: AiUsageFeature;
+  /**
+   * Paying tier, when billing is enforced and the user is NOT grandfathered — shapes the Engineer
+   * allowance (Standard 2/day, Pro 300/mo pool). Omit for grandfathered/comped users and while
+   * enforcement is dark: they keep the base budget, exactly today's behaviour.
+   */
+  tier?: "standard" | "pro";
 }): Promise<AiBudgetVerdict> {
   if (isAuthAdminEmail(input.userEmail)) return { ok: true };
 
-  const budget = resolveAiBudget(input.feature);
+  const base = resolveAiBudget(input.feature);
+  const budget =
+    input.tier && input.feature === "engineer-chat"
+      ? applyEngineerTierBudget(base, input.tier)
+      : base;
   const ymd = todayYmdInTimeZone(aiUsageTimeZone());
   const today = dayValue(ymd);
 
@@ -77,6 +88,36 @@ export async function checkAiBudget(input: {
   } catch (error) {
     console.error("[aiUsage] budget check failed; allowing the call", error);
     return { ok: true };
+  }
+}
+
+/**
+ * Engineer-chat usage counts for the quota meter: questions today and over the rolling 30 days.
+ * Read-only; returns zeros on a DB error (the meter is decoration, never a gate).
+ */
+export async function engineerQuotaSnapshot(
+  userId: string,
+): Promise<{ today: number; month: number }> {
+  const ymd = todayYmdInTimeZone(aiUsageTimeZone());
+  try {
+    const [todayRow, monthAgg] = await Promise.all([
+      prisma.aiUsageDaily.findUnique({
+        where: { userId_day_feature: { userId, day: dayValue(ymd), feature: "engineer-chat" } },
+        select: { calls: true },
+      }),
+      prisma.aiUsageDaily.aggregate({
+        where: {
+          userId,
+          feature: "engineer-chat",
+          day: { gte: dayValueDaysAgo(ymd, 29), lte: dayValue(ymd) },
+        },
+        _sum: { calls: true },
+      }),
+    ]);
+    return { today: todayRow?.calls ?? 0, month: monthAgg._sum.calls ?? 0 };
+  } catch (error) {
+    console.error("[aiUsage] quota snapshot failed", error);
+    return { today: 0, month: 0 };
   }
 }
 

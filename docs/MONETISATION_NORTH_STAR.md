@@ -66,7 +66,7 @@ strictly the invite list.
 |---|---|---|
 | **0** | Founder interview → this doc | ✅ 2026-08-01 |
 | **1** | Paid door: `/join`, public checkout, webhook provisioning + magic link, paid-subscriber sign-in gate | ✅ built + driven end-to-end in Stripe test mode 2026-08-01 (real checkout w/ test card → signed webhook → provisioned user, no allowlist row → magic link → welcome overlay on a fresh account) |
-| **2** | Enforcement: `requireEntitledUser` at the shell, `requireFeature` on video/roll-center (visible-but-locked UI), Engineer caps (2/day · 300/mo pool + meter), `BILLING_ENFORCED=1` in test | ⬜ |
+| **2** | Enforcement: shell gate (`requireCurrentUser` bounces unpaid → /billing; `/billing` uses `requireCurrentUserAllowUnpaid`), video + roll-center visible-but-locked via segment layouts + 402 API guards, Engineer caps (2/day · 300/mo pool, upsell cap-hit copy, body meter), lapsed-sub chat 402 | ✅ built + driven with `BILLING_ENFORCED=1` in dev 2026-08-01 (lapsed → /billing, Standard → locked panels + refused 3rd question, Pro → open + 300/mo meter) |
 | **3** | Demo: snapshot/anonymize script, public `/demo`, read-only guard, pre-baked threads, capped live asks | ⬜ |
 | **4** | Landing page in front of `/join` + demo | ⬜ |
 | **5** | Launch: test-mode end-to-end, comp codes to testers, retire grandfather branch, flip enforcement, open | ⬜ |

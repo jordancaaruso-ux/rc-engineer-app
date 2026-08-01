@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
+import { requireApiFeature } from "@/lib/entitlementGuards";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -77,8 +78,10 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const userId = await getAuthenticatedApiUserId();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Job creation is the Pro door for analysis; reads stay open so past results render anywhere.
+  const gate = await requireApiFeature("video");
+  if (gate.response) return gate.response;
+  const userId = gate.user.id;
 
   const body = (await request.json().catch(() => null)) as {
     trackId?: string;

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
+import { requireApiFeature } from "@/lib/entitlementGuards";
 import { prisma } from "@/lib/prisma";
 import {
   storeVideoFile,
@@ -36,8 +37,10 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const userId = await getAuthenticatedApiUserId();
-    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Upload is the Pro door for video work; reads stay open so existing footage renders anywhere.
+  const gate = await requireApiFeature("video");
+  if (gate.response) return gate.response;
+  const userId = gate.user.id;
 
   const ct = request.headers.get("content-type") ?? "";
   if (!ct.includes("multipart/form-data")) {

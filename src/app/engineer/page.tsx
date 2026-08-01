@@ -8,6 +8,7 @@ import { ButtonLink } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
+import { engineerQuotaNote } from "@/lib/aiUsage/engineerQuotaNote";
 
 function EngineerClientSkeleton() {
   return (
@@ -45,6 +46,7 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
   // but a first-time user burned a request to discover the tool only gets good
   // once it has their runs to read. Say so before they type (2026-07-22).
   const hasAnyRun = (await prisma.run.findFirst({ where: { userId: user.id }, select: { id: true } })) != null;
+  const quotaNote = await engineerQuotaNote(user);
 
   return (
     <>
@@ -55,6 +57,13 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
         </div>
       </header>
       <section className="page-body flex min-h-0 flex-1 flex-col pb-2 md:pb-0">
+        {/* Quota meter (MONETISATION_NORTH_STAR.md Phase 2). In the body, not the subtitle —
+            `.page-header .page-subtitle` is display:none globally. */}
+        {quotaNote ? (
+          <p className="mx-auto mb-2 w-full max-w-4xl text-center text-xs text-muted-foreground">
+            {quotaNote}
+          </p>
+        ) : null}
         {hasAnyRun ? null : (
           <CardPanel className="mx-auto mb-3 w-full max-w-4xl">
             <Eyebrow>Before you ask</Eyebrow>

@@ -12,6 +12,8 @@ import { generateEngineerChatReplyWithTools } from "@/lib/engineerPhase5/openaiE
 import { tryAnswerLapHistoryQuery } from "@/lib/engineerPhase5/lapHistoryQuery";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
 import { checkAiBudget, recordAiUsage } from "@/lib/aiUsage/ledger";
+import { getEntitlement } from "@/lib/entitlement";
+import { isBillingEnforced } from "@/lib/entitlementLogic";
 import { persistEngineerChatExchange } from "@/lib/engineerFeedback/persistExchange";
 import type { EngineerMessageContextSnapshot } from "@/lib/engineerFeedback/types";
 import { engineerOpenAiUserMessage } from "@/lib/openAiRetry";
@@ -211,18 +213,18 @@ export async function POST(request: Request) {
 
     // Budget check sits AFTER the deterministic route above — it answers from the DB and
     // costs nothing, so it must never burn a user's AI allowance.
-    const budget = await checkAiBudget({
-      userId: user.id,
-      userEmail: user.email,
-      feature: "engineer-chat",
-    });
-    if (!budget.ok) {
+    // Tier shaping (MONETISATION_NORTH_STAR.md Phase 2): a lapsed subscriber is blocked outright;
+    // paying tiers get their allowance (Standard 2/day, Pro 300/mo); grandfathered/comped users
+    // and dark enforcement keep the base budget untouched.
+    // Streaming clients only understand error FRAMES, so refusals ship as a 200 SSE stream with
+    // one error event; plain clients get real status codes.
+    const refuseAllowance = (message: string, status: number): Response => {
       if (useStream) {
         const encoder = new TextEncoder();
         const stream = new ReadableStream({
           start(controller) {
             controller.enqueue(
-              encoder.encode(`event: error\ndata: ${JSON.stringify({ message: budget.message })}\n\n`)
+              encoder.encode(`event: error\ndata: ${JSON.stringify({ message })}\n\n`)
             );
             controller.close();
           },
@@ -239,7 +241,30 @@ export async function POST(request: Request) {
           },
         });
       }
-      return NextResponse.json({ error: budget.message }, { status: 429 });
+      return NextResponse.json({ error: message }, { status });
+    };
+
+    const entitlement = await getEntitlement(user);
+    if (isBillingEnforced() && !entitlement.entitled) {
+      return refuseAllowance(
+        "Your subscription has ended — renew on the Subscription page to keep asking the Engineer.",
+        402,
+      );
+    }
+    const tier =
+      isBillingEnforced() &&
+      !entitlement.grandfathered &&
+      (entitlement.tier === "standard" || entitlement.tier === "pro")
+        ? entitlement.tier
+        : undefined;
+    const budget = await checkAiBudget({
+      userId: user.id,
+      userEmail: user.email,
+      feature: "engineer-chat",
+      tier,
+    });
+    if (!budget.ok) {
+      return refuseAllowance(budget.message, 429);
     }
 
     if (useStream) {
