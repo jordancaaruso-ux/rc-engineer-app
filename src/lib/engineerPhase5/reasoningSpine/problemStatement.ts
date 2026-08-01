@@ -1,54 +1,87 @@
 import "server-only";
 
 import type { EngineeringReadV1 } from "@/lib/engineerPhase5/engineeringRead";
-import type { CornerPhase } from "@/lib/runHandlingAssessment";
 import { detectOutcomeIntent } from "@/lib/engineerPhase5/parameterEffects/intentFromMessage";
-import type { ProblemStatementV1 } from "@/lib/engineerPhase5/reasoningSpine/types";
+import type {
+  PhaseProfileEntryV1,
+  ProblemShape,
+  ProblemStatementV1,
+} from "@/lib/engineerPhase5/reasoningSpine/types";
 
-function dominantPhase(read: EngineeringReadV1): ProblemStatementV1["phase"] {
-  let best: CornerPhase | null = null;
-  let bestMag = 0;
+const PHASE_ORDER: Record<"entry" | "mid" | "exit", number> = { entry: 0, mid: 1, exit: 2 };
+
+function severityForValue(v: number): PhaseProfileEntryV1["severity"] {
+  const a = Math.abs(v);
+  if (a >= 3) return "severe";
+  if (a === 2) return "moderate";
+  return "mild";
+}
+
+/**
+ * Every phase the driver flagged, worst first — the thing that replaced picking a single
+ * winner and discarding the rest.
+ *
+ * Neutral (0) phases are dropped: the driver saying a phase is fine is real information,
+ * but it is not a problem and it must not dilute the shape. Ties break in corner order so
+ * the lead of an equal-magnitude pair is the one that happens first in the corner.
+ */
+function buildPhaseProfile(read: EngineeringReadV1): PhaseProfileEntryV1[] {
+  const out: PhaseProfileEntryV1[] = [];
   for (const phase of ["entry", "mid", "exit"] as const) {
     const v = read.feelRead.phaseBalance[phase].value;
-    if (v == null) continue;
-    const mag = Math.abs(v);
-    if (mag > bestMag) {
-      bestMag = mag;
-      best = phase;
-    }
+    if (v == null || v === 0) continue;
+    out.push({
+      phase,
+      value: v,
+      severity: severityForValue(v),
+      direction: v > 0 ? "oversteer" : "understeer",
+      end: v > 0 ? "rear" : "front",
+    });
   }
-  return best ?? "unknown";
+  return out.sort(
+    (a, b) => Math.abs(b.value) - Math.abs(a.value) || PHASE_ORDER[a.phase] - PHASE_ORDER[b.phase]
+  );
 }
 
-function balanceSignFromPhase(read: EngineeringReadV1): ProblemStatementV1["balanceSign"] {
-  const phases = (["entry", "mid", "exit"] as const)
-    .map((p) => read.feelRead.phaseBalance[p])
-    .filter((p) => p.value != null);
-  if (phases.length === 0) return "unknown";
-  const us = phases.filter((p) => p.direction === "more_understeer").length;
-  const os = phases.filter((p) => p.direction === "more_oversteer").length;
-  if (us > 0 && os > 0) return "mixed";
-  if (us >= os) return "understeer";
-  if (os > us) return "oversteer";
-  return "neutral";
+function opposedDirections(profile: PhaseProfileEntryV1[]): boolean {
+  return (
+    profile.some((p) => p.direction === "understeer") &&
+    profile.some((p) => p.direction === "oversteer")
+  );
 }
 
-function inferEnd(read: EngineeringReadV1, intentPhrase: string | null): ProblemStatementV1["end"] {
+function shapeFromProfile(profile: PhaseProfileEntryV1[]): ProblemShape {
+  if (profile.length === 0) return "unknown";
+  if (profile.length === 1) return "localized";
+  return opposedDirections(profile) ? "split" : "whole_corner";
+}
+
+function balanceSignFromProfile(
+  profile: PhaseProfileEntryV1[],
+  anyPhaseRated: boolean
+): ProblemStatementV1["balanceSign"] {
+  // Every rated phase sat at 0 — that is a neutral car, not an understeering one. The old
+  // count-based version fell through its `us >= os` branch on 0/0 and returned "understeer".
+  if (profile.length === 0) return anyPhaseRated ? "neutral" : "unknown";
+  if (opposedDirections(profile)) return "mixed";
+  return profile[0]!.direction === "oversteer" ? "oversteer" : "understeer";
+}
+
+/**
+ * The end owning the LEAD phase. A `split` reports `both` rather than the old `unknown`:
+ * both ends are genuinely in play, and `unknown` read as "no idea" at exactly the moment
+ * we know most precisely which end owns which phase.
+ */
+function inferEnd(
+  profile: PhaseProfileEntryV1[],
+  shape: ProblemShape,
+  intentPhrase: string | null
+): ProblemStatementV1["end"] {
   const lower = (intentPhrase ?? "").toLowerCase();
   if (/\b(rear|back)\b/.test(lower)) return "rear";
   if (/\b(front|nose)\b/.test(lower)) return "front";
-  const sign = balanceSignFromPhase(read);
-  if (sign === "understeer") return "front";
-  if (sign === "oversteer") return "rear";
-  return "unknown";
-}
-
-function severityFromFeel(read: EngineeringReadV1): ProblemStatementV1["severity"] {
-  const w = read.feelRead.betterWorse.magnitudeWord;
-  if (w === "strong") return "severe";
-  if (w === "moderate") return "moderate";
-  if (w === "mild") return "mild";
-  return "unknown";
+  if (shape === "split") return "both";
+  return profile[0]?.end ?? "unknown";
 }
 
 function buildConfounders(read: EngineeringReadV1): string[] {
@@ -100,15 +133,25 @@ export function buildProblemStatementV1(input: {
   const intent = detectOutcomeIntent(input.userMessage);
   const read = input.engineeringRead;
 
+  const phaseProfile = buildPhaseProfile(read);
+  const shape = shapeFromProfile(phaseProfile);
+  const anyPhaseRated = (["entry", "mid", "exit"] as const).some(
+    (p) => read.feelRead.phaseBalance[p].value != null
+  );
+
   return {
     version: 1,
     goalOutcome: intent?.outcome ?? null,
     goalDirection: intent?.direction ?? null,
     matchedPhrase: intent?.matchedPhrase ?? null,
-    end: inferEnd(read, intent?.matchedPhrase ?? null),
-    phase: dominantPhase(read),
-    severity: severityFromFeel(read),
-    balanceSign: balanceSignFromPhase(read),
+    end: inferEnd(phaseProfile, shape, intent?.matchedPhrase ?? null),
+    phase: phaseProfile[0]?.phase ?? "unknown",
+    phaseProfile,
+    shape,
+    // Lead phase's own magnitude. No flagged phase means no measured severity — the
+    // vs-last-run chip is a different axis and must not stand in for this one.
+    severity: phaseProfile[0]?.severity ?? "unknown",
+    balanceSign: balanceSignFromProfile(phaseProfile, anyPhaseRated),
     paceFeelAgreement: read.paceRead.paceFeelAgreement,
     confounders: buildConfounders(read),
     diagnosisConfidence: diagnosisConfidence(read),

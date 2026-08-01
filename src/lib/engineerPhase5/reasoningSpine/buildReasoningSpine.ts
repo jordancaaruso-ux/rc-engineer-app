@@ -10,6 +10,8 @@ import { routeEngineerMessage } from "@/lib/engineerPhase5/reasoningSpine/routeM
 import type {
   DecisionTier,
   GradedLeverV1,
+  PhaseProfileEntryV1,
+  ProblemShape,
   ProblemStatementV1,
   ReasoningSpineV1,
 } from "@/lib/engineerPhase5/reasoningSpine/types";
@@ -77,6 +79,38 @@ function formatLeverLine(lever: GradedLeverV1, index: number): string {
   );
 }
 
+function formatPhaseEntry(e: PhaseProfileEntryV1): string {
+  const signed = e.value > 0 ? `+${e.value}` : String(e.value);
+  return `${e.phase} ${signed} ${e.severity} ${e.direction} (${e.end})`;
+}
+
+/**
+ * The phases the driver actually flagged, worst first. Before 2026-08-01 the spine printed
+ * only the winner, so a car loose at entry, mid AND exit reached the model as `phase=exit`
+ * and the other two were never recoverable from this line.
+ */
+function formatPhaseProfileLine(p: ProblemStatementV1): string | null {
+  if (p.phaseProfile.length === 0) return null;
+  const [lead, ...rest] = p.phaseProfile;
+  const also = rest.length > 0 ? ` Also flagged: ${rest.map(formatPhaseEntry).join("; ")}.` : "";
+  return `Phases (worst first): lead ${formatPhaseEntry(lead!)}.${also} Shape=${p.shape}.`;
+}
+
+/**
+ * What the shape means for the SHAPE OF THE ANSWER. This is the line that decides whether
+ * stacking two levers is the right call or the trap — it is guidance about strategy, never
+ * about which specific knob to turn.
+ */
+const SHAPE_GUIDANCE: Record<ProblemShape, string | null> = {
+  whole_corner:
+    "WHOLE-CORNER PROBLEM: every flagged phase leans the same way, so this is one underlying problem showing up across the corner — worst at the lead phase, but present in all of them. Lead with the phase that is worst; do NOT present it as the only problem. A lever that acts through the whole corner is the base of the answer, and a phase-specific lever may be stacked on top of it for the lead phase — say plainly that you are stacking, and which part each change is aimed at.",
+  split:
+    "SPLIT PROBLEM: the flagged phases lean OPPOSITE ways, so this is rotation timing rather than one end simply being short of grip. A lever that acts through the whole corner moves both phases the same way and will trade one problem for the other — if you raise one, say so rather than presenting it as a fix. Prefer levers aimed at a single phase, or a change to how quickly load moves between the ends.",
+  localized:
+    "LOCALIZED PROBLEM: one flagged phase only. Prefer a lever that acts in that phase over one that acts through the whole corner.",
+  unknown: null,
+};
+
 function buildPromptLines(input: {
   route: ReasoningSpineV1["route"];
   tier: DecisionTier;
@@ -94,9 +128,14 @@ function buildPromptLines(input: {
         ? `Goal: ${p.goalDirection} ${p.goalOutcome}${p.matchedPhrase ? ` (matched "${p.matchedPhrase}")` : ""}.`
         : "Goal: symptom-driven (no closed outcome intent matched).";
     lines.push(
-      `Problem: ${goal} End=${p.end}, phase=${p.phase}, balance=${p.balanceSign}, ` +
-        `diagnosisConfidence=${p.diagnosisConfidence}, mode=${p.recommendationMode}.`
+      `Problem: ${goal} End=${p.end}, leadPhase=${p.phase}, severity=${p.severity}, ` +
+        `balance=${p.balanceSign}, diagnosisConfidence=${p.diagnosisConfidence}, ` +
+        `mode=${p.recommendationMode}.`
     );
+    const profileLine = formatPhaseProfileLine(p);
+    if (profileLine) lines.push(profileLine);
+    const guidance = SHAPE_GUIDANCE[p.shape];
+    if (guidance) lines.push(guidance);
     if (p.confounders.length > 0) {
       lines.push(`Confounders: ${p.confounders.join(" ")}`);
     }

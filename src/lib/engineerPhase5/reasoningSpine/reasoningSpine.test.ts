@@ -97,6 +97,116 @@ test("engine_decides when catalog match + confident diagnosis", () => {
   assert.equal(spine.gradedLevers[0]!.parameterKey, "toe_rear");
 });
 
+/** Spine for a run whose only interesting input is its per-phase balance chips. */
+function spineForBalance(balanceByPhase: Record<string, number>) {
+  const read = buildEngineeringReadV1({
+    anchor: makeRun({ id: "cur", handlingAssessmentJson: { version: 3, balanceByPhase } }),
+    reference: makeRun({ id: "ref", sortAtIso: "2026-05-14T10:00:00.000Z" }),
+  });
+  return buildReasoningSpineV1({
+    userMessage: "fix my car",
+    engineeringRead: read,
+    parameterIntentMatches: null,
+  });
+}
+
+test("whole-corner: every flagged phase survives, worst leads", () => {
+  const spine = spineForBalance({ entry: 1, mid: 2, exit: 3 });
+  const p = spine.problemStatement!;
+
+  assert.equal(p.shape, "whole_corner");
+  assert.equal(p.phase, "exit");
+  assert.equal(p.severity, "severe");
+  assert.equal(p.end, "rear");
+  assert.equal(p.balanceSign, "oversteer");
+  // The regression this whole change exists for: mid and entry are still there.
+  assert.deepEqual(
+    p.phaseProfile.map((e) => e.phase),
+    ["exit", "mid", "entry"]
+  );
+  assert.deepEqual(
+    p.phaseProfile.map((e) => e.severity),
+    ["severe", "moderate", "mild"]
+  );
+
+  const joined = spine.promptLines.join("\n");
+  assert.ok(joined.includes("lead exit +3 severe oversteer (rear)"));
+  assert.ok(joined.includes("mid +2 moderate oversteer (rear)"));
+  assert.ok(joined.includes("entry +1 mild oversteer (rear)"));
+  assert.ok(joined.includes("WHOLE-CORNER PROBLEM"));
+});
+
+test("split: opposed phases name both ends and warn against a whole-corner lever", () => {
+  const spine = spineForBalance({ entry: -2, exit: 3 });
+  const p = spine.problemStatement!;
+
+  assert.equal(p.shape, "split");
+  assert.equal(p.phase, "exit");
+  assert.equal(p.balanceSign, "mixed");
+  // Was "unknown" — which told the lever filter to pass everything at the exact moment
+  // we know precisely which end owns which phase.
+  assert.equal(p.end, "both");
+  assert.deepEqual(
+    p.phaseProfile.map((e) => `${e.phase}:${e.end}`),
+    ["exit:rear", "entry:front"]
+  );
+
+  const joined = spine.promptLines.join("\n");
+  assert.ok(joined.includes("lead exit +3 severe oversteer (rear)"));
+  assert.ok(joined.includes("entry -2 moderate understeer (front)"));
+  assert.ok(joined.includes("SPLIT PROBLEM"));
+});
+
+test("localized: a single flagged phase is not a whole-corner problem", () => {
+  const spine = spineForBalance({ entry: 0, mid: 0, exit: 3 });
+  const p = spine.problemStatement!;
+
+  assert.equal(p.shape, "localized");
+  assert.equal(p.phase, "exit");
+  assert.equal(p.end, "rear");
+  assert.equal(p.phaseProfile.length, 1);
+  assert.ok(spine.promptLines.join("\n").includes("LOCALIZED PROBLEM"));
+});
+
+test("all-neutral phases read as neutral, not understeer", () => {
+  const p = spineForBalance({ entry: 0, mid: 0, exit: 0 }).problemStatement!;
+  assert.equal(p.balanceSign, "neutral");
+  assert.equal(p.shape, "unknown");
+  assert.equal(p.phase, "unknown");
+  assert.equal(p.severity, "unknown");
+  assert.equal(p.end, "unknown");
+  assert.equal(p.phaseProfile.length, 0);
+});
+
+test("equal magnitudes lead with the earlier phase in the corner", () => {
+  const p = spineForBalance({ mid: 2, exit: 2 }).problemStatement!;
+  assert.equal(p.phase, "mid");
+  assert.equal(p.shape, "whole_corner");
+});
+
+test("severity tracks the lead phase, not the vs-last-run chip", () => {
+  const read = buildEngineeringReadV1({
+    anchor: makeRun({
+      id: "cur",
+      handlingAssessmentJson: {
+        version: 3,
+        // Mild balance problem, but "much worse than last run" — the old code read the
+        // second number and reported severity=severe for a mild oversteer.
+        balanceByPhase: { exit: 1 },
+        feelVsLastRun: -3,
+      },
+    }),
+    reference: makeRun({ id: "ref", sortAtIso: "2026-05-14T10:00:00.000Z" }),
+  });
+  const spine = buildReasoningSpineV1({
+    userMessage: "fix my car",
+    engineeringRead: read,
+    parameterIntentMatches: null,
+  });
+  assert.equal(read.feelRead.betterWorse.magnitudeWord, "strong");
+  assert.equal(spine.problemStatement!.severity, "mild");
+});
+
 test("diagnose mode forces fallback even with catalog", () => {
   const read = buildEngineeringReadV1({
     anchor: makeRun({ id: "cur", carRating: 3 }),
