@@ -95,6 +95,7 @@
     "test:auth-access-code": "npx tsx src/lib/auth/signupAccessCode.test.ts",
     "test:ai-usage": "npx tsx src/lib/aiUsage/budgets.test.ts",
     "test:entitlement": "npx tsx src/lib/entitlementLogic.test.ts && npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx src/lib/entitlement.test.ts",
+    "test:paid-signup": "npx tsx src/lib/billing/paidSignupLogic.test.ts",
     "test:stripe-sync": "npx tsx src/lib/stripeSubscriptionSync.test.ts",
     "setup-extract:eval": "npx dotenv-cli -e .env.local -- npx tsx scripts/setup-extract-eval/run-eval.ts",
     "setup-extract:review": "npx tsx scripts/setup-extract-eval/build-review-page.ts",

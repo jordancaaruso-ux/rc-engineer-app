@@ -50,6 +50,14 @@ export default auth((req) => {
   if (pathname === "/api/stripe/webhook") {
     return NextResponse.next();
   }
+  // The paid door: /join (pricing) + /join/success (post-checkout landing) are how strangers pay
+  // their way in, and the checkout API they call is public by design (rate-limited in the route).
+  if (pathname === "/join" || pathname.startsWith("/join/")) {
+    return NextResponse.next();
+  }
+  if (pathname === "/api/billing/public-checkout") {
+    return NextResponse.next();
+  }
 
   const authed = Boolean(req.auth);
 

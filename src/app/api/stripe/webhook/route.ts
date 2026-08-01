@@ -5,6 +5,8 @@ import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { getStripe, stripeConfigured, tierForPriceId } from "@/lib/stripe";
 import { deriveSubscriptionSchedule } from "@/lib/stripeSubscriptionSync";
+import { extractCheckoutEmail, isPublicSignupSession } from "@/lib/billing/paidSignupLogic";
+import { provisionPaidUser, sendPaidSignupSignInLink } from "@/lib/billing/paidSignup";
 
 /**
  * Stripe webhook — the ONLY source of truth for entitlement. Public (server-to-server), verified
@@ -50,12 +52,31 @@ async function syncFromCheckoutSession(session: Stripe.Checkout.Session): Promis
       .update({ where: { id: userId }, data: { stripeCustomerId: customerId } })
       .catch(() => undefined);
   }
+
+  // The paid door (MONETISATION_NORTH_STAR.md): a stranger paid via /join, so no user exists yet.
+  // Provision BEFORE the subscription sync (syncSubscription finds users by customer id) and email
+  // the sign-in link only AFTER the sync succeeds, so a sync failure retries without having sent.
+  // Ordering within the handler is safe because a thrown error drops the event claim for retry,
+  // and every step here is idempotent.
+  const publicSignupEmail =
+    !userId && customerId && isPublicSignupSession(session)
+      ? extractCheckoutEmail(session)
+      : null;
+  if (publicSignupEmail && customerId) {
+    await provisionPaidUser(publicSignupEmail, customerId);
+  }
+
   const subId =
     typeof session.subscription === "string"
       ? session.subscription
       : session.subscription?.id ?? null;
-  if (!subId) return;
-  await syncSubscription(await getStripe().subscriptions.retrieve(subId));
+  if (subId) {
+    await syncSubscription(await getStripe().subscriptions.retrieve(subId));
+  }
+
+  if (publicSignupEmail) {
+    await sendPaidSignupSignInLink(publicSignupEmail);
+  }
 }
 
 async function handleEvent(event: Stripe.Event): Promise<void> {
