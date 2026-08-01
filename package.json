@@ -112,6 +112,7 @@
     "engineer:bench:model-pairwise": "npx tsx scripts/engineer-bench/build-model-pairwise-page.ts",
     "engineer:bench:model-tally": "npx tsx scripts/engineer-bench/tally-model-pairwise.ts",
     "engineer:bench:vocab": "npx tsx scripts/engineer-bench/lint-vocabulary.ts",
+    "engineer:bench:compare": "npx tsx scripts/engineer-bench/compare-arms.ts",
     "engineer:bench:rating-page": "npx tsx scripts/engineer-bench/build-rating-page.ts",
     "engineer:bench:pearson": "npx tsx scripts/engineer-bench/ingest-ratings.ts",
     "engineer:bench:failures": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/engineer-bench/failure-distribution.ts",

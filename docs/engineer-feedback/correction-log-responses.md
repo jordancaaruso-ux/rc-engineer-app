@@ -23,6 +23,36 @@ audits them per the stopgap rule._
 
 ## Correction log (LIVING — append new patterns, newest first, with date)
 
+**2026-08-01 — THE PROMPT WAS THE PROBLEM: defaults flipped to stripped + terra (prompt `2026-08-01a`):**
+- **The 74k-char CHAT_SYSTEM lost 5-0 to four sentences** in blind founder pairwise — it suppressed
+  length by suppressing content. The stripped prompt is now the shipping default; the old one stays
+  behind `ENGINEER_PROMPT_VARIANT=full`. Four intermediate "cut the fluff" blocks all failed (three
+  cut content, one made answers longer); the founder's verdict was to ship stripped plus a single
+  plain-word rule and stop legislating.
+- **Chat model → `ENGINEER_CHAT_MODEL = gpt-5.6-terra`** (won 3-1-1 vs gpt-5.5 on stripped, $0.055
+  vs $0.145/answer, p50 11s vs 21s; terra@medium beat terra@high 2-0-3). Scoped to chat only:
+  betweenRunHints/dashboard/quickFix stay on gpt-5.5 — they call chat/completions directly and were
+  never measured. `ENGINEER_API` now defaults to Responses (terra is hard-rejected on
+  chat/completions with tools); `ENGINEER_API=chat` is the escape hatch.
+- **`LOCK_RC_SIGN_CORE` DELETED — replaced by KB, per the founder's own call** ("just put the rc
+  directional info in the kb"). LOCK probes showed 7 of 9 signs carried by the KB unaided; the RC
+  reversal traced to `upper-link-geometry.md`'s "flatter / more angled" framing, which requires
+  already knowing which end sits higher. The file now states per-key signs, solver-checked via
+  `computeAxleMetrics` perturbations.
+- **SOLVER REFUTED A KB CLAIM while checking:** "the upper inner is the stronger of the two" is
+  false — upper inner and upper outer are EQUAL (~0.5mm RC per 0.5mm shim, opposite senses), and
+  the genuinely stronger levers are under-lower-arm (~1.1mm) and under-hub (~1.05mm), roughly
+  double. The KB line was corrected rather than preserved. Lesson: hand-written physics claims can
+  be checked against the in-repo solver, and should be.
+- **A geometry calculator TOOL was considered and rejected on measurement:** on the stripped prompt
+  terra called tools 0 of 9 probes, and neither arm called any tool on the RC probes — a runtime
+  tool would sit unused exactly where it is needed. Static signs belong in the KB the model already
+  reads. (Tool-shyness on the stripped prompt is itself worth watching — the spine tools exist and
+  nothing in the stripped prompt encourages their use.)
+- Rounds discarded for contamination along the way: lean v1 leaked its "read/change/check" labels as
+  literal headings (numbered shape in the prompt → template in the output); the founder's blinding
+  leaked once on length ("guess terra"). Both documented in the ablation report.
+
 **2026-07-31 — prompt A/B judged 6-0, and the four notes attached to it (prompt `2026-07-31b`):**
 - **`2026-07-31a` WON 6 OF 6 BLIND PAIRS** against `2026-07-30b` — same model, cases, runs and KB,
   only the prompt moved. Answers 25% shorter (1271 → 956 words), load-bearing comparisons intact,

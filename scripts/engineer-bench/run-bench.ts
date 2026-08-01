@@ -35,7 +35,7 @@ import { prisma } from "@/lib/prisma";
 import { estimateCostUsd } from "@/lib/aiUsage/budgets";
 import { runEngineerChatTurn } from "@/lib/engineerPhase5/engineerChatPipeline";
 import {
-  ENGINEER_DEFAULT_MODEL,
+  ENGINEER_CHAT_MODEL,
   engineerReasoningEffort,
 } from "@/lib/engineerPhase5/openaiEngineer";
 import {
@@ -273,7 +273,10 @@ async function main() {
   }
   // Default must track the pipeline's own default, not a hardcoded "gpt-4o" — the results file is
   // the only record of which model wrote the answers, and a stale label silently mislabels an arm.
-  const answerModel = process.env.ENGINEER_MODEL?.trim() || ENGINEER_DEFAULT_MODEL;
+  // ENGINEER_CHAT_MODEL, not ENGINEER_DEFAULT_MODEL: the bench exercises the CHAT pipeline, and
+  // since the 2026-08-01 split those defaults differ. Labelling from the wrong constant priced a
+  // terra run at gpt-5.5 rates and stamped the wrong model into the results file.
+  const answerModel = process.env.ENGINEER_MODEL?.trim() || ENGINEER_CHAT_MODEL;
   const answerEffort = engineerReasoningEffort(answerModel);
   const judgeModel = process.env.ENGINEER_JUDGE_MODEL?.trim() || "gpt-4o";
   const exemplars: JudgeExemplar[] = set.exemplars ?? [];

@@ -134,6 +134,23 @@ function buildChatCompletionBody(
  * `temperature` is only sent when the model accepts it (see modelSupportsCustomTemperature).
  */
 export const ENGINEER_DEFAULT_MODEL = "gpt-5.5";
+
+/**
+ * CHAT-ONLY model (founder decision 2026-08-01, blind pairwise): gpt-5.6-terra beat gpt-5.5
+ * 3-1-1 on the stripped prompt at $0.055/answer vs $0.145 and p50 11s vs 21s. terra@medium
+ * beat terra@high 2-0-3, so effort stays medium (the env default).
+ *
+ * Deliberately NOT `ENGINEER_DEFAULT_MODEL`: betweenRunHints, dashboardSuggestions and quickFix
+ * read that constant and call /v1/chat/completions DIRECTLY — a path OpenAI hard-400s for every
+ * gpt-5.6 model when tools are attached, and one none of today's measurements covered. They stay
+ * on gpt-5.5 until measured. This constant scopes the flip to exactly what was tested: the chat
+ * tool loop on the Responses path.
+ *
+ * NOT a cheap-model breach: the north-star rule was written against gpt-4o-mini. terra is a
+ * frontier tier that won the founder's own blind judging outright.
+ */
+export const ENGINEER_CHAT_MODEL = "gpt-5.6-terra";
+
 function getEngineerChatModelAndTemperature(tier: EngineerChatContextTier = "full"): {
   model: string;
   temperature: number;
@@ -143,7 +160,7 @@ function getEngineerChatModelAndTemperature(tier: EngineerChatContextTier = "ful
   // its regex failed to recognise ("doesn't feel right") got answered by gpt-4o-mini,
   // in direct breach of the ENGINEER_NORTH_STAR.md hard rule. Lookup questions now
   // differ by PROMPT and context size only; the model is always full strength.
-  const model = process.env.ENGINEER_MODEL?.trim() || ENGINEER_DEFAULT_MODEL;
+  const model = process.env.ENGINEER_MODEL?.trim() || ENGINEER_CHAT_MODEL;
   // Lookup answers read out logged numbers — keep them tight; advice gets a little room.
   return { model, temperature: tier === "lookup" ? 0.2 : 0.3 };
 }
@@ -234,6 +251,143 @@ function applyRule13Flag(prompt: string): string {
     .replace("{{RULE13_BLOCK}}", off ? "" : RULE13_BLOCK);
 }
 
+/**
+ * Ablation arm for "how much of CHAT_SYSTEM does the model actually need, given it already gets
+ * the whole KB and the context JSON?" — role, KB-is-ground-truth, don't-invent-numbers, answer
+ * the question. Nothing else: no answer shape, no rules, no LOCKs.
+ *
+ * Everything structural (tool instructions, choice chips, the reasoning-spine addon) is kept
+ * identical in both arms, so the ONLY variable is the ~72k chars of advice guidance.
+ */
+const CHAT_SYSTEM_MINIMAL = `You are an RC touring car race engineer, talking to the driver who owns the car in the context below.
+
+The vehicle-dynamics knowledge base you have been given is this team's curated ground truth. Build your physics from it. Where it is silent, say so rather than filling the gap from general racing knowledge.
+
+Never invent a number. Every value, lap time, setting and comparison must come from the context JSON or the knowledge base.
+
+Use plain words. Say it the way a driver would say it across the pit table, not the way an engineering report would write it — everyday words over technical ones wherever both carry the meaning.
+
+Answer the question you were asked.`;
+
+/**
+ * Third arm. `minimal` beat the full prompt 5-0 on content but the founder called it "much too
+ * fluffy": 43 list items across six answers versus 3, at 87% more words. Note the minimal arm was
+ * ALREADY writing shorter sentences (18.9 vs 24.7 words) — the bloat is the NUMBER of points, not
+ * the density of prose, so this block attacks volume rather than sentence length.
+ *
+ * Deliberately no rules, no answer shape, no LOCKs: the whole finding was that removing those
+ * improved the content. This adds only what the founder asked for after seeing the result —
+ * "remove length by removing fluff", mechanism withheld until asked, and no not-this lists.
+ */
+/**
+ * Fourth calibration, written after reading what the fluff actually IS.
+ *
+ * Measured across every arm: filler phrases 0, padding modifiers 0, ~19 words per sentence.
+ * The prose was never padded — PROSE_BLOCK had nothing to bite on and made answers LONGER
+ * (316 -> 360 words/answer), because its "padding is a smaller failure than omission" guard
+ * licensed more.
+ *
+ * A stripped 424-word answer breaks down as: a recap of the driver's own laps and notes, the
+ * read, ONE real recommendation, a speculative lever he did not ask about, two "be cautious
+ * / don't chase" warnings, and a closing summary repeating the recommendation. Roughly a third
+ * is the answer. The rest is four categories the founder has now asked to remove three times.
+ *
+ * So this cuts CATEGORIES, not words and not sentences. Every recommendation and every fact
+ * supporting it survives intact — which is what "stop removing info" has to mean, given the
+ * same founder also asked for the don't-do lists and the recaps to go.
+ */
+const CATEGORY_BLOCK = `
+
+WHAT TO LEAVE OUT. Keep every recommendation you would have made and every number, comparison and caveat that supports it — the advice itself is never what gets cut. Four things do get cut, completely:
+
+- **Rejected directions.** No "I wouldn't add more rear toe", no "be cautious using damping as the fix", no "don't chase tyre age with camber". If a lever is not your recommendation, it does not appear at all. The driver asked what to do, not what to avoid.
+- **Recaps of their own data.** They logged the lap times, the notes and the setup; do not read them back. Cite a number only where it is the evidence for your call.
+- **Closing summaries.** No "my call is…", no "so in short…", no restating the recommendation at the end. You already said it.
+- **Levers they did not ask about.** Give the change you would actually make. Do not append the two or three other things they could theoretically try, ranked or otherwise.
+
+Mechanism is the one thing you hold back rather than delete: do not explain WHY a change works in the first reply, and close by offering it in one short clause — "want the reasoning?" — then give it in full if they ask.
+
+What remains is the read, the change with its numbers, and what to look for next run. That is a complete answer, and it should land in a few short paragraphs of ordinary prose rather than a numbered brief.`;
+
+/**
+ * Third calibration, and a change of kind rather than degree.
+ *
+ * FLUFF_BLOCK (50 words/answer) and LEAN_BLOCK (123) both cut length by cutting CONTENT — the
+ * founder's verdict on lean was "removes way too much actual info". Both failed the same way:
+ * they legislated what an answer may contain (one move, no mechanism, a fixed shape).
+ *
+ * This one touches only WORDING. Nothing here says what to include, how many changes to name,
+ * whether to explain a mechanism, or how long to be. Every point the model was going to make
+ * still gets made — just said once and said plainly. The guard at the end is deliberately the
+ * inverse of the earlier blocks': if trimming words would drop a fact, keep the words.
+ */
+const PROSE_BLOCK = `
+
+HOW YOU WRITE, not what you say. Make every point you were going to make — this is only about the words used to make them.
+
+- **Say each thing once.** The most common padding is one point made twice: stated, then restated in different words, then summarised at the end. Say it once, in its best form.
+- **Cut throat-clearing.** "It's worth noting", "keep in mind", "what this tells us is", "the reason being", "as you can see", "in terms of", "when it comes to" carry no information. Delete them and start with the point.
+- **Cut padding modifiers.** "quite", "fairly", "somewhat", "a little bit", "generally speaking", "relatively", "potentially", "arguably" weaken a sentence without qualifying it. Either you mean it or you don't; if a real uncertainty needs stating, state it plainly and once.
+- **One idea per sentence.** Break the chains of "which means… so that… which in turn…" into separate short sentences. Prefer concrete words over abstract ones.
+- **No preamble and no summary.** Do not open by restating the question. Do not close by recapping what you just said.
+
+**This is compression, never subtraction.** Every setting, number, comparison, caveat and option you would have given still appears. If shortening a sentence would drop a fact, keep the longer sentence — a padded answer is a much smaller failure than one missing the advice.`;
+
+/**
+ * Second calibration. FLUFF_BLOCK cut 1893 words to 300 — past the point: the qualifying answer
+ * came back as 29 words with no read of the problem at all, just an instruction.
+ *
+ * The diagnosis is that FLUFF_BLOCK was ALL prohibitions and no floor, so there was nothing to
+ * stop the answer collapsing. This one keeps the same prohibitions and adds a required shape:
+ * the read, the change, the check. Prohibitions cap the ceiling; the shape holds the floor.
+ */
+const LEAN_BLOCK = `
+
+HOW TO WRITE IT — trim fluff, never substance. **Roughly 100–150 words**, written as ordinary prose paragraphs. Do not pad to reach that, and do not compress below it by dropping advice.
+
+A good reply says what the symptom or data indicates, gives one change with its numbers, and says what to look for next run. Write those as flowing sentences — **never label them, never head them, never number them.** Words like "The read:", "The change:", "The check:" must not appear; that is scaffolding for you, and a driver seeing it reads a form rather than an engineer. No bullet lists and no numbered points unless the driver asked for a list.
+
+- **Lead with what it tells you.** The reading of the situation is what makes you worth asking — never skip straight to an instruction.
+- **One change, with its numbers.** A second only when the first can fail for a reason you can name. Match the size of the move to the risk the driver stated.
+- **No mechanism in the first reply.** Do not explain WHY it works — not load transfer, not roll centre, not the grip budget. **Close instead by offering it in one short clause — "want the reasoning?" — and give it if they ask.** That offer belongs on every reply that withheld a mechanism.
+- **Never say what you would NOT do.** No "I wouldn't add more rear toe", no "don't keep chasing softer springs", no listing rejected directions. If a direction is wrong, simply do not raise it.
+- **No recap.** Do not restate their notes, laps or setup values back to them, and do not summarise your own answer at the end.
+- **Plain sentences, one idea each.** Cut "which means", "the reason being", "it's worth noting", "keep in mind". Short, but still sentences — a telegram is not an answer.
+
+Dropping the actual advice to hit a length is a worse failure than being long.`;
+
+const FLUFF_BLOCK = `
+
+HOW TO WRITE IT — this is about trimming fluff, never about trimming substance. Say the same thing with less around it.
+
+- **One move, not a list.** Give the single best change and its expected result. Do not enumerate every option you considered, do not add a second and third candidate, do not break one answer into numbered sections. A short paragraph beats a structured brief.
+- **No mechanism in the first reply.** Do not explain WHY it works — not the load transfer, not the roll centre, not the grip budget. Name the change, the number, and what to look for. Then offer it in one short clause: "want the reasoning?" The driver asks if they care, and most of the time they are standing over the car and do not.
+- **Never say what you would NOT do.** No "I wouldn't add more rear toe", no "don't keep chasing softer springs", no listing of rejected directions. It was not asked for and it doubles the length. If a direction is wrong, just do not raise it.
+- **Short sentences, one idea each.** Cut every clause that survives deletion. "Which means", "so that", "the reason being", "it's worth noting", "keep in mind" are all removable. Prefer plain words to precise-sounding ones.
+- **No recap.** Do not restate their notes, lap times or setup values back to them, and do not summarise your own answer at the end.
+
+Length is the symptom, not the target: a dense two-line answer that dropped the actual advice is a worse failure than a long one.`;
+
+/**
+ * DEFAULT FLIPPED 2026-08-01 (founder decision, blind pairwise): the stripped prompt beat the
+ * 74k-char CHAT_SYSTEM 5-0 — the big prompt was suppressing length by suppressing content. The
+ * advice tier now serves CHAT_SYSTEM_MINIMAL; the old prompt stays reachable for A/Bs behind
+ * ENGINEER_PROMPT_VARIANT=full. Evidence: docs/engineer-prompt-ablation-2026-08-01.md.
+ *
+ * Read at CALL time so one process can flip between arms. Deliberately NOT part of
+ * ENGINEER_PROMPT_VERSION's hash: that fingerprint tracks the shipping prompt, and moving it when
+ * an experiment flag flips would mislabel every persisted answer.
+ */
+function advicePromptForVariant(): string {
+  const variant = process.env.ENGINEER_PROMPT_VARIANT?.trim();
+  if (variant === "full") return applyRule13Flag(CHAT_SYSTEM);
+  if (variant === "fluff") return CHAT_SYSTEM_MINIMAL + FLUFF_BLOCK;
+  if (variant === "lean") return CHAT_SYSTEM_MINIMAL + LEAN_BLOCK;
+  if (variant === "language") return CHAT_SYSTEM_MINIMAL + PROSE_BLOCK;
+  if (variant === "category") return CHAT_SYSTEM_MINIMAL + CATEGORY_BLOCK;
+  return CHAT_SYSTEM_MINIMAL;
+}
+
 function chatSystemPromptForContext(tier: EngineerChatContextTier, contextJson: unknown): string {
   // Lookup and general are SHAPES, not downgrades — same model behind every tier. Lookup
   // skips the advice-shaping material; general swaps in the theory-only prompt (choice
@@ -243,7 +397,7 @@ function chatSystemPromptForContext(tier: EngineerChatContextTier, contextJson: 
       ? CHAT_SYSTEM_LOOKUP
       : tier === "general"
         ? CHAT_SYSTEM_GENERAL + CHOICE_CHIP_INSTRUCTIONS
-        : applyRule13Flag(CHAT_SYSTEM) + CHOICE_CHIP_INSTRUCTIONS;
+        : advicePromptForVariant() + CHOICE_CHIP_INSTRUCTIONS;
   return base + reasoningSpineSystemPromptAddon(spineFromContext(contextJson));
 }
 
@@ -266,7 +420,9 @@ const LOCK_DAMPER_OIL = `DAMPER OIL DIRECTION (LOCK — the Engineer has been ob
 
 const LOCK_TOE_GAIN = `TOE-GAIN / BUMP-STEER SHIM DIRECTION (LOCK — the Engineer has been observed reversing this). The platform signs are ground truth in the KB ("Sign" lines in the bump-steer / toe-gain sections): on this car FEWER **toe_gain_shims_rear** = MORE gain, while MORE **bump_steer_shims_front** = more bump-in — front and rear run OPPOSITE senses. Quote the KB sign line for the end you are discussing; never write "more shims" as the way to add rear toe gain, and never carry either sign to a different chassis. What the toe change does to grip or balance is not settled here — work it out from the KB.`;
 
-const LOCK_RC_SIGN_CORE = `**Forbidden:** claiming **raising upper inner** causes **higher** roll centre (here it **lowers** RC). **Forbidden:** **lowering** upper outer **raises** roll centre—it tends **lower**.`;
+// LOCK_RC_SIGN_CORE deleted 2026-08-01: the per-key sign table now lives in
+// upper-link-geometry.md (solver-checked), where statics belong. If probes show the
+// reversal returning, restore from git history — on evidence, not assumption.
 
 const LOCK_VOCABULARY = `VOCABULARY (all messages): Do not use **responsive** for **lower RC** or **flatter** upper link. Reserve **responsive** for **on the track** / **initial bite** / **initial grip** when that is what you mean. For lower RC and flatter links, use **smoother**, **more rolled-in**, **more in the track**, **less initial bite**, **mid-corner**, **overall grip**—not "responsive."
 **THE FEEL VOCABULARY IS A CLOSED LIST.** The KB's bite/hold section carries it in full, and it is the complete set of words available for saying how a change feels: **bite · initial grip · overall grip · hold · precise · pointy · planted · forgiving · numb · vague · imprecise · smoother · more rolled-in · on the track · in the track · entry · mid-corner · on power**, plus **responsive** in its reserved sense above.
@@ -403,7 +559,7 @@ NET PER AXLE: If **upper inner**, **upper outer**, and/or **under lower arm** al
 
 ROLL CENTRE BALANCE (front vs rear): When **only the front** or **only the rear** upper-link keys appear in the diff (see rollCentreBalanceNote), after stating per-end RC direction from rcEffectHints/KB, explain **how** that changes **front vs rear roll-centre balance** per vehicleDynamicsKb (e.g. **raising front upper inner** lowers front RC—often **less initial grip**, **smoother** turn-in and **over bumps**, grip that can **hold later** into the corner and **more mid-corner steering** tendency—while the **other** axle’s upper link was **unchanged**, so the **relative** balance is what drives the familiar **upper link balance** handling effects). If both axles appear in the diff, still judge **net** per axle then **relative** balance.
 
-RC SIGN DISCIPLINE: When discussing roll centre, do not contradict **frontAxleNetNote**, **rearAxleNetNote**, or **rcEffectHints**. ${LOCK_RC_SIGN_CORE}
+RC SIGN DISCIPLINE: When discussing roll centre, do not contradict **frontAxleNetNote**, **rearAxleNetNote**, or **rcEffectHints**. The per-key shim directions are stated in the KB's upper-link-geometry section — read the sign there, never derive it from link-angle reasoning.
 
 ${LOCK_VOCABULARY}
 
@@ -501,7 +657,7 @@ KB GROUNDING: the vehicle-dynamics corpus provided to you is the curated ground 
 
 (6) ${LOCK_TOE_GAIN}
 
-RC SIGN DISCIPLINE: ${LOCK_RC_SIGN_CORE}
+RC SIGN DISCIPLINE: The per-key shim directions are stated in the KB's upper-link-geometry section — read the sign there, never derive it from link-angle reasoning.
 
 ${LOCK_VOCABULARY}
 
@@ -534,6 +690,10 @@ GENERAL SUBJECT — this conversation is deliberately general theory; the driver
 export const ENGINEER_PROMPT_VERSION = formatEngineerPromptVersion(
   ENGINEER_PROMPT_LABEL,
   [
+    // CHAT_SYSTEM_MINIMAL leads: it IS the shipping advice prompt since 2026-08-01. CHAT_SYSTEM
+    // stays in the hash because variant=full can still serve it and the fingerprint must move
+    // if either edits.
+    CHAT_SYSTEM_MINIMAL,
     CHAT_SYSTEM,
     CHAT_SYSTEM_LOOKUP,
     CHAT_SYSTEM_GENERAL,

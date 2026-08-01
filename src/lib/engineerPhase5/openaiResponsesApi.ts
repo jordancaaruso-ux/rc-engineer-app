@@ -57,8 +57,12 @@ export type ChatCompletionStreamResult = {
  * per arm in-process.
  */
 export function responsesApiEnabled(): boolean {
+  // Default flipped 2026-08-01 with the chat model moving to gpt-5.6-terra: OpenAI hard-400s
+  // every gpt-5.6 model on chat/completions when function tools are attached, so for terra the
+  // Responses path is a requirement, not a preference. ENGINEER_API=chat is the escape hatch
+  // (only usable with a gpt-5.5-or-older ENGINEER_MODEL override).
   const raw = process.env.ENGINEER_API?.trim().toLowerCase();
-  return raw === "responses";
+  return raw !== "chat";
 }
 
 export const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";

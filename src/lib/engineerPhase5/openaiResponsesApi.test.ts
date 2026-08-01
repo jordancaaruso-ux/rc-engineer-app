@@ -15,11 +15,15 @@ import {
   type ChatCompletionMessage,
 } from "@/lib/engineerPhase5/openaiResponsesApi";
 
-test("the endpoint flag defaults to chat completions", () => {
+test("the endpoint flag defaults to Responses; ENGINEER_API=chat is the escape hatch", () => {
+  // Default flipped 2026-08-01: the shipping chat model (gpt-5.6-terra) is hard-rejected on
+  // chat/completions when tools are attached, so Responses is the default, not the opt-in.
   const prev = process.env.ENGINEER_API;
   delete process.env.ENGINEER_API;
-  assert.equal(responsesApiEnabled(), false);
+  assert.equal(responsesApiEnabled(), true);
   process.env.ENGINEER_API = "chat";
+  assert.equal(responsesApiEnabled(), false);
+  process.env.ENGINEER_API = "CHAT";
   assert.equal(responsesApiEnabled(), false);
   process.env.ENGINEER_API = "responses";
   assert.equal(responsesApiEnabled(), true);
