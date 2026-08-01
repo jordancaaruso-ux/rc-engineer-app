@@ -78,16 +78,21 @@ Update this table as work lands — a spec is intent, not shipped code (`docs/NO
 The code side is done and driven in test mode; going live is configuration. Order matters —
 comp codes must reach testers BEFORE enforcement flips, or every tester lands on /billing.
 
-1. **Stripe live mode:** swap the `sk_test_` guard aside deliberately — run
-   `scripts/stripe-setup-prices.ts` against the LIVE key (edit the guard, or create the four
-   products/prices by hand at $14.99/$149.90 · $27.99/$279.90 AUD). Create the live 100%-off
-   "Founders comp" coupon + a promo code per tester (per-tester codes → per-tester revocation;
-   `max_redemptions: 1` each).
-2. **Vercel env:** `STRIPE_SECRET_KEY` (live), the four `STRIPE_PRICE_*` ids,
-   `STRIPE_WEBHOOK_SECRET` from a live webhook endpoint pointed at
-   `https://<prod>/api/stripe/webhook` (events: `checkout.session.completed`,
-   `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`). Leave
-   `BILLING_ENFORCED` unset for now.
+0. **Domain (decided 2026-08-01): `app.jrcdynamics.com`.** DNS is on Cloudflare. Add the domain
+   to the Vercel project (`vercel domains add` or dashboard), then in Cloudflare: CNAME `app` →
+   `cname.vercel-dns.com`, **proxy OFF (grey cloud)** so Vercel can issue TLS. Update
+   `AUTH_URL` + `NEXT_PUBLIC_APP_URL` to `https://app.jrcdynamics.com`; if Google OAuth is on,
+   add the new origin + `/api/auth/callback/google` redirect in Google Console. Do this BEFORE
+   comp codes go out so testers bookmark the final URL and magic links never break.
+1. **Stripe live mode — one command:** put `STRIPE_SECRET_KEY_LIVE="sk_live_..."` in .env.local,
+   then `npm run stripe:launch-live -- --origin=https://app.jrcdynamics.com --comp-codes=<N>`.
+   Creates the four products/prices, the "Founders comp" coupon + N single-use codes, the live
+   webhook endpoint, and prints the whole Vercel env block. Idempotent.
+2. **Vercel env (Production):** paste the printed block — `STRIPE_SECRET_KEY` (live), four
+   `STRIPE_PRICE_*` ids, `STRIPE_WEBHOOK_SECRET`, `AUTH_URL`, `NEXT_PUBLIC_APP_URL`. **Also
+   verify `EMAIL_SERVER`/`EMAIL_FROM` are set and deliver** — a paid signup's magic link goes by
+   email; without SMTP the webhook logs the link into Vercel logs and the buyer sees nothing.
+   Leave `BILLING_ENFORCED` unset for now. Redeploy.
 3. **Smoke the dark door:** visit `/welcome` and `/join` signed out on prod; buy Standard with a
    real card, confirm the magic-link email arrives and the account provisions; refund yourself in
    the Stripe dashboard.
