@@ -25,6 +25,25 @@ process.stdin.on("end", () => {
   }
   if (!cmd) process.exit(0);
 
+  // Match against what actually EXECUTES, not free text the command merely carries.
+  // A commit message or doc that mentions `db:push` is prose, not a database write —
+  // without this, writing about the guard trips the guard.
+  // Only commands that consume stdin as PROSE get their heredoc stripped. For anything else
+  // — `bash <<EOF`, `sh <<EOF`, `node <<EOF` — the heredoc body IS the program, so stripping
+  // it would be a bypass. Whitelist, not blacklist: unknown commands stay strict.
+  const prosePipe = /\bgit\s+(commit|tag|notes|merge)\b|\bgh\s+(pr|issue|release)\b/.test(cmd);
+
+  const executable = cmd
+    // heredoc bodies: <<EOF / <<'EOF' / <<-"EOF" ... up to the closing delimiter
+    .replace(
+      /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1[\s\S]*?^\s*\2\s*$/gm,
+      (m) => (prosePipe ? " " : m),
+    )
+    // message arguments: -m "..." | -m '...' | --message="..."
+    // Deliberately NOT stripping all quoted text — `sh -c 'npm run db:push'` must still be
+    // caught, so only an explicit message flag is treated as prose.
+    .replace(/(^|\s)(-m|--message)(=|\s+)(['"])[\s\S]*?\4/g, " ");
+
   /** [pattern, why] — first match wins. */
   const BLOCKED = [
     [
@@ -53,7 +72,7 @@ process.stdin.on("end", () => {
     ],
   ];
 
-  const hit = BLOCKED.find(([re]) => re.test(cmd));
+  const hit = BLOCKED.find(([re]) => re.test(executable));
   if (!hit) process.exit(0);
 
   process.stdout.write(
