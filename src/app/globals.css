@@ -51,6 +51,25 @@
   --color-surface-runna-inset: 30 29 28;
 
   /*
+   * Car-rating band ramp (CarHandlingRatingQuickPick; docs/HANDLING_CAPTURE_NORTH_STAR.md).
+   * Red→green is on-policy here: the palette rule reserves the pair for pace and
+   * *quality* deltas, and a 1–10 "how close to perfect" rating is quality — this is
+   * not decoration standing in for data.
+   *
+   * Deliberately not a straight red→green interpolation: the midpoint of that lands
+   * on olive mud right where the scale matters most. The warm arm cools to sand
+   * through Workable, then crosses to sage at Good — so the single discontinuity in
+   * the ramp sits exactly on the 5→6 boundary, which is a real threshold in how the
+   * Engineer reads a run. Bad and Dialled reuse `destructive` and the `gain` green
+   * unchanged; only the two middle stops are new. No stop goes near brand yellow —
+   * yellow stays action-only.
+   */
+  --color-rating-bad: 229 100 78; /* = destructive #E5644E */
+  --color-rating-workable: 217 154 124; /* #D99A7C */
+  --color-rating-good: 111 188 144; /* #6FBC90 */
+  --color-rating-dialled: 79 208 137; /* = gain #4FD089 */
+
+  /*
    * Mobile bottom dock (see BottomNav.tsx) — clearance the page reserves under
    * scrolling content: 3.5rem bar + 0.75rem float gap + 1rem breathing room.
    */
