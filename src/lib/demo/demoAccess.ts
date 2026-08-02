@@ -46,6 +46,6 @@ export function decideDemoRequest(input: {
   return "forbid";
 }
 
-/** The message every refused write carries — sells, never scolds. */
-export const DEMO_READ_ONLY_MESSAGE =
-  "This demo garage is read-only — get your own at jrcdynamics.com/join.";
+/** The message every refused write carries — quiet, never aggressive (founder 2026-08-02).
+ *  The selling happens in the banner; the refusal just states the fact. */
+export const DEMO_READ_ONLY_MESSAGE = "The demo is read-only.";

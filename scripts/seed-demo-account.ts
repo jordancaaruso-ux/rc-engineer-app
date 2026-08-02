@@ -41,7 +41,7 @@ import {
 const SOURCE_USER_ID = "cmo75nzr60000vl5kvr0rqhej"; // the founder
 const DEMO_USER_ID = process.env.DEMO_USER_ID?.trim() || "demo0000000000000000user1";
 const DEMO_USER_EMAIL = process.env.DEMO_USER_EMAIL?.trim() || "demo@jrcdynamics.com";
-const DEMO_DRIVER_NAME = process.env.DEMO_DRIVER_NAME?.trim() || "Alex Marino"; // decision-board 9C: founder may override
+const DEMO_DRIVER_NAME = process.env.DEMO_DRIVER_NAME?.trim() || "Nic Swole"; // founder pick 2026-08-02
 const DEFAULT_NAME_SCRUB = [
   { from: "Jordan Caruso", to: DEMO_DRIVER_NAME },
   { from: "Caruso", to: DEMO_DRIVER_NAME.split(" ").pop() ?? DEMO_DRIVER_NAME },

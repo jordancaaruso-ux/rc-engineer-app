@@ -3,7 +3,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { JrcMark } from "@/components/brand/JrcMark";
-import { TelemetryBackground } from "@/components/brand/TelemetryBackground";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { Eyebrow } from "@/components/ui/panel";
 import { CardPanel } from "@/components/ui/CardPanel";
@@ -38,15 +37,24 @@ export default async function WelcomePage(): Promise<ReactNode> {
 
   return (
     <div className="relative min-h-[100dvh] w-full bg-background">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <TelemetryBackground />
-      </div>
+      {/* TITC sunset backdrop (founder pick 2026-08-02) — the same baked photo the app's
+          "photo" background mode uses (blur + grade baked into the JPEG; scrim + vignette
+          here because they're viewport-relative). Fixed so it holds through the scroll. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0"
+        className="pointer-events-none fixed inset-0"
+        style={{ background: "url(/brand/track-hero-baked.jpg) center / cover no-repeat" }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0"
+        style={{ background: "rgb(18 17 16 / 0.62)" }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0"
         style={{
-          background:
-            "radial-gradient(115% 75% at 50% -8%, rgba(255,214,10,0.10), rgba(255,214,10,0) 55%)",
+          background: "radial-gradient(130% 120% at 50% 40%, transparent 55%, rgba(0,0,0,0.45))",
         }}
       />
 

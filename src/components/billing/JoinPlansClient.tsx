@@ -17,7 +17,7 @@ const ROWS: Array<{ label: string; standard: string; pro: string }> = [
   { label: "Session review & lap analysis", standard: "✓", pro: "✓" },
   { label: "Compare runs & setups", standard: "✓", pro: "✓" },
   { label: "Engineer questions", standard: "2 a day", pro: "300 a month" },
-  { label: "Video analysis", standard: "—", pro: "✓" },
+  { label: "Video analysis", standard: "—", pro: "Soon" },
   { label: "Roll-centre tools", standard: "—", pro: "✓" },
 ];
 

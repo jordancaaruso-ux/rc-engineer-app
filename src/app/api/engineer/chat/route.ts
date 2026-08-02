@@ -11,7 +11,7 @@ import {
 import { generateEngineerChatReplyWithTools } from "@/lib/engineerPhase5/openaiEngineer";
 import { tryAnswerLapHistoryQuery } from "@/lib/engineerPhase5/lapHistoryQuery";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
-import { checkAiBudget, recordAiUsage } from "@/lib/aiUsage/ledger";
+import { checkAiBudget, engineerQuotaSnapshot, recordAiUsage } from "@/lib/aiUsage/ledger";
 import { getEntitlement } from "@/lib/entitlement";
 import { isBillingEnforced } from "@/lib/entitlementLogic";
 import { isDemoIdentity } from "@/lib/demo/demoAccess";
@@ -254,9 +254,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: message }, { status });
     };
 
-    // Demo visitors get 2 live questions a day per IP (decision-board pick 10A copy) — placed
-    // AFTER the free deterministic lap-history path so a database answer never burns one, and
-    // BEFORE the budget block so the refusal is the friendly one, not a budget message.
+    // Demo visitors: 2 live questions a day per IP, plus a DURABLE global ceiling on the shared
+    // demo account (15/day · 100/month — founder wants this very limited, 2026-08-02). The
+    // per-IP brake is in-memory best-effort on serverless; the snapshot query is the one that
+    // actually bounds spend. Placed AFTER the free deterministic lap-history path so a database
+    // answer never burns a question, and BEFORE the budget block so refusals stay friendly.
     if (isDemo) {
       const demoRl = checkApiRateLimit({
         key: `engineer-chat-demo:${clientIpKey(request)}`,
@@ -266,6 +268,13 @@ export async function POST(request: Request) {
       if (!demoRl.ok) {
         return refuseAllowance(
           "That's both demo questions for today. In the full app, the Engineer answers all day — about your own car, not the demo driver's. Get your own garage at jrcdynamics.com/join.",
+          429,
+        );
+      }
+      const demoUsage = await engineerQuotaSnapshot(user.id);
+      if (demoUsage.today >= 15 || demoUsage.month >= 100) {
+        return refuseAllowance(
+          "The demo Engineer has answered a lot today — come back tomorrow, or get your own garage and ask about your own car.",
           429,
         );
       }
