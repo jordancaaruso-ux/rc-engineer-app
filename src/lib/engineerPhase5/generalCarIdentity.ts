@@ -2,8 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { chassisPlatformLabel } from "@/lib/cars/carClasses";
-import { platformForChassisSlug } from "@/lib/cars/chassisPlatform";
-import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
+import { disciplineForCar } from "@/lib/cars/chassisPlatform";
 import {
   formatGeneralCarIdentityLine,
   type GeneralCarIdentity,
@@ -31,8 +30,7 @@ export async function loadGeneralCarIdentity(
     },
   });
   if (!car) return null;
-  const slug = car.setupSheetModel?.slug ?? canonicalSetupSheetTemplateId(car.setupSheetTemplate);
-  const platformLabel = chassisPlatformLabel(platformForChassisSlug(slug) ?? car.carClass);
+  const platformLabel = chassisPlatformLabel(disciplineForCar(car));
   const identity = {
     carId: car.id,
     name: car.name,

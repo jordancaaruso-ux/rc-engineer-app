@@ -8,8 +8,9 @@ import { isSamePlatform } from "@/lib/cars/carClasses";
  * - **Tires + prep**: carry between cars on the same platform (the same wheels
  *   bolt on); a cross-platform swap re-derives them from the new car's own last
  *   run. Unknown platform on either car counts as the same platform (safe
- *   default). The platform is inferred from the car's chassis — it used to come
- *   from a user-set `Car.carClass` picker, dropped 2026-07-22.
+ *   default). The platform comes from `disciplineForCar`: inferred from the
+ *   car's chassis, falling back to `Car.carClass` for a chassis the catalog
+ *   can't place.
  * - **Setup**: always car-specific → reload from the new car's last run,
  *   EXCEPT when the driver hand-edited setup values this session AND both cars
  *   read the same setup-sheet model — then the edits transfer meaningfully and

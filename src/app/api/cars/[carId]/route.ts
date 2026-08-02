@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
+import { CHASSIS_PLATFORMS } from "@/lib/cars/carClasses";
 import { templateKeyFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
 import { revalidateAfterCarMutation } from "@/lib/revalidateUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -90,6 +91,7 @@ export async function PATCH(
   const body = (await request.json()) as {
     name?: string;
     chassis?: string | null;
+    carClass?: string | null;
     notes?: string | null;
     setupSheetTemplate?: string | null;
     setupSheetModelId?: string | null;
@@ -98,6 +100,7 @@ export async function PATCH(
   const data: {
     name?: string;
     chassis?: string | null;
+    carClass?: string | null;
     notes?: string | null;
     setupSheetTemplate?: string | null;
     setupSheetModelId?: string | null;
@@ -107,8 +110,23 @@ export async function PATCH(
     if (v) data.name = v;
   }
   if (body.chassis !== undefined) data.chassis = body.chassis?.trim() || null;
-  // `carClass` is no longer settable — the picker was dropped 2026-07-22 and the car-swap rule
-  // now infers the platform from the chassis. The column stays in the DB, dormant.
+  /*
+   * `carClass` is settable again (founder call 2026-08-03), but only as the *override* half of
+   * `disciplineForCar`: the chassis catalog answers first, and this fills the gap for a chassis
+   * it can't place. It was unsettable from 2026-07-22, when the always-on picker was dropped as
+   * noise on a touring-only app — the column survived that, so there is nothing to migrate.
+   *
+   * Validated against `CHASSIS_PLATFORMS` rather than stored free-text: `isSamePlatform` compares
+   * these by equality to scope teammate run lists and the car-swap tire rule, and two spellings of
+   * "buggy" would silently read as two disciplines.
+   */
+  if (body.carClass !== undefined) {
+    const raw = body.carClass?.trim() || null;
+    if (raw && !CHASSIS_PLATFORMS.some((p) => p.id === raw)) {
+      return NextResponse.json({ error: "Unknown discipline" }, { status: 400 });
+    }
+    data.carClass = raw;
+  }
   if (body.notes !== undefined) data.notes = body.notes?.trim() || null;
   if (body.setupSheetTemplate !== undefined) {
     data.setupSheetTemplate = canonicalSetupSheetTemplateId(body.setupSheetTemplate);
@@ -133,7 +151,7 @@ export async function PATCH(
   if (Object.keys(data).length === 0) {
     const car = await prisma.car.findFirst({
       where: { id: carId, userId: userId },
-      select: { id: true, name: true, chassis: true, notes: true, setupSheetTemplate: true, setupSheetModelId: true, createdAt: true },
+      select: { id: true, name: true, chassis: true, carClass: true, notes: true, setupSheetTemplate: true, setupSheetModelId: true, createdAt: true },
     });
     return NextResponse.json({ car });
   }
@@ -141,7 +159,7 @@ export async function PATCH(
   const car = await prisma.car.update({
     where: { id: carId },
     data,
-    select: { id: true, name: true, chassis: true, notes: true, setupSheetTemplate: true, setupSheetModelId: true, createdAt: true },
+    select: { id: true, name: true, chassis: true, carClass: true, notes: true, setupSheetTemplate: true, setupSheetModelId: true, createdAt: true },
   });
   revalidateAfterCarMutation(userId);
   return NextResponse.json({ car });

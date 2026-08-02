@@ -49,9 +49,13 @@ export function RunPageClient({
   const [setupOpen, setSetupOpen] = useState(false);
   const [lapsOpen, setLapsOpen] = useState(false);
 
-  const sameCarPickerRuns = run.carId
-    ? pickerRuns.filter((r) => r.car?.id === run.carId)
-    : pickerRuns;
+  // Own runs arrive already filtered to this car by the server query, so this is belt-and-braces.
+  // A teammate's arrive scoped to the run's *discipline* instead — re-cutting those to the exact
+  // car would throw away everything the page just went and fetched.
+  const lapComparePickerRuns =
+    runOwnedByViewer && run.carId
+      ? pickerRuns.filter((r) => r.car?.id === run.carId)
+      : pickerRuns;
 
   return (
     <div className="space-y-3">
@@ -120,7 +124,7 @@ export function RunPageClient({
           open={lapsOpen}
           onClose={() => setLapsOpen(false)}
           run={run}
-          pickerRunsSameCar={sameCarPickerRuns}
+          pickerRunsSameCar={lapComparePickerRuns}
           runListSource={runListSource}
           userDisplayName={runOwnerDisplayName}
           runOwnedByViewer={runOwnedByViewer}

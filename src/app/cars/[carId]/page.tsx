@@ -14,9 +14,13 @@ import {
   showLegacySetupSheetTemplateEdit,
 } from "@/components/cars/CarSetupSheetModelCard";
 import { CarSetupSheetTemplateEdit } from "@/components/cars/CarSetupSheetTemplateEdit";
+import { CarDisciplineEdit } from "@/components/cars/CarDisciplineEdit";
+import { disciplineForCar } from "@/lib/cars/chassisPlatform";
+import { chassisPlatformLabel } from "@/lib/cars/carClasses";
 import { canEditSetupSheetModel } from "@/lib/setupSheetModels/modelAccess";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { CarSetupsCard } from "@/components/setup/CarSetupsCard";
+import { getSetupFillDraftSummaryForCar } from "@/lib/setup/getSetupFillDraft";
 import { CarCurrentSetupCard } from "@/components/setup/CarCurrentSetupCard";
 import { CarSetupHistory } from "@/components/setup/CarSetupHistory";
 import { getCarSetupHistory } from "@/lib/setup/getCarSetupHistory";
@@ -68,13 +72,14 @@ export default async function CarDetailPage(props: {
     getExplicitTimeZoneForRunFormatting(),
   ]);
 
-  const [car, runCount, librarySetups, tireRunRows] = await Promise.all([
+  const [car, runCount, librarySetups, tireRunRows, setupFillDraft] = await Promise.all([
     prisma.car.findFirst({
       where: { id: carId, userId: user.id },
       select: {
         id: true,
         name: true,
         chassis: true,
+        carClass: true,
         notes: true,
         setupSheetTemplate: true,
         setupSheetModelId: true,
@@ -106,6 +111,8 @@ export default async function CarDetailPage(props: {
         tireType: { select: { displayName: true } },
       },
     }),
+    // An unfinished sequential fill, if any. Summary only — no sheet JSON for one label.
+    getSetupFillDraftSummaryForCar(user.id, carId),
   ]);
 
   if (!car) {
@@ -173,6 +180,16 @@ export default async function CarDetailPage(props: {
     valueCount: Object.keys(normalizeSetupData(b.data)).length,
   }));
 
+  /*
+   * Discipline: the chassis catalog answers for every car it knows, and only the gap gets a
+   * picker (founder call 2026-08-03). Passing `carClass: null` asks what the chassis alone says
+   * — when that comes back null there is nothing to infer from and the override is worth asking
+   * for; otherwise the car states its own discipline and the question would be the noise that
+   * got the original picker deleted.
+   */
+  const inferredDiscipline = disciplineForCar({ ...car, carClass: null });
+  const resolvedDiscipline = disciplineForCar(car);
+
   const runsOnCarByTire = new Map<string, number>();
   /** Highest run count reached on this compound — a rough "how far you've taken it". */
   const furthestRunByTire = new Map<string, number>();
@@ -221,6 +238,15 @@ export default async function CarDetailPage(props: {
           <CarSetupsCard
             carId={car.id}
             label="Saved setups"
+            fillDraft={
+              setupFillDraft
+                ? {
+                    answeredCount: setupFillDraft.answeredCount,
+                    stepCount: setupFillDraft.stepCount,
+                    updatedAt: setupFillDraft.updatedAt.toISOString(),
+                  }
+                : null
+            }
             setups={librarySetups.map((s) => ({
               id: s.id,
               name: s.name,
@@ -255,6 +281,10 @@ export default async function CarDetailPage(props: {
 
           {showLegacySetupSheetTemplateEdit(car.setupSheetModelId, car.setupSheetTemplate) ? (
             <CarSetupSheetTemplateEdit carId={car.id} currentTemplate={car.setupSheetTemplate} />
+          ) : null}
+
+          {inferredDiscipline == null ? (
+            <CarDisciplineEdit carId={car.id} currentDiscipline={car.carClass} />
           ) : null}
 
           {car.setupSheetTemplate && !car.setupSheetModelId ? (
@@ -314,6 +344,14 @@ export default async function CarDetailPage(props: {
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-muted-foreground">Chassis</span>
                   <span className="min-w-0 truncate">{car.chassis}</span>
+                </div>
+              ) : null}
+              {resolvedDiscipline ? (
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-muted-foreground">Discipline</span>
+                  <span className="min-w-0 truncate">
+                    {chassisPlatformLabel(resolvedDiscipline)}
+                  </span>
                 </div>
               ) : null}
               {car.notes ? (

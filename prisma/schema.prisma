@@ -424,9 +424,11 @@ model Car {
   id                 String   @id @default(cuid())
   name               String
   chassis            String?
-  /// Race class / discipline (ids from src/lib/cars/carClasses.ts, e.g. "touring").
-  /// Drives the log-run car-swap rule: same/unknown class keeps the day's tires+prep,
-  /// different class re-derives them from the new car's last run. Null = unspecified.
+  /// Discipline OVERRIDE (ids from src/lib/cars/carClasses.ts, e.g. "touring"). Only consulted
+  /// when the chassis catalog cannot place the car - resolve with disciplineForCar(), never by
+  /// reading this directly. Drives the log-run car-swap rule (same/unknown discipline keeps the
+  /// days tires+prep, different re-derives from the new cars last run), same-class tire
+  /// suggestions, and the teammate lap-compare scope. Null = fall back to inference.
   carClass           String?
   notes              String?
   setupSheetTemplate String?  // legacy: "awesomatix_a800rr" | null; prefer setupSheetModelId

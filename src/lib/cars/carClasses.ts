@@ -6,12 +6,20 @@
  * platform (the same wheels bolt on), while a cross-platform swap re-derives them from the new
  * car's own last run. Setup is always car-specific and swaps regardless.
  *
- * History (2026-07-22): this used to be a user-facing `Car.carClass` picker offering
- * touring / buggy / crawler / … Nothing consumed it but the swap rule, no car ever had one set,
- * and on a touring-only app the picker read as noise — so the field was dropped and the platform
- * is now **inferred from the car's chassis** (`platformForChassisSlug` in
- * `setupSheetModels/authorizedCatalog.ts`). Drivers never see it. `Car.carClass` stays in the DB,
- * dormant and unread.
+ * How a car gets one — inference first, override second (`disciplineForCar` in
+ * `chassisPlatform.ts` is the only correct way to ask):
+ *
+ *  1. The chassis catalog (`platformForChassisSlug`). Answers for every catalogued chassis and
+ *     costs the driver nothing.
+ *  2. `Car.carClass`, set from the picker on the car page — which renders ONLY when step 1 comes
+ *     back null, i.e. a hand-built or user-created chassis.
+ *
+ * History: this was an always-on `Car.carClass` picker until 2026-07-22, when it was dropped for
+ * reading as noise on a touring-only app (nothing consumed it but the swap rule and no car ever
+ * had one set). The column survived. It came back 2026-08-03 as the fallback half above, because
+ * scoping a teammate's lap comparisons by discipline needs an answer for cars the catalog can't
+ * place. Note every entry in `CHASSIS_PLATFORM_BY_SLUG` is still `touring`, so on current data a
+ * discipline comparison cannot discriminate — see the note on `disciplineForCar`.
  *
  * Racing class (17.5, Modified, …) is a *different* concept and already lives on the run/event as
  * `raceClass`; if it ever needs to drive behaviour it belongs there, not here.

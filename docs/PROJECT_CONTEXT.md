@@ -356,10 +356,15 @@ evaporated into a 403 and the founder never heard about it."*
 
 **`Car`** — `name`, `chassis?` (free text), `carClass?`, `notes?`, `setupSheetTemplate?` (legacy
 string like `awesomatix_a800rr`), `setupSheetModelId?`. Owned by one user (cascade delete).
-⚠️ **Schema/code drift:** the `carClass` doc comment says it drives the log-run car-swap rule, but
-`src/lib/cars/carClasses.ts` states the field was dropped from the UI on 2026-07-22, nothing reads it,
-and platform is now inferred from the chassis via `platformForChassisSlug`. The column is *"dormant
-and unread."*
+`carClass` holds the car's **discipline** (== chassis platform; ids in `src/lib/cars/carClasses.ts`).
+Never read it directly — `disciplineForCar` (`src/lib/cars/chassisPlatform.ts`) is the resolver:
+the chassis catalog answers first via `platformForChassisSlug`, and `carClass` is the override for a
+chassis the catalog can't place. It is set from a picker on the car page that renders *only* when
+inference returns null (always-on picker dropped 2026-07-22 as noise; fallback picker restored
+2026-08-03). Consumers: the log-run car-swap tire rule, `/api/tire-types/recent` (same-class-first),
+the Engineer's car identity line, and the teammate lap-compare scope on `/runs/[id]`.
+⚠️ Every slug in `CHASSIS_PLATFORM_BY_SLUG` is `touring` today, so any discipline *comparison* is
+inert on current data — it starts discriminating when a non-touring chassis is catalogued.
 
 **`TireSet`** — one physical set of four tyres. `label` (denormalised display), `setNumber` (internal
 per-compound counter, *"never shown as identity"*), `initialRunCount` (runs done before logging
