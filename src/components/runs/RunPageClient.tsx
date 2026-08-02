@@ -33,14 +33,17 @@ export function RunPageClient({
   runListSource,
   displayTimeZone,
   allowRunMutations,
-  userDisplayName,
+  runOwnerDisplayName,
+  runOwnedByViewer,
 }: {
   run: Run;
   pickerRuns: CompareRunShape[];
   runListSource: RunCompareListSource;
   displayTimeZone: string | null;
   allowRunMutations: boolean;
-  userDisplayName: string | null;
+  /** Driver of this run. A teammate's name on a shared session — never the viewer's. */
+  runOwnerDisplayName: string | null;
+  runOwnedByViewer: boolean;
 }) {
   const router = useRouter();
   const [setupOpen, setSetupOpen] = useState(false);
@@ -119,7 +122,8 @@ export function RunPageClient({
           run={run}
           pickerRunsSameCar={sameCarPickerRuns}
           runListSource={runListSource}
-          userDisplayName={userDisplayName}
+          userDisplayName={runOwnerDisplayName}
+          runOwnedByViewer={runOwnedByViewer}
           viewerUserId={null}
         />
       ) : null}

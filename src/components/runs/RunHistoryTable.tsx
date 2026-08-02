@@ -305,6 +305,8 @@ export function RunHistoryTable({
       ? userDisplayName
       : memberDisplayByUserId[lapModalRun.userId] ?? null;
   }, [lapModalRun, viewerUserId, memberDisplayByUserId, userDisplayName]);
+  const lapModalRunOwnedByViewer =
+    !lapModalRun?.userId || !viewerUserId || lapModalRun.userId === viewerUserId;
 
   return (
     <>
@@ -606,6 +608,7 @@ export function RunHistoryTable({
                   pickerRunsSameCar={lapModalPickerRuns}
                   runListSource={runListSource}
                   userDisplayName={lapModalUserDisplayName}
+                  runOwnedByViewer={lapModalRunOwnedByViewer}
                   viewerUserId={viewerUserId}
                   memberDisplayByUserId={memberDisplayByUserId}
                 />

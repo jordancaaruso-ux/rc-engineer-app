@@ -14,6 +14,7 @@ import {
   importedSetToLapRows,
   primaryLapRowsFromRun,
 } from "@/lib/lapAnalysis";
+import { lapSeriesMatchesCompareScope } from "@/lib/lapCompareScope";
 import { formatLap, normalizeLapTimes } from "@/lib/runLaps";
 import { cn } from "@/lib/utils";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
@@ -65,17 +66,6 @@ function dayBucketFromSortIso(sortIso: string): number {
   const today = startOfLocalDay(new Date());
   const day = startOfLocalDay(t);
   return Math.round((today - day) / MS_PER_DAY);
-}
-
-function sameLocalCalendarDay(isoA: string, isoB: string): boolean {
-  const a = new Date(isoA);
-  const b = new Date(isoB);
-  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return false;
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
 }
 
 /** Today first, then newer calendar days before older; within a day, newest instant first. */
@@ -201,7 +191,8 @@ function SetupHint({
 }
 
 export function LapComparisonColumnGrid({
-  myDisplayName,
+  primaryDriverName,
+  primaryIsViewer = true,
   run,
   currentRunId,
   otherRuns = [],
@@ -212,7 +203,14 @@ export function LapComparisonColumnGrid({
   viewerUserId = null,
   memberDisplayByUserId,
 }: {
-  myDisplayName?: string | null;
+  /**
+   * Who drove the run these laps came from — NOT who is looking at it. On a
+   * teammate's shared session the viewer's own name here put "Jordan Caruso"
+   * on the target column above someone else's lap times.
+   */
+  primaryDriverName?: string | null;
+  /** False when the run belongs to a teammate; drops the "(my runs)" wording. */
+  primaryIsViewer?: boolean;
   run: {
     lapTimes: unknown;
     lapSession?: unknown;
@@ -233,7 +231,8 @@ export function LapComparisonColumnGrid({
   viewerUserId?: string | null;
   memberDisplayByUserId?: Record<string, string>;
 }) {
-  const primaryRunLabel = myDisplayName?.trim() || "Me";
+  const primaryRunLabel =
+    primaryDriverName?.trim() || (primaryIsViewer ? "Me" : "Driver");
 
   const primaryLaps = useMemo(() => primaryLapRowsFromRun(run), [run]);
 
@@ -320,9 +319,14 @@ export function LapComparisonColumnGrid({
 
     const rawHistory: ComparisonSeries[] = [];
     for (const r of historyPickOptions) {
+      // Team Sessions feeds every member's runs in here, so the anchor run's
+      // driver is the wrong name to print above a column that isn't theirs. The
+      // roster is only passed in team mode; solo lists fall through unchanged.
+      const runDriverLabel =
+        (r.userId ? memberDisplayByUserId?.[r.userId]?.trim() : "") || primaryRunLabel;
       const ser = buildComparisonSeries(
         `history:${r.id}`,
-        primaryRunLabel,
+        runDriverLabel,
         "run",
         primaryLapRowsFromRun({ lapTimes: r.lapTimes, lapSession: r.lapSession })
       );
@@ -364,7 +368,15 @@ export function LapComparisonColumnGrid({
     ]);
     const list = [primarySeries, ...dedupedOthers];
     return { seriesList: list, metaById };
-  }, [run, primaryRunLabel, historyPickOptions, compareAnchorRun, primaryLaps, librarySessions]);
+  }, [
+    run,
+    primaryRunLabel,
+    historyPickOptions,
+    compareAnchorRun,
+    primaryLaps,
+    librarySessions,
+    memberDisplayByUserId,
+  ]);
 
   const anchorInstantIso = useMemo(
     () => resolveRunDisplayInstant(compareAnchorRun).toISOString(),
@@ -380,24 +392,17 @@ export function LapComparisonColumnGrid({
         const sortIso = m?.sortIso ?? "";
         return { series: s, sortIso, label: m?.selectLabel ?? s.label };
       })
-      .filter(({ series, sortIso }) => {
-        if (compareScope === "all") return true;
-        if (compareScope === "same_day") {
-          return sameLocalCalendarDay(sortIso, anchorInstantIso);
-        }
-        if (!ev) {
-          if (series.id.startsWith("library:")) return false;
-          return true;
-        }
-        if (series.id === "run:primary") return run.eventId === ev;
-        if (series.id.startsWith("history:")) {
-          const rid = series.id.slice(8);
-          return otherRuns.find((o) => o.id === rid)?.eventId === ev;
-        }
-        if (series.id.startsWith("imported:")) return run.eventId === ev;
-        if (series.id.startsWith("library:")) return false;
-        return false;
-      });
+      .filter(({ series, sortIso }) =>
+        lapSeriesMatchesCompareScope({
+          seriesId: series.id,
+          sortIso,
+          scope: compareScope,
+          anchorInstantIso,
+          anchorEventId: ev,
+          primaryRunEventId: run.eventId ?? null,
+          eventIdForHistoryRun: (rid) => otherRuns.find((o) => o.id === rid)?.eventId,
+        })
+      );
   }, [
     seriesList,
     targetId,
@@ -414,7 +419,12 @@ export function LapComparisonColumnGrid({
     const hasMe = scopeFilteredRows.some(
       (r) => r.series.id === "run:primary" || r.series.id.startsWith("history:")
     );
-    if (hasMe) opts.push({ key: "__me__", label: `${primaryRunLabel} (my runs)` });
+    if (hasMe) {
+      opts.push({
+        key: "__me__",
+        label: primaryIsViewer ? `${primaryRunLabel} (my runs)` : primaryRunLabel,
+      });
+    }
     const seenImported = new Set<string>();
     const seenLib = new Set<string>();
     for (const r of scopeFilteredRows) {
@@ -439,7 +449,7 @@ export function LapComparisonColumnGrid({
       }
     }
     return opts;
-  }, [scopeFilteredRows, primaryRunLabel, run.importedLapSets, librarySessions]);
+  }, [scopeFilteredRows, primaryRunLabel, primaryIsViewer, run.importedLapSets, librarySessions]);
 
   useEffect(() => {
     const keys = new Set(compareDriverChoices.map((c) => c.key));
@@ -505,16 +515,39 @@ export function LapComparisonColumnGrid({
     return alignLapsByNumber(cols);
   }, [targetSeries, comparisonSeries]);
 
-  const sortedSeriesForTarget = useMemo(() => {
-    const primary = seriesList.find((s) => s.id === "run:primary");
-    const rest = seriesList.filter((s) => s.id !== "run:primary");
-    const restSorted = [...rest].sort((a, b) => {
-      const ma = metaById.get(a.id)?.sortIso ?? "";
-      const mb = metaById.get(b.id)?.sortIso ?? "";
-      return compareOptionSort({ sortIso: ma }, { sortIso: mb });
-    });
-    return primary ? [primary, ...restSorted] : restSorted;
-  }, [seriesList, metaById]);
+  /*
+   * The target list is four different kinds of thing wearing one label shape
+   * ("NAME · date, time"): this run, the rest of the race field that came in on
+   * its timing import, the driver's earlier runs, and their own imported lap
+   * library. Flat, it reads as a pile of unexplained runs — worse on a
+   * teammate's session, where every name in it is a stranger. Native
+   * `<optgroup>` headings cost nothing and say which is which; skipped entirely
+   * when only one kind is present, so a plain solo run keeps a plain list.
+   */
+  const targetOptionGroups = useMemo(() => {
+    const bySortIso = (a: ComparisonSeries, b: ComparisonSeries) =>
+      compareOptionSort(
+        { sortIso: metaById.get(a.id)?.sortIso ?? "" },
+        { sortIso: metaById.get(b.id)?.sortIso ?? "" }
+      );
+    const pick = (prefix: string) =>
+      seriesList.filter((s) => s.id.startsWith(prefix)).sort(bySortIso);
+    const groups: { key: string; label: string; series: ComparisonSeries[] }[] = [
+      {
+        key: "this_run",
+        label: "This run",
+        series: seriesList.filter((s) => s.id === "run:primary"),
+      },
+      { key: "field", label: "Rest of the race field", series: pick("imported:") },
+      {
+        key: "history",
+        label: primaryIsViewer ? "My other runs" : "Other runs",
+        series: pick("history:"),
+      },
+      { key: "library", label: "My imported sessions", series: pick("library:") },
+    ];
+    return groups.filter((g) => g.series.length > 0);
+  }, [seriesList, metaById, primaryIsViewer]);
 
   const compareOptionCount = compareOptionRows.length;
 
@@ -563,11 +596,21 @@ export function LapComparisonColumnGrid({
             onChange={(e) => setTargetId(e.target.value)}
             aria-label="Target series"
           >
-            {sortedSeriesForTarget.map((s) => (
-              <option key={s.id} value={s.id}>
-                {metaFor(s).selectLabel}
-              </option>
-            ))}
+            {targetOptionGroups.length === 1
+              ? targetOptionGroups[0].series.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {metaFor(s).selectLabel}
+                  </option>
+                ))
+              : targetOptionGroups.map((g) => (
+                  <optgroup key={g.key} label={g.label}>
+                    {g.series.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {metaFor(s).selectLabel}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
           </select>
         </div>
         <div className="space-y-2">

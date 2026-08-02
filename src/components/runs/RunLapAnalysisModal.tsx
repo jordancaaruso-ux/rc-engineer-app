@@ -36,7 +36,10 @@ type Props = {
   run: RunWithImports;
   pickerRunsSameCar: CompareRunShape[];
   runListSource: RunCompareListSource;
+  /** Driver of THIS run — a teammate's name on a shared session, not the viewer's. */
   userDisplayName?: string | null;
+  /** False when the run belongs to a teammate. */
+  runOwnedByViewer?: boolean;
   viewerUserId?: string | null;
   memberDisplayByUserId?: Record<string, string>;
 };
@@ -48,6 +51,7 @@ export function RunLapAnalysisModal({
   pickerRunsSameCar,
   runListSource,
   userDisplayName,
+  runOwnedByViewer = true,
   viewerUserId = null,
   memberDisplayByUserId,
 }: Props) {
@@ -234,7 +238,8 @@ export function RunLapAnalysisModal({
             <p className="text-xs text-muted-foreground py-2">Loading imported lap sets…</p>
           ) : (
             <LapComparisonColumnGrid
-              myDisplayName={userDisplayName}
+              primaryDriverName={userDisplayName}
+              primaryIsViewer={runOwnedByViewer}
               run={runForLapCompare}
               currentRunId={run.id}
               otherRuns={pickerRunsSameCar.filter((r) => r.id !== run.id)}

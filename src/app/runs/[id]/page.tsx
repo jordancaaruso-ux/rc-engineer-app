@@ -10,6 +10,7 @@ import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { toCompareRunShape } from "@/lib/runCompareShape";
 import { viewerMayAccessRun } from "@/lib/teams/teamRunAccess";
+import { loadTeamMemberDisplays } from "@/lib/teams/teamMemberDisplay";
 import {
   BACK_PARAM,
   SESSIONS_RETURN_KEY,
@@ -168,7 +169,13 @@ export default async function RunPage(props: {
     : [run];
   const pickerRuns = pickerSource.map(toCompareRunShape);
 
-  const myName = await getMyNameSetting(user.id);
+  // Lap columns are attributed to whoever *drove* the run, not whoever opened it: on a
+  // teammate's shared session the viewer's own name sat on the target column above
+  // someone else's lap times. `loadTeamMemberDisplays` is a plain user lookup (my-name
+  // setting → account name → email), so it also covers a run shared by link.
+  const runOwnerDisplayName = isOwner
+    ? await getMyNameSetting(user.id)
+    : (await loadTeamMemberDisplays([run.userId], user.id)).get(run.userId)?.name ?? null;
 
   const sessionDisplay = formatRunSessionDisplay(run, { fallback: "Testing run" });
   const title = `${run.event?.name ? `${run.event.name} · ` : ""}${sessionDisplay}`;
@@ -203,7 +210,8 @@ export default async function RunPage(props: {
           runListSource="my_runs"
           displayTimeZone={displayTimeZone}
           allowRunMutations={isOwner}
-          userDisplayName={myName}
+          runOwnerDisplayName={runOwnerDisplayName}
+          runOwnedByViewer={isOwner}
         />
       </section>
     </>
