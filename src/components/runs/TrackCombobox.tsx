@@ -1,5 +1,9 @@
 "use client";
 
+import { useMemo, useState } from "react";
+import { PickerSheet, PickerTrigger } from "@/components/ui/PickerSheet";
+import type { OptionSection } from "@/lib/search/optionSearch";
+
 export type TrackOption = {
   id: string;
   name: string;
@@ -13,13 +17,18 @@ function trackLabel(t: TrackOption): string {
 }
 
 /**
- * Track picker — a native `<select>` with Favourites / All tracks optgroups.
+ * Track picker — a `PickerSheet` with Favourites / All tracks.
  *
- * Deliberately native (founder decision 2026-07-14): on iPhone the OS draws the
- * menu itself — compositor-attached, background scroll locked, keyboard never
- * opens. The previous custom search-combobox (portal + fixed + JS re-pin)
- * rubber-banded on iOS touch scroll; track lists are short enough that
- * favourites-first grouping replaces type-to-search.
+ * It went native in the 2026-07-14 sweep on the argument that track lists are
+ * short enough for favourites-first grouping to replace type-to-search. That
+ * holds for a club racer's first season and stops holding the moment someone
+ * travels: by then the list is every venue they've ever entered, ordered
+ * alphabetically, and finding one means scrolling an iOS wheel five rows at a
+ * time. Same complaint as the tire list, same fix.
+ *
+ * The town is searchable in its own right — drivers reach for "Adelaide" as
+ * often as for the club's name — and grip/layout tags match too, so "high grip"
+ * or "carpet" narrows the list without any of that being on screen.
  */
 export function TrackCombobox({
   tracks,
@@ -41,54 +50,69 @@ export function TrackCombobox({
   "aria-label"?: string;
   disabled?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
+
   // Merge in favouriteTracks so a selected favourite not present in `tracks`
   // still renders its label (previous combobox had the same fallback).
-  const byId = new Map<string, TrackOption>();
-  for (const t of [...tracks, ...favouriteTracks]) {
-    if (!byId.has(t.id)) byId.set(t.id, t);
-  }
-  const all = [...byId.values()];
-  const favSet = new Set(favouriteTrackIds);
-  const favourites = all
-    .filter((t) => favSet.has(t.id))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const others = all
-    .filter((t) => !favSet.has(t.id))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const all = useMemo(() => {
+    const byId = new Map<string, TrackOption>();
+    for (const t of [...tracks, ...favouriteTracks]) {
+      if (!byId.has(t.id)) byId.set(t.id, t);
+    }
+    return [...byId.values()];
+  }, [tracks, favouriteTracks]);
+
+  const sections = useMemo<OptionSection[]>(() => {
+    const favSet = new Set(favouriteTrackIds);
+    const byName = (a: TrackOption, b: TrackOption) => a.name.localeCompare(b.name);
+    const toRow = (t: TrackOption) => ({
+      value: t.id,
+      label: t.name,
+      detail: t.location ?? null,
+      keywords: [...(t.gripTags ?? []), ...(t.layoutTags ?? [])].join(" ") || null,
+    });
+    return [
+      {
+        key: "favourites",
+        label: "Favourites",
+        options: all.filter((t) => favSet.has(t.id)).sort(byName).map(toRow),
+      },
+      {
+        key: "all",
+        label: "All tracks",
+        options: all.filter((t) => !favSet.has(t.id)).sort(byName).map(toRow),
+      },
+    ];
+  }, [all, favouriteTrackIds]);
+
+  const selected = all.find((t) => t.id === value) ?? null;
 
   return (
-    <select
-      className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none disabled:opacity-60"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      aria-label={ariaLabel}
-      disabled={disabled}
-    >
-      <option value="">{placeholder}</option>
-      {favourites.length > 0 ? (
-        <>
-          <optgroup label="Favourites">
-            {favourites.map((t) => (
-              <option key={t.id} value={t.id}>
-                {trackLabel(t)}
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label="All tracks">
-            {others.map((t) => (
-              <option key={t.id} value={t.id}>
-                {trackLabel(t)}
-              </option>
-            ))}
-          </optgroup>
-        </>
-      ) : (
-        others.map((t) => (
-          <option key={t.id} value={t.id}>
-            {trackLabel(t)}
-          </option>
-        ))
-      )}
-    </select>
+    <>
+      <PickerTrigger
+        onClick={() => setOpen(true)}
+        disabled={disabled}
+        open={open}
+        aria-label={ariaLabel}
+        placeholder={!selected}
+        className="rounded-lg border border-border bg-card"
+      >
+        {selected ? trackLabel(selected) : placeholder}
+      </PickerTrigger>
+
+      <PickerSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title={ariaLabel}
+        value={value}
+        onSelect={(id) => {
+          onChange(id);
+          setOpen(false);
+        }}
+        sections={sections}
+        searchPlaceholder="Search tracks or towns…"
+        clearRow={{ label: placeholder }}
+      />
+    </>
   );
 }

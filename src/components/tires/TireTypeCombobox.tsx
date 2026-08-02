@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Eyebrow } from "@/components/ui/panel";
+import { PickerSheet, PickerTrigger } from "@/components/ui/PickerSheet";
+import type { OptionSection } from "@/lib/search/optionSearch";
 
 export type TireTypeOption = {
   id: string;
@@ -11,13 +13,22 @@ export type TireTypeOption = {
   verifiedAt?: string | null;
 };
 
-const CREATE_VALUE = "__create_tire_type__";
+/**
+ * The whole catalog comes down in one request so filtering is local and lands on
+ * the keystroke — no debounce, no spinner, no round trip per character. The
+ * catalog is ~30 rows and every row is a real product, so the ceiling is
+ * headroom rather than a page size; if it is ever genuinely approached the
+ * picker needs server-backed search instead of raising this again.
+ */
+const CATALOG_LIMIT = 500;
 
 /**
- * Tire type picker — a native `<select>` (fully native 2026-07-14 for the iOS
- * feel). Options load up-front so the OS menu is populated; "Recently used" and
- * "All types" become `<optgroup>`s, and an inline "+ Add new tire type…" option
- * reveals a small create panel below (replaces the old create-from-query row).
+ * Tire type picker — a `PickerSheet`, because the compound list is long enough
+ * that a native `<select>` wheel means scrolling blind past your own tire.
+ *
+ * The tire-specific parts that stay here: "Recently used" ranked by the car's
+ * discipline, the model code being searchable even though it's never shown, and
+ * the inline create panel with its near-match steering.
  */
 export function TireTypeCombobox({
   value,
@@ -50,6 +61,7 @@ export function TireTypeCombobox({
   const [options, setOptions] = useState<TireTypeOption[]>([]);
   const [recentOptions, setRecentOptions] = useState<TireTypeOption[]>([]);
   const [selectedOption, setSelectedOption] = useState<TireTypeOption | null>(null);
+  const [open, setOpen] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [newDisplayName, setNewDisplayName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -73,7 +85,7 @@ export function TireTypeCombobox({
 
   const loadAll = useCallback(async () => {
     try {
-      const res = await fetch("/api/tire-types?limit=200", { cache: "no-store" });
+      const res = await fetch(`/api/tire-types?limit=${CATALOG_LIMIT}`, { cache: "no-store" });
       const data = (await res.json()) as { tireTypes?: TireTypeOption[] };
       setOptions(data.tireTypes ?? []);
     } catch {
@@ -114,7 +126,7 @@ export function TireTypeCombobox({
       return;
     }
     let cancelled = false;
-    fetch("/api/tire-types?limit=200", { cache: "no-store" })
+    fetch(`/api/tire-types?limit=${CATALOG_LIMIT}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d: { tireTypes?: TireTypeOption[] }) => {
         if (cancelled) return;
@@ -158,19 +170,41 @@ export function TireTypeCombobox({
     };
   }, [showCreate, newDisplayName]);
 
-  const recentIds = new Set(recentOptions.map((o) => o.id));
-  const rest = options.filter((o) => !recentIds.has(o.id));
-  const known = new Set([...recentOptions, ...options].map((o) => o.id));
-  const extra = selectedOption && !known.has(selectedOption.id) ? [selectedOption] : [];
+  // A selection made elsewhere (event spec tire, copy-forward, restored draft)
+  // may name a type the lists don't hold; carry it so the sheet can show it
+  // ticked rather than silently dropping the row the trigger is naming.
+  const extra = useMemo(() => {
+    if (!selectedOption) return [] as TireTypeOption[];
+    const known = new Set([...recentOptions, ...options].map((o) => o.id));
+    return known.has(selectedOption.id) ? ([] as TireTypeOption[]) : [selectedOption];
+  }, [selectedOption, recentOptions, options]);
+
+  const sections = useMemo<OptionSection[]>(() => {
+    // `keywords` carries the model code: never shown, always searched, so "D32"
+    // finds a compound whose visible name never says D32.
+    const toRow = (o: TireTypeOption) => ({
+      value: o.id,
+      label: o.displayName,
+      keywords: o.modelCode,
+    });
+    return [
+      { key: "recent", label: "Recently used", options: recentOptions.map(toRow) },
+      { key: "all", label: "All types", options: [...options, ...extra].map(toRow) },
+    ];
+  }, [recentOptions, options, extra]);
+
+  const closeSheet = useCallback(() => {
+    setOpen(false);
+    setShowCreate(false);
+    setError(null);
+  }, []);
 
   function pick(id: string) {
-    const opt =
-      [...recentOptions, ...options, ...extra].find((o) => o.id === id) ?? null;
+    const opt = [...recentOptions, ...options, ...extra].find((o) => o.id === id) ?? null;
     onChange(id);
     setSelectedOption(opt);
     reportSelected(opt);
-    setShowCreate(false);
-    setError(null);
+    closeSheet();
   }
 
   function adopt(option: TireTypeOption) {
@@ -180,19 +214,12 @@ export function TireTypeCombobox({
     setSuggestions([]);
   }
 
-  function handleChange(next: string) {
-    if (next === CREATE_VALUE) {
-      setShowCreate(true);
-      setError(null);
-      return;
-    }
-    if (!next) {
-      onChange("");
-      setSelectedOption(null);
-      reportSelected(null);
-      return;
-    }
-    pick(next);
+  /** Hand the create panel whatever was typed in the search — they've named it once. */
+  function beginCreate(query: string) {
+    setNewDisplayName(query);
+    setSuggestions([]);
+    setError(null);
+    setShowCreate(true);
   }
 
   async function createTireType() {
@@ -233,90 +260,119 @@ export function TireTypeCombobox({
     }
   }
 
-  const renderOption = (o: TireTypeOption) => (
-    <option key={o.id} value={o.id}>
-      {o.displayName}
-    </option>
+  // A value that hasn't resolved to a name yet is still a real selection, so the
+  // trigger must not read as empty — that would invite picking it all over again.
+  const triggerLabel = selectedOption?.displayName ?? (value ? "Loading…" : placeholder);
+
+  const createPanel = (
+    <div className="space-y-2">
+      <Eyebrow>Name</Eyebrow>
+      <input
+        className="w-full rounded-md border border-border bg-background px-3 py-2.5 text-sm outline-none"
+        placeholder="e.g. Sweep D32"
+        value={newDisplayName}
+        onChange={(e) => setNewDisplayName(e.target.value)}
+        aria-label="Tire type name"
+        autoCapitalize="words"
+        autoCorrect="off"
+        spellCheck={false}
+        autoFocus
+      />
+      {suggestions.length > 0 ? (
+        <div className="space-y-1.5 pt-1">
+          <p className="text-[11px] text-muted-foreground">Did you mean an existing type?</p>
+          <div className="flex flex-wrap gap-1.5">
+            {suggestions.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => adopt(s)}
+                className="tap-active rounded-md border border-primary/40 px-2.5 py-1.5 text-[12px] text-primary hover:bg-muted/50"
+              >
+                {s.displayName}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          onClick={() => void createTireType()}
+          disabled={creating || !newDisplayName.trim()}
+          className="btn-surface px-3 py-2 text-xs disabled:opacity-60"
+        >
+          {creating ? "Adding…" : "Add tire type"}
+        </button>
+        <button
+          type="button"
+          className="px-2 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => {
+            setShowCreate(false);
+            setError(null);
+          }}
+        >
+          Back
+        </button>
+      </div>
+    </div>
   );
 
   return (
     <div className={className}>
-      <select
-        className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none disabled:opacity-60"
-        value={value}
-        onChange={(e) => handleChange(e.target.value)}
-        aria-label={ariaLabel}
+      <PickerTrigger
+        onClick={() => setOpen(true)}
         disabled={disabled}
+        open={open}
+        aria-label={ariaLabel}
+        placeholder={!selectedOption}
+        className="rounded-md border border-border bg-card"
       >
-        <option value="" disabled>
-          {placeholder}
-        </option>
-        {recentOptions.length > 0 ? (
-          <optgroup label="Recently used">{recentOptions.map(renderOption)}</optgroup>
-        ) : null}
-        {rest.length > 0 ? (
-          recentOptions.length > 0 ? (
-            <optgroup label="All types">{rest.map(renderOption)}</optgroup>
-          ) : (
-            rest.map(renderOption)
-          )
-        ) : null}
-        {extra.map(renderOption)}
-        {allowInlineCreate ? (
-          <option value={CREATE_VALUE}>+ Add new tire type…</option>
-        ) : null}
-      </select>
+        {triggerLabel}
+      </PickerTrigger>
 
-      {showCreate && allowInlineCreate ? (
-        <div className="mt-2 space-y-2 rounded-md border border-border bg-card p-3">
-          <Eyebrow>New tire type</Eyebrow>
-          <input
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
-            placeholder="e.g. Sweep D32"
-            value={newDisplayName}
-            onChange={(e) => setNewDisplayName(e.target.value)}
-            aria-label="Tire type name"
-          />
-          {suggestions.length > 0 ? (
-            <div className="space-y-1">
-              <p className="text-[11px] text-muted-foreground">Did you mean an existing type?</p>
-              <div className="flex flex-wrap gap-1.5">
-                {suggestions.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => adopt(s)}
-                    className="rounded-md border border-primary/40 px-2 py-1 text-[11px] text-primary hover:bg-muted/50"
-                  >
-                    {s.displayName}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => void createTireType()}
-              disabled={creating || !newDisplayName.trim()}
-              className="btn-surface px-2 py-1 text-xs disabled:opacity-60"
-            >
-              {creating ? "Adding…" : "Add tire type"}
-            </button>
-            <button
-              type="button"
-              className="px-2 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                setShowCreate(false);
-                setError(null);
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <PickerSheet
+        open={open}
+        onClose={closeSheet}
+        title={ariaLabel}
+        value={value}
+        onSelect={pick}
+        sections={sections}
+        searchPlaceholder="Search tire types…"
+        panel={showCreate && allowInlineCreate ? createPanel : null}
+        panelTitle="New tire type"
+        emptyAction={
+          allowInlineCreate
+            ? (q) => (
+                <button
+                  type="button"
+                  onClick={() => beginCreate(q)}
+                  className="tap-active rounded-md border border-primary/40 px-3 py-2 text-[13px] font-semibold text-primary hover:bg-muted/50"
+                >
+                  {q ? `Add “${q}”` : "Add a tire type"}
+                </button>
+              )
+            : undefined
+        }
+        footer={
+          allowInlineCreate
+            ? (q) => (
+                <button
+                  type="button"
+                  onClick={() => beginCreate(q)}
+                  className="tap-active w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-primary hover:bg-muted/60"
+                >
+                  {/* Neutral wording even mid-search: a half-typed "con" is a
+                      filter, not a name, and offering to create it as one invites
+                      junk into a catalog everybody shares. The panel still opens
+                      with it filled in to finish. */}
+                  + Add new tire type…
+                </button>
+              )
+            : null
+        }
+      />
     </div>
   );
 }

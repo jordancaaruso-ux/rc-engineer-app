@@ -82,6 +82,7 @@
     "test:car-swap": "npx tsx --test src/lib/runs/carSwap.test.ts",
     "test:tire-age": "npx tsx src/lib/tires/tireAgeReadout.test.ts",
     "test:tire-stint": "npx tsx src/lib/tires/deriveTireStint.test.ts",
+    "test:option-search": "npx tsx --test src/lib/search/optionSearch.test.ts src/lib/tires/matchTireType.test.ts",
     "test:tire-change": "npx tsx src/lib/runs/tireSetChange.test.ts",
     "test:tire-prep": "npx tsx src/lib/runs/tirePrep.test.ts",
     "test:sessions-return": "npx tsx --test src/lib/runs/sessionsReturn.test.ts",

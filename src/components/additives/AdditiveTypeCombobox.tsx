@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Eyebrow } from "@/components/ui/panel";
+import { PickerSheet, PickerTrigger } from "@/components/ui/PickerSheet";
+import type { OptionSection } from "@/lib/search/optionSearch";
 
 export type AdditiveTypeOption = {
   id: string;
@@ -11,13 +13,16 @@ export type AdditiveTypeOption = {
   verifiedAt?: string | null;
 };
 
-const CREATE_VALUE = "__create_additive_type__";
+/** See `TireTypeCombobox` — the catalog is small enough to filter locally. */
+const CATALOG_LIMIT = 500;
 
 /**
- * Additive type picker — a native `<select>` (fully native 2026-07-14 for the
- * iOS feel). Options load up-front; "Recently used" / "All types" become
- * `<optgroup>`s, "None" clears when `allowClear`, and "+ Add new additive…"
- * reveals an inline create panel below.
+ * Additive type picker — a `PickerSheet`, for the same reason tires are: the
+ * traction-compound shelf is long, and picking off a five-row iOS wheel means
+ * scrolling past your own bottle to find it.
+ *
+ * "None" is a real answer here (most runs are dry), so it keeps its own row at
+ * the top of the list rather than being a create-or-nothing choice.
  */
 export function AdditiveTypeCombobox({
   value,
@@ -41,6 +46,7 @@ export function AdditiveTypeCombobox({
   const [options, setOptions] = useState<AdditiveTypeOption[]>([]);
   const [recentOptions, setRecentOptions] = useState<AdditiveTypeOption[]>([]);
   const [selectedOption, setSelectedOption] = useState<AdditiveTypeOption | null>(null);
+  const [open, setOpen] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [newDisplayName, setNewDisplayName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -48,7 +54,7 @@ export function AdditiveTypeCombobox({
 
   const loadAll = useCallback(async () => {
     try {
-      const res = await fetch("/api/additive-types?limit=200", { cache: "no-store" });
+      const res = await fetch(`/api/additive-types?limit=${CATALOG_LIMIT}`, { cache: "no-store" });
       const data = (await res.json()) as { additiveTypes?: AdditiveTypeOption[] };
       setOptions(data.additiveTypes ?? []);
     } catch {
@@ -82,7 +88,7 @@ export function AdditiveTypeCombobox({
       return;
     }
     let cancelled = false;
-    fetch("/api/additive-types?limit=200", { cache: "no-store" })
+    fetch(`/api/additive-types?limit=${CATALOG_LIMIT}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data: { additiveTypes?: AdditiveTypeOption[] }) => {
         if (cancelled) return;
@@ -94,26 +100,42 @@ export function AdditiveTypeCombobox({
     };
   }, [value, options, recentOptions]);
 
-  const recentIds = new Set(recentOptions.map((o) => o.id));
-  const rest = options.filter((o) => !recentIds.has(o.id));
-  const known = new Set([...recentOptions, ...options].map((o) => o.id));
-  const extra = selectedOption && !known.has(selectedOption.id) ? [selectedOption] : [];
+  const extra = useMemo(() => {
+    if (!selectedOption) return [] as AdditiveTypeOption[];
+    const known = new Set([...recentOptions, ...options].map((o) => o.id));
+    return known.has(selectedOption.id) ? ([] as AdditiveTypeOption[]) : [selectedOption];
+  }, [selectedOption, recentOptions, options]);
 
-  function handleChange(next: string) {
-    if (next === CREATE_VALUE) {
-      setShowCreate(true);
-      setError(null);
-      return;
-    }
-    if (!next) {
-      onChange("");
-      setSelectedOption(null);
-      return;
-    }
-    const opt = [...recentOptions, ...options, ...extra].find((o) => o.id === next) ?? null;
-    onChange(next);
-    setSelectedOption(opt);
+  const sections = useMemo<OptionSection[]>(() => {
+    const toRow = (o: AdditiveTypeOption) => ({
+      value: o.id,
+      label: o.displayName,
+      keywords: o.modelCode,
+    });
+    return [
+      { key: "recent", label: "Recently used", options: recentOptions.map(toRow) },
+      { key: "all", label: "All additives", options: [...options, ...extra].map(toRow) },
+    ];
+  }, [recentOptions, options, extra]);
+
+  const closeSheet = useCallback(() => {
+    setOpen(false);
     setShowCreate(false);
+    setError(null);
+  }, []);
+
+  /** `""` arrives from the "None" row — a real answer, not an empty state. */
+  function pick(id: string) {
+    const opt = id ? ([...recentOptions, ...options, ...extra].find((o) => o.id === id) ?? null) : null;
+    onChange(id);
+    setSelectedOption(opt);
+    closeSheet();
+  }
+
+  function beginCreate(query: string) {
+    setNewDisplayName(query);
+    setError(null);
+    setShowCreate(true);
   }
 
   async function createType() {
@@ -135,8 +157,8 @@ export function AdditiveTypeCombobox({
       setOptions((prev) => [data.additiveType!, ...prev.filter((o) => o.id !== data.additiveType!.id)]);
       onChange(data.additiveType.id);
       setSelectedOption(data.additiveType);
-      setShowCreate(false);
       setNewDisplayName("");
+      closeSheet();
     } catch {
       setError("Failed to create additive type.");
     } finally {
@@ -144,78 +166,98 @@ export function AdditiveTypeCombobox({
     }
   }
 
-  const renderOption = (o: AdditiveTypeOption) => (
-    <option key={o.id} value={o.id}>
-      {o.displayName}
-    </option>
+  const triggerLabel = selectedOption?.displayName ?? (value ? "Loading…" : allowClear ? "None" : placeholder);
+
+  const createPanel = (
+    <div className="space-y-2">
+      <Eyebrow>Name</Eyebrow>
+      <input
+        type="text"
+        className="w-full rounded-md border border-border bg-background px-3 py-2.5 text-sm outline-none"
+        placeholder="e.g. PDR Extreme"
+        value={newDisplayName}
+        onChange={(e) => setNewDisplayName(e.target.value)}
+        aria-label="New additive name"
+        autoCapitalize="words"
+        autoCorrect="off"
+        spellCheck={false}
+        autoFocus
+      />
+      {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          className="btn-surface px-3 py-2 text-xs disabled:opacity-60"
+          disabled={creating || !newDisplayName.trim()}
+          onClick={() => void createType()}
+        >
+          {creating ? "Adding…" : "Add additive"}
+        </button>
+        <button
+          type="button"
+          className="px-2 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => {
+            setShowCreate(false);
+            setError(null);
+          }}
+        >
+          Back
+        </button>
+      </div>
+    </div>
   );
 
   return (
     <div className={className}>
-      <select
-        className="w-full form-control px-3 py-2 text-sm disabled:opacity-60"
-        value={value}
-        onChange={(e) => handleChange(e.target.value)}
-        aria-label={ariaLabel}
+      <PickerTrigger
+        onClick={() => setOpen(true)}
         disabled={disabled}
+        open={open}
+        aria-label={ariaLabel}
+        placeholder={!selectedOption}
+        className="form-control"
       >
-        {allowClear ? (
-          <option value="">None</option>
-        ) : (
-          <option value="" disabled>
-            {placeholder}
-          </option>
-        )}
-        {recentOptions.length > 0 ? (
-          <optgroup label="Recently used">{recentOptions.map(renderOption)}</optgroup>
-        ) : null}
-        {rest.length > 0 ? (
-          recentOptions.length > 0 ? (
-            <optgroup label="All types">{rest.map(renderOption)}</optgroup>
-          ) : (
-            rest.map(renderOption)
-          )
-        ) : null}
-        {extra.map(renderOption)}
-        {allowInlineCreate ? (
-          <option value={CREATE_VALUE}>+ Add new additive…</option>
-        ) : null}
-      </select>
+        {triggerLabel}
+      </PickerTrigger>
 
-      {showCreate && allowInlineCreate ? (
-        <div className="mt-2 space-y-2 rounded-md border border-border bg-card p-3">
-          <Eyebrow>New additive</Eyebrow>
-          <input
-            type="text"
-            className="w-full form-control px-3 py-2 text-sm"
-            placeholder="e.g. PDR Extreme"
-            value={newDisplayName}
-            onChange={(e) => setNewDisplayName(e.target.value)}
-            aria-label="New additive name"
-          />
-          {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="btn-surface px-2 py-1 text-xs disabled:opacity-60"
-              disabled={creating || !newDisplayName.trim()}
-              onClick={() => void createType()}
-            >
-              {creating ? "Adding…" : "Add additive"}
-            </button>
-            <button
-              type="button"
-              className="px-2 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                setShowCreate(false);
-                setError(null);
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <PickerSheet
+        open={open}
+        onClose={closeSheet}
+        title={ariaLabel}
+        value={value}
+        onSelect={pick}
+        sections={sections}
+        searchPlaceholder="Search additives…"
+        clearRow={allowClear ? { label: "None" } : null}
+        panel={showCreate && allowInlineCreate ? createPanel : null}
+        panelTitle="New additive"
+        emptyAction={
+          allowInlineCreate
+            ? (q) => (
+                <button
+                  type="button"
+                  onClick={() => beginCreate(q)}
+                  className="tap-active rounded-md border border-primary/40 px-3 py-2 text-[13px] font-semibold text-primary hover:bg-muted/50"
+                >
+                  {q ? `Add “${q}”` : "Add an additive"}
+                </button>
+              )
+            : undefined
+        }
+        footer={
+          allowInlineCreate
+            ? (q) => (
+                <button
+                  type="button"
+                  onClick={() => beginCreate(q)}
+                  className="tap-active w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-primary hover:bg-muted/60"
+                >
+                  + Add new additive…
+                </button>
+              )
+            : null
+        }
+      />
     </div>
   );
 }

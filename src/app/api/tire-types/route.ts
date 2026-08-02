@@ -22,7 +22,11 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q")?.trim() ?? "";
-  const take = Math.min(50, Math.max(1, Number(searchParams.get("limit") ?? 50) || 50));
+  // The picker filters locally so its search is instant, which only holds if it
+  // was handed the whole catalog — a cap of 50 silently hid the tail and pushed
+  // drivers into creating duplicates of types that already existed. Default stays
+  // 50 for callers that just want a sample (admin merge, near-match suggestions).
+  const take = Math.min(500, Math.max(1, Number(searchParams.get("limit") ?? 50) || 50));
 
   const count = await prisma.tireType.count();
   if (count === 0) {
@@ -33,7 +37,7 @@ export async function GET(request: Request) {
     const catalog = await prisma.tireType.findMany({
       select: TIRE_TYPE_SELECT,
       orderBy: [{ displayName: "asc" }],
-      take: 200,
+      take: 500,
     });
     const matches = matchTireTypes(q, catalog, take);
     return NextResponse.json({

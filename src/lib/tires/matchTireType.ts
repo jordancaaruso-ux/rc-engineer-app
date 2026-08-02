@@ -1,48 +1,25 @@
+import { normalizeSearchText, scoreSearchMatch } from "@/lib/search/optionSearch";
+
 export type TireTypeRecord = {
   id: string;
   displayName: string;
   modelCode: string;
 };
 
-/** Normalize tire text for fuzzy comparison. */
+/**
+ * Normalize tire text for fuzzy comparison.
+ *
+ * Re-exported rather than reimplemented: the picker sheets, the setup-sheet
+ * auto-match and this matcher all have to agree on what "Sweep 32 #2" reduces
+ * to, or the same typed string ranks differently depending on where it was
+ * typed. See `@/lib/search/optionSearch`.
+ */
 export function normalizeTireText(input: string): string {
-  return input
-    .trim()
-    .toLowerCase()
-    .replace(/\s*#\s*\d+\s*$/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function tokenOverlapScore(a: string, b: string): number {
-  if (!a || !b) return 0;
-  if (a === b) return 100;
-  const aCompact = a.replace(/\s+/g, "");
-  const bCompact = b.replace(/\s+/g, "");
-  if (aCompact === bCompact) return 95;
-  if (a.includes(b) || b.includes(a)) return 85;
-  if (aCompact.includes(bCompact) || bCompact.includes(aCompact)) return 82;
-  const aTokens = new Set(a.split(" ").filter(Boolean));
-  const bTokens = b.split(" ").filter(Boolean);
-  if (bTokens.length === 0) return 0;
-  let hits = 0;
-  for (const t of bTokens) {
-    if (aTokens.has(t)) hits++;
-  }
-  const ratio = hits / bTokens.length;
-  return Math.round(ratio * 70);
+  return normalizeSearchText(input);
 }
 
 export function scoreTireTypeMatch(query: string, tireType: TireTypeRecord): number {
-  const q = normalizeTireText(query);
-  if (!q) return 0;
-  const name = normalizeTireText(tireType.displayName);
-  const code = normalizeTireText(tireType.modelCode);
-  const nameScore = tokenOverlapScore(name, q);
-  const codeScore = tokenOverlapScore(code, q);
-  if (name === q || code === q) return 100;
-  return Math.max(nameScore, codeScore);
+  return scoreSearchMatch(query, [tireType.displayName, tireType.modelCode]);
 }
 
 export const TIRE_TYPE_AUTO_MATCH_THRESHOLD = 72;
