@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { LapComparisonColumnGrid } from "@/components/runs/LapComparisonColumnGrid";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
@@ -74,6 +75,23 @@ export function RunLapAnalysisModal({
       setImportedLapsLoading(false);
     }
   }, [open, run.id]);
+
+  // Escape closes, and the page underneath is frozen — without the lock a flick
+  // that lands outside the grid scrolls the run page behind the sheet, which is
+  // half of why it read as "somewhere down the page" rather than as a modal.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open, onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -162,11 +180,29 @@ export function RunLapAnalysisModal({
     };
   }, [open]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  /*
+   * Portalled to <body>, above the dock, and a real height — three separate
+   * reasons this sheet used to open as a strip stranded at the bottom of the
+   * page:
+   *
+   *  - Rendered in place, it sat inside `.page-body` among the run's cards. Any
+   *    transformed or backdrop-blurred ancestor turns `fixed` into `absolute`
+   *    and pins the overlay to that ancestor instead of the viewport — the same
+   *    trap the Ideas, Upload and exit-prompt sheets already portal around.
+   *  - z-50 tied the floating dock, which is drawn later, so the nav pill won
+   *    the stack and covered the sheet's bottom rows. z-[60] clears it while
+   *    staying under `PickerSheet` (z-[70]), which opens *from* this sheet's
+   *    own run/driver selects and has to land on top of it.
+   *  - `max-h` alone let a short or failed body collapse to a few rows hugging
+   *    the bottom edge — the "super low on the page" part. It now opens at a
+   *    fixed sheet height, in `dvh` so iOS browser chrome can't push the bottom
+   *    off-screen.
+   */
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-0 sm:p-4 bg-black/50"
+      className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-0 sm:p-4 bg-black/50"
       role="dialog"
       aria-modal
       aria-labelledby="lap-analysis-modal-title"
@@ -175,7 +211,7 @@ export function RunLapAnalysisModal({
       }}
     >
       <div
-        className="w-full max-h-[min(92vh,720px)] sm:max-w-4xl rounded-t-lg sm:rounded-lg border border-border bg-surface-runna shadow-lg flex flex-col"
+        className="flex h-[min(92dvh,720px)] max-h-full w-full flex-col rounded-t-lg border border-border bg-surface-runna pb-[env(safe-area-inset-bottom)] shadow-lg sm:max-w-4xl sm:rounded-lg sm:pb-0"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 shrink-0">
@@ -212,6 +248,7 @@ export function RunLapAnalysisModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
