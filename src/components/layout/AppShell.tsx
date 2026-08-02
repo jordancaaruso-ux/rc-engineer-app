@@ -12,6 +12,7 @@ import { PrimaryNavProvider } from "@/components/layout/PrimaryNavProvider";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TodayDraftRunProvider } from "@/components/layout/TodayDraftRunProvider";
 import { RouteTransitionProvider } from "@/components/layout/RouteTransitionProvider";
+import { DemoBanner } from "@/components/layout/DemoBanner";
 import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -25,9 +26,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   if (hideNav) {
     return (
-      <main className="page bg-background">
-        {children}
-      </main>
+      <>
+        <DemoBanner />
+        <main className="page bg-background">
+          {children}
+        </main>
+      </>
     );
   }
 
@@ -35,6 +39,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <TodayDraftRunProvider>
       <PrimaryNavProvider>
         <MobileBackProvider>
+          <DemoBanner />
           <div
             className="app-shell"
             data-nav-sector={navSector >= 0 ? navSector : undefined}

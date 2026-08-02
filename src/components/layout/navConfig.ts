@@ -41,6 +41,8 @@ export function isHiddenNavRoute(pathname: string | null | undefined): boolean {
   // bounce to /login (MONETISATION_NORTH_STAR.md Phases 1+4).
   if (pathname === "/welcome") return true;
   if (pathname === "/join" || pathname.startsWith("/join/")) return true;
+  // Demo entry page (the demo SESSION itself gets full nav — only this splash hides it).
+  if (pathname === "/demo") return true;
   if (pathname.startsWith("/api/")) return true;
   return false;
 }

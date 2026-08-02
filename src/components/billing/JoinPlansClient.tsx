@@ -1,49 +1,38 @@
 "use client";
 
 import { useState } from "react";
+import { PillToggle } from "@/components/ui/PillToggle";
 
 export type JoinPlan = {
   tier: "standard" | "pro";
   interval: "month" | "year";
   priceId: string;
-  /** Formatted amount, e.g. "$14.99" — null when Stripe couldn't be read (render without). */
+  /** Formatted amount, e.g. "$14.99" — null when Stripe couldn't be read (render em dash). */
   amount: string | null;
 };
 
-const TIER_COPY: Record<
-  "standard",
-  { name: string; blurb: string; features: string[] }
-> & Record<"pro", { name: string; blurb: string; features: string[] }> = {
-  standard: {
-    name: "Standard",
-    blurb: "The smart race notebook.",
-    features: [
-      "Log every run in seconds",
-      "Review sessions and lap analysis",
-      "Compare runs and setups",
-      "Ask the Engineer — 2 questions a day",
-    ],
-  },
-  pro: {
-    name: "Pro",
-    blurb: "The full race engineer.",
-    features: [
-      "Everything in Standard",
-      "Engineer — 300 questions a month",
-      "Video analysis",
-      "Roll-center tools",
-    ],
-  },
-};
+/** The comparison rows (decision-board pick 4A) — feature truth mirrors entitlementLogic.ts. */
+const ROWS: Array<{ label: string; standard: string; pro: string }> = [
+  { label: "Run logging (LiveRC · Speedhive · MyRCM)", standard: "✓", pro: "✓" },
+  { label: "Session review & lap analysis", standard: "✓", pro: "✓" },
+  { label: "Compare runs & setups", standard: "✓", pro: "✓" },
+  { label: "Engineer questions", standard: "2 a day", pro: "300 a month" },
+  { label: "Video analysis", standard: "—", pro: "✓" },
+  { label: "Roll-centre tools", standard: "—", pro: "✓" },
+];
 
 /**
- * The paid door's plan picker (public — no session). Posts to /api/billing/public-checkout;
- * Stripe Checkout collects the email and the webhook provisions the account
- * (MONETISATION_NORTH_STAR.md, Phase 1).
+ * The /join decision surface: one table, monthly/annual toggle ("2 months free" — pick 5A),
+ * a checkout door per tier. Posts to /api/billing/public-checkout; Stripe collects the email
+ * and the webhook provisions the account (MONETISATION_NORTH_STAR.md Phase 1, unchanged).
  */
 export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
+  const [interval, setInterval] = useState<"month" | "year">("month");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const plan = (tier: "standard" | "pro") =>
+    plans.find((p) => p.tier === tier && p.interval === interval) ?? null;
 
   async function startCheckout(priceId: string) {
     setBusy(priceId);
@@ -63,61 +52,89 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
     }
   }
 
-  const tiers: Array<"standard" | "pro"> = ["standard", "pro"];
+  const standard = plan("standard");
+  const pro = plan("pro");
 
   return (
     <div className="flex flex-col gap-4">
-      {error && <p className="text-sm text-red-500">{error}</p>}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {tiers.map((tier) => {
-          const copy = TIER_COPY[tier];
-          const tierPlans = plans.filter((p) => p.tier === tier);
-          return (
-            <div
-              key={tier}
-              className="flex flex-col gap-3 rounded-xl border border-neutral-300 p-5 dark:border-neutral-700"
-            >
-              <div>
-                <h2 className="text-lg font-semibold">{copy.name}</h2>
-                <p className="text-sm text-muted-foreground">{copy.blurb}</p>
-              </div>
-              <ul className="flex flex-col gap-1.5 text-sm">
-                {copy.features.map((f) => (
-                  <li key={f} className="flex gap-2">
-                    <span aria-hidden="true" className="text-accent">
-                      ✓
-                    </span>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-auto flex flex-col gap-2 pt-2">
-                {tierPlans.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Not available yet.</p>
-                ) : (
-                  tierPlans.map((p) => (
-                    <button
-                      key={p.priceId}
-                      type="button"
-                      disabled={busy !== null}
-                      onClick={() => startCheckout(p.priceId)}
-                      className="rounded-lg border border-neutral-300 px-4 py-2.5 text-left transition-colors hover:border-neutral-500 disabled:opacity-50 dark:border-neutral-700"
-                    >
-                      <span className="block text-sm font-medium">
-                        {p.amount ? `${p.amount} ` : ""}
-                        {p.interval === "year" ? "per year" : "per month"}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {busy === p.priceId ? "Redirecting…" : "Get started"}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-          );
-        })}
+      <div className="mx-auto w-full max-w-xs">
+        <PillToggle
+          ariaLabel="Billing interval"
+          options={[
+            { value: "month", label: "Monthly" },
+            { value: "year", label: "Annual · 2 months free" },
+          ]}
+          value={interval}
+          onChange={setInterval}
+        />
       </div>
+
+      {error && <p className="text-sm text-red-500">{error}</p>}
+
+      {/* Comparison table — hairline grid, the app's lap-grid idiom. */}
+      <div className="overflow-hidden rounded-xl border border-border">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-border bg-secondary/60">
+              <th className="w-[46%] px-3 py-2.5 text-left text-[12px] font-semibold text-muted-foreground">
+                What you get
+              </th>
+              <th className="border-l border-border px-3 py-2.5 text-left text-[13px] font-semibold">
+                Standard
+              </th>
+              <th className="border-l border-border px-3 py-2.5 text-left text-[13px] font-semibold">
+                Pro
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {ROWS.map((row) => (
+              <tr key={row.label} className="border-b border-border last:border-b-0">
+                <td className="px-3 py-2.5 text-[12.5px] leading-snug text-muted-foreground">
+                  {row.label}
+                </td>
+                <td className="border-l border-border px-3 py-2.5 text-[13px]">{row.standard}</td>
+                <td className="border-l border-border px-3 py-2.5 text-[13px]">{row.pro}</td>
+              </tr>
+            ))}
+            <tr className="border-t border-border bg-secondary/40">
+              <td className="px-3 py-3 text-[12px] font-semibold text-muted-foreground">
+                {interval === "year" ? "Per year" : "Per month"}
+              </td>
+              <td className="border-l border-border px-3 py-3 text-[15px] font-semibold">
+                {standard?.amount ?? "—"}
+              </td>
+              <td className="border-l border-border px-3 py-3 text-[15px] font-semibold">
+                {pro?.amount ?? "—"}
+              </td>
+            </tr>
+            <tr>
+              <td className="px-3 py-3" />
+              <td className="border-l border-border px-3 py-3">
+                <button
+                  type="button"
+                  disabled={busy !== null || !standard}
+                  onClick={() => standard && startCheckout(standard.priceId)}
+                  className="w-full whitespace-nowrap rounded-lg bg-primary px-2 py-2 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-[#E6BE00] disabled:opacity-50"
+                >
+                  {busy === standard?.priceId ? "Redirecting…" : "Get started"}
+                </button>
+              </td>
+              <td className="border-l border-border px-3 py-3">
+                <button
+                  type="button"
+                  disabled={busy !== null || !pro}
+                  onClick={() => pro && startCheckout(pro.priceId)}
+                  className="w-full whitespace-nowrap rounded-lg bg-primary px-2 py-2 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-[#E6BE00] disabled:opacity-50"
+                >
+                  {busy === pro?.priceId ? "Redirecting…" : "Get started"}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       <p className="text-xs text-muted-foreground">
         Not for you? Full refund in the first 14 days, no questions. Have a promo code? Enter it at
         checkout.

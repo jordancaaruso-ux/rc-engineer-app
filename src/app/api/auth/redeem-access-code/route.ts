@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
+import { clientIpKey } from "@/lib/clientIp";
 import { isEmailAuthAllowed } from "@/lib/authAllowlist";
 import {
   isSignupAccessCodeConfigured,
@@ -23,11 +24,6 @@ function normalizeEmail(raw: string): string | null {
   return t;
 }
 
-/** Best-effort client IP for the burst brake (Vercel sets x-forwarded-for). */
-function clientIpKey(request: Request): string {
-  const fwd = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return fwd || request.headers.get("x-real-ip")?.trim() || "unknown";
-}
 
 export async function POST(request: Request): Promise<NextResponse> {
   if (!hasDatabaseUrl()) {

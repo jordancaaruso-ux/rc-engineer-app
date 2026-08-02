@@ -14,6 +14,8 @@ import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
 import { checkAiBudget, recordAiUsage } from "@/lib/aiUsage/ledger";
 import { getEntitlement } from "@/lib/entitlement";
 import { isBillingEnforced } from "@/lib/entitlementLogic";
+import { isDemoIdentity } from "@/lib/demo/demoAccess";
+import { clientIpKey } from "@/lib/clientIp";
 import { persistEngineerChatExchange } from "@/lib/engineerFeedback/persistExchange";
 import type { EngineerMessageContextSnapshot } from "@/lib/engineerFeedback/types";
 import { engineerOpenAiUserMessage } from "@/lib/openAiRetry";
@@ -118,6 +120,12 @@ export async function POST(request: Request) {
     const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    // Demo mode (MONETISATION_NORTH_STAR.md Phase 3): the one write a demo session may make.
+    // Per-IP cap below; the shared demo userId also flows through checkAiBudget, whose
+    // AiUsageDaily row doubles as a DB-backed GLOBAL demo ceiling. Persistence is skipped so
+    // live questions never pollute the curated thread history.
+    const isDemo = isDemoIdentity({ id: user.id, email: user.email });
+
     const rl = checkApiRateLimit({
       key: `engineer-chat:${user.id}`,
       limit: 60,
@@ -156,18 +164,20 @@ export async function POST(request: Request) {
           timeZone,
         });
     if (lapHistoryAnswer) {
-      const feedback = await maybePersistEngineerReply({
-        userId: user.id,
-        body,
-        messages,
-        reply: lapHistoryAnswer.reply,
-        contextJson: null,
-        resolvedFocus: null,
-        runId,
-        compareRunId,
-        source: "lap_history",
-        anchor,
-      });
+      const feedback = isDemo
+        ? null
+        : await maybePersistEngineerReply({
+            userId: user.id,
+            body,
+            messages,
+            reply: lapHistoryAnswer.reply,
+            contextJson: null,
+            resolvedFocus: null,
+            runId,
+            compareRunId,
+            source: "lap_history",
+            anchor,
+          });
       if (useStream) {
         const encoder = new TextEncoder();
         const stream = new ReadableStream({
@@ -243,6 +253,23 @@ export async function POST(request: Request) {
       }
       return NextResponse.json({ error: message }, { status });
     };
+
+    // Demo visitors get 2 live questions a day per IP (decision-board pick 10A copy) — placed
+    // AFTER the free deterministic lap-history path so a database answer never burns one, and
+    // BEFORE the budget block so the refusal is the friendly one, not a budget message.
+    if (isDemo) {
+      const demoRl = checkApiRateLimit({
+        key: `engineer-chat-demo:${clientIpKey(request)}`,
+        limit: 2,
+        windowMs: 24 * 60 * 60 * 1000,
+      });
+      if (!demoRl.ok) {
+        return refuseAllowance(
+          "That's both demo questions for today. In the full app, the Engineer answers all day — about your own car, not the demo driver's. Get your own garage at jrcdynamics.com/join.",
+          429,
+        );
+      }
+    }
 
     const entitlement = await getEntitlement(user);
     if (isBillingEnforced() && !entitlement.entitled) {
@@ -324,19 +351,21 @@ export async function POST(request: Request) {
               completionTokens: out.usage?.completionTokens ?? 0,
               cachedPromptTokens: out.usage?.cachedPromptTokens ?? 0,
             });
-            const feedback = await maybePersistEngineerReply({
-              userId: user.id,
-              body,
-              messages,
-              reply: out.reply,
-              contextJson: out.contextJson,
-              resolvedFocus: out.resolvedFocus,
-              runId,
-              compareRunId,
-              source: "llm",
-              anchor,
-              anchorLabel,
-            });
+            const feedback = isDemo
+              ? null
+              : await maybePersistEngineerReply({
+                  userId: user.id,
+                  body,
+                  messages,
+                  reply: out.reply,
+                  contextJson: out.contextJson,
+                  resolvedFocus: out.resolvedFocus,
+                  runId,
+                  compareRunId,
+                  source: "llm",
+                  anchor,
+                  anchorLabel,
+                });
             send("done", {
               reply: out.reply,
               resolvedFocus: out.resolvedFocus,
@@ -402,19 +431,21 @@ export async function POST(request: Request) {
       cachedPromptTokens: out.usage?.cachedPromptTokens ?? 0,
     });
 
-    const feedback = await maybePersistEngineerReply({
-      userId: user.id,
-      body,
-      messages,
-      reply: out.reply,
-      contextJson: out.contextJson,
-      resolvedFocus: out.resolvedFocus,
-      runId,
-      compareRunId,
-      source: "llm",
-      anchor,
-      anchorLabel,
-    });
+    const feedback = isDemo
+      ? null
+      : await maybePersistEngineerReply({
+          userId: user.id,
+          body,
+          messages,
+          reply: out.reply,
+          contextJson: out.contextJson,
+          resolvedFocus: out.resolvedFocus,
+          runId,
+          compareRunId,
+          source: "llm",
+          anchor,
+          anchorLabel,
+        });
 
     return NextResponse.json({
       contextJson: out.contextJson,

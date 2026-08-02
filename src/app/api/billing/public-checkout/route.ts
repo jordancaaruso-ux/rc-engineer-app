@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
+import { clientIpKey } from "@/lib/clientIp";
 import { getPricePlans, getStripe, stripeConfigured } from "@/lib/stripe";
 import { PUBLIC_SIGNUP_SOURCE } from "@/lib/billing/paidSignupLogic";
 
@@ -20,10 +21,8 @@ export async function POST(request: Request): Promise<Response> {
 
   // Public endpoint — brake by IP. Best-effort (per serverless instance), same caveat as
   // redeem-access-code; the real cost of abuse is bounded because a session is just a URL.
-  const fwd = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const ip = fwd || request.headers.get("x-real-ip")?.trim() || "unknown";
   const rl = checkApiRateLimit({
-    key: `public-checkout:${ip}`,
+    key: `public-checkout:${clientIpKey(request)}`,
     limit: 10,
     windowMs: 10 * 60 * 1000,
   });

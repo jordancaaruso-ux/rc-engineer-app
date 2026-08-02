@@ -66,7 +66,7 @@
    * or line-height changes, update this. Shared by MobileBrandMark + AccountMenu.
    */
   --top-chrome-y: calc(
-    env(safe-area-inset-top, 0px) + 7px + 0.575 * clamp(22px, 4vw, 30px)
+    env(safe-area-inset-top, 0px) + var(--demo-banner-h, 0px) + 7px + 0.575 * clamp(22px, 4vw, 30px)
   );
 
   /*

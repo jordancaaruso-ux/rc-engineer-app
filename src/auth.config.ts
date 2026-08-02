@@ -34,6 +34,17 @@ const authConfig = {
       if (trigger === "update" && session && typeof session === "object" && "image" in session) {
         token.picture = (session as { image?: string | null }).image ?? null;
       }
+      // Demo mode (MONETISATION_NORTH_STAR.md Phase 3): stamp the shared demo account so the
+      // edge middleware can enforce read-only without a DB read. Re-derived every call (not
+      // only at sign-in) so env changes and reseeds take effect on live tokens. Env unset ⇒
+      // never demo — this line is inert until the demo launches.
+      const demoId = process.env.DEMO_USER_ID?.trim();
+      const demoEmail = process.env.DEMO_USER_EMAIL?.trim().toLowerCase();
+      token.isDemo =
+        (Boolean(demoId) && token.sub === demoId) ||
+        (Boolean(demoEmail) &&
+          (user?.email ?? token.email)?.toLowerCase() === demoEmail) ||
+        undefined;
       return token;
     },
     async session({ session, token }) {
@@ -42,6 +53,9 @@ const authConfig = {
       }
       if (session.user && token.picture !== undefined) {
         session.user.image = token.picture as string | null;
+      }
+      if (session.user) {
+        session.user.isDemo = token.isDemo === true;
       }
       return session;
     },

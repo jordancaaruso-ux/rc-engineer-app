@@ -1,0 +1,6 @@
+{
+  "$comment": "Founder curation for the demo seed (scripts/seed-demo-account.ts). Keys under `runs` are ORIGINAL run ids from your own account; `notes`/`driverNotes` replace the scrubbed text wholesale. `includeThreadIds` lists YOUR EngineerChatThread ids to copy as the demo's curated history. `nameScrub` adds mates' names → replacements. Edit and re-run demo:seed — it wipes and reseeds idempotently.",
+  "nameScrub": [],
+  "includeThreadIds": [],
+  "runs": {}
+}

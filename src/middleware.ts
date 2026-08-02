@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import authConfig from "@/auth.config";
+import { DEMO_READ_ONLY_MESSAGE, decideDemoRequest } from "@/lib/demo/demoAccess";
 
 const { auth } = NextAuth(authConfig);
 
@@ -62,11 +63,31 @@ export default auth((req) => {
   if (pathname === "/welcome") {
     return NextResponse.next();
   }
+  // Demo entry (the page redirects to /api/auth/demo, which is matcher-exempt).
+  if (pathname === "/demo") {
+    return NextResponse.next();
+  }
 
   const authed = Boolean(req.auth);
 
   if (debugGate) {
     console.log("[middleware] pathname:", pathname, "authed:", authed);
+  }
+
+  // Demo mode is READ-ONLY (MONETISATION_NORTH_STAR.md Phase 3). One central chokepoint for
+  // all ~111 mutating API routes; the tiny allowlist (Engineer chat) lives in demoAccess.ts.
+  // Sits AFTER the public early-returns (checkout/join stay reachable — the conversion path)
+  // and BEFORE proceed(). /api/auth/* is matcher-exempt: sign-out works, and the account
+  // DELETE route carries its own in-route demo guard.
+  const isDemo =
+    req.auth?.user?.isDemo === true ||
+    (Boolean(process.env.DEMO_USER_ID) && req.auth?.user?.id === process.env.DEMO_USER_ID);
+  if (isDemo && decideDemoRequest({ method: req.method, pathname }) === "forbid") {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: DEMO_READ_ONLY_MESSAGE, demo: true }, { status: 403 });
+    }
+    // Server actions POST to page paths.
+    return new NextResponse(DEMO_READ_ONLY_MESSAGE, { status: 403 });
   }
 
   if (!authed) {
