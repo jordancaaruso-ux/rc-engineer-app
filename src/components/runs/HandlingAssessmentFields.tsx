@@ -36,9 +36,15 @@ const PHASE_BALANCE_INFO =
 
 const CORNER_SPEEDS: CornerSpeed[] = ["slow", "fast", "both"];
 const SPEED_SHORT: Record<CornerSpeed, string> = { slow: "Low speed", fast: "High speed", both: "Both" };
-/** Tile-width labels — the full phrase is carried by aria-label. */
-const SPEED_TINY: Record<CornerSpeed, string> = { slow: "Low", fast: "High", both: "Both" };
 const SEVERITIES: Array<1 | 2 | 3> = [1, 2, 3];
+
+/**
+ * Rising step heights for a notable's severity mark. The staircase is the whole
+ * point: the silhouette has to read "worse" before the word does, so the blocks
+ * grow left→right and the unlit ones stay visible as a ghost — you can see there
+ * is more to give before you give it.
+ */
+const SEVERITY_STEP_H: Record<1 | 2 | 3, number> = { 1: 3, 2: 6, 3: 10 };
 
 /**
  * Balance is a **deviation** axis, not a direction-of-preference one — the capture model
@@ -71,11 +77,11 @@ function balanceValueText(value: PhaseBalance | null): string {
   return `${word} ${value < 0 ? "understeer" : "oversteer"}`;
 }
 
-/** Compact state for the phase bar, where the full phrase won't fit. */
-function balanceShortText(value: PhaseBalance | null): string {
-  if (value == null) return "not set";
-  if (value === 0) return "neutral";
-  return `${value < 0 ? "US" : "OS"} ${Math.abs(value)}`;
+/** Lane readout — 30px of column, so the phrase contracts to a code. */
+function balanceCode(value: PhaseBalance | null): string {
+  if (value == null) return "—";
+  if (value === 0) return "0";
+  return `${value < 0 ? "US" : "OS"}${Math.abs(value)}`;
 }
 
 function notchLabel(p: PhaseBalance): string {
@@ -96,118 +102,65 @@ function patch(next: HandlingAssessmentUiState): HandlingAssessmentUiState {
 }
 
 /* ── Corner balance ────────────────────────────────────────────────────────────
-   Geometry for the shared axis. Three named marks ride one −3…+3 track, each
-   locked to its own vertical slot: an even three-way split would put the middle
-   mark straight through the axis line and its tick marks, so two sit above and
-   one below. Slots are fixed rather than computed so two phases on the same
-   value can never stack on top of each other — the failure the earlier
-   three-identical-dots version had.
+   One lane per phase, all three on the same −3…+3 grid. `LANE_COLS` is shared by
+   the legend so "Understeer / neutral / Oversteer" sits over the track column and
+   nothing else.
    ──────────────────────────────────────────────────────────────────────────── */
-const AXIS_H = 86;
-const AXIS_Y = 43;
-const MARK_H = 17;
-const MARK_SLOT: Record<PhaseRow["phase"], number> = { entry: 2, mid: 21, exit: 58 };
+const LANE_COLS = "grid-cols-[34px_1fr_30px]";
 
-/** Stop centres, as a percentage of the (padded) track width. */
+/** Stop centres, as a percentage of the track width. */
 function stopLeft(p: PhaseBalance): string {
   return `${((PHASE_BALANCE_LEVELS.indexOf(p) + 0.5) / PHASE_BALANCE_LEVELS.length) * 100}%`;
 }
 
-/** Leader runs from the mark's near edge to the axis — never through it. */
-function leaderBox(slot: number): { top: number; height: number } {
-  const bottom = slot + MARK_H;
-  return bottom <= AXIS_Y
-    ? { top: bottom, height: AXIS_Y - bottom }
-    : { top: AXIS_Y, height: slot - AXIS_Y };
+/** Mark diameter grows with magnitude, so size seconds what the fill already says. */
+function markSize(v: PhaseBalance): number {
+  return v === 0 ? 13 : 12 + Math.abs(v) * 2.5;
 }
 
 /**
- * Entry / mid / exit on a single understeer ↔ oversteer axis.
+ * One phase on its own −3…+3 track: label · track · readout.
  *
- * Rebuilt 2026-08-02 (founder review, three rounds of live A/B). What changed and why:
- * - **One axis, not three rows of seven notches.** Twenty-one targets to say one thing
- *   about a corner; now seven, and the three marks on one scale make the shape of the
- *   corner readable at a glance.
- * - **Each mark is named.** The previous pass distinguished the phases only by fill
- *   opacity, which was already carrying severity — one channel doing two jobs, and it
- *   could only do one. The label carries the phase; the fill is free to mean severity.
- * - **The −21° skew is gone.** Skewed chips at this size read as noise rather than brand.
+ * Every stop is directly tappable, which is the whole reason the lane exists —
+ * the previous pass shared a single line between all three phases, so a tap only
+ * meant something after you had told it which phase you were talking about. Three
+ * lanes cost nothing in height and delete that step. They also make collisions
+ * impossible: two phases on the same value can't stack, because they were never
+ * on the same line.
  *
  * Tap-only by design: the panel lives inside a swipeable `PagedCard`, which claims
- * horizontal drags, so a drag slider can never work here — and buttons can't be cleared
- * by finger jitter mid-tap.
+ * horizontal drags, so a drag slider can never work here — and buttons can't be
+ * cleared by finger jitter mid-tap.
  */
-function BalanceAxis({
-  values,
-  live,
-  onLive,
+function BalanceLane({
+  row,
+  value,
   onSelect,
 }: {
-  values: Record<PhaseRow["phase"], PhaseBalance | null>;
-  live: PhaseRow["phase"];
-  onLive: (phase: PhaseRow["phase"]) => void;
-  onSelect: (phase: PhaseRow["phase"], n: PhaseBalance) => void;
+  row: PhaseRow;
+  value: PhaseBalance | null;
+  onSelect: (n: PhaseBalance) => void;
 }) {
-  const liveRow = PHASE_ROWS.find((r) => r.phase === live) ?? PHASE_ROWS[0];
-  const liveValue = values[live];
-
   const nudge = (delta: number) => {
-    const idx = PHASE_BALANCE_LEVELS.indexOf(liveValue ?? 0);
+    const idx = PHASE_BALANCE_LEVELS.indexOf(value ?? 0);
     const next = Math.min(PHASE_BALANCE_LEVELS.length - 1, Math.max(0, idx + delta));
-    onSelect(live, PHASE_BALANCE_LEVELS[next]);
+    onSelect(PHASE_BALANCE_LEVELS[next]);
   };
 
   return (
-    <div className="space-y-2">
-      {/* Which phase the next tap lands on, plus a read of all three at once. */}
-      <div className="flex gap-[3px]" role="group" aria-label="Corner phase">
-        {PHASE_ROWS.map((row) => {
-          const isLive = row.phase === live;
-          return (
-            <button
-              key={row.phase}
-              type="button"
-              aria-pressed={isLive}
-              onClick={() => onLive(row.phase)}
-              className={cn(
-                "flex-1 rounded-md px-1 pb-1.5 pt-1.5 text-center font-sans text-[11px] font-semibold tracking-tight",
-                "ring-1 ring-inset transition-colors duration-150",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                isLive
-                  ? "bg-muted text-foreground ring-foreground/40"
-                  : "bg-secondary text-muted-foreground ring-border hover:text-foreground"
-              )}
-            >
-              {row.label}
-              <span
-                className={cn(
-                  "mt-px block font-sans text-[9.5px] font-medium",
-                  isLive ? "text-muted-foreground" : "text-faint"
-                )}
-              >
-                {balanceShortText(values[row.phase])}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+    <div className={cn("grid h-[26px] items-center gap-2", LANE_COLS)}>
+      <span className="font-sans text-[11px] font-semibold tracking-tight text-foreground">
+        {row.label}
+      </span>
 
-      {/* One legend for all three phases — they share a single scale. One voice
-          throughout: the centre word used to be mono among sans. */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center px-3 font-sans text-[10.5px] font-medium text-muted-foreground">
-        <span className="text-left">Understeer</span>
-        <span className="text-center text-faint">neutral</span>
-        <span className="text-right">Oversteer</span>
-      </div>
-
-      <div className="relative px-3" style={{ height: AXIS_H }}>
-        <div className="absolute inset-x-3 top-1/2 h-px bg-border" />
-        <div className="absolute left-1/2 w-px -translate-x-1/2 bg-muted-foreground/30" style={{ top: 26, bottom: 26 }} />
+      <div className="relative h-[26px]">
+        <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
+        <div className="absolute inset-y-[3px] left-1/2 w-px -translate-x-1/2 bg-muted-foreground/30" />
 
         <div
           role="radiogroup"
-          aria-label={`${liveRow.label} corner balance`}
-          className="absolute inset-x-3 top-1/2 flex h-0"
+          aria-label={`${row.label} corner balance`}
+          className="absolute inset-0 flex"
           onKeyDown={(e) => {
             if (e.key === "ArrowRight" || e.key === "ArrowUp") {
               nudge(1);
@@ -219,17 +172,17 @@ function BalanceAxis({
           }}
         >
           {PHASE_BALANCE_LEVELS.map((p) => {
-            const selected = liveValue === p;
+            const selected = value === p;
             return (
               <button
                 key={p}
                 type="button"
                 role="radio"
                 aria-checked={selected}
-                aria-label={`${liveRow.label} — ${notchLabel(p)}`}
-                tabIndex={selected || (liveValue == null && p === 0) ? 0 : -1}
-                onClick={() => onSelect(live, p)}
-                className="group -mt-[13px] grid h-[26px] flex-1 place-items-center rounded-[3px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`${row.label} — ${notchLabel(p)}`}
+                tabIndex={selected || (value == null && p === 0) ? 0 : -1}
+                onClick={() => onSelect(p)}
+                className="group grid flex-1 place-items-center rounded-[3px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span className="block h-[7px] w-[2px] rounded-[1px] bg-border transition-colors duration-150 group-hover:bg-faint" />
               </button>
@@ -237,36 +190,69 @@ function BalanceAxis({
           })}
         </div>
 
-        {/* Marks + leaders. Percentages are taken against the same padded box as
-            the stops, so a mark always sits dead on its notch. */}
-        <div className="pointer-events-none absolute inset-x-3 inset-y-0">
-          {PHASE_ROWS.map((row) => {
-            const v = values[row.phase];
-            if (v == null) return null;
-            const slot = MARK_SLOT[row.phase];
-            const leader = leaderBox(slot);
-            const style = markStyle(v);
-            return (
-              <div key={row.phase}>
-                <div
-                  className="absolute w-px bg-muted-foreground/30"
-                  style={{ left: stopLeft(v), top: leader.top, height: leader.height }}
-                />
-                <div
-                  className="absolute -translate-x-1/2 rounded-full px-2 py-[3px] font-sans text-[9.5px] font-bold uppercase leading-none tracking-[0.04em] transition-[left] duration-200"
-                  style={{ left: stopLeft(v), top: slot, ...style }}
-                >
-                  {row.label}
-                </div>
-              </div>
-            );
-          })}
+        {value != null ? (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 rounded-full transition-[left,width,height] duration-200"
+            style={{
+              left: stopLeft(value),
+              width: markSize(value),
+              height: markSize(value),
+              transform: "translate(-50%, -50%)",
+              background: markStyle(value).background,
+              boxShadow: "0 0 0 3px rgb(var(--color-background) / 0.85)",
+            }}
+          />
+        ) : null}
+      </div>
+
+      <span
+        className={cn(
+          "text-right font-sans text-[10px] font-semibold tabular-nums tracking-tight",
+          value == null ? "text-faint" : value === 0 ? "text-muted-foreground" : "text-foreground"
+        )}
+      >
+        {balanceCode(value)}
+      </span>
+    </div>
+  );
+}
+
+/** Entry / mid / exit, one lane each, under a legend they all share. */
+function BalanceLanes({
+  values,
+  onSelect,
+}: {
+  values: Record<PhaseRow["phase"], PhaseBalance | null>;
+  onSelect: (phase: PhaseRow["phase"], n: PhaseBalance) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      {/* One legend for all three lanes — they share a single scale. One voice
+          throughout: the centre word used to be mono among sans. */}
+      <div className={cn("grid gap-2", LANE_COLS)}>
+        <span />
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center font-sans text-[10.5px] font-medium text-muted-foreground">
+          <span className="text-left">Understeer</span>
+          <span className="text-center text-faint">neutral</span>
+          <span className="text-right">Oversteer</span>
         </div>
+        <span />
+      </div>
+
+      <div className="space-y-1.5">
+        {PHASE_ROWS.map((row) => (
+          <BalanceLane
+            key={row.phase}
+            row={row}
+            value={values[row.phase]}
+            onSelect={(n) => onSelect(row.phase, n)}
+          />
+        ))}
       </div>
 
       <p className="ui-caption">
-        Tap a phase, then place it — it steps on by itself. Leave one untouched if you&apos;d rather not
-        say.
+        Place each phase on the line. Leave one untouched if you&apos;d rather not say.
       </p>
     </div>
   );
@@ -285,7 +271,7 @@ function SpeedTagPicker({
   groupLabel?: string;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex shrink-0 items-center gap-1.5">
       {label ? <span className="text-[10px] text-muted-foreground">{label}</span> : null}
       <div className="flex gap-1" role="group" aria-label={groupLabel}>
         {CORNER_SPEEDS.map((s) => {
@@ -296,7 +282,7 @@ function SpeedTagPicker({
               type="button"
               aria-pressed={selected}
               onClick={() => onChange(selected ? null : s)}
-              className={cn(chipToggleClass(selected), "px-2 py-0.5 text-[10px]")}
+              className={cn(chipToggleClass(selected), "whitespace-nowrap px-2 py-0.5 text-[10px]")}
             >
               {SPEED_SHORT[s]}
             </button>
@@ -312,82 +298,64 @@ function SpeedTagPicker({
  * mild → moderate → severe, once more to clear. That replaces the old chip-then-hunt-
  * for-the-severity-card two-step, which was the actual complaint about the chip wall —
  * nothing appears or disappears below you as you answer.
+ *
+ * The corner-speed row is gone (founder call 2026-08-03): Low / High / Both was a
+ * second question asked six times over, and on a trait it rarely changed the read —
+ * "traction rolled" is "traction rolled". The three balance phases keep their speed
+ * tag, which is where slow-vs-fast does change the diagnosis. Nothing is stripped
+ * from runs that already carry a trait tag; capture just stops adding new ones.
+ *
+ * With speed gone the mark has to carry the escalation alone, so the blocks rise
+ * left→right instead of sitting flat — the silhouette says "worse" before the word
+ * does, and the unlit steps stay visible so the remaining headroom is legible.
  */
 function NotableTile({
   label,
   severity,
-  speed,
   onCycle,
-  onSpeed,
 }: {
   label: string;
   severity: 1 | 2 | 3 | null;
-  speed: CornerSpeed | undefined;
   onCycle: () => void;
-  onSpeed: (next: CornerSpeed | null) => void;
 }) {
   const active = severity != null;
   return (
-    <div
+    <button
+      type="button"
+      aria-pressed={active}
+      aria-label={
+        active
+          ? `${label} — ${HANDLING_SEVERITY_CHIP_LABELS[severity]}. Tap to raise or clear.`
+          : `${label} — not flagged. Tap to flag.`
+      }
+      onClick={onCycle}
       className={cn(
-        "flex flex-col gap-1.5 rounded-lg border p-2.5 transition-colors duration-150",
+        "flex flex-col gap-2 rounded-lg border p-2.5 text-left transition-colors duration-150",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         active ? "border-destructive/60 bg-destructive/10" : "border-border bg-secondary"
       )}
     >
-      <button
-        type="button"
-        aria-pressed={active}
-        aria-label={
-          active
-            ? `${label} — ${HANDLING_SEVERITY_CHIP_LABELS[severity]}. Tap to raise or clear.`
-            : `${label} — not flagged. Tap to flag.`
-        }
-        onClick={onCycle}
-        className="flex w-full flex-col gap-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      <span
+        className={cn(
+          "font-sans text-[11.5px] font-semibold leading-tight tracking-tight",
+          active ? "text-foreground" : "text-muted-foreground"
+        )}
       >
-        <span
-          className={cn(
-            "font-sans text-[11.5px] font-semibold leading-tight tracking-tight",
-            active ? "text-foreground" : "text-muted-foreground"
-          )}
-        >
-          {label}
-        </span>
-        <span aria-hidden className="flex gap-[3px]">
-          {SEVERITIES.map((s) => (
-            <span
-              key={s}
-              className={cn(
-                "h-[3px] w-full rounded-sm transition-colors duration-150",
-                severity != null && s <= severity ? "bg-destructive" : "bg-muted"
-              )}
-            />
-          ))}
-        </span>
-      </button>
-
-      {/* The corner-speed tag lives inside the tile it belongs to, so flagging one
-          notable never reflows the ones below it. */}
-      {active ? (
-        <div className="flex gap-[3px]" role="group" aria-label={`${label} — which corners`}>
-          {CORNER_SPEEDS.map((s) => {
-            const selected = speed === s;
-            return (
-              <button
-                key={s}
-                type="button"
-                aria-pressed={selected}
-                aria-label={SPEED_SHORT[s]}
-                onClick={() => onSpeed(selected ? null : s)}
-                className={cn(chipToggleClass(selected), "flex-1 px-1 py-0.5 text-[10px]")}
-              >
-                {SPEED_TINY[s]}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
+        {label}
+      </span>
+      <span aria-hidden className="mt-auto flex h-[10px] items-end gap-[3px]">
+        {SEVERITIES.map((s) => (
+          <span
+            key={s}
+            className={cn(
+              "w-full rounded-[1.5px] transition-colors duration-150",
+              severity != null && s <= severity ? "bg-destructive" : "bg-muted"
+            )}
+            style={{ height: SEVERITY_STEP_H[s] }}
+          />
+        ))}
+      </span>
+    </button>
   );
 }
 
@@ -408,7 +376,6 @@ const NOTABLE_TILES: { axis: CaptureTraitAxisKey; sign: -1 | 1; label: string }[
 
 export function HandlingAssessmentFields({ value, onChange }: Props) {
   const [balanceInfoOpen, setBalanceInfoOpen] = useState(false);
-  const [livePhase, setLivePhase] = useState<PhaseRow["phase"]>("entry");
   const primaryFocusOptions = useMemo(() => buildPrimaryFocusOptions(value), [value]);
   const primaryFocusId = selectedPrimaryFocusId(value);
 
@@ -425,14 +392,9 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
   function setPhaseBalance(phase: PhaseRow["phase"], n: PhaseBalance) {
     const row = PHASE_ROWS.find((r) => r.phase === phase);
     if (!row) return;
-    const cur = value[row.stateKey];
-    const cleared = cur === n;
-    emit({ ...value, [row.stateKey]: cleared ? null : n });
-    // Placing a phase steps to the next one; clearing leaves you where you are.
-    if (!cleared) {
-      const idx = PHASE_ROWS.findIndex((r) => r.phase === phase);
-      if (idx < PHASE_ROWS.length - 1) setLivePhase(PHASE_ROWS[idx + 1].phase);
-    }
+    // Tapping the stop a phase already sits on clears it — the only way back to
+    // "didn't say", which is a real answer here.
+    emit({ ...value, [row.stateKey]: value[row.stateKey] === n ? null : n });
   }
 
   function setSpeed(issueKey: HandlingIssueKey, speed: CornerSpeed | null) {
@@ -489,12 +451,7 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
           <p className="text-[10px] leading-snug text-muted-foreground">{PHASE_BALANCE_INFO}</p>
         ) : null}
 
-        <BalanceAxis
-          values={balanceValues}
-          live={livePhase}
-          onLive={setLivePhase}
-          onSelect={setPhaseBalance}
-        />
+        <BalanceLanes values={balanceValues} onSelect={setPhaseBalance} />
 
         {flaggedPhases.length > 0 ? (
           <div className="space-y-1.5 pt-0.5">
@@ -511,7 +468,9 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
                     label={null}
                     groupLabel={`${row.label} — which corners`}
                   />
-                  <span className="ml-auto font-sans text-[10px] text-muted-foreground">
+                  {/* Truncates rather than squeezing the chips into a second line —
+                      the lane readout two rows up already carries the value. */}
+                  <span className="ml-auto min-w-0 truncate font-sans text-[10px] text-muted-foreground">
                     {balanceValueText(value[row.stateKey])}
                   </span>
                 </div>
@@ -530,15 +489,12 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
             const cur = value[tile.axis];
             const active = cur != null && cur !== 0 && Math.sign(cur) === tile.sign;
             const severity = active ? (Math.abs(cur as number) as 1 | 2 | 3) : null;
-            const issueKey = `trait:${tile.axis}` as HandlingIssueKey;
             return (
               <NotableTile
                 key={`${tile.axis}:${tile.sign}`}
                 label={tile.label}
                 severity={severity}
-                speed={value.speedTags[issueKey]}
                 onCycle={() => cycleNotable(tile.axis, tile.sign)}
-                onSpeed={(s) => setSpeed(issueKey, s)}
               />
             );
           })}
