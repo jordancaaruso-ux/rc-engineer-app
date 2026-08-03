@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import { trackCatalogScopeWhere } from "@/lib/tracks/communityTrackAccess";
 
 export async function GET() {
   if (!hasDatabaseUrl()) {
@@ -20,6 +21,7 @@ export async function GET() {
       select: { id: true, name: true }
     }),
     prisma.track.findMany({
+      where: trackCatalogScopeWhere({ id: userId }),
       orderBy: { name: "asc" },
       select: {
         id: true,

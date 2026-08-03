@@ -9,6 +9,9 @@
  * caps in the chat route.
  */
 
+/** Fixed id of the shared demo account — mirrors the default in scripts/seed-demo-account.ts. */
+export const DEMO_USER_ID_FALLBACK = "demo0000000000000000user1";
+
 /** Writes a demo session may still perform. Exact-path match, deliberately tiny. */
 const DEMO_WRITE_ALLOWLIST = new Set<string>(["/api/engineer/chat"]);
 
@@ -30,6 +33,15 @@ export function isDemoIdentity(
   if (demoId && identity.id === demoId) return true;
   if (demoEmail && identity.email?.trim().toLowerCase() === demoEmail) return true;
   return false;
+}
+
+/**
+ * The demo account's id for **catalog scoping**. Unlike `isDemoIdentity`, this never goes dark
+ * when the env is unset: the seed writes its rows under the fixed id either way, and those rows
+ * must never join the community catalog even on a box that has not set DEMO_USER_ID.
+ */
+export function demoCatalogUserId(env: DemoEnv = process.env as DemoEnv): string {
+  return env.DEMO_USER_ID?.trim() || DEMO_USER_ID_FALLBACK;
 }
 
 /**

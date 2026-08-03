@@ -36,10 +36,12 @@ import {
   deepScrub,
   type CurationOverlay,
 } from "@/lib/demo/anonymize";
+import { demoCatalogUserId } from "@/lib/demo/demoAccess";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const SOURCE_USER_ID = "cmo75nzr60000vl5kvr0rqhej"; // the founder
-const DEMO_USER_ID = process.env.DEMO_USER_ID?.trim() || "demo0000000000000000user1";
+// Shared with the catalog scope filter — demo-owned tracks are hidden from the community list.
+const DEMO_USER_ID = demoCatalogUserId();
 const DEMO_USER_EMAIL = process.env.DEMO_USER_EMAIL?.trim() || "demo@jrcdynamics.com";
 const DEMO_DRIVER_NAME = process.env.DEMO_DRIVER_NAME?.trim() || "Nic Swole"; // founder pick 2026-08-02
 const DEFAULT_NAME_SCRUB = [

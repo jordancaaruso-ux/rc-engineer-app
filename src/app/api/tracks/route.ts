@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     const favouriteTrackIds =
       favouritesOnly || favouritesFirst ? await getFavouriteTrackIdsForUser(user.id) : [];
 
-    const whereBase = communityTrackListWhere(q);
+    const whereBase = communityTrackListWhere(user, q);
 
     const tracks = await prisma.track.findMany({
       where:
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
     }
 
     const existing = await prisma.track.findFirst({
-      where: dominantTrackByNameWhere(name),
+      where: dominantTrackByNameWhere(name, user),
       orderBy: DOMINANT_TRACK_ORDER_BY,
       select: {
         id: true,

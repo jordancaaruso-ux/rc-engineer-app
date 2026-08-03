@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
+import { trackCatalogScopeWhere } from "@/lib/tracks/communityTrackAccess";
 import { TrackList } from "@/components/tracks/TrackList";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
@@ -35,7 +36,7 @@ export default async function TracksPage(): Promise<ReactNode> {
   const user = await requireCurrentUser();
   const [tracks, favouriteTrackIds] = await Promise.all([
     prisma.track.findMany({
-      where: {},
+      where: trackCatalogScopeWhere(user),
       orderBy: { name: "asc" },
       select: {
         id: true,

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { trackCatalogScopeWhere } from "@/lib/tracks/communityTrackAccess";
 
 export type MatchedTrack = {
   id: string;
@@ -63,6 +64,7 @@ export async function matchTracksForEngineerQuery(
 
   const tracks = await prisma.track.findMany({
     where: {
+      ...trackCatalogScopeWhere({ id: userId }),
       OR: [
         { runs: { some: { userId } } },
         { name: { contains: q, mode: "insensitive" } },

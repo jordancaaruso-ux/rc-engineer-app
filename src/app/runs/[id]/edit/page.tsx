@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
+import { trackCatalogScopeWhere } from "@/lib/tracks/communityTrackAccess";
 import { NewRunForm } from "@/components/runs/NewRunFormDynamic";
 import { RunVideoAnalysisSection } from "@/components/videoAnalysis/RunVideoAnalysisSection";
 import { CardPanel } from "@/components/ui/CardPanel";
@@ -151,7 +152,7 @@ export default async function EditRunPage({
       select: { id: true, name: true, setupSheetTemplate: true, setupSheetModelId: true },
     }),
     prisma.track.findMany({
-      where: {},
+      where: trackCatalogScopeWhere(user),
       orderBy: { name: "asc" },
       select: {
         id: true,

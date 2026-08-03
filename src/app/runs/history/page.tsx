@@ -24,6 +24,7 @@ import {
   sortRunsForHistory,
   type MatchReason,
 } from "@/lib/runs/runHistoryFilters";
+import { trackCatalogScopeWhere } from "@/lib/tracks/communityTrackAccess";
 import { normalizeSetupData } from "@/lib/runSetup";
 import { getBestLap, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
 import { formatLap } from "@/lib/runLaps";
@@ -346,6 +347,7 @@ export default async function RunHistoryPage({
         select: { id: true, name: true },
       }),
       prisma.track.findMany({
+        where: trackCatalogScopeWhere(user),
         orderBy: { name: "asc" },
         select: { id: true, name: true },
       }),

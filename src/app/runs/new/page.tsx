@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
+import { trackCatalogScopeWhere } from "@/lib/tracks/communityTrackAccess";
 import { NewRunForm } from "@/components/runs/NewRunFormDynamic";
 import { hasDatabaseUrl } from "@/lib/env";
 import {
@@ -129,7 +130,7 @@ export default async function NewRunPage({
       _max: { createdAt: true },
     }),
     prisma.track.findMany({
-      where: {},
+      where: trackCatalogScopeWhere(user),
       orderBy: { name: "asc" },
       select: {
         id: true,

@@ -5,6 +5,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { prisma } from "@/lib/prisma";
+import { trackCatalogScopeWhere } from "@/lib/tracks/communityTrackAccess";
 import { formatRunDateOnly } from "@/lib/formatDate";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { listPendingChassisTypeRequests } from "@/lib/setupSheetModels/chassisTypeRequests";
@@ -80,7 +81,8 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
       select: { id: true, displayName: true, modelCode: true, createdAt: true },
     }),
     prisma.track.findMany({
-      where: { verifiedAt: null },
+      // Demo clones are unverified by construction — they are not review candidates.
+      where: { ...trackCatalogScopeWhere(user), verifiedAt: null },
       orderBy: { createdAt: "desc" },
       take: TAKE,
       select: {
