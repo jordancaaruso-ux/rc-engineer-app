@@ -16,10 +16,7 @@ import { formatLap, formatStintTime, normalizeLapTimes } from "@/lib/runLaps";
 import { DEFAULT_SETUP_FIELDS, normalizeSetupData } from "@/lib/runSetup";
 import { setupChangedRowsSincePrevious } from "@/lib/setupCompare/changedSincePrevious";
 import { SetupChangedSincePreviousList } from "@/components/runs/SetupChangedSincePreviousList";
-import {
-  formatHandlingAssessmentDetailLines,
-  parseHandlingAssessmentJson,
-} from "@/lib/runHandlingAssessment";
+import { formatHandlingAssessmentDetailLines } from "@/lib/runHandlingAssessment";
 import { formatConditionsChip } from "@/lib/weather/conditions";
 import { runConditionsFromRecord } from "@/lib/weather/runConditionsRecord";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
@@ -47,7 +44,6 @@ import { Eyebrow } from "@/components/ui/panel";
 import { StatWellGrid, StatWellCell } from "@/components/runs/LapStatStrip";
 import dynamic from "next/dynamic";
 import { CarHandlingRatingQuickPick } from "@/components/runs/CarHandlingRatingQuickPick";
-import { FeelVsLastRunQuickPick } from "@/components/runs/FeelVsLastRunQuickPick";
 import { RUN_HISTORY_DATA_CLASS } from "@/components/runs/runHistoryTableColumns";
 
 const LapComparePanel = dynamic(
@@ -402,18 +398,20 @@ export function RunDetailPanel({
     }
     return null;
   }, [run.carRating]);
-  const feelVsLastRun = useMemo(() => {
-    const parsed = parseHandlingAssessmentJson(run.handlingAssessmentJson);
-    const feel = parsed?.feelVsLastRun ?? null;
-    return feel;
-  }, [run.handlingAssessmentJson]);
   const handlingDetailsText = useMemo(() => {
     const text = handlingDetails(run);
-    return text
-      .split("\n")
-      .filter((line) => !line.startsWith("Feel vs last run:"))
-      .join("\n")
-      .trim();
+    return (
+      text
+        .split("\n")
+        // "Feel vs last run" was retired from capture, so nothing asks the question any
+        // more. Runs logged before that still carry a stored value, and the completion
+        // path still seeds a neutral 0 on a car's first run — neither is something the
+        // driver said on this screen, so the line stays out of the read-back. The value
+        // is untouched in storage and still reaches the Engineer.
+        .filter((line) => !line.startsWith("Feel vs last run:"))
+        .join("\n")
+        .trim()
+    );
   }, [run]);
 
   const runInstant = resolveRunDisplayInstant(run);
@@ -647,11 +645,6 @@ export function RunDetailPanel({
         />
         <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
           <CarHandlingRatingQuickPick value={carRatingDisplay} readOnly />
-          <FeelVsLastRunQuickPick
-            value={feelVsLastRun}
-            eligible={previousRunOnCar != null}
-            readOnly
-          />
         </div>
         {handlingDetailsText ? (
           <DetailRow
