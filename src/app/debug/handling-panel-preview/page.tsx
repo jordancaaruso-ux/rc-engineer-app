@@ -12,6 +12,10 @@
  * The live UI state is printed underneath: that's `HandlingAssessmentUiState`
  * exactly as `NewRunForm` would hand it to the sanitizer, so you can see what a
  * gesture stores as well as what it looks like.
+ *
+ * The `readOnly` render below it is the same component in the shape the session view
+ * (`RunDetailPanel`) uses, bound to the same state — so a change to the capture control
+ * and its read-back can be judged in one look instead of two screens apart.
  */
 
 import { notFound } from "next/navigation";
@@ -62,6 +66,21 @@ function Preview() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* The session read-back, tracking the same state — edit on the left, watch what
+          `RunDetailPanel` will show. Judging the two apart is how they drift. */}
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-muted-foreground">
+          Session read-back — same state, <code>readOnly</code>
+        </p>
+        <div className="flex flex-wrap items-start gap-8">
+          {WIDTHS.map((w) => (
+            <div key={w.id} data-testid={`handling-readback-${w.id}`} style={{ width: w.px }}>
+              <HandlingAssessmentFields value={ui} readOnly />
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="space-y-2">

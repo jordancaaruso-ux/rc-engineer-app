@@ -136,10 +136,12 @@ function BalanceLane({
   row,
   value,
   onSelect,
+  readOnly = false,
 }: {
   row: PhaseRow;
   value: PhaseBalance | null;
   onSelect: (n: PhaseBalance) => void;
+  readOnly?: boolean;
 }) {
   const nudge = (delta: number) => {
     const idx = PHASE_BALANCE_LEVELS.indexOf(value ?? 0);
@@ -153,42 +155,59 @@ function BalanceLane({
         {row.label}
       </span>
 
-      <div className="relative h-[26px]">
+      <div
+        className="relative h-[26px]"
+        {...(readOnly
+          ? { role: "img", "aria-label": `${row.label} — ${balanceValueText(value)}` }
+          : null)}
+      >
         <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
         <div className="absolute inset-y-[3px] left-1/2 w-px -translate-x-1/2 bg-muted-foreground/30" />
 
-        <div
-          role="radiogroup"
-          aria-label={`${row.label} corner balance`}
-          className="absolute inset-0 flex"
-          onKeyDown={(e) => {
-            if (e.key === "ArrowRight" || e.key === "ArrowUp") {
-              nudge(1);
-              e.preventDefault();
-            } else if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
-              nudge(-1);
-              e.preventDefault();
-            }
-          }}
-        >
-          {PHASE_BALANCE_LEVELS.map((p) => {
-            const selected = value === p;
-            return (
-              <button
-                key={p}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                aria-label={`${row.label} — ${notchLabel(p)}`}
-                tabIndex={selected || (value == null && p === 0) ? 0 : -1}
-                onClick={() => onSelect(p)}
-                className="group grid flex-1 place-items-center rounded-[3px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <span className="block h-[7px] w-[2px] rounded-[1px] bg-border transition-colors duration-150 group-hover:bg-faint" />
-              </button>
-            );
-          })}
-        </div>
+        {/* The scale survives read-back: without the stops the mark is a dot in space,
+            and how far off centre it sits is the whole reading. */}
+        {readOnly ? (
+          <div aria-hidden className="absolute inset-0 flex">
+            {PHASE_BALANCE_LEVELS.map((p) => (
+              <span key={p} className="grid flex-1 place-items-center">
+                <span className="block h-[7px] w-[2px] rounded-[1px] bg-border" />
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div
+            role="radiogroup"
+            aria-label={`${row.label} corner balance`}
+            className="absolute inset-0 flex"
+            onKeyDown={(e) => {
+              if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+                nudge(1);
+                e.preventDefault();
+              } else if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+                nudge(-1);
+                e.preventDefault();
+              }
+            }}
+          >
+            {PHASE_BALANCE_LEVELS.map((p) => {
+              const selected = value === p;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  aria-label={`${row.label} — ${notchLabel(p)}`}
+                  tabIndex={selected || (value == null && p === 0) ? 0 : -1}
+                  onClick={() => onSelect(p)}
+                  className="group grid flex-1 place-items-center rounded-[3px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span className="block h-[7px] w-[2px] rounded-[1px] bg-border transition-colors duration-150 group-hover:bg-faint" />
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {value != null ? (
           <span
@@ -222,9 +241,11 @@ function BalanceLane({
 function BalanceLanes({
   values,
   onSelect,
+  readOnly = false,
 }: {
   values: Record<PhaseRow["phase"], PhaseBalance | null>;
   onSelect: (phase: PhaseRow["phase"], n: PhaseBalance) => void;
+  readOnly?: boolean;
 }) {
   return (
     <div className="space-y-2">
@@ -247,13 +268,19 @@ function BalanceLanes({
             row={row}
             value={values[row.phase]}
             onSelect={(n) => onSelect(row.phase, n)}
+            readOnly={readOnly}
           />
         ))}
       </div>
 
-      <p className="ui-caption">
-        Place each phase on the line. Leave one untouched if you&apos;d rather not say.
-      </p>
+      {/* All three lanes stay on read-back even when one was never answered: an empty
+          track between two filled ones is how "didn't say" reads, and it is a different
+          answer from neutral. Prose could not say that at all. */}
+      {readOnly ? null : (
+        <p className="ui-caption">
+          Place each phase on the line. Leave one untouched if you&apos;d rather not say.
+        </p>
+      )}
     </div>
   );
 }
@@ -264,11 +291,13 @@ function SpeedTagPicker({
   onChange,
   label = "Which corners?",
   groupLabel = "Which corners",
+  readOnly = false,
 }: {
   value: CornerSpeed | undefined;
   onChange: (next: CornerSpeed | null) => void;
   label?: string | null;
   groupLabel?: string;
+  readOnly?: boolean;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-1.5">
@@ -276,13 +305,26 @@ function SpeedTagPicker({
       <div className="flex gap-1" role="group" aria-label={groupLabel}>
         {CORNER_SPEEDS.map((s) => {
           const selected = value === s;
+          const chipClass = cn(
+            chipToggleClass(selected),
+            "whitespace-nowrap px-2 py-0.5 text-[10px]"
+          );
+          if (readOnly) {
+            // `pointer-events-none` is doing real work: chipToggleClass carries a hover
+            // colour, and a chip that lights under the cursor but does nothing is a lie.
+            return (
+              <span key={s} className={cn(chipClass, "pointer-events-none")}>
+                {SPEED_SHORT[s]}
+              </span>
+            );
+          }
           return (
             <button
               key={s}
               type="button"
               aria-pressed={selected}
               onClick={() => onChange(selected ? null : s)}
-              className={cn(chipToggleClass(selected), "whitespace-nowrap px-2 py-0.5 text-[10px]")}
+              className={chipClass}
             >
               {SPEED_SHORT[s]}
             </button>
@@ -313,12 +355,60 @@ function NotableTile({
   label,
   severity,
   onCycle,
+  readOnly = false,
 }: {
   label: string;
   severity: 1 | 2 | 3 | null;
   onCycle: () => void;
+  readOnly?: boolean;
 }) {
   const active = severity != null;
+  const shellClass = cn(
+    "flex flex-col gap-2 rounded-lg border p-2.5 text-left",
+    active ? "border-destructive/60 bg-destructive/10" : "border-border bg-secondary"
+  );
+  const labelEl = (
+    <span
+      className={cn(
+        "font-sans text-[11.5px] font-semibold leading-tight tracking-tight",
+        active ? "text-foreground" : "text-muted-foreground"
+      )}
+    >
+      {label}
+    </span>
+  );
+  const steps = (
+    <span aria-hidden className="mt-auto flex h-[10px] items-end gap-[3px]">
+      {SEVERITIES.map((s) => (
+        <span
+          key={s}
+          className={cn(
+            "w-full rounded-[1.5px]",
+            !readOnly && "transition-colors duration-150",
+            severity != null && s <= severity ? "bg-destructive" : "bg-muted"
+          )}
+          style={{ height: SEVERITY_STEP_H[s] }}
+        />
+      ))}
+    </span>
+  );
+
+  // Read-back keeps the unflagged tiles greyed rather than dropping them: they are the
+  // record of what was considered and dismissed, which a list of only the flagged ones
+  // silently loses. The staircase is aria-hidden either way, so the severity word has to
+  // reach a screen reader in text.
+  if (readOnly) {
+    return (
+      <div className={shellClass}>
+        {labelEl}
+        <span className="sr-only">
+          {active ? HANDLING_SEVERITY_CHIP_LABELS[severity] : "not flagged"}
+        </span>
+        {steps}
+      </div>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -330,38 +420,28 @@ function NotableTile({
       }
       onClick={onCycle}
       className={cn(
-        "flex flex-col gap-2 rounded-lg border p-2.5 text-left transition-colors duration-150",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        active ? "border-destructive/60 bg-destructive/10" : "border-border bg-secondary"
+        shellClass,
+        "transition-colors duration-150",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       )}
     >
-      <span
-        className={cn(
-          "font-sans text-[11.5px] font-semibold leading-tight tracking-tight",
-          active ? "text-foreground" : "text-muted-foreground"
-        )}
-      >
-        {label}
-      </span>
-      <span aria-hidden className="mt-auto flex h-[10px] items-end gap-[3px]">
-        {SEVERITIES.map((s) => (
-          <span
-            key={s}
-            className={cn(
-              "w-full rounded-[1.5px] transition-colors duration-150",
-              severity != null && s <= severity ? "bg-destructive" : "bg-muted"
-            )}
-            style={{ height: SEVERITY_STEP_H[s] }}
-          />
-        ))}
-      </span>
+      {labelEl}
+      {steps}
     </button>
   );
 }
 
 type Props = {
   value: HandlingAssessmentUiState;
-  onChange: (next: HandlingAssessmentUiState) => void;
+  onChange?: (next: HandlingAssessmentUiState) => void;
+  /**
+   * Session read-back (`RunDetailPanel`). Same controls, same marks, no taps — the driver
+   * answered these by placing a dot on a lane and raising a staircase, so that is what the
+   * session shows back. The prose formatters
+   * (`formatHandlingAssessmentForEngineer`) are untouched and still feed the Engineer;
+   * this changes only what the driver reads.
+   */
+  readOnly?: boolean;
 };
 
 /** Each problem pole gets its own tile; poles on one axis stay mutually exclusive. */
@@ -374,13 +454,14 @@ const NOTABLE_TILES: { axis: CaptureTraitAxisKey; sign: -1 | 1; label: string }[
     }))
   );
 
-export function HandlingAssessmentFields({ value, onChange }: Props) {
+export function HandlingAssessmentFields({ value, onChange, readOnly = false }: Props) {
   const [balanceInfoOpen, setBalanceInfoOpen] = useState(false);
   const primaryFocusOptions = useMemo(() => buildPrimaryFocusOptions(value), [value]);
   const primaryFocusId = selectedPrimaryFocusId(value);
 
   function emit(next: HandlingAssessmentUiState) {
-    onChange(patch(next));
+    if (readOnly) return;
+    onChange?.(patch(next));
   }
 
   const balanceValues: Record<PhaseRow["phase"], PhaseBalance | null> = {
@@ -430,105 +511,157 @@ export function HandlingAssessmentFields({ value, onChange }: Props) {
   });
 
   /* Primary focus only earns its place once there's a genuine choice to make — with 0–1 flagged
-     issues the main problem is implicit (HANDLING_CAPTURE_NORTH_STAR). */
-  const showPrimaryFocus = primaryFocusOptions.length >= 2;
+     issues the main problem is implicit (HANDLING_CAPTURE_NORTH_STAR). On read-back the question
+     is already answered, so the bar is simply whether an answer exists. */
+  const showPrimaryFocus = readOnly ? value.primaryFocus != null : primaryFocusOptions.length >= 2;
+
+  /* Read-back drops whole blocks that were never answered — an untouched section is not
+     information, it's an empty form. Within a block that *was* answered, unanswered parts
+     stay visible (the empty lane, the greyed tile). */
+  const anyBalance = PHASE_ROWS.some((row) => value[row.stateKey] != null);
+  const anyNotable = NOTABLE_TILES.some((t) => {
+    const cur = value[t.axis];
+    return cur != null && cur !== 0 && Math.sign(cur) === t.sign;
+  });
+  const showBalance = !readOnly || anyBalance;
+  const showNotables = !readOnly || anyNotable;
+
+  /* On capture the speed row appears for every flagged phase, because it's the question.
+     On read-back a phase with no tag would render three dead chips saying nothing — and
+     unlike a blank lane there's no second answer it could be confused with. */
+  const speedRows = readOnly
+    ? flaggedPhases.filter((row) => value.speedTags[`balance:${row.phase}` as HandlingIssueKey])
+    : flaggedPhases;
 
   return (
     <div className="space-y-4 inset-panel p-3">
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground">Corner balance</span>
-          <button
-            type="button"
-            aria-expanded={balanceInfoOpen}
-            onClick={() => setBalanceInfoOpen((v) => !v)}
-            className="font-sans text-[11px] text-faint underline decoration-border underline-offset-[3px] transition-colors hover:text-muted-foreground"
-          >
-            What&apos;s this?
-          </button>
+      {showBalance ? (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Corner balance</span>
+            {readOnly ? null : (
+              <button
+                type="button"
+                aria-expanded={balanceInfoOpen}
+                onClick={() => setBalanceInfoOpen((v) => !v)}
+                className="font-sans text-[11px] text-faint underline decoration-border underline-offset-[3px] transition-colors hover:text-muted-foreground"
+              >
+                What&apos;s this?
+              </button>
+            )}
+          </div>
+          {balanceInfoOpen && !readOnly ? (
+            <p className="text-[10px] leading-snug text-muted-foreground">{PHASE_BALANCE_INFO}</p>
+          ) : null}
+
+          <BalanceLanes values={balanceValues} onSelect={setPhaseBalance} readOnly={readOnly} />
+
+          {speedRows.length > 0 ? (
+            <div className="space-y-1.5 pt-0.5">
+              {speedRows.map((row) => {
+                const issueKey = `balance:${row.phase}` as HandlingIssueKey;
+                return (
+                  <div key={row.phase} className="flex items-center gap-2">
+                    <span className="w-9 shrink-0 font-sans text-[10px] font-semibold text-foreground">
+                      {row.label}
+                    </span>
+                    <SpeedTagPicker
+                      value={value.speedTags[issueKey]}
+                      onChange={(s) => setSpeed(issueKey, s)}
+                      label={null}
+                      groupLabel={`${row.label} — which corners`}
+                      readOnly={readOnly}
+                    />
+                    {/* Truncates rather than squeezing the chips into a second line —
+                        the lane readout two rows up already carries the value. */}
+                    <span className="ml-auto min-w-0 truncate font-sans text-[10px] text-muted-foreground">
+                      {balanceValueText(value[row.stateKey])}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
-        {balanceInfoOpen ? (
-          <p className="text-[10px] leading-snug text-muted-foreground">{PHASE_BALANCE_INFO}</p>
-        ) : null}
+      ) : null}
 
-        <BalanceLanes values={balanceValues} onSelect={setPhaseBalance} />
-
-        {flaggedPhases.length > 0 ? (
-          <div className="space-y-1.5 pt-0.5">
-            {flaggedPhases.map((row) => {
-              const issueKey = `balance:${row.phase}` as HandlingIssueKey;
+      {showNotables ? (
+        <div className="space-y-2">
+          <div className="text-xs font-medium text-muted-foreground">
+            {readOnly ? "Notable" : "Anything notable? Only what was a problem."}
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {NOTABLE_TILES.map((tile) => {
+              const cur = value[tile.axis];
+              const active = cur != null && cur !== 0 && Math.sign(cur) === tile.sign;
+              const severity = active ? (Math.abs(cur as number) as 1 | 2 | 3) : null;
               return (
-                <div key={row.phase} className="flex items-center gap-2">
-                  <span className="w-9 shrink-0 font-sans text-[10px] font-semibold text-foreground">
-                    {row.label}
-                  </span>
-                  <SpeedTagPicker
-                    value={value.speedTags[issueKey]}
-                    onChange={(s) => setSpeed(issueKey, s)}
-                    label={null}
-                    groupLabel={`${row.label} — which corners`}
-                  />
-                  {/* Truncates rather than squeezing the chips into a second line —
-                      the lane readout two rows up already carries the value. */}
-                  <span className="ml-auto min-w-0 truncate font-sans text-[10px] text-muted-foreground">
-                    {balanceValueText(value[row.stateKey])}
-                  </span>
-                </div>
+                <NotableTile
+                  key={`${tile.axis}:${tile.sign}`}
+                  label={tile.label}
+                  severity={severity}
+                  onCycle={() => cycleNotable(tile.axis, tile.sign)}
+                  readOnly={readOnly}
+                />
               );
             })}
           </div>
-        ) : null}
-      </div>
-
-      <div className="space-y-2">
-        <div className="text-xs font-medium text-muted-foreground">
-          Anything notable? Only what was a problem.
+          {readOnly ? null : (
+            <p className="ui-caption">
+              Tap to flag. Tap again for worse — mild, moderate, severe, then off.
+            </p>
+          )}
         </div>
-        <div className="grid grid-cols-2 gap-1.5">
-          {NOTABLE_TILES.map((tile) => {
-            const cur = value[tile.axis];
-            const active = cur != null && cur !== 0 && Math.sign(cur) === tile.sign;
-            const severity = active ? (Math.abs(cur as number) as 1 | 2 | 3) : null;
-            return (
-              <NotableTile
-                key={`${tile.axis}:${tile.sign}`}
-                label={tile.label}
-                severity={severity}
-                onCycle={() => cycleNotable(tile.axis, tile.sign)}
-              />
-            );
-          })}
-        </div>
-        <p className="ui-caption">
-          Tap to flag. Tap again for worse — mild, moderate, severe, then off.
-        </p>
-      </div>
+      ) : null}
 
       {showPrimaryFocus ? (
         <div className="space-y-2">
           <div className="text-xs font-medium text-muted-foreground">
-            Which one mattered most?
+            {readOnly ? "Mattered most" : "Which one mattered most?"}
           </div>
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Primary focus">
-            {primaryFocusOptions.map((o) => {
-              const selected = primaryFocusId === o.id;
-              return (
-                <button
-                  key={o.id}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => emit({ ...value, primaryFocus: selected ? null : o.focus })}
-                  className={cn(chipToggleClass(selected), "px-2.5 py-1 text-[11px]")}
-                >
-                  {o.label}
-                </button>
-              );
-            })}
+            {primaryFocusOptions
+              .filter((o) => !readOnly || primaryFocusId === o.id)
+              .map((o) => {
+                const selected = primaryFocusId === o.id;
+                const chipClass = cn(chipToggleClass(selected), "px-2.5 py-1 text-[11px]");
+                if (readOnly) {
+                  return (
+                    <span key={o.id} className={cn(chipClass, "pointer-events-none")}>
+                      {o.label}
+                    </span>
+                  );
+                }
+                return (
+                  <button
+                    key={o.id}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => emit({ ...value, primaryFocus: selected ? null : o.focus })}
+                    className={chipClass}
+                  >
+                    {o.label}
+                  </button>
+                );
+              })}
           </div>
         </div>
       ) : null}
     </div>
   );
+}
+
+/**
+ * Does a parsed assessment have anything the read-only panel can draw? Guards the call
+ * site so a run with only legacy fields (or nothing) doesn't render an empty inset panel.
+ */
+export function hasRenderableHandlingReadback(ui: HandlingAssessmentUiState): boolean {
+  if (PHASE_ROWS.some((row) => ui[row.stateKey] != null)) return true;
+  if (ui.primaryFocus != null) return true;
+  return NOTABLE_TILES.some((t) => {
+    const cur = ui[t.axis];
+    return cur != null && cur !== 0 && Math.sign(cur) === t.sign;
+  });
 }
 
 function selectedPrimaryFocusId(ui: HandlingAssessmentUiState): string {

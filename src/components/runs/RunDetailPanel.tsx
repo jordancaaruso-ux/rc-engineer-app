@@ -16,7 +16,15 @@ import { formatLap, formatStintTime, normalizeLapTimes } from "@/lib/runLaps";
 import { DEFAULT_SETUP_FIELDS, normalizeSetupData } from "@/lib/runSetup";
 import { setupChangedRowsSincePrevious } from "@/lib/setupCompare/changedSincePrevious";
 import { SetupChangedSincePreviousList } from "@/components/runs/SetupChangedSincePreviousList";
-import { formatHandlingAssessmentDetailLines } from "@/lib/runHandlingAssessment";
+import {
+  CORNER_SPEED_LABELS,
+  HANDLING_TRAIT_AXIS_UI,
+  formatHandlingTraitAxisForEngineer,
+  parseHandlingAssessmentJson,
+  uiStateFromParsed,
+  type CornerSpeed,
+  type HandlingTraitAxisKey,
+} from "@/lib/runHandlingAssessment";
 import { formatConditionsChip } from "@/lib/weather/conditions";
 import { runConditionsFromRecord } from "@/lib/weather/runConditionsRecord";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
@@ -44,6 +52,10 @@ import { Eyebrow } from "@/components/ui/panel";
 import { StatWellGrid, StatWellCell } from "@/components/runs/LapStatStrip";
 import dynamic from "next/dynamic";
 import { CarHandlingRatingQuickPick } from "@/components/runs/CarHandlingRatingQuickPick";
+import {
+  HandlingAssessmentFields,
+  hasRenderableHandlingReadback,
+} from "@/components/runs/HandlingAssessmentFields";
 import { RUN_HISTORY_DATA_CLASS } from "@/components/runs/runHistoryTableColumns";
 
 const LapComparePanel = dynamic(
@@ -153,12 +165,46 @@ function runNotesOnly(run: Pick<Run, "notes" | "driverNotes">): string {
   return run.notes?.trim() || run.driverNotes?.trim() || "";
 }
 
-function handlingDetails(run: Pick<Run, "handlingProblems" | "handlingAssessmentJson">): string {
+/**
+ * Text fallback for the stored fields the read-back controls cannot draw. Everything the
+ * driver answered through a control is now shown as that control (`HandlingAssessmentFields`
+ * in `readOnly`); this is only what has no control to sit in, so nothing quietly vanishes
+ * from an older session:
+ *
+ *   - `handlingProblems` — free text, from before the structured capture existed.
+ *   - `feelGeneral` — axis retired from capture 2026-07-08, no tile.
+ *   - per-trait speed tags — retired from capture 2026-08-03; the trait keeps its tile,
+ *     but the slow/fast answer has nowhere to render.
+ *
+ * "Feel vs last run" stays out (cc935b9): the question was retired, and completion seeded a
+ * neutral 0 on a car's first run, so a stored value is not necessarily something the driver
+ * said. Untouched in storage, and it still reaches the Engineer.
+ */
+function legacyHandlingLines(
+  run: Pick<Run, "handlingProblems" | "handlingAssessmentJson">
+): string[] {
   const lines: string[] = [];
-  const legacy = run.handlingProblems?.trim();
-  if (legacy) lines.push(legacy);
-  lines.push(...formatHandlingAssessmentDetailLines(run.handlingAssessmentJson));
-  return lines.join("\n");
+  const freeText = run.handlingProblems?.trim();
+  if (freeText) lines.push(freeText);
+
+  const parsed = parseHandlingAssessmentJson(run.handlingAssessmentJson);
+  if (!parsed) return lines;
+
+  if (parsed.feelGeneral != null) {
+    lines.push(formatHandlingTraitAxisForEngineer("feelGeneral", parsed.feelGeneral));
+  }
+  for (const [key, speed] of Object.entries(parsed.speedTags ?? {})) {
+    if (!key.startsWith("trait:")) continue;
+    const axis = key.slice("trait:".length) as HandlingTraitAxisKey;
+    const meta = HANDLING_TRAIT_AXIS_UI[axis];
+    if (!meta) continue;
+    const where =
+      speed === "both"
+        ? "in slow and fast corners"
+        : `in ${CORNER_SPEED_LABELS[speed as CornerSpeed]}`;
+    lines.push(`${meta.title} — ${where}`);
+  }
+  return lines;
 }
 
 export function RunDetailPanel({
@@ -398,21 +444,23 @@ export function RunDetailPanel({
     }
     return null;
   }, [run.carRating]);
-  const handlingDetailsText = useMemo(() => {
-    const text = handlingDetails(run);
-    return (
-      text
-        .split("\n")
-        // "Feel vs last run" was retired from capture, so nothing asks the question any
-        // more. Runs logged before that still carry a stored value, and the completion
-        // path still seeds a neutral 0 on a car's first run — neither is something the
-        // driver said on this screen, so the line stays out of the read-back. The value
-        // is untouched in storage and still reaches the Engineer.
-        .filter((line) => !line.startsWith("Feel vs last run:"))
+  /* The driver placed a dot on a lane and raised a staircase; the session shows them back
+     the lane and the staircase, not a paragraph describing what they did. */
+  const handlingUi = useMemo(
+    () => uiStateFromParsed(parseHandlingAssessmentJson(run.handlingAssessmentJson)),
+    [run.handlingAssessmentJson]
+  );
+  const showHandlingReadback = hasRenderableHandlingReadback(handlingUi);
+  const legacyHandlingText = useMemo(
+    () =>
+      legacyHandlingLines({
+        handlingProblems: run.handlingProblems,
+        handlingAssessmentJson: run.handlingAssessmentJson,
+      })
         .join("\n")
-        .trim()
-    );
-  }, [run]);
+        .trim(),
+    [run.handlingProblems, run.handlingAssessmentJson]
+  );
 
   const runInstant = resolveRunDisplayInstant(run);
   const dateTimeLabel = formatRunDateTime(runInstant, displayTimeZone);
@@ -646,10 +694,15 @@ export function RunDetailPanel({
         <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
           <CarHandlingRatingQuickPick value={carRatingDisplay} readOnly />
         </div>
-        {handlingDetailsText ? (
+        {/* No `stopPropagation` wrapper: read-only, so there is nothing to tap and clicks
+            should behave like the rest of the panel. */}
+        {showHandlingReadback ? <HandlingAssessmentFields value={handlingUi} readOnly /> : null}
+        {legacyHandlingText ? (
           <DetailRow
-            label="Handling details"
-            value={handlingDetailsText}
+            /* Alongside the controls this is the leftover; on its own (a pre-capture run)
+               it is still the whole of what was recorded. */
+            label={showHandlingReadback ? "Also noted" : "Handling details"}
+            value={legacyHandlingText}
             multiline
             emptyAsDash
             prose
