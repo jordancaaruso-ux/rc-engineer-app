@@ -64,6 +64,15 @@ export function rawSessionDriversFromImportedPayload(parsed: unknown): LapUrlSes
   return outDrivers.length > 0 ? outDrivers : null;
 }
 
+/** Server-matched driver name (`sessionHint.name`) from a stored `parsedPayload`. */
+function sessionHintNameFromPayload(parsed: unknown): string | null {
+  if (!parsed || typeof parsed !== "object") return null;
+  const hint = (parsed as { sessionHint?: unknown }).sessionHint;
+  if (!hint || typeof hint !== "object") return null;
+  const name = (hint as { name?: unknown }).name;
+  return typeof name === "string" && name.trim() ? name.trim() : null;
+}
+
 /**
  * Build URL-import driver list + selection for Log your run from stored `parsedPayload`.
  * Practice: optionally restrict to the user’s LiveRC driver. Race: full field, preselect user row.
@@ -105,6 +114,8 @@ export function buildImportedIngestPlanFromPayload(
     primary = pickPrimarySessionDriver(outDrivers, {
       liveRcDriverId: opts.liveRcDriverId ?? null,
       liveRcDriverName: opts.liveRcDriverName ?? null,
+      // Import-time server match (Speedhive transponder / name aware) persisted in the payload.
+      sessionHintName: sessionHintNameFromPayload(parsed),
     });
   } else {
     primary = working[0]!;

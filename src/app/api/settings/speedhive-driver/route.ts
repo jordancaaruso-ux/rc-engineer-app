@@ -14,9 +14,13 @@ import {
   formatSpeedhiveTransponderNumbersForSetting,
   parseSpeedhiveTransponderNumbersSetting,
 } from "@/lib/speedhive/speedhiveTransponder";
+import {
+  formatSpeedhiveDriverNamesForSetting,
+  parseSpeedhiveDriverNamesSetting,
+} from "@/lib/speedhive/speedhiveDriverNames";
 
 async function readIdentity(userId: string) {
-  const [speedhiveDriverName, effectiveDriverName, transponderRaw, transponderLoaner] =
+  const [driverNameRaw, effectiveDriverName, transponderRaw, transponderLoaner] =
     await Promise.all([
       getSpeedhiveDriverNameSetting(userId),
       getSpeedhiveDriverNameForUser(userId),
@@ -24,8 +28,12 @@ async function readIdentity(userId: string) {
       getSpeedhiveTransponderLoanerSetting(userId),
     ]);
   const transponderNumbers = parseSpeedhiveTransponderNumbersSetting(transponderRaw);
+  const driverNames = parseSpeedhiveDriverNamesSetting(driverNameRaw);
   return {
-    speedhiveDriverName,
+    // Kept for callers that only ever wanted one; the list is the real answer.
+    speedhiveDriverName: driverNames[0] ?? null,
+    speedhiveDriverNames: driverNames,
+    speedhiveDriverNamesText: formatSpeedhiveDriverNamesForSetting(driverNames),
     effectiveDriverName,
     speedhiveTransponderNumbers: transponderNumbers,
     speedhiveTransponderNumbersText: formatSpeedhiveTransponderNumbersForSetting(transponderNumbers),
@@ -54,8 +62,14 @@ export async function POST(request: Request) {
     speedhiveTransponderLoaner?: boolean;
   } | null;
 
+  // Normalised on the way in so the stored value always round-trips through the
+  // same parser the matcher reads it with — one name or a newline list, either way.
   if (typeof body?.speedhiveDriverName === "string" || body?.speedhiveDriverName === null) {
-    await setSpeedhiveDriverNameSetting(userId, body.speedhiveDriverName);
+    const parsed = parseSpeedhiveDriverNamesSetting(body.speedhiveDriverName);
+    await setSpeedhiveDriverNameSetting(
+      userId,
+      parsed.length > 0 ? formatSpeedhiveDriverNamesForSetting(parsed) : null
+    );
   }
 
   if (typeof body?.speedhiveTransponderLoaner === "boolean") {

@@ -63,4 +63,35 @@ test("falls back to first row when neither id nor name matches", () => {
   assert.equal(picked.driverId, "1");
 });
 
+test("server sessionHint match beats P1 fallback (Speedhive transponder match)", () => {
+  // User has no LiveRC identity configured; the server matched their row by transponder.
+  const drivers = [driver("sh-1-1", "Alex Rival"), driver("sh-1-3", "Jordan Caruso")];
+  const picked = pickPrimarySessionDriver(drivers, {
+    liveRcDriverId: null,
+    liveRcDriverName: null,
+    sessionHintName: "Jordan Caruso",
+  });
+  assert.equal(picked.driverId, "sh-1-3");
+});
+
+test("local LiveRC name match still beats sessionHint", () => {
+  const drivers = [driver("1", "Jordan Caruso"), driver("2", "Alex Rival")];
+  const picked = pickPrimarySessionDriver(drivers, {
+    liveRcDriverId: null,
+    liveRcDriverName: "Jordan Caruso",
+    sessionHintName: "Alex Rival",
+  });
+  assert.equal(picked.driverId, "1", "explicit local identity outranks the server hint");
+});
+
+test("sessionHint that matches no row still falls back to P1", () => {
+  const drivers = [driver("1", "First Row"), driver("2", "Second Row")];
+  const picked = pickPrimarySessionDriver(drivers, {
+    liveRcDriverId: null,
+    liveRcDriverName: null,
+    sessionHintName: "Ghost Driver",
+  });
+  assert.equal(picked.driverId, "1");
+});
+
 console.log("pickPrimarySessionDriver.test.ts OK");

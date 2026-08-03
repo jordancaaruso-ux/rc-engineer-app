@@ -7,12 +7,20 @@ import {
 export type PickPrimarySessionDriverOpts = {
   liveRcDriverId: string | null;
   liveRcDriverName: string | null;
+  /**
+   * Server-matched driver name from the parse result (`sessionHint.name`). The import service
+   * matches source-aware identity the client doesn't have (Speedhive transponder numbers,
+   * Speedhive driver name), so when the local id/name find nothing, trust it before falling
+   * back to the P1 row.
+   */
+  sessionHintName?: string | null;
 };
 
 /**
  * Pick which timing row is "yours" for URL import defaults.
  * Prefers the stored LiveRC driver id, but only when the matched row's name also agrees —
  * the id is event-scoped and can collide across events, so a name mismatch defeats it.
+ * Falls back to the server's `sessionHint` match (transponder/Speedhive-aware) before P1.
  */
 export function pickPrimarySessionDriver(
   drivers: LapUrlSessionDriver[],
@@ -44,6 +52,14 @@ export function pickPrimarySessionDriver(
   if (nameWant) {
     const byName = drivers.find((d) => liveRcNameMatchesConfigured(d.driverName, nameWant));
     if (byName) return byName;
+  }
+
+  const hintWant = opts.sessionHintName?.trim();
+  if (hintWant) {
+    const byHint = drivers.find(
+      (d) => d.driverName.trim().toLowerCase() === hintWant.toLowerCase()
+    );
+    if (byHint) return byHint;
   }
 
   return drivers[0]!;

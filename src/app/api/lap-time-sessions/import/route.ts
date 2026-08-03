@@ -5,7 +5,7 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import {
-  getSpeedhiveDriverNameForUser,
+  getSpeedhiveDriverNamesForUser,
   getSpeedhiveTransponderNumbersForUser,
 } from "@/lib/speedhive/speedhiveDriverSettings";
 import { importOneTimingUrl } from "@/lib/lapImport/service";
@@ -66,14 +66,17 @@ export async function POST(request: Request) {
   const eventId =
     typeof body?.eventId === "string" && body.eventId.trim() ? body.eventId.trim() : undefined;
 
-  const [liveName, speedhiveName, transponderNumbers] = await Promise.all([
+  const [liveName, speedhiveNames, transponderNumbers] = await Promise.all([
     getLiveRcDriverNameSetting(user.id).catch(() => null),
-    getSpeedhiveDriverNameForUser(user.id).catch(() => null),
+    getSpeedhiveDriverNamesForUser(user.id).catch(() => [] as string[]),
     getSpeedhiveTransponderNumbersForUser(user.id).catch(() => [] as number[]),
   ]);
-  const driverName = (speedhiveName ?? liveName)?.trim() ?? "";
+  // `driverName` stays a single value: it's what the LiveRC/MyRCM parsers read.
+  // Speedhive gets the whole set alongside it.
+  const driverName = (speedhiveNames[0] ?? liveName)?.trim() ?? "";
   const ctx = {
     ...(driverName ? { driverName } : {}),
+    ...(speedhiveNames.length > 0 ? { speedhiveDriverNames: speedhiveNames } : {}),
     ...(transponderNumbers.length > 0
       ? { speedhiveTransponderNumbers: transponderNumbers }
       : {}),

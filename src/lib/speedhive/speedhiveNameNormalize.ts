@@ -21,3 +21,16 @@ export function speedhiveDriverNameMatches(
   if (tokens.length < 2) return false;
   return tokens.every((t) => normRow.includes(t));
 }
+
+/**
+ * Any of the driver's stored names against one classification row.
+ *
+ * A hit on one spelling is a hit — the names are alternatives for the same
+ * person, not conditions to satisfy together.
+ */
+export function speedhiveDriverNameMatchesAny(
+  rowName: string,
+  driverNorms: readonly string[]
+): boolean {
+  return driverNorms.some((norm) => speedhiveDriverNameMatches(rowName, norm));
+}

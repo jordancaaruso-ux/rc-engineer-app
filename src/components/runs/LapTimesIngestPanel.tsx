@@ -772,6 +772,7 @@ export function LapTimesIngestPanel({
         laps?: number[];
         lapRows?: LapImportLapRow[] | null;
         sessionDrivers?: LapUrlSessionDriver[];
+        sessionHint?: { name?: string | null } | null;
         url?: string;
       };
 
@@ -807,7 +808,15 @@ export function LapTimesIngestPanel({
           ? []
           : sessionDrivers.length === 1 && sessionDrivers[0]?.driverId
             ? [sessionDrivers[0].driverId]
-            : [pickPrimarySessionDriver(sessionDrivers, { liveRcDriverId, liveRcDriverName }).driverId];
+            : [
+              pickPrimarySessionDriver(sessionDrivers, {
+                liveRcDriverId,
+                liveRcDriverName,
+                // Server-side match (Speedhive transponder / driver name aware) — used
+                // when the local LiveRC id/name don't identify a row.
+                sessionHintName: typeof row.sessionHint?.name === "string" ? row.sessionHint.name : null,
+              }).driverId,
+            ];
 
       const recordedAt = row.recordedAt ?? new Date().toISOString();
       const sessionCompletedAtIso =

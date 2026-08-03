@@ -15,6 +15,7 @@ export const speedhiveParser: LapUrlParser = {
   async parse(url: string, context?: LapUrlParseContext): Promise<LapUrlParseResult> {
     return importSpeedhiveSession(url, {
       driverName: context?.driverName ?? null,
+      driverNames: context?.speedhiveDriverNames ?? [],
       transponderNumbers: context?.speedhiveTransponderNumbers ?? [],
     });
   },

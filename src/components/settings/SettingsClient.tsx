@@ -1,6 +1,15 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { ChipListField } from "@/components/settings/ChipListField";
+import {
+  formatSpeedhiveTransponderNumbersForSetting,
+  parseSpeedhiveTransponderNumbersSetting,
+} from "@/lib/speedhive/speedhiveTransponder";
+import {
+  formatSpeedhiveDriverNamesForSetting,
+  parseSpeedhiveDriverNamesSetting,
+} from "@/lib/speedhive/speedhiveDriverNames";
 
 type InitialSettings = {
   myName: string;
@@ -13,7 +22,11 @@ type InitialSettings = {
   speedhiveTransponderNumbers: string;
 };
 
-type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "ok" } | { kind: "error"; text: string };
+export type SaveState =
+  | { kind: "idle" }
+  | { kind: "saving" }
+  | { kind: "ok" }
+  | { kind: "error"; text: string };
 
 export function SettingsClient({ initial }: { initial: InitialSettings }) {
   const [myName, setMyName] = useState(initial.myName);
@@ -95,36 +108,55 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
         placeholder="e.g. Jordan Smith"
       />
 
-      <SettingField
-        label="MYLAPS transponder number(s)"
-        value={speedhiveTransponderNumbers}
-        onChange={setSpeedhiveTransponderNumbers}
-        onSave={() =>
-          postSetting(
-            "/api/settings/speedhive-driver",
-            {
-              speedhiveTransponderNumbers: speedhiveTransponderNumbers.trim() || null,
-            },
-            setSavingSpeedhiveTransponder
-          )
-        }
+      <ChipListField<number>
+        id="speedhive-transponder-input"
+        label="MYLAPS transponder numbers"
+        initialText={speedhiveTransponderNumbers}
+        parse={parseSpeedhiveTransponderNumbersSetting}
+        format={formatSpeedhiveTransponderNumbersForSetting}
         state={savingSpeedhiveTransponder}
+        inputMode="numeric"
+        chipMono
+        // Numbers can't contain either, so both are natural separators.
+        commitKeys={["Enter", ",", " "]}
         placeholder="e.g. 1234567"
+        invalidHint="Transponder numbers are digits only."
+        hint="Add every chip you own — race, practice, spare, the one in a loaner. Any of them matches a session, so you only do this once."
+        onSave={(text) => {
+          setSpeedhiveTransponderNumbers(text ?? "");
+          return postSetting(
+            "/api/settings/speedhive-driver",
+            { speedhiveTransponderNumbers: text },
+            setSavingSpeedhiveTransponder
+          );
+        }}
       />
 
-      <SettingField
-        label="Speedhive driver name"
-        value={speedhiveDriverName}
-        onChange={setSpeedhiveDriverName}
-        onSave={() =>
-          postSetting(
-            "/api/settings/speedhive-driver",
-            { speedhiveDriverName: speedhiveDriverName.trim() || null },
-            setSavingSpeedhiveDriver
-          )
-        }
+      {/* Not redundant with the chips above: a transponder only matches when
+          MYLAPS actually publishes one on the classification row, and plenty of
+          sessions don't carry the field at all. The name is what
+          `classificationRowMatchesUser` falls back to then — and it is the only
+          matcher at all for anyone racing a club or loaner chip. */}
+      <ChipListField<string>
+        id="speedhive-driver-name-input"
+        label="Speedhive driver names"
+        initialText={speedhiveDriverName}
+        parse={parseSpeedhiveDriverNamesSetting}
+        format={formatSpeedhiveDriverNamesForSetting}
         state={savingSpeedhiveDriver}
+        // Enter only: a name contains spaces, and sheets print "Caruso, Jordan".
+        commitKeys={["Enter"]}
         placeholder="e.g. Jordan Smith"
+        invalidHint="Type the name as the timing sheet prints it."
+        hint="Every spelling you show up under — each club types it differently, and a chip registered to someone else prints their name. Any one matching counts."
+        onSave={(text) => {
+          setSpeedhiveDriverName(text ?? "");
+          return postSetting(
+            "/api/settings/speedhive-driver",
+            { speedhiveDriverName: text },
+            setSavingSpeedhiveDriver
+          );
+        }}
       />
 
       <div className="space-y-1 text-sm">
@@ -169,6 +201,7 @@ function SettingField({
   onSave,
   state,
   placeholder,
+  hint,
 }: {
   label: string;
   value: string;
@@ -176,6 +209,8 @@ function SettingField({
   onSave: () => Promise<boolean>;
   state: SaveState;
   placeholder?: string;
+  /** One line under the field saying what it's actually for. */
+  hint?: string;
 }) {
   // Last value we've committed to the server. Blur only writes when the trimmed
   // value differs, so tabbing through untouched fields costs nothing.
@@ -210,6 +245,7 @@ function SettingField({
           <span className="ui-caption text-destructive">{state.text}</span>
         ) : null}
       </div>
+      {hint ? <p className="ui-caption text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }

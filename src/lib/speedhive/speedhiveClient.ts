@@ -39,6 +39,8 @@ export type SpeedhiveLapRow = {
   lap: number;
   lapTime: string;
   inPit?: boolean;
+  /** Epoch millis of the transponder crossing — a true instant (unlike session `startTime`, which is zoneless track-local schedule). */
+  timeOfDay?: number;
 };
 
 export type SpeedhiveCompetitorLaps = {

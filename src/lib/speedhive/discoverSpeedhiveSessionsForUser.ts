@@ -13,12 +13,10 @@ import {
   sessionClassificationHasTransponderFields,
 } from "@/lib/speedhive/speedhiveClassificationMatch";
 import {
-  getSpeedhiveDriverNameForUser,
+  getSpeedhiveDriverNamesForUser,
   getSpeedhiveTransponderNumbersForUser,
 } from "@/lib/speedhive/speedhiveDriverSettings";
-import {
-  normalizeSpeedhiveDriverNameForMatch,
-} from "@/lib/speedhive/speedhiveNameNormalize";
+import { normalizeSpeedhiveDriverNamesForMatch } from "@/lib/speedhive/speedhiveDriverNames";
 import { discoverSpeedhivePracticeSessionsForUser } from "@/lib/speedhive/discoverSpeedhivePracticeSessionsForUser";
 import { practiceLocationIdFromTrackUrl } from "@/lib/speedhive/speedhivePracticeUrl";
 import { organizationIdFromTrackUrl } from "@/lib/speedhive/speedhiveUrl";
@@ -97,13 +95,13 @@ async function discoverSpeedhiveOrganizationSessionsForUser(input: {
     };
   }
 
-  const [driverName, userTransponders] = await Promise.all([
-    getSpeedhiveDriverNameForUser(input.userId),
+  const [driverNames, userTransponders] = await Promise.all([
+    getSpeedhiveDriverNamesForUser(input.userId),
     getSpeedhiveTransponderNumbersForUser(input.userId),
   ]);
-  const driverNorm = driverName ? normalizeSpeedhiveDriverNameForMatch(driverName) : "";
+  const driverNorms = normalizeSpeedhiveDriverNamesForMatch(driverNames);
 
-  if (!driverNorm && userTransponders.length === 0) {
+  if (driverNorms.length === 0 && userTransponders.length === 0) {
     return {
       candidates: [],
       unimportedCandidates: [],
@@ -148,7 +146,7 @@ async function discoverSpeedhiveOrganizationSessionsForUser(input: {
           classificationRowMatchesUser({
             row,
             userTransponders,
-            driverNorm,
+            driverNorms,
             raceClassFilter,
           })
         );
@@ -212,12 +210,13 @@ async function discoverSpeedhiveOrganizationSessionsForUser(input: {
   );
   const unimported = sorted.filter((d) => !d.alreadyImported);
 
+  const hasNames = driverNorms.length > 0;
   const noMatchHint =
-    userTransponders.length > 0 && !sawTransponderFields && !driverNorm
-      ? "No Speedhive sessions matched your transponder at this organization. Public results here may not include transponder numbers — add your Speedhive driver name in Settings as a fallback."
-      : userTransponders.length > 0 && !sawTransponderFields && driverNorm
-        ? "No sessions matched at this organization. Public results may not list transponder numbers; matching used your driver name where possible."
-        : "No Speedhive sessions matched your transponder or driver name at this organization.";
+    userTransponders.length > 0 && !sawTransponderFields && !hasNames
+      ? "No Speedhive sessions matched your transponder at this organization. Public results here may not include transponder numbers — add the names you appear under in Settings as a fallback."
+      : userTransponders.length > 0 && !sawTransponderFields && hasNames
+        ? "No sessions matched at this organization. Public results may not list transponder numbers; matching used your driver names where possible."
+        : "No Speedhive sessions matched your transponders or driver names at this organization.";
 
   return {
     candidates: sorted,

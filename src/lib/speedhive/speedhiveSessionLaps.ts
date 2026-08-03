@@ -8,7 +8,7 @@ import {
   parseSpeedhiveLapTimeSeconds,
 } from "@/lib/speedhive/speedhiveClient";
 import { classificationRowMatchesUser } from "@/lib/speedhive/speedhiveClassificationMatch";
-import { normalizeSpeedhiveDriverNameForMatch } from "@/lib/speedhive/speedhiveNameNormalize";
+import { normalizeSpeedhiveDriverNamesForMatch } from "@/lib/speedhive/speedhiveDriverNames";
 import { parseSpeedhiveSessionRef } from "@/lib/speedhive/speedhiveUrl";
 
 const PARSER_ID = "speedhive_api_v1";
@@ -19,12 +19,26 @@ export function isSpeedhiveSessionUrl(url: string): boolean {
 
 export async function importSpeedhiveSession(
   urlOrSessionId: string | { sessionId: number; eventId?: number },
-  identity?: { driverName?: string | null; transponderNumbers?: number[] } | string | null
+  identity?:
+    | {
+        driverName?: string | null;
+        /** Every spelling the driver appears under; any one matching is a hit. */
+        driverNames?: string[];
+        transponderNumbers?: number[];
+      }
+    | string
+    | null
 ): Promise<LapUrlParseResult> {
   const driverName =
     typeof identity === "string" || identity == null
       ? identity
       : identity.driverName;
+  // `driverNames` is the real input; `driverName` stays for the string-identity
+  // shorthand and any caller that still passes a single one.
+  const driverNames =
+    typeof identity === "object" && identity != null && !Array.isArray(identity)
+      ? (identity.driverNames ?? [])
+      : [];
   const transponderNumbers =
     typeof identity === "object" && identity != null && !Array.isArray(identity)
       ? (identity.transponderNumbers ?? [])
@@ -62,18 +76,26 @@ export async function importSpeedhiveSession(
       if (row.name?.trim()) nameByPosition.set(row.position, row.name.trim());
     }
 
-    const driverNorm = driverName?.trim()
-      ? normalizeSpeedhiveDriverNameForMatch(driverName)
-      : "";
+    const driverNorms = normalizeSpeedhiveDriverNamesForMatch([
+      ...driverNames,
+      ...(driverName ? [driverName] : []),
+    ]);
     const userTransponders = transponderNumbers.filter((n) => Number.isFinite(n) && n > 0);
 
     const sessionDrivers: LapUrlSessionDriver[] = [];
+    // Latest transponder crossing across the field = when the session actually finished.
+    // `timeOfDay` is epoch millis (a true instant); the session's `startTime` is a zoneless
+    // track-local schedule and often doesn't match when the session really ran.
+    let lastCrossingMs = 0;
 
     for (const block of lapBlocks) {
       const name = nameByPosition.get(block.position) ?? `P${block.position}`;
       const lapsRaw = block.laps ?? [];
       const laps: number[] = [];
       for (const lap of lapsRaw) {
+        if (typeof lap.timeOfDay === "number" && lap.timeOfDay > lastCrossingMs) {
+          lastCrossingMs = lap.timeOfDay;
+        }
         if (lap.inPit) continue;
         const sec = parseSpeedhiveLapTimeSeconds(lap.lapTime);
         if (sec != null && sec > 0) laps.push(sec);
@@ -109,16 +131,16 @@ export async function importSpeedhiveSession(
       return classificationRowMatchesUser({
         row,
         userTransponders,
-        driverNorm,
+        driverNorms,
         raceClassFilter: null,
       });
     });
     if (matched) primary = matched;
 
-    const sessionMeta = classification[0] as { startTime?: string } | undefined;
+    // Sanity band: crossings before 2001 (bad epoch) or in the future are timing-system noise.
     const sessionCompletedAtIso =
-      typeof sessionMeta?.startTime === "string" && sessionMeta.startTime.trim()
-        ? new Date(sessionMeta.startTime).toISOString()
+      lastCrossingMs > 978_307_200_000 && lastCrossingMs < Date.now() + 24 * 60 * 60 * 1000
+        ? new Date(lastCrossingMs).toISOString()
         : null;
 
     return {

@@ -14,13 +14,11 @@ import {
 } from "@/lib/speedhive/speedhivePracticeUrl";
 import type { SpeedhiveDiscoveredSession } from "@/lib/speedhive/discoverSpeedhiveSessionsForUser";
 import {
-  getSpeedhiveDriverNameForUser,
+  getSpeedhiveDriverNamesForUser,
   getSpeedhiveTransponderNumbersForUser,
 } from "@/lib/speedhive/speedhiveDriverSettings";
-import {
-  normalizeSpeedhiveDriverNameForMatch,
-  speedhiveDriverNameMatches,
-} from "@/lib/speedhive/speedhiveNameNormalize";
+import { speedhiveDriverNameMatchesAny } from "@/lib/speedhive/speedhiveNameNormalize";
+import { normalizeSpeedhiveDriverNamesForMatch } from "@/lib/speedhive/speedhiveDriverNames";
 import { normalizeSpeedhiveTransponderNumber } from "@/lib/speedhive/speedhiveTransponder";
 import { practiceLocationIdFromTrackUrl } from "@/lib/speedhive/speedhivePracticeUrl";
 
@@ -134,14 +132,14 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
     };
   }
 
-  const [driverName, userTransponders] = await Promise.all([
-    getSpeedhiveDriverNameForUser(input.userId),
+  const [driverNames, userTransponders] = await Promise.all([
+    getSpeedhiveDriverNamesForUser(input.userId),
     getSpeedhiveTransponderNumbersForUser(input.userId),
   ]);
-  const driverNorm = driverName ? normalizeSpeedhiveDriverNameForMatch(driverName) : "";
+  const driverNorms = normalizeSpeedhiveDriverNamesForMatch(driverNames);
   const chipCodes = chipCodesForUser(userTransponders);
 
-  if (chipCodes.length === 0 && !driverNorm) {
+  if (chipCodes.length === 0 && driverNorms.length === 0) {
     return {
       candidates: [],
       unimportedCandidates: [],
@@ -177,7 +175,7 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
       }
     }
 
-    if (activityIds.size === 0 && driverNorm) {
+    if (activityIds.size === 0 && driverNorms.length > 0) {
       const activities = await fetchPracticeLocationActivities(locationId, {
         count: MAX_ACTIVITIES_TO_EXPAND,
         sport: location?.sport ?? "RC",
@@ -185,7 +183,7 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
       for (const act of activities) {
         if (!act.id) continue;
         const label = act.chipLabel?.trim();
-        if (!label || !speedhiveDriverNameMatches(label, driverNorm)) continue;
+        if (!label || !speedhiveDriverNameMatchesAny(label, driverNorms)) continue;
         if (chipCodes.length > 0 && act.chipCode) {
           const codeNorm = normalizeSpeedhiveTransponderNumber(act.chipCode);
           if (codeNorm && !chipCodes.includes(codeNorm)) continue;

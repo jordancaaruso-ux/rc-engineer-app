@@ -54,7 +54,7 @@ test("classificationRowMatchesUser prefers transponder when configured", () => {
     classificationRowMatchesUser({
       row,
       userTransponders: [111],
-      driverNorm: "",
+      driverNorms: [],
       raceClassFilter: null,
     }),
     true
@@ -67,7 +67,43 @@ test("classificationRowMatchesUser falls back to driver name", () => {
     classificationRowMatchesUser({
       row,
       userTransponders: [],
-      driverNorm: "jordan smith",
+      driverNorms: ["jordan smith"],
+      raceClassFilter: null,
+    }),
+    true
+  );
+});
+
+test("any stored spelling matches — the club that types it differently still lands", () => {
+  const row = { position: 1, name: "J Smith" };
+  assert.equal(
+    classificationRowMatchesUser({
+      row,
+      userTransponders: [],
+      driverNorms: ["jordan smith"],
+      raceClassFilter: null,
+    }),
+    false,
+    "one spelling alone doesn't reach the short form"
+  );
+  assert.equal(
+    classificationRowMatchesUser({
+      row,
+      userTransponders: [],
+      driverNorms: ["jordan smith", "j smith"],
+      raceClassFilter: null,
+    }),
+    true
+  );
+});
+
+test("a chip that misses still lets a name match — sessions without transponder fields", () => {
+  const row = { position: 1, name: "Jordan Smith" };
+  assert.equal(
+    classificationRowMatchesUser({
+      row,
+      userTransponders: [999],
+      driverNorms: ["jordan smith"],
       raceClassFilter: null,
     }),
     true
