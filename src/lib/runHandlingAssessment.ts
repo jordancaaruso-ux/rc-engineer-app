@@ -63,23 +63,16 @@ export function formatFeelVsLastRunQuickLabel(v: FeelVsLastRun): string {
   return `${adv ? `${adv} ` : ""}${direction}`.replace(/^\w/, (c) => c.toUpperCase());
 }
 
-export function coerceFeelVsLastRunForCompleteRun(
-  raw: unknown,
-  hasPriorRunOnCar: boolean
-): { parsed: RunHandlingAssessmentParsed | null; error?: string } {
-  const parsed = parseHandlingAssessmentJson(raw);
-  const feel = parsed?.feelVsLastRun ?? null;
+/*
+ * `coerceFeelVsLastRunForCompleteRun` lived here. It seeded `feelVsLastRun: 0` when a run
+ * completed with no prior outing on the car — correct while the pick was required and had
+ * nothing to compare against, but the pick was retired and the seed outlived its reason.
+ * All it did afterwards was invent an answer: `engineeringRead` maps 0 to "same" (null is
+ * "unknown"), so the Engineer was told a car felt unchanged versus a run that never
+ * happened. Completion is no longer blocked on the field, so the API just stores what was
+ * answered and every reader treats absent as unknown.
+ */
 
-  // The "feel vs last run" quick-pick was retired from the complete flow, so
-  // completion is never blocked on it. When it's absent and there's no prior
-  // run to compare against, seed a neutral 0; otherwise pass through untouched.
-  if (!hasPriorRunOnCar && feel == null) {
-    if (!parsed) return { parsed: { version: 6, feelVsLastRun: 0 } };
-    return { parsed: { ...parsed, feelVsLastRun: 0 } };
-  }
-
-  return { parsed };
-}
 
 export type BalanceByPhaseMap = {
   entry?: PhaseBalance;

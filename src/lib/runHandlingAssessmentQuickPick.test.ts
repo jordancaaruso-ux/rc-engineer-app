@@ -4,8 +4,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  coerceFeelVsLastRunForCompleteRun,
   formatFeelVsLastRunQuickLabel,
+  formatHandlingAssessmentDetailLines,
+  parseHandlingAssessmentJson,
 } from "@/lib/runHandlingAssessment";
 
 test("formatFeelVsLastRunQuickLabel maps quick-pick values including Similar", () => {
@@ -16,21 +17,35 @@ test("formatFeelVsLastRunQuickLabel maps quick-pick values including Similar", (
   assert.equal(formatFeelVsLastRunQuickLabel(3), "Much better");
 });
 
-test("coerceFeelVsLastRunForCompleteRun no longer blocks when prior run exists (picker retired)", () => {
-  const result = coerceFeelVsLastRunForCompleteRun(null, true);
-  assert.equal(result.error, undefined);
-  assert.equal(result.parsed, null);
+/*
+ * Completion used to seed `feelVsLastRun: 0` on a car's first outing, left over from when
+ * the pick was required and had nothing to compare against. 0 means "Similar", so the
+ * Engineer was told a car felt unchanged versus a run that never happened. These pin the
+ * replacement rule: an unanswered field stays unanswered, and only a real answer is read
+ * back. See the note where `coerceFeelVsLastRunForCompleteRun` used to live.
+ */
+test("an unanswered feel-vs-last-run stays absent rather than becoming Similar", () => {
+  assert.equal(parseHandlingAssessmentJson(null), null);
+
+  const parsed = parseHandlingAssessmentJson({ version: 6, balanceByPhase: { entry: -1 } });
+  assert.equal(parsed?.feelVsLastRun ?? null, null);
+  // The rest of the answers still survive the round trip.
+  assert.deepEqual(parsed?.balanceByPhase, { entry: -1 });
 });
 
-test("coerceFeelVsLastRunForCompleteRun defaults to Similar on first run", () => {
-  const result = coerceFeelVsLastRunForCompleteRun(null, false);
-  assert.equal(result.error, undefined);
-  assert.deepEqual(result.parsed, { version: 6, feelVsLastRun: 0 });
-});
+test("only a real feel-vs-last-run answer reaches the read-back lines", () => {
+  const unanswered = formatHandlingAssessmentDetailLines({
+    version: 6,
+    balanceByPhase: { entry: -1 },
+  });
+  assert.equal(
+    unanswered.some((line) => line.startsWith("Feel vs last run:")),
+    false
+  );
 
-test("coerceFeelVsLastRunForCompleteRun preserves other handling fields when coercing", () => {
-  const raw = { version: 5, balanceByPhase: { entry: -1 } };
-  const result = coerceFeelVsLastRunForCompleteRun(raw, false);
-  assert.equal(result.parsed?.feelVsLastRun, 0);
-  assert.deepEqual(result.parsed?.balanceByPhase, { entry: -1 });
+  const answered = formatHandlingAssessmentDetailLines({ version: 6, feelVsLastRun: -2 });
+  assert.equal(
+    answered.some((line) => line.startsWith("Feel vs last run:")),
+    true
+  );
 });

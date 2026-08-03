@@ -24,7 +24,7 @@ import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
 import { linkImportedSessionsToRun } from "@/lib/lapImport/service";
 import { resolveRunSessionCompletedAtFromUpsertBody } from "@/lib/runSessionCompletedAt";
 import { getTimeZoneFromCookies } from "@/lib/requestTimeZone";
-import { coerceFeelVsLastRunForCompleteRun, parseHandlingAssessmentJson } from "@/lib/runHandlingAssessment";
+import { parseHandlingAssessmentJson } from "@/lib/runHandlingAssessment";
 import { buildPromptMarkTrackLocation } from "@/lib/trackLocationPrompt";
 import { communityTrackByIdWhere } from "@/lib/tracks/communityTrackAccess";
 import { ensureEventParticipation } from "@/lib/events/eventParticipation";
@@ -171,22 +171,6 @@ function prismaJsonFromHandlingBody(raw: unknown): Prisma.InputJsonValue | typeo
   return parsed === null ? Prisma.JsonNull : (parsed as Prisma.InputJsonValue);
 }
 
-async function userHasPriorCompletedRunOnCar(params: {
-  userId: string;
-  carId: string;
-  excludeRunId?: string;
-}): Promise<boolean> {
-  const count = await prisma.run.count({
-    where: {
-      userId: params.userId,
-      carId: params.carId,
-      loggingComplete: true,
-      ...(params.excludeRunId ? { id: { not: params.excludeRunId } } : {}),
-    },
-  });
-  return count > 0;
-}
-
 async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; mode: "create" | "update" }) {
   const body = params.body;
   const carId = body.carId;
@@ -239,28 +223,14 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     );
   }
 
-  const excludeRunId =
-    params.mode === "update" && typeof body.runId === "string" ? body.runId.trim() : undefined;
-  const hasPriorRunOnCar =
-    loggingComplete &&
-    (await userHasPriorCompletedRunOnCar({
-      userId: params.userId,
-      carId,
-      excludeRunId: excludeRunId || undefined,
-    }));
-
+  // Store exactly what the driver answered. Completion used to seed a neutral
+  // "feel vs last run" on a car's first outing — a leftover from when that pick was
+  // required and had nothing to compare against. The pick is retired, so the seed only
+  // manufactured an answer: it reached the Engineer as "Feel vs last run: same" for a
+  // run with no previous outing, and lit up a phantom option in "which mattered most".
+  // Absent now stays absent, which every reader already handles as unknown.
   let handlingAssessmentForSave: Prisma.InputJsonValue | typeof Prisma.JsonNull = Prisma.JsonNull;
-  if (loggingComplete) {
-    const resolved = coerceFeelVsLastRunForCompleteRun(
-      body.handlingAssessmentJson ?? null,
-      hasPriorRunOnCar
-    );
-    if (resolved.error) {
-      return NextResponse.json({ error: resolved.error }, { status: 400 });
-    }
-    handlingAssessmentForSave =
-      resolved.parsed === null ? Prisma.JsonNull : (resolved.parsed as Prisma.InputJsonValue);
-  } else if ("handlingAssessmentJson" in body) {
+  if (loggingComplete || "handlingAssessmentJson" in body) {
     handlingAssessmentForSave = prismaJsonFromHandlingBody(body.handlingAssessmentJson ?? null);
   }
 
