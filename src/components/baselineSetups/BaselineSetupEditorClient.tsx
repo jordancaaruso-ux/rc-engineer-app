@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
 import { SetupFillFlow } from "@/components/setup/SetupFillFlow";
+import { SetupFillDraftResumeCard } from "@/components/setup/SetupFillDraftResumeCard";
+import { useSetupFillDraft } from "@/components/setup/useSetupFillDraft";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
@@ -38,6 +40,18 @@ export type BaselineStartOption = {
 
 type Mode = "existing" | "empty";
 
+/** A sequential fill this admin parked on this chassis, counts recomputed against the template. */
+export type BaselineFillDraftResume = {
+  values: SetupSnapshotData;
+  stepIndex: number;
+  pendingText: string | null;
+  pendingStepKey: string | null;
+  name: string | null;
+  answeredCount: number;
+  stepCount: number;
+  updatedAt: string;
+};
+
 export function BaselineSetupEditorClient({
   modelId,
   modelName,
@@ -45,6 +59,7 @@ export function BaselineSetupEditorClient({
   baselineId,
   initial,
   startOptions,
+  fillDraft: parkedDraft = null,
 }: {
   modelId: string;
   modelName: string;
@@ -61,6 +76,8 @@ export function BaselineSetupEditorClient({
   };
   /** Other baselines on this chassis, offered as starting points when creating. */
   startOptions: BaselineStartOption[];
+  /** A sequential fill parked on this chassis. Never set on the edit path — see below. */
+  fillDraft?: BaselineFillDraftResume | null;
 }) {
   const router = useRouter();
   const isEdit = Boolean(baselineId);
@@ -76,6 +93,28 @@ export function BaselineSetupEditorClient({
   const [started, setStarted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resumed, setResumed] = useState(false);
+  const [clearingDraft, setClearingDraft] = useState(false);
+
+  /*
+   * Drafts only exist on the create-from-empty path — the edit path already has a real row, and
+   * `SetupFillFlow` is never mounted there (see the `started && !isEdit && mode === "empty"`
+   * branch below). Passing null disables the whole thing at the hook.
+   */
+  const draftBinding = useSetupFillDraft(isEdit ? null : { setupSheetModelId: modelId }, {
+    name: name.trim() || null,
+    templateId: template.id,
+  });
+
+  const discardParkedDraft = async () => {
+    setClearingDraft(true);
+    try {
+      await draftBinding?.discard();
+      router.refresh();
+    } finally {
+      setClearingDraft(false);
+    }
+  };
 
   const backHref = `/setup-sheet-models/${modelId}`;
   const selectedStart = startOptions.find((o) => o.id === startFromId) ?? startOptions[0] ?? null;
@@ -101,6 +140,8 @@ export function BaselineSetupEditorClient({
         surface: surface || null,
         gripLevel: gripLevel || null,
         data: values,
+        // Only the create route knows this field; the PATCH path has no draft to clear anyway.
+        ...(isEdit ? {} : { clearFillDraft: true }),
       };
       const res = await fetch(
         isEdit ? `/api/baseline-setups/${baselineId}` : `/api/setup-sheet-models/${modelId}/baselines`,
@@ -126,13 +167,21 @@ export function BaselineSetupEditorClient({
     return (
       <SetupFillFlow
         template={template}
-        initialValues={startValues}
+        initialValues={resumed && parkedDraft ? parkedDraft.values : startValues}
+        initialStepIndex={resumed ? parkedDraft?.stepIndex : undefined}
+        initialPendingText={resumed ? parkedDraft?.pendingText : null}
+        initialPendingStepKey={resumed ? parkedDraft?.pendingStepKey : null}
+        fillDraft={draftBinding}
         subject={name.trim() || modelName}
         saveLabel="Publish baseline"
         saving={saving}
         error={error}
         onSave={(values) => void save(values)}
-        onCancel={() => setStarted(false)}
+        onCancel={() => {
+          setStarted(false);
+          setResumed(false);
+          router.refresh();
+        }}
       />
     );
   }
@@ -153,7 +202,33 @@ export function BaselineSetupEditorClient({
   }
 
   return (
-    <SurfaceCard>
+    <div className="space-y-3">
+      {parkedDraft ? (
+        <SetupFillDraftResumeCard
+          answeredCount={parkedDraft.answeredCount}
+          stepCount={parkedDraft.stepCount}
+          updatedAt={parkedDraft.updatedAt}
+          busy={clearingDraft}
+          onResume={() => {
+            setName(parkedDraft.name ?? "");
+            setMode("empty");
+            setResumed(true);
+            setStarted(true);
+          }}
+          onStartOver={() => {
+            if (
+              !window.confirm(
+                `Start over? The draft with ${parkedDraft.answeredCount} answers is deleted.`
+              )
+            ) {
+              return;
+            }
+            void discardParkedDraft();
+          }}
+        />
+      ) : null}
+
+      <SurfaceCard>
       <div className="space-y-5">
         <div className="space-y-3">
           <Eyebrow>{modelName}</Eyebrow>
@@ -306,14 +381,28 @@ export function BaselineSetupEditorClient({
               setError("Give this baseline a name.");
               return;
             }
+            // A fresh empty fill overwrites the parked draft on the first autosave — the row's
+            // natural key is (admin, chassis). Ask rather than clobber.
+            if (
+              !isEdit &&
+              mode === "empty" &&
+              parkedDraft &&
+              !window.confirm(
+                `Start over? The draft with ${parkedDraft.answeredCount} answers is deleted.`
+              )
+            ) {
+              return;
+            }
             setError(null);
+            setResumed(false);
             setStarted(true);
           }}
         >
           {!isEdit && mode === "empty" ? "Start filling" : "Open the sheet"}
         </button>
       </div>
-    </SurfaceCard>
+      </SurfaceCard>
+    </div>
   );
 }
 

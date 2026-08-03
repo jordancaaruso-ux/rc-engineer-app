@@ -136,7 +136,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (body.data === undefined) sourceData = baseline.data;
   }
 
-  const setup = await prisma.setupSnapshot.create({
+  const createArgs = {
     data: {
       userId: userId,
       carId,
@@ -147,7 +147,22 @@ export async function POST(request: Request): Promise<NextResponse> {
       ...(fromBaselineId ? { sourceBaselineId: fromBaselineId } : {}),
     },
     select: { id: true, name: true, createdAt: true },
-  });
+  };
+
+  /**
+   * Promoting a parked sequential fill: the draft goes in the same transaction as the create,
+   * never as a follow-up request. That flow's whole premise is the app getting backgrounded
+   * mid-action, and a save that lands without its cleanup leaves a "Draft in progress" card
+   * pointing at a setup that already exists.
+   */
+  const setup = body.clearFillDraft === true
+    ? (
+        await prisma.$transaction([
+          prisma.setupSnapshot.create(createArgs),
+          prisma.setupFillDraft.deleteMany({ where: { userId, carId } }),
+        ])
+      )[0]
+    : await prisma.setupSnapshot.create(createArgs);
 
   return NextResponse.json(
     { setup: { id: setup.id, name: setup.name, createdAt: setup.createdAt.toISOString() } },

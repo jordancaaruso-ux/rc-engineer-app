@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
 import { SetupFillFlow } from "@/components/setup/SetupFillFlow";
+import { SetupFillDraftResumeCard } from "@/components/setup/SetupFillDraftResumeCard";
+import { useSetupFillDraft } from "@/components/setup/useSetupFillDraft";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
@@ -47,6 +49,18 @@ export type BaselineStartChoice = {
   data: SetupSnapshotData;
 };
 
+/** A sequential fill this driver parked on this car, counts recomputed against today's template. */
+export type SetupFillDraftResume = {
+  values: SetupSnapshotData;
+  stepIndex: number;
+  pendingText: string | null;
+  pendingStepKey: string | null;
+  name: string | null;
+  answeredCount: number;
+  stepCount: number;
+  updatedAt: string;
+};
+
 const KIND_LABEL: Record<PreviousSetupOption["kind"], string> = {
   saved: "Saved",
   run: "From a run",
@@ -59,6 +73,7 @@ export function NewCarSetupClient({
   template,
   baselines,
   previousSetups,
+  fillDraft: parkedDraft = null,
 }: {
   carId: string;
   carName: string;
@@ -67,9 +82,11 @@ export function NewCarSetupClient({
   baselines: BaselineStartChoice[];
   /** This car's recent snapshots, newest first — saved setups, run setups and imported sheets. */
   previousSetups: PreviousSetupOption[];
+  /** A sequential fill parked on this car, if there is one. */
+  fillDraft?: SetupFillDraftResume | null;
 }) {
   const router = useRouter();
-  const [name, setName] = useState("");
+  const [name, setName] = useState(parkedDraft?.name ?? "");
   const [mode, setMode] = useState<StartMode>(
     previousSetups.length > 0 ? "previous" : baselines.length > 0 ? "baseline" : "empty"
   );
@@ -78,6 +95,26 @@ export function NewCarSetupClient({
   const [started, setStarted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Whether this fill picked up the parked draft. Only then do the resume props apply — pressing
+  // "Start filling" fresh must begin at question one with an empty sheet.
+  const [resumed, setResumed] = useState(false);
+  const [clearingDraft, setClearingDraft] = useState(false);
+
+  const draftBinding = useSetupFillDraft(
+    { carId },
+    { name: name.trim() || null, templateId: template.id }
+  );
+
+  /** Throw away the parked draft, then re-read so the card goes with it. */
+  const discardParkedDraft = async () => {
+    setClearingDraft(true);
+    try {
+      await draftBinding?.discard();
+      router.refresh();
+    } finally {
+      setClearingDraft(false);
+    }
+  };
 
   const selectedPrevious =
     previousSetups.find((s) => s.id === previousId) ?? previousSetups[0] ?? null;
@@ -101,6 +138,9 @@ export function NewCarSetupClient({
           carId,
           name: name.trim() || "Untitled setup",
           data: values,
+          // Clear the parked fill in the same transaction as the create, so a backgrounded app
+          // can't land the setup and still leave a resume card pointing at it.
+          clearFillDraft: true,
           // Audit lineage only when this really started from something.
           ...(mode === "previous" && selectedPrevious
             ? { baseSetupSnapshotId: selectedPrevious.id }
@@ -126,12 +166,21 @@ export function NewCarSetupClient({
     return (
       <SetupFillFlow
         template={template}
-        initialValues={startValues}
+        initialValues={resumed && parkedDraft ? parkedDraft.values : startValues}
+        initialStepIndex={resumed ? parkedDraft?.stepIndex : undefined}
+        initialPendingText={resumed ? parkedDraft?.pendingText : null}
+        initialPendingStepKey={resumed ? parkedDraft?.pendingStepKey : null}
+        fillDraft={draftBinding}
         subject={name.trim() || carName}
         saving={saving}
         error={error}
         onSave={(values) => void save(values)}
-        onCancel={() => setStarted(false)}
+        onCancel={() => {
+          setStarted(false);
+          setResumed(false);
+          // The draft may have just been saved or discarded; re-read so the card matches.
+          router.refresh();
+        }}
       />
     );
   }
@@ -176,7 +225,33 @@ export function NewCarSetupClient({
   ];
 
   return (
-    <SurfaceCard>
+    <div className="space-y-3">
+      {parkedDraft ? (
+        <SetupFillDraftResumeCard
+          answeredCount={parkedDraft.answeredCount}
+          stepCount={parkedDraft.stepCount}
+          updatedAt={parkedDraft.updatedAt}
+          busy={clearingDraft}
+          onResume={() => {
+            setName(parkedDraft.name ?? "");
+            setMode("empty");
+            setResumed(true);
+            setStarted(true);
+          }}
+          onStartOver={() => {
+            if (
+              !window.confirm(
+                `Start over? The draft with ${parkedDraft.answeredCount} answers is deleted.`
+              )
+            ) {
+              return;
+            }
+            void discardParkedDraft();
+          }}
+        />
+      ) : null}
+
+      <SurfaceCard>
       <div className="space-y-5">
         <div>
           <Eyebrow>{carName}</Eyebrow>
@@ -269,12 +344,30 @@ export function NewCarSetupClient({
         <button
           type="button"
           className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
-          onClick={() => setStarted(true)}
+          onClick={() => {
+            /*
+             * Starting a fresh empty fill overwrites the parked draft on the first autosave — the
+             * row's natural key is (user, car), so there is nowhere else for it to go. Ask rather
+             * than clobber; Resume on the card above is the other door.
+             */
+            if (
+              mode === "empty" &&
+              parkedDraft &&
+              !window.confirm(
+                `Start over? The draft with ${parkedDraft.answeredCount} answers is deleted.`
+              )
+            ) {
+              return;
+            }
+            setResumed(false);
+            setStarted(true);
+          }}
         >
           {mode === "empty" ? "Start filling" : "Open the sheet"}
         </button>
       </div>
-    </SurfaceCard>
+      </SurfaceCard>
+    </div>
   );
 }
 

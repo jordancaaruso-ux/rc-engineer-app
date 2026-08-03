@@ -1,3 +1,4 @@
+import type { SetupSnapshotData } from "@/lib/runSetup";
 import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 
 /**
@@ -80,6 +81,42 @@ export function buildSetupFillSteps(template: SetupSheetTemplate): SetupFillStep
   }
 
   return steps;
+}
+
+/**
+ * A multi-select value as stored tokens, tolerating the legacy comma-joined string form.
+ */
+export function readSetupFillMultiValue(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((v) => String(v));
+  if (typeof value === "string" && value.trim()) {
+    return value
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+/**
+ * Whether a step counts as filled.
+ *
+ * Note "0" is answered: the fill flow's boolean control writes "0" for No precisely so a deliberate
+ * No is distinguishable from never-asked, and the review screen's "left blank" list depends on that.
+ *
+ * Lives here rather than in the fill flow component so the server can count a parked draft's
+ * progress without importing a client component — and so the two can never disagree.
+ */
+export function isSetupFillStepAnswered(step: SetupFillStep, value: unknown): boolean {
+  if (step.kind === "multiChoice") return readSetupFillMultiValue(value).length > 0;
+  if (value == null) return false;
+  return String(value).trim() !== "";
+}
+
+export function countAnsweredSetupFillSteps(
+  steps: SetupFillStep[],
+  values: SetupSnapshotData
+): number {
+  return steps.reduce((n, s) => (isSetupFillStepAnswered(s, values[s.key]) ? n + 1 : n), 0);
 }
 
 /** Section boundaries for the jump-to-section control, in fill order. */

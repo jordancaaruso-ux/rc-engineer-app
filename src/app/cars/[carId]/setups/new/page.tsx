@@ -13,7 +13,15 @@ import {
   sortBaselineSetups,
   type BaselineSetupKindValue,
 } from "@/lib/baselineSetups/baselineSetupShape";
-import type { BaselineStartChoice } from "@/components/setup/NewCarSetupClient";
+import type {
+  BaselineStartChoice,
+  SetupFillDraftResume,
+} from "@/components/setup/NewCarSetupClient";
+import { getSetupFillDraftForCar } from "@/lib/setup/getSetupFillDraft";
+import {
+  buildSetupFillSteps,
+  countAnsweredSetupFillSteps,
+} from "@/lib/setup/setupFillOrder";
 import { formatRunDateShort } from "@/lib/formatDate";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { formatRunSessionDisplay } from "@/lib/runSession";
@@ -85,6 +93,29 @@ export default async function NewCarSetupPage(props: {
     contextLabel: baselineContextLabel(b),
     data: normalizeSetupData(b.data),
   }));
+
+  /*
+   * A sequential fill parked on this car. The stored `answeredCount`/`stepCount` are the client's
+   * own last report and are ignored here: we have the template in hand, so this is where a chassis
+   * schema change since the draft was parked resolves itself, silently and correctly.
+   */
+  const draftRow = await getSetupFillDraftForCar(user.id, carId);
+  const fillDraft: SetupFillDraftResume | null = draftRow
+    ? (() => {
+        const values = normalizeSetupData(draftRow.data);
+        const steps = buildSetupFillSteps(template);
+        return {
+          values,
+          stepIndex: draftRow.stepIndex,
+          pendingText: draftRow.pendingText,
+          pendingStepKey: draftRow.pendingStepKey,
+          name: draftRow.name,
+          answeredCount: countAnsweredSetupFillSteps(steps, values),
+          stepCount: steps.length,
+          updatedAt: draftRow.updatedAt.toISOString(),
+        };
+      })()
+    : null;
 
   const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
 
@@ -164,6 +195,7 @@ export default async function NewCarSetupPage(props: {
             template={template}
             baselines={baselines}
             previousSetups={previousSetups}
+            fillDraft={fillDraft}
           />
         </div>
       </section>

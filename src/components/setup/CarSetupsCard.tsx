@@ -5,6 +5,8 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
+import { RelativeTime } from "@/components/ui/RelativeTime";
+import { setupFillDraftProgressLabel } from "@/lib/setup/setupFillDraft";
 
 /**
  * The car's setup library — named, reusable setups. Rows are hairline-separated inside one card
@@ -26,15 +28,25 @@ export type CarLibrarySetup = {
   usedInRuns: number;
 };
 
+/** A sequential fill parked on this car. Progress is the client's last report — see the row below. */
+export type CarSetupFillDraft = {
+  answeredCount: number;
+  stepCount: number;
+  updatedAt: string;
+};
+
 export function CarSetupsCard({
   carId,
   setups,
   label = "Setups",
+  fillDraft = null,
 }: {
   carId: string;
   setups: CarLibrarySetup[];
   /** Section label — "Saved setups" when it sits beside sheets and run setups. */
   label?: string;
+  /** An unfinished fill to point at. Null when there isn't one. */
+  fillDraft?: CarSetupFillDraft | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -98,6 +110,28 @@ export function CarSetupsCard({
           New setup
         </Link>
       </div>
+
+      {/*
+        A detour, not a list item — this isn't a saved setup, it's an unfinished action. Link only:
+        Resume and Start over both live on the page it goes to, which is also the page that can
+        recount the progress against today's chassis schema (these counts are the client's last
+        report and can drift by a field or two if that schema changed).
+      */}
+      {fillDraft ? (
+        <Link
+          href={`/cars/${carId}/setups/new`}
+          className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 transition hover:border-amber-500/60"
+        >
+          <span className="min-w-0">
+            <span className="block text-sm text-foreground">Draft in progress</span>
+            <span className="block font-mono text-[11px] text-muted-foreground">
+              {setupFillDraftProgressLabel(fillDraft.answeredCount, fillDraft.stepCount)} ·{" "}
+              <RelativeTime iso={fillDraft.updatedAt} fallback="recently" />
+            </span>
+          </span>
+          <span className="ui-caption shrink-0 text-amber-600 dark:text-amber-300">Resume →</span>
+        </Link>
+      ) : null}
 
       {setups.length === 0 ? (
         <p className="text-xs text-muted-foreground">

@@ -3,7 +3,14 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildSetupFillSteps, setupFillSections } from "@/lib/setup/setupFillOrder";
+import {
+  buildSetupFillSteps,
+  countAnsweredSetupFillSteps,
+  isSetupFillStepAnswered,
+  readSetupFillMultiValue,
+  setupFillSections,
+  type SetupFillStep,
+} from "@/lib/setup/setupFillOrder";
 import { buildSetupSheetTemplateFromParsedSchema } from "@/lib/setupSheetModels/buildSetupSheetTemplate";
 import type { SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
@@ -142,6 +149,62 @@ test("a key repeated across layout rows is asked exactly once", () => {
   assert.deepEqual(
     buildSetupFillSteps(tpl).map((s) => s.key),
     ["a", "b"]
+  );
+});
+
+function stepOf(kind: SetupFillStep["kind"]): SetupFillStep {
+  return {
+    key: "k",
+    label: "K",
+    sectionId: "s",
+    sectionTitle: "S",
+    kind,
+    indexInSection: 1,
+    sectionSize: 1,
+  };
+}
+
+test("multi values read from both the array and the legacy comma-joined forms", () => {
+  assert.deepEqual(readSetupFillMultiValue(["fan", "body_posts"]), ["fan", "body_posts"]);
+  assert.deepEqual(readSetupFillMultiValue("fan, body_posts"), ["fan", "body_posts"]);
+  assert.deepEqual(readSetupFillMultiValue(""), []);
+  assert.deepEqual(readSetupFillMultiValue("   "), []);
+  assert.deepEqual(readSetupFillMultiValue(null), []);
+});
+
+test("a multi step is answered only once something is selected", () => {
+  const multi = stepOf("multiChoice");
+  assert.equal(isSetupFillStepAnswered(multi, []), false);
+  assert.equal(isSetupFillStepAnswered(multi, ["fan"]), true);
+  assert.equal(isSetupFillStepAnswered(multi, "fan,body_posts"), true);
+  assert.equal(isSetupFillStepAnswered(multi, undefined), false);
+});
+
+test('a deliberate "No" counts as answered', () => {
+  // The boolean control writes "0" for No rather than "" precisely so it's distinguishable from
+  // never-asked. If this flips, every No silently reappears on the review screen's blank list.
+  const bool = stepOf("boolean");
+  assert.equal(isSetupFillStepAnswered(bool, "0"), true);
+  assert.equal(isSetupFillStepAnswered(bool, "1"), true);
+  assert.equal(isSetupFillStepAnswered(bool, ""), false);
+  assert.equal(isSetupFillStepAnswered(stepOf("number"), 0), true);
+});
+
+test("blank-ish text values are not answered", () => {
+  const text = stepOf("text");
+  assert.equal(isSetupFillStepAnswered(text, "  "), false);
+  assert.equal(isSetupFillStepAnswered(text, null), false);
+  assert.equal(isSetupFillStepAnswered(text, "3.2"), true);
+});
+
+test("answered count walks the whole step list", () => {
+  const tpl = buildSetupSheetTemplateFromParsedSchema("m1", "Xray X4", schema());
+  const steps = buildSetupFillSteps(tpl);
+  assert.equal(countAnsweredSetupFillSteps(steps, {}), 0);
+  assert.equal(countAnsweredSetupFillSteps(steps, { rh_f: 5.5, notes: "" }), 1);
+  assert.equal(
+    countAnsweredSetupFillSteps(steps, { rh_f: 5.5, arb_f: "f_1_2", options: ["fan"], notes: "x" }),
+    4
   );
 });
 

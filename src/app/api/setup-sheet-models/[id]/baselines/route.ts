@@ -63,7 +63,7 @@ export async function POST(
     return NextResponse.json({ error: "A baseline needs at least one value" }, { status: 400 });
   }
 
-  const created = await prisma.baselineSetup.create({
+  const createArgs = {
     data: {
       setupSheetModelId: model.id,
       name,
@@ -75,7 +75,20 @@ export async function POST(
       createdByUserId: user.id,
     },
     select: { id: true, name: true, kind: true },
-  });
+  };
+
+  // Promoting a parked sequential fill — the draft is cleared in the same transaction, so a
+  // backgrounded app can't leave a resume card pointing at a baseline that already exists.
+  const created = body.clearFillDraft === true
+    ? (
+        await prisma.$transaction([
+          prisma.baselineSetup.create(createArgs),
+          prisma.setupFillDraft.deleteMany({
+            where: { userId: user.id, setupSheetModelId: model.id },
+          }),
+        ])
+      )[0]
+    : await prisma.baselineSetup.create(createArgs);
 
   return NextResponse.json({ baseline: created }, { status: 201 });
 }

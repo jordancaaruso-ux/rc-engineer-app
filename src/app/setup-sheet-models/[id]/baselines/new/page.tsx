@@ -6,7 +6,13 @@ import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { loadBaselineEditorContext } from "@/lib/baselineSetups/loadBaselineEditorContext";
-import { BaselineSetupEditorClient } from "@/components/baselineSetups/BaselineSetupEditorClient";
+import {
+  BaselineSetupEditorClient,
+  type BaselineFillDraftResume,
+} from "@/components/baselineSetups/BaselineSetupEditorClient";
+import { getSetupFillDraftForModel } from "@/lib/setup/getSetupFillDraft";
+import { buildSetupFillSteps, countAnsweredSetupFillSteps } from "@/lib/setup/setupFillOrder";
+import { normalizeSetupData } from "@/lib/runSetup";
 
 /**
  * Admin-only: publish a global baseline setup (kit / base / pro) against a chassis type. Drivers
@@ -35,6 +41,27 @@ export default async function NewBaselineSetupPage({
   const ctx = await loadBaselineEditorContext(id);
   if (!ctx) notFound();
 
+  // Only the create path can park a fill; the edit page always has a real row. Counts are
+  // recomputed here against today's schema rather than trusting the client's last report.
+  const draftRow = ctx.template ? await getSetupFillDraftForModel(user.id, ctx.model.id) : null;
+  const fillDraft: BaselineFillDraftResume | null =
+    draftRow && ctx.template
+      ? (() => {
+          const values = normalizeSetupData(draftRow.data);
+          const steps = buildSetupFillSteps(ctx.template!);
+          return {
+            values,
+            stepIndex: draftRow.stepIndex,
+            pendingText: draftRow.pendingText,
+            pendingStepKey: draftRow.pendingStepKey,
+            name: draftRow.name,
+            answeredCount: countAnsweredSetupFillSteps(steps, values),
+            stepCount: steps.length,
+            updatedAt: draftRow.updatedAt.toISOString(),
+          };
+        })()
+      : null;
+
   return (
     <>
       <header className="page-header">
@@ -54,6 +81,7 @@ export default async function NewBaselineSetupPage({
               modelName={ctx.model.name}
               template={ctx.template}
               startOptions={ctx.startOptions}
+              fillDraft={fillDraft}
             />
           ) : (
             <CardPanel contentClassName="text-sm text-muted-foreground">

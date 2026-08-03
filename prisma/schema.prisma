@@ -65,6 +65,7 @@ model User {
   aiUsageDaily    AiUsageDaily[]
   chassisTypeRequests ChassisTypeRequest[]
   baselineSetupsCreated BaselineSetup[] @relation("BaselineSetupCreatedBy")
+  setupFillDrafts SetupFillDraft[]
 }
 
 /**
@@ -348,10 +349,11 @@ model SetupSheetModel {
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
   userId String?
 
-  cars           Car[]
-  baselineSetups BaselineSetup[]
-  setupDocuments SetupDocument[]
-  calibrations   SetupSheetCalibration[]
+  cars            Car[]
+  baselineSetups  BaselineSetup[]
+  setupDocuments  SetupDocument[]
+  calibrations    SetupSheetCalibration[]
+  setupFillDrafts SetupFillDraft[]
   /** PDF calibration used for auto-pick and the car-page â€œEdit PDF calibrationâ€ link. */
   defaultCalibrationId String?                @unique
   defaultCalibration   SetupSheetCalibration? @relation("ModelDefaultCalibration", fields: [defaultCalibrationId], references: [id], onDelete: SetNull)
@@ -413,6 +415,77 @@ model BaselineSetup {
   @@index([setupSheetModelId, kind])
 }
 
+/**
+ * An unfinished sequential setup fill — the one-question-at-a-time flow's state, parked on the
+ * server so cancel / back-swipe / refresh / phone-lock stop costing 40 answers.
+ *
+ * Deliberately its own table rather than a flag on `SetupSnapshot` (founder call 2026-08-02): a
+ * half-filled sheet must be structurally incapable of reaching the Engineer's prompt builders, the
+ * community aggregations, or a car's setup library. Because it lives here, *zero* existing read
+ * sites need a draft filter — the guarantee is in the schema, not in every query that ever gets
+ * written against setups.
+ *
+ * One draft per subject, and the subject is exactly one of:
+ *   - `carId`             — a driver filling a new library setup on their car
+ *   - `setupSheetModelId` — an admin authoring a global baseline for a chassis
+ *
+ * The two `@@unique`s look like they would fight each other; they don't. Postgres treats NULLs as
+ * distinct in a unique index, so each constraint only ever binds the rows whose own subject column
+ * is non-null: driver rows are policed by the first, admin rows by the second, and neither sees the
+ * other. (The "exactly one is set" half is a CHECK constraint in the migration — Prisma has no
+ * syntax for it.)
+ */
+model SetupFillDraft {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  /// Driver subject. Cascade, not SetNull as on `SetupSnapshot.carId`: a snapshot is history and
+  /// outlives its car, an unfinished action does not.
+  car    Car?    @relation(fields: [carId], references: [id], onDelete: Cascade)
+  carId  String?
+
+  /// Admin subject, for baseline authoring.
+  setupSheetModel   SetupSheetModel? @relation(fields: [setupSheetModelId], references: [id], onDelete: Cascade)
+  setupSheetModelId String?
+
+  /// Answers so far, `SetupSnapshot.data` shape (written through `normalizeSetupSnapshotForStorage`,
+  /// so promoting a draft to a real setup is a straight copy with no second normalisation pass).
+  data Json
+
+  /// Question the driver was on. Clamped on restore: a schema change can leave it past the end.
+  stepIndex Int @default(0)
+
+  /// Raw, uncommitted text in the current text/number step. `commitPendingText` only fires on
+  /// advance or blur, so without this a phone-lock mid-question loses the keystrokes and the resume
+  /// lands on an empty box — which reads as the app eating your input, the exact failure being fixed.
+  pendingText String?
+
+  /// Step key `pendingText` belongs to. Guards against a schema change moving that index onto a
+  /// different question; on mismatch the text is dropped rather than pasted somewhere wrong.
+  pendingStepKey String?
+
+  /// Setup name typed on the start screen, so Resume doesn't ask for it again.
+  name String?
+
+  /// Denormalised progress for the "34 of 68 filled" labels. Display only, and deliberately not
+  /// trusted: `/cars/[carId]/setups/new` has the template in hand and recomputes the truth. This
+  /// exists so the car page can render its resume row without resolving a chassis schema.
+  answeredCount Int @default(0)
+  stepCount     Int @default(0)
+
+  /// Template this was filled against. Diagnostics only — never used to invalidate a draft, since
+  /// losing 34 answers because an admin added a field is worse than the mismatch.
+  templateId String?
+
+  @@unique([userId, carId])
+  @@unique([userId, setupSheetModelId])
+  @@index([userId, updatedAt])
+}
+
 /// Catalog slugs removed by an admin — global seed must not recreate them.
 model SetupSheetCatalogSuppression {
   slug         String   @id
@@ -444,6 +517,7 @@ model Car {
   snapshots SetupSnapshot[]
   setupDocuments SetupDocument[]
   setupParameterAggregations SetupParameterAggregation[]
+  setupFillDrafts            SetupFillDraft[]
 
   @@index([setupSheetModelId])
   @@index([userId])
