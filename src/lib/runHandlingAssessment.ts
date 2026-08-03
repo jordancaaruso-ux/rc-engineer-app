@@ -144,16 +144,25 @@ export const HANDLING_SEVERITY_CHIP_LABELS: Record<1 | 2 | 3, string> = {
  * the same vocabulary the advice is built from, instead of guessing what a 7 means.
  *
  * MUST stay in sync with the band sentence in the Engineer prompt
- * (`engineerPhase5/openaiEngineer.ts`: "very bad (1–3) / workable (4–5) / good (6–7) /
- * dialled (8–10)"). The top boundary is load-bearing: `KNOWN_GOOD_RATING_THRESHOLD = 8`
- * in `engineerPhase5/knownGoodMemory.ts` promotes a run to a known-good reference setup
- * at exactly that line — which is why the picker calls the top band out.
+ * (`engineerPhase5/openaiEngineer.ts`) and `summarizeRating` in
+ * `engineerPhase5/engineeringRead.ts`, which words the same rating for the Engineer.
+ *
+ * Regrouped 2026-08-03 (founder): dialled tightened to 9–10, good to 7–8, workable widened
+ * to 4–6. Only a car you'd race as-is earns the top word, and the middle band absorbs the
+ * 6 that used to flatter itself as "good".
+ *
+ * `KNOWN_GOOD_RATING_THRESHOLD = 8` in `engineerPhase5/knownGoodMemory.ts` — the line at
+ * which a run gets mined as a reference setup — deliberately no longer coincides with a
+ * band edge, and is not drift to be "fixed". That mining always returns the *best-rated*
+ * runs on the car; the threshold is only a floor stopping it from presenting a mediocre
+ * run as the setup to return to. Where that floor belongs is a question about advice
+ * quality, not about which word the picker prints.
  */
 export const CAR_RATING_BANDS: readonly { caption: string; ratings: readonly number[] }[] = [
   { caption: "Bad", ratings: [1, 2, 3] },
-  { caption: "Workable", ratings: [4, 5] },
-  { caption: "Good", ratings: [6, 7] },
-  { caption: "Dialled", ratings: [8, 9, 10] },
+  { caption: "Workable", ratings: [4, 5, 6] },
+  { caption: "Good", ratings: [7, 8] },
+  { caption: "Dialled", ratings: [9, 10] },
 ] as const;
 
 /** Band word for a rating, for the readout ("8 / 10 · dialled"). Null outside 1–10. */

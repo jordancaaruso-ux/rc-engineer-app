@@ -9,8 +9,13 @@ import { CAR_RATING_BANDS, carRatingBandCaption } from "@/lib/runHandlingAssessm
  *
  * The scale stays 1–10 (founder 2026-07-08, re-confirmed 2026-07-26): the anchor drivers
  * use is **"how close is this to what I know perfect is"** — absolute, not "good for
- * today's grip" — which is exactly what `knownGoodMemory` assumes when it promotes a run
- * to a reference setup at ≥8.
+ * today's grip" — which is exactly what `knownGoodMemory` assumes when it mines a run as a
+ * reference setup.
+ *
+ * Band grouping regrouped 2026-08-03 — see `CAR_RATING_BANDS`. The picker no longer
+ * advertises the reference-setup threshold: naming a number that "does something" invites
+ * rating the car you want rather than the car you drove, and the whole feature is built on
+ * that rating being honest.
  *
  * Visual (founder review 2026-08-02, three rounds of live A/B):
  * - **Band blocks, not ten plates.** The band is the unit of meaning, so it's the unit of
@@ -55,7 +60,7 @@ export function CarHandlingRatingQuickPick({
 }: Props) {
   const bandWord = value == null ? null : carRatingBandCaption(value);
   /** Band groups sized by how many numbers they hold, so every cell stays equal width. */
-  const bandGrid = "grid grid-cols-[3fr_2fr_2fr_3fr] gap-1.5";
+  const bandGrid = "grid grid-cols-[3fr_3fr_2fr_2fr] gap-1.5";
   const missing = value == null && highlightMissing && !readOnly;
 
   return (
@@ -159,13 +164,6 @@ export function CarHandlingRatingQuickPick({
           </div>
         </div>
       </div>
-
-      {/* The 8 boundary changes what the app does with the run, so it stops being invisible. */}
-      {!readOnly ? (
-        <p className="ui-caption mt-2.5">
-          8+ saves this setup as a reference the Engineer can bring back later.
-        </p>
-      ) : null}
     </div>
   );
 }

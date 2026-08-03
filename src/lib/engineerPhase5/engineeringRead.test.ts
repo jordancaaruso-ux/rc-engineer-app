@@ -77,7 +77,7 @@ test("runQuality + recommendation strategy celebrate when car rated high and pac
   const read = buildEngineeringReadV1({ anchor: cur, reference: ref });
   assert.equal(read.runQuality.carRating, 9);
   assert.equal(read.runQuality.confidence, "high");
-  assert.match(read.runQuality.summary, /excellent|good/);
+  assert.match(read.runQuality.summary, /dialled|good/);
   assert.equal(read.recommendationStrategy.mode, "celebrate");
   assert.equal(read.recommendationStrategy.strength, "soft");
   assert.equal(read.paceRead.peakPace.direction, "improved");

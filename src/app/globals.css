@@ -59,8 +59,10 @@
    * Deliberately not a straight red→green interpolation: the midpoint of that lands
    * on olive mud right where the scale matters most. The warm arm cools to sand
    * through Workable, then crosses to sage at Good — so the single discontinuity in
-   * the ramp sits exactly on the 5→6 boundary, which is a real threshold in how the
-   * Engineer reads a run. Bad and Dialled reuse `destructive` and the `gain` green
+   * the ramp sits exactly on the Workable→Good boundary (6→7 since the 2026-08-03
+   * regroup), which is a real threshold in how the Engineer reads a run. The stops are
+   * keyed by band caption, so a regroup moves them without retuning any colour value.
+   * Bad and Dialled reuse `destructive` and the `gain` green
    * unchanged; only the two middle stops are new. No stop goes near brand yellow —
    * yellow stays action-only.
    */

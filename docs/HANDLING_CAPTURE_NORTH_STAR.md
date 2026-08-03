@@ -115,10 +115,16 @@ scales in similar contexts backed this:
 
 Two cheap upgrades, no capture-model change:
 
-1. **Engineer reads bands, not points** — e.g. 1–3 very bad · 4–5 workable · 6–7 good ·
-   8–10 dialled. A "6 vs 7" argument never drives advice.
-2. **Light anchor labels** at a couple of points (5 = "workable", 8 = "race-winning") so
-   a rating means the same thing across days and drivers.
+1. **Engineer reads bands, not points** — 1–3 bad · 4–6 workable · 7–8 good · 9–10
+   dialled. A "7 vs 8" argument never drives advice.
+2. **Light anchor labels** so a rating means the same thing across days and drivers.
+
+**Regrouped 2026-08-03** (founder; was 4–5 workable · 6–7 good · 8–10 dialled). "Dialled"
+now means a car you would race as-is, which two-thirds of the old top band did not; the 6
+moved down to workable rather than flattering itself as good. The bands live in
+`CAR_RATING_BANDS` (`src/lib/runHandlingAssessment.ts`) and are drawn on the picker itself,
+so the driver rates in the same words the advice is built from — and the picker no longer
+prints the reference-setup threshold, which only taught drivers to rate for the feature.
 
 ---
 

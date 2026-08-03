@@ -273,11 +273,12 @@ function ratingToConfidence(rating: number | null): EngineeringReadConfidence {
 
 function summarizeRating(rating: number | null): string {
   if (rating == null) return "No driver rating supplied (drafts only — completed runs require one).";
-  if (rating >= 9) return `Rated ${rating}/10 — the driver felt the car was excellent.`;
+  // Cutoffs follow CAR_RATING_BANDS (runHandlingAssessment.ts) — the driver picked the
+  // rating against those band words, so the Engineer must be told the same word back.
+  if (rating >= 9) return `Rated ${rating}/10 — the driver felt the car was dialled.`;
   if (rating >= 7) return `Rated ${rating}/10 — the driver felt the car was good.`;
-  if (rating >= 5) return `Rated ${rating}/10 — the driver felt the car was workable.`;
-  if (rating >= 3) return `Rated ${rating}/10 — the driver felt the car was off pace / hard to drive.`;
-  return `Rated ${rating}/10 — the driver felt the car was very bad.`;
+  if (rating >= 4) return `Rated ${rating}/10 — the driver felt the car was workable.`;
+  return `Rated ${rating}/10 — the driver felt the car was bad — off pace / hard to drive.`;
 }
 
 function buildRunQuality(rating: number | null): RunQualityV1 {

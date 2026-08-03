@@ -811,8 +811,12 @@ capture 2026-07-08**; the parser is kept only to label legacy rows.
 `trait:feelSteering|onPower|braking|tractionRoll|driveEase`.
 
 The Engineer is instructed to read `carRating` as **bands, not points** — "very bad (1–3) / workable
-(4–5) / good (6–7) / dialled (8–10)… Never hinge a recommendation on a one-point difference"
-(`openaiEngineer.ts`).
+(4–6) / good (7–8) / dialled (9–10)… Never hinge a recommendation on a one-point difference"
+(`openaiEngineer.ts`). The bands are defined once in `CAR_RATING_BANDS`
+(`src/lib/runHandlingAssessment.ts`) and drawn on the capture picker, so the driver rates in the same
+vocabulary the advice is built from. Regrouped **2026-08-03** (was 4–5 / 6–7 / 8–10) to tighten
+"dialled" to a car you'd race as-is. `KNOWN_GOOD_RATING_THRESHOLD = 8` (`knownGoodMemory.ts`) is
+independent of the band edges by design — it is a quality floor on reference-setup mining, not a band.
 
 ## 5.5 Tyre rules
 
