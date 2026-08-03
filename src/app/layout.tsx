@@ -9,6 +9,7 @@ import "./globals.css";
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { PRODUCT_NAME } from "@/lib/brand/brandNames";
 
 import { auth } from "@/auth";
 
@@ -80,13 +81,13 @@ const jetBrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
 
-  title: "JRC Race Engineer",
+  title: PRODUCT_NAME,
 
   description:
 
     "Track runs, setups, and engineering-style guidance for competitive RC touring car drivers.",
 
-  applicationName: "JRC Race Engineer",
+  applicationName: PRODUCT_NAME,
 
   /*
    * iOS home-screen behaviour. `capable` renders full-screen (no Safari chrome);

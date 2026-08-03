@@ -7,8 +7,9 @@ import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { Eyebrow } from "@/components/ui/panel";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { getPricePlansWithAmounts } from "@/lib/stripe";
+import { COMPANY_NAME, PRODUCT_NAME } from "@/lib/brand/brandNames";
 
-export const metadata = { title: "JRC Dynamics App — your next tenth is in the data" };
+export const metadata = { title: `${PRODUCT_NAME} — your next tenth is in the data` };
 
 /**
  * The public landing page — Jordan's own marketing site (artifact "JRC Engineering Marketing",
@@ -91,7 +92,7 @@ export default async function WelcomePage(): Promise<ReactNode> {
             </h1>
             <p className="mt-4 max-w-[46ch] text-[15px] leading-relaxed text-muted-foreground">
               Session trends, lap analysis, and AI setup calls — from the runs you&rsquo;re already
-              doing. JRC turns every practice day into lap time you can point to.
+              doing. {PRODUCT_NAME} turns every practice day into lap time you can point to.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link href="/join" className={buttonLinkClassName("primary")}>
@@ -352,7 +353,7 @@ export default async function WelcomePage(): Promise<ReactNode> {
             </Link>
           </div>
           <p className="font-mono text-[10px] uppercase tracking-[0.14em]">
-            © 2026 JRC Engineering · Built by racers
+            © 2026 {COMPANY_NAME} · Built by racers
           </p>
         </footer>
       </main>

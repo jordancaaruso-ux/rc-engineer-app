@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { LEGAL_CONTACT_EMAIL, LEGAL_LAST_UPDATED, LEGAL_OPERATOR } from "@/lib/legal/legalMeta";
+import { PRODUCT_NAME } from "@/lib/brand/brandNames";
 
 export const metadata = {
-  title: "Privacy — JRC Race Engineer",
-  description: "Privacy policy for JRC Race Engineer",
+  title: `Privacy — ${PRODUCT_NAME}`,
+  description: `Privacy policy for ${PRODUCT_NAME}`,
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -20,7 +21,7 @@ export default function PrivacyPage() {
     <div className="container mx-auto max-w-2xl px-4 py-10 text-sm leading-relaxed text-foreground">
       <h1 className="page-title">Privacy policy</h1>
       <p className="mt-4 text-muted-foreground">
-        JRC Race Engineer is a run-logging and setup-analysis tool for RC racing, operated by{" "}
+        {PRODUCT_NAME} is a run-logging and setup-analysis tool for RC racing, operated by{" "}
         {LEGAL_OPERATOR} in Australia. This policy explains what the hosted service collects, who it
         is shared with, and how to get your data back or deleted. Questions:{" "}
         <a className="underline underline-offset-4" href={`mailto:${LEGAL_CONTACT_EMAIL}`}>

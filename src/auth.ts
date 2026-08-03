@@ -4,6 +4,7 @@ import Google from "next-auth/providers/google";
 import Nodemailer from "next-auth/providers/nodemailer";
 import { createTransport } from "nodemailer";
 import authConfig from "@/auth.config";
+import { DEV_EMAIL_FROM } from "@/lib/brand/brandNames";
 import { prisma } from "@/lib/prisma";
 import { isEmailAuthAllowed } from "@/lib/authAllowlist";
 import { isMagicLinkSmtpConfigured } from "@/lib/emailAuthEnv";
@@ -29,7 +30,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       : []),
     Nodemailer({
       server: process.env.EMAIL_SERVER?.trim() || { jsonTransport: true },
-      from: process.env.EMAIL_FROM?.trim() || "JRC Race Engineer <dev@localhost>",
+      from: process.env.EMAIL_FROM?.trim() || DEV_EMAIL_FROM,
       async sendVerificationRequest(params) {
         const { identifier, url, provider } = params;
         if (!(await isEmailAuthAllowed(identifier))) {

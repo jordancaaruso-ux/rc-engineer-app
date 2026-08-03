@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { PRODUCT_NAME } from "@/lib/brand/brandNames";
 import {
   getExistingSubscription,
   pushSupported,
@@ -72,7 +73,7 @@ export function NotificationsSection() {
         setStatus(
           granted
             ? "Notifications enabled on this device."
-            : "Notifications weren't allowed. Enable them in iOS Settings → JRC Race Engineer.",
+            : `Notifications weren't allowed. Enable them in iOS Settings → ${PRODUCT_NAME}.`,
         );
         return;
       }

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import { createPortal } from "react-dom";
 
+import { PRODUCT_NAME } from "@/lib/brand/brandNames";
+
 /**
  * Smart, gentle "Add to Home Screen" hint for iOS Safari.
  *
@@ -105,7 +107,7 @@ export function PwaInstallPrompt(): React.ReactNode {
   return createPortal(
     <div
       role="dialog"
-      aria-label="Install JRC Race Engineer"
+      aria-label={`Install ${PRODUCT_NAME}`}
       className="fixed inset-x-0 z-[60] flex justify-center px-4"
       style={{
         bottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)",
@@ -133,7 +135,7 @@ export function PwaInstallPrompt(): React.ReactNode {
           </span>
           <div className="min-w-0">
             <p className="text-[15px] font-bold leading-tight text-foreground">
-              Install JRC Race Engineer
+              Install {PRODUCT_NAME}
             </p>
             <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
               Add it to your home screen for a full-screen app — faster to open at the

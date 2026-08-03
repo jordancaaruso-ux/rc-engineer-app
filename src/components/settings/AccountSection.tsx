@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signOut } from "next-auth/react";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { PRODUCT_NAME } from "@/lib/brand/brandNames";
 
 export function AccountSection({ email }: { email: string }) {
   const [busy, setBusy] = useState(false);
@@ -11,7 +12,7 @@ export function AccountSection({ email }: { email: string }) {
   async function onDeleteAccount() {
     if (
       !window.confirm(
-        "Delete your JRC Race Engineer account and all runs, setups, and uploads? This cannot be undone."
+        `Delete your ${PRODUCT_NAME} account and all runs, setups, and uploads? This cannot be undone.`
       )
     ) {
       return;

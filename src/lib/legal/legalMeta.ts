@@ -5,7 +5,14 @@
  * single line to change.
  */
 
-export const LEGAL_OPERATOR = "Jordan Caruso (JRC Race Engineer)";
+import { COMPANY_NAME } from "@/lib/brand/brandNames";
+
+/**
+ * The operating ENTITY, not the product. A product name (and never one with "App" in it)
+ * must not appear here — this string is what /privacy and /terms name as the party you are
+ * contracting with, so it has to survive any rebrand of the app itself.
+ */
+export const LEGAL_OPERATOR = `Jordan Caruso (${COMPANY_NAME})`;
 
 export const LEGAL_CONTACT_EMAIL = "jordancaaruso@gmail.com";
 

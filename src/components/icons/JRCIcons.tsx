@@ -1,4 +1,4 @@
-// JRC Race Engineer — nav icon set ("Solid Form").
+// JRC nav icon set ("Solid Form").
 // Drawn on a 24px grid. Fill = currentColor, so tint via CSS `color`.
 // Negative-space details (gauge needle, garage door, keylines) use
 // --jrc-icon-cutout, which must match the surface the icon sits on.

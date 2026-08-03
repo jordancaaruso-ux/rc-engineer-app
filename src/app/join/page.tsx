@@ -4,9 +4,10 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { getPricePlansWithAmounts } from "@/lib/stripe";
+import { PRODUCT_NAME } from "@/lib/brand/brandNames";
 import { JoinPlansClient, type JoinPlan } from "@/components/billing/JoinPlansClient";
 
-export const metadata = { title: "Join JRC Dynamics App" };
+export const metadata = { title: `Join ${PRODUCT_NAME}` };
 
 /**
  * The paid door's decision page (rebuilt 2026-08-02 to the decision-board picks): back link,

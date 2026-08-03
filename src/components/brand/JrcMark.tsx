@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { PRODUCT_NAME } from "@/lib/brand/brandNames";
 
 const SRC = {
   yellow: "/brand/jrc-mark-yellow.svg",
@@ -21,7 +22,7 @@ type Props = {
  * white = persistent chrome (keeps yellow meaning "action" per VISUAL_NORTH_STAR).
  * Replaces the retired red→blue `JrcRaceEngineerLogo` (Known Gap #2).
  */
-export function JrcMark({ variant = "yellow", className, priority, alt = "JRC Race Engineer" }: Props) {
+export function JrcMark({ variant = "yellow", className, priority, alt = PRODUCT_NAME }: Props) {
   return (
     <Image
       src={SRC[variant]}

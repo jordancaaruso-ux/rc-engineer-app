@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { sendPushToUser } from "@/lib/webPush/server";
+import { PRODUCT_NAME } from "@/lib/brand/brandNames";
 
 /**
  * Send a test push to all of the caller's registered devices (via stored
@@ -15,7 +16,7 @@ export async function POST(): Promise<Response> {
 
   try {
     const result = await sendPushToUser(userId, {
-      title: "JRC Race Engineer",
+      title: PRODUCT_NAME,
       body: "Push is working — this is where run alerts will land.",
       url: "/",
       tag: "jrc-test",

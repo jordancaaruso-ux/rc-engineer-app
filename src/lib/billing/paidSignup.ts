@@ -3,6 +3,7 @@ import { createTransport } from "nodemailer";
 import { prisma } from "@/lib/prisma";
 import { isMagicLinkSmtpConfigured } from "@/lib/emailAuthEnv";
 import { renderMagicLinkEmail } from "@/lib/auth/magicLinkEmail";
+import { DEV_EMAIL_FROM } from "@/lib/brand/brandNames";
 
 /**
  * Paid-signup provisioning (MONETISATION_NORTH_STAR.md, Phase 1). Called by the Stripe webhook
@@ -90,7 +91,7 @@ export async function sendPaidSignupSignInLink(email: string): Promise<void> {
   const rendered = renderMagicLinkEmail(url, email);
   const result = await transport.sendMail({
     to: email,
-    from: process.env.EMAIL_FROM?.trim() || "JRC Race Engineer <dev@localhost>",
+    from: process.env.EMAIL_FROM?.trim() || DEV_EMAIL_FROM,
     subject: rendered.subject,
     text: rendered.text,
     html: rendered.html,

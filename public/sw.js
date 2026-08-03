@@ -1,5 +1,9 @@
 /*
- * JRC Race Engineer service worker.
+ * Trackside service worker.
+ *
+ * Product name is a literal here on purpose: this file is served verbatim as a static asset
+ * and is never bundled, so it cannot import PRODUCT_NAME from src/lib/brand/brandNames.ts.
+ * Grep for the name when it changes.
  *
  * Scope: web push (notifications) + a MINIMAL offline shell. Deliberately does NOT
  * cache pages or API responses — only static brand assets + an offline fallback — so
@@ -85,7 +89,7 @@ self.addEventListener("push", (event) => {
     data = { body: event.data ? event.data.text() : "" };
   }
 
-  const title = data.title || "JRC Race Engineer";
+  const title = data.title || "Trackside";
   const options = {
     body: data.body || "",
     icon: data.icon || "/icons/icon-192.png",

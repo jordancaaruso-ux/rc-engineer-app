@@ -3,6 +3,7 @@
 import { memo } from "react";
 import Link from "next/link";
 import { JrcMark } from "@/components/brand/JrcMark";
+import { PRODUCT_NAME } from "@/lib/brand/brandNames";
 import { DESKTOP_NAV } from "@/components/layout/navConfig";
 import { PrimaryNavLink } from "@/components/layout/PrimaryNavLink";
 import { usePrimaryNav } from "@/components/layout/PrimaryNavProvider";
@@ -15,7 +16,7 @@ export const Sidebar = memo(function Sidebar() {
 
   return (
     <aside className="sidebar hidden md:flex">
-      <Link href="/" aria-label="JRC Race Engineer — dashboard" className="sidebar-brand">
+      <Link href="/" aria-label={`${PRODUCT_NAME} — dashboard`} className="sidebar-brand">
         <JrcMark variant="white" className="h-5 opacity-90" />
       </Link>
       <nav className="sidebar-nav">

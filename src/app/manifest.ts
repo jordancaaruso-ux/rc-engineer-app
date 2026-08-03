@@ -1,5 +1,7 @@
 import type { MetadataRoute } from "next";
 
+import { PRODUCT_NAME } from "@/lib/brand/brandNames";
+
 /**
  * PWA web app manifest. Next serves this at `/manifest.webmanifest` and auto-injects
  * `<link rel="manifest">`, so no manual head wiring is needed.
@@ -11,7 +13,7 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "JRC Race Engineer",
+    name: PRODUCT_NAME,
     short_name: "JRC",
     description:
       "Track runs, setups, and engineering-style guidance for competitive RC drivers.",

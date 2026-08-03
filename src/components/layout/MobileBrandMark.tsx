@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { JrcMark } from "@/components/brand/JrcMark";
+import { PRODUCT_NAME } from "@/lib/brand/brandNames";
 import { useMobileBackAction, useMobileBackHref } from "@/components/layout/MobileBackContext";
 
 /**
@@ -47,7 +48,7 @@ export function MobileBrandMark() {
   return (
     <Link
       href="/"
-      aria-label="JRC Race Engineer — dashboard"
+      aria-label={`${PRODUCT_NAME} — dashboard`}
       className={`${PILL_CLASS} px-3.5`}
       style={{ top: "var(--top-chrome-y)" }}
     >

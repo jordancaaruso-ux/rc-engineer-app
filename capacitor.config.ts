@@ -12,7 +12,10 @@ const serverUrl = process.env.CAPACITOR_SERVER_URL?.trim();
 
 const config: CapacitorConfig = {
   appId: "com.rcengineer.app",
-  appName: "JRC Race Engineer",
+  // Keep in sync with PRODUCT_NAME in src/lib/brand/brandNames.ts — the Capacitor CLI reads
+  // this outside the app's module graph, so it cannot import the constant. Changing it renames
+  // the installed native app on the device home screen.
+  appName: "Trackside",
   webDir: "capacitor-www",
   server: serverUrl
     ? {

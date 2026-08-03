@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { LEGAL_CONTACT_EMAIL, LEGAL_LAST_UPDATED, LEGAL_OPERATOR } from "@/lib/legal/legalMeta";
+import { PRODUCT_NAME } from "@/lib/brand/brandNames";
 
 export const metadata = {
-  title: "Terms — JRC Race Engineer",
-  description: "Terms of use for JRC Race Engineer",
+  title: `Terms — ${PRODUCT_NAME}`,
+  description: `Terms of use for ${PRODUCT_NAME}`,
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -20,7 +21,7 @@ export default function TermsPage() {
     <div className="container mx-auto max-w-2xl px-4 py-10 text-sm leading-relaxed text-foreground">
       <h1 className="page-title">Terms of use</h1>
       <p className="mt-4 text-muted-foreground">
-        These terms cover your use of JRC Race Engineer, operated by {LEGAL_OPERATOR}. By signing in
+        These terms cover your use of {PRODUCT_NAME}, operated by {LEGAL_OPERATOR}. By signing in
         you agree to them. If you do not agree, do not use the service.
       </p>
 
