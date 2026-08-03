@@ -37,6 +37,7 @@ import { reasoningSpineSystemPromptAddon } from "@/lib/engineerPhase5/reasoningS
 import type { ReasoningSpineV1 } from "@/lib/engineerPhase5/reasoningSpine/types";
 import {
   buildFullKbSystemBlock,
+  FULL_KB_HEADER,
   replaceRetrievedKbWithFullKbPointer,
 } from "@/lib/engineerPhase5/fullKbInContext";
 import {
@@ -501,7 +502,7 @@ How to use the brain:
 7. **preferEngineerChat**: this is already chat. Ignore that flag here.
 
 HANDLING DETAILS (driver feel — fallible evidence; weigh it, never treat as ground truth):
-- **Car rating (1–10) is a rough band, not a precise score** — read it as very bad (1–3) / workable (4–5) / good (6–7) / dialled (8–10). Never hinge a recommendation on a one-point difference (a 6 vs a 7 is the same band).
+- **Car rating (1–10) is a rough band, not a precise score** — read it as very bad (1–3) / workable (4–6) / good (7–8) / dialled (9–10). Never hinge a recommendation on a one-point difference (a 7 vs an 8 is the same band).
 - **Flagged handling chips** (steering feel dull↔pointy, on-power snap, braking loose, traction rolling, drivability, plus per-phase understeer/oversteer balance) are *problems the driver chose to report* — real signal, but still feel. When a chip conflicts with the lap data, **surface the conflict**; do not silently trust either side.
 - **Speed tag** (slow / fast / both) on a flagged issue narrows the fix and sharpens the prediction: a **slow-corner** symptom points at steering/geometry/diff; a **fast-corner** symptom points at springs, grip, aero, and rear stability. Corner *phase* (entry/mid/exit) and corner *speed* are different axes — use both when present.
 
@@ -695,6 +696,11 @@ export const ENGINEER_PROMPT_VERSION = formatEngineerPromptVersion(
     // if either edits.
     CHAT_SYSTEM_MINIMAL,
     CHAT_SYSTEM,
+    // The full-KB header is instruction text the model obeys, not corpus — it ships in system
+    // message 0 on every advice turn. Hashed here so header edits (e.g. the concept-graph
+    // traversal block) land in the fingerprint; without it a header change is invisible to
+    // ratings grouped by prompt version. The KB prose itself is deliberately NOT hashed.
+    FULL_KB_HEADER,
     CHAT_SYSTEM_LOOKUP,
     CHAT_SYSTEM_GENERAL,
     TOOL_INSTRUCTIONS,

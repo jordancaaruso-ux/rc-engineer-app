@@ -73,6 +73,19 @@ test("buildFullKbSystemBlock ships full prose under the ceiling", async () => {
   assert.ok(block!.content.includes(kb.markdown), "block must embed the whole corpus");
 });
 
+test("header tells the model the Concepts lines are a traversable index", async () => {
+  const block = await buildFullKbSystemBlock();
+  assert.ok(block, "block should build for the current KB size");
+  // The knob→concept declarations are the corpus's own index; without this instruction the
+  // model reads 56K of flat prose and pattern-matches (2026-08-01: a bite question reached
+  // upper-link geometry, which does not declare [[bite-hold]], over the three knobs that do).
+  assert.match(block!.content, /TRAVERSE THEM BEFORE YOU CHOOSE A LEVER/);
+  // Absence from the index must not read as "does not apply" — coverage is ~75-80%.
+  assert.match(block!.content, /This index is INCOMPLETE/);
+  // Traversal must never become a ranking: the corpus stores mechanisms, not outcomes.
+  assert.match(block!.content, /never a ranking read out of these files/);
+});
+
 test("ENGINEER_FULL_KB_IN_CONTEXT=0 disables the block", async () => {
   process.env.ENGINEER_FULL_KB_IN_CONTEXT = "0";
   try {

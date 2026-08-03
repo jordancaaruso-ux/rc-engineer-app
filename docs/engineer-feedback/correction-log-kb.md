@@ -3,6 +3,19 @@
 Extracted from the vehicle-dynamics-kb-author skill on 2026-07-31 when that skill was deleted.
 Carries Jordan's “physics that cannot be argued” test and the transcription-trap ruling.
 ## Correction log (LIVING — append new patterns, newest first, with date)
+- 2026-08-01 — "Pretty good - but the camber gain direction is wrong" (in-app rating 7/10 on an answer
+  that said lowering the inner lower pickups front and rear gives **more** camber gain).
+  **AN ASYMMETRIC BRANCH PAIR IS A COMPOSITION TRAP.** `under-lower-arm.md`'s Physics block stated the
+  coupling correctly — RC and camber gain move together — but the Effects bullet listed camber gain only
+  on the `higher →` branch and gave the `lower →` branch "more roll" in its place. Nothing in the file
+  was false. The model read the branch it needed, found roll and not gain, and composed "more roll →
+  more camber" from [[camber-gain]]'s "roll is what calls on it" — inverting a direction the same file
+  states two paragraphs above. The full KB ships in context, so this was **not** a retrieval miss: an
+  omission on one branch is read as "does not apply here", not as "left out for brevity".
+  **Guard:** when a branch pair (`higher →` / `lower →`, `more` / `fewer`) lists consequences, both
+  branches carry the SAME consequence set — no term appears on one side only. And where the pair moves
+  a **rate** and the **multiplier that rate acts on** in opposite directions, say on the bullet that the
+  net is not derivable, per COLLAPSED OPPOSING STRANDS below.
 - 2026-07-30 — "**lower mount inboard** — not sure this line is right - doesnt moving it inboard do
   the opposite?" **COLLAPSED OPPOSING STRANDS (instance of the one-way-chain pattern).** shock-geometry
   stated "lower mount inboard lowers the motion ratio" flat, but an inboard mount move drives TWO

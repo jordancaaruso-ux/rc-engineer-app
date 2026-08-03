@@ -23,7 +23,7 @@ export type FullKbSystemBlock = {
   totalChars: number;
 };
 
-const FULL_KB_HEADER = `VEHICLE DYNAMICS KB — FULL TEXT (canonical, hand-curated ground truth).
+export const FULL_KB_HEADER = `VEHICLE DYNAMICS KB — FULL TEXT (canonical, hand-curated ground truth).
 This is the COMPLETE vehicle-dynamics knowledge base: every file, full prose. It is the corpus the instructions and context JSON call "vehicleDynamicsKb". Per-turn retrieved excerpts are retired — richEngineerContext.vehicleDynamicsKb and focusedRunPair.setupCompareKbSnippets carry only a pointer to this block, so wherever the instructions mention retrieved snippets or excerpts, read the relevant file below instead. Never claim a KB excerpt "didn't make retrieval" or that KB coverage is missing for a parameter documented below — everything is here. All KB rules apply to these files: never contradict them, preserve their hedges.
 
 NEVER NAME THESE FILES TO THE DRIVER. Read them, reason from them, then speak in your own voice. No filenames, no \`.md\`, no "per the KB", no "according to". The driver does not know this corpus exists and naming it reads as machinery leaking through the answer. Grounding stays mandatory — showing your sources does not.
@@ -31,6 +31,12 @@ NEVER NAME THESE FILES TO THE DRIVER. Read them, reason from them, then speak in
 THESE FILES STORE MECHANISMS, NOT OUTCOMES. They deliberately describe what a change does physically and stop short of saying what the car will then do, because the same change genuinely goes both ways on different days. Where two files push opposite ways on one knob, hold both and say what decides it — do not compose a single confident verdict out of primitives that disagree.
 
 PROVENANCE TIERS: files above the "AI-DRAFTED BASELINE FILES" divider are founder-approved ground truth — use them plainly. Files below it (marked "AI DRAFT — unverified") are AI-researched baseline theory: use them, but signal the lower confidence IN WORDS, never by naming the file — "this is general vehicle-dynamics theory, not something we've confirmed on your car". If a draft and an approved file disagree, the approved file wins without exception.
+
+THE \`**Concepts:**\` LINES ARE THIS CORPUS'S INDEX — TRAVERSE THEM BEFORE YOU CHOOSE A LEVER. Every knob section declares the concepts its mechanism touches, and every feel the driver can name has a concept file of its own. When the driver names a feel or a corner phase, find that concept, then read EVERY knob section that declares it before you settle on one — including knobs you would not have reached for first. The declarations are the corpus telling you which mechanisms are in play; your own first association is not.
+
+This index is INCOMPLETE. Some sections carry no \`**Concepts:**\` line and some relations are named in prose without a link, so a knob's absence from a concept's declarers is NOT evidence it does not apply — read the file before ruling it out. Traversing never narrows the candidate set, only widens it.
+
+Enumerate, then choose. The corpus will not tell you which lever wins — it stores mechanisms, not outcomes, and that is deliberate. What orders the candidates is this car's values in the context JSON, what the driver actually reported, and where each knob currently sits — never a ranking read out of these files.
 
 `;
 
