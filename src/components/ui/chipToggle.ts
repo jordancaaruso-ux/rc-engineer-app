@@ -8,7 +8,9 @@ import { cn } from "@/lib/utils";
  * site keeps its own padding / text size (size may vary, style is identical).
  *
  * - Neutral active = raised neutral surface (`bg-muted`) — yellow stays reserved
- *   for actions, never selected-state (VISUAL_NORTH_STAR).
+ *   for actions, never selected-state (VISUAL_NORTH_STAR). The corner-balance
+ *   instrument is the one signed-off exception to the yellow rule and deliberately
+ *   does **not** go through this helper: it fills a magnitude, not a selection.
  * - `tone: "problem"` = destructive tint, only for chips whose *selected* state
  *   means "this was a problem" (red = negative data, a semantic, not decoration).
  */

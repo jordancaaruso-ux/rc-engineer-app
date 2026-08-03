@@ -5,7 +5,7 @@
  *
  * The real panel sits behind a signed-in account, a car, and a run in progress —
  * `/runs/new` → Feedback → Handling detail — which is a lot of clicks to look at a
- * 26px lane or a 10px severity step. This renders the REAL
+ * 14px balance tile or a 10px severity step. This renders the REAL
  * `HandlingAssessmentFields` against local state at the width it actually gets
  * inside `PagedCard`, so what you're judging is the shipped control.
  *

@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { chipToggleClass } from "@/components/ui/chipToggle";
+import { haptic } from "@/lib/haptics";
 import {
   buildPrimaryFocusOptions,
   CAPTURE_TRAIT_AXIS_KEYS,
@@ -10,11 +11,8 @@ import {
   HANDLING_TRAIT_CHIP_META,
   sanitizeHandlingUiState,
   type CaptureTraitAxisKey,
-  type CornerSpeed,
   type HandlingAssessmentUiState,
-  type HandlingIssueKey,
   type PhaseBalance,
-  type PrimaryFocus,
 } from "@/lib/runHandlingAssessment";
 
 const PHASE_ROWS: {
@@ -29,13 +27,9 @@ const PHASE_ROWS: {
 
 type PhaseRow = (typeof PHASE_ROWS)[number];
 
-const PHASE_BALANCE_LEVELS: PhaseBalance[] = [-3, -2, -1, 0, 1, 2, 3];
-
 const PHASE_BALANCE_INFO =
-  "Understeer = the front washes out and the car won't turn in. Oversteer = the rear steps out and it rotates too much. The centre notch means it felt neutral there; leave a phase untouched if you'd rather not say.";
+  "Understeer = the front washes out and the car won't turn in. Oversteer = the rear steps out and it rotates too much. Tap a side to flag it, again for worse. The dot in the middle means it felt neutral there; leave a phase alone if you'd rather not say.";
 
-const CORNER_SPEEDS: CornerSpeed[] = ["slow", "fast", "both"];
-const SPEED_SHORT: Record<CornerSpeed, string> = { slow: "Low speed", fast: "High speed", both: "Both" };
 const SEVERITIES: Array<1 | 2 | 3> = [1, 2, 3];
 
 /**
@@ -47,48 +41,52 @@ const SEVERITIES: Array<1 | 2 | 3> = [1, 2, 3];
 const SEVERITY_STEP_H: Record<1 | 2 | 3, number> = { 1: 3, 2: 6, 3: 10 };
 
 /**
- * Balance is a **deviation** axis, not a direction-of-preference one — the capture model
- * already treats any non-zero phase as a flagged issue (it's what unlocks the speed tag),
- * so both poles read in `destructive`, the app's "negative data" colour, and the intensity
- * ramps with magnitude. Direction is carried by which side of centre the mark sits on plus
- * the written readout — never by hue. (Purple/amber collided with best-lap purple and
- * validation amber elsewhere on this screen.)
+ * Balance tile heights (px) for |1| / |2| / |3|. Taller than the notable staircase
+ * because the balance rows are 44px — at the notable's 3/6/10 the silhouette gets
+ * lost in the extra height, which is the whole thing the tiles are there to carry.
  */
-function markStyle(v: PhaseBalance): { background: string; color: string } {
-  if (v === 0) {
-    return {
-      background: "rgb(var(--color-muted-foreground) / 0.32)",
-      color: "rgb(var(--color-foreground))",
-    };
+const BALANCE_TILE_H: Record<1 | 2 | 3, number> = { 1: 5, 2: 9, 3: 14 };
+
+/**
+ * Filling springs, draining doesn't. `PrepSlider`'s curve is reused deliberately —
+ * anything in this app that fills should fill the same way — while clearing gets a
+ * plain deceleration, so building an answer up feels earned and taking it away
+ * feels like nothing.
+ */
+const FILL_SPRING = "cubic-bezier(0.34, 1.4, 0.64, 1)";
+const DRAIN_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
+
+/**
+ * Balance is a **deviation** axis, not a direction-of-preference one — direction is
+ * carried by which side of the centre the tiles light on, never by hue, and magnitude
+ * by how far the staircase has climbed.
+ *
+ * Capture uses the **accent** (founder 2026-08-03, superseding the destructive-coral
+ * treatment and VISUAL_NORTH_STAR's "yellow = action only"): balance is now asked on
+ * every run, so most answers describe what the car did rather than report a fault, and
+ * coral read as "something is wrong" on ordinary data. Read-back drops to a monochrome
+ * ink ramp so a stored record can never be mistaken for a live control.
+ */
+function tileFill(level: 1 | 2 | 3, readOnly: boolean): string {
+  if (readOnly) {
+    const grey = level === 1 ? 0.22 : level === 2 ? 0.4 : 0.62;
+    return `rgb(var(--color-foreground) / ${grey})`;
   }
-  const magnitude = Math.abs(v);
-  const alpha = magnitude === 1 ? 0.45 : magnitude === 2 ? 0.72 : 1;
-  return {
-    background: `rgb(var(--color-destructive) / ${alpha})`,
-    // The two strong fills are dark enough that ink-on-fill loses contrast.
-    color: magnitude >= 2 ? "rgb(var(--color-background))" : "rgb(var(--color-foreground))",
-  };
+  const alpha = level === 1 ? 0.42 : level === 2 ? 0.7 : 1;
+  return `rgb(var(--color-accent) / ${alpha})`;
 }
 
 function balanceValueText(value: PhaseBalance | null): string {
-  if (value == null) return "—";
+  if (value == null) return "not answered";
   if (value === 0) return "neutral";
   const word = HANDLING_SEVERITY_CHIP_LABELS[Math.abs(value) as 1 | 2 | 3];
   return `${word} ${value < 0 ? "understeer" : "oversteer"}`;
 }
 
-/** Lane readout — 30px of column, so the phrase contracts to a code. */
-function balanceCode(value: PhaseBalance | null): string {
-  if (value == null) return "—";
-  if (value === 0) return "0";
-  return `${value < 0 ? "US" : "OS"}${Math.abs(value)}`;
-}
-
-function notchLabel(p: PhaseBalance): string {
-  if (p === 0) return "neutral";
-  return `${HANDLING_SEVERITY_CHIP_LABELS[Math.abs(p) as 1 | 2 | 3]} ${
-    p < 0 ? "understeer" : "oversteer"
-  }`;
+/** Magnitude currently showing on one side of a phase; 0 when that side isn't flagged. */
+function sideMagnitude(value: PhaseBalance | null, sign: -1 | 1): 0 | 1 | 2 | 3 {
+  if (value == null || value === 0) return 0;
+  return Math.sign(value) === sign ? (Math.abs(value) as 1 | 2 | 3) : 0;
 }
 
 function patch(next: HandlingAssessmentUiState): HandlingAssessmentUiState {
@@ -102,232 +100,276 @@ function patch(next: HandlingAssessmentUiState): HandlingAssessmentUiState {
 }
 
 /* ── Corner balance ────────────────────────────────────────────────────────────
-   One lane per phase, all three on the same −3…+3 grid. `LANE_COLS` is shared by
-   the legend so "Understeer / neutral / Oversteer" sits over the track column and
-   nothing else.
+   One instrument per phase: [ understeer | · | oversteer ], sealed into a single
+   hairline-seamed object so a row reads as one question with a middle rather than
+   two loose chips. `BALANCE_COLS` is shared by the header so "Understeer" and
+   "Oversteer" are said once, over the column they name, instead of six times down
+   the card. The label column is 48px because "Entry" overruns anything narrower
+   and lands under the tiles.
    ──────────────────────────────────────────────────────────────────────────── */
-const LANE_COLS = "grid-cols-[34px_1fr_30px]";
+const BALANCE_COLS = "grid-cols-[48px_1fr_30px_1fr]";
 
-/** Stop centres, as a percentage of the track width. */
-function stopLeft(p: PhaseBalance): string {
-  return `${((PHASE_BALANCE_LEVELS.indexOf(p) + 0.5) / PHASE_BALANCE_LEVELS.length) * 100}%`;
-}
+/**
+ * One pole of one phase: a severity word over three tiles that climb toward the
+ * outside edge, so the pair of zones opens away from the centre and the silhouette
+ * says which way the car went before any word does.
+ *
+ * Flag and severity are the same gesture, exactly as the notable tiles do it — tap
+ * to flag, tap again for worse, once more to clear. At severe the press dims the
+ * tiles first: the fourth tap destroys the answer, so it is previewed rather than
+ * sprung.
+ *
+ * Tap-only by design: the panel lives inside a swipeable `PagedCard`, which claims
+ * horizontal drags, so a drag control can never work here.
+ */
+function BalanceZone({
+  phaseLabel,
+  sign,
+  value,
+  onPress,
+  readOnly = false,
+}: {
+  phaseLabel: string;
+  sign: -1 | 1;
+  value: PhaseBalance | null;
+  onPress: () => void;
+  readOnly?: boolean;
+}) {
+  const magnitude = sideMagnitude(value, sign);
+  const active = magnitude > 0;
+  // Understeer draws 3→1 left to right, oversteer 1→3, so the tall tile always
+  // lands on the outer edge and the lit run grows out of the centre seam.
+  const levels: Array<1 | 2 | 3> = sign < 0 ? [3, 2, 1] : [1, 2, 3];
 
-/** Mark diameter grows with magnitude, so size seconds what the fill already says. */
-function markSize(v: PhaseBalance): number {
-  return v === 0 ? 13 : 12 + Math.abs(v) * 2.5;
+  /* The zone surface never changes with state. An accent wash goes olive over this
+     ground and fights the tiles in front of it; lifting to `bg-muted` instead makes
+     the *unlit* tiles vanish, because that is exactly their colour — and losing the
+     ghost staircase costs the "there is more to give" reading the tiles exist for.
+     Lit tiles plus the severity word carry the state on their own. */
+  const shell = cn(
+    "group flex min-h-[44px] items-center bg-secondary px-2.5 py-[7px] text-left transition-colors duration-150",
+    !readOnly &&
+      "focus-visible:relative focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+  );
+
+  const body = (
+    <span className="grid w-full gap-1 transition-transform duration-100 group-active:scale-[0.975] motion-reduce:transition-none">
+      {/* The word keeps a reserved line whether or not it is showing, so nothing
+          shifts under the thumb when a phase is first flagged. It hugs the seam on
+          both sides — the two words end up next to each other, which is where the
+          eye lands scanning three rows. */}
+      <span className={cn("flex h-3 items-center", sign < 0 ? "justify-end" : "justify-start")}>
+        {active ? (
+          <span className="font-sans text-[10px] font-semibold tracking-tight text-foreground">
+            {HANDLING_SEVERITY_CHIP_LABELS[magnitude as 1 | 2 | 3]}
+          </span>
+        ) : null}
+      </span>
+      <span aria-hidden className="flex h-3.5 items-end gap-[3px]">
+        {levels.map((level) => {
+          const lit = level <= magnitude;
+          return (
+            <span
+              key={level}
+              className={cn(
+                "block flex-1 rounded-[2px] bg-muted transition-[background-color,opacity] motion-reduce:transition-none",
+                magnitude === 3 && !readOnly && "group-active:opacity-30"
+              )}
+              style={{
+                height: BALANCE_TILE_H[level],
+                /* A CSS transition uses the timing declared on the state it is moving
+                   *to*, so lighting up springs outward from the seam and clearing
+                   drains back inward — no need to track the previous value. */
+                transitionDuration: lit ? "190ms" : "130ms",
+                transitionTimingFunction: lit ? FILL_SPRING : DRAIN_EASE,
+                transitionDelay: `${lit ? (level - 1) * 26 : (3 - level) * 22}ms`,
+                ...(lit ? { background: tileFill(level, readOnly) } : null),
+              }}
+            />
+          );
+        })}
+      </span>
+    </span>
+  );
+
+  const poleWord = sign < 0 ? "understeer" : "oversteer";
+
+  if (readOnly) {
+    // The tiles are aria-hidden, so the reading has to reach a screen reader in text.
+    return (
+      <div className={shell}>
+        <span className="sr-only">
+          {phaseLabel} — {active ? balanceValueText(value) : `not flagged, ${poleWord}`}
+        </span>
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      aria-label={
+        active
+          ? `${phaseLabel} — ${balanceValueText(value)}. Tap to raise or clear.`
+          : `${phaseLabel} — not flagged, ${poleWord}. Tap to flag.`
+      }
+      onClick={onPress}
+      className={shell}
+    >
+      {body}
+    </button>
+  );
 }
 
 /**
- * One phase on its own −3…+3 track: label · track · readout.
- *
- * Every stop is directly tappable, which is the whole reason the lane exists —
- * the previous pass shared a single line between all three phases, so a tap only
- * meant something after you had told it which phase you were talking about. Three
- * lanes cost nothing in height and delete that step. They also make collisions
- * impossible: two phases on the same value can't stack, because they were never
- * on the same line.
- *
- * Tap-only by design: the panel lives inside a swipeable `PagedCard`, which claims
- * horizontal drags, so a drag slider can never work here — and buttons can't be
- * cleared by finger jitter mid-tap.
+ * The middle of the axis. Two poles alone can't say "I checked, it was fine" — and
+ * balance is asked on every run, so that answer comes up constantly. `0` is a value
+ * the data model already stores and the Engineer already reads; without somewhere to
+ * put it, neutral would silently collapse into "didn't say", which is a different
+ * answer entirely.
  */
-function BalanceLane({
-  row,
-  value,
-  onSelect,
+function BalanceNeutral({
+  phaseLabel,
+  isNeutral,
+  onPress,
   readOnly = false,
 }: {
-  row: PhaseRow;
-  value: PhaseBalance | null;
-  onSelect: (n: PhaseBalance) => void;
+  phaseLabel: string;
+  isNeutral: boolean;
+  onPress: () => void;
   readOnly?: boolean;
 }) {
-  const nudge = (delta: number) => {
-    const idx = PHASE_BALANCE_LEVELS.indexOf(value ?? 0);
-    const next = Math.min(PHASE_BALANCE_LEVELS.length - 1, Math.max(0, idx + delta));
-    onSelect(PHASE_BALANCE_LEVELS[next]);
-  };
+  const shell = cn(
+    "flex min-h-[44px] items-center justify-center bg-secondary",
+    !readOnly &&
+      "focus-visible:relative focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+  );
+  const pip = (
+    <span
+      aria-hidden
+      className={cn(
+        "block h-1.5 w-1.5 rounded-full transition-[transform,background-color] duration-200 motion-reduce:transition-none",
+        isNeutral ? "scale-150 bg-muted-foreground/80" : "bg-border"
+      )}
+    />
+  );
+
+  if (readOnly) {
+    return (
+      <div className={shell}>
+        <span className="sr-only">{isNeutral ? `${phaseLabel} — neutral` : ""}</span>
+        {pip}
+      </div>
+    );
+  }
 
   return (
-    <div className={cn("grid h-[26px] items-center gap-2", LANE_COLS)}>
-      <span className="font-sans text-[11px] font-semibold tracking-tight text-foreground">
-        {row.label}
-      </span>
-
-      <div
-        className="relative h-[26px]"
-        {...(readOnly
-          ? { role: "img", "aria-label": `${row.label} — ${balanceValueText(value)}` }
-          : null)}
-      >
-        <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
-        <div className="absolute inset-y-[3px] left-1/2 w-px -translate-x-1/2 bg-muted-foreground/30" />
-
-        {/* The scale survives read-back: without the stops the mark is a dot in space,
-            and how far off centre it sits is the whole reading. */}
-        {readOnly ? (
-          <div aria-hidden className="absolute inset-0 flex">
-            {PHASE_BALANCE_LEVELS.map((p) => (
-              <span key={p} className="grid flex-1 place-items-center">
-                <span className="block h-[7px] w-[2px] rounded-[1px] bg-border" />
-              </span>
-            ))}
-          </div>
-        ) : (
-          <div
-            role="radiogroup"
-            aria-label={`${row.label} corner balance`}
-            className="absolute inset-0 flex"
-            onKeyDown={(e) => {
-              if (e.key === "ArrowRight" || e.key === "ArrowUp") {
-                nudge(1);
-                e.preventDefault();
-              } else if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
-                nudge(-1);
-                e.preventDefault();
-              }
-            }}
-          >
-            {PHASE_BALANCE_LEVELS.map((p) => {
-              const selected = value === p;
-              return (
-                <button
-                  key={p}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  aria-label={`${row.label} — ${notchLabel(p)}`}
-                  tabIndex={selected || (value == null && p === 0) ? 0 : -1}
-                  onClick={() => onSelect(p)}
-                  className="group grid flex-1 place-items-center rounded-[3px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <span className="block h-[7px] w-[2px] rounded-[1px] bg-border transition-colors duration-150 group-hover:bg-faint" />
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {value != null ? (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 rounded-full transition-[left,width,height] duration-200"
-            style={{
-              left: stopLeft(value),
-              width: markSize(value),
-              height: markSize(value),
-              transform: "translate(-50%, -50%)",
-              background: markStyle(value).background,
-              boxShadow: "0 0 0 3px rgb(var(--color-background) / 0.85)",
-            }}
-          />
-        ) : null}
-      </div>
-
-      <span
-        className={cn(
-          "text-right font-sans text-[10px] font-semibold tabular-nums tracking-tight",
-          value == null ? "text-faint" : value === 0 ? "text-muted-foreground" : "text-foreground"
-        )}
-      >
-        {balanceCode(value)}
-      </span>
-    </div>
+    <button
+      type="button"
+      role="radio"
+      aria-checked={isNeutral}
+      aria-label={`${phaseLabel} — felt neutral. ${isNeutral ? "Tap to clear." : "Tap to mark neutral."}`}
+      onClick={onPress}
+      className={shell}
+    >
+      {pip}
+    </button>
   );
 }
 
-/** Entry / mid / exit, one lane each, under a legend they all share. */
-function BalanceLanes({
+/**
+ * Entry / mid / exit, each its own sealed instrument, under a header they share.
+ *
+ * On read-back only the phases that were answered are drawn (founder 2026-08-03) —
+ * an empty row in a stored record is not information, and the header keeps the scale
+ * readable without it.
+ */
+function BalanceInstrument({
   values,
-  onSelect,
+  onSet,
   readOnly = false,
 }: {
   values: Record<PhaseRow["phase"], PhaseBalance | null>;
-  onSelect: (phase: PhaseRow["phase"], n: PhaseBalance) => void;
+  onSet: (phase: PhaseRow["phase"], next: PhaseBalance | null) => void;
   readOnly?: boolean;
 }) {
+  const rows = readOnly ? PHASE_ROWS.filter((row) => values[row.phase] != null) : PHASE_ROWS;
+  if (rows.length === 0) return null;
+
+  /** Off → mild → moderate → severe → off, with the ceiling given its own haptic. */
+  function cycle(phase: PhaseRow["phase"], sign: -1 | 1) {
+    const current = values[phase];
+    const magnitude = sideMagnitude(current, sign);
+    if (magnitude === 0) {
+      haptic("light");
+      onSet(phase, sign);
+      return;
+    }
+    if (magnitude < 3) {
+      const next = (magnitude + 1) as 2 | 3;
+      haptic(next === 3 ? "medium" : "light");
+      onSet(phase, (sign * next) as PhaseBalance);
+      return;
+    }
+    haptic("light");
+    onSet(phase, null);
+  }
+
   return (
-    <div className="space-y-2">
-      {/* One legend for all three lanes — they share a single scale. One voice
-          throughout: the centre word used to be mono among sans. */}
-      <div className={cn("grid gap-2", LANE_COLS)}>
+    <div className="overflow-hidden rounded-lg border border-border bg-secondary">
+      {/* Said once, over the column it names — not six times down the card. */}
+      <div className={cn("grid gap-px border-b border-border py-[7px]", BALANCE_COLS)}>
         <span />
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center font-sans text-[10.5px] font-medium text-muted-foreground">
-          <span className="text-left">Understeer</span>
-          <span className="text-center text-faint">neutral</span>
-          <span className="text-right">Oversteer</span>
-        </div>
+        <span className="pl-2.5 font-sans text-[9.5px] font-bold uppercase tracking-[0.06em] text-faint">
+          Understeer
+        </span>
         <span />
+        <span className="pr-2.5 text-right font-sans text-[9.5px] font-bold uppercase tracking-[0.06em] text-faint">
+          Oversteer
+        </span>
       </div>
 
-      <div className="space-y-1.5">
-        {PHASE_ROWS.map((row) => (
-          <BalanceLane
-            key={row.phase}
-            row={row}
-            value={values[row.phase]}
-            onSelect={(n) => onSelect(row.phase, n)}
-            readOnly={readOnly}
-          />
-        ))}
-      </div>
-
-      {/* All three lanes stay on read-back even when one was never answered: an empty
-          track between two filled ones is how "didn't say" reads, and it is a different
-          answer from neutral. Prose could not say that at all. */}
-      {readOnly ? null : (
-        <p className="ui-caption">
-          Place each phase on the line. Leave one untouched if you&apos;d rather not say.
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** Slow / Fast / Both selector for a flagged issue. Tap the active one to clear. */
-function SpeedTagPicker({
-  value,
-  onChange,
-  label = "Which corners?",
-  groupLabel = "Which corners",
-  readOnly = false,
-}: {
-  value: CornerSpeed | undefined;
-  onChange: (next: CornerSpeed | null) => void;
-  label?: string | null;
-  groupLabel?: string;
-  readOnly?: boolean;
-}) {
-  return (
-    <div className="flex shrink-0 items-center gap-1.5">
-      {label ? <span className="text-[10px] text-muted-foreground">{label}</span> : null}
-      <div className="flex gap-1" role="group" aria-label={groupLabel}>
-        {CORNER_SPEEDS.map((s) => {
-          const selected = value === s;
-          const chipClass = cn(
-            chipToggleClass(selected),
-            "whitespace-nowrap px-2 py-0.5 text-[10px]"
-          );
-          if (readOnly) {
-            // `pointer-events-none` is doing real work: chipToggleClass carries a hover
-            // colour, and a chip that lights under the cursor but does nothing is a lie.
-            return (
-              <span key={s} className={cn(chipClass, "pointer-events-none")}>
-                {SPEED_SHORT[s]}
-              </span>
-            );
-          }
+      {/* The seams are the grid gap showing the container's border colour through. */}
+      <div
+        role="radiogroup"
+        aria-label="Corner balance"
+        aria-readonly={readOnly || undefined}
+        className={cn("grid gap-px bg-border", BALANCE_COLS)}
+      >
+        {rows.map((row) => {
+          const value = values[row.phase];
           return (
-            <button
-              key={s}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => onChange(selected ? null : s)}
-              className={chipClass}
-            >
-              {SPEED_SHORT[s]}
-            </button>
+            <Fragment key={row.phase}>
+              <div className="flex min-h-[44px] items-center bg-secondary pl-2.5 font-sans text-[11px] font-semibold tracking-tight text-foreground">
+                {row.label}
+              </div>
+              <BalanceZone
+                phaseLabel={row.label}
+                sign={-1}
+                value={value}
+                onPress={() => cycle(row.phase, -1)}
+                readOnly={readOnly}
+              />
+              <BalanceNeutral
+                phaseLabel={row.label}
+                isNeutral={value === 0}
+                onPress={() => {
+                  haptic("light");
+                  onSet(row.phase, value === 0 ? null : 0);
+                }}
+                readOnly={readOnly}
+              />
+              <BalanceZone
+                phaseLabel={row.label}
+                sign={1}
+                value={value}
+                onPress={() => cycle(row.phase, 1)}
+                readOnly={readOnly}
+              />
+            </Fragment>
           );
         })}
       </div>
@@ -470,19 +512,12 @@ export function HandlingAssessmentFields({ value, onChange, readOnly = false }: 
     exit: value.balanceExit,
   };
 
-  function setPhaseBalance(phase: PhaseRow["phase"], n: PhaseBalance) {
+  /** The instrument decides the next value (including `null` for "didn't say"); this
+      only writes it. */
+  function setPhaseBalance(phase: PhaseRow["phase"], next: PhaseBalance | null) {
     const row = PHASE_ROWS.find((r) => r.phase === phase);
     if (!row) return;
-    // Tapping the stop a phase already sits on clears it — the only way back to
-    // "didn't say", which is a real answer here.
-    emit({ ...value, [row.stateKey]: value[row.stateKey] === n ? null : n });
-  }
-
-  function setSpeed(issueKey: HandlingIssueKey, speed: CornerSpeed | null) {
-    const nextTags = { ...value.speedTags };
-    if (speed == null) delete nextTags[issueKey];
-    else nextTags[issueKey] = speed;
-    emit({ ...value, speedTags: nextTags });
+    emit({ ...value, [row.stateKey]: next });
   }
 
   /**
@@ -505,19 +540,16 @@ export function HandlingAssessmentFields({ value, onChange, readOnly = false }: 
     emit({ ...value, [axis]: null });
   }
 
-  const flaggedPhases = PHASE_ROWS.filter((row) => {
-    const v = value[row.stateKey];
-    return v != null && v !== 0;
-  });
-
   /* Primary focus only earns its place once there's a genuine choice to make — with 0–1 flagged
      issues the main problem is implicit (HANDLING_CAPTURE_NORTH_STAR). On read-back the question
      is already answered, so the bar is simply whether an answer exists. */
   const showPrimaryFocus = readOnly ? value.primaryFocus != null : primaryFocusOptions.length >= 2;
 
   /* Read-back drops whole blocks that were never answered — an untouched section is not
-     information, it's an empty form. Within a block that *was* answered, unanswered parts
-     stay visible (the empty lane, the greyed tile). */
+     information, it's an empty form. Inside the balance block it goes further and drops
+     the unanswered *phases* too (founder 2026-08-03); the notables still show their
+     greyed tiles, because there the unflagged ones are the record of what was considered
+     and dismissed. */
   const anyBalance = PHASE_ROWS.some((row) => value[row.stateKey] != null);
   const anyNotable = NOTABLE_TILES.some((t) => {
     const cur = value[t.axis];
@@ -525,13 +557,6 @@ export function HandlingAssessmentFields({ value, onChange, readOnly = false }: 
   });
   const showBalance = !readOnly || anyBalance;
   const showNotables = !readOnly || anyNotable;
-
-  /* On capture the speed row appears for every flagged phase, because it's the question.
-     On read-back a phase with no tag would render three dead chips saying nothing — and
-     unlike a blank lane there's no second answer it could be confused with. */
-  const speedRows = readOnly
-    ? flaggedPhases.filter((row) => value.speedTags[`balance:${row.phase}` as HandlingIssueKey])
-    : flaggedPhases;
 
   return (
     <div className="space-y-4 inset-panel p-3">
@@ -554,34 +579,14 @@ export function HandlingAssessmentFields({ value, onChange, readOnly = false }: 
             <p className="text-[10px] leading-snug text-muted-foreground">{PHASE_BALANCE_INFO}</p>
           ) : null}
 
-          <BalanceLanes values={balanceValues} onSelect={setPhaseBalance} readOnly={readOnly} />
+          <BalanceInstrument values={balanceValues} onSet={setPhaseBalance} readOnly={readOnly} />
 
-          {speedRows.length > 0 ? (
-            <div className="space-y-1.5 pt-0.5">
-              {speedRows.map((row) => {
-                const issueKey = `balance:${row.phase}` as HandlingIssueKey;
-                return (
-                  <div key={row.phase} className="flex items-center gap-2">
-                    <span className="w-9 shrink-0 font-sans text-[10px] font-semibold text-foreground">
-                      {row.label}
-                    </span>
-                    <SpeedTagPicker
-                      value={value.speedTags[issueKey]}
-                      onChange={(s) => setSpeed(issueKey, s)}
-                      label={null}
-                      groupLabel={`${row.label} — which corners`}
-                      readOnly={readOnly}
-                    />
-                    {/* Truncates rather than squeezing the chips into a second line —
-                        the lane readout two rows up already carries the value. */}
-                    <span className="ml-auto min-w-0 truncate font-sans text-[10px] text-muted-foreground">
-                      {balanceValueText(value[row.stateKey])}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : null}
+          {readOnly ? null : (
+            <p className="ui-caption">
+              Tap a side to flag it, again for worse — mild, moderate, severe, then off. The dot in
+              the middle means it felt neutral.
+            </p>
+          )}
         </div>
       ) : null}
 

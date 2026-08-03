@@ -41,14 +41,14 @@ Two consequences, both decided this session:
 |---|---|---|---|---|
 | **Car rating** | keep | **required** (completed runs) | 1–10 buttons | 1–10; Engineer reads as **bands**, not literal points |
 | **Feel vs last run** | keep | **required** when a prior run on the car exists | 5-button quick pick | Much worse / Worse / Similar / Better / Much better (−3/−2/0/+2/+3) |
-| **Corner balance** | keep | optional | per-phase circle scale | entry / mid / exit, each −3 (understeer) … +3 (oversteer) |
+| **Corner balance** | keep | optional | per-phase **two-pole instrument** (2026-08-03) | entry / mid / exit, each −3 (understeer) … +3 (oversteer) |
 | **Steering feel** | keep (reframed) | optional | **flag-if-notable chip** | dull ↔ pointy (bipolar) |
 | **On-power** | **NEW** | optional | **flag-if-notable chip** | hooks up ↔ snaps |
 | **Braking** | **NEW** | optional | **flag-if-notable chip** | loose ↔ stable |
 | **Traction rolling** | keep | optional | **flag-if-notable chip** | never ↔ often |
 | **Drivability** | keep (reframed from `driveEase`) | optional | **flag-if-notable chip** | on-edge ↔ easy |
 | **General character** (`feelGeneral`, smooth↔reactive) | **RETIRED** from capture | — | — | parser kept for old runs; not offered on new runs |
-| **Speed tag** | **NEW** | optional, per flagged issue | Slow / Fast / Both | attaches to any balance chip or trait chip |
+| **Speed tag** | **RETIRED** from capture 2026-08-03 | — | — | parser + Engineer read keep it for runs that already carry one; never offered on new runs |
 | **Primary focus** | keep (lighter) | optional / implicit | see below | which flagged issue is the main one |
 
 ### The five traits — why each survives
@@ -229,6 +229,16 @@ miscalibration). Until step 1 lands, the step-4 prompt change is **unmeasured**.
 ---
 
 **Changelog:**
+- 2026-08-03 — **corner-balance capture rebuilt** (founder, four artifact rounds). The
+  −3…+3 tap lane is replaced by one sealed instrument per phase: `[ understeer · | ·
+  oversteer ]`, each pole a 44px zone carrying three tiles that rise toward the outside,
+  flagged and escalated by the same tap-to-raise gesture the notable tiles use. Words are
+  said once in a shared header; the centre pip is `0`/neutral, which two poles alone could
+  not express. Fill is the **accent**, not destructive coral — balance describes what the
+  car did rather than reporting a fault — and read-back drops to a monochrome ramp showing
+  only the phases that were answered. **Balance speed tags retired from capture**, matching
+  what was already done for traits. Storage is unchanged: signed −3…+3, `null` = not
+  answered, `0` = neutral, so no migration and no Engineer read change.
 - 2026-07-08 — initial draft from founder interview: traits → flag-if-notable chips,
   five survive (steering feel, on-power [new], braking [new], traction rolling,
   drivability), general character retired; speed tag on flagged issues; rating stays

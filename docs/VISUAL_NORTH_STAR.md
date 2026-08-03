@@ -71,7 +71,8 @@ Use **Tailwind semantic tokens** (`bg-background`, `text-foreground`, `border-bo
 
 ### Color semantics
 
-- **Yellow = action only** (CTAs, focus rings, active nav — including the page-title timing-line segment, which is nav-position information, not decoration). Never use yellow to mean “fast lap” or “good data.”
+- **Yellow = action, plus one measured axis** (CTAs, focus rings, active nav — including the page-title timing-line segment, which is nav-position information, not decoration). Never use yellow to mean “fast lap” or “good data.”
+  - **The one exception (founder 2026-08-03): corner balance.** The balance instrument in `HandlingAssessmentFields.tsx` fills its severity tiles in accent. Balance is captured on *every* run, so most answers describe what the car did rather than report a fault, and the previous destructive-coral treatment read as “something is wrong” on ordinary data. The exception is narrow and stays narrow: it is a **magnitude on a measured axis**, not a verdict, and read-back drops to a monochrome ink ramp so a stored record is never mistaken for a live control. Anything else wanting yellow for data still needs a founder call.
 - **Green / red = pace/quality deltas only** (`gain` / `loss` — faster/slower, cleaner/messier). **Volume deltas are neutral:** fewer runs, laps, or wheel time is *less*, not a failure, so those changes render in muted ink with a plain ↑/↓, never green/red (2026-07-10; `DashboardSummaryCard` `DeltaChip`).
 - **Dark text on yellow** — always `primary-foreground` (`#121110`), never white on yellow.
 
@@ -252,7 +253,7 @@ Before opening a PR or marking a screen “done”:
 - [ ] Page title uses `.page-title` (Sora bold, **UPPERCASE** +0.02em).
 - [ ] Works at 390px width with bottom tab bar.
 - [ ] No behavior, routing, or API changes.
-- [ ] Yellow is not used for data meaning (only actions / focus).
+- [ ] Yellow is not used for data meaning (only actions / focus — the corner-balance instrument is the single signed-off exception).
 
 ---
 
