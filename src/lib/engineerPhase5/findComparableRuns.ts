@@ -11,6 +11,14 @@ import {
 export type { ComparableRun };
 
 /**
+ * DORMANT SINCE 2026-08-05 — NOTHING CALLS THIS.
+ *
+ * It was wired into the reasoning spine, which the Engineer v0 teardown removed: the chat now
+ * sends the model the knowledge base, a short prompt and the conversation, and no run data at
+ * all. This module is kept, unwired and intact, because comparable runs are the intended next
+ * rung — when per-car facts go back in, they go in as a plain block of facts rather than as
+ * spine scaffolding. Verify it still matches the schema before trusting it again.
+ *
  * Answers the founder's actual first question — *"was the car ever good in these
  * conditions and what was different since then"* — by finding the past runs on this car
  * whose conditions are closest to the one being discussed.

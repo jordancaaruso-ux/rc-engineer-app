@@ -3,7 +3,6 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { engineerChatIsLapHistoryQuestion, engineerChatNeedsDeepContext } from "@/lib/engineerPhase5/engineerChatContextTier";
 import { parseLapHistoryDateWindow } from "@/lib/engineerPhase5/parseLapHistoryWindow";
 import {
   extractLapHistoryPriorFromMessages,
@@ -14,22 +13,10 @@ import {
   stripTireQualifierClause,
 } from "@/lib/engineerPhase5/lapHistoryQueryParse";
 
-test("lap history question is light tier not deep", () => {
-  const msg = "whats the best laptime ive done at tftr in the last 2 months";
-  assert.equal(engineerChatIsLapHistoryQuestion(msg), true);
-  assert.equal(
-    engineerChatNeedsDeepContext({ lastUserMessage: msg, runId: "", compareRunId: "" }),
-    false
-  );
-});
-
-test("setup question stays deep tier", () => {
-  const msg = "what spring change should I make for more rear grip";
-  assert.equal(
-    engineerChatNeedsDeepContext({ lastUserMessage: msg, runId: "", compareRunId: "" }),
-    true
-  );
-});
+// The two tier assertions that used to open this file went with the context-tier module in the
+// Engineer v0 teardown (2026-08-05). There is one tier now, and lap-history questions are
+// separated from everything else by whether parseLapHistoryQueryIntent matches — which is what
+// the rest of this file already tests.
 
 test("parseLapHistoryQueryIntent extracts track", () => {
   const intent = parseLapHistoryQueryIntent(
