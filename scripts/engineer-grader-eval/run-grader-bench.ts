@@ -25,7 +25,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
-import { runEngineerChatTurn } from "@/lib/engineerPhase5/engineerChatPipeline";
+import { runEngineerChatTurn } from "@/lib/engineerChat/runChatTurn";
 import {
   judgeEngineerAnswerPairwise,
   type JudgeExemplar,

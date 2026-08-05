@@ -17,7 +17,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
-import { runEngineerChatTurn } from "@/lib/engineerPhase5/engineerChatPipeline";
+import { runEngineerChatTurn } from "@/lib/engineerChat/runChatTurn";
 import { sleepMs } from "@/lib/openAiRetry";
 
 const SCENARIO_DIR = path.join(process.cwd(), "scripts/engineer-grader-eval/scenarios");

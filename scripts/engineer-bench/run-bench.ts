@@ -33,11 +33,11 @@ import { prisma } from "@/lib/prisma";
  * round, so ignoring it overstated cost by however much of the prompt was actually cache-served.
  */
 import { estimateCostUsd } from "@/lib/aiUsage/budgets";
-import { runEngineerChatTurn } from "@/lib/engineerPhase5/engineerChatPipeline";
+import { runEngineerChatTurn } from "@/lib/engineerChat/runChatTurn";
 import {
   ENGINEER_CHAT_MODEL,
   engineerReasoningEffort,
-} from "@/lib/engineerPhase5/openaiEngineer";
+} from "@/lib/engineerChat/openaiChatClient";
 import {
   judgeEngineerAnswer,
   judgeEngineerAnswerSampled,
@@ -298,11 +298,11 @@ async function main() {
         userId,
         question: c.question,
         runId,
-        // Pin it the way the chat route does. Passing `runId` alone is only a SOFT focus — the
-        // context packet still carries the user's LATEST run and the model may answer about that
-        // instead, which it demonstrably did (a Boronia-anchored case answered about a TFTR run).
-        // The app always sends a pinned anchor, so without this the bench measures a path no user
-        // is on, and every arm is judged on answers worse than production.
+        // IGNORED since Engineer v0 (2026-08-05) — kept because the anchoring problem it solves
+        // will come back the moment run data does. Every case now measures the KB and the prompt
+        // alone, so cases whose question assumes the driver's own numbers ("why is MY car loose")
+        // are being scored on an answer that can only say it cannot see them. Read the scores
+        // accordingly, and do not compare them with any bench run recorded before that date.
         anchor: runId
           ? { kind: "run", id: runId, compareRunId: null, setupId: null, pinned: true }
           : null,

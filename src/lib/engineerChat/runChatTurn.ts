@@ -133,13 +133,17 @@ export async function generateEngineerChatReply(params: {
 }
 
 /**
- * Bench/eval entry point. Takes the same params the old pipeline did so the harnesses keep
- * running — run and anchor arguments are accepted and ignored, because v0 has no per-car data.
- * Scores from here are a NEW baseline; they are not comparable with runs from before 2026-08-05.
+ * Bench/eval entry point. Keeps the signature the old pipeline had so the harnesses need only a
+ * new import path.
+ *
+ * `runId`, `compareRunId` and `anchor` are accepted and IGNORED. v0 sends no per-car data, so
+ * anchoring a bench case to a run no longer changes the answer — every case is now measuring the
+ * KB and the prompt. Scores from here are a new baseline and cannot be compared with any run
+ * recorded before 2026-08-05.
  */
 export async function runEngineerChatTurn(params: {
   userId: string;
-  messages: EngineerChatMessage[];
+  question: string;
   runId?: string;
   compareRunId?: string;
   anchor?: unknown;
@@ -153,7 +157,7 @@ export async function runEngineerChatTurn(params: {
   model: string;
 }> {
   const out = await generateEngineerChatReply({
-    messages: params.messages,
+    messages: [{ role: "user", content: params.question.trim() }],
     onToken: params.onToken,
   });
   return { ...out, contextJson: null, resolvedFocus: null };

@@ -5,7 +5,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
-import { runEngineerChatTurn } from "@/lib/engineerPhase5/engineerChatPipeline";
+import { runEngineerChatTurn } from "@/lib/engineerChat/runChatTurn";
 import { buildEngineerResponseMetadata } from "@/lib/engineerFeedback/extractResponseMetadata";
 import { reviewEngineerAnswer } from "@/lib/engineerFeedback/reviewEngineerAnswer";
 import { reviewerPassesShipBar } from "@/lib/engineerFeedback/reviewerParse";
