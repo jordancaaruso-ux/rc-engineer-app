@@ -4,6 +4,7 @@ import { loadFullVehicleDynamicsKb } from "@/lib/engineerPhase5/vehicleDynamicsK
 import { engineerOpenAiUserMessage } from "@/lib/openAiRetry";
 import {
   ENGINEER_CHAT_SYSTEM_PROMPT,
+  ENGINEER_CHAT_SYSTEM_PROMPT_WITH_FACTS,
   ENGINEER_KB_HEADER,
 } from "@/lib/engineerChat/prompt";
 import {
@@ -39,10 +40,16 @@ const MAX_MESSAGE_CHARS = 4096;
  * Order matters. The KB goes first and its bytes never vary, so OpenAI's prompt cache can serve
  * the whole ~14K-token prefix on every turn after the first. Anything placed before it — or any
  * per-turn text spliced into it — silently un-caches the corpus and doubles the input bill.
+ *
+ * `factBlocks` is the Engineer lab (admin-only, off by default; see `lab/labFlags.ts`). They go
+ * AFTER the KB and the prompt for the same reason: they are the only per-turn-varying text here,
+ * so putting them last keeps everything before them cacheable. When the array is empty this
+ * returns exactly the shipped request.
  */
 export function buildEngineerChatMessages(
   kbMarkdown: string,
-  history: EngineerChatMessage[]
+  history: EngineerChatMessage[],
+  factBlocks: string[] = []
 ): ChatCompletionMessage[] {
   const safe = history
     .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
@@ -52,9 +59,17 @@ export function buildEngineerChatMessages(
     }))
     .filter((m) => m.content.trim().length > 0);
 
+  const blocks = factBlocks.filter((b) => b.trim().length > 0);
+
   return [
     { role: "system", content: ENGINEER_KB_HEADER + kbMarkdown },
-    { role: "system", content: ENGINEER_CHAT_SYSTEM_PROMPT },
+    {
+      role: "system",
+      content: blocks.length > 0 ? ENGINEER_CHAT_SYSTEM_PROMPT_WITH_FACTS : ENGINEER_CHAT_SYSTEM_PROMPT,
+    },
+    ...(blocks.length > 0
+      ? [{ role: "system" as const, content: blocks.join("\n\n") }]
+      : []),
     ...safe,
   ];
 }
@@ -76,6 +91,8 @@ function readUsage(data: Record<string, unknown> | undefined): EngineerChatUsage
 export async function generateEngineerChatReply(params: {
   messages: EngineerChatMessage[];
   onToken?: (delta: string) => void;
+  /** Engineer lab fact blocks. Empty (the default) means the shipped, KB-only request. */
+  factBlocks?: string[];
 }): Promise<{ reply: string; usage: EngineerChatUsage | null; model: string }> {
   const apiKey = mustGetOpenAiKey();
   const kb = await loadFullVehicleDynamicsKb();
@@ -83,8 +100,9 @@ export async function generateEngineerChatReply(params: {
     throw new Error("The vehicle-dynamics knowledge base is empty — the Engineer has nothing to reason from.");
   }
 
+  const factBlocks = params.factBlocks ?? [];
   const { model, temperature } = engineerChatModel();
-  let messages = buildEngineerChatMessages(kb.markdown, params.messages);
+  let messages = buildEngineerChatMessages(kb.markdown, params.messages, factBlocks);
 
   let res = await postChatCompletion(
     apiKey,
@@ -99,7 +117,7 @@ export async function generateEngineerChatReply(params: {
     const lastUser = [...params.messages].reverse().find((m) => m.role === "user");
     if (lastUser) {
       console.warn("[engineer-chat] request too large — retrying with the latest question only");
-      messages = buildEngineerChatMessages(kb.markdown, [lastUser]);
+      messages = buildEngineerChatMessages(kb.markdown, [lastUser], factBlocks);
       res = await postChatCompletion(
         apiKey,
         buildChatCompletionBody(model, temperature, { messages }),

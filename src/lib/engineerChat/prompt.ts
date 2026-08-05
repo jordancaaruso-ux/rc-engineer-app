@@ -36,6 +36,22 @@ Use plain words. Say it the way a driver would say it across the pit table, not 
 Answer the question you were asked.`;
 
 /**
+ * Used instead of the above when the Engineer lab attaches fact blocks. Only the third paragraph
+ * differs, and it has to: the shipped prompt states outright that the model cannot see the
+ * driver's data, which stops being true the moment a rung is switched on. Leaving that sentence
+ * in place while handing over a setup sheet would teach the model to distrust what it was given.
+ */
+export const ENGINEER_CHAT_SYSTEM_PROMPT_WITH_FACTS = `You are an RC touring car race engineer, talking to the driver across the pit table.
+
+The vehicle-dynamics knowledge base you have been given is this team's curated ground truth. Build your physics from it. Where it is silent, say so rather than filling the gap from general racing knowledge.
+
+Never invent a number. Facts about this driver's car and session are given to you below, and those plus the knowledge base and what they tell you in this conversation are the only numbers you may use. Anything not given to you, you cannot see — say so plainly rather than guessing at it.
+
+Use plain words. Say it the way a driver would say it across the pit table, not the way an engineering report would write it — everyday words over technical ones wherever both carry the meaning.
+
+Answer the question you were asked.`;
+
+/**
  * Header on the KB system message. Cut from 3,081 chars to the three rules that were doing
  * real work; the rest described machinery that no longer exists (retrieval pointers, the
  * context JSON, provenance tiers for a drafts section, concept-index traversal orders).
@@ -58,3 +74,23 @@ export const ENGINEER_PROMPT_VERSION = formatEngineerPromptVersion(
   ENGINEER_PROMPT_LABEL,
   [ENGINEER_CHAT_SYSTEM_PROMPT, ENGINEER_KB_HEADER].join("\n")
 );
+
+/**
+ * Prompt version for a lab answer, e.g. `2026-08-05-lab-setupSheet+sessionFacts+a1b2c3d4`.
+ *
+ * This exists so lab answers never land in the shipped Engineer's rating batch. The founder is
+ * the only person who rates answers, so if a private variant stamped the shipped version, the
+ * v0 baseline would quietly fill with answers no user could ever get — and the one number the
+ * rebuild is measured against would be wrong with no way to tell.
+ *
+ * `rungs` must already be in a stable order, and the fingerprint covers prompt text only, never
+ * the per-run facts — otherwise every single answer would be its own version and nothing could
+ * be grouped.
+ */
+export function engineerLabPromptVersion(rungs: readonly string[]): string {
+  if (rungs.length === 0) return ENGINEER_PROMPT_VERSION;
+  return formatEngineerPromptVersion(
+    `${ENGINEER_PROMPT_LABEL.replace(/-minimal$/, "")}-lab-${rungs.join("+")}`,
+    [ENGINEER_CHAT_SYSTEM_PROMPT_WITH_FACTS, ENGINEER_KB_HEADER].join("\n")
+  );
+}

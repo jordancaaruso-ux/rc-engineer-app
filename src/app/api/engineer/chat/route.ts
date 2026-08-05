@@ -6,6 +6,12 @@ import {
   generateEngineerChatReply,
   type EngineerChatMessage,
 } from "@/lib/engineerChat/runChatTurn";
+import { loadEngineerLabRungs } from "@/lib/engineerChat/lab/labFlags";
+import {
+  buildEngineerLabFactBlocks,
+  labRunIdFromAnchor,
+} from "@/lib/engineerChat/lab/factBlocks";
+import { engineerLabPromptVersion } from "@/lib/engineerChat/prompt";
 import { tryAnswerLapHistoryQuery } from "@/lib/engineerPhase5/lapHistoryQuery";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
 import { checkAiBudget, engineerQuotaSnapshot, recordAiUsage } from "@/lib/aiUsage/ledger";
@@ -86,6 +92,7 @@ async function maybePersistEngineerReply(params: {
   source?: string;
   anchor?: EngineerChatAnchor | null;
   anchorLabel?: string | null;
+  promptVersion?: string;
 }): Promise<EngineerChatFeedbackPayload | null> {
   const userQuestion = [...params.messages].reverse().find((m) => m.role === "user")?.content ?? "";
   if (!userQuestion.trim() || !params.reply.trim()) return null;
@@ -103,6 +110,7 @@ async function maybePersistEngineerReply(params: {
       source: params.source,
       anchor: params.anchor ?? null,
       anchorLabel: params.anchorLabel ?? null,
+      promptVersion: params.promptVersion,
     });
     // Gold-set auto-capture disconnected 2026-07-30 (founder call): the founder reviews
     // answers directly via in-app ratings + notes for now. The candidate lib, admin API
@@ -310,6 +318,29 @@ export async function POST(request: Request) {
       return refuseAllowance(budget.message, 429);
     }
 
+    // Engineer lab (admin-only, every rung off by default — see lib/engineerChat/lab/labFlags.ts).
+    // For every other account this resolves to no rungs and no blocks, and the request below is
+    // byte-for-byte the shipped one. Failures here must never cost someone their answer, so a
+    // broken rung degrades to the shipped Engineer rather than throwing.
+    const labRungs = await loadEngineerLabRungs({ userId: user.id, email: user.email }).catch(
+      () => []
+    );
+    const factBlocks =
+      labRungs.length > 0
+        ? await buildEngineerLabFactBlocks({
+            userId: user.id,
+            runId: labRunIdFromAnchor(anchor, runId),
+            rungs: labRungs,
+          }).catch((err) => {
+            console.error("[api/engineer/chat] lab fact blocks failed", err);
+            return [] as string[];
+          })
+        : [];
+    // Stamp what actually reached the model, not what was requested: a rung that produced no
+    // facts (unanchored question, run with no setup sheet) leaves the answer identical to the
+    // shipped one, and labelling it a lab answer would put a false variant in the rating batch.
+    const promptVersion = engineerLabPromptVersion(factBlocks.length > 0 ? labRungs : []);
+
     if (useStream) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
@@ -329,6 +360,7 @@ export async function POST(request: Request) {
             send("status", { phase: "thinking" });
             const out = await generateEngineerChatReply({
               messages,
+              factBlocks,
               onToken: (t) => send("token", { t }),
             });
             await recordAiUsage({
@@ -352,6 +384,7 @@ export async function POST(request: Request) {
                   compareRunId,
                   source: "llm",
                   anchor,
+                  promptVersion,
                 });
             send("done", {
               reply: out.reply,
@@ -379,7 +412,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const out = await generateEngineerChatReply({ messages });
+    const out = await generateEngineerChatReply({ messages, factBlocks });
 
     await recordAiUsage({
       userId: user.id,
@@ -403,6 +436,7 @@ export async function POST(request: Request) {
           compareRunId,
           source: "llm",
           anchor,
+          promptVersion,
         });
 
     return NextResponse.json({

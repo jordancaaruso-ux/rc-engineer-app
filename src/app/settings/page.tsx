@@ -12,13 +12,13 @@ import {
   parseSpeedhiveTransponderNumbersSetting,
 } from "@/lib/speedhive/speedhiveTransponder";
 import { SettingsNavSection } from "@/components/settings/SettingsNavSection";
-import { BackgroundSection } from "@/components/settings/BackgroundSection";
 import { ProfilePictureSection } from "@/components/settings/ProfilePictureSection";
 import { AccountSection } from "@/components/settings/AccountSection";
 import { OnboardingResetSection } from "@/components/settings/OnboardingResetSection";
 import { NotificationsSection } from "@/components/settings/NotificationsSection";
 import { AllowlistAdminSection } from "@/components/settings/AllowlistAdminSection";
 import { EngineerFeedbackAdminSection } from "@/components/settings/EngineerFeedbackAdminSection";
+import { EngineerLabSection } from "@/components/settings/EngineerLabSection";
 import { ManufacturerBaselineAdminSection } from "@/components/settings/ManufacturerBaselineAdminSection";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -67,7 +67,6 @@ export default async function SettingsPage() {
           />
         </div>
         <SettingsNavSection isAdmin={isAuthAdminEmail(user.email)} />
-        <BackgroundSection />
         <NotificationsSection />
         <ProfilePictureSection
           initialImage={user.image}
@@ -77,6 +76,7 @@ export default async function SettingsPage() {
         <AccountSection email={user.email ?? ""} />
         {isAuthAdminEmail(user.email) ? (
           <>
+            <EngineerLabSection />
             <OnboardingResetSection />
             <AllowlistAdminSection />
             <ManufacturerBaselineAdminSection />

@@ -44,7 +44,7 @@
     "test:chat-mode": "npx tsx src/lib/engineerPhase5/engineerChoiceChips.test.ts && npx tsx src/lib/engineerPhase5/engineerChatStatus.test.ts",
     "test:lap-history": "npx tsx src/lib/engineerPhase5/lapHistoryQuery.test.ts",
     "test:engineer-anchor": "npx tsx src/lib/engineerPhase5/engineerAnchor.test.ts && npx tsx src/lib/engineerPhase5/anchorCandidates.test.ts",
-    "test:engineer-chat": "node --conditions=react-server --import tsx src/lib/engineerChat/minimalChat.test.ts",
+    "test:engineer-chat": "node --conditions=react-server --import tsx src/lib/engineerChat/minimalChat.test.ts && node --conditions=react-server --import tsx src/lib/engineerChat/lab/engineerLab.test.ts",
     "test:engineer-responses-api": "npx tsx src/lib/engineerPhase5/openaiResponsesApi.test.ts",
     "test:intent": "node --conditions=react-server --import tsx src/lib/engineerPhase5/parameterEffects/intentFromMessage.test.ts",
     "test:mechanism-outcomes": "node --conditions=react-server --import tsx src/lib/engineerPhase5/parameterEffects/mechanismOutcomes.test.ts",

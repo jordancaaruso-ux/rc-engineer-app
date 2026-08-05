@@ -60,6 +60,11 @@ export async function persistEngineerChatExchange(params: {
   /** Explicit anchor from the chat request; a pinned one beats resolvedFocus. */
   anchor?: EngineerChatAnchor | null;
   anchorLabel?: string | null;
+  /**
+   * Which Engineer produced this. Defaults to the shipped one; the Engineer lab passes its own
+   * so private variant answers never join the shipped version's rating batch.
+   */
+  promptVersion?: string;
 }): Promise<PersistedChatExchange> {
   const focus = resolveThreadFocusForPersist({
     anchor: params.anchor ?? null,
@@ -84,7 +89,7 @@ export async function persistEngineerChatExchange(params: {
     runId: params.runId,
     compareRunId: params.compareRunId,
     source: params.source,
-    promptVersion: ENGINEER_PROMPT_VERSION,
+    promptVersion: params.promptVersion ?? ENGINEER_PROMPT_VERSION,
   });
 
   const metadataJson: EngineerMessageContextSnapshot = ratingContext;
