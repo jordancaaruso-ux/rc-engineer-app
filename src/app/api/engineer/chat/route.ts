@@ -2,13 +2,10 @@ import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasOpenAiApiKey } from "@/lib/openaiServerEnv";
-import type { EngineerChatMessage } from "@/lib/engineerPhase5/openaiEngineer";
 import {
-  buildEngineerChatContext,
-  buildMergeContextWithFocusedPair,
-  pinnedAnchorForModel,
-} from "@/lib/engineerPhase5/engineerChatPipeline";
-import { generateEngineerChatReplyWithTools } from "@/lib/engineerPhase5/openaiEngineer";
+  generateEngineerChatReply,
+  type EngineerChatMessage,
+} from "@/lib/engineerChat/runChatTurn";
 import { tryAnswerLapHistoryQuery } from "@/lib/engineerPhase5/lapHistoryQuery";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
 import { checkAiBudget, engineerQuotaSnapshot, recordAiUsage } from "@/lib/aiUsage/ledger";
@@ -43,21 +40,31 @@ function exceptionToClientPayload(err: unknown): { message: string; debug?: stri
   return { message: message || "Engineer chat failed", debug };
 }
 
+/**
+ * Fields the client sends. Most are now IGNORED — v0 of the Engineer (2026-08-05) sends the
+ * model the knowledge base, a five-sentence prompt and the conversation, and nothing else. The
+ * client still computes and posts the run/pattern/pace payloads; they are dropped here rather
+ * than in the client so old app builds keep working. Clearing them out of the client is a
+ * separate tidy-up.
+ */
 type ChatRequestBody = {
   messages?: Array<{ role?: unknown; content?: unknown }>;
+  /** Stamped on the persisted exchange so the thread still records what was on screen. */
   runId?: unknown;
   compareRunId?: unknown;
-  /** Explicit anchor (EngineerChatAnchor). A pinned one is a hard subject; wins over runId/compareRunId. */
+  /** Still parsed: it guards the lap-history path and labels the persisted thread. */
   anchor?: unknown;
+  /** Used only by the deterministic lap-history answer below. */
+  timeZone?: unknown;
+  stream?: unknown;
+  threadId?: unknown;
+  /** Ignored. Old clients still send these; v0 has no context to put them in. */
   includePatternDigest?: boolean;
   patternDigest?: unknown;
   includeRunCatalog?: boolean;
-  timeZone?: unknown;
   paceVsFieldRunDigest?: unknown;
   paceVsFieldRunDigestSubset?: unknown;
-  stream?: unknown;
-  threadId?: unknown;
-  /** Ignored — the quick/normal/deep mode system is retired (2026-07-29). Old clients may still send it. */
+  /** Ignored — the quick/normal/deep mode system is retired (2026-07-29). */
   mode?: unknown;
 };
 
@@ -319,37 +326,9 @@ export async function POST(request: Request) {
           };
           try {
             send("status", { phase: "preparing" });
-            const built = await buildEngineerChatContext({
-              userId: user.id,
-              body,
-              messages,
-              runId,
-              compareRunId,
-              anchor,
-              timeZone,
-              onStage: (phase) => send("status", { phase }),
-            });
-            if ("error" in built) {
-              send("error", { message: built.error ?? "Run not found" });
-              return;
-            }
-            const { contextJson, baseForMerge, lastUser, contextTier, anchorLabel } = built;
-            const mergeContextWithFocusedPair = buildMergeContextWithFocusedPair({
-              userId: user.id,
-              baseForMerge,
-              lastUser,
-              timeZone,
-            });
             send("status", { phase: "thinking" });
-            const out = await generateEngineerChatReplyWithTools({
-              contextJson,
+            const out = await generateEngineerChatReply({
               messages,
-              userId: user.id,
-              mergeContextWithFocusedPair,
-              contextTier,
-              timeZone,
-              pinnedAnchor: pinnedAnchorForModel(anchor, anchorLabel),
-              onStatus: (phase) => send("status", { phase }),
               onToken: (t) => send("token", { t }),
             });
             await recordAiUsage({
@@ -367,18 +346,17 @@ export async function POST(request: Request) {
                   body,
                   messages,
                   reply: out.reply,
-                  contextJson: out.contextJson,
-                  resolvedFocus: out.resolvedFocus,
+                  contextJson: null,
+                  resolvedFocus: null,
                   runId,
                   compareRunId,
                   source: "llm",
                   anchor,
-                  anchorLabel,
                 });
             send("done", {
               reply: out.reply,
-              resolvedFocus: out.resolvedFocus,
-              anchor: anchor ? { ...anchor, label: anchorLabel } : null,
+              resolvedFocus: null,
+              anchor: anchor ? { ...anchor, label: null } : null,
               feedback,
             });
           } catch (err) {
@@ -401,35 +379,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const built = await buildEngineerChatContext({
-      userId: user.id,
-      body,
-      messages,
-      runId,
-      compareRunId,
-      anchor,
-      timeZone,
-    });
-    if ("error" in built) {
-      return jsonError(404, built.error ?? "Run not found");
-    }
-    const { contextJson, baseForMerge, lastUser, contextTier, anchorLabel } = built;
-    const mergeContextWithFocusedPair = buildMergeContextWithFocusedPair({
-      userId: user.id,
-      baseForMerge,
-      lastUser,
-      timeZone,
-    });
-
-    const out = await generateEngineerChatReplyWithTools({
-      contextJson,
-      messages,
-      userId: user.id,
-      mergeContextWithFocusedPair,
-      contextTier,
-      timeZone,
-      pinnedAnchor: pinnedAnchorForModel(anchor, anchorLabel),
-    });
+    const out = await generateEngineerChatReply({ messages });
 
     await recordAiUsage({
       userId: user.id,
@@ -447,20 +397,19 @@ export async function POST(request: Request) {
           body,
           messages,
           reply: out.reply,
-          contextJson: out.contextJson,
-          resolvedFocus: out.resolvedFocus,
+          contextJson: null,
+          resolvedFocus: null,
           runId,
           compareRunId,
           source: "llm",
           anchor,
-          anchorLabel,
         });
 
     return NextResponse.json({
-      contextJson: out.contextJson,
+      contextJson: null,
       reply: out.reply,
-      resolvedFocus: out.resolvedFocus,
-      anchor: anchor ? { ...anchor, label: anchorLabel } : null,
+      resolvedFocus: null,
+      anchor: anchor ? { ...anchor, label: null } : null,
       feedback,
     });
   } catch (err) {

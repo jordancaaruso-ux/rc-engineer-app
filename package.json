@@ -44,6 +44,7 @@
     "test:chat-mode": "npx tsx src/lib/engineerPhase5/engineerChoiceChips.test.ts && npx tsx src/lib/engineerPhase5/engineerChatStatus.test.ts",
     "test:chat-tier": "npx tsx src/lib/engineerPhase5/engineerChatContextTier.test.ts && npx tsx src/lib/engineerPhase5/lapHistoryQuery.test.ts",
     "test:engineer-anchor": "npx tsx src/lib/engineerPhase5/engineerAnchor.test.ts && npx tsx src/lib/engineerPhase5/anchorCandidates.test.ts && npx tsx src/lib/engineerPhase5/savedSetupAnchorShape.test.ts && npx tsx src/lib/engineerPhase5/eventAnchorDigestShape.test.ts && npx tsx src/lib/engineerPhase5/engineerGeneralContext.test.ts",
+    "test:engineer-chat": "node --conditions=react-server --import tsx src/lib/engineerChat/minimalChat.test.ts",
     "test:engineer-responses-api": "npx tsx src/lib/engineerPhase5/openaiResponsesApi.test.ts",
     "test:full-kb": "node --conditions=react-server --import tsx src/lib/engineerPhase5/fullKbInContext.test.ts",
     "test:intent": "node --conditions=react-server --import tsx src/lib/engineerPhase5/parameterEffects/intentFromMessage.test.ts",

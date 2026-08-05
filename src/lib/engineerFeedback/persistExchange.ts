@@ -2,7 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { buildEngineerResponseMetadata } from "@/lib/engineerFeedback/extractResponseMetadata";
-import { ENGINEER_PROMPT_VERSION } from "@/lib/engineerPhase5/openaiEngineer";
+import { ENGINEER_PROMPT_VERSION } from "@/lib/engineerChat/prompt";
 import type { EngineerMessageContextSnapshot, PersistedChatExchange } from "@/lib/engineerFeedback/types";
 import {
   resolveThreadFocusForPersist,

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { ENGINEER_DEFAULT_MODEL } from "@/lib/engineerPhase5/openaiEngineer";
+import { ENGINEER_DEFAULT_MODEL } from "@/lib/engineerChat/openaiChatClient";
 
 import { getOpenAiApiKey } from "@/lib/openaiServerEnv";
 import type { VehicleDynamicsKbSnippet } from "@/lib/engineerPhase5/vehicleDynamicsKb";
