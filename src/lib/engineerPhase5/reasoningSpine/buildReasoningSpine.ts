@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { ComparableRun } from "@/lib/engineerPhase5/comparableRunScore";
 import type { EngineeringReadV1 } from "@/lib/engineerPhase5/engineeringRead";
 import type { ParameterIntentMatches } from "@/lib/engineerPhase5/parameterEffects/types";
 import { applyPersonalCertaintyModulators } from "@/lib/engineerPhase5/reasoningSpine/certaintyModulators";
@@ -34,12 +35,6 @@ function pickDecisionTier(input: {
     return {
       tier: "grounded_reasoner_fallback",
       reason: "diagnose-first mode — explain before prescribing",
-    };
-  }
-  if (input.problem.diagnosisConfidence === "low") {
-    return {
-      tier: "grounded_reasoner_fallback",
-      reason: "low diagnosis confidence or confounders",
     };
   }
   if (input.gradedLevers.length === 0) {
@@ -111,26 +106,63 @@ const SHAPE_GUIDANCE: Record<ProblemShape, string | null> = {
   unknown: null,
 };
 
+/**
+ * What we have to compare this car against, in the words an engineer would use. This is
+ * the whole replacement for the deleted `diagnosisConfidence` grade — founder 2026-08-04:
+ * *"we should give it some sentences in human wording that it can interpret so it knows
+ * when to be confident vs not."*
+ *
+ * It deliberately states the closeness and stops. No threshold, no verdict, no number the
+ * model could mistake for a certainty reading.
+ */
+function formatComparableRunsLine(runs: ComparableRun[]): string {
+  if (runs.length === 0) {
+    return (
+      "Nothing comparable on file: no earlier run on this car shares enough of the tyre, " +
+      "grip level or layout to lean on. This is a first read — say so plainly rather than " +
+      "implying you have seen this car in these conditions before."
+    );
+  }
+
+  const listed = runs.map((r) => {
+    const when = r.whenIso.slice(0, 10);
+    const where = r.trackName ? ` at ${r.trackName}` : "";
+    const rated =
+      r.carRating != null ? `he rated the car ${r.carRating}/10` : "he left it unrated";
+    return `${when}${where} — ${r.howClose}; ${rated}`;
+  });
+
+  return (
+    `Nearest runs on this car, closest conditions first: ${listed.join(" | ")}. ` +
+    "What these are worth scales with how close they are — identical conditions carry a lot, " +
+    "tyre and grip alone carry a little. Judge that yourself from the closeness above; there " +
+    "is no confidence figure and none is implied."
+  );
+}
+
 function buildPromptLines(input: {
   route: ReasoningSpineV1["route"];
   tier: DecisionTier;
   tierReason: string;
   problem: ProblemStatementV1 | null;
   gradedLevers: GradedLeverV1[];
+  comparableRuns: ComparableRun[];
 }): string[] {
   const lines: string[] = [];
   lines.push(`Reasoning spine route: ${input.route}. Decision tier: ${input.tier} (${input.tierReason}).`);
 
   if (input.problem) {
     const p = input.problem;
-    const goal =
-      p.goalOutcome != null
-        ? `Goal: ${p.goalDirection} ${p.goalOutcome}${p.matchedPhrase ? ` (matched "${p.matchedPhrase}")` : ""}.`
-        : "Goal: symptom-driven (no closed outcome intent matched).";
+    // Was "Goal: symptom-driven (no closed outcome intent matched)", which read as a
+    // retrieval failure the model should work around. It never was one — what the driver
+    // wants is in his message, and reading it is the model's job, not a phrase list's.
+    const goal = "Goal: read it from the driver's own words.";
     lines.push(
-      `Problem: ${goal} End=${p.end}, leadPhase=${p.phase}, severity=${p.severity}, ` +
-        `balance=${p.balanceSign}, diagnosisConfidence=${p.diagnosisConfidence}, ` +
-        `mode=${p.recommendationMode}.`
+      // "End=" was ambiguous once keyword matching went: it reads like the end the driver
+      // asked about, when it is only where his own phase ratings point. Spelled out so the
+      // model cannot mistake a rating for a request.
+      `Problem: ${goal} His ratings point at the ${p.end}. leadPhase=${p.phase}, ` +
+        `severity=${p.severity}, balance=${p.balanceSign}, mode=${p.recommendationMode}.`
     );
     const profileLine = formatPhaseProfileLine(p);
     if (profileLine) lines.push(profileLine);
@@ -141,12 +173,19 @@ function buildPromptLines(input: {
     }
   }
 
+  lines.push(formatComparableRunsLine(input.comparableRuns));
+
   if (input.gradedLevers.length > 0) {
     lines.push("Graded levers (engine ordering — do not reorder in engine_decides tier):");
     input.gradedLevers.forEach((l, i) => lines.push(formatLeverLine(l, i)));
   } else if (input.route === "setup_advice") {
+    // Was "hedge heavily", which read as a blanket instruction to soften every answer and
+    // sat oddly beside a confidence field that said the opposite. Choosing the lever is the
+    // judgement we want the model making from the physics, so say that instead.
     lines.push(
-      "No catalogued levers for this intent — use vehicleDynamicsKb + setupVsSpread; hedge heavily."
+      "Choose the lever yourself, reasoning from the knowledge base for what would move this " +
+        "symptom. Where two candidates genuinely both hold up, give both — one as the " +
+        "recommendation, one as also worth a try — and say what separates them."
     );
   }
 
@@ -168,6 +207,8 @@ export function buildReasoningSpineV1(input: {
   engineeringRead: EngineeringReadV1 | null;
   parameterIntentMatches: ParameterIntentMatches | null;
   setupOutcomeMemory?: SetupOutcomeMemoryV1 | null;
+  /** Nearest past runs by conditions. Absent means we genuinely have nothing to compare. */
+  comparableRuns?: ComparableRun[] | null;
 }): ReasoningSpineV1 {
   const route = routeEngineerMessage(input.userMessage);
   const problem =
@@ -190,6 +231,8 @@ export function buildReasoningSpineV1(input: {
     input.setupOutcomeMemory ?? null
   );
 
+  const comparableRuns = input.comparableRuns ?? [];
+
   const { tier, reason } = pickDecisionTier({ route, problem, gradedLevers });
   const promptLines = buildPromptLines({
     route,
@@ -197,6 +240,7 @@ export function buildReasoningSpineV1(input: {
     tierReason: reason,
     problem,
     gradedLevers,
+    comparableRuns,
   });
 
   return {
@@ -205,6 +249,7 @@ export function buildReasoningSpineV1(input: {
     decisionTier: tier,
     problemStatement: problem,
     gradedLevers,
+    comparableRuns,
     promptLines,
     tierReason: reason,
   };

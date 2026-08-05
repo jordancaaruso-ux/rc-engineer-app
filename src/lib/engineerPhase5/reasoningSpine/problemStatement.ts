@@ -1,7 +1,6 @@
 import "server-only";
 
 import type { EngineeringReadV1 } from "@/lib/engineerPhase5/engineeringRead";
-import { detectOutcomeIntent } from "@/lib/engineerPhase5/parameterEffects/intentFromMessage";
 import type {
   PhaseProfileEntryV1,
   ProblemShape,
@@ -74,12 +73,8 @@ function balanceSignFromProfile(
  */
 function inferEnd(
   profile: PhaseProfileEntryV1[],
-  shape: ProblemShape,
-  intentPhrase: string | null
+  shape: ProblemShape
 ): ProblemStatementV1["end"] {
-  const lower = (intentPhrase ?? "").toLowerCase();
-  if (/\b(rear|back)\b/.test(lower)) return "rear";
-  if (/\b(front|nose)\b/.test(lower)) return "front";
   if (shape === "split") return "both";
   return profile[0]?.end ?? "unknown";
 }
@@ -108,29 +103,22 @@ function buildConfounders(read: EngineeringReadV1): string[] {
   return lines;
 }
 
-function diagnosisConfidence(read: EngineeringReadV1): ProblemStatementV1["diagnosisConfidence"] {
-  if (read.recommendationStrategy.mode === "diagnose" || read.paceRead.paceFeelAgreement === "disagree") {
-    return "low";
-  }
-  if (
-    read.changeRead.tireChangeSignificance === "compound_change" ||
-    read.changeRead.chassisChangedKeyCount > 4
-  ) {
-    return "low";
-  }
-  const hasFeel =
-    read.feelRead.betterWorse.direction !== "unknown" ||
-    Object.values(read.feelRead.phaseBalance).some((p) => p.value != null);
-  if (!hasFeel && read.runQuality.carRating == null) return "low";
-  if (read.recommendationStrategy.mode === "verify") return "medium";
-  return "high";
-}
-
+/**
+ * `diagnosisConfidence` REMOVED 2026-08-04. It scored certainty by looking for reasons to
+ * doubt — a tyre change, a track change, too many keys moved, pace disagreeing with feel —
+ * and returned "high" when it found none. A driver with no history has none of them
+ * *because he has no history*, so the app was most confident about the drivers it knew
+ * least, and the narration prompt then read that as licence not to hedge.
+ *
+ * Nothing replaces it as a grade. `reasoningSpine.comparableRuns` carries the nearest run
+ * on file and how close it is on tyre, grip and layout, in plain words, and the model
+ * calibrates off that. Founder: "we should give it some sentences in human wording that it
+ * can interpret so it knows when to be confident vs not."
+ */
 export function buildProblemStatementV1(input: {
   engineeringRead: EngineeringReadV1;
   userMessage: string;
 }): ProblemStatementV1 {
-  const intent = detectOutcomeIntent(input.userMessage);
   const read = input.engineeringRead;
 
   const phaseProfile = buildPhaseProfile(read);
@@ -141,10 +129,18 @@ export function buildProblemStatementV1(input: {
 
   return {
     version: 1,
-    goalOutcome: intent?.outcome ?? null,
-    goalDirection: intent?.direction ?? null,
-    matchedPhrase: intent?.matchedPhrase ?? null,
-    end: inferEnd(phaseProfile, shape, intent?.matchedPhrase ?? null),
+    /**
+     * Keyword intent matching DROPPED 2026-08-04 (founder: "intent match is terrible —
+     * 5.6 terra should be more than strong enough to interpret what the driver means").
+     * These were filled by matching the message against a hand-written phrase list, which
+     * "fix my car" and most real phrasings missed entirely. The `end` override was worse
+     * than useless: it let the word "rear" appearing anywhere in the message outrank the
+     * phase ratings the driver actually gave us.
+     */
+    goalOutcome: null,
+    goalDirection: null,
+    matchedPhrase: null,
+    end: inferEnd(phaseProfile, shape),
     phase: phaseProfile[0]?.phase ?? "unknown",
     phaseProfile,
     shape,
@@ -154,7 +150,6 @@ export function buildProblemStatementV1(input: {
     balanceSign: balanceSignFromProfile(phaseProfile, anyPhaseRated),
     paceFeelAgreement: read.paceRead.paceFeelAgreement,
     confounders: buildConfounders(read),
-    diagnosisConfidence: diagnosisConfidence(read),
     recommendationMode: read.recommendationStrategy.mode,
   };
 }

@@ -4,8 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { buildSetupSpreadForEngineer } from "@/lib/engineerPhase5/setupSpreadForEngineer";
 import { searchVehicleDynamicsKb } from "@/lib/engineerPhase5/vehicleDynamicsKb";
 import { expandEngineerUserMessageForKbSearch } from "@/lib/engineerPhase5/intentVocabularyExpansion";
-import { detectOutcomeIntent } from "@/lib/engineerPhase5/parameterEffects/intentFromMessage";
-import { buildParameterIntentMatches } from "@/lib/engineerPhase5/parameterEffects/query";
 import type { ParameterIntentMatches } from "@/lib/engineerPhase5/parameterEffects/types";
 import { formatGripTagsForDisplay, formatLayoutTagsForDisplay } from "@/lib/trackMetaTags";
 import { normalizeTirePrep, tirePrepHasContent, formatTirePrepLine } from "@/lib/runs/tirePrep";
@@ -241,18 +239,17 @@ export async function buildEngineerRichContextV1(params: {
   const kbLimit = params.opts?.kbLimit ?? 12;
   const skipFieldStats = params.opts?.skipFieldStats ?? spreadDepth === "none";
   const generalMode = params.opts?.mode === "general";
-  const detectedIntent = detectOutcomeIntent(params.lastUserMessage);
+
+  /**
+   * Keyword intent detection DROPPED 2026-08-04 (founder: "intent match is terrible").
+   * It matched the driver's message against a hand-written phrase list and, on a miss,
+   * silently skipped the structured path — "fix my car" matched nothing at all. Reading
+   * what the driver means is the model's job. Kept as a null so the context shape and
+   * every consumer of `parameterIntentMatches` are unchanged.
+   */
+  const parameterIntentMatches = null;
 
   if (generalMode || !params.anchorRunId?.trim()) {
-    const parameterIntentMatches =
-      detectedIntent != null
-        ? buildParameterIntentMatches({
-            outcome: detectedIntent.outcome,
-            direction: detectedIntent.direction,
-            matchedPhrase: detectedIntent.matchedPhrase,
-            spreadRows: [],
-          })
-        : null;
     const kbQuery = kbSearchQueryForMessage(params.lastUserMessage, parameterIntentMatches);
     const kb = await searchVehicleDynamicsKb(kbQuery, kbLimit);
     // General mode keeps the shape even with empty retrieval — the full-KB system
@@ -358,16 +355,6 @@ export async function buildEngineerRichContextV1(params: {
           rows: [] as Awaited<ReturnType<typeof buildSetupSpreadForEngineer>>["rows"],
           truncated: false,
         };
-
-  const parameterIntentMatches =
-    detectedIntent != null
-      ? buildParameterIntentMatches({
-          outcome: detectedIntent.outcome,
-          direction: detectedIntent.direction,
-          matchedPhrase: detectedIntent.matchedPhrase,
-          spreadRows: spread.rows,
-        })
-      : null;
 
   const kbQuery = kbSearchQueryForMessage(params.lastUserMessage, parameterIntentMatches);
   const kb = await searchVehicleDynamicsKb(kbQuery, kbLimit);

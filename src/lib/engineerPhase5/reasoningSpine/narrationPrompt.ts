@@ -29,9 +29,10 @@ When "reasoningSpine.decisionTier" is "engine_decides", you MUST:
 - Honour PARAMETER CHANGE RECOMMENDATIONS (current value + community median + KB cite) for each lever you mention.`
       : `REASONING_SPINE (grounded_reasoner_fallback):
 When "reasoningSpine.decisionTier" is "grounded_reasoner_fallback", use reasoningSpine.problemStatement and promptLines as diagnosis scaffolding.
-You may reason beyond gradedLevers when the catalog is empty or evidence is thin, but:
+Choosing the lever is yours — reason it from the physics. But:
 - Do not invent physics outside vehicleDynamicsKb.
-- Hedge when problemStatement.confounders is non-empty or diagnosisConfidence is low.
+- Judge how far to commit from reasoningSpine.comparableRuns: how close the nearest run on file actually is on tyre, grip and layout. Identical conditions are worth a lot, tyre and grip alone are worth a little, nothing comparable means you are giving a first read and should say so.
+- Certainty changes the FRAMING, not the recommendation. Give the same change either way; what changes is whether you say plainly that it is a close call or that the mechanism can go both ways.
 - Personal history and setupOutcomeMemory modulate certainty only — never override KB direction from anecdote.`;
 
   return `

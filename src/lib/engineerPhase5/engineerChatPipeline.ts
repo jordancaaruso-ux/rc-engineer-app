@@ -26,8 +26,8 @@ import { buildTireLifePriorsForChatContext } from "@/lib/engineerPhase5/tireLife
 import { buildSetupHandlingPaceBundle } from "@/lib/engineerPhase5/setupHandlingPaceBundle";
 import { buildSetupOutcomeMemoryForRun } from "@/lib/engineerPhase5/setupOutcomeMemory";
 import { buildEngineeringBrainV1 } from "@/lib/engineerPhase5/engineeringBrain";
+import { findComparableRunsForEngineer } from "@/lib/engineerPhase5/findComparableRuns";
 import { buildReasoningSpineV1 } from "@/lib/engineerPhase5/reasoningSpine/buildReasoningSpine";
-import { applyHybridContextMode } from "@/lib/engineerPhase5/reasoningSpine/hybridContext";
 import {
   parsePaceVsFieldRunDigestPayload,
   parsePaceVsFieldRunDigestSubsetPayload,
@@ -289,8 +289,14 @@ export async function buildEngineerChatContext(params: {
     // instantly and the status line would be claiming work that never happens.
     if (needsDeep) onStage?.("context_history");
 
-    const [summaryResult, tireLifePriors, setupOutcomeMemory, engineeringBrain, runCatalog] =
-      await Promise.all([
+    const [
+      summaryResult,
+      tireLifePriors,
+      setupOutcomeMemory,
+      engineeringBrain,
+      runCatalog,
+      comparableRuns,
+    ] = await Promise.all([
         needsDeep
           ? !focusedRunPair
             ? perfSpan("getOrComputeEngineerSummaryForLatestRun", () =>
@@ -332,6 +338,14 @@ export async function buildEngineerChatContext(params: {
             )
           : Promise.resolve(null),
         includeRunCatalog ? buildRunCatalogV1({ userId }) : Promise.resolve(null),
+        // Replaces the deleted diagnosisConfidence grade: the nearest runs by CONDITIONS
+        // (tyre, grip, layout), not the last run by date. What the founder actually asks
+        // first — "was this car ever good in these conditions, and what changed since".
+        needsDeep && anchorForRichContext
+          ? perfSpan("findComparableRunsForEngineer", () =>
+              findComparableRunsForEngineer(userId, anchorForRichContext).catch(() => [])
+            )
+          : Promise.resolve([]),
       ]);
 
     const engineerSummary: EngineerRunSummaryV2 | null = summaryResult?.summary ?? null;
@@ -344,6 +358,7 @@ export async function buildEngineerChatContext(params: {
             engineeringRead: engineeringBrain?.engineeringRead ?? null,
             parameterIntentMatches: richEngineerContext?.parameterIntentMatches ?? null,
             setupOutcomeMemory,
+            comparableRuns,
           })
         : null;
 
@@ -371,7 +386,18 @@ export async function buildEngineerChatContext(params: {
       paceVsFieldRunDigestSubset,
     };
 
-    if (reasoningSpine) applyHybridContextMode(contextJson, reasoningSpine);
+    /**
+     * Hybrid context mode DELETED 2026-08-04. On every setup, planning and comparison
+     * question it emptied `setupVsSpread.rows` — the driver's own values against the
+     * community spread — and told the model to fetch them with a tool if it wanted them.
+     * It often didn't, and then recommended moving a setting whose current value it had
+     * never seen. It also trimmed the KB excerpts, which by then had already been replaced
+     * by a pointer to the full corpus in system message 0, so that half was a no-op.
+     *
+     * Size is handled properly by `slimEngineerChatContextForApi`, which caps the rows and
+     * drops them with a note only when the payload genuinely will not fit — degrading under
+     * pressure rather than deleting up front.
+     */
 
     const baseForMerge: Record<string, unknown> = {
       contextTier,
@@ -412,7 +438,14 @@ export function buildMergeContextWithFocusedPair(opts: {
   timeZone?: string | null;
 }) {
   return async (focused: NonNullable<Awaited<ReturnType<typeof buildFocusedRunPairContext>>>) => {
-    const [summaryResult, rich, reTire, reSetupOutcomeMemory, reEngineeringBrain] = await Promise.all([
+    const [
+      summaryResult,
+      rich,
+      reTire,
+      reSetupOutcomeMemory,
+      reEngineeringBrain,
+      reComparableRuns,
+    ] = await Promise.all([
       !focused.compareRunId
         ? getOrComputeEngineerSummaryForRun(opts.userId, focused.primaryRunId, {
             timeZone: opts.timeZone,
@@ -445,6 +478,7 @@ export function buildMergeContextWithFocusedPair(opts: {
             timeZone: opts.timeZone,
           }).catch(() => null)
         : Promise.resolve(null),
+      findComparableRunsForEngineer(opts.userId, focused.primaryRunId).catch(() => []),
     ]);
     const reasoningSpine =
       opts.lastUser && typeof opts.lastUser.content === "string"
@@ -453,6 +487,7 @@ export function buildMergeContextWithFocusedPair(opts: {
             engineeringRead: reEngineeringBrain?.engineeringRead ?? null,
             parameterIntentMatches: rich?.parameterIntentMatches ?? null,
             setupOutcomeMemory: reSetupOutcomeMemory,
+            comparableRuns: reComparableRuns,
           })
         : null;
     const merged = {
@@ -467,7 +502,6 @@ export function buildMergeContextWithFocusedPair(opts: {
       engineeringBrain: reEngineeringBrain,
       reasoningSpine,
     };
-    if (reasoningSpine) applyHybridContextMode(merged, reasoningSpine);
     return merged;
   };
 }

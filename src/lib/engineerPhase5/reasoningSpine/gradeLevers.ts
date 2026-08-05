@@ -6,7 +6,6 @@ import type {
   EvidenceCertainty,
   GradedLeverV1,
   OverallRecommendationGrade,
-  ProblemEnd,
   ProblemStatementV1,
 } from "@/lib/engineerPhase5/reasoningSpine/types";
 
@@ -16,32 +15,6 @@ const CERTAINTY_RANK = { high: 4, moderate: 3, low: 2, very_low: 1 } as const;
 function primaryMechanismForKey(key: string): SetupMechanismId | null {
   const mappings = mechanismsForKey(key);
   return mappings[0]?.mechanism ?? null;
-}
-
-function matchesEndFilter(
-  parameterKey: string,
-  mechanismId: SetupMechanismId | null,
-  end: ProblemEnd
-): boolean {
-  if (end === "unknown" || end === "both") return true;
-  const lower = parameterKey.toLowerCase();
-  if (end === "front") {
-    return (
-      lower.includes("front") ||
-      lower.includes("_ff") ||
-      lower.includes("_fr") ||
-      mechanismId?.startsWith("front_") === true
-    );
-  }
-  if (end === "rear") {
-    return (
-      lower.includes("rear") ||
-      lower.includes("_rf") ||
-      lower.includes("_rr") ||
-      mechanismId?.startsWith("rear_") === true
-    );
-  }
-  return true;
 }
 
 function gradeEvidenceCertainty(input: {
@@ -55,13 +28,14 @@ function gradeEvidenceCertainty(input: {
   if (!match.effect.hedge) score += 1;
   if (match.communityMedian != null) score += 1;
   if (!match.hedgedDirectionAtPosition) score += 1;
-  if (problem.diagnosisConfidence === "high") score += 2;
-  else if (problem.diagnosisConfidence === "medium") score += 1;
   if (problem.confounders.length >= 2) score -= 1;
   if (problem.recommendationMode === "diagnose") score -= 2;
 
-  if (score >= 5) return "high";
-  if (score >= 3) return "moderate";
+  // Bands dropped by 2 alongside the removal of the `diagnosisConfidence` term, which used
+  // to contribute up to +2 here. Without the shift every lever would grade one tier lower
+  // than it did, which would be a silent behaviour change rather than a deliberate one.
+  if (score >= 3) return "high";
+  if (score >= 2) return "moderate";
   if (score >= 1) return "low";
   return "very_low";
 }
@@ -136,11 +110,17 @@ export function buildGradedLevers(input: {
   matches: readonly ParameterIntentMatch[];
   problem: ProblemStatementV1;
 }): GradedLeverV1[] {
-  const filtered = input.matches.filter((m) =>
-    matchesEndFilter(m.parameterKey, primaryMechanismForKey(m.parameterKey), input.problem.end)
-  );
-
-  const graded = filtered.map((m) => gradeSingleLever(m, input.problem));
+  /**
+   * The axle filter was removed 2026-08-04 along with keyword intent matching. It dropped
+   * any lever whose key did not match `problem.end` — but `end` is now derived purely from
+   * the phase ratings, so it describes WHERE THE CAR IS SHORT, not what the driver asked
+   * about. Those are different things: a driver whose ratings read understeer can still be
+   * asking how to free the rear, and the filter silently discarded every rear lever for him.
+   *
+   * Deciding whether a rear lever answers a front complaint is judgement, and it belongs
+   * with the model reading both the ratings and the driver's own words.
+   */
+  const graded = input.matches.map((m) => gradeSingleLever(m, input.problem));
 
   const byMechanism = new Map<string, GradedLeverV1>();
   for (const lever of graded) {

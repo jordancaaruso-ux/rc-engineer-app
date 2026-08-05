@@ -7,7 +7,7 @@ export const SPINE_TOOL_DEFINITIONS = [
     function: {
       name: "get_param_spread",
       description:
-        "Fetch setup-vs-spread rows for an anchor run (current value, community median, positionBand, grip trend). Use when hybrid context trimmed spread or user asks about specific parameters.",
+        "Fetch setup-vs-spread rows for an anchor run (current value, community median, positionBand, grip trend). Rows normally ship in the context; call this when they were dropped for size, or to pull a parameter the context did not carry.",
       parameters: {
         type: "object",
         properties: {
@@ -81,7 +81,7 @@ export const SPINE_TOOL_DEFINITIONS = [
 ] as const;
 
 export const SPINE_TOOL_INSTRUCTIONS = `
-Spine retrieval tools (use when hybridContextMode is true or spread/KB is missing):
+Spine retrieval tools (use when spread rows or KB detail are missing from the context):
 - get_param_spread: on-demand setupVsSpread rows for specific keys on a run id.
 - kb_search: vehicle-dynamics KB excerpts (chunk index + fallback retrieval).
 - compare_tires: pace comparison between two tire labels; optional track filter.

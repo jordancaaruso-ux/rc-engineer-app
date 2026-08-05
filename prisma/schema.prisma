@@ -1162,6 +1162,25 @@ model Run {
   trackLayoutNameSnapshot String?
   /** Optional running direction for this session. */
   trackDirection TrackDirection?
+  /**
+   * Grip level for THIS session — one of TRACK_GRIP_TAG_IDS (VERY_LOW…VERY_HIGH).
+   *
+   * Track.gripTags describes the venue in general; grip genuinely moves through a day as
+   * rubber goes down and temperature changes, so a run wants its own. Added 2026-08-04
+   * after the Engineer's "nearest comparable run" search proved blunt: with grip read off
+   * the track, every run at a venue matched every other run there perfectly, and two of the
+   * three similarity axes collapsed into "same track".
+   *
+   * DORMANT — NOTHING WRITES THIS. The capture control was pulled the next day to keep the
+   * log-run form lean for the launch push; the column stayed because it is already migrated
+   * and costs nothing empty. `resolveGripTags` falls back to Track.gripTags, so comparable-run
+   * scoring works exactly as it did before, just without a per-session signal.
+   *
+   * Deliberately NOT auto-filled from the track baseline while there is no control: that
+   * would be indistinguishable from a driver's own judgement, and null is the honest state.
+   * When grip capture returns, null still means "not recorded".
+   */
+  gripLevel String?
 
   event   Event?  @relation(fields: [eventId], references: [id])
   eventId String?

@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { ComparableRun } from "@/lib/engineerPhase5/comparableRunScore";
 import type { EngineeringReadV1 } from "@/lib/engineerPhase5/engineeringRead";
 import type { Outcome, OutcomeDirection } from "@/lib/engineerPhase5/parameterEffects/types";
 import type { SetupMechanismId } from "@/lib/engineerPhase5/setupMechanismMap";
@@ -86,7 +87,14 @@ export type ProblemStatementV1 = {
   balanceSign: "understeer" | "oversteer" | "neutral" | "mixed" | "unknown";
   paceFeelAgreement: EngineeringReadV1["paceRead"]["paceFeelAgreement"];
   confounders: string[];
-  diagnosisConfidence: "high" | "medium" | "low";
+  /**
+   * `diagnosisConfidence` REMOVED 2026-08-04 (founder: "diagnosis confidence is dumb").
+   * It graded certainty by counting reasons to doubt — tyre change, track change, too many
+   * keys moved — so a driver with no history tripped none of them and scored "high". The
+   * app was most certain about the drivers it knew least, and then told the model it did
+   * not need to hedge. Replaced by a fact rather than a grade: `comparableRuns` carries the
+   * nearest run on file and how close it is on tyre, grip and layout, in plain words.
+   */
   recommendationMode: EngineeringReadV1["recommendationStrategy"]["mode"];
 };
 
@@ -113,6 +121,13 @@ export type ReasoningSpineV1 = {
   decisionTier: DecisionTier;
   problemStatement: ProblemStatementV1 | null;
   gradedLevers: GradedLeverV1[];
+  /**
+   * Past runs on this car whose conditions are nearest to the one in focus, closest first,
+   * each carrying how near it is in plain words. This is what the model calibrates its
+   * certainty against now that the graded confidence field is gone — a fact about what is
+   * on file, not a verdict about how sure to be.
+   */
+  comparableRuns: ComparableRun[];
   /** Deterministic lines for the LLM narrator — do not re-derive diagnosis from raw JSON. */
   promptLines: string[];
   /** Short label for UI/debug. */

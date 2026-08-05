@@ -186,22 +186,10 @@ type SlimPass = (ctx: Record<string, unknown>) => void;
 
 const SLIM_PASSES: SlimPass[] = [
   (ctx) => {
-    if (ctx.hybridContextMode === true && isRecord(ctx.richEngineerContext)) {
-      const rich = { ...ctx.richEngineerContext };
-      if (isRecord(rich.setupVsSpread)) {
-        rich.setupVsSpread = {
-          ...rich.setupVsSpread,
-          note:
-            "Hybrid mode — spread rows omitted from payload; call get_param_spread for on-demand rows.",
-          rows: [],
-          truncated: true,
-        };
-      }
-      if (Array.isArray(rich.vehicleDynamicsKb)) {
-        rich.vehicleDynamicsKb = rich.vehicleDynamicsKb.slice(0, 3);
-      }
-      ctx.richEngineerContext = rich;
-    }
+    // The hybrid-mode branch that used to sit here emptied the driver's setup values out of
+    // the very first slim pass, before the budget was even under pressure. Deleted
+    // 2026-08-04 with the rest of hybrid mode — later passes drop those rows properly, and
+    // only if the payload actually will not fit.
     if (ctx.reasoningSpine && isRecord(ctx.reasoningSpine)) {
       ctx.reasoningSpine = {
         version: ctx.reasoningSpine.version,
@@ -214,6 +202,11 @@ const SLIM_PASSES: SlimPass[] = [
         problemStatement: ctx.reasoningSpine.problemStatement ?? null,
         gradedLevers: Array.isArray(ctx.reasoningSpine.gradedLevers)
           ? ctx.reasoningSpine.gradedLevers.slice(0, 8)
+          : [],
+        // Kept through slimming: this is what the model calibrates certainty against since
+        // the confidence grade was deleted. Three entries at most, so it costs almost nothing.
+        comparableRuns: Array.isArray(ctx.reasoningSpine.comparableRuns)
+          ? ctx.reasoningSpine.comparableRuns.slice(0, 3)
           : [],
       };
     }

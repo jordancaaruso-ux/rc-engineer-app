@@ -245,3 +245,90 @@ test("diagnose mode forces fallback even with catalog", () => {
   });
   assert.equal(spine.decisionTier, "grounded_reasoner_fallback");
 });
+
+/**
+ * The 2026-08-04 change: `diagnosisConfidence` scored certainty by counting reasons to
+ * doubt, so a driver with no history tripped none of them and graded "high". These lock in
+ * the replacement — a stated fact about what is on file, and never a grade.
+ */
+
+const NO_HISTORY_READ = () =>
+  buildEngineeringReadV1({
+    anchor: makeRun({
+      id: "anchor",
+      carRating: 5,
+      handlingAssessmentJson: {
+        version: 3,
+        balanceByPhase: { entry: -2, mid: -2, exit: -2 },
+      },
+    }),
+    reference: null,
+  });
+
+test("no comparable run says so plainly instead of implying familiarity", () => {
+  const spine = buildReasoningSpineV1({
+    userMessage: "fix my car",
+    engineeringRead: NO_HISTORY_READ(),
+    parameterIntentMatches: null,
+    comparableRuns: [],
+  });
+  const joined = spine.promptLines.join("\n");
+  assert.match(joined, /Nothing comparable on file/);
+  assert.match(joined, /first read/);
+  assert.deepEqual(spine.comparableRuns, []);
+});
+
+test("no certainty grade reaches the model any more", () => {
+  const spine = buildReasoningSpineV1({
+    userMessage: "fix my car",
+    engineeringRead: NO_HISTORY_READ(),
+    parameterIntentMatches: null,
+    comparableRuns: [],
+  });
+  const joined = spine.promptLines.join("\n");
+  assert.doesNotMatch(joined, /diagnosisConfidence/);
+  assert.doesNotMatch(joined, /confidence=/);
+  // The old blanket instruction is gone too — it softened every answer regardless.
+  assert.doesNotMatch(joined, /hedge heavily/i);
+});
+
+test("a comparable run reaches the model with its closeness and the driver's rating", () => {
+  const spine = buildReasoningSpineV1({
+    userMessage: "fix my car",
+    engineeringRead: NO_HISTORY_READ(),
+    parameterIntentMatches: null,
+    comparableRuns: [
+      {
+        runId: "run-good",
+        whenIso: "2026-04-02T09:00:00.000Z",
+        trackName: "Boronia",
+        carRating: 9,
+        comparability: { tyre: "same", grip: "same", layout: "adjacent", score: 7 },
+        howClose: "same tyre, same grip level, layout one notch away",
+      },
+    ],
+  });
+  const joined = spine.promptLines.join("\n");
+  assert.match(joined, /2026-04-02 at Boronia/);
+  assert.match(joined, /same tyre, same grip level, layout one notch away/);
+  assert.match(joined, /rated the car 9\/10/);
+});
+
+test("an unrated comparable run is reported as unrated, not silently dropped", () => {
+  const spine = buildReasoningSpineV1({
+    userMessage: "fix my car",
+    engineeringRead: NO_HISTORY_READ(),
+    parameterIntentMatches: null,
+    comparableRuns: [
+      {
+        runId: "run-x",
+        whenIso: "2026-04-02T09:00:00.000Z",
+        trackName: null,
+        carRating: null,
+        comparability: { tyre: "same", grip: "same", layout: "same", score: 8 },
+        howClose: "same tyre, same grip level, same layout style",
+      },
+    ],
+  });
+  assert.match(spine.promptLines.join("\n"), /he left it unrated/);
+});
