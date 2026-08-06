@@ -17,6 +17,9 @@
  */
 import { randomBytes } from "node:crypto";
 import Stripe from "stripe";
+// Relative, not `@/` — this runs under tsx outside the Next build, so no path aliases.
+// brandNames is a pure module by design, which is exactly what makes it importable here.
+import { PRODUCT_NAME } from "../src/lib/brand/brandNames";
 
 const args = process.argv.slice(2);
 const argValue = (name: string) =>
@@ -29,7 +32,11 @@ if (!key?.startsWith("sk_live_")) {
   );
   process.exit(1);
 }
-const origin = (argValue("origin") ?? "https://app.jrcdynamics.com").replace(/\/$/, "");
+// The live origin is www, NOT the `app.` subdomain the runbook first specified: `app.` was never
+// pointed at Vercel (it doesn't resolve), and the live webhook Stripe already holds is
+// https://www.jrcdynamics.com/api/stripe/webhook. Defaulting to `app.` here would mint a SECOND
+// endpoint at a dead hostname on the next re-run, and every event to it would fail silently.
+const origin = (argValue("origin") ?? "https://www.jrcdynamics.com").replace(/\/$/, "");
 const compCodeCount = Math.max(0, Number(argValue("comp-codes") ?? 0) || 0);
 const stripe = new Stripe(key);
 
@@ -37,7 +44,7 @@ const APP = "rc-engineer";
 const TIERS = [
   {
     tier: "standard",
-    productName: "RC Engineer — Standard",
+    productName: `${PRODUCT_NAME} — Standard`,
     prices: [
       { envVar: "STRIPE_PRICE_STANDARD_MONTHLY", lookupKey: "rc_engineer_standard_monthly", interval: "month" as const, unitAmount: 1499 },
       { envVar: "STRIPE_PRICE_STANDARD_ANNUAL", lookupKey: "rc_engineer_standard_annual", interval: "year" as const, unitAmount: 14990 },
@@ -45,7 +52,7 @@ const TIERS = [
   },
   {
     tier: "pro",
-    productName: "RC Engineer — Pro",
+    productName: `${PRODUCT_NAME} — Pro`,
     prices: [
       { envVar: "STRIPE_PRICE_PRO_MONTHLY", lookupKey: "rc_engineer_pro_monthly", interval: "month" as const, unitAmount: 2799 },
       { envVar: "STRIPE_PRICE_PRO_ANNUAL", lookupKey: "rc_engineer_pro_annual", interval: "year" as const, unitAmount: 27990 },

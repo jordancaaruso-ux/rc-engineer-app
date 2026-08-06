@@ -57,7 +57,7 @@ Mitigations:
 Both native asset sets are generated from the brand sources and committed:
 
 - **App icon** — `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png`, from `public/icons/icon-1024.png`.
-- **Splash** — `Splash.imageset`, JRC mark on `#121110` (matches `ios.backgroundColor` so overscroll doesn't flash).
+- **Splash** — `Splash.imageset`, JRC mark on ash warm `#1B1A17` (re-tinted 2026-08-05; matches `ios.backgroundColor` and `--page-bg-base` so the launch → app handoff doesn't flash).
 
 > **Alpha channel:** App Store Connect rejects an app icon that carries an alpha channel, *even a fully opaque one* — the PWA source PNG has one, so the generated icon is flattened and `removeAlpha()`'d. If you ever regenerate the icon, keep that step or the first upload fails after the archive.
 

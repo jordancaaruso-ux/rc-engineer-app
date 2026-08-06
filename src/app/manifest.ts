@@ -14,6 +14,9 @@ import { PRODUCT_NAME } from "@/lib/brand/brandNames";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: PRODUCT_NAME,
+    // Deliberately the house brand, not the product name: the home-screen label truncates
+    // around 12 characters, and "JRC" survives the next rename untouched while the product
+    // name is still provisional.
     short_name: "JRC",
     description:
       "Track runs, setups, and engineering-style guidance for competitive RC drivers.",
@@ -22,10 +25,10 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    // Charcoal graphite base (matches `--page-top-theme` / viewport themeColor) so the
-    // Android splash + status chrome never flash off-palette.
-    background_color: "#121110",
-    theme_color: "#121110",
+    // Ash warm — the one app background (matches `--page-bg-base` in globals.css /
+    // viewport themeColor) so the Android splash + status chrome never flash off-palette.
+    background_color: "#1B1A17",
+    theme_color: "#1B1A17",
     icons: [
       {
         src: "/icons/icon-192.png",

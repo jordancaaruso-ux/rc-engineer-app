@@ -1,5 +1,5 @@
 /*
- * Trackside service worker.
+ * JRC Trackside service worker.
  *
  * Product name is a literal here on purpose: this file is served verbatim as a static asset
  * and is never bundled, so it cannot import PRODUCT_NAME from src/lib/brand/brandNames.ts.
@@ -89,7 +89,7 @@ self.addEventListener("push", (event) => {
     data = { body: event.data ? event.data.text() : "" };
   }
 
-  const title = data.title || "Trackside";
+  const title = data.title || "JRC Trackside";
   const options = {
     body: data.body || "",
     icon: data.icon || "/icons/icon-192.png",

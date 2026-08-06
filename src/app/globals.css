@@ -42,8 +42,6 @@
   --body-stripe-blue: 0;
   /* boxShadow.glow / glow-sm — subtle yellow lift on active chrome. */
   --glow-shadow-rgb: 255 214 10;
-  /* Safari `theme-color` + html overscroll fallback — charcoal, matches the flat base. */
-  --page-top-theme: #121110;
 
   /* Neutral flat surfaces — inset controls stay on-palette with card/muted layers. */
   --color-surface-runna-deep: 15 15 14;
@@ -91,121 +89,44 @@
   );
 
   /*
-   * Appearance knobs — referenced by the photo wash + glass surfaces below.
-   * These are the shipped values.
+   * Appearance knobs — referenced by the glass surfaces below. These are the
+   * shipped values.
    */
-  --tune-bg-blur: 12px;
-  --tune-bg-dark: 0.6;
-  --tune-bg-yellow: 0;
   --tune-glass-alpha: 0.6;
   --tune-glass-blur: 30px;
 }
 
 /*
- * ===== Background modes — Settings → Background =====
+ * ===== The app background — Ash warm =====
  *
- * `data-bg-preview` on <html> (written by BackgroundSection, applied pre-paint by
- * `bgPreviewBootstrapScript()` in layout.tsx, localStorage-only so it never syncs
- * or hits the DB) chooses what paints behind every page. No attribute = Graphite
- * wash, the shipped default since 2026-07-29.
+ * One background, everywhere, for everyone (founder decision 2026-08-05). The
+ * per-device picker (Settings → Background, the `data-bg-preview` attribute and
+ * its graphite / photo / flat-colour modes) is gone: the app has a look and it
+ * isn't a preference. `--page-bg-base` is the single knob — set it here and the
+ * fixed `.page-bg` layer, the html overscroll fallback, the PWA splash and the
+ * native/browser chrome colours all follow.
  *
- * A mode moves ONLY the four `.page-bg*` layers plus the overscroll fallback.
- * Card, glass, border and text tokens are deliberately untouched, so switching
- * compares backgrounds rather than whole themes. Add a mode = add a block here
- * AND an entry in `src/lib/appThemePreview.ts` (a test asserts they agree).
+ * Ash warm — a lifted warm grey, flat. No wash, no photo, no vignette: card,
+ * glass and border tokens are unchanged, so cards read as quiet panels set into
+ * the page rather than lifted off a dark hole.
  *
- * The four knobs, front→back: `--page-bg-vignette` · `--page-bg-scrim` ·
- * `--page-bg-photo` · `--page-bg-wash` over `--page-bg-base`.
- *
- * Graphite wash (the default, so it lives in `:root`) — charcoal base plus the
- * Technical v2 depth gradients (edge vignette, a yellow "lit-from-above" whisper,
- * graphite lifts top + bottom, soft corner depth). Tuned subtle: richness in the
- * gutters without fighting content.
+ * Kept as an RGB triplet so scrims that fade to the page (the title condenser)
+ * can take an alpha. The hex is duplicated outside CSS in `themeColor`
+ * (layout.tsx), `manifest.ts`, `capacitor.config.ts`, `public/offline.html` and
+ * the iOS `Splash.imageset` — those paint before or outside the document, so they
+ * can't read this. Move them together or a launch flashes the wrong colour.
  */
 :root {
-  --page-bg-base: #121110;
-  --page-bg-wash:
-    radial-gradient(120% 120% at 50% 42%, transparent 52%, rgba(0, 0, 0, 0.32) 100%),
-    radial-gradient(150% 100% at 50% -10%, rgba(255, 214, 10, 0.13), transparent 62%),
-    radial-gradient(135% 95% at 50% -22%, rgba(58, 54, 50, 0.18), transparent 60%),
-    radial-gradient(130% 85% at 50% 120%, rgba(44, 42, 40, 0.22), transparent 72%),
-    radial-gradient(75% 62% at 6% 4%, rgba(68, 64, 60, 0.10), transparent 60%),
-    radial-gradient(95% 85% at 102% 104%, rgba(72, 68, 64, 0.14), transparent 64%),
-    radial-gradient(72% 62% at 100% 100%, rgba(255, 214, 10, 0.10), transparent 60%);
-  --page-bg-photo: none;
-  --page-bg-scrim: none;
-  --page-bg-vignette: none;
-}
-
-/* Flat colour modes — base fill only; each clears the default wash. */
-html[data-bg-preview="black"] {
-  --page-bg-base: #000000;
-  --page-top-theme: #000000;
-  --page-bg-wash: none;
-}
-
-html[data-bg-preview="charcoal"] {
-  --page-bg-base: #121110;
-  --page-top-theme: #121110;
-  --page-bg-wash: none;
-}
-
-html[data-bg-preview="dark-grey"] {
-  --page-bg-base: #1c1d1f;
-  --page-top-theme: #1c1d1f;
-  --page-bg-wash: none;
-}
-
-html[data-bg-preview="cool-slate"] {
-  --page-bg-base: #14161c;
-  --page-top-theme: #14161c;
-  --page-bg-wash: none;
-}
-
-html[data-bg-preview="ash-warm"] {
-  --page-bg-base: #1b1a17;
-  --page-top-theme: #1b1a17;
-  --page-bg-wash: none;
-}
-
-html[data-bg-preview="butter-cream"] {
-  --page-bg-base: #231f15;
-  --page-top-theme: #231f15;
-  --page-bg-wash: none;
-}
-
-html[data-bg-preview="moss-tint"] {
-  --page-bg-base: #131816;
-  --page-top-theme: #131816;
-  --page-bg-wash: none;
-}
-
-/*
- * Track photo — the original TITC sunset wash (founder-tuned 2026-07-06:
- * blur 12px · yellow 0 · dark 0.6). Blur/grade are BAKED into the JPEG (perf
- * bake 2026-07-14), so there is no runtime `filter` and no blend group here —
- * every `.glass-card` still composites over a flat backdrop. Dark + vignette
- * stay in CSS because they're viewport-relative and can't be baked into a
- * fixed-aspect image. Re-bake if the source photo changes: sharp(track-hero.jpg)
- *   .blur(12).modulate({saturation:0.6,brightness:0.92}) → track-hero-baked.jpg
- * Base + wash come from `:root` (the graphite default) and show through while the
- * JPEG loads; this block only adds the photo, scrim and vignette on top.
- */
-html[data-bg-preview="photo"] {
-  --page-bg-photo: url("/brand/track-hero-baked.jpg") center / cover no-repeat;
-  --page-bg-scrim: rgb(var(--color-background) / var(--tune-bg-dark));
-  --page-bg-vignette: radial-gradient(
-    130% 120% at 50% 40%,
-    transparent 55%,
-    rgba(0, 0, 0, 0.45)
-  );
+  --page-bg-rgb: 27 26 23; /* #1B1A17 */
+  --page-bg-base: rgb(var(--page-bg-rgb));
 }
 
 html {
   min-height: 100%;
   min-height: 100dvh;
-  /* Overscroll / gap fallback — tinted to match top mesh, not flat black. */
-  background-color: var(--page-top-theme);
+  /* Overscroll / gap fallback — the page background, so the rubber-band bounce
+     never exposes flat black behind it. */
+  background-color: var(--page-bg-base);
   /* No-zoom (founder decision 2026-07-14): kill double-tap zoom app-wide. Pinch
    * is blocked by the viewport meta (WKWebView/PWA) + the `gesturestart` guard in
    * layout.tsx (Safari, which ignores user-scalable). Tap-to-focus zoom on inputs
@@ -232,15 +153,10 @@ body {
 }
 
 /*
- * Single fixed wash (see `layout.tsx`). Full viewport height on iOS (`lvh` +
- * `-webkit-fill-available`). Corner origins pulled above y=0 so red/blue meet
- * behind the Dynamic Island instead of leaving flat base color there.
- */
-/*
- * The four background layers (see `layout.tsx`). Full viewport height on iOS
- * (`lvh` + `-webkit-fill-available`). What each one paints is owned entirely by
- * the `--page-bg-*` knobs above, so the active background mode is one attribute
- * on <html> and never a DOM change. All four default to `none` = flat base.
+ * The single fixed background layer (see `layout.tsx`) — one flat fill, no
+ * gradients, no photo, no blend groups, so every `.glass-card` composites over a
+ * uniform backdrop. Full viewport height on iOS (`lvh` + `-webkit-fill-available`)
+ * so it reaches under the Dynamic Island and the home indicator.
  */
 .page-bg {
   position: fixed;
@@ -254,28 +170,6 @@ body {
   z-index: 0;
   pointer-events: none;
   background-color: var(--page-bg-base);
-  background-image: var(--page-bg-wash);
-  background-repeat: no-repeat;
-}
-
-/* Photo wash — fixed, same clarity everywhere; `.page-bg`'s gradients show through
-   while the JPEG loads. */
-.page-bg-img {
-  position: absolute;
-  inset: 0;
-  background: var(--page-bg-photo);
-}
-
-.page-bg-dark {
-  position: absolute;
-  inset: 0;
-  background: var(--page-bg-scrim);
-}
-
-.page-bg-vig {
-  position: absolute;
-  inset: 0;
-  background: var(--page-bg-vignette);
 }
 
 /*
@@ -345,7 +239,8 @@ html[data-standalone="true"] .no-select {
 /*
  * PWA launch splash — hidden by default; shown only on installed (standalone)
  * launches. Because `data-standalone` is set pre-paint, this covers the cold-launch
- * gap with the yellow mark on charcoal. `PwaSplashDismiss` fades then removes it.
+ * gap with the yellow mark on the page background. `PwaSplashDismiss` fades then
+ * removes it.
  */
 #pwa-splash {
   display: none;
@@ -357,7 +252,7 @@ html[data-standalone="true"] #pwa-splash {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #121110;
+  background: var(--page-bg-base);
   opacity: 1;
   /*
    * Safety net: if hydration stalls or PwaSplashDismiss never runs, this clears
@@ -445,7 +340,7 @@ html.pwa-splash-done[data-standalone="true"] #pwa-splash {
   z-index: 50;
   /* JRC icon negative space (gauge needle, garage door, teams keylines) is
      painted, not punched — it must match the surface behind the glass bar. */
-  --jrc-icon-cutout: var(--background);
+  --jrc-icon-cutout: var(--page-bg-base);
 }
 
 .bottom-nav a {
@@ -692,9 +587,9 @@ html[data-nav-pending] .page {
   height: calc(var(--top-chrome-y) + 58px);
   z-index: -1;
   background: linear-gradient(
-    rgb(var(--color-background) / 0.7) 0%,
-    rgb(var(--color-background) / 0.7) 12%,
-    rgb(var(--color-background) / 0) 100%
+    rgb(var(--page-bg-rgb) / 0.7) 0%,
+    rgb(var(--page-bg-rgb) / 0.7) 12%,
+    rgb(var(--page-bg-rgb) / 0) 100%
   );
   pointer-events: none;
 }

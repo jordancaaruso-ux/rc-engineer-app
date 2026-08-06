@@ -15,7 +15,7 @@ const config: CapacitorConfig = {
   // Keep in sync with PRODUCT_NAME in src/lib/brand/brandNames.ts — the Capacitor CLI reads
   // this outside the app's module graph, so it cannot import the constant. Changing it renames
   // the installed native app on the device home screen.
-  appName: "Trackside",
+  appName: "JRC Trackside",
   webDir: "capacitor-www",
   server: serverUrl
     ? {
@@ -31,8 +31,8 @@ const config: CapacitorConfig = {
      * `env(safe-area-inset-top)` in CSS (see `.page` and the mobile menu button).
      */
     contentInset: "never",
-    /** Match `--page-top-theme` / `--color-background` so rubber-band overscroll is not true black. */
-    backgroundColor: "#121110",
+    /** Match `--page-bg-base` (ash warm) so rubber-band overscroll is not true black. */
+    backgroundColor: "#1B1A17",
   },
   plugins: {
     SplashScreen: {

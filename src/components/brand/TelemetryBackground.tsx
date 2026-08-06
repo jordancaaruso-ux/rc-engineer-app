@@ -9,9 +9,9 @@
  * prefers-reduced-motion with a composed static frame. ~30fps cap, DPR ≤ 2.
  *
  * Colors are read from the globals.css RGB triplets (--color-background,
- * --color-foreground, --color-muted-foreground, --color-primary) so
- * `data-bg-preview` theme variants keep working; hardcoded fallbacks match
- * Technical v2. Vignette is baked in (matches the login treatment).
+ * --color-foreground, --color-muted-foreground, --color-primary) so a palette
+ * change carries through; hardcoded fallbacks match Technical v2. Vignette is
+ * baked in (matches the login treatment).
  *
  * Usage — in src/app/login/page.tsx, replace the whole photo backdrop block
  * (login-bg-photo + scrim + vignette divs) with:

@@ -1038,7 +1038,7 @@ cardinal sin) 2. Generic/forum-tier advice 3. Laundry list 4. Over-hedging.
   "mark this track's location" prompt when appropriate.
 - Sub-panels: `RunTireSelectionPanel`, `RunAdditiveTimingPanel`, `HandlingAssessmentFields`,
   `RunConditionsSection`, `SetupSheetStructured`, `LapTimesIngestPanel`, `RunLayoutPicker`,
-  `FeelVsLastRunQuickPick`, `InlineNewTrackRow`.
+  `FeelVsLastRunQuickPick`, `InlineNewTrackRow`, `TrackTimingSourceNotice`.
 
 ### C. Lap-time ingestion
 - **Parsers** (`src/lib/lapUrlParsers/registry.ts`, tried in order): `liveRcParser`, `myRcmParser`,
@@ -1047,6 +1047,9 @@ cardinal sin) 2. Generic/forum-tier advice 3. Laundry list 4. Over-hedging.
   `LapSourceKind` = `manual | screenshot | url | csv` (csv reserved, not implemented).
 - Routes: `POST /api/lap-time-sessions/import`, `/api/laps/parse-url-preview`,
   `/api/laps/extract-preview`, `/api/laps/discover-sessions`, `/api/laps/scan-day-url` (459 lines).
+- **Which timing site is being searched is stated, not implied** — `TrackTimingSourceNotice` heads
+  the URL Auto tab; a track with no `liveRcUrl`/`speedhiveUrl` says so and takes the URL inline
+  (see `docs/ONBOARDING_NORTH_STAR.md`). Covered by `e2e/run-track-timing-source.spec.ts`.
 - **Auto-detection at events**: `src/lib/eventLapDetection/`, `eventLapDiscovery/` scan an event's
   practice and results URLs, match the driver, and create `ImportedLapTimeSession` rows with
   `eventDetectionSource` set. Dashboard shows a "Detected sessions" prompt.
@@ -1351,7 +1354,8 @@ Source of truth: `docs/VISUAL_NORTH_STAR.md` ("Technical v2", **Locked**, June 2
 
 | Token | Hex | CSS var / Tailwind | Role |
 |---|---|---|---|
-| bg | `#121110` | `--color-background` / `bg-background` | App background |
+| **page** | **`#1B1A17`** | `--page-bg-base` / `.page-bg` | **App background — ash warm, flat, not configurable** (see 7.4) |
+| bg | `#121110` | `--color-background` / `bg-background` | Deepest surface — input fills, code blocks, inset chips |
 | surface | `#181716` | `--color-card` / `bg-card` | Cards, panels |
 | surface-inset | `#151413` | `--color-secondary`, `--color-input` | Inputs, inset areas |
 | elevated | `#1E1D1C` | `--color-muted` | Hover, menus, raised |
@@ -1424,12 +1428,18 @@ scale exists; I did not read all of `globals.css`'s 1,189 lines.
 
 ## 7.4 Background treatment
 
-The app shell uses a **TITC sunset photo wash** — `public/brand/track-hero.jpg` layered on `.page-bg`
-children, fixed position, identical on every screen. Founder-tuned 2026-07-06 to blur 12px / yellow 0 /
-dark 0.6, with those knobs exposed as `--tune-*` vars in `:root` and a dev-only `AppearanceTuner` that
-overrides them live. As of a 2026-07-14 performance bake the blur and grade are **pre-baked into the
-JPEG** and the runtime blend-mode layers are gone. Charcoal radial gradients on `.page-bg` remain as
-the loading fallback.
+**One background: ash warm `#1B1A17`, flat, on every screen, for everyone** (founder 2026-08-05). It is
+a single fixed `.page-bg` layer reading `--page-bg-base` in `globals.css` — no gradients, no photo, no
+vignette, no blend groups, so every glass surface composites over a uniform backdrop. The hex is
+duplicated (deliberately) in `themeColor` (`layout.tsx`), `manifest.ts`, `capacitor.config.ts`,
+`public/offline.html` and the iOS `Splash.imageset` — those paint before or outside the document and
+cannot read the CSS var. **Move them together or a launch will flash the wrong colour.**
+
+**Retired:** the per-device background picker (Settings → Background, `data-bg-preview`,
+`src/lib/appThemePreview.ts`) and every mode it offered — graphite wash, TITC track photo, and the flat
+black / charcoal / dark-grey / cool-slate / butter-cream / moss-tint alternatives. The app has a look;
+it is not a preference. The baked photo (`public/brand/track-hero-baked.jpg`) survives only as the
+`/welcome` landing backdrop.
 
 Cards use **liquid glass** — `.glass-card`: `card/0.7` + `backdrop-blur(78px) saturate(1.3)`, white/0.10
 border, specular top rim. Hard limit: *"do not drop card alpha below ~0.6"* (legibility over the photo).
@@ -1605,11 +1615,10 @@ local `.env.local` sometimes points at the real prod DB."*
 
 Debt is tracked instead in `@deprecated` markers, doc status tables, and `docs/NOT_YET_BUILT.md`.
 
-## 9.2 `@deprecated` inventory (40 markers)
+## 9.2 `@deprecated` inventory (34 markers)
 
 | File | What's deprecated |
 |---|---|
-| `src/lib/appThemePreview.ts` | 6 markers — an entire legacy theme-preview API migrated to `BG_PREVIEW_*` |
 | `src/lib/runHandlingAssessment.ts` | `feelGeneral` (retired from capture 2026-07-08), legacy v1 trait ids, v2 dual-axis balance |
 | `src/lib/manualVideoAnalysis/{loadTiming,sync,types}.ts` | 5 markers — pre-session-scoped timing loaders and v1 shape |
 | `src/lib/engineerPhase5/setupCompareAxleNet.ts` | 2 bulkhead-split accessors superseded by `setupBulkheadInnerSplits` |

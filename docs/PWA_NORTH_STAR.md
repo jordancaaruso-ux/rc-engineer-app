@@ -17,14 +17,14 @@ store path later. Both reuse the same Next.js app.
 
 | Piece | File | Effect |
 |---|---|---|
-| Web app manifest | `src/app/manifest.ts` | Name, `display: standalone`, charcoal splash/theme, install icons (Android/desktop). Served at `/manifest.webmanifest`. |
-| Apple home-screen meta | `src/app/layout.tsx` (`metadata.appleWebApp`) | Full-screen launch, `black-translucent` status bar (charcoal flows under the clock), home-screen title "JRC Engineer". |
+| Web app manifest | `src/app/manifest.ts` | Name, `display: standalone`, ash-warm splash/theme, install icons (Android/desktop). Served at `/manifest.webmanifest`. |
+| Apple home-screen meta | `src/app/layout.tsx` (`metadata.appleWebApp`) | Full-screen launch, `black-translucent` status bar (the page background flows under the clock), home-screen title "JRC Engineer". |
 | apple-touch-icon | `layout.tsx` (`metadata.icons.apple`) | The iOS home-screen tile (iOS ignores the manifest icons for this). |
 | Standalone detection | `layout.tsx` bootstrap script → `html[data-standalone="true"]` | Gates native-feel CSS to installed launches only. |
 | Native-feel CSS | `globals.css` (`html[data-standalone]` block) | Kills rubber-band overscroll, tap-flash, long-press callout on chrome — **only when installed**; browser UX untouched. Content stays selectable/copyable. |
 | Install prompt | `src/components/pwa/PwaInstallPrompt.tsx` | Smart, gentle iOS-Safari-only Share→Add card; 2nd visit onward; dismiss persists ~60 days; portaled to `<body>`. |
 
-Already present before this pass: `viewportFit: "cover"`, `themeColor: "#121110"`, `env(safe-area-inset-*)` handling.
+Already present before this pass: `viewportFit: "cover"`, `themeColor` (ash warm `#1B1A17` since 2026-08-05 — matches `--page-bg-base`), `env(safe-area-inset-*)` handling.
 
 ### Shipped 2026-07-11 (batch 2) — brand + push plumbing
 - [x] **Icon + brand art** — on-brand yellow/white JRC marks; generated app icons/favicon/apple-touch; `JrcMark` on login/sidebar/mobile/splash (closes Visual North Star Known Gap #2).

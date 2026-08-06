@@ -26,8 +26,6 @@ import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar"
 
 import { TimeZoneCookieSync } from "@/components/layout/TimeZoneCookieSync";
 
-import { bgPreviewBootstrapScript } from "@/lib/appThemePreview";
-
 import { PWA_SPLASH_MARK_SVG } from "@/lib/pwa/splashMark";
 
 import { RC_TIMEZONE_COOKIE } from "@/lib/rcTimeZoneCookie";
@@ -147,7 +145,9 @@ export const viewport: Viewport = {
 
   viewportFit: "cover",
 
-  themeColor: "#121110",
+  // Ash warm — matches `--page-bg-base` in globals.css so browser chrome and the
+  // page read as one surface. Move both together.
+  themeColor: "#1B1A17",
 
 };
 
@@ -178,26 +178,17 @@ export default async function RootLayout({
 
         {/*
 
-         * Single fixed wash at z-index 0 (never negative): duplicate fixed layers on
+         * Single fixed background at z-index 0 (never negative): duplicate fixed layers
 
-         * `html` + a div caused a visible seam below the island on iOS Safari.
+         * on `html` + a div caused a visible seam below the island on iOS Safari.
 
-         * `.app-root` stacks all UI above it so modals/portals still work.
+         * `.app-root` stacks all UI above it so modals/portals still work. One flat
+
+         * ash-warm fill — colour and comment live in globals.css.
 
          */}
 
-        <div className="page-bg" aria-hidden="true">
-
-          {/* Baked wash + CSS dark/vignette only — no runtime filter or blend layers
-              (see .page-bg-img in globals.css). tint/warm/grain removed 2026-07-14. */}
-
-          <div className="page-bg-img" />
-
-          <div className="page-bg-dark" />
-
-          <div className="page-bg-vig" />
-
-        </div>
+        <div className="page-bg" aria-hidden="true" />
 
         {/*
          * PWA launch splash — CSS-gated to installed (standalone) launches via
@@ -212,12 +203,6 @@ export default async function RootLayout({
         />
 
         <div className="app-root">
-
-          <Script id="rc-bg-preview-bootstrap" strategy="beforeInteractive">
-
-            {bgPreviewBootstrapScript()}
-
-          </Script>
 
           {/*
            * Mark the document when launched from the home screen (installed PWA) so

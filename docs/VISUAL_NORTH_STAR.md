@@ -47,7 +47,8 @@ Use **Tailwind semantic tokens** (`bg-background`, `text-foreground`, `border-bo
 
 | Token | Hex | Tailwind / CSS | Use |
 |-------|-----|----------------|-----|
-| `bg` | `#121110` | `background`, `--color-background` | App background (charcoal base under the default graphite wash) |
+| **`page`** | **`#1B1A17`** | `--page-bg-base` (`.page-bg`) | **The app background** — ash warm, flat. One look for everyone; there is no picker (founder 2026-08-05) |
+| `bg` | `#121110` | `background`, `--color-background` | Deepest surface — input fills, code blocks, inset chips (`bg-background`). Sits *below* the page tone |
 | `surface` | `#181716` | `card`, `--color-card` | Cards, panels |
 | `surface-inset` | `#151413` | `secondary`, `input`, `--color-secondary` | Inputs, inset areas |
 | `elevated` | `#1E1D1C` | `muted`, `--color-muted` | Hover, menus, raised |
@@ -63,6 +64,7 @@ Use **Tailwind semantic tokens** (`bg-background`, `text-foreground`, `border-bo
 
 ### Retired (do not reintroduce)
 
+- The background picker (Settings → Background; graphite wash, track photo, flat-colour modes, `data-bg-preview`). Deleted 2026-08-05 — the app has one background, ash warm, and it is not a preference.
 - Red primary `#c92a2a` and blue accent `#2563eb` as brand colors.
 - Red/blue body mesh (`--body-glow-*`, `--body-stripe-*`) — set to `0` on default theme.
 - Dusty rose `#D9A299` accent.
