@@ -53,7 +53,7 @@
     "test:setup-model-dedupe": "npx tsx src/lib/setupSheetModels/dedupeElection.test.ts",
     "test:setup-model-match": "npx tsx src/lib/setupSheetModels/matchAuthorizedModel.test.ts",
     "test:setup-universal": "npx tsx src/lib/setupSheetModels/universalParameters.test.ts && npx tsx src/lib/setupSheetModels/genericPresetSchema.test.ts && npx tsx src/lib/setupSheetModels/setupSheetGroups.test.ts && npx tsx --test src/lib/setupSheetModels/genericSetupSheetTemplate.test.ts",
-    "test:picker-models": "npx tsx src/lib/setupSheetModels/pickerModels.test.ts",
+    "test:picker-models": "npx tsx src/lib/setupSheetModels/pickerModels.test.ts && npx tsx --test src/lib/setupSheetModels/modelAccess.test.ts",
     "test:new-parameter": "npx tsx --test src/lib/setupSheetModels/newParameterDef.test.ts src/lib/setupSheetModels/parameterNameSuggestions.test.ts src/lib/setupSheetModels/pendingBoxGrid.test.ts",
     "test:setup-fill-order": "npx tsx --test src/lib/setup/setupFillOrder.test.ts",
     "test:setup-fill-draft": "npx tsx --test src/lib/setup/setupFillDraft.test.ts",

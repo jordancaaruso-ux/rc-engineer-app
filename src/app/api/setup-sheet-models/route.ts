@@ -54,6 +54,9 @@ export async function GET() {
         slug: m.slug,
         carCount: m._count.cars,
         calibrationCount: m._count.calibrations,
+        // Must go IN to the dedupe, not only back on after it: the score decides which row wins a
+        // duplicate name group, and a driver-authored row must never beat the curated one.
+        isAuthorized: m.isAuthorized,
       }))
     ).map((m) => ({ ...m, isAuthorized: authById.get(m.id) ?? false })),
   });

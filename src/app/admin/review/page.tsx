@@ -15,6 +15,7 @@ import { Eyebrow } from "@/components/ui/panel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { CatalogVerifyToggleButton } from "@/components/assets/CatalogVerifyToggleButton";
 import { ChassisRequestResolveButton } from "@/components/admin/ChassisRequestResolveButton";
+import { SetupSheetModelAuthorizeToggle } from "@/components/setup-sheet-models/SetupSheetModelAuthorizeToggle";
 import { CatalogDeleteButton } from "@/components/admin/CatalogDeleteButton";
 import { CatalogMergeControl } from "@/components/admin/CatalogMergeControl";
 import {
@@ -57,7 +58,8 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
   if (!isAuthAdminEmail(user.email)) notFound();
 
   const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
-  const [tireTypes, additiveTypes, tracks, calibrations, chassisRequests] = await Promise.all([
+  const [tireTypes, additiveTypes, tracks, calibrations, chassisTypes, chassisRequests] =
+    await Promise.all([
     prisma.tireType.findMany({
       where: { verifiedAt: null },
       orderBy: { createdAt: "desc" },
@@ -100,6 +102,23 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
       take: TAKE,
       select: { id: true, name: true, sourceType: true, createdAt: true },
     }),
+    // Chassis types a driver built. They go live for everyone the moment they are created, so
+    // without this queue they stay flagged "unreviewed" forever with no way to promote them.
+    // `userId: not null` keeps seeded catalog rows out — those are curated by construction.
+    prisma.setupSheetModel.findMany({
+      where: { isAuthorized: false, userId: { not: null } },
+      orderBy: { createdAt: "desc" },
+      take: TAKE,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        createdAt: true,
+        schemaJson: true,
+        user: { select: { email: true } },
+        _count: { select: { cars: true, calibrations: true } },
+      },
+    }),
     listPendingChassisTypeRequests(TAKE),
   ]);
 
@@ -115,7 +134,14 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
     additiveTypes.length +
     tracks.length +
     calibrations.length +
+    chassisTypes.length +
     chassisRequests.length;
+
+  /** How much sheet is actually there — the one number that says whether it is worth promoting. */
+  const chassisFieldCount = (schemaJson: unknown): number => {
+    const fields = (schemaJson as { fields?: unknown[] } | null)?.fields;
+    return Array.isArray(fields) ? fields.length : 0;
+  };
 
   const fmt = (d: Date) => formatRunDateOnly(d, displayTimeZone);
 
@@ -201,6 +227,28 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
               endpoint={`/api/setup-calibrations/${c.id}`}
               openHref={`/setup-calibrations/${c.id}`}
             />
+          ))}
+        </ReviewSection>
+
+        <ReviewSection eyebrow="Chassis types built by drivers" empty={chassisTypes.length === 0}>
+          {chassisTypes.map((m) => (
+            <li key={m.id} className="flex items-center justify-between gap-2 px-4 py-2">
+              <div className="min-w-0">
+                <Link
+                  href={`/setup-sheet-models/${m.id}/schema`}
+                  className="block truncate text-xs text-foreground hover:underline"
+                >
+                  {m.name}
+                </Link>
+                <div className="text-[10px] text-muted-foreground">
+                  {m.user?.email ?? "unknown"} · {fmt(m.createdAt)} ·{" "}
+                  {chassisFieldCount(m.schemaJson)} fields
+                  {m._count.cars > 0 ? ` · ${m._count.cars} car(s)` : ""}
+                  {m._count.calibrations > 0 ? ` · ${m._count.calibrations} calibration(s)` : ""}
+                </div>
+              </div>
+              <SetupSheetModelAuthorizeToggle modelId={m.id} isAuthorized={false} />
+            </li>
           ))}
         </ReviewSection>
 

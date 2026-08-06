@@ -78,6 +78,7 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
     slug: m.slug,
     carCount: m._count.cars,
     calibrationCount: m._count.calibrations,
+    isAuthorized: m.isAuthorized,
   }));
   const recommendedIds = recommendedSetupSheetModelIds(pickerRows);
   const duplicateGroupCount = countDuplicateGroups(pickerRows);

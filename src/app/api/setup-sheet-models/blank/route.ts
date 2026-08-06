@@ -48,10 +48,15 @@ export async function POST(request: Request): Promise<NextResponse> {
   const norm = normalizeSetupSheetModelName(name);
   const existingRows = await prisma.setupSheetModel.findMany({
     orderBy: [{ isAuthorized: "desc" }, { createdAt: "asc" }],
-    select: { id: true, name: true, slug: true, defaultCalibrationId: true },
+    select: { id: true, name: true, slug: true, defaultCalibrationId: true, isAuthorized: true },
   });
   const clash = existingRows.find((m) => normalizeSetupSheetModelName(m.name) === norm);
-  if (clash) {
+  // An admin is not blocked by an unreviewed driver-authored row of the same name. Ordering above
+  // puts a curated row first, so a clash that is still unauthorized means the ONLY row for this
+  // chassis is a driver's — and refusing there would let anyone permanently deny the founder the
+  // name by typing it first. The two rows are merged by the dedupe script afterwards.
+  const blocks = clash && (clash.isAuthorized || !isAuthAdminEmail(user.email));
+  if (clash && blocks) {
     return NextResponse.json(
       {
         error: `“${clash.name}” already exists. Open it from Chassis types and keep mapping there.`,

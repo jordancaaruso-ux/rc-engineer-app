@@ -257,9 +257,15 @@ export function CarList({
                   aria-label="Chassis type"
                 >
                   <option value="">Select chassis type…</option>
+                  {/*
+                    The flag goes on the UNREVIEWED rows, not the curated ones. Drivers can author
+                    their own chassis types and those go live for everyone immediately, so the
+                    catalog is now mostly-curated with driver rows mixed in — badging the good ones
+                    made every unbadged row look equally trustworthy. Same rule as tracks and tires.
+                  */}
                   {sortedModels.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.isAuthorized ? `${m.name} · Authorized` : m.name}
+                      {m.isAuthorized ? m.name : `${m.name} · Unreviewed`}
                     </option>
                   ))}
                   {/* Non-admins can't add types — let them proceed without one (flagged pending). */}

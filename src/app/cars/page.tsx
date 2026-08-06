@@ -102,6 +102,9 @@ export default async function CarManagerPage({
       slug: m.slug,
       carCount: m._count.cars,
       calibrationCount: m._count.calibrations,
+      // Passed IN, not just stitched back on afterwards: the dedupe score has to see it, or a
+      // driver-authored duplicate can win its name group before the badge is ever applied.
+      isAuthorized: m.isAuthorized,
     }))
   ).map((m) => ({
     id: m.id,

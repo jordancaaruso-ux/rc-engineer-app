@@ -9,18 +9,29 @@ export type SetupSheetModelPickerRow = {
   slug: string;
   carCount: number;
   calibrationCount: number;
+  /** Curated catalog entry. Absent is treated as unauthorized — the safe default. */
+  isAuthorized?: boolean;
 };
 
 /**
  * Higher score = preferred row when collapsing duplicate chassis names.
- * A row that actually has a calibration always beats one without, because the
- * calibrated row is the only one whose example PDF can fingerprint-match uploads.
- * (Previously car count dominated, so a duplicate "Mugen MTC3" with cars but no
- * calibration could win and silently break scoped fingerprint matching.)
+ *
+ * Authorized dominates everything. Drivers can author their own chassis types, which go live for
+ * everyone the moment they are made, so without this term a user-created "Mugen MTC3" that picked
+ * up a calibration and a couple of cars would outrank the curated row and become the one the whole
+ * app resolves — silently breaking scoped fingerprint matching against the real sheet. This mirrors
+ * `compareDedupeKeeper`'s precedence deliberately: the picker and the dedupe script must never
+ * disagree about which row is canonical.
+ *
+ * Below that, a row that actually has a calibration beats one without, because the calibrated row
+ * is the only one whose example PDF can fingerprint-match uploads. (Car count used to dominate that
+ * too, with the same class of consequence.)
  */
 export function setupSheetModelPickerScore(row: SetupSheetModelPickerRow): number {
+  const authorized = row.isAuthorized ? 1_000_000_000 : 0;
   const hasCalibration = row.calibrationCount > 0 ? 1_000_000 : 0;
   return (
+    authorized +
     hasCalibration +
     row.carCount * 1000 +
     row.calibrationCount * 10 -

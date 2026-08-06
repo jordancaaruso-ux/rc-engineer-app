@@ -42,6 +42,37 @@ test("canonical slug breaks ties over suffixed duplicate", () => {
   assert.ok(setupSheetModelPickerScore(canonical) > setupSheetModelPickerScore(suffixed));
 });
 
+test("the curated row wins even against a driver-authored row with everything else", () => {
+  // The case that matters once drivers can author their own chassis types, which go live for
+  // everyone: a user row that has picked up a calibration and cars must not become the row the
+  // whole app resolves for "Mugen MTC3", or scoped fingerprint matching silently targets it.
+  const curated = row({ id: "curated", isAuthorized: true, carCount: 0, calibrationCount: 0 });
+  const userMade = row({
+    id: "user",
+    isAuthorized: false,
+    carCount: 5,
+    calibrationCount: 1,
+    slug: "mugen_mtc3_1",
+  });
+  assert.ok(setupSheetModelPickerScore(curated) > setupSheetModelPickerScore(userMade));
+
+  const kept = recommendedSetupSheetModelIds([userMade, curated]);
+  assert.equal(kept.has("curated"), true);
+  assert.equal(kept.has("user"), false);
+});
+
+test("authorization does not disturb ordering among rows that share it", () => {
+  const a = row({ id: "a", isAuthorized: true, carCount: 1, calibrationCount: 1 });
+  const b = row({ id: "b", isAuthorized: true, carCount: 3, calibrationCount: 1, slug: "mugen_mtc3_1" });
+  assert.ok(setupSheetModelPickerScore(b) > setupSheetModelPickerScore(a));
+});
+
+test("an absent isAuthorized is treated as unauthorized", () => {
+  const unknown = row({ id: "unknown", carCount: 9, calibrationCount: 2 });
+  const curated = row({ id: "curated", isAuthorized: true, slug: "mugen_mtc3_1" });
+  assert.ok(setupSheetModelPickerScore(curated) > setupSheetModelPickerScore(unknown));
+});
+
 test("dedupe collapses by normalized name and keeps the best row", () => {
   const out = dedupeSetupSheetModelsForPicker([
     row({ id: "a", name: "Mugen MTC3", carCount: 9, calibrationCount: 0 }),
