@@ -1,11 +1,21 @@
 ## Damping
 **Physics.** A damper resists movement with a force that grows the **faster the suspension moves** —
 near nothing at rest, more on a quick input or bump. So it doesn't set *where* the car sits (springs
-do) — it sets **how fast** the car gets there: how quickly it rolls and pitches, and how sharply it
-reacts to inputs and bumps. More damping → slower, more controlled movement; less → faster, more
-reactive. Because it acts on rate, it governs the **speed of the elastic (spring) path** of load transfer.
+do) — it sets **how fast** the car gets there: how quickly it rolls and pitches, and how long it keeps
+moving after an input. More damping → slower movement, fewer cycles; less → faster movement, more
+cycles. Because it acts on rate, it governs the **speed of the elastic (spring) path** of load transfer.
+
+**Because force grows with speed, the same damper is near-rigid to a fast input and soft to a slow
+one.** A bump or kerb is fast, so the wheel cannot move out of the way and more of the input passes
+into the chassis — less damping lets the wheel take it instead. But the wheel then has to come back:
+the spring returns it, and with too little damping it overshoots and keeps oscillating, so tyre load
+goes on varying after the input has passed. Both are load-steadiness costs in the same currency —
+more damping costs at the moment of the hit, less damping costs after it — and where a given car
+sits between them is not derivable from the change alone.
+
+Over a *run* of inputs the wheel must also extend before the next arrives; if it can't, travel is
+used up and the car rides down.
 
 **Moved by:** damper oil [[damper-oil]] (thicker → more damping), plus pistons and holes.
-**Affected by:** [[oil-viscosity-temperature]] — the same oil damps more when cold, less as it warms.
 **Affects:** [[load-transfer]] (rate of the slow/elastic path) → and through that speed, [[bite-hold]]
 (faster → bite, slower → hold).

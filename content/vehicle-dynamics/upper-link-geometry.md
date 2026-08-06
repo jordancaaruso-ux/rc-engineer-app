@@ -19,9 +19,14 @@ direction gets inverted.
 **Adding** shims (per 0.5 mm; front and rear behave the same):
 - `upper_inner_shims_*` → **RC DOWN** (~0.5 mm), **less** camber gain
 - `upper_outer_shims_*` → **RC UP** (~0.5 mm), **more** camber gain
-- `under_lower_arm_shims_*` → **RC UP** (~1.1 mm), **less** camber gain
-- `under_hub_shims_*` → **RC UP** (~1.05 mm), **less** camber gain
-- Higher ride height → RC up (~0.6 mm per 0.5 mm); a wheel spacer is negligible (~0.04 mm)
+- `under_lower_arm_shims_*` → **RC UP** (~1.1 mm), **more** camber gain
+- `under_hub_shims_*` → **RC UP** (~1.05 mm), **more** camber gain
+- Higher ride height → RC up (~0.6 mm per 0.5 mm) but **less** camber gain — the one move that
+  splits the two; a wheel spacer is negligible (~0.04 mm)
+
+Moving a pickup point moves RC and camber gain the same way, every time — so any shim change is also
+a camber change and the static angle has to be re-checked against it. Ride height is the exception:
+it moves RC without taking camber gain with it.
 
 **Removing** shims reverses each. The two upper-link ends run **opposite senses** and are **equal in
 strength** (~0.5 mm of RC each); the **under-lower-arm and under-hub shims are about twice as
