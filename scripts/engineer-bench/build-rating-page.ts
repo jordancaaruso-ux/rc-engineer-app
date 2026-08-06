@@ -29,8 +29,10 @@ function arg(name: string): string | null {
   return process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? null;
 }
 
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function esc(s: string | null | undefined): string {
+  // Tolerates a missing field: not every bench set carries `mode` (the quick/normal/deep system
+  // was retired 2026-07-29), and a rating session should not die over a caption.
+  return (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 async function main() {

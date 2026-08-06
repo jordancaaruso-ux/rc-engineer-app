@@ -3,6 +3,27 @@
 Extracted from the vehicle-dynamics-kb-author skill on 2026-07-31 when that skill was deleted.
 Carries Jordan's “physics that cannot be argued” test and the transcription-trap ruling.
 ## Correction log (LIVING — append new patterns, newest first, with date)
+- 2026-08-06 — **WIRING THE THIN KNOBS DID NOT MOVE WHICH LEVER GETS PICKED FIRST. THE COUNT WAS
+  THE WRONG INSTRUMENT.** `spring-rate` (43→~440 w), `arb` (92→~450) and `damper-oil` (45→~430)
+  were rewritten to be self-sufficient — direction, a condition split indexed on something the
+  driver has already said, and a scaling line — on the theory that the diff wins because it is the
+  only node an answer can be read straight out of. Measured on 12 questions before and after:
+  **the diff still led 3 of 7 non-throttle cases, the same three.** The "assembly beats linkage"
+  theory is not confirmed as the cause of *first-lever choice*.
+  **What did change is invisible to that count, and is the real result.** Before, "the car pushes
+  on entry into the hairpin" got one lever (thinner diff) and a clarifying question. After, it got
+  the diff *for the off-throttle case*, then softer rear roll stiffness with the reason — "in a
+  hairpin the car is still moving into roll" — then front roll centre, having worked out the
+  regime from the corner name **without asking**. "I lose the rear, mostly smooth" went from three
+  diff bullets to soften-rear-ARB for a sweeper and **stiffen**-rear-ARB for a hairpin, the two
+  mechanisms with opposite signs indexed to named corners.
+  **Guard:** counting which lever is named first cannot see a corpus change that improves what
+  comes second and third, and the diff leading an off-throttle rear question is correct physics,
+  not a failure. Founder's call on the metric, before the result was in: *"shouldn't be aiming for
+  a specific number of references"* — right, and this is the evidence. Lever counts are a detector
+  for whether behaviour moved at all; only reading the answers says whether it improved.
+  Re-runnable with `scripts/engineer-bench/lever-set.json` + `lever-distribution.ts` (the results
+  files themselves are gitignored, so re-measure rather than hunt for them).
 - 2026-08-06 — "this line should be deliberate, not sometimes the engineer suggests this" (in-app 7/10
   on a camber re-check). **A "VERIFIED" LABEL IS WHY NOBODY RE-CHECKS IT.** `upper-link-geometry.md`
   carries the per-key sign table and instructs the reader "Read the sign here. Do not derive it." Two

@@ -59,7 +59,7 @@ test("lab answers are stamped a different prompt version from the shipped baseli
   const lab = engineerLabPromptVersion(["setupSheet", "sessionFacts"]);
   assert.equal(shipped, ENGINEER_PROMPT_VERSION, "no rungs = the shipped batch");
   assert.notEqual(lab, ENGINEER_PROMPT_VERSION);
-  assert.match(lab, /^2026-08-05-lab-setupSheet\+sessionFacts\+[0-9a-f]{8}$/);
+  assert.match(lab, /-lab-setupSheet\+sessionFacts\+[0-9a-f]{8}$/);
 });
 
 test("each rung combination gets its own version, so batches stay separable", () => {

@@ -14,6 +14,7 @@ import {
   ENGINEER_KB_HEADER,
   ENGINEER_PROMPT_VERSION,
 } from "@/lib/engineerChat/prompt";
+import { ENGINEER_PROMPT_LABEL } from "@/lib/engineerPhase5/promptVersion";
 
 const KB = "=== vehicle-dynamics/springs.md ===\n\nStiffer springs move load faster.";
 
@@ -60,5 +61,8 @@ test("empty and oversized messages are handled before they reach the wire", () =
 });
 
 test("prompt version fingerprints the prompt text, so a wording change is traceable", () => {
-  assert.match(ENGINEER_PROMPT_VERSION, /^2026-08-05-minimal\+[0-9a-f]{8}$/);
+  // Asserted against the live label rather than a hard-coded date: the label is meant to be
+  // bumped whenever Engineer behaviour changes (a KB rework, a prompt edit), and a test that
+  // fails every time someone does the right thing gets edited away instead of read.
+  assert.match(ENGINEER_PROMPT_VERSION, new RegExp(`^${ENGINEER_PROMPT_LABEL}\\+[0-9a-f]{8}$`));
 });

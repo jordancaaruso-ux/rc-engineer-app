@@ -1,55 +1,66 @@
-## Corner regime (steady-state vs transient)
+## Corner regime — which corners settle, and which never do
 
-**Concepts:** [[bite-hold]], [[roll-stiffness]], [[tyre-load-sensitivity]]
+**Concepts:** [[bite-hold]], [[roll-stiffness]], [[tyre-load-sensitivity]], [[load-transfer]], [[roll-center]]
 
-**Physics.** Stiffness changes act through two mechanisms that dominate in different kinds of
-corner. Which one governs depends on whether the car reaches **steady state** — a constant roll
-angle held under constant speed and radius — before the corner is over.
+**Physics.** A stiffness change acts through two different mechanisms, and which one the driver
+gets depends on whether the car reaches a **settled** state — a constant roll angle held under
+constant speed and radius — before the corner is over.
 
-A corner is steady-state when both hold:
+**The driver has almost always already said which kind of corner it is: they named it.** Work it
+out from the corner they named rather than asking them to classify it. If they named none, answer
+for both and say which is which — never ask them to decide whether a corner is settled.
 
-- **Enough time.** The chassis takes a roughly fixed time (a property of springs, dampers, and
-  inertia) to finish rolling and hold its roll angle. The corner must last well beyond that.
-- **Inputs hold.** Speed, radius, and therefore roll stay near-constant through the middle of the
-  corner.
+- **A corner the car settles into:** a long, fast sweeper. Speed and radius hold long enough for
+  roll to finish and stay put.
+- **A corner the car never settles into:** a hairpin, a chicane, an ess, a flick, a tight 90.
+  A hairpin lasts a long time and still never settles — brake, apex and throttle keep the loads
+  moving, so the chassis never holds one state. A chicane or flick fails for the opposite reason:
+  the direction change is over before the roll has finished.
+- **Corner entry is never settled**, whatever the corner. At turn-in the car has not rolled yet.
 
-A long, fast sweeper passes both tests. A hairpin fails the second even though it lasts many
-seconds: brake, apex, and throttle keep the loads moving, so the chassis never holds one state.
-Chicanes and flicks fail the first — the direction change is over before the roll finishes.
+The test underneath, for a corner not on the list: it settles only if the corner lasts well beyond
+the time the chassis takes to finish rolling (a fixed property of springs, dampers and inertia),
+**and** speed and radius hold near-constant through the middle.
 
-**The two mechanisms.**
+## Corner regime — how far a stiffness change carries
 
-- **Steady-state — load-transfer share.** Stiffness cannot change the **total** lateral transfer —
-  that is CoG height, track width and g ([[load-transfer]]). It only moves **where the total lands**:
-  once roll is constant, each axle's share is set by its roll stiffness and its roll centre height
-  ([[roll-center]]). The loaded outside tyre cannot convert extra load into equal extra grip
-  ([[tyre-load-sensitivity]]), so the end carrying the larger share gives up side grip — by how much
-  depends on how much transfer there is to move, and how far that tyre already sits into the falling
-  part of its curve.
-- **Transient — load timing.** While roll is still developing, the stiffer end takes load — and
-  therefore builds grip — sooner ([[bite-hold]]). A softer rear builds rear lateral force later in
-  the direction change, so yaw develops while the rear is still loading: more rotation from entry
-  to apex. A stiffer rear loads immediately and resists yaw from the first steering input.
+**In a corner the car settles into.** Stiffness cannot change the **total** lateral transfer —
+that is CoG height, track width and g ([[load-transfer]]). It only moves **where the total lands**:
+once roll is constant, each axle's share is set by its roll stiffness and its roll centre height
+([[roll-center]]). The loaded outside tyre cannot convert extra load into equal extra grip
+([[tyre-load-sensitivity]]), so the end carrying the larger share gives up side grip.
 
-The two mechanisms pull **opposite directions** for the same change. A stiffer rear frees the rear
-in a steady-state sweeper but plants it in a hairpin flick; a softer rear supports the rear in steady
-state but lets the car yaw in transients.
+**In a corner the car never settles into.** While roll is still developing, the stiffer end takes
+load — and therefore builds grip — **sooner** ([[bite-hold]]); the softer end builds it **later**.
+A softer rear builds rear lateral force later in the direction change, so yaw develops while the
+rear is still loading. A stiffer rear loads immediately and resists yaw from the first steering
+input.
 
-**Speed scales the regime.** Corner time is corner length divided by speed, while the chassis roll
-time is fixed. The same corner is therefore more transient for a faster car and more steady-state
-for a slower one — a slower car reaches its steady roll angle earlier relative to where it is in
-the corner. Faster classes (modified) spend more of the lap in the transient regime than slower
-classes (stock/blinky) on the same layout, so the same stiffness change can answer differently
-between classes: advice tuned in a slower class leans steady-state, and can invert when carried
-to a faster car on the same track. Anything that changes corner speed shifts the regime the same
-way — grip coming up over a race day, a tyre change, or a layout rework all move which mechanism
-a given corner samples ([[bite-hold]] describes what the early and late parts of the grip build
-look like).
+The two pull **opposite directions** for the same change. A stiffer rear frees the rear in a
+sweeper the car settles into but plants it in a hairpin or flick; a softer rear supports the rear
+in a corner the car settles into but lets it yaw in a quick change of direction. Answer for the
+corner in front of you, and say which one you answered for.
 
-**Front/rear symmetry.** The regime split applies at either axle. Stiffer front loads sooner while
-roll develops and carries a bigger steady-state share once roll is constant; softer front is the
-mirror of both. Which mechanism the corner samples decides the sign.
+**What makes the change bigger or smaller.**
+
+- **How much transfer there is to move.** The settled mechanism can only redistribute the transfer
+  that exists, so it shrinks as cornering force falls — with grip, and with speed.
+- **How hard that tyre is already worked.** The settled mechanism bites harder the further the
+  loaded tyre already sits into the falling part of its curve ([[tyre-load-sensitivity]]).
+- **How much of the corner is left to roll through.** Corner time is corner length divided by
+  speed while the chassis roll time is fixed, so the same corner is less settled for a faster car
+  and more settled for a slower one. Faster classes (modified) spend more of the lap unsettled
+  than slower ones (stock/blinky) on the same layout, so a change tuned in a slower class can
+  answer differently on a faster car at the same track. Anything that changes corner speed moves
+  this the same way — grip coming up over a race day, a tyre change, a layout rework
+  ([[bite-hold]] describes what the early and late parts of the grip build feel like).
+- **Nothing at all before the car has rolled.** At turn-in the springs have not deflected, so they
+  have moved no load yet; the split at that instant is roll-centre height alone ([[load-transfer]]).
+
+**Front/rear symmetry.** All of this applies at either axle. A stiffer front loads sooner while
+roll develops and carries a bigger share once roll is constant; a softer front is the mirror of
+both. Which corner it is decides the sign.
 
 **Low grip (tendency, not a law).** Low grip cuts cornering force, so there is less load transfer
-for the steady-state mechanism to redistribute — its effect shrinks with grip. Low grip also slows
-corners, giving the chassis more time to reach steady state.
+for the settled mechanism to redistribute — its effect shrinks with grip. Low grip also slows
+corners, giving the chassis more time to settle.
