@@ -23,6 +23,41 @@ audits them per the stopgap rule._
 
 ## Correction log (LIVING — append new patterns, newest first, with date)
 
+**2026-08-05 — FIRST v0 BATCH: 12 founder ratings, mean 6.8/10 (prompt `2026-08-05-minimal+8ad322cf`):**
+- **The KB is now the ceiling, and the scores say so.** Theory questions (spring and droop
+  behaviour) averaged **7.8**; applied advice averaged **6.3**. The two 9/10s were both pure
+  theory — "how should a stiffer rear spring affect the balance" drew *"this is great, its what i
+  felt was missing from the stuff that relies on corner regime from before"*. The 6s and the single
+  4 all sit on questions whose physics the corpus covers thinly. With the pipeline deleted there is
+  nothing else left to blame: **answer quality is KB quality**.
+- **THE BEST-SPECIFIED NODE OUT-COMPETES ITS NEIGHBOURS — three notes, one cause.** *"seems to
+  surface quite a lot"*, *"again loves mentioning diff a lot"*, *"itll probably help in this case,
+  but not my first pick"*. There is no ranking signal in v0 to blame. `diff-and-driveline.md`
+  carries a founder-confirmed sign, an explicit on/off-throttle split and consequences composed all
+  the way to the outcome; `droop-downstop.md` is six lines and **kerbs appear nowhere in the
+  corpus**. Relative completeness has become the de-facto ranking signal. Founder's ruling: bring
+  the diff **down** to mechanism-only rather than writing the others up to match it, per the
+  2026-07-27 PUSH vs NET rule. Authoring consequence logged in `correction-log-kb.md`.
+- **A recommendation without the driver's current value is half an answer.** On off-throttle
+  mid-corner push: *"again, its something that would help, but would only be a good suggestion if
+  im already on the high side."* v0 cannot see the setup sheet by design and says so, but the
+  answer still read as prescriptive. The `setupSheet` lab rung exists and stays **off** — founder's
+  call is to prove the KB first: *"lets keep setup pull off for now and try to nail fundamental
+  basics to make sure the kb is sound enough."*
+- **LENGTH REGRESSION on the stripped prompt.** *"the long list of dot points is a bit weird"* and
+  *"This is a very long answer also - i think too long"*. The 74k rulebook lost partly on length;
+  the five-sentence prompt is now producing the same complaint without any shape instruction to
+  blame. Watch whether it tracks question breadth ("how can i make my car faster") rather than the
+  prompt.
+- **A COUPLING THE KB STATES SHOULD FIRE EVERY TIME, NOT SOMETIMES.** 7/10: *"'Re-check rear camber
+  afterward, because the geometry change also alters camber gain.' this line should be deliberate,
+  not sometimes the engineer suggests this."* The coupling is real and already in the corpus; it
+  reaches the answer intermittently. Intermittent recall of a stated coupling is a node-structure
+  problem (see the 2026-08-01 asymmetric-branch bug on this exact pair), not a prompt problem.
+- **Five of twelve notes name KB gaps in his own words** — sweeper roll-stiffness specifics, droop
+  and the transient regime, rear droop to balance, kerbs and damping, tyre state early in a run.
+  All routed to `correction-log-kb.md` and the KB itself; none of them are prompt work.
+
 **2026-08-01 — THE PROMPT WAS THE PROBLEM: defaults flipped to stripped + terra (prompt `2026-08-01a`):**
 - **The 74k-char CHAT_SYSTEM lost 5-0 to four sentences** in blind founder pairwise — it suppressed
   length by suppressing content. The stripped prompt is now the shipping default; the old one stays
