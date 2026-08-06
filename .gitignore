@@ -48,3 +48,9 @@ hardware/**/__pycache__/
 /playwright-report/
 /blob-report/
 /e2e/.auth/
+
+# Marketing walkthrough captures (regenerate with e2e/walkthrough.spec.ts)
+/walkthrough-frames/
+
+# App-surface captures (regenerate with e2e/tabs-walkthrough.spec.ts)
+/tabs-frames/
