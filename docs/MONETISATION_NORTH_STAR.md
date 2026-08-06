@@ -17,8 +17,8 @@ sees once inside) — this doc governs how anyone *gets* an account at all.
 |---|---|
 | **The door** | **Pay to sign up. No free tier, no open signup, no trial.** The demo is the try-before-you-buy. Rejected: card-up-front Stripe trial (trial accounts burn Engineer budget before paying), money-back-window-as-trial framing. |
 | **Refunds** | **14-day money-back, stated plainly at checkout.** Converts would-be chargebacks into clean refunds; protects word-of-mouth in a niche scene. |
-| **Tiers** | **Standard $14.99 · Pro $27.99 AUD/mo** (+ annual variants, price points set when the Stripe prices are created). Pro was raised from the earlier $24.99 sketch to keep margin over the AI pool. Standard = the smart notebook with a taste of the Engineer; Pro = the real Engineer tier + video + roll-center. |
-| **Engineer caps** | **Standard 2 questions/day · Pro 300/month pool.** At the terra chat rate (~$0.055/answer) a drained Standard month costs ~$3.30, a drained Pro pool $16.50 — profitable even at max. The contrast is the pitch: "2 a day" vs "300 a month, use them whenever". Cap-hit copy must sell the upgrade, never read as a limit error. Pro needs a "remaining this month" meter. |
+| **Tiers** | **Notebook $9.99 · Race Engineer $19.99 AUD/mo** (+ annual $99.90 / $199.90, two months free). Repriced and renamed 2026-08-06 — see the reprice note below. Notebook = the smart notebook with a taste of the Engineer; Race Engineer = the real Engineer tier + video + roll-center. **Tier IDs remain `standard` / `pro`** in the database, in Stripe product `metadata.tier`, and throughout the code; only the labels moved, and they live in `TIER_LABELS` (`src/lib/brand/brandNames.ts`). |
+| **Engineer caps** | **Notebook 1 question/day · Race Engineer 100/month pool.** At the MEASURED rate (see below) a drained Notebook month costs ~US$1.45 against ~US$6.19 net, a drained Race Engineer pool ~US$4.83 against ~US$12.58 net — and both stay profitable even if nothing caches at all. The pitch is no longer volume (30 vs 100 is only 3×) but **burst**: a Race Engineer can spend a weekend's questions on Saturday, which a Notebook member structurally cannot, and gets video + roll-center with it. Cap-hit copy must sell the upgrade, never read as a limit error. Race Engineer needs a "remaining this month" meter. |
 | **Pro gating** | Video + roll-center **visible-but-locked** for Standard — one line on what it does, an example, "Upgrade to Pro". The only upsell channel that exists once there's no free tier. Rejected: hiding Pro features from Standard. |
 | **Demo** | **Shared read-only demo account** running as **Pro**, public route, seeded from **Jordan's real season, curated subset** (2–3 events, anonymized to a fictional driver, frozen snapshot — racers smell fake lap times). Pre-baked Engineer threads readable free; **1–2 live Engineer asks per visitor**, throttled per-IP + a global daily spend ceiling on the `AiUsageDaily` machinery, degrading to the pre-baked threads when tripped. |
 | **Front door** | **Small landing page** (what it is, three value points, pricing) → **Try the demo** / **Get started**. Built last — its buttons need somewhere real to go. |
@@ -47,6 +47,50 @@ allowlisting payers would grant permanent free Pro the moment they cancel. Inste
 subscriber must still be able to sign in to reach `/billing` and renew). The allowlist stays
 strictly the invite list.
 
+## The reprice — 2026-08-06
+
+Founder call five days after launch: cut prices to drive volume, and rename the tiers to the
+language the landing page already used ("The notebook, or the race engineer").
+
+| | Was | Now |
+|---|---|---|
+| Cheap tier | Standard $14.99 · 2 q/day | **Notebook $9.99 · 1 q/day** · annual $99.90 |
+| Full tier | Pro $27.99 · 300 q/month | **Race Engineer $19.99 · 100 q/month** · annual $199.90 |
+
+**What the old margin note got wrong.** It read "a drained Pro pool $16.50 — profitable even at
+max" against $27.99. That compared **AUD revenue to USD cost**: $27.99 AUD is ~US$18.20 gross,
+~US$17.67 net of Stripe, against US$16.50 of AI — roughly break-even, not comfortable. The `$0.055`
+per-answer figure was also the **cached** case; `budgets.ts` separately recorded that an uncached
+answer at ~79K prompt is ~4× that.
+
+**What was actually measured** (prod `AiUsageDaily`, all 77 `engineer-chat` answers, 2026-08-06):
+
+| | Value |
+|---|---|
+| Blended cost per answer | **US$0.048** |
+| Since the terra ship (2026-08-01) | US$0.048 |
+| Implied prompt-cache hit | 58% |
+| Average prompt | **~42K tokens** — not the ~79K the old note assumed; the v0 KB rebuild roughly halved it |
+| Same answer with zero caching | **US$0.097** |
+
+That US$0.097 worst case is what makes the new numbers safe: at 100 questions a Race Engineer
+member costs at most US$9.73 against US$12.58 net, so the tier is profitable at a full drain even
+if the cache never hits once. Notebook at 1/day is the tier that needed the cut — at 2/day and
+30 cold days it would have run at a loss.
+
+**Re-measure before moving these numbers again.** The script that produced the table is a plain
+aggregate over `AiUsageDaily` (`costUsd / calls`, filtered to `engineer-chat`); the sample was 3
+users, essentially the founder and testers, so it reflects founder usage patterns rather than a
+cohort. Note also that the pool is a **rolling 30 days**, not a calendar month.
+
+**The bug this would have caused.** `tierForPriceId` resolved a member's tier by matching their
+price id against the currently configured `STRIPE_PRICE_*` env vars, falling back to `"standard"`.
+Stripe prices are immutable, so repricing mints new ids while every existing subscriber keeps the
+old one — their next routine `invoice.paid` sync would have silently demoted them, comped testers
+included. Replaced by `resolveTierForPriceId`, which falls back to the price's **product
+`metadata.tier`** and so survives every future reprice. This had to ship BEFORE the new prices
+existed.
+
 ## Hazards
 
 - **Grandfather vs comp codes.** Every current `AuthAllowedEmail` row resolves to free Pro forever
@@ -57,8 +101,10 @@ strictly the invite list.
   failure 500s the event so Stripe retries (user creation is idempotent by email). "Paid but the
   email never arrived" is the support case — the success page tells them to check spam and offers
   the support address.
-- **`.env.example` pricing comment is stale** — it still says Pro $24.99; real price set in Stripe
-  is $27.99.
+- **Repricing is a two-step deploy.** The `resolveTierForPriceId` fix must be live BEFORE the new
+  Stripe prices are created, or existing members are demoted on their next invoice. Then run the
+  setup script (test), update `.env.local`, run `stripe:launch-live`, and paste the four new ids
+  into Vercel Production. Old prices stay active by design so current members keep their rate.
 
 ## Rollout
 

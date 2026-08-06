@@ -3,11 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { getEntitlement } from "@/lib/entitlement";
 import { isBillingEnforced } from "@/lib/entitlementLogic";
 import { getPricePlans } from "@/lib/stripe";
+import { tierLabel } from "@/lib/brand/brandNames";
 import { BillingClient, type BillingPlan } from "@/components/billing/BillingClient";
 
 export const metadata = { title: "Subscription" };
-
-const TIER_LABEL: Record<string, string> = { standard: "Standard", pro: "Pro" };
 
 /**
  * Billing / plan picker. Uses `requireCurrentUserAllowUnpaid` — `requireCurrentUser` now
@@ -20,7 +19,9 @@ export default async function BillingPage() {
   const sub = await prisma.subscription.findUnique({ where: { userId: user.id } });
   const subscription = sub
     ? {
-        tier: sub.tier,
+        // The LABEL, not the id — this string is rendered to a member as-is, and until now they
+        // were shown the raw column value ("standard · active").
+        tierLabel: tierLabel(sub.tier),
         status: sub.status,
         currentPeriodEnd: sub.currentPeriodEnd ? sub.currentPeriodEnd.toISOString() : null,
         cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
@@ -30,7 +31,7 @@ export default async function BillingPage() {
     tier: p.tier,
     interval: p.interval,
     priceId: p.priceId,
-    label: `${TIER_LABEL[p.tier] ?? p.tier} · ${p.interval === "year" ? "Annual" : "Monthly"}`,
+    label: `${tierLabel(p.tier)} · ${p.interval === "year" ? "Annual" : "Monthly"}`,
   }));
 
   return (
@@ -39,7 +40,7 @@ export default async function BillingPage() {
       <BillingClient
         plans={plans}
         entitled={entitlement.entitled}
-        tier={entitlement.tier}
+        tierLabel={tierLabel(entitlement.tier)}
         grandfathered={entitlement.grandfathered}
         hasCustomer={Boolean(user.stripeCustomerId)}
         enforced={isBillingEnforced()}

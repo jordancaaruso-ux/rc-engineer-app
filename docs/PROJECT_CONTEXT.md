@@ -1260,14 +1260,18 @@ body for signature verification, idempotent via `StripeWebhookEvent`.
 Tiers (`src/lib/entitlementLogic.ts`):
 - `standard` → `logging`, `review`, `compare`, `engineer`
 - `pro` → all of the above + `video`, `roll-center`
-- The Engineer is in **both** tiers — the Standard/Pro difference on AI is a usage cap
-  (`AiUsageDaily`), not a feature gate.
+- The Engineer is in **both** tiers — the difference on AI is a usage cap (`AiUsageDaily`), not a
+  feature gate.
 - Active statuses: `active`, `trialing` only. An unrecognised tier string fails **safe to standard**,
   never to pro.
 - `BILLING_ENFORCED !== "1"` → paywall fully dark, everyone gets Pro.
-- Allowlisted and admin emails are grandfathered to Pro even when enforcement is on
-  (`.env.example`).
-- Indicative pricing in `.env.example` comments: **Standard $14.99/mo, Pro $24.99/mo AUD**, plus annual.
+- Grandfathering was **retired to admins only** 2026-08-01; testers are comped via 100%-off Stripe
+  promo codes (`src/lib/entitlement.ts`).
+- **The tier ids `standard`/`pro` are not what customers see.** Repriced and renamed 2026-08-06 to
+  **Notebook $9.99/mo** (1 Engineer question/day) and **Race Engineer $19.99/mo** (100/month pool),
+  annual $99.90 / $199.90. The ids stayed put deliberately — they are the DB column, the env var
+  names and Stripe's product `metadata.tier`. Labels live in `TIER_LABELS`
+  (`src/lib/brand/brandNames.ts`); never hardcode them. See `MONETISATION_NORTH_STAR.md`.
 
 **AI spend caps** (`src/lib/aiUsage/budgets.ts`): default 60 calls/day for `engineer-chat`, 40 for
 `engineer-quick-fix`, 25 for `setup-extract`; **$3/day and $25/rolling-30-days** across all features.
@@ -1737,10 +1741,9 @@ Things a new contributor would have to ask a human.
 
 ## Product & strategy
 
-1. **Is the paywall going live, and when?** `BILLING_ENFORCED` is off, Stripe price ids are unset, and
-   `PRODUCT_NORTH_STAR.md` says *"Do not optimize monetization before the loop is habit-forming for
-   beta users."* The prices in `.env.example` ($14.99 / $24.99 AUD) are commented examples — it is
-   unclear whether they are decided.
+1. ~~**Is the paywall going live, and when?**~~ **ANSWERED — launched 2026-08-01** with
+   `BILLING_ENFORCED=1` at www.jrcdynamics.com, then repriced 2026-08-06 to $9.99 Notebook /
+   $19.99 Race Engineer. See `MONETISATION_NORTH_STAR.md`.
 2. **When does the allowlist open?** The whole access model (`ASSET_ACCESS_NORTH_STAR.md`) is designed
    for "open signup", and there is an access-code route, but no date or trigger is recorded.
 3. **iOS: yes or no?** Explicitly listed as an open decision with a 6-month window from ~June 2026.

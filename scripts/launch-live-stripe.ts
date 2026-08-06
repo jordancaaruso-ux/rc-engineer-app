@@ -8,8 +8,8 @@
  *   2. npm run stripe:launch-live -- --origin=https://app.jrcdynamics.com --comp-codes=8
  *
  * Does, in live mode:
- *   - products + prices: Standard $14.99/$149.90 · Pro $27.99/$279.90 AUD (same lookup keys as
- *     test; amount changes create a replacement price and transfer the key)
+ *   - products + prices: Notebook $9.99/$99.90 · Race Engineer $19.99/$199.90 AUD (same lookup
+ *     keys as test; amount changes create a replacement price and transfer the key)
  *   - "Founders comp" 100%-off-forever coupon + N single-use promo codes (JRC-XXXXXX) — one per
  *     tester so a comp can be revoked individually by cancelling that subscription
  *   - webhook endpoint at <origin>/api/stripe/webhook with exactly the events the route handles
@@ -19,7 +19,7 @@ import { randomBytes } from "node:crypto";
 import Stripe from "stripe";
 // Relative, not `@/` — this runs under tsx outside the Next build, so no path aliases.
 // brandNames is a pure module by design, which is exactly what makes it importable here.
-import { PRODUCT_NAME } from "../src/lib/brand/brandNames";
+import { PRODUCT_NAME, TIER_LABELS } from "../src/lib/brand/brandNames";
 
 const args = process.argv.slice(2);
 const argValue = (name: string) =>
@@ -41,21 +41,25 @@ const compCodeCount = Math.max(0, Number(argValue("comp-codes") ?? 0) || 0);
 const stripe = new Stripe(key);
 
 const APP = "rc-engineer";
+// Repriced 2026-08-06 — see scripts/stripe-setup-prices.ts for the margin note. Tier IDS are
+// deliberately unchanged; only the labels and the amounts move. Re-running this against live
+// creates REPLACEMENT prices (Stripe prices are immutable) and transfers the lookup keys, so
+// existing members keep renewing at what they signed up for.
 const TIERS = [
   {
     tier: "standard",
-    productName: `${PRODUCT_NAME} — Standard`,
+    productName: `${PRODUCT_NAME} — ${TIER_LABELS.standard}`,
     prices: [
-      { envVar: "STRIPE_PRICE_STANDARD_MONTHLY", lookupKey: "rc_engineer_standard_monthly", interval: "month" as const, unitAmount: 1499 },
-      { envVar: "STRIPE_PRICE_STANDARD_ANNUAL", lookupKey: "rc_engineer_standard_annual", interval: "year" as const, unitAmount: 14990 },
+      { envVar: "STRIPE_PRICE_STANDARD_MONTHLY", lookupKey: "rc_engineer_standard_monthly", interval: "month" as const, unitAmount: 999 },
+      { envVar: "STRIPE_PRICE_STANDARD_ANNUAL", lookupKey: "rc_engineer_standard_annual", interval: "year" as const, unitAmount: 9990 },
     ],
   },
   {
     tier: "pro",
-    productName: `${PRODUCT_NAME} — Pro`,
+    productName: `${PRODUCT_NAME} — ${TIER_LABELS.pro}`,
     prices: [
-      { envVar: "STRIPE_PRICE_PRO_MONTHLY", lookupKey: "rc_engineer_pro_monthly", interval: "month" as const, unitAmount: 2799 },
-      { envVar: "STRIPE_PRICE_PRO_ANNUAL", lookupKey: "rc_engineer_pro_annual", interval: "year" as const, unitAmount: 27990 },
+      { envVar: "STRIPE_PRICE_PRO_MONTHLY", lookupKey: "rc_engineer_pro_monthly", interval: "month" as const, unitAmount: 1999 },
+      { envVar: "STRIPE_PRICE_PRO_ANNUAL", lookupKey: "rc_engineer_pro_annual", interval: "year" as const, unitAmount: 19990 },
     ],
   },
 ];
@@ -74,7 +78,17 @@ async function ensureProduct(tier: string, name: string): Promise<string> {
   const found = await stripe.products.search({
     query: `active:'true' AND metadata['app']:'${APP}' AND metadata['tier']:'${tier}'`,
   });
-  if (found.data[0]) return found.data[0].id;
+  const existing = found.data[0];
+  if (existing) {
+    // Matched on metadata.tier, which never changes — so without this a renamed tier would keep
+    // its old product name in LIVE Stripe forever, and that name is what a customer reads on their
+    // receipt and in the billing portal.
+    if (existing.name !== name) {
+      console.log(`  product ${existing.id}: renaming "${existing.name}" → "${name}"`);
+      await stripe.products.update(existing.id, { name });
+    }
+    return existing.id;
+  }
   const created = await stripe.products.create({ name, metadata: { app: APP, tier } });
   return created.id;
 }

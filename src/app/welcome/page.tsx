@@ -7,7 +7,7 @@ import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { Eyebrow } from "@/components/ui/panel";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { getPricePlansWithAmounts } from "@/lib/stripe";
-import { COMPANY_NAME, PRODUCT_NAME } from "@/lib/brand/brandNames";
+import { COMPANY_NAME, PRODUCT_NAME, TIER_LABELS } from "@/lib/brand/brandNames";
 
 export const metadata = { title: `${PRODUCT_NAME} — your next tenth is in the data` };
 
@@ -305,7 +305,7 @@ export default async function WelcomePage(): Promise<ReactNode> {
           <Eyebrow>Pricing</Eyebrow>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <CardPanel contentClassName="p-4">
-              <p className="text-sm font-semibold">Standard</p>
+              <p className="text-sm font-semibold">{TIER_LABELS.standard}</p>
               <p className="mt-0.5 text-[13px] text-muted-foreground">The smart race notebook.</p>
               <p className="mt-2 text-lg font-semibold">
                 {monthly("standard") ?? "—"}
@@ -313,7 +313,7 @@ export default async function WelcomePage(): Promise<ReactNode> {
               </p>
             </CardPanel>
             <CardPanel contentClassName="p-4">
-              <p className="text-sm font-semibold">Pro</p>
+              <p className="text-sm font-semibold">{TIER_LABELS.pro}</p>
               <p className="mt-0.5 text-[13px] text-muted-foreground">The full race engineer.</p>
               <p className="mt-2 text-lg font-semibold">
                 {monthly("pro") ?? "—"}
@@ -322,8 +322,9 @@ export default async function WelcomePage(): Promise<ReactNode> {
             </CardPanel>
           </div>
           <p className="mt-3 text-[13px] text-muted-foreground">
-            Pro is about half a set of tyres a month. Annual gets 2 months free. Not for you? Full
-            refund in the first 14 days, no questions.
+            {TIER_LABELS.pro} costs less than a set of tyres, and the questions are yours to spend
+            how you like. Annual gets 2 months free. Not for you? Full refund in the first 14 days,
+            no questions.
           </p>
         </section>
 

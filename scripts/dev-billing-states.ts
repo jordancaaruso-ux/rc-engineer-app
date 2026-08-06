@@ -19,7 +19,11 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import { aiUsageTimeZone } from "@/lib/aiUsage/budgets";
+import {
+  aiUsageTimeZone,
+  PRO_ENGINEER_MONTHLY_QUESTIONS,
+  STANDARD_ENGINEER_DAILY_QUESTIONS,
+} from "@/lib/aiUsage/budgets";
 import { todayYmdInTimeZone } from "@/lib/eventActive";
 
 const BASE = (process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000")
@@ -41,7 +45,10 @@ const STATES = [
     tier: "standard",
     status: "active",
     periodEnd: () => new Date(Date.now() + 30 * 86400000),
-    expect: "/videos + /analysis/roll-center locked · /engineer '0 of 2 left today' · next ask refused",
+    // Interpolated, not spelled out: these expectations are printed to whoever runs the script, and
+    // a hardcoded number here quietly becomes a lie the next time the allowances move (it already
+    // did once — this line said "0 of 2 left today" after the 2026-08-06 reprice to 1/day).
+    expect: `/videos + /analysis/roll-center locked · /engineer '${STANDARD_ENGINEER_DAILY_QUESTIONS} of ${STANDARD_ENGINEER_DAILY_QUESTIONS} ... left today' · next ask refused`,
   },
   {
     key: "pro",
@@ -49,7 +56,7 @@ const STATES = [
     tier: "pro",
     status: "active",
     periodEnd: () => new Date(Date.now() + 30 * 86400000),
-    expect: "everything open · /engineer '300 of 300 left this month'",
+    expect: `everything open · /engineer '${PRO_ENGINEER_MONTHLY_QUESTIONS} of ${PRO_ENGINEER_MONTHLY_QUESTIONS} ... left this month'`,
   },
 ] as const;
 

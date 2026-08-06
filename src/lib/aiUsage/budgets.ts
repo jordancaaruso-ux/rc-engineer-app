@@ -8,6 +8,8 @@
  * Pure functions only — no Prisma, no env reads at module scope — so the maths is testable.
  */
 
+import { TIER_LABELS } from "@/lib/brand/brandNames";
+
 export const AI_USAGE_FEATURES = [
   "engineer-chat",
   "engineer-quick-fix",
@@ -226,22 +228,41 @@ export function evaluateAiBudget(input: {
 }
 
 /**
- * Tier allowances for Engineer chat (MONETISATION_NORTH_STAR.md, founder-locked 2026-08-01):
- * Standard is the notebook with a taste of the Engineer — 2 questions a DAY; Pro is the real
- * Engineer tier — a 300-a-MONTH pool, spent whenever ("2 a day" vs "300 a month" IS the pitch).
- * At the terra chat rate (~$0.055/answer) even a fully drained pool stays profitable.
+ * Tier allowances for Engineer chat (MONETISATION_NORTH_STAR.md; repriced 2026-08-06).
+ *
+ * Notebook is the notebook with a taste of the Engineer — 1 question a DAY; Race Engineer is the
+ * real Engineer tier — a 100-a-MONTH pool, spent whenever. The pitch is no longer raw volume
+ * (30 vs 100 is only 3x) but BURST: a Race Engineer can spend a whole weekend's questions on
+ * Saturday, which a Notebook member structurally cannot, and gets video + roll-centre with it.
+ *
+ * Margin, measured against real production usage 2026-08-06 (77 answers, prod `AiUsageDaily`):
+ * $0.048/answer blended at a 58% cache hit, $0.097 if nothing caches at all. Against net-of-Stripe
+ * revenue of ~US$6.19 (Notebook) and ~US$12.58 (Race Engineer), BOTH tiers stay profitable at a
+ * full drain even in the zero-cache case — which is the property these numbers were chosen for.
+ * Re-measure before moving them: the old "~$0.055" note assumed a ~79K-token prompt, and the v0 KB
+ * rebuild roughly halved that to ~42K.
  */
-export const STANDARD_ENGINEER_DAILY_QUESTIONS = 2;
-export const PRO_ENGINEER_MONTHLY_QUESTIONS = 300;
+export const STANDARD_ENGINEER_DAILY_QUESTIONS = 1;
+export const PRO_ENGINEER_MONTHLY_QUESTIONS = 100;
+
+/**
+ * "1 Engineer question" / "100 Engineer questions". The allowances are constants that have already
+ * moved once, and a cap-hit line that reads "today's 1 Engineer questions" undercuts the copy at
+ * exactly the moment it is trying to sell an upgrade.
+ */
+export function engineerQuestionCount(n: number): string {
+  return `${n} Engineer question${n === 1 ? "" : "s"}`;
+}
 
 /**
  * Shape a feature budget for a paying tier. Only Engineer chat has tier allowances; every other
  * feature keeps its base abuse brakes. Callers must NOT pass grandfathered users through here —
  * comps and pre-paywall testers keep the base (untiered) budget.
  *
- * Standard: the 2/day allowance REPLACES the daily-call brake (the smaller number wins anyway);
- * no monthly pool. Pro: the 300/month pool sits alongside the base daily brake, which stays as
- * burst protection — 60 questions in one race day is legitimate Pro usage, 60 every day is not.
+ * Notebook: the 1/day allowance REPLACES the daily-call brake (the smaller number wins anyway);
+ * no monthly pool. Race Engineer: the 100/month pool sits alongside the base daily brake, which
+ * stays as burst protection — a weekend's questions in one day is the tier's whole pitch, but 60
+ * every day is not a race weekend.
  */
 export function applyEngineerTierBudget(
   budget: AiBudget,
@@ -253,7 +274,7 @@ export function applyEngineerTierBudget(
       dailyCalls: Math.min(budget.dailyCalls, STANDARD_ENGINEER_DAILY_QUESTIONS),
       messages: {
         ...budget.messages,
-        dailyCalls: `You've used today's ${STANDARD_ENGINEER_DAILY_QUESTIONS} Engineer questions. Pro includes ${PRO_ENGINEER_MONTHLY_QUESTIONS} a month — upgrade any time on the Subscription page.`,
+        dailyCalls: `You've used today's ${engineerQuestionCount(STANDARD_ENGINEER_DAILY_QUESTIONS)}. ${TIER_LABELS.pro} includes ${PRO_ENGINEER_MONTHLY_QUESTIONS} a month, to spend whenever you like — upgrade any time on the Subscription page.`,
       },
     };
   }
@@ -262,7 +283,7 @@ export function applyEngineerTierBudget(
     monthlyCalls: PRO_ENGINEER_MONTHLY_QUESTIONS,
     messages: {
       ...budget.messages,
-      monthlyCalls: `You've used this month's ${PRO_ENGINEER_MONTHLY_QUESTIONS} Engineer questions. They reset next month.`,
+      monthlyCalls: `You've used this month's ${engineerQuestionCount(PRO_ENGINEER_MONTHLY_QUESTIONS)}. They reset next month.`,
     },
   };
 }

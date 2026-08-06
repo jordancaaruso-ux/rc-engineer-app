@@ -2,21 +2,37 @@
 
 import { useState } from "react";
 import { PillToggle } from "@/components/ui/PillToggle";
+import { TIER_LABELS } from "@/lib/brand/brandNames";
+import {
+  PRO_ENGINEER_MONTHLY_QUESTIONS,
+  STANDARD_ENGINEER_DAILY_QUESTIONS,
+} from "@/lib/aiUsage/budgets";
 
 export type JoinPlan = {
   tier: "standard" | "pro";
   interval: "month" | "year";
   priceId: string;
-  /** Formatted amount, e.g. "$14.99" — null when Stripe couldn't be read (render em dash). */
+  /** Formatted amount, e.g. "$9.99" — null when Stripe couldn't be read (render em dash). */
   amount: string | null;
 };
 
-/** The comparison rows (decision-board pick 4A) — feature truth mirrors entitlementLogic.ts. */
+/**
+ * The comparison rows (decision-board pick 4A) — feature truth mirrors entitlementLogic.ts.
+ *
+ * The Engineer row reads its numbers from `budgets.ts` rather than repeating them: this table is
+ * the promise, `applyEngineerTierBudget` is the enforcement, and the two drifting apart is how a
+ * member gets sold one number and refused at another.
+ */
 const ROWS: Array<{ label: string; standard: string; pro: string }> = [
   { label: "Run logging (LiveRC · Speedhive · MyRCM)", standard: "✓", pro: "✓" },
   { label: "Session review & lap analysis", standard: "✓", pro: "✓" },
   { label: "Compare runs & setups", standard: "✓", pro: "✓" },
-  { label: "Engineer questions", standard: "2 a day", pro: "300 a month" },
+  {
+    label: "Engineer questions",
+    standard: `${STANDARD_ENGINEER_DAILY_QUESTIONS} a day`,
+    pro: `${PRO_ENGINEER_MONTHLY_QUESTIONS} a month`,
+  },
+  { label: "Ask a weekend's worth in one day", standard: "—", pro: "✓" },
   { label: "Video analysis", standard: "—", pro: "Soon" },
   { label: "Roll-centre tools", standard: "—", pro: "✓" },
 ];
@@ -80,10 +96,10 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
                 What you get
               </th>
               <th className="border-l border-border px-3 py-2.5 text-left text-[13px] font-semibold">
-                Standard
+                {TIER_LABELS.standard}
               </th>
               <th className="border-l border-border px-3 py-2.5 text-left text-[13px] font-semibold">
-                Pro
+                {TIER_LABELS.pro}
               </th>
             </tr>
           </thead>

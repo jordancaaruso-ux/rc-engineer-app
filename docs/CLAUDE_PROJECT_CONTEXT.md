@@ -120,13 +120,20 @@ or numbers go stale silently.
   feel-named files.
 - **The KB is nearly empty, and that's the real blocker** — not the Engineer's reasoning. With little
   to ground on it hedges and generalises. The flaw-hunt harness is parked until it's filled.
-- **Monetization:** demo-to-paid, no free tier. Standard AUD 14.99/mo (logging, review, compare +
-  ~15 Engineer questions/month), Pro AUD 24.99/mo (+ video, roll-centre, full Engineer). A public
-  read-only demo — a seeded driver whose data shows a believable *arc* — is the try-before-buy,
-  because the value is longitudinal and a fresh trial account is empty. Testers grandfathered to Pro.
-  Foundation built but inert behind a flag.
-- **Engineer cost** ~$0.12 per typical question; Standard break-even ≈ 75/month; a race weekend is
-  20–40. **Video has zero AI cost** — its cost is stored GB forever, hence ~30-day retention.
+- **Monetization:** pay-to-signup, no free tier. **LIVE since 2026-08-01**; repriced 2026-08-06 to
+  **Notebook AUD 9.99/mo** (logging, review, compare + 1 Engineer question/day) and **Race Engineer
+  AUD 19.99/mo** (+ video, roll-centre, a 100-question/month Engineer pool spendable in bursts).
+  Annual $99.90 / $199.90. Internal tier ids are still `standard`/`pro`; labels live in
+  `TIER_LABELS`. A public read-only demo — a seeded driver whose data shows a believable *arc* — is
+  the try-before-buy, because the value is longitudinal and a fresh trial account is empty. Testers
+  are comped via 100%-off promo codes (grandfathering retired to admins only).
+- **Engineer cost — MEASURED 2026-08-06 against real production usage: US$0.048/answer** (all 77
+  `engineer-chat` answers in prod `AiUsageDaily`; 58% prompt-cache hit; ~42K-token average prompt,
+  roughly half what the older notes assumed because the v0 KB rebuild shrank it). **US$0.097 with
+  zero caching** — the number the current prices are safe against. **Video has zero AI cost** — its
+  cost is stored GB forever, hence ~30-day retention.
+  - Everything below this line predates the terra ship and the v0 KB rebuild; it is kept for the
+    reasoning, not the figures.
   - **MEASURED 2026-07-31 (gpt-5.5, 3 bench cases, real usage):** ~**$0.18/answer**, not $0.12.
     Two errors cancelled out to roughly the right answer: `budgets.ts` priced gpt-5.5 at gpt-5's
     $1.25/$10 when it is **$5/$30** (~4x under), while every harness ignored prompt caching, which

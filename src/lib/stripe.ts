@@ -52,7 +52,7 @@ export function getPricePlans(): PricePlan[] {
  *
  * `getPricePlans()` deliberately stays synchronous (checkout validates a client-supplied price id
  * against it, and that must not depend on a network call). The amount lives here instead, because
- * a plan picker cannot render "$14.99/mo" — or compute the annual saving — from a price id alone.
+ * a plan picker cannot render "$9.99/mo" — or compute the annual saving — from a price id alone.
  *
  * `unitAmount` is in MINOR units (cents), exactly as Stripe reports it. Null means the lookup
  * failed or Stripe isn't configured; render those plans without a figure rather than crashing the
@@ -93,14 +93,60 @@ export const getPricePlansWithAmounts = cache(
   },
 );
 
-/** Map a Stripe price id back to our internal tier. Unknown → "standard" (fail-safe to cheaper). */
-export function tierForPriceId(priceId: string | null | undefined): Tier {
-  if (!priceId) return "standard";
+/**
+ * Map a Stripe price id back to our internal tier, by matching the CURRENTLY CONFIGURED price ids.
+ * Unknown → null, meaning "these env vars can't answer" — never a tier guess. See
+ * `resolveTierForPriceId` for why that distinction matters.
+ */
+function tierFromEnvPriceId(priceId: string): Tier | null {
   if (
     priceId === process.env[PRICE_ENV_KEYS.proMonthly] ||
     priceId === process.env[PRICE_ENV_KEYS.proAnnual]
   ) {
     return "pro";
+  }
+  if (
+    priceId === process.env[PRICE_ENV_KEYS.standardMonthly] ||
+    priceId === process.env[PRICE_ENV_KEYS.standardAnnual]
+  ) {
+    return "standard";
+  }
+  return null;
+}
+
+/**
+ * The tier a price grants — the authority for what a paying member gets.
+ *
+ * This USED to be a bare env-id comparison that fell back to "standard". That fallback is a
+ * downgrade bomb the moment prices change: Stripe prices are immutable, so a repricing creates NEW
+ * ids while every existing subscriber keeps paying against the OLD one. Their next routine
+ * `invoice.paid` sync would find no env match and silently move them to the cheap tier — for Pro
+ * members and comped testers alike, with no error anywhere and no way to notice but a complaint.
+ *
+ * So the env map is only a fast path (the common case: a current subscriber, no network call), and
+ * a miss falls through to the price's PRODUCT metadata, which both setup scripts stamp with
+ * `metadata.tier` and which Stripe carries forward across every future price. Only when Stripe
+ * itself can't answer do we fail safe to "standard" — cheaper is the safe direction to be wrong in,
+ * but it must be the last resort rather than the default.
+ */
+export async function resolveTierForPriceId(priceId: string | null | undefined): Promise<Tier> {
+  if (!priceId) return "standard";
+  const fromEnv = tierFromEnvPriceId(priceId);
+  if (fromEnv) return fromEnv;
+  if (!stripeConfigured()) return "standard";
+  try {
+    const price = await getStripe().prices.retrieve(priceId, { expand: ["product"] });
+    const product = price.product;
+    // A deleted product still resolves as `{ id, deleted: true }` with no metadata.
+    const tier =
+      typeof product === "object" && product && "metadata" in product
+        ? product.metadata?.tier
+        : undefined;
+    if (tier === "pro" || tier === "standard") return tier;
+    console.error(`[stripe] price ${priceId} has no usable product metadata.tier — using standard`);
+  } catch (error) {
+    // Never throw here: this runs inside the webhook, and a Stripe blip must not wedge the event.
+    console.error(`[stripe] could not resolve tier for price ${priceId}`, error);
   }
   return "standard";
 }

@@ -10,7 +10,8 @@ export type BillingPlan = {
 };
 
 export type BillingSubscription = {
-  tier: string;
+  /** Already resolved to a display name upstream — never the raw `Subscription.tier` id. */
+  tierLabel: string;
   status: string;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
@@ -19,7 +20,7 @@ export type BillingSubscription = {
 export function BillingClient({
   plans,
   entitled,
-  tier,
+  tierLabel,
   grandfathered,
   hasCustomer,
   enforced,
@@ -27,7 +28,7 @@ export function BillingClient({
 }: {
   plans: BillingPlan[];
   entitled: boolean;
-  tier: string;
+  tierLabel: string;
   grandfathered: boolean;
   hasCustomer: boolean;
   enforced: boolean;
@@ -63,7 +64,7 @@ export function BillingClient({
       {subscription && (
         <div className="rounded-lg border border-neutral-300 px-4 py-3 text-sm dark:border-neutral-700">
           <span className="font-medium">Current subscription:</span>{" "}
-          {subscription.tier} · {subscription.status}
+          {subscription.tierLabel} · {subscription.status}
           {subscription.currentPeriodEnd &&
             ` · ${subscription.cancelAtPeriodEnd ? "ends" : "renews"} ${new Date(
               subscription.currentPeriodEnd,
@@ -75,7 +76,7 @@ export function BillingClient({
         {grandfathered
           ? "You have full access as an existing member — no payment needed."
           : entitled
-            ? `Current plan: ${tier}.`
+            ? `Current plan: ${tierLabel}.`
             : "Choose a plan to unlock the app."}
         {!enforced && " (Billing is not yet enforced — everyone has full access for now.)"}
       </p>

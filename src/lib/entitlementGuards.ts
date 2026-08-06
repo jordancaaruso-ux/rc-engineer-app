@@ -6,6 +6,7 @@ import type { User } from "@prisma/client";
 import { getAuthenticatedApiUser, requireCurrentUser } from "@/lib/currentUser";
 import { isFeatureEntitled, type Feature } from "@/lib/entitlementLogic";
 import { getEntitlement, type Entitlement } from "@/lib/entitlement";
+import { TIER_LABELS } from "@/lib/brand/brandNames";
 
 /**
  * Redirect-based entitlement guards (kept separate from the resolvers in `entitlement.ts` so those
@@ -74,7 +75,9 @@ export async function requireApiFeature(
     return {
       user: null,
       response: NextResponse.json(
-        { error: "This feature is part of Pro. Upgrade on the Subscription page." },
+        {
+          error: `This feature is part of ${TIER_LABELS.pro}. Upgrade on the Subscription page.`,
+        },
         { status: 402 },
       ),
     };

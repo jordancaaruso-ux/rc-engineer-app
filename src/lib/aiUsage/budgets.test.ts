@@ -6,13 +6,17 @@ import { test } from "node:test";
 import {
   aiUsageTimeZone,
   applyEngineerTierBudget,
+  engineerQuestionCount,
   estimateCostUsd,
   evaluateAiBudget,
   modelRate,
   remainingMonthlyCalls,
   resolveAiBudget,
+  PRO_ENGINEER_MONTHLY_QUESTIONS,
+  STANDARD_ENGINEER_DAILY_QUESTIONS,
   type AiBudget,
 } from "@/lib/aiUsage/budgets";
+import { TIER_LABELS } from "@/lib/brand/brandNames";
 
 const budget: AiBudget = { dailyCalls: 10, dailyCostUsd: 2, monthlyCostUsd: 20 };
 
@@ -199,30 +203,74 @@ test("ledger day zone is fixed by default, env-overridable", () => {
   );
 });
 
-test("Standard tier: 2 questions a day, and the cap-hit line sells Pro", () => {
+// The founder-decided allowances, pinned as literals ON PURPOSE (repriced 2026-08-06). Everything
+// below reads the constants so it survives the next move; this one test is the tripwire that says
+// the numbers themselves changed, so a careless edit can't quietly reprice the product.
+test("the tier allowances are 1 a day and 100 a month", () => {
+  assert.equal(STANDARD_ENGINEER_DAILY_QUESTIONS, 1);
+  assert.equal(PRO_ENGINEER_MONTHLY_QUESTIONS, 100);
+});
+
+test("question counts read naturally at 1 and at many", () => {
+  assert.equal(engineerQuestionCount(1), "1 Engineer question");
+  assert.equal(engineerQuestionCount(100), "100 Engineer questions");
+});
+
+test("Notebook tier: a daily allowance, and the cap-hit line sells the top tier", () => {
   const shaped = applyEngineerTierBudget(budget, "standard");
-  assert.equal(shaped.dailyCalls, 2);
+  assert.equal(shaped.dailyCalls, STANDARD_ENGINEER_DAILY_QUESTIONS);
   assert.equal(shaped.monthlyCalls, undefined);
   // Dollar brakes are untouched — the tier changes the allowance, not the abuse ceiling.
   assert.equal(shaped.dailyCostUsd, budget.dailyCostUsd);
-  assert.equal(evaluateAiBudget({ ...clear, budget: shaped, featureCallsToday: 1 }).ok, true);
-  const v = evaluateAiBudget({ ...clear, budget: shaped, featureCallsToday: 2 });
+  assert.equal(
+    evaluateAiBudget({
+      ...clear,
+      budget: shaped,
+      featureCallsToday: STANDARD_ENGINEER_DAILY_QUESTIONS - 1,
+    }).ok,
+    true,
+  );
+  const v = evaluateAiBudget({
+    ...clear,
+    budget: shaped,
+    featureCallsToday: STANDARD_ENGINEER_DAILY_QUESTIONS,
+  });
   assert.equal(v.ok === false && v.reason, "daily-calls");
-  if (v.ok === false) assert.match(v.message, /Pro/);
+  // Must name the tier it is selling, and must never read as a bare limit error.
+  if (v.ok === false) assert.match(v.message, new RegExp(TIER_LABELS.pro));
+  if (v.ok === false) assert.match(v.message, /upgrade/i);
 });
 
-test("Pro tier: 300-a-month pool beside the base daily burst brake", () => {
+test("Race Engineer tier: a monthly pool beside the base daily burst brake", () => {
   const shaped = applyEngineerTierBudget(budget, "pro");
-  assert.equal(shaped.monthlyCalls, 300);
+  assert.equal(shaped.monthlyCalls, PRO_ENGINEER_MONTHLY_QUESTIONS);
   assert.equal(shaped.dailyCalls, budget.dailyCalls);
-  assert.equal(evaluateAiBudget({ ...clear, budget: shaped, featureCallsMonth: 299 }).ok, true);
-  const v = evaluateAiBudget({ ...clear, budget: shaped, featureCallsMonth: 300 });
+  assert.equal(
+    evaluateAiBudget({
+      ...clear,
+      budget: shaped,
+      featureCallsMonth: PRO_ENGINEER_MONTHLY_QUESTIONS - 1,
+    }).ok,
+    true,
+  );
+  const v = evaluateAiBudget({
+    ...clear,
+    budget: shaped,
+    featureCallsMonth: PRO_ENGINEER_MONTHLY_QUESTIONS,
+  });
   assert.equal(v.ok === false && v.reason, "monthly-calls");
-  // Pro's cap-hit line must NOT upsell — there is nothing above Pro to sell.
+  // The top tier's cap-hit line must NOT upsell — there is nothing above it to sell.
   if (v.ok === false) assert.doesNotMatch(v.message, /upgrade/i);
 });
 
-test("a Standard cap never widens an operator-tightened daily brake", () => {
-  const tightened: AiBudget = { ...budget, dailyCalls: 1 };
-  assert.equal(applyEngineerTierBudget(tightened, "standard").dailyCalls, 1);
+test("a Notebook cap never widens an operator-tightened daily brake", () => {
+  // The invariant is min(operator brake, tier allowance) — asserted across the range rather than
+  // at one value, so it keeps testing something when the allowance itself moves.
+  for (const operatorLimit of [0, 1, 5, 60]) {
+    const tightened: AiBudget = { ...budget, dailyCalls: operatorLimit };
+    assert.equal(
+      applyEngineerTierBudget(tightened, "standard").dailyCalls,
+      Math.min(operatorLimit, STANDARD_ENGINEER_DAILY_QUESTIONS),
+    );
+  }
 });

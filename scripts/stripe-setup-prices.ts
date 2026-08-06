@@ -1,6 +1,6 @@
 /**
- * One-off: create the RC Engineer subscription products + prices in Stripe. Idempotent —
- * products are matched by metadata, prices by lookup_key, so re-running reuses what exists.
+ * One-off: create the subscription products + prices in Stripe. Idempotent — products are matched
+ * by metadata, prices by lookup_key, so re-running reuses what exists.
  *
  * Run (needs your TEST key `sk_test_...` in .env.local):
  *   npm run stripe:setup-prices
@@ -10,6 +10,9 @@
  * Annual = 10x monthly (~2 months free).
  */
 import Stripe from "stripe";
+// Relative, not `@/` — this runs under tsx outside the Next build, so no path aliases.
+// Both modules are pure by design, which is what makes them importable here.
+import { PRODUCT_NAME, TIER_LABELS } from "../src/lib/brand/brandNames";
 
 const key = process.env.STRIPE_SECRET_KEY;
 if (!key) {
@@ -37,23 +40,27 @@ type TierDef = {
   prices: PriceDef[];
 };
 
+// Repriced 2026-08-06: $14.99/$27.99 → $9.99/$19.99, and Standard/Pro renamed to
+// Notebook/Race Engineer. The tier IDS below are unchanged on purpose — they are the values in
+// `Subscription.tier` and in each product's `metadata.tier`, and the webhook resolves entitlement
+// through them. Only the labels moved. See docs/MONETISATION_NORTH_STAR.md.
 const TIERS: TierDef[] = [
   {
     tier: "standard",
-    productName: "RC Engineer — Standard",
+    productName: `${PRODUCT_NAME} — ${TIER_LABELS.standard}`,
     prices: [
-      { envVar: "STRIPE_PRICE_STANDARD_MONTHLY", lookupKey: "rc_engineer_standard_monthly", interval: "month", unitAmount: 1499 },
-      { envVar: "STRIPE_PRICE_STANDARD_ANNUAL", lookupKey: "rc_engineer_standard_annual", interval: "year", unitAmount: 14990 },
+      { envVar: "STRIPE_PRICE_STANDARD_MONTHLY", lookupKey: "rc_engineer_standard_monthly", interval: "month", unitAmount: 999 },
+      { envVar: "STRIPE_PRICE_STANDARD_ANNUAL", lookupKey: "rc_engineer_standard_annual", interval: "year", unitAmount: 9990 },
     ],
   },
   {
     tier: "pro",
-    productName: "RC Engineer — Pro",
+    productName: `${PRODUCT_NAME} — ${TIER_LABELS.pro}`,
     prices: [
-      // $27.99 (raised from the $24.99 sketch, founder-locked 2026-08-01) keeps ~40% margin over
-      // a fully drained 300-question Engineer pool — see MONETISATION_NORTH_STAR.md.
-      { envVar: "STRIPE_PRICE_PRO_MONTHLY", lookupKey: "rc_engineer_pro_monthly", interval: "month", unitAmount: 2799 },
-      { envVar: "STRIPE_PRICE_PRO_ANNUAL", lookupKey: "rc_engineer_pro_annual", interval: "year", unitAmount: 27990 },
+      // $19.99 against a 100-question pool: ~US$12.58 net of Stripe versus US$4.83 of Engineer
+      // spend at the measured $0.048/answer, and still profitable at US$9.73 if nothing caches.
+      { envVar: "STRIPE_PRICE_PRO_MONTHLY", lookupKey: "rc_engineer_pro_monthly", interval: "month", unitAmount: 1999 },
+      { envVar: "STRIPE_PRICE_PRO_ANNUAL", lookupKey: "rc_engineer_pro_annual", interval: "year", unitAmount: 19990 },
     ],
   },
 ];
@@ -62,7 +69,17 @@ async function ensureProduct(tier: string, name: string): Promise<string> {
   const found = await stripe.products.search({
     query: `active:'true' AND metadata['app']:'${APP}' AND metadata['tier']:'${tier}'`,
   });
-  if (found.data[0]) return found.data[0].id;
+  const existing = found.data[0];
+  if (existing) {
+    // Products are matched on metadata.tier, which never changes — so a renamed tier would
+    // otherwise keep its old Stripe product name forever, and that name is what customers read on
+    // their receipts and in the billing portal. Push the rename through.
+    if (existing.name !== name) {
+      console.log(`  product ${existing.id}: renaming "${existing.name}" → "${name}"`);
+      await stripe.products.update(existing.id, { name });
+    }
+    return existing.id;
+  }
   const created = await stripe.products.create({ name, metadata: { app: APP, tier } });
   return created.id;
 }
@@ -71,9 +88,12 @@ async function ensurePrice(productId: string, def: PriceDef): Promise<string> {
   const existing = await stripe.prices.list({ lookup_keys: [def.lookupKey], limit: 1 });
   const current = existing.data[0];
   if (current && current.unit_amount === def.unitAmount) return current.id;
-  // Stripe prices are immutable: a changed amount (e.g. Pro $24.99 → $27.99, 2026-08-01) means a
-  // NEW price that takes over the lookup key. The old price stays active so existing subscribers
-  // keep renewing at what they signed up for; only new checkouts see the new id.
+  // Stripe prices are immutable: a changed amount (e.g. Pro $27.99 → Race Engineer $19.99,
+  // 2026-08-06) means a NEW price that takes over the lookup key. The old price stays active so
+  // existing subscribers keep renewing at what they signed up for; only new checkouts see the new
+  // id. That is also why the webhook must NOT identify a tier by matching the configured price ids
+  // — see `resolveTierForPriceId`, which falls back to the product's metadata.tier precisely
+  // because everyone who subscribed before a reprice still carries the superseded id.
   if (current) {
     console.log(
       `  ${def.lookupKey}: amount changed ${current.unit_amount} → ${def.unitAmount}, creating replacement price`,

@@ -3,7 +3,7 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
-import { getStripe, stripeConfigured, tierForPriceId } from "@/lib/stripe";
+import { getStripe, stripeConfigured, resolveTierForPriceId } from "@/lib/stripe";
 import { deriveSubscriptionSchedule } from "@/lib/stripeSubscriptionSync";
 import { extractCheckoutEmail, isPublicSignupSession } from "@/lib/billing/paidSignupLogic";
 import { provisionPaidUser, sendPaidSignupSignInLink } from "@/lib/billing/paidSignup";
@@ -23,7 +23,7 @@ async function syncSubscription(sub: Stripe.Subscription): Promise<void> {
   if (!user) return; // customer not linked to a user yet — nothing to sync
 
   const priceId = sub.items.data[0]?.price?.id ?? null;
-  const tier = tierForPriceId(priceId);
+  const tier = await resolveTierForPriceId(priceId);
   const { currentPeriodEnd, cancelAtPeriodEnd } = deriveSubscriptionSchedule(sub);
 
   const data = {
