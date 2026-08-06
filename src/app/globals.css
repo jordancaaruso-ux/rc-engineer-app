@@ -737,10 +737,51 @@ html[data-nav-pending] .page {
   @apply text-[13px] font-normal leading-relaxed tracking-normal text-muted-foreground;
 }
 
+/*
+ * Page body — the content column.
+ *
+ * `w-full mx-auto` is what CENTERS it, and it is deliberately here rather than at the 28 call
+ * sites that set their own `max-w-*`: 24 of them had the clamp WITHOUT `mx-auto`, so on any screen
+ * wider than the clamp the content hugged the left edge while `.page-header` centered the title
+ * across the whole pane — the two were visibly on different axes. The header was never wrong; the
+ * body was. Centering both in the same container aligns them by construction, so a page can no
+ * longer forget.
+ *
+ * `w-full` is load-bearing, not decoration: auto inline margins on a column-flex item suppress the
+ * default `stretch`, so without an explicit width the column would shrink-to-fit its content.
+ *
+ * No mobile effect. Below the clamp (every phone width) the column is already full-bleed, so the
+ * auto margins have nothing to distribute. Verified with `npm run layout:probe` at 390px, stashed
+ * vs applied: identical geometry on all 8 routes. Do NOT try to verify this with screenshots —
+ * these pages differ by up to 98% between two captures of the same code.
+ */
 .page-body {
   @apply flex flex-1 flex-col gap-3 pt-2 pb-3 min-w-0;
+  /* Plain CSS, not `@apply w-full mx-auto` — Tailwind 4 silently dropped those two from the
+     @apply list here while emitting the other seven, so the rule shipped without them. */
+  width: 100%;
+  margin-inline: auto;
   padding-left: max(1.25rem, env(safe-area-inset-left));
   padding-right: max(1.25rem, env(safe-area-inset-right));
+}
+
+/*
+ * Desktop gutters. The 1.25rem trackside gutter is a thumb-reach compromise that reads as a hairline
+ * once there is a mouse and a 1440px viewport, and it only shows on the full-bleed pages (run
+ * history, comparison) — a clamped column gets its breathing room from the auto margins instead.
+ */
+@media (min-width: 1024px) {
+  .page-body {
+    padding-left: max(2rem, env(safe-area-inset-left));
+    padding-right: max(2rem, env(safe-area-inset-right));
+  }
+}
+
+@media (min-width: 1536px) {
+  .page-body {
+    padding-left: max(3rem, env(safe-area-inset-left));
+    padding-right: max(3rem, env(safe-area-inset-right));
+  }
 }
 
 /* Hints, save feedback, and compact supporting copy below labels. */

@@ -54,3 +54,5 @@ hardware/**/__pycache__/
 
 # App-surface captures (regenerate with e2e/tabs-walkthrough.spec.ts)
 /tabs-frames/
+desktop-shots/
+.layout-probes/

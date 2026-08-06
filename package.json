@@ -150,7 +150,9 @@
     "db:seed:additives": "npx dotenv-cli -e .env.local -- npx tsx scripts/sync-additive-types.ts",
     "stripe:setup-prices": "npx dotenv-cli -e .env.local -- npx tsx scripts/stripe-setup-prices.ts",
     "cap:sync": "cap sync ios",
-    "cap:open": "cap open ios"
+    "cap:open": "cap open ios",
+    "shots:desktop": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/dev-desktop-shots.ts",
+    "layout:probe": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/dev-layout-probe.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
