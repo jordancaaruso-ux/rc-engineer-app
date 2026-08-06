@@ -5,11 +5,8 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "r
 import { cn } from "@/lib/utils";
 import { readSetupField } from "@/lib/a800rrSetupRead";
 import { coerceSetupValue, type SetupSnapshotData } from "@/lib/runSetup";
-import {
-  getDefaultSetupSheetTemplate,
-  type SetupSheetFieldDef,
-  type SetupSheetTemplate,
-} from "@/lib/setupSheetTemplate";
+import type { SetupSheetFieldDef, SetupSheetTemplate } from "@/lib/setupSheetTemplate";
+import { getGenericSetupSheetTemplate } from "@/lib/setupSheetModels/genericSetupSheetTemplate";
 import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
 import type { CompareColumnRole } from "@/lib/setupCompare/compareHighlight";
 import { getDifferenceColor } from "@/lib/setupCompare/differenceColor";
@@ -218,7 +215,7 @@ export function SetupSheetView({
   fieldKeyFilter,
   compareHighlightOnly = false,
 }: SetupSheetViewProps) {
-  const template = templateProp ?? getDefaultSetupSheetTemplate();
+  const template = templateProp ?? getGenericSetupSheetTemplate();
   const baseline = baselineValue ?? null;
 
   const commit = useCallback(

@@ -17,7 +17,8 @@ import { isRunContextSetupKey } from "@/lib/setup/runContextSetupKeys";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
-import { getDefaultSetupSheetTemplate, type SetupSheetTemplate } from "@/lib/setupSheetTemplate";
+import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
+import { getGenericSetupSheetTemplate } from "@/lib/setupSheetModels/genericSetupSheetTemplate";
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { TrackCombobox } from "@/components/runs/TrackCombobox";
 import { RunLayoutPicker } from "@/components/runs/RunLayoutPicker";
@@ -1495,7 +1496,7 @@ export function NewRunForm(props: {
     if (isA800RRCar(selectedCar?.setupSheetTemplate)) {
       return A800RR_SETUP_SHEET_V1;
     }
-    return getDefaultSetupSheetTemplate();
+    return getGenericSetupSheetTemplate();
   }, [modelTemplate, selectedCar?.setupSheetTemplate]);
 
   const sheetFieldKeys = useMemo(

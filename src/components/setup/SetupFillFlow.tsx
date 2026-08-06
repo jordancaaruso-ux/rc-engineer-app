@@ -501,7 +501,7 @@ export function SetupFillFlow({
         ) : null}
 
         {step.kind === "choice" ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div data-testid="fill-choice-options" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {(step.options ?? []).map((label, i) => {
               const token = tokenFor(step, i);
               const active = current != null && String(current) === token;
@@ -524,7 +524,7 @@ export function SetupFillFlow({
         ) : null}
 
         {step.kind === "multiChoice" ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div data-testid="fill-multichoice-options" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {(step.options ?? []).map((label, i) => {
               const token = tokenFor(step, i);
               const active = multiSelected.includes(token);

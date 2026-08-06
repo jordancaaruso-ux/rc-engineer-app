@@ -2,7 +2,7 @@ import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { prisma } from "@/lib/prisma";
 import { collectSetupSheetTemplateKeys } from "@/lib/setupSheetModels/collectTemplateKeys";
 import { resolveSetupSheetModelForCar } from "@/lib/setupSheetModels/resolveModelForCar";
-import { getDefaultSetupSheetTemplate } from "@/lib/setupSheetTemplate";
+import { getGenericSetupSheetTemplate } from "@/lib/setupSheetModels/genericSetupSheetTemplate";
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import {
   buildSetupSheetTemplateFromParsedSchema,
@@ -26,7 +26,7 @@ export async function getSetupSheetFieldKeysForCar(
 
   const template = isA800RRCar(car.setupSheetTemplate)
     ? A800RR_SETUP_SHEET_V1
-    : getDefaultSetupSheetTemplate();
+    : getGenericSetupSheetTemplate();
   return collectSetupSheetTemplateKeys(template);
 }
 
@@ -41,7 +41,7 @@ export async function getSetupSheetFieldKeysForCarRow(
   }
   const template = isA800RRCar(car.setupSheetTemplate)
     ? A800RR_SETUP_SHEET_V1
-    : getDefaultSetupSheetTemplate();
+    : getGenericSetupSheetTemplate();
   return collectSetupSheetTemplateKeys(template);
 }
 

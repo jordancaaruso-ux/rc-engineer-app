@@ -19,7 +19,8 @@ import { SegmentedControl, type SegmentedOption } from "@/components/ui/Segmente
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { Eyebrow } from "@/components/ui/panel";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
-import { getDefaultSetupSheetTemplate, type SetupSheetTemplate } from "@/lib/setupSheetTemplate";
+import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
+import { getGenericSetupSheetTemplate } from "@/lib/setupSheetModels/genericSetupSheetTemplate";
 import { canonicalSetupSheetTemplateId, isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { GRIP_BUCKET_ANY } from "@/lib/setupAggregations/gripBuckets";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
@@ -522,7 +523,7 @@ export function SetupSheetModal({
   const template = useMemo(() => {
     if (modelTemplate) return modelTemplate;
     if (isA800RRCar(run?.car?.setupSheetTemplate)) return A800RR_SETUP_SHEET_V1;
-    return getDefaultSetupSheetTemplate();
+    return getGenericSetupSheetTemplate();
   }, [modelTemplate, run?.car?.setupSheetTemplate]);
 
   if (!open || !portalReady) return null;

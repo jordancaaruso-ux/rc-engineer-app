@@ -5,7 +5,7 @@ import { hasOpenAiApiKey, getOpenAiApiKey } from "@/lib/openaiServerEnv";
 import { prisma } from "@/lib/prisma";
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
-import { getDefaultSetupSheetTemplate } from "@/lib/setupSheetTemplate";
+import { getGenericSetupSheetTemplate } from "@/lib/setupSheetModels/genericSetupSheetTemplate";
 import { buildCatalogFromTemplate } from "@/lib/setupFieldCatalog";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { isDerivedSetupKey } from "@/lib/setupCalculations/a800rrDerived";
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
   });
   if (!car) return NextResponse.json({ error: "Car not found" }, { status: 404 });
 
-  const template = isA800RRCar(car.setupSheetTemplate) ? A800RR_SETUP_SHEET_V1 : getDefaultSetupSheetTemplate();
+  const template = isA800RRCar(car.setupSheetTemplate) ? A800RR_SETUP_SHEET_V1 : getGenericSetupSheetTemplate();
   const catalog = buildCatalogFromTemplate(template);
 
   const setup = normalizeSetupData(body?.setupData) as SetupSnapshotData;

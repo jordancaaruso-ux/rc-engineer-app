@@ -1,5 +1,6 @@
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
-import { getDefaultSetupSheetTemplate, type SetupSheetTemplate } from "@/lib/setupSheetTemplate";
+import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
+import { getGenericSetupSheetTemplate } from "@/lib/setupSheetModels/genericSetupSheetTemplate";
 import {
   buildSetupSheetTemplateFromParsedSchema,
   type SetupSheetTemplateView,
@@ -49,7 +50,7 @@ export async function getSetupSheetTemplateAndKeyForCar(
     return { template: A800RR_SETUP_SHEET_V1, templateKey: SETUP_SHEET_TEMPLATE_A800RR };
   }
   return {
-    template: getDefaultSetupSheetTemplate(),
+    template: getGenericSetupSheetTemplate(),
     templateKey: canonicalSetupSheetTemplateId(car.setupSheetTemplate),
   };
 }

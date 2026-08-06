@@ -9,12 +9,32 @@ import { expect, test } from "@playwright/test";
  * fetch would test nothing that was broken.
  *
  * The suite's account is minted fresh and empty (see `auth.setup.ts`), so this makes its own car.
- * A car with no chassis gets `getDefaultSetupSheetTemplate()`, which is enough questions to walk.
+ * A car with no chassis gets `getGenericSetupSheetTemplate()`, which is enough questions to walk.
  */
 
-/** Answer the current question and move on. Works for text/number steps, which the default sheet leads with. */
+/**
+ * Answer whatever question is on screen and move on.
+ *
+ * Kind-aware on purpose. The generic sheet used to fill as 43 free-text boxes, so walking it meant
+ * typing into every step; since it is built through the model schema, Surface is a chip set and
+ * Traction takes several. Typing at a chip step finds no input and hangs. `value` is used only
+ * where there is something to type into.
+ */
 async function answerAndAdvance(page: import("@playwright/test").Page, value: string) {
   const input = page.locator('input[enterkeyhint="next"]');
+  const choices = page.getByTestId("fill-choice-options");
+  const multi = page.getByTestId("fill-multichoice-options");
+
+  if (await choices.isVisible().catch(() => false)) {
+    // Picking an option advances on its own — no Next to press.
+    await choices.getByRole("button").first().click();
+    return;
+  }
+  if (await multi.isVisible().catch(() => false)) {
+    await multi.getByRole("button").first().click();
+    await page.getByRole("button", { name: /^(Next|Done)$/ }).click();
+    return;
+  }
   await expect(input).toBeVisible();
   await input.fill(value);
   await page.getByRole("button", { name: /^(Next|Done)$/ }).click();

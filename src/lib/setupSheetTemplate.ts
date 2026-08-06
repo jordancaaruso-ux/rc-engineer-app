@@ -146,7 +146,10 @@ export const GENERIC_SETUP_SHEET_V1: SetupSheetTemplate = {
       title: "Diff & drivetrain",
       rows: [
         { type: "single", key: "diff", label: "Diff / slipper" },
-        { type: "single", key: "diff_oil", label: "Diff oil" },
+        // Unit lives here as well as on the flat `groups` copy below: `buildGenericPresetSchema`
+        // reads the structured rows, so without it the generic sheet loses "cSt" the moment it is
+        // built through the schema (see genericSetupSheetTemplate.ts).
+        { type: "single", key: "diff_oil", label: "Diff oil", unit: "cSt" },
         {
           type: "pair",
           label: "Diff height",
@@ -246,6 +249,14 @@ export const GENERIC_SETUP_SHEET_V1: SetupSheetTemplate = {
   ],
 };
 
+/**
+ * @deprecated Use `getGenericSetupSheetTemplate()` from
+ * `@/lib/setupSheetModels/genericSetupSheetTemplate` instead.
+ *
+ * This returns the raw constant, whose fields carry no `valueType` and no chip options — every
+ * field on it fills as free text. It is kept because `buildGenericPresetSchema` and the grouping
+ * totality test read the raw shape; nothing that *renders or fills* a sheet should call it.
+ */
 export function getDefaultSetupSheetTemplate(): SetupSheetTemplate {
   return GENERIC_SETUP_SHEET_V1;
 }

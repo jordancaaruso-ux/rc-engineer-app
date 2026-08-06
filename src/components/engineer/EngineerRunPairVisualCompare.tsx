@@ -11,7 +11,8 @@ import { compareSetupSnapshots } from "@/lib/setupCompare/compare";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { formatLap } from "@/lib/runLaps";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
-import { getDefaultSetupSheetTemplate, type SetupSheetTemplate } from "@/lib/setupSheetTemplate";
+import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
+import { getGenericSetupSheetTemplate } from "@/lib/setupSheetModels/genericSetupSheetTemplate";
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { cn } from "@/lib/utils";
@@ -43,7 +44,7 @@ export type EngineerByIdsRunRow = {
 
 function templateForRun(carTemplate: string | null | undefined): SetupSheetTemplate {
   if (isA800RRCar(carTemplate)) return A800RR_SETUP_SHEET_V1;
-  return getDefaultSetupSheetTemplate();
+  return getGenericSetupSheetTemplate();
 }
 
 function changedSetupKeys(a: SetupSnapshotData, b: SetupSnapshotData): Set<string> {
