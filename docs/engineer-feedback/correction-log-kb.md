@@ -3,6 +3,75 @@
 Extracted from the vehicle-dynamics-kb-author skill on 2026-07-31 when that skill was deleted.
 Carries Jordan's “physics that cannot be argued” test and the transcription-trap ruling.
 ## Correction log (LIVING — append new patterns, newest first, with date)
+- 2026-08-06 — "this line should be deliberate, not sometimes the engineer suggests this" (in-app 7/10
+  on a camber re-check). **A "VERIFIED" LABEL IS WHY NOBODY RE-CHECKS IT.** `upper-link-geometry.md`
+  carries the per-key sign table and instructs the reader "Read the sign here. Do not derive it." Two
+  of its four rows had the camber-gain column inverted (`under_lower_arm_shims_*` and
+  `under_hub_shims_*` said **less**; the solver says **more**). The RC column matched the solver
+  exactly, so the error entered when the camber column was transcribed, not from the solver. It
+  survived five days *because* the block was stamped "solver-verified 2026-08-01" — the stamp reads as
+  a completed check and stops anyone re-running it, while the surrounding "do not derive" instruction
+  disarms the one defence (a reader noticing the physics looks off). Two parameter files stated the
+  coupling correctly the whole time and were the only reason the contradiction was visible at all.
+  **Guard:** a provenance stamp covers the run that produced the numbers, NOT the transcription into
+  prose — re-derive any table that a KB entry designates as the authority, and cross-check it against
+  every file that restates the same coupling. Re-run: `computeAxleMetrics` from `src/lib/rollCenter/`
+  over the pack with ±0.5 mm on each knob. Second finding from the same run: **higher ride height
+  raises RC but REDUCES camber gain** — the one move that breaks the coupling, so the coupling belongs
+  to moving a pickup point and must never be stated as a property of roll centre itself.
+- 2026-08-06 — "anything can effect bump comp, spring, arb, damping, flex, roll center. What you're
+  stating is a static rule, not something that can be derived" (caught twice in one edit: first the
+  `Affected by:` line, then the reworded inline version). **A LIST OF CAUSES IS A STATIC RULE.**
+  `bump-compliance.md` named spring, damping and droop as what affects it. The list was not wrong, it
+  was closed — ARB, chassis flex and roll centre all affect bump compliance and none were on it. An
+  entry that names its causes can only answer for the causes it named. State instead the property the
+  causes act *through*, phrased so any lever can be tested against it: bump compliance became "what
+  the movement has to fight on its way from tyre to chassis — what resists the wheel rising, what
+  ties it to the other wheel, what routes load through the links instead of the springs, what gives
+  instead of the suspension." Four mechanisms, no parts named, and every listed cause falls out of
+  one of them. **Guard:** a concept file that enumerates parts is a lookup table; rewrite it as the
+  rule that generates them. Symptom: the Engineer ignores a relevant lever because the concept file
+  didn't happen to list it.
+- 2026-08-05 — "seems to surface quite a lot", "again loves mentioning diff a lot", "not my first
+  pick" (three separate ratings in one batch). **UNEVEN DEPTH IS NOW A BEHAVIOUR BUG, NOT A TODO.**
+  Retrieval is gone: Engineer v0 ships the whole corpus every turn, so the model is choosing among
+  files that all arrive together. It reaches for whichever node is written most completely.
+  `diff-and-driveline.md` carries a founder-confirmed sign, an on/off-throttle split AND composed
+  outcomes; `droop-downstop.md` is six lines with two links; kerbs are absent entirely. The diff was
+  not over-weighted by anything — it was simply the only place a full answer could be assembled.
+  **Guard:** relative completeness across neighbouring nodes is itself a ranking signal now. When
+  one node is materially deeper than the knobs it competes with, that is a live defect either way —
+  and the fix direction is a founder call: he ruled **level the deep node down** (strip the diff's
+  composed outcomes) rather than write the thin ones up, because the deep node was breaking PUSH vs
+  NET (2026-07-27) to get there. A node that wins by breaking the corpus rule is not a model to
+  copy.
+- 2026-08-05 — "the kb isnt clear enough on this point. its about corner regime but the engineer
+  doesnt always interpret it right", and separately "id guess softer rear could give more steering,
+  not stiffer". **A COMPOSED CHAIN GETS QUOTED AS THE ANSWER, CONDITIONS AND ALL LEFT BEHIND.**
+  `corner-regime.md`'s steady-state paragraph derives the push correctly (the stiffer end gives up
+  side grip) and then appends the fully composed "classic chain: stiffer rear → less rear side grip
+  → more mid/exit steering". The Engineer quoted the chain, not the derivation, and the founder's
+  own instinct went the other way on his car. Ruling when asked whether to invert it: **"the gap in
+  the specifics to capture nuance accurately"** — so the direction is not wrong and roll stiffness
+  stays the frame; what is missing are the conditions that decide how far the chain carries.
+  **Guard:** the same PUSH vs NET rule that governs knob files governs concept files. A concept may
+  derive a push and must stop there; a chain written out to a balance outcome will be lifted whole,
+  and every condition stated around it is invisible next to it. Related tell to the 2026-08-04 "net
+  tendency" entry — this one arrives as an appositive ("this is the classic chain") rather than a
+  summary sentence.
+- 2026-08-04 — "on low grip, stiffness changes do less overall i dont think thats true - if its in the
+  kb remove it". **A "NET TENDENCY" LINE IS A COMPOSED VERDICT, NOT MECHANISM.** `corner-regime.md`'s
+  low-grip paragraph stated two mechanisms — less cornering force means less transfer for the
+  steady-state mechanism to redistribute, and slower corners give the chassis more time to reach
+  steady state — then closed with "Net tendency: on low grip, stiffness changes do less overall, and
+  what remains is mostly the timing mechanism." Founder kept both mechanisms and cut the net sentence
+  only. **Guard:** a paragraph that establishes two strands must stop there. The word "net" (also
+  "overall", "on balance", "what remains is mostly") is the tell that a verdict is being composed out
+  of primitives — the same failure as COLLAPSED OPPOSING STRANDS below, but arriving as a summary
+  sentence at the end of a paragraph rather than inside a bullet. Note the heading already said
+  "tendency, not a law" and that hedge did **not** save it; a labelled tendency is still a verdict the
+  model will quote. Observed live: the sentence was about to steer a worked answer away from stiffness
+  levers entirely on a low-grip layout.
 - 2026-08-01 — "Pretty good - but the camber gain direction is wrong" (in-app rating 7/10 on an answer
   that said lowering the inner lower pickups front and rear gives **more** camber gain).
   **AN ASYMMETRIC BRANCH PAIR IS A COMPOSITION TRAP.** `under-lower-arm.md`'s Physics block stated the

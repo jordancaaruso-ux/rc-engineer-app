@@ -19,11 +19,13 @@ Chicanes and flicks fail the first — the direction change is over before the r
 
 **The two mechanisms.**
 
-- **Steady-state — load-transfer share.** Once roll is constant, each axle carries a share of the
-  total lateral load transfer proportional to its share of roll stiffness. The loaded outside tyre
-  cannot convert extra load into equal extra grip ([[tyre-load-sensitivity]]), so the stiffer end
-  gives up side grip. This is the classic chain: stiffer rear → less rear side grip → more mid/exit
-  steering. The Xray setup book scopes exactly this claim to "long, high-speed corners".
+- **Steady-state — load-transfer share.** Stiffness cannot change the **total** lateral transfer —
+  that is CoG height, track width and g ([[load-transfer]]). It only moves **where the total lands**:
+  once roll is constant, each axle's share is set by its roll stiffness and its roll centre height
+  ([[roll-center]]). The loaded outside tyre cannot convert extra load into equal extra grip
+  ([[tyre-load-sensitivity]]), so the end carrying the larger share gives up side grip — by how much
+  depends on how much transfer there is to move, and how far that tyre already sits into the falling
+  part of its curve.
 - **Transient — load timing.** While roll is still developing, the stiffer end takes load — and
   therefore builds grip — sooner ([[bite-hold]]). A softer rear builds rear lateral force later in
   the direction change, so yaw develops while the rear is still loading: more rotation from entry
@@ -44,20 +46,10 @@ way — grip coming up over a race day, a tyre change, or a layout rework all mo
 a given corner samples ([[bite-hold]] describes what the early and late parts of the grip build
 look like).
 
-**Front/rear symmetry.** The regime split applies at either axle. Stiffer front: steering response
-arrives sooner (transient authority, turn-in) but the front carries a bigger steady-state transfer
-share, costing mid/exit steering. Softer front: slower initial response, more steady-state
-steering. This matches the Xray table's front spring rows — "increases responsiveness" alongside
-"increases mid-corner and corner-exit understeer".
+**Front/rear symmetry.** The regime split applies at either axle. Stiffer front loads sooner while
+roll develops and carries a bigger steady-state share once roll is constant; softer front is the
+mirror of both. Which mechanism the corner samples decides the sign.
 
 **Low grip (tendency, not a law).** Low grip cuts cornering force, so there is less load transfer
 for the steady-state mechanism to redistribute — its effect shrinks with grip. Low grip also slows
-corners, giving the chassis more time to reach steady state. Net tendency: on low grip, stiffness
-changes do less overall, and what remains is mostly the timing mechanism.
-
-**Handling.** When reasoning about a spring or ARB change, first place the complaint in a corner
-type. "Won't rotate in hairpins / tight corners" is a transient-regime problem — the timing
-mechanism governs, so softening the rear tends to add rotation there, and stiffening the rear
-tends to remove it. "Loose / free through fast corners" is a steady-state problem — the
-load-transfer-share mechanism governs, with the opposite sign. Advice that quotes one mechanism
-without naming the corner type will be right in one regime and wrong in the other.
+corners, giving the chassis more time to reach steady state.
