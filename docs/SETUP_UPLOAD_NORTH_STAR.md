@@ -226,15 +226,16 @@ wait) → reads it → it becomes a **full setup on that car** (runs/compare/Eng
   ~100 of the exhaustive hand schema: the drafter captures the substantive fields; granular
   checkbox sub-fields are what an admin refine pass adds — and schemas are admin-reviewed
   anyway.)
-- **Wired into the app 2026-07-06 (flag-gated `SETUP_AI_EXTRACT=1`):** the quick-create
-  upload route's unrecognized-image branch now runs
-  `ensureSheetModelForUpload` — identify → match global model catalog → or create
-  `SetupSheetModel` (`isAuthorized:false`, drafted schema via `draftedSchemaToModelSchema`,
-  round-trip verified through `parseSetupSheetModelSchema` 104/104 fields) + a `Car` for the
-  uploader. Doc links the model → `processImport` AI extraction targets its schema →
-  review page shows values; review reason reports "AI read N values — glance over M flagged".
-  Client routing needed no change (detectedModelId → review page). **Not yet driven in the
-  browser** — needs `npm run dev` + a real upload (the founder's next step).
+- **RETIRED 2026-08-06 — auto-creating a chassis type from an upload is gone.** It was wired
+  behind `SETUP_AI_EXTRACT=1` on 2026-07-06 (quick-create's unrecognized-image branch ran
+  `ensureSheetModelForUpload` → identify → match the global catalog → or mint a
+  `SetupSheetModel` with `isAuthorized:false` plus a `Car` for the uploader) but was never
+  driven in a browser, and the caller had already been unwired before the module itself was
+  deleted. **Sheets are now authored by hand**: a driver whose chassis has no curated model
+  fills the generic 43-parameter sheet, or creates their own chassis type (live but flagged
+  until an admin authorizes — see `docs/ASSET_ACCESS_NORTH_STAR.md`).
+  `draftSetupSheetModelSchema` and `draftedSchemaToModelSchema` survive as offline eval tools
+  under `scripts/setup-extract-eval/`; nothing in the app calls them.
 
 ### Stage 2 — Auto-calibration cache (the "learn where parameters are" step)
 

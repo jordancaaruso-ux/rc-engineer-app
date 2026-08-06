@@ -5,7 +5,10 @@ import { inferSectionLayoutRows } from "@/lib/setupSheetModels/inferStructuredLa
 /**
  * Convert an AI-drafted schema (Stage 1.5) into a real SetupSheetModelSchema — the shape
  * stored in SetupSheetModel.schemaJson and consumed by parseSetupSheetModelSchema.
- * Pure, so it's unit-testable; the DB write lives in ensureSheetModelForUpload.
+ *
+ * Pure, and currently used only by `scripts/setup-extract-eval/*`. There is no DB write behind
+ * it any more: `ensureSheetModelForUpload` was deleted 2026-08-06 when automated chassis
+ * onboarding was abandoned (sheets are authored by hand — see docs/SETUP_UPLOAD_NORTH_STAR.md).
  */
 
 function sectionIdFromTitle(title: string): string {
