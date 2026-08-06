@@ -12,6 +12,12 @@ import { COMPANY_NAME, PRODUCT_NAME } from "@/lib/brand/brandNames";
 export const metadata = { title: `${PRODUCT_NAME} — your next tenth is in the data` };
 
 /**
+ * SUPERSEDED 2026-08-06 AND UNREACHABLE. `/welcome` is rewritten to `public/landing/index.html`
+ * by the `beforeFiles` rule in next.config.mjs, so nothing renders this file. Kept because it is
+ * the only version that reads prices live from Stripe — the static page hardcodes them. To bring
+ * it back, delete that one rewrite; the signed-in bounce below is now duplicated in middleware.ts
+ * and would need removing there too.
+ *
  * The public landing page — Jordan's own marketing site (artifact "JRC Engineering Marketing",
  * merged 2026-08-02) ported into the app and converted from waitlist-era CTAs to the paid door.
  * His copy verbatim wherever it existed; pricing, pedigree and the demo door are the additions

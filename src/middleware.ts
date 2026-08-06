@@ -59,8 +59,20 @@ export default auth((req) => {
   if (pathname === "/api/billing/public-checkout") {
     return NextResponse.next();
   }
-  // The landing page (the page itself bounces signed-in visitors back to the dashboard).
+  // The landing page's static assets. NOT optional: the matcher at the bottom of this file only
+  // exempts image extensions, so `support.js` and the walkthrough `.mp4` would be redirected to
+  // /login for exactly the signed-out visitors the page exists for — it would boot to a blank
+  // frame with no video. Images already bypass the matcher; this covers the rest.
+  if (pathname.startsWith("/landing/")) {
+    return NextResponse.next();
+  }
+  // The landing page. `/welcome` is rewritten to `public/landing/index.html` (next.config.mjs,
+  // beforeFiles), so the bounce the old React page did in its own body has to happen here —
+  // a static file can't read the session. Stale links and PWA-cached entries still land right.
   if (pathname === "/welcome") {
+    if (req.auth) {
+      return NextResponse.redirect(new URL("/", req.url));
+    }
     return NextResponse.next();
   }
   // Demo entry (the page redirects to /api/auth/demo, which is matcher-exempt).

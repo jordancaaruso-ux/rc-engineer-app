@@ -27,6 +27,20 @@ const nextConfig = {
       "./node_modules/pdfjs-dist/standard_fonts/**/*",
     ],
   },
+  // The landing page is the Claude Design artifact served verbatim from `public/landing/` —
+  // founder call 2026-08-06, to keep the design exact rather than re-implement its scroll
+  // reveals, video scrubber and card deck in React. `beforeFiles` is required: it runs ahead of
+  // filesystem routes, which is the only way this wins over `src/app/welcome/page.tsx` (kept in
+  // the tree, now unreachable — delete that file, or this rewrite, but never neither).
+  //
+  // Trade-off accepted with it: prices in that HTML are literals ($14.99/$27.99/$149.90/
+  // $279.90), not Stripe reads. They match the live account today. If a price moves, it moves
+  // in Stripe AND in public/landing/index.html.
+  async rewrites() {
+    return {
+      beforeFiles: [{ source: "/welcome", destination: "/landing/index.html" }],
+    };
+  },
   experimental: {
     // Reuse a recently-fetched RSC payload from the client Router Cache instead of
     // re-fetching every navigation (default is 0 for dynamic routes → grey re-flash
