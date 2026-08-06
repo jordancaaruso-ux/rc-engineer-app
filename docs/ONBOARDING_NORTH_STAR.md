@@ -41,6 +41,14 @@ lives at the lap-ingest point (`LapTimesIngestPanel`, keyed off the scan route's
 `hasDriverNameSetting`) — a real, Settings-linked block that stays source-aware so it never over-asks a
 LiveRC-name-only or manual-results driver.
 
+**The track's own timing site is the other half of that gate** (added 2026-08-05).
+`TrackTimingSourceNotice` heads the URL Auto tab and always names what discovery is pointed at
+("Searching Thornhill on LiveRC (tftr.liverc.com)"). A track with no `liveRcUrl`/`speedhiveUrl`
+searched nothing while looking exactly like a scan that found nothing — the common case being a
+venue *someone else* added to the shared catalog. Timing URLs are an open contribution
+(`PATCH /api/tracks/[trackId]` allows any driver), so the notice takes the URL inline and the
+changed props re-scan; no trip to the Tracks page mid-run.
+
 **Cut:** the home-track step and the tire step (both are picked *during* log-run, so neither can be a
 readiness blocker).
 

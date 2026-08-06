@@ -1654,6 +1654,11 @@ export function NewRunForm(props: {
     () => (needsEvent && eventId ? events.find((e) => e.id === eventId) ?? null : null),
     [needsEvent, eventId, events]
   );
+  /** The run's own track row — name + timing URLs for the lap-discovery panel. */
+  const selectedRunTrack = useMemo(
+    () => (trackId ? tracksList.find((t) => t.id === trackId) ?? null : null),
+    [trackId, tracksList]
+  );
   /**
    * LiveRC root URL of the selected/new event's track, if any. When present, the
    * timing pages are discoverable from the track root, so the manual practice /
@@ -5272,8 +5277,14 @@ export function NewRunForm(props: {
         practiceDayUrl={lapTimesLiveRcScanIndexUrl}
         lapImportEventId={sessionType === "RACE_MEETING" && eventId ? eventId : null}
         trackId={trackId.trim() || null}
-        trackLiveRcUrl={tracksList.find((t) => t.id === trackId)?.liveRcUrl ?? null}
-        trackSpeedhiveUrl={tracksList.find((t) => t.id === trackId)?.speedhiveUrl ?? null}
+        trackName={selectedRunTrack?.name ?? null}
+        trackLiveRcUrl={selectedRunTrack?.liveRcUrl ?? null}
+        trackSpeedhiveUrl={selectedRunTrack?.speedhiveUrl ?? null}
+        onTrackTimingUrlsSaved={(next) =>
+          setTracksList((prev) =>
+            prev.map((t) => (t.id === trackId ? { ...t, ...next } : t))
+          )
+        }
         editingRunId={isEditing ? editRun?.id ?? null : null}
       />
       </div>

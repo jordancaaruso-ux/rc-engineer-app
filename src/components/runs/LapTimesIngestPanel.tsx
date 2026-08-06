@@ -23,6 +23,10 @@ import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLa
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
 import { PagedCard } from "@/components/ui/PagedCard";
+import {
+  TrackTimingSourceNotice,
+  type TrackTimingUrls,
+} from "@/components/runs/TrackTimingSourceNotice";
 
 export type UrlImportBlock = {
   blockId: string;
@@ -322,8 +326,10 @@ export function LapTimesIngestPanel({
   practiceDayUrl,
   lapImportEventId,
   trackId,
+  trackName,
   trackLiveRcUrl,
   trackSpeedhiveUrl,
+  onTrackTimingUrlsSaved,
   editingRunId,
 }: {
   value: LapIngestFormValue;
@@ -337,8 +343,12 @@ export function LapTimesIngestPanel({
   lapImportEventId?: string | null;
   /** When set with a track timing URL, scan finds your most recent sessions without a daily URL. */
   trackId?: string | null;
+  /** Names the track in the timing-source line, so "no timing site" points at a venue. */
+  trackName?: string | null;
   trackLiveRcUrl?: string | null;
   trackSpeedhiveUrl?: string | null;
+  /** Timing URL added from the notice below — caller updates its track list, which re-scans. */
+  onTrackTimingUrlsSaved?: (next: TrackTimingUrls) => void;
   /** When editing a run, linked timing imports stay visible in discovery even if already imported. */
   editingRunId?: string | null;
 }) {
@@ -1028,6 +1038,17 @@ export function LapTimesIngestPanel({
             label: "URL Auto",
             content: (
         <div className="space-y-2 text-sm">
+          {/* What discovery is actually pointed at, said before the empty list can be read
+              as a failed scan (founder 2026-08-05). */}
+          {trackId?.trim() ? (
+            <TrackTimingSourceNotice
+              trackId={trackId.trim()}
+              trackName={trackName}
+              liveRcUrl={trackLiveRcUrl}
+              speedhiveUrl={trackSpeedhiveUrl}
+              onSaved={(next) => onTrackTimingUrlsSaved?.(next)}
+            />
+          ) : null}
           {hasTrackDiscovery || lapImportEventId?.trim() || dayScanCandidates != null ? (
             <div
               className="space-y-2 rounded-md border border-border bg-surface-runna p-2"
@@ -1189,14 +1210,13 @@ export function LapTimesIngestPanel({
           ) : hasUrlScan ? (
             <div className="space-y-2 rounded-md border border-border bg-surface-runna p-2">
               <p className="ui-label-meta">
-                Add a LiveRC or Speedhive URL on the Tracks page for this venue, or use{" "}
-                <span className="text-foreground/90">URL Manual</span> to paste a session URL or a
-                MyRCM event URL.
+                Or use <span className="text-foreground/90">URL Manual</span> to paste a session URL
+                or a MyRCM event URL.
               </p>
             </div>
-          ) : (
+          ) : trackId?.trim() ? null : (
             <p className="ui-label-meta">
-              Automatic lap-time ingestion based on the selected track.
+              Pick a track first — sessions are found from that track&apos;s timing site.
             </p>
           )}
         </div>
