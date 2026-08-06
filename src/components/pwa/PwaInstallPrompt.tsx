@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { createPortal } from "react-dom";
+import { useSession } from "next-auth/react";
 
 import { PRODUCT_NAME } from "@/lib/brand/brandNames";
 
@@ -19,6 +20,9 @@ import { PRODUCT_NAME } from "@/lib/brand/brandNames";
  *   - not already running installed (standalone)
  *   - the user has been around a little (2nd visit onward)
  *   - not previously dismissed (persisted ~60 days)
+ *   - NOT the shared demo account — asking a stranger evaluating the product to install
+ *     somebody else's read-only garage to their home screen is the wrong ask at the wrong
+ *     moment, and it competes with the demo's own conversion door ("Get your own garage").
  *
  * Portaled to <body> so a transformed ancestor (route-transition wrapper, page-body
  * reveal) can never trap its `position: fixed`.
@@ -75,9 +79,21 @@ export function PwaInstallPrompt(): React.ReactNode {
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
   const [shown, setShown] = useState(false); // drives the slide-in transition
+  const { data: session, status } = useSession();
+  const isDemo = session?.user?.isDemo === true;
+  /** The eligibility pass is a one-shot: `bumpVisits` writes, so it must not run twice. */
+  const decided = useRef(false);
 
   useEffect(() => {
     setMounted(true);
+    // Wait for the session before deciding. `useSession` reports "loading" on first paint, so an
+    // unguarded pass would read isDemo as false and schedule the card for a demo visitor anyway —
+    // the 2.5s delay usually hides that, which is exactly what makes it an intermittent bug.
+    if (status === "loading") return;
+    if (isDemo) return;
+    if (decided.current) return;
+    decided.current = true;
+
     if (!isEligible()) return;
 
     const visits = bumpVisits();
@@ -90,7 +106,16 @@ export function PwaInstallPrompt(): React.ReactNode {
     }, SHOW_AFTER_MS);
 
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [status, isDemo]);
+
+  // Covers the case the effect cannot: a session that resolves to the demo *after* the card is
+  // already on screen. Hiding is correct either way — nothing about the demo should ask for this.
+  useEffect(() => {
+    if (isDemo && visible) {
+      setShown(false);
+      setVisible(false);
+    }
+  }, [isDemo, visible]);
 
   function dismiss(): void {
     setShown(false);

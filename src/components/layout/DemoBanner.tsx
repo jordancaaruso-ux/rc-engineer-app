@@ -55,6 +55,33 @@ export function DemoBanner() {
     };
   }, [isDemo]);
 
+  /**
+   * Put the visitor back where they were reading when they tapped into the demo.
+   *
+   * The landing page drops a `/welcome#section` breadcrumb in sessionStorage on the way in (see
+   * the capture script at the bottom of public/landing/index.html) — it has to happen there
+   * because the fragment is the whole point and a fragment never reaches the server.
+   *
+   * Validated hard before use: only `/welcome`, optionally with a simple fragment. It is a
+   * redirect target read out of client-controlled storage, so anything else — an absolute URL, a
+   * protocol-relative `//evil.example`, another path — is discarded rather than followed.
+   */
+  function exitDemo(): void {
+    let target = "/welcome";
+    try {
+      const stored = window.sessionStorage.getItem("jrc-demo-return");
+      if (stored && /^\/welcome(#[A-Za-z0-9_-]+)?$/.test(stored)) target = stored;
+      window.sessionStorage.removeItem("jrc-demo-return");
+    } catch {
+      // storage blocked — the default target is already correct
+    }
+    // `redirect: false` then navigate by hand: NextAuth completes the sign-out through a server
+    // redirect, and relying on that to carry a fragment back is not something to trust.
+    void signOut({ redirect: false }).then(() => {
+      window.location.assign(target);
+    });
+  }
+
   if (!isDemo) return null;
 
   return (
@@ -68,18 +95,38 @@ export function DemoBanner() {
         <p className="text-[12px] leading-snug text-muted-foreground">
           You&rsquo;re exploring a demo garage — everything&rsquo;s read-only.
         </p>
-        <span className="flex items-center gap-3">
+        <span className="flex items-center gap-2.5">
           <Link
             href="/join"
             className="whitespace-nowrap text-[12px] font-semibold text-primary underline-offset-2 hover:underline"
           >
             Get your own garage →
           </Link>
+          {/*
+            A real button, not an 11px text link. Leaving a demo is a thing a visitor should be
+            able to find without hunting: it read as fine print next to the yellow CTA, so people
+            went looking for a back gesture instead.
+          */}
           <button
             type="button"
-            onClick={() => void signOut({ callbackUrl: "/welcome" })}
-            className="whitespace-nowrap text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            onClick={exitDemo}
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border bg-card px-2.5 py-1 text-[12px] font-medium text-foreground transition-colors hover:border-foreground/40 hover:bg-muted"
           >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 16 16"
+              className="h-3 w-3"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              {/* door + arrow leaving it */}
+              <path d="M9.5 2H3.5v12h6" />
+              <path d="M11 5.5 13.5 8 11 10.5" />
+              <path d="M13.5 8H6.5" />
+            </svg>
             Exit demo
           </button>
         </span>

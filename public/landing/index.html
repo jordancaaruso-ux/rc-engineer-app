@@ -69,6 +69,24 @@
      and every load logged net::ERR_INVALID_URL. In a stylesheet the browser's own CSS parser
      handles it. Invisible today (applyTexture forces grain to opacity 0) but correct if it
      is ever switched back on. */
+  /* Nav CTAs, small phones — 2026-08-06.
+     The header row is logo | "Try the demo" + "Get started", and the button group is
+     flex-shrink:0 with nowrap on both labels. Below ~440px there is not room for all of it, so
+     "Get started" ran off the right edge and was clipped — 98px of it lost at 320px, and still
+     8px at 414px. The page itself never scrolled sideways, so it read as a design choice rather
+     than a bug.
+     Both CTAs are kept (Get started is the conversion door): the wordmark goes instead, since the
+     JRC mark beside it already identifies the page, and the buttons tighten. Declared here rather
+     than inline because inline styles cannot carry a media query. */
+  @media (max-width: 460px) {
+    #jrcHdr [data-hdr-wordmark] { display:none !important; }
+    #jrcHdr a[href="/demo"], #jrcHdr a[href="/join"] {
+      font-size:12px !important;
+      padding-left:0.62rem !important;
+      padding-right:0.62rem !important;
+    }
+  }
+
   .jrcGrain { background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxODAiIGhlaWdodD0iMTgwIj48ZmlsdGVyIGlkPSJuIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC44IiBudW1PY3RhdmVzPSI0IiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjE4MCIgaGVpZ2h0PSIxODAiIGZpbHRlcj0idXJsKCNuKSIvPjwvc3ZnPg=="); background-size:180px 180px; }
 </style>
 </helmet>
@@ -95,7 +113,7 @@
     <div style="max-width:1360px;margin:0 auto;padding:1rem clamp(1rem,5vw,4.5rem);display:flex;align-items:center;justify-content:space-between;gap:1rem">
       <a href="#top" aria-label="JRC Trackside — home" style="display:flex;align-items:center;gap:0.7rem;color:#EDE8DF">
         <img src="/landing/assets/jrc-mark-white.svg" alt="JRC" style="height:17px;width:auto;display:block" />
-        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.26em;text-transform:uppercase;color:#A5A59C;white-space:nowrap;padding-top:1px">Trackside</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.26em;text-transform:uppercase;color:#A5A59C;white-space:nowrap;padding-top:1px" data-hdr-wordmark>Trackside</span>
       </a>
       <div style="display:flex;gap:0.5rem;align-items:center;flex-shrink:0">
         <a href="/demo" style="display:inline-flex;align-items:center;gap:0.45rem;font-weight:600;font-size:13px;padding:0.55rem 0.9rem;border-radius:7px;border:1px solid #FFD60A;background:#FFD60A;color:#171614;white-space:nowrap;transition:transform .2s ease,box-shadow .3s ease" style-hover="transform:translateY(-1px);box-shadow:0 6px 22px rgba(255,214,10,0.18)"><span style="width:6px;height:6px;border-radius:50%;background:#171614;animation:jrcPulse 2.2s ease-in-out infinite"></span>Try the demo</a>
@@ -1647,6 +1665,48 @@ class Component extends DCLogic {
   }
 
 }
+</script>
+
+<script>
+/*
+  Remember where the visitor was standing when they tapped into the demo, so Exit can put them
+  back there instead of at the top of the page.
+
+  Written here rather than server-side because the part that matters is the URL fragment, and a
+  fragment is never sent to the server — a Referer header would only ever say "/welcome". Read
+  back by DemoBanner on exit, which validates the value before using it.
+
+  sessionStorage, not localStorage: this is a per-tab breadcrumb. Opening the demo in a new tab
+  correctly finds nothing and falls back to the top of the page.
+*/
+(function () {
+  var SECTIONS = ["top", "problem", "log", "engineer", "session", "teams", "demo", "pricing"];
+  var KEY = "jrc-demo-return";
+
+  function currentSection() {
+    // The last section whose top has crossed the middle of the viewport — i.e. the one being read.
+    var best = "", bestTop = -Infinity, mid = window.innerHeight * 0.5;
+    for (var i = 0; i < SECTIONS.length; i++) {
+      var el = document.getElementById(SECTIONS[i]);
+      if (!el) continue;
+      var top = el.getBoundingClientRect().top;
+      if (top <= mid && top > bestTop) { bestTop = top; best = SECTIONS[i]; }
+    }
+    return best;
+  }
+
+  document.addEventListener("click", function (e) {
+    var el = e.target;
+    var link = el && el.closest ? el.closest('a[href="/demo"]') : null;
+    if (!link) return;
+    try {
+      var section = currentSection();
+      sessionStorage.setItem(KEY, "/welcome" + (section && section !== "top" ? "#" + section : ""));
+    } catch (err) {
+      /* storage blocked (private mode) — exit just falls back to the top of the page */
+    }
+  }, true);
+})();
 </script>
 </body>
 </html>
