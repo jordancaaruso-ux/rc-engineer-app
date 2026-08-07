@@ -7,6 +7,7 @@ import {
   bestDeltaVsPreviousSameCarTrack,
   collectCarOptions,
   computeAnalysisRunMetrics,
+  computeLapDistribution,
   computeSetupChangesByRunId,
   isTrackCarPersonalBest,
   medianOf,
@@ -67,6 +68,114 @@ test("computeAnalysisRunMetrics: consistency + mistakes on a real run", () => {
   assert.ok(metrics.consistencyScore != null && metrics.consistencyScore > 0);
   assert.ok(metrics.consistencyScore! <= 100);
   assert.equal(metrics.mistakeCount, 1);
+});
+
+test("computeLapDistribution: quartiles ordered, no mistakes on a clean run", () => {
+  // 12 laps 25.0 .. 26.1
+  const lapTimes = Array.from({ length: 12 }, (_, i) => 25.0 + i * 0.1);
+  const d = computeLapDistribution({ lapTimes });
+  assert.ok(d != null);
+  assert.ok(d!.best <= d!.p25);
+  assert.ok(d!.p25 <= d!.median);
+  assert.ok(d!.median <= d!.p75);
+  assert.ok(d!.p75 <= d!.slowestClean);
+  assert.ok(Math.abs(d!.best - 25.0) < 1e-9);
+  assert.ok(Math.abs(d!.median - 25.55) < 1e-9);
+  // IQR here is 0.55, so the threshold is 2×IQR = 1.1 — nothing reaches it.
+  assert.deepEqual(d!.mistakes, []);
+  assert.ok(Math.abs(d!.slowestClean - 26.1) < 1e-9);
+});
+
+test("computeLapDistribution: no box until the mistake rule also applies", () => {
+  // The floor is MIN_LAPS_FOR_MISTAKES, not "enough to compute quartiles". A
+  // 5-lap run can compute a Q1/Q3 but can't have a mistake, so its crash lap
+  // would sit on the top whisker while the same lap in a longer run plots as a
+  // dot — one event, two drawings, depending only on stint length.
+  assert.equal(computeLapDistribution({ lapTimes: [25.0, 25.1, 25.2] }), null);
+  assert.equal(computeLapDistribution({ lapTimes: [] }), null);
+  assert.equal(computeLapDistribution({ lapTimes: [25.0, 25.1, 25.2, 25.3, 31.0] }), null);
+  assert.ok(computeLapDistribution({ lapTimes: [25.0, 25.1, 25.2, 25.3, 25.4, 25.5] }) != null);
+});
+
+test("computeLapDistribution: a crash lap is a dot at the floor, not a whisker", () => {
+  // Exactly at the floor: the blow-up is classified, so the whisker stays clean.
+  const d = computeLapDistribution({ lapTimes: [25.0, 25.1, 25.2, 25.3, 25.15, 31.0] });
+  assert.ok(d != null);
+  assert.deepEqual(d!.mistakes, [31.0]);
+  assert.ok(Math.abs(d!.slowestClean - 25.3) < 1e-9);
+  assert.ok(Math.abs(d!.best - 25.0) < 1e-9);
+});
+
+test("computeLapDistribution: a crash lap becomes a dot, not the top whisker", () => {
+  const d = computeLapDistribution({
+    lapTimes: [25.0, 25.1, 25.0, 25.2, 25.1, 25.0, 25.1, 25.0, 31.5],
+  });
+  assert.ok(d != null);
+  assert.deepEqual(d!.mistakes, [31.5]);
+  assert.ok(Math.abs(d!.slowestClean - 25.2) < 1e-9);
+  assert.ok(d!.slowestClean < d!.mistakes[0]);
+  // Same rule the Mistakes face counts by — these must never disagree.
+  const metrics = computeAnalysisRunMetrics({
+    lapTimes: [25.0, 25.1, 25.0, 25.2, 25.1, 25.0, 25.1, 25.0, 31.5],
+  });
+  assert.equal(metrics.mistakeCount, d!.mistakes.length);
+});
+
+test("computeLapDistribution: identical laps collapse to a flat box", () => {
+  const d = computeLapDistribution({ lapTimes: [25.0, 25.0, 25.0, 25.0, 25.0, 25.0] });
+  assert.ok(d != null);
+  assert.equal(d!.best, 25.0);
+  assert.equal(d!.p25, 25.0);
+  assert.equal(d!.median, 25.0);
+  assert.equal(d!.p75, 25.0);
+  assert.equal(d!.slowestClean, 25.0);
+  assert.deepEqual(d!.mistakes, []);
+});
+
+test("computeLapDistribution: Q3 may land above the slowest clean lap", () => {
+  // 9 tidy laps + 3 blow-ups. Q3's interpolation index (8.25 of 12) straddles the
+  // clean/mistake boundary, so Q3 lands in the gap: above every clean lap, below
+  // every mistake. The chart draws no upper whisker there. Seen on 2 of 146
+  // mistake-eligible runs in the demo season, so it is worth pinning.
+  const lapTimes = [25.1, 25.0, 25.3, 25.05, 27.0, 25.2, 25.1, 28.0, 25.15, 25.0, 27.5, 25.25];
+  const d = computeLapDistribution({ lapTimes });
+  assert.ok(d != null);
+  assert.deepEqual(d!.mistakes, [27.0, 27.5, 28.0]);
+  assert.ok(Math.abs(d!.slowestClean - 25.3) < 1e-9);
+  assert.ok(d!.p75 > d!.slowestClean, "Q3 above the slowest clean lap is legal here");
+  // The invariants that DO hold everywhere.
+  assert.ok(d!.best <= d!.p25 && d!.p25 <= d!.median && d!.median <= d!.p75);
+  assert.ok(d!.mistakes.every((m) => m > d!.slowestClean));
+  // Quartiles span every included lap, so the median bar is the same number the
+  // Line view's Median series plots. If this drifts, the morph lies.
+  assert.equal(d!.median, computeAnalysisRunMetrics({ lapTimes }).median);
+});
+
+test("computeLapDistribution: duplicate lap times are classified independently", () => {
+  // Two laps share the slowest clean time; flagging one must not drop both.
+  const lapTimes = [25.0, 25.1, 25.2, 25.2, 25.0, 25.1, 25.0, 31.5];
+  const d = computeLapDistribution({ lapTimes });
+  assert.ok(d != null);
+  assert.deepEqual(d!.mistakes, [31.5]);
+  assert.ok(Math.abs(d!.slowestClean - 25.2) < 1e-9);
+});
+
+test("computeLapDistribution: excluded laps do not move the quartiles", () => {
+  const base = Array.from({ length: 12 }, (_, i) => 25.0 + i * 0.1);
+  const expected = computeLapDistribution({ lapTimes: base });
+  // Same run plus a towed-in lap the user un-ticked in run review.
+  const withExcluded = computeLapDistribution({
+    lapTimes: [...base, 40.0],
+    lapSession: {
+      version: 1,
+      entries: [
+        {
+          perLap: [...base.map(() => ({ isIncluded: true })), { isIncluded: false }],
+        },
+      ],
+    },
+  });
+  assert.deepEqual(withExcluded, expected);
 });
 
 test("shortRunLabel: code wins, short label used, else R{n}", () => {

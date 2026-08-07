@@ -3,9 +3,13 @@ import {
   computeMistakeLaps,
   getAverageTopN,
   getIncludedLaps,
+  percentileSorted,
   primaryLapRowsFromRun,
   roundConsistencyScore,
   analyzeLapRows,
+  MIN_LAPS_FOR_MISTAKES,
+  MISTAKE_IQR_MULTIPLIER,
+  MISTAKE_MIN_ABSOLUTE_SEC,
 } from "@/lib/lapAnalysis";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { calendarYmdInTimeZone } from "@/lib/formatDate";
@@ -44,6 +48,47 @@ export type RunSetupChangeIndicator = {
   changedFieldLabels: string[];
 };
 
+/**
+ * Lap distribution for one run — the box-and-whisker ("Spread") view of the
+ * trend chart's Pace face. Quartiles over included laps.
+ *
+ * The whiskers are deliberately asymmetric rather than textbook Tukey: in RC a
+ * fast tail is performance and a slow tail is a mistake, so the bottom whisker
+ * always reaches the best lap (never clipped as an "outlier") while the top
+ * whisker stops at the slowest lap that isn't a mistake. `mistakes` uses the
+ * same rule as the Mistakes face, so "bad lap" means one thing across the card.
+ */
+export type AnalysisRunDistribution = {
+  /** Fastest included lap — the bottom whisker, never clipped as an outlier. */
+  best: number;
+  p25: number;
+  median: number;
+  p75: number;
+  /**
+   * Slowest included lap that is not a mistake lap — the top whisker.
+   *
+   * NOT guaranteed to be ≥ `p75`. Quartiles span every included lap (mistakes
+   * included) so the median here is the same number as the trend chart's Median
+   * series; when a run's whole top quartile is mistakes, Q3 lands above the
+   * slowest clean lap and there is simply no upper whisker to draw. Rare —
+   * 2 of 146 mistake-eligible runs on the demo season — but real.
+   */
+  slowestClean: number;
+  /** Mistake lap times (same rule as the Mistakes face), plotted as dots. */
+  mistakes: number[];
+};
+
+/**
+ * A run needs enough laps for the *whole* whisker rule to work, not merely enough
+ * for quartiles to compute. Below `MIN_LAPS_FOR_MISTAKES` no lap can be
+ * classified as a mistake, so a short run's crash lap would sit on its top
+ * whisker while an identical lap in a longer run plots as a dot — the same
+ * event drawn two different ways depending on stint length. Tying both to one
+ * floor removes the special case, and Q1/Q3 off five samples was never worth
+ * drawing anyway.
+ */
+export const MIN_LAPS_FOR_DISTRIBUTION = MIN_LAPS_FOR_MISTAKES;
+
 export type AnalysisTrendRun = {
   id: string;
   carId: string | null;
@@ -52,6 +97,8 @@ export type AnalysisTrendRun = {
   shortLabel: string;
   createdAtIso: string;
   metrics: AnalysisRunMetrics;
+  /** Lap distribution for the spread view; null when too few included laps. */
+  distribution: AnalysisRunDistribution | null;
   /** Tire set + wear for this run; null when no set was logged. */
   tireIndicator: RunTireIndicator | null;
   /** Setup fields changed vs the previous run on this car; null when none / no baseline. */
@@ -147,6 +194,47 @@ export function computeAnalysisRunMetrics(run: {
     cleanLapCount: included.length,
     consistencyScore,
     mistakeCount: mistakes.eligible ? mistakes.mistakeCount : null,
+  };
+}
+
+/**
+ * Lap distribution for one run's spread view — see `AnalysisRunDistribution`.
+ * Null below `MIN_LAPS_FOR_DISTRIBUTION` included laps, which is the same floor
+ * mistake detection uses, so every run that draws a box also gets the outlier
+ * rule applied to it. Clean/mistake laps split on the threshold rather than on
+ * membership of `computeMistakeLaps`'s list, so duplicate lap times are
+ * classified independently.
+ */
+export function computeLapDistribution(run: {
+  lapTimes: unknown;
+  lapSession?: unknown;
+}): AnalysisRunDistribution | null {
+  const included = getIncludedLaps(primaryLapRowsFromRun(run));
+  const sorted = included
+    .map((lap) => lap.lapTimeSeconds)
+    .filter((t) => Number.isFinite(t))
+    .sort((a, b) => a - b);
+  if (sorted.length < MIN_LAPS_FOR_DISTRIBUTION) return null;
+
+  const median = medianOf(sorted)!;
+  const p25 = percentileSorted(sorted, 0.25);
+  const p75 = percentileSorted(sorted, 0.75);
+  const iqr = Math.max(0, p75 - p25);
+  const threshold = Math.max(MISTAKE_MIN_ABSOLUTE_SEC, MISTAKE_IQR_MULTIPLIER * iqr);
+
+  const mistakes = sorted.filter((t) => t - median > threshold);
+  // Every lap being a "mistake" is impossible (they can't all be above their own
+  // median), but fall back to the full set rather than trusting that here.
+  const clean = sorted.filter((t) => t - median <= threshold);
+  const cleanOrAll = clean.length > 0 ? clean : sorted;
+
+  return {
+    best: sorted[0],
+    p25,
+    median,
+    p75,
+    slowestClean: cleanOrAll[cleanOrAll.length - 1],
+    mistakes,
   };
 }
 

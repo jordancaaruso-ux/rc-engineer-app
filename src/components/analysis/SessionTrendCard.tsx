@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Wrench } from "lucide-react";
-import type { AnalysisTrendModel, AnalysisTrendRun } from "@/lib/analysis/analysisHomeModel";
+import type {
+  AnalysisRunDistribution,
+  AnalysisTrendModel,
+  AnalysisTrendRun,
+} from "@/lib/analysis/analysisHomeModel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
 import { PagedCard } from "@/components/ui/PagedCard";
+import { PillToggle } from "@/components/ui/PillToggle";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { TireIndicatorIcon } from "@/components/runs/TireIndicatorIcon";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/runs/RunHistoryModalsLazy";
@@ -19,9 +24,19 @@ import { cn } from "@/lib/utils";
  * Mistakes (IQR-outlier count, lower = cleaner). The car tabs are shared across
  * faces; each face owns its own orientation and units. Chart-series hues only —
  * yellow stays reserved for actions per VISUAL_NORTH_STAR.
+ *
+ * The Pace face carries two views behind a toggle: the four-series Line chart,
+ * and Spread — a box-and-whisker per run that shows the *shape* of a stint
+ * rather than four summary numbers from it. Same axis, same units, so they read
+ * as one question at two resolutions and the switch is a morph, not a swap.
  */
 
 type SeriesKey = "best" | "avgTop5" | "avgTop10" | "median";
+
+/** Pace face lens. Remembered per device alongside PagedCard's face memory. */
+type TrendView = "line" | "spread";
+
+const PACE_VIEW_STORAGE_KEY = "analysisTrendPaceView";
 
 // Single warm-ink luminance ramp, not a rainbow: the series you came to read
 // (best lap) is the brightest + thickest line and everything else recedes with
@@ -34,24 +49,69 @@ const SERIES: Array<{ key: SeriesKey; name: string; color: string; width: number
   { key: "median", name: "Median", color: "#5C5A55", width: 1.75 },
 ];
 
-const CHART_HEIGHT = 252;
+/**
+ * Spread-view marks, extending the same luminance ramp — no new palette. The box
+ * recedes; the median bar and the best-lap cap are bright ink, deliberately the
+ * same white as the `best` line so the eye tracks one mark across the morph.
+ * Mistake dots borrow the Mistakes face's colour, so a bad lap looks the same
+ * wherever you meet it on this card.
+ */
+const BOX_COLOR = "#87847D";
+const BOX_FILL_OPACITY = 0.18;
+const WHISKER_COLOR = "#5C5A55";
+const SPREAD_INK = "#ECE9E4";
+const MISTAKE_COLOR = "#E5644E";
+
+/** Box width clamp — without it boxes are enormous at 2 runs and hairlines past ~20. */
+const BOX_WIDTH_MIN = 6;
+const BOX_WIDTH_MAX = 26;
+/** At or below the floor a box can't be read: fall back to a range line + median tick. */
+const BOX_DEGRADE_AT = 6.5;
+
+/**
+ * The card sizes itself to its *container*, not the viewport — it's 560px wide on
+ * /analysis and ~730px in the Sessions workbench pane, and the phone's marker
+ * glyphs were drawn for a thumb at 390px. Past `SPACIOUS_AT` the plot grows and
+ * the wrench + tire glyphs come up with it; below it nothing changes, so the
+ * phone renders exactly as it did.
+ */
+const SPACIOUS_AT = 620;
+
+type ChartMetrics = {
+  height: number;
+  padBottom: number;
+  plotBottom: number;
+  setupIcon: number;
+  tireSlot: number;
+  setupRowTop: number;
+  tireRowTop: number;
+  /** Below this px-per-run the tire row thins to changed sets only (wheels would touch). */
+  tireMinSpacing: number;
+  /** Roughly how many x-axis labels fit before they collide. */
+  labelBudget: number;
+};
+
+function chartMetrics(chartWidth: number): ChartMetrics {
+  const spacious = chartWidth >= SPACIOUS_AT;
+  const height = spacious ? 384 : 252;
+  const padBottom = spacious ? 96 : 78;
+  const plotBottom = height - padBottom;
+  return {
+    height,
+    padBottom,
+    plotBottom,
+    setupIcon: spacious ? 22 : 17,
+    tireSlot: spacious ? 30 : 24,
+    setupRowTop: plotBottom + (spacious ? 9 : 6),
+    tireRowTop: plotBottom + (spacious ? 30 : 22),
+    tireMinSpacing: spacious ? 34 : 26,
+    labelBudget: spacious ? 14 : 8,
+  };
+}
+
 const PAD_LEFT = 38;
 const PAD_RIGHT = 14;
 const PAD_TOP = 14;
-/** Bottom band: setup-change wrench row + tire indicator row + x-axis run labels. */
-const PAD_BOTTOM = 78;
-/** Bottom of the plotted area (top of the marker band). */
-const PLOT_BOTTOM = CHART_HEIGHT - PAD_BOTTOM;
-/** Edge length of the setup-change wrench glyph. */
-const SETUP_ICON = 17;
-/** Square slot for the tire wheel marker (TireIndicatorIcon size="sm" — kept close to the wrench glyph size). */
-const TIRE_SLOT = 24;
-/** Top of the setup-change wrench icons, directly below the plot (all faces). Tappable → opens the setup sheet. */
-const SETUP_ROW_TOP = PLOT_BOTTOM + 6;
-/** Top of the tire wheel slot, below the setup row (pace face only). */
-const TIRE_ROW_TOP = PLOT_BOTTOM + 22;
-/** Minimum px between runs before the tire row thins to changed-set runs only (wheels would otherwise touch). */
-const TIRE_ROW_MIN_SPACING = 26;
 
 function seconds(value: number | null | undefined, digits = 3): string {
   return value == null ? "—" : value.toFixed(digits);
@@ -81,6 +141,197 @@ function niceTicks(lo: number, hi: number, minStep = 0): number[] {
   return ticks;
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * One run's box-and-whisker. Whiskers are asymmetric on purpose: the bottom
+ * always reaches the best lap (a fast tail is performance, never an outlier to
+ * clip), the top stops at the slowest lap that isn't a mistake, and mistakes
+ * sit above as dots.
+ *
+ * A mistake beyond the domain clamps to the top edge and goes stroke-only —
+ * holding one crash lap on scale would flatten every box on the chart, and a
+ * hollow dot reads as "off scale" without needing a caret. The hovered run's
+ * real value is still named in the readout strip.
+ *
+ * Grows from its own median on the morph, so each box rises out of the line it
+ * replaces. `transform-box` is set explicitly — its initial value has changed
+ * across spec revisions and browsers disagree on the default.
+ */
+function RunSpreadBox({
+  distribution,
+  x,
+  boxWidth,
+  scale,
+  expanded,
+  emphasized,
+}: {
+  distribution: AnalysisRunDistribution;
+  x: number;
+  boxWidth: number;
+  scale: { lo: number; hi: number; yAt: (value: number) => number };
+  expanded: boolean;
+  emphasized: boolean;
+}) {
+  const { best, p25, median, p75, slowestClean, mistakes } = distribution;
+  const yMedian = scale.yAt(median);
+  const yTop = scale.yAt(p75);
+  const boxHeight = Math.max(1.5, scale.yAt(p25) - yTop);
+  const degraded = boxWidth <= BOX_DEGRADE_AT;
+  // Quartiles span every included lap, mistakes included, so that the median bar
+  // is the same number as the Line view's Median series. When a run's whole top
+  // quartile is mistakes, Q3 lands above the slowest clean lap and there is no
+  // upper whisker to draw — the box top already exceeds every clean lap.
+  const hasUpperWhisker = slowestClean > p75;
+
+  return (
+    <g
+      className="motion-safe:transition-transform motion-safe:duration-[420ms] motion-safe:ease-[cubic-bezier(0.32,0.72,0.3,1)]"
+      style={{
+        transformBox: "view-box",
+        transformOrigin: `${x}px ${yMedian}px`,
+        transform: expanded ? undefined : "scaleY(0.001)",
+      }}
+    >
+      {hasUpperWhisker ? (
+        <line
+          x1={x}
+          x2={x}
+          y1={scale.yAt(slowestClean)}
+          y2={yTop}
+          stroke={WHISKER_COLOR}
+          strokeWidth={1.5}
+        />
+      ) : null}
+      <line
+        x1={x}
+        x2={x}
+        y1={scale.yAt(p25)}
+        y2={scale.yAt(best)}
+        stroke={WHISKER_COLOR}
+        strokeWidth={1.5}
+      />
+
+      {degraded ? (
+        // Too tight to read as a box: the quartile range becomes a thick line.
+        <>
+          <line
+            x1={x}
+            x2={x}
+            y1={yTop}
+            y2={scale.yAt(p25)}
+            stroke={BOX_COLOR}
+            strokeWidth={3.5}
+          />
+          <line x1={x - 3.5} x2={x + 3.5} y1={yMedian} y2={yMedian} stroke={SPREAD_INK} strokeWidth={2} />
+        </>
+      ) : (
+        <>
+          <rect
+            x={x - boxWidth / 2}
+            y={yTop}
+            width={boxWidth}
+            height={boxHeight}
+            rx={2.5}
+            fill={BOX_COLOR}
+            fillOpacity={BOX_FILL_OPACITY}
+            stroke={BOX_COLOR}
+            strokeWidth={emphasized ? 2 : 1.5}
+          />
+          <line
+            x1={x - boxWidth / 2}
+            x2={x + boxWidth / 2}
+            y1={yMedian}
+            y2={yMedian}
+            stroke={SPREAD_INK}
+            strokeWidth={2.5}
+          />
+          {hasUpperWhisker ? (
+            <line
+              x1={x - boxWidth * 0.3}
+              x2={x + boxWidth * 0.3}
+              y1={scale.yAt(slowestClean)}
+              y2={scale.yAt(slowestClean)}
+              stroke={BOX_COLOR}
+              strokeWidth={2}
+            />
+          ) : null}
+          {/* Same bright ink as the `best` line — one mark to track across the morph. */}
+          <line
+            x1={x - boxWidth * 0.34}
+            x2={x + boxWidth * 0.34}
+            y1={scale.yAt(best)}
+            y2={scale.yAt(best)}
+            stroke={SPREAD_INK}
+            strokeWidth={2.5}
+          />
+        </>
+      )}
+
+      {mistakes.map((lapTime, index) => {
+        const offScale = lapTime > scale.hi;
+        const spread = mistakes.length > 1 ? (index - (mistakes.length - 1) / 2) * 5 : 0;
+        return (
+          <circle
+            key={`${lapTime}-${index}`}
+            cx={x + (offScale ? spread : spread * 0.6)}
+            cy={offScale ? PAD_TOP + 3.5 : scale.yAt(lapTime)}
+            r={3}
+            fill={offScale ? "none" : MISTAKE_COLOR}
+            stroke={MISTAKE_COLOR}
+            strokeWidth={offScale ? 1.5 : 0}
+            opacity={offScale ? 0.9 : 1}
+          />
+        );
+      })}
+    </g>
+  );
+}
+
+/** Spread-view readout row: the five box values, plus a mistake count when there is one. */
+function SpreadReadoutValues({ run }: { run: AnalysisTrendRun }) {
+  const distribution = run.distribution;
+  if (!distribution) {
+    return (
+      <div className="mt-1 text-[11px] text-muted-foreground">
+        Too few laps in this run for quartiles.
+      </div>
+    );
+  }
+  const cells: Array<[string, number]> = [
+    ["best", distribution.best],
+    ["q1", distribution.p25],
+    ["med", distribution.median],
+    ["q3", distribution.p75],
+    ["slowest", distribution.slowestClean],
+  ];
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+      {cells.map(([label, value]) => (
+        <span key={label} className="flex items-baseline gap-1">
+          <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-faint">{label}</span>
+          <span className="font-mono text-[11.5px] font-medium tabular-nums text-foreground">
+            {seconds(value)}
+          </span>
+        </span>
+      ))}
+      {distribution.mistakes.length > 0 ? (
+        <span className="flex items-baseline gap-1">
+          <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-faint">miss</span>
+          <span
+            className="font-mono text-[11.5px] font-medium tabular-nums"
+            style={{ color: MISTAKE_COLOR }}
+          >
+            {distribution.mistakes.length}
+          </span>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function buildPolylineSegments(points: Array<{ x: number; y: number } | null>): string[] {
   const segments: string[] = [];
   let current: string[] = [];
@@ -107,11 +358,13 @@ function buildPolylineSegments(points: Array<{ x: number; y: number } | null>): 
 function SetupChangeRow({
   carRuns,
   xAt,
+  dims,
   onOpenSetup,
   loadingRunId,
 }: {
   carRuns: AnalysisTrendRun[];
   xAt: (index: number) => number;
+  dims: ChartMetrics;
   onOpenSetup: (runId: string) => void;
   loadingRunId: string | null;
 }) {
@@ -149,18 +402,18 @@ function SetupChangeRow({
           >
             <title>{`View setup — changed: ${changedLabels}`}</title>
             <rect
-              x={x - 14}
-              y={SETUP_ROW_TOP - 4}
-              width={28}
-              height={26}
+              x={x - dims.setupIcon}
+              y={dims.setupRowTop - 4}
+              width={dims.setupIcon * 2}
+              height={dims.setupIcon + 9}
               rx={6}
               fill="transparent"
             />
             <Wrench
-              x={x - SETUP_ICON / 2}
-              y={SETUP_ROW_TOP}
-              width={SETUP_ICON}
-              height={SETUP_ICON}
+              x={x - dims.setupIcon / 2}
+              y={dims.setupRowTop}
+              width={dims.setupIcon}
+              height={dims.setupIcon}
               aria-hidden
             />
           </g>
@@ -187,7 +440,21 @@ function useChartWidth(dep: unknown): [React.RefObject<HTMLDivElement | null>, n
   return [chartRef, chartWidth];
 }
 
-export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }) {
+export function SessionTrendCard({
+  trend,
+  onSelectRun,
+}: {
+  trend: AnalysisTrendModel | null;
+  /**
+   * What tapping a run on the chart should do. Omitted, it navigates to
+   * `/runs/<id>` — right on `/analysis`, where the chart is the whole surface and
+   * the run is elsewhere. The Sessions workbench passes a handler instead: there
+   * the run already has a home in the right-hand pane, so leaving the page to
+   * read it would throw away the rail, the scroll position and the day you were
+   * comparing against.
+   */
+  onSelectRun?: (runId: string) => void;
+}) {
   const [selectedCarId, setSelectedCarId] = useState<string | null>(trend?.defaultCarId ?? null);
   // Tapping a wrench opens the same setup sheet the "View setup" button opens in
   // Sessions — but in-place here, no navigation. We fetch the run + compare
@@ -277,6 +544,7 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
                 scopeLabel={trend.scopeLabel}
                 onOpenSetup={openSetupForRun}
                 setupLoadingRunId={setupLoadingRunId}
+                onSelectRun={onSelectRun}
               />
             ),
           },
@@ -294,6 +562,7 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
                 emptyLabel="No consistency data for this car yet in this window."
                 onOpenSetup={openSetupForRun}
                 setupLoadingRunId={setupLoadingRunId}
+                onSelectRun={onSelectRun}
               />
             ),
           },
@@ -312,6 +581,7 @@ export function SessionTrendCard({ trend }: { trend: AnalysisTrendModel | null }
                 emptyLabel="No mistake-eligible runs for this car yet in this window."
                 onOpenSetup={openSetupForRun}
                 setupLoadingRunId={setupLoadingRunId}
+                onSelectRun={onSelectRun}
               />
             ),
           },
@@ -338,51 +608,121 @@ function PaceTrendFace({
   scopeLabel,
   onOpenSetup,
   setupLoadingRunId,
+  onSelectRun,
 }: {
   carRuns: AnalysisTrendRun[];
   scopeLabel: string;
   onOpenSetup: (runId: string) => void;
   setupLoadingRunId: string | null;
+  onSelectRun?: (runId: string) => void;
 }) {
   const router = useRouter();
+  const openRun = useCallback(
+    (runId: string) => {
+      if (onSelectRun) onSelectRun(runId);
+      else router.push(`/runs/${encodeURIComponent(runId)}`);
+    },
+    [onSelectRun, router]
+  );
+  const [view, setView] = useState<TrendView>("line");
   const [hidden, setHidden] = useState<Set<SeriesKey>>(new Set());
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [chartRef, chartWidth] = useChartWidth(carRuns);
   const pointerDownRef = useRef<{ x: number; y: number; sameIndex: boolean } | null>(null);
 
+  // Read after mount so the server and first client render agree.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(PACE_VIEW_STORAGE_KEY);
+      if (saved === "spread" || saved === "line") setView(saved);
+    } catch {
+      /* storage unavailable (private mode) — stay on the line view */
+    }
+  }, []);
+
+  const chooseView = (next: TrendView) => {
+    setView(next);
+    try {
+      window.localStorage.setItem(PACE_VIEW_STORAGE_KEY, next);
+    } catch {
+      /* non-fatal */
+    }
+  };
+
+  const dims = useMemo(() => chartMetrics(chartWidth), [chartWidth]);
+
   const geometry = useMemo(() => {
-    if (carRuns.length < 2) return null;
-    const values: number[] = [];
+    if (carRuns.length === 0) return null;
+    const innerWidth = chartWidth - PAD_LEFT - PAD_RIGHT;
+    const innerHeight = dims.height - PAD_TOP - dims.padBottom;
+    const xAt = (index: number) =>
+      PAD_LEFT + (carRuns.length === 1 ? innerWidth / 2 : (index / (carRuns.length - 1)) * innerWidth);
+    const spacing = carRuns.length > 1 ? innerWidth / (carRuns.length - 1) : innerWidth;
+
+    /** One y-scale over a set of values: 0.15s minimum span, 7% padding, snapped ticks. */
+    const scaleFor = (values: number[]) => {
+      if (values.length === 0) return null;
+      let min = Math.min(...values);
+      let max = Math.max(...values);
+      if (max - min < 0.15) {
+        const mid = (min + max) / 2;
+        min = mid - 0.15;
+        max = mid + 0.15;
+      }
+      const padding = (max - min) * 0.07;
+      const lo = min - padding;
+      const hi = max + padding;
+      return {
+        lo,
+        hi,
+        yAt: (value: number) => PAD_TOP + ((hi - value) / (hi - lo)) * innerHeight,
+        ticks: niceTicks(lo, hi),
+      };
+    };
+
+    const lineValues: number[] = [];
     for (const run of carRuns) {
       for (const { key } of SERIES) {
         const v = run.metrics[key];
-        if (v != null) values.push(v);
+        if (v != null) lineValues.push(v);
       }
     }
-    if (values.length === 0) return null;
-    let min = Math.min(...values);
-    let max = Math.max(...values);
-    if (max - min < 0.15) {
-      const mid = (min + max) / 2;
-      min = mid - 0.15;
-      max = mid + 0.15;
+
+    // The two views cannot share a domain. Spread spans the whiskers only —
+    // one crash lap held on scale would flatten every box on the chart into a
+    // sliver, so mistakes beyond `hi` clamp to the top edge instead.
+    const spreadValues: number[] = [];
+    for (const run of carRuns) {
+      if (run.distribution) spreadValues.push(run.distribution.best, run.distribution.slowestClean);
     }
-    const padding = (max - min) * 0.07;
-    const lo = min - padding;
-    const hi = max + padding;
-    const innerWidth = chartWidth - PAD_LEFT - PAD_RIGHT;
-    const innerHeight = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
-    const xAt = (index: number) =>
-      PAD_LEFT + (carRuns.length === 1 ? innerWidth / 2 : (index / (carRuns.length - 1)) * innerWidth);
-    const yAt = (value: number) => PAD_TOP + ((hi - value) / (hi - lo)) * innerHeight;
-    const pointsFor = (key: SeriesKey) =>
-      carRuns.map((run, index) => {
-        const v = run.metrics[key];
-        return v == null ? null : { x: xAt(index), y: yAt(v) };
-      });
-    const ticks = niceTicks(lo, hi);
-    return { xAt, yAt, pointsFor, ticks };
-  }, [carRuns, chartWidth]);
+
+    return { xAt, spacing, line: scaleFor(lineValues), spread: scaleFor(spreadValues) };
+  }, [carRuns, chartWidth, dims]);
+
+  // A line needs two runs to be a line; a box plot of one run reads fine.
+  const lineReady = carRuns.length >= 2 && geometry?.line != null;
+  const spreadReady =
+    geometry?.spread != null && carRuns.some((run) => run.distribution != null);
+  const ready = view === "spread" ? spreadReady : lineReady;
+
+  // The collapsed state has to paint before it's released or the boxes appear
+  // fully grown. Skip it on mount (restored view) — only a real switch animates.
+  const [morphed, setMorphed] = useState(true);
+  const previousViewRef = useRef<TrendView | null>(null);
+  useEffect(() => {
+    const previous = previousViewRef.current;
+    previousViewRef.current = view;
+    if (view !== "spread" || previous == null || previous === "spread") return;
+    setMorphed(false);
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => setMorphed(true));
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
+  }, [view]);
 
   const toggleSeries = (key: SeriesKey) => {
     setHidden((previous) => {
@@ -432,7 +772,7 @@ function PaceTrendFace({
     if (Math.abs(event.clientX - down.x) > 8 || Math.abs(event.clientY - down.y) > 8) return;
     const run = carRuns[hoverIndex];
     if (down.sameIndex && run) {
-      router.push(`/runs/${encodeURIComponent(run.id)}`);
+      openRun(run.id);
     }
   };
 
@@ -443,7 +783,19 @@ function PaceTrendFace({
 
   return (
     <div className="flex flex-col gap-3">
-      {geometry && displayRun ? (
+      {/* Above the readout so the control never moves when you use it. */}
+      <PillToggle
+        options={[
+          { value: "line", label: "Line" },
+          { value: "spread", label: "Spread" },
+        ]}
+        value={view}
+        onChange={chooseView}
+        role="tablist"
+        ariaLabel="Pace chart view"
+      />
+
+      {ready && displayRun ? (
         <div className="rounded-lg border border-border/60 bg-secondary/40 px-2.5 py-1.5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
@@ -467,31 +819,39 @@ function PaceTrendFace({
               ) : null}
             </div>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
-            {SERIES.filter((series) => !hidden.has(series.key)).map((series) => (
-              <span key={series.key} className="flex items-center gap-1.5">
-                <span
-                  className="h-2 w-2 rounded-[2px]"
-                  style={{ backgroundColor: series.color }}
-                  aria-hidden
-                />
-                <span className="font-mono text-[11.5px] font-medium tabular-nums text-foreground">
-                  {seconds(displayRun.metrics[series.key])}
+          {view === "spread" ? (
+            <SpreadReadoutValues run={displayRun} />
+          ) : (
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+              {SERIES.filter((series) => !hidden.has(series.key)).map((series) => (
+                <span key={series.key} className="flex items-center gap-1.5">
+                  <span
+                    className="h-2 w-2 rounded-[2px]"
+                    style={{ backgroundColor: series.color }}
+                    aria-hidden
+                  />
+                  <span className="font-mono text-[11.5px] font-medium tabular-nums text-foreground">
+                    {seconds(displayRun.metrics[series.key])}
+                  </span>
                 </span>
-              </span>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : null}
-      {geometry ? (
+      {geometry && ready ? (
         <div ref={chartRef} className="relative">
           <svg
             width="100%"
-            height={CHART_HEIGHT}
-            viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
+            height={dims.height}
+            viewBox={`0 0 ${chartWidth} ${dims.height}`}
             className="block cursor-pointer touch-pan-y"
             role="img"
-            aria-label={`Lap metric trend across ${carRuns.length} runs — ${scopeLabel}. Tap a run to open it.`}
+            aria-label={
+              view === "spread"
+                ? `Lap spread across ${carRuns.length} runs — ${scopeLabel}. Tap a run to open it.`
+                : `Lap metric trend across ${carRuns.length} runs — ${scopeLabel}. Tap a run to open it.`
+            }
             onPointerMove={handlePointerMove}
             onPointerDown={handlePointerDown}
             onPointerCancel={() => {
@@ -502,29 +862,44 @@ function PaceTrendFace({
             }}
             onClick={handleClick}
           >
-            {geometry.ticks.map((tick) => (
-              <g key={tick}>
-                <line
-                  x1={PAD_LEFT}
-                  x2={chartWidth - PAD_RIGHT}
-                  y1={geometry.yAt(tick)}
-                  y2={geometry.yAt(tick)}
-                  className="stroke-border"
-                  strokeWidth={1}
-                />
-                <text
-                  x={PAD_LEFT - 6}
-                  y={geometry.yAt(tick) + 3}
-                  textAnchor="end"
-                  className="fill-faint font-mono text-[9px] tabular-nums"
+            {/* One tick set per domain; the inactive one cross-fades out. */}
+            {(["line", "spread"] as const).map((mode) => {
+              const scale = geometry[mode];
+              if (!scale) return null;
+              return (
+                <g
+                  key={mode}
+                  className={cn(
+                    "motion-safe:transition-opacity motion-safe:duration-300",
+                    view === mode ? "opacity-100" : "opacity-0"
+                  )}
                 >
-                  {tick.toFixed(2)}
-                </text>
-              </g>
-            ))}
+                  {scale.ticks.map((tick) => (
+                    <g key={tick}>
+                      <line
+                        x1={PAD_LEFT}
+                        x2={chartWidth - PAD_RIGHT}
+                        y1={scale.yAt(tick)}
+                        y2={scale.yAt(tick)}
+                        className="stroke-border"
+                        strokeWidth={1}
+                      />
+                      <text
+                        x={PAD_LEFT - 6}
+                        y={scale.yAt(tick) + 3}
+                        textAnchor="end"
+                        className="fill-faint font-mono text-[9px] tabular-nums"
+                      >
+                        {tick.toFixed(2)}
+                      </text>
+                    </g>
+                  ))}
+                </g>
+              );
+            })}
 
             {carRuns.map((run, index) => {
-              const step = Math.max(1, Math.ceil(carRuns.length / 8));
+              const step = Math.max(1, Math.ceil(carRuns.length / dims.labelBudget));
               const isLast = index === carRuns.length - 1;
               const stepped = index % step === 0 && carRuns.length - 1 - index >= step;
               if (!isLast && !stepped) return null;
@@ -532,7 +907,7 @@ function PaceTrendFace({
                 <text
                   key={run.id}
                   x={geometry.xAt(index)}
-                  y={CHART_HEIGHT - 8}
+                  y={dims.height - 8}
                   textAnchor="middle"
                   className={cn("font-mono text-[9px]", isLast ? "fill-muted-foreground" : "fill-faint")}
                 >
@@ -551,7 +926,7 @@ function PaceTrendFace({
                   ? (chartWidth - PAD_LEFT - PAD_RIGHT) / (carRuns.length - 1)
                   : chartWidth;
               const shown =
-                spacing >= TIRE_ROW_MIN_SPACING
+                spacing >= dims.tireMinSpacing
                   ? withTires
                   : withTires.filter(({ run }) => run.tireIndicator!.changed);
               return shown.map(({ run, index }) => {
@@ -563,10 +938,10 @@ function PaceTrendFace({
                 return (
                   <foreignObject
                     key={`tire-${run.id}`}
-                    x={x - TIRE_SLOT / 2}
-                    y={TIRE_ROW_TOP}
-                    width={TIRE_SLOT}
-                    height={TIRE_SLOT}
+                    x={x - dims.tireSlot / 2}
+                    y={dims.tireRowTop}
+                    width={dims.tireSlot}
+                    height={dims.tireSlot}
                     style={{ overflow: "visible", pointerEvents: "none" }}
                   >
                     <div className="flex items-center justify-center">
@@ -580,6 +955,7 @@ function PaceTrendFace({
             <SetupChangeRow
               carRuns={carRuns}
               xAt={geometry.xAt}
+              dims={dims}
               onOpenSetup={onOpenSetup}
               loadingRunId={setupLoadingRunId}
             />
@@ -589,97 +965,142 @@ function PaceTrendFace({
                 x1={geometry.xAt(hoverIndex)}
                 x2={geometry.xAt(hoverIndex)}
                 y1={PAD_TOP - 2}
-                y2={CHART_HEIGHT - PAD_BOTTOM + 4}
+                y2={dims.plotBottom + 4}
                 className="stroke-border"
                 strokeWidth={1}
                 strokeDasharray="3 3"
               />
             ) : null}
 
-            {[...SERIES].reverse().map((series) => {
-              const points = geometry.pointsFor(series.key);
-              const isHidden = hidden.has(series.key);
-              return (
-                <g key={series.key} className={cn("transition-opacity", isHidden && "opacity-[0.07]")}>
-                  {buildPolylineSegments(points).map((segment) => (
-                    <polyline
-                      key={segment}
-                      points={segment}
-                      fill="none"
-                      stroke={series.color}
-                      strokeWidth={series.width}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+            {geometry.line ? (
+              <g
+                className={cn(
+                  "motion-safe:transition-opacity motion-safe:duration-300",
+                  view === "line" ? "opacity-100" : "opacity-0"
+                )}
+              >
+                {[...SERIES].reverse().map((series) => {
+                  const scale = geometry.line!;
+                  const points = carRuns.map((run, index) => {
+                    const v = run.metrics[series.key];
+                    return v == null ? null : { x: geometry.xAt(index), y: scale.yAt(v) };
+                  });
+                  const isHidden = hidden.has(series.key);
+                  return (
+                    <g
+                      key={series.key}
+                      className={cn("transition-opacity", isHidden && "opacity-[0.07]")}
+                    >
+                      {buildPolylineSegments(points).map((segment) => (
+                        <polyline
+                          key={segment}
+                          points={segment}
+                          fill="none"
+                          stroke={series.color}
+                          strokeWidth={series.width}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      ))}
+                      {points.map((point, index) =>
+                        point ? (
+                          <circle
+                            // eslint-disable-next-line react/no-array-index-key
+                            key={index}
+                            cx={point.x}
+                            cy={point.y}
+                            r={series.key === "best" ? 2.75 : 2.5}
+                            fill={series.color}
+                            className="stroke-card"
+                            strokeWidth={1}
+                          />
+                        ) : null
+                      )}
+                      {hoverIndex != null && !isHidden && points[hoverIndex] ? (
+                        <circle
+                          cx={points[hoverIndex].x}
+                          cy={points[hoverIndex].y}
+                          r={4}
+                          fill={series.color}
+                          className="stroke-card"
+                          strokeWidth={1.5}
+                        />
+                      ) : null}
+                    </g>
+                  );
+                })}
+              </g>
+            ) : null}
+
+            {geometry.spread ? (
+              <g
+                className={cn(
+                  "motion-safe:transition-opacity motion-safe:duration-300",
+                  view === "spread" ? "opacity-100" : "opacity-0"
+                )}
+              >
+                {carRuns.map((run, index) =>
+                  run.distribution ? (
+                    <RunSpreadBox
+                      key={run.id}
+                      distribution={run.distribution}
+                      x={geometry.xAt(index)}
+                      boxWidth={clamp(geometry.spacing * 0.5, BOX_WIDTH_MIN, BOX_WIDTH_MAX)}
+                      scale={geometry.spread!}
+                      expanded={morphed}
+                      emphasized={hoverIndex === index}
                     />
-                  ))}
-                  {points.map((point, index) =>
-                    point ? (
-                      <circle
-                        // eslint-disable-next-line react/no-array-index-key
-                        key={index}
-                        cx={point.x}
-                        cy={point.y}
-                        r={series.key === "best" ? 2.75 : 2.5}
-                        fill={series.color}
-                        className="stroke-card"
-                        strokeWidth={1}
-                      />
-                    ) : null
-                  )}
-                  {hoverIndex != null && !isHidden && points[hoverIndex] ? (
-                    <circle
-                      cx={points[hoverIndex].x}
-                      cy={points[hoverIndex].y}
-                      r={4}
-                      fill={series.color}
-                      className="stroke-card"
-                      strokeWidth={1.5}
-                    />
-                  ) : null}
-                </g>
-              );
-            })}
+                  ) : null
+                )}
+              </g>
+            ) : null}
           </svg>
         </div>
       ) : (
         <p className="text-[13px] leading-relaxed text-muted-foreground">
-          {carRuns.length === 1
-            ? "One run with laps so far — log another and the trend line appears."
-            : "No lap times for this car yet in this window."}
+          {view === "spread"
+            ? "Not enough laps in these runs to show lap spread yet."
+            : carRuns.length === 1
+              ? "One run with laps so far — log another and the trend line appears."
+              : "No lap times for this car yet in this window."}
         </p>
       )}
 
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Metrics">
-        {SERIES.map((series) => {
-          const isHidden = hidden.has(series.key);
-          return (
-            <button
-              key={series.key}
-              type="button"
-              onClick={() => toggleSeries(series.key)}
-              aria-pressed={!isHidden}
-              className={cn(
-                "tap-active flex items-center gap-1.5 rounded-md border border-border bg-secondary px-2 py-1 transition-opacity hover:border-ring/30",
-                isHidden && "opacity-45"
-              )}
-            >
-              <span
-                className="h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: series.color }}
-                aria-hidden
-              />
-              <span
+      {/* Line-view only — these toggle series the spread view doesn't draw. The
+          `hidden` set is React state, so what you switched off comes back with you. */}
+      {view === "line" ? (
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Metrics">
+          {SERIES.map((series) => {
+            const isHidden = hidden.has(series.key);
+            return (
+              <button
+                key={series.key}
+                type="button"
+                onClick={() => toggleSeries(series.key)}
+                aria-pressed={!isHidden}
                 className={cn(
-                  "text-[10.5px] tracking-tight",
-                  isHidden ? "text-faint" : "text-muted-foreground"
+                  "tap-active flex items-center gap-1.5 rounded-md border border-border bg-secondary px-2 py-1 transition-opacity hover:border-ring/30",
+                  isHidden && "opacity-45"
                 )}
               >
-                {series.name}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: series.color }}
+                  aria-hidden
+                />
+                <span
+                  className={cn(
+                    "text-[10.5px] tracking-tight",
+                    isHidden ? "text-faint" : "text-muted-foreground"
+                  )}
+                >
+                  {series.name}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -696,6 +1117,7 @@ function SingleMetricTrendFace({
   tickMinStep = 0,
   onOpenSetup,
   setupLoadingRunId,
+  onSelectRun,
 }: {
   carRuns: AnalysisTrendRun[];
   metric: "consistencyScore" | "mistakeCount";
@@ -708,10 +1130,19 @@ function SingleMetricTrendFace({
   tickMinStep?: number;
   onOpenSetup: (runId: string) => void;
   setupLoadingRunId: string | null;
+  onSelectRun?: (runId: string) => void;
 }) {
   const router = useRouter();
+  const openRun = useCallback(
+    (runId: string) => {
+      if (onSelectRun) onSelectRun(runId);
+      else router.push(`/runs/${encodeURIComponent(runId)}`);
+    },
+    [onSelectRun, router]
+  );
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [chartRef, chartWidth] = useChartWidth(carRuns);
+  const dims = useMemo(() => chartMetrics(chartWidth), [chartWidth]);
   const pointerDownRef = useRef<{ x: number; y: number; sameIndex: boolean } | null>(null);
 
   const values = useMemo(() => carRuns.map((run) => run.metrics[metric]), [carRuns, metric]);
@@ -730,7 +1161,7 @@ function SingleMetricTrendFace({
     const lo = min - padding;
     const hi = max + padding;
     const innerWidth = chartWidth - PAD_LEFT - PAD_RIGHT;
-    const innerHeight = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
+    const innerHeight = dims.height - PAD_TOP - dims.padBottom;
     const xAt = (index: number) =>
       PAD_LEFT + (carRuns.length === 1 ? innerWidth / 2 : (index / (carRuns.length - 1)) * innerWidth);
     // "Better" always plots higher: consistency up = higher score; mistakes up = fewer.
@@ -744,7 +1175,7 @@ function SingleMetricTrendFace({
     });
     const ticks = niceTicks(lo, hi, tickMinStep);
     return { xAt, yAt, points, ticks };
-  }, [present, carRuns, chartWidth, higherIsBetter, metric, tickMinStep]);
+  }, [present, carRuns, chartWidth, dims, higherIsBetter, metric, tickMinStep]);
 
   const nearestRunIndex = (event: React.PointerEvent<SVGSVGElement>): number | null => {
     if (!geometry || carRuns.length === 0) return null;
@@ -776,7 +1207,7 @@ function SingleMetricTrendFace({
     if (Math.abs(event.clientX - down.x) > 8 || Math.abs(event.clientY - down.y) > 8) return;
     const run = carRuns[hoverIndex];
     if (down.sameIndex && run) {
-      router.push(`/runs/${encodeURIComponent(run.id)}`);
+      openRun(run.id);
     }
   };
 
@@ -811,8 +1242,8 @@ function SingleMetricTrendFace({
         <div ref={chartRef} className="relative">
           <svg
             width="100%"
-            height={CHART_HEIGHT}
-            viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
+            height={dims.height}
+            viewBox={`0 0 ${chartWidth} ${dims.height}`}
             className="block cursor-pointer touch-pan-y"
             role="img"
             aria-label={`${title} trend across ${carRuns.length} runs. Tap a run to open it.`}
@@ -851,7 +1282,7 @@ function SingleMetricTrendFace({
             ))}
 
             {carRuns.map((run, index) => {
-              const step = Math.max(1, Math.ceil(carRuns.length / 8));
+              const step = Math.max(1, Math.ceil(carRuns.length / dims.labelBudget));
               const isLast = index === carRuns.length - 1;
               const stepped = index % step === 0 && carRuns.length - 1 - index >= step;
               if (!isLast && !stepped) return null;
@@ -859,7 +1290,7 @@ function SingleMetricTrendFace({
                 <text
                   key={run.id}
                   x={geometry.xAt(index)}
-                  y={CHART_HEIGHT - 8}
+                  y={dims.height - 8}
                   textAnchor="middle"
                   className={cn("font-mono text-[9px]", isLast ? "fill-muted-foreground" : "fill-faint")}
                 >
@@ -871,6 +1302,7 @@ function SingleMetricTrendFace({
             <SetupChangeRow
               carRuns={carRuns}
               xAt={geometry.xAt}
+              dims={dims}
               onOpenSetup={onOpenSetup}
               loadingRunId={setupLoadingRunId}
             />
@@ -880,7 +1312,7 @@ function SingleMetricTrendFace({
                 x1={geometry.xAt(hoverIndex)}
                 x2={geometry.xAt(hoverIndex)}
                 y1={PAD_TOP - 2}
-                y2={CHART_HEIGHT - PAD_BOTTOM + 4}
+                y2={dims.plotBottom + 4}
                 className="stroke-border"
                 strokeWidth={1}
                 strokeDasharray="3 3"

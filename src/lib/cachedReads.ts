@@ -29,12 +29,18 @@ export async function getCachedDashboardHomeModel(userId: string, timeZone: stri
  * every navigation. Invalidated on run mutations (revalidateAfterRunMutation
  * busts runsTag) and also via the dashboard tag; a 30s window covers video-job
  * status drift, which isn't tag-invalidated.
+ *
+ * BUMP THE VERSION whenever the model's SHAPE changes. Tags and `revalidate`
+ * only handle staleness of the *data*; an entry written by the previous build
+ * still deserialises, so a new field arrives `undefined` and the UI renders its
+ * own empty state — which looks like a data problem, not a cache one. v2 added
+ * `AnalysisTrendRun.distribution` for the trend chart's spread view.
  */
 export async function getCachedAnalysisHomeModel(userId: string, timeZone: string) {
   return perfSpan("cachedAnalysisHome", () =>
     unstable_cache(
       async () => loadAnalysisHomeModel(userId, timeZone),
-      [`analysis-home-v1-${userId}-${timeZone}`],
+      [`analysis-home-v2-${userId}-${timeZone}`],
       { tags: [runsTag(userId), dashboardTag(userId)], revalidate: 30 }
     )()
   );

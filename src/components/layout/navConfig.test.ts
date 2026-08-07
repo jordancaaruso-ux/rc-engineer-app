@@ -4,8 +4,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  ANALYSIS_HUB_LINKS,
   CATALOG_LINKS,
+  DESKTOP_NAV,
   MOBILE_NAV,
+  TOOLS_HUB_LINKS,
   catalogLinksForUser,
   resolveActiveNavId,
   shouldShowLogRunFab,
@@ -16,6 +19,37 @@ test("mobile dock is six pure destinations, in order, without add-run or setting
     MOBILE_NAV.map((item) => item.id),
     ["dashboard", "analysis", "events", "engineer", "assets", "teams"]
   );
+});
+
+test("Analysis lands on the workbench at desktop and the card hub on the phone", () => {
+  const desktop = DESKTOP_NAV.find((item) => item.id === "analysis");
+  const mobile = MOBILE_NAV.find((item) => item.id === "analysis");
+  assert.equal(desktop?.href, "/runs/history");
+  assert.equal(mobile?.href, "/analysis");
+  // Same section, same label, different destination — the tab must light either way.
+  assert.equal(desktop?.label, "Analysis");
+  assert.equal(mobile?.label, "Analysis");
+  assert.equal(resolveActiveNavId("/runs/history"), "analysis");
+  assert.equal(resolveActiveNavId("/analysis"), "analysis");
+});
+
+test("Tools is desktop-only; the phone keeps reaching them from /analysis", () => {
+  assert.ok(DESKTOP_NAV.some((item) => item.id === "tools"));
+  assert.ok(!MOBILE_NAV.some((item) => item.id === "tools"));
+  // Every tool the desktop hub lists is still a door on the phone's Analysis hub.
+  const analysisHrefs = new Set(ANALYSIS_HUB_LINKS.map((l) => l.href));
+  for (const link of TOOLS_HUB_LINKS) {
+    assert.ok(analysisHrefs.has(link.href), `${link.href} is unreachable on mobile`);
+  }
+});
+
+test("tool routes light Tools, not Analysis — longest prefix wins", () => {
+  assert.equal(resolveActiveNavId("/tools"), "tools");
+  assert.equal(resolveActiveNavId("/setup/comparison"), "tools");
+  // Lives under /analysis but scores longer against the Tools list.
+  assert.equal(resolveActiveNavId("/analysis/roll-center"), "tools");
+  // …and the hub itself must not get dragged along with it.
+  assert.equal(resolveActiveNavId("/analysis"), "analysis");
 });
 
 test("events own their tab — /events no longer lights Garage (2026-07-29)", () => {

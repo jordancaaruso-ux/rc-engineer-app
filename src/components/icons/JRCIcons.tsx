@@ -113,9 +113,38 @@ export const IconAddRun = ({ size = 24, ...props }: IconProps) => (
   </svg>
 );
 
+/**
+ * Tools — a toolbox. Deliberately not a wrench (that already means "setup changed
+ * on this run" on the trend chart and Sessions rows), not sliders (Settings), and
+ * not a flask (the Roll Center Lab's own door). A first pass used dividers and
+ * read as a walking figure at 24px, which is the wrong idea entirely two rows
+ * above Teams.
+ */
+export const IconTools = ({ size = 24, ...props }: IconProps) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" {...props}>
+    <path
+      d="M9.2 6.9V6a1.9 1.9 0 0 1 1.9-1.9h1.8A1.9 1.9 0 0 1 14.8 6v.9"
+      stroke="currentColor"
+      strokeWidth="2.1"
+      strokeLinecap="round"
+    />
+    <rect
+      x="3.4"
+      y="6.9"
+      width="17.2"
+      height="12.6"
+      rx="2.2"
+      stroke="currentColor"
+      strokeWidth="2.1"
+    />
+    <path d="M3.4 12.3h17.2" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
+  </svg>
+);
+
 export const navIcons = {
   dashboard: IconDashboard,
   analysis: IconAnalysis,
+  tools: IconTools,
   engineer: IconEngineer,
   garage: IconGarage, // assets nav id
   teams: IconTeams,

@@ -20,15 +20,35 @@ import { cn } from "@/lib/utils";
  * we emit both sets and toggle them with `sm:hidden` / `hidden sm:block` so
  * exactly the right count shows at each width.
  */
+/**
+ * The strip sizes off its own box, not the viewport (`@container`). It has to: in
+ * the Sessions workbench this same strip renders in a 614px middle column on a
+ * 1600px screen, and a viewport breakpoint would hand it four columns of 150px
+ * and wrap every value.
+ *
+ * Two thresholds, because they answer different questions and the answers are far
+ * apart:
+ *
+ * - **30rem — cells go inline.** A cell needs about 240px to hold a label and its
+ *   longest real value on one line ("Additive · Mighty Gripper – Yellow"), and at
+ *   the narrow column count 30rem is where cells reach that.
+ * - **44rem — one more column.** Only then is there room for another cell without
+ *   pushing the others back under 240px.
+ *
+ * Tying both to one threshold is what a first pass did, and it made the strip
+ * *taller* in the middle column: 614px cleared neither, so six cells stacked into
+ * three rows. Inline has to arrive first.
+ */
+
 const COLS_CLASS: Record<number, string> = {
   2: "grid-cols-2",
   3: "grid-cols-3",
   4: "grid-cols-4",
 };
-const SM_COLS_CLASS: Record<number, string> = {
-  2: "sm:grid-cols-2",
-  3: "sm:grid-cols-3",
-  4: "sm:grid-cols-4",
+const WIDE_COLS_CLASS: Record<number, string> = {
+  2: "@[44rem]:grid-cols-2",
+  3: "@[44rem]:grid-cols-3",
+  4: "@[44rem]:grid-cols-4",
 };
 
 /** Fillers needed to complete the last row for a given column count. */
@@ -44,36 +64,36 @@ export function StatWellGrid({
 }: {
   children: ReactNode;
   className?: string;
-  /** Base-width column count (`grid-cols-{cols}`). */
+  /** Narrow-container column count (`grid-cols-{cols}`). */
   cols?: number;
-  /** ≥`sm` column count (`sm:grid-cols-{smCols}`). */
+  /** Column count once the container passes {@link WIDE_AT}. */
   smCols?: number;
 }) {
   // toArray drops null / false children, so this is the true visible cell count.
   const itemCount = Children.toArray(children).length;
   const baseFill = fillerCount(itemCount, cols);
-  const smFill = fillerCount(itemCount, smCols);
+  const wideFill = fillerCount(itemCount, smCols);
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-xl border border-border bg-background/45",
+        "@container overflow-hidden rounded-xl border border-border bg-background/45",
         className
       )}
     >
-      <div className={cn("grid -ml-px -mt-px", COLS_CLASS[cols], SM_COLS_CLASS[smCols])}>
+      <div className={cn("grid -ml-px -mt-px", COLS_CLASS[cols], WIDE_COLS_CLASS[smCols])}>
         {children}
         {Array.from({ length: baseFill }).map((_, i) => (
           <div
             key={`bf-${i}`}
             aria-hidden
-            className="border-l border-t border-border sm:hidden"
+            className="border-l border-t border-border @[44rem]:hidden"
           />
         ))}
-        {Array.from({ length: smFill }).map((_, i) => (
+        {Array.from({ length: wideFill }).map((_, i) => (
           <div
             key={`sf-${i}`}
             aria-hidden
-            className="hidden border-l border-t border-border sm:block"
+            className="hidden border-l border-t border-border @[44rem]:block"
           />
         ))}
       </div>
@@ -122,12 +142,16 @@ export function StatWellCell({
    */
   mono?: boolean;
 }) {
-  const base = "min-w-0 border-l border-t border-border px-3 py-2 text-left";
+  const base = "min-w-0 border-l border-t border-border px-3 py-2 text-left @[30rem]:py-[7px]";
   const labelNode = (
     <div
       className={cn(
-        "type-data-label",
-        alignValue && "line-clamp-2 min-h-[2.6em] leading-[1.3]"
+        "type-data-label @[30rem]:shrink-0",
+        // `alignValue`'s reserved 2-line label box only exists to keep stacked
+        // values on a shared baseline. Inline they already share one, and the
+        // reserve would just re-inflate the row it was protecting.
+        alignValue &&
+          "line-clamp-2 min-h-[2.6em] leading-[1.3] @[30rem]:min-h-0 @[30rem]:leading-normal"
       )}
     >
       {label}
@@ -137,11 +161,25 @@ export function StatWellCell({
     <div
       className={cn(
         "mt-1 text-[13px] font-medium tabular-nums text-foreground",
+        "@[30rem]:mt-0 @[30rem]:min-w-0 @[30rem]:text-right",
         mono && "lap-figure",
         valueClassName
       )}
     >
       {value}
+    </div>
+  );
+
+  /**
+   * Stacked in a narrow strip, label-left/value-right from 30rem. A stacked cell
+   * spends two lines saying what one line can as soon as the column can hold the
+   * label and the figure side by side. Halves the height of both strips without
+   * dropping a single field.
+   */
+  const body = (
+    <div className="@[30rem]:flex @[30rem]:items-baseline @[30rem]:justify-between @[30rem]:gap-2.5">
+      {labelNode}
+      {valueNode}
     </div>
   );
 
@@ -156,20 +194,18 @@ export function StatWellCell({
         }}
         className={cn(
           base,
-          "transition-colors hover:bg-muted/40 active:bg-muted/60",
+          "w-full transition-colors hover:bg-muted/40 active:bg-muted/60",
           expanded && "bg-primary/5 ring-1 ring-inset ring-primary/40"
         )}
       >
-        {labelNode}
-        {valueNode}
+        {body}
       </button>
     );
   }
 
   return (
     <div className={base} title={title}>
-      {labelNode}
-      {valueNode}
+      {body}
     </div>
   );
 }

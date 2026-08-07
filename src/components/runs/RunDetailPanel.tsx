@@ -7,7 +7,7 @@
  * only one of them. Do not fork a page-specific variant.
  */
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Collapse } from "@/components/ui/Collapse";
 import { formatRunDateTime } from "@/lib/formatDate";
@@ -215,6 +215,10 @@ export function RunDetailPanel({
   allowRunMutations = true,
   onDeleted,
   className,
+  headerLead,
+  headerActions,
+  layout = "single",
+  columnClassName,
 }: {
   run: Run;
   pickerRuns: CompareRunShape[];
@@ -229,6 +233,23 @@ export function RunDetailPanel({
   onDeleted?: () => void;
   /** Outer card override — `/runs/[id]` squares the top corners to fuse with its action strip. */
   className?: string;
+  /**
+   * Slots on the "Session details" row, which is the card's header line. The
+   * Sessions workbench hangs the run's controls here instead of stacking a strip
+   * above the card: in a two-pane layout that strip is a band of dead height
+   * between the filter bar and the first real content, and it pushes the detail
+   * card out of alignment with the session rail beside it.
+   */
+  headerLead?: ReactNode;
+  headerActions?: ReactNode;
+  /**
+   * `"split"` emits the record and the log as two sibling cards instead of one —
+   * for the Sessions workbench's three-track grid. Everything else keeps them in
+   * one card, in the same order, so the phone and `/runs/[id]` are unchanged.
+   */
+  layout?: "single" | "split";
+  /** Applied to *both* cards in split mode — the per-column scroll box. */
+  columnClassName?: string;
 }) {
   const router = useRouter();
   const todayDraft = useTodayDraftRunOptional();
@@ -615,22 +636,33 @@ export function RunDetailPanel({
       </div>
     ) : null;
 
-  return (
-    <CardPanel className={className} contentClassName="space-y-3 text-sm min-w-0 w-full">
+  /**
+   * What the car did — the performance record. Session identity, the lap stats,
+   * every lap, the trace. This is the half you stare at between runs, and the
+   * half that wants width and height.
+   */
+  const record = (
+    <>
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <Eyebrow>Session details</Eyebrow>
-          {allowRunMutations ? (
-            <Link
-              href={`/runs/${encodeURIComponent(run.id)}/edit`}
-              aria-label="Edit run"
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground no-underline hover:bg-muted/80 transition"
-              title="Edit run"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <SquarePen className="h-4 w-4" aria-hidden />
-            </Link>
-          ) : null}
+          <div className="flex min-w-0 items-center gap-2">
+            {headerLead}
+            <Eyebrow className="mb-0">Session details</Eyebrow>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {headerActions}
+            {allowRunMutations ? (
+              <Link
+                href={`/runs/${encodeURIComponent(run.id)}/edit`}
+                aria-label="Edit run"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground no-underline hover:bg-muted/80 transition"
+                title="Edit run"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <SquarePen className="h-4 w-4" aria-hidden />
+              </Link>
+            ) : null}
+          </div>
         </div>
         <StatWellGrid cols={2} smCols={3}>
           <StatWellCell label="Date / time" value={dateTimeLabel} />
@@ -669,13 +701,17 @@ export function RunDetailPanel({
           }
         />
       </div>
+    </>
+  );
 
-      <LapComparePanel
-        runId={run.id}
-        trackId={run.track?.id ?? null}
-        allowMutations={allowRunMutations}
-      />
-
+  /**
+   * What *you* did, and what you thought of it. Narrow content, all of it: a
+   * handful of changed parameters, a sentence or two of notes, a rating. Video
+   * closes it out — it's somewhere you go, not something you read past, which is
+   * why it sits at the bottom on every surface now rather than mid-record.
+   */
+  const log = (
+    <>
       <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
         <Eyebrow>Setup vs previous run</Eyebrow>
         <SetupChangedSincePreviousList
@@ -710,6 +746,12 @@ export function RunDetailPanel({
         ) : null}
       </div>
 
+      <LapComparePanel
+        runId={run.id}
+        trackId={run.track?.id ?? null}
+        allowMutations={allowRunMutations}
+      />
+
       {allowRunMutations || deleteError ? (
         <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
           {allowRunMutations ? (
@@ -729,6 +771,34 @@ export function RunDetailPanel({
           {deleteError ? <p className="text-[11px] text-destructive">{deleteError}</p> : null}
         </div>
       ) : null}
+    </>
+  );
+
+  const CONTENT = "space-y-3 text-sm min-w-0 w-full";
+
+  /**
+   * Two cards, emitted as siblings so the workbench grid can place them in its
+   * own tracks — record in the wide middle column, log in the narrow right one.
+   * Deliberately NOT a nested grid: the columns have to be the *page's* tracks or
+   * they can't align with the rail or scroll independently of each other.
+   */
+  if (layout === "split") {
+    return (
+      <>
+        <CardPanel className={cn(className, columnClassName)} contentClassName={CONTENT}>
+          {record}
+        </CardPanel>
+        <CardPanel className={cn(className, columnClassName)} contentClassName={CONTENT}>
+          {log}
+        </CardPanel>
+      </>
+    );
+  }
+
+  return (
+    <CardPanel className={className} contentClassName={CONTENT}>
+      {record}
+      {log}
     </CardPanel>
   );
 }

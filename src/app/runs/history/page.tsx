@@ -11,6 +11,12 @@ import { RunHistoryColGroup, RunHistoryMobileHeaderRow, RUN_HISTORY_ACTION_CELL_
 import { SessionGroupsPager } from "@/components/runs/SessionGroupsPager";
 import { SessionsFocusScroll } from "@/components/runs/SessionsFocusScroll";
 import { SessionsDesktopDefaultOpen } from "@/components/runs/SessionsDesktopDefaultOpen";
+import { SessionsWorkbench } from "@/components/runs/SessionsWorkbench";
+import {
+  buildGroupRunRows,
+  buildGroupTrendModel,
+  type WorkbenchGroup,
+} from "@/lib/runs/sessionWorkbenchModel";
 import { RunHistoryViewMore } from "@/components/runs/RunHistoryViewMore";
 import { OPEN_GROUP_PARAM } from "@/lib/runs/sessionsReturn";
 import { SessionsFilterBar } from "@/components/runs/SessionsFilterBar";
@@ -447,6 +453,24 @@ export default async function RunHistoryPage({
     focusGroupIndex >= 0 ? Math.max(8, focusGroupIndex + 1) : 8;
 
   const teamMode = Boolean(teamId && !teamAccessDenied);
+
+  // lg+ workbench data. Solo grouped view only: a team group nests by driver
+  // first, which is a different shape than "sessions → runs" and would need its
+  // own rail — team keeps the accordion until that's designed.
+  const workbenchActive = !teamMode && filters.layout !== "flat" && groups.length > 0;
+  const workbenchGroups: WorkbenchGroup[] = workbenchActive
+    ? groups.map((group) => ({
+        id: group.id,
+        // Same rule the accordion uses: a test day's date lives on the meta line,
+        // so "Test day – 19 Jul 2026" collapses to "Test day".
+        title: group.type === "Race Meeting" ? group.title : "Test day",
+        type: group.type,
+        trackName: group.trackName && group.trackName !== "—" ? group.trackName : null,
+        dateLabel: group.dateLabel,
+        runs: buildGroupRunRows(group),
+        trend: buildGroupTrendModel(group, { setupDataByRunId }),
+      }))
+    : [];
   const pageTitle = teamAccessDenied ? "Sessions" : teamMode ? `Team — ${teamTitle}` : "Sessions";
   const mySessionsViewDescription =
     "Your runs grouped by session. Filter, compare, and drag to reorder within a group.";
@@ -782,6 +806,20 @@ export default async function RunHistoryPage({
     ...(viewAll ? { viewAll: "1" } : {}),
   }).toString();
 
+  // One node, three placements — the flat list, the phone/team accordion, and the
+  // foot of the workbench rail. Built once so the props can't drift apart.
+  const viewMore = (
+    <RunHistoryViewMore
+      viewAll={viewAll}
+      hasMoreRuns={hasMoreRuns}
+      totalRunCount={totalRunCount}
+      loadedRunCount={dbMatchedCount}
+      teamId={teamId}
+      openGroup={focusRunId}
+      filterQuery={filterQuery}
+    />
+  );
+
   if (teamAccessDenied) {
     return (
       <>
@@ -849,26 +887,33 @@ export default async function RunHistoryPage({
         ) : filters.layout === "flat" ? (
           <div className="space-y-2">
             {renderFlatRunList()}
-            <RunHistoryViewMore
-              viewAll={viewAll}
-              hasMoreRuns={hasMoreRuns}
-              totalRunCount={totalRunCount}
-              loadedRunCount={dbMatchedCount}
-              teamId={teamId}
-              openGroup={focusRunId}
-              filterQuery={filterQuery}
-            />
+            {viewMore}
           </div>
         ) : (
           <div className="space-y-2">
+            {/* lg+ solo: the workbench replaces the accordion outright — the rail keeps
+                its place while the pane shows the day or one run. Team mode and the
+                phone keep the accordion below, which `sessions-split` still turns into
+                master-detail at lg+ for team. */}
+            {workbenchActive ? (
+              <SessionsWorkbench
+                groups={workbenchGroups}
+                runs={runs}
+                pickerRuns={compareRunsDescending}
+                runListSource="my_runs"
+                displayTimeZone={displayTimeZone}
+                userDisplayName={userDisplayName}
+                railFooter={viewMore}
+              />
+            ) : null}
             {/* One glass card holds every session group (approved artifact:
                 sessions-redesign); groups divide with hairlines inside it.
                 `sessions-split` turns that same markup into a master-detail layout at lg+ —
                 session list on the left, the open session's runs in a pane on the right. */}
             <SurfaceCard
               variant="panel"
-              contentClassName="p-0 sessions-split"
-              className="min-w-0 max-w-full"
+              contentClassName={cn("p-0", !workbenchActive && "sessions-split")}
+              className={cn("min-w-0 max-w-full", workbenchActive && "lg:hidden")}
             >
               {viewAll ? (
                 groups.map((group, idx) => renderSessionGroup(group, idx))
@@ -878,15 +923,9 @@ export default async function RunHistoryPage({
                 </SessionGroupsPager>
               )}
             </SurfaceCard>
-            <RunHistoryViewMore
-              viewAll={viewAll}
-              hasMoreRuns={hasMoreRuns}
-              totalRunCount={totalRunCount}
-              loadedRunCount={dbMatchedCount}
-              teamId={teamId}
-              openGroup={focusRunId}
-              filterQuery={filterQuery}
-            />
+            {/* The workbench carries its own copy at the foot of the rail, so this
+                one is for the phone and team mode only — otherwise you'd get two. */}
+            <div className={cn(workbenchActive && "lg:hidden")}>{viewMore}</div>
           </div>
         )}
       </section>

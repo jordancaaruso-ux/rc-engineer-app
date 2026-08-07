@@ -7,6 +7,7 @@ import {
   IconGarage,
   IconSettings,
   IconTeams,
+  IconTools,
   type JrcIcon,
 } from "@/components/icons/JRCIcons";
 
@@ -18,6 +19,7 @@ export type PrimaryNavId =
   | "assets"
   | "engineer"
   | "teams"
+  | "tools"
   | "settings";
 
 export type PrimaryNavItem = {
@@ -67,7 +69,6 @@ export function shouldShowLogRunFab(pathname: string | null | undefined): boolea
 }
 
 const ANALYSIS_PREFIXES = [
-  "/setup/comparison",
   "/videos/analysis",
   "/runs/history",
   // Run view (`/runs/<id>`) lights Analysis. Longest-prefix scoring keeps `/runs/new` and
@@ -75,6 +76,13 @@ const ANALYSIS_PREFIXES = [
   "/runs",
   "/analysis",
 ] as const;
+
+/**
+ * Tools own the workbenches you go to deliberately. `/analysis/roll-center` sits
+ * under `/analysis` but scores longer here, and longest-prefix wins — so the lab
+ * lights Tools without needing to move route.
+ */
+const TOOLS_PREFIXES = ["/setup/comparison", "/analysis/roll-center", "/tools"] as const;
 
 const ASSETS_PREFIXES = [
   "/setup-sheet-models",
@@ -116,6 +124,7 @@ export function resolveActiveNavId(pathname: string): PrimaryNavId | null {
     { id: "dashboard", score: pathname === "/" ? 1 : 0 },
     { id: "add-run", score: addRunMatchScore(pathname) },
     { id: "analysis", score: sectionMatchScore(pathname, ANALYSIS_PREFIXES) },
+    { id: "tools", score: sectionMatchScore(pathname, TOOLS_PREFIXES) },
     { id: "events", score: matchPrefixScore(pathname, "/events") },
     { id: "assets", score: sectionMatchScore(pathname, ASSETS_PREFIXES) },
     { id: "engineer", score: matchPrefixScore(pathname, "/engineer") },
@@ -143,6 +152,21 @@ const ADD_RUN: PrimaryNavItem = {
 };
 const ANALYSIS: PrimaryNavItem = { id: "analysis", href: "/analysis", label: "Analysis", icon: IconAnalysis };
 /**
+ * Desktop Analysis lands on the Sessions workbench, not the card hub.
+ *
+ * At lg+ `/runs/history` IS the analysis surface — session rail on the left, the
+ * day's trend or one run in the pane — so the hub's Recent-runs card and trend
+ * chart are the same data one click further away. The phone keeps `/analysis`,
+ * where the stacked cards are still the right read on a small screen.
+ *
+ * Same nav id either way, and `/runs/history` was already in `ANALYSIS_PREFIXES`,
+ * so the tab lights identically and no active-state logic changes. This is a
+ * different destination for the same section, not a different section.
+ */
+const ANALYSIS_DESKTOP: PrimaryNavItem = { ...ANALYSIS, href: "/runs/history" };
+/** Desktop-only: on the phone these stay as doors on `/analysis`. */
+const TOOLS: PrimaryNavItem = { id: "tools", href: "/tools", label: "Tools", icon: IconTools };
+/**
  * Events got their own tab (founder call 2026-07-29). They had one door left after the Garage hub
  * was deleted — the dashboard Next-outing card — and a meeting is neither an asset nor team data,
  * so no existing tab fitted. Sits next to Analysis; `/events` no longer lights Garage.
@@ -169,14 +193,20 @@ export const PRIMARY_NAV: PrimaryNavItem[] = [
   SETTINGS,
 ];
 
-/** Desktop sidebar: full section list, natural top-to-bottom order. */
+/**
+ * Desktop sidebar: full section list, natural top-to-bottom order. Analysis
+ * points at the workbench here (see `ANALYSIS_DESKTOP`), and Tools exists only on
+ * this list — the phone reaches the same destinations as doors on `/analysis`,
+ * and the mobile dock has no slot to spare.
+ */
 export const DESKTOP_NAV: PrimaryNavItem[] = [
   DASHBOARD,
   ADD_RUN,
-  ANALYSIS,
+  ANALYSIS_DESKTOP,
   EVENTS,
   ENGINEER,
   ASSETS,
+  TOOLS,
   TEAMS,
   SETTINGS,
 ];
@@ -238,6 +268,32 @@ export const ANALYSIS_HUB_LINKS: NavHubLink[] = [
     label: "Roll Center Lab",
     description: "What-if suspension geometry — shims, roll, RC migration.",
     icon: "flask",
+  },
+];
+
+/**
+ * Tools hub (`/tools`) — the workbenches you open on purpose, rather than glance
+ * at. Same links the phone still shows as doors on `/analysis`; this is where
+ * desktop reaches them now that Analysis lands on the Sessions workbench.
+ */
+export const TOOLS_HUB_LINKS: NavHubLink[] = [
+  {
+    href: "/setup/comparison",
+    label: "Setup comparison",
+    description: "Compare setups across runs and community data.",
+    icon: "git-compare",
+  },
+  {
+    href: "/analysis/roll-center",
+    label: "Roll Center Lab",
+    description: "What-if suspension geometry — shims, roll, RC migration.",
+    icon: "flask",
+  },
+  {
+    href: "/videos",
+    label: "Video",
+    description: "Analysis sessions, saved videos, and tools.",
+    icon: "video",
   },
 ];
 

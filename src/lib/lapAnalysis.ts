@@ -443,7 +443,8 @@ export type MistakeLapAnalysis = {
   iqrSec: number | null;
 };
 
-function percentileSorted(sorted: number[], p: number): number {
+/** Linear-interpolated percentile over an ascending array. Exported for the trend spread view. */
+export function percentileSorted(sorted: number[], p: number): number {
   if (sorted.length === 0) return NaN;
   if (sorted.length === 1) return sorted[0]!;
   const idx = (sorted.length - 1) * p;

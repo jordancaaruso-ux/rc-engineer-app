@@ -6,6 +6,7 @@ import {
   bestDeltaVsPreviousSameCarTrack,
   collectCarOptions,
   computeAnalysisRunMetrics,
+  computeLapDistribution,
   computeSetupChangesByRunId,
   isTrackCarPersonalBest,
   resolveTrendScope,
@@ -124,6 +125,7 @@ async function loadTrendModel(
       shortLabel: shortRunLabel(run, index),
       createdAtIso: run.createdAt.toISOString(),
       metrics,
+      distribution: computeLapDistribution(run),
       tireIndicator: tireIndicatorsByRunId.get(run.id) ?? null,
       setupChange: setupChangesByRunId.get(run.id) ?? null,
     });
