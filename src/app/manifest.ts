@@ -24,6 +24,12 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     scope: "/",
     display: "standalone",
+    // FOUNDER DECISION PENDING (raised 2026-08-07 during the desktop pass): this letterboxes a
+    // desktop PWA install into a phone-shaped portrait window, so the desktop layouts never appear
+    // for anyone who installs the app. The fix is `"any"`, but a manifest has no media queries —
+    // it is one value for every device, so relaxing it ALSO lets a phone rotate into landscape,
+    // where the >=768px breakpoints would swap the bottom dock for the desktop sidebar mid-race.
+    // That is a product call about the trackside experience, not a layout fix, so it stays as-is.
     orientation: "portrait",
     // Ash warm — the one app background (matches `--page-bg-base` in globals.css /
     // viewport themeColor) so the Android splash + status chrome never flash off-palette.

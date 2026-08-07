@@ -221,10 +221,18 @@ export default async function RootLayout({
            * blocks pinch-zoom without touching normal scroll/tap. Double-tap zoom
            * is handled by `touch-action: manipulation` (globals.css) and input
            * focus-zoom by `maximum-scale=1` (viewport). Founder decision 2026-07-14.
+           *
+           * SKIPPED ON DESKTOP (2026-08-07). These are WebKit gesture events, and on macOS Safari
+           * a TRACKPAD pinch fires them too — so the guard was silently disabling pinch-to-zoom for
+           * desktop Safari users, which is an accessibility problem nobody asked for and the phone
+           * decision never intended. The bar is `(min-width: 1024px) and (pointer: fine)`: a phone
+           * is neither, and a touch tablet fails the pointer test, so the trackside behaviour is
+           * unchanged. Desktop keyboard zoom (ctrl +/-) and ctrl+scroll were never affected —
+           * those are wheel/key events, and desktop browsers ignore the viewport meta entirely.
            */}
           <Script id="rc-no-zoom-guard" strategy="beforeInteractive">
 
-            {`(function(){try{var p=function(e){e.preventDefault();};document.addEventListener('gesturestart',p,{passive:false});document.addEventListener('gesturechange',p,{passive:false});}catch(e){}})();`}
+            {`(function(){try{if(window.matchMedia&&window.matchMedia('(min-width: 1024px) and (pointer: fine)').matches){return;}var p=function(e){e.preventDefault();};document.addEventListener('gesturestart',p,{passive:false});document.addEventListener('gesturechange',p,{passive:false});}catch(e){}})();`}
 
           </Script>
 

@@ -27,7 +27,15 @@ This document is the **single source of truth** for UI/visual work in JRC Race E
 2. **Trust first** — especially login and dashboard; drivers must feel this is a serious tool.
 3. **Intuition** — one obvious next action; labels and hierarchy do the work.
 4. **Polish** — consistent tokens, primitives, and spacing; no one-off hex unless migrating.
-5. **Mobile-first** — every Tier A screen works at **390px** with the bottom tab bar visible.
+5. **Mobile-first, desktop second — and 390px is the FIXED one.** Every Tier A screen works at
+   **390px** with the bottom tab bar visible. Since 2026-08-07 desktop is a first-class target too
+   (usage was ~99% mobile and the desktop workflow had never been designed), but the relationship
+   is not symmetric: **mobile is the reference, and desktop work must not move it.** In practice
+   that means desktop layout lives behind `md:` / `lg:` / `xl:` and never edits a base class.
+   Prove it, don't assert it — `npm run layout:probe --width=390` before and after, and compare.
+   Do NOT try to prove it with screenshots: captured twice from identical code these pages differ
+   by up to 98%, so a pixel diff both screams about nothing and would bury a real one-pixel shift.
+   `npm run shots:desktop` is for LOOKING at desktop, not for regression-testing mobile.
 
 ---
 
@@ -253,7 +261,10 @@ Before opening a PR or marking a screen “done”:
 - [ ] Cards use `CardPanel` or `SurfaceCard`, not one-off `bg-card` wrappers with different radii.
 - [ ] Section labels use `<Eyebrow>` where the dashboard does.
 - [ ] Page title uses `.page-title` (Sora bold, **UPPERCASE** +0.02em).
-- [ ] Works at 390px width with bottom tab bar.
+- [ ] Works at 390px width with bottom tab bar — and `layout:probe` at 390px is UNCHANGED if the
+      change was for desktop.
+- [ ] Works at 1440px: content centred on the same axis as the page title, no dead right margin,
+      no phone-width component stretched across the pane.
 - [ ] No behavior, routing, or API changes.
 - [ ] Yellow is not used for data meaning (only actions / focus — the corner-balance instrument is the single signed-off exception).
 
