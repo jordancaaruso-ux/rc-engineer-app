@@ -1,8 +1,220 @@
 # Engineer feedback inbox
 
-Generated: 2026-08-06T06:03:31.635Z
+Generated: 2026-08-07T05:49:58.215Z
 
 Agent-readable rollup of founder (admin) 0–10 ratings. Canonical source is the database; regenerate via Settings → Export feedback or `npm run engineer:export-feedback`.
+
+## 2026-08-07T05:49:58.080Z — score 5/10
+
+- **User:** jordancaaruso@gmail.com
+- **Message:** `cmsiigvxh0072vl6szgf4rogj` · **Thread:** `cmsiigvvn006yvl6s1av84vcq`
+- **Prompt version:** `2026-08-06-kb-wired+d67d3158`
+
+**Question:**
+
+super low grip track, like driving on ice. how would you generate more overall grip, and a little more rear grip balance
+
+**Answer:**
+
+On a track this low-grip, start with **reducing load transfer**, then add rear support for the part of the corner where it is missing.
+
+1. **Lower the whole car carefully, without letting it bottom.**  
+   Lower ride height lowers the centre of gravity, so there is less total load transfer in every corner. That lets each tyre pair share load more evenly, which is the cleanest route to more overall grip. Re-check camber and roll-centre settings afterward: ride height moves both.
+
+2. **If the surface is rough, free up wheel movement.**  
+   Softer springs and less damping let the wheels follow bumps rather than passing the hit into the tyre load. That can add grip on a rough low-grip track. Don’t just soften it blindly: too little damping leaves the wheel moving after the bump, so grip can become inconsistent.
+
+3. **For more rear grip in long, settled corners, soften the rear roll support.**  
+   A softer rear bar is the narrow first move if the rear ride height and bump compliance are already right. In a sweeper, it puts less lateral transfer through the rear axle, helping rear overall grip.  
+   If the bar is already soft or absent, a softer rear spring does the same roll-balance job, but also changes rear heave support and bump compliance.
+
+4. **Lower rear roll centre if the rear needs more hold through the middle.**  
+   On this chassis, you can do that by removing rear inner-lower-arm shims or rear under-hub shims, or by adding rear upper-inner shims. That reduces the rear’s geometric load transfer and gives the rear more “in the track” hold. It also reduces rear camber gain, so re-check rear camber rather than assuming the old static number still works.
+
+5. **If it is loose only when power goes on, free the rear diff.**  
+   Thinner diff oil reduces coupling. On throttle that leaves more rear tyre grip available for turning instead of spending it on drive force, so it is the direct rear-grip-balance move for the on-power phase.
+
+One important split: **do not use a softer rear bar or spring to fix a rear that is loose on entry into hairpins or flicks.** In those corners the car is still moving into roll; a softer rear builds rear grip later and can let it yaw more. A stiffer rear does the opposite there—it brings rear grip in sooner—but that same stiffer rear can reduce rear overall grip in a settled sweeper.
+
+So I’d make the order: **safe lower ride height first; then rear bar/roll-centre for mid-corner rear hold; then diff oil if the problem is specifically on power.**
+
+**Note:**
+
+often in these kinds of conditions, its important to go stiffer to work the tire more to generate more initial grip, and i think it can work the tire better so it actually generates more grip.
+
+---
+
+## 2026-08-07T05:33:02.062Z — score 7/10
+
+- **User:** jordancaaruso@gmail.com
+- **Message:** `cmsiid102006avl6sbw78q063` · **Thread:** `cmsiid0y70066vl6ss317xnhg`
+- **Prompt version:** `2026-08-06-kb-wired+d67d3158`
+
+**Question:**
+
+how would you prevent traction rolling
+
+**Answer:**
+
+Start with the things that reduce the load transfer that can pick the car up:
+
+- **Lower the centre of gravity.** Run the car lower only while it still clears the track; if the chassis bottoms, it goes solid and can unload a tyre. Keep any ballast as low as the rules allow.
+- **Take away geometric support if the car is jacking up in the corner.** A lower roll centre sends less load through the links instantly and reduces the upward jacking effect. It will also let the car roll more, so this is a test, not an automatic cure.
+- **If it happens over kerbs or bumps, free the wheel up.** Less damping at that end lets the wheel move over the hit instead of passing the spike into the tyre and chassis. Too little damping can then leave it moving and varying tyre load after the kerb, so make a small change.
+
+Then separate *where* it rolls:
+
+- **Smooth, fast corner:** look first at ride height, low ballast, and roll-centre support. The body and its height/position can matter here too because aero load rises sharply with speed.
+- **Tight corner, chicane, or kerb:** look harder at damping, droop, and whether the car is hitting a travel limit. A wheel that tops out or reaches a compression stop becomes effectively rigid at that moment.
+- **Only when grip comes up:** the same roll-centre support and end-of-travel settings matter more because their effect grows with cornering load.
+
+An overall wider track is also worth a controlled test: unverified baseline theory says it may reduce traction-roll tendency, but it also changes steering scrub and contact-patch geometry, so I would not treat it as a guaranteed fix.
+
+Before changing springs or bars, tell me whether it rolls in a smooth fast corner, a tight turn, or on a kerb—and whether it lifts the inside front or rear.
+
+---
+
+## 2026-08-07T05:28:35.138Z — score 7/10
+
+- **User:** jordancaaruso@gmail.com
+- **Message:** `cmsii2pck005hvl6s8mehyo7i` · **Thread:** `cmsihujyl004tvl6s1wcmmil0`
+- **Prompt version:** `2026-08-06-kb-wired+d67d3158`
+
+**Question:**
+
+what would you recommend with damper oin
+
+**Answer:**
+
+For a rear that moves around in hairpins, chicanes, or on entry, try **slightly thicker rear damper oil**, with the front unchanged.
+
+It slows rear suspension movement, so the rear takes load sooner as the car starts to roll. That brings rear **initial grip** in earlier and resists the rear rotating in those unsettled corners. It can also stop the rear from continuing to move after the first steering input.
+
+Don’t use thicker rear oil as the answer to a rear that slides in a long, settled mid-corner. Once the car has finished rolling, oil does not set the lasting front/rear balance; rear roll centre, rear spring, or rear bar are the better tools there.
+
+If the rear loses grip specifically over kerbs, bumps, or rough sections, go the other way: **lighter rear oil** lets that wheel move over the hit and keep its load steadier. But if you go too light, the rear can keep cycling after the bump and lose hold then.
+
+So: thicker rear oil for rear security while the car is moving into the corner; lighter rear oil if the slide starts at the bump itself.
+
+**Note:**
+
+its okay - id still say bump compliance is usually better with thicker oil. I agree with the damper change, but i dont think the reasoning is right, it doesnt increase initial grip generally, only a damper with more pack might - not slower movement
+
+---
+
+## 2026-08-07T05:23:59.450Z — score 7/10
+
+- **User:** jordancaaruso@gmail.com
+- **Message:** `cmsihuk0g004xvl6sn78a58vo` · **Thread:** `cmsihujyl004tvl6s1wcmmil0`
+- **Prompt version:** `2026-08-06-kb-wired+d67d3158`
+
+**Question:**
+
+low / medium grip touring car, feel like i could always have a little more rear grip and security to push without it sliding
+
+**Answer:**
+
+Start with the rear roll centre: lower it at both rear corners. Adding shims at the rear inner upper-link pickups does that; removing rear inner-lower or under-hub shims does the same more strongly. It puts the rear more **in the track**, with more rear **hold** rather than a rear that slides as you lean on it.
+
+That geometry change also reduces rear camber gain, so re-check the rear static camber afterward. Don’t go too low: the rear can become vague at the limit.
+
+Then match the change to where it slides:
+
+- **On power:** run a freer rear diff with thinner oil. More rear diff coupling uses more rear grip for drive, leaving less for holding the corner.
+- **Off throttle / entry:** more rear diff coupling resists rear rotation off throttle. That is the opposite diff direction from the on-power fix.
+- **Long mid-corner sweepers:** softer rear spring or rear bar can give the rear more hold once the car has settled.
+- **Hairpins, chicanes, and flicks:** don’t assume softer rear stiffness will help. It delays rear load build-up and can let the car rotate more in those corners.
+
+If the rear slides in every phase, I’d make the rear roll-centre move first. If it is mainly entry, mid-corner, or on power, say which one—the next change is different.
+
+**Note:**
+
+vague - would prefer 'unpredicatble' vague to most people is irrelevant
+
+---
+
+## 2026-08-07T05:17:17.896Z — score 6/10
+
+- **User:** jordancaaruso@gmail.com
+- **Message:** `cmsihrvyi004fvl6susr8z3mq` · **Thread:** `cmsihlvn1003bvl6sxvbxo536`
+- **Prompt version:** `2026-08-06-kb-wired+d67d3158`
+
+**Question:**
+
+i softened it and it made it understeer worse
+
+**Answer:**
+
+Put the rear bar back. On this car and track, that softer rear took away steering rather than giving you the yaw we were aiming for.
+
+For the hairpin, try **one step stiffer front anti-roll bar** next. In a corner that is still loading up, it makes the front take load and build grip earlier, which is the steering you need through the middle.
+
+If the understeer is mainly **after throttle goes on**, don’t keep chasing bars first—test **thicker diff oil** instead. That changes on-power rotation specifically.
+
+**Note:**
+
+id be thinking softer front arb - mid corner steering (the original complaint) is almost always improved by softer front. if the complain was into the corner, id suggest stiffer front arb
+
+---
+
+## 2026-08-07T05:15:44.478Z — score 7/10
+
+- **User:** jordancaaruso@gmail.com
+- **Message:** `cmsihpg6i003wvl6s9nr1kx1o` · **Thread:** `cmsihlvn1003bvl6sxvbxo536`
+- **Prompt version:** `2026-08-06-kb-wired+d67d3158`
+
+**Question:**
+
+hairpin
+
+**Answer:**
+
+For a hairpin, start by **softening the rear anti-roll bar one step**.
+
+A hairpin never really settles: brake, turn and throttle keep the load moving. A softer rear bar makes rear grip arrive later, so the car can yaw more through the middle instead of the rear resisting the turn straight away.
+
+Use the rear bar first because it changes roll balance without changing how the rear handles bumps under both wheels.
+
+If the push is only **once you pick up throttle**, say so—that points at the rear diff instead.
+
+**Note:**
+
+this could be right, but its hedged. He should clarify the effect can change depending on conditions, if it makes it worse, go the other direction
+
+---
+
+## 2026-08-07T05:13:57.760Z — score 6/10
+
+- **User:** jordancaaruso@gmail.com
+- **Message:** `cmsihlvp4003fvl6stmzutohv` · **Thread:** `cmsihlvn1003bvl6sxvbxo536`
+- **Prompt version:** `2026-08-06-kb-wired+d67d3158`
+
+**Question:**
+
+how can i get more mid corner steering
+
+**Answer:**
+
+First split it by corner:
+
+- **Long, fast sweeper:** soften the **front anti-roll bar** a step, or stiffen the **rear anti-roll bar** a step. That shifts more of the settled cornering load transfer to the rear, so the front keeps more overall grip and the car can rotate more mid-corner. Start with the bar: it moves roll balance without changing how that end takes bumps under both wheels.
+
+- **Tight 90, hairpin, chicane:** those corners are still loading and unloading through the middle. A **stiffer front bar or front spring** brings front grip in earlier; a **softer rear bar or rear spring** lets the rear load later and lets the car yaw more. Those are the opposite answer to the long sweeper, so don’t use the sweeper fix blindly here.
+
+Then separate whether it happens **on power**:
+
+- If it only needs more steering once you pick up throttle, use **thicker diff oil**. More rear diff coupling uses more of the rear tyres’ grip budget to drive the car, leaving less for cornering, so it rotates more on power.
+- If it needs more steering **off throttle**, thinner diff oil is the direction to test; more coupling restricts off-throttle rotation.
+
+Geometry can move the character too, but I’d leave it until the basic balance is close. Raising front roll centre gives more front bite and support, but it also puts more lateral transfer through the front tyres; in a settled corner those two effects can disagree. Camber is also tyre-dependent: more negative camber can add mid-corner front grip up to the tyre’s best angle, then takes it away.
+
+Tell me whether this is a long sweeper or a tight corner, and whether it is off throttle or on power, and I’ll give you one first change.
+
+**Note:**
+
+still want to clarify corner regime a bit more, but this is okay
+
+---
 
 ## 2026-08-06T06:03:31.499Z — score 6/10
 

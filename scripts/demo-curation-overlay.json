@@ -1,6 +1,11 @@
 {
   "$comment": "Founder curation for the demo seed (scripts/seed-demo-account.ts). Keys under `runs` are ORIGINAL run ids from your own account; `notes`/`driverNotes` replace the scrubbed text wholesale. `includeThreadIds` lists YOUR EngineerChatThread ids to copy as the demo's curated history. `nameScrub` adds mates' names → replacements. Edit and re-run demo:seed — it wipes and reseeds idempotently.",
+  "$includeThreadIdsComment": "Populated 2026-08-06. This array sat EMPTY, which is the entire reason the public demo's Engineer rendered 'No past conversations yet' — the seed's copy loop (seed-demo-account.ts:375) is correct, it simply had nothing to iterate. Ids must be YOUR OWN threads under SOURCE_USER_ID; the seed skips any it cannot find under that user, with a warning, so a deleted thread degrades quietly instead of failing the seed.",
+  "$excludedThreadComment": "DELIBERATELY NOT LISTED: cmrwzy4cs0003jl04s86zyd3w, the beginner 'why is it so hard to turn my car' question. It reads well and scripts/dev-copy-demo-engineer-threads.ts copies it, but it belongs to nicshanaya23@gmail.com — a real user, not the founder — and the demo is a PUBLIC page. The seed's userId filter already refuses it; this note exists so nobody 'fixes' that filter to make it work. If you want a beginner question in the demo, ask one from your own account and list that id here.",
   "nameScrub": [],
-  "includeThreadIds": [],
+  "includeThreadIds": [
+    "cms5zgqy60003l204y3w10qfo",
+    "cms6o9kpd000sl404en7ypylz"
+  ],
   "runs": {}
 }
