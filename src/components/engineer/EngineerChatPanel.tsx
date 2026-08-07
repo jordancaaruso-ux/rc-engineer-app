@@ -1276,11 +1276,24 @@ export function EngineerChatPanel({
 
   return (
 
-    <div className="flex flex-col">
+    /*
+     * Phone: one column — transcript, composer, then past conversations. Unchanged.
+     *
+     * lg+: the same three blocks become a real chat window. History moves to a left rail, the
+     * transcript takes the full height and the composer anchors to the bottom. DOM order stays
+     * transcript → composer → history so the phone is untouched; the grid does the placing.
+     *
+     * Row 1 is `1fr` so that before the first question the empty track still absorbs the slack
+     * and the composer sits at the bottom — the way every chat app resolves an empty thread.
+     */
+    <div className="flex flex-col lg:grid lg:h-[min(76dvh,48rem)] lg:grid-cols-[19rem_1fr] lg:grid-rows-[1fr_auto]">
 
       {messages.length > 0 ? (
 
-        <div className="max-h-[min(42vh,340px)] overflow-y-auto border-b border-border/80 px-3 py-2.5 space-y-2">
+        /* `lg:max-h-none` is the point of this whole pass: a hard 340px scroll-well is right on a
+           phone and absurd on a 1440px monitor, where it left the bottom 45% of the screen empty.
+           At lg the grid row owns the height instead. */
+        <div className="max-h-[min(42vh,340px)] overflow-y-auto border-b border-border/80 px-3 py-2.5 space-y-2 lg:col-start-2 lg:row-start-1 lg:max-h-none lg:min-h-0 lg:border-b-0 lg:px-5 lg:py-4">
 
           {messages.map((m, idx) => {
 
@@ -1414,7 +1427,23 @@ export function EngineerChatPanel({
 
 
 
-      <div className="p-3 space-y-2">
+      {/*
+        * Desktop-only empty state. On a phone the composer is the first thing under the subject
+        * bar, so an empty thread reads as "ready" without being told. At lg the transcript owns a
+        * full-height grid row, and with no conversation loaded that row is a large blank panel —
+        * so it says what belongs there. `hidden lg:flex` is what keeps this off the phone.
+        */}
+      {messages.length === 0 ? (
+        <div className="hidden lg:col-start-2 lg:row-start-1 lg:flex lg:min-h-0 lg:flex-col lg:items-center lg:justify-center lg:gap-2 lg:px-8 lg:text-center">
+          <p className="text-sm font-medium text-foreground">Ask the Engineer about your car.</p>
+          <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
+            Open a past conversation on the left, or start a new one below. It reads the runs,
+            setups and conditions you&rsquo;ve logged.
+          </p>
+        </div>
+      ) : null}
+
+      <div className="p-3 space-y-2 lg:col-start-2 lg:row-start-2 lg:border-t lg:border-border/80 lg:px-5 lg:py-4">
 
         <EngineerSubjectBar
           mode={generalMode ? "general" : "data"}
@@ -1531,7 +1560,7 @@ export function EngineerChatPanel({
 
 
 
-      <div className="border-t border-border/80 px-3 py-3 md:px-4">
+      <div className="border-t border-border/80 px-3 py-3 md:px-4 lg:col-start-1 lg:row-start-1 lg:row-span-2 lg:min-h-0 lg:overflow-y-auto lg:border-t-0 lg:border-r lg:px-4">
 
         <Eyebrow className="mb-2">History</Eyebrow>
 
