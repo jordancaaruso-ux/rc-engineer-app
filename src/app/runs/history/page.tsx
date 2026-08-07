@@ -10,6 +10,7 @@ import { RunHistoryTable } from "@/components/runs/RunHistoryTable";
 import { RunHistoryColGroup, RunHistoryMobileHeaderRow, RUN_HISTORY_ACTION_CELL_CLASS, computeRunHistoryColSpan } from "@/components/runs/runHistoryTableColumns";
 import { SessionGroupsPager } from "@/components/runs/SessionGroupsPager";
 import { SessionsFocusScroll } from "@/components/runs/SessionsFocusScroll";
+import { SessionsDesktopDefaultOpen } from "@/components/runs/SessionsDesktopDefaultOpen";
 import { RunHistoryViewMore } from "@/components/runs/RunHistoryViewMore";
 import { OPEN_GROUP_PARAM } from "@/lib/runs/sessionsReturn";
 import { SessionsFilterBar } from "@/components/runs/SessionsFilterBar";
@@ -640,7 +641,10 @@ export default async function RunHistoryPage({
             />
           </div>
         </summary>
-        <div className="min-w-0 max-w-full border-t border-border bg-background/60">
+        {/* `session-detail` is the hook the lg+ master-detail layout uses to lift this pane out of
+            the accordion flow and into the right-hand column (see `.sessions-split` in globals.css).
+            Below lg it is an ordinary block and this class does nothing. */}
+        <div className="session-detail min-w-0 max-w-full border-t border-border bg-background/60">
           {multiDriver && driverClusters ? (
             driverClusters.map((driver, dIdx) => {
               const driverHasFocus =
@@ -815,6 +819,8 @@ export default async function RunHistoryPage({
       <section className="page-body min-w-0 max-w-full">
         {/* Back from a run view: centre the row that was open, don't dump them at the top. */}
         <SessionsFocusScroll runId={focusRunId} />
+        {/* lg+ only: fill the master-detail pane instead of landing on an empty right half. */}
+        <SessionsDesktopDefaultOpen />
         <Suspense fallback={<div className="h-20 rounded-lg border border-border bg-card animate-pulse" />}>
           <SessionsFilterBar
             cars={filterCars}
@@ -856,8 +862,14 @@ export default async function RunHistoryPage({
         ) : (
           <div className="space-y-2">
             {/* One glass card holds every session group (approved artifact:
-                sessions-redesign); groups divide with hairlines inside it. */}
-            <SurfaceCard variant="panel" contentClassName="p-0" className="min-w-0 max-w-full">
+                sessions-redesign); groups divide with hairlines inside it.
+                `sessions-split` turns that same markup into a master-detail layout at lg+ —
+                session list on the left, the open session's runs in a pane on the right. */}
+            <SurfaceCard
+              variant="panel"
+              contentClassName="p-0 sessions-split"
+              className="min-w-0 max-w-full"
+            >
               {viewAll ? (
                 groups.map((group, idx) => renderSessionGroup(group, idx))
               ) : (
