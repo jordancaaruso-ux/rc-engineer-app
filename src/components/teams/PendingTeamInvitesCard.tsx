@@ -23,7 +23,7 @@ type MyInviteRow = {
  * Deliberately client-side and self-contained rather than threaded through `dashboardServer.ts`:
  * the dashboard model is a large cached aggregate and this needs neither its caching nor its cost.
  */
-export function PendingTeamInvitesCard() {
+export function PendingTeamInvitesCard({ className }: { className?: string } = {}) {
   const [invites, setInvites] = useState<MyInviteRow[]>([]);
 
   const load = useCallback(async () => {
@@ -46,7 +46,10 @@ export function PendingTeamInvitesCard() {
   const single = invites.length === 1 ? invites[0] : null;
 
   return (
-    <CardPanel contentClassName="flex flex-wrap items-center justify-between gap-3">
+    <CardPanel
+      className={className}
+      contentClassName="flex flex-wrap items-center justify-between gap-3"
+    >
       <div className="min-w-0">
         <h2 className="text-sm font-medium text-foreground">
           {single ? `Invite to join ${single.teamName}` : `${invites.length} team invites`}

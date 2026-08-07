@@ -863,6 +863,111 @@ html[data-nav-pending] .page {
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Dashboard desktop grid (docs/DASHBOARD_NORTH_STAR.md, desktop pass 2026-08-07)
+
+   Below xl this does nothing at all: `.page-body` stays the flex column it has
+   always been, and the dashboard's own children stack in the same order with the
+   same gap. That is the whole point — the phone dashboard is the locked
+   reference and this pass must not move it.
+
+   At xl+ `.dash-cols` becomes two asymmetric columns:
+
+     .dash-main   wide, left   — the evidence: day verdict, today's runs,
+                                 last-run read, last 30 days
+     .dash-side   narrow, right — the lists: next outing / test plan,
+                                 things to do / things to try
+
+   The lists are short text rows and do not earn a 750px measure; the stat tiles,
+   bar strip and setup diffs do (founder, 2026-08-07). Everything is an ordinary
+   flex column below xl, so on a phone the wrappers are visually transparent —
+   parent gap and child gap are both 0.75rem, so cards space identically whether
+   they are wrapped or not.
+
+   The DOM order deliberately does NOT match the visual order. The phone stack is
+   locked (the verdict leads, "Last 30 days" is always last), so the markup stays
+   in phone order and the COLUMNS do the moving. On a track day that means the left
+   column is interleaved around the right one — verdict + strip, then the list,
+   then last-run + 30-days — so `.dash-main` boxes take their rows in document
+   order while `.dash-side` is pinned to row 1. `grid-auto-flow: dense` is
+   load-bearing: without it a `.dash-main` box appearing after `.dash-side` in the
+   DOM is pushed to a new row instead of back-filling column 1 beside it.
+
+   XL (1280px), NOT lg (1024px), and that was measured rather than assumed. The
+   desktop pane is `100vw − 16rem` of sidebar, so at a 1024px viewport there are
+   only ~704px to split: the grid resolved to a 336px main column beside a 352px
+   rail — a "main" column narrower than both its own rail and the 350px card the
+   phone shows. Two columns need roughly 1280px of viewport before the main column
+   is worth having. Between 1024 and 1279 the page stays the centred single column
+   step 1 already fixed. The two desktop-only cards are gated `hidden xl:block` to
+   match; if this breakpoint moves, move theirs with it.
+
+   Note that `.page-body` itself stays `display: flex` — only its max-width is
+   raised, and the grid lives on a plain child. That is deliberate: `.page-body` is
+   UNLAYERED, and Tailwind 4 puts utilities in `@layer utilities`. Unlayered styles
+   beat layered ones no matter the source order, so an `xl:grid` utility on
+   `.page-body` loses to its own `display: flex` silently — the class lands in the
+   HTML, the DOM says the class is applied, and the layout stays a column. Putting
+   the grid on `.dash-cols` avoids the fight entirely. (Same trap as the `@apply`
+   note on `.page-body` above.)
+
+   The max-width cap is not decoration. On a 1920px monitor the pane is ~1664px
+   and an uncapped card renders ~1250px wide, which is well past a readable
+   measure. Capped and centred it reads as measure rather than dead margin.
+--------------------------------------------------------------------------- */
+@media (min-width: 1280px) {
+  /* Only the cap moves; the flex column stays a flex column. */
+  .dash-wide {
+    max-width: 90rem;
+  }
+
+  .dash-cols {
+    display: grid;
+    /* The narrow column the lists live in. */
+    --dash-rail-w: 22rem;
+    grid-template-columns: minmax(0, 1fr) var(--dash-rail-w);
+    grid-auto-flow: row dense;
+    align-items: start;
+    column-gap: 1rem;
+    row-gap: 0.75rem;
+  }
+
+  .dash-cols > .dash-main {
+    grid-column: 1;
+  }
+
+  .dash-cols > .dash-side {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  /* Track day only, where the left column is TWO boxes with the list between them.
+     Without this the single implicit row is as tall as the tallest item in it, so a
+     long "things to try" list would push the last-run + 30-day box down and leave a
+     hole under the verdict — the exact dead space this pass exists to remove. Two
+     explicit rows let the left column close up while the list spans both.
+
+     Deliberately not applied in off-day mode: there is only one `.dash-main` there,
+     so a second row would just add an empty track and a trailing row-gap. */
+  .dash-cols-split {
+    /* `auto 1fr`, not `auto auto`: a spanning item distributes its height across the
+       intrinsic tracks it spans, so with two `auto` rows a long list inflates row 1
+       and opens a hole between the two left-hand boxes. Making row 2 flexible sends
+       that slack to the BOTTOM of the column instead, where it is just column height. */
+    grid-template-rows: auto 1fr;
+  }
+
+  .dash-cols-split > .dash-side {
+    grid-row: 1 / -1;
+  }
+}
+
+@media (min-width: 1536px) {
+  .dash-cols {
+    --dash-rail-w: 24rem;
+  }
+}
+
 /* Hints, save feedback, and compact supporting copy below labels. */
 .ui-caption {
   @apply text-[11px] leading-snug text-muted-foreground;
@@ -907,7 +1012,11 @@ html[data-nav-pending] .page {
   /* Snappier entrance: content that is already loaded should read as "instant".
      Duration + stagger halved (was 460ms / up-to-340ms delay ≈ 800ms tail) so a
      ready page's lower cards land by ~400ms instead of ~800ms after the tap. */
-  .page-body > *:not(.rc-reveal) {
+  /* `.dash-cols` is excluded for the same reason as `.rc-reveal`: the dashboard's
+     desktop column wrapper holds cards that already animate themselves, so fading
+     the wrapper too would double up. The nth-child delay rules below can still
+     match it — with no animation to delay, that is inert. */
+  .page-body > *:not(.rc-reveal):not(.dash-cols) {
     animation: rc-reveal 250ms cubic-bezier(0, 0, 0.2, 1) both;
   }
   .page-body > *:not(.rc-reveal):nth-child(1) { animation-delay: 0ms; }
@@ -936,6 +1045,17 @@ html[data-nav-pending] .page {
 @keyframes rc-fade {
   from {
     opacity: 0;
+  }
+}
+
+/* Sessions workbench (lg+): the reading pane swapping between the day's trend and
+   one run. A short rise, not a slide — the rail beside it never moves, so anything
+   longer reads as a page navigation, which is exactly what the pane exists to
+   avoid. Applied via `motion-safe:` so reduced motion gets an instant swap. */
+@keyframes rc-pane-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
   }
 }
 

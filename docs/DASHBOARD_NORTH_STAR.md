@@ -1,6 +1,7 @@
 # Dashboard North Star — the adaptive home
 
-**Status:** Locked (founder interviews 2026-07-16 + v2 2026-07-19; Setups card added and retired 2026-07-29).
+**Status:** Locked (founder interviews 2026-07-16 + v2 2026-07-19; Setups card added and retired
+2026-07-29; **desktop pass 2026-08-07**).
 **Owner:** Jordan.
 
 This doc governs what the dashboard (`/`) shows and in what order. `PRODUCT_NORTH_STAR.md`
@@ -19,9 +20,24 @@ proposed, check the boundary rule and the mode stacks here first.
 
 **Now & next only.** The dashboard shows today plus the next action. One line per thing,
 pre-computed verdicts, never raw evidence. Any tap for depth lands in Analysis / Sessions.
-Analysis owns history, charts, comparisons, tables — **and the run lists**: v2 removed the
-dashboard's run-by-run strip because it duplicated the top of Analysis. If a dashboard
-block starts growing a chart or a second screen of rows, it has crossed the line — move it.
+Analysis owns history, charts, comparisons, tables. If a dashboard block starts growing a
+chart or a second screen of rows, it has crossed the line — move it.
+
+**The boundary is about attention, not about content** (founder, 2026-08-07). It was written
+against a 390px screen where there is room for one thing at a time, and the cost of a second
+block is that it pushes the first one off. A 1280px+ pane does not have that cost. So the rule
+is **width-aware**:
+
+- **Below `xl` the rule is unchanged and absolute.** The phone dashboard is now & next. Nothing
+  in the desktop pass may add, remove or reorder anything at 390px — proven with
+  `npm run layout:probe --width=390` before and after, not asserted.
+- **At `xl`+ the second column earns *today's own evidence*** — the runs you logged today and
+  the read on your last one. Still one line per row, still pre-computed. It does **not** earn
+  history, charts, comparisons, other days, or anything requiring a new query. Those stay in
+  Analysis, and the tap-for-depth rule is untouched.
+
+The test for a desktop-only block: *it is about today or your last run, it needs no data the
+dashboard model does not already carry, and removing it would not change what the phone shows.*
 
 **No exceptions.** Every card here is derived from today or self-deletes when its job is done.
 The permanent Setups card added on 2026-07-29 was the one attempt at an exception and it lasted a
@@ -89,6 +105,76 @@ The onboarding ask, and only the ask (`DashboardAddSetupCard`; rules in `ONBOARD
 4. **Things to do** — reminders list.
 5. **Last 30 days card** — always last.
 
+## Desktop (≥1280px) — added 2026-08-07
+
+The stacks above ARE the phone, unchanged. At `xl` the same cards re-flow into a full-width
+action strip over two asymmetric columns, plus two desktop-only cards that exist only there.
+One DOM, `xl:`-prefixed placement only — never a separate desktop render (the cards are
+stateful clients; a twin render would double-mount the invite fetch and the Things lists).
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  START / FINISH RUN                             full width  │
+├──────────────────────────────────┬──────────────────────────┤
+│  .dash-main   minmax(0,1fr)      │  .dash-side  22rem→24rem │
+│  the evidence — measured values  │  the lists — short rows  │
+└──────────────────────────────────┴──────────────────────────┘
+```
+
+| Slot | Track day | Off day |
+|---|---|---|
+| Full width | Welcome · Get-set-up · Pending invites · **Start/Finish CTA** · Add-a-setup | same |
+| `.dash-main` (wide, left) | Day verdict · **Today's runs** … then **Last-run read** · Last 30 days | **Last-run read** · Last 30 days |
+| `.dash-side` (narrow, right) | Things to try *(or the active-event outing card)* | Next outing · Things to do |
+
+- **The evidence gets the width; the lists do not** (founder, 2026-08-07). "Things to do" and the
+  test plan are short text rows — they read fine at 22rem and looked padded at 47rem. The stat
+  strips, the run strip's lap columns and the setup diffs are what a wide measure is for.
+- **The CTA stays #1 and gets wider, not smaller.** A laptop can be at the track (founder,
+  2026-08-07) — desktop must not assume "at home, reviewing". It sits outside the two columns
+  and runs the full width, a bigger target than the phone card, and stops eating a card's height.
+- **The 30-day summary is still last** — foot of the evidence column at `xl`, last card on the
+  phone. Ambient momentum never leads.
+- **`max-width: 90rem` cap.** Uncapped on a 1920px monitor a card renders ~1250px wide and
+  the measure becomes unreadable. Capped and centred it reads as measure, not dead margin.
+- **DOM order is phone order, not visual order.** The locked stack leads with the verdict and
+  ends with the 30-day card, so on a track day the left column is *interleaved* around the right
+  one and ships as two `.dash-main` boxes that the grid reunites in column 1. Do not merge them
+  — that reorders the phone. `grid-auto-flow: dense` is what lets the second box back-fill
+  beside the list rather than dropping to a new row.
+- **Track day uses `grid-template-rows: auto 1fr`** (`.dash-cols-split`). A spanning item
+  distributes its height across the intrinsic rows it crosses, so with two `auto` rows a long
+  things-to-try list inflated row 1 and opened a hole between the two left boxes — measured at
+  34px with a 400px list. A flexible second row sends that slack to the bottom of the column,
+  where it is just column height. Off-day has one `.dash-main` and so needs neither.
+- **`xl` (1280px), not `lg` (1024px) — measured, not assumed.** The pane is `100vw − 16rem` of
+  sidebar, so a 1024px viewport leaves only ~704px to split, and the grid resolved to a **336px
+  main column beside a 352px rail** — a "main" column narrower than its own rail *and* narrower
+  than the 350px card the phone shows. Two columns need ~1280px of viewport to be worth having.
+  Between 1024 and 1279 the dashboard stays the centred single column from desktop step 1.
+  Resolved widths: 1280 → 592+352 · 1440 → 752+352 · 1920 → 944+384.
+- **Both desktop-only cards are `hidden xl:block`** and return `null` when their model field is
+  empty, so they cannot leave an empty shell on a new account.
+
+### The two desktop-only cards
+
+**Today's runs** (`DashboardTodayRunsCard`) — one row per run today, latest first: clock time,
+run label, best lap, the best-lap delta vs the previous run, and what setup changed going in.
+Straight from `todayStrip`, which the model has always built. Rows tap through to the run.
+
+**Last-run read** (`DashboardLastRunReadCard`) — the car rating out of 10, the structured
+handling read, and the setup diff you made going into it. Straight from `recentRun`. This is
+the closest thing on the dashboard to "what should I change next" until that card is built —
+it shows what you changed and how it felt, and leaves the conclusion to the driver.
+Laid out FOR the wide column: a `StatStrip` across the full measure (the same primitive the
+30-day card below it uses, so the column reads as one instrument) over a two-up body of
+"You changed" and "How it felt". On a track day the newest run is usually this same run and
+its diff is already on the verdict card *and* the run strip, so the card drops its own copy
+rather than printing the same change three times on one screen.
+
+Neither costs a query: both fields are computed on every dashboard load and were previously
+discarded (`DashboardHome` destructured 12 of the model's 20 fields).
+
 ## Retired
 
 **2026-07-29:** the **permanent Setups card** — one row per car naming the setup it was running,
@@ -103,6 +189,10 @@ running" read — last-run snapshot, newest-baseline fallback — went with them
 **2026-07-19 (v2):**
 - **Today-so-far run strip** — the run list belongs to Sessions/Analysis; the verdict card
   is its door. (`DashboardTodaySoFarCard` deleted.)
+  **Partially reversed 2026-08-07:** it returns at `xl`+ only, as `DashboardTodayRunsCard`.
+  The retirement stands on the phone and the reasoning still holds there — at 390px the strip
+  duplicated the top of Analysis and cost the verdict card its place. In a 1184px pane it costs
+  nothing, and the model never stopped building `todayStrip`. The phone dashboard is unchanged.
 - **Last-session digest card** — survives as the single "last visit" line in the next-outing
   card. (`DashboardLastSessionDigestCard` deleted, `lastSessionDigest` model field removed.)
 - **Next-event-prep card** — absorbed by the next-outing card. (`DashboardNextEventPrepCard` deleted.)
@@ -129,6 +219,13 @@ coming up and what you planned to test. If either glance says "nothing new," the
 has failed its job.
 
 **Changelog:**
+- 2026-08-07 **desktop pass** — founder interview. Boundary rule made width-aware (attention,
+  not content); `xl`+ gains a two-column shape under a full-width CTA strip; the Today-so-far
+  strip un-retired at `xl`+ and a Last-run read card added, both from model fields that were
+  already computed and discarded. Phone unchanged and probe-verified at 390px. Founder calls
+  recorded: same auto-switch (no manual toggle), CTA stays #1 because a laptop can be at the
+  track, 30-day summary demoted to the rail, and the "what should I change next" advice card
+  **deferred, not declined** — `buildEngineeringReadV1` is the pure no-LLM door when it is wanted.
 - 2026-07-19 **v2** — founder interview (3 rounds) + artifact variant board
   (https://claude.ai/code/artifact/c3d5964d-1448-48b0-87c9-c11d2b64a2d4): run strip → computed
   day-verdict card (variant A), Engineer auto-read retired → on-demand footer, off-day →
