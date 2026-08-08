@@ -25,7 +25,7 @@ being forced to differ in speed** — the more the car is rotating for its speed
 there is to fight, which is why a tight corner shows it more than a fast one. The on-throttle
 effect also grows the **less grip there is to spend**, because the same drive demand then eats a
 bigger share of the budget. Neither scales with how long the corner lasts, so this is a separate
-question from whether the car settles into it ([[corner-regime]], [[bite-hold]]).
+question from which phase the driver is in ([[corner-regime]], [[bite-hold]]).
 
 ## Front driveline (spool) — context, not a lever
 Touring cars run a **spool** front: both front wheels locked to one speed, no coupling knob. It

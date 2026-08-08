@@ -37,5 +37,5 @@ the middle has settled ([[corner-regime]]).
   input at that wheel makes any oil change matter more, and a smooth slow one makes it matter less.
 - **How often the inputs arrive.** Over a run of them the wheel must extend before the next one
   comes; if it cannot, travel is used up and the car rides down ([[damping]]).
-- **How much of the corner is left to roll through.** Damping acts while the car is still moving into
-  roll, so it has more to act on in a corner the car never settles into ([[corner-regime]]).
+- **How much roll is left to build.** Damping acts while the car is still moving into roll, so it
+  has most to act on on the way in and least once the middle has settled ([[corner-regime]]).
