@@ -10,8 +10,8 @@ tyre* (how much you're leaning on it), up the side is grip.
   fast in theory but demands precision and gives little warning when it lets go.
 - **Hold** (overall grip): the curve peaks **later, lower, and wider** — a plateau you can lean on.
   Less ultimate grip, but it builds progressively and stays, and past the edge it lets go gently with
-  time to catch it. Feels planted and forgiving; too little bite, though, feels **numb, vague,
-  imprecise** — the car doesn't do what you ask.
+  time to catch it. Feels planted and forgiving; too little bite, though, feels **numb,
+  unpredictable, imprecise** — the car doesn't do what you ask.
 
 Neither end is "better" — there's a window that depends on the driver and the car. More bite leans
 toward ultimate pace that's hard to hit consistently; more hold toward easy and repeatable with a
@@ -30,7 +30,7 @@ stop.
 - **Grip arriving:** `bite`, `initial grip`, `overall grip`, `hold`
 - **Bite end of the window:** `precise`, `pointy`
 - **Hold end of the window:** `planted`, `forgiving`
-- **Too little bite:** `numb`, `vague`, `imprecise`
+- **Too little bite:** `numb`, `unpredictable`, `imprecise`
 - **Roll-centre / link language:** `smoother`, `more rolled-in`, `on the track`, `in the track`
 - **Phase:** `entry`, `mid-corner`, `on power`
 - `responsive` — reserved: only for **on the track** / **initial bite** / **initial grip**. Never for

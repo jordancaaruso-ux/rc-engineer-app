@@ -8,24 +8,23 @@ given spring is worth at the wheel depends on where the unit mounts — [[motion
 spring is also one of the things the wheel has to fight on its way up over a bump
 ([[bump-compliance]]).
 
-## Spring rate — which way it answers, by corner
+## Spring rate — which way it answers, by phase
 
 A spring change drives two mechanisms that pull **opposite directions**, and which one the driver
-gets is decided by the corner, not by the spring ([[corner-regime]]).
+gets is decided by the phase of the corner, not by the spring ([[corner-regime]]).
 
-**In a corner the car settles into** — a long, fast sweeper — each axle's share of the lateral load
-transfer is set by its roll stiffness and its roll centre height, and the end carrying the larger
-share gives up side grip ([[tyre-load-sensitivity]]). Stiffer at an end takes the larger share
-there; softer takes the smaller.
+**In the middle, once roll has finished** — each axle's share of the lateral load transfer is set by
+its roll stiffness and its roll centre height, and the end carrying the larger share gives up side
+grip ([[tyre-load-sensitivity]]). Stiffer at an end takes the larger share there; softer takes the
+smaller.
 
-**In a corner the car never settles into** — a hairpin, a chicane, a flick, and every corner entry —
-the stiffer end takes load, and builds grip, **sooner**; the softer end builds it **later**
-([[bite-hold]]). Stiffer at an end brings its grip in earlier; softer brings it in later.
+**On the way in, while roll is still building** — the stiffer end takes load, and builds grip,
+**sooner**; the softer end builds it **later** ([[bite-hold]]). Stiffer at an end brings its grip in
+earlier; softer brings it in later.
 
-The two do not add up to one direction: a stiffer rear frees the rear in a sweeper the car settles
-into but plants it in a hairpin or flick; a softer rear supports the rear in a corner the car
-settles into but lets it yaw in a quick change of direction. Answer for the corner in front of you,
-and say which one you answered for.
+The same change answers **opposite ways** in the two phases. A stiffer rear carries a **larger
+share** of the settled transfer, so it makes **less** side grip in the middle; the same stiffer rear
+takes its load **sooner** on the way in, so its grip is there **earlier**. Softer mirrors both.
 
 **What makes the change bigger or smaller.**
 

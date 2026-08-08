@@ -17,5 +17,5 @@ Over a *run* of inputs the wheel must also extend before the next arrives; if it
 used up and the car rides down.
 
 **Moved by:** damper oil [[damper-oil]] (thicker → more damping), plus pistons and holes.
-**Affects:** [[load-transfer]] (rate of the slow/elastic path) → and through that speed, [[bite-hold]]
-(faster → bite, slower → hold).
+**Affects:** [[load-transfer]] (rate of the slow/elastic path); what that timing does to grip
+character lives in [[bite-hold]].

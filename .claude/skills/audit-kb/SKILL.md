@@ -27,6 +27,10 @@ Jordan's experience — forced.
 7. **A second home** — a claim on two pages. One home; everything else links. Near-duplicate
    prose across files is the only check a script can do.
 
+8. **An unresolvable condition** — a split the driver's own words can't answer. Conditions are
+   written in the phase vocabulary (`concepts/bite-hold.md`, "Phase" line); symptom words
+   ("pushes", "loose") are car outcomes and never appear — their translation lives in the prompt.
+
 ## How to audit
 
 Read it. One question per claim: **what forces this?**
@@ -37,3 +41,14 @@ Pages are never finished.
 
 **Propose removals. Surface gaps.** Deletions and restructuring are mine. Physics Jordan has not
 ruled on is his.
+
+## Process
+
+Fluent prose pulls toward more than the physics gives. These move the catching from Jordan to me:
+
+- **Audit before he reads.** No KB prose reaches Jordan until every sentence has passed "what
+  forces this?" — flag what I couldn't force rather than let him find it.
+- **One page or claim per exchange.** He rules, then build on ruled ground. Multi-part proposals
+  let one bad premise infect everything after it.
+- **Prove, don't assert.** Claims about Engineer behaviour come from wire dumps, his ratings or
+  benches — never from reading source or from my synthesis.

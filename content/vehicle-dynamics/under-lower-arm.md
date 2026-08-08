@@ -19,6 +19,6 @@ together in the same direction.
   single direction.
 - At the extremes support shows as a failure mode: too high = **over-supported** (stiff, little roll,
   can go snappy and give up grip mid-corner); too low = **under-supported** (never firms up under load,
-  soft/vague at the limit). — usual (exact trigger is car- and grip-dependent)
+  soft/unpredictable at the limit). — usual (exact trigger is car- and grip-dependent)
 - Per axle: front and rear inner-lower set front vs rear RC independently.
 - Depends on: grip, tyres, and the rest of the geometry.

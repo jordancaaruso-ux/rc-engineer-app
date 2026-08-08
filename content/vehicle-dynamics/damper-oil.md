@@ -21,12 +21,15 @@ goes on varying after the input has passed. Thicker oil settles it sooner.
 
 Both are load-steadiness costs in the same currency — thicker costs at the moment of the hit,
 thinner costs after it — and **where a given car sits between them is not derivable from the oil
-alone**. Say which of the two you are answering for.
+alone**.
 
 Through the corner itself, damping governs the **speed of the spring path** of load transfer, so a
-thicker end takes its load sooner and a thinner end later ([[bite-hold]], [[load-transfer]]). That
-is the same timing mechanism a spring or bar works through, which is why damping shows up most in a
-corner the car never settles into and least in one it does ([[corner-regime]]).
+thicker end takes its load sooner and a thinner end later ([[load-transfer]]). That is timing only:
+it moves **when** the load arrives, not how much grip that end makes when it gets there — slower
+movement does not buy initial grip (founder-confirmed 2026-08-07). Whether **pack** — damping force
+that climbs steeply with shaft speed, set by the piston and its holes rather than the oil — can
+raise it is unverified (founder hedged: it might). Damping matters most on the way in and least once
+the middle has settled ([[corner-regime]]).
 
 **What makes the change bigger or smaller.**
 
