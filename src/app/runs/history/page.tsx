@@ -247,7 +247,7 @@ export default async function RunHistoryPage({
       <>
         <header className="page-header">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <PageBackLink href="/analysis" />
+            <PageBackLink href="/analysis" className="md:hidden" />
             <div>
               <h1 className="page-title">Sessions</h1>
               <p className="page-subtitle">Database not configured.</p>
@@ -827,7 +827,7 @@ export default async function RunHistoryPage({
       <>
         <header className="page-header">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <PageBackLink href="/analysis" />
+            <PageBackLink href="/analysis" className="md:hidden" />
             <div>
               <h1 className="page-title">{pageTitle}</h1>
               <p className="page-subtitle">{pageSubtitle}</p>
@@ -849,7 +849,18 @@ export default async function RunHistoryPage({
     <>
       <header className="page-header">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <PageBackLink href="/analysis" />
+          {/*
+            Phone only, and the breakpoint is the whole point (2026-08-08).
+
+            Below md the dock's Analysis tab is `/analysis` and Sessions is a door on it, so
+            back-to-the-hub is the true parent. From md up the sidebar appears and its Analysis
+            item IS `/runs/history` (navConfig `ANALYSIS_DESKTOP`) — Sessions is a top-level
+            destination there, and an arrow to `/analysis` walks sideways into a page the
+            desktop nav can no longer reach. Dashboard, Engineer, Garage and Tools carry no
+            back arrow for the same reason. Repeated verbatim on the two early-return headers
+            below; move all three together.
+          */}
+          <PageBackLink href="/analysis" className="md:hidden" />
           <div>
             <h1 className="page-title">{pageTitle}</h1>
             <p className="page-subtitle">{pageSubtitle}</p>
