@@ -91,14 +91,34 @@ export function DemoBanner() {
       className="sticky top-0 z-40 border-b border-border bg-[#1E1D1C]/95 backdrop-blur-md"
       style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
     >
-      <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2">
+      {/*
+        The yellow edge (founder pick 2026-08-08, "Bar 2"). A 2px rule welded to the very top
+        of the screen — above the safe-area inset, so on iOS standalone it paints under the
+        notch and the demo announces itself before any content does.
+
+        It is a rule and not a fill on purpose: yellow is action-only in this palette, and a
+        solid yellow bar would spend the accent on furniture and leave every real yellow
+        beneath it — the primary buttons, the rating dial, the chart line — arguing with the
+        ceiling. On the edge it costs no surface area, so the one filled yellow button below
+        stays the loudest thing on the page for the whole visit.
+      */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-primary"
+      />
+      <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2.5">
         <p className="text-[12px] leading-snug text-muted-foreground">
-          You&rsquo;re exploring a demo garage — everything&rsquo;s read-only.
+          You&rsquo;re in a demo garage — everything&rsquo;s{" "}
+          <strong className="font-semibold text-foreground">read-only</strong>.
         </p>
         <span className="flex items-center gap-2.5">
+          {/*
+            A filled button, not a text link. This is the one thing the demo exists to sell,
+            and it sat at the same weight as the sentence explaining the demo was read-only.
+          */}
           <Link
             href="/join"
-            className="whitespace-nowrap text-[12px] font-semibold text-primary underline-offset-2 hover:underline"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-3 py-1.5 text-[12px] font-bold text-primary-foreground transition-transform hover:-translate-y-px"
           >
             Get your own garage →
           </Link>

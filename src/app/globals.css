@@ -1510,6 +1510,71 @@ html.video-overlay-fullscreen-active body {
   );
 }
 
+/* ---------------------------------------------------------------------------
+   The demo door (`/demo`, DemoEntryScreen) — 2026-08-08
+   The entry screen holds for a beat on purpose (HERO_DWELL_MS) so a visitor can
+   read who they're borrowing a season from before the browser navigates. These
+   are the two things it needs that the app didn't already have; the staggered
+   spec rows reuse `.rc-reveal` + `--rc-delay`.
+--------------------------------------------------------------------------- */
+
+/* Display voice at hero scale, left-aligned. `.page-title` can't be reused here:
+   it's `width: fit-content; margin-inline: auto` and carries the yellow nav-sector
+   track, which means location — and this screen isn't anywhere in the dock yet. */
+.demo-door-title {
+  font-family: var(--font-display), var(--font-ui), sans-serif;
+  font-weight: 700;
+  font-size: clamp(28px, 8vw, 38px);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  text-wrap: balance;
+  @apply text-foreground;
+}
+
+/*
+ * Indeterminate hairline. A travelling sliver, NOT a percentage: the wait is one
+ * DB read plus two redirects and the page genuinely cannot know how long that is,
+ * so anything that fills toward 100% would be inventing a number.
+ */
+@keyframes rc-demo-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+.demo-door-sweep {
+  position: relative;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 1px;
+  @apply bg-muted;
+}
+
+.demo-door-sweep::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 38%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(var(--color-primary)),
+    transparent
+  );
+  animation: rc-demo-sweep 1500ms cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-door-sweep::after {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
 /* Hairline / glow surfaces retired June 2026 — cards use `.glass-card` (frosted). */
 
 /* The onboarding guide-pulse (`data-guide-target` / `data-guide` anchors) was
