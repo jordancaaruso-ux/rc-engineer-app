@@ -6,8 +6,6 @@ import { DashboardStartRunCta } from "@/components/dashboard/DashboardStartRunCt
 import { DashboardAddSetupCard } from "@/components/dashboard/DashboardAddSetupCard";
 import { DashboardGetSetUpCard } from "@/components/dashboard/DashboardGetSetUpCard";
 import { DashboardSummaryCard } from "@/components/dashboard/DashboardSummaryCard";
-import { DashboardTodayRunsCard } from "@/components/dashboard/DashboardTodayRunsCard";
-import { DashboardLastRunReadCard } from "@/components/dashboard/DashboardLastRunReadCard";
 import { WelcomeScreen } from "@/components/onboarding/WelcomeScreen";
 import { PendingTeamInvitesCard } from "@/components/teams/PendingTeamInvitesCard";
 import type { OnboardingView } from "@/lib/onboarding/server";
@@ -15,7 +13,7 @@ import { showGetSetUpCard } from "@/lib/onboarding/visibility";
 import type { DashboardSetups } from "@/lib/setup/getDashboardSetups";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Reveal } from "@/components/ui/Reveal";
-import { cn } from "@/lib/utils";
+import { DashboardDesktop } from "@/components/dashboard/desktop/DashboardDesktop";
 
 /**
  * Adaptive dashboard — two modes, auto-switched (docs/DASHBOARD_NORTH_STAR.md;
@@ -29,42 +27,36 @@ import { cn } from "@/lib/utils";
  *     CTA → Next outing (event countdown + test plan; plan-only without an
  *     event) → Things to do → 30-day summary
  *
- * Retired in v2 (2026-07-19): the last-session digest card (one "last visit" line
- * in the outing card carries the story), the next-event-prep card (absorbed by the
- * outing card), and the auto Engineer read (on-demand only, via the verdict-card
- * footer). The Today-so-far run strip was retired with them and came back at xl+
- * only on 2026-08-07 — see below.
+ * Retired in v2 (2026-07-19): the Today-so-far run strip (the run list lives in
+ * Sessions), the last-session digest card, the next-event-prep card, and the auto
+ * Engineer read (on-demand only, via the verdict-card footer).
  *
- * Desktop pass 2026-08-07. The stacks above ARE the phone and are unchanged. The
- * run CTA stays a full-width child of `.page-body`; everything under it goes into
- * `.dash-cols`, which `globals.css` turns into two columns at xl+, plus two
- * `hidden xl:block` cards that only exist there:
+ * ── Desktop, 2026-08-08 ──────────────────────────────────────────────────────
+ * The stacks above ARE the phone and are unchanged. At xl+ they are replaced
+ * wholesale by `DashboardDesktop` — the "timing tower" design handoff: a hero
+ * carrying the big lap numeral, two RatingDials and a pace chart, a ledger of the
+ * last run's changes, and a 420px column with the CTA and the two lists.
  *
- *   .dash-main  wide, left    day verdict · today's runs        (track day)
- *                             last-run read · 30-day summary    (both modes)
- *   .dash-side  narrow, right things to try                     (track day)
- *                             next outing · things to do        (off day)
+ * A twin render, NOT a re-flow, and that is a reversal of the 2026-08-07 pass which
+ * kept one DOM. The two layouts are no longer the same cards in different places:
+ * the hero has no phone equivalent and the phone's verdict / next-outing cards have
+ * no desktop slot, so a single DOM would render both compositions anyway. Same call
+ * as SessionsWorkbench.
  *
- * The lists went right because they are short text rows and do not earn a 750px
- * measure; the stat tiles, bar strip and setup diffs do (founder, 2026-08-07).
+ * The price of a twin render is double-mounted client state, so:
+ *   · `PendingTeamInvitesCard` is hoisted OUT of both trees and rendered once here —
+ *     a copy in each would fetch /api/teams/invites twice per desktop load.
+ *   · The two `ActionItemListPanel`s do mount twice. Only one is ever visible, both
+ *     seed from the same server rows, and they can diverge only if the window is
+ *     resized across 1280px mid-edit. Accepted.
  *
- * The wrappers below are in PHONE order, not visual order — the locked stack leads
- * with the verdict and ends with the 30-day card, so on a track day the left column
- * is interleaved around the right one and appears as two `.dash-main` boxes that the
- * grid reunites. Do not "tidy" them into one; that would reorder the phone.
- *
- * One DOM, never a separate desktop render: these cards are stateful clients
- * (PendingTeamInvitesCard self-fetches, ActionItemListPanel holds drag state), so a
- * `hidden xl:grid` twin would double-mount the fetch and split the lists in two.
- *
- * Mobile is untouched BY CONSTRUCTION, not by care: every wrapper is a plain flex
- * column at every width with the same 0.75rem gap as the parent, DOM order still
- * equals the phone order, empty wrappers are guarded so they cannot add a stray
- * gap, and the two new cards render nothing below xl. Prove it with
- * `npm run layout:probe --width=390`, never screenshots.
+ * Mobile is the locked reference: everything below the desktop tree is `xl:hidden`
+ * and byte-identical to before. Prove it with `npm run layout:probe --width=390`,
+ * never screenshots.
  */
 export function DashboardHome({
   model,
+  displayTimeZone,
   onboarding,
   setups,
 }: {
@@ -114,12 +106,34 @@ export function DashboardHome({
   const ob = onboarding;
   const showGetSetUp = ob ? showGetSetUpCard(ob) : false;
 
+  // "FRI 07 AUG" beside the desktop title. Rendered from the rc_tz zone so it agrees
+  // with the day the model bucketed today's runs into.
+  const todayStamp = new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    timeZone: displayTimeZone || "UTC",
+  })
+    .format(new Date())
+    .replace(/,/g, "")
+    .toUpperCase();
+
   return (
     <>
-      <header className="page-header">
+      <header className="page-header dash-header">
         <div className="min-w-0">
           <h1 className="page-title">Dashboard</h1>
         </div>
+        {/* Desktop only — the handoff's timestamp line beside the title. Track/venue
+            only when the day's runs share one, otherwise just the date. */}
+        <span className="hidden font-mono text-[11px] uppercase tracking-[.12em] text-faint xl:inline">
+          {[
+            todayStamp,
+            isTrackDay ? (todayContext?.trackName ?? null) : "Off day",
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
       </header>
 
       <section className="page-body dash-wide max-w-3xl">
@@ -139,15 +153,20 @@ export function DashboardHome({
         ) : null}
 
         {/* Above the CTA and self-hiding when empty: an unanswered invite is somebody
-            waiting on this driver, and push only reaches installed apps. */}
+            waiting on this driver, and push only reaches installed apps.
+            Hoisted OUT of both trees deliberately: it fetches its own data, and a copy
+            in each would hit /api/teams/invites twice on every desktop load. */}
         <PendingTeamInvitesCard />
 
-        {/* The primary action always leads — the single unmissable run entry point.
-            It sits outside the two columns, so at xl+ it runs the full width of the
-            page rather than shrinking: a laptop can be at the track (founder
-            2026-08-07), so desktop must not treat starting a run as a phone-only
-            action. Full-bleed it is a wider target than the phone card. */}
-        <Reveal index={0}>
+        {/* ── Desktop (xl+) ─────────────────────────────────────────────────────
+            The 2026-08-08 handoff layout. A twin render rather than a re-flow: the
+            hero's numeral, dials and chart have no phone equivalent, and the phone's
+            verdict / next-outing cards have no desktop slot. Same call as
+            SessionsWorkbench. Everything below is `xl:hidden` and untouched. */}
+        <DashboardDesktop model={model} isTrackDay={isTrackDay} />
+
+        {/* The primary action always leads — the single unmissable run entry point. */}
+        <Reveal index={0} className="xl:hidden">
           <DashboardStartRunCta
             serverDraftRunId={todayDraftRunId}
             serverDraftSavedAt={todayDraftSavedAt}
@@ -164,146 +183,72 @@ export function DashboardHome({
           </Reveal>
         ) : null}
 
-        {/* Two columns at xl+, one plain stack below it (`.dash-cols` in globals.css).
-            `.dash-main` is the wide left column — the evidence. `.dash-side` is the
-            narrow right one — the lists, which are short text rows and do not earn a
-            750px measure (founder 2026-08-07).
-
-            The wrappers appear in PHONE order, not visual order: the locked stack puts
-            the verdict first and the 30-day card last, so on a track day the left
-            column has to be interleaved around the right one. That is what the two
-            separate `.dash-main` boxes below are for — the grid reunites them in
-            column 1. Keeping DOM order is what keeps 390px untouched by construction. */}
-        <div className={cn("dash-cols flex flex-col gap-3", isTrackDay && "dash-cols-split")}>
+        {/* ── Phone (below xl) ──────────────────────────────────────────────────
+            The locked stack, exactly as it was before the desktop passes: verdict or
+            next-outing, the driver's list, then ambient momentum last. Nothing here
+            may move — `npm run layout:probe --width=390` is the gate. */}
+        <div className="flex flex-col gap-3 xl:hidden">
           {isTrackDay ? (
             <>
-              {/* Left column, first row: how today is going. Guarded as a whole — an
-                  empty wrapper is still a flex item on mobile and would add a stray
-                  12px gap, and a phantom grid cell at xl. */}
-              {todayVerdict || todayStrip.length > 0 ? (
-                <div className="dash-main flex min-w-0 flex-col gap-3">
-                  {todayVerdict ? (
-                    <Reveal index={1}>
-                      <DashboardDayVerdictCard verdict={todayVerdict} context={todayContext} />
-                    </Reveal>
-                  ) : null}
-
-                  {/* Desktop only — the v2-retired run strip, back at xl+ where it
-                      costs nothing (docs/DASHBOARD_NORTH_STAR.md, 2026-08-07). */}
-                  <DashboardTodayRunsCard strip={todayStrip} />
-                </div>
+              {todayVerdict ? (
+                <Reveal index={1}>
+                  <DashboardDayVerdictCard verdict={todayVerdict} context={todayContext} />
+                </Reveal>
               ) : null}
 
-              {/* Right column: the driver's own experiment list, live during a session
-                  — inside the outing card when a meeting is running, on its own
-                  otherwise. */}
-              <div className="dash-side flex min-w-0 flex-col gap-3">
-                <Reveal index={2}>
-                  {activeEvent ? (
-                    <DashboardNextOutingCard
-                      event={activeEvent}
-                      thingsToTry={thingsToTry}
-                      openTodoCount={thingsToDo.length}
-                      todayRunCount={todayRunCount}
-                    />
-                  ) : (
-                    <CardPanel>
-                      <ActionItemListPanel
-                        list="try"
-                        title="Things to try"
-                        addPlaceholder="Add an idea…"
-                        initialItems={thingsToTry}
-                        embedded
-                      />
-                    </CardPanel>
-                  )}
-                </Reveal>
-              </div>
-
-              {/* Left column, second row — see the block below (shared by both modes). */}
-              <DashboardEvidenceColumn
-                recentRun={recentRun}
-                showSetupChanges={todayStrip[0]?.runId !== recentRun?.id}
-                summary={summary}
-                records={records}
-                newPb={newPb}
-              />
-            </>
-          ) : (
-            <>
-              {/* Right column: the lists. */}
-              <div className="dash-side flex min-w-0 flex-col gap-3">
-                <Reveal index={1}>
+              {/* The driver's own experiment list, live during a session — inside the
+                  outing card when a meeting is running, on its own otherwise. */}
+              <Reveal index={2}>
+                {activeEvent ? (
                   <DashboardNextOutingCard
-                    event={nextEvent}
+                    event={activeEvent}
                     thingsToTry={thingsToTry}
                     openTodoCount={thingsToDo.length}
+                    todayRunCount={todayRunCount}
                   />
-                </Reveal>
-
-                <Reveal index={2}>
+                ) : (
                   <CardPanel>
                     <ActionItemListPanel
-                      list="do"
-                      title="Things to do"
-                      addPlaceholder="Add a reminder…"
-                      initialItems={thingsToDo}
+                      list="try"
+                      title="Things to try"
+                      addPlaceholder="Add an idea…"
+                      initialItems={thingsToTry}
                       embedded
                     />
                   </CardPanel>
-                </Reveal>
-              </div>
+                )}
+              </Reveal>
+            </>
+          ) : (
+            <>
+              <Reveal index={1}>
+                <DashboardNextOutingCard
+                  event={nextEvent}
+                  thingsToTry={thingsToTry}
+                  openTodoCount={thingsToDo.length}
+                />
+              </Reveal>
 
-              {/* Left column: the evidence. */}
-              <DashboardEvidenceColumn
-                recentRun={recentRun}
-                showSetupChanges
-                summary={summary}
-                records={records}
-                newPb={newPb}
-              />
+              <Reveal index={2}>
+                <CardPanel>
+                  <ActionItemListPanel
+                    list="do"
+                    title="Things to do"
+                    addPlaceholder="Add a reminder…"
+                    initialItems={thingsToDo}
+                    embedded
+                  />
+                </CardPanel>
+              </Reveal>
             </>
           )}
+
+          {/* Demoted 2026-07-16: ambient momentum rides last, never the lead. */}
+          <Reveal index={3}>
+            <DashboardSummaryCard summary={summary} records={records} newPb={newPb} />
+          </Reveal>
         </div>
       </section>
     </>
-  );
-}
-
-/**
- * The tail of the wide left column, identical in both modes: the read on the last
- * run, then ambient momentum. Ambient momentum was already "always last"
- * (2026-07-16) and still is — in the phone stack it is the final card, and at xl+
- * it is the foot of the evidence column.
- *
- * Extracted only because the track-day branch needs it AFTER the list wrapper in
- * the DOM (the phone stack puts the 30-day card last) while the off-day branch
- * needs it in the same place — one component, two call sites, no copy.
- */
-function DashboardEvidenceColumn({
-  recentRun,
-  showSetupChanges,
-  summary,
-  records,
-  newPb,
-}: {
-  recentRun: DashboardHomeModel["recentRun"];
-  showSetupChanges: boolean;
-  summary: DashboardHomeModel["summary"];
-  records: DashboardHomeModel["records"];
-  newPb: DashboardHomeModel["newPb"];
-}) {
-  return (
-    <div className="dash-main flex min-w-0 flex-col gap-3">
-      {/* Desktop only — recorded fact about the last run, no inference. On a track
-          day the newest run is usually this same run, and its setup diff is already
-          on the verdict card AND the run strip; suppress the third copy rather than
-          print the same change three times on one screen. */}
-      <DashboardLastRunReadCard run={recentRun} showSetupChanges={showSetupChanges} />
-
-      <Reveal index={3}>
-        <DashboardSummaryCard summary={summary} records={records} newPb={newPb} />
-      </Reveal>
-    </div>
   );
 }

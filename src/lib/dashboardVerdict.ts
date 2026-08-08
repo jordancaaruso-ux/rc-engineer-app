@@ -23,6 +23,42 @@ export type VerdictRunInput = {
   changedRows: VerdictChangedRow[];
 };
 
+export type ConsistencyWord = "Tight" | "Fair" | "Scrappy";
+
+/**
+ * Judge a top-5 spread relative to lap length, so 5-second laps and 12-second laps
+ * get the same bar: within 1% of the best lap is tight, within 2.5% fair, beyond
+ * that scrappy. Falls back to absolute seconds when there is no best lap to scale by.
+ *
+ * Exported because the desktop hero's consistency dial reads the same scale — two
+ * copies of these cutoffs would drift, and then the dial and the verdict card would
+ * disagree about the same run on the same screen.
+ */
+export function consistencyWord(
+  top5SpreadSeconds: number,
+  bestLap: number | null,
+): ConsistencyWord {
+  const ratio = bestLap != null && bestLap > 0 ? top5SpreadSeconds / bestLap : null;
+  if (ratio != null) return ratio <= 0.01 ? "Tight" : ratio <= 0.025 ? "Fair" : "Scrappy";
+  return top5SpreadSeconds <= 0.15 ? "Tight" : top5SpreadSeconds <= 0.4 ? "Fair" : "Scrappy";
+}
+
+/**
+ * The same spread as a 0–10 magnitude, for `RatingDial` in verdict mode. Anchored on
+ * the word cutoffs above: a tight run (≤1%) lands at 7.5+, the fair band spans roughly
+ * 3.75–7.5, and scrappy falls below. It is the arc length and colour only — the dial
+ * prints the word, never this number.
+ */
+export function consistencyDialValue(
+  top5SpreadSeconds: number,
+  bestLap: number | null,
+): number {
+  const ratio = bestLap != null && bestLap > 0 ? top5SpreadSeconds / bestLap : null;
+  if (ratio == null) return consistencyWord(top5SpreadSeconds, bestLap) === "Tight" ? 8 : 5;
+  const scaled = 10 - (ratio / 0.04) * 10;
+  return Math.max(1, Math.min(10, Math.round(scaled * 10) / 10));
+}
+
 export type TodayVerdict = {
   runCount: number;
   /** Day direction over runs that have the chosen metric; null with fewer than 2 comparable runs. */
@@ -144,22 +180,11 @@ export function computeTodayVerdict(runs: VerdictRunInput[]): TodayVerdict | nul
   for (let i = runs.length - 1; i >= 0; i--) {
     const r = runs[i];
     if (r.top5SpreadSeconds == null) continue;
-    // Judge the spread relative to lap length so 5ths and 12ths get the same
-    // bar: within 1% of the best lap is tight, within 2.5% fair, beyond scrappy.
-    const ratio = r.bestLap != null && r.bestLap > 0 ? r.top5SpreadSeconds / r.bestLap : null;
-    const word: "Tight" | "Fair" | "Scrappy" =
-      ratio != null
-        ? ratio <= 0.01
-          ? "Tight"
-          : ratio <= 0.025
-            ? "Fair"
-            : "Scrappy"
-        : r.top5SpreadSeconds <= 0.15
-          ? "Tight"
-          : r.top5SpreadSeconds <= 0.4
-            ? "Fair"
-            : "Scrappy";
-    consistency = { runLabel: r.runLabel, spreadSeconds: r.top5SpreadSeconds, word };
+    consistency = {
+      runLabel: r.runLabel,
+      spreadSeconds: r.top5SpreadSeconds,
+      word: consistencyWord(r.top5SpreadSeconds, r.bestLap),
+    };
     break;
   }
 

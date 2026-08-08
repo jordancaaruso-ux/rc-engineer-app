@@ -82,6 +82,8 @@ const runHistorySelect = {
   sessionCompletedAt: true,
   loggingCompletedAt: true,
   loggingComplete: true,
+  // Read by the row's "no lap times — import them" warning (runNeedsLapImport).
+  lapImportPromptDismissedAt: true,
   sessionType: true,
   meetingSessionType: true,
   meetingSessionCode: true,

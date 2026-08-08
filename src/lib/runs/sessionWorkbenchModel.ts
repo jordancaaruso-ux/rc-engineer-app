@@ -7,6 +7,7 @@ import {
   type AnalysisTrendRun,
 } from "@/lib/analysis/analysisHomeModel";
 import { computeTireIndicatorsByRunId } from "@/lib/runs/tireSetChange";
+import { runNeedsLapImport } from "@/lib/runs/lapImportPrompt";
 
 /**
  * Shaping for the desktop Sessions workbench (`SessionsWorkbench`).
@@ -32,6 +33,10 @@ export type WorkbenchRunSource = {
   createdAt: Date | string;
   lapTimes: unknown;
   lapSession?: unknown;
+  /** All three read by `runNeedsLapImport` for the rail's "no lap times" mark. */
+  importedLapSets?: readonly unknown[] | null;
+  lapImportPromptDismissedAt?: Date | string | null;
+  loggingComplete?: boolean | null;
   bestLapSeconds?: number | null;
   avgTop5LapSeconds?: number | null;
   meetingSessionCode?: string | null;
@@ -150,6 +155,12 @@ export type WorkbenchRunRow = {
   lapCount: number;
   /** This run holds the group's fastest lap. */
   isGroupBest: boolean;
+  /**
+   * No lap times on this run and the driver hasn't silenced the prompt. At lg+
+   * the workbench replaces the accordion outright, so without this the desktop
+   * rail would be the one Sessions surface that stays silent about it.
+   */
+  needsLapImport: boolean;
 };
 
 /** Rows for one group, newest-first — the order the rail lists them in. */
@@ -174,6 +185,7 @@ export function buildGroupRunRows(group: WorkbenchGroupSource): WorkbenchRunRow[
       median: metrics.median,
       lapCount: metrics.cleanLapCount,
       isGroupBest: false,
+      needsLapImport: runNeedsLapImport(run),
     };
   });
 

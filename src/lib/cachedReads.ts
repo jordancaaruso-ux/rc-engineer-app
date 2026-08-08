@@ -17,7 +17,11 @@ export async function getCachedDashboardHomeModel(userId: string, timeZone: stri
   return perfSpan("cachedDashboardHome", () =>
     unstable_cache(
       async () => loadDashboardHomeModel(userId, timeZone),
-      [`dashboard-home-v2-${userId}-${timeZone}`],
+      // v3 (2026-08-08): `heroPace` added for the desktop hero. Bump this whenever the
+      // model GAINS a field — a cached v2 entry has no `heroPace`, so the hero silently
+      // renders nothing until the 30s window rolls, which on a deploy means every warm
+      // user sees a broken page for half a minute.
+      [`dashboard-home-v3-${userId}-${timeZone}`],
       { tags: [dashboardTag(userId)], revalidate: 30 }
     )()
   );

@@ -38,7 +38,14 @@ import { resolveEventTrackLabel } from "@/lib/tracks/legacyTrackSnapshot";
 import { getLiveRcDriverIdSetting, getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 import type { SetupSnapshotData } from "@/lib/runSetup";
-import { computeTodayVerdict, type TodayVerdict, type VerdictRunInput } from "@/lib/dashboardVerdict";
+import {
+  computeTodayVerdict,
+  consistencyDialValue,
+  consistencyWord,
+  type ConsistencyWord,
+  type TodayVerdict,
+  type VerdictRunInput,
+} from "@/lib/dashboardVerdict";
 import { perfSpan } from "@/lib/perfLog";
 
 export type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
@@ -351,6 +358,33 @@ export type DashboardHomeModel = {
    * (docs/DASHBOARD_NORTH_STAR.md v2, 2026-07-19). Pure math, no AI.
    */
   todayVerdict: TodayVerdict | null;
+  /**
+   * Desktop hero readout (design handoff 2026-08-08) — the big lap numeral, the two
+   * rating dials and the pace chart. Track day plots today's runs; an off day plots the
+   * last eight sessions.
+   *
+   * Costs no extra query: `completedRunRows` (the full history behind the 30-day summary
+   * and the records board) already carries best lap, laps and track per run. Null when
+   * the account has nothing to plot yet.
+   */
+  heroPace: null | {
+    bestLap: number | null;
+    avgTop5: number | null;
+    /** 1–10 handling rating behind the first dial; null when the run was not rated. */
+    carRating: number | null;
+    /** Signed delta of the last series point vs the one before it; negative is faster. */
+    deltaSeconds: number | null;
+    consistency: null | {
+      word: ConsistencyWord;
+      spreadSeconds: number;
+      /** 0–10 magnitude for the dial's arc. The dial prints the word, never this. */
+      value: number;
+    };
+    /** Oldest first — the chart reads left to right. */
+    series: Array<{ runId: string; label: string; best: number }>;
+    /** Total time found across the series; positive = quicker now than at the start. */
+    foundSeconds: number | null;
+  };
   recentRun: null | {
     id: string;
     carId: string | null;
@@ -618,6 +652,9 @@ export async function loadDashboardHomeModel(
         lapTimes: true,
         lapSession: true,
         loggingComplete: true,
+        // Feeds the desktop hero's handling dial for the day's latest run. A column on
+        // a query that already runs, not a new read.
+        carRating: true,
         car: { select: { id: true, name: true } },
         track: { select: { id: true, name: true } },
         event: { select: { id: true, name: true } },
@@ -1033,7 +1070,94 @@ export async function loadDashboardHomeModel(
 
   const incompleteRuns: DashboardIncompleteRunRow[] = incompleteRunsRows.map(toDashboardIncompleteRunRow);
 
+  /*
+   * Desktop hero (design handoff 2026-08-08, docs/DASHBOARD_NORTH_STAR.md).
+   *
+   * Every value here is derived from rows already fetched above — no extra query. The
+   * handoff assumed the off-day pace series would need one; it does not, because
+   * `completedRunRows` is the full run history the 30-day summary and the records board
+   * already read, carrying best lap, laps and track per run.
+   */
+  const heroSeriesFormatter = new Intl.DateTimeFormat(RUN_DATETIME_LOCALE, {
+    day: "2-digit",
+    month: "short",
+    timeZone,
+  });
+
+  /** Spread of a run's five best included laps — the consistency dial's input. */
+  const top5SpreadOf = (run: { lapTimes: unknown; lapSession: unknown }): number | null => {
+    const included = getIncludedLaps(primaryLapRowsFromRun(run as never));
+    if (included.length < 5) return null;
+    const top5 = included
+      .map((l) => l.lapTimeSeconds)
+      .sort((a, b) => a - b)
+      .slice(0, 5);
+    return top5[4] - top5[0];
+  };
+
+  let heroPace: DashboardHomeModel["heroPace"] = null;
+  {
+    // Track day plots today run-by-run; an off day plots the last eight sessions, which
+    // is the only way the page can answer "am I getting faster" at a glance.
+    const series = hasRunToday
+      ? [...todayStrip]
+          .reverse()
+          .filter((r) => r.bestLap != null)
+          .map((r) => ({ runId: r.runId, label: r.runLabel, best: r.bestLap as number }))
+      : completedRunRows
+          .filter((r) => typeof r.bestLapSeconds === "number")
+          .slice(-8)
+          .map((r) => ({
+            runId: r.id,
+            label: heroSeriesFormatter.format(r.sortAt ?? r.createdAt).toUpperCase(),
+            best: r.bestLapSeconds as number,
+          }));
+
+    const anchorRun = hasRunToday ? todaysRuns[todaysRuns.length - 1] : recentRun;
+    const anchorBest = hasRunToday
+      ? todayBestLap
+      : recentRun
+        ? computeIncludedLapMetricsFromRun(recentRun).bestLap
+        : null;
+
+    const spread = anchorRun ? top5SpreadOf(anchorRun) : null;
+    const anchorRunBest =
+      anchorRun && "bestLapSeconds" in anchorRun && typeof anchorRun.bestLapSeconds === "number"
+        ? anchorRun.bestLapSeconds
+        : anchorBest;
+
+    if (series.length > 0 || anchorBest != null) {
+      heroPace = {
+        bestLap: anchorBest,
+        avgTop5: hasRunToday
+          ? todayBestAvgTop5
+          : recentRun
+            ? computeIncludedLapMetricsFromRun(recentRun).averageTop5
+            : null,
+        carRating: hasRunToday
+          ? (todaysRuns[todaysRuns.length - 1]?.carRating ?? null)
+          : (recentRun?.carRating ?? null),
+        // Last point vs the one before it: the move the driver just made.
+        deltaSeconds:
+          series.length >= 2 ? series[series.length - 1].best - series[series.length - 2].best : null,
+        consistency:
+          spread != null
+            ? {
+                word: consistencyWord(spread, anchorRunBest),
+                spreadSeconds: spread,
+                value: consistencyDialValue(spread, anchorRunBest),
+              }
+            : null,
+        series,
+        // Positive = quicker now than at the start of the series.
+        foundSeconds:
+          series.length >= 2 ? series[0].best - series[series.length - 1].best : null,
+      };
+    }
+  }
+
   return {
+    heroPace,
     incompleteRuns,
     thingsToTry: thingsToTryRows.map((i) => ({
       id: i.id,

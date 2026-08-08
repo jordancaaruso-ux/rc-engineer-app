@@ -71,9 +71,12 @@ export async function GET(request: Request): Promise<Response> {
     (process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? new URL(request.url).origin)
       .trim()
       .replace(/\/$/, "");
-  // Demo drops into Analysis first (decision-board pick 7C) — graphs before anything else.
+  // Demo drops into Sessions first (decision-board pick 7C — graphs before anything
+  // else; the surface that pick names moved to /runs/history). Hard-coding /analysis
+  // sent desktop demo visitors to the pre-workbench page, bypassing ANALYSIS_DESKTOP
+  // in navConfig, which already routes this nav slot to /runs/history.
   const params = new URLSearchParams({
-    callbackUrl: `${origin}/analysis`,
+    callbackUrl: `${origin}/runs/history`,
     token,
     email: demoEmail,
   });

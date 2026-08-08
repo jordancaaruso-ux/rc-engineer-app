@@ -1,7 +1,7 @@
 import { Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatLap } from "@/lib/runLaps";
-import { type DashboardSummary } from "@/lib/dashboardSummary";
+import { longestStreak, type DashboardSummary } from "@/lib/dashboardSummary";
 import {
   recordMetricLabel,
   type DashboardNewPb,
@@ -221,17 +221,6 @@ function RecordCell({
       </div>
     </div>
   );
-}
-
-/** Longest run of consecutive active days in the window. */
-function longestStreak(activityByDay: number[]): number {
-  let best = 0;
-  let cur = 0;
-  for (const count of activityByDay) {
-    cur = count > 0 ? cur + 1 : 0;
-    if (cur > best) best = cur;
-  }
-  return best;
 }
 
 /**

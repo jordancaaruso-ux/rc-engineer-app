@@ -28,6 +28,21 @@ export type SummaryRunInput = {
 
 export type SummaryDelta = { current: number; prior: number };
 
+/**
+ * Longest run of consecutive active days in the window. Lives here rather than in the
+ * summary card because the desktop hero's stat strip shows the same figure — two copies
+ * would be free to disagree about the same window on the same page.
+ */
+export function longestStreak(activityByDay: number[]): number {
+  let best = 0;
+  let cur = 0;
+  for (const count of activityByDay) {
+    cur = count > 0 ? cur + 1 : 0;
+    if (cur > best) best = cur;
+  }
+  return best;
+}
+
 export type DashboardPaceTrend = {
   trackName: string;
   className: string | null;

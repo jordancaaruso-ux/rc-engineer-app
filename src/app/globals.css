@@ -68,6 +68,9 @@
   --color-rating-workable: 217 154 124; /* #D99A7C */
   --color-rating-good: 111 188 144; /* #6FBC90 */
   --color-rating-dialled: 79 208 137; /* = gain #4FD089 */
+  /* The fifth stop: no rating recorded. Sits a step above `border` so a dashed empty
+     ring reads as "nothing here yet" rather than as a hairline (RatingDial, 2026-08-08). */
+  --color-rating-unrated: 58 57 55; /* #3A3937 */
 
   /*
    * Mobile bottom dock (see BottomNav.tsx) — clearance the page reserves under
@@ -372,24 +375,39 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
    <main> to sit above the sidebar and intercept clicks. BottomNav must render
    after <main> (see AppShell.tsx) and outside `.app-shell` overflow clipping. */
 
+/* ---------------------------------------------------------------------------
+   Desktop icon rail (design handoff 2026-08-08). Replaces the 256px sidebar.
+
+   76px, icon over a 9px label. All nine destinations are kept — the handoff cut
+   Add run and Teams to reach seven, but the cut was the designer's judgement and not
+   a space constraint: nine 56px items plus the mark fit inside 1080px with room to
+   spare, and dropping the app's second-most-used verb from the only persistent nav
+   is not a trade worth making (founder, 2026-08-08).
+
+   Visibility is still `hidden md:flex` in the JSX — this rule must not set `display`.
+--------------------------------------------------------------------------- */
 .sidebar {
   /* NOTE: do not set display here; responsive visibility is controlled in JSX */
-  /*
-   * Top padding matches the approximate height of `.page-header` (title + subtitle + py-3),
-   * so the first nav row lines up with the header band / horizontal rule to the right.
-   */
-  @apply w-64 flex-col gap-3 border-r border-border bg-secondary/80 px-4 pb-5 backdrop-blur-md;
-  padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
+  width: 76px;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 22px 0 20px;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 22px);
+  border-right: 1px solid rgb(var(--color-border));
+  background-color: rgb(var(--color-secondary) / 0.8);
+  backdrop-filter: blur(12px);
   /* Surface colour behind the JRC icon cutouts (see `.bottom-nav`). */
   --jrc-icon-cutout: rgb(var(--color-secondary));
 }
 
-/* Brand mark atop the desktop sidebar — white mark (chrome), reclaims the space
-   the old top padding held so the first nav row stays near the header hairline. */
+/* Yellow mark, not white: at 18px the white mark reads as a smudge, where the
+   yellow one still resolves as the JRC shape. */
 .sidebar-brand {
   display: inline-flex;
   align-items: center;
-  margin: 0 0 1.5rem 0.25rem;
+  margin: 0 0 20px;
   transition: opacity 150ms ease;
 }
 .sidebar-brand:hover {
@@ -397,31 +415,49 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
 }
 
 .sidebar-nav {
-  @apply flex flex-col gap-0.5 text-sm;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
 }
 
 .sidebar-nav a {
-  @apply flex items-center rounded-lg border border-transparent px-3 py-1.5 hover:bg-card/40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 56px;
+  padding: 9px 0;
+  border-radius: 10px;
+  color: rgb(var(--color-muted-foreground));
   transition-property: background-color, color;
   transition-duration: 150ms;
   -webkit-tap-highlight-color: transparent;
 }
 
+.sidebar-nav a:hover {
+  color: rgb(var(--color-foreground));
+}
+
 .sidebar-nav a:active {
-  @apply opacity-90;
+  opacity: 0.9;
 }
 
 .sidebar-nav a[data-active="true"] {
-  @apply border-transparent bg-transparent;
+  background-color: rgb(255 255 255 / 0.05);
+  color: rgb(var(--color-primary));
   transition-duration: 0ms;
 }
 
-.sidebar-nav a[data-active="true"]:hover {
-  @apply bg-card/40;
+/* Settings sits apart from the journey, at the foot of the rail. */
+.sidebar-nav .sidebar-nav-tail {
+  margin-top: auto;
 }
 
 .sidebar-footer {
-  @apply mt-auto text-xs text-muted-foreground;
+  display: none;
 }
 
 .page {
@@ -632,10 +668,22 @@ html[data-nav-pending] .page {
   @apply text-[14.5px] leading-tight tracking-tight text-foreground;
 }
 
+/* 9px under a 20px icon. Supporting, never sufficient — every rail link keeps its
+   aria-label, because this is below the size text alone can carry (see the rail
+   accessibility note in the handoff). */
 .sidebar-nav .nav-sidebar-label {
   font-family: var(--font-ui);
   font-weight: 500;
-  @apply tracking-tight;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0;
+  /* The rail is 76px and the target 56px; a label that outgrew either would spill
+     across the page content, so it is clamped rather than trusted to fit. */
+  max-width: 100%;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar-nav a[data-active="true"] .nav-sidebar-label {
@@ -784,6 +832,110 @@ html[data-nav-pending] .page {
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Desktop page header — the title sits on the card's left edge (xl+)
+
+   Below xl nothing here applies: the phone header keeps its centred title over
+   the hairline track, which is the locked mobile reference.
+
+   At xl+ the header stops being centred chrome and becomes the top of the card
+   column. Two things have to be true for that to read as one axis, and the
+   header used to get neither:
+
+     1. Same gutter. `.page-header`'s padding was a flat 1.25rem at every width
+        while `.page-body` widened to 2rem/3rem on desktop, so the title sat
+        12–28px left of the cards it belonged to.
+     2. Same clamp. Most pages clamp the body (`max-w-2xl`, `max-w-4xl`, …) and
+        `.page-body`'s auto margins then centre that column, while the header
+        stayed full-bleed — on a wide monitor the title ended up hundreds of px
+        left of the first card. The clamp lives on a per-page utility class, so
+        the header mirrors it off its own next sibling rather than making all 60
+        call sites remember to set it twice.
+
+   The 2px underrule goes with the centring: whitespace separates the header on
+   desktop, matching the dashboard/events handoffs. The yellow sector tick
+   (`.page-title::before`) is retained — it carries location, not decoration.
+--------------------------------------------------------------------------- */
+@media (min-width: 1280px) {
+  .page-header {
+    justify-content: flex-start;
+    gap: 1rem;
+    padding-left: max(2rem, env(safe-area-inset-left));
+    padding-right: max(2rem, env(safe-area-inset-right));
+    /* `width` is load-bearing, not decoration — auto inline margins on a
+       column-flex item suppress the default `stretch`. Same trap as
+       `.page-body` above. */
+    width: 100%;
+    margin-inline: auto;
+  }
+
+  /* Title (+ subtitle) stack and the wrapper that may also hold the back
+     control: both were centring their contents. */
+  .page-header > div:has(> .page-title) {
+    align-items: flex-start;
+  }
+
+  .page-header > div:has(.page-title) {
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .page-title {
+    margin-inline: 0;
+  }
+
+  .page-title::after {
+    display: none;
+  }
+
+  /* The mirror of `.page-body`'s clamp. Adjacent-sibling `:has()` rather than a
+     class on the header, because the header is always the element immediately
+     before `.page-body` (verified across all 60 call sites) and this way a page
+     cannot align its title to a column it no longer has. Equal specificity, so
+     the `-wide` overrides must stay last — same reason they win on the body. */
+  .page-header:has(+ .page-body.max-w-md) { max-width: 28rem; }
+  .page-header:has(+ .page-body.max-w-lg) { max-width: 32rem; }
+  .page-header:has(+ .page-body.max-w-2xl) { max-width: 42rem; }
+  .page-header:has(+ .page-body.max-w-3xl) { max-width: 48rem; }
+  .page-header:has(+ .page-body.max-w-4xl) { max-width: 56rem; }
+  .page-header:has(+ .page-body.max-w-6xl) { max-width: 72rem; }
+  .page-header:has(+ .page-body.dash-wide),
+  .page-header:has(+ .page-body.events-wide) { max-width: 110rem; }
+  /* Engineer's clamp is `lg:`-prefixed; the escaped class name is not something to
+     put in a selector, so the page carries a plain marker for the mirror. */
+  .page-header:has(+ .page-body.engineer-wide) { max-width: 72rem; }
+
+  /*
+   * Back-arrow pages. The arrow hangs in the gutter, OUTSIDE the column, so the
+   * title stays flush with the card rather than being indented past it. That
+   * needs 36px of arrow plus a gap, which the xl gutter (2rem) cannot give, so
+   * these pages take the 1536px gutter early — on the header and the body
+   * together, so the two never come off the same axis to buy the room.
+   */
+  .page:has(.page-header a[aria-label="Back"]) .page-header,
+  .page:has(.page-header a[aria-label="Back"]) .page-body {
+    padding-left: max(3rem, env(safe-area-inset-left));
+    padding-right: max(3rem, env(safe-area-inset-right));
+  }
+
+  /* left: 0 is the header's padding-box edge — i.e. the outer edge of the
+     column, one gutter left of where the title and cards begin. */
+  .page-header a[aria-label="Back"] {
+    left: env(safe-area-inset-left, 0px);
+  }
+}
+
+/* The body's 2xl gutter, mirrored. This has to come AFTER the block above rather
+   than joining the `.page-body` 2xl rule further up: both selectors are a single
+   class, so between two matching media queries it is source order that decides,
+   and the earlier rule would lose to the xl one. */
+@media (min-width: 1536px) {
+  .page-header {
+    padding-left: max(3rem, env(safe-area-inset-left));
+    padding-right: max(3rem, env(safe-area-inset-right));
+  }
+}
+
 /* --------------------------------------------------------------------------
    Sessions — master-detail at lg+
    --------------------------------------------------------------------------
@@ -864,107 +1016,56 @@ html[data-nav-pending] .page {
 }
 
 /* ---------------------------------------------------------------------------
-   Dashboard desktop grid (docs/DASHBOARD_NORTH_STAR.md, desktop pass 2026-08-07)
+   Dashboard desktop shell (docs/DASHBOARD_NORTH_STAR.md; design handoff
+   "Desktop dashboard 1b — timing tower", 2026-08-08)
 
-   Below xl this does nothing at all: `.page-body` stays the flex column it has
-   always been, and the dashboard's own children stack in the same order with the
-   same gap. That is the whole point — the phone dashboard is the locked
-   reference and this pass must not move it.
+   Below xl this does nothing at all: `.page-body` stays the flex column it has always
+   been and the phone stack renders unchanged. That is the point — the phone dashboard is
+   the locked reference and desktop work must not move it.
 
-   At xl+ `.dash-cols` becomes two asymmetric columns:
+   At xl+ the page widens to the handoff's 1760px cap and `DashboardDesktop` takes over
+   with its own grid (a Tailwind `xl:grid` on a plain div, which has no cascade problem).
+   Only two things have to live in CSS:
 
-     .dash-main   wide, left   — the evidence: day verdict, today's runs,
-                                 last-run read, last 30 days
-     .dash-side   narrow, right — the lists: next outing / test plan,
-                                 things to do / things to try
+     .dash-wide    raises `.page-body`'s max-width. It has to be CSS, not an `xl:max-w-*`
+                   utility, because `.page-body` is UNLAYERED and Tailwind 4 puts
+                   utilities in `@layer utilities` — unlayered wins regardless of source
+                   order, so the utility would lose silently: class in the HTML, DOM says
+                   applied, layout unchanged. Same trap as the `@apply` note above.
 
-   The lists are short text rows and do not earn a 750px measure; the stat tiles,
-   bar strip and setup diffs do (founder, 2026-08-07). Everything is an ordinary
-   flex column below xl, so on a phone the wrappers are visually transparent —
-   parent gap and child gap are both 0.75rem, so cards space identically whether
-   they are wrapped or not.
+   `.dash-header` no longer carries any geometry. The left-aligned title, the 1rem gap
+   beside it and the dropped underrule started here and became the app-wide desktop header
+   rule (see "Desktop page header" above), which also teaches the header to mirror
+   `.dash-wide`'s cap. The class stays on the element as the handoff's name for it.
 
-   The DOM order deliberately does NOT match the visual order. The phone stack is
-   locked (the verdict leads, "Last 30 days" is always last), so the markup stays
-   in phone order and the COLUMNS do the moving. On a track day that means the left
-   column is interleaved around the right one — verdict + strip, then the list,
-   then last-run + 30-days — so `.dash-main` boxes take their rows in document
-   order while `.dash-side` is pinned to row 1. `grid-auto-flow: dense` is
-   load-bearing: without it a `.dash-main` box appearing after `.dash-side` in the
-   DOM is pushed to a new row instead of back-filling column 1 beside it.
-
-   XL (1280px), NOT lg (1024px), and that was measured rather than assumed. The
-   desktop pane is `100vw − 16rem` of sidebar, so at a 1024px viewport there are
-   only ~704px to split: the grid resolved to a 336px main column beside a 352px
-   rail — a "main" column narrower than both its own rail and the 350px card the
-   phone shows. Two columns need roughly 1280px of viewport before the main column
-   is worth having. Between 1024 and 1279 the page stays the centred single column
-   step 1 already fixed. The two desktop-only cards are gated `hidden xl:block` to
-   match; if this breakpoint moves, move theirs with it.
-
-   Note that `.page-body` itself stays `display: flex` — only its max-width is
-   raised, and the grid lives on a plain child. That is deliberate: `.page-body` is
-   UNLAYERED, and Tailwind 4 puts utilities in `@layer utilities`. Unlayered styles
-   beat layered ones no matter the source order, so an `xl:grid` utility on
-   `.page-body` loses to its own `display: flex` silently — the class lands in the
-   HTML, the DOM says the class is applied, and the layout stays a column. Putting
-   the grid on `.dash-cols` avoids the fight entirely. (Same trap as the `@apply`
-   note on `.page-body` above.)
-
-   The max-width cap is not decoration. On a 1920px monitor the pane is ~1664px
-   and an uncapped card renders ~1250px wide, which is well past a readable
-   measure. Capped and centred it reads as measure rather than dead margin.
+   The 2026-08-07 two-column grid (`.dash-cols` / `.dash-main` / `.dash-side`) is gone,
+   superseded by this layout one day later. Its finding survives in the handoff: the lists
+   are short text rows and do not earn a wide measure, which is why they are the 420px
+   column here too.
 --------------------------------------------------------------------------- */
 @media (min-width: 1280px) {
-  /* Only the cap moves; the flex column stays a flex column. */
   .dash-wide {
-    max-width: 90rem;
-  }
-
-  .dash-cols {
-    display: grid;
-    /* The narrow column the lists live in. */
-    --dash-rail-w: 22rem;
-    grid-template-columns: minmax(0, 1fr) var(--dash-rail-w);
-    grid-auto-flow: row dense;
-    align-items: start;
-    column-gap: 1rem;
-    row-gap: 0.75rem;
-  }
-
-  .dash-cols > .dash-main {
-    grid-column: 1;
-  }
-
-  .dash-cols > .dash-side {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  /* Track day only, where the left column is TWO boxes with the list between them.
-     Without this the single implicit row is as tall as the tallest item in it, so a
-     long "things to try" list would push the last-run + 30-day box down and leave a
-     hole under the verdict — the exact dead space this pass exists to remove. Two
-     explicit rows let the left column close up while the list spans both.
-
-     Deliberately not applied in off-day mode: there is only one `.dash-main` there,
-     so a second row would just add an empty track and a trailing row-gap. */
-  .dash-cols-split {
-    /* `auto 1fr`, not `auto auto`: a spanning item distributes its height across the
-       intrinsic tracks it spans, so with two `auto` rows a long list inflates row 1
-       and opens a hole between the two left-hand boxes. Making row 2 flexible sends
-       that slack to the BOTTOM of the column instead, where it is just column height. */
-    grid-template-rows: auto 1fr;
-  }
-
-  .dash-cols-split > .dash-side {
-    grid-row: 1 / -1;
+    max-width: 110rem; /* 1760px */
   }
 }
 
-@media (min-width: 1536px) {
-  .dash-cols {
-    --dash-rail-w: 24rem;
+/* ---------------------------------------------------------------------------
+   Events desktop shell (design handoff "Events — desktop redesign / Season",
+   2026-08-08). Second page in the desktop programme; inherits the dashboard's
+   76px rail and 1760px cap.
+
+   Only the cap lives here now. The header's alignment was `.events-header`'s own
+   for one day; it is the app-wide desktop header rule above, which every page
+   shares — including the `ml-auto` control group this header hangs off the end
+   of its flex row.
+
+   Same `@layer` trap as `.dash-wide`: `.page-body` is UNLAYERED, so an
+   `xl:max-w-*` utility would lose to it regardless of source order. The cap has
+   to be plain CSS.
+--------------------------------------------------------------------------- */
+@media (min-width: 1280px) {
+  .events-wide {
+    max-width: 110rem; /* 1760px */
   }
 }
 
@@ -1012,11 +1113,7 @@ html[data-nav-pending] .page {
   /* Snappier entrance: content that is already loaded should read as "instant".
      Duration + stagger halved (was 460ms / up-to-340ms delay ≈ 800ms tail) so a
      ready page's lower cards land by ~400ms instead of ~800ms after the tap. */
-  /* `.dash-cols` is excluded for the same reason as `.rc-reveal`: the dashboard's
-     desktop column wrapper holds cards that already animate themselves, so fading
-     the wrapper too would double up. The nth-child delay rules below can still
-     match it — with no animation to delay, that is inert. */
-  .page-body > *:not(.rc-reveal):not(.dash-cols) {
+  .page-body > *:not(.rc-reveal) {
     animation: rc-reveal 250ms cubic-bezier(0, 0, 0.2, 1) both;
   }
   .page-body > *:not(.rc-reveal):nth-child(1) { animation-delay: 0ms; }

@@ -1317,6 +1317,13 @@ model Run {
   loggingCompletedAt DateTime?
   /** Dashboard / import chooser: hide "incomplete logging" reminder without deleting the run. */
   incompleteLoggingPromptDismissedAt DateTime?
+  /**
+   * Sessions list: hide the "no lap times — import them" warning on this run without
+   * deleting it. Deliberately NOT `incompleteLoggingPromptDismissedAt` — that column
+   * drives the dashboard's "Runs not finished logging" list, and sharing it would make
+   * silencing a lap warning silently drop the run out of that list too.
+   */
+  lapImportPromptDismissedAt DateTime?
 
   /**
    * Stable ordering axis for run lists. Stamped once at create time (= server `now()`)

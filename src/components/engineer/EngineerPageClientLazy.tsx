@@ -5,7 +5,7 @@ import { CardPanel } from "@/components/ui/CardPanel";
 
 function EngineerClientSkeleton() {
   return (
-    <CardPanel className="max-w-4xl mx-auto w-full" contentClassName="p-0">
+    <CardPanel className="w-full" contentClassName="p-0">
       <div className="animate-pulse border-b border-border px-4 py-3">
         <div className="h-4 w-32 rounded-md bg-muted/60" />
       </div>

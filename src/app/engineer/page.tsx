@@ -56,16 +56,22 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
           <p className="page-subtitle">Setup guidance from your runs and knowledge base.</p>
         </div>
       </header>
-      <section className="page-body flex min-h-0 flex-1 flex-col pb-2 md:pb-0">
+      {/* The chat column's clamp lives HERE, not on the children that used to carry
+          `mx-auto max-w-4xl lg:max-w-6xl` each. `.page-header` mirrors its next
+          sibling's clamp to put the title on the card's left edge (globals.css,
+          "Desktop page header"), and a clamp on a grandchild is invisible to it —
+          the title floated 74px left of the chat panel. `engineer-wide` is the
+          mirror key for the `lg:`-prefixed width, same role as `.dash-wide`. */}
+      <section className="page-body engineer-wide flex min-h-0 max-w-4xl flex-1 flex-col pb-2 lg:max-w-6xl md:pb-0">
         {/* Quota meter (MONETISATION_NORTH_STAR.md Phase 2). In the body, not the subtitle —
             `.page-header .page-subtitle` is display:none globally. */}
         {quotaNote ? (
-          <p className="mx-auto mb-2 w-full max-w-4xl text-center text-xs text-muted-foreground">
+          <p className="mb-2 w-full text-center text-xs text-muted-foreground">
             {quotaNote}
           </p>
         ) : null}
         {hasAnyRun ? null : (
-          <CardPanel className="mx-auto mb-3 w-full max-w-4xl">
+          <CardPanel className="mb-3 w-full">
             <Eyebrow>Before you ask</Eyebrow>
             <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
               The Engineer is at its best reading <span className="text-foreground">your</span> runs —

@@ -29,10 +29,11 @@ import {
   primaryLapRowsFromRun,
 } from "@/lib/lapAnalysis";
 import { RunLapAnalysisModal } from "@/components/runs/RunHistoryModalsLazy";
-import { Timer, Wrench } from "lucide-react";
+import { Timer, TriangleAlert, Wrench, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
 import { type Run } from "@/components/runs/RunDetailPanel";
+import { runNeedsLapImport } from "@/lib/runs/lapImportPrompt";
 import {
   computeRunHistoryColSpan,
   RUN_HISTORY_ACTION_CELL_CLASS,
@@ -41,6 +42,65 @@ import {
   RunHistoryMobileColumns,
   RunHistoryMobileRowShell,
 } from "@/components/runs/runHistoryTableColumns";
+
+/**
+ * "This run has no lap times" — the amber warning that sits beside the Draft badge.
+ *
+ * Founder report 2026-08-08: a driver logged a run before LiveRC had posted the
+ * times and marked it complete. The row then showed three em-dashes and nothing
+ * else — no signal, no way back to the importer. Tapping this lands straight on
+ * the wizard's Laps step (`?step=laps` — needed because `firstUnfinishedStep`
+ * would otherwise stop at the first empty step, typically Prep).
+ *
+ * Amber, matching the Draft badge. That does not break the house rule below
+ * ("yellow is actions only") — the rule reserves *yellow*; amber is already the
+ * established badge tone on this row, and green stays good/complete.
+ */
+function LapImportWarning({
+  onImport,
+  onDismiss,
+  compact,
+  className,
+}: {
+  onImport: () => void;
+  onDismiss: () => void;
+  /** Mobile: icon only — the date column is already carrying date + session + Draft. */
+  compact: boolean;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn("inline-flex shrink-0 items-center gap-0.5", className)}
+      // The whole <tr> is role="button" → openRun. Everything in here is its own
+      // target, so stop the row from swallowing the tap.
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        onClick={onImport}
+        aria-label="Lap times missing — import them"
+        title="No lap times on this run — tap to import"
+        className={cn(
+          "inline-flex items-center gap-0.5 rounded border border-amber-500/40 bg-amber-500/10 ui-title text-amber-900 transition hover:bg-amber-500/20 dark:text-amber-100",
+          compact ? "px-0.5 py-px text-[8px]" : "px-1 py-0.5 text-[8px] md:text-[9px]"
+        )}
+      >
+        <TriangleAlert className={compact ? "h-2.5 w-2.5" : "h-3 w-3"} aria-hidden />
+        {compact ? null : "Import laps"}
+      </button>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Hide the missing lap times warning for this run"
+        title="This run will never have lap times — hide this"
+        className="inline-flex items-center justify-center rounded p-0.5 text-muted-foreground transition hover:bg-muted/80 hover:text-foreground"
+      >
+        <X className="h-2.5 w-2.5" aria-hidden />
+      </button>
+    </span>
+  );
+}
 
 function RunHistoryActionButtons({
   onSetup,
@@ -184,10 +244,36 @@ export function RunHistoryTable({
   const [reorderErr, setReorderErr] = useState<string | null>(null);
   const [reorderBusy, setReorderBusy] = useState(false);
   const [modalsPortalReady, setModalsPortalReady] = useState(false);
+  /**
+   * Runs whose "no lap times" warning the driver just dismissed. Held locally and
+   * applied optimistically: Sessions is a 30s-revalidate server component, so a
+   * `router.refresh()` would read as a stall trackside. The column is the source
+   * of truth on the next load.
+   */
+  const [dismissedLapPromptIds, setDismissedLapPromptIds] = useState<Set<string>>(
+    () => new Set()
+  );
 
   useEffect(() => {
     setModalsPortalReady(true);
   }, []);
+
+  async function dismissLapImportPrompt(runId: string) {
+    setDismissedLapPromptIds((prev) => new Set(prev).add(runId));
+    try {
+      const res = await fetch(`/api/runs/${runId}/dismiss-lap-import-prompt`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error(String(res.status));
+    } catch {
+      // Put the warning back rather than leave the driver believing it stuck.
+      setDismissedLapPromptIds((prev) => {
+        const next = new Set(prev);
+        next.delete(runId);
+        return next;
+      });
+    }
+  }
 
   /**
    * Rows navigate to the run view — the one place a run is looked at (Option A, 2026-07-29).
@@ -334,6 +420,12 @@ export function RunHistoryTable({
           dayRunNumber: dayRunNumberByRunId?.[run.id],
         });
         const runInstant = resolveRunDisplayInstant(run);
+        // Team Sessions lists other members' runs. Their missing laps are not
+        // yours to chase — the deep link would open an edit page you can't save
+        // and the dismiss POST would 404 on the ownership check.
+        const runOwnedByViewer = !run.userId || !viewerUserId || run.userId === viewerUserId;
+        const showLapImportWarning =
+          runOwnedByViewer && runNeedsLapImport(run) && !dismissedLapPromptIds.has(run.id);
         const isDragging = draggingId === run.id;
         const showDropAbove = dropTarget?.runId === run.id && dropTarget.edge === "above";
         const showDropBelow = dropTarget?.runId === run.id && dropTarget.edge === "below";
@@ -453,6 +545,14 @@ export function RunHistoryTable({
                             Draft
                           </span>
                         ) : null}
+                        {showLapImportWarning ? (
+                          <LapImportWarning
+                            compact
+                            className="mt-0.5"
+                            onImport={() => router.push(`/runs/${run.id}/edit?step=laps`)}
+                            onDismiss={() => void dismissLapImportPrompt(run.id)}
+                          />
+                        ) : null}
                       </>
                     }
                     best={
@@ -513,6 +613,17 @@ export function RunHistoryTable({
                 <span title={formatRunDateTime(runInstant, displayTimeZone)}>
                   {formatRunDateShort(runInstant, displayTimeZone)}
                 </span>
+                {/* The Session cell is where this normally lives, but it only exists
+                    when some run in the group is labelled. Unlabelled testing days
+                    would otherwise lose the warning entirely on desktop. */}
+                {showLapImportWarning && !showSessionColumn ? (
+                  <LapImportWarning
+                    compact={false}
+                    className="ml-1.5"
+                    onImport={() => router.push(`/runs/${run.id}/edit?step=laps`)}
+                    onDismiss={() => void dismissLapImportPrompt(run.id)}
+                  />
+                ) : null}
               </td>
               {showSessionColumn ? (
                 <td className="hidden md:table-cell px-2 py-1.5 md:px-3 md:py-2 min-w-0 align-middle">
@@ -527,6 +638,13 @@ export function RunHistoryTable({
                       >
                         Draft
                       </span>
+                    ) : null}
+                    {showLapImportWarning ? (
+                      <LapImportWarning
+                        compact={false}
+                        onImport={() => router.push(`/runs/${run.id}/edit?step=laps`)}
+                        onDismiss={() => void dismissLapImportPrompt(run.id)}
+                      />
                     ) : null}
                   </div>
                 </td>

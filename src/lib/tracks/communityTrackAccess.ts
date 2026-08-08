@@ -1,8 +1,26 @@
 import type { Prisma } from "@prisma/client";
 
 import { demoCatalogUserId, isDemoIdentity } from "@/lib/demo/demoAccess";
+import { throwawayEmailWhere } from "@/lib/account/throwawayAccounts";
 
 export type TrackCatalogViewer = { id?: string | null; email?: string | null };
+
+/**
+ * Tracks created by a disposable `+ob…` onboarding-test account are dev debris, not community
+ * rows — but the account that made them is mid-walkthrough and must still see its own work, or
+ * the flow the throwaway exists to test (add a track, then pick it) breaks in a way real users
+ * never experience. So: own rows always, other throwaways never.
+ *
+ * Returned nested under `AND` on purpose. `communityTrackListWhere` puts the search on a
+ * top-level `OR`; a second top-level `OR` here would be silently overwritten by the spread.
+ */
+function throwawayExclusionWhere(viewer: TrackCatalogViewer): Prisma.TrackWhereInput {
+  const notThrowaway: Prisma.TrackWhereInput = {
+    user: { isNot: { email: throwawayEmailWhere() } },
+  };
+  if (!viewer.id) return notThrowaway;
+  return { OR: [{ userId: viewer.id }, notThrowaway] };
+}
 
 /**
  * Demo rows are NOT community rows.
@@ -19,7 +37,11 @@ export type TrackCatalogViewer = { id?: string | null; email?: string | null };
 export function trackCatalogScopeWhere(viewer: TrackCatalogViewer): Prisma.TrackWhereInput {
   const demoUserId = demoCatalogUserId();
   const viewerIsDemo = viewer.id === demoUserId || isDemoIdentity(viewer);
-  return viewerIsDemo ? { userId: demoUserId } : { userId: { not: demoUserId } };
+  if (viewerIsDemo) return { userId: demoUserId };
+  return {
+    userId: { not: demoUserId },
+    AND: [throwawayExclusionWhere(viewer)],
+  };
 }
 
 export function communityTrackListWhere(

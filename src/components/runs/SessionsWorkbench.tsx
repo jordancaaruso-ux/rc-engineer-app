@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronRight, Flag, Wrench } from "lucide-react";
+import { ChevronRight, Flag, TriangleAlert, Wrench } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { SessionTrendCard } from "@/components/analysis/SessionTrendCardLazy";
 import { RunPageClient } from "@/components/runs/RunPageClient";
 import type { Run } from "@/components/runs/RunDetailPanel";
@@ -341,6 +342,7 @@ function RunRail({
   selectedRunId: string | null;
   onSelect: (runId: string | null) => void;
 }) {
+  const router = useRouter();
   // Selection can arrive from the chart, not just from this list — scroll the
   // chosen row into view so the spine never highlights something off-screen.
   // `block: "nearest"` is a no-op when the row is already visible, so clicking a
@@ -399,6 +401,25 @@ function RunRail({
             >
               {run.label}
             </span>
+            {run.needsLapImport ? (
+              // At lg+ this rail IS Sessions (the accordion is lg:hidden), so the
+              // mark has to be actionable here or the desktop has no way in.
+              // `?step=laps` because firstUnfinishedStep would otherwise stop at
+              // the first empty step, usually Prep.
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  router.push(`/runs/${run.id}/edit?step=laps`);
+                }}
+                onKeyDown={(event) => event.stopPropagation()}
+                aria-label={`Lap times missing on ${run.label} — import them`}
+                title="No lap times on this run — tap to import"
+                className="inline-flex shrink-0 items-center justify-center rounded border border-amber-500/40 bg-amber-500/10 p-0.5 text-amber-900 transition hover:bg-amber-500/20 dark:text-amber-100"
+              >
+                <TriangleAlert className="h-3 w-3" aria-hidden />
+              </button>
+            ) : null}
             <span className="shrink-0 font-mono text-[9.5px] text-faint">{run.lapCount} laps</span>
             <span
               className={cn(

@@ -1,24 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { Eyebrow, HubRowTitle } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { CollapsibleAddRow } from "@/components/assets/CollapsibleAddRow";
 import { formatEventDate } from "@/lib/formatDate";
+import { formatLap } from "@/lib/runLaps";
 import { splitEventsForPicker } from "@/lib/events/splitEventsForPicker";
-import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
-import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
+import { EventAddForm, type TrackOption } from "@/components/events/EventAddForm";
 
-type TrackOption = { id: string; name: string; location?: string | null };
-
-type EventItem = {
+export type EventListItem = {
   id: string;
   name: string;
   startDate: string | Date;
@@ -36,6 +31,15 @@ type EventItem = {
   isLegacyTrack?: boolean;
 };
 
+/**
+ * Per-event evidence, keyed by event id — what a row shows instead of the removed status
+ * badge. Absent for an event created moments ago, which is correct: it has no runs yet.
+ */
+export type EventListStats = Record<
+  string,
+  { runCount: number; bestLapSeconds: number | null; vsVenueSeconds: number | null }
+>;
+
 async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const res = await fetch(input, { ...init, cache: "no-store" });
   const data = await res.json().catch(() => ({}));
@@ -45,8 +49,42 @@ async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
   return data as T;
 }
 
-function splitEvents(events: EventItem[]) {
+function splitEvents(events: EventListItem[]) {
   return splitEventsForPicker(events);
+}
+
+/**
+ * The evidence line that replaced the `Planned` / `LiveRC linked` badge (2026-08-08).
+ *
+ * The badge described whether a LiveRC URL had been pasted, but sat where event status
+ * belongs — so a club day raced in April still read `Planned`. What actually tells twelve
+ * identical "Clubday · Boronia" rows apart is how they went: runs, best lap, and whether
+ * it beat the venue. Same change as the desktop table, because the badge was wrong on
+ * both.
+ */
+function EventEvidence({
+  stats,
+}: {
+  stats: EventListStats[string] | undefined;
+}) {
+  if (!stats || stats.runCount === 0) return null;
+  const { runCount, bestLapSeconds, vsVenueSeconds } = stats;
+  const faster = vsVenueSeconds != null && vsVenueSeconds < 0;
+  return (
+    <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[11px] tabular-nums text-muted-foreground">
+      <span>
+        {runCount} {runCount === 1 ? "run" : "runs"}
+      </span>
+      {bestLapSeconds != null ? (
+        <span className="text-foreground">{formatLap(bestLapSeconds)}</span>
+      ) : null}
+      {vsVenueSeconds != null && Math.abs(vsVenueSeconds) >= 0.0005 ? (
+        <span className={cn("font-bold", faster ? "text-[#4FD089]" : "text-destructive")}>
+          {faster ? "▼" : "▲"} {Math.abs(vsVenueSeconds).toFixed(3)}
+        </span>
+      ) : null}
+    </span>
+  );
 }
 
 /** A subheader row + the section's event rows, flush inside the single card's `<ul>`. */
@@ -55,11 +93,13 @@ function EventSectionRows({
   subtitle,
   events,
   emptyMessage,
+  stats,
 }: {
   title: string;
   subtitle?: string;
-  events: EventItem[];
+  events: EventListItem[];
   emptyMessage: string;
+  stats: EventListStats;
 }) {
   return (
     <>
@@ -80,15 +120,6 @@ function EventSectionRows({
               <div className="flex items-center gap-2">
                 <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                   <HubRowTitle as="span">{ev.name}</HubRowTitle>
-                  {ev.hasLiveRcLink ? (
-                    <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent">
-                      LiveRC linked
-                    </span>
-                  ) : (
-                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      Planned
-                    </span>
-                  )}
                 </span>
                 <ChevronRight
                   className="h-4 w-4 shrink-0 text-muted-foreground"
@@ -111,6 +142,7 @@ function EventSectionRows({
                     ` – ${formatEventDate(ev.endDate)}`}
                 </span>
               </div>
+              <EventEvidence stats={stats[ev.id]} />
               {ev.notes && (
                 <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{ev.notes}</p>
               )}
@@ -125,27 +157,15 @@ function EventSectionRows({
 export function EventList({
   initialEvents,
   tracks,
+  stats = {},
 }: {
-  initialEvents: EventItem[];
+  initialEvents: EventListItem[];
   tracks: TrackOption[];
+  stats?: EventListStats;
 }) {
-  const router = useRouter();
   const pathname = usePathname();
-  const [events, setEvents] = useState<EventItem[]>(initialEvents);
+  const [events, setEvents] = useState<EventListItem[]>(initialEvents);
   const [trackOptions, setTrackOptions] = useState<TrackOption[]>(tracks);
-  const [name, setName] = useState("");
-  const [trackId, setTrackId] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [notes, setNotes] = useState("");
-  const [practiceSourceUrl, setPracticeSourceUrl] = useState("");
-  const [resultsSourceUrl, setResultsSourceUrl] = useState("");
-  const [tireControlled, setTireControlled] = useState(false);
-  const [controlledTireTypeId, setControlledTireTypeId] = useState("");
-  const [controlAdditiveEnabled, setControlAdditiveEnabled] = useState(false);
-  const [controlledAdditiveTypeId, setControlledAdditiveTypeId] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
 
   const { upcoming, past } = useMemo(() => splitEvents(events), [events]);
@@ -179,243 +199,18 @@ export function EventList({
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [pathname]);
 
-  const dateRangeInvalid = useMemo(
-    () => isEndDateBeforeStartDateYmd(startDate, endDate),
-    [startDate, endDate]
-  );
-
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) {
-      setMessage("Name is required.");
-      return;
-    }
-    if (!trackId.trim()) {
-      setMessage("Select a track for this event.");
-      return;
-    }
-    if (dateRangeInvalid) {
-      setMessage(null);
-      return;
-    }
-    setMessage(null);
-    setAdding(true);
-    try {
-      const start = startDate || new Date().toISOString().slice(0, 10);
-      const end = endDate || start;
-      const res = await fetch("/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: trimmed,
-          trackId,
-          startDate: start,
-          endDate: end,
-          notes: notes.trim() || null,
-          practiceSourceUrl: practiceSourceUrl.trim() || null,
-          resultsSourceUrl: resultsSourceUrl.trim() || null,
-          controlledTireTypeId: tireControlled ? controlledTireTypeId.trim() || null : null,
-          controlledAdditiveTypeId: controlAdditiveEnabled ? controlledAdditiveTypeId.trim() || null : null,
-        }),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        event?: EventItem;
-        error?: string;
-        existingEventId?: string;
-      };
-      if (res.status === 409 && data.event) {
-        setEvents((prev) => [data.event!, ...prev.filter((e) => e.id !== data.event!.id)]);
-        setMessage(data.error ?? "Joined existing event with this LiveRC URL.");
-        router.refresh();
-        return;
-      }
-      if (!res.ok) {
-        throw new Error(data.error ?? `Request failed (${res.status})`);
-      }
-      const { event } = data as { event: EventItem };
-      setEvents((prev) => [event, ...prev]);
-      setName("");
-      setTrackId("");
-      setStartDate("");
-      setEndDate("");
-      setNotes("");
-      setPracticeSourceUrl("");
-      setResultsSourceUrl("");
-      setTireControlled(false);
-      setControlledTireTypeId("");
-      setControlAdditiveEnabled(false);
-      setControlledAdditiveTypeId("");
-      setMessage("Event created.");
-      setAddOpen(false);
-      router.refresh();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to create event");
-    } finally {
-      setAdding(false);
-    }
-  }
-
   return (
     <SurfaceCard variant="panel" contentClassName="p-0" overflowHidden={false}>
       <ul className="divide-y divide-border">
         <CollapsibleAddRow label="New event" open={addOpen} onOpenChange={setAddOpen}>
-          <form onSubmit={handleAdd} className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-2">
-          <div>
-            <label className="block text-[11px] text-muted-foreground mb-1">Name *</label>
-            <input
-              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. BRCA Nationals R3"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-[11px] text-muted-foreground mb-1">Track *</label>
-            <select
-              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-              value={trackId}
-              onChange={(e) => setTrackId(e.target.value)}
-              aria-label="Track"
-              required
-            >
-              <option value="">— Select track —</option>
-              {trackOptions.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                  {t.location ? ` (${t.location})` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="grid gap-3 md:grid-cols-2">
-          <div>
-            <label className="block text-[11px] text-muted-foreground mb-1">Start date</label>
-            <input
-              type="date"
-              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              aria-label="Start date"
-            />
-          </div>
-          <div>
-            <label className="block text-[11px] text-muted-foreground mb-1">End date</label>
-            <input
-              type="date"
-              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              aria-label="End date"
-            />
-          </div>
-        </div>
-        {dateRangeInvalid ? (
-          <p className="text-[11px] text-destructive">
-            End date must be on or after the start date.
-          </p>
-        ) : null}
-        <div>
-          <label className="block text-[11px] text-muted-foreground mb-1">Notes (optional)</label>
-          <input
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Optional notes"
-          />
-        </div>
-        <div>
-          <label className="block text-[11px] text-muted-foreground mb-1">Practice timing URL (optional)</label>
-          <input
-            type="url"
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-            value={practiceSourceUrl}
-            onChange={(e) => setPracticeSourceUrl(e.target.value)}
-            placeholder="LiveRC practice session list URL"
-          />
-        </div>
-        <div>
-          <label className="block text-[11px] text-muted-foreground mb-1">Race timing URL (optional)</label>
-          <input
-            type="url"
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-            value={resultsSourceUrl}
-            onChange={(e) => setResultsSourceUrl(e.target.value)}
-            placeholder="LiveRC results / race timing page URL"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="block text-[11px] text-muted-foreground">Tire</label>
-          <SegmentedControl<"open" | "controlled">
-            ariaLabel="Event tire — open or controlled"
-            size="sm"
-            value={tireControlled ? "controlled" : "open"}
-            onChange={(v) => {
-              const on = v === "controlled";
-              setTireControlled(on);
-              if (!on) setControlledTireTypeId("");
+          <EventAddForm
+            tracks={trackOptions}
+            onCreated={(event) => {
+              const created = event as EventListItem;
+              setEvents((prev) => [created, ...prev.filter((e) => e.id !== created.id)]);
+              setAddOpen(false);
             }}
-            options={[
-              { value: "open", label: "Open" },
-              { value: "controlled", label: "Controlled" },
-            ]}
           />
-          {tireControlled ? (
-            <TireTypeCombobox
-              value={controlledTireTypeId}
-              onChange={setControlledTireTypeId}
-              placeholder="Select control tire type…"
-              aria-label="Event control tire type"
-            />
-          ) : null}
-        </div>
-        <div className="space-y-1.5">
-          <label className="block text-[11px] text-muted-foreground">Additive</label>
-          <SegmentedControl<"open" | "controlled">
-            ariaLabel="Event additive — open or controlled"
-            size="sm"
-            value={controlAdditiveEnabled ? "controlled" : "open"}
-            onChange={(v) => {
-              const on = v === "controlled";
-              setControlAdditiveEnabled(on);
-              if (!on) setControlledAdditiveTypeId("");
-            }}
-            options={[
-              { value: "open", label: "Open" },
-              { value: "controlled", label: "Controlled" },
-            ]}
-          />
-          {controlAdditiveEnabled ? (
-            <AdditiveTypeCombobox
-              value={controlledAdditiveTypeId}
-              onChange={setControlledAdditiveTypeId}
-              placeholder="Select control additive…"
-              aria-label="Event control additive type"
-              allowInlineCreate={false}
-            />
-          ) : null}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="submit"
-            disabled={adding || !trackId.trim() || dateRangeInvalid}
-            className={cn(
-              buttonLinkClassName("primary"),
-              (adding || !trackId.trim() || dateRangeInvalid) && "opacity-70 pointer-events-none"
-            )}
-          >
-            {adding ? "Creating…" : "Create event"}
-          </button>
-          {message && (
-            <span className={cn("text-xs", message === "Event created." ? "text-accent" : "text-muted-foreground")}>
-              {message}
-            </span>
-          )}
-        </div>
-          </form>
         </CollapsibleAddRow>
 
         <EventSectionRows
@@ -423,6 +218,7 @@ export function EventList({
           subtitle="End date is today or later."
           events={upcoming}
           emptyMessage="No upcoming events. Create one above or log a race meeting from Log your run."
+          stats={stats}
         />
 
         <EventSectionRows
@@ -430,6 +226,7 @@ export function EventList({
           subtitle="End date before today."
           events={past}
           emptyMessage="No past events yet."
+          stats={stats}
         />
       </ul>
     </SurfaceCard>

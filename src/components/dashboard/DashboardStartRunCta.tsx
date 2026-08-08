@@ -30,9 +30,16 @@ import { warmNewRunForm } from "@/lib/runs/warmNewRunForm";
 export function DashboardStartRunCta({
   serverDraftRunId,
   serverDraftSavedAt,
+  footer,
 }: {
   serverDraftRunId: string | null;
   serverDraftSavedAt: string | null;
+  /**
+   * Optional line inside the yellow card, under a hairline (design handoff 2026-08-08).
+   * Used by the desktop column, where the CTA is a card with room for one more fact;
+   * the phone passes nothing and renders exactly as before.
+   */
+  footer?: string | null;
 }) {
   const router = useRouter();
   const { draftRunId, draftSavedAt } = useTodayDraftRun();
@@ -67,12 +74,16 @@ export function DashboardStartRunCta({
         onPointerEnter={() => warmLogRun(primaryHref)}
         onTouchStart={() => warmLogRun(primaryHref)}
         aria-label={hasDraft ? "Finish today's run" : "Start a new run"}
-        className="tap-active logrun-glow relative isolate flex w-full items-center gap-3.5 overflow-visible rounded-2xl bg-primary px-[18px] pb-4 pt-[15px] text-left text-primary-foreground shadow-[0_10px_26px_-12px_rgba(255,214,10,0.55),inset_0_1px_0_rgba(255,255,255,0.35)] transition hover:brightness-105 active:brightness-95"
+        className="tap-active logrun-glow relative isolate flex w-full flex-col overflow-visible rounded-2xl bg-primary px-[18px] pb-4 pt-[15px] text-left text-primary-foreground shadow-[0_10px_26px_-12px_rgba(255,214,10,0.55),inset_0_1px_0_rgba(255,255,255,0.35)] transition hover:brightness-105 active:brightness-95"
       >
         {/* Moving-hotspot face layer — drifts behind the content, clipped to the
-            bar shape; the aura ring on ::after still radiates outward. */}
+            bar shape; the aura ring on ::after still radiates outward. Stays a DIRECT
+            child of the link so its containing block is unchanged. */}
         <span className="logrun-fx" aria-hidden />
-        <span className="relative z-[2] min-w-0">
+        {/* The row the card has always been. The link became a column only so an
+            optional footer can sit under it; with no footer this renders identically. */}
+        <span className="relative z-[2] flex w-full items-center gap-3.5">
+        <span className="min-w-0">
           {/* Micro label — indented by notch width + gap (6.5 + 8) so it sits on
               the headline text's left edge. */}
           <span
@@ -102,7 +113,13 @@ export function DashboardStartRunCta({
             {hasDraft ? "Finish today's run" : "Start a new run"}
           </span>
         </span>
-        <ArrowRight aria-hidden className="relative z-[2] ml-auto size-[21px] shrink-0 opacity-75" strokeWidth={2.4} />
+        <ArrowRight aria-hidden className="ml-auto size-[21px] shrink-0 opacity-75" strokeWidth={2.4} />
+        </span>
+        {footer ? (
+          <span className="relative z-[2] mt-3 w-full border-t border-[rgba(18,17,16,0.18)] pt-[11px] text-[11.5px] font-semibold text-[rgba(18,17,16,0.62)]">
+            {footer}
+          </span>
+        ) : null}
       </Link>
 
       {hasDraft ? (

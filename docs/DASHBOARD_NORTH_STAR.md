@@ -1,7 +1,7 @@
 # Dashboard North Star — the adaptive home
 
 **Status:** Locked (founder interviews 2026-07-16 + v2 2026-07-19; Setups card added and retired
-2026-07-29; **desktop pass 2026-08-07**).
+2026-07-29; desktop pass 2026-08-07, **superseded by the "timing tower" redesign 2026-08-08**).
 **Owner:** Jordan.
 
 This doc governs what the dashboard (`/`) shows and in what order. `PRODUCT_NORTH_STAR.md`
@@ -31,13 +31,18 @@ is **width-aware**:
 - **Below `xl` the rule is unchanged and absolute.** The phone dashboard is now & next. Nothing
   in the desktop pass may add, remove or reorder anything at 390px — proven with
   `npm run layout:probe --width=390` before and after, not asserted.
-- **At `xl`+ the second column earns *today's own evidence*** — the runs you logged today and
-  the read on your last one. Still one line per row, still pre-computed. It does **not** earn
-  history, charts, comparisons, other days, or anything requiring a new query. Those stay in
-  Analysis, and the tap-for-depth rule is untouched.
+- **At `xl`+ the page earns *today's own evidence*** — the runs you logged today and the read
+  on your last one — plus, since 2026-08-08, **one pace series in the hero**. Nothing else the
+  rule excludes: no comparisons, no tables, no other cars or metrics. Those stay in Analysis,
+  and the tap-for-depth rule is untouched.
 
-The test for a desktop-only block: *it is about today or your last run, it needs no data the
-dashboard model does not already carry, and removing it would not change what the phone shows.*
+The test for a desktop-only block: *it is about today, your last run, or your pace trend; it
+needs no data the dashboard model does not already carry; and removing it would not change
+what the phone shows.*
+
+The pace-series exception was argued and granted on 2026-08-08 — see the Desktop section. In
+short: "am I getting faster" is the question the app exists to answer, a verdict line cannot
+answer it, and the series costs no query. It is the only history on the page.
 
 **No exceptions.** Every card here is derived from today or self-deletes when its job is done.
 The permanent Setups card added on 2026-07-29 was the one attempt at an exception and it lasted a
@@ -105,75 +110,95 @@ The onboarding ask, and only the ask (`DashboardAddSetupCard`; rules in `ONBOARD
 4. **Things to do** — reminders list.
 5. **Last 30 days card** — always last.
 
-## Desktop (≥1280px) — added 2026-08-07
+## Desktop (≥1280px) — "timing tower", 2026-08-08
 
-The stacks above ARE the phone, unchanged. At `xl` the same cards re-flow into a full-width
-action strip over two asymmetric columns, plus two desktop-only cards that exist only there.
-One DOM, `xl:`-prefixed placement only — never a separate desktop render (the cards are
-stateful clients; a twin render would double-mount the invite fetch and the Things lists).
+The stacks above ARE the phone and are unchanged. At `xl` they are replaced wholesale by
+`DashboardDesktop` — the design handoff's direction 1b. This supersedes the 2026-08-07
+two-column pass, one day later; that pass's finding survives here (the lists are short text
+rows and do not earn a wide measure, which is why they are the 420px column).
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  START / FINISH RUN                             full width  │
-├──────────────────────────────────┬──────────────────────────┤
-│  .dash-main   minmax(0,1fr)      │  .dash-side  22rem→24rem │
-│  the evidence — measured values  │  the lists — short rows  │
-└──────────────────────────────────┴──────────────────────────┘
+┌──────────────────────────────────────────────┬─────────────────────┐
+│  HERO — best lap · dials · pace chart        │  START / FINISH RUN │
+│  ── 6-up stat strip ─────────────────────────│  TEST PLAN          │
+├──────────────────────────────────────────────│  THINGS TO DO       │
+│  LEDGER — you changed / how it felt          │                     │
+└──────────────────────────────────────────────┴─────────────────────┘
+   minmax(0,1fr)                                  420px
 ```
 
-| Slot | Track day | Off day |
+Page cap 1760px (`.dash-wide`). Header is left-aligned with a mono timestamp beside the
+title and no underrule — whitespace separates it, not a line.
+
+**The hero is the point of the redesign.** Nothing on the old page answered the question
+the app exists to answer, so the hero is built around one large lap numeral with a signed
+delta chip, the rating dials beside it, and the pace trend to its right:
+
+| Block | Track day | Off day |
 |---|---|---|
-| Full width | Welcome · Get-set-up · Pending invites · **Start/Finish CTA** · Add-a-setup | same |
-| `.dash-main` (wide, left) | Day verdict · **Today's runs** … then **Last-run read** · Last 30 days | **Last-run read** · Last 30 days |
-| `.dash-side` (narrow, right) | Things to try *(or the active-event outing card)* | Next outing · Things to do |
+| Numeral | best lap today | best lap · last run |
+| Dials | handling · consistency (from the day's latest run) | same, from the last run |
+| Chart | best lap per run today | best lap per session, last 8 |
+| Strip | runs · laps · wheel time · active days · tracks · best streak (30d, both modes) |
 
-- **The evidence gets the width; the lists do not** (founder, 2026-08-07). "Things to do" and the
-  test plan are short text rows — they read fine at 22rem and looked padded at 47rem. The stat
-  strips, the run strip's lap columns and the setup diffs are what a wide measure is for.
-- **The CTA stays #1 and gets wider, not smaller.** A laptop can be at the track (founder,
-  2026-08-07) — desktop must not assume "at home, reviewing". It sits outside the two columns
-  and runs the full width, a bigger target than the phone card, and stops eating a card's height.
-- **The 30-day summary is still last** — foot of the evidence column at `xl`, last card on the
-  phone. Ambient momentum never leads.
-- **`max-width: 90rem` cap.** Uncapped on a 1920px monitor a card renders ~1250px wide and
-  the measure becomes unreadable. Capped and centred it reads as measure, not dead margin.
-- **DOM order is phone order, not visual order.** The locked stack leads with the verdict and
-  ends with the 30-day card, so on a track day the left column is *interleaved* around the right
-  one and ships as two `.dash-main` boxes that the grid reunites in column 1. Do not merge them
-  — that reorders the phone. `grid-auto-flow: dense` is what lets the second box back-fill
-  beside the list rather than dropping to a new row.
-- **Track day uses `grid-template-rows: auto 1fr`** (`.dash-cols-split`). A spanning item
-  distributes its height across the intrinsic rows it crosses, so with two `auto` rows a long
-  things-to-try list inflated row 1 and opened a hole between the two left boxes — measured at
-  34px with a 400px list. A flexible second row sends that slack to the bottom of the column,
-  where it is just column height. Off-day has one `.dash-main` and so needs neither.
-- **`xl` (1280px), not `lg` (1024px) — measured, not assumed.** The pane is `100vw − 16rem` of
-  sidebar, so a 1024px viewport leaves only ~704px to split, and the grid resolved to a **336px
-  main column beside a 352px rail** — a "main" column narrower than its own rail *and* narrower
-  than the 350px card the phone shows. Two columns need ~1280px of viewport to be worth having.
-  Between 1024 and 1279 the dashboard stays the centred single column from desktop step 1.
-  Resolved widths: 1280 → 592+352 · 1440 → 752+352 · 1920 → 944+384.
-- **Both desktop-only cards are `hidden xl:block`** and return `null` when their model field is
-  empty, so they cannot leave an empty shell on a new account.
+**Two dials, not three.** The handoff specified a third — corner balance as a left/right
+weight percentage ("51.4%, 1.4% L"). This app captures no corner weights of any kind, so
+that dial had no data behind it. Founder call 2026-08-08: ship the two that are real. (What
+the app *does* capture under "corner balance" is the entry/mid/exit understeer↔oversteer
+axis on every run — a candidate for a future axis-mode dial, not a substitute for this one.)
 
-### The two desktop-only cards
+**The rating ramp is the app's, not the handoff's.** The handoff groups 8 as "Dialled";
+`CAR_RATING_BANDS` (founder-locked, regrouped 2026-08-03, flagged in-source as "not drift
+to be fixed") puts 7–8 in "Good" and reserves "Dialled" for 9–10. `RatingDial` reads that
+constant so it cannot disagree with the picker the driver actually taps.
 
-**Today's runs** (`DashboardTodayRunsCard`) — one row per run today, latest first: clock time,
-run label, best lap, the best-lap delta vs the previous run, and what setup changed going in.
-Straight from `todayStrip`, which the model has always built. Rows tap through to the run.
+### The pace chart and the boundary rule
 
-**Last-run read** (`DashboardLastRunReadCard`) — the car rating out of 10, the structured
-handling read, and the setup diff you made going into it. Straight from `recentRun`. This is
-the closest thing on the dashboard to "what should I change next" until that card is built —
-it shows what you changed and how it felt, and leaves the conclusion to the driver.
-Laid out FOR the wide column: a `StatStrip` across the full measure (the same primitive the
-30-day card below it uses, so the column reads as one instrument) over a two-up body of
-"You changed" and "How it felt". On a track day the newest run is usually this same run and
-its diff is already on the verdict card *and* the run strip, so the card drops its own copy
-rather than printing the same change three times on one screen.
+The chart plots **history** — on an off day, the last eight sessions. That is the second
+amendment to the boundary rule in two days, and it is deliberate (founder, 2026-08-08):
 
-Neither costs a query: both fields are computed on every dashboard load and were previously
-discarded (`DashboardHome` destructured 12 of the model's 20 fields).
+> The boundary rule stands for the phone. At `xl` the hero may carry **one pace series**,
+> because "am I getting faster" is the question the dashboard exists to answer and a
+> verdict line cannot answer it. One series, in the hero, nowhere else. Everything else
+> the rule excludes — comparisons, tables, other cars, other metrics — stays in Analysis.
+
+**It still costs no query.** The handoff assumed the off-day series needed a new one; it
+does not. `completedRunRows` is the full run history the 30-day summary and the records
+board already read, carrying best lap, laps and track per run. `heroPace` is derived from
+it and from `todayStrip` in `dashboardServer.ts`. The only schema-adjacent change was
+adding `carRating` to a select that already ran.
+
+**Faster laps plot LOWER**, so an improving series slopes down. That matches the sparkline
+on the verdict card; a lap chart that rose as times fell would read as a different quantity
+on the same screen.
+
+### Structure
+
+A **twin render** at `xl` (`DashboardDesktop`), reversing the 2026-08-07 pass's single-DOM
+approach. The two layouts are no longer the same cards in different places — the hero has
+no phone equivalent and the phone's verdict / next-outing cards have no desktop slot — so
+one DOM would render both compositions anyway. Consequences, handled:
+
+- `PendingTeamInvitesCard` is hoisted out of both trees and rendered once, or it would
+  fetch `/api/teams/invites` twice on every desktop load.
+- The two `ActionItemListPanel`s mount twice. Only one is visible, both seed from the same
+  server rows, and they can diverge only if the window is resized across 1280px mid-edit.
+- `getCachedDashboardHomeModel` was bumped to **v3**. Bump it whenever the model gains a
+  field: a cached v2 entry has no `heroPace`, so the hero renders nothing until the 30s
+  window rolls — on a deploy that is every warm user seeing a broken page for half a minute.
+
+### App shell — the icon rail
+
+The 256px sidebar became a **76px icon rail** (`.sidebar` in globals.css, `sidebar.tsx`).
+This is app-wide, not a dashboard change. Icon at 20px over a 9px label; active is
+`rgb(255 255 255 / .05)` behind accent yellow; Settings sits at the foot via `margin-top:
+auto`; the mark is the **yellow** JRC glyph because at 18px the white one reads as a smudge.
+
+**All nine destinations are kept.** The handoff cut *Add run* and *Teams* to reach seven;
+the cut was the designer's judgement, not a space constraint — nine 56px items plus the
+mark fit inside 1080px with room to spare, and dropping the app's second-most-used verb
+from the only persistent nav is not a trade worth making (founder, 2026-08-08). The 9px
+labels are supporting only; every link keeps its `aria-label`.
 
 ## Retired
 
@@ -219,6 +244,13 @@ coming up and what you planned to test. If either glance says "nothing new," the
 has failed its job.
 
 **Changelog:**
+- 2026-08-08 **"timing tower" redesign** — built from the `design_handoff_desktop_dashboard`
+  bundle. Desktop replaced wholesale at `xl` by a hero (big lap numeral · RatingDials · pace
+  chart · 6-up strip) over a ledger, beside a 420px column; 256px sidebar → 76px icon rail
+  app-wide; new shared `RatingDial`; page cap 1760px. Boundary rule amended a second time to
+  admit one pace series in the hero. Founder calls: keep all nine rail destinations (the
+  handoff cut two), two dials not three (the third had no data in this app), and the app's
+  own `CAR_RATING_BANDS` over the handoff's ramp. Phone unchanged and probe-verified at 390px.
 - 2026-08-07 **desktop pass** — founder interview. Boundary rule made width-aware (attention,
   not content); `xl`+ gains a two-column shape under a full-width CTA strip; the Today-so-far
   strip un-retired at `xl`+ and a Last-run read card added, both from model fields that were

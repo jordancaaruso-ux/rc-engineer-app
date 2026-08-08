@@ -87,6 +87,8 @@ type ChartMetrics = {
   tireRowTop: number;
   /** Below this px-per-run the tire row thins to changed sets only (wheels would touch). */
   tireMinSpacing: number;
+  /** Same rule for the wrench row: below this, only setup *changes* keep a wrench. */
+  setupMinSpacing: number;
   /** Roughly how many x-axis labels fit before they collide. */
   labelBudget: number;
 };
@@ -105,6 +107,7 @@ function chartMetrics(chartWidth: number): ChartMetrics {
     setupRowTop: plotBottom + (spacious ? 9 : 6),
     tireRowTop: plotBottom + (spacious ? 30 : 22),
     tireMinSpacing: spacious ? 34 : 26,
+    setupMinSpacing: spacious ? 27 : 21,
     labelBudget: spacious ? 14 : 8,
   };
 }
@@ -348,12 +351,22 @@ function buildPolylineSegments(points: Array<{ x: number; y: number } | null>): 
 }
 
 /**
- * The setup-change wrench row: a wrench under every run whose chassis setup
- * differed from the previous run on that car (tires / battery / additive
- * excluded — see `computeSetupChangesByRunId`). Each wrench is its own tap
- * target (transparent hit rect) — tapping opens that run's setup sheet, the
- * same modal as the "View setup" button in Sessions. Native `<title>` names
- * the changed fields on hover / long-press. Shared by all three faces.
+ * The wrench row: a wrench under *every* run, so the row reads as "here is the
+ * car at each session" and any of them opens that run's setup sheet — the same
+ * modal as the "View setup" button in Sessions.
+ *
+ * Brightness carries the signal, exactly as the tire row does: bright ink when
+ * the chassis setup differed from the previous run on that car (tires / battery
+ * / additive excluded — see `computeSetupChangesByRunId`), faint when the car
+ * went back out as it came in. Presence stopped meaning "something changed", so
+ * the eye scans for white, not for gaps.
+ *
+ * Each wrench is its own tap target — a transparent hit rect never wider than
+ * the gap to its neighbour, since tiled wrenches would otherwise steal each
+ * other's taps. Native `<title>` names the changed fields on hover / long-press.
+ * A run with no car gets no wrench: the setup modal needs one to resolve the
+ * sheet. Below `setupMinSpacing` px per run the wrenches would touch, so the row
+ * thins back to changed runs only. Shared by all three faces.
  */
 function SetupChangeRow({
   carRuns,
@@ -368,25 +381,37 @@ function SetupChangeRow({
   onOpenSetup: (runId: string) => void;
   loadingRunId: string | null;
 }) {
+  const spacing = carRuns.length > 1 ? xAt(1) - xAt(0) : Number.POSITIVE_INFINITY;
+  const changedOnly = spacing < dims.setupMinSpacing;
   const marks = carRuns
     .map((run, index) => ({ run, index }))
-    .filter(({ run }) => run.setupChange != null);
+    .filter(({ run }) => run.carId != null && (!changedOnly || run.setupChange != null));
   if (marks.length === 0) return null;
+  const hitWidth = Math.min(dims.setupIcon * 2, spacing);
   return (
     <>
       {marks.map(({ run, index }) => {
         const x = xAt(index);
-        const changedLabels = run.setupChange!.changedFieldLabels.join(", ");
+        const changed = run.setupChange != null;
+        const changedLabels = run.setupChange?.changedFieldLabels.join(", ") ?? "";
         const loading = loadingRunId === run.id;
         return (
           <g
             key={`setup-${run.id}`}
             role="button"
             tabIndex={0}
-            aria-label={`View setup for ${run.shortLabel} — changed: ${changedLabels}`}
+            aria-label={
+              changed
+                ? `View setup for ${run.shortLabel} — changed: ${changedLabels}`
+                : `View setup for ${run.shortLabel}`
+            }
             className={cn(
               "cursor-pointer transition-colors hover:text-foreground focus-visible:text-foreground",
-              loading ? "animate-pulse text-primary" : "text-muted-foreground"
+              loading
+                ? "animate-pulse text-primary"
+                : changed
+                  ? "text-foreground"
+                  : "text-faint"
             )}
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
@@ -400,11 +425,11 @@ function SetupChangeRow({
               }
             }}
           >
-            <title>{`View setup — changed: ${changedLabels}`}</title>
+            <title>{changed ? `View setup — changed: ${changedLabels}` : "View setup"}</title>
             <rect
-              x={x - dims.setupIcon}
+              x={x - hitWidth / 2}
               y={dims.setupRowTop - 4}
-              width={dims.setupIcon * 2}
+              width={hitWidth}
               height={dims.setupIcon + 9}
               rx={6}
               fill="transparent"

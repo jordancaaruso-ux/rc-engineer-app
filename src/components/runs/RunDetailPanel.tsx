@@ -83,6 +83,8 @@ export type Run = {
   sortAt?: Date | string | null;
   /** False until user marks "Run completed" when saving. */
   loggingComplete?: boolean;
+  /** Set once the driver silences the Sessions-row "no lap times" warning. */
+  lapImportPromptDismissedAt?: Date | string | null;
   carId: string | null;
   eventId: string | null;
   sessionType: string;

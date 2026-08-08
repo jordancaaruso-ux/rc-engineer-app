@@ -23,11 +23,17 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
+import {
+  THROWAWAY_BASE_EMAIL,
+  THROWAWAY_EMAIL_TAG,
+} from "@/lib/account/throwawayAccounts";
 
-/** Base address the throwaway aliases are built from — any inbox works, none is ever emailed. */
-const BASE_EMAIL = "jordancaaruso@gmail.com";
-/** Marks an address as disposable. `--cleanup` deletes exactly these and nothing else. */
-const THROWAWAY_TAG = "+ob";
+/**
+ * Shared with `src/lib/tracks/communityTrackAccess.ts`, which hides these accounts' tracks from
+ * the community catalog. Two copies of the pattern would drift and leave debris visible forever.
+ */
+const BASE_EMAIL = THROWAWAY_BASE_EMAIL;
+const THROWAWAY_TAG = THROWAWAY_EMAIL_TAG;
 
 const args = process.argv.slice(2);
 const hasFlag = (name: string) => args.includes(`--${name}`);

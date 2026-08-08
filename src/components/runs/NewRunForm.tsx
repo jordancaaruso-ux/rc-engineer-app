@@ -63,6 +63,7 @@ import {
   type WizardStepId,
   type WizardStepStatus,
 } from "@/lib/runs/wizardWalk";
+import { runHasLapTimes } from "@/lib/runs/lapImportPrompt";
 import { InlineNewTrackRow } from "@/components/runs/InlineNewTrackRow";
 import { deriveContinueEntry, type NewRunWizardEntry } from "@/lib/runs/wizardEntry";
 import { planCarSwap, type CarSwapPlan } from "@/lib/runs/carSwap";
@@ -500,6 +501,15 @@ export function NewRunForm(props: {
    * every step is walked; continuing prefills instead of skipping.
    */
   wizard?: NewRunWizardEntry | null;
+  /**
+   * Force the wizard's landing step, overriding the first-unfinished-step walk.
+   *
+   * Set by the Sessions row warning's `?step=laps` deep link. The walk can't be
+   * relied on there: `firstUnfinishedStep` returns the FIRST empty step, so a
+   * completed run whose only gap is lap times still lands on Prep or Setup if
+   * those were skipped — which is exactly the run the warning fires on.
+   */
+  wizardInitialStep?: WizardStepId | null;
   /** The run the wizard's continue mode carries (labels the Session-step status card). */
   wizardCandidate?: EntryCandidate | null;
   /** Today's unfinished runs, surfaced on the Session step. */
@@ -665,6 +675,8 @@ export function NewRunForm(props: {
   const [wizardStep, setWizardStep] = useState<WizardStepId>(() => {
     const r = props.editRun;
     if (!wizardActive || !r?.id) return "session";
+    // An explicit deep link wins over the walk — see `wizardInitialStep`.
+    if (props.wizardInitialStep) return props.wizardInitialStep;
     const setupKeyCount =
       r.setupSnapshot?.data && typeof r.setupSnapshot.data === "object"
         ? Object.keys(r.setupSnapshot.data as object).length
@@ -677,9 +689,9 @@ export function NewRunForm(props: {
         Boolean(r.additiveTypeId ?? r.additiveType?.id) ||
         r.warmerTimingMinutes != null,
       setup: setupKeyCount > 0,
-      laps:
-        (Array.isArray(r.lapTimes) && r.lapTimes.length > 0) ||
-        (r.importedLapSets?.length ?? 0) > 0,
+      // Shared with the Sessions row warning so "this run needs laps" and "the
+      // wizard lands on Laps" can never disagree.
+      laps: runHasLapTimes(r),
       feel: r.carRating != null,
     });
   });
@@ -5287,6 +5299,14 @@ export function NewRunForm(props: {
           )
         }
         editingRunId={isEditing ? editRun?.id ?? null : null}
+        onUrlImportSuccess={() => {
+          // Importing the times IS the Laps step's completion moment. Before this
+          // the "Haven't driven yet?" card unmounted and left the driver on a step
+          // with nothing to do (founder report 2026-08-08). Via goToWizardStep so
+          // the history spine holds — system back returns to Laps, not out of the
+          // wizard. Read the ref, not `wizardStep`, to avoid a stale closure.
+          if (wizardActive && wizardStepRef.current === "laps") goToWizardStep("feel");
+        }}
       />
       </div>
 

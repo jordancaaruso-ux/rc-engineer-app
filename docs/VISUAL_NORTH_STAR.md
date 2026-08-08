@@ -246,6 +246,8 @@ Foundations (globals.css tokens + fonts)
 | Tailwind | `tailwind.config.ts` | Semantic colors; Sora + JetBrains in `fontFamily` |
 | Fonts | `src/app/layout.tsx` | `--font-ui` (Sora), `--font-mono-jb` |
 | Panel DNA | `src/components/ui/panel.tsx` | Eyebrow, StatStrip, StatTile |
+| Instruments | `src/components/ui/RatingDial.tsx` | Bounded magnitude as an arc (2026-08-08). Verdict mode reads `CAR_RATING_BANDS`; axis mode is the accent-yellow exception below. Replaces the "Rating 7/10" tile app-wide |
+| Desktop nav | `src/components/layout/sidebar.tsx`, `.sidebar` | 76px icon rail since 2026-08-08 (was a 256px sidebar). Icon 20px over a 9px label; yellow mark, because white illegibly small at 18px |
 | Surfaces | `src/components/ui/SurfaceCard.tsx` | Prefer tokens over hardcoded `#1b1712` when refactoring |
 | Theme preview | `html[data-theme-preview=...]` in `globals.css` | Dev-only; still has legacy red/blue — update or remove when touching |
 

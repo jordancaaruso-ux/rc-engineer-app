@@ -17,6 +17,7 @@ export function ActionItemListPanel({
   addPlaceholder,
   initialItems,
   embedded = false,
+  variant = "pill",
 }: {
   list: ListParam;
   title: string;
@@ -25,7 +26,15 @@ export function ActionItemListPanel({
   addPlaceholder: string;
   initialItems: DashboardActionItemRow[];
   embedded?: boolean;
+  /**
+   * "ledger" is the desktop column's hairline row (design handoff 2026-08-08): no pill,
+   * a numbered index in place of the grip, and a heavier line of text. Behaviour is
+   * identical — add, archive and drag-to-reorder are untouched, and the index IS the
+   * drag affordance (it swaps to the grip on hover).
+   */
+  variant?: "pill" | "ledger";
 }) {
+  const isLedger = variant === "ledger";
   const [items, setItems] = useState(initialItems);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -163,7 +172,13 @@ export function ActionItemListPanel({
       ? "rounded-md border-0 bg-transparent p-0 shadow-none"
       : "rounded-xl border border-border p-4 shadow-[0_18px_50px_-28px_rgba(0,0,0,0.75)]";
 
-  const titleEl = <Eyebrow dot="muted">{title}</Eyebrow>;
+  // In the ledger variant the card shell above supplies the title (and the count), so the
+  // panel's own heading would be a second copy. Kept in the DOM for screen readers.
+  const titleEl = isLedger ? (
+    <h3 className="sr-only">{title}</h3>
+  ) : (
+    <Eyebrow dot="muted">{title}</Eyebrow>
+  );
 
   const content = (
     <>
@@ -213,7 +228,7 @@ export function ActionItemListPanel({
         <p className="mt-1.5 text-[11px] text-muted-foreground">Nothing here yet — add above.</p>
       ) : (
         <ul className="mt-1.5 space-y-1">
-          {items.map((i) => {
+          {items.map((i, rowIndex) => {
             const showDropAbove = dropTarget?.itemId === i.id && dropTarget.edge === "above";
             const showDropBelow = dropTarget?.itemId === i.id && dropTarget.edge === "below";
             return (
@@ -258,22 +273,50 @@ export function ActionItemListPanel({
                   }
                 }}
                 className={cn(
-                  "flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5",
+                  "group flex items-center justify-between gap-2",
+                  isLedger
+                    ? "gap-3 border-b border-border/70 py-[11px] last:border-b-0"
+                    : "rounded-lg border border-border bg-muted/40 px-2.5 py-1.5",
                   draggingId === i.id && "opacity-50",
                   showDropAbove && "shadow-[inset_0_2px_0_0_rgb(var(--color-primary))]",
                   showDropBelow && "shadow-[inset_0_-2px_0_0_rgb(var(--color-primary))]"
                 )}
               >
                 <div
-                  className="shrink-0 cursor-grab select-none px-0.5 leading-none text-muted-foreground/70"
+                  className={cn(
+                    "shrink-0 cursor-grab select-none leading-none",
+                    isLedger
+                      ? "relative w-5 text-center font-mono text-[11px] tabular-nums text-faint"
+                      : "px-0.5 text-muted-foreground/70"
+                  )}
                   title="Drag to reorder"
                   aria-label="Drag to reorder"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <GripVertical className="size-4" strokeWidth={2} aria-hidden />
+                  {isLedger ? (
+                    <>
+                      {/* The index IS the handle: it steps aside for the grip on hover
+                          so the row keeps its numbered reading at rest. */}
+                      <span aria-hidden className="group-hover:invisible">
+                        {String(rowIndex + 1).padStart(2, "0")}
+                      </span>
+                      <GripVertical
+                        className="invisible absolute inset-0 m-auto size-4 text-muted-foreground/70 group-hover:visible"
+                        strokeWidth={2}
+                        aria-hidden
+                      />
+                    </>
+                  ) : (
+                    <GripVertical className="size-4" strokeWidth={2} aria-hidden />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium leading-snug tracking-tight text-foreground whitespace-pre-wrap break-words">
+                  <p
+                    className={cn(
+                      "font-medium leading-snug tracking-tight text-foreground whitespace-pre-wrap break-words",
+                      isLedger ? "text-[14px] tracking-[-.01em]" : "text-sm"
+                    )}
+                  >
                     {i.text}
                   </p>
                 </div>

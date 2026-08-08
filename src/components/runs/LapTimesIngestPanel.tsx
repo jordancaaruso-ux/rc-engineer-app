@@ -331,6 +331,7 @@ export function LapTimesIngestPanel({
   trackSpeedhiveUrl,
   onTrackTimingUrlsSaved,
   editingRunId,
+  onUrlImportSuccess,
 }: {
   value: LapIngestFormValue;
   onChange: (next: LapIngestFormValue) => void;
@@ -351,6 +352,18 @@ export function LapTimesIngestPanel({
   onTrackTimingUrlsSaved?: (next: TrackTimingUrls) => void;
   /** When editing a run, linked timing imports stay visible in discovery even if already imported. */
   editingRunId?: string | null;
+  /**
+   * A URL import just landed laps for at least one driver (both the discovered-session
+   * rows and the paste box route through here). The wizard uses this to move off the
+   * Laps step — importing IS that step's completion moment, and before this the driver
+   * was left on a step with nothing to do and no prompt to continue.
+   *
+   * Deliberately a callback rather than the caller watching lap state: an effect would
+   * also fire when a draft rehydrates with laps already attached, throwing the driver
+   * off Laps on mount. Photo/OCR and manual paste do not call this — those get looked
+   * over before moving on.
+   */
+  onUrlImportSuccess?: () => void;
 }) {
   const hasLiveRcTrack = Boolean(trackId?.trim() && trackLiveRcUrl?.trim());
   const hasSpeedhiveTrack = Boolean(trackId?.trim() && trackSpeedhiveUrl?.trim());
@@ -878,6 +891,10 @@ export function LapTimesIngestPanel({
         prev ? prev.map((c) => (c.sessionUrl === url ? { ...c, alreadyImported: true } : c)) : prev
       );
       void loadEventRaceSessions();
+      // Gated on a driver being present — that is the same condition the caller's
+      // buildImportedLapSetsFromIngest requires before it will produce any lap
+      // sets, so a driver-less parse never advances off a still-empty step.
+      if (sessionDrivers.length > 0) onUrlImportSuccess?.();
     } catch {
       setUrlMessage("Request failed.");
     } finally {

@@ -26,9 +26,11 @@ export function EngineerPageClient({ ratingsEnabled = false }: { ratingsEnabled?
   }, [promptParam]);
 
   return (
-    /* Wider at lg: the panel becomes two columns there (history rail + chat), so 4xl would leave
-       the conversation itself in a ~576px gutter — narrower than it is on the phone-width layout. */
-    <div className="max-w-4xl lg:max-w-6xl mx-auto w-full space-y-3">
+    /* The clamp that used to be here (`max-w-4xl lg:max-w-6xl mx-auto` — wider at lg because the
+       panel becomes two columns there, and 4xl would leave the conversation itself in a ~576px
+       gutter) now lives on `.page-body` in app/engineer/page.tsx, so the page header can mirror it
+       and the title lands on this panel's left edge. */
+    <div className="w-full space-y-3">
       <SurfaceCard variant="panel" overflowHidden={false} contentClassName="p-0">
         <EngineerChatPanel
           ratingsEnabled={ratingsEnabled}

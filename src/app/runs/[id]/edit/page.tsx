@@ -10,6 +10,7 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { getDashboardNewRunPrefill } from "@/lib/dashboardServer";
 import { runConditionsFromRecord } from "@/lib/weather/runConditionsRecord";
 import { deriveEditEntry } from "@/lib/runs/wizardEntry";
+import { WIZARD_STEPS } from "@/lib/runs/wizardWalk";
 
 export const dynamic = "force-dynamic";
 
@@ -200,6 +201,15 @@ export default async function EditRunPage({
       })
     : null;
   const finishingDraft = wizardEnabled && run.loggingComplete === false;
+  /**
+   * `?step=laps` — the Sessions row "no lap times" warning drops the driver
+   * straight on the importer. Validated against the step model so a junk value
+   * falls back to the normal first-unfinished walk rather than wedging the form.
+   */
+  const wizardInitialStep =
+    wizardEnabled && typeof sp.step === "string"
+      ? WIZARD_STEPS.find((s) => s.id === sp.step)?.id ?? null
+      : null;
 
   return (
     <>
@@ -221,6 +231,7 @@ export default async function EditRunPage({
           favouriteTracks={favouriteTracks}
           dashboardPrefill={dashboardPrefill}
           wizard={wizardEntry}
+          wizardInitialStep={wizardInitialStep}
           editRun={{
             id: run.id,
             createdAt: run.createdAt.toISOString(),

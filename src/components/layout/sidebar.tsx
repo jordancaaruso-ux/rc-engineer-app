@@ -16,11 +16,12 @@ export const Sidebar = memo(function Sidebar() {
 
   return (
     <aside className="sidebar hidden md:flex">
+      {/* Yellow mark at rail width: at 18px the white chrome mark reads as a smudge. */}
       <Link href="/" aria-label={`${PRODUCT_NAME} — dashboard`} className="sidebar-brand">
-        <JrcMark variant="white" className="h-5 opacity-90" />
+        <JrcMark variant="yellow" className="h-[18px] opacity-90" />
       </Link>
       <nav className="sidebar-nav">
-        {DESKTOP_NAV.map((item) => {
+        {DESKTOP_NAV.map((item, i) => {
           const active = activeId === item.id;
           const href =
             item.smartDraft && item.id === "add-run" ? addRunHref(item.href) : item.href;
@@ -33,25 +34,17 @@ export const Sidebar = memo(function Sidebar() {
               href={href}
               data-active={active ? "true" : "false"}
               className={cn(
-                "tap-active min-h-9 touch-manipulation",
-                active ? "text-primary" : "text-muted-foreground"
+                "tap-active touch-manipulation",
+                // Settings is the tail of the list and sits at the foot of the rail.
+                i === DESKTOP_NAV.length - 1 && "sidebar-nav-tail"
               )}
             >
-              <span className="flex min-w-0 items-center gap-2">
-                <span className={cn("shrink-0", active ? "opacity-100" : "opacity-75")}>
-                  <Icon size={18} aria-hidden />
-                </span>
-                <span className="nav-sidebar-label truncate">{item.label}</span>
-              </span>
+              <Icon size={20} aria-hidden />
+              <span className="nav-sidebar-label">{item.label}</span>
             </PrimaryNavLink>
           );
         })}
       </nav>
-
-      <div className="sidebar-footer">
-        <div>Track session ready</div>
-        <div className="mt-1 text-[10px] opacity-80">Built for touring car engineers.</div>
-      </div>
     </aside>
   );
 });
