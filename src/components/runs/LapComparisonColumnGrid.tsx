@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Wrench } from "lucide-react";
-import type { ComparisonSeries, LapRow } from "@/lib/lapAnalysis";
+import type { ComparisonSeries, LapRow, SummaryMetricDeltas } from "@/lib/lapAnalysis";
 import {
   alignLapsByNumber,
   areLapSeriesEquivalent,
@@ -15,9 +15,22 @@ import {
   primaryLapRowsFromRun,
   resolveDeltaTintRange,
 } from "@/lib/lapAnalysis";
-import { lapCompareTrackKey, lapSeriesMatchesCompareScope } from "@/lib/lapCompareScope";
+import {
+  lapCompareTrackKey,
+  lapSeriesMatchesCompareScope,
+  sameLocalCalendarDay,
+} from "@/lib/lapCompareScope";
 import { formatLap, normalizeLapTimes } from "@/lib/runLaps";
+import { formatRunDateTime } from "@/lib/formatDate";
+import { formatRunSessionDisplay } from "@/lib/runSession";
 import { cn } from "@/lib/utils";
+import {
+  LapCompareSegmentBar,
+  LapCompareSessionList,
+  LapCompareSheet,
+  type LapPickerGroup,
+  type LapPickerRow,
+} from "@/components/runs/LapCompareSessionPicker";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/setup-sheet/SetupSheetModal";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
@@ -50,7 +63,25 @@ type SeriesMeta = {
   selectLabel: string;
   /** Ordering: true session / run instant as ISO (for sorting compare options). */
   sortIso: string;
+  /**
+   * Session name on its own, with no timestamp glued to it. The picker prints
+   * name and time on separate lines, and splitting `selectLabel` back apart on
+   * " · " would break the moment a car or track name contained one.
+   */
+  name: string;
+  /** Which tab of the picker this series lives under. */
+  segment: CompareSegmentKey;
+  /** Track it was run at, for grouping rows under "Earlier at …". */
+  trackKey: string | null;
 };
+
+/**
+ * Who the comparison belongs to. Replaces the old Driver dropdown, whose
+ * per-driver keys ("compare against Dayne") were a filter over a list you then
+ * had to tick anyway — two steps to say one thing. Segments carve the same set
+ * by *whose* sessions they are, and every row inside stays individually tickable.
+ */
+type CompareSegmentKey = "driver" | "teammates" | "field" | "library";
 
 const MS_PER_DAY = 86400000;
 
@@ -90,44 +121,32 @@ function isBestLapOf(series: ComparisonSeries, lap: LapRow): boolean {
   return series.bestLap != null && lap.lapTimeSeconds === series.bestLap;
 }
 
+/** Whole-session summary rows under the laps — see the `<tfoot>` that renders them. */
+const SUMMARY_FOOTER_ROWS: Array<{
+  label: string;
+  pick: (s: ComparisonSeries) => number | null;
+  delta: (d: SummaryMetricDeltas) => number | null;
+}> = [
+  { label: "Avg 5", pick: (s) => s.avgTop5, delta: (d) => d.avgTop5Delta },
+  { label: "Avg 10", pick: (s) => s.avgTop10, delta: (d) => d.avgTop10Delta },
+];
+
 /** Gain green / loss red for delta text where there is no background tint (header metrics). */
 function deltaTextClass(delta: number): string {
   if (!Number.isFinite(delta) || Math.abs(delta) < 1e-9) return "text-foreground/80";
   return delta > 0 ? "text-destructive" : "text-[#4FD089]";
 }
 
-function MetricBlock({
-  label,
-  value,
-  delta,
-  showDelta,
-}: {
-  label: string;
-  value: string;
-  delta: number | null;
-  showDelta: boolean;
-}) {
-  const hasDelta = showDelta && delta != null && Number.isFinite(delta);
-  return (
-    <div className="space-y-0.5">
-      <div className="text-[10px] text-muted-foreground">{label}</div>
-      <div className="font-mono text-[11px] tabular-nums text-foreground">{value}</div>
-      {/* Delta slot always reserves its line height (even on the target column and
-          when no delta exists) so Best / Avg top 5 / Avg top 10 stay aligned across
-          every column. */}
-      <div
-        className={cn(
-          "text-[10px] font-mono tabular-nums leading-tight",
-          hasDelta ? deltaTextClass(delta!) : "opacity-0"
-        )}
-        aria-hidden={hasDelta ? undefined : true}
-      >
-        {hasDelta ? formatLapDelta(delta!) : "0.000"}
-      </div>
-    </div>
-  );
-}
-
+/**
+ * A column's identity and its one headline number — three lines, not fifteen.
+ *
+ * This block used to stack name, meta line, a setup note, and Best / Avg top 5 /
+ * Avg top 10 each with its own delta: about 400px of header on a 390px phone, so
+ * the sheet opened on a screen of column headings with no lap times on it at all.
+ * Best lap is the number that decides whether a column is worth reading; the two
+ * averages moved to the table footer, where they compare just as well and cost
+ * nothing until you have scrolled the laps you came for.
+ */
 function ColumnHeaderBlock({
   series,
   meta,
@@ -141,33 +160,32 @@ function ColumnHeaderBlock({
   summaryDelta: ReturnType<typeof computeSummaryDeltas> | null;
   onViewSetup?: (r: CompareRunShape) => void;
 }) {
-  const d = isTarget ? null : summaryDelta;
+  const bestDelta = isTarget ? null : summaryDelta?.bestDelta ?? null;
   return (
     <>
-      <div className="font-medium text-foreground truncate">{series.label}</div>
-      {meta.metaLine ? (
-        <div className="text-[9px] text-muted-foreground leading-tight line-clamp-2">{meta.metaLine}</div>
-      ) : null}
-      <SetupHint series={series} run={meta.setupRun} onView={onViewSetup} />
-      <div className="mt-1 space-y-1">
-        <MetricBlock
-          label="Best"
-          value={formatLap(series.bestLap)}
-          delta={d?.bestDelta ?? null}
-          showDelta={!isTarget}
-        />
-        <MetricBlock
-          label="Avg top 5"
-          value={formatLap(series.avgTop5)}
-          delta={d?.avgTop5Delta ?? null}
-          showDelta={!isTarget}
-        />
-        <MetricBlock
-          label="Avg top 10"
-          value={formatLap(series.avgTop10)}
-          delta={d?.avgTop10Delta ?? null}
-          showDelta={!isTarget}
-        />
+      <div className="flex items-start gap-1">
+        <div className="min-w-0 flex-1">
+          {/* The session, not the driver. Three of the driver's own runs side by
+              side all read "Dayne Warren" — a heading that cannot tell you which
+              column you are looking at. */}
+          <div className="truncate font-medium text-foreground">{meta.name}</div>
+          <div className="truncate text-[9px] leading-tight text-muted-foreground">
+            {meta.sortIso ? formatRunDateTime(meta.sortIso) : ""}
+            {isTarget ? " · target" : ""}
+          </div>
+        </div>
+        <SetupHint series={series} run={meta.setupRun} onView={onViewSetup} />
+      </div>
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-1 font-mono text-[10px] tabular-nums">
+        <span className="text-muted-foreground">best</span>
+        <span className={cn("font-medium", isTarget ? "text-primary" : "text-foreground")}>
+          {formatLap(series.bestLap)}
+        </span>
+        {bestDelta != null && Number.isFinite(bestDelta) ? (
+          <span className={cn("text-[9px]", deltaTextClass(bestDelta))}>
+            {formatLapDelta(bestDelta)}
+          </span>
+        ) : null}
       </div>
     </>
   );
@@ -183,16 +201,17 @@ function SetupHint({
   onView?: (r: CompareRunShape) => void;
 }) {
   if (series.sourceType === "imported") return null;
-  if (!run?.setupSnapshot?.id) {
-    return <div className="text-[9px] text-muted-foreground mt-0.5">No saved setup snapshot</div>;
-  }
+  // "No saved setup snapshot" was printed in every column that lacked one — the
+  // same sentence three times across a header that had no room for it. Absence of
+  // the wrench says the same thing and takes no space.
+  if (!run?.setupSnapshot?.id) return null;
   if (!onView) return null;
   return (
     <button
       type="button"
       aria-label="View setup"
       title="View setup sheet for this run"
-      className="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-md border border-border bg-background text-foreground transition hover:bg-muted/80"
+      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground transition hover:bg-muted/80"
       onClick={() => onView(run)}
     >
       <Wrench className="h-3.5 w-3.5" aria-hidden />
@@ -240,6 +259,8 @@ export function LapComparisonColumnGrid({
   librarySessions?: Array<{
     id: string;
     selectLabel: string;
+    /** Driver on the timing sheet, without the time appended — the picker row's title. */
+    name?: string | null;
     laps: LapRow[];
     sortTimeIso: string;
     /** Track this import was run at, via its linked run; null when never linked. */
@@ -283,7 +304,8 @@ export function LapComparisonColumnGrid({
         ? "same_track"
         : "all"
   );
-  const [compareDriverKey, setCompareDriverKey] = useState<string>("__me__");
+  const [activeSegment, setActiveSegment] = useState<CompareSegmentKey>("driver");
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const { seriesList, metaById } = useMemo(() => {
     const metaById = new Map<string, SeriesMeta>();
@@ -311,6 +333,10 @@ export function LapComparisonColumnGrid({
         })
       : anchorSessionIso;
 
+    const anchorTrack = lapCompareTrackKey(
+      compareAnchorRun.track?.name ?? compareAnchorRun.trackNameSnapshot ?? null
+    );
+
     metaById.set(primarySeries.id, {
       metaLine: formatCompareRunMetaLine(compareAnchorRun),
       setupRun: compareAnchorRun,
@@ -319,6 +345,9 @@ export function LapComparisonColumnGrid({
         isWallClockTime: primaryImport?.sessionCompletedAt != null,
       }),
       sortIso: meSortIso,
+      name: formatRunSessionDisplay(compareAnchorRun, { fallback: primaryRunLabel }),
+      segment: "driver",
+      trackKey: anchorTrack,
     });
 
     const rawImported: ComparisonSeries[] = [];
@@ -346,6 +375,11 @@ export function LapComparisonColumnGrid({
           isWallClockTime: s.sessionCompletedAt != null,
         }),
         sortIso: whenIso,
+        name: label,
+        segment: "field",
+        // The field came in on THIS run's timing sheet, so it was at this track
+        // by construction — it has no track of its own to read.
+        trackKey: anchorTrack,
       });
     }
 
@@ -372,6 +406,14 @@ export function LapComparisonColumnGrid({
         setupRun: r,
         selectLabel: formatDriverSessionLabelWithContext(carName, whenIso, trackCtx ?? undefined),
         sortIso: whenIso,
+        name: formatRunSessionDisplay(r, { fallback: carName }),
+        // Team Sessions mixes every member's runs into this list; a run that
+        // isn't the anchor driver's belongs under Teammates, not under their name.
+        segment:
+          compareAnchorRun.userId && r.userId && r.userId !== compareAnchorRun.userId
+            ? "teammates"
+            : "driver",
+        trackKey: lapCompareTrackKey(trackCtx),
       });
     }
 
@@ -390,6 +432,9 @@ export function LapComparisonColumnGrid({
         setupRun: null,
         selectLabel: lib.selectLabel,
         sortIso: lib.sortTimeIso,
+        name: lib.name?.trim() || lib.selectLabel,
+        segment: "library",
+        trackKey: lapCompareTrackKey(lib.trackName),
       });
     }
 
@@ -475,109 +520,127 @@ export function LapComparisonColumnGrid({
     trackKeyForSeries,
   ]);
 
-  /*
-   * "This driver" means the driver of the run being viewed — not every run in the list.
-   * Team Sessions feeds every member's runs in as `history:` series, so the old test
-   * (any history series) quietly mixed teammates into what reads as your own sessions.
-   * With no userId on the anchor (solo lists don't always carry one) it falls back to
-   * the previous behaviour rather than filtering everything away.
-   */
-  const isAnchorDriverSeries = useCallback(
-    (seriesId: string): boolean => {
-      if (seriesId === "run:primary") return true;
-      if (!seriesId.startsWith("history:")) return false;
-      const anchorUserId = compareAnchorRun.userId ?? null;
-      if (!anchorUserId) return true;
-      const r = otherRuns.find((o) => o.id === seriesId.slice("history:".length));
-      return (r?.userId ?? anchorUserId) === anchorUserId;
-    },
-    [compareAnchorRun.userId, otherRuns]
+  const segmentFor = useCallback(
+    (seriesId: string): CompareSegmentKey => metaById.get(seriesId)?.segment ?? "driver",
+    [metaById]
   );
 
-  const compareDriverChoices = useMemo(() => {
-    const opts: { key: string; label: string }[] = [{ key: "__all__", label: "All drivers" }];
-    const hasMe = scopeFilteredRows.some((r) => isAnchorDriverSeries(r.series.id));
-    if (hasMe) {
-      opts.push({
-        key: "__me__",
-        label: primaryIsViewer ? `${primaryRunLabel} (my runs)` : primaryRunLabel,
-      });
-    }
-    const seenImported = new Set<string>();
-    const seenLib = new Set<string>();
+  /**
+   * Only segments that actually hold something are offered. A solo testing run
+   * has one (its driver); a club race with an imported timing sheet has two;
+   * a team session can have all four. An empty tab is a dead end you can press.
+   */
+  const segments = useMemo(() => {
+    const counts = new Map<CompareSegmentKey, number>();
     for (const r of scopeFilteredRows) {
-      if (r.series.id.startsWith("imported:")) {
-        const setId = r.series.id.slice(9);
-        const set = run.importedLapSets?.find((x) => x.id === setId);
-        const label = (set?.displayName?.trim() || set?.driverName || "").trim();
-        if (!label) continue;
-        const k = `drv:${label}`;
-        if (seenImported.has(k)) continue;
-        seenImported.add(k);
-        opts.push({ key: k, label });
-      } else if (r.series.id.startsWith("library:")) {
-        const libId = r.series.id.slice(8);
-        const lib = librarySessions.find((l) => l.id === libId);
-        const lead = lib?.selectLabel.split(" · ")[0]?.trim() || lib?.selectLabel || "";
-        if (!lead) continue;
-        const k = `lib:${lead}`;
-        if (seenLib.has(k)) continue;
-        seenLib.add(k);
-        opts.push({ key: k, label: `${lead} (library)` });
-      }
+      const k = segmentFor(r.series.id);
+      counts.set(k, (counts.get(k) ?? 0) + 1);
     }
-    return opts;
-  }, [
-    scopeFilteredRows,
-    primaryRunLabel,
-    primaryIsViewer,
-    run.importedLapSets,
-    librarySessions,
-    isAnchorDriverSeries,
-  ]);
+    const labels: Record<CompareSegmentKey, string> = {
+      driver: primaryIsViewer ? "My runs" : primaryRunLabel,
+      teammates: "Teammates",
+      field: "Field",
+      library: "My imports",
+    };
+    const order: CompareSegmentKey[] = ["driver", "teammates", "field", "library"];
+    return order
+      .filter((k) => (counts.get(k) ?? 0) > 0)
+      .map((k) => ({ key: k, label: labels[k], count: counts.get(k)! }));
+  }, [scopeFilteredRows, segmentFor, primaryIsViewer, primaryRunLabel]);
 
   useEffect(() => {
-    const keys = new Set(compareDriverChoices.map((c) => c.key));
-    if (keys.has(compareDriverKey)) return;
-    const next =
-      compareDriverChoices.find((c) => c.key === "__me__") ?? compareDriverChoices[0];
-    if (next) setCompareDriverKey(next.key);
-  }, [compareDriverChoices, compareDriverKey]);
+    if (segments.length === 0) return;
+    if (segments.some((s) => s.key === activeSegment)) return;
+    setActiveSegment(segments[0]!.key);
+  }, [segments, activeSegment]);
 
   const compareOptionRows = useMemo(() => {
-    return scopeFilteredRows
-      .filter(({ series }) => {
-        if (compareDriverKey === "__all__") return true;
-        if (compareDriverKey === "__me__") return isAnchorDriverSeries(series.id);
-        if (compareDriverKey.startsWith("drv:")) {
-          const name = compareDriverKey.slice(4);
-          if (!series.id.startsWith("imported:")) return false;
-          const setId = series.id.slice(9);
-          const set = run.importedLapSets?.find((x) => x.id === setId);
-          const label = (set?.displayName?.trim() || set?.driverName || "").trim();
-          return label === name;
-        }
-        if (compareDriverKey.startsWith("lib:")) {
-          const lead = compareDriverKey.slice(4);
-          if (!series.id.startsWith("library:")) return false;
-          const libId = series.id.slice(8);
-          const lib = librarySessions.find((l) => l.id === libId);
-          return lib?.selectLabel.startsWith(lead) ?? false;
-        }
-        return true;
-      })
-      .map(({ series, sortIso, label }) => ({ id: series.id, sortIso, label }))
-      // Newest first, like every other run list in the app — and like the Target
-      // dropdown directly above it, which has always used this comparator. The
-      // ascending sort here put your oldest session at the top of the one list you
-      // pick from, which is the opposite of what you reach for after a run.
-      .sort(compareOptionSort);
+    return (
+      scopeFilteredRows
+        .filter(({ series }) => segmentFor(series.id) === activeSegment)
+        .map(({ series, sortIso, label }) => ({ id: series.id, sortIso, label }))
+        // Newest first, like every other run list in the app — and like the Target
+        // dropdown directly above it, which has always used this comparator. The
+        // ascending sort here put your oldest session at the top of the one list you
+        // pick from, which is the opposite of what you reach for after a run.
+        .sort(compareOptionSort)
+    );
+  }, [scopeFilteredRows, activeSegment, segmentFor]);
+
+  const seriesById = useMemo(() => {
+    const m = new Map<string, ComparisonSeries>();
+    for (const s of seriesList) m.set(s.id, s);
+    return m;
+  }, [seriesList]);
+
+  const anchorTrackName =
+    compareAnchorRun.track?.name?.trim() || compareAnchorRun.trackNameSnapshot?.trim() || null;
+
+  /**
+   * The rows, cut into the three groups a driver actually thinks in: what
+   * happened today, what happened here before, and everything else.
+   *
+   * Day membership uses `sameLocalCalendarDay` — the same test the `same_day`
+   * scope uses — so the grouping and the filter can never disagree with each
+   * other. Note that it resolves the day in the READER's zone, not the driver's:
+   * `resolveRunLocalTimeZone` is the zone-correct answer and is already used by
+   * the Sessions groups, but it needs `Run.localTimeZone` plumbed onto
+   * `CompareRunShape` first. Until then a session that crosses your midnight can
+   * still land in "Earlier at …" rather than "This test day".
+   */
+  const pickerGroups = useMemo((): LapPickerGroup[] => {
+    const toRow = (r: { id: string; sortIso: string; label: string }): LapPickerRow => ({
+      id: r.id,
+      name: metaById.get(r.id)?.name ?? r.label,
+      when: r.sortIso ? formatRunDateTime(r.sortIso) : "—",
+      bestLap: seriesById.get(r.id)?.bestLap ?? null,
+    });
+
+    // The field came in on this run's own timing sheet — every entrant shares its
+    // day and its track, so splitting them by either says nothing.
+    if (activeSegment === "field") {
+      if (compareOptionRows.length === 0) return [];
+      return [
+        { key: "field", label: "Rest of the race field", rows: compareOptionRows.map(toRow) },
+      ];
+    }
+
+    const today: LapPickerRow[] = [];
+    const hereBefore: LapPickerRow[] = [];
+    const elsewhere: LapPickerRow[] = [];
+    for (const r of compareOptionRows) {
+      const trackKey = metaById.get(r.id)?.trackKey ?? null;
+      // "This test day" is a day AND a place. Under the widest scope a session run
+      // the same afternoon at a different venue would otherwise be filed under a
+      // heading naming this one — the label would be a lie about where you were.
+      const here = !anchorTrackKey || trackKey === anchorTrackKey;
+      if (here && r.sortIso && sameLocalCalendarDay(r.sortIso, anchorInstantIso)) {
+        today.push(toRow(r));
+      } else if (here && anchorTrackKey) {
+        hereBefore.push(toRow(r));
+      } else {
+        elsewhere.push(toRow(r));
+      }
+    }
+
+    const atTrack = anchorTrackName ? ` · ${anchorTrackName}` : "";
+    return [
+      { key: "today", label: `This test day${atTrack}`, rows: today },
+      {
+        key: "here",
+        label: anchorTrackName ? `Earlier at ${anchorTrackName}` : "Earlier sessions",
+        rows: hereBefore,
+      },
+      { key: "elsewhere", label: "Other tracks and events", rows: elsewhere },
+    ].filter((g) => g.rows.length > 0);
   }, [
-    scopeFilteredRows,
-    compareDriverKey,
-    run.importedLapSets,
-    librarySessions,
-    isAnchorDriverSeries,
+    compareOptionRows,
+    metaById,
+    seriesById,
+    activeSegment,
+    anchorInstantIso,
+    anchorTrackKey,
+    anchorTrackName,
   ]);
 
   useEffect(() => {
@@ -666,8 +729,6 @@ export function LapComparisonColumnGrid({
     return groups.filter((g) => g.series.length > 0);
   }, [seriesList, metaById, primaryIsViewer]);
 
-  const compareOptionCount = compareOptionRows.length;
-
   function metaFor(s: ComparisonSeries): SeriesMeta {
     const fallbackIso = resolveRunDisplayInstant(compareAnchorRun).toISOString();
     return (
@@ -676,9 +737,36 @@ export function LapComparisonColumnGrid({
         setupRun: null,
         selectLabel: s.label,
         sortIso: fallbackIso,
+        name: s.label,
+        segment: "driver",
+        trackKey: anchorTrackKey,
       }
     );
   }
+
+  /** The pinned, untickable row at the top of the picker: what everything is measured against. */
+  const targetPickerRow = useMemo((): LapPickerRow | null => {
+    if (!targetSeries) return null;
+    const m = metaById.get(targetSeries.id);
+    return {
+      id: targetSeries.id,
+      name: m?.name ?? targetSeries.label,
+      when: m?.sortIso ? formatRunDateTime(m.sortIso) : "—",
+      bestLap: targetSeries.bestLap,
+    };
+  }, [targetSeries, metaById]);
+
+  /** What the "Compared with" bar reads out, so the grid never has to be scrolled to find out. */
+  const comparedWithLabel = useMemo(() => {
+    if (comparisonSeries.length === 0) return "Nothing yet — pick a session";
+    return comparisonSeries.map((s) => metaById.get(s.id)?.name ?? s.label).join(", ");
+  }, [comparisonSeries, metaById]);
+
+  const toggleComparison = useCallback((id: string) => {
+    setSelectedComparisonIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }, []);
 
   const modalRuns = useMemo(
     () => (pickerRunsForModal.length > 0 ? pickerRunsForModal : [compareAnchorRun]) as SetupSheetModalRun[],
@@ -701,107 +789,108 @@ export function LapComparisonColumnGrid({
         memberDisplayByUserId={memberDisplayByUserId}
       />
 
-      <div className="space-y-3 sm:max-w-[520px]">
-        <div className="space-y-1">
-          <label className="ui-label-caps" htmlFor="lap-compare-target">
-            Target
-          </label>
-          <select
-            id="lap-compare-target"
-            className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none"
-            value={targetId}
-            onChange={(e) => setTargetId(e.target.value)}
-            aria-label="Target series"
+      {/*
+       * The "Compared with" bar: one line that answers what the grid is showing,
+       * and one button that changes it. It replaces three stacked dropdowns
+       * (Target / Scope / Driver) plus a checkbox list — four controls the reader
+       * had to work through before the first lap time was on screen, on a sheet
+       * opened to look at lap times.
+       */}
+      <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface-runna px-3 py-2">
+        <div className="min-w-0">
+          <p className="ui-label-caps text-[9px] uppercase tracking-wider">Compared with</p>
+          <p
+            className={cn(
+              "truncate text-[12px]",
+              comparisonSeries.length === 0 ? "text-muted-foreground" : "text-foreground"
+            )}
           >
-            {targetOptionGroups.length === 1
-              ? targetOptionGroups[0].series.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {metaFor(s).selectLabel}
-                  </option>
-                ))
-              : targetOptionGroups.map((g) => (
-                  <optgroup key={g.key} label={g.label}>
-                    {g.series.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {metaFor(s).selectLabel}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-          </select>
-        </div>
-        <div className="space-y-2">
-          <div className="ui-label-caps">Compare against</div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="min-w-0 space-y-0.5">
-              <label className="text-[10px] text-muted-foreground" htmlFor="lap-compare-scope">
-                Scope
-              </label>
-              <select
-                id="lap-compare-scope"
-                className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none"
-                value={compareScope}
-                onChange={(e) => setCompareScope(e.target.value as typeof compareScope)}
-              >
-                <option value="same_track">Same track</option>
-                <option value="same_event">Same event</option>
-                <option value="same_day">Same calendar day</option>
-                <option value="all">All</option>
-              </select>
-            </div>
-            <div className="min-w-0 space-y-0.5">
-              <label className="text-[10px] text-muted-foreground" htmlFor="lap-compare-driver">
-                Driver
-              </label>
-              <select
-                id="lap-compare-driver"
-                className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs outline-none"
-                value={compareDriverKey}
-                onChange={(e) => setCompareDriverKey(e.target.value)}
-              >
-                {compareDriverChoices.map((c) => (
-                  <option key={c.key} value={c.key}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          {compareOptionCount === 0 ? (
-            <p className="text-[11px] text-muted-foreground">No lap series match this scope and driver.</p>
-          ) : (
-            <div
-              className="max-h-[min(220px,40vh)] overflow-y-auto rounded-md border border-border bg-card px-2 py-1.5"
-              role="group"
-              aria-label="Series to compare against the target"
-            >
-              <ul className="space-y-1.5">
-                {compareOptionRows.map((row) => (
-                  <li key={row.id}>
-                    <label className="flex cursor-pointer items-start gap-2 text-[11px] leading-snug">
-                      <input
-                        type="checkbox"
-                        className="mt-0.5 shrink-0"
-                        checked={selectedComparisonIds.includes(row.id)}
-                        onChange={(e) => {
-                          setSelectedComparisonIds((prev) => {
-                            if (e.target.checked) return [...prev, row.id];
-                            return prev.filter((id) => id !== row.id);
-                          });
-                        }}
-                      />
-                      <span className="min-w-0 text-foreground">{row.label}</span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <p className="text-[10px] text-muted-foreground">
-            Choose scope and driver, then tick runs to compare. Newest first.
+            {comparedWithLabel}
           </p>
         </div>
+        <button
+          type="button"
+          className="tap-active shrink-0 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 text-[11px] font-medium text-primary transition hover:bg-primary/20"
+          onClick={() => setPickerOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={pickerOpen}
+        >
+          Change
+        </button>
       </div>
+
+      <LapCompareSheet
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        selectedCount={selectedComparisonIds.length}
+      >
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <label className="ui-label-caps text-[9px] uppercase tracking-wider" htmlFor="lap-compare-target">
+              Measure everything against
+            </label>
+            <select
+              id="lap-compare-target"
+              className="w-full rounded-md border border-border bg-card px-2 py-2 text-xs outline-none"
+              value={targetId}
+              onChange={(e) => setTargetId(e.target.value)}
+              aria-label="Target series"
+            >
+              {targetOptionGroups.length === 1
+                ? targetOptionGroups[0].series.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {metaFor(s).selectLabel}
+                    </option>
+                  ))
+                : targetOptionGroups.map((g) => (
+                    <optgroup key={g.key} label={g.label}>
+                      {g.series.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {metaFor(s).selectLabel}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+            </select>
+          </div>
+
+          <LapCompareSegmentBar
+            segments={segments}
+            active={activeSegment}
+            onSelect={(k) => setActiveSegment(k as CompareSegmentKey)}
+          />
+
+          <LapCompareSessionList
+            groups={pickerGroups}
+            selectedIds={selectedComparisonIds}
+            onToggle={toggleComparison}
+            target={targetPickerRow}
+          />
+
+          {/*
+           * Scope sits at the bottom on purpose. The grouping above already says
+           * "this test day" and "earlier at MR33 Arena", so widening the net is a
+           * thing you reach for when the list ran out — not a decision to make
+           * before you have seen it.
+           */}
+          <div className="space-y-1 border-t border-border pt-3">
+            <label className="ui-label-caps text-[9px] uppercase tracking-wider" htmlFor="lap-compare-scope">
+              How far to look
+            </label>
+            <select
+              id="lap-compare-scope"
+              className="w-full rounded-md border border-border bg-card px-2 py-2 text-xs outline-none"
+              value={compareScope}
+              onChange={(e) => setCompareScope(e.target.value as typeof compareScope)}
+            >
+              <option value="same_track">This track only</option>
+              {compareAnchorRun.eventId ? <option value="same_event">This event only</option> : null}
+              <option value="same_day">This calendar day only</option>
+              <option value="all">Everything</option>
+            </select>
+          </div>
+        </div>
+      </LapCompareSheet>
 
       <div className="overflow-x-auto rounded-md border border-border">
         {/* No forced min-width: Lap + target + one comparison fit a 390px phone;
@@ -809,7 +898,9 @@ export function LapComparisonColumnGrid({
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="border-b border-border bg-muted/80">
-              <th className="w-9 text-left text-xs sm:text-sm font-medium text-muted-foreground px-1.5 sm:px-2 py-2 align-bottom sticky left-0 bg-muted/80 z-10">
+              {/* w-12, not w-9: the footer's "Avg 10" label lives in this column and
+                  wrapped to two lines at the old width. */}
+              <th className="w-12 text-left text-xs sm:text-sm font-medium text-muted-foreground px-1.5 sm:px-2 py-2 align-bottom sticky left-0 bg-muted/80 z-10">
                 Lap
               </th>
               {targetSeries ? (
@@ -968,6 +1059,45 @@ export function LapComparisonColumnGrid({
               );
             })}
           </tbody>
+          {/*
+           * Where Avg top 5 / Avg top 10 went when the column headers were cut down.
+           * A footer is the right home for a whole-session summary anyway: it reads
+           * after the laps it summarises, and it stays out of the way of the first
+           * screen. Same comparison, same deltas, none of the opening cost.
+           */}
+          <tfoot>
+            {SUMMARY_FOOTER_ROWS.map((row) => (
+              <tr key={row.label} className="border-t border-border bg-muted/70">
+                <td className="sticky left-0 z-10 whitespace-nowrap bg-muted/70 px-1.5 py-1 text-[10px] font-medium text-muted-foreground sm:px-2">
+                  {row.label}
+                </td>
+                {targetSeries ? (
+                  <td className="border-l border-border px-1.5 py-1 font-mono text-[11px] tabular-nums text-foreground sm:px-2">
+                    {formatLap(row.pick(targetSeries))}
+                  </td>
+                ) : null}
+                {comparisonSeries.map((s) => {
+                  const d = targetSeries ? computeSummaryDeltas(targetSeries, s) : null;
+                  const dv = d ? row.delta(d) : null;
+                  return (
+                    <td
+                      key={s.id}
+                      className="border-l border-border px-1.5 py-1 font-mono text-[11px] tabular-nums text-foreground sm:px-2"
+                    >
+                      <div className="flex flex-col leading-tight">
+                        <span>{formatLap(row.pick(s))}</span>
+                        {dv != null && Number.isFinite(dv) ? (
+                          <span className={cn("text-[9px]", deltaTextClass(dv))}>
+                            {formatLapDelta(dv)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tfoot>
         </table>
       </div>
 

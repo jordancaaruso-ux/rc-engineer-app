@@ -7,6 +7,10 @@ import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import { toCompareRunShape } from "@/lib/runCompareShape";
 import type { LapRow } from "@/lib/lapAnalysis";
+import { getIncludedLaps, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
+import { formatRunSessionDisplay } from "@/lib/runSession";
+import { formatRunDateTime } from "@/lib/formatDate";
+import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import {
   formatDriverSessionLabel,
   resolveImportedSessionDisplayTimeIso,
@@ -62,11 +66,35 @@ export function RunLapAnalysisModal({
     Array<{
       id: string;
       selectLabel: string;
+      name: string;
       laps: LapRow[];
       sortTimeIso: string;
       trackName: string | null;
     }>
   >([]);
+
+  /**
+   * The sheet names the session it is about, rather than naming itself. "Lap
+   * times — column compare" described the widget; on a teammate's shared run it
+   * left you reading someone else's laps under a heading that never said whose.
+   */
+  const headerTitle = useMemo(() => {
+    const session = formatRunSessionDisplay(run, { fallback: "Lap times" });
+    const track = run.track?.name?.trim() || run.trackNameSnapshot?.trim();
+    return track ? `${session} · ${track}` : session;
+  }, [run]);
+
+  const headerSubtitle = useMemo(() => {
+    const lapCount = getIncludedLaps(
+      primaryLapRowsFromRun({ lapTimes: run.lapTimes, lapSession: run.lapSession })
+    ).length;
+    const parts = [
+      userDisplayName?.trim() || (runOwnedByViewer ? null : "Teammate"),
+      formatRunDateTime(resolveRunDisplayInstant(run)),
+      lapCount > 0 ? `${lapCount} lap${lapCount === 1 ? "" : "s"}` : null,
+    ].filter(Boolean);
+    return parts.join(" · ");
+  }, [run, userDisplayName, runOwnedByViewer]);
 
   const missingImportedLapRows =
     (run.importedLapSets?.length ?? 0) > 0 && run.importedLapSets!.some((s) => !("laps" in s));
@@ -160,6 +188,7 @@ export function RunLapAnalysisModal({
           const mapped: Array<{
             id: string;
             selectLabel: string;
+            name: string;
             laps: LapRow[];
             sortTimeIso: string;
             trackName: string | null;
@@ -182,6 +211,7 @@ export function RunLapAnalysisModal({
                   parsedPayload: s.parsedPayload,
                 }),
               }),
+              name: parsed.driverName?.trim() || "Imported session",
               laps: parsed.rows,
               sortTimeIso: whenIso,
               trackName: s.trackName ?? null,
@@ -232,10 +262,18 @@ export function RunLapAnalysisModal({
         className="flex h-[min(92dvh,720px)] max-h-full w-full flex-col rounded-t-lg border border-border bg-surface-runna pb-[env(safe-area-inset-bottom)] shadow-lg sm:max-w-4xl sm:rounded-lg sm:pb-0"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 shrink-0">
-          <h2 id="lap-analysis-modal-title" className="text-sm font-semibold text-foreground truncate pr-2">
-            Lap times — column compare
-          </h2>
+        <div className="flex items-start justify-between gap-2 border-b border-border px-3 py-2.5 shrink-0">
+          <div className="min-w-0">
+            <h2
+              id="lap-analysis-modal-title"
+              className="ui-title truncate text-sm text-foreground"
+            >
+              {headerTitle}
+            </h2>
+            {headerSubtitle ? (
+              <p className="truncate text-[11px] text-muted-foreground">{headerSubtitle}</p>
+            ) : null}
+          </div>
           <button
             type="button"
             className="btn-surface px-2 py-1 text-[11px] font-medium shrink-0"
