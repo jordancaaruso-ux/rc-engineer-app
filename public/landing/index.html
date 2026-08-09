@@ -77,14 +77,34 @@
      than a bug.
      Both CTAs are kept (Get started is the conversion door): the wordmark goes instead, since the
      JRC mark beside it already identifies the page, and the buttons tighten. Declared here rather
-     than inline because inline styles cannot carry a media query. */
+     than inline because inline styles cannot carry a media query.
+
+     "Sign in" joined the row 2026-08-09 and tightens with them. It is deliberately the ONLY
+     borderless item in the group — a third bordered pill would not fit at 320px, and a returning
+     customer is not choosing between three offers: two are for strangers and one is the way home.
+     Brightness and position carry it instead of a border. */
   @media (max-width: 460px) {
     #jrcHdr [data-hdr-wordmark] { display:none !important; }
-    #jrcHdr a[href="/demo"], #jrcHdr a[href="/join"] {
+    #jrcHdr a[href="/demo"], #jrcHdr a[href="/join"], #jrcHdr a[href="/login"] {
       font-size:12px !important;
       padding-left:0.62rem !important;
       padding-right:0.62rem !important;
     }
+    #jrcHdr a[href="/login"] {
+      padding-left:0.25rem !important;
+      padding-right:0.25rem !important;
+    }
+  }
+  /* Real hover/focus for the sign-in door. The `style-hover` attribute used
+     throughout this file is inert — nothing in the page script ever reads it — so
+     every other button here is stateless on hover. Not fixing that wholesale (it is
+     15 elements and a separate decision), but the one link a returning customer
+     reaches for should answer to the pointer, and to the keyboard. */
+  #jrcHdr a[href="/login"]:hover { color:#FFD60A; }
+  #jrcHdr a[href="/login"]:focus-visible {
+    outline:2px solid #FFD60A;
+    outline-offset:2px;
+    color:#FFD60A;
   }
 
   .jrcGrain { background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxODAiIGhlaWdodD0iMTgwIj48ZmlsdGVyIGlkPSJuIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC44IiBudW1PY3RhdmVzPSI0IiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjE4MCIgaGVpZ2h0PSIxODAiIGZpbHRlcj0idXJsKCNuKSIvPjwvc3ZnPg=="); background-size:180px 180px; }
@@ -116,6 +136,15 @@
         <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.26em;text-transform:uppercase;color:#A5A59C;white-space:nowrap;padding-top:1px" data-hdr-wordmark>Trackside</span>
       </a>
       <div style="display:flex;gap:0.5rem;align-items:center;flex-shrink:0">
+        <!-- The way home. Signed-out "/" redirects here to /welcome, so a customer whose session
+             lapsed — or who is on a new phone, or who just typed the address from memory — meets a
+             page built entirely for strangers: demo, Get started, Get started, Get started. Until
+             2026-08-09 the only "Sign in" on it was in the footer at 13px grey, beside Privacy and
+             Terms, which is where links go to be ignored. Sits FIRST in the group on purpose: the
+             right edge is where "Get started" was clipped at 320px before the wordmark was dropped,
+             and this is the one link that must never be the casualty. /login sends you to the
+             dashboard when `from` is absent. -->
+        <a href="/login" style="display:inline-flex;align-items:center;font-weight:600;font-size:13px;padding:0.55rem 0.5rem;border-radius:7px;color:#EDE8DF;white-space:nowrap;transition:color .3s ease">Sign in</a>
         <a href="/demo" style="display:inline-flex;align-items:center;gap:0.45rem;font-weight:600;font-size:13px;padding:0.55rem 0.9rem;border-radius:7px;border:1px solid #FFD60A;background:#FFD60A;color:#171614;white-space:nowrap;transition:transform .2s ease,box-shadow .3s ease" style-hover="transform:translateY(-1px);box-shadow:0 6px 22px rgba(255,214,10,0.18)"><span style="width:6px;height:6px;border-radius:50%;background:#171614;animation:jrcPulse 2.2s ease-in-out infinite"></span>Try the demo</a>
         <a href="/join" style="display:inline-flex;align-items:center;font-weight:600;font-size:13px;padding:0.55rem 0.9rem;border-radius:7px;border:1px solid #34332F;background:transparent;color:#A5A59C;white-space:nowrap;transition:color .3s ease,border-color .3s ease" style-hover="color:#EDE8DF;border-color:#4C4C48">Get started</a>
       </div>
