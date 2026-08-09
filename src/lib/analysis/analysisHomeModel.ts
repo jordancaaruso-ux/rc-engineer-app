@@ -147,6 +147,13 @@ export type AnalysisHomeModel = {
   /** Null when the user has no runs at all. */
   trend: AnalysisTrendModel | null;
   recentRuns: AnalysisRecentRun[];
+  /**
+   * Every run the driver has logged — RUNS, not session groups (Sessions groups
+   * them by day / meeting, so the two numbers differ). The Recent-runs card's
+   * door to Sessions quotes it: "148 runs" is a reason to tap, "all sessions"
+   * on its own is an abstraction.
+   */
+  totalRunCount: number;
   video: AnalysisVideoModel;
 };
 

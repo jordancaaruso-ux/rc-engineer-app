@@ -55,7 +55,7 @@ export default async function AnalysisHubPage(): Promise<ReactNode> {
       </header>
       <section className="page-body flex max-w-2xl flex-col gap-3">
         <Reveal index={0}>
-          <RecentRunsCard runs={model.recentRuns} />
+          <RecentRunsCard runs={model.recentRuns} totalRunCount={model.totalRunCount} />
         </Reveal>
         <Reveal index={1}>
           <SessionTrendCard trend={model.trend} />

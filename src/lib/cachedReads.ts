@@ -38,13 +38,15 @@ export async function getCachedDashboardHomeModel(userId: string, timeZone: stri
  * only handle staleness of the *data*; an entry written by the previous build
  * still deserialises, so a new field arrives `undefined` and the UI renders its
  * own empty state — which looks like a data problem, not a cache one. v2 added
- * `AnalysisTrendRun.distribution` for the trend chart's spread view.
+ * `AnalysisTrendRun.distribution` for the trend chart's spread view; v3 added
+ * `totalRunCount` for the Recent-runs card's door into Sessions (a v2 entry
+ * would render that door with no number on it).
  */
 export async function getCachedAnalysisHomeModel(userId: string, timeZone: string) {
   return perfSpan("cachedAnalysisHome", () =>
     unstable_cache(
       async () => loadAnalysisHomeModel(userId, timeZone),
-      [`analysis-home-v2-${userId}-${timeZone}`],
+      [`analysis-home-v3-${userId}-${timeZone}`],
       { tags: [runsTag(userId), dashboardTag(userId)], revalidate: 30 }
     )()
   );

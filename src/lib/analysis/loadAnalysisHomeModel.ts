@@ -21,9 +21,16 @@ import {
 } from "@/lib/analysis/analysisHomeModel";
 import { computeTireIndicatorsByRunId } from "@/lib/runs/tireSetChange";
 
-/** Runs fetched for the recent-runs card; extras beyond 4 feed the delta-vs-previous lookback. */
+/** Runs fetched for the recent-runs card; extras beyond the shown rows feed the delta-vs-previous lookback. */
 const RECENT_RUNS_LOOKBACK = 12;
-const RECENT_RUNS_SHOWN = 4;
+/**
+ * Three, not four (2026-08-09). The card's footer became a full door row into
+ * Sessions — icon well, title and subline — because the old one-line "See all
+ * sessions" was the only way into the whole history on a phone and read as fine
+ * print. The door takes roughly the height of a run row, so the fourth row pays
+ * for it and the card doesn't grow.
+ */
+const RECENT_RUNS_SHOWN = 3;
 /** Cap for one event/day of runs on the trend chart. */
 const TREND_SCOPE_TAKE = 80;
 /** Day-scope query window around the latest run; exact match is by calendar day in `timeZone`. */
@@ -248,8 +255,8 @@ async function loadVideoModel(userId: string, timeZone: string): Promise<Analysi
 
 /**
  * Server model for the `/analysis` debrief page: trend chart scope (active
- * event, else the latest run's day), the last four runs, and the latest video
- * analysis job.
+ * event, else the latest run's day), the most recent runs, the driver's total
+ * run count, and the latest video analysis job.
  */
 export async function loadAnalysisHomeModel(
   userId: string,
@@ -261,11 +268,14 @@ export async function loadAnalysisHomeModel(
     select: { eventId: true, createdAt: true, carId: true },
   });
 
-  const [trend, recentRuns, video] = await Promise.all([
+  const [trend, recentRuns, totalRunCount, video] = await Promise.all([
     latest ? loadTrendModel(userId, latest, timeZone) : Promise.resolve(null),
     loadRecentRuns(userId, timeZone),
+    // The number on the Sessions door. One indexed count on `userId`, inside a
+    // read that is already cached for 30s — it runs on a miss, not per render.
+    perfSpan("analysisTotalRunCount", () => prisma.run.count({ where: { userId } })),
     loadVideoModel(userId, timeZone),
   ]);
 
-  return { trend, recentRuns, video };
+  return { trend, recentRuns, totalRunCount, video };
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, History } from "lucide-react";
 import type { AnalysisRecentRun } from "@/lib/analysis/analysisHomeModel";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
@@ -7,10 +7,29 @@ import { ButtonLink } from "@/components/ui/ButtonLink";
 import { cn } from "@/lib/utils";
 
 /**
- * Last four runs — each row is a door straight into that run's full session
- * view (tap anywhere on the row). No inline accordion: "see everything" lives
- * on the run page. Each row carries the run's best lap with median beneath it;
- * a quiet "See all sessions" footer opens the full history.
+ * The most recent runs — each row is a door straight into that run's full
+ * session view (tap anywhere on the row). No inline accordion: "see everything"
+ * lives on the run page. Each row carries the run's best lap with median
+ * beneath it.
+ *
+ * ── The Sessions door, 2026-08-09 ────────────────────────────────────────────
+ * This card carries the ONLY way into Sessions from `/analysis` on a phone: the
+ * hub's door tiles are filtered down to Setup comparison and Roll Center Lab
+ * (`src/app/analysis/page.tsx`), so the Sessions entry in `ANALYSIS_HUB_LINKS`
+ * never renders, and the mobile dock's Analysis tab is `/analysis` — only the
+ * desktop sidebar points straight at `/runs/history`. It used to be one 12.5px
+ * muted line reading "See all sessions", which is fine print advertising a list
+ * control; behind it is every run the driver has ever logged.
+ *
+ * So the door is now stated twice, at both ends of the card:
+ *   · a quiet "All N runs" affordance beside the eyebrow, so you learn this card
+ *     is a PREVIEW before you read the rows rather than after;
+ *   · a full row at the foot, weighted like the run rows above it.
+ * Both quote runs, never "N sessions" — Sessions groups runs by day / meeting,
+ * so the two counts are different numbers.
+ *
+ * If this ever needs to shout louder, the escalation is to render the Sessions
+ * tile as its own door card on `/analysis` — not to make this card noisier.
  */
 
 function seconds(value: number | null): string {
@@ -26,13 +45,23 @@ function PbChip({ run }: { run: AnalysisRecentRun }) {
   );
 }
 
-export function RecentRunsCard({ runs }: { runs: AnalysisRecentRun[] }) {
+function runCountLabel(count: number): string {
+  return `${count} run${count === 1 ? "" : "s"}`;
+}
+
+export function RecentRunsCard({
+  runs,
+  totalRunCount,
+}: {
+  runs: AnalysisRecentRun[];
+  totalRunCount: number;
+}) {
   if (runs.length === 0) {
     return (
       <CardPanel contentClassName="flex flex-col gap-3 p-4">
         <Eyebrow dot="muted">Recent runs</Eyebrow>
         <p className="text-[13px] leading-relaxed text-muted-foreground">
-          No runs yet. Your last four runs land here with best lap and median.
+          No runs yet. Your latest runs land here with best lap and median.
         </p>
         <ButtonLink href="/runs/new" className="self-start">
           Log your first run
@@ -41,10 +70,33 @@ export function RecentRunsCard({ runs }: { runs: AnalysisRecentRun[] }) {
     );
   }
 
+  // Suppressed when the card already shows everything — "All 3 runs" beside
+  // exactly three rows promises a bigger room than it opens. The footer door
+  // stays either way: grouped days, filters and compare are still through it.
+  const showHeaderAffordance = totalRunCount > runs.length;
+
   return (
     <CardPanel contentClassName="flex flex-col gap-1 p-4">
       <div className="pb-1.5">
-        <Eyebrow dot="muted">Recent runs</Eyebrow>
+        {/* `eyebrow-root` (hairline + pad) composed by hand rather than via
+            <Eyebrow> so the count can sit on the label's row — same trick the
+            hub door cards use. */}
+        <div className="eyebrow-root mb-2 flex items-center gap-3">
+          <span className="eyebrow-label min-w-0 flex-1">Recent runs</span>
+          {showHeaderAffordance ? (
+            <Link
+              href="/runs/history"
+              prefetch
+              className="tap-active group flex shrink-0 items-center gap-1 rounded-full border border-primary/35 py-0.5 pl-2.5 pr-1.5 text-[11px] font-semibold tabular-nums text-primary transition-colors hover:border-primary/60 hover:bg-primary/10"
+            >
+              All {runCountLabel(totalRunCount)}
+              <ChevronRight
+                className="h-3 w-3 transition-transform group-hover:translate-x-0.5"
+                aria-hidden
+              />
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex flex-col">
@@ -87,13 +139,27 @@ export function RecentRunsCard({ runs }: { runs: AnalysisRecentRun[] }) {
         ))}
       </div>
 
+      {/* Full-bleed to the card edges: the negative margins reach past the p-4,
+          and SurfaceCard's content wrapper is `rounded-xl overflow-hidden`, so
+          the tinted band is clipped to the card's bottom corners for free. */}
       <Link
         href="/runs/history"
-        className="tap-active group mt-0.5 flex items-center justify-between gap-2 border-t border-border px-1.5 pb-0.5 pt-3 text-[12.5px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
+        prefetch
+        className="tap-active group -mx-4 -mb-4 mt-1 flex items-center gap-3 border-t border-border bg-primary/[0.04] px-4 py-3 transition-colors hover:bg-primary/[0.08]"
       >
-        See all sessions
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-primary/35 bg-primary/[0.09] text-primary">
+          <History className="h-4 w-4" aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[13.5px] font-bold leading-tight tracking-tight text-foreground">
+            All sessions
+          </span>
+          <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+            {runCountLabel(totalRunCount)}, grouped by day · filter and compare
+          </span>
+        </span>
         <ChevronRight
-          className="h-3.5 w-3.5 text-primary transition-transform group-hover:translate-x-0.5"
+          className="h-4 w-4 shrink-0 text-primary transition-transform group-hover:translate-x-0.5"
           aria-hidden
         />
       </Link>
