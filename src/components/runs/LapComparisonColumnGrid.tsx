@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Wrench } from "lucide-react";
 import type { ComparisonSeries, LapRow } from "@/lib/lapAnalysis";
 import {
@@ -13,8 +13,9 @@ import {
   getDeltaStyle,
   importedSetToLapRows,
   primaryLapRowsFromRun,
+  resolveDeltaTintRange,
 } from "@/lib/lapAnalysis";
-import { lapSeriesMatchesCompareScope } from "@/lib/lapCompareScope";
+import { lapCompareTrackKey, lapSeriesMatchesCompareScope } from "@/lib/lapCompareScope";
 import { formatLap, normalizeLapTimes } from "@/lib/runLaps";
 import { cn } from "@/lib/utils";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
@@ -78,6 +79,15 @@ function compareOptionSort(a: { sortIso: string }, b: { sortIso: string }): numb
 
 function lapAt(series: ComparisonSeries, lapNumber: number): LapRow | undefined {
   return series.laps.find((l) => l.lapNumber === lapNumber);
+}
+
+/**
+ * Is this the column's own quickest lap? Marked with a dot so the one lap everyone
+ * scans for is findable without reading every row. Compared on the stored value —
+ * `bestLap` comes off these same rows, so an epsilon would only mask a real mismatch.
+ */
+function isBestLapOf(series: ComparisonSeries, lap: LapRow): boolean {
+  return series.bestLap != null && lap.lapTimeSeconds === series.bestLap;
 }
 
 /** Gain green / loss red for delta text where there is no background tint (header metrics). */
@@ -227,7 +237,14 @@ export function LapComparisonColumnGrid({
   pickerRunsForModal?: CompareRunShape[];
   runListSource?: RunCompareListSource;
   /** User-owned imported lap-time library (any session from /laps/import or Log your run). */
-  librarySessions?: Array<{ id: string; selectLabel: string; laps: LapRow[]; sortTimeIso: string }>;
+  librarySessions?: Array<{
+    id: string;
+    selectLabel: string;
+    laps: LapRow[];
+    sortTimeIso: string;
+    /** Track this import was run at, via its linked run; null when never linked. */
+    trackName?: string | null;
+  }>;
   viewerUserId?: string | null;
   memberDisplayByUserId?: Record<string, string>;
 }) {
@@ -250,7 +267,22 @@ export function LapComparisonColumnGrid({
   /** Columns to show vs target: imports, library, and previous runs (ids from seriesList). */
   const [selectedComparisonIds, setSelectedComparisonIds] = useState<string[]>([]);
   const [setupModalRun, setSetupModalRun] = useState<CompareRunShape | null>(null);
-  const [compareScope, setCompareScope] = useState<"all" | "same_day" | "same_event">("same_day");
+  /*
+   * Defaults to the track, not the day. "Same calendar day" was the old default and it
+   * quietly hid half a test day: the day was resolved from raw instants in the reader's
+   * zone, so a session that ran across the reader's midnight lost everything on the far
+   * side of it (reported 2026-08-09 — a continuous MR33 Arena test day). The track is
+   * the question a lap sheet is opened to answer anyway, and no clock can break it.
+   */
+  const [compareScope, setCompareScope] = useState<"all" | "same_day" | "same_event" | "same_track">(
+    // …unless this run has no track, where "same track" has nothing to match on and
+    // would open the sheet on an empty list. Scoping to a venue you never recorded is
+    // a dead end, so those runs start at "All" instead.
+    () =>
+      lapCompareTrackKey(compareAnchorRun.track?.name ?? compareAnchorRun.trackNameSnapshot ?? null)
+        ? "same_track"
+        : "all"
+  );
   const [compareDriverKey, setCompareDriverKey] = useState<string>("__me__");
 
   const { seriesList, metaById } = useMemo(() => {
@@ -383,6 +415,31 @@ export function LapComparisonColumnGrid({
     [compareAnchorRun]
   );
 
+  const anchorTrackKey = useMemo(
+    () =>
+      lapCompareTrackKey(
+        compareAnchorRun.track?.name ?? compareAnchorRun.trackNameSnapshot ?? null
+      ),
+    [compareAnchorRun]
+  );
+
+  /** Track behind a series id: the run it came from, or the import's linked run. */
+  const trackKeyForSeries = useCallback(
+    (seriesId: string): string | null => {
+      if (seriesId === "run:primary") return anchorTrackKey;
+      if (seriesId.startsWith("history:")) {
+        const r = otherRuns.find((o) => o.id === seriesId.slice("history:".length));
+        return lapCompareTrackKey(r?.track?.name ?? r?.trackNameSnapshot ?? null);
+      }
+      if (seriesId.startsWith("library:")) {
+        const lib = librarySessions.find((l) => l.id === seriesId.slice("library:".length));
+        return lapCompareTrackKey(lib?.trackName ?? null);
+      }
+      return null;
+    },
+    [anchorTrackKey, otherRuns, librarySessions]
+  );
+
   const scopeFilteredRows = useMemo(() => {
     const ev = compareAnchorRun.eventId;
     return seriesList
@@ -401,6 +458,8 @@ export function LapComparisonColumnGrid({
           anchorEventId: ev,
           primaryRunEventId: run.eventId ?? null,
           eventIdForHistoryRun: (rid) => otherRuns.find((o) => o.id === rid)?.eventId,
+          anchorTrackKey,
+          trackKeyForSeries,
         })
       );
   }, [
@@ -412,13 +471,32 @@ export function LapComparisonColumnGrid({
     compareAnchorRun.eventId,
     run.eventId,
     otherRuns,
+    anchorTrackKey,
+    trackKeyForSeries,
   ]);
+
+  /*
+   * "This driver" means the driver of the run being viewed — not every run in the list.
+   * Team Sessions feeds every member's runs in as `history:` series, so the old test
+   * (any history series) quietly mixed teammates into what reads as your own sessions.
+   * With no userId on the anchor (solo lists don't always carry one) it falls back to
+   * the previous behaviour rather than filtering everything away.
+   */
+  const isAnchorDriverSeries = useCallback(
+    (seriesId: string): boolean => {
+      if (seriesId === "run:primary") return true;
+      if (!seriesId.startsWith("history:")) return false;
+      const anchorUserId = compareAnchorRun.userId ?? null;
+      if (!anchorUserId) return true;
+      const r = otherRuns.find((o) => o.id === seriesId.slice("history:".length));
+      return (r?.userId ?? anchorUserId) === anchorUserId;
+    },
+    [compareAnchorRun.userId, otherRuns]
+  );
 
   const compareDriverChoices = useMemo(() => {
     const opts: { key: string; label: string }[] = [{ key: "__all__", label: "All drivers" }];
-    const hasMe = scopeFilteredRows.some(
-      (r) => r.series.id === "run:primary" || r.series.id.startsWith("history:")
-    );
+    const hasMe = scopeFilteredRows.some((r) => isAnchorDriverSeries(r.series.id));
     if (hasMe) {
       opts.push({
         key: "__me__",
@@ -449,7 +527,14 @@ export function LapComparisonColumnGrid({
       }
     }
     return opts;
-  }, [scopeFilteredRows, primaryRunLabel, primaryIsViewer, run.importedLapSets, librarySessions]);
+  }, [
+    scopeFilteredRows,
+    primaryRunLabel,
+    primaryIsViewer,
+    run.importedLapSets,
+    librarySessions,
+    isAnchorDriverSeries,
+  ]);
 
   useEffect(() => {
     const keys = new Set(compareDriverChoices.map((c) => c.key));
@@ -463,9 +548,7 @@ export function LapComparisonColumnGrid({
     return scopeFilteredRows
       .filter(({ series }) => {
         if (compareDriverKey === "__all__") return true;
-        if (compareDriverKey === "__me__") {
-          return series.id === "run:primary" || series.id.startsWith("history:");
-        }
+        if (compareDriverKey === "__me__") return isAnchorDriverSeries(series.id);
         if (compareDriverKey.startsWith("drv:")) {
           const name = compareDriverKey.slice(4);
           if (!series.id.startsWith("imported:")) return false;
@@ -484,8 +567,18 @@ export function LapComparisonColumnGrid({
         return true;
       })
       .map(({ series, sortIso, label }) => ({ id: series.id, sortIso, label }))
-      .sort((a, b) => new Date(a.sortIso).getTime() - new Date(b.sortIso).getTime());
-  }, [scopeFilteredRows, compareDriverKey, run.importedLapSets, librarySessions]);
+      // Newest first, like every other run list in the app — and like the Target
+      // dropdown directly above it, which has always used this comparator. The
+      // ascending sort here put your oldest session at the top of the one list you
+      // pick from, which is the opposite of what you reach for after a run.
+      .sort(compareOptionSort);
+  }, [
+    scopeFilteredRows,
+    compareDriverKey,
+    run.importedLapSets,
+    librarySessions,
+    isAnchorDriverSeries,
+  ]);
 
   useEffect(() => {
     setSelectedComparisonIds([]);
@@ -514,6 +607,30 @@ export function LapComparisonColumnGrid({
     const cols = targetSeries ? [targetSeries, ...comparisonSeries] : comparisonSeries;
     return alignLapsByNumber(cols);
   }, [targetSeries, comparisonSeries]);
+
+  /*
+   * Colour range for THIS grid, from the deltas actually drawn in it.
+   *
+   * The fixed 1.0s range assumed a spread lap data never has: in a 14.8s class a 0.1s
+   * delta tinted at 10% opacity, so every meaningful lap sat in the bottom sixth of the
+   * ramp and the grid read as one flat wash. Recomputed per grid (and so per comparison
+   * you tick on), which is also why excluded laps are skipped — an 18s crash lap is not
+   * part of the comparison and must not set the scale for the laps that are.
+   */
+  const deltaTintRange = useMemo(() => {
+    if (!targetSeries || comparisonSeries.length === 0) return undefined;
+    const deltas: number[] = [];
+    for (const lapNum of lapNumbers) {
+      const t = lapAt(targetSeries, lapNum);
+      if (!t || !t.isIncluded || t.lapNumber === 0) continue;
+      for (const s of comparisonSeries) {
+        const c = lapAt(s, lapNum);
+        if (!c || !c.isIncluded || c.lapNumber === 0) continue;
+        deltas.push(c.lapTimeSeconds - t.lapTimeSeconds);
+      }
+    }
+    return resolveDeltaTintRange(deltas);
+  }, [targetSeries, comparisonSeries, lapNumbers]);
 
   /*
    * The target list is four different kinds of thing wearing one label shape
@@ -626,8 +743,9 @@ export function LapComparisonColumnGrid({
                 value={compareScope}
                 onChange={(e) => setCompareScope(e.target.value as typeof compareScope)}
               >
-                <option value="same_day">Same calendar day</option>
+                <option value="same_track">Same track</option>
                 <option value="same_event">Same event</option>
+                <option value="same_day">Same calendar day</option>
                 <option value="all">All</option>
               </select>
             </div>
@@ -680,7 +798,7 @@ export function LapComparisonColumnGrid({
             </div>
           )}
           <p className="text-[10px] text-muted-foreground">
-            Choose scope and driver, then tick runs to compare. Order is chronological (earliest first).
+            Choose scope and driver, then tick runs to compare. Newest first.
           </p>
         </div>
       </div>
@@ -745,9 +863,13 @@ export function LapComparisonColumnGrid({
                   fastestComparisonSeconds = lap.lapTimeSeconds;
                 }
               }
-              const targetMirrorStyle =
+              const targetMirrorDelta =
                 targetOk && fastestComparisonSeconds != null
-                  ? getDeltaStyle(tLap.lapTimeSeconds - fastestComparisonSeconds)
+                  ? tLap.lapTimeSeconds - fastestComparisonSeconds
+                  : null;
+              const targetMirrorStyle =
+                targetMirrorDelta != null
+                  ? getDeltaStyle(targetMirrorDelta, deltaTintRange)
                   : undefined;
               return (
                 <tr key={lapNum} className="border-b border-border/80 hover:bg-muted/50">
@@ -763,10 +885,31 @@ export function LapComparisonColumnGrid({
                       )}
                       style={targetMirrorStyle}
                     >
-                      {tLap ? `${tLap.lapTimeSeconds.toFixed(3)}` : "—"}
-                      {tLap && !tLap.isIncluded ? (
-                        <span className="ml-1 ui-title text-[9px] text-muted-foreground">Excluded</span>
-                      ) : null}
+                      {/* The target cell states its delta too. It was the only column
+                          that showed a tint without the number behind it — the one
+                          column everything else is measured against, silent about by
+                          how much. It mirrors the tint: measured against the fastest
+                          comparison in this row. */}
+                      <div className="flex flex-col gap-0.5 leading-tight">
+                        <span className="tabular-nums">
+                          {tLap ? tLap.lapTimeSeconds.toFixed(3) : "—"}
+                          {tLap && targetOk && isBestLapOf(targetSeries, tLap) ? (
+                            <span
+                              className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-primary align-middle"
+                              title="Best lap of this session"
+                              aria-label="Best lap of this session"
+                            />
+                          ) : null}
+                          {tLap && !tLap.isIncluded ? (
+                            <span className="ml-1 ui-title text-[9px] text-muted-foreground">Excluded</span>
+                          ) : null}
+                        </span>
+                        {targetMirrorDelta != null ? (
+                          <span className="text-[10px] font-mono text-foreground/80 tabular-nums">
+                            {formatLapDelta(targetMirrorDelta)}
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                   ) : null}
                   {comparisonSeries.map((s) => {
@@ -786,7 +929,7 @@ export function LapComparisonColumnGrid({
                       !excluded && targetOk ? lap.lapTimeSeconds - tLap.lapTimeSeconds : null;
                     const showDelta = !excluded && delta != null && Number.isFinite(delta);
                     const cellStyle =
-                      showDelta && delta != null ? getDeltaStyle(delta) : undefined;
+                      showDelta && delta != null ? getDeltaStyle(delta, deltaTintRange) : undefined;
                     return (
                       <td
                         key={s.id}
@@ -797,8 +940,15 @@ export function LapComparisonColumnGrid({
                         style={cellStyle}
                       >
                         <div className="flex flex-col gap-0.5 leading-tight">
-                          <span>
+                          <span className="tabular-nums">
                             {lap.lapTimeSeconds.toFixed(3)}
+                            {!excluded && isBestLapOf(s, lap) ? (
+                              <span
+                                className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-primary align-middle"
+                                title="Best lap of this session"
+                                aria-label="Best lap of this session"
+                              />
+                            ) : null}
                             {excluded ? (
                               <span className="ml-1 ui-title text-[9px] text-muted-foreground not-italic">
                                 Excluded
@@ -820,6 +970,24 @@ export function LapComparisonColumnGrid({
           </tbody>
         </table>
       </div>
+
+      {/* Nothing in the grid said what the colours meant. The ramp shows both the
+          direction and that strength tracks size — and it only appears once there is
+          a comparison actually tinting cells. */}
+      {targetSeries && comparisonSeries.length > 0 ? (
+        <div className="flex items-center gap-2">
+          <span className="ui-label-caps text-[9px] text-muted-foreground">Quicker</span>
+          <span
+            aria-hidden
+            className="h-1.5 flex-1 rounded-full"
+            style={{
+              backgroundImage:
+                "linear-gradient(to right, rgba(79,208,137,0.5), rgba(79,208,137,0.08), rgba(128,128,128,0.06), rgba(229,100,78,0.08), rgba(229,100,78,0.5))",
+            }}
+          />
+          <span className="ui-label-caps text-[9px] text-muted-foreground">Slower</span>
+        </div>
+      ) : null}
     </div>
   );
 }

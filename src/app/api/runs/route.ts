@@ -178,8 +178,13 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     return NextResponse.json({ error: "carId is required" }, { status: 400 });
   }
 
+  // The logging device's zone, used twice: to resolve the session's wall time, and —
+  // stamped onto the run — to decide which calendar day the run belongs to for anyone
+  // who later reads it. See `Run.localTimeZone`.
+  const deviceTimeZone = await getTimeZoneFromCookies();
+
   const sessionCompletedAtResolved = await resolveRunSessionCompletedAtFromUpsertBody(params.userId, body, {
-    userTimeZone: await getTimeZoneFromCookies(),
+    userTimeZone: deviceTimeZone,
   });
 
   let existingUpdate: {
@@ -527,6 +532,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         userId: params.userId,
         carId,
         carNameSnapshot: car.name,
+        localTimeZone: deviceTimeZone,
         sessionType,
         meetingSessionType,
         meetingSessionCode,
@@ -705,6 +711,17 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       userId: params.userId,
       importedLapTimeSessionIds: lapImportIds,
       runId: run.id,
+    });
+  }
+
+  // Keep the account-level zone current so runs logged before `Run.localTimeZone`
+  // existed still resolve to a sensible day for their driver. `updateMany` with the
+  // inequality means this only writes when the zone actually changed, so the common
+  // case costs one cheap no-op query rather than a write per run.
+  if (deviceTimeZone) {
+    await prisma.user.updateMany({
+      where: { id: params.userId, OR: [{ timeZone: null }, { timeZone: { not: deviceTimeZone } }] },
+      data: { timeZone: deviceTimeZone },
     });
   }
 

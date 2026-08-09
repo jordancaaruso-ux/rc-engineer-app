@@ -113,6 +113,59 @@ test("buildRunHistoryGroups groups by local day, not UTC, when a zone is given",
   assert.equal(local[0]!.runs.length, 2);
 });
 
+test("a teammate's test day stays one group, whatever zone the reader is in", () => {
+  // Dayne runs 09:12 → 17:02 on 6 Aug at MR33 Arena (UTC+2). Read from Melbourne
+  // (UTC+10), his afternoon crosses the reader's midnight — which used to file the
+  // last runs under 07 Aug in a group of their own.
+  const runs = ["07:12", "11:20", "15:02"].map((hhmm, i) => ({
+    id: `dayne-${i + 1}`,
+    createdAt: new Date(`2026-08-06T${hhmm}:00Z`),
+    sortAt: new Date(`2026-08-06T${hhmm}:00Z`),
+    eventId: null,
+    userId: "dayne",
+    localTimeZone: "Europe/Berlin",
+    trackNameSnapshot: "MR33 Arena",
+    track: { name: "MR33 Arena" },
+    event: null,
+  }));
+
+  const readFromMelbourne = buildRunHistoryGroups(runs, "Australia/Melbourne");
+  assert.equal(readFromMelbourne.length, 1);
+  assert.equal(readFromMelbourne[0]!.runs.length, 3);
+  // And the header names the driver's date, not the reader's.
+  assert.match(readFromMelbourne[0]!.title, /6 Aug 2026/);
+
+  // Same grouping for every reader — that is the whole point.
+  for (const zone of ["Europe/Berlin", "America/New_York", "UTC", null]) {
+    assert.equal(buildRunHistoryGroups(runs, zone).length, 1, `reader zone ${zone}`);
+  }
+});
+
+test("runs without their own zone fall back to the owner's account zone", () => {
+  // Logged before Run.localTimeZone existed, so only User.timeZone can say what day
+  // these were to the person who drove them.
+  const runs = ["07:12", "15:02"].map((hhmm, i) => ({
+    id: `legacy-${i + 1}`,
+    createdAt: new Date(`2026-08-06T${hhmm}:00Z`),
+    sortAt: new Date(`2026-08-06T${hhmm}:00Z`),
+    eventId: null,
+    userId: "dayne",
+    localTimeZone: null,
+    trackNameSnapshot: "MR33 Arena",
+    track: { name: "MR33 Arena" },
+    event: null,
+  }));
+
+  // Reader in Melbourne, no owner zone known → splits, as it does today.
+  assert.equal(buildRunHistoryGroups(runs, "Australia/Melbourne").length, 2);
+  // Owner zone known → one group again.
+  const withOwner = buildRunHistoryGroups(runs, "Australia/Melbourne", {
+    ownerTimeZoneByUserId: { dayne: "Europe/Berlin" },
+  });
+  assert.equal(withOwner.length, 1);
+  assert.equal(withOwner[0]!.runs.length, 2);
+});
+
 test("buildDayRunNumberMap numbers runs per user per local day, in sortAt order", () => {
   const runs = [
     // Jordan, day 1 — logged out of array order; sortAt decides.

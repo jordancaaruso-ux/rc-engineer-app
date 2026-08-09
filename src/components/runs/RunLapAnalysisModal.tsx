@@ -59,7 +59,13 @@ export function RunLapAnalysisModal({
   const [importedLapsLoading, setImportedLapsLoading] = useState(false);
   const [importedLapsError, setImportedLapsError] = useState<string | null>(null);
   const [libraryLapSessions, setLibraryLapSessions] = useState<
-    Array<{ id: string; selectLabel: string; laps: LapRow[]; sortTimeIso: string }>
+    Array<{
+      id: string;
+      selectLabel: string;
+      laps: LapRow[];
+      sortTimeIso: string;
+      trackName: string | null;
+    }>
   >([]);
 
   const missingImportedLapRows =
@@ -146,11 +152,18 @@ export function RunLapAnalysisModal({
             sessionCompletedAt?: string | null;
             sourceUrl?: string | null;
             parserId?: string | null;
+            trackName?: string | null;
             parsedPayload: unknown;
           }>;
         } | null) => {
           if (!alive || !data?.sessions) return;
-          const mapped: Array<{ id: string; selectLabel: string; laps: LapRow[]; sortTimeIso: string }> = [];
+          const mapped: Array<{
+            id: string;
+            selectLabel: string;
+            laps: LapRow[];
+            sortTimeIso: string;
+            trackName: string | null;
+          }> = [];
           for (const s of data.sessions) {
             const parsed = primaryLapRowsFromImportedPayload(s.parsedPayload);
             if (!parsed) continue;
@@ -171,6 +184,7 @@ export function RunLapAnalysisModal({
               }),
               laps: parsed.rows,
               sortTimeIso: whenIso,
+              trackName: s.trackName ?? null,
             });
           }
           setLibraryLapSessions(mapped);

@@ -79,6 +79,9 @@ const runHistorySelect = {
   userId: true,
   createdAt: true,
   sortAt: true,
+  // Which day this run belongs to is decided in the DRIVER's zone, not the reader's
+  // (buildRunHistoryGroups → resolveRunLocalTimeZone).
+  localTimeZone: true,
   sessionCompletedAt: true,
   loggingCompletedAt: true,
   loggingComplete: true,
@@ -423,9 +426,25 @@ export default async function RunHistoryPage({
     .sort((a, b) => a.label.localeCompare(b.label));
 
   const dbMatchedCount = runs.length;
+  // Account-level zone per driver — the fallback for runs logged before
+  // `Run.localTimeZone` existed. Without it those runs would fall back to the
+  // reader's zone, which is what split a teammate's test day across two dates.
+  const ownerTimeZoneByUserId: Record<string, string | null> = {};
+  {
+    const driverIds = [...new Set(runs.map((r) => r.userId).filter(Boolean))];
+    if (driverIds.length > 0) {
+      const owners = await prisma.user.findMany({
+        where: { id: { in: driverIds } },
+        select: { id: true, timeZone: true },
+      });
+      for (const o of owners) ownerTimeZoneByUserId[o.id] = o.timeZone;
+    }
+  }
   // Day-position names for unlabeled testing runs ("Run 2"). Computed from the
   // full fetched set (pre-search-filter) so filtering never renumbers a day.
-  const dayRunNumberByRunId = buildDayRunNumberMap(runs, displayTimeZone);
+  const dayRunNumberByRunId = buildDayRunNumberMap(runs, displayTimeZone, {
+    ownerTimeZoneByUserId,
+  });
   // Changed-keys diffing is O(runs × setup keys) — only pay for it when the
   // "setup item changed" filter is actually in play.
   const changedKeysByRunId = filters.setupChangedField
@@ -444,7 +463,9 @@ export default async function RunHistoryPage({
   const matchedRunCount = runs.length;
 
   const groups: Group[] =
-    filters.layout === "flat" ? [] : buildRunHistoryGroups(runs, displayTimeZone);
+    filters.layout === "flat"
+      ? []
+      : buildRunHistoryGroups(runs, displayTimeZone, { ownerTimeZoneByUserId });
   const allRunsDescending = [...runs].sort(compareRunTimestamp);
   const compareRunsDescending = allRunsDescending.map(toCompareRunShape);
   const focusRunId =

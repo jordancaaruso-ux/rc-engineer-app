@@ -105,6 +105,38 @@ export function alignLapsByNumber(seriesList: ComparisonSeries[]): number[] {
 export const DELTA_MAX_ABS_RANGE = 1.0;
 
 /**
+ * Floor for the adaptive tint range. Without it a metronomic run — every lap within a
+ * few hundredths — would stretch those hundredths across the full colour ramp and paint
+ * a screaming grid over differences nobody can drive to.
+ */
+export const DELTA_TINT_MIN_RANGE = 0.08;
+
+/**
+ * Tint range (seconds) for one grid, derived from the deltas actually on screen.
+ *
+ * The fixed 1.0s range this replaces was calibrated for a spread real lap data never
+ * has: in a 14.8s class, lap-to-lap deltas run 0.03–0.25s, so every meaningful lap
+ * landed in the bottom sixth of the ramp (a 0.1s delta tinted at 10% opacity) and the
+ * only thing that ever coloured strongly was a crash lap — usually excluded anyway.
+ * Six different laps came out as one flat wash.
+ *
+ * p90 rather than max so a single wild lap that survived exclusion can't flatten the
+ * other twenty-three, clamped both ends so the ramp stays honest at either extreme.
+ * Callers pass only INCLUDED laps — an excluded 18s lap is not part of the comparison
+ * and must not set the scale for the laps that are.
+ */
+export function resolveDeltaTintRange(deltas: Iterable<number>): number {
+  const abs = [...deltas]
+    .filter((d) => Number.isFinite(d))
+    .map((d) => Math.abs(d))
+    .filter((d) => d > 0)
+    .sort((a, b) => a - b);
+  if (abs.length === 0) return DELTA_TINT_MIN_RANGE;
+  const idx = Math.max(0, Math.min(abs.length - 1, Math.ceil(abs.length * 0.9) - 1));
+  return Math.min(DELTA_MAX_ABS_RANGE, Math.max(DELTA_TINT_MIN_RANGE, abs[idx]!));
+}
+
+/**
  * Smooth opacity gradient for lap-cell tints (target and comparison columns).
  * delta = cell − anchor: positive = slower → loss red (#E5644E), negative =
  * faster → gain green (#4FD089), the north-star data-delta semantics.

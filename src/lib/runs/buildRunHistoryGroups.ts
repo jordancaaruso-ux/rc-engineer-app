@@ -6,6 +6,10 @@ export type RunForHistoryGroup = {
   sortAt: Date | null;
   eventId: string | null;
   trackNameSnapshot: string | null;
+  /** Zone of the device that logged this run; null on runs predating the column. */
+  localTimeZone?: string | null;
+  /** Owner of the run — the driver, who may not be the viewer in team Sessions. */
+  userId?: string | null;
   track?: { name: string } | null;
   event?: {
     name: string;
@@ -23,6 +27,32 @@ export type RunHistoryGroup<T extends RunForHistoryGroup = RunForHistoryGroup> =
   trackName: string | null;
   dateLabel: string;
   runs: T[];
+};
+
+/**
+ * Zone a run's calendar day should be resolved in: the driver's, never the reader's.
+ *
+ * Keyed on the viewer's zone, a teammate's continuous test day splits into two dated
+ * groups the moment it crosses the viewer's midnight — which is exactly how one MR33
+ * Arena test day came to show as both 06 and 07 Aug (reported 2026-08-09). Runs carry
+ * the logging device's zone from 2026-08-09; older runs fall back to the last zone seen
+ * on the owner's account, and only then to the reader's.
+ */
+export function resolveRunLocalTimeZone(
+  run: Pick<RunForHistoryGroup, "localTimeZone" | "userId">,
+  opts?: RunGroupZoneOptions
+): string | null {
+  if (run.localTimeZone) return run.localTimeZone;
+  const owner = run.userId ? opts?.ownerTimeZoneByUserId?.[run.userId] : null;
+  if (owner) return owner;
+  return opts?.viewerTimeZone ?? null;
+}
+
+export type RunGroupZoneOptions = {
+  /** `User.timeZone` per driver — the fallback for runs logged before per-run capture. */
+  ownerTimeZoneByUserId?: Record<string, string | null | undefined>;
+  /** Reader's own zone; last resort only, and the reason days used to split. */
+  viewerTimeZone?: string | null;
 };
 
 /**
@@ -69,13 +99,19 @@ export function runSessionSortInstant(
  * server → client component boundary.
  */
 export function buildDayRunNumberMap(
-  runs: Array<Pick<RunForHistoryGroup, "id" | "createdAt" | "sortAt"> & { userId?: string | null }>,
-  timeZone?: string | null
+  runs: Array<
+    Pick<RunForHistoryGroup, "id" | "createdAt" | "sortAt" | "localTimeZone"> & {
+      userId?: string | null;
+    }
+  >,
+  timeZone?: string | null,
+  opts?: Pick<RunGroupZoneOptions, "ownerTimeZoneByUserId">
 ): Record<string, number> {
+  const zones: RunGroupZoneOptions = { ...opts, viewerTimeZone: timeZone };
   const byDay = new Map<string, Array<{ id: string; t: number }>>();
   for (const run of runs) {
     const instant = runSessionSortInstant(run);
-    const key = `${run.userId ?? ""}|${dateKey(instant, timeZone)}`;
+    const key = `${run.userId ?? ""}|${dateKey(instant, resolveRunLocalTimeZone(run, zones))}`;
     const list = byDay.get(key) ?? [];
     list.push({ id: run.id, t: instant.getTime() });
     byDay.set(key, list);
@@ -92,28 +128,36 @@ export function buildDayRunNumberMap(
 
 export function buildRunHistoryGroups<T extends RunForHistoryGroup>(
   runs: T[],
-  timeZone?: string | null
+  timeZone?: string | null,
+  opts?: Pick<RunGroupZoneOptions, "ownerTimeZoneByUserId">
 ): RunHistoryGroup<T>[] {
+  const zones: RunGroupZoneOptions = { ...opts, viewerTimeZone: timeZone };
+  // The day is resolved in the DRIVER's zone (see `resolveRunLocalTimeZone`), so the
+  // same key comes out no matter who is reading the list.
+  const groupKeyFor = (run: T): string =>
+    run.eventId
+      ? `event-${run.eventId}`
+      : `day-${dateKey(runSessionSortInstant(run), resolveRunLocalTimeZone(run, zones))}-${trackKey(run)}`;
+
   // Non-event runs group by day AND track: a single calendar day can span two
   // venues (especially in team view, where teammates run different tracks the
   // same day) — keying on day alone merged them and mislabelled the group with
   // one track. Events keep their own single-venue grouping.
   const byKey = new Map<string, T[]>();
   for (const run of runs) {
-    const key = run.eventId
-      ? `event-${run.eventId}`
-      : `day-${dateKey(runSessionSortInstant(run), timeZone)}-${trackKey(run)}`;
+    const key = groupKeyFor(run);
     const list = byKey.get(key) ?? [];
     list.push(run);
     byKey.set(key, list);
   }
   const groups: RunHistoryGroup<T>[] = [];
-  for (const [, groupRuns] of byKey) {
+  for (const [groupKey, groupRuns] of byKey) {
     const run = groupRuns[0]!;
+    const runZone = resolveRunLocalTimeZone(run, zones);
     const isEvent = !!run.eventId && run.event;
     const title = isEvent && run.event
       ? run.event.name
-      : `Test day – ${formatGroupDate(runSessionSortInstant(run), timeZone)}`;
+      : `Test day – ${formatGroupDate(runSessionSortInstant(run), runZone)}`;
     const type: RunHistoryGroup["type"] = isEvent ? "Race Meeting" : "Testing";
     const trackName = isEvent && run.event
       ? (run.event.track?.name ?? run.event.trackNameSnapshot ?? run.track?.name ?? run.trackNameSnapshot ?? "—")
@@ -136,11 +180,9 @@ export function buildRunHistoryGroups<T extends RunForHistoryGroup>(
           }
           return `${startLabel} – ${endLabel}`;
         })()
-      : formatGroupDate(runSessionSortInstant(run), timeZone);
+      : formatGroupDate(runSessionSortInstant(run), runZone);
     groups.push({
-      id: run.eventId
-        ? `event-${run.eventId}`
-        : `day-${dateKey(runSessionSortInstant(run), timeZone)}-${trackKey(run)}`,
+      id: groupKey,
       title,
       type,
       trackName,

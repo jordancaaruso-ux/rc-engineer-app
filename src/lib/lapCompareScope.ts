@@ -12,7 +12,18 @@
  *   `library:<id>` — a session from the viewer's imported lap-time library
  */
 
-export type LapCompareScope = "all" | "same_day" | "same_event";
+export type LapCompareScope = "all" | "same_day" | "same_event" | "same_track";
+
+/**
+ * Track identity for scoping, keyed on the resolved NAME rather than the id: imported
+ * and legacy rows routinely carry only a `trackNameSnapshot` with a null `trackId`, so
+ * id-keying would hide a session run at the very venue you are standing at. Same rule
+ * as `trackKey` in buildRunHistoryGroups.
+ */
+export function lapCompareTrackKey(name?: string | null): string | null {
+  const trimmed = (name ?? "").trim().toLowerCase();
+  return trimmed ? trimmed : null;
+}
 
 /** True when two ISO instants land on the same local calendar day. */
 export function sameLocalCalendarDay(isoA: string, isoB: string): boolean {
@@ -39,6 +50,10 @@ export function lapSeriesMatchesCompareScope(input: {
   primaryRunEventId?: string | null;
   /** `history:<id>` → that run's event id. */
   eventIdForHistoryRun?: (runId: string) => string | null | undefined;
+  /** Track of the anchor run, via {@link lapCompareTrackKey}. */
+  anchorTrackKey?: string | null;
+  /** Any series id → the track it was run at, via {@link lapCompareTrackKey}. */
+  trackKeyForSeries?: (seriesId: string) => string | null | undefined;
 }): boolean {
   const {
     seriesId,
@@ -48,6 +63,8 @@ export function lapSeriesMatchesCompareScope(input: {
     anchorEventId = null,
     primaryRunEventId = null,
     eventIdForHistoryRun,
+    anchorTrackKey = null,
+    trackKeyForSeries,
   } = input;
 
   // Lap sets imported onto this run ARE this session — the rest of the race field
@@ -60,6 +77,16 @@ export function lapSeriesMatchesCompareScope(input: {
 
   if (scope === "all") return true;
   if (scope === "same_day") return sameLocalCalendarDay(sortIso, anchorInstantIso);
+
+  // same_track — the default. "Was I quicker here?" is the question a lap sheet is
+  // actually opened to answer, and unlike same_day it cannot be broken by a session
+  // that crosses midnight. A series whose track is unknown (an imported session never
+  // linked to a run) is dropped rather than guessed at; it stays reachable under "All".
+  if (scope === "same_track") {
+    if (seriesId === "run:primary") return true;
+    if (!anchorTrackKey) return false;
+    return (trackKeyForSeries?.(seriesId) ?? null) === anchorTrackKey;
+  }
 
   // same_event. With no event on the anchor there is nothing to match, so keep
   // everything attached to a run and drop the free-floating library sessions.

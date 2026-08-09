@@ -26,6 +26,12 @@ export async function GET() {
       linkedEventId: true,
       parsedPayload: true,
       fieldStatsJson: true,
+      // An import has no track of its own; the only claim it can make is via the run
+      // it was linked to. The lap sheet's "same track" scope needs this, and an
+      // unlinked import stays honestly trackless rather than being guessed at.
+      linkedRun: {
+        select: { trackNameSnapshot: true, track: { select: { name: true } } },
+      },
     },
   });
 
@@ -39,6 +45,7 @@ export async function GET() {
       sourceType: r.sourceType,
       linkedRunId: r.linkedRunId,
       linkedEventId: r.linkedEventId,
+      trackName: r.linkedRun?.track?.name ?? r.linkedRun?.trackNameSnapshot ?? null,
       parsedPayload: r.parsedPayload,
       fieldStatsPreview: importedSessionFieldStatsPreviewFromJson(r.fieldStatsJson),
     }))

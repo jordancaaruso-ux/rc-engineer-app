@@ -21,6 +21,14 @@ model User {
   updatedAt     DateTime  @updatedAt
   stripeCustomerId String? @unique
 
+  /**
+   * Last IANA zone seen from this user's device (the `rc_tz` cookie, refreshed on run
+   * create). Session grouping needs to know what day a run was to the person who DROVE
+   * it, and runs logged before per-run capture have no zone of their own — this is the
+   * fallback for those. See `Run.localTimeZone`.
+   */
+  timeZone String?
+
   accounts Account[]
   sessions Session[]
   subscription Subscription?
@@ -1334,6 +1342,21 @@ model Run {
    * re-imports, or lap-time changes. Backfilled from `COALESCE(sessionCompletedAt, createdAt)`.
    */
   sortAt DateTime @default(now())
+
+  /**
+   * IANA zone of the device that logged this run (`rc_tz` cookie at create time).
+   *
+   * Session grouping asks "what calendar day was this run, to the driver?" — NOT to
+   * whoever happens to be reading. Keyed on the reader's zone, a teammate's continuous
+   * test day splits into two dated groups the moment it crosses the reader's midnight
+   * (reported 2026-08-09: one MR33 Arena test day appearing as 06 + 07 Aug). Stamped
+   * once at create and never rewritten; an edit months later must not relabel the day
+   * the driver was actually there.
+   *
+   * Null on runs logged before this column existed — `resolveRunLocalTimeZone` falls
+   * back to the owner's `User.timeZone`, then the viewer's zone.
+   */
+  localTimeZone String?
 
   /**
    * When false, team members do not see this run in team Sessions or any Engineer peer path.
