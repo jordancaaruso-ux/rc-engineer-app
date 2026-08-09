@@ -259,7 +259,9 @@ export function RunLapAnalysisModal({
       }}
     >
       <div
-        className="flex h-[min(92dvh,720px)] max-h-full w-full flex-col rounded-t-lg border border-border bg-surface-runna pb-[env(safe-area-inset-bottom)] shadow-lg sm:max-w-4xl sm:rounded-lg sm:pb-0"
+        // lg:max-w-6xl: from `lg` the grid gains a 17rem session rail beside it,
+        // and at 4xl the lap columns were left about 39rem to share.
+        className="flex h-[min(92dvh,720px)] max-h-full w-full flex-col rounded-t-lg border border-border bg-surface-runna pb-[env(safe-area-inset-bottom)] shadow-lg sm:max-w-4xl sm:rounded-lg sm:pb-0 lg:max-w-6xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-2 border-b border-border px-3 py-2.5 shrink-0">

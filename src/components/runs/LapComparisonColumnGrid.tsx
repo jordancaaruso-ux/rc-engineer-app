@@ -5,16 +5,23 @@ import { Wrench } from "lucide-react";
 import type { ComparisonSeries, LapRow, SummaryMetricDeltas } from "@/lib/lapAnalysis";
 import {
   alignLapsByNumber,
+  analyzeLapRows,
   areLapSeriesEquivalent,
   buildComparisonSeries,
   computeSummaryDeltas,
   filterDuplicateImportedSeries,
   formatLapDelta,
   getDeltaStyle,
+  getIncludedLaps,
   importedSetToLapRows,
   primaryLapRowsFromRun,
   resolveDeltaTintRange,
 } from "@/lib/lapAnalysis";
+import { LapTimeGraph } from "@/components/runs/LapTimeGraph";
+import {
+  LapCompareStatTiles,
+  type LapStatTile,
+} from "@/components/runs/LapCompareStatTiles";
 import {
   lapCompareTrackKey,
   lapSeriesMatchesCompareScope,
@@ -762,6 +769,111 @@ export function LapComparisonColumnGrid({
     return comparisonSeries.map((s) => metaById.get(s.id)?.name ?? s.label).join(", ");
   }, [comparisonSeries, metaById]);
 
+  /**
+   * The desktop tile row. Comparisons are read against the FIRST ticked column —
+   * the same one the lap trace draws — so the tiles, the trace and the grid are
+   * all answering "versus what?" with the same session rather than three.
+   */
+  const statTiles = useMemo((): LapStatTile[] => {
+    if (!targetSeries) return [];
+    const vs = comparisonSeries[0] ?? null;
+    const vsName = vs ? metaById.get(vs.id)?.name ?? vs.label : null;
+    const d = vs ? computeSummaryDeltas(targetSeries, vs) : null;
+
+    /** `comparison − target`, so negative means the target was quicker. */
+    const noteFor = (delta: number | null | undefined) => {
+      if (delta == null || !Number.isFinite(delta) || !vsName) return { note: null };
+      return {
+        // Flipped to read from the target's side: "−0.091 on Run 6" means this
+        // session was 0.091 quicker than that one.
+        note: `${formatLapDelta(-delta)} on ${vsName}`,
+        noteTone: (-delta < 0 ? "good" : "bad") as "good" | "bad",
+      };
+    };
+
+    const targetAnalysis = analyzeLapRows(targetSeries.laps);
+    const vsAnalysis = vs ? analyzeLapRows(vs.laps) : null;
+    const included = getIncludedLaps(targetSeries.laps).length;
+    const total = targetSeries.laps.filter((l) => l.lapNumber !== 0).length;
+
+    const consistencyDelta =
+      targetAnalysis.consistencyStdDev != null && vsAnalysis?.consistencyStdDev != null
+        ? vsAnalysis.consistencyStdDev - targetAnalysis.consistencyStdDev
+        : null;
+
+    /*
+     * Where this session's best lap sat among the field that came in on the same
+     * timing sheet. Only the `imported:` series are the field — another of the
+     * driver's own runs is not someone they finished ahead of — so the tile is
+     * omitted entirely on a session with no timing import rather than reporting
+     * "P1 of 1", which is not information.
+     */
+    const fieldBests = seriesList
+      .filter((s) => s.id.startsWith("imported:"))
+      .map((s) => s.bestLap)
+      .filter((b): b is number => b != null);
+    let fieldTile: LapStatTile | null = null;
+    if (fieldBests.length > 0 && targetSeries.bestLap != null) {
+      const all = [targetSeries.bestLap, ...fieldBests].sort((a, b) => a - b);
+      const rank = all.filter((b) => b < targetSeries.bestLap! - 1e-9).length + 1;
+      const mid = all.length / 2;
+      const median =
+        all.length % 2 === 1 ? all[Math.floor(mid)]! : (all[mid - 1]! + all[mid]!) / 2;
+      fieldTile = {
+        label: "Vs field",
+        value: `P${rank}`,
+        valueSuffix: `/${all.length}`,
+        note: `median ${median.toFixed(3)}`,
+        noteTone: "muted",
+      };
+    }
+
+    const tiles: LapStatTile[] = [
+      {
+        label: "Best lap",
+        value: formatLap(targetSeries.bestLap),
+        accent: true,
+        ...noteFor(d?.bestDelta),
+      },
+      { label: "Avg top 5", value: formatLap(targetSeries.avgTop5), ...noteFor(d?.avgTop5Delta) },
+      {
+        label: "Consistency",
+        value:
+          targetAnalysis.consistencyStdDev != null
+            ? `±${targetAnalysis.consistencyStdDev.toFixed(2)}`
+            : "—",
+        ...(consistencyDelta != null && vsName
+          ? {
+              note: `${formatLapDelta(-consistencyDelta)} on ${vsName}`,
+              noteTone: (-consistencyDelta < 0 ? "good" : "bad") as "good" | "bad",
+            }
+          : { note: null }),
+      },
+      {
+        label: "Laps counted",
+        value: String(included),
+        valueSuffix: `/${total}`,
+        note: total > included ? `${total - included} excluded` : null,
+        noteTone: "muted",
+      },
+    ];
+    if (fieldTile) tiles.push(fieldTile);
+    return tiles;
+  }, [targetSeries, comparisonSeries, metaById, seriesList]);
+
+  /**
+   * Trace rows for the target and, when one is ticked, the first comparison as a
+   * baseline. `LapTimeGraph` carries the app's established trace conventions
+   * (clean-pace clamp, excluded laps bridged, mono ticks) and takes exactly one
+   * baseline — so this shows two sessions, not the artifact's three. A true
+   * N-series trace needs a categorical chart palette, which the app does not yet
+   * have and which is a design-system call rather than one to make here.
+   */
+  const traceBaseline = comparisonSeries[0] ?? null;
+  const traceBaselineName = traceBaseline
+    ? metaById.get(traceBaseline.id)?.name ?? traceBaseline.label
+    : null;
+
   const toggleComparison = useCallback((id: string) => {
     setSelectedComparisonIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -775,6 +887,97 @@ export function LapComparisonColumnGrid({
 
   if (seriesList.length < 1) {
     return <p className="text-xs text-muted-foreground">No lap data for comparison.</p>;
+  }
+
+  /**
+   * One picker, two homes: the phone opens it in a sheet, the desktop leaves it
+   * standing in the rail. Rendered from a function rather than a shared variable
+   * because both are mounted at once (hidden by breakpoint, not unmounted), and
+   * two live copies of the same `id` would break every label's `htmlFor`.
+   */
+  /**
+   * One clock across the whole sheet. `selectLabel` formats its time through
+   * `formatImportedSessionTime` ("09/08/2026, 01:20 pm") while every row, column
+   * header and tile below it reads `formatRunDateTime` ("9 Aug, 1:20 PM") — two
+   * notations for the same instant, on one screen, and the long one overflowed
+   * the rail's select anyway.
+   */
+  function targetOptionLabel(s: ComparisonSeries): string {
+    const m = metaFor(s);
+    return m.sortIso ? `${m.name} · ${formatRunDateTime(m.sortIso)}` : m.name;
+  }
+
+  function renderPicker(idPrefix: string) {
+    const targetId_ = `${idPrefix}-lap-compare-target`;
+    const scopeId = `${idPrefix}-lap-compare-scope`;
+    return (
+      <div className="space-y-3">
+        <div className="space-y-1">
+          <label className="ui-label-caps text-[9px] uppercase tracking-wider" htmlFor={targetId_}>
+            Measure everything against
+          </label>
+          <select
+            id={targetId_}
+            className="w-full rounded-md border border-border bg-card px-2 py-2 text-xs outline-none"
+            value={targetId}
+            onChange={(e) => setTargetId(e.target.value)}
+            aria-label="Target series"
+          >
+            {targetOptionGroups.length === 1
+              ? targetOptionGroups[0].series.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {targetOptionLabel(s)}
+                  </option>
+                ))
+              : targetOptionGroups.map((g) => (
+                  <optgroup key={g.key} label={g.label}>
+                    {g.series.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {targetOptionLabel(s)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+          </select>
+        </div>
+
+        <LapCompareSegmentBar
+          segments={segments}
+          active={activeSegment}
+          onSelect={(k) => setActiveSegment(k as CompareSegmentKey)}
+        />
+
+        <LapCompareSessionList
+          groups={pickerGroups}
+          selectedIds={selectedComparisonIds}
+          onToggle={toggleComparison}
+          target={targetPickerRow}
+        />
+
+        {/*
+         * Scope sits at the bottom on purpose. The grouping above already says
+         * "this test day" and "earlier at MR33 Arena", so widening the net is a
+         * thing you reach for when the list ran out — not a decision to make
+         * before you have seen it.
+         */}
+        <div className="space-y-1 border-t border-border pt-3">
+          <label className="ui-label-caps text-[9px] uppercase tracking-wider" htmlFor={scopeId}>
+            How far to look
+          </label>
+          <select
+            id={scopeId}
+            className="w-full rounded-md border border-border bg-card px-2 py-2 text-xs outline-none"
+            value={compareScope}
+            onChange={(e) => setCompareScope(e.target.value as typeof compareScope)}
+          >
+            <option value="same_track">This track only</option>
+            {compareAnchorRun.eventId ? <option value="same_event">This event only</option> : null}
+            <option value="same_day">This calendar day only</option>
+            <option value="all">Everything</option>
+          </select>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -796,7 +999,7 @@ export function LapComparisonColumnGrid({
        * had to work through before the first lap time was on screen, on a sheet
        * opened to look at lap times.
        */}
-      <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface-runna px-3 py-2">
+      <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface-runna px-3 py-2 lg:hidden">
         <div className="min-w-0">
           <p className="ui-label-caps text-[9px] uppercase tracking-wider">Compared with</p>
           <p
@@ -824,73 +1027,73 @@ export function LapComparisonColumnGrid({
         onClose={() => setPickerOpen(false)}
         selectedCount={selectedComparisonIds.length}
       >
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <label className="ui-label-caps text-[9px] uppercase tracking-wider" htmlFor="lap-compare-target">
-              Measure everything against
-            </label>
-            <select
-              id="lap-compare-target"
-              className="w-full rounded-md border border-border bg-card px-2 py-2 text-xs outline-none"
-              value={targetId}
-              onChange={(e) => setTargetId(e.target.value)}
-              aria-label="Target series"
-            >
-              {targetOptionGroups.length === 1
-                ? targetOptionGroups[0].series.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {metaFor(s).selectLabel}
-                    </option>
-                  ))
-                : targetOptionGroups.map((g) => (
-                    <optgroup key={g.key} label={g.label}>
-                      {g.series.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {metaFor(s).selectLabel}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-            </select>
-          </div>
-
-          <LapCompareSegmentBar
-            segments={segments}
-            active={activeSegment}
-            onSelect={(k) => setActiveSegment(k as CompareSegmentKey)}
-          />
-
-          <LapCompareSessionList
-            groups={pickerGroups}
-            selectedIds={selectedComparisonIds}
-            onToggle={toggleComparison}
-            target={targetPickerRow}
-          />
-
-          {/*
-           * Scope sits at the bottom on purpose. The grouping above already says
-           * "this test day" and "earlier at MR33 Arena", so widening the net is a
-           * thing you reach for when the list ran out — not a decision to make
-           * before you have seen it.
-           */}
-          <div className="space-y-1 border-t border-border pt-3">
-            <label className="ui-label-caps text-[9px] uppercase tracking-wider" htmlFor="lap-compare-scope">
-              How far to look
-            </label>
-            <select
-              id="lap-compare-scope"
-              className="w-full rounded-md border border-border bg-card px-2 py-2 text-xs outline-none"
-              value={compareScope}
-              onChange={(e) => setCompareScope(e.target.value as typeof compareScope)}
-            >
-              <option value="same_track">This track only</option>
-              {compareAnchorRun.eventId ? <option value="same_event">This event only</option> : null}
-              <option value="same_day">This calendar day only</option>
-              <option value="all">Everything</option>
-            </select>
-          </div>
-        </div>
+        {renderPicker("sheet")}
       </LapCompareSheet>
+
+      {/* Desktop: the tiles, then the rail beside the grid. The rail renders the
+          same picker the phone opens in a sheet — at this width there is room to
+          leave it standing, so choosing what to compare stops being a mode. */}
+      <LapCompareStatTiles tiles={statTiles} className="hidden lg:grid" />
+
+      <div className="lg:grid lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-4">
+        <aside className="hidden lg:block">
+          <div className="max-h-[52vh] overflow-y-auto overscroll-contain rounded-md border border-border bg-surface-runna p-2.5">
+            {renderPicker("rail")}
+          </div>
+        </aside>
+
+        <div className="min-w-0 space-y-3">
+          {/* The trace answers "what shape was the run?" before the grid answers
+              "by how much, lap by lap?". Hidden until a comparison is ticked —
+              on its own it repeats what the single-run views already show. */}
+          {targetSeries && traceBaseline ? (
+            <div className="hidden rounded-md border border-border bg-surface-runna p-2.5 lg:block">
+              <div className="mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <p className="ui-label-caps text-[9px] uppercase tracking-wider">Lap trace</p>
+                {/* Two series means a legend, always: the trace separates them by
+                    line style alone, and a <title> tooltip is not an answer for
+                    anyone reading rather than hovering. */}
+                <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <svg width="16" height="6" aria-hidden className="shrink-0">
+                    <line x1="0" y1="3" x2="16" y2="3" stroke="#A09D96" strokeWidth="2" />
+                  </svg>
+                  {metaById.get(targetSeries.id)?.name ?? targetSeries.label}
+                </span>
+                <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <svg width="16" height="6" aria-hidden className="shrink-0">
+                    <line
+                      x1="0"
+                      y1="3"
+                      x2="16"
+                      y2="3"
+                      stroke="#A09D96"
+                      strokeWidth="1.5"
+                      strokeOpacity="0.35"
+                      strokeDasharray="4 3"
+                    />
+                  </svg>
+                  {traceBaselineName}
+                </span>
+              </div>
+              <LapTimeGraph
+                rows={targetSeries.laps}
+                bestLapNumbers={
+                  new Set(
+                    targetSeries.bestLap != null
+                      ? targetSeries.laps
+                          .filter((l) => isBestLapOf(targetSeries, l) && l.isIncluded)
+                          .map((l) => l.lapNumber)
+                      : []
+                  )
+                }
+                mistakeLapNumbers={new Set()}
+                mistakeDetailByLapNumber={new Map()}
+                medianSeconds={null}
+                baseline={traceBaseline.laps}
+                baselineLabel={traceBaselineName}
+              />
+            </div>
+          ) : null}
 
       <div className="overflow-x-auto rounded-md border border-border">
         {/* No forced min-width: Lap + target + one comparison fit a 390px phone;
@@ -1118,6 +1321,8 @@ export function LapComparisonColumnGrid({
           <span className="ui-label-caps text-[9px] text-muted-foreground">Slower</span>
         </div>
       ) : null}
+        </div>
+      </div>
     </div>
   );
 }

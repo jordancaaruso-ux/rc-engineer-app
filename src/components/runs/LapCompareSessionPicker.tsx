@@ -70,8 +70,10 @@ export function LapCompareSegmentBar({
             type="button"
             role="tab"
             aria-selected={on}
+            // text-[10px]/px-1: in the 17rem desktop rail, three segments at 11px
+            // clipped "Teammates" to "Teammat…".
             className={cn(
-              "min-w-0 flex-1 truncate rounded px-2 py-1.5 text-[11px] transition",
+              "min-w-0 flex-1 truncate rounded px-1 py-1.5 text-[10px] transition",
               on
                 ? "bg-primary font-semibold text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground"
