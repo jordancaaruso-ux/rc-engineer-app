@@ -423,6 +423,7 @@ export function CarList({
                   value={name}
                   onChange={(e) => onNameChange(e.target.value)}
                   placeholder={selectedModel?.name ?? "e.g. My MTC3"}
+                  aria-label="Car name"
                   required
                 />
               </div>
@@ -434,6 +435,7 @@ export function CarList({
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Optional"
+                  aria-label="Car notes"
                 />
               </div>
 

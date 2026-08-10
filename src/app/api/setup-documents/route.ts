@@ -12,6 +12,7 @@ import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
 import { canonicalSetupTemplateForUserCarId } from "@/lib/carSetupScope";
 import { isAllowedSetupDocumentBlobUrl } from "@/lib/setupDocuments/blobStorageRef";
+import { DRIVER_VISIBLE_SETUP_DOCUMENT_WHERE } from "@/lib/setupDocuments/driverVisibleDocuments";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
   const docs = await prisma.setupDocument.findMany({
     where: forExamplePdf
       ? { userId: userId, mimeType: "application/pdf" }
-      : { userId: userId, setupImportBatchId: null },
+      : { userId: userId, ...DRIVER_VISIBLE_SETUP_DOCUMENT_WHERE },
     orderBy: { createdAt: "desc" },
     take: forExamplePdf ? 100 : undefined,
     select: {
@@ -135,7 +136,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "File too large (max 12 MB)" }, { status: 400 });
   }
   if (!SETUP_DOCUMENT_ALLOWED_MIME.has(mimeType)) {
-    return NextResponse.json({ error: "Unsupported file type. Use PDF/JPG/PNG/WEBP." }, { status: 400 });
+    // Images stopped being accepted 2026-08-10; this message still sent drivers off to find a JPG
+    // that the very next line would refuse.
+    return NextResponse.json(
+      { error: "A setup sheet has to be a fillable PDF — the one you can type into." },
+      { status: 400 }
+    );
   }
 
   let storagePath: string;

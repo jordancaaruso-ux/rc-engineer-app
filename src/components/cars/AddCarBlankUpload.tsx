@@ -80,7 +80,12 @@ export function AddCarBlankUpload({
       <div>
         <p className="text-xs text-foreground">Add your chassis from your setup sheet.</p>
         <p className="mt-1 text-[11px] text-muted-foreground">
-          It has to be the <span className="text-foreground">fillable</span> PDF — the one you can
+          {/*
+            No space is needed straight after the closing tag. JSX drops one there, which turned
+            "fillable PDF — the one" into "fillable PDF— the one" on the rendered page; leading the
+            next text node with punctuation sidesteps it rather than relying on an escape.
+          */}
+          It has to be the <span className="text-foreground">fillable PDF</span>, the one you can
           type into. Your manufacturer&rsquo;s blank works, and so does a sheet you&rsquo;ve already
           filled in: whatever is in the boxes comes with it.
         </p>
@@ -109,7 +114,7 @@ export function AddCarBlankUpload({
             setError(null);
             setOfferNoSheet(false);
           }}
-          aria-label="Blank setup sheet PDF"
+          aria-label="Setup sheet (fillable PDF)"
         />
       </div>
 

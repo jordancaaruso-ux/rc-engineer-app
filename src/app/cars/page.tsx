@@ -14,6 +14,7 @@ import { setupSheetModelIdsSupportingUpload } from "@/lib/setupCalibrations/carS
 import { getCachedCarManagerData } from "@/lib/cachedReads";
 import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerModels";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
+import { DRIVER_VISIBLE_SETUP_DOCUMENT_WHERE } from "@/lib/setupDocuments/driverVisibleDocuments";
 
 /**
  * Garage — the cars & setups index, and the Garage tab's destination. A setup belongs to a car, so
@@ -81,11 +82,11 @@ export default async function CarManagerPage({
       }),
       prisma.setupDocument.groupBy({
         by: ["carId"],
-        where: { userId: user.id, setupImportBatchId: null, carId: { not: null } },
+        where: { userId: user.id, ...DRIVER_VISIBLE_SETUP_DOCUMENT_WHERE, carId: { not: null } },
         _count: { _all: true },
       }),
       prisma.setupDocument.count({
-        where: { userId: user.id, setupImportBatchId: null, carId: null },
+        where: { userId: user.id, ...DRIVER_VISIBLE_SETUP_DOCUMENT_WHERE, carId: null },
       }),
       prisma.run.groupBy({
         by: ["carId"],

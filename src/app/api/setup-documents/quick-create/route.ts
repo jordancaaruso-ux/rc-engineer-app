@@ -227,7 +227,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   if (!SETUP_DOCUMENT_ALLOWED_MIME.has(mimeType)) {
     return NextResponse.json(
-      { error: "Unsupported file type. Use PDF/JPG/PNG/WEBP." },
+      { error: "A setup sheet has to be a fillable PDF — the one you can type into." },
       { status: 400 }
     );
   }

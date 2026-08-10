@@ -139,6 +139,37 @@ export async function storeRunRenderedSetupPdf(runId: string, pdfBytes: Buffer):
   return rel;
 }
 
+/**
+ * Persist a rendered page of a blank setup sheet, so the picture is drawn once per chassis instead
+ * of once per driver who opens it.
+ *
+ * Keyed by chassis and page rather than by document, because the chassis is what everybody shares:
+ * the driver who uploaded the sheet may delete their account and take the PDF with them, and the
+ * sheet still has to draw for the drivers who came after.
+ */
+export async function storeSheetPageImage(
+  setupSheetModelId: string,
+  pageNumber: number,
+  webpBytes: Buffer
+): Promise<string> {
+  assertDurableStorageForWrites();
+  const key = `sheet-pages/${setupSheetModelId}-p${pageNumber}.webp`;
+  if (useBlobStorage()) {
+    const blob = await put(key, webpBytes, {
+      access: "private",
+      contentType: "image/webp",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+    return blob.url;
+  }
+  const dir = path.join(LOCAL_UPLOAD_ROOT, "sheet-pages");
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, `${setupSheetModelId}-p${pageNumber}.webp`), webpBytes);
+  return `/uploads/sheet-pages/${setupSheetModelId}-p${pageNumber}.webp`;
+}
+
 /** Persist lazily rendered setup-snapshot PDF (no run). */
 export async function storeSetupSnapshotRenderedSetupPdf(setupSnapshotId: string, pdfBytes: Buffer): Promise<string> {
   assertDurableStorageForWrites();

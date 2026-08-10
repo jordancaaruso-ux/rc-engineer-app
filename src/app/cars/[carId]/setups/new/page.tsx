@@ -26,6 +26,8 @@ import { formatRunDateShort } from "@/lib/formatDate";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { NewCarSetupClient } from "@/components/setup/NewCarSetupClient";
+import { SheetModeFill } from "@/components/setup/SheetModeFill";
+import { chassisFillsAsSheet } from "@/lib/setupSheetModels/sheetPlan";
 
 /**
  * First fill for a new library setup on a car.
@@ -75,6 +77,22 @@ export default async function NewCarSetupPage(props: {
   if (!car) notFound();
 
   const template = await getSetupSheetTemplateForCar(user.id, car, "setup");
+
+  /*
+   * A chassis somebody built from their own PDF fills as their sheet, not as a form.
+   *
+   * The test is whether we have geometry to draw with, never how many boxes are still unnamed. An
+   * unnamed box has `showInLogRun: false`, and the ordinary form only shows fields with that flag
+   * set — so falling back to the form on a half-named sheet would hand the driver a shorter form
+   * and silently drop the rest of their sheet.
+   */
+  const blank = car.setupSheetModelId
+    ? await prisma.setupSheetBlank.findUnique({
+        where: { setupSheetModelId: car.setupSheetModelId },
+        select: { boxesJson: true, fillSurface: true },
+      })
+    : null;
+  const sheetMode = chassisFillsAsSheet(blank);
 
   // Baselines are global — never scope this read by userId. Kit first, then base, then pro.
   const baselineRows = car.setupSheetModelId
@@ -189,14 +207,29 @@ export default async function NewCarSetupPage(props: {
       </header>
       <section className="page-body">
         <div className="max-w-2xl">
-          <NewCarSetupClient
-            carId={car.id}
-            carName={car.name}
-            template={template}
-            baselines={baselines}
-            previousSetups={previousSetups}
-            fillDraft={fillDraft}
-          />
+          {sheetMode && car.setupSheetModelId ? (
+            /*
+             * No start-from picker here, on purpose. Those three choices — previous setup, baseline,
+             * empty — answer "what should the boxes start at", and on this driver's own sheet the
+             * answer already came out of their PDF. A parked draft still resumes, because that is
+             * the same sheet half-finished rather than a different place to start from.
+             */
+            <SheetModeFill
+              carId={car.id}
+              setupSheetModelId={car.setupSheetModelId}
+              chassisName={template.label ?? car.name}
+              initialValues={fillDraft?.values as Record<string, string> | undefined}
+            />
+          ) : (
+            <NewCarSetupClient
+              carId={car.id}
+              carName={car.name}
+              template={template}
+              baselines={baselines}
+              previousSetups={previousSetups}
+              fillDraft={fillDraft}
+            />
+          )}
         </div>
       </section>
     </>

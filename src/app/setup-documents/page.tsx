@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { SetupDocumentLibraryClient } from "@/components/setup-documents/SetupDocumentLibraryClient";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { DRIVER_VISIBLE_SETUP_DOCUMENT_WHERE } from "@/lib/setupDocuments/driverVisibleDocuments";
 
 function formatUtcStamp(iso: string): string {
   // Deterministic SSR+client string (no locale/timezone differences).
@@ -33,7 +34,7 @@ export default async function SetupDocumentsPage(): Promise<ReactNode> {
   const user = await requireCurrentUser();
   const [documents, cars] = await Promise.all([
     prisma.setupDocument.findMany({
-    where: { userId: user.id, setupImportBatchId: null },
+    where: { userId: user.id, ...DRIVER_VISIBLE_SETUP_DOCUMENT_WHERE },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
