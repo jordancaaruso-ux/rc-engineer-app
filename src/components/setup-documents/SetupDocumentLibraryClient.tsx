@@ -125,7 +125,7 @@ export function SetupDocumentLibraryClient({
                 <input
                   type="file"
                   className="hidden"
-                  accept="application/pdf,image/jpeg,image/png,image/webp"
+                  accept="application/pdf"
                   disabled={uploading || cars.length === 0}
                   onChange={(e) => onSelect(e.currentTarget.files?.[0] ?? null)}
                 />

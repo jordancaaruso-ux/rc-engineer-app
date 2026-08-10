@@ -10,6 +10,7 @@ import { HubRowTitle } from "@/components/ui/panel";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Collapse } from "@/components/ui/Collapse";
+import { AddCarBlankUpload } from "@/components/cars/AddCarBlankUpload";
 
 type SetupSheetModelOption = { id: string; name: string; slug: string; isAuthorized?: boolean };
 
@@ -92,7 +93,15 @@ export function CarList({
   const [nameDirty, setNameDirty] = useState(false);
   const [notes, setNotes] = useState("");
   const [setupSheetModelId, setSetupSheetModelId] = useState("");
-  const [pending, setPending] = useState(false); // "my chassis isn't listed yet"
+  const [pending, setPending] = useState(false); // no setup sheet — the fallback, not the offer
+  const [showUpload, setShowUpload] = useState(false); // "isn't listed" → upload your sheet
+  /**
+   * What the uploaded sheet already had in its boxes, waiting for a car to belong to.
+   *
+   * A finished sheet and a manufacturer's blank are not distinguishable, and both are worth
+   * keeping — a blank carries the kit settings, which beats starting from nothing.
+   */
+  const [importedSetup, setImportedSetup] = useState<Record<string, unknown> | null>(null);
   const [showCreateType, setShowCreateType] = useState(false); // admin-only inline create
   const [newTypeName, setNewTypeName] = useState("");
   const [creatingType, setCreatingType] = useState(false);
@@ -111,14 +120,55 @@ export function CarList({
   function selectModel(m: SetupSheetModelOption) {
     setSetupSheetModelId(m.id);
     setPending(false);
+    setShowUpload(false);
     setShowCreateType(false);
     if (!nameDirty) setName(m.name); // auto-fill name from chassis (still editable)
   }
 
-  function chooseNotListed() {
+  /**
+   * "My chassis isn't listed" now opens the upload panel instead of ending the conversation.
+   * The old no-sheet car is still reachable, but from inside that panel — it is the fallback for a
+   * sheet we cannot read, not the thing we offer first.
+   */
+  function chooseUploadBlank() {
     setSetupSheetModelId("");
-    setPending(true);
+    setPending(false);
+    setShowUpload(true);
     setShowCreateType(false);
+  }
+
+  function chooseWithoutSheet() {
+    setSetupSheetModelId("");
+    setShowUpload(false);
+    setPending(true);
+  }
+
+  function onChassisCreatedFromBlank(
+    model: SetupSheetModelOption,
+    summary: {
+      totalBoxes: number;
+      unnamedBoxes: number;
+      merged: boolean;
+      values: Record<string, unknown>;
+      filledCount: number;
+    }
+  ) {
+    setSetupSheetModels((prev) =>
+      prev.some((m) => m.id === model.id) ? prev : [{ ...model, isAuthorized: false }, ...prev]
+    );
+    selectModel(model);
+    // Held until the car exists — a setup needs a car to hang off. Saved by `handleAdd`.
+    setImportedSetup(summary.filledCount > 0 ? summary.values : null);
+    // Say what they got, in boxes. "289 parameters derived" is our word for it, not theirs.
+    // A merge is said out loud: they typed one name and are now on a row called something else.
+    const where = summary.merged
+      ? `We already had this exact sheet — your car goes on “${model.name}”, with everyone else running it.`
+      : `Chassis added from your sheet — ${summary.totalBoxes} boxes, where they sit on the paper.`;
+    setMessage(
+      summary.filledCount > 0
+        ? `${where} ${summary.filledCount} boxes already had something in them, so that becomes your first setup.`
+        : where
+    );
   }
 
   async function createTypeFromName() {
@@ -150,8 +200,10 @@ export function CarList({
     setNotes("");
     setSetupSheetModelId("");
     setPending(false);
+    setShowUpload(false);
     setShowCreateType(false);
     setNewTypeName("");
+    setImportedSetup(null);
   }
 
   async function handleAdd(e: React.FormEvent) {
@@ -162,7 +214,11 @@ export function CarList({
       return;
     }
     if (!setupSheetModelId && !pending) {
-      setMessage("Choose a chassis type — or ‘My chassis isn’t listed yet’.");
+      setMessage(
+        showUpload
+          ? "Add the chassis from your sheet first — or choose ‘I don’t have the sheet’."
+          : "Choose a chassis type — or ‘My chassis isn’t listed’."
+      );
       return;
     }
     setMessage(null);
@@ -177,13 +233,43 @@ export function CarList({
           setupSheetModelId: setupSheetModelId || null,
         }),
       });
+      /*
+       * The setup that came out of their sheet, now that there is a car to put it on.
+       *
+       * Saved after the car rather than with it, so a failure here costs them the setup and not the
+       * car — they can re-upload the sheet, but a half-created car is a mess they cannot fix. Same
+       * reason it does not block: the car is already theirs.
+       */
+      let importedSetupSaved = false;
+      if (importedSetup && Object.keys(importedSetup).length > 0) {
+        try {
+          await jsonFetch("/api/setup-snapshots", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              carId: car.id,
+              name: "From your sheet",
+              data: importedSetup,
+            }),
+          });
+          importedSetupSaved = true;
+        } catch {
+          importedSetupSaved = false;
+        }
+      }
+
       setCars((prev) => [car, ...prev]);
+      const hadImport = Boolean(importedSetup && Object.keys(importedSetup).length > 0);
       resetForm();
       setAddOpen(false);
       setMessage(
-        setupSheetModelId
-          ? "Car added. You can use it when logging a run."
-          : "Car added — no setup sheet yet. We’ll flag it to add your chassis type."
+        hadImport && importedSetupSaved
+          ? "Car added, with the setup from your sheet saved on it."
+          : hadImport
+            ? "Car added — but we couldn’t save the setup off your sheet. Try uploading it again from the car."
+            : setupSheetModelId
+              ? "Car added. You can use it when logging a run."
+              : "Car added — no setup sheet yet. We’ll flag it to add your chassis type."
       );
       router.refresh();
     } catch (err) {
@@ -237,10 +323,10 @@ export function CarList({
                     the old menu actions. */}
                 <select
                   className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-                  value={pending ? "__not_listed__" : setupSheetModelId}
+                  value={pending || showUpload ? "__upload_blank__" : setupSheetModelId}
                   onChange={(e) => {
                     const v = e.target.value;
-                    if (v === "__not_listed__") return chooseNotListed();
+                    if (v === "__upload_blank__") return chooseUploadBlank();
                     if (v === "__create__") {
                       // Keep the current selection; just reveal the create panel.
                       setShowCreateType(true);
@@ -249,6 +335,7 @@ export function CarList({
                     if (!v) {
                       setSetupSheetModelId("");
                       setPending(false);
+                      setShowUpload(false);
                       return;
                     }
                     const m = setupSheetModels.find((x) => x.id === v);
@@ -268,8 +355,13 @@ export function CarList({
                       {m.isAuthorized ? m.name : `${m.name} · Unreviewed`}
                     </option>
                   ))}
-                  {/* Non-admins can't add types — let them proceed without one (flagged pending). */}
-                  <option value="__not_listed__">My chassis isn’t listed yet — add without a setup sheet</option>
+                  {/*
+                    Was "add without a setup sheet", which made a car that could not hold one and
+                    told nobody. Now it opens the upload panel: the driver's own blank sheet becomes
+                    the chassis. The no-sheet car still exists, one step further in, for when the
+                    sheet cannot be read.
+                  */}
+                  <option value="__upload_blank__">My chassis isn’t listed — upload your setup sheet</option>
                   {/* Admin-only: mint a new global chassis type (custom setup sheet). */}
                   {isAdmin ? <option value="__create__">+ Create new chassis type…</option> : null}
                 </select>
@@ -301,6 +393,12 @@ export function CarList({
                     </div>
                   </div>
                 ) : null}
+                {showUpload ? (
+                  <AddCarBlankUpload
+                    onCreated={onChassisCreatedFromBlank}
+                    onAddWithoutSheet={chooseWithoutSheet}
+                  />
+                ) : null}
                 {selectedModel ? (
                   <p className="mt-1 text-[11px] text-muted-foreground">
                     Uses the shared <span className="text-foreground">{selectedModel.name}</span> setup sheet.
@@ -310,7 +408,7 @@ export function CarList({
                     No setup sheet yet — community stats and structured setup tools won’t apply until your
                     chassis type is added.
                   </p>
-                ) : (
+                ) : showUpload ? null : (
                   <p className="mt-1 text-[11px] text-muted-foreground">
                     Required — pick the chassis so the car gets the right setup sheet.
                   </p>

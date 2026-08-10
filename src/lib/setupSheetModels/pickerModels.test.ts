@@ -82,3 +82,27 @@ test("dedupe collapses by normalized name and keeps the best row", () => {
   const ids = out.map((m) => m.id).sort();
   assert.deepEqual(ids, ["b", "c"]);
 });
+
+test("a chassis built from a driver's own sheet is never collapsed away", () => {
+  // Founder call 2026-08-11. Without this, a driver who uploads their own "Mugen MTC3" blank while
+  // a curated row of that name exists gets a chassis that never appears in their own dropdown —
+  // their car works, but their SECOND car lands on the curated row and the two stop comparing.
+  const curated = row({ id: "curated", isAuthorized: true, slug: "mugen_mtc3" });
+  const mine = row({ id: "mine", name: "Mugen MTC3", slug: "sheet_a1b2c3d4e5f60718" });
+
+  const kept = recommendedSetupSheetModelIds([curated, mine]);
+  assert.equal(kept.has("curated"), true, "the curated row is still the canonical named row");
+  assert.equal(kept.has("mine"), true, "and the driver can still see their own sheet");
+
+  const out = dedupeSetupSheetModelsForPicker([curated, mine]);
+  assert.deepEqual(out.map((m) => m.id).sort(), ["curated", "mine"]);
+});
+
+test("two derived sheets sharing a name are two chassis, because the sheets differ", () => {
+  // Same car, different vintage of the sheet. The fingerprint already proved they are not
+  // interchangeable, so the name has nothing left to decide.
+  const a = row({ id: "a", name: "Xray X4", slug: "sheet_1111111111111111" });
+  const b = row({ id: "b", name: "Xray X4", slug: "sheet_2222222222222222" });
+  const out = dedupeSetupSheetModelsForPicker([a, b]);
+  assert.deepEqual(out.map((m) => m.id).sort(), ["a", "b"]);
+});

@@ -6,8 +6,15 @@
 import { uploadSetupDocumentViaClientBlob } from "@/lib/setupDocuments/clientBlobUpload";
 import { SETUP_UPLOAD_SERVERLESS_SAFE_BYTES } from "@/lib/setupDocuments/uploadLimits";
 
-export const QUICK_CREATE_SETUP_ACCEPT_MIME =
-  "application/pdf,image/jpeg,image/png,image/webp" as const;
+/**
+ * What the file picker offers. PDFs only — see `SETUP_DOCUMENT_ALLOWED_MIME`, which is the gate
+ * that actually enforces it.
+ *
+ * Restricting the picker is worth doing even though the server re-checks: on a phone, an `accept`
+ * that includes images puts the photo library in front of the driver, which invites exactly the
+ * upload the app is about to refuse.
+ */
+export const QUICK_CREATE_SETUP_ACCEPT_MIME = "application/pdf" as const;
 
 export type QuickCreateCarCandidate = { id: string; name: string };
 

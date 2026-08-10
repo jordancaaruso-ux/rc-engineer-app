@@ -117,6 +117,58 @@ export function universalParameterIdForSnapshotKey(snapshotKey: string): string 
   return CANONICAL_IDS.has(canonical) ? canonical : undefined;
 }
 
+/**
+ * Which universal parameter a stored snapshot key pools under, or undefined if it pools nowhere.
+ *
+ * WHY THIS EXISTS. Until 2026-08-10 the cross-car pool was keyed purely off the stored key string
+ * via the alias table above, and every sheet's `universalParameterId` was written but never read.
+ * That worked only because the generic preset's keys ARE the canonical ids — so a chassis whose
+ * boxes are keyed `text47` could declare `universalParameterId: "droop_front"` and still contribute
+ * nothing to any pool, forever. Sheets derived from a manufacturer's PDF are keyed off its form
+ * field names, so that is the normal case now, not an edge case.
+ *
+ * The schema's declaration wins, and the alias table is the fallback — which keeps behaviour
+ * byte-identical for every field that declares nothing (the existing catalog, and the derived
+ * geometry metrics, which have no schema field at all).
+ *
+ * A declaration that isn't a real canonical id is ignored rather than trusted: a mistyped or
+ * driver-supplied id must not be able to mint a new shared pool.
+ */
+export function resolveUniversalParameterId(
+  snapshotKey: string,
+  schemaUniversalIds?: ReadonlyMap<string, string> | null
+): string | undefined {
+  const declared = schemaUniversalIds?.get(snapshotKey.trim());
+  if (declared) {
+    const canonical = canonicalAggregationParameterKey(declared);
+    if (CANONICAL_IDS.has(canonical)) return canonical;
+  }
+  return universalParameterIdForSnapshotKey(snapshotKey);
+}
+
+/**
+ * Schema field key → the universal parameter it declares, for the sheets that declare one.
+ *
+ * Structurally typed rather than importing `SetupSheetModelSchema` so this module stays free of
+ * setup-sheet imports and the resolver above can be unit-tested with a plain map.
+ */
+export function universalParameterIdsBySchemaKey(
+  schema: { fields?: unknown } | null | undefined
+): Map<string, string> {
+  const out = new Map<string, string>();
+  const fields = schema && typeof schema === "object" ? (schema as { fields?: unknown }).fields : null;
+  if (!Array.isArray(fields)) return out;
+  for (const raw of fields) {
+    if (!raw || typeof raw !== "object") continue;
+    const f = raw as { key?: unknown; universalParameterId?: unknown };
+    const key = typeof f.key === "string" ? f.key.trim() : "";
+    const uid = typeof f.universalParameterId === "string" ? f.universalParameterId.trim() : "";
+    if (!key || !uid) continue;
+    out.set(key, uid);
+  }
+  return out;
+}
+
 export function lookupUniversalParameterDef(id: string): UniversalParameterDef | undefined {
   const canonical = canonicalAggregationParameterKey(id);
   return UNIVERSAL_TOURING_PARAMETERS.find((p) => p.id === canonical);

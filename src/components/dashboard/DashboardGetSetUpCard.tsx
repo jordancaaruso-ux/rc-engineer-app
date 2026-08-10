@@ -117,7 +117,7 @@ export function DashboardGetSetUpCard({ hasCar, hasTimingIdentity, hasSetup, set
     : !hasCar
       ? "Add a car first"
       : canUpload
-        ? "Snap a photo of your sheet — about 30 seconds"
+        ? "Upload your sheet — the fillable PDF, about 30 seconds"
         : "Build it in the app — a few minutes";
 
   const timingRow = (

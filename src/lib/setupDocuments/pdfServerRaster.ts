@@ -39,6 +39,25 @@ export async function renderPdfFirstPageToPng(
   bytes: Uint8Array,
   opts?: { scale?: number; timeoutMs?: number }
 ): Promise<Buffer> {
+  return renderPdfPageToPng(bytes, 1, opts);
+}
+
+/**
+ * Any page of a PDF, as a PNG.
+ *
+ * Added for the driver-facing fill surface, which shows a driver their own setup sheet. Rendering
+ * here rather than in the browser means a phone never downloads pdf.js or its 1.2 MB worker to
+ * look at a sheet — it downloads a picture. That matters trackside, where the connection is a
+ * club's wifi or nothing, and it removes the whole PDF engine from the page a driver uses most.
+ *
+ * `pageCountOf` exists alongside it because the caller needs to know how many pages to offer
+ * before it can ask for one.
+ */
+export async function renderPdfPageToPng(
+  bytes: Uint8Array,
+  pageNumber: number,
+  opts?: { scale?: number; timeoutMs?: number }
+): Promise<Buffer> {
   const scale = opts?.scale ?? 2;
   const timeoutMs = opts?.timeoutMs ?? 30_000;
 
@@ -51,7 +70,8 @@ export async function renderPdfFirstPageToPng(
     });
     try {
       if (doc.length < 1) throw new Error("PDF has no pages");
-      const png = await doc.getPage(1); // 1-indexed; returns a PNG Buffer
+      const page = Math.min(Math.max(Math.trunc(pageNumber) || 1, 1), doc.length);
+      const png = await doc.getPage(page); // 1-indexed; returns a PNG Buffer
       if (png.byteLength > 40 * 1024 * 1024) throw new Error("Rasterized PNG too large");
       return png;
     } finally {

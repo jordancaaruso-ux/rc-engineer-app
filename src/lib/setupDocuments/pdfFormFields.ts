@@ -11,6 +11,11 @@ import {
   PDFTextField,
 } from "pdf-lib";
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
+import {
+  checkMarkForCaption,
+  describePdfFieldAppearance,
+  type PdfFieldAppearance,
+} from "@/lib/setupDocuments/pdfFieldAppearance";
 import { normalizeTemplateExtractedValue } from "@/lib/setupCalibrations/applyTextTemplate";
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import { AWESOMATIX_MULTI_SELECT_GROUPS, AWESOMATIX_SINGLE_CHOICE_GROUPS } from "@/lib/setupDocuments/awesomatixWidgetGroups";
@@ -36,6 +41,11 @@ export type PdfFormFieldWidgetRect = {
   height: number;
   /** Btn/checkbox widget: from annotation /AS vs /AP on-states */
   checked?: boolean;
+  /**
+   * The mark this tick box makes — the sheet's own choice, not always a check mark.
+   * See `pdfFieldAppearance`: the Xray X4 '26 blank crosses 131 boxes and ticks none.
+   */
+  checkMark?: string;
 };
 
 export type PdfFormFieldEntry = {
@@ -46,12 +56,39 @@ export type PdfFormFieldEntry = {
   widgets: PdfFormFieldWidgetRect[];
   pageNumber: number | null;
   readError?: string;
+  /**
+   * The choices a dropdown / option list / radio group already declares, in the order the PDF
+   * lists them. Absent for text and checkbox fields.
+   *
+   * WHY IT IS WORTH CARRYING. On a sheet whose field names are Acrobat defaults (`Text2`…`Text142`
+   * — the whole Mugen MTC3), this is the only self-describing thing in the file: a box offering
+   * "Soft / Medium / Hard" says what it is without anyone reading the printed page. It costs one
+   * pdf-lib call and it is the difference between a derived sheet of blank boxes and one that
+   * already knows its own answers.
+   */
+  options?: string[];
+  /**
+   * The font, size, colour and alignment this PDF says a filled value must be drawn in.
+   *
+   * Carried so the app can draw a value the way the driver's own PDF viewer would. Without it the
+   * app picks its own look, the sheet stops matching the one they filled in last week, and an
+   * exported copy reads as something other than their setup sheet.
+   */
+  appearance?: PdfFieldAppearance;
 };
 
 export type PdfFormFieldsExtraction = {
   hasFormFields: boolean;
   fields: PdfFormFieldEntry[];
   loadError?: string;
+  /**
+   * Pages in the file, not pages carrying boxes.
+   *
+   * The honest number matters when deciding whether an upload is a setup sheet at all: a forty-page
+   * product manual with a two-box form on page three has a perfectly good form layer, and counting
+   * only the pages with widgets would let it through as a two-parameter chassis.
+   */
+  pageCount?: number;
 };
 
 export type PdfFormImportDebugRow = {
@@ -65,12 +102,40 @@ export type PdfFormImportDebugRow = {
 };
 
 /** pdf-lib widget annotation — use structural typing (not all builds export this class). */
-type AcroWidget = {
+export type AcroWidget = {
   getRectangle(): { x: number; y: number; width: number; height: number };
   P(): { toString(): string } | undefined;
   getAppearanceState(): unknown;
   getOnValue(): unknown;
+  setAppearanceState(state: unknown): void;
+  getAppearanceCharacteristics?(): { CA?(): { asString?(): string } | undefined } | undefined;
 };
+
+/**
+ * A widget rectangle with its corners the right way round.
+ *
+ * A PDF rectangle is two opposite corners in whichever order the writer felt like, and viewers are
+ * required to sort that out. pdf-lib hands back the raw subtraction, so a rectangle written
+ * top-then-bottom comes out with a negative height — measured: 22 of the 237 boxes on the Xray X4
+ * '22 blank. Left alone those 22 boxes are drawn in the wrong place on the sheet.
+ */
+function normalizeRect(rect: { x: number; y: number; width: number; height: number }) {
+  return {
+    x: rect.width < 0 ? rect.x + rect.width : rect.x,
+    y: rect.height < 0 ? rect.y + rect.height : rect.y,
+    width: Math.abs(rect.width),
+    height: Math.abs(rect.height),
+  };
+}
+
+/** The ZapfDingbats character this tick box marks itself with, if it names one. */
+function widgetCheckMark(widget: AcroWidget): string {
+  try {
+    return checkMarkForCaption(widget.getAppearanceCharacteristics?.()?.CA?.()?.asString?.());
+  } catch {
+    return checkMarkForCaption(null);
+  }
+}
 
 function widgetAppearanceIsOn(widget: AcroWidget): boolean {
   try {
@@ -82,6 +147,15 @@ function widgetAppearanceIsOn(widget: AcroWidget): boolean {
     return false;
   } catch {
     return false;
+  }
+}
+
+/** A malformed field should cost its own appearance, never the whole extraction. */
+function safely<T>(read: () => T): T | undefined {
+  try {
+    return read();
+  } catch {
+    return undefined;
   }
 }
 
@@ -117,10 +191,41 @@ function fieldSupportsPerWidgetToggle(field: PDFField): boolean {
   return field instanceof PDFCheckBox || field instanceof PDFRadioGroup;
 }
 
+/** The choices a field declares, deduped and trimmed. Empty for text/checkbox fields. */
+function readFieldOptions(field: PDFField): string[] {
+  try {
+    if (
+      !(field instanceof PDFDropdown)
+      && !(field instanceof PDFOptionList)
+      && !(field instanceof PDFRadioGroup)
+    ) {
+      return [];
+    }
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const raw of field.getOptions()) {
+      const v = typeof raw === "string" ? raw.trim() : "";
+      if (!v || seen.has(v)) continue;
+      seen.add(v);
+      out.push(v);
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 /**
- * Sorted widget layouts + per-widget checked state (checkbox / radio appearances).
+ * A field's widgets in `instanceIndex` order, paired with the annotation itself.
+ *
+ * The order IS the identity: a mapping that says "widget 2 of `fr-caster`" means the second box
+ * reading down and across the paper, and writing a value back has to land on the same box that was
+ * read. So reading and writing share this one function rather than each sorting for themselves.
  */
-export function collectWidgetLayouts(pdfDoc: PDFDocument, field: PDFField): PdfFormFieldWidgetRect[] {
+export function orderedFieldWidgets(
+  pdfDoc: PDFDocument,
+  field: PDFField
+): { widget: AcroWidget; layout: PdfFormFieldWidgetRect }[] {
   try {
     const pages = pdfDoc.getPages();
     const refToIndex = new Map<string, number>();
@@ -129,47 +234,54 @@ export function collectWidgetLayouts(pdfDoc: PDFDocument, field: PDFField): PdfF
     }
 
     const perWidget = fieldSupportsPerWidgetToggle(field);
-    const acroWidgets = field.acroField.getWidgets() as AcroWidget[];
-    const items: PdfFormFieldWidgetRect[] = [];
+    const items: { widget: AcroWidget; layout: PdfFormFieldWidgetRect }[] = [];
 
-    for (const w of acroWidgets) {
-      const rect = w.getRectangle();
+    for (const w of field.acroField.getWidgets() as AcroWidget[]) {
+      const rect = normalizeRect(w.getRectangle());
       const pageRef = w.P();
       const pageIdx = pageRef ? refToIndex.get(pageRef.toString()) : undefined;
       if (pageIdx === undefined) continue;
 
       const page = pages[pageIdx]!;
       const pageHeight = page.getHeight();
-      const x = rect.x;
-      const yTop = pageHeight - rect.y - rect.height;
-      const checked = perWidget ? widgetAppearanceIsOn(w) : undefined;
 
       items.push({
-        instanceIndex: 0,
-        pageNumber: pageIdx + 1,
-        pageWidth: page.getWidth(),
-        pageHeight,
-        x,
-        y: yTop,
-        width: rect.width,
-        height: rect.height,
-        checked,
+        widget: w,
+        layout: {
+          instanceIndex: 0,
+          pageNumber: pageIdx + 1,
+          pageWidth: page.getWidth(),
+          pageHeight,
+          x: rect.x,
+          y: pageHeight - rect.y - rect.height,
+          width: rect.width,
+          height: rect.height,
+          checked: perWidget ? widgetAppearanceIsOn(w) : undefined,
+          ...(perWidget ? { checkMark: widgetCheckMark(w) } : {}),
+        },
       });
     }
 
     items.sort((a, b) => {
-      if (a.pageNumber !== b.pageNumber) return a.pageNumber - b.pageNumber;
-      if (a.y !== b.y) return a.y - b.y;
-      if (a.x !== b.x) return a.x - b.x;
+      if (a.layout.pageNumber !== b.layout.pageNumber) return a.layout.pageNumber - b.layout.pageNumber;
+      if (a.layout.y !== b.layout.y) return a.layout.y - b.layout.y;
+      if (a.layout.x !== b.layout.x) return a.layout.x - b.layout.x;
       return 0;
     });
     items.forEach((it, i) => {
-      it.instanceIndex = i;
+      it.layout.instanceIndex = i;
     });
     return items;
   } catch {
     return [];
   }
+}
+
+/**
+ * Sorted widget layouts + per-widget checked state (checkbox / radio appearances).
+ */
+export function collectWidgetLayouts(pdfDoc: PDFDocument, field: PDFField): PdfFormFieldWidgetRect[] {
+  return orderedFieldWidgets(pdfDoc, field).map((it) => it.layout);
 }
 
 function summarizeCheckedWidgets(fieldName: string, widgets: PdfFormFieldWidgetRect[]): string {
@@ -294,10 +406,21 @@ function inferMultiSelectFromSimpleMultiWidget(input: {
   return { value: picked.join(", "), rawNote: raw };
 }
 
+/** The default appearance the whole form declares, inherited by fields that state none. */
+function formDefaultAppearance(form: ReturnType<PDFDocument["getForm"]>): string | undefined {
+  try {
+    const da = form.acroForm.dict.lookup(PDFName.of("DA")) as { asString?: () => string } | undefined;
+    return da?.asString?.();
+  } catch {
+    return undefined;
+  }
+}
+
 export async function extractPdfFormFields(buffer: Buffer): Promise<PdfFormFieldsExtraction> {
   try {
     const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
     const form = pdfDoc.getForm();
+    const formDa = formDefaultAppearance(form);
     const rawFields = form.getFields();
     const fields: PdfFormFieldEntry[] = rawFields.map((field) => {
       const name = field.getName();
@@ -315,6 +438,14 @@ export async function extractPdfFormFields(buffer: Buffer): Promise<PdfFormField
         displayValue = onIdx.length ? `on: #${onIdx.join(", #")}` : "all off";
       }
 
+      const options = readFieldOptions(field);
+      const appearance = describePdfFieldAppearance({
+        da: safely(() => field.acroField.getDefaultAppearance()),
+        formDa,
+        quadding: field instanceof PDFTextField ? safely(() => field.getAlignment()) : undefined,
+        multiline: field instanceof PDFTextField ? safely(() => field.isMultiline()) : false,
+      });
+
       return {
         name,
         type,
@@ -323,11 +454,14 @@ export async function extractPdfFormFields(buffer: Buffer): Promise<PdfFormField
         widgets,
         pageNumber,
         readError,
+        appearance,
+        ...(options.length > 0 ? { options } : {}),
       };
     });
     return {
       hasFormFields: fields.length > 0,
       fields,
+      pageCount: pdfDoc.getPageCount(),
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

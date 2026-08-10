@@ -5,10 +5,8 @@ import { useCallback, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { CardPanel } from "@/components/ui/CardPanel";
 import {
-  clipboardEventToImageFile,
   postQuickCreateSetup,
   QUICK_CREATE_SETUP_ACCEPT_MIME,
-  readImageFromClipboard,
 } from "@/lib/setupDocuments/quickCreateSetupClient";
 
 type UploadStage = "idle" | "uploading" | "detecting" | "creating" | "done";
@@ -119,28 +117,6 @@ export function RunLogQuickSetupUpload(props: {
     void runUpload(f);
   }
 
-  function onPaste(ev: React.ClipboardEvent) {
-    if (busy) return;
-    const f = clipboardEventToImageFile(ev);
-    if (!f) return;
-    ev.preventDefault();
-    void runUpload(f);
-  }
-
-  // Tap-to-paste: the `paste` event never fires on touch, so read the image straight off the
-  // clipboard via the async Clipboard API (works on iOS Safari / Android Chrome on a gesture).
-  async function onPasteTap() {
-    if (busy) return;
-    setError(null);
-    setInfo(null);
-    const res = await readImageFromClipboard();
-    if (!res.ok) {
-      setError(res.reason);
-      return;
-    }
-    void runUpload(res.file);
-  }
-
   const controls = (
     <div className="flex flex-wrap items-center gap-2">
       <input
@@ -159,24 +135,18 @@ export function RunLogQuickSetupUpload(props: {
       >
         {stageLabel(stage)}
       </button>
-      <button
-        type="button"
-        aria-label="Paste setup screenshot from clipboard"
-        disabled={busy}
-        onClick={onPasteTap}
-        onPaste={onPaste}
+      {/*
+       * Pasting a screenshot was removed 2026-08-10: a setup sheet must be the fillable PDF, and a
+       * screenshot is by definition a picture. See `SETUP_DOCUMENT_ALLOWED_MIME`.
+       */}
+      <span
         className={cn(
-          // Tap reads the clipboard via the async Clipboard API (mobile-friendly); on desktop the
-          // same control still accepts a Ctrl+V paste after focus.
-          "min-h-[2rem] rounded border border-dashed border-border bg-surface-runna-inset px-2 py-1.5 text-[11px] text-muted-foreground text-left outline-none focus-visible:ring-1 focus-visible:ring-accent/50 disabled:opacity-60",
+          "text-[11px] leading-snug text-muted-foreground",
           variant === "banner" ? "flex-1 min-w-[8rem] max-w-md" : "min-w-[6rem] flex-1 max-w-xs"
         )}
       >
-        <span className="sm:hidden">Paste a screenshot</span>
-        <span className="hidden sm:inline">
-          Click here, then <span className="font-medium text-foreground">Ctrl+V</span> to paste a screenshot
-        </span>
-      </button>
+        The fillable PDF — the one you can type into.
+      </span>
       {onRefetchList ? (
         <button
           type="button"
@@ -194,7 +164,8 @@ export function RunLogQuickSetupUpload(props: {
     return (
       <div className="max-w-2xl space-y-1.5">
         <p className="text-[11px] text-muted-foreground leading-snug">
-          Import a setup PDF or paste a screenshot — no need to leave this page.
+          Import your setup sheet — the fillable PDF, the one you can type into. No need to leave
+          this page.
         </p>
         {controls}
         {info ? <p className="text-[11px] text-amber-800 dark:text-amber-200">{info}</p> : null}
@@ -214,10 +185,9 @@ export function RunLogQuickSetupUpload(props: {
     >
       <div className="text-xs font-medium text-foreground">Import a setup sheet</div>
       <p className="text-[11px] text-muted-foreground leading-snug">
-        Upload a <span className="font-medium text-foreground">PDF</span> or paste a{" "}
-        <span className="font-medium text-foreground">screenshot</span> to add it to Downloaded setups
-        for this car. First-time image templates need a one-off calibration in a new tab — your run
-        form stays here.
+        Upload the <span className="font-medium text-foreground">fillable PDF</span> of your sheet —
+        the one you can type into — to add it to this car. A photo or a printed copy can&apos;t be
+        read.
       </p>
       {controls}
       {info ? <p className="text-[11px] text-amber-800 dark:text-amber-200">{info}</p> : null}

@@ -4,10 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import {
-  clipboardEventToImageFile,
   postQuickCreateSetup,
   QUICK_CREATE_SETUP_ACCEPT_MIME,
-  readImageFromClipboard,
 } from "@/lib/setupDocuments/quickCreateSetupClient";
 
 type UploadStage = "idle" | "uploading" | "matching" | "creating" | "done";
@@ -136,27 +134,6 @@ export function NewSetupUploadButton({
     handleFile(f);
   }
 
-  function onPaste(ev: React.ClipboardEvent) {
-    if (busy) return;
-    const f = clipboardEventToImageFile(ev);
-    if (!f) return;
-    ev.preventDefault();
-    handleFile(f);
-  }
-
-  // Tap-to-paste for mobile (and click-to-paste on desktop): the `paste` event never fires on
-  // touch, so pull the image straight off the clipboard via the async Clipboard API.
-  async function onPasteTap() {
-    if (busy) return;
-    setError(null);
-    const res = await readImageFromClipboard();
-    if (!res.ok) {
-      setError(res.reason);
-      return;
-    }
-    handleFile(res.file);
-  }
-
   function confirmPendingImage() {
     const file = pendingImage;
     if (!file || !pendingCarId) return;
@@ -180,20 +157,15 @@ export function NewSetupUploadButton({
           onClick={openFilePicker}
           disabled={busy || needsCar}
           className="rounded-md border border-primary/60 bg-primary/90 px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-sm transition hover:bg-primary disabled:opacity-60 disabled:cursor-default"
-          title={needsCar ? "Add a car first" : "Upload a setup sheet (PDF or image)"}
+          title={needsCar ? "Add a car first" : "Upload your setup sheet (the fillable PDF)"}
         >
           {stageLabel(stage)}
         </button>
-        <button
-          type="button"
-          onClick={onPasteTap}
-          onPaste={onPaste}
-          disabled={busy || needsCar}
-          className="rounded border border-dashed border-border/80 bg-card/40 px-2 py-1 ui-label-meta outline-none focus-visible:ring-1 focus-visible:ring-accent/40 disabled:opacity-60"
-          title={needsCar ? "Add a car first" : "Tap to paste a copied screenshot (or click here, then Ctrl+V)"}
-        >
-          Paste image
-        </button>
+        {/*
+         * "Paste image" was removed 2026-08-10: a setup sheet must be the fillable PDF, and a
+         * pasted screenshot is by definition a picture. See `SETUP_DOCUMENT_ALLOWED_MIME`.
+         */}
+        <span className="ui-label-meta text-muted-foreground">The fillable PDF</span>
       </div>
       {needsCar ? (
         <span className="text-xs text-muted-foreground">

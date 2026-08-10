@@ -5,18 +5,36 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { normalizeSetupSheetModelName } from "@/lib/setupSheetModels/normalizeModelName";
-import { slugifySetupSheetModelName, uniqueSlugCandidate } from "@/lib/setupSheetModels/slug";
-import { storeSetupDocumentFile, StorageConfigurationError } from "@/lib/setupDocuments/storage";
-import { verifiedAtForNewCalibration } from "@/lib/setupCalibrations/calibrationAccess";
+import { StorageConfigurationError } from "@/lib/setupDocuments/storage";
+import { recordChassisTypeRequest } from "@/lib/setupSheetModels/chassisTypeRequests";
+import {
+  createModelFromBlank,
+  type BlankUploadSource,
+} from "@/lib/setupSheetModels/createModelFromBlank";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Create a chassis type the driver maps **by hand**: an empty schema plus an empty AcroForm
- * calibration anchored to the blank sheet he just uploaded, then straight into the mapping editor.
- * Every parameter comes into existence there by clicking its box — no AI naming to undo.
+ * Create a chassis type from a blank manufacturer setup sheet.
  *
- * Admin-only, like every other chassis-type creation: the catalog is curated ground truth.
+ * TWO DOORS, ONE ROUTE.
+ *
+ *   derive=1   Any signed-in driver. The parameter list is read off the PDF's form layer, so the
+ *              car works the moment it is added, and whatever the file already holds comes back
+ *              with it as values. One door handles a finished sheet and a manufacturer's blank
+ *              alike, because nothing can tell them apart — see `createModelFromBlank`. The chassis
+ *              is global and unreviewed, exactly like a driver-authored track or tire; see
+ *              `docs/ASSET_ACCESS_NORTH_STAR.md`, where chassis types were the one admin-only-create
+ *              exception. This retires that exception: the founder still reviews, he no longer has
+ *              to author.
+ *
+ *   (default)  Admin only. An empty schema plus an empty AcroForm calibration anchored to the
+ *              blank, then straight into the mapping editor. Every parameter comes into existence
+ *              by clicking its box — no derived naming to undo.
+ *
+ * Duplicate NAMES are not blocked on the driver's door: a name is a label, not evidence, and
+ * refusing on one would let anyone deny a name to everyone else by typing it first. Two uploads
+ * become one chassis only when the derivation proves them identical — see `createModelFromBlank`.
  */
 export async function POST(request: Request): Promise<NextResponse> {
   if (!hasDatabaseUrl()) {
@@ -24,120 +42,133 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const user = await getAuthenticatedApiUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAuthAdminEmail(user.email)) {
-    return NextResponse.json({ error: "Only an admin can create a chassis type." }, { status: 403 });
+  const isAdmin = isAuthAdminEmail(user.email);
+
+  const contentType = request.headers.get("content-type") ?? "";
+  let name = "";
+  let derive = false;
+  let upload: BlankUploadSource | null = null;
+
+  if (contentType.includes("application/json")) {
+    // The browser already streamed the file to Blob because it was over the serverless body limit.
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    name = typeof body.name === "string" ? body.name.trim() : "";
+    derive = body.derive === true || body.derive === "1";
+    const storagePath = typeof body.storagePath === "string" ? body.storagePath.trim() : "";
+    if (!storagePath) {
+      return NextResponse.json({ error: "storagePath is required." }, { status: 400 });
+    }
+    upload = {
+      kind: "stored",
+      storagePath,
+      originalFilename: typeof body.originalFilename === "string" ? body.originalFilename : "blank.pdf",
+      mimeType: typeof body.mimeType === "string" ? body.mimeType : "application/pdf",
+      byteSize: typeof body.byteSize === "number" ? body.byteSize : 1,
+    };
+  } else {
+    let form: FormData;
+    try {
+      form = await request.formData();
+    } catch {
+      return NextResponse.json({ error: "Expected multipart form data (name, pdf)." }, { status: 400 });
+    }
+    name = (typeof form.get("name") === "string" ? (form.get("name") as string) : "").trim();
+    derive = form.get("derive") === "1";
+    const pdf = form.get("pdf");
+    if (!(pdf instanceof File)) {
+      return NextResponse.json({ error: "The blank setup sheet PDF is required." }, { status: 400 });
+    }
+    upload = { kind: "file", file: pdf };
   }
 
-  let form: FormData;
-  try {
-    form = await request.formData();
-  } catch {
-    return NextResponse.json({ error: "Expected multipart form data (name, pdf)." }, { status: 400 });
-  }
-  const name = (typeof form.get("name") === "string" ? (form.get("name") as string) : "").trim();
-  const pdf = form.get("pdf");
   if (!name) return NextResponse.json({ error: "A chassis name is required." }, { status: 400 });
-  if (!(pdf instanceof File)) {
-    return NextResponse.json({ error: "The blank setup sheet PDF is required." }, { status: 400 });
-  }
-  if (pdf.type && pdf.type !== "application/pdf") {
-    return NextResponse.json({ error: "Upload the blank sheet as a PDF." }, { status: 400 });
-  }
 
-  // Models are global — never mint a second row for a chassis that already exists.
-  const norm = normalizeSetupSheetModelName(name);
-  const existingRows = await prisma.setupSheetModel.findMany({
-    orderBy: [{ isAuthorized: "desc" }, { createdAt: "asc" }],
-    select: { id: true, name: true, slug: true, defaultCalibrationId: true, isAuthorized: true },
-  });
-  const clash = existingRows.find((m) => normalizeSetupSheetModelName(m.name) === norm);
-  // An admin is not blocked by an unreviewed driver-authored row of the same name. Ordering above
-  // puts a curated row first, so a clash that is still unauthorized means the ONLY row for this
-  // chassis is a driver's — and refusing there would let anyone permanently deny the founder the
-  // name by typing it first. The two rows are merged by the dedupe script afterwards.
-  const blocks = clash && (clash.isAuthorized || !isAuthAdminEmail(user.email));
-  if (clash && blocks) {
+  if (!derive && !isAdmin) {
     return NextResponse.json(
-      {
-        error: `“${clash.name}” already exists. Open it from Chassis types and keep mapping there.`,
-        existingModelId: clash.id,
-        existingCalibrationId: clash.defaultCalibrationId,
-      },
-      { status: 409 }
+      { error: "Only an admin can map a chassis type by hand." },
+      { status: 403 }
     );
   }
 
-  // Store the blank first: it is what makes the model readable later, and it anchors the calibration.
-  let storagePath: string;
-  try {
-    ({ storagePath } = await storeSetupDocumentFile(pdf));
-  } catch (e) {
-    const msg =
-      e instanceof StorageConfigurationError
-        ? e.message
-        : e instanceof Error
-          ? e.message
-          : "Could not store the PDF.";
-    return NextResponse.json({ error: msg }, { status: 500 });
+  // The admin door still refuses a name that already exists, because he is authoring the curated
+  // row and a second one would be his own duplicate. An unreviewed driver row does not block him:
+  // that is the case the ordering below exists for, and the two are merged afterwards.
+  if (!derive) {
+    const norm = normalizeSetupSheetModelName(name);
+    const existingRows = await prisma.setupSheetModel.findMany({
+      orderBy: [{ isAuthorized: "desc" }, { createdAt: "asc" }],
+      select: { id: true, name: true, defaultCalibrationId: true, isAuthorized: true },
+    });
+    const clash = existingRows.find((m) => normalizeSetupSheetModelName(m.name) === norm);
+    if (clash?.isAuthorized) {
+      return NextResponse.json(
+        {
+          error: `"${clash.name}" already exists. Open it from Chassis types and keep mapping there.`,
+          existingModelId: clash.id,
+          existingCalibrationId: clash.defaultCalibrationId,
+        },
+        { status: 409 }
+      );
+    }
   }
 
-  const document = await prisma.setupDocument.create({
-    data: {
-      originalFilename: `BLANK — ${name}`,
-      storagePath,
-      mimeType: "application/pdf",
-      sourceType: "PDF",
-      parseStatus: "PENDING",
-      importStatus: "COMPLETED",
-      userId: user.id,
-    },
-    select: { id: true },
-  });
-
-  const slug = uniqueSlugCandidate(
-    slugifySetupSheetModelName(name),
-    new Set(existingRows.map((r) => r.slug))
-  );
-  const model = await prisma.setupSheetModel.create({
-    data: {
-      userId: user.id,
+  let result;
+  try {
+    result = await createModelFromBlank({
+      user: { id: user.id, email: user.email },
       name,
-      slug,
-      // Deliberately empty: the parameter list is built box by box in the mapping editor.
-      schemaJson: { version: 1, label: name, structuredSections: [], fields: [] } as object,
-    },
-    select: { id: true, name: true, slug: true },
-  });
+      upload,
+      derive,
+      source: derive && !isAdmin ? "driver" : "admin",
+    });
+  } catch (e) {
+    // The storage hint names an environment variable and is written for the founder. A driver who
+    // sees it learns nothing and assumes they did something wrong.
+    if (e instanceof StorageConfigurationError) {
+      console.error("[blank-upload] storage not configured", e);
+      return NextResponse.json(
+        { error: isAdmin ? e.message : "We couldn't store that file. Try again in a moment." },
+        { status: 500 }
+      );
+    }
+    console.error("[blank-upload] failed", e);
+    return NextResponse.json({ error: "We couldn't read that PDF. Try again." }, { status: 500 });
+  }
 
-  const calibration = await prisma.setupSheetCalibration.create({
-    data: {
-      userId: user.id,
-      name: `${name} calibration`,
-      sourceType: "pdf",
-      calibrationDataJson: {
-        templateType: "pdf_form_fields",
-        documentMeta: { lineGroupingEpsilon: 2.5 },
-        formFieldMappings: {},
-        fieldMappings: {},
-        fields: {},
-      } as object,
-      exampleDocumentId: document.id,
-      setupSheetModelId: model.id,
-      verifiedAt: verifiedAtForNewCalibration({ id: user.id, email: user.email }),
-    },
-    select: { id: true },
-  });
-
-  await prisma.setupSheetModel.update({
-    where: { id: model.id },
-    data: { defaultCalibrationId: calibration.id },
-  });
-  await prisma.setupDocument.update({
-    where: { id: document.id },
-    data: { setupSheetModelId: model.id, calibrationProfileId: calibration.id },
-  });
+  if (!result.ok) {
+    // A sheet we could not use still means a chassis the catalog is missing, so the founder hears
+    // about it through the same channel as an explicit request.
+    if (result.refusal.status) {
+      await recordChassisTypeRequest({
+        userId: user.id,
+        userEmail: user.email,
+        requestedName: name,
+      });
+    }
+    return NextResponse.json(
+      {
+        error: result.refusal.message,
+        refusalCode: result.refusal.code,
+        offerCarWithoutSheet: result.refusal.offerCarWithoutSheet,
+      },
+      { status: 422 }
+    );
+  }
 
   revalidatePath("/cars");
   revalidatePath("/setup-sheet-models");
-  return NextResponse.json({ model, calibrationId: calibration.id }, { status: 201 });
+  return NextResponse.json(
+    {
+      model: { ...result.model, isAuthorized: false },
+      calibrationId: result.calibrationId,
+      blankId: result.blankId,
+      stats: result.stats,
+      merged: result.merged,
+      // Whatever the file already had in its boxes. Handed back rather than saved here, because
+      // there is no car to hang a setup off until the driver finishes adding one.
+      values: result.values,
+      filledCount: result.filledCount,
+    },
+    { status: result.merged ? 200 : 201 }
+  );
 }

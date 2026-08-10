@@ -16,7 +16,8 @@ import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 import { templateKeyFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
 import {
   UNIVERSAL_TOURING_TEMPLATE_ID,
-  isUniversalTouringTuningParameter,
+  resolveUniversalParameterId,
+  universalParameterIdsBySchemaKey,
 } from "@/lib/setupSheetModels/universalParameters";
 
 export type RebuildCommunityAggregationsExclusionCounts = {
@@ -115,7 +116,10 @@ export async function rebuildCommunityTemplateAggregations(): Promise<RebuildCom
     select: {
       id: true,
       setupSheetTemplate: true,
-      setupSheetModel: { select: { slug: true, isAuthorized: true } },
+      // `schemaJson` rides along because the universal pool now asks each sheet which parameter
+      // its keys mean (see `resolveUniversalParameterId`). One extra column on a query that
+      // already loads the model.
+      setupSheetModel: { select: { id: true, slug: true, isAuthorized: true, schemaJson: true } },
     },
   });
   // Prefer the linked model's slug (canonical template key); fall back to the stored string for
@@ -139,6 +143,23 @@ export async function rebuildCommunityTemplateAggregations(): Promise<RebuildCom
       return [c.id, { key: c.setupSheetTemplate, unverified: false }];
     })
   );
+
+  // Car -> its sheet's declared universal parameters. Built once per MODEL and shared by every car
+  // on it, because a popular chassis brings hundreds of cars through here and the map is identical
+  // for all of them. Cars with no linked model (legacy string templates) get no map and fall back
+  // to the alias table, exactly as before.
+  const universalIdsByModelId = new Map<string, ReadonlyMap<string, string>>();
+  const universalIdsByCarId = new Map<string, ReadonlyMap<string, string>>();
+  for (const c of cars) {
+    const model = c.setupSheetModel;
+    if (!model) continue;
+    let ids = universalIdsByModelId.get(model.id);
+    if (!ids) {
+      ids = universalParameterIdsBySchemaKey(model.schemaJson as { fields?: unknown } | null);
+      universalIdsByModelId.set(model.id, ids);
+    }
+    if (ids.size > 0) universalIdsByCarId.set(c.id, ids);
+  }
 
   // key = `${template}\x1e${surface}\x1e${gripBucket}` -> per-parameter observation buckets.
   // A single doc may land in multiple grip buckets (always `any`, plus one per matching traction tag).
@@ -187,6 +208,8 @@ export async function rebuildCommunityTemplateAggregations(): Promise<RebuildCom
     exclusionCounts.eligibleDocuments += 1;
     documentsIncluded += 1;
 
+    const docUniversalIds = universalIdsByCarId.get(effectiveCarId) ?? null;
+
     const gripBuckets = gripBucketsForDoc(data);
     // Precompute observations once per doc, then fan them out to all grip buckets this doc claims.
     const obsPerKey: Array<[
@@ -219,9 +242,14 @@ export async function rebuildCommunityTemplateAggregations(): Promise<RebuildCom
         universalMap = new Map();
         byTemplateSurfaceGrip.set(universalBucketKey, universalMap);
       }
+      // The cross-car pool is keyed by the universal parameter, not by this sheet's own key —
+      // that is what lets a PDF-derived sheet keyed `text47` pool with a generic sheet's
+      // `droop_front`. Sheets that declare nothing resolve through the alias table to the same
+      // id they bucketed under before, so this is a no-op for the existing catalog.
       for (const [k, obs] of obsPerKey) {
-        if (!isUniversalTouringTuningParameter(k)) continue;
-        getOrCreateBucket(universalMap, k, obs);
+        const universalId = resolveUniversalParameterId(k, docUniversalIds);
+        if (!universalId) continue;
+        getOrCreateBucket(universalMap, universalId, obs);
       }
     }
   }

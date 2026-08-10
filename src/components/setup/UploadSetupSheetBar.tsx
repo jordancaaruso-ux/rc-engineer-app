@@ -4,24 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  ArrowRight,
-  Camera,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardPaste,
-  FileUp,
-  Loader2,
-  Upload,
-  X,
-} from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, FileUp, Loader2, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEnterExit } from "@/components/ui/Collapse";
 import { Button } from "@/components/ui/Button";
 import {
   postQuickCreateSetup,
   QUICK_CREATE_SETUP_ACCEPT_MIME,
-  readImageFromClipboard,
   type QuickCreateMismatchInfo,
 } from "@/lib/setupDocuments/quickCreateSetupClient";
 
@@ -51,7 +40,12 @@ function stageLabel(stage: UploadStage): string {
  * "Upload setup sheet" flow on the Assets hub (founder-interviewed 2026-07-17):
  * an outline ghost bar above the hub card opens a two-step bottom sheet —
  * step 1 picks which car the setup is for (skipped silently with one car),
- * step 2 offers three doors: upload a file, take a photo, paste a screenshot.
+ * step 2 states the fillable-PDF requirement and opens the file picker.
+ *
+ * It offered three doors — file, photo, paste — until 2026-08-10, when images stopped being
+ * accepted anywhere. The requirement is now stated BEFORE the picker rather than discovered
+ * through a refusal afterwards, because a driver who is refused concludes their car is
+ * unsupported, and a driver who is told what to look for goes and finds it.
  * Car-first applies to PDFs too: the server 409-blocks (nothing created) when
  * the sheet fingerprints as a different chassis than the chosen car, and the
  * sheet shows a blocking "Change car / Use anyway" confirm.
@@ -73,7 +67,6 @@ export function UploadSetupSheetBar({
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const stageTimersRef = useRef<number[]>([]);
 
   const [open, setOpen] = useState(false);
@@ -203,17 +196,6 @@ export function UploadSetupSheetBar({
     handleFile(f);
   }
 
-  async function onPasteTap() {
-    if (busy) return;
-    setError(null);
-    const res = await readImageFromClipboard();
-    if (!res.ok) {
-      setError(res.reason);
-      return;
-    }
-    handleFile(res.file);
-  }
-
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -259,20 +241,11 @@ export function UploadSetupSheetBar({
         </button>
       )}
 
-      {/* Hidden pickers live outside the sheet so the portal teardown can't cancel a chosen file. */}
+      {/* Hidden picker lives outside the sheet so the portal teardown can't cancel a chosen file. */}
       <input
         ref={fileInputRef}
         type="file"
         accept={QUICK_CREATE_SETUP_ACCEPT_MIME}
-        className="hidden"
-        onChange={onFileChosen}
-        disabled={busy}
-      />
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        capture="environment"
         className="hidden"
         onChange={onFileChosen}
         disabled={busy}
@@ -439,26 +412,26 @@ export function UploadSetupSheetBar({
                           <span className="text-[13px] text-muted-foreground">{stageLabel(stage)}</span>
                         </div>
                       ) : (
-                        <ul className="divide-y divide-border">
-                          <DoorRow
-                            icon={<Upload className="size-4" strokeWidth={2} aria-hidden />}
-                            title="Upload file"
-                            hint="PDF or image from your device"
-                            onClick={() => fileInputRef.current?.click()}
-                          />
-                          <DoorRow
-                            icon={<Camera className="size-4" strokeWidth={2} aria-hidden />}
-                            title="Take photo"
-                            hint="Point the camera at a paper sheet"
-                            onClick={() => cameraInputRef.current?.click()}
-                          />
-                          <DoorRow
-                            icon={<ClipboardPaste className="size-4" strokeWidth={2} aria-hidden />}
-                            title="Paste"
-                            hint="An image or PDF you copied"
-                            onClick={() => void onPasteTap()}
-                          />
-                        </ul>
+                        <>
+                          {/*
+                           * The requirement is stated BEFORE the picker, not discovered through an
+                           * error afterwards (founder ruling 2026-08-10). A driver who picks the
+                           * wrong file and gets refused concludes their car is unsupported; a
+                           * driver who is told what to look for goes and finds it.
+                           */}
+                          <p className="pb-2 text-[12px] leading-relaxed text-muted-foreground">
+                            Your sheet needs to be the <span className="font-semibold text-foreground">fillable PDF</span>{" "}
+                            — the one you can type into. Photos and printed copies can&apos;t be read.
+                          </p>
+                          <ul className="divide-y divide-border">
+                            <DoorRow
+                              icon={<Upload className="size-4" strokeWidth={2} aria-hidden />}
+                              title="Choose a PDF"
+                              hint="From your device"
+                              onClick={() => fileInputRef.current?.click()}
+                            />
+                          </ul>
+                        </>
                       )}
                       {error ? (
                         <p className="pt-2 text-[12px] text-destructive" role="alert">

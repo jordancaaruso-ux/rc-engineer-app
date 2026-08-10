@@ -2,6 +2,7 @@ import {
   normalizeSetupSheetModelName,
   setupSheetModelSlugRank,
 } from "@/lib/setupSheetModels/normalizeModelName";
+import { isDerivedSheetSlug } from "@/lib/setupSheetModels/derivedSheetFingerprint";
 
 export type SetupSheetModelPickerRow = {
   id: string;
@@ -39,10 +40,27 @@ export function setupSheetModelPickerScore(row: SetupSheetModelPickerRow): numbe
   );
 }
 
-/** Id of the row `dedupeSetupSheetModelsForPicker` would keep for each normalized name. */
+/**
+ * Id of the row `dedupeSetupSheetModelsForPicker` would keep for each normalized name.
+ *
+ * A row built from a driver's own blank sheet is never collapsed away (founder call 2026-08-11).
+ * Those rows are identified by the sheet itself, so two of them existing means two genuinely
+ * different sheets — different vintage, different edition, a manufacturer revision. Collapsing them
+ * by name would hide a driver's own chassis behind somebody else's, and their next car would then
+ * land on the wrong row and stop comparing against their first.
+ *
+ * Sameness for those rows is already settled upstream, by `derivedSheetFingerprint`, which merges
+ * two uploads only when it can prove the derivations are interchangeable. So there is nothing left
+ * here for a name to decide.
+ */
 export function recommendedSetupSheetModelIds(models: SetupSheetModelPickerRow[]): Set<string> {
   const byNorm = new Map<string, SetupSheetModelPickerRow>();
+  const alwaysKeep: string[] = [];
   for (const m of models) {
+    if (isDerivedSheetSlug(m.slug)) {
+      alwaysKeep.push(m.id);
+      continue;
+    }
     const key = normalizeSetupSheetModelName(m.name);
     if (!key) continue;
     const existing = byNorm.get(key);
@@ -50,7 +68,7 @@ export function recommendedSetupSheetModelIds(models: SetupSheetModelPickerRow[]
       byNorm.set(key, m);
     }
   }
-  return new Set([...byNorm.values()].map((m) => m.id));
+  return new Set([...alwaysKeep, ...[...byNorm.values()].map((m) => m.id)]);
 }
 
 /**

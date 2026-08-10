@@ -74,6 +74,7 @@ model User {
   chassisTypeRequests ChassisTypeRequest[]
   baselineSetupsCreated BaselineSetup[] @relation("BaselineSetupCreatedBy")
   setupFillDrafts SetupFillDraft[]
+  setupSheetBlanksUploaded SetupSheetBlank[] @relation("SetupSheetBlankUploader")
 }
 
 /**
@@ -362,12 +363,77 @@ model SetupSheetModel {
   setupDocuments  SetupDocument[]
   calibrations    SetupSheetCalibration[]
   setupFillDrafts SetupFillDraft[]
+  /// The blank this chassis was derived from, when it came in that way.
+  derivedFromBlank SetupSheetBlank?
   /** PDF calibration used for auto-pick and the car-page â€œEdit PDF calibrationâ€ link. */
   defaultCalibrationId String?                @unique
   defaultCalibration   SetupSheetCalibration? @relation("ModelDefaultCalibration", fields: [defaultCalibrationId], references: [id], onDelete: SetNull)
 
   @@unique([slug])
   @@index([userId, updatedAt])
+}
+
+/**
+ * One blank manufacturer setup sheet somebody uploaded, and what was read off it.
+ *
+ * WHY THIS IS ITS OWN TABLE. The obvious homes both destroy the data on the next ordinary save:
+ * `SetupSheetCalibration.calibrationDataJson` is rebuilt by `normalizeCalibrationData`, and
+ * `SetupSheetModel.schemaJson` by `parseSetupSheetModelSchema`. Both are whitelists, so anything
+ * they do not recognise disappears the first time an admin edits a calibration or names a box —
+ * which is precisely when the founder is working on this chassis. A refused flat PDF also has no
+ * chassis row to hang off at all.
+ *
+ * WHY EVERY LINK IS SetNull. `boxesJson` is what the fill surface needs to draw the sheet, and the
+ * chassis is global — other drivers are on it. If the original uploader deletes their account, the
+ * `SetupDocument` cascade takes their PDF with them, and re-deriving from the file stops being
+ * possible. So the geometry is stored here rather than read back from the PDF on demand, and
+ * nothing about this row cascades: the sheet keeps working for everyone else, and the founder's
+ * review queue keeps the upload.
+ */
+model SetupSheetBlank {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// FILLABLE | NOT_FILLABLE | UNREADABLE. Refusals are kept so the founder can follow them up.
+  status String
+  /// driver | admin — which door this came in through.
+  source String @default("driver")
+
+  /// Null when the upload was refused: there is no chassis, only a file and a name.
+  setupSheetModel   SetupSheetModel? @relation(fields: [setupSheetModelId], references: [id], onDelete: SetNull)
+  setupSheetModelId String?          @unique
+
+  /// The stored PDF, as a normal SetupDocument named "BLANK - <name>". Goes with its uploader.
+  setupDocument   SetupDocument? @relation("SetupSheetBlankDocument", fields: [setupDocumentId], references: [id], onDelete: SetNull)
+  setupDocumentId String?        @unique
+
+  uploadedBy       User?   @relation("SetupSheetBlankUploader", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  uploadedByUserId String?
+
+  /// What the driver typed, and its normalized form so the duplicates view can group on it.
+  chassisNameTyped String
+  normalizedName   String
+
+  pageCount Int @default(1)
+  /// DerivedBox[] - page, fractional rect and draw style per schema key. The fill surface reads this.
+  boxesJson Json?
+  /// DerivedSheetStats, so a re-derivation can be compared against what this sheet produced.
+  statsJson Json?
+  /// page number -> storage ref for the cached page image.
+  pageImagesJson Json?
+  /// Names a driver volunteered for a box. Never applied to the shared schema automatically -
+  /// naming is the founder's job, and one driver must not relabel a chassis everyone else uses.
+  boxNameSuggestionsJson Json?
+
+  /// sheet | form - which surface this chassis fills on. Flipped by an admin once boxes are named,
+  /// deliberately, so nobody's fill surface changes underneath them mid-season.
+  fillSurface String @default("sheet")
+
+  reviewedAt DateTime?
+
+  @@index([status, reviewedAt, createdAt])
+  @@index([normalizedName])
 }
 
 /**
@@ -1080,6 +1146,8 @@ model SetupDocument {
   createdSetup   SetupSnapshot? @relation("CreatedSetup", fields: [createdSetupId], references: [id], onDelete: SetNull)
   createdSetupId String?
   exampleForCalibrations SetupSheetCalibration[] @relation("CalibrationExampleDocument")
+  /// Set when this document is a blank manufacturer sheet a chassis was derived from.
+  blankSheet SetupSheetBlank? @relation("SetupSheetBlankDocument")
   runsUsingAsPdfSource Run[] @relation("RunSetupPdfSource")
 
   @@index([userId, createdAt])
