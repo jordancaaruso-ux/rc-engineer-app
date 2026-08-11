@@ -16,6 +16,11 @@ import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { isRunContextSetupKey } from "@/lib/setup/runContextSetupKeys";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
+import { RunSheetSetupFill } from "@/components/runs/RunSheetSetupFill";
+import {
+  mergeSheetValuesIntoSnapshot,
+  sheetValuesFromSnapshot,
+} from "@/lib/setupSheetModels/sheetValues";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import { getGenericSetupSheetTemplate } from "@/lib/setupSheetModels/genericSetupSheetTemplate";
@@ -1483,20 +1488,40 @@ export function NewRunForm(props: {
 
   const selectedCar = useMemo(() => carsList.find((c) => c.id === carId) ?? null, [carsList, carId]);
   const [modelTemplate, setModelTemplate] = useState<SetupSheetTemplate | null>(null);
+  /**
+   * Set when this car's chassis was derived from somebody's own PDF and fills in on a picture of
+   * that sheet. The log-run form cannot show those cars a field list — see `RunSheetSetupFill`.
+   */
+  const [sheetChassis, setSheetChassis] = useState<{ modelId: string; name: string } | null>(null);
 
   useEffect(() => {
     if (!carId) {
       setModelTemplate(null);
+      setSheetChassis(null);
       return;
     }
     let cancelled = false;
     fetch(`/api/cars/${carId}/setup-sheet-template?view=logRun`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((d: { template?: SetupSheetTemplate }) => {
-        if (!cancelled && d.template) setModelTemplate(d.template);
-      })
+      .then(
+        (d: {
+          template?: SetupSheetTemplate;
+          sheetMode?: boolean;
+          setupSheetModelId?: string | null;
+        }) => {
+          if (cancelled) return;
+          if (d.template) setModelTemplate(d.template);
+          setSheetChassis(
+            d.sheetMode && d.setupSheetModelId
+              ? { modelId: d.setupSheetModelId, name: d.template?.label || "Your sheet" }
+              : null
+          );
+        }
+      )
       .catch(() => {
-        if (!cancelled) setModelTemplate(null);
+        if (cancelled) return;
+        setModelTemplate(null);
+        setSheetChassis(null);
       });
     return () => {
       cancelled = true;
@@ -1515,6 +1540,29 @@ export function NewRunForm(props: {
     () => collectSetupSheetTemplateKeys(setupTemplate),
     [setupTemplate]
   );
+
+  /**
+   * What the sheet surface hands back, folded into the run's setup.
+   *
+   * `useCallback` with no dependencies on purpose: the surface reports through an effect that
+   * depends on this function, so a new identity every render would loop. Nothing is captured —
+   * `setSetupData` takes an updater and the touched flag is a ref — so a fixed identity is also
+   * always correct here.
+   */
+  const applySheetValuesToSetup = useCallback((next: Record<string, string>) => {
+    setupTouchedByUserRef.current = true;
+    setSetupData((prev) =>
+      applyDerivedFieldsToSnapshot(mergeSheetValuesIntoSnapshot(prev, next))
+    );
+  }, []);
+
+  /**
+   * Which setup the sheet was seeded from. Changing the source, or the run it is loaded from,
+   * replaces the whole setup — so the sheet closes and re-seeds rather than showing values the
+   * driver has already moved off.
+   */
+  const sheetSeedKey = `${setupSource}:${setupBaselineSnapshotId ?? "none"}`;
+  const sheetSeedValues = useMemo(() => sheetValuesFromSnapshot(setupData), [setupData]);
   const applyRunContextToSetupSnapshotLocal = useCallback(
     (
       nextTireTypeId: string,
@@ -5208,17 +5256,33 @@ export function NewRunForm(props: {
                 </svg>
               </button>
             </div>
-            <SetupSheetView
-              value={setupData}
-              onChange={(next) => {
-                // A hand edit takes ownership of the setup — never let the
-                // last-run auto-apply overwrite it.
-                setupTouchedByUserRef.current = true;
-                setSetupData(applyDerivedFieldsToSnapshot(next));
-              }}
-              template={setupTemplate}
-              enableFieldSearch
-            />
+            {sheetChassis ? (
+              /*
+               * A chassis derived from somebody's own PDF fills in on a picture of that sheet.
+               * The field list below would be nearly empty for these cars: every box nobody has
+               * named yet is held out of the log-run form on purpose, and on a derived sheet that
+               * is most of them.
+               */
+              <RunSheetSetupFill
+                setupSheetModelId={sheetChassis.modelId}
+                chassisName={sheetChassis.name}
+                seedValues={sheetSeedValues}
+                seedKey={sheetSeedKey}
+                onValues={applySheetValuesToSetup}
+              />
+            ) : (
+              <SetupSheetView
+                value={setupData}
+                onChange={(next) => {
+                  // A hand edit takes ownership of the setup — never let the
+                  // last-run auto-apply overwrite it.
+                  setupTouchedByUserRef.current = true;
+                  setSetupData(applyDerivedFieldsToSnapshot(next));
+                }}
+                template={setupTemplate}
+                enableFieldSearch
+              />
+            )}
             {carId &&
             supportsSheetUpload &&
             downloadedSetups.length === 0 &&

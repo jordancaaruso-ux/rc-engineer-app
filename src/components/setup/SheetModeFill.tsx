@@ -7,6 +7,7 @@ import { haptic } from "@/lib/haptics";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { SheetFillSurface } from "@/components/setup/SheetFillSurface";
 import { useSetupFillDraft } from "@/components/setup/useSetupFillDraft";
+import { withoutEmptySheetValues } from "@/lib/setupSheetModels/sheetValues";
 
 /**
  * Filling a setup on a chassis that came from somebody's own PDF: their sheet, on screen, in the
@@ -23,16 +24,6 @@ import { useSetupFillDraft } from "@/components/setup/useSetupFillDraft";
  * for trying it out and wrong the moment the values are somebody's actual setup: a cleared browser,
  * a different phone, or the app being evicted from memory takes the lot.
  */
-
-/** Empty boxes are absent, not blank. See below. */
-function withoutEmpties(values: Record<string, string>): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(values)) {
-    if (typeof v === "string" && v.trim() === "") continue;
-    out[k] = v;
-  }
-  return out;
-}
 
 const DRAFT_DEBOUNCE_MS = 1200;
 
@@ -76,7 +67,7 @@ export function SheetModeFill({
       // are by construction the newest ones when it finally fires. No ref needed to chase them.
       if (timerRef.current) window.clearTimeout(timerRef.current);
       timerRef.current = window.setTimeout(() => {
-        const payload = withoutEmpties(next);
+        const payload = withoutEmptySheetValues(next);
         setDraftState("saving");
         draft
           .save({
@@ -115,7 +106,7 @@ export function SheetModeFill({
        * changed since your last run" every time, forever. Corrected here rather than in the
        * normaliser, which every setup writer in the app shares.
        */
-      const payload = withoutEmpties(values);
+      const payload = withoutEmptySheetValues(values);
       const res = await fetch("/api/setup-snapshots", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -138,7 +129,7 @@ export function SheetModeFill({
     }
   }
 
-  const filled = Object.keys(withoutEmpties(values)).length;
+  const filled = Object.keys(withoutEmptySheetValues(values)).length;
 
   return (
     <div className="space-y-3">

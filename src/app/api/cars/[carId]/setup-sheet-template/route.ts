@@ -4,6 +4,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import type { SetupSheetTemplateView } from "@/lib/setupSheetModels/buildSetupSheetTemplate";
 import { getSetupSheetTemplateAndKeyForCar } from "@/lib/setupSheetModels/getTemplateForCar";
+import { chassisFillsAsSheet } from "@/lib/setupSheetModels/sheetPlan";
 
 type RouteCtx = { params: Promise<{ carId: string }> };
 
@@ -28,9 +29,31 @@ export async function GET(request: Request, ctx: RouteCtx) {
   });
   if (!car) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  /*
+   * Does this car fill in on a picture of its own sheet?
+   *
+   * Asked here because the run form already makes this request every time the car changes, and the
+   * only other way to ask is to fetch the box list — the same answer, tens of kilobytes heavier,
+   * and pointless until the driver actually opens the sheet.
+   *
+   * A derived chassis is always attached to a car by id, so there is nothing to resolve: no
+   * `setupSheetModelId` means no sheet.
+   */
+  const blank = car.setupSheetModelId
+    ? await prisma.setupSheetBlank.findUnique({
+        where: { setupSheetModelId: car.setupSheetModelId },
+        select: { fillSurface: true, boxesJson: true },
+      })
+    : null;
+
   const { template, templateKey } = await getSetupSheetTemplateAndKeyForCar(userId, car, view);
   return NextResponse.json(
-    { template, templateKey },
+    {
+      template,
+      templateKey,
+      setupSheetModelId: car.setupSheetModelId,
+      sheetMode: chassisFillsAsSheet(blank),
+    },
     { headers: { "Cache-Control": "no-store" } }
   );
 }
