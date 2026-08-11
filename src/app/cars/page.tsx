@@ -180,7 +180,6 @@ export default async function CarManagerPage({
           <CarList
             initialCars={cars}
             setupSheetModels={setupSheetModels}
-            isAdmin={isAdmin}
             setupMetaById={setupMetaById}
             setupsByCarId={setupsByCarId}
             defaultOpenCarId={defaultOpenCarId}

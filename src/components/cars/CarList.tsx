@@ -44,14 +44,12 @@ async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
 export function CarList({
   initialCars,
   setupSheetModels: initialSetupSheetModels = [],
-  isAdmin = false,
   setupMetaById,
   setupsByCarId,
   defaultOpenCarId = null,
 }: {
   initialCars: Car[];
   setupSheetModels?: SetupSheetModelOption[];
-  isAdmin?: boolean;
   /** Per-car setup line ("2 sheets · 20 setups · last run 19 Jul"), built server-side. */
   setupMetaById?: Record<string, string>;
   /**
@@ -102,9 +100,6 @@ export function CarList({
    * keeping — a blank carries the kit settings, which beats starting from nothing.
    */
   const [importedSetup, setImportedSetup] = useState<Record<string, unknown> | null>(null);
-  const [showCreateType, setShowCreateType] = useState(false); // admin-only inline create
-  const [newTypeName, setNewTypeName] = useState("");
-  const [creatingType, setCreatingType] = useState(false);
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -121,7 +116,6 @@ export function CarList({
     setSetupSheetModelId(m.id);
     setPending(false);
     setShowUpload(false);
-    setShowCreateType(false);
     if (!nameDirty) setName(m.name); // auto-fill name from chassis (still editable)
   }
 
@@ -134,7 +128,6 @@ export function CarList({
     setSetupSheetModelId("");
     setPending(false);
     setShowUpload(true);
-    setShowCreateType(false);
   }
 
   function chooseWithoutSheet() {
@@ -171,29 +164,6 @@ export function CarList({
     );
   }
 
-  async function createTypeFromName() {
-    const typed = newTypeName.trim();
-    if (!typed || creatingType) return;
-    setCreatingType(true);
-    setMessage(null);
-    try {
-      const { model } = await jsonFetch<{ model: SetupSheetModelOption }>("/api/setup-sheet-models", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: typed }),
-      });
-      setSetupSheetModels((prev) =>
-        prev.some((m) => m.id === model.id) ? prev : [{ ...model, isAuthorized: false }, ...prev]
-      );
-      setNewTypeName("");
-      selectModel(model);
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to create chassis type");
-    } finally {
-      setCreatingType(false);
-    }
-  }
-
   function resetForm() {
     setName("");
     setNameDirty(false);
@@ -201,8 +171,6 @@ export function CarList({
     setSetupSheetModelId("");
     setPending(false);
     setShowUpload(false);
-    setShowCreateType(false);
-    setNewTypeName("");
     setImportedSetup(null);
   }
 
@@ -327,11 +295,6 @@ export function CarList({
                   onChange={(e) => {
                     const v = e.target.value;
                     if (v === "__upload_blank__") return chooseUploadBlank();
-                    if (v === "__create__") {
-                      // Keep the current selection; just reveal the create panel.
-                      setShowCreateType(true);
-                      return;
-                    }
                     if (!v) {
                       setSetupSheetModelId("");
                       setPending(false);
@@ -361,38 +324,17 @@ export function CarList({
                     the chassis. The no-sheet car still exists, one step further in, for when the
                     sheet cannot be read.
                   */}
+                  {/*
+                    ONE way past the list, for everybody.
+                    There used to be a second, admin-only entry here — "+ Create new chassis type…"
+                    — which minted an empty chassis by name and left the founder to hand-build every
+                    parameter. Two "not listed" options in one menu is a choice nobody should have to
+                    make, and the upload is the better half of it anyway: the same chassis arrives
+                    with its boxes and their positions already read off the paper. Hand-building an
+                    empty one still exists, on the page that is for exactly that — /setup-sheet-models/new.
+                  */}
                   <option value="__upload_blank__">My chassis isn’t listed — upload your setup sheet</option>
-                  {/* Admin-only: mint a new global chassis type (custom setup sheet). */}
-                  {isAdmin ? <option value="__create__">+ Create new chassis type…</option> : null}
                 </select>
-                {showCreateType && isAdmin ? (
-                  <div className="mt-2 space-y-2 rounded-md border border-border bg-card p-2">
-                    <input
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
-                      placeholder="New chassis type name, e.g. Mugen MTC3"
-                      value={newTypeName}
-                      onChange={(e) => setNewTypeName(e.target.value)}
-                      aria-label="New chassis type name"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void createTypeFromName()}
-                        disabled={creatingType || !newTypeName.trim()}
-                        className="btn-surface px-2 py-1 text-xs disabled:opacity-60"
-                      >
-                        {creatingType ? "Creating…" : "Create chassis type"}
-                      </button>
-                      <button
-                        type="button"
-                        className="px-2 text-xs text-muted-foreground hover:text-foreground"
-                        onClick={() => setShowCreateType(false)}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
                 {showUpload ? (
                   <AddCarBlankUpload
                     onCreated={onChassisCreatedFromBlank}
