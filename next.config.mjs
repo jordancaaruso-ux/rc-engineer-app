@@ -1,3 +1,18 @@
+/**
+ * pdfjs-dist loads its Node canvas with a bare `require("@napi-rs/canvas")` inside a try/catch, and
+ * that package hands off again to a per-platform binary package. Neither hop is a static import, so
+ * the file tracer never sees them and they don't reach the lambda — pdfjs then falls back to "cannot
+ * polyfill DOMMatrix" and importing the module throws. The platform glob is deliberately wide: only
+ * the build machine's own platform package is ever installed, so it resolves to one directory.
+ *
+ * The standard fonts are read by path at runtime too (see `pdfServerRaster.standardFontDataUrl`).
+ */
+const RASTER_NATIVE_FILES = [
+  "./node_modules/@napi-rs/canvas/**/*",
+  "./node_modules/@napi-rs/canvas-*/**/*",
+  "./node_modules/pdfjs-dist/standard_fonts/**/*",
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -25,7 +40,15 @@ const nextConfig = {
     "/api/setup-documents/**": [
       "./src/lib/setupCalibrations/models/**/*",
       "./node_modules/pdfjs-dist/standard_fonts/**/*",
+      ...RASTER_NATIVE_FILES,
     ],
+    // Every other function that rasterizes a PDF page. Blank upload (`/blank`) and the sheet
+    // picture (`/[id]/sheet-page`) are the driver-facing ones; derive-image-map is the
+    // calibration workbench. Prod 2026-08-11: `/blank` 500'd on `DOMMatrix is not defined`,
+    // which is what pdfjs reports when its canvas is missing from the bundle.
+    "/api/setup-sheet-models/**": RASTER_NATIVE_FILES,
+    "/api/setup-calibrations/**": RASTER_NATIVE_FILES,
+    "/api/debug/**": RASTER_NATIVE_FILES,
   },
   // The landing page is the Claude Design artifact served verbatim from `public/landing/` —
   // founder call 2026-08-06, to keep the design exact rather than re-implement its scroll
