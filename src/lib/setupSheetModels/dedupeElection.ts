@@ -1,4 +1,5 @@
 import { setupSheetModelSlugRank } from "@/lib/setupSheetModels/normalizeModelName";
+import { isDerivedSheetSlug } from "@/lib/setupSheetModels/derivedSheetFingerprint";
 
 /**
  * Inputs for electing which duplicate SetupSheetModel row survives a merge.
@@ -54,6 +55,21 @@ export function electDedupeWinner(rows: DedupeModelRow[]): DedupeModelRow {
 /**
  * Group rows by `keyOf` and elect a keeper per group. Returns only groups that actually need a
  * merge (more than one row), each with the winner and the losers to repoint + delete.
+ *
+ * ============================== SHEETS READ OFF A PDF NEVER MERGE ==============================
+ *
+ * A chassis derived from somebody's PDF is identified by its `derivedSheetFingerprint`, which
+ * hashes the derivation OUTPUT — the keys, in order, and where each reads from. Two uploads of the
+ * same sheet therefore already share one row, decided at upload. Two rows that survive that are a
+ * proof of difference, not a suspicion of sameness.
+ *
+ * Merging them by name would be destructive rather than tidy. The losing chassis's cars hold setups
+ * keyed to ITS boxes, and the winner's schema does not describe those keys — so every saved value
+ * stops meaning anything. `SetupSheetBlank.setupSheetModelId` is unique, so the loser's box geometry
+ * is cut loose as well, and its drivers cannot draw their own sheet any more.
+ *
+ * The founder still SEES same-named derived rows, in the review queue. Looking is the right action
+ * there; merging is not.
  */
 export function planSetupSheetModelDedupe(
   rows: DedupeModelRow[],
@@ -61,6 +77,7 @@ export function planSetupSheetModelDedupe(
 ): DedupeGroup[] {
   const byKey = new Map<string, DedupeModelRow[]>();
   for (const row of rows) {
+    if (isDerivedSheetSlug(row.slug)) continue;
     const key = keyOf(row);
     if (!key) continue;
     const list = byKey.get(key) ?? [];

@@ -85,3 +85,26 @@ test("planSetupSheetModelDedupe can dedupe by slug", () => {
   assert.equal(plan.length, 1);
   assert.equal(plan[0]!.winner.id, "b");
 });
+
+test("a sheet read off a PDF is never merged by name", () => {
+  // Two drivers upload two DIFFERENT Mugen sheets and both type the same chassis name. The
+  // fingerprint already proved the derivations differ, so merging would repoint one driver's cars
+  // onto a schema that does not describe their saved values.
+  const rows = [
+    row({ id: "d1", name: "Mugen MTC3", slug: "sheet_965cac7a0b8f8c37", carCount: 2 }),
+    row({ id: "d2", name: "Mugen MTC3", slug: "sheet_11aa22bb33cc44dd", carCount: 1 }),
+  ];
+  assert.deepEqual(
+    planSetupSheetModelDedupe(rows, (r) => normalizeSetupSheetModelName(r.name)),
+    []
+  );
+});
+
+test("a derived row never drags a hand-built row into a merge either", () => {
+  const rows = [
+    row({ id: "hand", name: "Mugen MTC3", slug: "mugen_mtc3" }),
+    row({ id: "derived", name: "Mugen MTC3", slug: "sheet_965cac7a0b8f8c37" }),
+  ];
+  // Only one mergeable row is left in the group, so there is nothing to merge.
+  assert.deepEqual(planSetupSheetModelDedupe(rows, (r) => normalizeSetupSheetModelName(r.name)), []);
+});

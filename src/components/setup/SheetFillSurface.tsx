@@ -124,6 +124,10 @@ const FIELD_TINT_BORDER = "rgba(112, 152, 200, 0.55)";
 const FOCUS_TINT = "rgba(255, 214, 10, 0.42)";
 const FOCUS_HALO = "0 0 0 2px rgba(255, 214, 10, 0.95), 0 0 0 5px rgba(255, 214, 10, 0.18)";
 
+/** Naming only: a box that has been said out loud. Green because it means done, not selected. */
+const NAMED_TINT = "rgba(52, 168, 83, 0.30)";
+const NAMED_TINT_BORDER = "rgba(34, 122, 58, 0.55)";
+
 /** A viewer sizes an auto-sized value to the box; this is that, near enough to read the same. */
 const AUTO_TEXT_HEIGHT_RATIO = 0.66;
 const AUTO_MARK_HEIGHT_RATIO = 0.78;
@@ -165,12 +169,30 @@ function distance(a: { clientX: number; clientY: number }, b: { clientX: number;
   return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
 }
 
+/**
+ * The same sheet, used for the other job only the founder does: saying what each box IS.
+ *
+ * Naming reuses this rather than getting a surface of its own, because the hard part here is not
+ * the dock — it is everything above it. Panning a 200-box page one-handed, keeping the driver's
+ * own zoom when stepping, and not letting the keyboard shove the page around took two phone drives
+ * to get right. Naming a box needs all of it and for exactly the same reason: you have to see the
+ * caption printed beside a box to know what it is.
+ *
+ * What changes in `name` mode:
+ *  - every box takes text, including tick boxes, because a tick box has a name like anything else
+ *  - the tint says named or not, rather than filled or not
+ *  - nothing is drawn inside the boxes: a name is far too long for a box six pixels tall, and it
+ *    is already right there in the bar while you type it
+ */
+export type SheetSurfaceMode = "fill" | "name";
+
 export function SheetFillSurface({
   pageImageUrl,
   planUrl,
   initialValues,
   onChange,
   storageKey,
+  mode = "fill",
 }: {
   /** Returns an image of one page; the page number is appended as `page=`. */
   pageImageUrl: string;
@@ -187,7 +209,10 @@ export function SheetFillSurface({
   onChange?: (values: Record<string, string>) => void;
   /** When set, values survive a reload — a sheet is filled over a whole day, not in one sitting. */
   storageKey?: string;
+  /** `fill` types values into boxes (the driver). `name` types what each box is (the founder). */
+  mode?: SheetSurfaceMode;
 }) {
+  const naming = mode === "name";
   const [plan, setPlan] = useState<SheetFillPlan>(EMPTY_PLAN);
   const [planError, setPlanError] = useState<string | null>(null);
   const { fields, boxes, pageCount } = plan;
@@ -214,8 +239,13 @@ export function SheetFillSurface({
   const focused = focusIndex === null ? null : order[focusIndex] ?? null;
   const focusedBox = focused ? boxByKey.get(focused.key) ?? null : null;
   const isFocusMode = focusIndex !== null;
-  /** True when this box is typed into. A tick box and a choice row are tapped, not typed. */
-  const typesValues = focused ? focused.uiType !== "checkbox" && !focused.options?.length : false;
+  /**
+   * True when this box is typed into. A tick box and a choice row are tapped, not typed —
+   * unless the job is naming, where every box takes a name however it is filled in.
+   */
+  const typesValues = focused
+    ? naming || (focused.uiType !== "checkbox" && !focused.options?.length)
+    : false;
 
   // --- the box list ----------------------------------------------------------------------
   useEffect(() => {
@@ -647,8 +677,17 @@ export function SheetFillSurface({
                     height: boxHeight,
                     // Pale blue is the field highlight every PDF reader draws. The box being filled
                     // right now takes the app's action colour instead, plus a halo outside it.
-                    background: isFocused ? FOCUS_TINT : FIELD_TINT,
-                    borderColor: isFocused ? undefined : FIELD_TINT_BORDER,
+                    // Naming instead marks off what is done, which is the only progress there is.
+                    background: isFocused
+                      ? FOCUS_TINT
+                      : naming && filled
+                        ? NAMED_TINT
+                        : FIELD_TINT,
+                    borderColor: isFocused
+                      ? undefined
+                      : naming && filled
+                        ? NAMED_TINT_BORDER
+                        : FIELD_TINT_BORDER,
                     boxShadow: isFocused ? FOCUS_HALO : undefined,
                     justifyContent:
                       isTick || s.alignment === "center"
@@ -658,7 +697,9 @@ export function SheetFillSurface({
                           : "flex-start",
                   }}
                 >
-                  {filled ? (
+                  {/* Naming draws nothing in the box: a name does not fit in six pixels, and it is
+                      already in the bar you are typing it into. */}
+                  {filled && !naming ? (
                     <span
                       className="pointer-events-none block max-w-full overflow-hidden whitespace-nowrap px-[1px] leading-none"
                       style={{
@@ -735,17 +776,23 @@ export function SheetFillSurface({
         <span
           className={cn(
             "min-w-0 flex-1 truncate text-[15px] font-semibold",
-            focused.unnamed && "font-medium text-muted-foreground"
+            (naming || focused.unnamed) && "font-medium text-muted-foreground"
           )}
         >
-          {focused.label}
+          {/* Naming: the heading is where the box IS, because what it is called is what you are
+              about to type. Filling: the heading is the name, because that is the question. */}
+          {naming
+            ? `Box ${focusIndex! + 1}${focusedBox ? ` · page ${focusedBox.pageNumber}` : ""}${
+                focused.uiType === "checkbox" ? " · tick box" : ""
+              }`
+            : focused.label}
         </span>
         <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
           {focusIndex! + 1} / {order.length}
         </span>
       </div>
 
-      {focused.options?.length ? (
+      {!naming && focused.options?.length ? (
         <div className="flex flex-wrap gap-1.5">
           {focused.options.map((o) => (
             <button
@@ -798,11 +845,13 @@ export function SheetFillSurface({
               }
             }}
             enterKeyHint="next"
-            autoCapitalize="off"
+            autoCapitalize={naming ? "sentences" : "off"}
             autoCorrect="off"
             spellCheck={false}
-            placeholder="—"
-            aria-label={focused.label}
+            // Naming shows the generated position as the placeholder, so the hint the derivation
+            // could give is still on screen while the real name is typed over it.
+            placeholder={naming ? (focused.unnamed ? focused.label : "Name this box") : "—"}
+            aria-label={naming ? `Name for box ${focusIndex! + 1}` : focused.label}
             aria-hidden={!typesValues}
             tabIndex={typesValues ? undefined : -1}
             className={cn(
@@ -851,7 +900,7 @@ export function SheetFillSurface({
 
       <div className="flex items-center justify-between gap-3">
         <span className="truncate font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">
-          {focused.sectionTitle}
+          {naming ? focused.key : focused.sectionTitle}
         </span>
         <button
           type="button"

@@ -76,6 +76,33 @@ export function setupDocumentReadableForCalibrationExampleWhere(
   };
 }
 
+/**
+ * The same, plus the one file an admin needs to work the upload review queue.
+ *
+ * A sheet that could not be turned into a chassis — a flat PDF, or one nothing could be read from —
+ * is kept precisely so the founder can make it fillable himself. It belongs to the driver who
+ * uploaded it and it is attached to no calibration, so the rule above hides it from the only person
+ * who can act on it.
+ *
+ * Deliberately narrow: an admin gets a driver's setup PDF only when that driver uploaded it AS a
+ * setup sheet and the app told them it could not be used. A sheet that worked is already readable,
+ * because it became the chassis's example document.
+ */
+export function setupDocumentReadableForReviewWhere(
+  user: CalibrationAccessUser,
+  docId: string
+): Prisma.SetupDocumentWhereInput {
+  const base = setupDocumentReadableForCalibrationExampleWhere(user.id, docId);
+  if (!isCalibrationAdmin(user)) return base;
+  return {
+    id: docId,
+    OR: [
+      ...((base.OR ?? []) as Prisma.SetupDocumentWhereInput[]),
+      { blankSheet: { is: { status: { not: "FILLABLE" } } } },
+    ],
+  };
+}
+
 /** Example PDFs linkable to a calibration the user is allowed to edit. */
 export function setupDocumentLinkableAsCalibrationExampleWhere(
   user: CalibrationAccessUser,

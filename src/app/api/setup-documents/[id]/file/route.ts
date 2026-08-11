@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedApiUserId } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
-import { setupDocumentReadableForCalibrationExampleWhere } from "@/lib/setupCalibrations/calibrationAccess";
+import { setupDocumentReadableForReviewWhere } from "@/lib/setupCalibrations/calibrationAccess";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -12,10 +12,10 @@ export async function GET(_request: Request, ctx: Ctx) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   const { id } = await ctx.params;
-  const userId = await getAuthenticatedApiUserId();
-    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await getAuthenticatedApiUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const doc = await prisma.setupDocument.findFirst({
-    where: setupDocumentReadableForCalibrationExampleWhere(userId, id),
+    where: setupDocumentReadableForReviewWhere(user, id),
     select: { storagePath: true, mimeType: true, originalFilename: true },
   });
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
