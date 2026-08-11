@@ -113,7 +113,10 @@ export function RatingDial({
 
   const numeral = size >= 28;
   const numeralText = display ?? (rated ? String(clamped) : "–");
-  const numeralSize = Math.max(9, Math.round(size * (numeralText.length > 2 ? 0.26 : 0.34)));
+  // Three steps, not two: a five-character display like "99.4%" runs into the ring at the
+  // 0.26 ratio, and the ring is the thing that must not be touched.
+  const numeralRatio = numeralText.length >= 5 ? 0.21 : numeralText.length > 2 ? 0.26 : 0.34;
+  const numeralSize = Math.max(9, Math.round(size * numeralRatio));
   const wordSize = Math.max(11, Math.round(size * 0.26));
   const captionSize = Math.max(10, Math.round(size * 0.2));
   const textGap = Math.round(size * 0.24);

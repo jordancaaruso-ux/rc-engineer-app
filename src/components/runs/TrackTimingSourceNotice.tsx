@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { validateLiveRcTrackUrl } from "@/lib/lapWatch/liveRcTrackUrl";
-import { isSpeedhiveHostname, validateSpeedhiveTrackUrl } from "@/lib/speedhive/speedhiveUrl";
+import {
+  TRACK_TIMING_PASTE_EXAMPLES as PASTE_EXAMPLES,
+  classifyTrackTimingUrl,
+  type TrackTimingUrls,
+} from "@/lib/tracks/trackTimingUrl";
 
-export type TrackTimingUrls = {
-  liveRcUrl: string | null;
-  speedhiveUrl: string | null;
-};
+export type { TrackTimingUrls };
 
 /**
  * A LiveRC subdomain *is* the track's identity, so it's worth the line length — where a
@@ -20,44 +20,6 @@ function liveRcHost(url: string): string {
   } catch {
     return url;
   }
-}
-
-function hostnameOf(url: string): string {
-  try {
-    return new URL(url).hostname.toLowerCase();
-  } catch {
-    return "";
-  }
-}
-
-const PASTE_EXAMPLES = "e.g. tftr.liverc.com or speedhive.mylaps.com/practice/4591";
-
-/**
- * One pasted URL, two possible fields — tell them apart by host so the driver never has to
- * know which timing provider column they are filling in.
- */
-function classifyTrackTimingUrl(
-  raw: string
-):
-  | { ok: true; field: "liveRcUrl" | "speedhiveUrl"; url: string }
-  | { ok: false; error: string } {
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    return { ok: false, error: `Paste the track's timing page — ${PASTE_EXAMPLES}` };
-  }
-  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-
-  const liveRc = validateLiveRcTrackUrl(candidate);
-  if (liveRc.ok) return { ok: true, field: "liveRcUrl", url: liveRc.normalized };
-
-  const speedhive = validateSpeedhiveTrackUrl(candidate);
-  if (speedhive.ok) return { ok: true, field: "speedhiveUrl", url: speedhive.normalized };
-
-  // Right provider, wrong page: their own parse errors say which page to grab instead.
-  const host = hostnameOf(candidate);
-  if (isSpeedhiveHostname(host)) return { ok: false, error: speedhive.error };
-  if (/\.liverc\.com$/i.test(host)) return { ok: false, error: liveRc.error };
-  return { ok: false, error: `That isn't a LiveRC or Speedhive track page — ${PASTE_EXAMPLES}` };
 }
 
 /**

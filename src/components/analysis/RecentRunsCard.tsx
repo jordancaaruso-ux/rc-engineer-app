@@ -52,9 +52,12 @@ function runCountLabel(count: number): string {
 export function RecentRunsCard({
   runs,
   totalRunCount,
+  hasTeam = false,
 }: {
   runs: AnalysisRecentRun[];
   totalRunCount: number;
+  /** Team member → the door names team sessions, because it can actually open them. */
+  hasTeam?: boolean;
 }) {
   if (runs.length === 0) {
     return (
@@ -87,11 +90,25 @@ export function RecentRunsCard({
             <Link
               href="/runs/history"
               prefetch
-              className="tap-active group flex shrink-0 items-center gap-1 rounded-full border border-primary/35 py-0.5 pl-2.5 pr-1.5 text-[11px] font-semibold tabular-nums text-primary transition-colors hover:border-primary/60 hover:bg-primary/10"
+              /*
+               * The vertical padding is deliberately uneven, and `leading-none` is load-
+               * bearing. `text-[11px]` sets font-size only, so the text kept the inherited
+               * 1.5 line-height: an 11px glyph in a 16.5px line box, with all of the slack
+               * below the baseline as unused descender space. Since "All 191 runs" has no
+               * descenders, the ink (cap-top to baseline) sat ~1px ABOVE the pill's centre
+               * and the pill read bottom-heavy — the "not vertically centred" report.
+               *
+               * leading-none collapses the line box to the font size; 5px over 3px puts the
+               * ink on the centre line and keeps the pill its original 22px tall, so the tap
+               * target does not shrink.
+               */
+              className="tap-active group flex shrink-0 items-center gap-1 rounded-full border border-primary/35 pb-[3px] pl-2.5 pr-1.5 pt-[5px] text-[11px] font-semibold leading-none tabular-nums text-primary transition-colors hover:border-primary/60 hover:bg-primary/10"
             >
               All {runCountLabel(totalRunCount)}
+              {/* Same cause: the chevron centres on the line box, the text centres on its
+                  ink, leaving the arrow a pixel low. -0.5 margin lifts it onto the text. */}
               <ChevronRight
-                className="h-3 w-3 transition-transform group-hover:translate-x-0.5"
+                className="-mt-0.5 h-3 w-3 transition-transform group-hover:translate-x-0.5"
                 aria-hidden
               />
             </Link>
@@ -155,7 +172,8 @@ export function RecentRunsCard({
             All sessions
           </span>
           <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
-            {runCountLabel(totalRunCount)}, grouped by day · filter and compare
+            {runCountLabel(totalRunCount)}, grouped by day ·{" "}
+            {hasTeam ? "filter, compare, team sessions" : "filter and compare"}
           </span>
         </span>
         <ChevronRight

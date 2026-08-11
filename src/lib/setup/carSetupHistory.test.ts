@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildCarSetupHistory,
+  carSetupCounts,
   type SetupHistoryDocumentInput,
   type SetupHistoryRunInput,
 } from "@/lib/setup/carSetupHistory";
@@ -136,6 +137,166 @@ test("a sheet with no setup still shows, pointing at the document", () => {
   );
   assert.equal(entries[0].href, "/setup-documents/doc1");
   assert.match(entries[0].meta, /needs review/);
+});
+
+// ---- saving marks the row it is on; it never adds a second one --------------------------------
+
+test("a saved run is one row with its bookmark filled, not two", () => {
+  const entries = build([
+    run({
+      id: "r1",
+      createdAt: "2026-07-15T11:44:59Z",
+      setupSnapshot: {
+        setupDeltaJson: { toe_rear: 3 },
+        baseSetupSnapshotId: "base",
+        isLibrary: true,
+        name: "Bayside qualifier",
+      },
+    }),
+  ]);
+  assert.equal(entries.length, 1, "marking must not mint a second row");
+  assert.equal(entries[0].kind, "run", "where it came from never changes");
+  assert.equal(entries[0].saved, true);
+  assert.equal(entries[0].saveAction, "mark");
+  assert.equal(entries[0].title, "Bayside qualifier", "the name the driver gave it wins");
+  assert.equal(entries[0].usedByRuns, 1, "a run points at it, so it is rename-only");
+});
+
+test("an unsaved run keeps its session title and an empty bookmark", () => {
+  const entries = build([
+    run({
+      id: "r1",
+      createdAt: "2026-07-15T11:44:59Z",
+      event: { name: "Clubday" },
+      setupSnapshot: { setupDeltaJson: { toe_rear: 3 }, baseSetupSnapshotId: "base" },
+    }),
+  ]);
+  assert.equal(entries[0].saved, false);
+  assert.equal(entries[0].title, "Clubday · Testing run");
+});
+
+test("a sheet whose values could not be read has nothing to save", () => {
+  const entries = build(
+    [],
+    [
+      {
+        id: "doc1",
+        originalFilename: "x4.pdf",
+        createdAt: new Date("2026-07-20T02:00:00Z"),
+        parseStatus: "FAILED",
+        createdSetupId: null,
+      },
+    ]
+  );
+  assert.equal(entries[0].saveAction, "none");
+  assert.equal(entries[0].saved, false);
+});
+
+test("a baseline can only be copied, opens nothing, and is never 'saved'", () => {
+  const entries = buildCarSetupHistory({
+    carId: CAR_ID,
+    runs: [],
+    documents: [],
+    baselines: [
+      {
+        id: "b1",
+        name: "Kit setup",
+        createdAt: new Date("2026-05-01T00:00:00Z"),
+        kindLabel: "Kit",
+        contextLabel: "Asphalt · medium grip",
+        valueCount: 42,
+        notes: "Straight out of the box.",
+      },
+    ],
+    labelForKey: (k) => k,
+    formatDate: (at) => at.toISOString().slice(0, 10),
+  });
+  assert.equal(entries[0].kind, "baseline");
+  assert.equal(entries[0].saveAction, "copy");
+  assert.equal(entries[0].saved, false, "a global row is nobody's saved setup");
+  assert.equal(entries[0].href, null, "there is no page for a baseline, so it must not pretend");
+  assert.equal(entries[0].baselineId, "b1");
+});
+
+test("a saved setup with no run and no sheet behind it gets its own kind", () => {
+  const entries = buildCarSetupHistory({
+    carId: CAR_ID,
+    runs: [],
+    documents: [],
+    librarySetups: [
+      {
+        id: "lib1",
+        name: "Cold morning base",
+        createdAt: new Date("2026-06-10T00:00:00Z"),
+        valueCount: 31,
+        runCount: 0,
+      },
+    ],
+    labelForKey: (k) => k,
+    formatDate: (at) => at.toISOString().slice(0, 10),
+  });
+  assert.equal(entries[0].kind, "saved");
+  assert.equal(entries[0].saved, true);
+  assert.equal(entries[0].meta, "31 values");
+  assert.equal(entries[0].href, `/cars/${CAR_ID}/setups/lib1`);
+});
+
+// ---- the chips ---------------------------------------------------------------------------------
+
+test("chip counts read kind for origin and the flag for saved", () => {
+  const entries = buildCarSetupHistory({
+    carId: CAR_ID,
+    runs: [
+      run({
+        id: "r1",
+        createdAt: "2026-07-15T00:00:00Z",
+        setupSnapshot: { setupDeltaJson: { toe_rear: 3 }, baseSetupSnapshotId: "base" },
+      }),
+      run({
+        id: "r2",
+        createdAt: "2026-07-16T00:00:00Z",
+        setupSnapshot: {
+          setupDeltaJson: { camber_front: 1 },
+          baseSetupSnapshotId: "base",
+          isLibrary: true,
+          name: "Kept one",
+        },
+      }),
+    ],
+    documents: [
+      {
+        id: "doc1",
+        originalFilename: "sheet.pdf",
+        createdAt: new Date("2026-07-17T00:00:00Z"),
+        parseStatus: "PARSED",
+        createdSetupId: "snap-sheet",
+        createdSetup: { isLibrary: false, name: null, runCount: 0 },
+      },
+    ],
+    librarySetups: [
+      { id: "lib1", name: "Base", createdAt: new Date("2026-06-10T00:00:00Z"), valueCount: 3, runCount: 0 },
+    ],
+    baselines: [
+      {
+        id: "b1",
+        name: "Kit",
+        createdAt: new Date("2026-05-01T00:00:00Z"),
+        kindLabel: "Kit",
+        contextLabel: null,
+        valueCount: 40,
+        notes: null,
+      },
+    ],
+    labelForKey: (k) => k,
+    formatDate: (at) => at.toISOString().slice(0, 10),
+  });
+  const counts = carSetupCounts(entries);
+  assert.equal(counts.all, 5);
+  assert.equal(counts.run, 2);
+  assert.equal(counts.sheet, 1);
+  assert.equal(counts.baseline, 1);
+  // The saved run and the standalone saved setup — a saved run counts under BOTH Runs and Saved.
+  assert.equal(counts.saved, 2);
 });
 
 test("runs and sheets interleave newest first", () => {

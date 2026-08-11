@@ -9,8 +9,10 @@ import { formatRunSessionDisplay } from "@/lib/runSession";
 import { normalizeSetupData } from "@/lib/runSetup";
 import { chassisChangedKeys } from "@/lib/setup/runContextSetupKeys";
 import { getSetupSheetTemplateForCar } from "@/lib/setupSheetModels/getTemplateForCar";
+import { chassisFillsAsSheet } from "@/lib/setupSheetModels/sheetPlan";
 import { ReadOnlySetupSheet } from "@/components/setup/ReadOnlySetupSheet";
-import { SaveAsBaselineButton } from "@/components/setup/SaveAsBaselineButton";
+import { ReadOnlySheetSurface } from "@/components/setup/ReadOnlySheetSurface";
+import { KeepSetupButton } from "@/components/setup/KeepSetupButton";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { ButtonLink, outlineButtonClassName } from "@/components/ui/ButtonLink";
 import { PageBackLink } from "@/components/ui/PageBackLink";
@@ -92,6 +94,18 @@ export default async function CarSetupViewPage(props: {
   if (!setup) notFound();
 
   const template = await getSetupSheetTemplateForCar(user.id, car, "setup");
+  /*
+   * On a chassis whose sheet the app can draw, the SHEET is the setup view (founder ruling,
+   * 2026-08-11): the driver's own paper with their values in its boxes. The field list stays for
+   * every other chassis, and for the session view's what-changed list, which this page is not.
+   */
+  const blank = car.setupSheetModelId
+    ? await prisma.setupSheetBlank.findUnique({
+        where: { setupSheetModelId: car.setupSheetModelId },
+        select: { boxesJson: true, fillSurface: true },
+      })
+    : null;
+  const sheetMode = chassisFillsAsSheet(blank);
   const changedKeys = chassisChangedKeys(setup.setupDeltaJson);
   const run = setup.runs[0] ?? null;
   const document = setup.sourceDocuments[0] ?? null;
@@ -126,11 +140,15 @@ export default async function CarSetupViewPage(props: {
 
       <section className="page-body max-w-4xl">
         <div className="flex flex-wrap items-center gap-2">
-          {setup.isLibrary ? (
+          {/*
+            Editing is only ever offered for a setup no run points at. A saved run setup is that
+            run's own record: saving marks the snapshot rather than copying it, so its values are
+            frozen and the door here is Save / Rename, not Edit.
+          */}
+          {setup.isLibrary && setup.runs.length === 0 ? (
             <ButtonLink href={`/cars/${car.id}/setups/${setup.id}/edit`}>Edit</ButtonLink>
-          ) : (
-            <SaveAsBaselineButton carId={car.id} setupId={setup.id} />
-          )}
+          ) : null}
+          <KeepSetupButton setupId={setup.id} name={title} initialSaved={setup.isLibrary} />
           {setup.isLibrary ? (
             <ButtonLink href={`/engineer?pin=setup:${setup.id}`} variant="outline">
               Ask the Engineer
@@ -156,18 +174,25 @@ export default async function CarSetupViewPage(props: {
           ) : null}
         </div>
 
-        {changedKeys.length > 0 ? (
+        {changedKeys.length > 0 && !sheetMode ? (
           <p className="ui-caption px-1">
             Highlighted values differ from{" "}
             {setup.baseSetupSnapshot?.name ?? "the setup this was based on"}.
           </p>
         ) : null}
 
-        <ReadOnlySetupSheet
-          value={normalizeSetupData(setup.data)}
-          template={template}
-          changedKeys={changedKeys}
-        />
+        {sheetMode && car.setupSheetModelId ? (
+          <ReadOnlySheetSurface
+            setupSheetModelId={car.setupSheetModelId}
+            values={normalizeSetupData(setup.data)}
+          />
+        ) : (
+          <ReadOnlySetupSheet
+            value={normalizeSetupData(setup.data)}
+            template={template}
+            changedKeys={changedKeys}
+          />
+        )}
       </section>
     </>
   );

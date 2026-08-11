@@ -19,8 +19,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const hideNav = isHiddenNavRoute(pathname);
 
-  // Page-title timing line: which of the 5 dock sectors this route belongs to.
-  // -1 (add run, settings, unknown) → no data attribute → bare track, no segment.
+  // Page-title timing line: which dock sector this route belongs to, and how many
+  // sectors there are. -1 (add run, settings, unknown) → no data attribute → bare
+  // track, no segment.
+  //
+  // The COUNT is published alongside the sector because the CSS used to hardcode
+  // five slots (`width: 20%`). Teams joined MOBILE_NAV as a sixth destination, so
+  // its tick resolved to `left: 100%` — past the right end of the title, where it
+  // dangled on `/teams` and was clipped away entirely on `/teams/[teamId]`. Deriving
+  // the slot width from the nav means a seventh destination cannot repeat it.
   const activeNavId = pathname ? resolveActiveNavId(pathname) : null;
   const navSector = activeNavId ? MOBILE_NAV.findIndex((item) => item.id === activeNavId) : -1;
 
@@ -43,7 +50,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div
             className="app-shell"
             data-nav-sector={navSector >= 0 ? navSector : undefined}
-            style={navSector >= 0 ? ({ "--title-nav-sector": navSector } as CSSProperties) : undefined}
+            style={
+              navSector >= 0
+                ? ({
+                    "--title-nav-sector": navSector,
+                    "--title-nav-count": MOBILE_NAV.length,
+                  } as CSSProperties)
+                : undefined
+            }
           >
             <Sidebar />
             <main

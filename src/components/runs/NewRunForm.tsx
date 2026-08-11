@@ -1549,7 +1549,7 @@ export function NewRunForm(props: {
    * `setSetupData` takes an updater and the touched flag is a ref — so a fixed identity is also
    * always correct here.
    */
-  const applySheetValuesToSetup = useCallback((next: Record<string, string>) => {
+  const applySheetValuesToSetup = useCallback((next: Record<string, unknown>) => {
     setupTouchedByUserRef.current = true;
     setSetupData((prev) =>
       applyDerivedFieldsToSnapshot(mergeSheetValuesIntoSnapshot(prev, next))
@@ -4139,8 +4139,12 @@ export function NewRunForm(props: {
                       )}
                       <InlineNewTrackRow
                         onCreated={(t) => {
+                          // Merge rather than skip: on a duplicate name the row hands back the
+                          // *existing* track, and its timing URLs are what the lap panel scans.
                           setTracksList((prev) =>
-                            prev.some((x) => x.id === t.id) ? prev : [...prev, t]
+                            prev.some((x) => x.id === t.id)
+                              ? prev.map((x) => (x.id === t.id ? { ...x, ...t } : x))
+                              : [...prev, t]
                           );
                           trackPickedManuallyRef.current = true;
                           wizardCtxTouchedRef.current = true;

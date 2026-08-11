@@ -1,8 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { TrackTimingUrls } from "@/lib/tracks/trackTimingUrl";
+import {
+  TrackTimingUrlsField,
+  type TrackTimingUrlsFieldHandle,
+} from "@/components/tracks/TrackTimingUrlsField";
+
+const NO_TIMING_URLS: TrackTimingUrls = { liveRcUrl: null, speedhiveUrl: null };
+
+export type InlineCreatedTrack = {
+  id: string;
+  name: string;
+  location: string | null;
+  liveRcUrl?: string | null;
+  speedhiveUrl?: string | null;
+};
 
 /**
  * Create a track without leaving the run you're logging — backlog FB-01/FB-02,
@@ -13,24 +28,46 @@ import { cn } from "@/lib/utils";
  * block *completing* a run, and asking them to leave the form to fix it is how
  * drafts get abandoned. Tracks are an open global catalog
  * (docs/ASSET_ACCESS_NORTH_STAR.md), so creating one here needs no approval.
+ *
+ * Asks for a timing page too (2026-08-10). A track born here used to start with no
+ * LiveRC and no Speedhive page, so lap discovery searched nothing and the driver
+ * pasted a session URL by hand for every run after. The person creating the track is
+ * the one person who knows its timing page, and they are already typing about it —
+ * TrackTimingSourceNotice further down the same form remains the second chance, and
+ * the only prompt for tracks somebody else added.
  */
 export function InlineNewTrackRow({
   onCreated,
   className,
 }: {
   /** Hand back the new track so the caller can add it to its list and select it. */
-  onCreated: (track: { id: string; name: string; location: string | null }) => void;
+  onCreated: (track: InlineCreatedTrack) => void;
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
+  const [timingUrls, setTimingUrls] = useState<TrackTimingUrls>(NO_TIMING_URLS);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const timingFieldRef = useRef<TrackTimingUrlsFieldHandle>(null);
 
   async function create() {
     const trimmed = name.trim();
     if (!trimmed || busy) return;
+
+    // Fold in a paste they never pressed Enter on, and catch a typo here rather than
+    // saving a track that silently searches nothing.
+    const committed = timingFieldRef.current?.commit() ?? { ok: true as const, value: timingUrls };
+    if (!committed.ok) {
+      setError(committed.error);
+      return;
+    }
+    const timing = {
+      liveRcUrl: committed.value.liveRcUrl ?? undefined,
+      speedhiveUrl: committed.value.speedhiveUrl ?? undefined,
+    };
+
     setBusy(true);
     setError(null);
     try {
@@ -40,23 +77,28 @@ export function InlineNewTrackRow({
         body: JSON.stringify({
           name: trimmed,
           location: location.trim() || null,
+          ...timing,
           // It's where they're racing — favouriting it makes it lead the picker next time.
           addToFavourites: true,
         }),
       });
       const json = (await res.json().catch(() => ({}))) as {
-        track?: { id: string; name: string; location: string | null };
+        track?: InlineCreatedTrack;
         error?: string;
         existingTrackId?: string;
       };
 
       // 409 = someone already added it. Select theirs rather than making a duplicate.
+      // Take the server's row, which carries the timing URLs the existing track already
+      // has — rebuilding it from local state reported those tracks as having none.
       if (res.status === 409 && json.existingTrackId) {
-        onCreated({
-          id: json.existingTrackId,
-          name: trimmed,
-          location: location.trim() || null,
-        });
+        onCreated(
+          json.track ?? {
+            id: json.existingTrackId,
+            name: trimmed,
+            location: location.trim() || null,
+          }
+        );
         reset();
         return;
       }
@@ -75,6 +117,7 @@ export function InlineNewTrackRow({
     setOpen(false);
     setName("");
     setLocation("");
+    setTimingUrls(NO_TIMING_URLS);
     setError(null);
   }
 
@@ -118,6 +161,15 @@ export function InlineNewTrackRow({
         placeholder="Town or suburb — optional"
         value={location}
         onChange={(e) => setLocation(e.currentTarget.value)}
+      />
+      <TrackTimingUrlsField
+        ref={timingFieldRef}
+        className="pt-0.5"
+        value={timingUrls}
+        onChange={setTimingUrls}
+        onError={setError}
+        labelClassName="block text-[11px] font-semibold text-muted-foreground"
+        inputClassName="ui-control w-full rounded-lg border border-border bg-input px-2.5 py-2 text-sm text-foreground"
       />
       {error ? (
         <p className="text-[11px] text-destructive" role="alert">

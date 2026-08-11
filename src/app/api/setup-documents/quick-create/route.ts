@@ -29,7 +29,6 @@ import { isAllowedSetupDocumentBlobUrl } from "@/lib/setupDocuments/blobStorageR
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
 import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 import { extractPdfFormFields } from "@/lib/setupDocuments/pdfFormFields";
-import { renderPdfFirstPageToPng } from "@/lib/setupDocuments/pdfServerRaster";
 import { calibrationsAutoPickableByUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
 import {
   checkAiBudget,
@@ -75,6 +74,8 @@ const PDF_MIME = "application/pdf";
 type QuickCreateResponse = {
   documentId: string;
   setupId: string | null;
+  /** The car the setup landed on, so a clean import can go straight to that setup. */
+  carId: string | null;
   calibrationId: string | null;
   calibrationName: string | null;
   pickSource: RepickOutcome["pickSource"];
@@ -247,28 +248,47 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Failed to read uploaded file" }, { status: 400 });
   }
 
-  // Flattened/scanned PDF bridge: a PDF with zero AcroForm fields (a sheet rendered/scanned to a
-  // PDF) can't be read by the form pipeline. Rasterize page 1 to a PNG server-side and treat it as
-  // an image, so the model's derived imageCalibration reads it (same path as a photo/screenshot
-  // upload). Kill switch SETUP_PDF_RASTER=0; on any failure we keep the PDF and fall through.
-  if (mimeType === PDF_MIME && process.env.SETUP_PDF_RASTER !== "0") {
+  /*
+   * A PDF with no form layer is a picture of a sheet. Refuse it, and say which file to look for.
+   *
+   * ================== WHY THE RASTER BRIDGE IS GONE (founder, 2026-08-11) ==================
+   *
+   * This used to render page 1 to a PNG and carry on down the image pipeline. That was the last way
+   * an image sheet got into the app — the driver never chose an image, the app made one. What
+   * followed was almost always the message "your sheet is saved, values will import automatically
+   * once it's supported", which was not true: reading it needs a hand-drawn image calibration for
+   * that exact chassis, and one is not coming.
+   *
+   * Founder call: no image sheets. Refuse, with the reason, before anything is stored.
+   *
+   * The words are the blank-sheet door's, deliberately — the two doors take the same files and a
+   * driver who has hit one should not have to learn a second explanation. That message names the
+   * pattern instead of merely refusing, because this is the mistake drivers make most: Xray
+   * publishes the fillable and the flat version on the same page under nearly the same name.
+   *
+   * `renderPdfFirstPageToPng` is still used by `deriveImageMap` — admin tooling for authoring an
+   * image calibration by hand. That is a different job and keeps working.
+   */
+  if (mimeType === PDF_MIME) {
+    let hasFormFields = false;
     try {
-      const { hasFormFields } = await extractPdfFormFields(Buffer.from(bytes));
-      if (!hasFormFields) {
-        const png = await renderPdfFirstPageToPng(bytes, { scale: 2 });
-        bytes = new Uint8Array(png);
-        mimeType = "image/png";
-        originalFilename = originalFilename.replace(/\.pdf$/i, "") + ".png";
-        // The client-Blob path stored the original PDF; null the prestored path so the persistence
-        // step below stores the rendered PNG and records that as the document's file.
-        preStoredPath = null;
-        console.log(
-          `[setup-documents/quick-create] flattened PDF rasterized → PNG (${png.byteLength}b) ${originalFilename}`
-        );
-      }
+      ({ hasFormFields } = await extractPdfFormFields(Buffer.from(bytes)));
     } catch (e) {
       console.warn(
-        `[setup-documents/quick-create] flattened-PDF raster skipped: ${e instanceof Error ? e.message : String(e)}`
+        `[setup-documents/quick-create] form-layer check failed: ${e instanceof Error ? e.message : String(e)}`
+      );
+      // Could not tell. Let it through rather than refuse a sheet that may be perfectly fine —
+      // the pipeline below simply finds no calibration match and says so.
+      hasFormFields = true;
+    }
+    if (!hasFormFields) {
+      return NextResponse.json(
+        {
+          error:
+            "There's nothing to type into in that PDF — it's a picture of a sheet rather than a fillable one. Manufacturers usually publish both, so look for the file with “editable” or “fillable” in its name. If you're not sure which you have, open it and try typing in a box.",
+          notFillable: true,
+        },
+        { status: 400 }
       );
     }
   }
@@ -340,6 +360,20 @@ export async function POST(request: Request): Promise<NextResponse> {
       pickUserNote = "Fingerprint matching failed — pick a calibration manually.";
     }
   } else if (mimeType.startsWith("image/")) {
+    /*
+     * UNREACHABLE since 2026-08-11, and deliberately not deleted yet.
+     *
+     * Two gates above make it so: `SETUP_DOCUMENT_ALLOWED_MIME` admits PDFs only, and the flat-PDF
+     * raster bridge that used to turn a PDF into a PNG here is gone. No image sheets — founder's
+     * call, twice now, which is exactly why this is signposted rather than quietly removed.
+     *
+     * The messages below are the ones that made it worth doing: they promise a driver that their
+     * sheet will import "once it's supported", and nothing is coming. If you are reading this
+     * because you are about to re-enable an image path, that promise is the thing to fix first.
+     *
+     * Left in place because unpicking `imageBlockReason` / `imageNeedsCar` reaches into the review
+     * screen's response shape, which is a separate change.
+     */
     // Car-driven (design 2026-07-08): read VALUES only through the resolved car's model's derived
     // image calibration. Never fingerprint-match across other calibrations, never invent a model.
     if (setupSheetModelId) {
@@ -682,6 +716,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const payload: QuickCreateResponse = {
     documentId: created.id,
     setupId,
+    carId: latest?.carId ?? carId,
     calibrationId: pickedCalibrationId,
     calibrationName: outcome.pickedCalibrationName,
     pickSource: outcome.pickSource,

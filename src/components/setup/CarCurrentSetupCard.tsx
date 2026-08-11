@@ -1,7 +1,7 @@
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { SaveAsBaselineButton } from "@/components/setup/SaveAsBaselineButton";
+import { KeepSetupButton } from "@/components/setup/KeepSetupButton";
 import type { CarCurrentSetup } from "@/lib/setup/getCarSetupHistory";
 
 /**
@@ -49,7 +49,11 @@ export function CarCurrentSetupCard({
 
       <div className="flex flex-wrap items-center gap-2">
         <ButtonLink href={`/cars/${carId}/setups/${current.setupId}`}>View sheet</ButtonLink>
-        <SaveAsBaselineButton carId={carId} setupId={current.setupId} />
+        <KeepSetupButton
+          setupId={current.setupId}
+          name={current.title}
+          initialSaved={current.saved}
+        />
         <ButtonLink href={`/runs/${current.runId}`} variant="outline">
           Open run
         </ButtonLink>

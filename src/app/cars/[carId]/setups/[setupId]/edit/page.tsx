@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -7,8 +7,10 @@ import { PageBackLink } from "@/components/ui/PageBackLink";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { ButtonLink, outlineButtonClassName } from "@/components/ui/ButtonLink";
 import { getSetupSheetTemplateForCar } from "@/lib/setupSheetModels/getTemplateForCar";
+import { chassisFillsAsSheet } from "@/lib/setupSheetModels/sheetPlan";
 import { normalizeSetupData } from "@/lib/runSetup";
 import { LibrarySetupEditorClient } from "@/components/setup/LibrarySetupEditorClient";
+import { SheetSetupEditorClient } from "@/components/setup/SheetSetupEditorClient";
 
 /**
  * Edit a saved baseline on the full grid sheet (the sequential flow is for a blank fill only).
@@ -49,11 +51,32 @@ export default async function CarSetupEditPage(props: {
 
   const setup = await prisma.setupSnapshot.findFirst({
     where: { id: setupId, userId: user.id, carId, isLibrary: true },
-    select: { id: true, name: true, data: true },
+    select: { id: true, name: true, data: true, _count: { select: { runs: true } } },
   });
   if (!setup) notFound();
 
+  /*
+   * A saved setup that a run points at is that run's own record — read it, don't edit it.
+   *
+   * Saving from "All setups" marks the run's existing snapshot rather than copying it, so these
+   * rows now reach the editor's URL for the first time. Send them to the read-only view, which
+   * offers the copy door ("Save as new setup") for anyone who wants to change the numbers. The
+   * API refuses the same write, so this redirect is the courtesy, not the enforcement.
+   */
+  if (setup._count.runs > 0) {
+    redirect(`/cars/${car.id}/setups/${setup.id}`);
+  }
+
   const template = await getSetupSheetTemplateForCar(user.id, car, "setup");
+
+  // A setup edits on the surface it was filled on — the sheet, when the chassis draws one.
+  const blank = car.setupSheetModelId
+    ? await prisma.setupSheetBlank.findUnique({
+        where: { setupSheetModelId: car.setupSheetModelId },
+        select: { boxesJson: true, fillSurface: true },
+      })
+    : null;
+  const sheetMode = chassisFillsAsSheet(blank);
 
   return (
     <>
@@ -81,13 +104,23 @@ export default async function CarSetupEditPage(props: {
               Setup details
             </ButtonLink>
           </div>
-          <LibrarySetupEditorClient
-            carId={car.id}
-            setupId={setup.id}
-            setupName={setup.name}
-            initialValues={normalizeSetupData(setup.data)}
-            template={template}
-          />
+          {sheetMode && car.setupSheetModelId ? (
+            <SheetSetupEditorClient
+              carId={car.id}
+              setupId={setup.id}
+              setupName={setup.name}
+              setupSheetModelId={car.setupSheetModelId}
+              initialValues={normalizeSetupData(setup.data)}
+            />
+          ) : (
+            <LibrarySetupEditorClient
+              carId={car.id}
+              setupId={setup.id}
+              setupName={setup.name}
+              initialValues={normalizeSetupData(setup.data)}
+              template={template}
+            />
+          )}
         </div>
       </section>
     </>

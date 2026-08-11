@@ -99,6 +99,23 @@ export function AnchoredMenu({
   const menuRef = externalMenuRef ?? internalRef;
   const pos = useAnchoredMenuPosition(open, anchorRef, gap);
 
+  // Pull a menu back on-screen when its anchor sits near the right edge. The hook
+  // pins `left` to the anchor, which is right for a full-width trigger but sends a
+  // wide menu off the viewport when the trigger is a small pill in a wrapping row.
+  // Measured after render because the menu's width is the caller's, not ours.
+  const [clampedLeft, setClampedLeft] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    if (!open || !pos) {
+      setClampedLeft(null);
+      return;
+    }
+    const width = menuRef.current?.offsetWidth ?? 0;
+    if (!width) return;
+    const EDGE = 8;
+    const next = Math.max(EDGE, Math.min(pos.left, window.innerWidth - width - EDGE));
+    setClampedLeft(next === pos.left ? null : next);
+  }, [open, pos, menuRef]);
+
   // Touch scroll-lock: while a menu is open, block page panning underneath it —
   // the property that makes native <select> feel solid on iOS. JS re-pinning
   // lags the compositor during touch scroll ("stretchy" menu); preventing the
@@ -142,7 +159,7 @@ export function AnchoredMenu({
       style={{
         position: "fixed",
         top: pos.top,
-        left: pos.left,
+        left: clampedLeft ?? pos.left,
         width: matchAnchorWidth ? pos.width : undefined,
         zIndex,
       }}

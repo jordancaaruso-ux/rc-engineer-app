@@ -268,14 +268,17 @@ export async function loadAnalysisHomeModel(
     select: { eventId: true, createdAt: true, carId: true },
   });
 
-  const [trend, recentRuns, totalRunCount, video] = await Promise.all([
+  const [trend, recentRuns, totalRunCount, teamCount, video] = await Promise.all([
     latest ? loadTrendModel(userId, latest, timeZone) : Promise.resolve(null),
     loadRecentRuns(userId, timeZone),
     // The number on the Sessions door. One indexed count on `userId`, inside a
     // read that is already cached for 30s — it runs on a miss, not per render.
     perfSpan("analysisTotalRunCount", () => prisma.run.count({ where: { userId } })),
+    // Membership only — the door needs to know IF he is on a team, never which one.
+    // Rides this wave, so it costs no extra round trip.
+    perfSpan("analysisTeamCount", () => prisma.teamMembership.count({ where: { userId } })),
     loadVideoModel(userId, timeZone),
   ]);
 
-  return { trend, recentRuns, totalRunCount, video };
+  return { trend, recentRuns, totalRunCount, hasTeam: teamCount > 0, video };
 }

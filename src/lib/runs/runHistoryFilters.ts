@@ -7,6 +7,11 @@ import { parseNumericFromSetupString } from "@/lib/setup/parseSetupNumeric";
 import { isDocumentMetadataField } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import { setupFieldLabel } from "@/lib/setupCompare/changedSincePrevious";
 import { compareSetupField } from "@/lib/setupCompare/compare";
+import {
+  RUN_RATING_UNRATED_SLUG,
+  carRatingsForBandSlugs,
+  normalizeRunRatingBandSlugs,
+} from "@/lib/runHandlingAssessment";
 
 export type RunHistorySort = "completed_desc" | "completed_asc" | "best_lap_asc" | "best_lap_desc";
 export type RunHistoryLayout = "grouped" | "flat";
@@ -29,6 +34,17 @@ export type RunHistoryFilters = {
   meetingSessionType: string | null;
   bestLapMin: number | null;
   bestLapMax: number | null;
+  /**
+   * Handling-rating bands to keep, as slugs from `RUN_RATING_BAND_OPTIONS`
+   * (`bad` / `workable` / `good` / `dialled` / `unrated`). Empty = every rating.
+   */
+  ratingBands: string[];
+  /**
+   * Team scope only: narrow to these team members. Empty = the whole roster. Ignored
+   * outside team scope, and always intersected with the caller's roster server-side —
+   * never trusted as a standalone `userId` filter.
+   */
+  driverIds: string[];
   raceClass: string | null;
   /** Setup-value filter: setup field key to look for (e.g. `toe_front`). */
   setupField: string | null;
@@ -57,6 +73,8 @@ export const DEFAULT_RUN_HISTORY_FILTERS: RunHistoryFilters = {
   meetingSessionType: null,
   bestLapMin: null,
   bestLapMax: null,
+  ratingBands: [],
+  driverIds: [],
   raceClass: null,
   setupField: null,
   setupOp: "eq",
@@ -153,6 +171,10 @@ export function parseRunHistoryFilters(
   const meetingSessionType = firstParam(searchParams.meetingSessionType) || null;
   const bestLapMin = parseOptionalFloat(firstParam(searchParams.bestLapMin));
   const bestLapMax = parseOptionalFloat(firstParam(searchParams.bestLapMax));
+  const ratingBands = normalizeRunRatingBandSlugs(
+    parseIdList(firstParam(searchParams.ratingBands))
+  );
+  const driverIds = parseIdList(firstParam(searchParams.driverIds));
   const raceClass = firstParam(searchParams.raceClass) || null;
   const setupField = firstParam(searchParams.setupField) || null;
   const setupOp = parseSetupOp(firstParam(searchParams.setupOp));
@@ -176,6 +198,8 @@ export function parseRunHistoryFilters(
     meetingSessionType,
     bestLapMin,
     bestLapMax,
+    ratingBands,
+    driverIds,
     raceClass,
     setupField,
     setupOp: setupField ? setupOp : "eq",
@@ -190,24 +214,41 @@ export function parseRunHistoryFilters(
   };
 }
 
+/**
+ * How many *filters* are on, counted by group rather than by value — picking three cars
+ * is one filter, not three. This is the number the Sessions bar prints on its Filters
+ * button, and the single definition of "a filter is set".
+ *
+ * Deliberately excludes `q` (it has its own visible input, and the button would read
+ * "Filters · 1" the moment you typed), and `sort`/`layout` (they change the view, not
+ * which runs are in it — Clear leaves them alone).
+ *
+ * Add every new filter here. {@link runHistoryFiltersActive} is derived from this count,
+ * so there is one list to keep up to date, not two.
+ */
+export function countActiveRunHistoryFilters(filters: RunHistoryFilters): number {
+  let n = 0;
+  if (filters.carIds.length > 0) n++;
+  if (filters.trackIds.length > 0) n++;
+  if (filters.driverIds.length > 0) n++;
+  if (filters.tireTypes.length > 0) n++;
+  if (filters.eventId) n++;
+  if (filters.dateFrom) n++;
+  if (filters.dateTo) n++;
+  if (filters.sessionType) n++;
+  if (filters.meetingSessionType) n++;
+  if (filters.ratingBands.length > 0) n++;
+  if (filters.bestLapMin != null) n++;
+  if (filters.bestLapMax != null) n++;
+  if (filters.raceClass) n++;
+  if (filters.setupField) n++;
+  if (filters.setupChangedField) n++;
+  if (filters.status !== "all") n++;
+  return n;
+}
+
 export function runHistoryFiltersActive(filters: RunHistoryFilters): boolean {
-  return (
-    Boolean(filters.q) ||
-    filters.carIds.length > 0 ||
-    filters.trackIds.length > 0 ||
-    filters.tireTypes.length > 0 ||
-    Boolean(filters.eventId) ||
-    Boolean(filters.dateFrom) ||
-    Boolean(filters.dateTo) ||
-    Boolean(filters.sessionType) ||
-    Boolean(filters.meetingSessionType) ||
-    filters.bestLapMin != null ||
-    filters.bestLapMax != null ||
-    Boolean(filters.raceClass) ||
-    Boolean(filters.setupField) ||
-    Boolean(filters.setupChangedField) ||
-    filters.status !== "all"
-  );
+  return Boolean(filters.q) || countActiveRunHistoryFilters(filters) > 0;
 }
 
 export function filtersToSearchParams(
@@ -234,6 +275,8 @@ export function filtersToSearchParams(
   setOrDelete("meetingSessionType", filters.meetingSessionType);
   setOrDelete("bestLapMin", filters.bestLapMin != null ? String(filters.bestLapMin) : null);
   setOrDelete("bestLapMax", filters.bestLapMax != null ? String(filters.bestLapMax) : null);
+  setOrDelete("ratingBands", filters.ratingBands.length ? filters.ratingBands.join(",") : null);
+  setOrDelete("driverIds", filters.driverIds.length ? filters.driverIds.join(",") : null);
   setOrDelete("raceClass", filters.raceClass);
   setOrDelete("setupField", filters.setupField);
   setOrDelete("setupOp", filters.setupField && filters.setupOp !== "eq" ? filters.setupOp : null);
@@ -257,6 +300,21 @@ export function filtersToSearchParams(
   return sp;
 }
 
+/** Append a clause to `where.AND`, preserving whatever the caller's baseWhere already had. */
+function andClause(where: Prisma.RunWhereInput, clause: Prisma.RunWhereInput): void {
+  where.AND = Array.isArray(where.AND)
+    ? [...where.AND, clause]
+    : where.AND
+      ? [where.AND, clause]
+      : [clause];
+}
+
+/**
+ * Note on scope: this never sets `userId`. Which drivers a viewer may see is the
+ * caller's `baseWhere` to decide (solo = own id, team = the roster), and the
+ * `driverIds` filter is applied there by intersecting with that roster. Setting
+ * `userId` here would let a URL parameter widen the scope.
+ */
 export function buildRunHistoryPrismaWhere(
   filters: RunHistoryFilters,
   baseWhere: Prisma.RunWhereInput
@@ -267,17 +325,21 @@ export function buildRunHistoryPrismaWhere(
   if (filters.tireTypes.length) {
     // Identity is the compound. Legacy runs reach it through the set they went out on.
     // Nested under AND so it composes with whatever the caller's baseWhere already has.
-    const tireMatch: Prisma.RunWhereInput = {
+    andClause(where, {
       OR: [
         { tireType: { displayName: { in: filters.tireTypes } } },
         { tireSet: { tireType: { displayName: { in: filters.tireTypes } } } },
       ],
-    };
-    where.AND = Array.isArray(where.AND)
-      ? [...where.AND, tireMatch]
-      : where.AND
-        ? [where.AND, tireMatch]
-        : [tireMatch];
+    });
+  }
+  if (filters.ratingBands.length) {
+    // carRating is a scalar column with an index, so the bands filter server-side.
+    // "Unrated" is a real choice here: drafts and legacy runs have no number at all.
+    const or: Prisma.RunWhereInput[] = [];
+    const ratings = carRatingsForBandSlugs(filters.ratingBands);
+    if (ratings.length) or.push({ carRating: { in: ratings } });
+    if (filters.ratingBands.includes(RUN_RATING_UNRATED_SLUG)) or.push({ carRating: null });
+    if (or.length) andClause(where, or.length === 1 ? or[0]! : { OR: or });
   }
   if (filters.eventId) where.eventId = filters.eventId;
   if (filters.sessionType) where.sessionType = filters.sessionType;
@@ -294,6 +356,8 @@ export function buildRunHistoryPrismaWhere(
 
 export type RunForHistoryFilter = {
   id?: string;
+  /** Owning driver. Only used in team scope, to search by teammate name. */
+  userId?: string | null;
   createdAt: Date;
   sessionCompletedAt: Date | null;
   loggingCompletedAt: Date | null;
@@ -352,6 +416,11 @@ export type RunHistoryMatchOptions = {
   setupDataByRunId?: Map<string, unknown>;
   /** runId → changed setup keys (with old/new values) vs the previous run on the same car. */
   changedKeysByRunId?: Map<string, Map<string, SetupChangedDelta>>;
+  /**
+   * Team scope only: userId → display label. Lets free-text search match a teammate's
+   * name, which is the first thing anyone tries before finding the Driver filter.
+   */
+  memberLabelByUserId?: Record<string, string>;
 };
 
 function runBestLapSeconds(run: RunForHistoryFilter): number | null {
@@ -472,8 +541,15 @@ function pushField(
 }
 
 /** Everything about a run that free-text search can match against. */
-function runSearchFields(run: RunForHistoryFilter, setupData: unknown): SearchField[] {
+function runSearchFields(
+  run: RunForHistoryFilter,
+  setupData: unknown,
+  opts?: RunHistoryMatchOptions
+): SearchField[] {
   const fields: SearchField[] = [];
+  if (run.userId && opts?.memberLabelByUserId) {
+    pushField(fields, "driver", opts.memberLabelByUserId[run.userId]);
+  }
   pushField(fields, "car", run.car?.name);
   pushField(fields, "car", run.carNameSnapshot);
   pushField(fields, "track", run.track?.name);
@@ -552,11 +628,12 @@ type TextMatchResult = { matched: boolean; reasons: MatchReason[] };
 function matchTextQuery(
   run: RunForHistoryFilter,
   q: string,
-  setupData: unknown
+  setupData: unknown,
+  opts?: RunHistoryMatchOptions
 ): TextMatchResult {
   const tokens = tokenizeQuery(q);
   if (tokens.length === 0) return { matched: true, reasons: [] };
-  const fields = runSearchFields(run, setupData).map((f) => ({
+  const fields = runSearchFields(run, setupData, opts).map((f) => ({
     ...f,
     lower: f.text.toLowerCase(),
   }));
@@ -686,7 +763,7 @@ function evaluateRun(
   const setupData = resolveSetupData(run, opts);
 
   if (filters.q) {
-    const text = matchTextQuery(run, filters.q, setupData);
+    const text = matchTextQuery(run, filters.q, setupData, opts);
     if (!text.matched) return { keep: false, reasons };
     reasons.push(...text.reasons);
   }

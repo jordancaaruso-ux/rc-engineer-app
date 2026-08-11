@@ -19,10 +19,16 @@ import {
     text2: "4.5",
     text9: 3,
     tires: { tireTypeId: "abc", displayName: "Sorex 32R" },
+    // A grouped row's ticked options DO seed (the A800RR's top-deck row is real boxes on the
+    // paper); the run context — tires, additive — still never crosses.
     top_deck_screws: ["a", "b"],
     notes: null,
   };
-  assert.deepEqual(sheetValuesFromSnapshot(snapshot), { text2: "4.5", text9: "3" });
+  assert.deepEqual(sheetValuesFromSnapshot(snapshot), {
+    text2: "4.5",
+    text9: "3",
+    top_deck_screws: "a, b",
+  });
 }
 
 // --- Folding the sheet back leaves everything it never mentioned alone -----------------------

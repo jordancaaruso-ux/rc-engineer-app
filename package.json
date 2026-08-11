@@ -158,6 +158,8 @@
     "db:dedupe:setup-models": "npx dotenv-cli -e .env.local -- npx tsx scripts/dedupe-setup-sheet-models.ts",
     "db:dedupe:events": "npx dotenv-cli -e .env.local -- npx tsx scripts/dedupe-events.ts",
     "db:seed:additives": "npx dotenv-cli -e .env.local -- npx tsx scripts/sync-additive-types.ts",
+    "ingest-blanks": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/ingest-blank-sheets.ts",
+    "prune-catalog": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/prune-placeholder-catalog.ts",
     "stripe:setup-prices": "npx dotenv-cli -e .env.local -- npx tsx scripts/stripe-setup-prices.ts",
     "cap:sync": "cap sync ios",
     "cap:open": "cap open ios",

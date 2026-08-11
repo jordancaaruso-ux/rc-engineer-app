@@ -11,6 +11,7 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAuthorizedCatalog";
 import { setupSheetModelIdsSupportingUpload } from "@/lib/setupCalibrations/carSupportsSheetUpload";
+import { baselineCountsByModelId } from "@/lib/baselineSetups/baselineCounts";
 import { getCachedCarManagerData } from "@/lib/cachedReads";
 import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerModels";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
@@ -127,17 +128,6 @@ export default async function CarManagerPage({
   const sheetsByCar = new Map(sheetCounts.map((r) => [r.carId ?? "", r._count._all]));
   const lastRunAt = new Map(lastRunByCar.map((r) => [r.carId ?? "", r._max.createdAt]));
 
-  // Expanded on load: the car you ran most recently — usually the one you came here to read.
-  let defaultOpenCarId: string | null = null;
-  let defaultOpenAt = 0;
-  for (const car of cars) {
-    const at = lastRunAt.get(car.id)?.getTime() ?? 0;
-    if (at > defaultOpenAt) {
-      defaultOpenAt = at;
-      defaultOpenCarId = car.id;
-    }
-  }
-
   const setupMetaById: Record<string, string> = {};
   for (const car of cars) {
     const saved = setupsByCarId[car.id]?.length ?? 0;
@@ -151,16 +141,19 @@ export default async function CarManagerPage({
     if (parts.length > 0) setupMetaById[car.id] = parts.join(" · ");
   }
 
-  // Every car can CREATE a setup, so the bar lists them all; `supportsUpload` (a green-lit
-  // calibration) only decides which door a car opens — the sheet upload, or the create flow.
-  const uploadableModelIds = await setupSheetModelIdsSupportingUpload(
-    cars.map((c) => c.setupSheetModelId ?? null)
-  );
+  // Every car gets all three doors, so the bar lists them all. `supportsUpload` (a green-lit
+  // calibration) and the baseline count only decide which doors are live and which are greyed
+  // with a reason under them.
+  const [uploadableModelIds, baselineCounts] = await Promise.all([
+    setupSheetModelIdsSupportingUpload(cars.map((c) => c.setupSheetModelId ?? null)),
+    baselineCountsByModelId(cars.map((c) => c.setupSheetModelId ?? null)),
+  ]);
   const uploadCars: UploadSetupCar[] = cars.map((c) => ({
     id: c.id,
     name: c.name,
     chassisName: c.setupSheetModel?.name ?? null,
     supportsUpload: Boolean(c.setupSheetModelId && uploadableModelIds.has(c.setupSheetModelId)),
+    baselineCount: c.setupSheetModelId ? (baselineCounts.get(c.setupSheetModelId) ?? 0) : 0,
   }));
 
   return (
@@ -179,10 +172,10 @@ export default async function CarManagerPage({
 
           <CarList
             initialCars={cars}
+            uploadCars={uploadCars}
             setupSheetModels={setupSheetModels}
             setupMetaById={setupMetaById}
             setupsByCarId={setupsByCarId}
-            defaultOpenCarId={defaultOpenCarId}
           />
 
           <div className="flex flex-wrap items-center gap-2">

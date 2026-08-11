@@ -12,6 +12,16 @@ import { mkdirSync } from "node:fs";
 const OUT = "sheet-fill-shots";
 mkdirSync(OUT, { recursive: true });
 
+/*
+ * This spec is about the PHONE, so it has to actually be one.
+ *
+ * `playwright.config.ts` runs at 390px with `isMobile: false`, which means `(pointer: fine)` matches
+ * and the sheet takes its DESKTOP path — no value bar, no zoom on focus, the caret in the box. The
+ * frames below were being captured from that path and called phone shots. See the same note in
+ * `sheet-fill-pointer.spec.ts`, which exists to hold the two apart.
+ */
+test.use({ hasTouch: true, isMobile: true });
+
 test("fill surface — Xray sheet, named boxes", async ({ page }) => {
   await page.goto("/debug/sheet-fill?blank=xray-x4-2026");
 

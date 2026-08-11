@@ -6,7 +6,9 @@ import { test } from "node:test";
 import {
   applyRunHistoryPostFilters,
   applyRunHistoryPostFiltersWithReasons,
+  buildRunHistoryPrismaWhere,
   computeChangedKeysByRun,
+  countActiveRunHistoryFilters,
   filtersToSearchParams,
   parseRunHistoryFilters,
   runHistoryFiltersActive,
@@ -73,6 +75,92 @@ test("runHistoryFiltersActive ignores sort and layout only", () => {
   assert.equal(runHistoryFiltersActive({ ...parseRunHistoryFilters({ sort: "best_lap_asc" }) }), false);
   assert.equal(runHistoryFiltersActive({ ...parseRunHistoryFilters({ layout: "flat" }) }), false);
   assert.equal(runHistoryFiltersActive({ ...parseRunHistoryFilters({ q: "x" }) }), true);
+});
+
+test("countActiveRunHistoryFilters counts groups, not values, and ignores q/sort/layout", () => {
+  assert.equal(
+    countActiveRunHistoryFilters(
+      parseRunHistoryFilters({ q: "wet", sort: "best_lap_asc", layout: "flat" })
+    ),
+    0
+  );
+  // Three cars is one filter, not three.
+  assert.equal(countActiveRunHistoryFilters(parseRunHistoryFilters({ carIds: "a,b,c" })), 1);
+  assert.equal(
+    countActiveRunHistoryFilters(
+      parseRunHistoryFilters({ carIds: "a", ratingBands: "good", status: "draft" })
+    ),
+    3
+  );
+});
+
+test("parseRunHistoryFilters round-trips rating bands and drops unknown slugs", () => {
+  const parsed = parseRunHistoryFilters({ ratingBands: "dialled,nonsense,good" });
+  // Normalized back to band order regardless of how the URL listed them.
+  assert.deepEqual(parsed.ratingBands, ["good", "dialled"]);
+  assert.equal(filtersToSearchParams(parsed).get("ratingBands"), "good,dialled");
+
+  assert.deepEqual(parseRunHistoryFilters({ ratingBands: "nonsense" }).ratingBands, []);
+  assert.equal(filtersToSearchParams(parseRunHistoryFilters({})).get("ratingBands"), null);
+});
+
+test("parseRunHistoryFilters round-trips driverIds", () => {
+  const parsed = parseRunHistoryFilters({ driverIds: "u1,u2,u1" });
+  assert.deepEqual(parsed.driverIds, ["u1", "u2"]);
+  assert.equal(filtersToSearchParams(parsed).get("driverIds"), "u1,u2");
+});
+
+test("buildRunHistoryPrismaWhere turns rating bands into carRating clauses", () => {
+  const banded = buildRunHistoryPrismaWhere(
+    parseRunHistoryFilters({ ratingBands: "good,dialled" }),
+    {}
+  );
+  assert.deepEqual(banded.AND, [{ carRating: { in: [7, 8, 9, 10] } }]);
+
+  const unrated = buildRunHistoryPrismaWhere(parseRunHistoryFilters({ ratingBands: "unrated" }), {});
+  assert.deepEqual(unrated.AND, [{ carRating: null }]);
+
+  // Mixed: rated band OR no rating at all.
+  const mixed = buildRunHistoryPrismaWhere(parseRunHistoryFilters({ ratingBands: "bad,unrated" }), {});
+  assert.deepEqual(mixed.AND, [
+    { OR: [{ carRating: { in: [1, 2, 3] } }, { carRating: null }] },
+  ]);
+});
+
+test("buildRunHistoryPrismaWhere composes with an existing AND instead of clobbering it", () => {
+  const where = buildRunHistoryPrismaWhere(
+    parseRunHistoryFilters({ ratingBands: "dialled", tireTypes: encodeURIComponent("Sweep 36") }),
+    { AND: [{ shareWithTeam: true }] }
+  );
+  const clauses = where.AND as unknown[];
+  assert.equal(clauses.length, 3);
+  assert.deepEqual(clauses[0], { shareWithTeam: true });
+  assert.deepEqual(clauses[2], { carRating: { in: [9, 10] } });
+});
+
+test("buildRunHistoryPrismaWhere never sets userId from filters", () => {
+  const where = buildRunHistoryPrismaWhere(parseRunHistoryFilters({ driverIds: "u1,u2" }), {
+    userId: { in: ["roster1"] },
+  });
+  // Scope is the caller's to decide — driverIds is intersected with the roster in the page.
+  assert.deepEqual(where.userId, { in: ["roster1"] });
+  assert.equal(where.AND, undefined);
+});
+
+test("free-text search matches a teammate's name when member labels are supplied", () => {
+  const runs = [
+    makeRun({ id: "mine", userId: "u1" }),
+    makeRun({ id: "theirs", userId: "u2" }),
+  ];
+  const filters = parseRunHistoryFilters({ q: "Priya" });
+  const result = applyRunHistoryPostFiltersWithReasons(runs, filters, "UTC", {
+    memberLabelByUserId: { u1: "You (Dave)", u2: "Priya" },
+  });
+  assert.deepEqual(result.runs.map((r) => r.id), ["theirs"]);
+  assert.deepEqual(result.reasonsById.get("theirs"), [{ kind: "driver", text: "Priya" }]);
+
+  // Without labels (solo scope) the same query matches nothing.
+  assert.equal(applyRunHistoryPostFilters(runs, filters, "UTC").length, 0);
 });
 
 test("applyRunHistoryPostFilters matches tire label in q", () => {

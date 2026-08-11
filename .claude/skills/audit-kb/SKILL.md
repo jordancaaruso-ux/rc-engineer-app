@@ -27,9 +27,10 @@ Jordan's experience — forced.
 7. **A second home** — a claim on two pages. One home; everything else links. Near-duplicate
    prose across files is the only check a script can do.
 
-8. **An unresolvable condition** — a split the driver's own words can't answer. Conditions are
-   written in the phase vocabulary (`concepts/bite-hold.md`, "Phase" line); symptom words
-   ("pushes", "loose") are car outcomes and never appear — their translation lives in the prompt.
+8. **A condition the driver can't perceive** — a split turning on chassis state ("has it
+   settled?") instead of something they observe: where in the corner, on or off throttle, which
+   end. The test is observability, never vocabulary — the Engineer interprets whatever they wrote,
+   and needs no list to do it.
 
 ## How to audit
 
@@ -52,3 +53,9 @@ Fluent prose pulls toward more than the physics gives. These move the catching f
   let one bad premise infect everything after it.
 - **Prove, don't assert.** Claims about Engineer behaviour come from wire dumps, his ratings or
   benches — never from reading source or from my synthesis.
+- **No static lists.** Word lists, banned coinages, vocabularies, translation tables. Each only
+  catches what was already complained about, and each encodes judgement the model already has.
+  If the proposed fix is a list, it is the wrong fix.
+- **Only a rating starts work.** Structural tidying nothing has complained about is how the
+  circle starts — it is work I can do without him, which is exactly why it fills the gap when
+  the real blocker is a ruling only he can give.

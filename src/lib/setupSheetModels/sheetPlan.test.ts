@@ -94,6 +94,51 @@ function field(p: Partial<SetupSheetModelFieldDef> & { key: string }): SetupShee
   assert.deepEqual(plan.boxes.map((b) => b.key), ["c", "a", "b"]);
 }
 
+// --- A grouped parameter keeps EVERY printed tick box, and the plan says what each one means ---
+{
+  const plan = buildSheetPlan({
+    schema: {
+      fields: [
+        field({
+          key: "diff_height",
+          displayLabel: "Diff height",
+          uiType: "select",
+          sortOrder: 1,
+          groupedOptionLabels: ["Up", "Mid", "Down"],
+          groupedOptionValues: ["Up", "Mid", "Down"],
+        }),
+        field({
+          key: "top_deck_cuts",
+          displayLabel: "Top deck cuts",
+          uiType: "multiSelect",
+          sortOrder: 2,
+          groupedOptionLabels: ["A", "B"],
+          groupedOptionValues: ["a", "b"],
+        }),
+        field({ key: "camber", displayLabel: "Camber", sortOrder: 3 }),
+      ],
+    },
+    boxes: [
+      { ...box("diff_height"), optionValue: "Up" },
+      { ...box("diff_height"), optionValue: "Mid" },
+      { ...box("diff_height"), optionValue: "Down" },
+      { ...box("top_deck_cuts"), optionValue: "a" },
+      { ...box("top_deck_cuts"), optionValue: "b" },
+      box("camber"),
+    ],
+  });
+  // One FIELD per parameter, however many boxes it prints as.
+  assert.deepEqual(plan.fields.map((f) => f.key), ["diff_height", "top_deck_cuts", "camber"]);
+  assert.equal(plan.boxes.length, 6, "every printed tick box survives");
+  assert.deepEqual(plan.fields[0]!.optionValues, ["Up", "Mid", "Down"]);
+  assert.equal(plan.fields[0]!.multi, undefined);
+  assert.equal(plan.fields[1]!.multi, true);
+  assert.equal(plan.fields[2]!.optionValues, undefined);
+  // Option boxes still travel to the browser as JSON without losing what they mean.
+  const roundTripped = parseStoredBoxes(JSON.parse(JSON.stringify(plan.boxes)));
+  assert.equal(roundTripped.filter((b) => b.optionValue).length, 5);
+}
+
 // --- An empty sheet is one page, not negative infinity ---
 {
   const plan = buildSheetPlan({ schema: { fields: [] }, boxes: [] });

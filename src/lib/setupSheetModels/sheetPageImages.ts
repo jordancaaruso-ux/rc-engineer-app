@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { renderPdfPageToPng } from "@/lib/setupDocuments/pdfServerRaster";
 import { readBytesFromStorageRef, storeSheetPageImage } from "@/lib/setupDocuments/storage";
 import { blankPdfFormValues } from "@/lib/setupDocuments/pdfBlankForm";
+import { MAX_BLANK_PAGES } from "@/lib/setupSheetModels/blankUploadDiagnosis";
 
 /**
  * The picture of one page of a chassis's setup sheet.
@@ -112,4 +113,76 @@ export async function getSheetPageImage(
   }
 
   return { bytes: webp, cached: false };
+}
+
+/**
+ * Draw and store every page of a chassis's sheet, at the moment the chassis is created.
+ *
+ * ============================== WHY NOT JUST LET THE FIRST OPEN DO IT ==============================
+ *
+ * Because the first open is somebody creating their car, and it is the worst possible moment to be
+ * made to wait. Measured 2026-08-11 on an X4'25: fetching the 3.2 MB PDF, clearing its form,
+ * rasterising and compressing is about two and a half seconds of work before any network. What the
+ * founder saw in that window was a pale, empty rectangle — indistinguishable from a broken sheet,
+ * indistinguishable from a failed render. They left, came back, and by then it was stored and
+ * instant. Doing it here moves that wait into an upload the driver already knows is working, and
+ * which already says "Reading sheet…" while it runs.
+ *
+ * The surface still handles a missing page, because this can fail and a stored image can be deleted.
+ * This makes the wait rare; it does not make it impossible.
+ *
+ * NEVER THROWS. A chassis whose picture could not be drawn is still a chassis worth having — its
+ * boxes came from the form layer, not from the picture — so a failure here is logged and the upload
+ * carries on. The next driver to open it simply pays the old cost.
+ */
+export async function prerenderSheetPages(setupSheetModelId: string): Promise<number> {
+  try {
+    const blank = await prisma.setupSheetBlank.findUnique({
+      where: { setupSheetModelId },
+      select: {
+        id: true,
+        pageCount: true,
+        pageImagesJson: true,
+        fillSurface: true,
+        setupDocument: { select: { storagePath: true } },
+      },
+    });
+    // A chassis that fills as an ordinary form never shows a picture, so drawing one is pure cost.
+    if (!blank || blank.fillSurface !== "sheet") return 0;
+
+    const source = blank.setupDocument?.storagePath;
+    if (!source) return 0;
+
+    const pages = Math.min(Math.max(blank.pageCount || 1, 1), MAX_BLANK_PAGES);
+    const pdfBytes = await readBytesFromStorageRef(source);
+    // Cleared once for the whole document rather than per page — see `blankPdfFormValues` for why
+    // the background must never carry the first uploader's setup.
+    const blanked = await blankPdfFormValues(new Uint8Array(pdfBytes));
+
+    const refs = storedPageRefs(blank.pageImagesJson);
+    let drawn = 0;
+    for (let page = 1; page <= pages; page++) {
+      if (refs[String(page)]) continue;
+      try {
+        const png = await renderPdfPageToPng(blanked, page, { scale: RENDER_SCALE });
+        const webp = await sharp(png).webp({ lossless: true, effort: 4 }).toBuffer();
+        refs[String(page)] = await storeSheetPageImage(setupSheetModelId, page, webp);
+        drawn++;
+      } catch (e) {
+        // One page that refuses to draw must not cost the pages that would have drawn fine.
+        console.error("[sheet-page] prerender failed for one page", { setupSheetModelId, page, e });
+      }
+    }
+
+    if (drawn > 0) {
+      await prisma.setupSheetBlank.update({
+        where: { id: blank.id },
+        data: { pageImagesJson: refs },
+      });
+    }
+    return drawn;
+  } catch (e) {
+    console.error("[sheet-page] prerender failed", { setupSheetModelId, e });
+    return 0;
+  }
 }

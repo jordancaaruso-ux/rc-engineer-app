@@ -1,7 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Check, ChevronDown, Loader2, Search, SlidersHorizontal, User, Users, X } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
+import { Check, ChevronDown, Loader2, Search, User, Users, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   DEFAULT_RUN_HISTORY_FILTERS,
@@ -10,29 +18,15 @@ import {
   runHistoryFiltersActive,
   type RunHistoryFilters,
 } from "@/lib/runs/runHistoryFilters";
+import {
+  RUN_RATING_BAND_OPTIONS,
+  normalizeRunRatingBandSlugs,
+  runRatingBandCaption,
+} from "@/lib/runHandlingAssessment";
 import { OPEN_GROUP_PARAM } from "@/lib/runs/sessionsReturn";
 import { Button } from "@/components/ui/Button";
-import { CardPanel } from "@/components/ui/CardPanel";
 import { AnchoredMenu } from "@/components/ui/AnchoredMenu";
-
-const FILTER_PANEL_SESSION_KEY = "runs-history-filters-open";
-
-function readFilterPanelSessionOpen(): boolean {
-  try {
-    return sessionStorage.getItem(FILTER_PANEL_SESSION_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function writeFilterPanelSessionOpen(open: boolean) {
-  try {
-    if (open) sessionStorage.setItem(FILTER_PANEL_SESSION_KEY, "1");
-    else sessionStorage.removeItem(FILTER_PANEL_SESSION_KEY);
-  } catch {
-    /* ignore */
-  }
-}
+import { chipToggleClass } from "@/components/ui/chipToggle";
 
 type Option = { id: string; label: string };
 
@@ -46,6 +40,8 @@ type SessionsFilterBarProps = {
   tireTypes: Option[];
   /** Setup parameter keys present across the loaded runs (id = setup key). */
   setupFields: Option[];
+  /** Team roster as Driver options. Empty outside team scope — the pill hides there. */
+  drivers: Option[];
   /** Teams the driver belongs to — drives the scope segment fused into the search bar. */
   teams: TeamOption[];
   teamId: string | null;
@@ -54,73 +50,178 @@ type SessionsFilterBarProps = {
   viewAll: boolean;
 };
 
-const controlClass =
-  "rounded-md border border-border bg-background px-2.5 py-2 ui-control outline-none";
-const labelClass = "ui-label-meta block";
+/**
+ * Every filter is a button on a row that is always on screen — there is no panel to
+ * open, and nothing to discover. This replaced a 573px-tall form (1001px with its
+ * advanced section open, on a 900px window) whose controls were only a fifth of its
+ * area. The six filters below carry their own value in the button; the ten nobody
+ * touches weekly live behind `More`, which is the only thing here that is still a
+ * list of form fields.
+ */
+const POP_SURFACE =
+  "max-w-[calc(100vw-1rem)] rounded-md border border-border bg-card p-2.5 shadow-lg";
+/** Controls inside the More menu. Fixed height so selects and inputs line up. */
+const POP_CONTROL =
+  "h-8 w-full rounded border border-border bg-background px-2 ui-control outline-none";
 
-function MultiSelect({
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function shortDate(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  if (!y || !m || !d) return ymd;
+  return `${d} ${MONTHS[m - 1]}`;
+}
+
+/**
+ * Calendar date `days` ago, in the reader's own zone. The server windows runs in the
+ * account's display zone, so a preset can land a day out for someone filtering across
+ * midnight in another zone — the exact From/To boxes below the presets are the escape
+ * hatch when that matters.
+ */
+function ymdDaysAgo(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+}
+
+function listSummary(options: Option[], ids: string[], plural: string): string | null {
+  if (ids.length === 0) return null;
+  if (ids.length === 1) return options.find((o) => o.id === ids[0])?.label ?? ids[0];
+  return `${ids.length} ${plural}`;
+}
+
+/**
+ * One filter as a button that opens its own small menu. Skinned with
+ * `chipToggleClass` so the row joins the same chip family as session type, handling
+ * traits and tire compounds rather than inventing a fourth control idiom.
+ */
+function FilterPill({
   label,
-  options,
-  selectedIds,
-  onChange,
-  className,
+  summary,
+  menuClassName,
+  children,
 }: {
   label: string;
-  options: Option[];
-  selectedIds: string[];
-  onChange: (ids: string[]) => void;
-  className?: string;
+  /** Set when the filter is on; printed after the label and marks the pill active. */
+  summary?: string | null;
+  menuClassName?: string;
+  children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
-  const summary =
-    selectedIds.length === 0
-      ? `All ${label.toLowerCase()}`
-      : selectedIds.length === 1
-        ? options.find((o) => o.id === selectedIds[0])?.label ?? "1 selected"
-        : `${selectedIds.length} selected`;
+  const active = Boolean(summary);
 
+  return (
+    <div ref={wrapRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-label={active ? `${label}: ${summary}` : label}
+        className={`tap-active flex max-w-full items-center gap-1.5 px-2.5 py-1.5 text-xs ${chipToggleClass(
+          active
+        )}`}
+      >
+        <span className={active ? "shrink-0 text-muted-foreground" : "shrink-0"}>{label}</span>
+        {active ? <span className="min-w-0 truncate font-semibold">{summary}</span> : null}
+        <ChevronDown
+          className={`size-3 shrink-0 opacity-60 transition-transform ${open ? "rotate-180" : ""}`}
+          strokeWidth={2.4}
+          aria-hidden
+        />
+      </button>
+      <AnchoredMenu
+        open={open}
+        anchorRef={wrapRef}
+        onClose={() => setOpen(false)}
+        matchAnchorWidth={false}
+      >
+        <div className={`${POP_SURFACE} ${menuClassName ?? "min-w-[13rem]"}`}>{children}</div>
+      </AnchoredMenu>
+    </div>
+  );
+}
+
+function CheckboxList({
+  options,
+  selectedIds,
+  onChange,
+  emptyLabel = "None",
+}: {
+  options: Option[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  emptyLabel?: string;
+}) {
+  const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
   const toggle = (id: string) => {
-    const next = new Set(selectedSet);
+    const next = new Set(selected);
     if (next.has(id)) next.delete(id);
     else next.add(id);
     onChange([...next]);
   };
 
+  if (options.length === 0) return <p className="px-1 py-1 ui-label-meta">{emptyLabel}</p>;
   return (
-    <div ref={wrapRef} className={`relative ${className ?? ""}`}>
-      <span className={labelClass}>{label}</span>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={`mt-1 flex w-full min-w-[8rem] items-center justify-between gap-2 text-left hover:bg-muted/40 ${controlClass}`}
-      >
-        <span className="truncate">{summary}</span>
-        <span className="text-muted-foreground">{open ? "▴" : "▾"}</span>
-      </button>
-      <AnchoredMenu open={open} anchorRef={wrapRef} onClose={() => setOpen(false)}>
-        <div className="max-h-48 w-full min-w-[12rem] overflow-y-auto rounded-md border border-border bg-card p-2 shadow-lg">
-          {options.length === 0 ? (
-            <p className="px-1 py-1 ui-label-meta">None</p>
-          ) : (
-            options.map((opt) => (
-              <label
-                key={opt.id}
-                className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 ui-control hover:bg-muted/50"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedSet.has(opt.id)}
-                  onChange={() => toggle(opt.id)}
-                  className="rounded border-border"
-                />
-                <span className="truncate">{opt.label}</span>
-              </label>
-            ))
-          )}
-        </div>
-      </AnchoredMenu>
+    <div className="max-h-56 min-w-[11rem] overflow-y-auto">
+      {options.map((opt) => (
+        <label
+          key={opt.id}
+          className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 ui-control hover:bg-muted/50"
+        >
+          <input
+            type="checkbox"
+            checked={selected.has(opt.id)}
+            onChange={() => toggle(opt.id)}
+            className="rounded border-border"
+          />
+          <span className="truncate">{opt.label}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+/** Label-left / control-right row inside the More menu. `stacked` for composites. */
+function PopRow({
+  label,
+  htmlFor,
+  stacked,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  stacked?: boolean;
+  children: ReactNode;
+}) {
+  if (stacked) {
+    return (
+      <div className="space-y-1 py-1.5">
+        <label className="ui-label-meta block" htmlFor={htmlFor}>
+          {label}
+        </label>
+        {children}
+      </div>
+    );
+  }
+  return (
+    <div className="grid grid-cols-[5.25rem_1fr] items-center gap-2 py-1.5">
+      <label className="ui-label-meta" htmlFor={htmlFor}>
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function PopGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="border-t border-border pt-1.5 first:border-t-0 first:pt-0">
+      <p className="ui-label-meta pb-0.5 uppercase tracking-wide opacity-70">{title}</p>
+      {children}
     </div>
   );
 }
@@ -234,6 +335,7 @@ export function SessionsFilterBar({
   events,
   tireTypes,
   setupFields,
+  drivers,
   teams,
   teamId,
   openGroup,
@@ -242,7 +344,6 @@ export function SessionsFilterBar({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const filters = useMemo(() => {
     const raw: Record<string, string | string[] | undefined> = {};
@@ -320,104 +421,66 @@ export function SessionsFilterBar({
   }, []);
 
   const clearFilters = () => {
+    // Sort and layout change how results are shown, not which ones — Clear leaves them.
     pushFilters({ ...DEFAULT_RUN_HISTORY_FILTERS, layout: filters.layout, sort: filters.sort });
   };
 
   const filtersActive = runHistoryFiltersActive(filters);
-  const filtersActiveExcludingQuery =
-    filters.carIds.length > 0 ||
-    filters.trackIds.length > 0 ||
-    filters.tireTypes.length > 0 ||
-    Boolean(filters.eventId) ||
-    Boolean(filters.dateFrom) ||
-    Boolean(filters.dateTo) ||
-    Boolean(filters.sessionType) ||
-    Boolean(filters.meetingSessionType) ||
-    filters.bestLapMin != null ||
-    filters.bestLapMax != null ||
-    Boolean(filters.raceClass) ||
-    Boolean(filters.setupField) ||
-    Boolean(filters.setupChangedField) ||
-    filters.status !== "all";
+  const showDriverPill = Boolean(teamId) && drivers.length > 0;
 
-  // The panel only auto-opens for structured filters (e.g. arriving via a
-  // filtered URL) — never while typing a text query, which would be jarring.
-  const [panelOpen, setPanelOpen] = useState(filtersActiveExcludingQuery);
-  const [sessionHydrated, setSessionHydrated] = useState(false);
-  const prevStructuredActive = useRef(filtersActiveExcludingQuery);
+  // How many filters are hiding inside More, so a closed menu never holds something
+  // you can't see. Best lap min+max count once — it reads as one filter.
+  const moreFilterCount =
+    (filters.eventId ? 1 : 0) +
+    (filters.sessionType ? 1 : 0) +
+    (filters.meetingSessionType ? 1 : 0) +
+    (filters.raceClass ? 1 : 0) +
+    (filters.bestLapMin != null || filters.bestLapMax != null ? 1 : 0) +
+    (filters.setupField ? 1 : 0) +
+    (filters.setupChangedField ? 1 : 0) +
+    (filters.status !== "all" ? 1 : 0);
 
-  useEffect(() => {
-    if (!sessionHydrated) {
-      setSessionHydrated(true);
-      if (!filtersActiveExcludingQuery && readFilterPanelSessionOpen()) {
-        setPanelOpen(true);
-      }
-      prevStructuredActive.current = filtersActiveExcludingQuery;
-      return;
-    }
-    if (!prevStructuredActive.current && filtersActiveExcludingQuery) {
-      setPanelOpen(true);
-    }
-    prevStructuredActive.current = filtersActiveExcludingQuery;
-  }, [filtersActiveExcludingQuery, sessionHydrated]);
+  const ratingSummary =
+    filters.ratingBands.length === 0
+      ? null
+      : filters.ratingBands.length === 1
+        ? runRatingBandCaption(filters.ratingBands[0]!) ?? filters.ratingBands[0]!
+        : `${filters.ratingBands.length} bands`;
 
-  const openPanel = () => {
-    setPanelOpen(true);
-    writeFilterPanelSessionOpen(true);
+  const dateSummary =
+    filters.dateFrom && filters.dateTo
+      ? `${shortDate(filters.dateFrom)} – ${shortDate(filters.dateTo)}`
+      : filters.dateFrom
+        ? `from ${shortDate(filters.dateFrom)}`
+        : filters.dateTo
+          ? `to ${shortDate(filters.dateTo)}`
+          : null;
+
+  const toggleBand = (slug: string) => {
+    patch({
+      ratingBands: filters.ratingBands.includes(slug)
+        ? filters.ratingBands.filter((s) => s !== slug)
+        : normalizeRunRatingBandSlugs([...filters.ratingBands, slug]),
+    });
   };
 
-  const closePanel = () => {
-    setPanelOpen(false);
-    writeFilterPanelSessionOpen(false);
+  const setDatePreset = (days: number | null) => {
+    patch(days == null ? { dateFrom: null, dateTo: null } : { dateFrom: ymdDaysAgo(days), dateTo: null });
   };
 
-  const togglePanel = () => {
-    if (panelOpen) closePanel();
-    else openPanel();
-  };
-
-  // One chip per active filter so what's applied — and how to undo it — is
-  // always visible without opening the panel.
+  // Chips only for what the pill row doesn't already show: the text query, and the
+  // filters that live inside More. Duplicating a pill's own value here was noise.
   const activeChips: { key: string; label: string; onRemove: () => void }[] = [];
   const optionLabel = (options: Option[], id: string) =>
     options.find((o) => o.id === id)?.label ?? id;
   if (filters.q) {
     activeChips.push({ key: "q", label: `“${filters.q}”`, onRemove: () => patch({ q: null }) });
   }
-  for (const id of filters.carIds) {
-    activeChips.push({
-      key: `car-${id}`,
-      label: optionLabel(cars, id),
-      onRemove: () => patch({ carIds: filters.carIds.filter((x) => x !== id) }),
-    });
-  }
-  for (const id of filters.trackIds) {
-    activeChips.push({
-      key: `track-${id}`,
-      label: optionLabel(tracks, id),
-      onRemove: () => patch({ trackIds: filters.trackIds.filter((x) => x !== id) }),
-    });
-  }
-  for (const id of filters.tireTypes) {
-    activeChips.push({
-      key: `tires-${id}`,
-      // Chip shows the identity itself, not the "· N sets" dropdown label.
-      label: id,
-      onRemove: () => patch({ tireTypes: filters.tireTypes.filter((x) => x !== id) }),
-    });
-  }
   if (filters.eventId) {
     activeChips.push({
       key: "event",
       label: optionLabel(events, filters.eventId),
       onRemove: () => patch({ eventId: null }),
-    });
-  }
-  if (filters.dateFrom || filters.dateTo) {
-    activeChips.push({
-      key: "dates",
-      label: `${filters.dateFrom ?? "…"} → ${filters.dateTo ?? "…"}`,
-      onRemove: () => patch({ dateFrom: null, dateTo: null }),
     });
   }
   if (filters.sessionType) {
@@ -430,7 +493,8 @@ export function SessionsFilterBar({
   if (filters.meetingSessionType) {
     activeChips.push({
       key: "meeting",
-      label: filters.meetingSessionType.charAt(0) + filters.meetingSessionType.slice(1).toLowerCase(),
+      label:
+        filters.meetingSessionType.charAt(0) + filters.meetingSessionType.slice(1).toLowerCase(),
       onRemove: () => patch({ meetingSessionType: null }),
     });
   }
@@ -486,7 +550,11 @@ export function SessionsFilterBar({
     // occluded by the later-sibling glass session cards painting over them.
     <div className="relative z-30 w-full min-w-0 space-y-2">
       <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="action-item-add-composite flex min-w-0 flex-1 items-stretch rounded-lg border border-border bg-card">
+        {/* `.action-item-add-composite` suppresses the inner input's own ring so the
+            shell can own focus — but nothing was drawing that ring here, so the bar
+            never looked focused. Applied locally, not on the shared class the
+            dashboard action row also uses. */}
+        <div className="action-item-add-composite flex min-w-0 flex-1 items-stretch rounded-lg border border-border bg-card transition has-[input:focus-visible]:border-ring/45 has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring/35">
           <ScopeSegment teams={teams} activeTeamId={teamId} />
           <span className="flex shrink-0 items-center justify-center pl-2.5 pr-1 text-muted-foreground" aria-hidden>
             {isPending ? (
@@ -513,21 +581,6 @@ export function SessionsFilterBar({
             }}
             onBlur={flushQuery}
           />
-          <button
-            type="button"
-            onClick={togglePanel}
-            aria-expanded={panelOpen}
-            aria-label="Filters"
-            className="tap-active relative inline-flex shrink-0 items-center justify-center rounded-l-none rounded-r-lg px-2.5 min-h-9 min-w-9 text-muted-foreground transition hover:text-foreground"
-          >
-            <SlidersHorizontal className="h-4 w-4" strokeWidth={2} aria-hidden />
-            {filtersActiveExcludingQuery ? (
-              <span
-                className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary ring-2 ring-card"
-                aria-label="Advanced filters active"
-              />
-            ) : null}
-          </button>
         </div>
         {filtersActive ? (
           <Button
@@ -541,13 +594,394 @@ export function SessionsFilterBar({
         ) : null}
       </div>
 
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filters">
+        <FilterPill label="Rating" summary={ratingSummary} menuClassName="w-[17.5rem]">
+          <p className="ui-label-meta pb-1.5">Handling rating</p>
+          <div className="flex flex-wrap gap-1.5">
+            {RUN_RATING_BAND_OPTIONS.map((opt) => {
+              const active = filters.ratingBands.includes(opt.slug);
+              return (
+                <button
+                  key={opt.slug}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => toggleBand(opt.slug)}
+                  className={`tap-active px-2 py-1 text-xs ${chipToggleClass(active)}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </FilterPill>
+
+        <FilterPill label="Cars" summary={listSummary(cars, filters.carIds, "cars")}>
+          <CheckboxList
+            options={cars}
+            selectedIds={filters.carIds}
+            onChange={(carIds) => patch({ carIds })}
+            emptyLabel="No cars yet"
+          />
+        </FilterPill>
+
+        <FilterPill label="Tracks" summary={listSummary(tracks, filters.trackIds, "tracks")}>
+          <CheckboxList
+            options={tracks}
+            selectedIds={filters.trackIds}
+            onChange={(trackIds) => patch({ trackIds })}
+            emptyLabel="No tracks yet"
+          />
+        </FilterPill>
+
+        {showDriverPill ? (
+          <FilterPill label="Driver" summary={listSummary(drivers, filters.driverIds, "drivers")}>
+            <CheckboxList
+              options={drivers}
+              selectedIds={filters.driverIds}
+              onChange={(driverIds) => patch({ driverIds })}
+            />
+          </FilterPill>
+        ) : null}
+
+        <FilterPill label="Date" summary={dateSummary} menuClassName="w-[15rem]">
+          <div className="flex flex-wrap gap-1.5 pb-2">
+            {[
+              { label: "Last 7 days", days: 7 },
+              { label: "Last 30 days", days: 30 },
+              { label: "Last 90 days", days: 90 },
+              { label: "Any time", days: null },
+            ].map((preset) => (
+              <button
+                key={preset.label}
+                type="button"
+                onClick={() => setDatePreset(preset.days)}
+                className={`tap-active px-2 py-1 text-xs ${chipToggleClass(
+                  preset.days == null
+                    ? !filters.dateFrom && !filters.dateTo
+                    : filters.dateFrom === ymdDaysAgo(preset.days) && !filters.dateTo
+                )}`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-[2.25rem_1fr] items-center gap-2 border-t border-border pt-2">
+            <label className="ui-label-meta" htmlFor="sessions-date-from">
+              From
+            </label>
+            <input
+              id="sessions-date-from"
+              type="date"
+              className={POP_CONTROL}
+              value={filters.dateFrom ?? ""}
+              onChange={(e) => patch({ dateFrom: e.target.value || null })}
+            />
+            <label className="ui-label-meta" htmlFor="sessions-date-to">
+              To
+            </label>
+            <input
+              id="sessions-date-to"
+              type="date"
+              className={POP_CONTROL}
+              value={filters.dateTo ?? ""}
+              onChange={(e) => patch({ dateTo: e.target.value || null })}
+            />
+          </div>
+        </FilterPill>
+
+        <FilterPill label="Tires" summary={listSummary(tireTypes, filters.tireTypes, "compounds")}>
+          <CheckboxList
+            options={tireTypes}
+            selectedIds={filters.tireTypes}
+            onChange={(next) => patch({ tireTypes: next })}
+            emptyLabel="No tires logged yet"
+          />
+        </FilterPill>
+
+        <FilterPill
+          label="More"
+          summary={moreFilterCount > 0 ? String(moreFilterCount) : null}
+          menuClassName="w-[20rem] max-h-[70vh] overflow-y-auto"
+        >
+          <div className="space-y-1.5">
+            <PopGroup title="Race">
+              <PopRow label="Event" htmlFor="sessions-event">
+                <select
+                  id="sessions-event"
+                  className={POP_CONTROL}
+                  value={filters.eventId ?? ""}
+                  onChange={(e) => patch({ eventId: e.target.value || null })}
+                >
+                  <option value="">All events</option>
+                  {events.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.label}
+                    </option>
+                  ))}
+                </select>
+              </PopRow>
+              <PopRow label="Type" htmlFor="sessions-session-type">
+                <select
+                  id="sessions-session-type"
+                  className={POP_CONTROL}
+                  value={filters.sessionType ?? ""}
+                  onChange={(e) =>
+                    patch({
+                      sessionType:
+                        e.target.value === "TESTING" || e.target.value === "RACE_MEETING"
+                          ? e.target.value
+                          : null,
+                    })
+                  }
+                >
+                  <option value="">Any</option>
+                  <option value="TESTING">Testing</option>
+                  <option value="RACE_MEETING">Race meeting</option>
+                </select>
+              </PopRow>
+              <PopRow label="Session" htmlFor="sessions-meeting-session">
+                <select
+                  id="sessions-meeting-session"
+                  className={POP_CONTROL}
+                  value={filters.meetingSessionType ?? ""}
+                  onChange={(e) => patch({ meetingSessionType: e.target.value || null })}
+                >
+                  <option value="">Any</option>
+                  <option value="PRACTICE">Practice</option>
+                  <option value="QUALIFYING">Qualifying</option>
+                  <option value="RACE">Race</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </PopRow>
+              <PopRow label="Class" htmlFor="sessions-race-class">
+                <input
+                  id="sessions-race-class"
+                  type="text"
+                  className={POP_CONTROL}
+                  placeholder="e.g. 13.5"
+                  defaultValue={filters.raceClass ?? ""}
+                  onBlur={(e) => patch({ raceClass: e.target.value.trim() || null })}
+                />
+              </PopRow>
+            </PopGroup>
+
+            <PopGroup title="Pace & status">
+              <PopRow label="Best lap">
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    step="0.001"
+                    aria-label="Best lap minimum (s)"
+                    placeholder="min"
+                    className={POP_CONTROL}
+                    value={filters.bestLapMin ?? ""}
+                    onChange={(e) =>
+                      patch({ bestLapMin: e.target.value ? parseFloat(e.target.value) : null })
+                    }
+                  />
+                  <span className="shrink-0 ui-label-meta">–</span>
+                  <input
+                    type="number"
+                    step="0.001"
+                    aria-label="Best lap maximum (s)"
+                    placeholder="max"
+                    className={POP_CONTROL}
+                    value={filters.bestLapMax ?? ""}
+                    onChange={(e) =>
+                      patch({ bestLapMax: e.target.value ? parseFloat(e.target.value) : null })
+                    }
+                  />
+                </div>
+              </PopRow>
+              <PopRow label="Status" htmlFor="sessions-status">
+                <select
+                  id="sessions-status"
+                  className={POP_CONTROL}
+                  value={filters.status}
+                  onChange={(e) =>
+                    patch({
+                      status:
+                        e.target.value === "draft" || e.target.value === "complete"
+                          ? e.target.value
+                          : "all",
+                    })
+                  }
+                >
+                  <option value="all">All runs</option>
+                  <option value="complete">Complete</option>
+                  <option value="draft">Draft</option>
+                </select>
+              </PopRow>
+            </PopGroup>
+
+            <PopGroup title="Setup">
+              <PopRow label="Value is" stacked>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <select
+                    aria-label="Setup field"
+                    className={`${POP_CONTROL} min-w-[8rem] flex-1`}
+                    value={filters.setupField ?? ""}
+                    onChange={(e) =>
+                      patch({
+                        setupField: e.target.value || null,
+                        setupOp: "eq",
+                        setupValue: null,
+                        setupValue2: null,
+                      })
+                    }
+                  >
+                    <option value="">Any field</option>
+                    {setupFields.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className={`${POP_CONTROL} w-14 disabled:opacity-50`}
+                    disabled={!filters.setupField}
+                    value={filters.setupOp}
+                    aria-label="Setup value condition"
+                    onChange={(e) =>
+                      patch({
+                        setupOp:
+                          e.target.value === "gte" ||
+                          e.target.value === "lte" ||
+                          e.target.value === "between"
+                            ? e.target.value
+                            : "eq",
+                        setupValue2: null,
+                      })
+                    }
+                  >
+                    <option value="eq">=</option>
+                    <option value="gte">≥</option>
+                    <option value="lte">≤</option>
+                    <option value="between">↔</option>
+                  </select>
+                  <input
+                    type={filters.setupOp === "eq" ? "text" : "number"}
+                    step="any"
+                    aria-label={
+                      filters.setupOp === "between" ? "Setup value minimum" : "Setup value"
+                    }
+                    className={`${POP_CONTROL} w-20 disabled:opacity-50`}
+                    placeholder={filters.setupOp === "between" ? "min" : "value"}
+                    disabled={!filters.setupField}
+                    defaultValue={filters.setupValue ?? ""}
+                    key={`setupValue-${filters.setupField ?? "none"}-${filters.setupOp}-${filters.setupValue ?? ""}`}
+                    onBlur={(e) => patch({ setupValue: e.target.value.trim() || null })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter")
+                        patch({ setupValue: e.currentTarget.value.trim() || null });
+                    }}
+                  />
+                  {filters.setupOp === "between" ? (
+                    <input
+                      type="number"
+                      step="any"
+                      aria-label="Setup value maximum"
+                      className={`${POP_CONTROL} w-20 disabled:opacity-50`}
+                      placeholder="max"
+                      disabled={!filters.setupField}
+                      defaultValue={filters.setupValue2 ?? ""}
+                      key={`setupValue2-${filters.setupField ?? "none"}-${filters.setupValue2 ?? ""}`}
+                      onBlur={(e) => patch({ setupValue2: e.target.value.trim() || null })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter")
+                          patch({ setupValue2: e.currentTarget.value.trim() || null });
+                      }}
+                    />
+                  ) : null}
+                </div>
+              </PopRow>
+              <PopRow label="Item changed" stacked>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <select
+                    aria-label="Changed setup field"
+                    className={`${POP_CONTROL} min-w-[8rem] flex-1`}
+                    value={filters.setupChangedField ?? ""}
+                    onChange={(e) =>
+                      patch({ setupChangedField: e.target.value || null, setupChangedDir: "any" })
+                    }
+                  >
+                    <option value="">Any change</option>
+                    {setupFields.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className={`${POP_CONTROL} w-28 disabled:opacity-50`}
+                    disabled={!filters.setupChangedField}
+                    value={filters.setupChangedDir}
+                    aria-label="Change direction"
+                    onChange={(e) =>
+                      patch({
+                        setupChangedDir:
+                          e.target.value === "up" || e.target.value === "down"
+                            ? e.target.value
+                            : "any",
+                      })
+                    }
+                  >
+                    <option value="any">any way</option>
+                    <option value="up">increased</option>
+                    <option value="down">decreased</option>
+                  </select>
+                </div>
+              </PopRow>
+            </PopGroup>
+
+            <PopGroup title="View">
+              <PopRow label="Sort" htmlFor="sessions-sort">
+                <select
+                  id="sessions-sort"
+                  className={POP_CONTROL}
+                  value={filters.sort}
+                  onChange={(e) =>
+                    patch({
+                      sort:
+                        e.target.value === "completed_asc" ||
+                        e.target.value === "best_lap_asc" ||
+                        e.target.value === "best_lap_desc"
+                          ? e.target.value
+                          : "completed_desc",
+                    })
+                  }
+                >
+                  <option value="completed_desc">Newest first</option>
+                  <option value="completed_asc">Oldest first</option>
+                  <option value="best_lap_asc">Fastest lap</option>
+                  <option value="best_lap_desc">Slowest lap</option>
+                </select>
+              </PopRow>
+              <PopRow label="Layout" htmlFor="sessions-layout">
+                <select
+                  id="sessions-layout"
+                  className={POP_CONTROL}
+                  value={filters.layout}
+                  onChange={(e) =>
+                    patch({ layout: e.target.value === "flat" ? "flat" : "grouped" })
+                  }
+                >
+                  <option value="grouped">Grouped sessions</option>
+                  <option value="flat">Flat list</option>
+                </select>
+              </PopRow>
+            </PopGroup>
+          </div>
+        </FilterPill>
+      </div>
+
       {activeChips.length > 0 ? (
         <div
           className={`flex flex-wrap items-center gap-1.5 transition-opacity ${isPending ? "opacity-60" : ""}`}
           aria-live="polite"
         >
           <span className="ui-label-meta shrink-0">
-            {isPending ? "Updating…" : "Filtering by"}
+            {isPending ? "Updating…" : "Also filtering by"}
           </span>
           {activeChips.map((chip) => (
             <span
@@ -566,319 +1000,6 @@ export function SessionsFilterBar({
             </span>
           ))}
         </div>
-      ) : null}
-
-      {panelOpen ? (
-        <CardPanel contentClassName="p-3 space-y-3">
-          <div className="flex flex-wrap items-end gap-3">
-        <MultiSelect
-          label="Cars"
-          options={cars}
-          selectedIds={filters.carIds}
-          onChange={(carIds) => patch({ carIds })}
-        />
-        <MultiSelect
-          label="Tracks"
-          options={tracks}
-          selectedIds={filters.trackIds}
-          onChange={(trackIds) => patch({ trackIds })}
-        />
-        <div className="space-y-1">
-          <label className={labelClass}>From</label>
-          <input
-            type="date"
-            className={`block ${controlClass}`}
-            value={filters.dateFrom ?? ""}
-            onChange={(e) => patch({ dateFrom: e.target.value || null })}
-          />
-        </div>
-        <div className="space-y-1">
-          <label className={labelClass}>To</label>
-          <input
-            type="date"
-            className={`block ${controlClass}`}
-            value={filters.dateTo ?? ""}
-            onChange={(e) => patch({ dateTo: e.target.value || null })}
-          />
-        </div>
-        <div className="flex items-end gap-2">
-          <button
-            type="button"
-            onClick={() => setAdvancedOpen((v) => !v)}
-            className={`hover:bg-muted/40 ${controlClass}`}
-          >
-            {advancedOpen ? "Fewer filters" : "More filters"}
-          </button>
-          <Button type="button" variant="outline" onClick={closePanel} aria-expanded={true}>
-            Hide
-          </Button>
-        </div>
-          </div>
-
-          {advancedOpen ? (
-            <div className="flex flex-wrap items-end gap-3 border-t border-border pt-3">
-          <div className="space-y-1 min-w-[10rem]">
-            <label className={labelClass}>Setup value</label>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <select
-                className={`min-w-[8rem] ${controlClass}`}
-                value={filters.setupField ?? ""}
-                onChange={(e) =>
-                  patch({
-                    setupField: e.target.value || null,
-                    setupOp: "eq",
-                    setupValue: null,
-                    setupValue2: null,
-                  })
-                }
-              >
-                <option value="">Any field</option>
-                {setupFields.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                className={`${controlClass} disabled:opacity-50`}
-                disabled={!filters.setupField}
-                value={filters.setupOp}
-                aria-label="Setup value condition"
-                onChange={(e) =>
-                  patch({
-                    setupOp:
-                      e.target.value === "gte" ||
-                      e.target.value === "lte" ||
-                      e.target.value === "between"
-                        ? e.target.value
-                        : "eq",
-                    setupValue2: null,
-                  })
-                }
-              >
-                <option value="eq">=</option>
-                <option value="gte">≥</option>
-                <option value="lte">≤</option>
-                <option value="between">between</option>
-              </select>
-              <input
-                type={filters.setupOp === "eq" ? "text" : "number"}
-                step="any"
-                className={`w-24 ${controlClass} disabled:opacity-50`}
-                placeholder={filters.setupOp === "between" ? "min" : "value"}
-                disabled={!filters.setupField}
-                defaultValue={filters.setupValue ?? ""}
-                key={`setupValue-${filters.setupField ?? "none"}-${filters.setupOp}-${filters.setupValue ?? ""}`}
-                onBlur={(e) => patch({ setupValue: e.target.value.trim() || null })}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter")
-                    patch({ setupValue: e.currentTarget.value.trim() || null });
-                }}
-              />
-              {filters.setupOp === "between" ? (
-                <input
-                  type="number"
-                  step="any"
-                  className={`w-24 ${controlClass} disabled:opacity-50`}
-                  placeholder="max"
-                  disabled={!filters.setupField}
-                  defaultValue={filters.setupValue2 ?? ""}
-                  key={`setupValue2-${filters.setupField ?? "none"}-${filters.setupValue2 ?? ""}`}
-                  onBlur={(e) => patch({ setupValue2: e.target.value.trim() || null })}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter")
-                      patch({ setupValue2: e.currentTarget.value.trim() || null });
-                  }}
-                />
-              ) : null}
-            </div>
-          </div>
-          <div className="space-y-1 min-w-[10rem]">
-            <label className={labelClass}>Setup item changed</label>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <select
-                className={`min-w-[8rem] ${controlClass}`}
-                value={filters.setupChangedField ?? ""}
-                onChange={(e) =>
-                  patch({ setupChangedField: e.target.value || null, setupChangedDir: "any" })
-                }
-              >
-                <option value="">Any change</option>
-                {setupFields.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                className={`${controlClass} disabled:opacity-50`}
-                disabled={!filters.setupChangedField}
-                value={filters.setupChangedDir}
-                aria-label="Change direction"
-                onChange={(e) =>
-                  patch({
-                    setupChangedDir:
-                      e.target.value === "up" || e.target.value === "down"
-                        ? e.target.value
-                        : "any",
-                  })
-                }
-              >
-                <option value="any">any change</option>
-                <option value="up">increased</option>
-                <option value="down">decreased</option>
-              </select>
-            </div>
-          </div>
-          <MultiSelect
-            label="Tire types"
-            options={tireTypes}
-            selectedIds={filters.tireTypes}
-            onChange={(next) => patch({ tireTypes: next })}
-          />
-          <div className="space-y-1 min-w-[10rem]">
-            <label className={labelClass}>Event</label>
-            <select
-              className={`w-full ${controlClass}`}
-              value={filters.eventId ?? ""}
-              onChange={(e) => patch({ eventId: e.target.value || null })}
-            >
-              <option value="">All events</option>
-              {events.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className={labelClass}>Session type</label>
-            <select
-              className={controlClass}
-              value={filters.sessionType ?? ""}
-              onChange={(e) =>
-                patch({
-                  sessionType:
-                    e.target.value === "TESTING" || e.target.value === "RACE_MEETING"
-                      ? e.target.value
-                      : null,
-                })
-              }
-            >
-              <option value="">Any</option>
-              <option value="TESTING">Testing</option>
-              <option value="RACE_MEETING">Race meeting</option>
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className={labelClass}>Meeting session</label>
-            <select
-              className={controlClass}
-              value={filters.meetingSessionType ?? ""}
-              onChange={(e) => patch({ meetingSessionType: e.target.value || null })}
-            >
-              <option value="">Any</option>
-              <option value="PRACTICE">Practice</option>
-              <option value="QUALIFYING">Qualifying</option>
-              <option value="RACE">Race</option>
-              <option value="OTHER">Other</option>
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className={labelClass}>Race class</label>
-            <input
-              type="text"
-              className={`w-28 ${controlClass}`}
-              placeholder="e.g. 13.5"
-              defaultValue={filters.raceClass ?? ""}
-              onBlur={(e) => patch({ raceClass: e.target.value.trim() || null })}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className={labelClass}>Best lap min (s)</label>
-            <input
-              type="number"
-              step="0.001"
-              className={`w-28 ${controlClass}`}
-              value={filters.bestLapMin ?? ""}
-              onChange={(e) =>
-                patch({
-                  bestLapMin: e.target.value ? parseFloat(e.target.value) : null,
-                })
-              }
-            />
-          </div>
-          <div className="space-y-1">
-            <label className={labelClass}>Best lap max (s)</label>
-            <input
-              type="number"
-              step="0.001"
-              className={`w-28 ${controlClass}`}
-              value={filters.bestLapMax ?? ""}
-              onChange={(e) =>
-                patch({
-                  bestLapMax: e.target.value ? parseFloat(e.target.value) : null,
-                })
-              }
-            />
-          </div>
-          <div className="space-y-1">
-            <label className={labelClass}>Status</label>
-            <select
-              className={controlClass}
-              value={filters.status}
-              onChange={(e) =>
-                patch({
-                  status:
-                    e.target.value === "draft" || e.target.value === "complete"
-                      ? e.target.value
-                      : "all",
-                })
-              }
-            >
-              <option value="all">All</option>
-              <option value="complete">Complete</option>
-              <option value="draft">Draft</option>
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className={labelClass}>Sort</label>
-            <select
-              className={controlClass}
-              value={filters.sort}
-              onChange={(e) =>
-                patch({
-                  sort:
-                    e.target.value === "completed_asc" ||
-                    e.target.value === "best_lap_asc" ||
-                    e.target.value === "best_lap_desc"
-                      ? e.target.value
-                      : "completed_desc",
-                })
-              }
-            >
-              <option value="completed_desc">Time completed (newest)</option>
-              <option value="completed_asc">Time completed (oldest)</option>
-              <option value="best_lap_asc">Fastest lap</option>
-              <option value="best_lap_desc">Slowest lap</option>
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className={labelClass}>Layout</label>
-            <select
-              className={controlClass}
-              value={filters.layout}
-              onChange={(e) =>
-                patch({ layout: e.target.value === "flat" ? "flat" : "grouped" })
-              }
-            >
-              <option value="grouped">Grouped sessions</option>
-              <option value="flat">Flat list</option>
-            </select>
-          </div>
-            </div>
-          ) : null}
-        </CardPanel>
       ) : null}
     </div>
   );

@@ -22,16 +22,10 @@ import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { CarSetupsCard } from "@/components/setup/CarSetupsCard";
 import { getSetupFillDraftSummaryForCar } from "@/lib/setup/getSetupFillDraft";
 import { CarCurrentSetupCard } from "@/components/setup/CarCurrentSetupCard";
-import { CarSetupHistory } from "@/components/setup/CarSetupHistory";
+import { CarAllSetups } from "@/components/setup/CarAllSetups";
 import { getCarSetupHistory } from "@/lib/setup/getCarSetupHistory";
-import { CarBaselineSetupsCard } from "@/components/baselineSetups/CarBaselineSetupsCard";
-import {
-  BASELINE_KIND_LABEL,
-  baselineContextLabel,
-  sortBaselineSetups,
-  type BaselineSetupKindValue,
-} from "@/lib/baselineSetups/baselineSetupShape";
-import { normalizeSetupData } from "@/lib/runSetup";
+import { UploadSetupSheetBar } from "@/components/setup/UploadSetupSheetBar";
+import { carSupportsSheetUpload } from "@/lib/setupCalibrations/carSupportsSheetUpload";
 
 export default async function CarDetailPage(props: {
   params: Promise<{ carId: string }>;
@@ -90,8 +84,13 @@ export default async function CarDetailPage(props: {
       },
     }),
     prisma.run.count({ where: { userId: user.id, carId } }),
-    // The car's saved baselines. `isLibrary` keeps per-run snapshots out of this list —
-    // those are history and belong to the setup history below.
+    /*
+     * The setups the driver chose to keep, whatever they came from.
+     *
+     * `isLibrary` used to mean "not a run's snapshot", because the only way to keep a run's setup
+     * was to copy it. Saving marks the snapshot now, so a run-backed row belongs in this list too —
+     * that is the point, and it is why the card offers Rename but not Delete on those.
+     */
     prisma.setupSnapshot.findMany({
       where: { userId: user.id, carId, isLibrary: true },
       orderBy: { createdAt: "desc" },
@@ -135,9 +134,12 @@ export default async function CarDetailPage(props: {
    * Wave 3 — the reads that genuinely needed `car` first. `setupHistory` wants the whole
    * row; `modelRow` and the baselines want `setupSheetModelId`. Independent of each other.
    */
-  const [setupHistory, modelRow, baselineRows] = await Promise.all([
-    // Everything this car has been set up with: newest run's setup, then the chassis
-    // changes and uploaded sheets behind it.
+  const [setupHistory, modelRow, baselineCount] = await Promise.all([
+    /*
+     * Everything this car can be set up with, in one list: runs where the chassis changed, sheets
+     * uploaded for it, baselines published for its chassis, and setups the driver kept. The
+     * baselines used to be read again here for their own card — `getCarSetupHistory` owns them now.
+     */
     getCarSetupHistory({ userId: user.id, car, displayTimeZone }),
     // Setup sheet models are global — never scope this read by userId.
     car.setupSheetModelId
@@ -151,34 +153,15 @@ export default async function CarDetailPage(props: {
           },
         })
       : null,
-    // Baselines are global — published against the chassis type, never scoped by userId.
+    // Only the count, for the upload panel's "start from a baseline" door.
     car.setupSheetModelId
-      ? prisma.baselineSetup.findMany({
-          where: { setupSheetModelId: car.setupSheetModelId },
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            name: true,
-            kind: true,
-            notes: true,
-            surface: true,
-            gripLevel: true,
-            data: true,
-          },
-        })
-      : [],
+      ? prisma.baselineSetup.count({ where: { setupSheetModelId: car.setupSheetModelId } })
+      : 0,
   ]);
 
-  const baselines = sortBaselineSetups(
-    baselineRows.map((b) => ({ ...b, kind: b.kind as BaselineSetupKindValue }))
-  ).map((b) => ({
-    id: b.id,
-    name: b.name,
-    kindLabel: BASELINE_KIND_LABEL[b.kind],
-    contextLabel: baselineContextLabel(b),
-    notes: b.notes,
-    valueCount: Object.keys(normalizeSetupData(b.data)).length,
-  }));
+  // Whether this car's chassis can be READ from a filled-in sheet. It never hides the upload door
+  // — it decides whether that door is live or greyed with the reason under it.
+  const supportsUpload = await carSupportsSheetUpload(car);
 
   /*
    * Discipline: the chassis catalog answers for every car it knows, and only the gap gets a
@@ -231,6 +214,25 @@ export default async function CarDetailPage(props: {
       </header>
       <section className="page-body">
         <div className="max-w-2xl space-y-4">
+          {/*
+            Making a setup is its own job, so it gets its own door at the top of the page — the same
+            full-width bar the Garage opens with (founder call 2026-08-11). It used to be a link in
+            the "Saved setups" header, which filed "create a setup" under "setups you have kept" and
+            read as though the two were related. They are not.
+          */}
+          <UploadSetupSheetBar
+            cars={[
+              {
+                id: car.id,
+                name: car.name,
+                chassisName: car.setupSheetModel?.name ?? null,
+                supportsUpload,
+                baselineCount,
+              },
+            ]}
+            preselectCarId={car.id}
+          />
+
           {setupHistory.current ? (
             <CarCurrentSetupCard carId={car.id} current={setupHistory.current} />
           ) : null}
@@ -255,12 +257,15 @@ export default async function CarDetailPage(props: {
             }))}
           />
 
-          {baselines.length > 0 ? (
-            <CarBaselineSetupsCard carId={car.id} baselines={baselines} />
-          ) : null}
-
-          <CarSetupHistory
+          {/*
+            Baselines used to be their own card here. They are rows in this list now, under their
+            own chip — one place that answers "what setups does this car have", instead of three
+            cards the driver had to join up themselves.
+          */}
+          <CarAllSetups
+            carId={car.id}
             entries={setupHistory.entries}
+            counts={setupHistory.counts}
             hasMore={setupHistory.hasMore}
             truncated={setupHistory.truncated}
           />

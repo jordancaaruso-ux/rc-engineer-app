@@ -29,20 +29,22 @@ import {
   type OnboardingFacts,
 } from "@/lib/onboarding/visibility";
 
-/** Green-lit chassis — the setup row offers the photo/PDF doors ("about 30 seconds"). */
+/** Green-lit chassis with baselines — all three doors live. */
 const UPLOADABLE_CAR: UploadSetupCar = {
   id: "preview_car_uploadable",
   name: "Mugen MTC3",
   chassisName: "Mugen MTC3",
   supportsUpload: true,
+  baselineCount: 3,
 };
 
-/** No calibration — the setup row routes to the hand-build flow ("a few minutes"). */
+/** No calibration and no baselines — the fill-a-blank-sheet door alone, the other two greyed. */
 const HAND_BUILD_CAR: UploadSetupCar = {
   id: "preview_car_handbuild",
   name: "Awesomatix A800",
   chassisName: "Awesomatix A800",
   supportsUpload: false,
+  baselineCount: 0,
 };
 
 const EMPTY: OnboardingFacts = {

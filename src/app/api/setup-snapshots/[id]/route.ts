@@ -50,6 +50,24 @@ export async function PATCH(request: Request, ctx: Ctx): Promise<NextResponse> {
     patch.name = name;
   }
   if (body.data !== undefined) {
+    /*
+     * A saved setup that a run points at is that run's own record, and must never be edited here.
+     *
+     * Saving from "All setups" flips `isLibrary` on the run's existing snapshot rather than copying
+     * it (see `./save/route.ts`). That is what keeps the list free of duplicates — and it puts run
+     * history inside the one table this route may write, so the guard has to live here. Without it,
+     * saving a run's setup and then editing it would silently change the numbers that run claims to
+     * have been on.
+     */
+    if (existing._count.runs > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "This setup is a record of a logged run, so its values can't be changed. Rename it, or start a new setup from it.",
+        },
+        { status: 409 }
+      );
+    }
     patch.data = normalizeSetupSnapshotForStorage(body.data);
   }
   if (Object.keys(patch).length === 0) {

@@ -170,6 +170,76 @@ export function carRatingBandCaption(rating: number): string | null {
   return CAR_RATING_BANDS.find((b) => b.ratings.includes(rating))?.caption ?? null;
 }
 
+/**
+ * URL-safe slug for a band, used by the Sessions rating filter. `unrated` is not a
+ * band — it's the fifth choice in the filter, covering drafts and legacy runs that
+ * never got a number. Everything else is derived from {@link CAR_RATING_BANDS} so the
+ * founder-locked grouping stays the one place the thresholds live. Slugs are plain
+ * strings validated by {@link normalizeRunRatingBandSlugs}, not a hand-mirrored union
+ * that would silently rot if the bands are ever regrouped again.
+ */
+export const RUN_RATING_UNRATED_SLUG = "unrated" as const;
+
+export function carRatingBandSlug(caption: string): string {
+  return caption.toLowerCase();
+}
+
+/**
+ * Chip options for the Sessions rating filter, in band order, with `unrated` last.
+ * `label` is the full chip text ("Good 7–8"); `caption` is the bare word, for places
+ * too narrow for the range (the filter pill's summary).
+ */
+export const RUN_RATING_BAND_OPTIONS: readonly {
+  slug: string;
+  label: string;
+  caption: string;
+  ratings: readonly number[];
+}[] = [
+  ...CAR_RATING_BANDS.map((b) => ({
+    slug: carRatingBandSlug(b.caption),
+    label: `${b.caption} ${b.ratings[0]}–${b.ratings[b.ratings.length - 1]}`,
+    caption: b.caption,
+    ratings: b.ratings,
+  })),
+  { slug: RUN_RATING_UNRATED_SLUG, label: "Unrated", caption: "Unrated", ratings: [] },
+];
+
+/** Keeps only slugs that name a real band or `unrated`; drops anything else. */
+export function normalizeRunRatingBandSlugs(slugs: string[]): string[] {
+  const known = new Set(RUN_RATING_BAND_OPTIONS.map((o) => o.slug));
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of slugs) {
+    const slug = raw.trim().toLowerCase();
+    if (!known.has(slug) || seen.has(slug)) continue;
+    seen.add(slug);
+    out.push(slug);
+  }
+  // Stable band order regardless of how the URL listed them.
+  return RUN_RATING_BAND_OPTIONS.filter((o) => out.includes(o.slug)).map((o) => o.slug);
+}
+
+/** The 1–10 ratings covered by these band slugs. `unrated` contributes nothing. */
+export function carRatingsForBandSlugs(slugs: string[]): number[] {
+  const wanted = new Set(slugs.map((s) => s.trim().toLowerCase()));
+  const out: number[] = [];
+  for (const band of CAR_RATING_BANDS) {
+    if (!wanted.has(carRatingBandSlug(band.caption))) continue;
+    out.push(...band.ratings);
+  }
+  return out;
+}
+
+/** Chip/label text for one slug ("Good 7–8", "Unrated"). Null for an unknown slug. */
+export function runRatingBandLabel(slug: string): string | null {
+  return RUN_RATING_BAND_OPTIONS.find((o) => o.slug === slug)?.label ?? null;
+}
+
+/** Bare band word for one slug ("Good", "Unrated"). Null for an unknown slug. */
+export function runRatingBandCaption(slug: string): string | null {
+  return RUN_RATING_BAND_OPTIONS.find((o) => o.slug === slug)?.caption ?? null;
+}
+
 /** Legacy v4 string presets — kept for migrating stored JSON only. */
 const STEERING_FEEL_PRESETS = ["pointy", "dull", "nervous", "neutral", "direct", "vague"] as const;
 type SteeringFeelPreset = (typeof STEERING_FEEL_PRESETS)[number];

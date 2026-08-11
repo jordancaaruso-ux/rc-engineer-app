@@ -67,6 +67,16 @@ export type DerivedBox = {
   height: number;
   /** How this sheet draws a value in this box. See `DerivedBoxStyle`. */
   style: DerivedBoxStyle;
+  /**
+   * Set when this box is ONE OPTION of a grouped parameter rather than the parameter itself — the
+   * printed tick boxes of a one-of-many row. Several boxes then share one `key`, and a box shows
+   * its mark when the parameter's value matches (case-insensitively) its `optionValue`.
+   *
+   * A derivation never writes this: it exists for a calibrated chassis, where the calibration
+   * already says which printed box is which choice. Absent everywhere else, so every existing
+   * sheet keeps its one-box-per-key shape untouched.
+   */
+  optionValue?: string;
 };
 
 /**

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
@@ -11,6 +11,7 @@ import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Collapse } from "@/components/ui/Collapse";
 import { AddCarBlankUpload } from "@/components/cars/AddCarBlankUpload";
+import { UploadSetupSheetBar, type UploadSetupCar } from "@/components/setup/UploadSetupSheetBar";
 
 type SetupSheetModelOption = { id: string; name: string; slug: string; isAuthorized?: boolean };
 
@@ -46,7 +47,7 @@ export function CarList({
   setupSheetModels: initialSetupSheetModels = [],
   setupMetaById,
   setupsByCarId,
-  defaultOpenCarId = null,
+  uploadCars = [],
 }: {
   initialCars: Car[];
   setupSheetModels?: SetupSheetModelOption[];
@@ -57,15 +58,22 @@ export function CarList({
    * tab (founder call 2026-07-29 — this replaced the duplicate setup cards on the old hub).
    */
   setupsByCarId?: Record<string, CarInlineSetup[]>;
-  /** Car expanded on load — the one you ran most recently. */
-  defaultOpenCarId?: string | null;
+  /**
+   * The same car list the "Create / Upload setup sheet" bar above this one runs on, so an expanded
+   * row can open that panel already pointed at its car. Empty falls back to a plain link.
+   */
+  uploadCars?: UploadSetupCar[];
 }) {
   const router = useRouter();
-  /** Collapsed by default; the last-run car starts open until you touch a row. */
-  const [openCarId, setOpenCarId] = useState<string | null>(defaultOpenCarId);
-  useEffect(() => {
-    setOpenCarId(defaultOpenCarId);
-  }, [defaultOpenCarId]);
+  /**
+   * Every row starts collapsed. The last-run car used to open itself, which made the list read as
+   * if one car had been picked for you — a plain list of cars, all the same, is the point.
+   */
+  const [openCarId, setOpenCarId] = useState<string | null>(null);
+  const uploadCarById = useMemo(
+    () => new Map(uploadCars.map((c) => [c.id, c])),
+    [uploadCars]
+  );
   const [cars, setCars] = useState<Car[]>(initialCars);
   const [setupSheetModels, setSetupSheetModels] =
     useState<SetupSheetModelOption[]>(initialSetupSheetModels);
@@ -505,13 +513,28 @@ export function CarList({
                           ))}
                         </ul>
                       )}
-                      <Link
-                        href={`/cars/${c.id}/setups/new`}
-                        className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition hover:text-foreground"
-                      >
-                        <Plus className="h-3 w-3" aria-hidden />
-                        New setup
-                      </Link>
+                      {/*
+                        The same panel the bar at the top of this page opens, already pointed at
+                        this car. It used to be a link straight to a blank sheet, which made the
+                        blank sheet the only way in from here — no upload, no baseline.
+                      */}
+                      {uploadCarById.get(c.id) ? (
+                        <div className="mt-2">
+                          <UploadSetupSheetBar
+                            cars={[uploadCarById.get(c.id)!]}
+                            trigger="link"
+                            preselectCarId={c.id}
+                          />
+                        </div>
+                      ) : (
+                        <Link
+                          href={`/cars/${c.id}/setups/new`}
+                          className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition hover:text-foreground"
+                        >
+                          <Plus className="h-3 w-3" aria-hidden />
+                          Create / Upload setup sheet
+                        </Link>
+                      )}
                     </div>
                   </Collapse>
                 ) : null}

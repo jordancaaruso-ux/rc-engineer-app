@@ -17,6 +17,7 @@ import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { SegmentedControl, type SegmentedOption } from "@/components/ui/SegmentedControl";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
+import { ReadOnlySheetSurface } from "@/components/setup/ReadOnlySheetSurface";
 import { Eyebrow } from "@/components/ui/panel";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
@@ -132,6 +133,8 @@ export function SetupSheetModal({
   const [baselineSetupData, setBaselineSetupData] = useState<unknown | null>(null);
   const [baselineSetupLoading, setBaselineSetupLoading] = useState(false);
   const [modelTemplate, setModelTemplate] = useState<SetupSheetTemplate | null>(null);
+  /** Set when this car's chassis draws as a sheet — the setup then shows ON the sheet. */
+  const [sheetModelId, setSheetModelId] = useState<string | null>(null);
 
   useEffect(() => {
     setPortalReady(true);
@@ -196,12 +199,22 @@ export function SetupSheetModal({
       cache: "no-store",
     })
       .then((res) => res.json())
-      .then((data: { template?: SetupSheetTemplate }) => {
-        if (!alive) return;
-        setModelTemplate(data.template ?? null);
-      })
+      .then(
+        (data: {
+          template?: SetupSheetTemplate;
+          sheetMode?: boolean;
+          setupSheetModelId?: string | null;
+        }) => {
+          if (!alive) return;
+          setModelTemplate(data.template ?? null);
+          setSheetModelId(data.sheetMode && data.setupSheetModelId ? data.setupSheetModelId : null);
+        }
+      )
       .catch(() => {
-        if (alive) setModelTemplate(null);
+        if (alive) {
+          setModelTemplate(null);
+          setSheetModelId(null);
+        }
       });
     return () => {
       alive = false;
@@ -671,16 +684,27 @@ export function SetupSheetModal({
                 ) : null}
               </div>
 
-              <SetupSheetView
-                key={template.id}
-                value={runSetup}
-                onChange={() => {}}
-                readOnly
-                template={template}
-                baselineValue={baselineValue}
-                compareHighlightOnly={compareActive}
-                numericAggregationByKey={compareActive ? numericAggregationByKey : null}
-              />
+              {sheetModelId && !compareActive ? (
+                /*
+                 * The setup, on the driver's own sheet (founder ruling 2026-08-11: on a chassis
+                 * that draws one, the sheet IS the setup view). The changed-since-previous list
+                 * above stays — that is the session view's question and its carve-out. Comparing
+                 * to another run falls back to the field list: highlights and community-spread
+                 * colouring live there, and a compare without them answers nothing.
+                 */
+                <ReadOnlySheetSurface setupSheetModelId={sheetModelId} values={runSetup} />
+              ) : (
+                <SetupSheetView
+                  key={template.id}
+                  value={runSetup}
+                  onChange={() => {}}
+                  readOnly
+                  template={template}
+                  baselineValue={baselineValue}
+                  compareHighlightOnly={compareActive}
+                  numericAggregationByKey={compareActive ? numericAggregationByKey : null}
+                />
+              )}
             </>
           )}
         </div>

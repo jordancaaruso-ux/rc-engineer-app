@@ -59,9 +59,23 @@ export default async function TeamFeedPage({ params, searchParams }: Props): Pro
     <>
       <header className="page-header">
         <PageBackLink href="/teams" />
-        <div className="flex items-start justify-between gap-3">
+        {/* Three classes, each load-bearing:
+              flex-1   — without it the wrapper shrinks to its contents and `Manage` ends up
+                         glued to the team name, 371px short of the card edge below it.
+              min-w-0  — a flex item's automatic minimum size is its CONTENT width, so a long
+                         team name pushed the wrapper (and Manage) straight past the column
+                         instead of truncating.
+              ml-auto  — on the link rather than `justify-between` here, because the desktop
+                         header rule in globals.css forces `justify-content: flex-start` on any
+                         `.page-header` child holding the title. An auto margin it cannot override. */}
+        <div className="flex min-w-0 flex-1 items-start gap-3">
           <div className="min-w-0">
-            <h1 className="page-title truncate">{model.teamName}</h1>
+            {/* Truncation lives on the span, not the `h1`. `truncate` sets `overflow: hidden`,
+                and `.page-title::before` — the yellow location tick — is a child pseudo-element,
+                so on a long team name the title clipped its own marker away. */}
+            <h1 className="page-title max-w-full">
+              <span className="block truncate">{model.teamName}</span>
+            </h1>
             <p className="page-subtitle">
               {model.members.length} member{model.members.length === 1 ? "" : "s"}
               {lastActivity ? (
@@ -74,7 +88,7 @@ export default async function TeamFeedPage({ params, searchParams }: Props): Pro
           </div>
           <Link
             href={`/teams/${encodeURIComponent(teamId)}/settings`}
-            className="tap-active inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-foreground transition hover:border-accent/40 hover:bg-muted/60"
+            className="tap-active ml-auto inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-foreground transition hover:border-accent/40 hover:bg-muted/60"
           >
             <Settings className="size-3.5" aria-hidden />
             Manage

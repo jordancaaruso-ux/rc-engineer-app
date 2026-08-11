@@ -21,7 +21,11 @@ export async function getCachedDashboardHomeModel(userId: string, timeZone: stri
       // model GAINS a field — a cached v2 entry has no `heroPace`, so the hero silently
       // renders nothing until the 30s window rolls, which on a deploy means every warm
       // user sees a broken page for half a minute.
-      [`dashboard-home-v3-${userId}-${timeZone}`],
+      // v4 (2026-08-10): `heroPace` gained `seriesKind` / `trackName` / `anchorLabel` and
+      // `consistency.percent`. A v3 entry is worse than missing here — it still holds the
+      // OLD mixed-track series, so a warm user would keep seeing three tracks on one line
+      // with the new single-track labels wrapped around it.
+      [`dashboard-home-v4-${userId}-${timeZone}`],
       { tags: [dashboardTag(userId)], revalidate: 30 }
     )()
   );
@@ -40,13 +44,15 @@ export async function getCachedDashboardHomeModel(userId: string, timeZone: stri
  * own empty state — which looks like a data problem, not a cache one. v2 added
  * `AnalysisTrendRun.distribution` for the trend chart's spread view; v3 added
  * `totalRunCount` for the Recent-runs card's door into Sessions (a v2 entry
- * would render that door with no number on it).
+ * would render that door with no number on it); v4 added `hasTeam`, which gates
+ * that door's mention of team sessions (a v3 entry reads `undefined` and quietly
+ * hides the mention from every team member until the window rolls).
  */
 export async function getCachedAnalysisHomeModel(userId: string, timeZone: string) {
   return perfSpan("cachedAnalysisHome", () =>
     unstable_cache(
       async () => loadAnalysisHomeModel(userId, timeZone),
-      [`analysis-home-v3-${userId}-${timeZone}`],
+      [`analysis-home-v4-${userId}-${timeZone}`],
       { tags: [runsTag(userId), dashboardTag(userId)], revalidate: 30 }
     )()
   );

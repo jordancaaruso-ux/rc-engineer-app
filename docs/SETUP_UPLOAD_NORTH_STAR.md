@@ -609,6 +609,102 @@ runs" split organised by provenance, which is never how a driver looks for a set
 
 ---
 
+## Supersedes the green light on the upload door — two mechanisms, not one (2026-08-11)
+
+**Read this before touching anything that decides whether a driver may upload a sheet.** The
+question kept getting re-litigated because the doc above only ever describes one of the two things
+below, and the code had merged them into a single switch.
+
+They are separate:
+
+| | What it needs | What it buys |
+|---|---|---|
+| **Using a sheet** | An editable PDF whose boxes the app can find | The driver fills their own sheet, uploads a filled one, logs runs against it, and sees what changed between two runs |
+| **Understanding a sheet** | A human to name the boxes (the green light) | The Engineer can reason about the setup and suggest changes |
+
+**A chassis needs only the first to be fully usable.** Nobody has to name a box. The manufacturer
+already printed the caption next to it, so the driver reads their own sheet off the paper. This is
+what "your setup sheet becomes your car" (2026-08-11) actually delivers, and it is why the door is
+open to any driver holding an editable PDF.
+
+**The green light keeps its real job** — telling the Engineer whether it can read this car. On a
+chassis with unnamed boxes the Engineer says so plainly rather than reasoning around a gap.
+
+### What changed in the code
+
+`carSupportsSheetUpload` gated the upload door on a green light. That meant the Xray X4'26 — a
+chassis built from its own blank PDF, every box mapped from the file's own form layer — was offered
+a greyed-out door saying "we can't read a sheet for this yet", when in fact it reads that sheet
+exactly. The rule now lives in `src/lib/setupCalibrations/uploadDoorRule.ts`: a calibration opens the
+door if it can read an editable PDF (non-empty `formFieldMappings`) **or** it is green-lit.
+
+**Image calibrations still need the green light.** They read values out of pixels by region and OCR,
+with no form layer to anchor to and no equivalent of "the file told us its own box names".
+
+### Why round 3's "partially-read is worse than none" no longer gates this
+
+That standard (2026-07-22) was set when a read was **invisible** — a list of extracted values with
+no way to see what had been missed. What was read now lands on a picture of the driver's own sheet,
+where a box that got nothing is a visibly empty box. A partial read became something the driver can
+see and fix, so it stops being a silent wrong answer. The standard still governs what the *Engineer*
+is allowed to treat as known.
+
+### The wrong-file guard is separate again, and stricter
+
+Uploading the wrong sheet is not caught by a coverage percentage. `fingerprintPick.ts` matches the
+PDF's **set of AcroForm field names** exactly against known calibrations, scopes the match to the
+chosen car's chassis, and blocks with a 409 plus "Change car / Use anyway" before anything is
+stored. Sheets from different makers that share generic internal names (`Text1..N`) hit the
+cross-model disambiguation path instead of being guessed at.
+
+### No image sheets. At all. (2026-08-11 — decided more than once)
+
+**An editable PDF or nothing.** Not a photo, not a scan, and not a flat PDF. A refused upload is
+refused *before anything is stored*, and the message names the file to go and find instead of
+merely saying no.
+
+This has now been decided at least twice and lost in between, which is why it is written here
+rather than only in a commit message. **Do not re-open an image path without changing this
+section first.**
+
+What enforces it:
+
+| Gate | Where |
+|---|---|
+| Only `application/pdf` is accepted | `SETUP_DOCUMENT_ALLOWED_MIME` — `src/lib/setupDocuments/types.ts` |
+| A PDF with no form layer is refused, with the "look for the editable one" message | `POST /api/setup-documents/quick-create` |
+| Same refusal on the blank/chassis door | `refusalForBlankExtraction` — `blankUploadDiagnosis.ts` |
+| The file picker never offers the photo library | `QUICK_CREATE_SETUP_ACCEPT_MIME` |
+| Pinned to the real Xray fillable/flat pair | `e2e/setup-sheet-upload-door.spec.ts` |
+
+**The flat-PDF raster bridge is gone.** `quick-create` used to render page 1 of a form-less PDF to
+a PNG and send it down the image pipeline. That was the last way an image sheet got in — and the
+driver never chose one, the app made it. What followed was almost always *"your sheet is saved,
+values will import automatically once it's supported"*, which was not true: reading it needs a
+hand-drawn image calibration for that exact chassis, and none was coming. Promising an import that
+cannot happen is worse than refusing.
+
+`renderPdfFirstPageToPng` still exists for `deriveImageMap` — admin tooling for authoring an image
+calibration by hand. Different job, unaffected.
+
+**Consequence for the upload door:** a green-lit image calibration must NOT open it. It would open
+onto a file type the next screen refuses. The rule in `uploadDoorRule.ts` is the single test "can
+this chassis read an editable PDF".
+
+The image branch in `quick-create` is now unreachable and is signposted in place rather than
+deleted; unpicking `imageBlockReason` / `imageNeedsCar` reaches into the review screen's response
+shape and is a separate change.
+
+### Correcting the 2026-08-06 entry above
+
+The Stage 1.5 note says auto-creating a chassis from an upload is gone and that a driver "fills the
+generic 43-parameter sheet, or creates their own chassis type". That was true on 6 August. On 11
+August the blank-sheet door shipped: a driver uploads their chassis's editable PDF and gets a
+working chassis with every box on it, derived from the form layer, no hand authoring. The retired
+thing was the **AI-identification** front door, not creating a chassis from a file.
+
+---
+
 ## Confidence doctrine
 
 Mirrors the Engineer's trust ethos (`ENGINEER_NORTH_STAR.md`): never bluff. Flag a

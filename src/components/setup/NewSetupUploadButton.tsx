@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import {
   postQuickCreateSetup,
+  quickCreateSetupLandingPath,
   QUICK_CREATE_SETUP_ACCEPT_MIME,
 } from "@/lib/setupDocuments/quickCreateSetupClient";
 
@@ -89,7 +90,8 @@ export function NewSetupUploadButton({
         return;
       }
       setStage("done");
-      router.push(`/setup-documents/${result.data.documentId}`);
+      // A clean read goes straight to the setup; only a real question stops at review.
+      router.push(quickCreateSetupLandingPath(result.data));
       router.refresh();
       setStage("idle");
     },

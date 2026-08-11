@@ -12,6 +12,7 @@ import {
   derivedSheetSlug,
 } from "@/lib/setupSheetModels/derivedSheetFingerprint";
 import { readDerivedSheetValues } from "@/lib/setupSheetModels/readDerivedSheetValues";
+import { prerenderSheetPages } from "@/lib/setupSheetModels/sheetPageImages";
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import {
   refusalForBlankExtraction,
@@ -309,6 +310,15 @@ export async function createModelFromBlank(
     },
     select: { id: true },
   });
+
+  /*
+   * Draw the sheet now, while the driver is still watching an upload they know is working.
+   *
+   * Left to the first open, this cost lands on somebody opening their brand-new car — and what they
+   * see meanwhile is empty paper, which reads as a broken sheet. See `prerenderSheetPages`; it
+   * never throws, so a chassis whose picture would not draw is still created.
+   */
+  await prerenderSheetPages(model.id);
 
   return {
     ok: true,

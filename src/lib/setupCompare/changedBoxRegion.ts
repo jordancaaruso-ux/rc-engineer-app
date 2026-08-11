@@ -1,5 +1,5 @@
 /**
- * Where to crop a driver's setup sheet so the boxes that changed are the picture.
+ * Where to crop a driver's setup sheet so one changed box is the picture.
  *
  * ============================== WHY A PICTURE AT ALL ==============================
  *
@@ -7,6 +7,13 @@
  * "Box 47 · page 1, upper left: 4.5 → 5.0". To use that you have to go and count boxes on the
  * paper. But the sheet already has the answer printed beside every box — "CAMBER°", "DROOP (mm)" —
  * so showing the box where it sits says what changed without anyone having to name it first.
+ *
+ * ============================== WHY ONE CROP PER BOX ==============================
+ *
+ * The list is what a driver reads. The picture is what they open when the list is not enough — one
+ * row at a time, from that row. So a crop answers one question: where is THIS on my sheet. It is
+ * cut tight, because a crop that carries half a page has to be drawn big to stay readable, and a
+ * stack of big pictures buried the list they were supposed to be helping.
  *
  * ============================== WHY IT IS ONLY ARITHMETIC ==============================
  *
@@ -28,47 +35,37 @@ export type ChangedSheetBox = {
 
 export type Rect = { x: number; y: number; width: number; height: number };
 
-export type ChangedBoxRegion = {
+export type ChangedBoxCrop = {
+  key: string;
   pageNumber: number;
   /** The part of the page to show, as fractions of the page. */
   crop: Rect;
-  /** The boxes to ring, as fractions of THE CROP — which is what the markup positions against. */
-  boxes: Array<{ key: string } & Rect>;
+  /** The box to ring, as fractions of THE CROP — which is what the markup positions against. */
+  box: Rect;
 };
 
 /**
- * Room left around the changed boxes.
+ * Room left around the changed box.
  *
- * Far more on the left than anywhere else, because setup sheets print the caption to the LEFT of
- * the box it labels. A crop tight to the box shows a rectangle with a number in it and no way to
- * know what the number is — which is worse than showing nothing, because it looks like an answer.
+ * Small on every side. The driver opened this crop from the row that names the parameter, so the
+ * crop does not have to identify anything — it only has to show the spot. Extra room is not free:
+ * a wider crop has to be drawn wider to stay readable, and the picture is meant to sit inside a
+ * list without pushing it off the screen.
  */
-const PAD_LEFT = 0.17;
-const PAD_RIGHT = 0.05;
-const PAD_TOP = 0.035;
-const PAD_BOTTOM = 0.035;
+const PAD_LEFT = 0.02;
+const PAD_RIGHT = 0.02;
+const PAD_TOP = 0.012;
+const PAD_BOTTOM = 0.012;
 
 /**
- * A crop never gets smaller than this, whatever the boxes measure.
+ * A crop never gets smaller than this, whatever the box measures.
  *
- * One 2%-wide box padded by the numbers above still lands somewhere the driver has to orient
- * themselves in. A minimum keeps a recognisable chunk of the sheet — a whole corner block, a whole
- * damper column — so they can see where on the paper they are looking.
+ * Some sheets store tick-boxes a couple of millimetres across. Cropped to themselves plus padding
+ * those come out as a grey square with nothing around it, which reads as a broken image rather than
+ * as a place on a sheet.
  */
-const MIN_WIDTH = 0.34;
-const MIN_HEIGHT = 0.16;
-
-/** Past this the crop stops being a crop; show the page instead of pretending to have narrowed it. */
-const FULL_PAGE_ABOVE = 0.88;
-
-/**
- * Most pictures one page may be cut into.
- *
- * Beyond a handful, several little crops stop being easier to read than one wide one — the driver
- * is looking at a scattered sheet either way, and at that point showing the page whole at least
- * keeps everything in one frame.
- */
-const MAX_REGIONS_PER_PAGE = 3;
+const MIN_WIDTH = 0.06;
+const MIN_HEIGHT = 0.03;
 
 function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;
@@ -92,119 +89,64 @@ function widen(start: number, end: number, min: number): { start: number; end: n
   return { start: s, end: e };
 }
 
-type Bounds = { left: number; right: number; top: number; bottom: number };
-
-function paddedBounds(b: ChangedSheetBox): Bounds {
-  return {
-    left: b.x - PAD_LEFT,
-    right: b.x + b.width + PAD_RIGHT,
-    top: b.y - PAD_TOP,
-    bottom: b.y + b.height + PAD_BOTTOM,
-  };
-}
-
-function overlaps(a: Bounds, b: Bounds): boolean {
-  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-}
-
-function union(a: Bounds, b: Bounds): Bounds {
-  return {
-    left: Math.min(a.left, b.left),
-    right: Math.max(a.right, b.right),
-    top: Math.min(a.top, b.top),
-    bottom: Math.max(a.bottom, b.bottom),
-  };
+function cropFor(b: ChangedSheetBox): Rect {
+  const h = widen(b.x - PAD_LEFT, b.x + b.width + PAD_RIGHT, MIN_WIDTH);
+  const v = widen(b.y - PAD_TOP, b.y + b.height + PAD_BOTTOM, MIN_HEIGHT);
+  return { x: h.start, y: v.start, width: h.end - h.start, height: v.end - v.start };
 }
 
 /**
- * Changed boxes on one page, grouped into the pictures worth taking.
+ * A crop for each box that changed, in the order the keys were asked for.
  *
- * Two changes at opposite ends of a sheet in one frame means a strip of page a few hundred pixels
- * wide and eighty tall, where nothing can be read — measured on the real Mugen sheet, which is what
- * sent this back for a second go. Boxes whose padded areas touch belong in one picture; boxes that
- * do not, get their own.
+ * A key with no box on the sheet is skipped rather than reported: the caller is showing a list of
+ * changes, and a change the sheet has no box for is still a change worth listing.
  */
-function clusterOnPage(pageBoxes: ChangedSheetBox[]): Array<{ bounds: Bounds; boxes: ChangedSheetBox[] }> {
-  const clusters: Array<{ bounds: Bounds; boxes: ChangedSheetBox[] }> = [];
-  for (const box of pageBoxes) {
-    clusters.push({ bounds: paddedBounds(box), boxes: [box] });
-  }
-  // Repeated passes, because merging two clusters can bring a third into reach of the result.
-  let merged = true;
-  while (merged) {
-    merged = false;
-    outer: for (let i = 0; i < clusters.length; i++) {
-      for (let j = i + 1; j < clusters.length; j++) {
-        if (!overlaps(clusters[i]!.bounds, clusters[j]!.bounds)) continue;
-        clusters[i] = {
-          bounds: union(clusters[i]!.bounds, clusters[j]!.bounds),
-          boxes: [...clusters[i]!.boxes, ...clusters[j]!.boxes],
-        };
-        clusters.splice(j, 1);
-        merged = true;
-        break outer;
-      }
-    }
-  }
-  return clusters;
-}
-
-function toRegion(pageNumber: number, bounds: Bounds, boxes: ChangedSheetBox[]): ChangedBoxRegion {
-  let { left, right, top, bottom } = bounds;
-  ({ start: left, end: right } = widen(left, right, MIN_WIDTH));
-  ({ start: top, end: bottom } = widen(top, bottom, MIN_HEIGHT));
-  if (right - left > FULL_PAGE_ABOVE) {
-    left = 0;
-    right = 1;
-  }
-  if (bottom - top > FULL_PAGE_ABOVE) {
-    top = 0;
-    bottom = 1;
-  }
-
-  const crop: Rect = { x: left, y: top, width: right - left, height: bottom - top };
-  return {
-    pageNumber,
-    crop,
-    boxes: boxes.map((b) => ({
-      key: b.key,
-      x: (b.x - crop.x) / crop.width,
-      y: (b.y - crop.y) / crop.height,
-      width: b.width / crop.width,
-      height: b.height / crop.height,
-    })),
-  };
-}
-
-/**
- * The pictures to show for a set of changed boxes: page by page, cluster by cluster, top to bottom.
- */
-export function changedBoxRegions(
+export function changedBoxCrops(
   boxes: ReadonlyArray<ChangedSheetBox>,
   changedKeys: Iterable<string>
-): ChangedBoxRegion[] {
-  const wanted = new Set(changedKeys);
-  if (wanted.size === 0) return [];
-
-  const byPage = new Map<number, ChangedSheetBox[]>();
+): ChangedBoxCrop[] {
+  /*
+   * A grouped parameter prints as several tick boxes sharing one key, and "where is this on my
+   * sheet" for a choice row is the WHOLE row — the change is which of its boxes carries the mark,
+   * so a crop of one arbitrary option would ring the wrong spot half the time. The row collapses
+   * to the union of its boxes; a one-box parameter is a union of one, exactly as before.
+   */
+  const byKey = new Map<string, ChangedSheetBox>();
   for (const b of boxes) {
-    if (!wanted.has(b.key)) continue;
-    byPage.set(b.pageNumber, [...(byPage.get(b.pageNumber) ?? []), b]);
-  }
-
-  const regions: ChangedBoxRegion[] = [];
-  for (const [pageNumber, pageBoxes] of [...byPage.entries()].sort((a, b) => a[0] - b[0])) {
-    const clusters = clusterOnPage(pageBoxes);
-    if (clusters.length > MAX_REGIONS_PER_PAGE) {
-      // Scattered across the page: one picture of the whole page beats a wall of small ones.
-      const whole = clusters.reduce((acc, c) => union(acc, c.bounds), clusters[0]!.bounds);
-      regions.push(toRegion(pageNumber, whole, pageBoxes));
+    const prev = byKey.get(b.key);
+    if (!prev) {
+      byKey.set(b.key, b);
       continue;
     }
-    clusters.sort((a, b) => a.bounds.top - b.bounds.top || a.bounds.left - b.bounds.left);
-    for (const cluster of clusters) {
-      regions.push(toRegion(pageNumber, cluster.bounds, cluster.boxes));
-    }
+    if (prev.pageNumber !== b.pageNumber) continue; // never stretch a crop across pages
+    const x = Math.min(prev.x, b.x);
+    const y = Math.min(prev.y, b.y);
+    byKey.set(b.key, {
+      key: b.key,
+      pageNumber: prev.pageNumber,
+      x,
+      y,
+      width: Math.max(prev.x + prev.width, b.x + b.width) - x,
+      height: Math.max(prev.y + prev.height, b.y + b.height) - y,
+    });
   }
-  return regions;
+
+  const out: ChangedBoxCrop[] = [];
+  for (const key of changedKeys) {
+    const b = byKey.get(key);
+    if (!b) continue;
+    const crop = cropFor(b);
+    out.push({
+      key,
+      pageNumber: b.pageNumber,
+      crop,
+      box: {
+        x: (b.x - crop.x) / crop.width,
+        y: (b.y - crop.y) / crop.height,
+        width: b.width / crop.width,
+        height: b.height / crop.height,
+      },
+    });
+  }
+  return out;
 }

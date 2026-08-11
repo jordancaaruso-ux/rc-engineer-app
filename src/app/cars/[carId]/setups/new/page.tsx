@@ -48,6 +48,7 @@ import { chassisFillsAsSheet } from "@/lib/setupSheetModels/sheetPlan";
 const PREVIOUS_SETUPS_LIMIT = 12;
 export default async function NewCarSetupPage(props: {
   params: Promise<{ carId: string }>;
+  searchParams: Promise<{ start?: string }>;
 }): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
     return (
@@ -55,7 +56,7 @@ export default async function NewCarSetupPage(props: {
         <header className="page-header">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <PageBackLink href="/cars" />
-            <h1 className="page-title">New setup</h1>
+            <h1 className="page-title">Create setup sheet</h1>
           </div>
         </header>
         <section className="page-body">
@@ -69,6 +70,15 @@ export default async function NewCarSetupPage(props: {
 
   const user = await requireCurrentUser();
   const { carId } = await props.params;
+  /*
+   * `?start=baseline` is the "Start from a baseline" door on the Create / Upload setup sheet panel.
+   *
+   * It only means "offer the baselines first". Everything else about this page is unchanged, and a
+   * chassis with no baselines published simply opens the way it always did — the door that sent
+   * them here is greyed out in that case anyway, so arriving with nothing to pick means somebody
+   * typed the URL.
+   */
+  const startFromBaseline = (await props.searchParams).start === "baseline";
 
   const car = await prisma.car.findFirst({
     where: { id: carId, userId: user.id },
@@ -200,7 +210,7 @@ export default async function NewCarSetupPage(props: {
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <PageBackLink href={`/cars/${car.id}`} />
           <div className="min-w-0">
-            <h1 className="page-title truncate">New setup</h1>
+            <h1 className="page-title truncate">Create setup sheet</h1>
             <p className="page-subtitle truncate">{car.name}</p>
           </div>
         </div>
@@ -209,16 +219,21 @@ export default async function NewCarSetupPage(props: {
         <div className="max-w-2xl">
           {sheetMode && car.setupSheetModelId ? (
             /*
-             * No start-from picker here, on purpose. Those three choices — previous setup, baseline,
-             * empty — answer "what should the boxes start at", and on this driver's own sheet the
-             * answer already came out of their PDF. A parked draft still resumes, because that is
-             * the same sheet half-finished rather than a different place to start from.
+             * The sheet opens straight into empty boxes, and that is still the default: on this
+             * driver's own sheet, "what should the boxes start at" was already answered by their
+             * PDF. A parked draft resumes for the same reason — it is this sheet half-finished,
+             * not a different place to start from.
+             *
+             * `baselines` is the one exception, and only when the driver came through the "start
+             * from a baseline" door. Then the choice is the point of the trip, so it is offered
+             * before the sheet rather than hidden behind it.
              */
             <SheetModeFill
               carId={car.id}
               setupSheetModelId={car.setupSheetModelId}
               chassisName={template.label ?? car.name}
-              initialValues={fillDraft?.values as Record<string, string> | undefined}
+              initialValues={fillDraft?.values}
+              baselines={startFromBaseline && !fillDraft ? baselines : undefined}
             />
           ) : (
             <NewCarSetupClient

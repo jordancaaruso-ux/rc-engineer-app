@@ -10,7 +10,7 @@ import { RunHistoryTable } from "@/components/runs/RunHistoryTable";
 import { RunHistoryColGroup, RunHistoryMobileHeaderRow, RUN_HISTORY_ACTION_CELL_CLASS, computeRunHistoryColSpan } from "@/components/runs/runHistoryTableColumns";
 import { SessionGroupsPager } from "@/components/runs/SessionGroupsPager";
 import { SessionsFocusScroll } from "@/components/runs/SessionsFocusScroll";
-import { SessionsDesktopDefaultOpen } from "@/components/runs/SessionsDesktopDefaultOpen";
+import { SessionsDesktopMasterDetail } from "@/components/runs/SessionsDesktopMasterDetail";
 import { SessionsWorkbench } from "@/components/runs/SessionsWorkbench";
 import {
   buildGroupRunRows,
@@ -303,6 +303,8 @@ export default async function RunHistoryPage({
   let filterEvents: { id: string; label: string }[] = [];
   let filterTireTypes: { id: string; label: string }[] = [];
   let filterSetupFields: { id: string; label: string }[] = [];
+  /** Team scope only — the roster, as Driver filter options. Empty in solo scope. */
+  let filterDrivers: { id: string; label: string }[] = [];
 
   if (teamId) {
     const allowed = await assertUserInTeam(teamId, user.id);
@@ -319,8 +321,14 @@ export default async function RunHistoryPage({
         120,
         Math.max(RUN_HISTORY_INITIAL_TAKE, RUN_HISTORY_INITIAL_TAKE * memberIds.length)
       );
+      // The Driver filter narrows *within* the roster, never outside it. Intersecting
+      // here — the one place that decides whose runs a viewer may see — means a
+      // hand-edited `driverIds` naming someone from another team falls back to the
+      // roster instead of reaching their runs.
+      const selectedDriverIds = filters.driverIds.filter((id) => memberIds.includes(id));
+      const scopedMemberIds = selectedDriverIds.length ? selectedDriverIds : memberIds;
       const baseWhere = buildRunHistoryPrismaWhere(filters, {
-        userId: { in: memberIds },
+        userId: { in: scopedMemberIds },
         shareWithTeam: true,
       });
       const loaded = await loadRunHistoryPage({
@@ -336,6 +344,11 @@ export default async function RunHistoryPage({
       memberDisplayByUserId = memberDisplayLabelRecord(
         await loadTeamMemberDisplays(memberIds, user.id)
       );
+      // Options come from the full roster, not the filtered result, so narrowing to one
+      // driver doesn't remove everyone else from the picker you'd use to widen again.
+      filterDrivers = memberIds
+        .map((id) => ({ id, label: memberDisplayByUserId[id] ?? "Unknown driver" }))
+        .sort((a, b) => a.label.localeCompare(b.label));
     }
   } else {
     const baseWhere = buildRunHistoryPrismaWhere(filters, { userId: user.id });
@@ -454,7 +467,7 @@ export default async function RunHistoryPage({
     runs,
     filters,
     displayTimeZone,
-    { setupDataByRunId, changedKeysByRunId }
+    { setupDataByRunId, changedKeysByRunId, memberLabelByUserId: memberDisplayByUserId }
   );
   runs = sortRunsForHistory(matchResult.runs, filters.sort);
   const matchReasonsById: Record<string, MatchReason[]> = Object.fromEntries(
@@ -891,8 +904,9 @@ export default async function RunHistoryPage({
       <section className="page-body min-w-0 max-w-full">
         {/* Back from a run view: centre the row that was open, don't dump them at the top. */}
         <SessionsFocusScroll runId={focusRunId} />
-        {/* lg+ only: fill the master-detail pane instead of landing on an empty right half. */}
-        <SessionsDesktopDefaultOpen />
+        {/* lg+ only: fill the master-detail pane on arrival, and keep exactly one session open
+            so the panes can never stack in the same column. */}
+        <SessionsDesktopMasterDetail />
         <Suspense fallback={<div className="h-20 rounded-lg border border-border bg-card animate-pulse" />}>
           <SessionsFilterBar
             cars={filterCars}
@@ -900,6 +914,7 @@ export default async function RunHistoryPage({
             events={filterEvents}
             tireTypes={filterTireTypes}
             setupFields={filterSetupFields}
+            drivers={filterDrivers}
             teams={teamsForUser.map((t) => ({ id: t.id, name: t.name }))}
             teamId={teamId}
             openGroup={focusRunId}
@@ -956,6 +971,10 @@ export default async function RunHistoryPage({
                   {groups.map((group, idx) => renderSessionGroup(group, idx))}
                 </SessionGroupsPager>
               )}
+              {/* The lg+ detail column with nothing selected. A `<p>` on purpose: the
+                  `.sessions-split > div` rule clamps the pager's footer to the list width,
+                  and this one has to span the pane instead. */}
+              <p className="sessions-empty">Pick a session to see its runs.</p>
             </SurfaceCard>
             {/* The workbench carries its own copy at the foot of the rail, so this
                 one is for the phone and team mode only — otherwise you'd get two. */}

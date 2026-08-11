@@ -21,6 +21,8 @@ export type QuickCreateCarCandidate = { id: string; name: string };
 export type QuickCreateSetupResponse = {
   documentId: string;
   setupId: string | null;
+  /** The car the setup landed on, so a clean import can go straight to that setup. */
+  carId: string | null;
   calibrationId: string | null;
   calibrationName: string | null;
   pickSource: "exact_fingerprint" | "ambiguous_suggestion" | "needs_disambiguation" | "none";
@@ -98,6 +100,7 @@ function parseQuickCreateResponse(
   return {
     documentId: data.documentId,
     setupId: data.setupId ?? null,
+    carId: data.carId ?? null,
     calibrationId: data.calibrationId ?? null,
     calibrationName: data.calibrationName ?? null,
     pickSource: data.pickSource ?? "none",
@@ -113,6 +116,23 @@ function parseQuickCreateResponse(
     carCandidates: Array.isArray(data.carCandidates) ? data.carCandidates : [],
     notRecognized: Boolean(data.notRecognized),
   };
+}
+
+/**
+ * Where a finished upload should land.
+ *
+ * A fillable PDF read through a verified calibration is exact — the values ARE in the file — so
+ * when the server made the setup with nothing flagged, the driver goes straight to that setup (on
+ * a sheet-mode chassis, that page IS their sheet with the values in its boxes; founder,
+ * 2026-08-11: "why would it need a review"). The review screen remains the stop for every upload
+ * that genuinely has a question in it: photos, unrecognized layouts, chassis mismatches, parse
+ * failures.
+ */
+export function quickCreateSetupLandingPath(data: QuickCreateSetupResponse): string {
+  if (data.setupId && data.carId && !data.needsReview) {
+    return `/cars/${data.carId}/setups/${data.setupId}`;
+  }
+  return `/setup-documents/${data.documentId}`;
 }
 
 export async function postQuickCreateSetup(

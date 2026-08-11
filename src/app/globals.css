@@ -553,9 +553,14 @@ html[data-nav-pending] .page {
   background: rgb(var(--color-border));
 }
 
-/* The sector segment — 1/5 of the track, positioned by nav slot.
+/* The sector segment — one slot of the track, positioned by nav slot.
    z-index lifts it above the track (::after paints later in pseudo order,
-   which would otherwise draw the hairline through the yellow). */
+   which would otherwise draw the hairline through the yellow).
+
+   Slot width comes from `--title-nav-count` (set by AppShell from MOBILE_NAV.length),
+   NOT a hardcoded 20%. It was 20% while the dock had five destinations; Teams became
+   the sixth and its tick resolved to `left: 100%`, off the end of the title. The
+   fallback keeps the rule honest if the variable is ever missing. */
 .page-title::before {
   content: "";
   position: absolute;
@@ -563,8 +568,8 @@ html[data-nav-pending] .page {
   z-index: 1;
   bottom: -1px;
   height: 4px;
-  width: 20%;
-  left: calc(var(--title-nav-sector, 0) * 20%);
+  width: calc(100% / var(--title-nav-count, 5));
+  left: calc(var(--title-nav-sector, 0) * (100% / var(--title-nav-count, 5)));
   background: rgb(var(--color-primary));
   transform: skewX(-21deg);
   transition: left 0.34s cubic-bezier(0.3, 0.9, 0.35, 1);
@@ -955,6 +960,12 @@ html[data-nav-pending] .page {
    last one wins. That is the correct desktop reading of "which session am I
    looking at", and it costs nothing to allow.
 --------------------------------------------------------------------------- */
+/* Belongs to the lg+ master-detail only — the phone accordion has no second column to
+   leave empty, so this never renders there. */
+.sessions-empty {
+  display: none;
+}
+
 @media (min-width: 1024px) {
   .sessions-split {
     position: relative;
@@ -989,6 +1000,32 @@ html[data-nav-pending] .page {
     overscroll-behavior: contain;
     border-top: 0;
     border-left: 1px solid rgb(var(--color-border));
+    /* OPAQUE, overriding the `bg-background/60` glass the phone accordion wears. Every
+       pane is positioned into this one column, so a translucent pane is a pane you can
+       see the others through: two open sessions rendered doubled member names and lap
+       times struck over each other. SessionsDesktopMasterDetail keeps it to one open
+       session; this makes a second one harmless rather than unreadable. */
+    background-color: rgb(var(--color-background));
+  }
+
+  /*
+   * The right-hand column with nothing selected. Closing the open session used to leave
+   * a bordered void the width of the pane — the layout still promised a detail view and
+   * showed none. Pure CSS via `:has()`: no state to keep, and it cannot drift out of sync
+   * with which `<details>` is actually open.
+   */
+  .sessions-split:not(:has(> details[open])) > .sessions-empty {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: var(--sessions-list-w);
+    display: grid;
+    place-items: center;
+    border-left: 1px solid rgb(var(--color-border));
+    background-color: rgb(var(--color-background));
+    color: rgb(var(--color-faint));
+    font-size: 13px;
   }
 
   /* The pager's "show more" footer is a sibling of the groups; keep it under the
@@ -1002,8 +1039,8 @@ html[data-nav-pending] .page {
      at lg+: in the accordion the content sits directly under its own summary, so what it
      belongs to is never in question.
 
-     (Which session is open by default is set by SessionsDesktopDefaultOpen — a closed
-     `<details>` cannot be revealed from CSS, so it could not be done here.) */
+     (Which session is open, and that only one is, is set by SessionsDesktopMasterDetail —
+     a closed `<details>` cannot be revealed from CSS, so it could not be done here.) */
   .sessions-split > details[open] > summary > div {
     background-color: rgb(var(--color-muted) / 0.5);
   }

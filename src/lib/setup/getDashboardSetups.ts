@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { setupSheetModelIdsSupportingUpload } from "@/lib/setupCalibrations/carSupportsSheetUpload";
+import { baselineCountsByModelId } from "@/lib/baselineSetups/baselineCounts";
 import type { UploadSetupCar } from "@/components/setup/UploadSetupSheetBar";
 
 /**
@@ -23,6 +24,11 @@ export type DashboardSetups = {
  * created by reading an uploaded sheet. Per-run snapshots deliberately don't count — every
  * logged run writes one, so counting them would silence the ask after run 1 for someone who has
  * never entered a single value.
+ *
+ * Since 2026-08-11 a driver can SAVE a run's setup, which flips `isLibrary` on that run's own
+ * snapshot — so a run-backed row can now satisfy the first arm of this test. That is correct and
+ * not a leak: the exclusion above is about snapshots the app writes automatically, and saving one
+ * is a deliberate act that means exactly what this function asks about.
  */
 export async function userHasAnySetup(userId: string): Promise<boolean> {
   const existing = await prisma.setupSnapshot.findFirst({
@@ -50,11 +56,12 @@ export async function loadDashboardSetups(userId: string): Promise<DashboardSetu
   });
   if (cars.length === 0) return null;
 
-  const [hasAnySetup, uploadableModelIds] = await Promise.all([
+  const [hasAnySetup, uploadableModelIds, baselineCounts] = await Promise.all([
     userHasAnySetup(userId),
-    // Same green-lit rule as the Garage hub: it only decides which door a car opens (read a sheet
-    // vs fill one in), never whether we ask.
+    // Same green-lit rule as the Garage hub. It decides whether the upload door is offered or
+    // greyed with a reason — never whether we ask, and never which doors exist.
     setupSheetModelIdsSupportingUpload(cars.map((c) => c.setupSheetModelId)),
+    baselineCountsByModelId(cars.map((c) => c.setupSheetModelId)),
   ]);
 
   return {
@@ -64,6 +71,7 @@ export async function loadDashboardSetups(userId: string): Promise<DashboardSetu
       name: c.name,
       chassisName: c.setupSheetModel?.name ?? null,
       supportsUpload: Boolean(c.setupSheetModelId && uploadableModelIds.has(c.setupSheetModelId)),
+      baselineCount: c.setupSheetModelId ? (baselineCounts.get(c.setupSheetModelId) ?? 0) : 0,
     })),
   };
 }

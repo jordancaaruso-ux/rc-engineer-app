@@ -1,4 +1,5 @@
-import type { SetupSnapshotData } from "@/lib/runSetup";
+import type { SetupSnapshotData, SetupSnapshotValue } from "@/lib/runSetup";
+import { storedValuesToSurface } from "@/lib/setupSheetModels/sheetSurfaceValues";
 
 /**
  * Moving values between a setup snapshot and the sheet surface.
@@ -31,17 +32,14 @@ export function withoutEmptySheetValues(values: Record<string, string>): Record<
 /**
  * Seed the sheet from a setup the driver already has.
  *
- * Only what can be drawn in a box comes across. A number is stringified because that is what a box
- * shows; everything structured is left behind, because the surface would render `[object Object]`
- * into somebody's tire row and then hand it back as their tire choice.
+ * Only what can be drawn in a box comes across, through the shared bridge: strings and numbers as
+ * themselves, a many-of-many array as its ticked options, a preset-with-other object as its two
+ * boxes. What the bridge cannot draw — the tire selection, the additive, the run context — is
+ * left behind, because the surface would render `[object Object]` into somebody's tire row and
+ * then hand it back as their tire choice.
  */
 export function sheetValuesFromSnapshot(setup: SetupSnapshotData): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(setup)) {
-    if (typeof v === "string") out[k] = v;
-    else if (typeof v === "number" && Number.isFinite(v)) out[k] = String(v);
-  }
-  return out;
+  return storedValuesToSurface(setup);
 }
 
 /**
@@ -56,13 +54,19 @@ export function sheetValuesFromSnapshot(setup: SetupSnapshotData): Record<string
  */
 export function mergeSheetValuesIntoSnapshot(
   previous: SetupSnapshotData,
-  sheetValues: Record<string, string>
+  sheetValues: Record<string, unknown>
 ): SetupSnapshotData {
   const next: SetupSnapshotData = { ...previous };
   for (const [k, v] of Object.entries(sheetValues)) {
-    if (typeof v !== "string") continue;
-    if (v.trim() === "") delete next[k];
-    else next[k] = v;
+    if (typeof v === "string") {
+      if (v.trim() === "") delete next[k];
+      else next[k] = v;
+      continue;
+    }
+    // Stored shapes from a calibrated sheet: a ticked-options array, a preset-with-other object,
+    // a number. They land as themselves — that is the entire point of the bridge.
+    if (v == null) continue;
+    next[k] = v as SetupSnapshotValue;
   }
   return next;
 }

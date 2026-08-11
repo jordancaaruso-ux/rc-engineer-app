@@ -93,6 +93,16 @@ export function buildSetupDiffRows(
 function formatSetupVal(v: unknown): string {
   if (v == null || v === "") return "—";
   if (Array.isArray(v)) return v.length ? v.join(", ") : "—";
+  // Some keys hold an object rather than a scalar — `tires` carries the compound and its
+  // run count. `String()` on those printed a literal "[object Object]" on screen, so name
+  // the thing if it can be named (fixed 2026-08-11).
+  if (typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    for (const key of ["displayName", "name", "label", "value"]) {
+      if (typeof o[key] === "string" && o[key].trim()) return o[key] as string;
+    }
+    return "—";
+  }
   return String(v);
 }
 

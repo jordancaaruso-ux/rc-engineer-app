@@ -19,6 +19,15 @@ import { setupFillDraftProgressLabel } from "@/lib/setup/setupFillDraft";
  * Rows open the grid editor directly (2026-07-29). They used to land on the read-only detail page,
  * which put a second "Edit" tap between a driver and the one value they came to change — testers
  * gave up and edited through Log Run instead, which writes a run snapshot, not the baseline.
+ *
+ * ONE EXCEPTION, since 2026-08-11: a setup kept from a run is that run's own record, so it opens
+ * read-only. Saving from "All setups" marks the run's snapshot rather than copying it, and editing
+ * the values afterwards would rewrite what that run says it ran. Those rows offer Rename, never
+ * Delete — the API refuses both edits, and the row should not offer what it cannot do.
+ *
+ * The create door is deliberately NOT in this header. It sits at the top of the car page, where the
+ * Garage puts it, because making a setup and keeping a setup are different jobs (founder call
+ * 2026-08-11: "they're not really related").
  */
 
 export type CarLibrarySetup = {
@@ -103,12 +112,9 @@ export function CarSetupsCard({
     <CardPanel contentClassName="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <Eyebrow>{label}</Eyebrow>
-        <Link
-          href={`/cars/${carId}/setups/new`}
-          className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium transition hover:bg-muted"
-        >
-          New setup
-        </Link>
+        <span className="ui-caption">
+          {setups.length > 0 ? `${setups.length} saved` : null}
+        </span>
       </div>
 
       {/*
@@ -135,8 +141,8 @@ export function CarSetupsCard({
 
       {setups.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          No saved setups yet. Create one and you&apos;ll be able to pick it when you log a run,
-          then only change what&apos;s different.
+          Nothing saved yet. Save a setup from the list below and it lands here, ready to pick when
+          you log a run.
         </p>
       ) : (
         <ul className="-mx-1">
@@ -145,7 +151,15 @@ export function CarSetupsCard({
               key={s.id}
               className="flex items-center justify-between gap-3 border-b border-border/60 px-1 py-2.5 last:border-0"
             >
-              <Link href={`/cars/${carId}/setups/${s.id}/edit`} className="min-w-0 flex-1">
+              <Link
+                // A run's record opens read-only; only a setup nothing has run opens the editor.
+                href={
+                  s.usedInRuns > 0
+                    ? `/cars/${carId}/setups/${s.id}`
+                    : `/cars/${carId}/setups/${s.id}/edit`
+                }
+                className="min-w-0 flex-1"
+              >
                 <div className="truncate text-sm text-foreground">{s.name ?? "Untitled setup"}</div>
                 <div className="font-mono text-[11px] tabular-nums text-muted-foreground">
                   {s.createdAtLabel}
@@ -163,14 +177,17 @@ export function CarSetupsCard({
                 >
                   Rename
                 </button>
-                <button
-                  type="button"
-                  className="rounded-md px-2 py-1 text-[11px] text-muted-foreground transition hover:text-destructive disabled:opacity-50"
-                  onClick={() => void remove(s)}
-                  disabled={busyId === s.id || pending}
-                >
-                  Delete
-                </button>
+                {/* Deleting a run's record is refused by the API — don't offer the door. */}
+                {s.usedInRuns === 0 ? (
+                  <button
+                    type="button"
+                    className="rounded-md px-2 py-1 text-[11px] text-muted-foreground transition hover:text-destructive disabled:opacity-50"
+                    onClick={() => void remove(s)}
+                    disabled={busyId === s.id || pending}
+                  >
+                    Delete
+                  </button>
+                ) : null}
               </div>
             </li>
           ))}

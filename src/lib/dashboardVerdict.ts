@@ -44,10 +44,32 @@ export function consistencyWord(
 }
 
 /**
+ * The spread as the percentage the hero dial prints in its middle: 100 minus the spread's
+ * share of lap time. A 0.084 s spread on a 15.04 s lap is 0.56% of the lap, so 99.4%.
+ *
+ * Null when there is no best lap to scale by — a percentage of nothing is not a number,
+ * and the dial shows an en-dash rather than inventing one.
+ *
+ * Founder call 2026-08-10, with the flattening flagged and accepted: because the spread
+ * is a small share of a lap, every run lands between roughly 97% and 100%, so this number
+ * separates a tight day from a scrappy one by ~2.5 points. The WORD carries the loud
+ * signal and the arc keeps the wider 0–10 scale below; this is the readable measurement,
+ * not the at-a-glance one.
+ */
+export function consistencyPercent(
+  top5SpreadSeconds: number,
+  bestLap: number | null,
+): number | null {
+  if (bestLap == null || bestLap <= 0) return null;
+  const pct = 100 - (top5SpreadSeconds / bestLap) * 100;
+  return Math.max(0, Math.min(100, Math.round(pct * 10) / 10));
+}
+
+/**
  * The same spread as a 0–10 magnitude, for `RatingDial` in verdict mode. Anchored on
  * the word cutoffs above: a tight run (≤1%) lands at 7.5+, the fair band spans roughly
  * 3.75–7.5, and scrappy falls below. It is the arc length and colour only — the dial
- * prints the word, never this number.
+ * prints the percentage, never this number.
  */
 export function consistencyDialValue(
   top5SpreadSeconds: number,

@@ -3,7 +3,7 @@ import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { chassisFillsAsSheet, parseStoredBoxes } from "@/lib/setupSheetModels/sheetPlan";
-import { changedBoxRegions } from "@/lib/setupCompare/changedBoxRegion";
+import { changedBoxCrops } from "@/lib/setupCompare/changedBoxRegion";
 
 export const dynamic = "force-dynamic";
 
@@ -52,12 +52,12 @@ export async function GET(request: Request, ctx: RouteCtx): Promise<NextResponse
   // Not a mistake and not an error: most chassis fill as an ordinary form and have no sheet to
   // draw. The caller shows its list instead.
   if (!chassisFillsAsSheet(blank) || !car.setupSheetModelId) {
-    return NextResponse.json({ sheetMode: false, setupSheetModelId: null, regions: [] });
+    return NextResponse.json({ sheetMode: false, setupSheetModelId: null, crops: [] });
   }
 
   return NextResponse.json({
     sheetMode: true,
     setupSheetModelId: car.setupSheetModelId,
-    regions: changedBoxRegions(parseStoredBoxes(blank?.boxesJson), keys),
+    crops: changedBoxCrops(parseStoredBoxes(blank?.boxesJson), keys),
   });
 }

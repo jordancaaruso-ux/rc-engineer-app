@@ -22,7 +22,15 @@ export type BlankSheetCalibrationFit = {
  * fields, so a legitimate re-run can map MORE keys than the model kept. Extra mapped keys are
  * therefore fine; missing ones are the signal that this is a different sheet.
  */
-export const MIN_MODEL_KEY_COVERAGE = 0.5;
+/**
+ * Raised from 0.5 on founder's call, 2026-08-11 ("I feel like it should be over 50%").
+ *
+ * Half was always a weak bar for this question. The same sheet re-run covers ~100% of the model's
+ * keys, because it is literally the same form layer — so anything that leaves a third of the
+ * chassis unaccounted for is a different sheet, not a near miss. 0.8 still tolerates a revision
+ * that moved a handful of boxes.
+ */
+export const MIN_MODEL_KEY_COVERAGE = 0.8;
 /** Guards tiny/stub schemas, where a couple of generic keys ("notes") would clear any ratio. */
 export const MIN_MATCHED_KEYS = 8;
 

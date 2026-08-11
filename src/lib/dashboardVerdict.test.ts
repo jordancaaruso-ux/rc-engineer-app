@@ -3,7 +3,12 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { computeTodayVerdict, type VerdictRunInput } from "@/lib/dashboardVerdict";
+import {
+  computeTodayVerdict,
+  consistencyPercent,
+  consistencyWord,
+  type VerdictRunInput,
+} from "@/lib/dashboardVerdict";
 
 function run(partial: Partial<VerdictRunInput> & { runLabel: string }): VerdictRunInput {
   return {
@@ -142,4 +147,25 @@ test("consistency: percent-of-lap thresholds and latest-run-with-laps wins", () 
 
   const none = computeTodayVerdict([run({ runLabel: "Run 1", bestLap: 15.0 })]);
   assert.equal(none?.consistency, null);
+});
+
+test("consistency percent: 100 minus the spread's share of the lap", () => {
+  // The worked example from the hero card: 0.084 s off a 15.04 s lap is 0.56% of the lap.
+  assert.equal(consistencyPercent(0.084, 15.04), 99.4);
+
+  // Band edges. 1% spread is the tight cutoff, 2.5% the fair one — so the whole usable
+  // range of this number is ~97.5 to 100. That compression is known and accepted; the
+  // word is what separates a tight day from a scrappy one at a glance.
+  assert.equal(consistencyPercent(0.15, 15.0), 99);
+  assert.equal(consistencyPercent(0.375, 15.0), 97.5);
+  assert.equal(consistencyWord(0.375, 15.0), "Fair");
+  assert.equal(consistencyWord(0.376, 15.0), "Scrappy");
+
+  // A perfect run is 100, and it never goes negative however wild the spread.
+  assert.equal(consistencyPercent(0, 15.0), 100);
+  assert.equal(consistencyPercent(60, 15.0), 0);
+
+  // No lap to scale by → no percentage. The dial shows an en-dash rather than inventing one.
+  assert.equal(consistencyPercent(0.084, null), null);
+  assert.equal(consistencyPercent(0.084, 0), null);
 });

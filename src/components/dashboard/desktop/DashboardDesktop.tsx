@@ -3,6 +3,7 @@ import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel"
 import { DashboardStartRunCta } from "@/components/dashboard/DashboardStartRunCta";
 import { DashboardLastRunReadCard } from "@/components/dashboard/DashboardLastRunReadCard";
 import { DashboardHeroCard } from "@/components/dashboard/desktop/DashboardHeroCard";
+import { DashboardTodayNoLapsCard } from "@/components/dashboard/desktop/DashboardTodayNoLapsCard";
 import { DashboardListCard } from "@/components/dashboard/desktop/DashboardListCard";
 
 /**
@@ -64,6 +65,14 @@ export function DashboardDesktop({
             todayRunCount={todayRunCount}
             recentRun={recentRun}
             lastChange={todayVerdict?.lastChange ?? null}
+          />
+        ) : isTrackDay && todayStrip.length > 0 ? (
+          // No lap times anywhere today, so there is no hero to build. The day still has
+          // ratings and setup changes in it — show those rather than an empty column.
+          <DashboardTodayNoLapsCard
+            strip={todayStrip}
+            todayContext={todayContext}
+            todayRunCount={todayRunCount}
           />
         ) : null}
 

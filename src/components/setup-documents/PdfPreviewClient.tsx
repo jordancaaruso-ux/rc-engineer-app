@@ -3,8 +3,27 @@
 import { useEffect } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 
+/**
+ * The pdf.js worker, bundled with the app rather than fetched from a CDN.
+ *
+ * WHY. This used to point at `unpkg.com`. Rendering a PDF therefore needed the open internet at the
+ * moment of rendering — and this app is used trackside, inside a WKWebView, on club wifi or no
+ * signal at all. The failure is silent and indistinguishable from a broken file: no worker, no
+ * page, an empty box where the sheet should be. Now that a driver (not just an admin in the
+ * calibration workbench) can open their own setup sheet, that is a guaranteed field bug.
+ *
+ * `new URL(..., import.meta.url)` makes the bundler emit the worker as a build asset and hand back
+ * its local path. Deliberately not a copy into `public/`: a copied worker silently drifts out of
+ * step when `pdfjs-dist` is upgraded, and pdf.js answers a version mismatch by refusing to render.
+ * Resolved through the bundler, the worker and the library cannot disagree.
+ */
+const PDF_WORKER_SRC = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url
+).toString();
+
 if (typeof window !== "undefined") {
-  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+  pdfjs.GlobalWorkerOptions.workerSrc = PDF_WORKER_SRC;
 }
 
 /**
@@ -33,7 +52,7 @@ export function PdfPreviewClient(props: {
   // Ensure workerSrc is set even if this module is hot-reloaded.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+    pdfjs.GlobalWorkerOptions.workerSrc = PDF_WORKER_SRC;
   }, []);
 
   return (

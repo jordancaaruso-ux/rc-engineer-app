@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
@@ -14,6 +14,13 @@ import { CollapsibleAddRow } from "@/components/assets/CollapsibleAddRow";
 import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 import { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotSetBanner";
 import { TrackMetaTagsEditor } from "@/components/tracks/TrackMetaTagsEditor";
+import type { TrackTimingUrls } from "@/lib/tracks/trackTimingUrl";
+import {
+  TrackTimingUrlsField,
+  type TrackTimingUrlsFieldHandle,
+} from "@/components/tracks/TrackTimingUrlsField";
+
+const NO_TIMING_URLS: TrackTimingUrls = { liveRcUrl: null, speedhiveUrl: null };
 
 type Track = {
   id: string;
@@ -50,8 +57,10 @@ export function TrackList({
   const [showAddForm, setShowAddForm] = useState(false);
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
-  const [liveRcUrl, setLiveRcUrl] = useState("");
-  const [speedhiveUrl, setSpeedhiveUrl] = useState("");
+  // One box for either provider, matching the run form's "New track" row — the driver
+  // shouldn't have to know which timing column they're filling in.
+  const [timingUrls, setTimingUrls] = useState<TrackTimingUrls>(NO_TIMING_URLS);
+  const timingFieldRef = useRef<TrackTimingUrlsFieldHandle>(null);
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [existingTrackId, setExistingTrackId] = useState<string | null>(null);
@@ -92,6 +101,16 @@ export function TrackList({
       setMessage("Name is required.");
       return;
     }
+    // Fold in a paste they never pressed Enter on, and refuse a typo before saving.
+    const committed = timingFieldRef.current?.commit() ?? { ok: true as const, value: timingUrls };
+    if (!committed.ok) {
+      setMessage(committed.error);
+      return;
+    }
+    const timing = {
+      liveRcUrl: committed.value.liveRcUrl ?? null,
+      speedhiveUrl: committed.value.speedhiveUrl ?? null,
+    };
     setMessage(null);
     setExistingTrackId(null);
     setAdding(true);
@@ -102,8 +121,7 @@ export function TrackList({
         body: JSON.stringify({
           name: trimmed,
           location: location.trim() || null,
-          liveRcUrl: liveRcUrl.trim() || null,
-          speedhiveUrl: speedhiveUrl.trim() || null,
+          ...timing,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -123,8 +141,7 @@ export function TrackList({
         setTracks((prev) => [data.track!, ...prev]);
         setName("");
         setLocation("");
-        setLiveRcUrl("");
-        setSpeedhiveUrl("");
+        setTimingUrls(NO_TIMING_URLS);
         setShowAddForm(false);
         setMessage("Track added.");
         router.refresh();
@@ -180,26 +197,14 @@ export function TrackList({
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-[11px] text-muted-foreground mb-1">LiveRC URL (optional)</label>
-                <input
-                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-                  value={liveRcUrl}
-                  onChange={(e) => setLiveRcUrl(e.target.value)}
-                  placeholder="https://tftr.liverc.com/"
-                  autoComplete="off"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] text-muted-foreground mb-1">Speedhive URL (optional)</label>
-                <input
-                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-                  value={speedhiveUrl}
-                  onChange={(e) => setSpeedhiveUrl(e.target.value)}
-                  placeholder="https://speedhive.mylaps.com/practice/4591"
-                  autoComplete="off"
-                />
-              </div>
+              <TrackTimingUrlsField
+                ref={timingFieldRef}
+                value={timingUrls}
+                onChange={setTimingUrls}
+                onError={setMessage}
+                labelClassName="block text-[11px] text-muted-foreground"
+                inputClassName="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+              />
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="submit"

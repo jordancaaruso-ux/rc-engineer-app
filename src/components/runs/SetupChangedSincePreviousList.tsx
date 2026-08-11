@@ -1,8 +1,9 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
+import { Maximize2 } from "lucide-react";
 import type { SetupChangedRow } from "@/lib/setupCompare/changedSincePrevious";
-import { SetupChangedSheetImage } from "@/components/runs/SetupChangedSheetImage";
+import { SheetBoxCrop, useSheetBoxCrops } from "@/components/runs/SheetBoxCrop";
 import { cn } from "@/lib/utils";
 
 const HEAD_CELL =
@@ -21,12 +22,16 @@ export function SetupChangedSincePreviousList({
   rows: SetupChangedRow[] | null;
   className?: string;
   /**
-   * When given, and this car's chassis came from an uploaded PDF, the changed boxes are also drawn
-   * on a crop of the driver's own sheet — see `SetupChangedSheetImage`. It draws nothing for every
-   * other chassis, so passing it is always safe and never changes what an ordinary car shows.
+   * When given, and this car's chassis came from an uploaded PDF, each row can be opened to show
+   * that box on a crop of the driver's own sheet — see `SheetBoxCrop`. Every other chassis gets no
+   * opener at all, so passing it is always safe and never changes what an ordinary car shows.
    */
   carId?: string | null;
 }) {
+  // Called before the early returns below, because a hook cannot be skipped on some renders.
+  const crops = useSheetBoxCrops(carId, (rows ?? []).map((r) => r.key));
+  const [openKey, setOpenKey] = useState<string | null>(null);
+
   if (rows == null) {
     return (
       <p className={cn("text-muted-foreground text-xs", className)}>
@@ -41,15 +46,20 @@ export function SetupChangedSincePreviousList({
       </p>
     );
   }
+
+  const cropByKey = crops.kind === "ready" ? crops.byKey : null;
+  const spansPages = cropByKey
+    ? new Set([...cropByKey.values()].map((c) => c.pageNumber)).size > 1
+    : false;
+
   return (
-    <div className={cn("space-y-2", className)}>
-      {carId ? <SetupChangedSheetImage carId={carId} rows={rows} /> : null}
-      <div
+    <div
       className={cn(
         // `w-fit` so the frame hugs the tracks. Without it the box stays full
         // width while the packed tracks don't, and the sticky header band stops
         // half way across.
-        "max-h-48 w-fit max-w-full overflow-y-auto rounded-md border border-border bg-muted/70"
+        "max-h-48 w-fit max-w-full overflow-y-auto rounded-md border border-border bg-muted/70",
+        className
       )}
     >
       {/* Single grid so NOW / WAS align in fixed columns across every row —
@@ -60,13 +70,19 @@ export function SetupChangedSincePreviousList({
           diff put "Toe (Rear)" against the left wall and "3.5" against the right
           with 500px of nothing between them — the change and its value stopped
           reading as one fact. `minmax(0, …)` keeps it able to shrink and truncate
-          when the column is genuinely narrow. */}
-      <div className="grid grid-cols-[minmax(0,max-content)_auto_auto] items-baseline justify-start">
+          when the column is genuinely narrow.
+
+          The fourth column is the opener. It collapses to nothing on a chassis
+          with no sheet, which is most of them. */}
+      <div className="grid grid-cols-[minmax(0,max-content)_auto_auto_auto] items-baseline justify-start">
         <div className={cn(HEAD_CELL, "pl-3.5 pr-2 text-left")}>Parameter</div>
         <div className={cn(HEAD_CELL, "px-2 text-right")}>Now</div>
         <div className={cn(HEAD_CELL, "pl-2 pr-3.5 text-right")}>Was</div>
+        <div className={cn(HEAD_CELL, cropByKey ? "pr-2" : "")} />
         {rows.map((row, i) => {
           const divider = i > 0 ? "border-t border-border/50" : undefined;
+          const crop = cropByKey?.get(row.key);
+          const open = openKey === row.key;
           return (
             <Fragment key={`${row.label}:${row.value}:${row.previousValue}`}>
               <div className={cn("min-w-0 truncate pl-3.5 pr-2 py-[7px] text-[13px] leading-tight text-muted-foreground", divider)}>
@@ -78,10 +94,39 @@ export function SetupChangedSincePreviousList({
               <div className={cn("pl-2 pr-3.5 py-[7px] text-right text-[12px] tabular-nums leading-tight text-faint line-through", divider)}>
                 {row.previousValue}
               </div>
+              <div className={cn("py-[3px]", divider, crop ? "pr-2" : "")}>
+                {crop ? (
+                  <button
+                    type="button"
+                    onClick={() => setOpenKey(open ? null : row.key)}
+                    aria-expanded={open}
+                    aria-label={
+                      open
+                        ? `Hide ${row.label} on the setup sheet`
+                        : `Show ${row.label} on the setup sheet`
+                    }
+                    className={cn(
+                      "flex h-6 w-6 items-center justify-center rounded text-faint transition-colors hover:bg-border/60 hover:text-foreground",
+                      open && "bg-border/60 text-foreground"
+                    )}
+                  >
+                    <Maximize2 className="h-3 w-3" aria-hidden />
+                  </button>
+                ) : null}
+              </div>
+              {crop && open ? (
+                <div className="col-span-4 border-t border-border/50 bg-background/40 px-3.5 py-2">
+                  <SheetBoxCrop
+                    modelId={crops.kind === "ready" ? crops.modelId : ""}
+                    crop={crop}
+                    value={row.value}
+                    showPage={spansPages}
+                  />
+                </div>
+              ) : null}
             </Fragment>
           );
         })}
-      </div>
       </div>
     </div>
   );

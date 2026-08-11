@@ -4,12 +4,23 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowRight, ChevronLeft, ChevronRight, FileUp, Loader2, Upload, X } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  FilePlus2,
+  FileUp,
+  Layers,
+  Loader2,
+  Upload,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEnterExit } from "@/components/ui/Collapse";
 import { Button } from "@/components/ui/Button";
 import {
   postQuickCreateSetup,
+  quickCreateSetupLandingPath,
   QUICK_CREATE_SETUP_ACCEPT_MIME,
   type QuickCreateMismatchInfo,
 } from "@/lib/setupDocuments/quickCreateSetupClient";
@@ -21,9 +32,11 @@ export type UploadSetupCar = {
   chassisName: string | null;
   /**
    * True when this car's chassis has a green-lit calibration, so a sheet upload actually reads
-   * values. False cars skip the upload doors and go straight to the create-a-setup flow.
+   * values. False greys the upload door and says why, rather than removing it.
    */
   supportsUpload: boolean;
+  /** Baselines published against this car's chassis. Zero greys the baseline door and says why. */
+  baselineCount: number;
 };
 
 type UploadStage = "idle" | "uploading" | "matching" | "creating";
@@ -37,21 +50,30 @@ function stageLabel(stage: UploadStage): string {
 }
 
 /**
- * "Upload setup sheet" flow on the Assets hub (founder-interviewed 2026-07-17):
- * an outline ghost bar above the hub card opens a two-step bottom sheet —
- * step 1 picks which car the setup is for (skipped silently with one car),
- * step 2 states the fillable-PDF requirement and opens the file picker.
+ * "Create / Upload setup sheet" flow (founder-interviewed 2026-07-17, re-interviewed 2026-08-11):
+ * an outline ghost bar opens a two-step bottom sheet — step 1 picks which car the setup is for
+ * (skipped silently with one car), step 2 offers the three ways to make one.
  *
- * It offered three doors — file, photo, paste — until 2026-08-10, when images stopped being
- * accepted anywhere. The requirement is now stated BEFORE the picker rather than discovered
- * through a refusal afterwards, because a driver who is refused concludes their car is
- * unsupported, and a driver who is told what to look for goes and finds it.
- * Car-first applies to PDFs too: the server 409-blocks (nothing created) when
- * the sheet fingerprints as a different chassis than the chosen car, and the
- * sheet shows a blocking "Change car / Use anyway" confirm.
+ * ============================== WHY THREE DOORS, ALWAYS ==============================
  *
- * `trigger="link"` swaps the bar for a compact control so the dashboard's Setups
- * card can offer "New setup" in its header without duplicating the car picker.
+ * There are exactly three ways a driver gets a setup, and they are all real: fill an empty sheet,
+ * upload one they have already filled, or start from a published baseline and adjust it.
+ *
+ * Between 2026-08-10 and today this screen showed **one** door, and silently routed cars that
+ * couldn't be read from a sheet somewhere else entirely — so which of the three you were offered
+ * depended on a property of your chassis you have no way to see. The founder noticed the choices
+ * had gone and could not tell where. A door that cannot work for this car is therefore SHOWN AND
+ * GREYED WITH THE REASON, never removed: an absent door teaches a driver the app cannot do the
+ * thing, and a greyed one with a sentence under it teaches them what would make it work.
+ *
+ * The fillable-PDF requirement is likewise stated BEFORE the picker rather than discovered through
+ * a refusal afterwards, because a driver who is refused concludes their car is unsupported, and a
+ * driver who is told what to look for goes and finds it. Car-first applies to PDFs too: the server
+ * 409-blocks (nothing created) when the sheet fingerprints as a different chassis than the chosen
+ * car, and the sheet shows a blocking "Change car / Use anyway" confirm.
+ *
+ * `trigger="link"` swaps the bar for a compact control so a card header can offer this without
+ * duplicating the car picker.
  */
 export function UploadSetupSheetBar({
   cars,
@@ -103,13 +125,9 @@ export function UploadSetupSheetBar({
     setPendingFile(null);
     const preselected = preselectCarId ? (cars.find((c) => c.id === preselectCarId) ?? null) : null;
     if (preselected || cars.length === 1) {
-      // The question is already answered — land straight on the doors, or on the create flow when
-      // that car can't be read from a sheet.
+      // The question is already answered — land straight on the doors. Every car gets the doors
+      // now, including one whose chassis can't be read from a sheet: it can still fill one in.
       const only = preselected ?? cars[0]!;
-      if (!only.supportsUpload) {
-        goToCreateSetup(only.id);
-        return;
-      }
       setCarId(only.id);
       setStep("doors");
     } else {
@@ -148,7 +166,9 @@ export function UploadSetupSheetBar({
         return;
       }
       setOpen(false);
-      router.push(`/setup-documents/${result.data.documentId}`);
+      // A clean read goes straight to the setup — on a sheet-mode chassis that page IS the
+      // driver's sheet. Only an upload with a real question in it stops at the review screen.
+      router.push(quickCreateSetupLandingPath(result.data));
       router.refresh();
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- router is a stable external dep
@@ -156,20 +176,17 @@ export function UploadSetupSheetBar({
   );
 
   /**
-   * A car whose chassis has no green-lit calibration can't be read from a sheet, so it skips the
-   * upload doors entirely and goes to the create-a-setup flow — the primary path now.
+   * The two doors that are just a page: an empty sheet, or a baseline to start from.
+   *
+   * Both land on the same screen. `?start=baseline` is what tells it to offer the published
+   * baselines first instead of opening straight into empty boxes.
    */
-  function goToCreateSetup(id: string) {
+  function goToCreateSetup(id: string, start?: "baseline") {
     setOpen(false);
-    router.push(`/cars/${id}/setups/new`);
+    router.push(`/cars/${id}/setups/new${start ? `?start=${start}` : ""}`);
   }
 
   function pickCar(id: string) {
-    const car = cars.find((c) => c.id === id);
-    if (car && !car.supportsUpload) {
-      goToCreateSetup(id);
-      return;
-    }
     setCarId(id);
     setError(null);
     setStep("doors");
@@ -344,9 +361,14 @@ export function UploadSetupSheetBar({
                       <p className="pb-1 text-[13px] text-muted-foreground">
                         Which car is this setup for?
                       </p>
+                      {/*
+                        No longer explains what the badge gates, because it no longer gates
+                        anything: every car is offered all three ways in, and the badge is just a
+                        note that this one can also read a filled-in PDF.
+                      */}
                       <p className="pb-1 text-[12px] text-muted-foreground">
-                        Cars marked <span className="font-medium">Sheet upload</span> can read a
-                        setup sheet; the rest open a new setup to fill in.
+                        Cars marked <span className="font-medium">Sheet upload</span> can also read
+                        a sheet you&apos;ve already filled in.
                       </p>
                       <ul className="divide-y divide-border">
                         {cars.map((car) => (
@@ -412,26 +434,56 @@ export function UploadSetupSheetBar({
                           <span className="text-[13px] text-muted-foreground">{stageLabel(stage)}</span>
                         </div>
                       ) : (
-                        <>
+                        <ul className="divide-y divide-border">
+                          <DoorRow
+                            icon={<FilePlus2 className="size-4" strokeWidth={2} aria-hidden />}
+                            title="Fill in a blank sheet"
+                            hint={
+                              selectedCar?.chassisName
+                                ? `The ${selectedCar.chassisName} sheet, empty`
+                                : "Empty boxes, filled in here"
+                            }
+                            onClick={() => goToCreateSetup(selectedCar!.id)}
+                          />
                           {/*
                            * The requirement is stated BEFORE the picker, not discovered through an
                            * error afterwards (founder ruling 2026-08-10). A driver who picks the
                            * wrong file and gets refused concludes their car is unsupported; a
                            * driver who is told what to look for goes and finds it.
                            */}
-                          <p className="pb-2 text-[12px] leading-relaxed text-muted-foreground">
-                            Your sheet needs to be the <span className="font-semibold text-foreground">fillable PDF</span>{" "}
-                            — the one you can type into. Photos and printed copies can&apos;t be read.
-                          </p>
-                          <ul className="divide-y divide-border">
-                            <DoorRow
-                              icon={<Upload className="size-4" strokeWidth={2} aria-hidden />}
-                              title="Choose a PDF"
-                              hint="From your device"
-                              onClick={() => fileInputRef.current?.click()}
-                            />
-                          </ul>
-                        </>
+                          <DoorRow
+                            icon={<Upload className="size-4" strokeWidth={2} aria-hidden />}
+                            title="Upload a sheet you've filled in"
+                            hint={
+                              selectedCar?.supportsUpload
+                                ? "The fillable PDF — the one you can type into, not a photo"
+                                : undefined
+                            }
+                            disabledReason={
+                              selectedCar?.supportsUpload
+                                ? null
+                                : selectedCar?.chassisName
+                                  ? `We can't read a sheet for the ${selectedCar.chassisName} yet. Fill one in above and it still counts as your setup.`
+                                  : "This car has no chassis sheet behind it yet, so there's nothing to read a file against."
+                            }
+                            onClick={() => fileInputRef.current?.click()}
+                          />
+                          <DoorRow
+                            icon={<Layers className="size-4" strokeWidth={2} aria-hidden />}
+                            title="Start from a baseline"
+                            hint={
+                              selectedCar && selectedCar.baselineCount > 0
+                                ? `${selectedCar.baselineCount} published for this chassis — kit, base and pro`
+                                : undefined
+                            }
+                            disabledReason={
+                              selectedCar && selectedCar.baselineCount > 0
+                                ? null
+                                : "No baselines published for this chassis yet."
+                            }
+                            onClick={() => goToCreateSetup(selectedCar!.id, "baseline")}
+                          />
+                        </ul>
                       )}
                       {error ? (
                         <p className="pt-2 text-[12px] text-destructive" role="alert">
@@ -450,32 +502,68 @@ export function UploadSetupSheetBar({
   );
 }
 
+/**
+ * One way in. A door that can't work for this car stays on the list, greyed, with the reason under
+ * it — see the "three doors, always" note at the top of this file.
+ */
 function DoorRow({
   icon,
   title,
   hint,
   onClick,
+  disabledReason = null,
 }: {
   icon: React.ReactNode;
   title: string;
-  hint: string;
+  hint?: string;
   onClick: () => void;
+  /** When set, the row is inert and this is shown in place of the hint. */
+  disabledReason?: string | null;
 }) {
+  const disabled = Boolean(disabledReason);
   return (
     <li>
       <button
         type="button"
-        onClick={onClick}
-        className="tap-active flex w-full items-center gap-3 py-3 text-left"
+        onClick={disabled ? undefined : onClick}
+        disabled={disabled}
+        aria-disabled={disabled}
+        className={cn(
+          "flex w-full items-center gap-3 py-3 text-left",
+          disabled ? "cursor-default" : "tap-active"
+        )}
       >
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
+        <span
+          className={cn(
+            "flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted",
+            disabled ? "text-muted-foreground opacity-50" : "text-foreground"
+          )}
+        >
           {icon}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[14px] font-semibold tracking-tight text-foreground">{title}</span>
-          <span className="block text-[12px] text-muted-foreground">{hint}</span>
+          <span
+            className={cn(
+              "block text-[14px] font-semibold tracking-tight",
+              disabled ? "text-muted-foreground" : "text-foreground"
+            )}
+          >
+            {title}
+          </span>
+          {disabledReason ?? hint ? (
+            <span
+              className={cn(
+                "block text-[12px] leading-relaxed",
+                disabled ? "text-faint" : "text-muted-foreground"
+              )}
+            >
+              {disabledReason ?? hint}
+            </span>
+          ) : null}
         </span>
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground" strokeWidth={2} aria-hidden />
+        {disabled ? null : (
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" strokeWidth={2} aria-hidden />
+        )}
       </button>
     </li>
   );

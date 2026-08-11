@@ -43,7 +43,12 @@ export function DashboardHeroCard({
   recentRun: DashboardHomeModel["recentRun"];
   lastChange: NonNullable<DashboardHomeModel["todayVerdict"]>["lastChange"] | null;
 }) {
-  const eyebrow = isTrackDay ? "Today" : "Where your pace is";
+  const isLapSeries = hero.seriesKind === "laps";
+
+  // "Where your pace is" said nothing and named no venue, which is how a mixed-track
+  // series went unnoticed. The card is about the most recent session, so it says so, and
+  // the track sits in the meta line beside it (founder call 2026-08-10).
+  const eyebrow = isTrackDay ? "Today" : "Last run";
   const meta = isTrackDay
     ? [
         `${todayRunCount} ${todayRunCount === 1 ? "run" : "runs"}`,
@@ -52,7 +57,7 @@ export function DashboardHeroCard({
       ]
         .filter(Boolean)
         .join(" · ")
-    : [recentRun?.carName, `last ${hero.series.length} sessions`].filter(Boolean).join(" · ");
+    : [recentRun?.carName, hero.trackName, hero.anchorLabel].filter(Boolean).join(" · ");
 
   const doorHref = isTrackDay ? "/runs/history?expandLatest=1" : "/analysis";
   const doorLabel = isTrackDay ? "Open in Sessions" : "Open Analysis";
@@ -70,8 +75,10 @@ export function DashboardHeroCard({
               : "effect unclear so far"
         }`
       : "vs the run before it"
-    : hero.series.length >= 2
-      ? `vs your previous session${recentRun?.trackName ? ` at ${recentRun.trackName}` : ""}`
+    : // Only says "at <track>" now that the series is scoped to one — it used to name the
+      // latest run's track no matter where the run it compared against actually was.
+      hero.seriesKind === "sessions" && hero.series.length >= 2
+      ? `vs your previous session${hero.trackName ? ` at ${hero.trackName}` : ""}`
       : null;
 
   return (
@@ -118,7 +125,7 @@ export function DashboardHeroCard({
             <div className="flex shrink-0 flex-col gap-[18px]">
               {hero.carRating != null ? (
                 <RatingDial
-                  size={52}
+                  size={60}
                   value={hero.carRating}
                   min={1}
                   word
@@ -132,10 +139,15 @@ export function DashboardHeroCard({
               ) : null}
               {hero.consistency ? (
                 <RatingDial
-                  size={52}
+                  // 60 for both dials: "99.4%" is five characters and at 52 it touches the
+                  // ring. The number is the point of the dial, so the ring grows rather than
+                  // the type shrinking, and the handling dial matches so the pair reads level.
+                  size={60}
                   value={hero.consistency.value}
                   min={1}
-                  display={CONSISTENCY_GLYPH[hero.consistency.word]}
+                  display={
+                    hero.consistency.percent != null ? `${hero.consistency.percent.toFixed(1)}%` : "–"
+                  }
                   word={hero.consistency.word}
                   label="Consistency"
                   caption={`top-5 within ${hero.consistency.spreadSeconds.toFixed(3)} s`}
@@ -149,16 +161,27 @@ export function DashboardHeroCard({
         <div className="min-w-0 flex-1">
           <div className="mb-2.5 flex items-baseline justify-between gap-3">
             <span className="font-mono text-[10px] font-bold uppercase tracking-[.18em] text-faint">
-              {isTrackDay ? "Pace · per run today" : `Pace · last ${hero.series.length} sessions`}
+              {isTrackDay
+                ? "Pace · per run today"
+                : isLapSeries
+                  ? "Pace · laps in your last run"
+                  : `Pace · last ${hero.series.length}${hero.trackName ? ` at ${hero.trackName}` : " sessions"}`}
             </span>
             <span className="shrink-0 text-[12px] text-faint">
-              lower is faster
+              {isLapSeries && hero.trackName ? `first session at ${hero.trackName}` : "lower is faster"}
               {hero.foundSeconds != null && hero.foundSeconds > 0.001
                 ? ` · ${hero.foundSeconds.toFixed(3)} s found`
                 : ""}
             </span>
           </div>
-          <PaceChart series={hero.series} deltaSeconds={hero.deltaSeconds} />
+          <PaceChart
+            series={hero.series}
+            deltaSeconds={hero.deltaSeconds}
+            kind={hero.seriesKind}
+            // Track-day only ever means "one run so far today", never a first visit — the
+            // empty state must not claim a venue is new when he has raced there for years.
+            trackName={isTrackDay ? null : hero.trackName}
+          />
         </div>
       </div>
 
@@ -166,13 +189,6 @@ export function DashboardHeroCard({
     </SurfaceCard>
   );
 }
-
-/** Mono glyph inside the consistency ring — the word carries the meaning beside it. */
-const CONSISTENCY_GLYPH: Record<string, string> = {
-  Tight: "TGT",
-  Fair: "FAIR",
-  Scrappy: "SCR",
-};
 
 /** Signed lap delta — negative (faster) reads green, positive red. Never neutral. */
 function DeltaChip({ seconds }: { seconds: number }) {

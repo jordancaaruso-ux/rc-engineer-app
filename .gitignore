@@ -56,3 +56,6 @@ hardware/**/__pycache__/
 /tabs-frames/
 desktop-shots/
 .layout-probes/
+
+# Sheet-fill captures (regenerate with e2e/sheet-fill.spec.ts)
+sheet-fill-shots/

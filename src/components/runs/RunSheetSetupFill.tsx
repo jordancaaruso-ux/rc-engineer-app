@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SheetFillSurface } from "@/components/setup/SheetFillSurface";
+import { SheetFillSurface, type SheetFillPlan } from "@/components/setup/SheetFillSurface";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { haptic } from "@/lib/haptics";
+import { surfaceValuesToStoredMerge } from "@/lib/setupSheetModels/sheetSurfaceValues";
 
 /**
  * The setup part of "Log your run", for a car whose chassis came from somebody's own PDF.
@@ -41,7 +42,11 @@ export function RunSheetSetupFill({
   seedValues: Record<string, string>;
   /** Changes when the setup itself is replaced from outside the sheet. See above. */
   seedKey: string;
-  onValues: (values: Record<string, string>) => void;
+  /**
+   * The sheet's state in STORED shapes — grouped rows as arrays, preset rows as objects, cleared
+   * boxes as `""` deletion markers — ready for `mergeSheetValuesIntoSnapshot`.
+   */
+  onValues: (values: Record<string, unknown>) => void;
 }) {
   /** Which setup this sheet was opened against — so a new one closes it, with no effect needed. */
   const [openedFor, setOpenedFor] = useState<string | null>(null);
@@ -59,8 +64,13 @@ export function RunSheetSetupFill({
   useEffect(() => {
     onValuesRef.current = onValues;
   });
+  const planRef = useRef<SheetFillPlan | null>(null);
   const handleChange = useCallback((next: Record<string, string>) => {
-    onValuesRef.current(next);
+    // Through the bridge before it leaves this component: the run's setup snapshot must hold the
+    // same shapes a form edit writes, or "what changed since your last run" would report every
+    // grouped row as changed after every sheet-logged run.
+    const plan = planRef.current;
+    onValuesRef.current(plan ? surfaceValuesToStoredMerge(next, plan.fields) : next);
   }, []);
 
   if (!open) {
@@ -113,6 +123,9 @@ export function RunSheetSetupFill({
         pageImageUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-page`}
         initialValues={seedValues}
         onChange={handleChange}
+        onPlanLoaded={(p) => {
+          planRef.current = p;
+        }}
       />
     </div>
   );

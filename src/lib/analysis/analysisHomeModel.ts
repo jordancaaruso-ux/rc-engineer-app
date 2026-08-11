@@ -154,6 +154,13 @@ export type AnalysisHomeModel = {
    * on its own is an abstraction.
    */
   totalRunCount: number;
+  /**
+   * Whether the driver belongs to any team. Gates the Sessions door's mention of team
+   * sessions: `/runs/history` carries a My sessions / <Team> scope switcher, but it only
+   * offers teams to members — promising them to a solo driver advertises a room they
+   * cannot open.
+   */
+  hasTeam: boolean;
   video: AnalysisVideoModel;
 };
 

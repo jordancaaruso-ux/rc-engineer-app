@@ -28,6 +28,13 @@ export type SheetPlanField = {
   uiType: "text" | "checkbox";
   sectionTitle?: string;
   options?: string[];
+  /**
+   * Stored value for each entry of `options`, index-aligned. Present only on a calibrated chassis
+   * whose schema declares them; a derived sheet's options are their own stored values.
+   */
+  optionValues?: string[];
+  /** Many-of-many: the value is a set of options, not one. */
+  multi?: boolean;
 };
 
 export type SheetPlan = {
@@ -55,13 +62,20 @@ export function buildSheetPlan(input: {
   schema: Pick<SetupSheetModelSchema, "fields">;
   boxes: DerivedBox[];
 }): SheetPlan {
-  const boxByKey = new Map(input.boxes.map((b) => [b.key, b] as const));
+  // A grouped parameter's printed tick boxes all share its key — see `DerivedBox.optionValue` —
+  // so a key maps to a LIST of boxes. Derived sheets only ever have lists of one.
+  const boxesByKey = new Map<string, DerivedBox[]>();
+  for (const b of input.boxes) {
+    const list = boxesByKey.get(b.key);
+    if (list) list.push(b);
+    else boxesByKey.set(b.key, [b]);
+  }
 
   const fields: SheetPlanField[] = [];
   const boxes: DerivedBox[] = [];
   for (const f of input.schema.fields) {
-    const box = boxByKey.get(f.key);
-    if (!box) continue;
+    const fieldBoxes = boxesByKey.get(f.key);
+    if (!fieldBoxes?.length) continue;
     fields.push({
       key: f.key,
       label: f.displayLabel,
@@ -69,8 +83,12 @@ export function buildSheetPlan(input: {
       uiType: f.uiType === "checkbox" ? "checkbox" : "text",
       ...(f.sectionTitle ? { sectionTitle: f.sectionTitle } : {}),
       ...(f.groupedOptionLabels?.length ? { options: f.groupedOptionLabels } : {}),
+      ...(f.groupedOptionLabels?.length && f.groupedOptionValues?.length
+        ? { optionValues: f.groupedOptionValues }
+        : {}),
+      ...(f.uiType === "multiSelect" ? { multi: true } : {}),
     });
-    boxes.push(box);
+    boxes.push(...fieldBoxes);
   }
 
   return {

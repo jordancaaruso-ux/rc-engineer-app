@@ -37,15 +37,18 @@ import { loadUserScopedEvents, userCanAccessEvent } from "@/lib/events/eventPart
 import { resolveEventTrackLabel } from "@/lib/tracks/legacyTrackSnapshot";
 import { getLiveRcDriverIdSetting, getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
+import { isRunContextSetupKey } from "@/lib/setup/runContextSetupKeys";
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import {
   computeTodayVerdict,
   consistencyDialValue,
+  consistencyPercent,
   consistencyWord,
   type ConsistencyWord,
   type TodayVerdict,
   type VerdictRunInput,
 } from "@/lib/dashboardVerdict";
+import { pickHeroSeries } from "@/lib/dashboardHeroSeries";
 import { perfSpan } from "@/lib/perfLog";
 
 export type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
@@ -336,6 +339,11 @@ export type DashboardHomeModel = {
     bestLap: number | null;
     avgTop5: number | null;
     lapCount: number;
+    /**
+     * 1–10 handling rating, null when the run was not rated. On a day with no lap times
+     * this is the only figure that moved, so the desktop's no-laps card leans on it.
+     */
+    carRating: number | null;
     loggingComplete: boolean;
     /** Best-lap delta vs the previous run today (negative = faster); null on the first run of the day. */
     bestDeltaVsPrev: number | null;
@@ -360,8 +368,14 @@ export type DashboardHomeModel = {
   todayVerdict: TodayVerdict | null;
   /**
    * Desktop hero readout (design handoff 2026-08-08) — the big lap numeral, the two
-   * rating dials and the pace chart. Track day plots today's runs; an off day plots the
-   * last eight sessions.
+   * rating dials and the pace chart. Track day plots today's runs; an off day plots
+   * earlier sessions AT THE SAME TRACK.
+   *
+   * The same-track scope is the whole point of the off-day series (founder call
+   * 2026-08-10). Plotting the last eight runs in date order regardless of venue put a
+   * 12-second club track and an 18-second big track on one axis, so most of the line's
+   * movement was a change of car park, and `foundSeconds` measured the gap between two
+   * circuits. Anything that scopes this series must stay single-track.
    *
    * Costs no extra query: `completedRunRows` (the full history behind the 30-day summary
    * and the records board) already carries best lap, laps and track per run. Null when
@@ -377,12 +391,28 @@ export type DashboardHomeModel = {
     consistency: null | {
       word: ConsistencyWord;
       spreadSeconds: number;
-      /** 0–10 magnitude for the dial's arc. The dial prints the word, never this. */
+      /** 0–10 magnitude for the dial's arc. The dial prints `percent`, never this. */
       value: number;
+      /** 100 minus the spread's share of lap time — the number inside the ring. */
+      percent: number | null;
     };
+    /**
+     * What the series counts. `sessions` = one point per run; `laps` = one point per lap
+     * within the anchor run, the fallback when the anchor track has no earlier session to
+     * compare against (a first visit). The two are different quantities on the same axis,
+     * so every label built from this series has to branch on it.
+     */
+    seriesKind: "sessions" | "laps";
+    /** The track the series is scoped to; null when the anchor run has no track. */
+    trackName: string | null;
+    /** The anchor run's date, formatted in the user's zone — the meta line's last field. */
+    anchorLabel: string | null;
     /** Oldest first — the chart reads left to right. */
     series: Array<{ runId: string; label: string; best: number }>;
-    /** Total time found across the series; positive = quicker now than at the start. */
+    /**
+     * Total time found across the series; positive = quicker now than at the start.
+     * Null for a lap series: first lap vs last lap inside one run is not progress.
+     */
     foundSeconds: number | null;
   };
   recentRun: null | {
@@ -617,7 +647,7 @@ export async function loadDashboardHomeModel(
     scopedEvents,
     recentRun,
     todaysRuns,
-    priorRun,
+    priorRuns,
     incompleteRunsRows,
     completedRunRows,
     [thingsToTryRows, thingsToDoRows],
@@ -661,13 +691,20 @@ export async function loadDashboardHomeModel(
         setupSnapshot: { select: { id: true, data: true } },
       },
     }),
-    // Last run _before_ today so the first today row's changes are diffed
-    // against yesterday's final snapshot instead of appearing as a full
-    // "everything changed" blob.
-    prisma.run.findFirst({
+    // Runs _before_ today, newest first, so the first today row's changes are diffed
+    // against that car's last snapshot instead of appearing as a full "everything
+    // changed" blob.
+    //
+    // A handful of rows rather than one, because the baseline has to be the same CAR
+    // (fixed 2026-08-11). Diffing an X4 against yesterday's MTC3 turned one setup change
+    // into 101 of them, most reading "-2 → —" because the other car's sheet simply has
+    // no such field. A day spent on the second car in the garage is ordinary, so the
+    // window covers a few runs back rather than only the very last one.
+    prisma.run.findMany({
       where: { userId, createdAt: { lt: todayStart } },
       orderBy: { sortAt: "desc" },
-      select: { setupSnapshot: { select: { id: true, data: true } } },
+      take: 12,
+      select: { carId: true, setupSnapshot: { select: { id: true, data: true } } },
     }),
     prisma.run.findMany({
       where: { userId, loggingComplete: false, incompleteLoggingPromptDismissedAt: null },
@@ -907,13 +944,32 @@ export async function loadDashboardHomeModel(
 
   const todaysChanges: DashboardHomeModel["todaysChanges"] = [];
   {
-    let prevSnapshot: SetupSnapshotData | null =
-      (priorRun?.setupSnapshot?.data as SetupSnapshotData | undefined) ?? null;
+    /**
+     * Yesterday's snapshot for one car. Null when that car has no run in the window —
+     * its first outing has nothing to have changed FROM, and a diff against another
+     * car's sheet is noise, not history.
+     */
+    const priorSnapshotForCar = (carId: string | null | undefined) =>
+      (priorRuns.find((p) => p.carId != null && p.carId === carId)?.setupSnapshot?.data as
+        | SetupSnapshotData
+        | undefined) ?? null;
+
+    let prevSnapshot: SetupSnapshotData | null = priorSnapshotForCar(todaysRuns[0]?.car?.id);
+    let prevCarId: string | null | undefined = todaysRuns[0]?.car?.id;
     for (const r of todaysRuns) {
       const cur = (r.setupSnapshot?.data as SetupSnapshotData | undefined) ?? null;
       if (!cur) continue;
+      // Swapping cars mid-day restarts the trail on that car's own last snapshot.
+      if (r.car?.id !== prevCarId) {
+        prevSnapshot = priorSnapshotForCar(r.car?.id);
+        prevCarId = r.car?.id;
+      }
       if (prevSnapshot) {
-        const diffRows = buildSetupDiffRows(cur, prevSnapshot).filter((row) => row.changed);
+        const diffRows = buildSetupDiffRows(cur, prevSnapshot).filter(
+          // Tires, additive and prep are picked on the run's Tires tab and mirrored into
+          // the sheet; RUN_CONTEXT_SETUP_KEYS says no "what changed" list may count them.
+          (row) => row.changed && !isRunContextSetupKey(row.key),
+        );
         if (diffRows.length > 0) {
           todaysChanges.push({
             runId: r.id,
@@ -970,6 +1026,7 @@ export async function loadDashboardHomeModel(
         bestLap: best,
         avgTop5: avg5,
         lapCount: m.lapCount,
+        carRating: r.carRating ?? null,
         loggingComplete: r.loggingComplete === true || Boolean(r.loggingCompletedAt),
         bestDeltaVsPrev: best != null && prevBest != null ? best - prevBest : null,
         changedRows,
@@ -1024,7 +1081,13 @@ export async function loadDashboardHomeModel(
     const currentSnapshot = (recentRun.setupSnapshot?.data as SetupSnapshotData | undefined) ?? null;
     if (currentSnapshot) {
       const runBefore = await prisma.run.findFirst({
-        where: { userId, sortAt: { lt: recentRun.sortAt } },
+        // Same car only — see the today-changes baseline above. Diffing this run against
+        // whatever car happened to run last printed a hundred phantom changes.
+        where: {
+          userId,
+          sortAt: { lt: recentRun.sortAt },
+          ...(recentRun.car?.id ? { carId: recentRun.car.id } : {}),
+        },
         orderBy: { sortAt: "desc" },
         select: { setupSnapshot: { select: { data: true } } },
       });
@@ -1032,7 +1095,7 @@ export async function loadDashboardHomeModel(
         (runBefore?.setupSnapshot?.data as SetupSnapshotData | undefined) ?? null;
       if (previousSnapshot) {
         setupChanges = buildSetupDiffRows(currentSnapshot, previousSnapshot)
-          .filter((row) => row.changed)
+          .filter((row) => row.changed && !isRunContextSetupKey(row.key))
           .map((row) => ({
             key: row.key,
             label: row.label,
@@ -1097,21 +1160,36 @@ export async function loadDashboardHomeModel(
 
   let heroPace: DashboardHomeModel["heroPace"] = null;
   {
-    // Track day plots today run-by-run; an off day plots the last eight sessions, which
-    // is the only way the page can answer "am I getting faster" at a glance.
-    const series = hasRunToday
-      ? [...todayStrip]
+    /*
+     * Track day plots today run-by-run. An off day plots earlier sessions at the SAME
+     * TRACK as the most recent run — see the `heroPace` type for why the old
+     * whatever-the-venue series had to go.
+     *
+     * A first visit leaves nothing to compare against, so rather than an empty box the
+     * chart drops a level and plots the laps inside that one run: still a real trend,
+     * just a shorter window (founder call 2026-08-10).
+     */
+    const offDay = hasRunToday
+      ? null
+      : pickHeroSeries({
+          anchorRunId: recentRun?.id ?? null,
+          anchorTrackId: recentRun?.track?.id ?? null,
+          history: completedRunRows.map((r) => ({
+            id: r.id,
+            trackId: r.trackId,
+            bestLapSeconds: typeof r.bestLapSeconds === "number" ? r.bestLapSeconds : null,
+            label: heroSeriesFormatter.format(r.sortAt ?? r.createdAt).toUpperCase(),
+          })),
+          anchorLaps: recentRun ? getIncludedLaps(primaryLapRowsFromRun(recentRun as never)) : [],
+        });
+
+    const seriesKind: "sessions" | "laps" = offDay?.kind ?? "sessions";
+    const series = offDay
+      ? offDay.points
+      : [...todayStrip]
           .reverse()
           .filter((r) => r.bestLap != null)
-          .map((r) => ({ runId: r.runId, label: r.runLabel, best: r.bestLap as number }))
-      : completedRunRows
-          .filter((r) => typeof r.bestLapSeconds === "number")
-          .slice(-8)
-          .map((r) => ({
-            runId: r.id,
-            label: heroSeriesFormatter.format(r.sortAt ?? r.createdAt).toUpperCase(),
-            best: r.bestLapSeconds as number,
-          }));
+          .map((r) => ({ runId: r.runId, label: r.runLabel, best: r.bestLap as number }));
 
     const anchorRun = hasRunToday ? todaysRuns[todaysRuns.length - 1] : recentRun;
     const anchorBest = hasRunToday
@@ -1137,21 +1215,42 @@ export async function loadDashboardHomeModel(
         carRating: hasRunToday
           ? (todaysRuns[todaysRuns.length - 1]?.carRating ?? null)
           : (recentRun?.carRating ?? null),
-        // Last point vs the one before it: the move the driver just made.
+        // Last point vs the one before it: the move the driver just made. A lap series has
+        // no earlier session to move from, so there is no honest delta to show.
         deltaSeconds:
-          series.length >= 2 ? series[series.length - 1].best - series[series.length - 2].best : null,
+          seriesKind === "sessions" && series.length >= 2
+            ? series[series.length - 1].best - series[series.length - 2].best
+            : null,
         consistency:
           spread != null
             ? {
                 word: consistencyWord(spread, anchorRunBest),
                 spreadSeconds: spread,
                 value: consistencyDialValue(spread, anchorRunBest),
+                percent: consistencyPercent(spread, anchorRunBest),
               }
+            : null,
+        seriesKind,
+        trackName: hasRunToday
+          ? (todayContext?.trackName ?? null)
+          : (recentRun?.track?.name ?? null),
+        anchorLabel:
+          !hasRunToday && recentRun
+            ? heroSeriesFormatter.format(
+                resolveRunDisplayInstant({
+                  createdAt: recentRun.createdAt,
+                  sessionCompletedAt: recentRun.sessionCompletedAt,
+                  loggingCompletedAt: recentRun.loggingCompletedAt,
+                  sortAt: recentRun.sortAt,
+                })
+              )
             : null,
         series,
         // Positive = quicker now than at the start of the series.
         foundSeconds:
-          series.length >= 2 ? series[0].best - series[series.length - 1].best : null,
+          seriesKind === "sessions" && series.length >= 2
+            ? series[0].best - series[series.length - 1].best
+            : null,
       };
     }
   }
