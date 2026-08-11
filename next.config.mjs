@@ -11,6 +11,13 @@ const RASTER_NATIVE_FILES = [
   "./node_modules/@napi-rs/canvas/**/*",
   "./node_modules/@napi-rs/canvas-*/**/*",
   "./node_modules/pdfjs-dist/standard_fonts/**/*",
+  // `pdf-to-img` pins its OWN pdfjs-dist (nested, a different version to the top-level one) and
+  // starts it "workerless" — which still `import()`s `legacy/build/pdf.worker.mjs` by computed
+  // path at runtime. A dynamic import of a computed path is invisible to the file tracer, so the
+  // worker never reached the lambda and every raster died on "Setting up fake worker failed:
+  // Cannot find module …/pdf.worker.mjs" (prod 2026-08-11: an X4'25 sheet with 271 good boxes and
+  // no picture behind them). The whole nested package, because pdfjs resolves siblings off it.
+  "./node_modules/pdf-to-img/node_modules/**/*",
 ];
 
 /** @type {import('next').NextConfig} */
