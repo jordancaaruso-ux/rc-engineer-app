@@ -240,44 +240,38 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
         </ReviewSection>
 
         <ReviewSection eyebrow="Setup sheets drivers uploaded" empty={blanks.waiting.length === 0}>
-          {blanks.waiting.map((b) => {
-            const left = b.boxCount - b.namedCount;
-            return (
-              <li key={b.blankId} className="flex items-center justify-between gap-2 px-4 py-2">
-                <div className="min-w-0">
-                  <Link
-                    href={`/setup-sheet-models/${b.modelId}/boxes`}
-                    className="block truncate text-xs text-foreground hover:underline"
-                  >
-                    {b.chassisName}
-                  </Link>
-                  <div className="text-[10px] text-muted-foreground">
-                    {b.uploaderEmail ?? "uploader has gone"} · {fmt(b.uploadedAt)} ·{" "}
-                    {left === 0
-                      ? `all ${b.boxCount} boxes named`
-                      : `${left} of ${b.boxCount} boxes still unnamed`}
-                    {b.carCount > 0 ? ` · ${b.carCount} car(s)` : ""}
-                    {b.pageCount > 1 ? ` · ${b.pageCount} pages` : ""}
-                    {b.suggestionCount > 0 ? ` · ${b.suggestionCount} suggested name(s)` : ""}
+          {blanks.waiting.map((b) => (
+            <li key={b.blankId} className="flex items-center justify-between gap-2 px-4 py-2">
+              <div className="min-w-0">
+                <Link
+                  href={`/setup-sheet-models/${b.modelId}`}
+                  className="block truncate text-xs text-foreground hover:underline"
+                >
+                  {b.chassisName}
+                </Link>
+                <div className="text-[10px] text-muted-foreground">
+                  {b.uploaderEmail ?? "uploader has gone"} · {fmt(b.uploadedAt)} · {b.boxCount} boxes
+                  {b.namedCount > 0 ? `, ${b.namedCount} described` : ""}
+                  {b.carCount > 0 ? ` · ${b.carCount} car(s)` : ""}
+                  {b.pageCount > 1 ? ` · ${b.pageCount} pages` : ""}
+                </div>
+                {b.typedNameIfDifferent ? (
+                  <div className="text-[10px] text-faint">
+                    uploaded as &ldquo;{b.typedNameIfDifferent}&rdquo;
                   </div>
-                  {b.typedNameIfDifferent ? (
-                    <div className="text-[10px] text-faint">
-                      uploaded as &ldquo;{b.typedNameIfDifferent}&rdquo;
-                    </div>
-                  ) : null}
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <Link
-                    href={`/setup-sheet-models/${b.modelId}/boxes`}
-                    className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
-                  >
-                    Name boxes
-                  </Link>
-                  <SetupSheetModelAuthorizeToggle modelId={b.modelId} isAuthorized={false} />
-                </div>
-              </li>
-            );
-          })}
+                ) : null}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Link
+                  href={`/setup-sheet-models/${b.modelId}`}
+                  className="rounded-md border border-border px-2 py-1 text-[11px] hover:bg-muted"
+                >
+                  Open
+                </Link>
+                <SetupSheetModelAuthorizeToggle modelId={b.modelId} isAuthorized={false} />
+              </div>
+            </li>
+          ))}
         </ReviewSection>
 
         {blanks.nameClashes.length > 0 ? (
@@ -295,7 +289,7 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
                         <li key={r.modelId} className="flex items-baseline gap-2 text-[10px]">
                           <span className="text-muted-foreground">{i === 0 ? "keep?" : "or"}</span>
                           <Link
-                            href={`/setup-sheet-models/${r.modelId}/boxes`}
+                            href={`/setup-sheet-models/${r.modelId}`}
                             className="truncate text-foreground hover:underline"
                           >
                             {r.boxCount} boxes · {r.carCount} car(s) ·{" "}

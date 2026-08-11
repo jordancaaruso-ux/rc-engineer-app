@@ -35,12 +35,19 @@ export type BlankQueueChassis = {
   pageCount: number;
   /** Boxes on the paper. Fixed at upload — a sheet is a sheet. */
   boxCount: number;
-  /** Boxes that now carry a real name rather than a position. This is the number that moves. */
+  /**
+   * Boxes that carry a real name rather than a position on the paper.
+   *
+   * Zero for every sheet read off a PDF, and that is not a chore waiting: describing boxes is what
+   * the calibration surface is for, and a driver's sheet is useful long before anyone has done it —
+   * they fill it, save it, compare it and see what changed, all keyed off the boxes themselves.
+   *
+   * It stays in the queue because it is the honest answer to "will authorizing this chassis add
+   * anything to the community numbers", which is keyed by named parameter and not by box.
+   */
   namedCount: number;
   carCount: number;
   isAuthorized: boolean;
-  /** Names drivers volunteered. Never applied automatically — see the schema note on the column. */
-  suggestionCount: number;
 };
 
 export type BlankQueueRefusal = {
@@ -73,7 +80,6 @@ type BlankRow = {
   chassisNameTyped: string;
   pageCount: number;
   statsJson: unknown;
-  boxNameSuggestionsJson: unknown;
   setupSheetModel: {
     id: string;
     name: string;
@@ -95,11 +101,6 @@ function boxAndNamedCount(row: BlankRow): { boxCount: number; namedCount: number
   return { boxCount: typeof stats?.parameterCount === "number" ? stats.parameterCount : 0, namedCount: 0 };
 }
 
-function suggestionCount(json: unknown): number {
-  if (!json || typeof json !== "object" || Array.isArray(json)) return 0;
-  return Object.keys(json as Record<string, unknown>).length;
-}
-
 function toChassis(row: BlankRow): BlankQueueChassis | null {
   const model = row.setupSheetModel;
   if (!model) return null;
@@ -117,7 +118,6 @@ function toChassis(row: BlankRow): BlankQueueChassis | null {
     namedCount,
     carCount: model._count.cars,
     isAuthorized: model.isAuthorized,
-    suggestionCount: suggestionCount(row.boxNameSuggestionsJson),
   };
 }
 
@@ -159,7 +159,6 @@ const BLANK_ROW_SELECT = {
   chassisNameTyped: true,
   pageCount: true,
   statsJson: true,
-  boxNameSuggestionsJson: true,
   setupSheetModel: {
     select: {
       id: true,
@@ -175,10 +174,11 @@ const BLANK_ROW_SELECT = {
 /**
  * Read the queue.
  *
- * `schemaJson` is pulled per row because "how many boxes still have no name" is the number that
- * says whether a chassis is ready, and only the live schema knows it — the derivation stats were
- * true the day the file arrived and never move again. That makes each row a few tens of kilobytes,
- * which is why `take` is small: this is a founder's working list, not a catalog.
+ * `schemaJson` is pulled per row because how many boxes are described is the number that says
+ * whether authorizing a chassis will add anything to the community numbers, and only the live
+ * schema knows it — the derivation stats were true the day the file arrived and never move again.
+ * That makes each row a few tens of kilobytes, which is why `take` is small: this is a founder's
+ * working list, not a catalog.
  */
 export async function loadBlankReviewQueue(take = 25): Promise<BlankReviewQueue> {
   const [fillable, refused] = await Promise.all([

@@ -17,7 +17,6 @@ function chassis(p: Partial<BlankQueueChassis> & { modelId: string }): BlankQueu
     namedCount: 0,
     carCount: 0,
     isAuthorized: false,
-    suggestionCount: 0,
     ...p,
   };
 }
