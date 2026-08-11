@@ -124,7 +124,7 @@ export function LogRunProgressRail({ sections }: { sections: RunProgressSection[
     "pointer-events-auto flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 " +
     "text-[11px] font-semibold font-sans leading-none whitespace-nowrap tap-active touch-manipulation " +
     "transition-transform duration-150 active:scale-95 focus-visible:outline focus-visible:outline-2 " +
-    "focus-visible:outline-offset-2 focus-visible:outline-primary";
+    "focus-visible:outline-offset-2 focus-visible:outline-primary-ink";
 
   return createPortal(
     <div
@@ -169,7 +169,7 @@ export function LogRunProgressRail({ sections }: { sections: RunProgressSection[
                 ) : (
                   <span
                     aria-hidden
-                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#4FD089] shadow-[0_0_6px_rgba(79,208,137,0.5)]"
+                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-gain shadow-[0_0_6px_rgba(79,208,137,0.5)]"
                   />
                 )
               ) : null}
@@ -188,7 +188,7 @@ export function LogRunProgressRail({ sections }: { sections: RunProgressSection[
 
         {allRequiredDone ? (
           <span
-            className="run-rail-pop pointer-events-none flex shrink-0 items-center gap-1 rounded-full border border-[#4FD089]/35 bg-[#4FD089]/[0.08] px-2.5 py-1.5 font-mono text-[10px] font-medium leading-none text-[#4FD089]"
+            className="run-rail-pop pointer-events-none flex shrink-0 items-center gap-1 rounded-full border border-gain/35 bg-gain/[0.08] px-2.5 py-1.5 font-mono text-[10px] font-medium leading-none text-gain"
             role="status"
           >
             <span aria-hidden>🏁</span> ready

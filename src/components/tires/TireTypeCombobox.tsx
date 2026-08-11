@@ -287,7 +287,7 @@ export function TireTypeCombobox({
                 key={s.id}
                 type="button"
                 onClick={() => adopt(s)}
-                className="tap-active rounded-md border border-primary/40 px-2.5 py-1.5 text-[12px] text-primary hover:bg-muted/50"
+                className="tap-active rounded-md border border-primary-ink/40 px-2.5 py-1.5 text-[12px] text-primary-ink hover:bg-muted/50"
               >
                 {s.displayName}
               </button>
@@ -348,7 +348,7 @@ export function TireTypeCombobox({
                 <button
                   type="button"
                   onClick={() => beginCreate(q)}
-                  className="tap-active rounded-md border border-primary/40 px-3 py-2 text-[13px] font-semibold text-primary hover:bg-muted/50"
+                  className="tap-active rounded-md border border-primary-ink/40 px-3 py-2 text-[13px] font-semibold text-primary-ink hover:bg-muted/50"
                 >
                   {q ? `Add “${q}”` : "Add a tire type"}
                 </button>
@@ -361,7 +361,7 @@ export function TireTypeCombobox({
                 <button
                   type="button"
                   onClick={() => beginCreate(q)}
-                  className="tap-active w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-primary hover:bg-muted/60"
+                  className="tap-active w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-primary-ink hover:bg-muted/60"
                 >
                   {/* Neutral wording even mid-search: a half-typed "con" is a
                       filter, not a name, and offering to create it as one invites

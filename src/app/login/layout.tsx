@@ -30,8 +30,8 @@ export default async function LoginLayout({ children }: { children: ReactNode })
           className="mx-auto max-w-lg px-4 pt-6 text-left text-sm text-foreground"
           role="status"
         >
-          <div className="rounded-lg border border-primary/50 bg-primary/10 px-4 py-3">
-            <p className="font-semibold text-primary">Auth URL mismatch</p>
+          <div className="rounded-lg border border-primary-ink/50 bg-primary/10 px-4 py-3">
+            <p className="font-semibold text-primary-ink">Auth URL mismatch</p>
             <p className="mt-2 text-muted-foreground">{mismatchBanner}</p>
           </div>
         </div>

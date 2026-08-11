@@ -140,7 +140,7 @@ function RunHistoryActionButtons({
             title="Tire prep for this run"
             className={cn(
               "inline-flex shrink-0 items-center justify-center rounded-md transition",
-              tirePrepOpen && "bg-accent/10 ring-1 ring-accent/50",
+              tirePrepOpen && "bg-accent/10 ring-1 ring-primary-ink/50",
               !tirePrepOpen && "hover:bg-muted/80"
             )}
           >

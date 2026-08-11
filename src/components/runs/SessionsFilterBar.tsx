@@ -293,7 +293,7 @@ function ScopeSegment({
             >
               <User className="size-4 shrink-0 text-muted-foreground" strokeWidth={2} aria-hidden />
               <span className="min-w-0 truncate">My sessions</span>
-              {!scopeIsTeam ? <Check className="ml-auto size-4 shrink-0 text-primary" strokeWidth={2.5} aria-hidden /> : null}
+              {!scopeIsTeam ? <Check className="ml-auto size-4 shrink-0 text-primary-ink" strokeWidth={2.5} aria-hidden /> : null}
             </button>
             {hasTeams ? (
               teams.map((t) => {
@@ -309,7 +309,7 @@ function ScopeSegment({
                   >
                     <Users className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.9} aria-hidden />
                     <span className="min-w-0 truncate">{t.name}</span>
-                    {active ? <Check className="ml-auto size-4 shrink-0 text-primary" strokeWidth={2.5} aria-hidden /> : null}
+                    {active ? <Check className="ml-auto size-4 shrink-0 text-primary-ink" strokeWidth={2.5} aria-hidden /> : null}
                   </button>
                 );
               })

@@ -207,7 +207,7 @@ export function MylapsLinkSection() {
         <p
           className={cn(
             "text-[11px]",
-            messageOk ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+            messageOk ? "text-emerald-600 dark:text-emerald-400" : "text-warning"
           )}
         >
           {message}

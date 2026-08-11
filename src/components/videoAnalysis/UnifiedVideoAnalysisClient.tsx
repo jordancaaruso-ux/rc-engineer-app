@@ -720,7 +720,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
                                 : isCompare
                                   ? "border-amber-500/60 bg-amber-500/15"
                                   : isSelected
-                                    ? "border-primary bg-primary/15"
+                                    ? "border-primary-ink bg-primary/15"
                                     : "border-transparent hover:bg-muted/50"
                             }`}
                             onClick={() => onLapClick(col, lap.lapNumber)}
@@ -763,7 +763,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
             </p>
           )}
           {ghostCompareActive && (
-            <p className="text-[10px] text-amber-600 dark:text-amber-400">
+            <p className="text-[10px] text-warning">
               Overlay: {compareSlotLabel(session, col0, compareLap0)} vs{" "}
               {compareSlotLabel(session, col1, compareLap1)}
             </p>

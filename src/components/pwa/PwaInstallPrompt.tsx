@@ -190,7 +190,7 @@ function ShareIcon(): React.ReactNode {
       height="18"
       viewBox="0 0 24 24"
       fill="none"
-      className="shrink-0 text-primary"
+      className="shrink-0 text-primary-ink"
       aria-hidden="true"
     >
       <path

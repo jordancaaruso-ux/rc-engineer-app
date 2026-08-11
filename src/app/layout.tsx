@@ -4,6 +4,8 @@ import { Sora, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 
 import Script from "next/script";
 
+import { cookies } from "next/headers";
+
 import "./globals.css";
 
 import type { ReactNode } from "react";
@@ -29,6 +31,8 @@ import { TimeZoneCookieSync } from "@/components/layout/TimeZoneCookieSync";
 import { PWA_SPLASH_MARK_SVG } from "@/lib/pwa/splashMark";
 
 import { RC_TIMEZONE_COOKIE } from "@/lib/rcTimeZoneCookie";
+
+import { PAGE_BG, RC_THEME_COOKIE, parseTheme } from "@/lib/theme/themeCookie";
 
 import { PERF_ENABLED } from "@/lib/perf/perfConfig";
 
@@ -119,7 +123,28 @@ export const metadata: Metadata = {
 
  */
 
-export const viewport: Viewport = {
+/*
+ * `generateViewport` rather than a static `viewport`, purely so `themeColor` can
+ * follow the chosen theme — the browser's own chrome (Safari's toolbar, the
+ * Android status bar) paints from this tag, and a charcoal bar above a paper page
+ * is the most visible seam a half-done theme has.
+ *
+ * The root layout is already per-request (it awaits `auth()`), so reading a cookie
+ * here costs nothing extra.
+ *
+ * NOT covered by this: `manifest.ts`, `capacitor.config.ts`, `public/offline.html`
+ * and the iOS `Splash.imageset`. Those are build-time assets that paint before the
+ * document exists, so an installed launch shows the charcoal splash whichever theme
+ * is set. That is a deliberate limit of a per-device cookie, not an oversight —
+ * making it follow would mean a themed manifest per user, and the splash is on
+ * screen for a few hundred milliseconds.
+ */
+export async function generateViewport(): Promise<Viewport> {
+  const theme = parseTheme((await cookies()).get(RC_THEME_COOKIE)?.value);
+  return { ...baseViewport, themeColor: PAGE_BG[theme] };
+}
+
+const baseViewport: Viewport = {
 
   width: "device-width",
 
@@ -145,9 +170,7 @@ export const viewport: Viewport = {
 
   viewportFit: "cover",
 
-  // Ash warm — matches `--page-bg-base` in globals.css so browser chrome and the
-  // page read as one surface. Move both together.
-  themeColor: "#1B1A17",
+  // themeColor is set per-request in `generateViewport` above, from PAGE_BG.
 
 };
 
@@ -164,11 +187,22 @@ export default async function RootLayout({
 
   const session = await perfSpan("auth", () => auth());
 
+  /*
+   * Stamped on the server, so the very first byte of HTML already carries the
+   * theme and there is no flash. A client-side read (localStorage in an effect,
+   * or a bootstrap <script>) would repaint after hydration on every navigation —
+   * the same trap the PWA standalone bootstrap avoids by running
+   * `beforeInteractive`, except a cookie lets us skip the script entirely.
+   */
+  const theme = parseTheme((await cookies()).get(RC_THEME_COOKIE)?.value);
+
   return (
 
     <html
 
       lang="en"
+
+      data-theme={theme}
 
       className={`${sora.variable} ${spaceGrotesk.variable} ${jetBrainsMono.variable}`}
 

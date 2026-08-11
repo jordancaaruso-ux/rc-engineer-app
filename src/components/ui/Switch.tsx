@@ -35,7 +35,7 @@ export function Switch({
       }}
       className={cn(
         "relative inline-flex h-6 w-[42px] shrink-0 items-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-        checked ? "border-primary bg-primary" : "border-border bg-muted",
+        checked ? "border-primary-ink bg-primary" : "border-border bg-muted",
         disabled && "opacity-50",
         className
       )}

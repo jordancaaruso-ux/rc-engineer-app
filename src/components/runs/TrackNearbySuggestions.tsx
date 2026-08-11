@@ -25,7 +25,7 @@ export function TrackNearbySuggestions({
             className="flex min-h-7 items-center gap-1 rounded-lg border border-border bg-secondary px-2.5 text-[11px] font-medium text-foreground transition hover:bg-muted"
           >
             {s.isFavourite ? (
-              <span className="text-primary" aria-hidden>
+              <span className="text-primary-ink" aria-hidden>
                 ★
               </span>
             ) : null}

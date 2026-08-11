@@ -51,9 +51,9 @@ function RowBody({
         className={cn(
           "grid size-6 shrink-0 place-items-center rounded-full border",
           done
-            ? "border-primary bg-primary text-primary-foreground"
+            ? "border-primary-ink bg-primary text-primary-foreground"
             : tone === "required"
-              ? "border-primary/60 text-primary"
+              ? "border-primary-ink/60 text-primary-ink"
               : "border-border text-muted-foreground"
         )}
       >
@@ -150,9 +150,9 @@ export function DashboardGetSetUpCard({ hasCar, hasTimingIdentity, hasSetup, set
     );
 
   return (
-    <CardPanel className="border-primary/30">
+    <CardPanel className="border-primary-ink/30">
       <div className="flex items-center gap-2">
-        <Eyebrow className={hasCar ? "text-primary" : undefined}>
+        <Eyebrow className={hasCar ? "text-primary-ink" : undefined}>
           {hasCar ? "Ready to run" : "Get set up"}
         </Eyebrow>
         <button

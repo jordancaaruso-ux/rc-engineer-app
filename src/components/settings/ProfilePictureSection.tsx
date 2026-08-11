@@ -118,7 +118,7 @@ export function ProfilePictureSection({
           <button
             type="button"
             disabled={busy !== null}
-            className="rounded-md border border-primary/50 bg-primary/10 px-3 py-1.5 text-sm text-primary hover:bg-primary/20 disabled:opacity-50"
+            className="rounded-md border border-primary-ink/50 bg-primary/10 px-3 py-1.5 text-sm text-primary-ink hover:bg-primary/20 disabled:opacity-50"
             onClick={() => inputRef.current?.click()}
           >
             {busy === "upload" ? "Uploading…" : image ? "Change photo" : "Upload photo"}
@@ -142,7 +142,7 @@ export function ProfilePictureSection({
         className="hidden"
         onChange={(e) => void onPick(e)}
       />
-      {error ? <p className="mt-3 text-xs text-primary">{error}</p> : null}
+      {error ? <p className="mt-3 text-xs text-primary-ink">{error}</p> : null}
     </CardPanel>
   );
 }

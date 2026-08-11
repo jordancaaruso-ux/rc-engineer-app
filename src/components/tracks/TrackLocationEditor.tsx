@@ -136,7 +136,7 @@ export function TrackLocationEditor({
           type="button"
           disabled={busy || !coordsPaste.trim()}
           className={cn(
-            "rounded-md border border-accent bg-accent/15 px-3 py-1.5 text-xs font-medium hover:bg-accent/25 transition",
+            "rounded-md border border-primary-ink bg-accent/15 px-3 py-1.5 text-xs font-medium hover:bg-accent/25 transition",
             (busy || !coordsPaste.trim()) && "opacity-60 pointer-events-none"
           )}
           onClick={() => void savePaste()}

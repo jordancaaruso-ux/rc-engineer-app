@@ -44,7 +44,7 @@ export function BetweenRunRecentSessionsThings({
               key={s.runId}
               className={cn(
                 "rounded-lg border border-border bg-card/70 px-3 py-2 text-[11px] leading-snug",
-                idx === 0 && "ring-1 ring-primary/25"
+                idx === 0 && "ring-1 ring-primary-ink/25"
               )}
             >
               <div className="font-medium text-foreground/95">{s.displayLabel}</div>

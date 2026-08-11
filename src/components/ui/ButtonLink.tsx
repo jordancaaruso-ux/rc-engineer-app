@@ -6,7 +6,7 @@ const primaryClass =
   "primary-action-chip tap-active inline-flex items-center justify-center rounded-lg bg-primary px-2.5 py-1.5 text-xs font-bold text-primary-foreground shadow-glow-sm transition hover:brightness-105 active:brightness-95";
 
 const outlineClass =
-  "tap-active inline-flex items-center justify-center rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:border-accent/40 hover:bg-muted/60";
+  "tap-active inline-flex items-center justify-center rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:border-primary-ink/40 hover:bg-muted/60";
 
 /** Same visual as `ButtonLink` primary — use on native `<button>`. */
 export function primaryButtonClassName(className?: string) {

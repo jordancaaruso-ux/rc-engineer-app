@@ -34,8 +34,8 @@ import {
 import { compareCarsFromManualSession } from "@/lib/videoAnalysis/manualCompareAdapter";
 import { SectorClipPlayer } from "@/components/videoAnalysis/SectorClipPlayer";
 
-const GAIN_TEXT = "text-[#4FD089]";
-const GAIN_BG = "bg-[#4FD089]";
+const GAIN_TEXT = "text-gain";
+const GAIN_BG = "bg-gain";
 const LOSS_TEXT = "text-destructive";
 const LOSS_BG = "bg-destructive";
 
@@ -236,12 +236,12 @@ export function LapComparePanel({
           <span className="min-w-0 truncate text-[12px] font-semibold tracking-tight">
             {job.profileName}
           </span>
-          <span className="rounded-md border border-[#4FD089]/25 bg-[#4FD089]/10 px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-[0.18em] text-[#4FD089]">
+          <span className="rounded-md border border-gain/25 bg-gain/10 px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-[0.18em] text-gain">
             Analyzed
           </span>
           <Link
             href={`/videos/analysis/jobs/${encodeURIComponent(job.id)}`}
-            className="ml-auto shrink-0 text-[11px] font-bold text-primary no-underline hover:underline"
+            className="ml-auto shrink-0 text-[11px] font-bold text-primary-ink no-underline hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
             Open session
@@ -257,7 +257,7 @@ export function LapComparePanel({
           </span>
           <Link
             href={`/videos/analysis/jobs/${encodeURIComponent(job.id)}`}
-            className="ml-auto shrink-0 text-[11px] font-bold text-primary no-underline hover:underline"
+            className="ml-auto shrink-0 text-[11px] font-bold text-primary-ink no-underline hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
             Continue
@@ -537,14 +537,14 @@ export function LapComparePanel({
                     className={cn(
                       "rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em]",
                       gained
-                        ? "border-[#4FD089]/25 bg-[#4FD089]/10 text-[#4FD089]"
+                        ? "border-gain/25 bg-gain/10 text-gain"
                         : "border-destructive/25 bg-destructive/10 text-destructive"
                     )}
                   >
                     {gained ? "Gained" : "Lost"} {Math.abs(seg.deltaSec).toFixed(2)}s
                   </span>
                   {d.videoUrl ? (
-                    <span className="ml-auto inline-flex items-center gap-1 text-[10.5px] font-bold text-primary">
+                    <span className="ml-auto inline-flex items-center gap-1 text-[10.5px] font-bold text-primary-ink">
                       <Play className="h-2.5 w-2.5" aria-hidden />
                       Watch both laps
                     </span>

@@ -166,7 +166,7 @@ export function SetupCalibrationModelSidebar(props: {
   return (
     <div className="space-y-3 text-xs">
       {armedField ? (
-        <CardPanel className="border-accent/60 bg-accent/10" contentClassName="p-3">
+        <CardPanel className="border-primary-ink/60 bg-accent/10" contentClassName="p-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-foreground">
@@ -191,7 +191,7 @@ export function SetupCalibrationModelSidebar(props: {
             <>
               <p className="mt-2 text-[11px] text-foreground">
                 Click the box for{" "}
-                <span className="font-semibold text-primary">{nextOption?.label ?? "—"}</span>
+                <span className="font-semibold text-primary-ink">{nextOption?.label ?? "—"}</span>
               </p>
               <div className="mt-2 flex flex-wrap gap-1">
                 {armedOptions.map((o, i) => {
@@ -203,7 +203,7 @@ export function SetupCalibrationModelSidebar(props: {
                       className={cn(
                         "rounded border px-2 py-0.5 text-[10px]",
                         done && "border-emerald-500/40 bg-emerald-500/10 text-emerald-200",
-                        current && "border-accent/70 bg-accent/20 text-foreground",
+                        current && "border-primary-ink/70 bg-accent/20 text-foreground",
                         !done && !current && "border-border text-muted-foreground"
                       )}
                     >
@@ -233,7 +233,7 @@ export function SetupCalibrationModelSidebar(props: {
                 key={f}
                 type="button"
                 className={`rounded border px-2 py-0.5 text-[10px] capitalize ${
-                  filter === f ? "border-accent/60 bg-accent/10" : "border-border"
+                  filter === f ? "border-primary-ink/60 bg-accent/10" : "border-border"
                 }`}
                 onClick={() => setFilter(f)}
               >
@@ -273,7 +273,7 @@ export function SetupCalibrationModelSidebar(props: {
                         className={cn(
                           "rounded-lg border transition-colors",
                           isArmed
-                            ? "border-accent/70 bg-accent/15"
+                            ? "border-primary-ink/70 bg-accent/15"
                             : row.mapped
                               ? "border-emerald-500/25"
                               : "border-border/60"
@@ -396,7 +396,7 @@ export function SetupCalibrationModelSidebar(props: {
                   key={k}
                   type="button"
                   className={`rounded border px-2 py-1 text-[10px] ${
-                    addKind === k ? "border-accent/60 bg-accent/10 text-foreground" : "border-border text-muted-foreground"
+                    addKind === k ? "border-primary-ink/60 bg-accent/10 text-foreground" : "border-border text-muted-foreground"
                   }`}
                   onClick={() => setAddKind(k)}
                 >
@@ -416,7 +416,7 @@ export function SetupCalibrationModelSidebar(props: {
             <div className="flex gap-2">
               <button
                 type="button"
-                className="flex-1 rounded border border-accent/60 bg-accent/15 px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                className="flex-1 rounded border border-primary-ink/60 bg-accent/15 px-3 py-1.5 text-xs font-medium disabled:opacity-50"
                 onClick={() => void submitNewParameter()}
                 disabled={addBusy || !addLabel.trim()}
               >
@@ -451,7 +451,7 @@ export function SetupCalibrationModelSidebar(props: {
               className={cn(
                 "block rounded border px-3 py-1.5 text-center text-xs font-medium",
                 allMapped
-                  ? "border-accent/60 bg-accent/15 text-foreground"
+                  ? "border-primary-ink/60 bg-accent/15 text-foreground"
                   : "border-border text-muted-foreground hover:bg-muted"
               )}
             >

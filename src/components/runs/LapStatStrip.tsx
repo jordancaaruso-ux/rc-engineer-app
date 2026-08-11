@@ -195,7 +195,7 @@ export function StatWellCell({
         className={cn(
           base,
           "w-full transition-colors hover:bg-muted/40 active:bg-muted/60",
-          expanded && "bg-primary/5 ring-1 ring-inset ring-primary/40"
+          expanded && "bg-primary/5 ring-1 ring-inset ring-primary-ink/40"
         )}
       >
         {body}

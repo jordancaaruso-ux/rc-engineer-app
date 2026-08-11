@@ -183,7 +183,7 @@ export function SetupAggregationsDebugClient(props: { initialCars: CarRow[] }) {
         </button>
         <button
           type="button"
-          className="rounded-md border border-primary bg-primary/90 px-3 py-1.5 text-sm text-primary-foreground"
+          className="rounded-md border border-primary-ink bg-primary/90 px-3 py-1.5 text-sm text-primary-foreground"
           disabled={rebuilding}
           onClick={() => void rebuild()}
         >

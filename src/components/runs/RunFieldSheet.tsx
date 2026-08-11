@@ -202,7 +202,7 @@ export function RunFieldSheet({
                   title="Finishing position — most laps, then lowest total time"
                   className={cn(
                     "table-col-header transition-colors",
-                    sortKey === "position" ? "text-primary" : "hover:text-foreground"
+                    sortKey === "position" ? "text-primary-ink" : "hover:text-foreground"
                   )}
                 >
                   P
@@ -224,7 +224,7 @@ export function RunFieldSheet({
                     title={col.title}
                     className={cn(
                       "table-col-header whitespace-nowrap transition-colors",
-                      sortKey === col.key ? "text-primary" : "hover:text-foreground"
+                      sortKey === col.key ? "text-primary-ink" : "hover:text-foreground"
                     )}
                   >
                     {col.label}
@@ -260,7 +260,7 @@ export function RunFieldSheet({
                   <td
                     className={cn(
                       "py-1 pl-1 font-mono text-[10px] tabular-nums",
-                      row.isUser ? "text-primary" : "text-faint"
+                      row.isUser ? "text-primary-ink" : "text-faint"
                     )}
                   >
                     {row.eligible ? row.position : "—"}
@@ -269,7 +269,7 @@ export function RunFieldSheet({
                     className={cn(
                       "max-w-[6.5rem] truncate py-1 pl-1 text-[12px] font-medium tracking-tight",
                       row.isUser
-                        ? "text-primary"
+                        ? "text-primary-ink"
                         : row.eligible
                           ? "text-foreground"
                           : "text-faint"
@@ -285,7 +285,7 @@ export function RunFieldSheet({
                         "inline-block rounded px-1 py-px",
                         // Purple = fastest lap of the session, matching the best-lap
                         // chip in the lap grid — including when it's yours.
-                        isSessionBest && "text-[#A78BFA]",
+                        isSessionBest && "text-[rgb(var(--color-best-lap))]",
                         !row.eligible && "text-faint"
                       )}
                       style={timeCellStyle(row.bestLap, you?.bestLap ?? null, row.isUser)}

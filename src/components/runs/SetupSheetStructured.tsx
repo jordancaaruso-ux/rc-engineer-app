@@ -211,9 +211,9 @@ function SetupFieldJumpSearch({
     const el = root.querySelector(`[data-setup-field-key="${CSS.escape(key)}"]`) as HTMLElement | null;
     if (!el) return;
     el.scrollIntoView({ block: "center", behavior: "smooth" });
-    el.classList.add("ring-2", "ring-accent/70", "rounded-sm");
+    el.classList.add("ring-2", "ring-primary-ink/70", "rounded-sm");
     window.setTimeout(() => {
-      el.classList.remove("ring-2", "ring-accent/70", "rounded-sm");
+      el.classList.remove("ring-2", "ring-primary-ink/70", "rounded-sm");
     }, 1400);
     setOpen(false);
     setQ("");
@@ -237,7 +237,7 @@ function SetupFieldJumpSearch({
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => window.setTimeout(() => setOpen(false), 180)}
-        className="w-full max-w-md rounded-md border border-border bg-surface-runna-inset px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-accent/50"
+        className="w-full max-w-md rounded-md border border-border bg-surface-runna-inset px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-primary-ink/50"
       />
       <AnchoredMenu open={open && filtered.length > 0} anchorRef={inputRef}>
         <ul
@@ -612,7 +612,7 @@ function OptionSquareFieldDisplay({
           const selectedChip =
             chipAccent === "rose"
               ? "border-destructive/90 bg-destructive/25 text-foreground"
-              : "border-primary/90 bg-primary/25 text-foreground";
+              : "border-primary-ink/90 bg-primary/25 text-foreground";
           return (
             <button
               key={opt}
@@ -716,7 +716,7 @@ function PresetWithOtherChipEditor({
       placeholder="Custom / notes (optional)"
       className={cn(
         "mt-1 w-full rounded border border-border/60 bg-surface-runna/40 px-2 py-1 text-xs font-mono tabular-nums font-medium outline-none placeholder:text-muted-foreground/70",
-        otherFocused && "bg-surface-runna-inset ring-1 ring-accent/40",
+        otherFocused && "bg-surface-runna-inset ring-1 ring-primary-ink/40",
         readOnly && "cursor-default border-transparent bg-transparent opacity-90"
       )}
       value={otherFocused ? localOther : otherRaw}
@@ -837,7 +837,7 @@ function LegacyCompanionOtherChipEditor({
         ref={otherInputRef}
         className={cn(
           "w-full rounded bg-transparent px-2 py-1 text-sm font-mono tabular-nums font-semibold outline-none",
-          otherFocused && "bg-surface-runna-inset ring-1 ring-accent/40"
+          otherFocused && "bg-surface-runna-inset ring-1 ring-primary-ink/40"
         )}
         value={otherFocused ? localOther : otherRawLegacy}
         onFocus={() => {
@@ -886,7 +886,7 @@ function LegacyCompanionOtherChipEditor({
           ref={otherInputRef}
           className={cn(
             "w-full rounded bg-transparent px-2 py-1 text-sm font-mono tabular-nums font-semibold outline-none",
-            otherFocused && "bg-surface-runna-inset ring-1 ring-accent/40"
+            otherFocused && "bg-surface-runna-inset ring-1 ring-primary-ink/40"
           )}
           value={otherFocused ? localOther : otherRawLegacy}
           onFocus={() => {
@@ -1155,7 +1155,7 @@ function EditableSingle({
                 type="button"
                 className={cn(
                   "rounded-md border border-border bg-surface-runna-inset px-2 py-1 text-[11px] font-mono tabular-nums font-semibold",
-                  getBoolFromSetupString(vRaw) && "border-accent/60 bg-accent/10"
+                  getBoolFromSetupString(vRaw) && "border-primary-ink/60 bg-accent/10"
                 )}
                 onClick={() => onCommit(fieldKey, getBoolFromSetupString(vRaw) ? "" : "1")}
               >
@@ -1296,7 +1296,7 @@ function EditableSingle({
               ref={textareaRef}
               className={cn(
                 "min-h-[2.5rem] w-full resize-y rounded bg-transparent px-2 py-1 text-xs font-mono tabular-nums font-semibold outline-none",
-                "bg-surface-runna-inset ring-1 ring-accent/40"
+                "bg-surface-runna-inset ring-1 ring-primary-ink/40"
               )}
               rows={2}
               value={local}
@@ -1325,7 +1325,7 @@ function EditableSingle({
               ref={textareaRef}
               className={cn(
                 "min-h-[2.5rem] w-full resize-y rounded bg-transparent px-2 py-1 text-xs font-mono tabular-nums font-semibold outline-none",
-                focused && "bg-surface-runna-inset ring-1 ring-accent/40"
+                focused && "bg-surface-runna-inset ring-1 ring-primary-ink/40"
               )}
               rows={2}
               value={focused ? local : v}
@@ -1345,7 +1345,7 @@ function EditableSingle({
             ref={inputRef}
             className={cn(
               "w-full rounded bg-transparent px-2 py-1 text-sm font-mono tabular-nums font-semibold outline-none",
-              "bg-surface-runna-inset ring-1 ring-accent/40"
+              "bg-surface-runna-inset ring-1 ring-primary-ink/40"
             )}
             value={local}
             onBlur={() => {
@@ -1374,7 +1374,7 @@ function EditableSingle({
             ref={inputRef}
             className={cn(
               "w-full rounded bg-transparent px-2 py-1 text-sm font-mono tabular-nums font-semibold outline-none",
-              focused && "bg-surface-runna-inset ring-1 ring-accent/40"
+              focused && "bg-surface-runna-inset ring-1 ring-primary-ink/40"
             )}
             value={focused ? local : v}
             onFocus={() => {
@@ -1500,7 +1500,7 @@ function PairSideCell({
               type="button"
               className={cn(
                 "rounded border border-border bg-surface-runna-inset px-1.5 py-0.5 text-[11px] font-mono tabular-nums font-semibold",
-                getBoolFromSetupString(vRaw) && "border-accent/60 bg-accent/10"
+                getBoolFromSetupString(vRaw) && "border-primary-ink/60 bg-accent/10"
               )}
               onClick={() => onCommit(fieldKey, getBoolFromSetupString(vRaw) ? "" : "1")}
             >
@@ -1573,7 +1573,7 @@ function PairSideCell({
           ref={inputRef}
           className={cn(
             "w-full min-w-0 rounded bg-transparent text-sm font-mono tabular-nums font-semibold outline-none",
-            "bg-surface-runna-inset ring-1 ring-accent/40"
+            "bg-surface-runna-inset ring-1 ring-primary-ink/40"
           )}
           value={local}
           onBlur={() => {
@@ -1601,7 +1601,7 @@ function PairSideCell({
           ref={inputRef}
           className={cn(
             "w-full min-w-0 rounded bg-transparent text-sm font-mono tabular-nums font-semibold outline-none",
-            focused && "bg-surface-runna-inset ring-1 ring-accent/40"
+            focused && "bg-surface-runna-inset ring-1 ring-primary-ink/40"
           )}
           value={focused ? local : v}
           onFocus={() => {
@@ -1883,7 +1883,7 @@ function CornerCell({
           ref={inputRef}
           className={cn(
             "w-full min-w-0 rounded bg-transparent text-sm font-mono tabular-nums font-semibold outline-none",
-            "bg-surface-runna-inset ring-1 ring-accent/40"
+            "bg-surface-runna-inset ring-1 ring-primary-ink/40"
           )}
           value={local}
           onBlur={() => {
@@ -1911,7 +1911,7 @@ function CornerCell({
           ref={inputRef}
           className={cn(
             "w-full min-w-0 rounded bg-transparent text-sm font-mono tabular-nums font-semibold outline-none",
-            focused && "bg-surface-runna-inset ring-1 ring-accent/40"
+            focused && "bg-surface-runna-inset ring-1 ring-primary-ink/40"
           )}
           value={focused ? local : value}
           onFocus={() => {

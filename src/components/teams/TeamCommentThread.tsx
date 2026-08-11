@@ -169,7 +169,7 @@ export function TeamCommentThread({
             <span className="type-timestamp">Replying in thread</span>
             <button
               type="button"
-              className="type-timestamp text-accent underline underline-offset-2"
+              className="type-timestamp text-primary-ink underline underline-offset-2"
               onClick={() => setReplyTo(null)}
             >
               Cancel
@@ -178,7 +178,7 @@ export function TeamCommentThread({
         ) : null}
         <div className="flex items-end gap-2">
           <textarea
-            className="min-h-9 flex-1 resize-y rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-ring"
+            className="min-h-9 flex-1 resize-y rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-primary-ink/40 focus:outline-none focus:ring-1 focus:ring-ring"
             rows={1}
             maxLength={COMMENT_MAX_LENGTH}
             placeholder="Add what you saw…"
@@ -240,7 +240,7 @@ function CommentRow({
       ) : isEditing ? (
         <div className="mt-1 flex items-end gap-2">
           <textarea
-            className="min-h-9 flex-1 resize-y rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-[13px] text-foreground focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-ring"
+            className="min-h-9 flex-1 resize-y rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-[13px] text-foreground focus:border-primary-ink/40 focus:outline-none focus:ring-1 focus:ring-ring"
             rows={2}
             maxLength={COMMENT_MAX_LENGTH}
             value={editDraft}

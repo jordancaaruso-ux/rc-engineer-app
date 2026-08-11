@@ -167,7 +167,7 @@ export function EngineerFeedbackAdminSection() {
         <button
           type="button"
           onClick={() => void loadMore()}
-          className="text-xs text-primary hover:underline"
+          className="text-xs text-primary-ink hover:underline"
         >
           Load more{cursor ? "…" : ""}
         </button>

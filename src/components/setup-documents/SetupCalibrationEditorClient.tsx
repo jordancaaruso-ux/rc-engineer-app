@@ -2700,7 +2700,7 @@ export function SetupCalibrationEditorClient({
               </button>
               <button
                 type="button"
-                className="rounded-md border border-accent/60 bg-accent/10 px-3 py-1.5 text-xs hover:bg-accent/20 disabled:opacity-60"
+                className="rounded-md border border-primary-ink/60 bg-accent/10 px-3 py-1.5 text-xs hover:bg-accent/20 disabled:opacity-60"
                 onClick={saveAsNewVersion}
                 disabled={savingAsNew || saving}
               >
@@ -2731,7 +2731,7 @@ export function SetupCalibrationEditorClient({
             >
               {attachListOpen ? "Close picker" : documentId ? "Change…" : "Link PDF…"}
             </button>
-            <Link href="/setup-documents" className="text-xs text-accent hover:text-accent/80">
+            <Link href="/setup-documents" className="text-xs text-primary-ink hover:text-primary-ink/80">
               Upload PDF
             </Link>
           </div>
@@ -2742,7 +2742,7 @@ export function SetupCalibrationEditorClient({
               ) : attachCandidates.length === 0 ? (
                 <div className="text-muted-foreground">
                   No PDFs found.{" "}
-                  <Link href="/setup-documents" className="text-accent hover:text-accent/80">
+                  <Link href="/setup-documents" className="text-primary-ink hover:text-primary-ink/80">
                     Upload one
                   </Link>{" "}
                   (bulk-import PDFs are included here).

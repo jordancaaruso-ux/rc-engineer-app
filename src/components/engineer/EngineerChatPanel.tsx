@@ -1369,7 +1369,7 @@ export function EngineerChatPanel({
 
                       onClick={() => void sendText(choice)}
 
-                      className="tap-active rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-xs text-foreground transition hover:border-primary/60 hover:bg-muted/70"
+                      className="tap-active rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-xs text-foreground transition hover:border-primary-ink/60 hover:bg-muted/70"
 
                     >
 

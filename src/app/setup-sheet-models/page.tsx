@@ -194,7 +194,7 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
                         Default calibration:{" "}
                         <Link
                           href={`/setup-calibrations/${m.defaultCalibration.id}`}
-                          className="text-accent hover:underline"
+                          className="text-primary-ink hover:underline"
                         >
                           {m.defaultCalibration.name}
                         </Link>

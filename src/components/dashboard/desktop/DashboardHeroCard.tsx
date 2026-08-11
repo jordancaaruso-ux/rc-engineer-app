@@ -197,7 +197,7 @@ function DeltaChip({ seconds }: { seconds: number }) {
     <span
       className={cn(
         "rounded-md px-2.5 py-1 font-mono text-[13px] font-bold tabular-nums",
-        faster ? "bg-[#4FD089]/[.12] text-[#4FD089]" : "bg-destructive/[.12] text-destructive",
+        faster ? "bg-gain/[.12] text-gain" : "bg-destructive/[.12] text-destructive",
       )}
     >
       {faster ? "▼" : "▲"} {Math.abs(seconds).toFixed(3)}

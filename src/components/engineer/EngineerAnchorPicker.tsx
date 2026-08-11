@@ -86,7 +86,7 @@ export function EngineerAnchorPicker({
               className={cn(
                 "tap-active rounded-full border px-2 py-0.5 text-[11px] transition",
                 carFilter === car.carId
-                  ? "border-primary/60 bg-primary/10 text-foreground"
+                  ? "border-primary-ink/60 bg-primary/10 text-foreground"
                   : "border-border bg-muted/30 text-muted-foreground hover:text-foreground"
               )}
             >
@@ -142,7 +142,7 @@ export function EngineerAnchorPicker({
                     onClick={() => onPickCompare(c)}
                     aria-label={`Compare ${c.label} against the pinned run`}
                     title="Compare against the pinned run"
-                    className="tap-active my-0.5 shrink-0 rounded-md border border-border px-1.5 text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
+                    className="tap-active my-0.5 shrink-0 rounded-md border border-border px-1.5 text-muted-foreground transition hover:border-primary-ink/60 hover:text-foreground"
                   >
                     <GitCompareArrows className="size-3.5" strokeWidth={2} aria-hidden />
                   </button>
@@ -153,7 +153,7 @@ export function EngineerAnchorPicker({
                     onClick={() => onPickSetupCombo(c)}
                     aria-label={`Test ${c.label} against the pinned run`}
                     title="Test this saved setup against the pinned run"
-                    className="tap-active my-0.5 shrink-0 rounded-md border border-border px-1.5 text-[10px] font-semibold text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
+                    className="tap-active my-0.5 shrink-0 rounded-md border border-border px-1.5 text-[10px] font-semibold text-muted-foreground transition hover:border-primary-ink/60 hover:text-foreground"
                   >
                     vs run
                   </button>

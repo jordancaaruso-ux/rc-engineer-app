@@ -46,7 +46,7 @@ export function DashboardListCard({
           className="tap-active flex items-center gap-2 border-t border-border px-[18px] py-3 text-[12.5px] font-semibold text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
         >
           {footer.sparkle ? (
-            <span aria-hidden className="text-primary">
+            <span aria-hidden className="text-primary-ink">
               ✦
             </span>
           ) : null}

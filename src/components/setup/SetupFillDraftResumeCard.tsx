@@ -37,7 +37,7 @@ export function SetupFillDraftResumeCard({
       <div className="flex gap-2">
         <button
           type="button"
-          className="flex-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm font-semibold text-amber-600 hover:border-amber-500/70 disabled:opacity-60 dark:text-amber-300"
+          className="flex-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm font-semibold text-warning hover:border-amber-500/70 disabled:opacity-60 dark:text-amber-300"
           onClick={onResume}
           disabled={busy}
         >

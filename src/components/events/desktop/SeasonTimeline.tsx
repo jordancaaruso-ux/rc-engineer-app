@@ -339,7 +339,7 @@ function PaceDelta({ stat }: { stat: SeasonStat }) {
     <span
       className={cn(
         "font-mono text-[11px] font-bold tabular-nums",
-        faster ? "text-[#4FD089]" : "text-destructive"
+        faster ? "text-gain" : "text-destructive"
       )}
     >
       {faster ? "▼" : "▲"} {Math.abs(diff).toFixed(3)}

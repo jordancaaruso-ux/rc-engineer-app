@@ -594,8 +594,8 @@ export function RunDetailPanel({
               className={cn(
                 "inline-grid grid-cols-[2rem_auto] gap-x-0.5 items-baseline tabular-nums rounded px-0.5",
                 !r.isIncluded && "opacity-50 line-through",
-                isMistake && "bg-red-600/55 text-white ring-1 ring-red-500/45",
-                isBest && !isMistake && "bg-purple-600/55 text-white ring-1 ring-purple-500/45"
+                isMistake && "lap-flag-mistake text-white ring-1 ring-red-500/45",
+                isBest && !isMistake && "lap-flag-best text-white ring-1 ring-purple-500/45"
               )}
               title={
                 !r.isIncluded

@@ -237,7 +237,7 @@ export function BulkImportDocReviewClient(input: {
           <div className="text-[11px] text-muted-foreground">
             Stored parse used: <span className="text-foreground">{appliedCalLabel}</span>
             {input.parsedCalibrationProfileId && input.parsedCalibrationProfileId !== selectedCalId ? (
-              <span className="text-amber-600 dark:text-amber-500"> · picker differs — parse to apply selection</span>
+              <span className="text-warning"> · picker differs — parse to apply selection</span>
             ) : null}
           </div>
         ) : null}
@@ -265,7 +265,7 @@ export function BulkImportDocReviewClient(input: {
             <div>
               <Eyebrow>Parsed setup</Eyebrow>
               {input.parsedSetupManuallyEdited ? (
-                <div className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5">
+                <div className="text-[10px] text-warning mt-0.5">
                   Includes manual field corrections (structured keys, not PDF widgets).
                 </div>
               ) : (

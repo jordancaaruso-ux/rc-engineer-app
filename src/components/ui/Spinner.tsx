@@ -27,7 +27,7 @@ export function Spinner({
     <span
       aria-hidden
       className={cn(
-        "inline-block shrink-0 rounded-full border-accent/20 border-t-accent motion-safe:animate-spin",
+        "inline-block shrink-0 rounded-full border-primary-ink/20 border-t-accent motion-safe:animate-spin",
         SPINNER_SIZE[size],
         className
       )}

@@ -217,7 +217,7 @@ export function TrackList({
                   {adding ? "Adding…" : "Add track"}
                 </button>
                 {message ? (
-                  <span className={cn("text-xs", message === "Track added." ? "text-accent" : "text-muted-foreground")}>
+                  <span className={cn("text-xs", message === "Track added." ? "text-primary-ink" : "text-muted-foreground")}>
                     {message}
                     {existingTrackId ? (
                       <>

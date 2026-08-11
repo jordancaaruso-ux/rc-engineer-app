@@ -126,7 +126,7 @@ export function DemoEntryScreen({ facts }: { facts: DemoSeasonFacts }) {
             </dt>
             <dd
               className={`text-[15px] font-medium tabular-nums ${
-                row.mark ? "text-primary" : "text-foreground"
+                row.mark ? "text-primary-ink" : "text-foreground"
               }`}
             >
               {row.value}

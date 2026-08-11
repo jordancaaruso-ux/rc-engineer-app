@@ -188,7 +188,7 @@ export function EventLapSourcesPanel(props: {
               <span className="font-medium text-foreground">Dashboard sync scope</span>
               <p className="mt-0.5 text-muted-foreground">{diag.scopeReason}</p>
               {!diag.eventInSyncScope ? (
-                <p className="mt-1 text-amber-600 dark:text-amber-500">
+                <p className="mt-1 text-warning">
                   This event is not synced when you open the dashboard — prompts will not update for it until it is in
                   scope.
                 </p>

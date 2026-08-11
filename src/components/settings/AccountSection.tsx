@@ -50,13 +50,13 @@ export function AccountSection({ email }: { email: string }) {
         <button
           type="button"
           disabled={busy}
-          className="rounded-md border border-primary/50 bg-primary/10 px-3 py-1.5 text-sm text-primary hover:bg-primary/20 disabled:opacity-50"
+          className="rounded-md border border-primary-ink/50 bg-primary/10 px-3 py-1.5 text-sm text-primary-ink hover:bg-primary/20 disabled:opacity-50"
           onClick={() => void onDeleteAccount()}
         >
           {busy ? "Deleting…" : "Delete account"}
         </button>
       </div>
-      {error ? <p className="mt-2 text-xs text-primary">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs text-primary-ink">{error}</p> : null}
     </CardPanel>
   );
 }

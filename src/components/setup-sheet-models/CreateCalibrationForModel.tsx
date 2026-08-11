@@ -103,7 +103,7 @@ export function CreateCalibrationForModel({
         <Button type="button" onClick={() => void create()} disabled={!docId || creating}>
           {creating ? "Creating…" : "Create calibration"}
         </Button>
-        <Link href="/cars" className="text-xs text-accent hover:underline">
+        <Link href="/cars" className="text-xs text-primary-ink hover:underline">
           Upload a PDF
         </Link>
       </div>

@@ -50,7 +50,7 @@ export function LapCompareStatTiles({
           <span
             className={cn(
               "font-mono text-[17px] leading-none tabular-nums",
-              t.accent ? "text-primary" : "text-foreground"
+              t.accent ? "text-primary-ink" : "text-foreground"
             )}
           >
             {t.value}
@@ -62,7 +62,7 @@ export function LapCompareStatTiles({
             className={cn(
               "font-mono text-[10px] tabular-nums",
               t.note == null && "opacity-0",
-              t.noteTone === "good" && "text-[#4FD089]",
+              t.noteTone === "good" && "text-gain",
               t.noteTone === "bad" && "text-destructive",
               (t.noteTone === "muted" || t.noteTone == null) && "text-muted-foreground"
             )}

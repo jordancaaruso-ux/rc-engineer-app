@@ -235,7 +235,7 @@ export default async function SetupSheetModelWorkbenchPage({
           <Eyebrow>Test reads</Eyebrow>
           <p className="text-sm text-muted-foreground">
             Upload known filled sheets for this chassis at{" "}
-            <Link href="/cars" className="text-accent hover:underline">
+            <Link href="/cars" className="text-primary-ink hover:underline">
               /cars
             </Link>
             , then open each document below and compare every extracted value against the sheet.
@@ -247,7 +247,7 @@ export default async function SetupSheetModelWorkbenchPage({
                 <li key={d.id} className="flex items-center justify-between gap-3 py-2">
                   <Link
                     href={`/setup-documents/${d.id}`}
-                    className="min-w-0 truncate text-accent hover:underline"
+                    className="min-w-0 truncate text-primary-ink hover:underline"
                   >
                     {d.originalFilename}
                   </Link>

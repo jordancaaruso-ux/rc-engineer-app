@@ -90,7 +90,7 @@ export function CarDisciplineEdit({
           <span
             className={cn(
               "text-xs",
-              message === "Saved." ? "text-accent" : "text-muted-foreground"
+              message === "Saved." ? "text-primary-ink" : "text-muted-foreground"
             )}
           >
             {message}

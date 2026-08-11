@@ -15,7 +15,7 @@ export function DashboardAddSetupCard({ cars }: { cars: UploadSetupCar[] }) {
   const onlyCar = cars.length === 1 ? cars[0]! : null;
 
   return (
-    <CardPanel className="border-primary/25">
+    <CardPanel className="border-primary-ink/25">
       <div className="flex items-center gap-2">
         <Eyebrow>Setup</Eyebrow>
         <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">

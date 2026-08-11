@@ -67,7 +67,7 @@ export const BottomNav = memo(function BottomNav() {
                   aria-label={item.label}
                   className={cn(
                     "tap-active flex min-w-0 items-center justify-center touch-manipulation transition-colors duration-150",
-                    active ? "text-primary" : "text-muted-foreground"
+                    active ? "text-primary-ink" : "text-muted-foreground"
                   )}
                 >
                   <span className="relative shrink-0">

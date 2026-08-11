@@ -127,7 +127,7 @@ export default async function SetupAdminPage(): Promise<ReactNode> {
             <Eyebrow>Chassis type requests</Eyebrow>
             <Link
               href="/admin/review"
-              className="rounded-md border border-primary/50 px-2.5 py-1 text-xs text-primary hover:bg-muted"
+              className="rounded-md border border-primary-ink/50 px-2.5 py-1 text-xs text-primary-ink hover:bg-muted"
             >
               Review queue
             </Link>

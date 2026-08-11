@@ -119,7 +119,7 @@ export function CarHandlingRatingQuickPick({
                           !selected && !readOnly && "hover:bg-muted hover:text-foreground",
                           !selected &&
                             missing &&
-                            "bg-amber-500/5 text-amber-700 dark:text-amber-300"
+                            "bg-amber-500/5 text-warning"
                         )}
                       >
                         {n}
@@ -148,7 +148,7 @@ export function CarHandlingRatingQuickPick({
             style={bandWord ? { color: bandColor(bandWord) } : undefined}
             className={cn(
               "font-sans text-[30px] font-semibold leading-none tracking-[-0.03em] tabular-nums",
-              !bandWord && (missing ? "text-amber-700 dark:text-amber-300" : "text-faint")
+              !bandWord && (missing ? "text-warning" : "text-faint")
             )}
           >
             {value ?? "—"}
@@ -157,7 +157,7 @@ export function CarHandlingRatingQuickPick({
           <div
             className={cn(
               "mt-0.5 font-sans text-[11px] font-semibold tracking-tight",
-              missing ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground"
+              missing ? "text-warning" : "text-muted-foreground"
             )}
           >
             {bandWord ?? (missing ? "Pick a rating" : "Not rated")}

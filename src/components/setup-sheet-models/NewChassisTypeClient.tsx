@@ -91,7 +91,7 @@ export function NewChassisTypeClient() {
           {existingCalibrationId ? (
             <>
               {" "}
-              <Link href={`/setup-calibrations/${existingCalibrationId}`} className="text-accent hover:underline">
+              <Link href={`/setup-calibrations/${existingCalibrationId}`} className="text-primary-ink hover:underline">
                 Open its mapping editor
               </Link>
             </>

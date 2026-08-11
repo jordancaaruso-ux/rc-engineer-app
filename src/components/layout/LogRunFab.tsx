@@ -54,7 +54,7 @@ export const LogRunFab = memo(function LogRunFab() {
         onTouchStart={warmNew}
         onClick={() => haptic("light")}
         aria-label="Start a new run"
-        className="tap-active flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/15 bg-[rgba(19,18,17,0.92)] text-muted-foreground shadow-[0_6px_16px_-10px_rgba(0,0,0,0.65)] backdrop-blur transition-transform duration-150 active:scale-95 touch-manipulation"
+        className="tap-active flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/15 bg-surface-runna-deep/90 text-muted-foreground shadow-[0_6px_16px_-10px_rgba(0,0,0,0.65)] backdrop-blur transition-transform duration-150 active:scale-95 touch-manipulation"
       >
         <IconAddRun size={24} aria-hidden />
       </Link>

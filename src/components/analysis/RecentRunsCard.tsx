@@ -102,7 +102,7 @@ export function RecentRunsCard({
                * ink on the centre line and keeps the pill its original 22px tall, so the tap
                * target does not shrink.
                */
-              className="tap-active group flex shrink-0 items-center gap-1 rounded-full border border-primary/35 pb-[3px] pl-2.5 pr-1.5 pt-[5px] text-[11px] font-semibold leading-none tabular-nums text-primary transition-colors hover:border-primary/60 hover:bg-primary/10"
+              className="tap-active group flex shrink-0 items-center gap-1 rounded-full border border-primary-ink/35 pb-[3px] pl-2.5 pr-1.5 pt-[5px] text-[11px] font-semibold leading-none tabular-nums text-primary-ink transition-colors hover:border-primary-ink/60 hover:bg-primary/10"
             >
               All {runCountLabel(totalRunCount)}
               {/* Same cause: the chevron centres on the line box, the text centres on its
@@ -164,7 +164,7 @@ export function RecentRunsCard({
         prefetch
         className="tap-active group -mx-4 -mb-4 mt-1 flex items-center gap-3 border-t border-border bg-primary/[0.04] px-4 py-3 transition-colors hover:bg-primary/[0.08]"
       >
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-primary/35 bg-primary/[0.09] text-primary">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-primary-ink/35 bg-primary/[0.09] text-primary-ink">
           <History className="h-4 w-4" aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
@@ -177,7 +177,7 @@ export function RecentRunsCard({
           </span>
         </span>
         <ChevronRight
-          className="h-4 w-4 shrink-0 text-primary transition-transform group-hover:translate-x-0.5"
+          className="h-4 w-4 shrink-0 text-primary-ink transition-transform group-hover:translate-x-0.5"
           aria-hidden
         />
       </Link>

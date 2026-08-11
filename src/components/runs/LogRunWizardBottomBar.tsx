@@ -349,7 +349,7 @@ export function LogRunWizardBottomBar({
               <span className="block truncate font-sans text-[10.5px] font-medium text-muted-foreground">
                 {currentIsPre ? (
                   preComplete ? (
-                    <span className="font-bold text-[#4FD089]">
+                    <span className="font-bold text-gain">
                       Pre-run logged ✓
                       {postRunData ? null : (
                         <span className="hidden min-[430px]:inline"> — you&rsquo;re ready to run</span>
@@ -390,7 +390,7 @@ export function LogRunWizardBottomBar({
               }
             >
               {saveSuccess ? (
-                <Check size={17} weight="bold" aria-hidden className="text-[#4FD089]" />
+                <Check size={17} weight="bold" aria-hidden className="text-gain" />
               ) : (
                 <FloppyDisk size={18} aria-hidden />
               )}
@@ -445,7 +445,7 @@ export function LogRunWizardBottomBar({
                     onClick={() => jump(s.id)}
                     className={cn(
                       "tap-active flex min-w-0 flex-1 touch-manipulation items-center justify-center py-1.5 transition-colors duration-150",
-                      cur ? "text-primary" : st?.done ? "text-foreground/85" : "text-muted-foreground"
+                      cur ? "text-primary-ink" : st?.done ? "text-foreground/85" : "text-muted-foreground"
                     )}
                   >
                     <span className="relative shrink-0">
@@ -469,7 +469,7 @@ export function LogRunWizardBottomBar({
               seam stays angled. V9: a wider gap under the ticks' seam splits
               the bar into its Before / After halves. */}
           <div
-            className="relative h-[7px] overflow-hidden rounded-[3px] bg-[#141310] shadow-[inset_0_0_0_1px_#34322f]"
+            className="relative h-[7px] overflow-hidden rounded-[3px] bg-surface-runna-deep shadow-[inset_0_0_0_1px_#34322f]"
             role="img"
             aria-label={`${doneCount} of ${walk.length} logged`}
           >
@@ -482,7 +482,7 @@ export function LogRunWizardBottomBar({
                   <span
                     className={cn(
                       "flex-1 -skew-x-[21deg] transition-colors duration-300",
-                      statusById?.[s.id]?.done ? "bg-primary" : "bg-[#232120]"
+                      statusById?.[s.id]?.done ? "bg-primary" : "bg-surface-runna-inset"
                     )}
                   />
                 </Fragment>
@@ -501,7 +501,7 @@ export function LogRunWizardBottomBar({
             aria-hidden
           />
           <div
-            className="fixed inset-x-0 bottom-0 z-[61] mx-auto w-full max-w-md rounded-t-[22px] border-t border-white/10 bg-[#1E1D1C] px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-24px_60px_-12px_rgba(0,0,0,0.8)]"
+            className="fixed inset-x-0 bottom-0 z-[61] mx-auto w-full max-w-md rounded-t-[22px] border-t border-white/10 bg-muted px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-24px_60px_-12px_rgba(0,0,0,0.8)]"
             role="dialog"
             aria-label="Run map"
           >
@@ -517,7 +517,7 @@ export function LogRunWizardBottomBar({
                   <span
                     className={cn(
                       "shrink-0 font-sans text-[12.5px]",
-                      r.go === current ? "font-bold text-primary" : "text-muted-foreground"
+                      r.go === current ? "font-bold text-primary-ink" : "text-muted-foreground"
                     )}
                   >
                     {r.label}
@@ -527,9 +527,9 @@ export function LogRunWizardBottomBar({
                       className={cn(
                         "min-w-0 truncate font-sans text-[12.5px] font-medium",
                         r.state === "miss"
-                          ? "text-amber-600 dark:text-amber-300"
+                          ? "text-warning"
                           : r.state === "chg"
-                            ? "text-primary"
+                            ? "text-primary-ink"
                             : "text-foreground"
                       )}
                     >
@@ -593,7 +593,7 @@ export function LogRunWizardBottomBar({
             aria-hidden
           />
           <div
-            className="fixed inset-x-0 bottom-0 z-[61] mx-auto w-full max-w-md rounded-t-[22px] border-t border-white/10 bg-[#1E1D1C] px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-24px_60px_-12px_rgba(0,0,0,0.8)]"
+            className="fixed inset-x-0 bottom-0 z-[61] mx-auto w-full max-w-md rounded-t-[22px] border-t border-white/10 bg-muted px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-24px_60px_-12px_rgba(0,0,0,0.8)]"
             role="dialog"
             aria-label="Leave this run?"
           >

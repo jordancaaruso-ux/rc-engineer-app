@@ -56,7 +56,7 @@ export function TodaySummaryCard({
         <TabButton id="changes" active={tab === "changes"} onClick={() => setTab("changes")}>
           Changes today
           {totalChanges > 0 ? (
-            <span className="ml-1.5 inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium text-primary">
+            <span className="ml-1.5 inline-flex items-center rounded-full border border-primary-ink/40 bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium text-primary-ink">
               {totalChanges}
             </span>
           ) : null}
@@ -105,7 +105,7 @@ function TabButton({
       onClick={onClick}
       className={`-mb-px flex items-center gap-1 border-b-2 px-2 py-1.5 text-xs font-medium transition ${
         active
-          ? "border-accent text-foreground"
+          ? "border-primary-ink text-foreground"
           : "border-transparent text-muted-foreground hover:text-foreground"
       }`}
     >

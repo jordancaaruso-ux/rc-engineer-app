@@ -54,7 +54,7 @@ export function DetectedRunPromptsBanner({
   if (prompts.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-accent/40 bg-accent/5 p-3 shadow-sm shadow-black/20">
+    <div className="rounded-lg border border-primary-ink/40 bg-accent/5 p-3 shadow-sm shadow-black/20">
       <div className="space-y-0.5">
         <Eyebrow>Detected sessions</Eyebrow>
         <p className="text-[10px] leading-snug text-muted-foreground">

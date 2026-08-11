@@ -43,8 +43,8 @@ const PACE_VIEW_STORAGE_KEY = "analysisTrendPaceView";
 // falling luminance. Yellow stays action-only (VISUAL_NORTH_STAR), so the hero
 // line is bright ink, never the accent.
 const SERIES: Array<{ key: SeriesKey; name: string; color: string; width: number }> = [
-  { key: "best", name: "Best lap", color: "#ECE9E4", width: 2.5 },
-  { key: "avgTop5", name: "Avg top 5", color: "#B7B3AC", width: 1.75 },
+  { key: "best", name: "Best lap", color: "rgb(var(--color-foreground))", width: 2.5 },
+  { key: "avgTop5", name: "Avg top 5", color: "rgb(var(--color-muted-foreground))", width: 1.75 },
   { key: "avgTop10", name: "Avg top 10", color: "#87847D", width: 1.75 },
   { key: "median", name: "Median", color: "#5C5A55", width: 1.75 },
 ];
@@ -59,8 +59,8 @@ const SERIES: Array<{ key: SeriesKey; name: string; color: string; width: number
 const BOX_COLOR = "#87847D";
 const BOX_FILL_OPACITY = 0.18;
 const WHISKER_COLOR = "#5C5A55";
-const SPREAD_INK = "#ECE9E4";
-const MISTAKE_COLOR = "#E5644E";
+const SPREAD_INK = "rgb(var(--color-foreground))";
+const MISTAKE_COLOR = "rgb(var(--color-destructive))";
 
 /** Box width clamp — without it boxes are enormous at 2 runs and hairlines past ~20. */
 const BOX_WIDTH_MIN = 6;
@@ -408,7 +408,7 @@ function SetupChangeRow({
             className={cn(
               "cursor-pointer transition-colors hover:text-foreground focus-visible:text-foreground",
               loading
-                ? "animate-pulse text-primary"
+                ? "animate-pulse text-primary-ink"
                 : changed
                   ? "text-foreground"
                   : "text-faint"
@@ -582,7 +582,7 @@ export function SessionTrendCard({
                 metric="consistencyScore"
                 title="Consistency"
                 higherIsBetter
-                color="#4FD089"
+                color="rgb(var(--color-gain))"
                 formatValue={(v) => `${v.toFixed(1)}%`}
                 emptyLabel="No consistency data for this car yet in this window."
                 onOpenSetup={openSetupForRun}
@@ -600,7 +600,7 @@ export function SessionTrendCard({
                 metric="mistakeCount"
                 title="Mistakes"
                 higherIsBetter={false}
-                color="#E5644E"
+                color="rgb(var(--color-destructive))"
                 formatValue={(v) => String(Math.round(v))}
                 tickMinStep={1}
                 emptyLabel="No mistake-eligible runs for this car yet in this window."

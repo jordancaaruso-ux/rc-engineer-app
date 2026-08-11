@@ -195,7 +195,7 @@ export function BulkImportBatchClient({
 
       <CardPanel contentClassName="flex flex-wrap items-end gap-3">
         {cars.length === 0 ? (
-          <p className="text-xs text-amber-600 dark:text-amber-400">
+          <p className="text-xs text-warning">
             Add a car under{" "}
             <Link href="/cars" className="underline hover:text-foreground">
               Cars
@@ -289,7 +289,7 @@ export function BulkImportBatchClient({
                     {d.calibrationResolvedSource === "exact_fingerprint" ? (
                       <div className="text-[9px] text-emerald-600 dark:text-emerald-400">auto: exact match</div>
                     ) : d.calibrationResolvedDebug ? (
-                      <div className="text-[9px] text-amber-600 dark:text-amber-400 truncate" title={d.calibrationResolvedDebug}>
+                      <div className="text-[9px] text-warning truncate" title={d.calibrationResolvedDebug}>
                         {d.calibrationResolvedDebug.replace(/^petitrc:auto\s*/i, "")}
                       </div>
                     ) : null}

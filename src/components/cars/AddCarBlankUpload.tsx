@@ -145,7 +145,7 @@ export function AddCarBlankUpload({
 
       {error ? (
         <div className={cn("space-y-2 rounded-md border p-2", "border-amber-500/40 bg-amber-500/5")}>
-          <p className="text-[11px] text-amber-700 dark:text-amber-400">{error}</p>
+          <p className="text-[11px] text-warning">{error}</p>
           {offerNoSheet ? (
             <button
               type="button"

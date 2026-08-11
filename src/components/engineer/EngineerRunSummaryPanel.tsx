@@ -97,7 +97,7 @@ export function EngineerRunSummaryPanel({
         <div className="border-t border-border px-3 py-2">
           <button
             type="button"
-            className="text-[11px] font-medium text-primary hover:underline"
+            className="text-[11px] font-medium text-primary-ink hover:underline"
             onClick={() => setFullSummaryOpen((v) => !v)}
           >
             {fullSummaryOpen ? "Hide full engineer summary" : "Show full engineer summary"}

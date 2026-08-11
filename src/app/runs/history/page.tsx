@@ -870,7 +870,7 @@ export default async function RunHistoryPage({
         </header>
       <section className="page-body min-w-0 max-w-full">
           <CardPanel contentClassName="text-sm text-muted-foreground">
-            <Link href="/runs/history" className="text-accent underline">
+            <Link href="/runs/history" className="text-primary-ink underline">
               Back to my sessions
             </Link>
           </CardPanel>
@@ -929,7 +929,7 @@ export default async function RunHistoryPage({
               <>No runs from team members yet.</>
             ) : (
               <>
-                No runs yet. <Link href="/runs/new" className="text-accent underline">Create your first run</Link>.
+                No runs yet. <Link href="/runs/new" className="text-primary-ink underline">Create your first run</Link>.
               </>
             )}
           </CardPanel>

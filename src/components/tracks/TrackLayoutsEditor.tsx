@@ -177,7 +177,7 @@ export function TrackLayoutsEditor({
           {saving ? "Saving…" : "Save layouts"}
         </button>
         {message ? (
-          <span className={cn("text-xs", message === "Saved." ? "text-accent" : "text-muted-foreground")}>
+          <span className={cn("text-xs", message === "Saved." ? "text-primary-ink" : "text-muted-foreground")}>
             {message}
           </span>
         ) : null}

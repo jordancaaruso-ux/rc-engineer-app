@@ -322,7 +322,7 @@ export default function VideoDecodeTestPage() {
           className={
             "rounded-xl border p-4 " +
             (report.verdict === "pass"
-              ? "border-[#4FD089]/40 bg-[#4FD089]/5"
+              ? "border-gain/40 bg-gain/5"
               : report.verdict === "marginal"
                 ? "border-[#E5A44E]/40 bg-[#E5A44E]/5"
                 : "border-destructive/40 bg-destructive/5")
@@ -332,7 +332,7 @@ export default function VideoDecodeTestPage() {
             className={
               "font-mono text-[20px] font-bold uppercase tracking-[0.1em] " +
               (report.verdict === "pass"
-                ? "text-[#4FD089]"
+                ? "text-gain"
                 : report.verdict === "marginal"
                   ? "text-[#E5A44E]"
                   : "text-destructive")

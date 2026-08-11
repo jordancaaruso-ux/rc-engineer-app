@@ -130,7 +130,7 @@ export function InlineNewTrackRow({
           // Yellow-outline chip (2026-07-27): was bare yellow text — the brightest
           // thing in the track panel with no container and a text-height tap target.
           // Now a peer of the Detect chip in shape, distinguished only by tint.
-          "flex min-h-8 items-center gap-1.5 rounded-lg border border-primary/45 bg-primary/[0.08] px-3 text-xs font-semibold text-primary transition hover:bg-primary/15",
+          "flex min-h-8 items-center gap-1.5 rounded-lg border border-primary-ink/45 bg-primary/[0.08] px-3 text-xs font-semibold text-primary-ink transition hover:bg-primary/15",
           className
         )}
       >

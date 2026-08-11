@@ -111,7 +111,7 @@ export function ManufacturerBaselineAdminSection() {
         One official PDF + optional summary per setup sheet template. Stored in the database; not mixed into
         community sample counts. URLs must be <code className="text-foreground">https://</code>.
       </p>
-      {error ? <p className="mt-2 text-xs text-primary">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs text-primary-ink">{error}</p> : null}
       {loading ? <p className="mt-3 text-xs text-muted-foreground">Loading…</p> : null}
       {!loading && rows.length > 0 ? (
         <ul className="mt-3 space-y-2 text-xs">
@@ -126,7 +126,7 @@ export function ManufacturerBaselineAdminSection() {
               </div>
               <button
                 type="button"
-                className="mt-2 text-xs text-primary underline disabled:opacity-50"
+                className="mt-2 text-xs text-primary-ink underline disabled:opacity-50"
                 disabled={busy}
                 onClick={() => void onRemove(r.setupSheetTemplate)}
               >

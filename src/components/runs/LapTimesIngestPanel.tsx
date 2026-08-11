@@ -244,7 +244,7 @@ function SessionImportListRow({
       className={cn(
         "flex w-full items-center gap-2.5 rounded-md border px-2.5 py-2 text-left transition",
         isActive
-          ? "border-accent/50 bg-accent/10"
+          ? "border-primary-ink/50 bg-accent/10"
           : "border-border bg-surface-runna hover:bg-surface-runna-inset",
         disabled && "opacity-60 pointer-events-none"
       )}
@@ -270,7 +270,7 @@ function SessionImportListRow({
           Imported
         </span>
       ) : (
-        <span className="shrink-0 rounded-full border border-accent/45 bg-accent/5 px-3 py-1 text-[11px] font-bold text-accent">
+        <span className="shrink-0 rounded-full border border-primary-ink/45 bg-accent/5 px-3 py-1 text-[11px] font-bold text-primary-ink">
           {actionLabel}
         </span>
       )}
@@ -1152,7 +1152,7 @@ export function LapTimesIngestPanel({
                 <div role="status" className="flex flex-col items-center gap-2.5 px-3 py-5 text-center">
                   <span
                     aria-hidden
-                    className="h-[22px] w-[22px] animate-spin rounded-full border-2 border-accent/20 border-t-accent"
+                    className="h-[22px] w-[22px] animate-spin rounded-full border-2 border-primary-ink/20 border-t-accent"
                   />
                   <p className="text-sm font-semibold text-foreground">Searching for new runs…</p>
                 </div>
@@ -1280,7 +1280,7 @@ export function LapTimesIngestPanel({
           {activeImportBlock ? (
             <div
               key={activeImportBlock.blockId}
-              className="space-y-2 rounded-lg border border-accent/35 bg-accent/5 p-2"
+              className="space-y-2 rounded-lg border border-primary-ink/35 bg-accent/5 p-2"
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -1289,7 +1289,7 @@ export function LapTimesIngestPanel({
                   </Eyebrow>
                   <div className="text-[11px] text-muted-foreground break-all">{activeImportBlock.sourceUrl}</div>
                 </div>
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-accent/40 bg-accent/10 px-2 py-1 text-[10px] font-medium text-foreground">
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-primary-ink/40 bg-accent/10 px-2 py-1 text-[10px] font-medium text-foreground">
                   <span aria-hidden>✓</span>
                   Active
                 </span>
@@ -1327,10 +1327,10 @@ export function LapTimesIngestPanel({
                           className={cn(
                             "flex items-start gap-3 rounded-md border p-2 cursor-pointer transition bg-surface-runna",
                             isPreview
-                              ? "border-accent/70 bg-accent/10"
+                              ? "border-primary-ink/70 bg-accent/10"
                               : cn(
                                   "border-border hover:bg-surface-runna-inset",
-                                  isPrimaryForRun && "border-primary/40 bg-primary/5"
+                                  isPrimaryForRun && "border-primary-ink/40 bg-primary/5"
                                 )
                           )}
                         >
@@ -1338,7 +1338,7 @@ export function LapTimesIngestPanel({
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                               <span className="text-xs font-medium truncate">{primaryLabel}</span>
                               {isPrimaryForRun ? (
-                                <span className="shrink-0 rounded border border-primary/35 bg-primary/10 px-1.5 py-0 ui-title text-[10px] text-foreground/90">
+                                <span className="shrink-0 rounded border border-primary-ink/35 bg-primary/10 px-1.5 py-0 ui-title text-[10px] text-foreground/90">
                                   Your laps
                                 </span>
                               ) : null}

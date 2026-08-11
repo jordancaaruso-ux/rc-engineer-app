@@ -49,7 +49,7 @@ export function ChassisDisambiguationPrompt({
   }
 
   return (
-    <CardPanel className="border-primary/30" contentClassName="space-y-3 p-4">
+    <CardPanel className="border-primary-ink/30" contentClassName="space-y-3 p-4">
       <Eyebrow>Which chassis?</Eyebrow>
       <p className="text-sm text-foreground">
         This sheet&apos;s layout is shared by more than one chassis, so it can&apos;t be told apart
@@ -62,7 +62,7 @@ export function ChassisDisambiguationPrompt({
             type="button"
             disabled={busyId !== null}
             onClick={() => void choose(c.modelId)}
-            className="rounded-lg border border-border bg-secondary px-3 py-2 text-sm font-medium text-foreground transition hover:border-primary/60 hover:bg-muted disabled:opacity-60 disabled:cursor-default"
+            className="rounded-lg border border-border bg-secondary px-3 py-2 text-sm font-medium text-foreground transition hover:border-primary-ink/60 hover:bg-muted disabled:opacity-60 disabled:cursor-default"
           >
             {busyId === c.modelId ? "Setting…" : c.modelName}
           </button>

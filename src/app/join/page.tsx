@@ -72,7 +72,7 @@ export default async function JoinPage(): Promise<ReactNode> {
           <Link
             href="/api/auth/logout"
             prefetch={false}
-            className="text-accent underline-offset-2 hover:underline"
+            className="text-primary-ink underline-offset-2 hover:underline"
           >
             Sign out
           </Link>{" "}
@@ -123,7 +123,7 @@ export default async function JoinPage(): Promise<ReactNode> {
           page can still offer them. */}
       <p className="mt-5 text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link href="/login" className="text-accent underline-offset-2 hover:underline">
+        <Link href="/login" className="text-primary-ink underline-offset-2 hover:underline">
           Sign in
         </Link>
         .
@@ -134,7 +134,7 @@ export default async function JoinPage(): Promise<ReactNode> {
           <Link
             href="/demo"
             prefetch={false}
-            className="text-accent underline-offset-2 hover:underline"
+            className="text-primary-ink underline-offset-2 hover:underline"
           >
             Try the live demo
           </Link>{" "}

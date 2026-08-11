@@ -135,7 +135,7 @@ export function CarSetupsCard({
               <RelativeTime iso={fillDraft.updatedAt} fallback="recently" />
             </span>
           </span>
-          <span className="ui-caption shrink-0 text-amber-600 dark:text-amber-300">Resume →</span>
+          <span className="ui-caption shrink-0 text-warning">Resume →</span>
         </Link>
       ) : null}
 

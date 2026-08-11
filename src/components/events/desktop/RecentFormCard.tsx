@@ -121,7 +121,7 @@ function VsVenue({ seconds, hasPace }: { seconds: number | null; hasPace: boolea
     <span
       className={cn(
         "font-mono text-[12px] font-bold tabular-nums",
-        faster ? "text-[#4FD089]" : "text-destructive"
+        faster ? "text-gain" : "text-destructive"
       )}
     >
       {faster ? "▼" : "▲"} {Math.abs(seconds).toFixed(3)}

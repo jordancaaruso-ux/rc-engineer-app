@@ -703,7 +703,7 @@ export function ImageCalibrationEditorClient(props: Props) {
             </div>
           ) : null}
           {detectError ? (
-            <div className="rounded border border-amber-500/50 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
+            <div className="rounded border border-amber-500/50 bg-amber-500/10 p-2 text-xs text-warning">
               {detectError}
             </div>
           ) : null}
@@ -774,7 +774,7 @@ export function ImageCalibrationEditorClient(props: Props) {
               ) : null}
             </>
           ) : (
-            <p className="text-xs text-amber-600">
+            <p className="text-xs text-warning">
               No editable PDF calibrations with form mappings were found yet. Calibrate the PDF first,
               then return here to derive the screenshot map.
             </p>
@@ -808,7 +808,7 @@ export function ImageCalibrationEditorClient(props: Props) {
                         ({(a.region.xPct * 100).toFixed(1)}%, {(a.region.yPct * 100).toFixed(1)}%)
                       </span>
                     ) : (
-                      <span className="text-amber-600">(needs region)</span>
+                      <span className="text-warning">(needs region)</span>
                     )}
                   </span>
                   <span className="flex items-center gap-1">
@@ -884,7 +884,7 @@ export function ImageCalibrationEditorClient(props: Props) {
               {fields.map((f) => (
                 <li key={f.id} onClick={() => setActiveFieldId(f.id)}>
                   <CardPanel
-                    className={cn(f.id === activeFieldId && "ring-1 ring-primary")}
+                    className={cn(f.id === activeFieldId && "ring-1 ring-primary-ink")}
                     contentClassName="p-2"
                   >
                   <div className="flex items-center justify-between gap-2">
@@ -1003,7 +1003,7 @@ export function ImageCalibrationEditorClient(props: Props) {
                     </div>
                   )}
                   {activeField?.id === f.id && drawMode ? (
-                    <div className="mt-1 text-[10px] text-primary">
+                    <div className="mt-1 text-[10px] text-primary-ink">
                       Drawing — drag on the image, or press Escape to cancel.
                     </div>
                   ) : null}

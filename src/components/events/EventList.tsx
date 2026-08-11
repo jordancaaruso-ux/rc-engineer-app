@@ -79,7 +79,7 @@ function EventEvidence({
         <span className="text-foreground">{formatLap(bestLapSeconds)}</span>
       ) : null}
       {vsVenueSeconds != null && Math.abs(vsVenueSeconds) >= 0.0005 ? (
-        <span className={cn("font-bold", faster ? "text-[#4FD089]" : "text-destructive")}>
+        <span className={cn("font-bold", faster ? "text-gain" : "text-destructive")}>
           {faster ? "▼" : "▲"} {Math.abs(vsVenueSeconds).toFixed(3)}
         </span>
       ) : null}
@@ -132,7 +132,7 @@ function EventSectionRows({
                     {ev.track?.name ?? ev.trackLabel}
                     {ev.track?.location ? ` (${ev.track.location})` : ""}
                     {ev.isLegacyTrack ? (
-                      <span className="text-amber-700 dark:text-amber-400"> · legacy track</span>
+                      <span className="text-warning"> · legacy track</span>
                     ) : null}
                   </span>
                 )}

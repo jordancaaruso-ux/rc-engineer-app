@@ -88,7 +88,7 @@ export function DemoBanner() {
     <div
       ref={ref}
       role="status"
-      className="sticky top-0 z-40 border-b border-border bg-[#1E1D1C]/95 backdrop-blur-md"
+      className="sticky top-0 z-40 border-b border-border bg-muted/95 backdrop-blur-md"
       style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
     >
       {/*
@@ -156,7 +156,7 @@ export function DemoBanner() {
         aria-live="polite"
         className={`pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center transition-opacity duration-300 ${toastVisible ? "opacity-100" : "opacity-0"}`}
       >
-        <span className="rounded-full border border-border bg-[#1E1D1C]/95 px-4 py-2 text-[12.5px] text-foreground shadow-lg backdrop-blur-md">
+        <span className="rounded-full border border-border bg-muted/95 px-4 py-2 text-[12.5px] text-foreground shadow-lg backdrop-blur-md">
           The demo is read-only
         </span>
       </div>

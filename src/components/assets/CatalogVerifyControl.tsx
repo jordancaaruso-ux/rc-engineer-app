@@ -47,7 +47,7 @@ export function CatalogVerifyControl({
             "text-xs px-3 py-1.5 rounded-md border hover:bg-muted/50 disabled:opacity-60",
             verified
               ? "border-border text-muted-foreground"
-              : "border-primary/50 text-primary"
+              : "border-primary-ink/50 text-primary-ink"
           )}
         >
           {pending ? "…" : verified ? "Unverify" : "Verify"}

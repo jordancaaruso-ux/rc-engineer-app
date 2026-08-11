@@ -73,7 +73,7 @@ export function WizardPrefillCard({
         const rowInner = (
           <>
             {applied ? (
-              <span aria-hidden className="w-3 shrink-0 text-[12px] text-[#4FD089]">
+              <span aria-hidden className="w-3 shrink-0 text-[12px] text-gain">
                 ✓
               </span>
             ) : null}
@@ -139,7 +139,7 @@ export function WizardPrefillCard({
 function PrefillNote({ text }: { text: string }) {
   return (
     <p className="pb-1 pt-1.5 text-[11px] font-semibold leading-snug text-muted-foreground">
-      <span aria-hidden className="text-primary">
+      <span aria-hidden className="text-primary-ink">
         ↳
       </span>{" "}
       {text}
@@ -177,7 +177,7 @@ export function WizardDraftsCard({ drafts }: { drafts: WizardDraftRow[] }) {
           <span className="font-mono text-[10px] text-muted-foreground">
             {[d.trackName, d.eventName, relativeWhen(d.createdAt)].filter(Boolean).join(" · ")}
           </span>
-          <span className="mt-1 text-[11px] text-amber-600 dark:text-amber-300">
+          <span className="mt-1 text-[11px] text-warning">
             finish logging — laps &amp; rating
           </span>
         </button>

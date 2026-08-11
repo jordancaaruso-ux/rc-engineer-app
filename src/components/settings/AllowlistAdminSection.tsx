@@ -98,7 +98,7 @@ export function AllowlistAdminSection() {
         Emails listed here may request a magic link (in addition to <code className="text-foreground">AUTH_ALLOWED_EMAILS</code>{" "}
         and seed). Env admins are set via <code className="text-foreground">AUTH_ADMIN_EMAILS</code>.
       </p>
-      {error ? <p className="mt-2 text-xs text-primary">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs text-primary-ink">{error}</p> : null}
       <form onSubmit={(e) => void onAdd(e)} className="mt-4 flex flex-wrap items-end gap-2">
         <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-xs text-muted-foreground">
           Add email
@@ -133,7 +133,7 @@ export function AllowlistAdminSection() {
                 <button
                   type="button"
                   disabled={busy}
-                  className="text-xs text-primary hover:underline disabled:opacity-50"
+                  className="text-xs text-primary-ink hover:underline disabled:opacity-50"
                   onClick={() => void onRemove(r.email)}
                 >
                   Remove
