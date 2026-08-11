@@ -64,9 +64,11 @@
    * has never rendered: `darkMode: "class"` in the Tailwind config wants a `.dark`
    * ancestor and the app has never had one. So every one of them has always been
    * amber-600 on charcoal (5.4:1, which is why nobody noticed), and would have
-   * been amber-600 on paper (2.6:1, which anyone would). One token, two values.
+   * been amber-600 on paper (2.6:1, which anyone would). One token, two values —
+   * and the dark value is amber-600 exactly, so adding a light theme does not quietly
+   * retune the charcoal app that already shipped.
    */
-  --color-warning: 224 169 59; /* #E0A93B — 7.6:1 on card */
+  --color-warning: 217 119 6; /* #D97706 — exactly amber-600, so dark is unchanged */
 
   /* Best-lap violet — the "purple" of timing screens. Chart dots and lap numerals. */
   --color-best-lap: 167 139 250; /* #A78BFA */
