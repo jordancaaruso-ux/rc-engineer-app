@@ -33,6 +33,11 @@ const config: Config = {
         warning: "rgb(var(--color-warning) / <alpha-value>)",
         /** Tint that lifts a surface off its ground: white in dark, ink in light. */
         elevate: "rgb(var(--color-elevate) / <alpha-value>)",
+        /**
+         * Loading placeholder bars only. Tuned for perceptibility (~1.3:1 on `card`),
+         * not contrast — never put text on it, and never use it as a surface.
+         */
+        skeleton: "rgb(var(--color-skeleton) / <alpha-value>)",
         secondary: {
           DEFAULT: "rgb(var(--color-secondary) / <alpha-value>)",
           foreground: "rgb(var(--color-secondary-foreground) / <alpha-value>)",

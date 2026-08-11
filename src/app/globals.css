@@ -59,6 +59,20 @@
   --color-elevate: 255 255 255;
 
   /*
+   * Loading placeholder bars. NOT `muted` — that is a surface colour, and at the
+   * 60% the skeletons used it landed 1.05:1 against `card` in BOTH themes, so a
+   * page waiting on data rendered as card furniture with nothing inside it. The
+   * cards read as empty rather than loading (founder, 2026-08-12: "the empty card
+   * backgrounds flash up ... it looks super weird").
+   *
+   * Its own token because it is the one colour in the app deliberately tuned by
+   * PERCEPTIBILITY rather than contrast: ~1.3:1 against `card` on both grounds.
+   * A placeholder carries no text, so the 4.5:1 rules do not apply to it, but it
+   * does have to be visible or it is not a placeholder.
+   */
+  --color-skeleton: 52 49 45; /* #34312D on #181716 — 1.37:1 */
+
+  /*
    * Attention that is not an error — "chassis type needed", "no timing source".
    * These were `text-amber-600 dark:text-amber-300` pairs, and the `dark:` half
    * has never rendered: `darkMode: "class"` in the Tailwind config wants a `.dark`
@@ -231,6 +245,9 @@
   --color-elevate: 25 24 21; /* tint with ink, not white */
   --color-warning: 140 84 0; /* #8C5400 — 5.6:1 (amber-600 is 2.6:1) */
   --color-best-lap: 109 40 217; /* #6D28D9 — 6.6:1 (#A78BFA is 2.5:1) */
+  /* Darker than the card here, lighter than it in dark — the bar has to sit
+     AGAINST the surface, and on paper that means down, not up. */
+  --color-skeleton: 226 221 210; /* #E2DDD2 on #FCFBF8 — 1.31:1 */
 
   /* Inset controls sit BELOW the card here — on charcoal they sat above it. */
   --color-surface-runna-deep: 228 224 215; /* #E4E0D7 */
@@ -1410,6 +1427,36 @@ html[data-nav-pending] .page {
   animation-delay: var(--rc-delay, 320ms);
 }
 
+/* ---------------------------------------------------------------------------
+   Deferred loading placeholders (2026-08-12)
+
+   A skeleton is only worth showing for a wait long enough to feel like one.
+   Measured on prod, `/runs/history` streams its shell instantly and the real
+   content 240–530ms later on a laptop; the skeleton was therefore painting on
+   EVERY navigation, fading in via `.page-body > *`, and being torn out again —
+   read as "the cards are empty", not "the cards are coming".
+
+   `both` + a delay holds the from-state, so the skeleton is simply invisible for
+   the first `--rc-skeleton-wait`. Under it the app shell (banner, header, nav) is
+   already painted, so a fast route lands on quiet background and then content —
+   never on furniture. A genuinely slow route still gets its skeleton.
+
+   Pure CSS on purpose: this has to work for `loading.tsx`, which is streamed by
+   the server before any JS has run, so a timer in React could not gate it.
+--------------------------------------------------------------------------- */
+@keyframes rc-skeleton-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.rc-skeleton-shell {
+  animation: rc-skeleton-in 160ms ease-out var(--rc-skeleton-wait, 400ms) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rc-reveal,
   .rc-draw,
@@ -1418,6 +1465,15 @@ html[data-nav-pending] .page {
   }
   .rc-draw {
     stroke-dashoffset: 0;
+  }
+  /*
+   * The delay is kept — it is not decoration. Reduced motion asks for no
+   * MOVEMENT, and someone who set it still benefits from not being shown a
+   * placeholder that outlives its usefulness. Only the fade is dropped, by
+   * collapsing the ramp to a step at the same deadline.
+   */
+  .rc-skeleton-shell {
+    animation: rc-skeleton-in 1ms step-end var(--rc-skeleton-wait, 400ms) both;
   }
 }
 

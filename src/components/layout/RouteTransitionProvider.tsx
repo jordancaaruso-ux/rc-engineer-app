@@ -39,6 +39,20 @@ function pathsMatch(current: string, target: string): boolean {
 const OVERLAY_SHOW_DELAY_MS = 120;
 
 /**
+ * When a placeholder is allowed to become VISIBLE, measured from the tap.
+ *
+ * The same deadline `rc-skeleton-shell` applies to `loading.tsx` (globals.css), so a
+ * soft navigation and a hard one behave identically — which they did not before:
+ * `loading.tsx` had no delay at all and painted its cards the instant the server
+ * flushed the shell.
+ *
+ * Mounting (above) stays earlier and cheaper than revealing, so the two are
+ * different numbers; subtracting keeps the number the USER experiences at 400ms
+ * rather than 120 + 400.
+ */
+const SKELETON_VISIBLE_AFTER_MS = 400;
+
+/**
  * Backstop: if `beginTransition` arms a transition but navigation never commits
  * (e.g. a touch `pointerdown` that turns into a scroll, not a tap), self-dismiss
  * so a revealed overlay can't strand and hide the whole page.
@@ -116,9 +130,18 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
       </div>
       {showOverlay && pendingHref ? (
         <div
-          className="pointer-events-none absolute inset-0 z-10 flex min-h-0 flex-1 flex-col bg-background"
+          /* No `bg-background` here — `PageLoadingShell` carries it, INSIDE the
+             delayed fade. On this element it would paint opaque the moment the
+             overlay mounts and blank the page the visitor is still reading, 280ms
+             before the placeholder it is covering for is allowed to appear. */
+          className="pointer-events-none absolute inset-0 z-10 flex min-h-0 flex-1 flex-col"
           aria-busy="true"
           aria-live="polite"
+          style={
+            {
+              "--rc-skeleton-wait": `${SKELETON_VISIBLE_AFTER_MS - OVERLAY_SHOW_DELAY_MS}ms`,
+            } as React.CSSProperties
+          }
         >
           {loadingSkeletonForPath(pendingHref)}
         </div>
