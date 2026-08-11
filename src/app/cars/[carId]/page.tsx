@@ -9,16 +9,11 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { CarDeleteClient } from "@/components/cars/CarDeleteClient";
-import {
-  CarSetupSheetModelCard,
-  showLegacySetupSheetTemplateEdit,
-} from "@/components/cars/CarSetupSheetModelCard";
+import { showLegacySetupSheetTemplateEdit } from "@/lib/setupSheetTemplateId";
 import { CarSetupSheetTemplateEdit } from "@/components/cars/CarSetupSheetTemplateEdit";
 import { CarDisciplineEdit } from "@/components/cars/CarDisciplineEdit";
 import { disciplineForCar } from "@/lib/cars/chassisPlatform";
 import { chassisPlatformLabel } from "@/lib/cars/carClasses";
-import { canEditSetupSheetModel } from "@/lib/setupSheetModels/modelAccess";
-import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { CarSetupsCard } from "@/components/setup/CarSetupsCard";
 import { getSetupFillDraftSummaryForCar } from "@/lib/setup/getSetupFillDraft";
 import { CarCurrentSetupCard } from "@/components/setup/CarCurrentSetupCard";
@@ -132,27 +127,19 @@ export default async function CarDetailPage(props: {
 
   /*
    * Wave 3 — the reads that genuinely needed `car` first. `setupHistory` wants the whole
-   * row; `modelRow` and the baselines want `setupSheetModelId`. Independent of each other.
+   * row; the baselines want `setupSheetModelId`. Independent of each other.
+   *
+   * The chassis's default calibration used to be read here too, for the authoring card removed on
+   * 2026-08-11. It was the card's only reader, and on a chassis with no default it cost a second
+   * round trip — so both are gone rather than left fetching for nobody.
    */
-  const [setupHistory, modelRow, baselineCount] = await Promise.all([
+  const [setupHistory, baselineCount] = await Promise.all([
     /*
      * Everything this car can be set up with, in one list: runs where the chassis changed, sheets
      * uploaded for it, baselines published for its chassis, and setups the driver kept. The
      * baselines used to be read again here for their own card — `getCarSetupHistory` owns them now.
      */
     getCarSetupHistory({ userId: user.id, car, displayTimeZone }),
-    // Setup sheet models are global — never scope this read by userId.
-    car.setupSheetModelId
-      ? prisma.setupSheetModel.findUnique({
-          where: { id: car.setupSheetModelId },
-          select: {
-            defaultCalibrationId: true,
-            defaultCalibration: {
-              select: { id: true, name: true, exampleDocumentId: true },
-            },
-          },
-        })
-      : null,
     // Only the count, for the upload panel's "start from a baseline" door.
     car.setupSheetModelId
       ? prisma.baselineSetup.count({ where: { setupSheetModelId: car.setupSheetModelId } })
@@ -186,18 +173,6 @@ export default async function CarDetailPage(props: {
     }
   }
   tireSetsOnCar.sort((a, b) => a.label.localeCompare(b.label));
-
-  // Falls back to the most recently touched calibration only when the model has no
-  // default — one extra round trip, and only on that branch.
-  const modelCalibration =
-    modelRow?.defaultCalibration
-    ?? (car.setupSheetModelId
-      ? await prisma.setupSheetCalibration.findFirst({
-          where: { setupSheetModelId: car.setupSheetModelId },
-          orderBy: { updatedAt: "desc" },
-          select: { id: true, name: true, exampleDocumentId: true },
-        })
-      : null);
 
   return (
     <>
@@ -270,19 +245,22 @@ export default async function CarDetailPage(props: {
             truncated={setupHistory.truncated}
           />
 
-          {/* Authoring card (schema/calibration links) — admins, plus the creator of a
-              still-unauthorized model (the unknown-chassis hand-build path). Release audit
-              2026-08-01: plain drivers must not see workbench/schema doors. */}
-          {car.setupSheetModel && canEditSetupSheetModel(user, car.setupSheetModel) ? (
-            <CarSetupSheetModelCard
-              carId={car.id}
-              model={car.setupSheetModel}
-              isAdmin={isAuthAdminEmail(user.email)}
-              calibrationId={modelCalibration?.id ?? null}
-              calibrationName={modelCalibration?.name ?? null}
-              exampleDocumentId={modelCalibration?.exampleDocumentId ?? null}
-            />
-          ) : null}
+          {/*
+            The "Setup sheet model" authoring card was removed 2026-08-11. All four of its doors had
+            stopped meaning anything to the person looking at a car:
+
+              - "Edit setup sheet" and "Edit PDF calibration" are workbench jobs, and the workbench
+                is at `/setup-sheet-models` where an admin already goes to do them.
+              - "Upload new setup for this car" has its own door now, at the top of this page.
+              - "View baseline setup PDF" pointed at the example document behind a calibration,
+                which is not a thing a driver has any use for.
+
+            It was also about to leak. The card showed for admins OR for the creator of a chassis
+            nobody had approved yet — and the blank-sheet upload door (shipped 2026-08-11) makes
+            every driver who uploads their own sheet exactly that. So the release-audit rule above
+            it, "plain drivers must not see workbench/schema doors", was days from being broken
+            without anyone changing the rule.
+          */}
 
           {showLegacySetupSheetTemplateEdit(car.setupSheetModelId, car.setupSheetTemplate) ? (
             <CarSetupSheetTemplateEdit carId={car.id} currentTemplate={car.setupSheetTemplate} />

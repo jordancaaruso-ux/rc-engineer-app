@@ -39,6 +39,21 @@ export function isA800RRCar(template: string | null | undefined): boolean {
   return canonicalSetupSheetTemplateId(template ?? null) === SETUP_SHEET_TEMPLATE_A800RR;
 }
 
+/**
+ * Show the legacy A800 template picker? Only for a car with no chassis type of its own.
+ *
+ * Lived on `CarSetupSheetModelCard` until that card was removed on 2026-08-11; it has nothing to do
+ * with the card and everything to do with the template ids in this module, so it moved here rather
+ * than keeping a component file alive for one exported function.
+ */
+export function showLegacySetupSheetTemplateEdit(
+  setupSheetModelId: string | null | undefined,
+  setupSheetTemplate: string | null | undefined
+): boolean {
+  if (setupSheetModelId) return false;
+  return isA800RRCar(setupSheetTemplate) || !setupSheetTemplate;
+}
+
 /** Short label for car lists and setup UX (“car type” for structured setup features). */
 export function labelForSetupSheetTemplate(template: string | null | undefined): string {
   const canonical = canonicalSetupSheetTemplateId(template ?? null);
