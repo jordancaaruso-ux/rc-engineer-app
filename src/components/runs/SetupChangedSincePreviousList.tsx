@@ -2,6 +2,7 @@
 
 import { Fragment } from "react";
 import type { SetupChangedRow } from "@/lib/setupCompare/changedSincePrevious";
+import { SetupChangedSheetImage } from "@/components/runs/SetupChangedSheetImage";
 import { cn } from "@/lib/utils";
 
 const HEAD_CELL =
@@ -15,9 +16,16 @@ const HEAD_CELL =
 export function SetupChangedSincePreviousList({
   rows,
   className,
+  carId,
 }: {
   rows: SetupChangedRow[] | null;
   className?: string;
+  /**
+   * When given, and this car's chassis came from an uploaded PDF, the changed boxes are also drawn
+   * on a crop of the driver's own sheet — see `SetupChangedSheetImage`. It draws nothing for every
+   * other chassis, so passing it is always safe and never changes what an ordinary car shows.
+   */
+  carId?: string | null;
 }) {
   if (rows == null) {
     return (
@@ -34,13 +42,14 @@ export function SetupChangedSincePreviousList({
     );
   }
   return (
-    <div
+    <div className={cn("space-y-2", className)}>
+      {carId ? <SetupChangedSheetImage carId={carId} rows={rows} /> : null}
+      <div
       className={cn(
         // `w-fit` so the frame hugs the tracks. Without it the box stays full
         // width while the packed tracks don't, and the sticky header band stops
         // half way across.
-        "max-h-48 w-fit max-w-full overflow-y-auto rounded-md border border-border bg-muted/70",
-        className
+        "max-h-48 w-fit max-w-full overflow-y-auto rounded-md border border-border bg-muted/70"
       )}
     >
       {/* Single grid so NOW / WAS align in fixed columns across every row —
@@ -72,6 +81,7 @@ export function SetupChangedSincePreviousList({
             </Fragment>
           );
         })}
+      </div>
       </div>
     </div>
   );

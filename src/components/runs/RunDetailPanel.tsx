@@ -718,6 +718,7 @@ export function RunDetailPanel({
         <Eyebrow>Setup vs previous run</Eyebrow>
         <SetupChangedSincePreviousList
           rows={setupPreview.mode === "no_baseline" ? null : setupPreview.rows}
+          carId={run.car?.id ?? null}
         />
       </div>
 
