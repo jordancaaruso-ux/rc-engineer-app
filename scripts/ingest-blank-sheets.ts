@@ -220,7 +220,10 @@ async function main() {
     }
     if (o.kind !== "ok") continue;
 
-    const file = new File([o.bytes], basename(p.entry.pdfPath), { type: "application/pdf" });
+    // Buffer's backing store is ArrayBufferLike, which File's typings reject; copy the view.
+    const file = new File([new Uint8Array(o.bytes)], basename(p.entry.pdfPath), {
+      type: "application/pdf",
+    });
     const result = await createModelFromBlank({
       user: { id: user.id, email: user.email },
       name: p.entry.name,
