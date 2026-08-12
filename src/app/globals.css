@@ -1621,3 +1621,81 @@ html.video-overlay-fullscreen-active body {
 
 
 
+
+/* ---------------------------------------------------------------------------
+   Demo walkthrough (src/components/demo/tour/*). Demo sessions only.
+
+   The dim is painted by the CUTOUT's box-shadow, not by a filled scrim, so the
+   element inside the hole shows through at full brightness. The scrim above the
+   page is transparent and exists only to swallow pointer events.
+--------------------------------------------------------------------------- */
+
+:root {
+  /* Spread on the cutout's shadow. `200vmax` rather than a hardcoded 9999px:
+     on a 3x DPR phone that would be a ~30000px shadow box, which Safari has
+     been seen to band or drop outright. 200vmax provably exceeds the diagonal
+     from any point on screen and scales with the device. */
+  --rc-tour-spread: 200vmax;
+}
+
+.rc-tour-hole {
+  /* Dim is the page ground at 0.78, NOT black — the page is Ash warm, and a
+     black scrim reads as a colour shift at the hole's edge. */
+  box-shadow: 0 0 0 var(--rc-tour-spread) rgb(var(--page-bg-rgb) / 0.78);
+  /* A white hairline, deliberately not yellow: yellow is action-only in this
+     palette (see the DemoBanner ruling), and the tour spends its one yellow on
+     the Next button. */
+  outline: 1px solid rgb(255 255 255 / 0.16);
+  transition:
+    top 0.28s cubic-bezier(0.3, 0.9, 0.35, 1),
+    left 0.28s cubic-bezier(0.3, 0.9, 0.35, 1),
+    width 0.28s cubic-bezier(0.3, 0.9, 0.35, 1),
+    height 0.28s cubic-bezier(0.3, 0.9, 0.35, 1);
+}
+
+.rc-tour-pop {
+  animation: rc-tour-in 0.22s cubic-bezier(0.3, 0.9, 0.35, 1) both;
+}
+
+@keyframes rc-tour-in {
+  from {
+    opacity: 0;
+    /* No transform on the settled state — a transformed ancestor would become
+       the containing block for the `position: fixed` cutout. Same reason
+       `rc-reveal` omits its `to { transform }`. */
+    transform: translateY(6px);
+  }
+}
+
+/* Progress rail — the page title's own timing line at popover scale.
+   `.page-title::before` already draws a −21deg yellow sector on a hairline
+   track to say which of N destinations you are in ("yellow here carries
+   location, not decoration"). Reusing it means the app has ONE way of showing
+   position in a sequence, not two. */
+.rc-tour-rail {
+  position: relative;
+  height: 2px;
+  margin-top: 2px;
+  background: rgb(var(--color-border));
+}
+
+.rc-tour-rail > i {
+  position: absolute;
+  bottom: -1px;
+  height: 4px;
+  width: calc(100% / var(--rc-tour-n, 7));
+  left: calc(var(--rc-tour-i, 0) * (100% / var(--rc-tour-n, 7)));
+  background: rgb(var(--color-primary));
+  transform: skewX(-21deg);
+  transition: left 0.34s cubic-bezier(0.3, 0.9, 0.35, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rc-tour-hole,
+  .rc-tour-rail > i {
+    transition: none;
+  }
+  .rc-tour-pop {
+    animation: none;
+  }
+}

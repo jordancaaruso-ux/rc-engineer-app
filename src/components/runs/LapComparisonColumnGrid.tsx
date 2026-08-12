@@ -323,22 +323,22 @@ export function LapComparisonColumnGrid({
       "run",
       primaryLaps
     );
+    /*
+     * The target is the run you opened, so it wears that run's clock — the same
+     * instant the sheet's own header prints and the same one every other row in
+     * the picker resolves. It used to read the primary IMPORT's time instead,
+     * which with no `sessionCompletedAt` on the timing sheet degraded to the
+     * import row's `createdAt`: the moment the laps were pasted in, not the
+     * moment the car was on track. A run driven at 4:40 PM and imported after
+     * midnight showed as the next day at 2:26 AM, against a list of siblings all
+     * dated correctly — the one row you cannot untick looked like someone
+     * else's session. Any real on-track wall time already lives on the Run
+     * itself, which `resolveRunDisplayInstant` prefers.
+     */
     const anchorSessionIso = resolveRunDisplayInstant(compareAnchorRun).toISOString();
     const primaryImport =
       run.importedLapSets?.find((x) => x.isPrimaryUser) ?? run.importedLapSets?.[0];
-    const primaryFallback =
-      primaryImport && primaryImport.createdAt != null
-        ? typeof primaryImport.createdAt === "string"
-          ? primaryImport.createdAt
-          : primaryImport.createdAt.toISOString()
-        : anchorSessionIso;
-    const meSortIso = primaryImport
-      ? resolveImportedSessionDisplayTimeIso({
-          sessionCompletedAt: primaryImport.sessionCompletedAt ?? null,
-          parsedPayload: undefined,
-          createdAt: primaryFallback,
-        })
-      : anchorSessionIso;
+    const meSortIso = anchorSessionIso;
 
     const anchorTrack = lapCompareTrackKey(
       compareAnchorRun.track?.name ?? compareAnchorRun.trackNameSnapshot ?? null
@@ -352,7 +352,16 @@ export function LapComparisonColumnGrid({
         isWallClockTime: primaryImport?.sessionCompletedAt != null,
       }),
       sortIso: meSortIso,
-      name: formatRunSessionDisplay(compareAnchorRun, { fallback: primaryRunLabel }),
+      // Falls back to the car, not the driver — the same fallback the history
+      // rows below it use. An unlabelled run put "Jordan Caruso" on the target
+      // and "A800RR" on every row under it, so the pinned row read as a
+      // different kind of thing from the sessions it is measured against.
+      name: formatRunSessionDisplay(compareAnchorRun, {
+        fallback:
+          compareAnchorRun.car?.name?.trim() ||
+          compareAnchorRun.carNameSnapshot?.trim() ||
+          primaryRunLabel,
+      }),
       segment: "driver",
       trackKey: anchorTrack,
     });

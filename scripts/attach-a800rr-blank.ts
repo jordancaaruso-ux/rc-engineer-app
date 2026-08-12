@@ -1,35 +1,29 @@
 /**
- * Attach a sheet picture to the EXISTING Awesomatix A800RR chassis — scratch DB only.
+ * Attach a sheet picture to the EXISTING Awesomatix A800RR chassis.
  *
  * Creates the SetupSheetBlank row that a derived chassis gets at upload, but with boxes built from
  * the CALIBRATION's mappings (existing schema keys; see boxesFromCalibration.ts) instead of minted
  * ones. The blank's PDF is the calibration's own example document — the exact file the mappings
  * were made against — and the page image pipeline blanks its values before rendering.
  *
- * Idempotent: refuses if the model already has a blank (delete it first to re-run).
+ * Because the boxes land on keys the schema ALREADY uses, every run logged against this chassis
+ * renders on the paper the moment the row exists. Nothing about the runs themselves changes.
+ *
+ *   npm run attach-a800rr                 preflight, writes nothing
+ *   npm run attach-a800rr -- --apply
+ *   npm run attach-a800rr -- --apply --prod
+ *
+ * Idempotent: refuses if the model already has a blank (delete it first to re-attach).
+ *
+ * `--conditions=react-server` is required: the storage and page-image modules import `server-only`.
  */
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { PrismaClient } from "@prisma/client";
-import { extractPdfFormFields } from "../src/lib/setupDocuments/pdfFormFields";
-import { boxesFromCalibrationMappings } from "../src/lib/setupSheetModels/boxesFromCalibration";
-import { normalizeSetupSheetModelName } from "../src/lib/setupSheetModels/normalizeModelName";
-import { parseSetupSheetModelSchema } from "../src/lib/setupSheetModels/types";
-import type { PdfFormFieldMappingRule } from "../src/lib/setupCalibrations/types";
-
-const repo = "c:/Users/Jordan/rc-engineer-app";
-
-function loadDatabaseUrl(): string {
-  const raw = readFileSync(resolve(repo, ".env.local"), "utf8");
-  for (const line of raw.split(/\r?\n/)) {
-    const m = line.match(/^DATABASE_URL\s*=\s*"?([^"\r\n]+)"?\s*$/);
-    if (m) return m[1]!;
-  }
-  throw new Error("DATABASE_URL not found in .env.local");
-}
-const url = loadDatabaseUrl();
-if (!url.includes("ep-muddy-unit")) throw new Error("Refusing: not the scratch host (ep-muddy-unit).");
-const prisma = new PrismaClient({ datasources: { db: { url } } });
+import { prisma } from "@/lib/prisma";
+import { extractPdfFormFields } from "@/lib/setupDocuments/pdfFormFields";
+import { boxesFromCalibrationMappings } from "@/lib/setupSheetModels/boxesFromCalibration";
+import { normalizeSetupSheetModelName } from "@/lib/setupSheetModels/normalizeModelName";
+import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
+import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
+import { guardDatabaseTarget } from "./lib/neonEnvGuard";
 
 /**
  * Printed boxes the calibration never mapped because the import path COMPUTES their values.
@@ -44,6 +38,12 @@ const EXTRA_SIMPLE_KEYS: Record<string, string> = {
 };
 
 async function main() {
+  const args = process.argv.slice(2);
+  const apply = args.includes("--apply");
+  // Storing the pre-rendered page images on prod without a Blob token would write rows pointing at
+  // `.local-uploads/` — dead references on Vercel, and a 2.5s re-render on every sheet open.
+  guardDatabaseTarget({ apply, prodFlag: args.includes("--prod"), requireBlobOnProd: true });
+
   const model = await prisma.setupSheetModel.findUnique({
     where: { slug: "awesomatix_a800rr" },
     select: {
@@ -70,7 +70,7 @@ async function main() {
   const schema = parseSetupSheetModelSchema(model.schemaJson);
   if (!schema) throw new Error("schema failed to parse");
 
-  const { readBytesFromStorageRef } = await import("../src/lib/setupDocuments/storage");
+  const { readBytesFromStorageRef } = await import("@/lib/setupDocuments/storage");
   const pdfBytes = await readBytesFromStorageRef(calibration.exampleDocument.storagePath);
   const extraction = await extractPdfFormFields(Buffer.from(pdfBytes));
   if (!extraction.hasFormFields) throw new Error(`example PDF has no form layer: ${extraction.loadError}`);
@@ -92,8 +92,8 @@ async function main() {
   const missing = schema.fields.filter((f) => !drawableKeys.has(f.key)).map((f) => f.key);
   console.log(`schema fields with no box (hidden on the sheet): ${JSON.stringify(missing)}`);
 
-  if (process.argv.includes("--dry")) {
-    console.log("dry run — nothing written");
+  if (!apply) {
+    console.log("dry run — nothing written. Re-run with --apply.");
     return;
   }
 
@@ -112,7 +112,7 @@ async function main() {
   });
   console.log(`blank created: ${blank.id}`);
 
-  const { prerenderSheetPages } = await import("../src/lib/setupSheetModels/sheetPageImages");
+  const { prerenderSheetPages } = await import("@/lib/setupSheetModels/sheetPageImages");
   const drawn = await prerenderSheetPages(model.id);
   console.log(`pages prerendered: ${drawn}`);
 }

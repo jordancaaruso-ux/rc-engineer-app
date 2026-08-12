@@ -1476,7 +1476,13 @@ export function EngineerChatPanel({
           />
         ) : null}
 
-        <div className="flex items-end gap-2">
+        {/*
+          Demo walkthrough stop 6 — the one stop that releases the scrim, so the textarea and
+          send button inside the cutout are usable. `/api/engineer/chat` is the only path in
+          the demo write allowlist, and the route already caps a demo visitor at two live
+          questions a day.
+        */}
+        <div className="flex items-end gap-2" data-tour="engineer-composer">
 
           <textarea
 

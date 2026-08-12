@@ -31,6 +31,17 @@ const PAGES = [
 ];
 
 test("no real names render anywhere on the demo account", async ({ page }) => {
+  // The demo walkthrough auto-starts for this account and would dim every page it walks. It
+  // does not hide text from `innerText`, so this spec would still pass — but a scrim over
+  // fourteen pages makes any failure impossible to read. Mark it done before the first load.
+  await page.addInitScript(() => {
+    try {
+      sessionStorage.setItem("jrc-demo-tour", JSON.stringify({ status: "done", stepIndex: 0 }));
+    } catch {
+      /* storage blocked — the tour degrades to in-memory and will show; harmless here */
+    }
+  });
+
   const out = execFileSync(
     "npx",
     ["dotenv-cli", "-e", ".env.local", "--", "node", "--conditions=react-server", "--import", "tsx",

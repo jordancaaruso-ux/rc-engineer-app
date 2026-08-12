@@ -74,9 +74,30 @@ function run(
   };
 }
 
+const ANCHOR_LAPS = laps([..."run_4"].reduce((a, c) => a * 31 + c.charCodeAt(0), 7), 14.93);
+
 const ANCHOR = {
   ...run("run_4", "Run 4", 0, 14.93),
   importedLapSets: [
+    /*
+     * The driver's OWN row off the timing sheet, imported after midnight and
+     * carrying no on-track wall time — the shape that produced the target-row
+     * date bug (reported 2026-08-12). Its laps match the run's, so
+     * `filterDuplicateImportedSeries` drops the duplicate column and it survives
+     * only as the run's `primaryImport`: exactly how a real LiveRC import lands.
+     */
+    {
+      id: "imp_me",
+      driverName: "Dayne Warren",
+      isPrimaryUser: true,
+      createdAt: new Date(Date.UTC(2026, 7, 9, 13, 26, 0)),
+      sessionCompletedAt: null,
+      laps: ANCHOR_LAPS.map((t, i) => ({
+        lapNumber: i + 1,
+        lapTimeSeconds: t,
+        isIncluded: i !== 4,
+      })),
+    },
     {
       id: "imp_volk",
       driverName: "T. Volk",

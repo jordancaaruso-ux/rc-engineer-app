@@ -11,11 +11,14 @@ export function CardPanel({
   className,
   contentClassName,
   overflowHidden,
+  dataTour,
 }: {
   children: ReactNode;
   className?: string;
   contentClassName?: string;
   overflowHidden?: boolean;
+  /** `data-tour` anchor for the demo walkthrough — see `SurfaceCard`. */
+  dataTour?: string;
 }) {
   return (
     <SurfaceCard
@@ -23,6 +26,7 @@ export function CardPanel({
       className={className}
       contentClassName={contentClassName}
       overflowHidden={overflowHidden}
+      dataTour={dataTour}
     >
       {children}
     </SurfaceCard>

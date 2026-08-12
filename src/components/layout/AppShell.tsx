@@ -13,6 +13,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { TodayDraftRunProvider } from "@/components/layout/TodayDraftRunProvider";
 import { RouteTransitionProvider } from "@/components/layout/RouteTransitionProvider";
 import { DemoBanner } from "@/components/layout/DemoBanner";
+import { DemoTour } from "@/components/demo/tour/DemoTour";
 import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -80,6 +81,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           <MobileBrandMark />
           <MobileTitleCondenser />
           <AccountMenu />
+          {/*
+           * The demo walkthrough. Renders null for everyone who is not in the shared demo
+           * session, so it costs a `useSession()` read and nothing else. Deliberately out
+           * here beside BottomNav rather than inside `.app-shell` — same fixed-position
+           * clipping reason — and only in this branch, so `isHiddenNavRoute` already keeps
+           * it off /demo, /login, /welcome and /join without a second route list.
+           */}
+          <DemoTour />
         </MobileBackProvider>
       </PrimaryNavProvider>
     </TodayDraftRunProvider>

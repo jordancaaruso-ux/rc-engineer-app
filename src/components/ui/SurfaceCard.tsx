@@ -19,10 +19,18 @@ export function SurfaceCard({
   overflowHidden = true,
   muted = false,
   bare = false,
+  dataTour,
 }: {
   children: ReactNode;
   variant?: "hero" | "panel";
   className?: string;
+  /**
+   * `data-tour` anchor id for the demo walkthrough (`src/lib/demo/tourSteps.ts`). Inert
+   * markup — it changes nothing about how the card renders, and only the tour ever reads it.
+   * An explicit prop rather than a `...rest` spread because this component enumerates its
+   * props on purpose.
+   */
+  dataTour?: string;
   /** Applied to the inner content wrapper. Pass `p-0` for custom/flush layouts. */
   contentClassName?: string;
   overflowHidden?: boolean;
@@ -41,7 +49,7 @@ export function SurfaceCard({
 
   if (bare) {
     return (
-      <div className={className}>
+      <div className={className} data-tour={dataTour}>
         <div className={cn("relative", contentClassName)}>{children}</div>
       </div>
     );
@@ -49,6 +57,7 @@ export function SurfaceCard({
 
   return (
     <div
+      data-tour={dataTour}
       className={cn(
         // `.glass-card` owns background alpha, backdrop blur, border color, and shadows.
         "glass-card group relative border transition-[opacity,filter] duration-500",
