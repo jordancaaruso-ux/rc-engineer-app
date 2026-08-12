@@ -1,10 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SheetFillSurface, type SheetFillPlan } from "@/components/setup/SheetFillSurface";
+import { SheetGeometryStrip } from "@/components/rollCenter/SheetGeometryStrip";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { haptic } from "@/lib/haptics";
-import { surfaceValuesToStoredMerge } from "@/lib/setupSheetModels/sheetSurfaceValues";
+import {
+  surfaceValuesToStored,
+  surfaceValuesToStoredMerge,
+} from "@/lib/setupSheetModels/sheetSurfaceValues";
 
 /**
  * The setup part of "Log your run", for a car whose chassis came from somebody's own PDF.
@@ -35,9 +39,12 @@ export function RunSheetSetupFill({
   seedValues,
   seedKey,
   onValues,
+  templateKey,
 }: {
   setupSheetModelId: string;
   chassisName: string;
+  /** Chassis-type key, for the computed-geometry strip. No key, no strip. */
+  templateKey?: string | null;
   /** The run's current setup, as sheet values. Read when the sheet is opened, not while it is up. */
   seedValues: Record<string, string>;
   /** Changes when the setup itself is replaced from outside the sheet. See above. */
@@ -65,13 +72,47 @@ export function RunSheetSetupFill({
     onValuesRef.current = onValues;
   });
   const planRef = useRef<SheetFillPlan | null>(null);
+  /** The plan as state too, so the geometry strip redraws when it lands. Fires once. */
+  const [planFields, setPlanFields] = useState<SheetFillPlan["fields"] | null>(null);
+  /**
+   * The boxes as they stand, kept here as well as pushed up.
+   *
+   * The parent owns the run's setup and merges into it; this is a local copy for the geometry strip
+   * alone, so the roll centre can move as boxes are filled without the run form re-rendering into
+   * the loop the stable `onChange` above exists to prevent.
+   */
+  const [liveValues, setLiveValues] = useState<Record<string, string>>(seedValues);
+  /**
+   * The setup this sheet opened ON, frozen.
+   *
+   * `seedValues` is derived from the run's setup, and the run's setup is what this sheet writes to
+   * — so it moves every time a box is filled. Using it directly as the geometry baseline would make
+   * the baseline chase the values and the delta read zero forever. Same hazard as the surface's
+   * read-once `initialValues`, and the same answer: capture at open.
+   */
+  const [openedFrom, setOpenedFrom] = useState<Record<string, string>>(seedValues);
   const handleChange = useCallback((next: Record<string, string>) => {
+    setLiveValues(next);
     // Through the bridge before it leaves this component: the run's setup snapshot must hold the
     // same shapes a form edit writes, or "what changed since your last run" would report every
     // grouped row as changed after every sheet-logged run.
     const plan = planRef.current;
     onValuesRef.current(plan ? surfaceValuesToStoredMerge(next, plan.fields) : next);
   }, []);
+
+  /*
+   * Geometry compares against the setup this run OPENED on — the previous run's, or whichever setup
+   * was chosen above. `surfaceValuesToStored` rather than the merge variant on both sides: the
+   * deletion markers the merge emits are for writing to a snapshot, not for reading a geometry from.
+   */
+  const geometryValue = useMemo(
+    () => (planFields ? surfaceValuesToStored(liveValues, planFields) : null),
+    [liveValues, planFields]
+  );
+  const geometryBaseline = useMemo(
+    () => (planFields ? surfaceValuesToStored(openedFrom, planFields) : null),
+    [openedFrom, planFields]
+  );
 
   if (!open) {
     return (
@@ -88,6 +129,10 @@ export function RunSheetSetupFill({
             type="button"
             onClick={() => {
               haptic("light");
+              // The sheet opens against the setup that is current NOW, so the geometry it reads and
+              // the geometry it counts from both start there — and the baseline stays there.
+              setLiveValues(seedValues);
+              setOpenedFrom(seedValues);
               setOpenedFor(seedKey);
             }}
             className={buttonLinkClassName("outline")}
@@ -118,6 +163,14 @@ export function RunSheetSetupFill({
           Close the sheet
         </button>
       </div>
+      {geometryValue ? (
+        <SheetGeometryStrip
+          value={geometryValue}
+          baselineValue={geometryBaseline}
+          templateKey={templateKey}
+          labLabels={{ s: "This run", g: "Setup you started from" }}
+        />
+      ) : null}
       <SheetFillSurface
         planUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-plan`}
         pageImageUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-page`}
@@ -125,6 +178,7 @@ export function RunSheetSetupFill({
         onChange={handleChange}
         onPlanLoaded={(p) => {
           planRef.current = p;
+          setPlanFields(p.fields);
         }}
       />
     </div>

@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SheetFillSurface, type SheetFillPlan } from "@/components/setup/SheetFillSurface";
+import { SheetGeometryStrip } from "@/components/rollCenter/SheetGeometryStrip";
 import {
   storedValuesToSurface,
   surfaceValuesToStored,
@@ -27,6 +28,7 @@ export function SheetSetupEditorClient({
   setupName,
   setupSheetModelId,
   initialValues,
+  templateKey,
 }: {
   carId: string;
   setupId: string;
@@ -34,6 +36,8 @@ export function SheetSetupEditorClient({
   setupName?: string | null;
   setupSheetModelId: string;
   initialValues: SetupSnapshotData;
+  /** Chassis-type key, for the computed-geometry strip. No key, no strip. */
+  templateKey?: string | null;
 }) {
   const router = useRouter();
   const [values, setValues] = useState<Record<string, string>>(() =>
@@ -45,12 +49,23 @@ export function SheetSetupEditorClient({
   // Skip the save that the initial render would otherwise trigger.
   const dirty = useRef(false);
   const planRef = useRef<SheetFillPlan | null>(null);
+  /** The plan as state too, so the geometry strip redraws when it lands. Fires once. */
+  const [planFields, setPlanFields] = useState<SheetFillPlan["fields"] | null>(null);
 
   const toStored = useCallback((surface: Record<string, string>): Record<string, unknown> => {
     const plan = planRef.current;
     // No plan yet means nothing has been drawn, so nothing can be dirty — but fail safe anyway.
     return plan ? surfaceValuesToStored(surface, plan.fields) : surface;
   }, []);
+
+  /*
+   * Geometry reads the boxes as they stand; the delta counts from the setup as it was opened, so it
+   * reads "what I have changed in this edit". `initialValues` is already in stored shapes.
+   */
+  const geometryValue = useMemo(
+    () => (planFields ? surfaceValuesToStored(values, planFields) : null),
+    [values, planFields]
+  );
 
   const save = useCallback(
     async (next: Record<string, string>) => {
@@ -129,6 +144,14 @@ export function SheetSetupEditorClient({
           <span className="ui-caption text-destructive">{error}</span>
         ) : null}
       </div>
+      {geometryValue ? (
+        <SheetGeometryStrip
+          value={geometryValue}
+          baselineValue={initialValues}
+          templateKey={templateKey}
+          labLabels={{ s: setupName ?? "This setup", g: "As opened" }}
+        />
+      ) : null}
       <SheetFillSurface
         planUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-plan`}
         pageImageUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-page`}
@@ -139,6 +162,7 @@ export function SheetSetupEditorClient({
         }}
         onPlanLoaded={(p) => {
           planRef.current = p;
+          setPlanFields(p.fields);
         }}
       />
     </div>

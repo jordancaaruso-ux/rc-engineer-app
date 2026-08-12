@@ -111,6 +111,7 @@ export default async function CarSetupEditPage(props: {
               setupName={setup.name}
               setupSheetModelId={car.setupSheetModelId}
               initialValues={normalizeSetupData(setup.data)}
+              templateKey={template.templateKey}
             />
           ) : (
             <LibrarySetupEditorClient

@@ -1492,7 +1492,12 @@ export function NewRunForm(props: {
    * Set when this car's chassis was derived from somebody's own PDF and fills in on a picture of
    * that sheet. The log-run form cannot show those cars a field list — see `RunSheetSetupFill`.
    */
-  const [sheetChassis, setSheetChassis] = useState<{ modelId: string; name: string } | null>(null);
+  const [sheetChassis, setSheetChassis] = useState<{
+    modelId: string;
+    name: string;
+    /** Chassis-type key, so the sheet can show this car's computed geometry. */
+    templateKey: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!carId) {
@@ -1506,6 +1511,7 @@ export function NewRunForm(props: {
       .then(
         (d: {
           template?: SetupSheetTemplate;
+          templateKey?: string | null;
           sheetMode?: boolean;
           setupSheetModelId?: string | null;
         }) => {
@@ -1513,7 +1519,11 @@ export function NewRunForm(props: {
           if (d.template) setModelTemplate(d.template);
           setSheetChassis(
             d.sheetMode && d.setupSheetModelId
-              ? { modelId: d.setupSheetModelId, name: d.template?.label || "Your sheet" }
+              ? {
+                  modelId: d.setupSheetModelId,
+                  name: d.template?.label || "Your sheet",
+                  templateKey: d.templateKey ?? d.template?.templateKey ?? null,
+                }
               : null
           );
         }
@@ -5270,6 +5280,7 @@ export function NewRunForm(props: {
               <RunSheetSetupFill
                 setupSheetModelId={sheetChassis.modelId}
                 chassisName={sheetChassis.name}
+                templateKey={sheetChassis.templateKey}
                 seedValues={sheetSeedValues}
                 seedKey={sheetSeedKey}
                 onValues={applySheetValuesToSetup}

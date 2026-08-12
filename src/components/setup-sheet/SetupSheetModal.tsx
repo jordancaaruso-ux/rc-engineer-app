@@ -692,7 +692,15 @@ export function SetupSheetModal({
                  * to another run falls back to the field list: highlights and community-spread
                  * colouring live there, and a compare without them answers nothing.
                  */
-                <ReadOnlySheetSurface setupSheetModelId={sheetModelId} values={runSetup} />
+                /* No baseline here by construction: picking one is what turns `compareActive` on,
+                   and that routes to the field list instead. Geometry deltas for a comparison live
+                   in `RollCenterCompareStrip` on the compare panel. */
+                <ReadOnlySheetSurface
+                  setupSheetModelId={sheetModelId}
+                  values={runSetup}
+                  templateKey={template.templateKey}
+                  labLabels={{ s: "This run" }}
+                />
               ) : (
                 <SetupSheetView
                   key={template.id}

@@ -185,6 +185,8 @@ export default async function CarSetupViewPage(props: {
           <ReadOnlySheetSurface
             setupSheetModelId={car.setupSheetModelId}
             values={normalizeSetupData(setup.data)}
+            templateKey={template.templateKey}
+            labLabels={{ s: title }}
           />
         ) : (
           <ReadOnlySetupSheet

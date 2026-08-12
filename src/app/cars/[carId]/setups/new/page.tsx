@@ -232,6 +232,7 @@ export default async function NewCarSetupPage(props: {
               carId={car.id}
               setupSheetModelId={car.setupSheetModelId}
               chassisName={template.label ?? car.name}
+              templateKey={template.templateKey}
               initialValues={fillDraft?.values}
               baselines={startFromBaseline && !fillDraft ? baselines : undefined}
             />

@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptics";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { SheetFillSurface, type SheetFillPlan } from "@/components/setup/SheetFillSurface";
+import { SheetGeometryStrip } from "@/components/rollCenter/SheetGeometryStrip";
 import { useSetupFillDraft } from "@/components/setup/useSetupFillDraft";
 import { withoutEmptySheetValues } from "@/lib/setupSheetModels/sheetValues";
 import {
@@ -40,10 +41,13 @@ export function SheetModeFill({
   initialValues,
   initialName,
   baselines,
+  templateKey,
 }: {
   carId: string;
   setupSheetModelId: string;
   chassisName: string;
+  /** Chassis-type key, for the computed-geometry strip. No key, no strip. */
+  templateKey?: string | null;
   /**
    * A resumed draft, or the setup being edited — in STORED shapes (arrays, preset objects), which
    * is what drafts and snapshots hold. Converted to the surface's strings here, and back to
@@ -83,6 +87,14 @@ export function SheetModeFill({
    * has been typed.
    */
   const planRef = useRef<SheetFillPlan | null>(null);
+  /**
+   * The same plan again, as state.
+   *
+   * The ref is what saving reads, and a ref cannot make the geometry strip redraw when the plan
+   * finally lands. `onPlanLoaded` fires exactly once, from the surface's fetch, so this is one
+   * render — not a loop.
+   */
+  const [planFields, setPlanFields] = useState<SheetFillPlan["fields"] | null>(null);
   const [name, setName] = useState(initialName ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -179,6 +191,23 @@ export function SheetModeFill({
 
   const filled = Object.keys(withoutEmptySheetValues(values)).length;
 
+  /*
+   * What the geometry strip reads: the boxes as they stand, and the boxes as they opened.
+   *
+   * Both go through the same bridge saving uses, so the numbers on the strip are computed from the
+   * shapes that will actually be stored — not from a second, looser reading of the same boxes. The
+   * baseline is deliberately the values as LOADED (or as poured from a baseline), which makes the
+   * delta read "what I have changed this session".
+   */
+  const geometryValue = useMemo(
+    () => (planFields ? surfaceValuesToStored(values, planFields) : null),
+    [values, planFields]
+  );
+  const geometryBaseline = useMemo(
+    () => (planFields && startValues ? surfaceValuesToStored(startValues, planFields) : null),
+    [startValues, planFields]
+  );
+
   /** Pour a baseline into the boxes, then get out of the way — the sheet is what they came for. */
   function startFrom(choice: BaselineStartChoice | null) {
     if (choice) {
@@ -236,6 +265,14 @@ export function SheetModeFill({
 
   return (
     <div className="space-y-3">
+      {geometryValue ? (
+        <SheetGeometryStrip
+          value={geometryValue}
+          baselineValue={geometryBaseline}
+          templateKey={templateKey}
+          labLabels={{ s: name.trim() || "This sheet", g: "As opened" }}
+        />
+      ) : null}
       <SheetFillSurface
         planUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-plan`}
         pageImageUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-page`}
@@ -243,6 +280,7 @@ export function SheetModeFill({
         onChange={onSurfaceChange}
         onPlanLoaded={(p) => {
           planRef.current = p;
+          setPlanFields(p.fields);
         }}
       />
 
