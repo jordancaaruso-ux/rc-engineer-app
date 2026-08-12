@@ -13,7 +13,6 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { TodayDraftRunProvider } from "@/components/layout/TodayDraftRunProvider";
 import { RouteTransitionProvider } from "@/components/layout/RouteTransitionProvider";
 import { DemoBanner } from "@/components/layout/DemoBanner";
-import { DemoTour } from "@/components/demo/tour/DemoTour";
 import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -82,13 +81,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           <MobileTitleCondenser />
           <AccountMenu />
           {/*
-           * The demo walkthrough. Renders null for everyone who is not in the shared demo
-           * session, so it costs a `useSession()` read and nothing else. Deliberately out
-           * here beside BottomNav rather than inside `.app-shell` — same fixed-position
-           * clipping reason — and only in this branch, so `isHiddenNavRoute` already keeps
-           * it off /demo, /login, /welcome and /join without a second route list.
+           * The demo walkthrough used to mount here — out beside BottomNav rather than inside
+           * `.app-shell`, for the same fixed-position clipping reason, and only in this branch
+           * so `isHiddenNavRoute` kept it off /demo, /login, /welcome and /join for free.
+           *
+           * Unmounted 2026-08-12 (founder): on a phone the popover works too hard to align to
+           * specific cards, and it misses more often than it lands. The whole tour is still in
+           * the tree — `src/components/demo/tour/`, `src/lib/demo/tourSteps.ts`, and the
+           * `/debug/demo-tour-preview` harness — so bringing it back is re-adding
+           * `<DemoTour />` here and the "Take the tour" button in DemoBanner. Fix the mobile
+           * anchoring before that happens.
            */}
-          <DemoTour />
         </MobileBackProvider>
       </PrimaryNavProvider>
     </TodayDraftRunProvider>
