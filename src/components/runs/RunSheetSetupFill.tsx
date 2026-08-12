@@ -16,18 +16,29 @@ import { surfaceValuesToStoredMerge } from "@/lib/setupSheetModels/sheetSurfaceV
  * than useless. On a chassis derived from a PDF that is most of the sheet, so the section rendered
  * empty: the driver had a car they could log runs on and no way to say what the car was on.
  *
- * ============================== WHY IT IS BEHIND A BUTTON ==============================
+ * ============================== WHY IT OPENS BY ITSELF ==============================
  *
- * Opening the sheet costs a picture of a page, and the run form is long. Most runs are logged from
- * a setup the driver already chose above — a past run, a saved setup — and they never need to look
- * at the paper at all. So the sheet loads when it is asked for, not when the section opens.
+ * It used to sit behind an "Open the sheet" button, on the reasoning that the page image costs a
+ * download and most runs are logged from a setup chosen further up the form. But the card that
+ * asked said nothing the driver did not already know — it repeated the car they had just picked and
+ * explained that its setup lives on a sheet — in front of the only control on this section that
+ * does anything. A door with nothing behind it but the thing you came for is not a choice, it is a
+ * step (founder, 2026-08-12).
+ *
+ * So it opens on arrival. The cost is real and accepted: the sheet page image now loads whenever
+ * this section renders, for every run on a sheet-drawn chassis.
+ *
+ * It can still be collapsed, and that state is remembered per setup — but collapsing is now
+ * something the driver asks for, not something they have to undo first.
  *
  * ============================== ON RE-SEEDING ==============================
  *
  * The surface reads `initialValues` once, at mount. Choosing a different setup source above
- * replaces the run's whole setup, so `seedKey` changes and this closes — and the next open seeds
- * from the setup that is now current. Without that, the sheet would keep showing values from a
- * setup the driver had already moved off, and hand them back as if they were still chosen.
+ * replaces the run's whole setup, so `seedKey` changes — and because the surface is keyed on it,
+ * React remounts it and it seeds from the setup that is now current. That remount used to come for
+ * free from the sheet closing; with the sheet always open the key is what does it. Without either,
+ * the sheet would keep showing values from a setup the driver had already moved off, and hand them
+ * back as if they were still chosen.
  */
 export function RunSheetSetupFill({
   setupSheetModelId,
@@ -48,9 +59,15 @@ export function RunSheetSetupFill({
    */
   onValues: (values: Record<string, unknown>) => void;
 }) {
-  /** Which setup this sheet was opened against — so a new one closes it, with no effect needed. */
-  const [openedFor, setOpenedFor] = useState<string | null>(null);
-  const open = openedFor !== null && openedFor === seedKey;
+  /**
+   * Which setup the driver COLLAPSED this against, rather than which one they opened it for.
+   *
+   * Inverted so that open is the default and stays the default: choosing a different setup source
+   * above changes `seedKey`, which no longer matches what was collapsed, and the sheet comes back
+   * up for the setup that is now current. No effect needed either way.
+   */
+  const [collapsedFor, setCollapsedFor] = useState<string | null>(null);
+  const open = collapsedFor !== seedKey;
 
   const filled = Object.values(seedValues).filter((v) => v.trim() !== "").length;
 
@@ -73,60 +90,55 @@ export function RunSheetSetupFill({
     onValuesRef.current(plan ? surfaceValuesToStoredMerge(next, plan.fields) : next);
   }, []);
 
-  if (!open) {
-    return (
-      <div className="max-w-2xl space-y-2 rounded-lg border border-border bg-card p-3">
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-foreground">{chassisName}</p>
-          <p className="text-[11.5px] leading-snug text-muted-foreground">
-            This car&rsquo;s setup lives on its own sheet. Open it to record what the car is on for
-            this run.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+  /*
+   * One row either way — the count on the left, the collapse control on the right. Collapsed is
+   * the SAME row with a different verb, not an explanatory card: by the time a driver is here they
+   * have chosen this car, and telling them its setup lives on a sheet in front of the sheet is the
+   * redundancy that got the old panel removed.
+   */
+  const countLabel = `${filled} ${filled === 1 ? "box" : "boxes"} filled on ${chassisName}`;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[11px] text-muted-foreground">{countLabel}</span>
+        {open ? (
+          <button
+            type="button"
+            onClick={() => setCollapsedFor(seedKey)}
+            className="btn-surface px-2 py-1 text-[11px]"
+          >
+            Collapse the sheet
+          </button>
+        ) : (
           <button
             type="button"
             onClick={() => {
               haptic("light");
-              setOpenedFor(seedKey);
+              setCollapsedFor(null);
             }}
             className={buttonLinkClassName("outline")}
           >
             Open the sheet
           </button>
-          <span className="text-[11px] text-muted-foreground">
-            {filled > 0
-              ? `${filled} ${filled === 1 ? "box" : "boxes"} filled`
-              : "Nothing filled in yet"}
-          </span>
-        </div>
+        )}
       </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[11px] text-muted-foreground">
-          {filled} {filled === 1 ? "box" : "boxes"} filled on {chassisName}
-        </span>
-        <button
-          type="button"
-          onClick={() => setOpenedFor(null)}
-          className="btn-surface px-2 py-1 text-[11px]"
-        >
-          Close the sheet
-        </button>
-      </div>
-      <SheetFillSurface
-        planUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-plan`}
-        pageImageUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-page`}
-        initialValues={seedValues}
-        onChange={handleChange}
-        onPlanLoaded={(p) => {
-          planRef.current = p;
-        }}
-      />
+      {open ? (
+        <SheetFillSurface
+          /*
+           * Keyed on the setup, so replacing the setup source above remounts the surface and it
+           * re-reads `initialValues`. See "ON RE-SEEDING" — the close/open cycle used to do this.
+           */
+          key={seedKey}
+          planUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-plan`}
+          pageImageUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-page`}
+          initialValues={seedValues}
+          onChange={handleChange}
+          onPlanLoaded={(p) => {
+            planRef.current = p;
+          }}
+        />
+      ) : null}
     </div>
   );
 }
