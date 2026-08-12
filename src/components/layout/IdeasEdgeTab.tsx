@@ -54,13 +54,14 @@ export function openIdeasPanel(): void {
  * Bottom-left rather than centred on the right edge (founder, 2026-08-12): the
  * centred version floated in the middle of the reading column, over whatever you
  * were looking at. Down here it is clear of the text and beside the bar it belongs
- * with. The tab rides out with the panel rather than being buried under it, so the
- * control you pressed to open stays the control you press to close, with the count
- * still readable.
+ * with, exactly one page-gutter wide so its inner edge lands on the line the cards
+ * start from. The tab rides out with the panel rather than being buried under it,
+ * so the control you pressed to open stays the control you press to close.
  *
- * Lists load on first open via GET /api/action-items. The badge shows what those
- * two lists total once loaded, and is simply absent before that rather than
- * showing a zero it has not verified.
+ * Lists load on first open via GET /api/action-items — which is why the tab shows
+ * no count. A badge could only be truthful after you had already opened the panel
+ * once, and making it truthful on arrival would cost that fetch on every page load
+ * for every user. The panel header carries the total instead, where it is known.
  */
 export function IdeasEdgeTab() {
   const [mounted, setMounted] = useState(false);
@@ -136,14 +137,13 @@ export function IdeasEdgeTab() {
       <button
         type="button"
         onClick={() => (open ? setOpen(false) : openPanel())}
-        aria-label={count === null ? "Ideas and reminders" : `Ideas and reminders — ${count} open`}
+        aria-label="Ideas and reminders"
         aria-expanded={open}
         /* Breakpoint is in the CSS, not a `md:hidden` here — see the note on
            `.ideas-edge-tab` in globals.css for why the utility loses. */
         className={cn("ideas-edge-tab", open && "is-out")}
       >
         <Lightbulb size={16} weight="fill" aria-hidden />
-        {count !== null && count > 0 ? <span className="ideas-edge-count">{count}</span> : null}
       </button>
 
       {panel.mounted ? (

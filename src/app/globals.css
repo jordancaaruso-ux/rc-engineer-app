@@ -969,12 +969,17 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
   left: 0;
   bottom: calc(var(--dock-slab-h) + 10px);
   z-index: 45;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  width: 26px;
-  height: 80px;
+  /*
+   * Exactly the page gutter, so the tab's inner edge lands on the line the cards
+   * start from instead of reaching past it into the reading column. Written as the
+   * same expression `.page-body` uses for its padding rather than the 20px it
+   * usually resolves to — on a notched phone in landscape the gutter grows with
+   * the safe-area inset and this has to grow with it.
+   */
+  width: max(1.25rem, env(safe-area-inset-left));
+  height: 56px;
   /* Rounded on the inward side only — it is anchored to the left edge now. */
   border-radius: 0 12px 12px 0;
   background-color: rgb(var(--color-primary));
@@ -1000,24 +1005,12 @@ body[data-logrun-wizard-chrome] .ideas-edge-tab {
   display: none;
 }
 
-.ideas-edge-count {
-  min-width: 16px;
-  padding: 0 3px;
-  border-radius: 9999px;
-  background-color: rgb(var(--color-primary-foreground));
-  color: rgb(var(--color-primary));
-  font-family: var(--font-mono, ui-monospace), monospace;
-  font-size: 9.5px;
-  font-weight: 700;
-  line-height: 16px;
-  text-align: center;
-}
-
-:root[data-theme="light"] .ideas-edge-count {
-  /* #FFD60A on ink is 1.4:1 the wrong way round at 9.5px — the badge is text. */
-  color: rgb(var(--color-primary-foreground));
-  background-color: rgb(var(--color-elevate) / 0.14);
-}
+/*
+ * No count badge (founder, 2026-08-12). It only ever appeared after you had opened
+ * the panel once — that is when the lists load — so in practice it was blank, and
+ * making it truthful on arrival would have cost an /api/action-items fetch on every
+ * page load for every user to render one digit. The lightbulb alone, centred.
+ */
 
 .ideas-scrim {
   position: fixed;
