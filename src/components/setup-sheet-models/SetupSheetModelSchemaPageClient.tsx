@@ -102,7 +102,7 @@ export function SetupSheetModelSchemaPageClient(props: {
 
       {returnTo ? (
         <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
-          <Link href={returnTo} className="font-medium text-accent hover:underline">
+          <Link href={returnTo} className="font-medium text-primary-ink hover:underline">
             ← Back to calibration
           </Link>
           <p className="mt-1 text-[11px] text-muted-foreground">

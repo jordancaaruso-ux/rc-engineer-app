@@ -590,7 +590,7 @@ export function SetupSheetModal({
                     className={cn(
                       "inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition",
                       compareOpen
-                        ? "border-accent bg-accent/15 text-foreground"
+                        ? "border-primary-ink bg-accent/15 text-foreground"
                         : "border-border bg-card hover:bg-muted/90"
                     )}
                     title="Compare this run's setup to another run"

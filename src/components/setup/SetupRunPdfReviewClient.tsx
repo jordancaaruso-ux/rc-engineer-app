@@ -194,7 +194,7 @@ export function SetupRunPdfReviewClient({ runId }: { runId: string }) {
             <button
               type="button"
               onClick={() => void load()}
-              className="mt-2 text-xs font-medium text-accent underline"
+              className="mt-2 text-xs font-medium text-primary-ink underline"
             >
               Retry
             </button>
@@ -261,7 +261,7 @@ export function SetupRunPdfReviewClient({ runId }: { runId: string }) {
                 </>
               ) : null}
               {dirty ? (
-                <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                <span className="text-[11px] font-medium text-warning">
                   Unsaved changes — save before generating PDF
                 </span>
               ) : payload.isOwner ? (

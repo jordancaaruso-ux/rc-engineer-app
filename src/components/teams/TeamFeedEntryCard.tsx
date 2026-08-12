@@ -11,7 +11,7 @@ import { TeamCommentThread } from "@/components/teams/TeamCommentThread";
 import type { TeamFeedEntryView } from "@/lib/teams/loadTeamFeed";
 
 /** Pace deltas only — green/red mean faster/slower, never "good"/"bad" (VISUAL_NORTH_STAR). */
-const GAIN = "text-[#4FD089]";
+const GAIN = "text-gain";
 
 /**
  * One run in the team feed: was it better, what did they change, what else moved.
@@ -44,7 +44,7 @@ export function TeamFeedEntryCard({
   return (
     <SurfaceCard
       variant="panel"
-      className={cn(highlighted && "ring-1 ring-primary/50")}
+      className={cn(highlighted && "ring-1 ring-primary-ink/50")}
       contentClassName="p-0"
     >
       <div id={`run-${entry.runId}`} className="scroll-mt-20">
@@ -126,7 +126,7 @@ export function TeamFeedEntryCard({
         <div className="flex items-center justify-between gap-2 border-t border-border/60 px-4 py-2">
           <Link
             href={`/runs/${encodeURIComponent(entry.runId)}`}
-            className="type-timestamp text-accent underline underline-offset-2"
+            className="type-timestamp text-primary-ink underline underline-offset-2"
           >
             Open session
           </Link>

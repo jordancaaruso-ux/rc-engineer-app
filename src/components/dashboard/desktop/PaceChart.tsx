@@ -72,12 +72,12 @@ export function PaceChart({
   const markX = x(markIndex);
   const markY = y(values[markIndex]);
   const markColor = isLaps
-    ? "#4FD089"
+    ? "rgb(var(--color-gain))"
     : deltaSeconds == null
-      ? "#64625E"
+      ? "rgb(var(--color-faint))"
       : deltaSeconds < 0
-        ? "#4FD089"
-        : "#E5644E";
+        ? "rgb(var(--color-gain))"
+        : "rgb(var(--color-destructive))";
 
   const first = series[0];
   const last = series[series.length - 1];
@@ -104,7 +104,7 @@ export function PaceChart({
           pathLength="1"
           points={points}
           fill="none"
-          stroke="#64625E"
+          stroke="rgb(var(--color-faint))"
           strokeWidth="2.5"
           strokeLinejoin="round"
           strokeLinecap="round"
@@ -113,7 +113,7 @@ export function PaceChart({
 
         {series.map((p, i) =>
           i === markIndex ? null : (
-            <circle key={p.runId} cx={x(i)} cy={y(p.best)} r="3" fill="#64625E" />
+            <circle key={p.runId} cx={x(i)} cy={y(p.best)} r="3" fill="rgb(var(--color-faint))" />
           )
         )}
         <circle cx={markX} cy={markY} r="6" fill={markColor} />

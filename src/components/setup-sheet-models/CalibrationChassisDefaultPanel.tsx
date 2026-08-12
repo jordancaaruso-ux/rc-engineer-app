@@ -107,7 +107,7 @@ export function CalibrationChassisDefaultPanel(props: Props) {
       <p className="mt-1 text-xs text-muted-foreground max-w-2xl">
         Link this profile to a chassis type (e.g. Mugen MTC3) and mark it as the default so uploads
         auto-select it when the PDF matches. If you have duplicate chassis types,{" "}
-        <a href="/setup-sheet-models" className="text-accent hover:underline">
+        <a href="/setup-sheet-models" className="text-primary-ink hover:underline">
           manage chassis types
         </a>{" "}
         to delete extras and keep one.
@@ -131,7 +131,7 @@ export function CalibrationChassisDefaultPanel(props: Props) {
         </label>
         <button
           type="button"
-          className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-primary/10 disabled:opacity-50"
+          className="rounded-md border border-primary-ink/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary-ink hover:bg-primary/10 disabled:opacity-50"
           disabled={loading || busy || !selectedModelId}
           onClick={onSetDefault}
         >

@@ -232,7 +232,7 @@ export function NewParameterFromBoxesPanel(props: {
   }, [grid]);
 
   return (
-    <CardPanel className="border-accent/60 bg-accent/10" contentClassName="space-y-3 p-3 text-xs">
+    <CardPanel className="border-primary-ink/60 bg-accent/10" contentClassName="space-y-3 p-3 text-xs">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <Eyebrow>New parameter</Eyebrow>
@@ -366,7 +366,7 @@ export function NewParameterFromBoxesPanel(props: {
                 className={cn(
                   "rounded border px-2 py-0.5 text-[10px]",
                   t.toLowerCase() === groupTitle.trim().toLowerCase()
-                    ? "border-accent/70 bg-accent/20 text-foreground"
+                    ? "border-primary-ink/70 bg-accent/20 text-foreground"
                     : "border-border text-muted-foreground hover:bg-muted"
                 )}
                 onClick={() => {
@@ -479,7 +479,7 @@ export function NewParameterFromBoxesPanel(props: {
                         box
                           ? "border-border/60 bg-card text-foreground"
                           : isNext
-                            ? "border-accent/60 bg-accent/10 text-muted-foreground"
+                            ? "border-primary-ink/60 bg-accent/10 text-muted-foreground"
                             : "border-dashed border-border/60 text-muted-foreground"
                       )}
                       onMouseEnter={() => props.onHoverBox(box?.sourceKey ?? null)}
@@ -616,7 +616,7 @@ export function NewParameterFromBoxesPanel(props: {
       <div className="flex gap-2">
         <button
           type="button"
-          className="flex-1 rounded border border-accent/60 bg-accent/15 px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+          className="flex-1 rounded border border-primary-ink/60 bg-accent/15 px-3 py-1.5 text-xs font-medium disabled:opacity-50"
           onClick={submit}
           disabled={busy || !displayLabel.trim() || filledBoxes.length === 0}
         >

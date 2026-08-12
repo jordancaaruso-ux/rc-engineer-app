@@ -246,7 +246,7 @@ export function UploadSetupSheetBar({
           className="tap-active glass-card flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left"
         >
           <span
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary-ink"
             aria-hidden
           >
             <FileUp className="size-4" strokeWidth={2} />
@@ -254,7 +254,7 @@ export function UploadSetupSheetBar({
           <span className="min-w-0 flex-1 text-[14px] font-semibold tracking-tight text-foreground">
             {label}
           </span>
-          <ArrowRight className="size-4 shrink-0 text-primary" strokeWidth={2} aria-hidden />
+          <ArrowRight className="size-4 shrink-0 text-primary-ink" strokeWidth={2} aria-hidden />
         </button>
       )}
 
@@ -313,7 +313,7 @@ export function UploadSetupSheetBar({
                       </p>
                       <Link
                         href="/cars"
-                        className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary"
+                        className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary-ink"
                       >
                         Add a car
                         <ArrowRight className="size-3.5" strokeWidth={2} aria-hidden />
@@ -427,7 +427,7 @@ export function UploadSetupSheetBar({
                       {busy ? (
                         <div className="flex items-center gap-2.5 py-4">
                           <Loader2
-                            className="size-4 shrink-0 animate-spin text-primary"
+                            className="size-4 shrink-0 animate-spin text-primary-ink"
                             strokeWidth={2}
                             aria-hidden
                           />

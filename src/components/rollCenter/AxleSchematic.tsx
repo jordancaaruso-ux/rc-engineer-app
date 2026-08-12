@@ -332,7 +332,7 @@ export function AxleSchematic({ solved, ghost, extraPoints, fitBox, axleLabel, s
       </text>
 
       {/* Roll center — the one yellow mark (marker only; doc's visual rule) */}
-      <g className="text-primary">
+      <g className="text-primary-ink">
         <rect
           x={d.X(d.main.rc.x) - 3.4}
           y={d.Y(d.main.rc.z) - 3.4}

@@ -255,7 +255,7 @@ export function RunConditionsSection({
                 className={cn(
                   "rounded-md border px-2.5 py-1 text-xs transition-colors",
                   active
-                    ? "border-primary bg-primary/15 text-foreground"
+                    ? "border-primary-ink bg-primary/15 text-foreground"
                     : "border-border text-muted-foreground hover:text-foreground"
                 )}
               >

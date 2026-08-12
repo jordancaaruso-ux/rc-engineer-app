@@ -292,7 +292,7 @@ export function CarList({
               {/* Chassis type — the required, schema-driving field, first. */}
               <div className="relative">
                 <label className="block text-[11px] text-muted-foreground mb-1">
-                  Chassis type <span className="text-amber-600 dark:text-amber-500">*</span>
+                  Chassis type <span className="text-warning">*</span>
                 </label>
                 {/* Native select (founder decision 2026-07-14): the OS draws the menu —
                     no portal, no JS re-pin, no iOS rubber-banding. Sentinel values map
@@ -354,7 +354,7 @@ export function CarList({
                     Uses the shared <span className="text-foreground">{selectedModel.name}</span> setup sheet.
                   </p>
                 ) : pending ? (
-                  <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
+                  <p className="mt-1 text-[11px] text-warning">
                     No setup sheet yet — community stats and structured setup tools won’t apply until your
                     chassis type is added.
                   </p>
@@ -401,7 +401,7 @@ export function CarList({
                   <span
                     className={cn(
                       "text-xs",
-                      message.startsWith("Car added") ? "text-accent" : "text-muted-foreground"
+                      message.startsWith("Car added") ? "text-primary-ink" : "text-muted-foreground"
                     )}
                   >
                     {message}
@@ -443,7 +443,7 @@ export function CarList({
                       </span>
                       <span className="ui-caption mt-0.5 block">
                         {c.setupSheetModel?.name ?? (
-                          <span className="text-amber-700 dark:text-amber-400">
+                          <span className="text-warning">
                             setup sheet coming
                           </span>
                         )}

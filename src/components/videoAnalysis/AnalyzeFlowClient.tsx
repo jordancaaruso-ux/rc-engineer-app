@@ -971,7 +971,7 @@ export function AnalyzeFlowClient({
             y1={l.y1 * 1000}
             x2={l.x2 * 1000}
             y2={l.y2 * 1000}
-            stroke={l.lineKey === "sf" ? "#ECE9E4" : "#FFD60A"}
+            stroke={l.lineKey === "sf" ? "rgb(var(--color-foreground))" : "rgb(var(--color-primary-ink))"}
             strokeWidth={2}
             vectorEffect="non-scaling-stroke"
             strokeDasharray={l.lineKey === "sf" ? "6 4" : undefined}
@@ -1004,7 +1004,7 @@ export function AnalyzeFlowClient({
             onPointerCancel={() => endLineDrag()}
             className={cn(
               "absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-background/70",
-              l.lineKey === "sf" ? "border-foreground/60" : "border-primary"
+              l.lineKey === "sf" ? "border-foreground/60" : "border-primary-ink"
             )}
             style={{
               left: `${(end === 1 ? l.x1 : l.x2) * 100}%`,
@@ -1069,7 +1069,7 @@ export function AnalyzeFlowClient({
         onPointerUp={(e) => requestSeek(Number(e.currentTarget.value))}
         onKeyUp={(e) => requestSeek(Number(e.currentTarget.value))}
         aria-label="Coarse scrub"
-        className="h-7 w-full accent-[#FFD60A]"
+        className="h-7 w-full accent-primary-ink"
       />
       <FineWheel onDelta={(dxPx) => nudge(dxPx * FINE_SEC_PER_PX)} />
       <div className="flex gap-2">
@@ -1180,7 +1180,7 @@ export function AnalyzeFlowClient({
                   <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold">
                     {v.label?.trim() || v.originalFilename}
                   </span>
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-primary-ink" aria-hidden />
                 </button>
               ))}
             </div>
@@ -1203,7 +1203,7 @@ export function AnalyzeFlowClient({
               type="button"
               disabled={timingLoading}
               onClick={() => void loadRunTiming()}
-              className="flex w-full items-center gap-3 rounded-xl border border-primary/50 bg-primary/5 px-3.5 py-3 text-left disabled:opacity-60"
+              className="flex w-full items-center gap-3 rounded-xl border border-primary-ink/50 bg-primary/5 px-3.5 py-3 text-left disabled:opacity-60"
             >
               <span className="min-w-0 flex-1">
                 <span className="block text-[13px] font-semibold">This run&apos;s laps</span>
@@ -1211,7 +1211,7 @@ export function AnalyzeFlowClient({
                   {timingLoading ? "Loading…" : "Imported timing from the linked run"}
                 </span>
               </span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+              <ChevronRight className="h-4 w-4 shrink-0 text-primary-ink" aria-hidden />
             </button>
           ) : null}
 
@@ -1332,7 +1332,7 @@ export function AnalyzeFlowClient({
                   )}
                 >
                   L{l.lapNumber} · {l.lapTimeSec.toFixed(3)}
-                  {i === 0 ? <span className="ml-1 text-[8px] tracking-[0.12em] text-[#4FD089]">BEST</span> : null}
+                  {i === 0 ? <span className="ml-1 text-[8px] tracking-[0.12em] text-gain">BEST</span> : null}
                 </button>
               ))}
             </div>
@@ -1505,7 +1505,7 @@ export function AnalyzeFlowClient({
                   key={s.id}
                   className={cn(
                     "flex items-center gap-1.5 rounded-lg border px-3 py-2.5",
-                    inUse ? "border-primary/60 bg-primary/5" : "border-border bg-secondary/60"
+                    inUse ? "border-primary-ink/60 bg-primary/5" : "border-border bg-secondary/60"
                   )}
                 >
                   <button
@@ -1626,7 +1626,7 @@ export function AnalyzeFlowClient({
         <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-5 lg:items-start">
           <div className="space-y-2.5 lg:sticky lg:top-4">
             {markQueue[markCursor] ? (
-              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-primary">
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-primary-ink">
                 {markQueue[markCursor]!.role === "competitor" ? `${compDriver?.driverName ?? "Rival"} · ` : ""}
                 L{markQueue[markCursor]!.lapNumber} · {markQueue[markCursor]!.label} line
               </p>
@@ -1710,7 +1710,7 @@ export function AnalyzeFlowClient({
                               className={cn(
                                 "inline-block h-3 w-3 rounded-full",
                                 done
-                                  ? "bg-[#4FD089] shadow-[0_0_5px_rgba(79,208,137,0.5)]"
+                                  ? "bg-gain shadow-[0_0_5px_rgba(79,208,137,0.5)]"
                                   : cur
                                     ? "bg-primary shadow-[0_0_6px_rgba(255,214,10,0.6)]"
                                     : "bg-border"
@@ -1741,7 +1741,7 @@ export function AnalyzeFlowClient({
         <div className="space-y-3">
           <div>
             <h2 className="flex items-center gap-2 text-[16px] font-bold tracking-tight">
-              <Check className="h-4 w-4 text-[#4FD089]" aria-hidden />
+              <Check className="h-4 w-4 text-gain" aria-hidden />
               Done — the session has it
             </h2>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
@@ -1758,7 +1758,7 @@ export function AnalyzeFlowClient({
                 <span
                   className={cn(
                     "font-mono text-2xl font-medium tabular-nums",
-                    doneReport.totalDeltaSec < 0 ? "text-[#4FD089]" : "text-destructive"
+                    doneReport.totalDeltaSec < 0 ? "text-gain" : "text-destructive"
                   )}
                 >
                   {formatSignedDeltaSec(doneReport.totalDeltaSec)}
@@ -1805,7 +1805,7 @@ export function AnalyzeFlowClient({
               </button>
             </div>
           ) : uploadState === "done" ? (
-            <p className="text-center text-[11px] text-[#4FD089]">Saved to library — clips enabled.</p>
+            <p className="text-center text-[11px] text-gain">Saved to library — clips enabled.</p>
           ) : null}
           {uploadError ? <p className="text-center text-[11px] text-destructive">{uploadError}</p> : null}
         </div>

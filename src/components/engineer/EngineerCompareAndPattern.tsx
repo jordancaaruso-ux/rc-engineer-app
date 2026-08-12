@@ -527,7 +527,7 @@ export function EngineerCompareAndPattern({
                   {teammates.length === 0 ? (
                     <p className="text-[10px] text-muted-foreground">
                       No teammates yet —{" "}
-                      <Link href="/teams" className="text-accent underline">
+                      <Link href="/teams" className="text-primary-ink underline">
                         invite someone to a team
                       </Link>
                       . They choose whether to join.

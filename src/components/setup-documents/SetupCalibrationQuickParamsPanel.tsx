@@ -92,7 +92,7 @@ export function SetupCalibrationQuickParamsPanel(props: {
   const groupedCtx = (def: CustomSetupFieldDefinition) => customFieldGroupedChipContext(def);
 
   return (
-    <CardPanel className="border-primary/30 bg-primary/10" contentClassName="p-3">
+    <CardPanel className="border-primary-ink/30 bg-primary/10" contentClassName="p-3">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-2 text-left"
@@ -177,7 +177,7 @@ export function SetupCalibrationQuickParamsPanel(props: {
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-primary/10"
+              className="rounded-md border border-primary-ink/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary-ink hover:bg-primary/10"
               onClick={() => {
                 setLocalError(null);
                 const lines =

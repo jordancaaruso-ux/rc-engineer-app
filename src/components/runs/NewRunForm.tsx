@@ -470,7 +470,7 @@ function prefillFieldClass(_active: boolean) {
 function PrefillBadge({ show }: { show?: boolean }) {
   if (!show) return null;
   return (
-    <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-accent/90">Prefilled</span>
+    <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-primary-ink/90">Prefilled</span>
   );
 }
 
@@ -4131,7 +4131,7 @@ export function NewRunForm(props: {
                         <span className="flex min-h-8 items-center gap-1 text-[11px] text-muted-foreground">
                           <Check
                             aria-hidden
-                            className="size-3.5 text-[#4FD089]"
+                            className="size-3.5 text-gain"
                             strokeWidth={2.5}
                           />
                           Detected from location
@@ -4270,7 +4270,7 @@ export function NewRunForm(props: {
             {wizardSessionKind}
             {" · "}
             {wizardTrackName ?? (
-              <span className="text-amber-600 dark:text-amber-300">track needed</span>
+              <span className="text-warning">track needed</span>
             )}
             {wizardCarName ? ` · ${wizardCarName}` : null}
           </span>
@@ -4279,7 +4279,7 @@ export function NewRunForm(props: {
       {wizardActive && props.wizardFirstRun && !isEditing ? (
         /* G1 coach line (founder 2026-07-22): one quiet per-step line for the
            driver's first run only — never a tip card, never a tour. */
-        <p className="border-l-2 border-primary py-0.5 pl-3 text-[12.5px] leading-relaxed text-muted-foreground">
+        <p className="border-l-2 border-primary-ink py-0.5 pl-3 text-[12.5px] leading-relaxed text-muted-foreground">
           {firstRunCoachLine(wizardStep)}
         </p>
       ) : null}
@@ -4287,7 +4287,7 @@ export function NewRunForm(props: {
         <CardPanel contentClassName="text-sm text-muted-foreground">
           <div className="text-sm text-muted-foreground">
             You need a car to log a run. Open{" "}
-            <Link href="/cars" className="text-accent underline font-medium">
+            <Link href="/cars" className="text-primary-ink underline font-medium">
               Car Manager
             </Link>{" "}
             to add one, then return here.
@@ -5462,7 +5462,7 @@ export function NewRunForm(props: {
         <div
           className={cn(
             "text-xs",
-            saveSuccess ? "text-accent font-medium" : "text-muted-foreground"
+            saveSuccess ? "text-primary-ink font-medium" : "text-muted-foreground"
           )}
         >
           {status}

@@ -40,7 +40,7 @@ const blockComponents: Components = {
       href={href}
       target="_blank"
       rel="noreferrer noopener"
-      className="text-primary underline underline-offset-2 hover:text-primary/80"
+      className="text-primary-ink underline underline-offset-2 hover:text-primary-ink/80"
     >
       {children}
     </a>

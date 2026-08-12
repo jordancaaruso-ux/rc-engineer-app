@@ -88,7 +88,7 @@ export default async function TeamFeedPage({ params, searchParams }: Props): Pro
           </div>
           <Link
             href={`/teams/${encodeURIComponent(teamId)}/settings`}
-            className="tap-active ml-auto inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-foreground transition hover:border-accent/40 hover:bg-muted/60"
+            className="tap-active ml-auto inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-foreground transition hover:border-primary-ink/40 hover:bg-muted/60"
           >
             <Settings className="size-3.5" aria-hidden />
             Manage
@@ -105,7 +105,7 @@ export default async function TeamFeedPage({ params, searchParams }: Props): Pro
         <div className="flex flex-wrap gap-2">
           <Link
             href={`/runs/history?teamId=${encodeURIComponent(teamId)}`}
-            className="tap-active inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-foreground transition hover:border-accent/40 hover:bg-muted/60"
+            className="tap-active inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-foreground transition hover:border-primary-ink/40 hover:bg-muted/60"
           >
             <Users className="size-3.5" aria-hidden />
             Team sessions

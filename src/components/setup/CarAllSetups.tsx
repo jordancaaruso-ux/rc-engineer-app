@@ -200,7 +200,7 @@ export function CarAllSetups({
               className={cn(
                 "tap-active flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition",
                 filter === value
-                  ? "border-accent/50 bg-accent/10 text-foreground"
+                  ? "border-primary-ink/50 bg-accent/10 text-foreground"
                   : "border-border bg-card text-muted-foreground hover:text-foreground"
               )}
             >
@@ -311,7 +311,7 @@ export function CarAllSetups({
                       className={cn(
                         "tap-active grid size-9 place-items-center rounded-md transition disabled:opacity-50",
                         saved
-                          ? "text-primary hover:bg-primary/10"
+                          ? "text-primary-ink hover:bg-primary/10"
                           : "text-muted-foreground hover:bg-muted hover:text-foreground"
                       )}
                     >

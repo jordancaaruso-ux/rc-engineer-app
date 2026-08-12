@@ -158,7 +158,7 @@ export function NewSetupUploadButton({
           type="button"
           onClick={openFilePicker}
           disabled={busy || needsCar}
-          className="rounded-md border border-primary/60 bg-primary/90 px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-sm transition hover:bg-primary disabled:opacity-60 disabled:cursor-default"
+          className="rounded-md border border-primary-ink/60 bg-primary/90 px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-sm transition hover:bg-primary disabled:opacity-60 disabled:cursor-default"
           title={needsCar ? "Add a car first" : "Upload your setup sheet (the fillable PDF)"}
         >
           {stageLabel(stage)}
@@ -172,7 +172,7 @@ export function NewSetupUploadButton({
       {needsCar ? (
         <span className="text-xs text-muted-foreground">
           Add a car first — setups attach to one of your cars.{" "}
-          <Link href="/cars" className="text-primary underline">
+          <Link href="/cars" className="text-primary-ink underline">
             Add a car
           </Link>
         </span>

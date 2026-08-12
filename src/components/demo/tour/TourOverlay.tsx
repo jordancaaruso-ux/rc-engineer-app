@@ -90,7 +90,9 @@ export function TourOverlay({
       tabIndex={-1}
       className={cn(
         "rc-tour-pop fixed z-[66] flex flex-col gap-2.5 rounded-xl border p-4",
-        "border-white/[0.12] bg-card shadow-[0_24px_55px_-20px_rgb(0_0_0/0.85)]",
+        // `elevate`, not white: a white rim is invisible on paper. The drop shadow
+        // moved to `.rc-tour-pop` in globals.css so it can differ per theme.
+        "border-elevate/[0.12] bg-card",
         "focus:outline-none"
       )}
       style={

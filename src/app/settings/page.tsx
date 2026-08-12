@@ -16,12 +16,15 @@ import { ProfilePictureSection } from "@/components/settings/ProfilePictureSecti
 import { AccountSection } from "@/components/settings/AccountSection";
 import { OnboardingResetSection } from "@/components/settings/OnboardingResetSection";
 import { NotificationsSection } from "@/components/settings/NotificationsSection";
+import { AppearanceSection } from "@/components/settings/AppearanceSection";
 import { AllowlistAdminSection } from "@/components/settings/AllowlistAdminSection";
 import { EngineerFeedbackAdminSection } from "@/components/settings/EngineerFeedbackAdminSection";
 import { EngineerLabSection } from "@/components/settings/EngineerLabSection";
 import { ManufacturerBaselineAdminSection } from "@/components/settings/ManufacturerBaselineAdminSection";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { hasDatabaseUrl } from "@/lib/env";
+import { cookies } from "next/headers";
+import { RC_THEME_COOKIE, parseTheme } from "@/lib/theme/themeCookie";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +38,9 @@ export default async function SettingsPage() {
     );
   }
   const user = await requireCurrentUser();
+  // Same cookie the root layout stamps <html> from — passed down so the client
+  // component never has to guess, and server and client agree on first paint.
+  const theme = parseTheme((await cookies()).get(RC_THEME_COOKIE)?.value);
   const [myName, liveRcDriverName, liveRcDriverId, speedhiveDriverName, speedhiveTransponderRaw] =
     await Promise.all([
       getMyNameSetting(user.id),
@@ -67,6 +73,7 @@ export default async function SettingsPage() {
           />
         </div>
         <SettingsNavSection isAdmin={isAuthAdminEmail(user.email)} />
+        <AppearanceSection initial={theme} />
         <NotificationsSection />
         <ProfilePictureSection
           initialImage={user.image}

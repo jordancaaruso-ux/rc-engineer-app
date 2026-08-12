@@ -92,7 +92,7 @@ export function ActionToast({
               action.onClick();
               onDismiss();
             }}
-            className="tap-active shrink-0 rounded-md px-2.5 py-1.5 text-[13px] font-semibold text-primary transition hover:bg-primary/10"
+            className="tap-active shrink-0 rounded-md px-2.5 py-1.5 text-[13px] font-semibold text-primary-ink transition hover:bg-primary/10"
           >
             {action.label}
           </button>

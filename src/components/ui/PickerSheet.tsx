@@ -375,7 +375,7 @@ export function PickerSheet<T extends SearchableOption>({
                 >
                   <span className="min-w-0 flex-1 truncate">{clearRow.label}</span>
                   {value === "" ? (
-                    <Check className="size-4 shrink-0 text-primary" strokeWidth={2.5} aria-hidden />
+                    <Check className="size-4 shrink-0 text-primary-ink" strokeWidth={2.5} aria-hidden />
                   ) : null}
                 </button>
               ) : null}
@@ -418,7 +418,7 @@ export function PickerSheet<T extends SearchableOption>({
                           </span>
                           {selected ? (
                             <Check
-                              className="size-4 shrink-0 text-primary"
+                              className="size-4 shrink-0 text-primary-ink"
                               strokeWidth={2.5}
                               aria-hidden
                             />

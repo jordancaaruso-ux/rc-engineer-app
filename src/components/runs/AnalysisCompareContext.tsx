@@ -133,7 +133,7 @@ export function AnalysisCompareBar() {
                 </span>
                 <button
                   type="button"
-                  className="text-accent underline underline-offset-2 text-[10px] shrink-0"
+                  className="text-primary-ink underline underline-offset-2 text-[10px] shrink-0"
                   onClick={clearTarget}
                 >
                   Clear
@@ -155,7 +155,7 @@ export function AnalysisCompareBar() {
                 </span>
                 <button
                   type="button"
-                  className="text-accent underline underline-offset-2 text-[10px] shrink-0"
+                  className="text-primary-ink underline underline-offset-2 text-[10px] shrink-0"
                   onClick={clearCompare}
                 >
                   Clear
@@ -202,7 +202,7 @@ export function RunComparePairCell({ runId }: { runId: string }) {
     >
       <div className="flex flex-col gap-1">
         {isTarget ? (
-          <span className="rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[9px] ui-title text-foreground w-fit">
+          <span className="rounded border border-primary-ink/40 bg-primary/10 px-1.5 py-0.5 text-[9px] ui-title text-foreground w-fit">
             Target
           </span>
         ) : (

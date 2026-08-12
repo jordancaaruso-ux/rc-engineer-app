@@ -70,8 +70,8 @@ const FIELD_TAB_ID = "__field__";
  * normally action-only; here it reads as "you" in an explicit comparison.)
  */
 export const RACE_IDENTITY = {
-  you: "#FFD60A",
-  competitor: "#ECE9E4",
+  you: "rgb(var(--color-primary-ink))",
+  competitor: "rgb(var(--color-foreground))",
 } as const;
 
 /**
@@ -527,11 +527,11 @@ function RaceFieldDriverPanel({
               <LapGapGraph userRows={userLapRows} competitorRows={rows} />
               <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] leading-snug text-muted-foreground">
                 <span className="inline-flex items-center gap-1">
-                  <span className="inline-block h-0.5 w-3 rounded bg-[#4FD089]" />
+                  <span className="inline-block h-0.5 w-3 rounded bg-gain" />
                   you ahead
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <span className="inline-block h-0.5 w-3 rounded bg-[#E5644E]" />
+                  <span className="inline-block h-0.5 w-3 rounded bg-destructive" />
                   behind {driver.name}
                 </span>
                 <span>bars = each lap&apos;s gain/loss</span>

@@ -289,7 +289,7 @@ export function EventAddForm({
           <span
             className={cn(
               "text-xs",
-              message === "Event created." ? "text-accent" : "text-muted-foreground"
+              message === "Event created." ? "text-primary-ink" : "text-muted-foreground"
             )}
           >
             {message}

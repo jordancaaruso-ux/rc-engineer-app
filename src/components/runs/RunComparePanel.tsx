@@ -219,14 +219,14 @@ export function RunComparePanel({
       </div>
 
       {mode === "current_setup" && !hasActiveSetup && (
-        <p className="text-xs text-amber-600/90 dark:text-amber-400/90">
+        <p className="text-xs text-warning">
           No current setup yet. Open <strong>Log your run</strong>—setup fields sync here. Or load a past setup from
           the dropdown there.
         </p>
       )}
 
       {mode === "current_setup" && hasActiveSetup && currentSetupCarMismatch && (
-        <p className="text-xs text-amber-600/90 dark:text-amber-400/90">
+        <p className="text-xs text-warning">
           Current setup belongs to a different car than this run. Load setup from a past run for{" "}
           <strong>{baseRun.car?.name ?? "this vehicle"}</strong> on Log your run to compare like-for-like.
         </p>
@@ -399,7 +399,7 @@ function ModeChip({
         disabled
           ? "border-border/80 text-muted-foreground/50 cursor-not-allowed"
           : active
-            ? "border-accent bg-accent/15 text-foreground"
+            ? "border-primary-ink bg-accent/15 text-foreground"
             : "border-border bg-card hover:bg-muted/90"
       }`}
     >

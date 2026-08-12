@@ -166,7 +166,7 @@ export function SectorClipPlayer({
           value={Math.min(clock, clipDur)}
           onChange={(e) => onScrub(Number(e.target.value))}
           aria-label="Scrub sector clip"
-          className="min-w-0 flex-1 accent-[#FFD60A]"
+          className="min-w-0 flex-1 accent-primary-ink"
         />
         <span className="shrink-0 font-mono text-[10px] tabular-nums text-faint">
           {Math.min(clock, clipDur).toFixed(1)} / {clipDur.toFixed(1)}s

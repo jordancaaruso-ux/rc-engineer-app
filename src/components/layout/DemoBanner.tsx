@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
-import { requestDemoTourStart } from "@/lib/demo/demoTourSession";
 
 /**
  * The demo session's persistent bar (MONETISATION_NORTH_STAR.md Phase 3, decision-board
@@ -106,7 +105,10 @@ export function DemoBanner() {
       // It measures this element rather than parsing `--demo-banner-h`, because that variable
       // is a calc() containing env(safe-area-inset-top), which script cannot resolve.
       data-demo-banner
-      className="sticky top-0 z-40 border-b border-border bg-[#1E1D1C]/95 backdrop-blur-md"
+      // `bg-muted`, not the `bg-[#1E1D1C]` the walkthrough branch was written against —
+      // that literal predates light mode and would paint a charcoal bar across the top
+      // of the paper theme.
+      className="sticky top-0 z-40 border-b border-border bg-muted/95 backdrop-blur-md"
       style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
     >
       {/*
@@ -130,37 +132,20 @@ export function DemoBanner() {
           <strong className="font-semibold text-foreground">read-only</strong>.
         </p>
         {/*
-          `flex-wrap` on the control group itself, not just on the row above it (added with the
-          third control, 2026-08-11): the outer row wrapping only moves this whole group to its
-          own line, and at 390px three controls do not fit on one line either — "Exit demo" was
-          pushed off the right edge and clipped. `--demo-banner-h` is observed now, so a wrapped
-          group republishes its height instead of leaving the top chrome overlapping.
+          `flex-wrap` on the control group itself, not just on the row above it: the outer row
+          wrapping only moves this whole group to its own line, and at 390px the controls need
+          not fit on one line either — "Exit demo" was pushed off the right edge and clipped.
+          `--demo-banner-h` is observed, so a wrapped group republishes its height instead of
+          leaving the top chrome overlapping. Kept after the walkthrough button came out
+          (2026-08-12): it is what makes a third control safe to add back.
         */}
         <span className="flex flex-wrap items-center justify-end gap-2.5">
           {/*
-            Restarts the walkthrough. Outlined like "Exit demo" rather than filled — the yellow
-            CTA beside it is the one thing this bar exists to sell, and a second filled control
-            would split that. Talks to `DemoTour` through a storage write + window event
-            (`requestDemoTourStart`) because this banner renders in BOTH AppShell branches while
-            the tour renders in one, so a context provider would have to wrap the whole shell
-            to serve a single button.
+            A "Take the tour" button sat here until 2026-08-12, talking to `DemoTour` through a
+            storage write + window event (`requestDemoTourStart`) because this banner renders in
+            BOTH AppShell branches while the tour rendered in one. Pulled with the walkthrough
+            itself — see the note in AppShell for why and for how to put it back.
           */}
-          <button
-            type="button"
-            onClick={() => requestDemoTourStart()}
-            aria-label="Take the tour"
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border bg-card px-2.5 py-1 text-[12px] font-medium text-foreground transition-colors hover:border-foreground/40 hover:bg-muted"
-          >
-            {/*
-              Short label below sm. Three full-width controls do not fit on one 390px line —
-              "Exit demo" was clipped off the right edge — and letting the row wrap instead
-              makes the banner two lines, which pushes the fixed top chrome (`--top-chrome-y`)
-              down onto page content that has no title bar to sit above. Shortening this one
-              label is the smaller change: the row stays a single line on a phone.
-            */}
-            <span className="sm:hidden">Tour</span>
-            <span className="hidden sm:inline">Take the tour</span>
-          </button>
           {/*
             A filled button, not a text link. This is the one thing the demo exists to sell,
             and it sat at the same weight as the sentence explaining the demo was read-only.
@@ -205,7 +190,7 @@ export function DemoBanner() {
         aria-live="polite"
         className={`pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center transition-opacity duration-300 ${toastVisible ? "opacity-100" : "opacity-0"}`}
       >
-        <span className="rounded-full border border-border bg-[#1E1D1C]/95 px-4 py-2 text-[12.5px] text-foreground shadow-lg backdrop-blur-md">
+        <span className="rounded-full border border-border bg-muted/95 px-4 py-2 text-[12.5px] text-foreground shadow-lg backdrop-blur-md">
           The demo is read-only
         </span>
       </div>

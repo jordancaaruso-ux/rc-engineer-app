@@ -237,7 +237,7 @@ function LoginForm() {
                 autoComplete="email"
                 required
                 placeholder="you@example.com"
-                className="ui-control w-full rounded-lg border border-border bg-input px-3.5 py-3 text-foreground outline-none transition-colors placeholder:text-faint focus:border-primary"
+                className="ui-control w-full rounded-lg border border-border bg-input px-3.5 py-3 text-foreground outline-none transition-colors placeholder:text-faint focus:border-primary-ink"
               />
             </label>
             {accessCodeEnabled ? (
@@ -253,7 +253,7 @@ function LoginForm() {
                   autoCorrect="off"
                   spellCheck={false}
                   placeholder="Only needed the first time"
-                  className="ui-control w-full rounded-lg border border-border bg-input px-3.5 py-3 text-foreground outline-none transition-colors placeholder:text-faint focus:border-primary"
+                  className="ui-control w-full rounded-lg border border-border bg-input px-3.5 py-3 text-foreground outline-none transition-colors placeholder:text-faint focus:border-primary-ink"
                 />
               </label>
             ) : null}

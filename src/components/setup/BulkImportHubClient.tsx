@@ -213,7 +213,7 @@ export function BulkImportHubClient({
           />
         </label>
         {cars.length === 0 ? (
-          <p className="text-xs text-amber-600 dark:text-amber-400">
+          <p className="text-xs text-warning">
             Add a car under{" "}
             <Link href="/cars" className="underline hover:text-foreground">
               Cars

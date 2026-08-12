@@ -51,7 +51,7 @@ export function TrackMetaChipGroups({
                 className={cn(
                   "rounded-md border px-2.5 py-1 text-[11px] font-medium transition",
                   on
-                    ? "border-primary bg-primary/15 text-foreground"
+                    ? "border-primary-ink bg-primary/15 text-foreground"
                     : "border-border bg-card text-muted-foreground hover:bg-muted/60",
                   disabled && "opacity-50 pointer-events-none"
                 )}
@@ -76,7 +76,7 @@ export function TrackMetaChipGroups({
                 className={cn(
                   "rounded-md border px-2.5 py-1 text-[11px] font-medium transition",
                   on
-                    ? "border-primary bg-primary/15 text-foreground"
+                    ? "border-primary-ink bg-primary/15 text-foreground"
                     : "border-border bg-card text-muted-foreground hover:bg-muted/60",
                   disabled && "opacity-50 pointer-events-none"
                 )}

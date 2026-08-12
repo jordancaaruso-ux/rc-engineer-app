@@ -126,7 +126,7 @@ export function VideoOverlayTransport({
           ? "border-white bg-white/20 text-white"
           : "border-white/30 text-white/80 hover:bg-white/10"
         : active
-          ? "border-accent bg-accent/15 text-foreground"
+          ? "border-primary-ink bg-accent/15 text-foreground"
           : "border-border text-muted-foreground hover:bg-muted"
     );
 

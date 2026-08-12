@@ -95,7 +95,7 @@ export function SetupDocumentLibraryClient({
               PDF and images are stored as setup documents. Parsing creates draft values for review.
             </p>
             {cars.length === 0 ? (
-              <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
+              <p className="mt-3 text-xs text-warning">
                 Add a car under{" "}
                 <Link href="/cars" className="underline hover:text-foreground">
                   Cars

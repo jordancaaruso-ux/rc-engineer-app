@@ -272,7 +272,7 @@ function RailPanel({
               // brightening a segment of it. Transparent otherwise so closed rows
               // keep a flush left edge.
               "border-l-2 transition-colors",
-              open ? "border-primary/30 bg-muted/25" : "border-transparent",
+              open ? "border-primary-ink/30 bg-muted/25" : "border-transparent",
               index > 0 && "border-t border-t-border"
             )}
           >
@@ -396,7 +396,7 @@ function RunRail({
               "relative -ml-[2px] flex cursor-pointer items-baseline gap-2.5 border-l-2 py-1 pl-[2.375rem] pr-3 transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-inset",
               active
-                ? "border-primary bg-muted text-foreground"
+                ? "border-primary-ink bg-muted text-foreground"
                 : "border-transparent hover:bg-muted/40"
             )}
           >
@@ -433,7 +433,7 @@ function RunRail({
                 // Gain green, matching every other "this is the fast one" mark in
                 // the app. It's a CSS var, not a Tailwind colour — hence the literal.
                 "shrink-0 font-mono text-[11px] tabular-nums",
-                run.isGroupBest ? "text-[#4FD089]" : "text-foreground"
+                run.isGroupBest ? "text-gain" : "text-foreground"
               )}
               title={run.isGroupBest ? "Fastest lap of this session" : undefined}
             >

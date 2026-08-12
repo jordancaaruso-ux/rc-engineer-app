@@ -131,7 +131,7 @@ export function RunLogQuickSetupUpload(props: {
         type="button"
         disabled={busy}
         onClick={() => fileInputRef.current?.click()}
-        className="rounded-md border border-primary/60 bg-primary/90 px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-sm transition hover:bg-primary disabled:opacity-60 disabled:cursor-default"
+        className="rounded-md border border-primary-ink/60 bg-primary/90 px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-sm transition hover:bg-primary disabled:opacity-60 disabled:cursor-default"
       >
         {stageLabel(stage)}
       </button>
@@ -180,7 +180,7 @@ export function RunLogQuickSetupUpload(props: {
 
   return (
     <CardPanel
-      className="max-w-2xl border-primary/25"
+      className="max-w-2xl border-primary-ink/25"
       contentClassName="space-y-2 bg-primary/5"
     >
       <div className="text-xs font-medium text-foreground">Import a setup sheet</div>

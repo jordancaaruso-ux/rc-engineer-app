@@ -20,7 +20,24 @@ const config: Config = {
         primary: {
           DEFAULT: "rgb(var(--color-primary) / <alpha-value>)",
           foreground: "rgb(var(--color-primary-foreground) / <alpha-value>)",
+          /**
+           * Yellow doing a foreground job (text, icon, stroke, tick). Identical to
+           * `primary` in dark; #8A6A00 in light, where #FFD60A is 1.4:1 on the card.
+           * If you are writing `text-primary` or `stroke-primary`, you want this.
+           */
+          ink: "rgb(var(--color-primary-ink) / <alpha-value>)",
         },
+        /** Improvement green — a lap got faster. Was the literal #4FD089. */
+        gain: "rgb(var(--color-gain) / <alpha-value>)",
+        /** Attention, not error. Replaces the `text-amber-600 dark:text-amber-*` pairs. */
+        warning: "rgb(var(--color-warning) / <alpha-value>)",
+        /** Tint that lifts a surface off its ground: white in dark, ink in light. */
+        elevate: "rgb(var(--color-elevate) / <alpha-value>)",
+        /**
+         * Loading placeholder bars only. Tuned for perceptibility (~1.3:1 on `card`),
+         * not contrast — never put text on it, and never use it as a surface.
+         */
+        skeleton: "rgb(var(--color-skeleton) / <alpha-value>)",
         secondary: {
           DEFAULT: "rgb(var(--color-secondary) / <alpha-value>)",
           foreground: "rgb(var(--color-secondary-foreground) / <alpha-value>)",

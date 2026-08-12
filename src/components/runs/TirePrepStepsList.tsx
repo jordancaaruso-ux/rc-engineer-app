@@ -53,7 +53,7 @@ export function TirePrepStepsList({ steps }: { steps: TirePrepStep[] }) {
           className="flex items-center gap-1.5 text-[11px] tabular-nums text-muted-foreground"
         >
           <span className="w-3 flex-none text-faint">{i + 1}</span>
-          <span className="flex flex-none items-center gap-0.5 text-accent">
+          <span className="flex flex-none items-center gap-0.5 text-primary-ink">
             {s.appliedAdditive ? <AdditiveDropIcon className="h-3 w-3" /> : null}
             {s.warmers ? <WarmerSteamIcon className="h-3 w-3" /> : null}
             {s.towels ? <TowelRollIcon className="h-3 w-3" /> : null}

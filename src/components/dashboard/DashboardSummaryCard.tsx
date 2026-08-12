@@ -71,8 +71,8 @@ export function DashboardSummaryCard({
 function NewPbBanner({ newPb }: { newPb: DashboardNewPb }) {
   const improvement = Math.max(0, newPb.previousValue - newPb.value);
   return (
-    <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-[#4FD089]/30 bg-[#4FD089]/10 px-3 py-2.5">
-      <Trophy className="size-4 shrink-0 text-[#4FD089]" aria-hidden />
+    <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-gain/30 bg-gain/10 px-3 py-2.5">
+      <Trophy className="size-4 shrink-0 text-gain" aria-hidden />
       <div className="min-w-0 text-[12.5px] leading-snug">
         <span className="font-semibold text-foreground">New {recordMetricLabel(newPb.metric)}</span>
         <span className="text-muted-foreground">
@@ -80,7 +80,7 @@ function NewPbBanner({ newPb }: { newPb: DashboardNewPb }) {
           {newPb.trackName}
           {newPb.className ? ` · ${newPb.className}` : ""}
         </span>{" "}
-        <span className="font-mono tabular-nums text-[#4FD089]">{formatLap(newPb.value)}</span>{" "}
+        <span className="font-mono tabular-nums text-gain">{formatLap(newPb.value)}</span>{" "}
         <span className="font-mono tabular-nums text-muted-foreground">(−{improvement.toFixed(2)}s)</span>
       </div>
     </div>
@@ -180,7 +180,7 @@ function RecordRow({ record, className }: { record: DashboardRecord; className?:
           {record.className ? ` · ${record.className}` : ""}
         </div>
         {record.freshPbMetric ? (
-          <span className="shrink-0 rounded-md bg-[#4FD089]/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-[#4FD089]">
+          <span className="shrink-0 rounded-md bg-gain/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-gain">
             New PB
           </span>
         ) : (
@@ -214,7 +214,7 @@ function RecordCell({
       <div
         className={cn(
           "mt-0.5 font-mono text-[13px] tabular-nums",
-          fresh ? "text-[#4FD089]" : "text-foreground"
+          fresh ? "text-gain" : "text-foreground"
         )}
       >
         {formatLap(value)}

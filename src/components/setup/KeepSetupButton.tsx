@@ -73,7 +73,7 @@ export function KeepSetupButton({
         className={cn(
           "tap-active inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition disabled:opacity-50",
           saved
-            ? "border-primary/40 bg-primary/10 text-primary"
+            ? "border-primary-ink/40 bg-primary/10 text-primary-ink"
             : "border-border bg-card text-foreground hover:bg-muted"
         )}
       >

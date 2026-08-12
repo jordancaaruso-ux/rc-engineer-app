@@ -388,7 +388,7 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
               type="button"
               onClick={openEngineerCompare}
               disabled={!engineerCompareState.enabled}
-              className="rounded-md border border-primary/60 bg-primary/90 px-2 py-1 text-xs font-medium text-primary-foreground shadow-sm transition hover:bg-primary disabled:cursor-default disabled:opacity-40"
+              className="rounded-md border border-primary-ink/60 bg-primary/90 px-2 py-1 text-xs font-medium text-primary-foreground shadow-sm transition hover:bg-primary disabled:cursor-default disabled:opacity-40"
               title={
                 engineerCompareState.reason ??
                 "Open the Engineer chat with these two runs and auto-run the compare-setups prompt"

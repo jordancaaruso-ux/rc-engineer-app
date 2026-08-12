@@ -16,9 +16,9 @@ import type { LapGraphRow } from "@/components/runs/LapTimeGraph";
  * index (lap N vs lap N), so the gap only runs over the shared lap count.
  */
 
-const GAIN_COLOR = "#4FD089"; // matches the gain token (faster / you ahead)
-const LOSS_COLOR = "#E5644E"; // loss token (slower / you behind)
-const CROSS_COLOR = "#A09D96"; // neutral ink-2 for segments crossing zero
+const GAIN_COLOR = "rgb(var(--color-gain))"; // matches the gain token (faster / you ahead)
+const LOSS_COLOR = "rgb(var(--color-destructive))"; // loss token (slower / you behind)
+const CROSS_COLOR = "rgb(var(--color-muted-foreground))"; // neutral ink-2 for segments crossing zero
 
 const CHART_HEIGHT = 150;
 const PAD_LEFT = 40;

@@ -130,10 +130,10 @@ export default async function WelcomePage(): Promise<ReactNode> {
               <polyline
                 points="10,24 50,34 90,30 130,48 170,44 210,62 250,58 290,74"
                 fill="none"
-                stroke="#ECE9E4"
+                stroke="rgb(var(--color-foreground))"
                 strokeWidth="2"
               />
-              <circle cx="290" cy="74" r="3.5" fill="#FFD60A" />
+              <circle cx="290" cy="74" r="3.5" fill="rgb(var(--color-primary-ink))" />
             </svg>
             <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-lg border border-border">
               {(
@@ -190,15 +190,15 @@ export default async function WelcomePage(): Promise<ReactNode> {
                 <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                   Racing on data
                 </span>
-                <span className="font-mono text-[12px] text-[#4FD089]">▼ −0.18s</span>
+                <span className="font-mono text-[12px] text-gain">▼ −0.18s</span>
               </div>
               <ul className="mt-3 flex flex-col gap-2 text-[13.5px] leading-relaxed">
                 <li className="font-mono text-[12.5px]">
                   R5 → R6: front camber −1.5° → −2.0°
                 </li>
                 <li className="text-muted-foreground">
-                  Avg top 5 <span className="text-[#4FD089]">−0.18s</span> · consistency{" "}
-                  <span className="text-[#4FD089]">+2.1%</span>
+                  Avg top 5 <span className="text-gain">−0.18s</span> · consistency{" "}
+                  <span className="text-gain">+2.1%</span>
                 </li>
                 <li>
                   <span className="text-foreground">Kept for Q3.</span>{" "}
@@ -282,7 +282,7 @@ export default async function WelcomePage(): Promise<ReactNode> {
               ] as const
             ).map(([n, title, line]) => (
               <div key={n} className="rounded-xl border border-border p-4">
-                <div className="font-mono text-[11px] text-primary">{n}</div>
+                <div className="font-mono text-[11px] text-primary-ink">{n}</div>
                 <p className="mt-1 text-sm font-semibold">{title}</p>
                 <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{line}</p>
               </div>

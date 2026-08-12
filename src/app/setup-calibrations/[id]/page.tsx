@@ -78,7 +78,7 @@ export default async function SetupCalibrationDetailPage({
           </div>
         </header>
         <section className="page-body">
-          <Link href="/setup-calibrations" className="text-sm text-accent hover:underline">
+          <Link href="/setup-calibrations" className="text-sm text-primary-ink hover:underline">
             Back to calibrations
           </Link>
         </section>
@@ -114,7 +114,7 @@ export default async function SetupCalibrationDetailPage({
               currentModelId={calibration.setupSheetModelId}
               currentModelName={calibration.setupSheetModel?.name ?? null}
             />
-            <Link href="/setup-calibrations" className="inline-block text-xs text-accent hover:underline">
+            <Link href="/setup-calibrations" className="inline-block text-xs text-primary-ink hover:underline">
               Back to calibrations
             </Link>
           </CardPanel>
@@ -136,7 +136,7 @@ export default async function SetupCalibrationDetailPage({
                 ·{" "}
                 <Link
                   href={`/setup-sheet-models/${calibration.setupSheetModel.id}`}
-                  className="text-accent hover:underline"
+                  className="text-primary-ink hover:underline"
                 >
                   {calibration.setupSheetModel.name}
                 </Link>
@@ -211,7 +211,7 @@ export default async function SetupCalibrationDetailPage({
             ) : (
               <p className="text-xs text-muted-foreground">No example PDF linked.</p>
             )}
-            <Link href="/setup-calibrations" className="inline-block text-xs text-accent hover:underline">
+            <Link href="/setup-calibrations" className="inline-block text-xs text-primary-ink hover:underline">
               Back to calibrations
             </Link>
           </CardPanel>

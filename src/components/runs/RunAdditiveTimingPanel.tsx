@@ -80,7 +80,7 @@ function ValueChip({
       className={cn(
         "min-w-[58px] flex-none rounded-lg border px-2 py-1.5 text-center font-mono text-[13px] tabular-nums transition",
         open
-          ? "border-accent bg-accent/10 text-foreground"
+          ? "border-primary-ink bg-accent/10 text-foreground"
           : "border-border bg-secondary hover:border-muted-foreground/40",
         value == null ? "text-faint" : "text-foreground"
       )}
@@ -118,7 +118,7 @@ function IconToggle({
       className={cn(
         "grid h-[34px] w-[34px] flex-none place-items-center rounded-lg border transition",
         on
-          ? "border-accent/60 bg-accent/10 text-accent"
+          ? "border-primary-ink/60 bg-accent/10 text-primary-ink"
           : "border-border text-faint hover:border-muted-foreground/40 hover:text-muted-foreground",
         hidden && "invisible pointer-events-none"
       )}

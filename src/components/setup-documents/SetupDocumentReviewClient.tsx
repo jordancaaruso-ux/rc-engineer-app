@@ -945,7 +945,7 @@ export function SetupDocumentReviewClient({
           </div>
         ) : null}
         {autoPickUserNote ? (
-          <div className="mt-2 rounded border border-accent/35 bg-accent/10 px-3 py-2 text-sm text-accent-foreground space-y-2">
+          <div className="mt-2 rounded border border-primary-ink/35 bg-accent/10 px-3 py-2 text-sm text-accent-foreground space-y-2">
             <p>{autoPickUserNote}</p>
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
               <Link href="/setup-sheet-models/new" className="underline text-accent-foreground hover:text-foreground">
@@ -1019,7 +1019,7 @@ export function SetupDocumentReviewClient({
                 {calibrationSelectionChanged && selectedCalibration ? (
                   <button
                     type="button"
-                    className="rounded-md border border-primary/40 bg-primary/20 px-3 py-1.5 text-xs hover:bg-primary/30 disabled:opacity-60"
+                    className="rounded-md border border-primary-ink/40 bg-primary/20 px-3 py-1.5 text-xs hover:bg-primary/30 disabled:opacity-60"
                     onClick={applyCalibrationAndProcess}
                     disabled={processingImport}
                   >
@@ -1028,7 +1028,7 @@ export function SetupDocumentReviewClient({
                 ) : awaitingCalibration && selectedCalibration ? (
                   <button
                     type="button"
-                    className="rounded-md border border-primary/40 bg-primary/20 px-3 py-1.5 text-xs hover:bg-primary/30 disabled:opacity-60"
+                    className="rounded-md border border-primary-ink/40 bg-primary/20 px-3 py-1.5 text-xs hover:bg-primary/30 disabled:opacity-60"
                     onClick={applyCalibrationAndProcess}
                     disabled={processingImport}
                   >
@@ -1270,7 +1270,7 @@ export function SetupDocumentReviewClient({
             Saved templates map editable PDF text (and optional regions) to setup fields. Choose one and confirm to prefill.
           </p>
           {!liveDoc.calibrationProfileId && !liveDoc.calibrationResolvedProfileId ? (
-            <div className="mt-2 rounded border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px] text-accent-foreground">
+            <div className="mt-2 rounded border border-primary-ink/40 bg-accent/10 px-2 py-1.5 text-[11px] text-accent-foreground">
               No calibration selected yet — pick one whose example PDF matches this form layout.
             </div>
           ) : null}
@@ -1327,7 +1327,7 @@ export function SetupDocumentReviewClient({
             </select>
             <button
               type="button"
-              className="rounded-md border border-primary/40 bg-primary/20 px-3 py-1.5 text-xs hover:bg-primary/30 disabled:opacity-60"
+              className="rounded-md border border-primary-ink/40 bg-primary/20 px-3 py-1.5 text-xs hover:bg-primary/30 disabled:opacity-60"
               onClick={applyCalibrationAndProcess}
               disabled={!selectedCalibration || processingImport}
             >
@@ -1351,7 +1351,7 @@ export function SetupDocumentReviewClient({
             </button>
             <button
               type="button"
-              className="rounded-md border border-primary/40 bg-primary/20 px-3 py-1.5 text-xs hover:bg-primary/30 disabled:opacity-60"
+              className="rounded-md border border-primary-ink/40 bg-primary/20 px-3 py-1.5 text-xs hover:bg-primary/30 disabled:opacity-60"
               onClick={processNow}
               disabled={processingImport || !liveDoc.calibrationProfileId || liveDoc.importStatus === "PROCESSING"}
             >
@@ -1410,7 +1410,7 @@ export function SetupDocumentReviewClient({
         <CardPanel contentClassName="p-3">
           <Eyebrow>Document tools</Eyebrow>
           {liveDoc.parsedSetupManuallyEdited ? (
-            <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
+            <p className="mt-1 text-[11px] text-warning">
               This document includes saved manual corrections to structured fields.
             </p>
           ) : null}
@@ -1438,7 +1438,7 @@ export function SetupDocumentReviewClient({
             </button>
             <button
               type="button"
-              className="rounded-md border border-primary/40 bg-primary/20 px-3 py-1.5 text-xs hover:bg-primary/30 disabled:opacity-60"
+              className="rounded-md border border-primary-ink/40 bg-primary/20 px-3 py-1.5 text-xs hover:bg-primary/30 disabled:opacity-60"
               onClick={createSetup}
               disabled={
                 creatingSetup || Boolean(liveDoc.createdSetupId) || savingCarLink

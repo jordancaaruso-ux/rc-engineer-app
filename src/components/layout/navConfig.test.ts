@@ -8,17 +8,65 @@ import {
   CATALOG_LINKS,
   DESKTOP_NAV,
   MOBILE_NAV,
+  MORE_HUB_LINKS,
+  NAV_ADD_RUN,
+  NAV_SETTINGS,
   TOOLS_HUB_LINKS,
   catalogLinksForUser,
+  resolveActiveMobileNavId,
   resolveActiveNavId,
   shouldShowLogRunFab,
 } from "@/components/layout/navConfig";
 
-test("mobile dock is six pure destinations, in order, without add-run or settings", () => {
+test("mobile dock is five cells ending in More, without add-run or settings", () => {
   assert.deepEqual(
     MOBILE_NAV.map((item) => item.id),
-    ["dashboard", "analysis", "events", "engineer", "assets", "teams"]
+    ["dashboard", "analysis", "engineer", "teams", "more"]
   );
+  // The two that live outside the dock entirely: the log-run circle and the avatar.
+  assert.equal(MOBILE_NAV.some((item) => item.id === "add-run"), false);
+  assert.equal(MOBILE_NAV.some((item) => item.id === "settings"), false);
+});
+
+test("the desktop rail is seven destinations; add-run and settings are utilities", () => {
+  assert.deepEqual(
+    DESKTOP_NAV.map((item) => item.id),
+    ["dashboard", "analysis", "events", "engineer", "assets", "tools", "teams"]
+  );
+  // Both left the destination list for the rail's right-hand cluster — but they are
+  // still defined here, so the cluster cannot drift from the nav.
+  assert.equal(DESKTOP_NAV.some((item) => item.id === "add-run"), false);
+  assert.equal(DESKTOP_NAV.some((item) => item.id === "settings"), false);
+  assert.equal(NAV_ADD_RUN.href, "/runs/new");
+  assert.equal(NAV_ADD_RUN.smartDraft, true);
+  assert.equal(NAV_SETTINGS.href, "/settings");
+});
+
+test("everything the dock dropped is still reachable from /more", () => {
+  const moreHrefs = MORE_HUB_LINKS.map((l) => l.href);
+  assert.deepEqual(moreHrefs, ["/events", "/cars", "/tools"]);
+  // Each door must land where its own desktop tab lands, or the two platforms
+  // disagree about what "Garage" means.
+  for (const id of ["events", "assets", "tools"] as const) {
+    const tab = DESKTOP_NAV.find((item) => item.id === id);
+    assert.ok(tab, `${id} missing from the rail`);
+    assert.ok(moreHrefs.includes(tab.href), `${tab.href} is unreachable on mobile`);
+  }
+});
+
+test("More stays lit while you are inside a section it owns", () => {
+  // The fold: section id everywhere, dock cell in the dock.
+  for (const path of ["/events", "/events/abc", "/cars", "/tools", "/setup/comparison"]) {
+    assert.equal(resolveActiveMobileNavId(path), "more", `${path} should light More`);
+  }
+  assert.equal(resolveActiveMobileNavId("/more"), "more");
+  // …and the five real cells are untouched by the fold.
+  for (const path of ["/", "/analysis", "/runs/history", "/engineer", "/teams"]) {
+    assert.equal(resolveActiveMobileNavId(path), resolveActiveNavId(path), `${path} folded wrongly`);
+  }
+  // Settings is not in the dock at all — it must not light More either.
+  assert.equal(resolveActiveMobileNavId("/settings"), "settings");
+  assert.equal(resolveActiveNavId("/more"), "more");
 });
 
 test("Analysis lands on the workbench at desktop and the card hub on the phone", () => {
@@ -33,14 +81,16 @@ test("Analysis lands on the workbench at desktop and the card hub on the phone",
   assert.equal(resolveActiveNavId("/analysis"), "analysis");
 });
 
-test("Tools is desktop-only; the phone keeps reaching them from /analysis", () => {
+test("Tools has no dock cell; the phone reaches every tool two ways", () => {
   assert.ok(DESKTOP_NAV.some((item) => item.id === "tools"));
   assert.ok(!MOBILE_NAV.some((item) => item.id === "tools"));
-  // Every tool the desktop hub lists is still a door on the phone's Analysis hub.
+  // Still doors on the phone's Analysis hub — the /more route added a second way in,
+  // it did not take this one away.
   const analysisHrefs = new Set(ANALYSIS_HUB_LINKS.map((l) => l.href));
   for (const link of TOOLS_HUB_LINKS) {
     assert.ok(analysisHrefs.has(link.href), `${link.href} is unreachable on mobile`);
   }
+  assert.ok(MORE_HUB_LINKS.some((l) => l.href === "/tools"));
 });
 
 test("tool routes light Tools, not Analysis — longest prefix wins", () => {
@@ -57,13 +107,14 @@ test("events own their tab — /events no longer lights Garage (2026-07-29)", ()
   assert.equal(resolveActiveNavId("/events/abc123"), "events");
   // The Garage prefix list used to swallow /events; keep it out for good.
   assert.notEqual(resolveActiveNavId("/events"), "assets");
-  const events = MOBILE_NAV.find((item) => item.id === "events");
+  // Its tab is the rail's now — the phone reaches it through More (2026-08-12).
+  const events = DESKTOP_NAV.find((item) => item.id === "events");
   assert.equal(events?.href, "/events");
   assert.equal(events?.label, "Events");
 });
 
 test("the Garage tab lands on the cars list, not a hub (2026-07-29)", () => {
-  const garage = MOBILE_NAV.find((item) => item.id === "assets");
+  const garage = DESKTOP_NAV.find((item) => item.id === "assets");
   assert.equal(garage?.href, "/cars");
   assert.equal(garage?.label, "Garage");
   // Legacy hub routes still light the tab — both redirect to /cars.

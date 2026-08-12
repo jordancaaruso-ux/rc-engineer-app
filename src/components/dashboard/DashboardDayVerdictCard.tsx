@@ -6,7 +6,7 @@ import { formatLap } from "@/lib/runLaps";
 import { cn } from "@/lib/utils";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 
-const GAIN = "text-[#4FD089]";
+const GAIN = "text-gain";
 const LOSS = "text-destructive";
 
 /** Signed lap delta, 3 decimals — negative (faster) reads green, positive red. */
@@ -45,10 +45,10 @@ function Sparkline({ values, direction }: { values: number[]; direction: "faster
   const y = (v: number) => (range === 0 ? H / 2 : PAD + ((max - v) * (H - 2 * PAD)) / range);
   const points = values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
   const last = values[values.length - 1];
-  const endColor = direction === "faster" ? "#4FD089" : direction === "slower" ? "#E5644E" : "#64625E";
+  const endColor = direction === "faster" ? "rgb(var(--color-gain))" : direction === "slower" ? "rgb(var(--color-destructive))" : "rgb(var(--color-faint))";
   return (
     <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden className="shrink-0">
-      <polyline points={points} fill="none" stroke="#64625E" strokeWidth="1.5" />
+      <polyline points={points} fill="none" stroke="rgb(var(--color-faint))" strokeWidth="1.5" />
       <circle cx={x(values.length - 1)} cy={y(last)} r="2.6" fill={endColor} />
     </svg>
   );
@@ -215,7 +215,7 @@ export function DashboardDayVerdictCard({
           prefetch
           className="tap-active flex items-center gap-2 text-[13px] font-semibold text-muted-foreground transition hover:text-foreground"
         >
-          <span aria-hidden className="text-primary">✦</span>
+          <span aria-hidden className="text-primary-ink">✦</span>
           Ask the Engineer about today
           <ArrowUpRight aria-hidden className="ml-auto size-[15px] text-faint" strokeWidth={2.2} />
         </Link>

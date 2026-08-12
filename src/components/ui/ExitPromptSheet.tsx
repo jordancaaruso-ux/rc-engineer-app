@@ -82,7 +82,7 @@ export function ExitPromptSheet({
         aria-hidden
       />
       <div
-        className="fixed inset-x-0 bottom-0 z-[61] mx-auto w-full max-w-md rounded-t-[22px] border-t border-white/10 bg-[#1E1D1C] px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-24px_60px_-12px_rgba(0,0,0,0.8)]"
+        className="fixed inset-x-0 bottom-0 z-[61] mx-auto w-full max-w-md rounded-t-[22px] border-t border-white/10 bg-muted px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-24px_60px_-12px_rgba(0,0,0,0.8)]"
         role="dialog"
         aria-modal="true"
         aria-label={title}

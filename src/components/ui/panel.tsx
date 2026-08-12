@@ -133,7 +133,7 @@ export function StatTile({
       <div
         className={cn(
           "mt-1 font-mono text-[18px] font-medium tabular-nums",
-          accent ? "text-primary" : "text-foreground"
+          accent ? "text-primary-ink" : "text-foreground"
         )}
       >
         {value}

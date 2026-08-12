@@ -48,7 +48,7 @@ export function CatalogVerifyToggleButton({
       disabled={busy}
       className={cn(
         "rounded-md border px-3 py-1.5 text-xs hover:bg-muted/50 disabled:opacity-50",
-        verified ? "border-border text-muted-foreground" : "border-primary/50 text-primary",
+        verified ? "border-border text-muted-foreground" : "border-primary-ink/50 text-primary-ink",
         className
       )}
     >

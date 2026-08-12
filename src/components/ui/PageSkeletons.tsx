@@ -1,13 +1,29 @@
 import type { ReactNode } from "react";
 import { CardPanel } from "@/components/ui/CardPanel";
 
+/**
+ * One placeholder bar.
+ *
+ * `bg-skeleton`, not the `bg-muted/60` this used to be: `muted` is a surface token
+ * and at 60% it resolved to 1.05:1 against `card` in both themes, so `animate-pulse`
+ * was animating a colour nobody could see. The card's own border and background
+ * were the only thing on screen — hence "empty card backgrounds".
+ */
 function Shimmer({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-muted/60 ${className ?? ""}`} />;
+  return <div className={`animate-pulse rounded-md bg-skeleton ${className ?? ""}`} />;
 }
 
-/** Branded full-page shell — keeps charcoal base visible during route transitions. */
+/**
+ * Branded full-page shell — keeps the app's base visible during route transitions.
+ *
+ * `rc-skeleton-shell` is what makes this not flash: the whole shell stays invisible
+ * for the first 400ms, so a route that resolves quickly never shows a placeholder
+ * at all. See the `rc-skeleton-in` block in globals.css.
+ */
 export function PageLoadingShell({ children }: { children: ReactNode }) {
-  return <div className="flex min-h-0 flex-1 flex-col bg-background">{children}</div>;
+  return (
+    <div className="rc-skeleton-shell flex min-h-0 flex-1 flex-col bg-background">{children}</div>
+  );
 }
 
 export function loadingSkeletonForPath(path: string): ReactNode {

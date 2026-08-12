@@ -33,6 +33,60 @@
   --color-ring: 255 214 10; /* #FFD60A */
   --color-faint: 100 98 94; /* #64625E */
 
+  /*
+   * ── Three roles that had to become tokens before light mode was expressible ──
+   * (2026-08-11.) In dark these hold exactly the values that were previously
+   * hard-coded at ~60 call sites, so none of this moves the charcoal app.
+   *
+   * `primary-ink` is yellow doing a FOREGROUND job — the active rail item, the
+   * nav-sector tick, eyebrow ticks, the pace line, focus rings. `primary` stays
+   * the FILL, always beneath dark text. On charcoal one value serves both, which
+   * is why they were ever the same token; on paper #FFD60A is 1.4:1 against the
+   * card and cannot be ink at all. Never use `primary` as a text or stroke
+   * colour — that is what this is for.
+   *
+   * `gain` is the improvement green (a lap got faster). It was the literal
+   * #4FD089 in 25 files. It carries data, so it has to clear contrast on both
+   * grounds rather than merely read as green.
+   *
+   * `elevate` is the colour a surface is tinted with to lift it off its ground:
+   * white on charcoal, ink on paper. Every `rgb(255 255 255 / .05)` sheen in this
+   * file was really asking for this, and each one silently did nothing the moment
+   * the card went pale.
+   */
+  --color-primary-ink: 255 214 10; /* #FFD60A */
+  --color-gain: 79 208 137; /* #4FD089 */
+  --color-elevate: 255 255 255;
+
+  /*
+   * Loading placeholder bars. NOT `muted` — that is a surface colour, and at the
+   * 60% the skeletons used it landed 1.05:1 against `card` in BOTH themes, so a
+   * page waiting on data rendered as card furniture with nothing inside it. The
+   * cards read as empty rather than loading (founder, 2026-08-12: "the empty card
+   * backgrounds flash up ... it looks super weird").
+   *
+   * Its own token because it is the one colour in the app deliberately tuned by
+   * PERCEPTIBILITY rather than contrast: ~1.3:1 against `card` on both grounds.
+   * A placeholder carries no text, so the 4.5:1 rules do not apply to it, but it
+   * does have to be visible or it is not a placeholder.
+   */
+  --color-skeleton: 52 49 45; /* #34312D on #181716 — 1.37:1 */
+
+  /*
+   * Attention that is not an error — "chassis type needed", "no timing source".
+   * These were `text-amber-600 dark:text-amber-300` pairs, and the `dark:` half
+   * has never rendered: `darkMode: "class"` in the Tailwind config wants a `.dark`
+   * ancestor and the app has never had one. So every one of them has always been
+   * amber-600 on charcoal (5.4:1, which is why nobody noticed), and would have
+   * been amber-600 on paper (2.6:1, which anyone would). One token, two values —
+   * and the dark value is amber-600 exactly, so adding a light theme does not quietly
+   * retune the charcoal app that already shipped.
+   */
+  --color-warning: 217 119 6; /* #D97706 — exactly amber-600, so dark is unchanged */
+
+  /* Best-lap violet — the "purple" of timing screens. Chart dots and lap numerals. */
+  --color-best-lap: 167 139 250; /* #A78BFA */
+
   /* Flat charcoal base — red/blue mesh retired. Faded hero lives only on login/dashboard. */
   --body-glow-red-strong: 0;
   --body-glow-red-soft: 0;
@@ -74,9 +128,21 @@
 
   /*
    * Mobile bottom dock (see BottomNav.tsx) — clearance the page reserves under
-   * scrolling content: 3.5rem bar + 0.75rem float gap + 1rem breathing room.
+   * scrolling content. Recomputed for the full-bleed slab (2026-08-12); the
+   * floating pill it replaced was 3.5rem bar + 0.75rem float gap + 1rem.
+   *
+   *   10px slab padding-top
+   * + 52px row — the CELLS are 46px, but the log-run circle is 52 and it is in
+   *              the same centred flex row, so the circle sets the height
+   * + 12px slab padding-bottom (the `max(12px, safe-area)` floor)
+   * ---------------------------------------------------------------
+   *   74px of slab, + 1rem breathing room = 90px
+   *
+   * The safe-area inset is NOT counted here: `AppShell` adds `env(...)` on top of
+   * this value, and the slab's own bottom padding is the same `max()`, so on a
+   * notched phone the two agree and on a flat one this is the floor.
    */
-  --mobile-tab-bar-height: 5.25rem;
+  --mobile-tab-bar-height: 5.625rem;
 
   /*
    * Vertical anchor for the fixed mobile corner chrome (JRC pill + account
@@ -122,6 +188,101 @@
 :root {
   --page-bg-rgb: 27 26 23; /* #1B1A17 */
   --page-bg-base: rgb(var(--page-bg-rgb));
+}
+
+/* ---------------------------------------------------------------------------
+   ===== Light mode — "Ash paper" (2026-08-11) =====
+
+   Opt-in only. `data-theme="light"` is stamped on <html> by the server from the
+   `rc_theme` cookie (see `src/lib/theme/themeCookie.ts` and `layout.tsx`), so the
+   un-stamped document is the charcoal app exactly as it shipped and nobody's
+   install changes colour on its own. Deliberately NOT wired to
+   `prefers-color-scheme`: a phone that flips itself to light at a night meeting
+   is the wrong call, and the per-device background picker was retired for the
+   same reason — the app has a look, and this is a choice you make once.
+
+   Two things carry over from dark rather than inverting, and they are the whole
+   character of the theme:
+
+     · Neutrals stay WARM. Every value here is biased toward the yellow, which is
+       what stops the paper reading as office grey.
+     · The card is LIGHTER than the page, preserving the dark theme's own
+       relationship (card #181716 sits on page #1B1A17). Panels therefore still
+       read as surfaces set into the ground rather than cut out of it — which is
+       also what saves `.surface-1`, whose entire lift is a white top sheen that
+       does nothing on a white card.
+
+   The yellow does not invert. #FFD60A is 1.4:1 on this card, so it survives only
+   as a FILL under dark text (12.6:1) — buttons, the log-run circle, chips. Every
+   foreground use resolves through `--color-primary-ink` to #8A6A00 (4.9:1).
+--------------------------------------------------------------------------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* Legacy single-hex aliases, kept in step with the triplets below. */
+  --background: #f4f1ea;
+  --foreground: #191815;
+  --surface: #fcfbf8;
+  --secondary-bg: #f2efe8;
+  --muted-fg: #6b675f;
+  --faint: #9a958b;
+  --border: #ddd8ce;
+  --accent: #ffd60a;
+  --primary: #ffd60a;
+
+  --page-bg-rgb: 234 231 224; /* #EAE7E0 — warm ash paper */
+
+  --color-background: 244 241 234; /* #F4F1EA */
+  --color-foreground: 25 24 21; /* #191815 — warm ink, never black */
+  --color-card: 252 251 248; /* #FCFBF8 — the lightest surface on screen */
+  --color-card-foreground: 25 24 21;
+  --color-primary: 255 214 10; /* #FFD60A — unchanged, FILL ONLY */
+  --color-primary-foreground: 25 24 21; /* dark on yellow, as in dark mode */
+  --color-secondary: 242 239 232; /* #F2EFE8 */
+  --color-secondary-foreground: 25 24 21;
+  --color-muted: 242 239 232; /* #F2EFE8 */
+  --color-muted-foreground: 107 103 95; /* #6B675F — 5.4:1 */
+  --color-accent: 255 214 10;
+  --color-accent-foreground: 25 24 21;
+  --color-destructive: 190 63 39; /* #BE3F27 — 5.2:1 (was 3.2:1 unadjusted) */
+  --color-border: 221 216 206; /* #DDD8CE */
+  --color-input: 242 239 232; /* #F2EFE8 */
+  --color-faint: 154 149 139; /* #9A958B — 2.9:1, decorative only, as in dark */
+
+  /* Yellow's two jobs, finally separated. */
+  --color-primary-ink: 138 106 0; /* #8A6A00 — 4.9:1 on card */
+  --color-ring: 138 106 0; /* a yellow focus ring is invisible on paper */
+  --glow-shadow-rgb: 138 106 0;
+  --color-gain: 7 121 77; /* #07794D — 5.3:1 (#4FD089 is 1.9:1) */
+  --color-elevate: 25 24 21; /* tint with ink, not white */
+  --color-warning: 140 84 0; /* #8C5400 — 5.6:1 (amber-600 is 2.6:1) */
+  --color-best-lap: 109 40 217; /* #6D28D9 — 6.6:1 (#A78BFA is 2.5:1) */
+  /* Darker than the card here, lighter than it in dark — the bar has to sit
+     AGAINST the surface, and on paper that means down, not up. */
+  --color-skeleton: 226 221 210; /* #E2DDD2 on #FCFBF8 — 1.31:1 */
+
+  /* Inset controls sit BELOW the card here — on charcoal they sat above it. */
+  --color-surface-runna-deep: 228 224 215; /* #E4E0D7 */
+  --color-surface-runna: 252 251 248; /* #FCFBF8 */
+  --color-surface-runna-inset: 242 239 232; /* #F2EFE8 */
+
+  /*
+   * Rating ramp, re-stepped rather than darkened. Keeping the shipped hues and
+   * just dropping their lightness collapses Good into Dialled — on charcoal those
+   * two are separated by lightness (sage vs vivid), which is the one axis paper
+   * takes away. So the separation moves to chroma: Good is a low-chroma pine,
+   * Dialled a saturated green at nearly the same lightness. The single
+   * discontinuity still lands on the Workable→Good boundary, which is the whole
+   * point of the ramp (see the note on the dark values above).
+   */
+  --color-rating-bad: 190 63 39; /* #BE3F27 — 5.2:1 */
+  --color-rating-workable: 158 98 56; /* #9E6238 — 4.8:1 */
+  --color-rating-good: 74 127 99; /* #4A7F63 — 4.5:1, low chroma */
+  --color-rating-dialled: 7 121 77; /* #07794D — 5.3:1, high chroma */
+  --color-rating-unrated: 207 201 188; /* #CFC9BC — a step above border, as in dark */
+
+  /* Paper needs more opacity behind text than charcoal does. */
+  --tune-glass-alpha: 0.78;
 }
 
 html {
@@ -191,6 +352,21 @@ body {
     inset 0 1px 0 rgb(255 255 255 / 0.14),
     inset 0 -1px 0 rgb(0 0 0 / 0.2),
     0 24px 55px -26px rgb(0 0 0 / 0.7);
+}
+
+/*
+ * Light: the anatomy inverts, not the colours. The specular top rim and the deep
+ * black drop are both readings of a light source above a dark object — on paper
+ * the rim is invisible against the card and the black drop reads as dirt. So the
+ * rim becomes a real hairline border at 9% ink, and the shadow becomes a warm,
+ * tighter one that grounds the card without smudging it. The blur stays: the
+ * frosted effect is the point of the class and it survives the change of ground.
+ */
+:root[data-theme="light"] .glass-card {
+  border-color: rgb(var(--color-elevate) / 0.09);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    0 12px 26px -20px rgb(60 52 32 / 0.55);
 }
 
 /* Grain retired (2026-07-14 perf bake): the 0.05 soft-light noise was the last
@@ -323,6 +499,21 @@ html.pwa-splash-done[data-standalone="true"] #pwa-splash {
     0 18px 40px -26px rgb(0 0 0 / 0.85);
 }
 
+/*
+ * Light: both halves of the lift are no-ops on a near-white card — a white top
+ * sheen over #FCFBF8 is nothing, and `color-mix(… 84%, white)` moves the panel
+ * about two levels. (The comment above claims `color-mix` "keeps it on-palette
+ * across every theme". It does not; it only ever worked because the card was
+ * dark.) Separation on paper comes from the ground instead: the card is already
+ * the lightest thing on screen, so the panel needs only a hairline and a soft
+ * warm drop to sit above the page.
+ */
+:root[data-theme="light"] .surface-1 {
+  background-image: none;
+  border: 1px solid rgb(var(--color-border));
+  box-shadow: 0 10px 24px -20px rgb(60 52 32 / 0.6);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -332,18 +523,161 @@ html.pwa-splash-done[data-standalone="true"] #pwa-splash {
   @apply relative flex min-h-[100dvh] overflow-x-hidden overflow-y-visible bg-transparent text-foreground;
 }
 
+/* ---------------------------------------------------------------------------
+   Nav glass — one recipe, both surfaces (nav restructure 2026-08-12).
+
+   The dock and the desktop rail were three different glasses between them: the
+   pill ran card/0.32 + blur(40px) saturate(1.9), the sidebar ran secondary/0.8 +
+   blur(12px) with no saturation at all — barely glass. They are now one recipe,
+   declared once here.
+
+   LESS transparent than the shipped pill, deliberately. Full-bleed puts far more
+   glass on screen than a floating pill did, and both surfaces sit over dense run
+   tables where high transparency smears numerals. If the lighter setting is
+   wanted back, these three values are the whole knob.
+
+   Paper needs more opacity behind text than charcoal does — same reason
+   `--tune-glass-alpha` is 0.6 dark and 0.78 light.
+--------------------------------------------------------------------------- */
+:root {
+  --nav-glass-alpha: 0.62;
+  --nav-glass-blur: 36px;
+  --nav-glass-saturate: 1.6;
+}
+
+:root[data-theme="light"] {
+  --nav-glass-alpha: 0.82;
+}
+
 .bottom-nav {
   /*
-   * Floating dock — the pill inside BottomNav.tsx carries its own blurred
-   * surface, border, and shadow; this wrapper stays transparent so page
-   * content scrolls behind the float gap. Bottom offset / safe-area handled
-   * by Tailwind classes on the nav element.
-   * z-index keeps the dock above `.page` when DOM/stacking order would otherwise bury it.
+   * z-index keeps the dock above `.page` when DOM/stacking order would otherwise
+   * bury it. The slab inside carries the surface; this wrapper is only the
+   * fixed-position frame, and stays pointer-events-none so the page keeps
+   * scrolling either side of the log-run circle.
    */
   z-index: 50;
+}
+
+/*
+ * Full-bleed, edge to edge: no side inset, no radius, no float gap. The pill spent
+ * all three on air, which is what squeezed six destinations to ~42.7px and cost
+ * the labels. Five cells at 60px (390px viewport) is what came back.
+ */
+.bottom-nav-slab {
+  padding: 10px 14px max(12px, env(safe-area-inset-bottom));
+  background-color: rgb(var(--color-card) / var(--nav-glass-alpha));
+  /* Standard property only — the build auto-generates -webkit- for Safari, and
+     hand-writing the prefixed one alongside it makes the build drop BOTH. */
+  backdrop-filter: blur(var(--nav-glass-blur)) saturate(var(--nav-glass-saturate));
+  box-shadow: 0 -14px 34px rgb(0 0 0 / 0.4);
+  position: relative;
   /* JRC icon negative space (gauge needle, garage door, teams keylines) is
-     painted, not punched — it must match the surface behind the glass bar. */
-  --jrc-icon-cutout: var(--page-bg-base);
+     painted, not punched — it must match the surface the icon actually sits on,
+     which is this slab, not the page. On charcoal the two differ by three levels
+     so it never mattered; on paper they are #EAE7E0 against #FCFBF8 and the icons
+     grow a visible grey smudge where the cutout should disappear. */
+  --jrc-icon-cutout: rgb(var(--color-card));
+}
+
+/*
+ * The top hairline. A gradient that fades out at both ends, so a bar with no side
+ * inset does not read as a hard drawn line across the whole screen — it brightens
+ * toward the centre, where the content is, and dissolves at the edges.
+ */
+.bottom-nav-slab::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(var(--color-elevate) / 0.24) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+:root[data-theme="light"] .bottom-nav-slab::before {
+  /* Ink at 24% is a bruise on paper; the hairline only has to separate. */
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(var(--color-elevate) / 0.1) 50%,
+    transparent 100%
+  );
+}
+
+/* 9.5px is the ceiling that keeps "Dashboard" on one line in a 60px cell. */
+.dock-label {
+  font-size: 9.5px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.bottom-nav a[data-active="true"] .dock-label {
+  font-weight: 700;
+}
+
+/*
+ * The active mark, shared by both platforms: 28×2, primary-ink, with a glow that
+ * only exists in dark. `primary-ink` and never `primary` — this is yellow doing a
+ * foreground job, and #FFD60A is 1.4:1 on paper.
+ */
+.nav-tick {
+  display: block;
+  width: 28px;
+  height: 2px;
+  border-radius: 9999px;
+  background-color: rgb(var(--color-primary-ink));
+  box-shadow: 0 0 10px 1px rgb(var(--color-primary-ink) / 0.4);
+}
+
+:root[data-theme="light"] .nav-tick {
+  /* Nothing to glow against on paper — a halo round a 2px bar reads as blur. */
+  box-shadow: none;
+}
+
+/*
+ * The JRC wordmark in the mobile corner pill is an <img> (`jrc-mark-white.svg`),
+ * so `color` cannot reach it — and a white mark on the light theme's near-white
+ * pill is simply not there. The asset is flat white, so `brightness(0)` renders it
+ * as ink without needing a second file to keep in sync with the first. The 0.82
+ * opacity matches the weight the white mark has on charcoal; at full black it
+ * shouts louder than the page title beside it.
+ */
+:root[data-theme="light"] .mobile-brand-mark img {
+  filter: brightness(0);
+  opacity: 0.82;
+}
+
+/*
+ * The log-run aura. On charcoal a yellow ring radiating out of the CTA reads as a
+ * glow; on paper the same ring in amber reads as a dirty halo around the button,
+ * because paper has nothing to glow against. Keep the beat, drop the spread: in
+ * light it becomes a tight, low-alpha ring that still pulses without staining the
+ * page. (`rc-logrun-aura` itself is shared with the dock circle, so this overrides
+ * the animation rather than editing the keyframes.)
+ */
+@keyframes rc-logrun-aura-light {
+  0% {
+    box-shadow: 0 0 0 0 rgb(var(--color-primary-ink) / 0.28);
+    opacity: 1;
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgb(var(--color-primary-ink) / 0);
+    opacity: 0;
+  }
+  100% {
+    box-shadow: 0 0 0 7px rgb(var(--color-primary-ink) / 0);
+    opacity: 0;
+  }
+}
+:root[data-theme="light"] .logrun-glow::after {
+  animation-name: rc-logrun-aura-light;
 }
 
 .bottom-nav a {
@@ -370,94 +704,369 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
 }
 
 /* NOTE: Avoid creating sibling stacking contexts here.
-   Mobile nav uses fixed overlays from the sidebar; if <main> and the sidebar
-   are both forced into equal z-index stacking contexts, DOM order can cause
-   <main> to sit above the sidebar and intercept clicks. BottomNav must render
-   after <main> (see AppShell.tsx) and outside `.app-shell` overflow clipping. */
+   If <main> and the nav chrome are both forced into equal z-index stacking
+   contexts, DOM order can cause <main> to sit above the nav and intercept clicks.
+   BottomNav must render after <main> (see AppShell.tsx) and outside `.app-shell`
+   overflow clipping. */
 
 /* ---------------------------------------------------------------------------
-   Desktop icon rail (design handoff 2026-08-08). Replaces the 256px sidebar.
+   Desktop top rail (nav restructure 2026-08-12). Replaces the 76px left sidebar,
+   which replaced the 256px one.
 
-   76px, icon over a 9px label. All nine destinations are kept — the handoff cut
-   Add run and Teams to reach seven, but the cut was the designer's judgement and not
-   a space constraint: nine 56px items plus the mark fit inside 1080px with room to
-   spare, and dropping the app's second-most-used verb from the only persistent nav
-   is not a trade worth making (founder, 2026-08-08).
+   64px tall, sticky, seven destinations on one line plus a right-hand utility
+   cluster. The rail was never the problem — the shape was: a permanent left gutter
+   spent 76px of every page's WIDTH on stacks that fit inside 64px of HEIGHT laid
+   out horizontally. Content max-width goes 1684 → 1760px and the page title starts
+   where the eye does.
 
-   Visibility is still `hidden md:flex` in the JSX — this rule must not set `display`.
+   Visibility is `hidden md:flex` in the JSX — these rules must not set `display`.
 --------------------------------------------------------------------------- */
-.sidebar {
-  /* NOTE: do not set display here; responsive visibility is controlled in JSX */
-  width: 76px;
+.top-rail {
+  position: sticky;
+  /*
+   * Below the demo banner, which is also sticky and also sits in the document
+   * flow (see the note in AppShell about why the rail lives out there too).
+   * Without the offset the rail slides under the banner on scroll and a demo
+   * visitor loses the nav entirely. `--demo-banner-h` is published by
+   * `DemoBanner` and is unset — so 0 — for everybody else.
+   */
+  top: var(--demo-banner-h, 0px);
+  z-index: 20;
+  height: 64px;
   flex: none;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 22px 0 20px;
-  padding-top: calc(env(safe-area-inset-top, 0px) + 22px);
-  border-right: 1px solid rgb(var(--color-border));
-  background-color: rgb(var(--color-secondary) / 0.8);
-  backdrop-filter: blur(12px);
-  /* Surface colour behind the JRC icon cutouts (see `.bottom-nav`). */
-  --jrc-icon-cutout: rgb(var(--color-secondary));
+  background-color: rgb(var(--color-card) / var(--nav-glass-alpha));
+  /* Standard property only — see `.bottom-nav-slab`. */
+  backdrop-filter: blur(var(--nav-glass-blur)) saturate(var(--nav-glass-saturate));
+  border-bottom: 1px solid rgb(var(--color-border));
+  box-shadow:
+    inset 0 1px 0 rgb(var(--color-elevate) / 0.14),
+    0 14px 34px -22px rgb(0 0 0 / 0.8);
+  /* Surface behind the JRC icon cutouts — the rail itself (see `.bottom-nav-slab`). */
+  --jrc-icon-cutout: rgb(var(--color-card));
 }
 
-/* Yellow mark, not white: at 18px the white mark reads as a smudge, where the
-   yellow one still resolves as the JRC shape. */
-.sidebar-brand {
+:root[data-theme="light"] .top-rail {
+  /* The inset white rim is the dark theme's lift; on paper it is invisible at
+     best and a grey line at worst. The border below does the whole job here. */
+  box-shadow: 0 14px 34px -26px rgb(0 0 0 / 0.35);
+}
+
+.top-rail-inner {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  width: 100%;
+  max-width: 1760px;
+  margin-inline: auto;
+  padding: 0 32px;
+}
+
+/* Yellow mark, not white: at this size the white mark reads as a smudge, where
+   the yellow one still resolves as the JRC shape. */
+.top-rail-brand {
   display: inline-flex;
   align-items: center;
-  margin: 0 0 20px;
+  flex: none;
   transition: opacity 150ms ease;
 }
-.sidebar-brand:hover {
+.top-rail-brand:hover {
   opacity: 0.85;
 }
 
-.sidebar-nav {
+.top-rail-nav {
+  position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  width: 100%;
+  gap: 2px;
+  min-width: 0;
+  /* Full rail height so the tick can sit on the bottom edge of the BAR, not on
+     the bottom edge of a 36px item floating in the middle of it. */
+  height: 64px;
 }
 
-.sidebar-nav a {
-  display: flex;
-  flex-direction: column;
+.top-rail-item {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 5px;
-  width: 56px;
-  padding: 9px 0;
-  border-radius: 10px;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
   color: rgb(var(--color-muted-foreground));
   transition-property: background-color, color;
   transition-duration: 150ms;
   -webkit-tap-highlight-color: transparent;
 }
 
-.sidebar-nav a:hover {
+.top-rail-item:hover {
   color: rgb(var(--color-foreground));
 }
 
-.sidebar-nav a:active {
-  opacity: 0.9;
+.top-rail-item[data-active="true"] {
+  background-color: rgb(var(--color-elevate) / 0.05);
+  color: rgb(var(--color-primary-ink));
+  font-weight: 700;
 }
 
-.sidebar-nav a[data-active="true"] {
-  background-color: rgb(255 255 255 / 0.05);
-  color: rgb(var(--color-primary));
-  transition-duration: 0ms;
+/*
+ * The tick's carriage. Measured and driven by transform from `TopRail` — tab
+ * widths vary with label length, so an index cannot place this (the dock can,
+ * because its cells are an equal-fraction grid).
+ */
+.top-rail-tick {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  pointer-events: none;
+  transition:
+    transform 200ms ease-out,
+    opacity 150ms ease-out;
 }
 
-/* Settings sits apart from the journey, at the foot of the rail. */
-.sidebar-nav .sidebar-nav-tail {
-  margin-top: auto;
+.top-rail-tick.is-hidden {
+  opacity: 0;
 }
 
-.sidebar-footer {
+/* Square off the bottom corners: this one is welded to the rail's edge. */
+.top-rail-tick .nav-tick {
+  border-radius: 2px 2px 0 0;
+}
+
+.top-rail-cluster {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex: none;
+}
+
+.top-rail-utility {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  width: 36px;
+  border-radius: 8px;
+  color: rgb(var(--color-muted-foreground));
+  transition-property: background-color, color;
+  transition-duration: 150ms;
+}
+
+.top-rail-utility:hover {
+  color: rgb(var(--color-foreground));
+  background-color: rgb(var(--color-elevate) / 0.05);
+}
+
+.top-rail-utility[data-active="true"] {
+  color: rgb(var(--color-primary-ink));
+  background-color: rgb(var(--color-elevate) / 0.05);
+}
+
+.top-rail-divider {
+  width: 1px;
+  height: 24px;
+  background-color: rgb(var(--color-border));
+}
+
+.top-rail-logrun {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  color: rgb(var(--color-primary-foreground));
+  background: linear-gradient(180deg, #ffdf3d 0%, rgb(var(--color-primary)) 38%);
+  box-shadow:
+    0 10px 22px -10px rgb(var(--glow-shadow-rgb) / 0.5),
+    inset 0 1.5px 0 rgb(255 255 255 / 0.55);
+  transition: transform 150ms ease;
+}
+
+.top-rail-logrun:hover {
+  transform: translateY(-1px);
+}
+
+/*
+ * Quiet on the dashboard, mirroring the mobile FAB rule (2026-07-16): the
+ * dashboard's own yellow Start-run bar owns that action, and two yellow CTAs a
+ * few hundred px apart split the one thing the page is asking for.
+ */
+.top-rail-logrun.is-quiet {
+  background: rgb(var(--color-surface-runna-deep) / 0.9);
+  color: rgb(var(--color-muted-foreground));
+  border: 1px solid rgb(var(--color-border));
+  box-shadow: none;
+}
+
+.top-rail-logrun.is-quiet:hover {
+  color: rgb(var(--color-foreground));
+}
+
+/* ---------------------------------------------------------------------------
+   Ideas edge tab + panel (nav restructure 2026-08-12). Replaces the dock's left
+   cap — same rules (a utility, never a destination, never active, app-wide), new
+   position. The cap was spending 52px of a 390px row; the edge costs no width at
+   all, and it gives Ideas a desktop home it never had.
+--------------------------------------------------------------------------- */
+:root {
+  --ideas-panel-w: 296px;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --ideas-panel-w: 400px;
+  }
+}
+
+/*
+ * Mobile only — desktop's trigger is the rail's lightbulb, and two triggers for
+ * one panel is one too many.
+ *
+ * The breakpoint lives HERE and not as `md:hidden` in the JSX: this rule sets
+ * `display: flex`, and a plain selector in this file beats a Tailwind utility of
+ * equal specificity purely on source order (globals.css is imported after the
+ * utilities). The class was on the element and did nothing.
+ */
+.ideas-edge-tab {
   display: none;
+}
+
+@media (max-width: 767px) {
+  .ideas-edge-tab {
+    display: flex;
+  }
+}
+
+/*
+ * The dock slab's real height, so things stacked above it can clear it without
+ * guessing. Must stay in step with `.bottom-nav-slab`'s own padding + row:
+ * 10px top + 52px row (the log-run circle, not the 46px cells) = 62px, then its
+ * bottom padding.
+ */
+:root {
+  --dock-slab-h: calc(62px + max(12px, env(safe-area-inset-bottom)));
+}
+
+.ideas-edge-tab {
+  position: fixed;
+  /*
+   * Bottom-left, sitting just above the dock (founder, 2026-08-12). Centred on
+   * the right edge put it in the middle of the reading column, where it hovered
+   * over whatever you were actually looking at; down here it is out of the text
+   * and next to the bar it belongs with. The 10px gap is deliberate — flush
+   * against the slab it reads as a piece of the dock, which is exactly what this
+   * pattern replaced.
+   */
+  left: 0;
+  bottom: calc(var(--dock-slab-h) + 10px);
+  z-index: 45;
+  align-items: center;
+  justify-content: center;
+  /*
+   * Exactly the page gutter, so the tab's inner edge lands on the line the cards
+   * start from instead of reaching past it into the reading column. Written as the
+   * same expression `.page-body` uses for its padding rather than the 20px it
+   * usually resolves to — on a notched phone in landscape the gutter grows with
+   * the safe-area inset and this has to grow with it.
+   */
+  width: max(1.25rem, env(safe-area-inset-left));
+  height: 56px;
+  /* Rounded on the inward side only — it is anchored to the left edge now. */
+  border-radius: 0 12px 12px 0;
+  background-color: rgb(var(--color-primary));
+  /* On yellow, always the dark ink — in both themes. */
+  color: rgb(var(--color-primary-foreground));
+  box-shadow: 4px 0 18px rgb(var(--glow-shadow-rgb) / 0.26);
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.3, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * Rides out with the panel rather than being buried under it, so the control you
+ * pressed to open is still the control you press to close and the count stays
+ * readable. Mobile only — desktop's panel opens on the far side of the screen
+ * from this tab, which is hidden there anyway.
+ */
+.ideas-edge-tab.is-out {
+  transform: translateX(var(--ideas-panel-w));
+}
+
+/* The log-run wizard owns the bottom edge; the dock yields there and so does this. */
+body[data-logrun-wizard-chrome] .ideas-edge-tab {
+  display: none;
+}
+
+/*
+ * No count badge (founder, 2026-08-12). It only ever appeared after you had opened
+ * the panel once — that is when the lists load — so in practice it was blank, and
+ * making it truthful on arrival would have cost an /api/action-items fetch on every
+ * page load for every user to render one digit. The lightbulb alone, centred.
+ */
+
+.ideas-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+  background-color: rgb(0 0 0 / 0.45);
+  transition: opacity 260ms ease-out;
+}
+
+/*
+ * The panel docks to the edge its TRIGGER lives on, which is why it differs by
+ * platform: the phone opens it from the bottom-left tab, so it comes in from the
+ * left; desktop opens it from the lightbulb in the rail's right-hand cluster, so
+ * it comes in from the right. A panel that flies in from the opposite side of the
+ * screen to the thing you pressed reads as a different surface arriving.
+ */
+.ideas-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: var(--ideas-panel-w);
+  max-width: 100vw;
+  padding: 20px 16px max(20px, env(safe-area-inset-bottom));
+  padding-top: max(20px, env(safe-area-inset-top));
+  background-color: rgb(var(--color-card) / 0.98);
+  border-right: 1px solid rgb(var(--color-border));
+  box-shadow: 18px 0 46px rgb(0 0 0 / 0.5);
+  transform: translateX(-100%);
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@media (min-width: 768px) {
+  .ideas-panel {
+    left: auto;
+    right: 0;
+    border-right: 0;
+    border-left: 1px solid rgb(var(--color-border));
+    box-shadow: -18px 0 46px rgb(0 0 0 / 0.5);
+    transform: translateX(100%);
+  }
+}
+
+.ideas-panel.is-open {
+  transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ideas-edge-tab,
+  .ideas-panel,
+  .ideas-scrim {
+    transition: none;
+  }
 }
 
 .page {
@@ -570,7 +1179,7 @@ html[data-nav-pending] .page {
   height: 4px;
   width: calc(100% / var(--title-nav-count, 5));
   left: calc(var(--title-nav-sector, 0) * (100% / var(--title-nav-count, 5)));
-  background: rgb(var(--color-primary));
+  background: rgb(var(--color-primary-ink));
   transform: skewX(-21deg);
   transition: left 0.34s cubic-bezier(0.3, 0.9, 0.35, 1);
 }
@@ -640,7 +1249,7 @@ html[data-nav-pending] .page {
   width: 14px;
   height: 5px;
   border-radius: 1px;
-  background: rgb(var(--color-primary));
+  background: rgb(var(--color-primary-ink));
   transform: skewX(-21deg);
 }
 
@@ -671,28 +1280,6 @@ html[data-nav-pending] .page {
   font-family: var(--font-ui);
   font-weight: 600;
   @apply text-[14.5px] leading-tight tracking-tight text-foreground;
-}
-
-/* 9px under a 20px icon. Supporting, never sufficient — every rail link keeps its
-   aria-label, because this is below the size text alone can carry (see the rail
-   accessibility note in the handoff). */
-.sidebar-nav .nav-sidebar-label {
-  font-family: var(--font-ui);
-  font-weight: 500;
-  font-size: 9px;
-  line-height: 1;
-  letter-spacing: 0;
-  /* The rail is 76px and the target 56px; a label that outgrew either would spill
-     across the page content, so it is clamped rather than trusted to fit. */
-  max-width: 100%;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sidebar-nav a[data-active="true"] .nav-sidebar-label {
-  font-weight: 700;
 }
 
 .ui-title:is(.text-sm, .text-base, .text-lg, .text-xl) {
@@ -736,7 +1323,7 @@ html[data-nav-pending] .page {
 }
 .eyebrow-label::before {
   content: "";
-  @apply h-[1em] w-[3px] flex-none rounded-[2px] bg-primary;
+  @apply h-[1em] w-[3px] flex-none rounded-[2px] bg-primary-ink;
 }
 /* Hairline rule under the label block — applied by the Eyebrow component wrapper. */
 .eyebrow-root {
@@ -1200,6 +1787,36 @@ html[data-nav-pending] .page {
   animation-delay: var(--rc-delay, 320ms);
 }
 
+/* ---------------------------------------------------------------------------
+   Deferred loading placeholders (2026-08-12)
+
+   A skeleton is only worth showing for a wait long enough to feel like one.
+   Measured on prod, `/runs/history` streams its shell instantly and the real
+   content 240–530ms later on a laptop; the skeleton was therefore painting on
+   EVERY navigation, fading in via `.page-body > *`, and being torn out again —
+   read as "the cards are empty", not "the cards are coming".
+
+   `both` + a delay holds the from-state, so the skeleton is simply invisible for
+   the first `--rc-skeleton-wait`. Under it the app shell (banner, header, nav) is
+   already painted, so a fast route lands on quiet background and then content —
+   never on furniture. A genuinely slow route still gets its skeleton.
+
+   Pure CSS on purpose: this has to work for `loading.tsx`, which is streamed by
+   the server before any JS has run, so a timer in React could not gate it.
+--------------------------------------------------------------------------- */
+@keyframes rc-skeleton-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.rc-skeleton-shell {
+  animation: rc-skeleton-in 160ms ease-out var(--rc-skeleton-wait, 400ms) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rc-reveal,
   .rc-draw,
@@ -1208,6 +1825,15 @@ html[data-nav-pending] .page {
   }
   .rc-draw {
     stroke-dashoffset: 0;
+  }
+  /*
+   * The delay is kept — it is not decoration. Reduced motion asks for no
+   * MOVEMENT, and someone who set it still benefits from not being shown a
+   * placeholder that outlives its usefulness. Only the fade is dropped, by
+   * collapsing the ramp to a step at the same deadline.
+   */
+  .rc-skeleton-shell {
+    animation: rc-skeleton-in 1ms step-end var(--rc-skeleton-wait, 400ms) both;
   }
 }
 
@@ -1269,7 +1895,7 @@ html[data-nav-pending] .page {
     100deg,
     transparent 34%,
     rgba(255, 255, 255, 0.1) 48%,
-    rgba(255, 214, 10, 0.07) 53%,
+    rgb(var(--color-primary-ink) / 0.07) 53%,
     transparent 68%
   );
   animation: rc-login-sheen 2400ms cubic-bezier(0.2, 0.7, 0.3, 1) 620ms 1 both;
@@ -1315,12 +1941,12 @@ html[data-nav-pending] .page {
 @keyframes rc-section-flash {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 214, 10, 0);
+    box-shadow: 0 0 0 0 rgb(var(--color-primary-ink) / 0);
   }
   12% {
     box-shadow:
-      0 0 0 1px rgba(255, 214, 10, 0.9),
-      0 0 24px -6px rgba(255, 214, 10, 0.45);
+      0 0 0 1px rgb(var(--color-primary-ink) / 0.9),
+      0 0 24px -6px rgb(var(--color-primary-ink) / 0.45);
   }
 }
 .run-section-flash {
@@ -1342,15 +1968,15 @@ html[data-nav-pending] .page {
    the host's own base shadow, and inherits its border-radius (bar or circle). */
 @keyframes rc-logrun-aura {
   0% {
-    box-shadow: 0 0 0 0 rgba(255, 214, 10, 0.45);
+    box-shadow: 0 0 0 0 rgb(var(--color-primary-ink) / 0.45);
     opacity: 1;
   }
   70% {
-    box-shadow: 0 0 0 16px rgba(255, 214, 10, 0);
+    box-shadow: 0 0 0 16px rgb(var(--color-primary-ink) / 0);
     opacity: 0;
   }
   100% {
-    box-shadow: 0 0 0 16px rgba(255, 214, 10, 0);
+    box-shadow: 0 0 0 16px rgb(var(--color-primary-ink) / 0);
     opacity: 0;
   }
 }
@@ -1360,13 +1986,13 @@ html[data-nav-pending] .page {
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  box-shadow: 0 0 0 0 rgba(255, 214, 10, 0.45);
+  box-shadow: 0 0 0 0 rgb(var(--color-primary-ink) / 0.45);
   animation: rc-logrun-aura 3.8s ease-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .logrun-glow::after {
     animation: none;
-    box-shadow: 0 0 22px 2px rgba(255, 214, 10, 0.28);
+    box-shadow: 0 0 22px 2px rgb(var(--color-primary-ink) / 0.28);
   }
 }
 
@@ -1598,7 +2224,7 @@ html.video-overlay-fullscreen-active body {
   background: linear-gradient(
     90deg,
     transparent,
-    rgb(var(--color-primary)),
+    rgb(var(--color-primary-ink)),
     transparent
   );
   animation: rc-demo-sweep 1500ms cubic-bezier(0.5, 0, 0.5, 1) infinite;
@@ -1610,6 +2236,32 @@ html.video-overlay-fullscreen-active body {
     width: 100%;
     opacity: 0.5;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Lap flags — the best lap and a mistake lap, in the all-laps grid (RunDetailPanel).
+
+   These were `bg-purple-600/55` / `bg-red-600/55` with `text-white`, which works on
+   charcoal because 55% of a mid violet over a near-black card lands somewhere deep
+   enough for white to sit at ~10:1. Over a near-white card the same 55% lands PALE,
+   and the white numerals drop to 2.9:1 — the one place in the app where colour is
+   marking specific laps, so losing it loses the reading.
+
+   Fixed by opacity, not by hue: the flag stays the same colour and the same idea,
+   the paper version is simply nearly opaque so the white numerals have something to
+   sit on. Dark is byte-identical to what shipped.
+--------------------------------------------------------------------------- */
+.lap-flag-best {
+  background-color: rgb(147 51 234 / 0.55);
+}
+.lap-flag-mistake {
+  background-color: rgb(220 38 38 / 0.55);
+}
+:root[data-theme="light"] .lap-flag-best {
+  background-color: rgb(107 33 168 / 0.94);
+}
+:root[data-theme="light"] .lap-flag-mistake {
+  background-color: rgb(185 28 28 / 0.94);
 }
 
 /* Hairline / glow surfaces retired June 2026 — cards use `.glass-card` (frosted). */
@@ -1642,10 +2294,11 @@ html.video-overlay-fullscreen-active body {
   /* Dim is the page ground at 0.78, NOT black — the page is Ash warm, and a
      black scrim reads as a colour shift at the hole's edge. */
   box-shadow: 0 0 0 var(--rc-tour-spread) rgb(var(--page-bg-rgb) / 0.78);
-  /* A white hairline, deliberately not yellow: yellow is action-only in this
-     palette (see the DemoBanner ruling), and the tour spends its one yellow on
-     the Next button. */
-  outline: 1px solid rgb(255 255 255 / 0.16);
+  /* A hairline, deliberately not yellow: yellow is action-only in this palette
+     (see the DemoBanner ruling), and the tour spends its one yellow on the Next
+     button. `elevate`, not literal white — white is the correct lift on charcoal
+     and invisible on paper, which is the whole reason that token exists. */
+  outline: 1px solid rgb(var(--color-elevate) / 0.16);
   transition:
     top 0.28s cubic-bezier(0.3, 0.9, 0.35, 1),
     left 0.28s cubic-bezier(0.3, 0.9, 0.35, 1),
@@ -1655,6 +2308,14 @@ html.video-overlay-fullscreen-active body {
 
 .rc-tour-pop {
   animation: rc-tour-in 0.22s cubic-bezier(0.3, 0.9, 0.35, 1) both;
+  /* Lives here rather than as an arbitrary Tailwind class so it can differ per
+     theme. An 85%-black drop is right when the popover floats over charcoal and
+     reads as soot when it floats over paper. */
+  box-shadow: 0 24px 55px -20px rgb(0 0 0 / 0.85);
+}
+
+:root[data-theme="light"] .rc-tour-pop {
+  box-shadow: 0 18px 40px -18px rgb(var(--color-foreground) / 0.22);
 }
 
 @keyframes rc-tour-in {
@@ -1685,7 +2346,10 @@ html.video-overlay-fullscreen-active body {
   height: 4px;
   width: calc(100% / var(--rc-tour-n, 7));
   left: calc(var(--rc-tour-i, 0) * (100% / var(--rc-tour-n, 7)));
-  background: rgb(var(--color-primary));
+  /* `primary-ink`, matching `.page-title::before` above — this rail is a copy of
+     that sector, and it carries location, which makes it ink and not fill. Plain
+     `primary` is 1.4:1 on a pale card, so on paper the progress mark vanished. */
+  background: rgb(var(--color-primary-ink));
   transform: skewX(-21deg);
   transition: left 0.34s cubic-bezier(0.3, 0.9, 0.35, 1);
 }

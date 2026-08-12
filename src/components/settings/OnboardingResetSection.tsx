@@ -63,7 +63,7 @@ export function OnboardingResetSection() {
           {busy ? "Resetting…" : "Reset onboarding"}
         </button>
         {done ? (
-          <a href="/" className="text-xs font-semibold text-primary underline">
+          <a href="/" className="text-xs font-semibold text-primary-ink underline">
             Open the dashboard
           </a>
         ) : null}

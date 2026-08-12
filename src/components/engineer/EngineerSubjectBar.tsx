@@ -61,8 +61,8 @@ export function EngineerSubjectBar({
       >
         {mode === "data" ? (
           pinned ? (
-            <span className="flex min-w-0 flex-1 items-center gap-1 rounded-md border border-primary/50 bg-primary/10 py-1 pl-2 pr-1 text-[11px] text-foreground">
-              <Pin className="size-3 shrink-0 text-primary" strokeWidth={2.25} aria-hidden />
+            <span className="flex min-w-0 flex-1 items-center gap-1 rounded-md border border-primary-ink/50 bg-primary/10 py-1 pl-2 pr-1 text-[11px] text-foreground">
+              <Pin className="size-3 shrink-0 text-primary-ink" strokeWidth={2.25} aria-hidden />
               {pinned.kindBadge ? (
                 <span className="shrink-0 rounded border border-border/70 bg-muted/40 px-1 py-px text-[9px] ui-title text-muted-foreground">
                   {pinned.kindBadge}
@@ -104,7 +104,7 @@ export function EngineerSubjectBar({
               }
               className={cn(
                 "tap-active flex min-w-0 flex-1 items-center gap-1 rounded-md border border-dashed border-border",
-                "bg-muted/30 px-2 py-1 text-[11px] text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
+                "bg-muted/30 px-2 py-1 text-[11px] text-muted-foreground transition hover:border-primary-ink/50 hover:text-foreground"
               )}
             >
               <span className="shrink-0 ui-title text-[9px]">Auto</span>
@@ -124,8 +124,8 @@ export function EngineerSubjectBar({
         )}
 
         {mode === "general" ? (
-          <span className="flex max-w-[60%] shrink-0 items-center gap-1 rounded-md border border-primary/50 bg-primary/10 px-2 py-1 text-[11px] text-foreground">
-            <Globe className="size-3 shrink-0 text-primary" strokeWidth={2.25} aria-hidden />
+          <span className="flex max-w-[60%] shrink-0 items-center gap-1 rounded-md border border-primary-ink/50 bg-primary/10 px-2 py-1 text-[11px] text-foreground">
+            <Globe className="size-3 shrink-0 text-primary-ink" strokeWidth={2.25} aria-hidden />
             <span className="min-w-0 truncate">
               General
               {generalCarName ? <span className="text-muted-foreground"> · {generalCarName}</span> : null}
@@ -150,7 +150,7 @@ export function EngineerSubjectBar({
           type="button"
           onClick={onSwitch}
           disabled={disabled}
-          className="tap-active rounded-full border border-border bg-muted/40 px-2 py-1 text-[11px] text-foreground transition hover:border-primary/60"
+          className="tap-active rounded-full border border-border bg-muted/40 px-2 py-1 text-[11px] text-foreground transition hover:border-primary-ink/60"
         >
           New run logged — switch?
         </button>
@@ -167,7 +167,7 @@ export function EngineerSubjectBar({
               className={cn(
                 "tap-active rounded-full border px-2 py-0.5 text-[11px] transition",
                 selectedGeneralCarId === null
-                  ? "border-primary/60 bg-primary/10 text-foreground"
+                  ? "border-primary-ink/60 bg-primary/10 text-foreground"
                   : "border-border bg-muted/30 text-muted-foreground hover:text-foreground"
               )}
             >
@@ -182,7 +182,7 @@ export function EngineerSubjectBar({
                 className={cn(
                   "tap-active rounded-full border px-2 py-0.5 text-[11px] transition",
                   selectedGeneralCarId === car.id
-                    ? "border-primary/60 bg-primary/10 text-foreground"
+                    ? "border-primary-ink/60 bg-primary/10 text-foreground"
                     : "border-border bg-muted/30 text-muted-foreground hover:text-foreground"
                 )}
               >

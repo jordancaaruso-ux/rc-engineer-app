@@ -97,7 +97,7 @@ export function TrackTimingSourceNotice({
     if (speedhive) parts.push("Speedhive");
     return (
       <p className={cn("ui-label-meta", className)}>
-        <span aria-hidden className="mr-1.5 text-[#4FD089]">
+        <span aria-hidden className="mr-1.5 text-gain">
           ●
         </span>
         Searching {track ?? "this track"} on {parts.join(" and ")}.

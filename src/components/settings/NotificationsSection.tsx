@@ -214,7 +214,7 @@ export function NotificationsSection() {
               type="button"
               disabled={busy || (!isNative && !VAPID)}
               onClick={() => void enable()}
-              className="rounded-md border border-primary bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-[#E6BE00] disabled:opacity-50"
+              className="rounded-md border border-primary-ink bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-[#E6BE00] disabled:opacity-50"
             >
               {busy ? "Enabling…" : "Enable notifications"}
             </button>
@@ -224,7 +224,7 @@ export function NotificationsSection() {
                 type="button"
                 disabled={busy}
                 onClick={() => void sendTest()}
-                className="rounded-md border border-primary bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-[#E6BE00] disabled:opacity-50"
+                className="rounded-md border border-primary-ink bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-[#E6BE00] disabled:opacity-50"
               >
                 Send test
               </button>
@@ -265,7 +265,7 @@ export function NotificationsSection() {
             value={testUrl}
             onChange={(e) => setTestUrl(e.target.value)}
             placeholder="Speedhive org/practice URL (optional)"
-            className="ui-control mt-3 w-full rounded-lg border border-border bg-input px-3 py-2 text-xs text-foreground outline-none placeholder:text-faint focus:border-primary"
+            className="ui-control mt-3 w-full rounded-lg border border-border bg-input px-3 py-2 text-xs text-foreground outline-none placeholder:text-faint focus:border-primary-ink"
           />
           <div className="mt-3 flex flex-wrap gap-3">
             <button

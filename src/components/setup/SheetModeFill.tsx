@@ -317,7 +317,7 @@ export function SheetModeFill({
           </span>
         </div>
 
-        {error ? <p className="text-[11px] text-amber-700 dark:text-amber-400">{error}</p> : null}
+        {error ? <p className="text-[11px] text-warning">{error}</p> : null}
       </div>
     </div>
   );

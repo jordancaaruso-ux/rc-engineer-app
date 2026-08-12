@@ -185,7 +185,7 @@ export function VideoFrameControls({
             type="button"
             className={`rounded-md border px-2 py-1 font-mono tabular-nums ${
               playbackRate === rate
-                ? "border-primary bg-primary/15"
+                ? "border-primary-ink bg-primary/15"
                 : "border-border hover:bg-muted"
             }`}
             onClick={() => applyPlaybackRate(rate)}

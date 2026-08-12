@@ -229,7 +229,7 @@ function MigrationPathChart({
 
       {/* Current-roll RC — the one yellow mark */}
       {current && (
-        <g className="text-primary">
+        <g className="text-primary-ink">
           <circle cx={X(current.x)} cy={Y(current.z)} r={4.5} fill="currentColor" />
         </g>
       )}
@@ -282,7 +282,7 @@ function SlotChip({
       className={cn(
         "flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border px-2 py-1.5 transition",
         selected
-          ? "border-primary/60 bg-secondary"
+          ? "border-primary-ink/60 bg-secondary"
           : "border-dashed border-border text-muted-foreground"
       )}
     >
@@ -296,7 +296,7 @@ function SlotChip({
         <span
           className={cn(
             "shrink-0 rounded border px-1 font-mono text-[9px] uppercase tracking-[0.18em]",
-            selected ? "border-primary/60 text-foreground" : "border-border text-faint"
+            selected ? "border-primary-ink/60 text-foreground" : "border-border text-faint"
           )}
         >
           {id}
@@ -649,7 +649,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
             type="button"
             onClick={freezeCurrentToB}
             title="Copy the current what-if into slot B, then tweak A against it"
-            className="tap-active flex flex-1 items-center justify-center gap-1 rounded-lg border border-dashed border-border px-2 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-accent/40 hover:text-foreground"
+            className="tap-active flex flex-1 items-center justify-center gap-1 rounded-lg border border-dashed border-border px-2 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-primary-ink/40 hover:text-foreground"
           >
             + Compare current…
           </button>

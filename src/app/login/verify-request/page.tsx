@@ -20,7 +20,7 @@ export default async function VerifyRequestPage({
       <h1 className="page-title">Check your email</h1>
       {consoleOnly ? (
         <div className="mt-4 text-left" role="status">
-          <CardPanel contentClassName="border border-accent/40 bg-accent/10">
+          <CardPanel contentClassName="border border-primary-ink/40 bg-accent/10">
           <p className="font-medium text-foreground">No email was sent from this environment</p>
           <p className="mt-2 text-muted-foreground">
             <code className="text-xs">EMAIL_SERVER</code> and <code className="text-xs">EMAIL_FROM</code>{" "}
@@ -44,7 +44,7 @@ export default async function VerifyRequestPage({
         Open the link on this device and you&rsquo;ll be signed in here automatically.
       </p>
       <p className="mt-4 text-sm">
-        <Link href="/login" className="text-accent underline-offset-2 hover:underline">
+        <Link href="/login" className="text-primary-ink underline-offset-2 hover:underline">
           Use a different email
         </Link>
       </p>

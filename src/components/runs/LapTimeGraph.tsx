@@ -21,9 +21,9 @@ export type LapGraphRow = {
 };
 
 /** Chart-series hues on charcoal — yellow stays reserved for actions. */
-const LINE_COLOR = "#A09D96"; // neutral ink-2: the single pace series
-const BEST_COLOR = "#A78BFA"; // matches best-lap purple in the All laps grid
-const MISTAKE_COLOR = "#E5644E"; // loss token, matches mistake chips
+const LINE_COLOR = "rgb(var(--color-muted-foreground))"; // neutral ink-2: the single pace series
+const BEST_COLOR = "rgb(var(--color-best-lap))"; // matches best-lap purple in the All laps grid
+const MISTAKE_COLOR = "rgb(var(--color-destructive))"; // loss token, matches mistake chips
 
 const CHART_HEIGHT = 150;
 const PAD_LEFT = 40;

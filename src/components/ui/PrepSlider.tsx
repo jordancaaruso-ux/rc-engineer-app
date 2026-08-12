@@ -168,7 +168,7 @@ export function PrepSlider({
           className={cn(
             "ml-auto origin-right font-mono text-[15px] tabular-nums transition-transform duration-150",
             SPRING,
-            value == null ? "text-faint" : "text-accent",
+            value == null ? "text-faint" : "text-primary-ink",
             live && "scale-[1.24]"
           )}
         >
@@ -215,7 +215,7 @@ export function PrepSlider({
           e.preventDefault();
           commit(v);
         }}
-        className="relative h-11 cursor-pointer touch-none rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="relative h-11 cursor-pointer touch-none rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary-ink"
       >
         {/* rail + fill */}
         <span

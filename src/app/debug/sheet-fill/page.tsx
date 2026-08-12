@@ -40,7 +40,7 @@ export default async function DebugSheetFillPage({
               href={`/debug/sheet-fill?blank=${key}`}
               className={`rounded-full border px-3 py-1.5 text-[13px] ${
                 key === id
-                  ? "border-primary bg-primary/10 text-primary"
+                  ? "border-primary-ink bg-primary/10 text-primary-ink"
                   : "border-border bg-secondary text-muted-foreground"
               }`}
             >

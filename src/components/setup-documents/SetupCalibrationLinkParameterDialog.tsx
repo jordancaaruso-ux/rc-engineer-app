@@ -302,7 +302,7 @@ export function SetupCalibrationLinkParameterDialog(props: {
                               type="button"
                               className={`rounded border px-2 py-0.5 text-[10px] ${
                                 assignOnPdfRow === a.optionValue
-                                  ? "border-primary/30 bg-primary/10 text-accent"
+                                  ? "border-primary-ink/30 bg-primary/10 text-primary-ink"
                                   : "border-border text-muted-foreground hover:bg-muted/50"
                               }`}
                               onClick={() =>
@@ -346,7 +346,7 @@ export function SetupCalibrationLinkParameterDialog(props: {
           {step === "assign" ? (
             <button
               type="button"
-              className="rounded border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-primary/10"
+              className="rounded border border-primary-ink/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary-ink hover:bg-primary/10"
               onClick={handleConfirmGrouped}
             >
               Confirm mapping

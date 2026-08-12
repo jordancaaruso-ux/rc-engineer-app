@@ -150,12 +150,12 @@ export function LapCompareSessionList({
   return (
     <div className={cn("space-y-3", className)}>
       {target ? (
-        <div className="flex items-center gap-2.5 rounded-md border border-primary/60 bg-primary/10 px-2 py-1.5">
+        <div className="flex items-center gap-2.5 rounded-md border border-primary-ink/60 bg-primary/10 px-2 py-1.5">
           <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
           <span className="min-w-0 flex-1 leading-tight">
             <span className="flex items-center gap-1.5">
               <span className="truncate text-[12px] text-foreground">{target.name}</span>
-              <span className="ui-label-caps shrink-0 rounded-full border border-primary/50 px-1.5 text-[9px] uppercase text-primary">
+              <span className="ui-label-caps shrink-0 rounded-full border border-primary-ink/50 px-1.5 text-[9px] uppercase text-primary-ink">
                 Target
               </span>
             </span>
@@ -163,7 +163,7 @@ export function LapCompareSessionList({
               {target.when}
             </span>
           </span>
-          <span className="shrink-0 font-mono text-[11px] tabular-nums text-primary">
+          <span className="shrink-0 font-mono text-[11px] tabular-nums text-primary-ink">
             {formatLap(target.bestLap)}
           </span>
         </div>

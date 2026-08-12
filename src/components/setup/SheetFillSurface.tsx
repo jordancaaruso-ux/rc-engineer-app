@@ -1031,7 +1031,7 @@ export function SheetFillSurface({
                   className={cn(
                     "absolute box-border flex items-center overflow-hidden rounded-[1px]",
                     !readOnly && "border",
-                    isFocused && !readOnly ? "z-20 border-[2px] border-primary" : "z-0"
+                    isFocused && !readOnly ? "z-20 border-[2px] border-primary-ink" : "z-0"
                   )}
                   style={{
                     left: b.x * fitted.width,
@@ -1289,7 +1289,7 @@ export function SheetFillSurface({
                 className={cn(
                   "tap-active rounded-full border px-3 py-1.5 text-[13.5px]",
                   on
-                    ? "border-primary bg-primary/10 text-primary"
+                    ? "border-primary-ink bg-primary/10 text-primary-ink"
                     : "border-border bg-muted text-muted-foreground"
                 )}
               >
@@ -1340,7 +1340,7 @@ export function SheetFillSurface({
             aria-hidden={!typesValues}
             tabIndex={typesValues ? undefined : -1}
             className={cn(
-              "w-full rounded-md border border-primary bg-background px-3 py-2.5 text-[17px] outline-none ring-[3px] ring-primary/10",
+              "w-full rounded-md border border-primary-ink bg-background px-3 py-2.5 text-[17px] outline-none ring-[3px] ring-primary-ink/10",
               !typesValues && "pointer-events-none opacity-0"
             )}
           />
@@ -1358,7 +1358,7 @@ export function SheetFillSurface({
               className={cn(
                 "absolute inset-0 rounded-md border px-3 text-[15px] font-semibold",
                 values[focused.key]
-                  ? "border-primary bg-primary/10 text-primary"
+                  ? "border-primary-ink bg-primary/10 text-primary-ink"
                   : "border-border bg-background text-muted-foreground"
               )}
             >

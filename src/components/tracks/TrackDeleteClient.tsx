@@ -50,7 +50,7 @@ export function TrackDeleteClient(props: {
       <Eyebrow>Delete track</Eyebrow>
 
       {props.asAdmin ? (
-        <p className="text-xs text-amber-700 dark:text-amber-400">
+        <p className="text-xs text-warning">
           You are deleting this track as an admin (you did not add it).
         </p>
       ) : null}

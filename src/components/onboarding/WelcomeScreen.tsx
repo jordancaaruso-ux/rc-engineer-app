@@ -63,7 +63,7 @@ export function WelcomeScreen() {
   return createPortal(
     <div className="fixed inset-0 z-[70] flex flex-col overflow-y-auto bg-background px-5 py-[max(2rem,env(safe-area-inset-top))]">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-8">
-        <Eyebrow className="text-primary">Welcome</Eyebrow>
+        <Eyebrow className="text-primary-ink">Welcome</Eyebrow>
         <h1 className="mt-2 text-[26px] font-bold leading-[1.15] tracking-[-0.02em] text-foreground">
           Your race-day engineer
         </h1>
@@ -76,7 +76,7 @@ export function WelcomeScreen() {
             <li key={title} className="flex items-start gap-3.5">
               <span
                 aria-hidden
-                className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-card text-primary"
+                className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-card text-primary-ink"
               >
                 <Icon className="size-5" strokeWidth={2} />
               </span>

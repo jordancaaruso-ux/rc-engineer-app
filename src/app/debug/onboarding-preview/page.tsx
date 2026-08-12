@@ -136,7 +136,7 @@ function Verdict({ f }: { f: OnboardingFacts }) {
           key={name}
           className={
             on
-              ? "rounded border border-primary/50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-primary"
+              ? "rounded border border-primary-ink/50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-primary-ink"
               : "rounded border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground"
           }
         >

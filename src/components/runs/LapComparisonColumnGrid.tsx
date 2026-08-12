@@ -141,7 +141,7 @@ const SUMMARY_FOOTER_ROWS: Array<{
 /** Gain green / loss red for delta text where there is no background tint (header metrics). */
 function deltaTextClass(delta: number): string {
   if (!Number.isFinite(delta) || Math.abs(delta) < 1e-9) return "text-foreground/80";
-  return delta > 0 ? "text-destructive" : "text-[#4FD089]";
+  return delta > 0 ? "text-destructive" : "text-gain";
 }
 
 /**
@@ -185,7 +185,7 @@ function ColumnHeaderBlock({
       </div>
       <div className="mt-1 flex flex-wrap items-baseline gap-x-1 font-mono text-[10px] tabular-nums">
         <span className="text-muted-foreground">best</span>
-        <span className={cn("font-medium", isTarget ? "text-primary" : "text-foreground")}>
+        <span className={cn("font-medium", isTarget ? "text-primary-ink" : "text-foreground")}>
           {formatLap(series.bestLap)}
         </span>
         {bestDelta != null && Number.isFinite(bestDelta) ? (
@@ -1022,7 +1022,7 @@ export function LapComparisonColumnGrid({
         </div>
         <button
           type="button"
-          className="tap-active shrink-0 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 text-[11px] font-medium text-primary transition hover:bg-primary/20"
+          className="tap-active shrink-0 rounded-full border border-primary-ink/50 bg-primary/10 px-3 py-1.5 text-[11px] font-medium text-primary-ink transition hover:bg-primary/20"
           onClick={() => setPickerOpen(true)}
           aria-haspopup="dialog"
           aria-expanded={pickerOpen}
@@ -1064,7 +1064,7 @@ export function LapComparisonColumnGrid({
                     anyone reading rather than hovering. */}
                 <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                   <svg width="16" height="6" aria-hidden className="shrink-0">
-                    <line x1="0" y1="3" x2="16" y2="3" stroke="#A09D96" strokeWidth="2" />
+                    <line x1="0" y1="3" x2="16" y2="3" stroke="rgb(var(--color-muted-foreground))" strokeWidth="2" />
                   </svg>
                   {metaById.get(targetSeries.id)?.name ?? targetSeries.label}
                 </span>
@@ -1075,7 +1075,7 @@ export function LapComparisonColumnGrid({
                       y1="3"
                       x2="16"
                       y2="3"
-                      stroke="#A09D96"
+                      stroke="rgb(var(--color-muted-foreground))"
                       strokeWidth="1.5"
                       strokeOpacity="0.35"
                       strokeDasharray="4 3"

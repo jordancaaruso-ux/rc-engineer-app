@@ -31,7 +31,7 @@ async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
 }
 
 const inputClass =
-  "min-h-9 w-full rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-ring";
+  "min-h-9 w-full rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-primary-ink/40 focus:outline-none focus:ring-1 focus:ring-ring";
 
 /**
  * Team administration, kept off the feed page.

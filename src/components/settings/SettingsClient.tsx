@@ -235,7 +235,7 @@ function SettingField({
             if (e.key === "Enter") e.currentTarget.blur();
           }}
           placeholder={placeholder}
-          className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-accent/50"
+          className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-primary-ink/50"
         />
         {state.kind === "saving" ? (
           <span className="ui-caption text-muted-foreground">Saving…</span>

@@ -179,7 +179,7 @@ function RatingDeltaChip({ delta }: { delta: number }) {
     <span
       className={cn(
         "rounded-md px-2.5 py-1 font-mono text-[13px] font-bold tabular-nums",
-        better ? "bg-[#4FD089]/[.12] text-[#4FD089]" : "bg-destructive/[.12] text-destructive",
+        better ? "bg-gain/[.12] text-gain" : "bg-destructive/[.12] text-destructive",
       )}
     >
       {better ? "▲" : "▼"} {Math.abs(delta)}

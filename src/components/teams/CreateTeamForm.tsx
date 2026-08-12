@@ -48,7 +48,7 @@ export function CreateTeamForm() {
           </label>
           <input
             id="team-name"
-            className="min-h-9 w-full rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-accent/40 focus:outline-none focus:ring-1 focus:ring-ring"
+            className="min-h-9 w-full rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-primary-ink/40 focus:outline-none focus:ring-1 focus:ring-ring"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Southside club group"

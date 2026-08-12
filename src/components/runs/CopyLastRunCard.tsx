@@ -49,7 +49,7 @@ export function CopyLastRunCard({
           aria-hidden
           className={cn(
             "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-runna-inset text-muted-foreground transition-colors",
-            !applied && "group-hover/copy:border-primary/35 group-hover/copy:text-accent"
+            !applied && "group-hover/copy:border-primary-ink/35 group-hover/copy:text-primary-ink"
           )}
         >
           <Copy className="h-4 w-4" strokeWidth={2} />
