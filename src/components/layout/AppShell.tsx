@@ -7,9 +7,14 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { MobileBrandMark } from "@/components/layout/MobileBrandMark";
 import { MobileTitleCondenser } from "@/components/layout/MobileTitleCondenser";
 import { MobileBackProvider } from "@/components/layout/MobileBackContext";
-import { isHiddenNavRoute, MOBILE_NAV, resolveActiveNavId } from "@/components/layout/navConfig";
+import {
+  isHiddenNavRoute,
+  MOBILE_NAV,
+  resolveActiveMobileNavId,
+} from "@/components/layout/navConfig";
 import { PrimaryNavProvider } from "@/components/layout/PrimaryNavProvider";
-import { Sidebar } from "@/components/layout/sidebar";
+import { IdeasEdgeTab } from "@/components/layout/IdeasEdgeTab";
+import { TopRail } from "@/components/layout/TopRail";
 import { TodayDraftRunProvider } from "@/components/layout/TodayDraftRunProvider";
 import { RouteTransitionProvider } from "@/components/layout/RouteTransitionProvider";
 import { DemoBanner } from "@/components/layout/DemoBanner";
@@ -28,7 +33,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   // its tick resolved to `left: 100%` — past the right end of the title, where it
   // dangled on `/teams` and was clipped away entirely on `/teams/[teamId]`. Deriving
   // the slot width from the nav means a seventh destination cannot repeat it.
-  const activeNavId = pathname ? resolveActiveNavId(pathname) : null;
+  // The DOCK cell, not the section — Events, Garage and Tools all sit behind More
+  // now, and the timing line has to agree with the dock underneath it.
+  const activeNavId = pathname ? resolveActiveMobileNavId(pathname) : null;
   const navSector = activeNavId ? MOBILE_NAV.findIndex((item) => item.id === activeNavId) : -1;
 
   if (hideNav) {
@@ -47,6 +54,18 @@ export function AppShell({ children }: { children: ReactNode }) {
       <PrimaryNavProvider>
         <MobileBackProvider>
           <DemoBanner />
+          {/*
+           * The rail is a ROW above the page, where the sidebar was a COLUMN beside
+           * it — so it sits here, outside `.app-shell`, next to the banner.
+           *
+           * Outside and not inside, because `.app-shell` is `overflow-x: hidden`
+           * and the spec computes `overflow-y` from `visible` to `auto` for that —
+           * making the shell a scrollport that never actually scrolls (the document
+           * does). A `position: sticky` rail inside it therefore resolves its
+           * offsets against a container that stays put, and simply scrolled away.
+           * Out here it sticks against the document, exactly as `DemoBanner` does.
+           */}
+          <TopRail />
           <div
             className="app-shell"
             data-nav-sector={navSector >= 0 ? navSector : undefined}
@@ -59,7 +78,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                 : undefined
             }
           >
-            <Sidebar />
             <main
               className={cn(
                 "page relative",
@@ -80,6 +98,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           <MobileBrandMark />
           <MobileTitleCondenser />
           <AccountMenu />
+          {/*
+           * Ideas — the edge tab on the phone, and the panel both platforms open
+           * (the rail's lightbulb reaches it through `openIdeasPanel`). Out here
+           * with BottomNav for the same fixed-position reason, and mounted once so
+           * there is a single panel and a single fetch.
+           */}
+          <IdeasEdgeTab />
           {/*
            * The demo walkthrough used to mount here — out beside BottomNav rather than inside
            * `.app-shell`, for the same fixed-position clipping reason, and only in this branch

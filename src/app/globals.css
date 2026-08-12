@@ -128,9 +128,23 @@
 
   /*
    * Mobile bottom dock (see BottomNav.tsx) — clearance the page reserves under
-   * scrolling content: 3.5rem bar + 0.75rem float gap + 1rem breathing room.
+   * scrolling content. Recomputed for the full-bleed slab (2026-08-12); the
+   * floating pill it replaced was 3.5rem bar + 0.75rem float gap + 1rem.
+   *
+   *   10px slab padding-top
+   * + 52px row — the CELLS are 46px, but the log-run circle is 52 and it is in
+   *              the same centred flex row, so the circle sets the height
+   * +  9px gap to the home indicator
+   * +  5px home indicator
+   * + 12px slab padding-bottom (the `max(12px, safe-area)` floor)
+   * ---------------------------------------------------------------
+   *   88px of slab, measured, + 1rem breathing room = 104px
+   *
+   * The safe-area inset is NOT counted here: `AppShell` adds `env(...)` on top of
+   * this value, and the slab's own bottom padding is the same `max()`, so on a
+   * notched phone the two agree and on a flat one this is the floor.
    */
-  --mobile-tab-bar-height: 5.25rem;
+  --mobile-tab-bar-height: 6.5rem;
 
   /*
    * Vertical anchor for the fixed mobile corner chrome (JRC pill + account
@@ -511,27 +525,132 @@ html.pwa-splash-done[data-standalone="true"] #pwa-splash {
   @apply relative flex min-h-[100dvh] overflow-x-hidden overflow-y-visible bg-transparent text-foreground;
 }
 
-.bottom-nav {
-  /*
-   * Floating dock — the pill inside BottomNav.tsx carries its own blurred
-   * surface, border, and shadow; this wrapper stays transparent so page
-   * content scrolls behind the float gap. Bottom offset / safe-area handled
-   * by Tailwind classes on the nav element.
-   * z-index keeps the dock above `.page` when DOM/stacking order would otherwise bury it.
-   */
-  z-index: 50;
-  /* JRC icon negative space (gauge needle, garage door, teams keylines) is
-     painted, not punched — it must match the surface behind the glass bar.
-     On charcoal `--page-bg-base` (#1B1A17) and the pill's card (#181716) differ by
-     three levels, so which one it is has never mattered. On paper they are #EAE7E0
-     against #FCFBF8, and the icons grow a visible grey smudge where the cutout is
-     supposed to disappear — so the value has to be the surface the icon actually
-     sits on, which is the pill, not the page. */
-  --jrc-icon-cutout: var(--page-bg-base);
+/* ---------------------------------------------------------------------------
+   Nav glass — one recipe, both surfaces (nav restructure 2026-08-12).
+
+   The dock and the desktop rail were three different glasses between them: the
+   pill ran card/0.32 + blur(40px) saturate(1.9), the sidebar ran secondary/0.8 +
+   blur(12px) with no saturation at all — barely glass. They are now one recipe,
+   declared once here.
+
+   LESS transparent than the shipped pill, deliberately. Full-bleed puts far more
+   glass on screen than a floating pill did, and both surfaces sit over dense run
+   tables where high transparency smears numerals. If the lighter setting is
+   wanted back, these three values are the whole knob.
+
+   Paper needs more opacity behind text than charcoal does — same reason
+   `--tune-glass-alpha` is 0.6 dark and 0.78 light.
+--------------------------------------------------------------------------- */
+:root {
+  --nav-glass-alpha: 0.62;
+  --nav-glass-blur: 36px;
+  --nav-glass-saturate: 1.6;
 }
 
-:root[data-theme="light"] .bottom-nav {
+:root[data-theme="light"] {
+  --nav-glass-alpha: 0.82;
+}
+
+.bottom-nav {
+  /*
+   * z-index keeps the dock above `.page` when DOM/stacking order would otherwise
+   * bury it. The slab inside carries the surface; this wrapper is only the
+   * fixed-position frame, and stays pointer-events-none so the page keeps
+   * scrolling either side of the log-run circle.
+   */
+  z-index: 50;
+}
+
+/*
+ * Full-bleed, edge to edge: no side inset, no radius, no float gap. The pill spent
+ * all three on air, which is what squeezed six destinations to ~42.7px and cost
+ * the labels. Five cells at 60px (390px viewport) is what came back.
+ */
+.bottom-nav-slab {
+  padding: 10px 14px max(12px, env(safe-area-inset-bottom));
+  background-color: rgb(var(--color-card) / var(--nav-glass-alpha));
+  /* Standard property only — the build auto-generates -webkit- for Safari, and
+     hand-writing the prefixed one alongside it makes the build drop BOTH. */
+  backdrop-filter: blur(var(--nav-glass-blur)) saturate(var(--nav-glass-saturate));
+  box-shadow: 0 -14px 34px rgb(0 0 0 / 0.4);
+  position: relative;
+  /* JRC icon negative space (gauge needle, garage door, teams keylines) is
+     painted, not punched — it must match the surface the icon actually sits on,
+     which is this slab, not the page. On charcoal the two differ by three levels
+     so it never mattered; on paper they are #EAE7E0 against #FCFBF8 and the icons
+     grow a visible grey smudge where the cutout should disappear. */
   --jrc-icon-cutout: rgb(var(--color-card));
+}
+
+/*
+ * The top hairline. A gradient that fades out at both ends, so a bar with no side
+ * inset does not read as a hard drawn line across the whole screen — it brightens
+ * toward the centre, where the content is, and dissolves at the edges.
+ */
+.bottom-nav-slab::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(var(--color-elevate) / 0.24) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+:root[data-theme="light"] .bottom-nav-slab::before {
+  /* Ink at 24% is a bruise on paper; the hairline only has to separate. */
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(var(--color-elevate) / 0.1) 50%,
+    transparent 100%
+  );
+}
+
+/* 9.5px is the ceiling that keeps "Dashboard" on one line in a 60px cell. */
+.dock-label {
+  font-size: 9.5px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.bottom-nav a[data-active="true"] .dock-label {
+  font-weight: 700;
+}
+
+/* The system home-indicator line, inside the slab so the bar owns the bottom edge. */
+.dock-home-indicator {
+  display: block;
+  width: 134px;
+  height: 5px;
+  margin: 9px auto 0;
+  border-radius: 9999px;
+  background-color: rgb(var(--color-foreground) / 0.28);
+}
+
+/*
+ * The active mark, shared by both platforms: 28×2, primary-ink, with a glow that
+ * only exists in dark. `primary-ink` and never `primary` — this is yellow doing a
+ * foreground job, and #FFD60A is 1.4:1 on paper.
+ */
+.nav-tick {
+  display: block;
+  width: 28px;
+  height: 2px;
+  border-radius: 9999px;
+  background-color: rgb(var(--color-primary-ink));
+  box-shadow: 0 0 10px 1px rgb(var(--color-primary-ink) / 0.4);
+}
+
+:root[data-theme="light"] .nav-tick {
+  /* Nothing to glow against on paper — a halo round a 2px bar reads as blur. */
+  box-shadow: none;
 }
 
 /*
@@ -597,94 +716,330 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
 }
 
 /* NOTE: Avoid creating sibling stacking contexts here.
-   Mobile nav uses fixed overlays from the sidebar; if <main> and the sidebar
-   are both forced into equal z-index stacking contexts, DOM order can cause
-   <main> to sit above the sidebar and intercept clicks. BottomNav must render
-   after <main> (see AppShell.tsx) and outside `.app-shell` overflow clipping. */
+   If <main> and the nav chrome are both forced into equal z-index stacking
+   contexts, DOM order can cause <main> to sit above the nav and intercept clicks.
+   BottomNav must render after <main> (see AppShell.tsx) and outside `.app-shell`
+   overflow clipping. */
 
 /* ---------------------------------------------------------------------------
-   Desktop icon rail (design handoff 2026-08-08). Replaces the 256px sidebar.
+   Desktop top rail (nav restructure 2026-08-12). Replaces the 76px left sidebar,
+   which replaced the 256px one.
 
-   76px, icon over a 9px label. All nine destinations are kept — the handoff cut
-   Add run and Teams to reach seven, but the cut was the designer's judgement and not
-   a space constraint: nine 56px items plus the mark fit inside 1080px with room to
-   spare, and dropping the app's second-most-used verb from the only persistent nav
-   is not a trade worth making (founder, 2026-08-08).
+   64px tall, sticky, seven destinations on one line plus a right-hand utility
+   cluster. The rail was never the problem — the shape was: a permanent left gutter
+   spent 76px of every page's WIDTH on stacks that fit inside 64px of HEIGHT laid
+   out horizontally. Content max-width goes 1684 → 1760px and the page title starts
+   where the eye does.
 
-   Visibility is still `hidden md:flex` in the JSX — this rule must not set `display`.
+   Visibility is `hidden md:flex` in the JSX — these rules must not set `display`.
 --------------------------------------------------------------------------- */
-.sidebar {
-  /* NOTE: do not set display here; responsive visibility is controlled in JSX */
-  width: 76px;
+.top-rail {
+  position: sticky;
+  /*
+   * Below the demo banner, which is also sticky and also sits in the document
+   * flow (see the note in AppShell about why the rail lives out there too).
+   * Without the offset the rail slides under the banner on scroll and a demo
+   * visitor loses the nav entirely. `--demo-banner-h` is published by
+   * `DemoBanner` and is unset — so 0 — for everybody else.
+   */
+  top: var(--demo-banner-h, 0px);
+  z-index: 20;
+  height: 64px;
   flex: none;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 22px 0 20px;
-  padding-top: calc(env(safe-area-inset-top, 0px) + 22px);
-  border-right: 1px solid rgb(var(--color-border));
-  background-color: rgb(var(--color-secondary) / 0.8);
-  backdrop-filter: blur(12px);
-  /* Surface colour behind the JRC icon cutouts (see `.bottom-nav`). */
-  --jrc-icon-cutout: rgb(var(--color-secondary));
+  background-color: rgb(var(--color-card) / var(--nav-glass-alpha));
+  /* Standard property only — see `.bottom-nav-slab`. */
+  backdrop-filter: blur(var(--nav-glass-blur)) saturate(var(--nav-glass-saturate));
+  border-bottom: 1px solid rgb(var(--color-border));
+  box-shadow:
+    inset 0 1px 0 rgb(var(--color-elevate) / 0.14),
+    0 14px 34px -22px rgb(0 0 0 / 0.8);
+  /* Surface behind the JRC icon cutouts — the rail itself (see `.bottom-nav-slab`). */
+  --jrc-icon-cutout: rgb(var(--color-card));
 }
 
-/* Yellow mark, not white: at 18px the white mark reads as a smudge, where the
-   yellow one still resolves as the JRC shape. */
-.sidebar-brand {
+:root[data-theme="light"] .top-rail {
+  /* The inset white rim is the dark theme's lift; on paper it is invisible at
+     best and a grey line at worst. The border below does the whole job here. */
+  box-shadow: 0 14px 34px -26px rgb(0 0 0 / 0.35);
+}
+
+.top-rail-inner {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  width: 100%;
+  max-width: 1760px;
+  margin-inline: auto;
+  padding: 0 32px;
+}
+
+/* Yellow mark, not white: at this size the white mark reads as a smudge, where
+   the yellow one still resolves as the JRC shape. */
+.top-rail-brand {
   display: inline-flex;
   align-items: center;
-  margin: 0 0 20px;
+  flex: none;
   transition: opacity 150ms ease;
 }
-.sidebar-brand:hover {
+.top-rail-brand:hover {
   opacity: 0.85;
 }
 
-.sidebar-nav {
+.top-rail-nav {
+  position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  width: 100%;
+  gap: 2px;
+  min-width: 0;
+  /* Full rail height so the tick can sit on the bottom edge of the BAR, not on
+     the bottom edge of a 36px item floating in the middle of it. */
+  height: 64px;
 }
 
-.sidebar-nav a {
-  display: flex;
-  flex-direction: column;
+.top-rail-item {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 5px;
-  width: 56px;
-  padding: 9px 0;
-  border-radius: 10px;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
   color: rgb(var(--color-muted-foreground));
   transition-property: background-color, color;
   transition-duration: 150ms;
   -webkit-tap-highlight-color: transparent;
 }
 
-.sidebar-nav a:hover {
+.top-rail-item:hover {
   color: rgb(var(--color-foreground));
 }
 
-.sidebar-nav a:active {
-  opacity: 0.9;
-}
-
-.sidebar-nav a[data-active="true"] {
+.top-rail-item[data-active="true"] {
   background-color: rgb(var(--color-elevate) / 0.05);
   color: rgb(var(--color-primary-ink));
-  transition-duration: 0ms;
+  font-weight: 700;
 }
 
-/* Settings sits apart from the journey, at the foot of the rail. */
-.sidebar-nav .sidebar-nav-tail {
-  margin-top: auto;
+/*
+ * The tick's carriage. Measured and driven by transform from `TopRail` — tab
+ * widths vary with label length, so an index cannot place this (the dock can,
+ * because its cells are an equal-fraction grid).
+ */
+.top-rail-tick {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  pointer-events: none;
+  transition:
+    transform 200ms ease-out,
+    opacity 150ms ease-out;
 }
 
-.sidebar-footer {
+.top-rail-tick.is-hidden {
+  opacity: 0;
+}
+
+/* Square off the bottom corners: this one is welded to the rail's edge. */
+.top-rail-tick .nav-tick {
+  border-radius: 2px 2px 0 0;
+}
+
+.top-rail-cluster {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex: none;
+}
+
+.top-rail-utility {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  width: 36px;
+  border-radius: 8px;
+  color: rgb(var(--color-muted-foreground));
+  transition-property: background-color, color;
+  transition-duration: 150ms;
+}
+
+.top-rail-utility:hover {
+  color: rgb(var(--color-foreground));
+  background-color: rgb(var(--color-elevate) / 0.05);
+}
+
+.top-rail-utility[data-active="true"] {
+  color: rgb(var(--color-primary-ink));
+  background-color: rgb(var(--color-elevate) / 0.05);
+}
+
+.top-rail-divider {
+  width: 1px;
+  height: 24px;
+  background-color: rgb(var(--color-border));
+}
+
+.top-rail-logrun {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  color: rgb(var(--color-primary-foreground));
+  background: linear-gradient(180deg, #ffdf3d 0%, rgb(var(--color-primary)) 38%);
+  box-shadow:
+    0 10px 22px -10px rgb(var(--glow-shadow-rgb) / 0.5),
+    inset 0 1.5px 0 rgb(255 255 255 / 0.55);
+  transition: transform 150ms ease;
+}
+
+.top-rail-logrun:hover {
+  transform: translateY(-1px);
+}
+
+/*
+ * Quiet on the dashboard, mirroring the mobile FAB rule (2026-07-16): the
+ * dashboard's own yellow Start-run bar owns that action, and two yellow CTAs a
+ * few hundred px apart split the one thing the page is asking for.
+ */
+.top-rail-logrun.is-quiet {
+  background: rgb(var(--color-surface-runna-deep) / 0.9);
+  color: rgb(var(--color-muted-foreground));
+  border: 1px solid rgb(var(--color-border));
+  box-shadow: none;
+}
+
+.top-rail-logrun.is-quiet:hover {
+  color: rgb(var(--color-foreground));
+}
+
+/* ---------------------------------------------------------------------------
+   Ideas edge tab + panel (nav restructure 2026-08-12). Replaces the dock's left
+   cap — same rules (a utility, never a destination, never active, app-wide), new
+   position. The cap was spending 52px of a 390px row; the edge costs no width at
+   all, and it gives Ideas a desktop home it never had.
+--------------------------------------------------------------------------- */
+:root {
+  --ideas-panel-w: 296px;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --ideas-panel-w: 400px;
+  }
+}
+
+/*
+ * Mobile only — desktop's trigger is the rail's lightbulb, and two triggers for
+ * one panel is one too many.
+ *
+ * The breakpoint lives HERE and not as `md:hidden` in the JSX: this rule sets
+ * `display: flex`, and a plain selector in this file beats a Tailwind utility of
+ * equal specificity purely on source order (globals.css is imported after the
+ * utilities). The class was on the element and did nothing.
+ */
+.ideas-edge-tab {
   display: none;
+}
+
+@media (max-width: 767px) {
+  .ideas-edge-tab {
+    display: flex;
+  }
+}
+
+.ideas-edge-tab {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  z-index: 45;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 26px;
+  height: 98px;
+  border-radius: 12px 0 0 12px;
+  background-color: rgb(var(--color-primary));
+  /* On yellow, always the dark ink — in both themes. */
+  color: rgb(var(--color-primary-foreground));
+  box-shadow: -4px 0 18px rgb(var(--glow-shadow-rgb) / 0.26);
+  transform: translateY(-50%);
+  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.3, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Rides out with the panel rather than being buried under it. */
+.ideas-edge-tab.is-out {
+  transform: translateY(-50%) translateX(calc(-1 * var(--ideas-panel-w)));
+}
+
+.ideas-edge-count {
+  min-width: 16px;
+  padding: 0 3px;
+  border-radius: 9999px;
+  background-color: rgb(var(--color-primary-foreground));
+  color: rgb(var(--color-primary));
+  font-family: var(--font-mono, ui-monospace), monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+:root[data-theme="light"] .ideas-edge-count {
+  /* #FFD60A on ink is 1.4:1 the wrong way round at 9.5px — the badge is text. */
+  color: rgb(var(--color-primary-foreground));
+  background-color: rgb(var(--color-elevate) / 0.14);
+}
+
+.ideas-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+  background-color: rgb(0 0 0 / 0.45);
+  transition: opacity 260ms ease-out;
+}
+
+.ideas-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: var(--ideas-panel-w);
+  max-width: 100vw;
+  padding: 20px 16px max(20px, env(safe-area-inset-bottom));
+  padding-top: max(20px, env(safe-area-inset-top));
+  background-color: rgb(var(--color-card) / 0.98);
+  border-left: 1px solid rgb(var(--color-border));
+  box-shadow: -18px 0 46px rgb(0 0 0 / 0.5);
+  transform: translateX(100%);
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.ideas-panel.is-open {
+  transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ideas-edge-tab,
+  .ideas-panel,
+  .ideas-scrim {
+    transition: none;
+  }
 }
 
 .page {
@@ -898,28 +1253,6 @@ html[data-nav-pending] .page {
   font-family: var(--font-ui);
   font-weight: 600;
   @apply text-[14.5px] leading-tight tracking-tight text-foreground;
-}
-
-/* 9px under a 20px icon. Supporting, never sufficient — every rail link keeps its
-   aria-label, because this is below the size text alone can carry (see the rail
-   accessibility note in the handoff). */
-.sidebar-nav .nav-sidebar-label {
-  font-family: var(--font-ui);
-  font-weight: 500;
-  font-size: 9px;
-  line-height: 1;
-  letter-spacing: 0;
-  /* The rail is 76px and the target 56px; a label that outgrew either would spill
-     across the page content, so it is clamped rather than trusted to fit. */
-  max-width: 100%;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sidebar-nav a[data-active="true"] .nav-sidebar-label {
-  font-weight: 700;
 }
 
 .ui-title:is(.text-sm, .text-base, .text-lg, .text-xl) {

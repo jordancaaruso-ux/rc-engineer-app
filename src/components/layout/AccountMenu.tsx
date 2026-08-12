@@ -5,15 +5,24 @@ import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { GearSix, ShieldCheck, SignOut } from "@phosphor-icons/react";
 import { avatarSrc } from "@/lib/profileImage/avatarSrc";
+import { cn } from "@/lib/utils";
 
 /**
  * Account avatar + menu — the home for Settings after it left the mobile dock
- * (2026-07-06). A floating button pinned top-right on mobile only (desktop
- * keeps Settings in the sidebar). Tapping it opens account details plus the
- * low-frequency destinations that no longer earn a dock slot.
+ * (2026-07-06). Account details plus the low-frequency destinations that no
+ * longer earn a dock slot.
  *
- * Positioned above the page header on centered-title screens (top-right is free
- * there); the dashboard's date chip is nudged clear in globals.css.
+ * Two placements, one menu (nav restructure 2026-08-12):
+ *
+ *   · `floating` — pinned top-right on mobile, above the page header on
+ *     centered-title screens (the dashboard's date chip is nudged clear in
+ *     globals.css). Tracks `--top-chrome-y`.
+ *   · `inline` — the last item in the desktop rail's utility cluster. Desktop had
+ *     no account door at all while Settings lived in the sidebar; sign-out was
+ *     reachable only by going to /settings and looking for it.
+ *
+ * Deliberately not two components: the menu body (identity, Settings, Privacy,
+ * Sign out) is the part that matters and it must not fork.
  */
 function initials(name?: string | null, email?: string | null): string {
   const src = (name && name.trim()) || (email && email.trim()) || "";
@@ -25,7 +34,7 @@ function initials(name?: string | null, email?: string | null): string {
   return src.split("@")[0].slice(0, 1).toUpperCase();
 }
 
-export function AccountMenu() {
+export function AccountMenu({ variant = "floating" }: { variant?: "floating" | "inline" }) {
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -59,11 +68,13 @@ export function AccountMenu() {
     <span aria-hidden>{initials(name, email)}</span>
   );
 
+  const inline = variant === "inline";
+
   return (
     <div
       ref={wrapRef}
-      className="fixed right-4 z-40 md:hidden"
-      style={{ top: "var(--top-chrome-y)" }}
+      className={cn(inline ? "relative shrink-0" : "fixed right-4 z-40 md:hidden")}
+      style={inline ? undefined : { top: "var(--top-chrome-y)" }}
     >
       <button
         type="button"
@@ -71,7 +82,14 @@ export function AccountMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="tap-active grid h-[34px] w-[34px] place-items-center overflow-hidden rounded-full border border-white/[0.15] bg-card/70 text-[13px] font-bold text-foreground shadow-[0_2px_10px_rgba(0,0,0,0.45)] backdrop-blur-[20px] backdrop-saturate-[1.4] transition-transform duration-150 active:scale-95"
+        className={cn(
+          "tap-active grid place-items-center overflow-hidden rounded-full border border-elevate/15 bg-card/70 text-[13px] font-bold text-foreground transition-transform duration-150 active:scale-95",
+          // The floating pill needs its own lift off the page; in the rail the bar
+          // already provides one, and a second drop shadow reads as a smudge.
+          inline
+            ? "h-9 w-9"
+            : "h-[34px] w-[34px] shadow-[0_2px_10px_rgba(0,0,0,0.45)] backdrop-blur-[20px] backdrop-saturate-[1.4]"
+        )}
       >
         {face}
       </button>
@@ -80,10 +98,10 @@ export function AccountMenu() {
         <div
           role="menu"
           aria-label="Account"
-          className="absolute right-0 top-[calc(100%+0.5rem)] w-56 overflow-hidden rounded-2xl border border-white/[0.12] bg-card/[0.85] p-1.5 shadow-[0_24px_50px_-18px_rgba(0,0,0,0.8)] backdrop-blur-[34px] backdrop-saturate-[1.4]"
+          className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-56 overflow-hidden rounded-2xl border border-elevate/[0.12] bg-card/[0.85] p-1.5 shadow-[0_24px_50px_-18px_rgba(0,0,0,0.8)] backdrop-blur-[34px] backdrop-saturate-[1.4]"
         >
           <div className="mb-1.5 flex items-center gap-2.5 border-b border-border px-2.5 pb-3 pt-2">
-            <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full border border-white/[0.15] bg-secondary text-[13px] font-bold text-foreground">
+            <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full border border-elevate/15 bg-secondary text-[13px] font-bold text-foreground">
               {face}
             </span>
             <span className="min-w-0">

@@ -12,9 +12,10 @@ import { warmNewRunForm } from "@/lib/runs/warmNewRunForm";
 
 /**
  * The "Log run" action — the app's #1 action, an icon-only yellow circle
- * sitting beside the dock bar at matched height (founder-locked 2026-07-14;
+ * sitting beside the dock cells at matched height (founder-locked 2026-07-14;
  * previously a labeled pill floating on its own row). Rendered in-row by
- * `BottomNav`, mobile only (desktop keeps "Add run" in the sidebar).
+ * `BottomNav`, mobile only — desktop's equivalent is the rail's "Log run" button
+ * (`TopRail`), which mirrors the dashboard rule below.
  *
  * The specular treatment (bright top rim over the gradient) is deliberate and
  * founder-kept — don't flatten it to a solid fill.
@@ -54,7 +55,7 @@ export const LogRunFab = memo(function LogRunFab() {
         onTouchStart={warmNew}
         onClick={() => haptic("light")}
         aria-label="Start a new run"
-        className="tap-active flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/15 bg-surface-runna-deep/90 text-muted-foreground shadow-[0_6px_16px_-10px_rgba(0,0,0,0.65)] backdrop-blur transition-transform duration-150 active:scale-95 touch-manipulation"
+        className="tap-active flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full border border-elevate/15 bg-surface-runna-deep/90 text-muted-foreground shadow-[0_6px_16px_-10px_rgba(0,0,0,0.65)] backdrop-blur transition-transform duration-150 active:scale-95 touch-manipulation"
       >
         <IconAddRun size={24} aria-hidden />
       </Link>
@@ -78,7 +79,7 @@ export const LogRunFab = memo(function LogRunFab() {
       onTouchStart={warm}
       onClick={() => haptic("light")}
       aria-label={label}
-      className="tap-active logrun-glow relative isolate flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#ffdf3d_0%,#FFD60A_38%)] text-primary-foreground shadow-[0_12px_26px_-6px_rgba(255,214,10,0.35),0_10px_22px_-8px_rgba(0,0,0,0.65),inset_0_1.5px_0_rgba(255,255,255,0.55),inset_0_-1px_0_rgba(0,0,0,0.18)] transition-transform duration-150 active:scale-95 touch-manipulation"
+      className="tap-active logrun-glow relative isolate flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#ffdf3d_0%,#FFD60A_38%)] text-primary-foreground shadow-[0_12px_26px_-6px_rgba(255,214,10,0.35),0_10px_22px_-8px_rgba(0,0,0,0.65),inset_0_1.5px_0_rgba(255,255,255,0.55),inset_0_-1px_0_rgba(0,0,0,0.18)] transition-transform duration-150 active:scale-95 touch-manipulation"
     >
       {/* Moving-hotspot face layer — matched to the dashboard bar. */}
       <span className="logrun-fx" aria-hidden />

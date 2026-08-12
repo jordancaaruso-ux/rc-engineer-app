@@ -11,10 +11,16 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { resolveActiveNavId, type PrimaryNavId } from "@/components/layout/navConfig";
+import { foldMobileNavId, resolveActiveNavId, type PrimaryNavId } from "@/components/layout/navConfig";
 
 type PrimaryNavContextValue = {
   activeId: PrimaryNavId | null;
+  /**
+   * The same answer folded onto the five dock cells — Events, Garage and Tools
+   * report as `more`. Both are published from here rather than resolved in the
+   * dock so the optimistic tab (`pendingNavId`) applies to both equally.
+   */
+  mobileActiveId: PrimaryNavId | null;
   /** `href` arms the wedge self-heal for that destination — see `SOFT_NAV_HEAL_MS`. */
   beginNav: (id: PrimaryNavId, href: string) => void;
 };
@@ -107,13 +113,10 @@ export function PrimaryNavProvider({ children }: { children: ReactNode }) {
     [disarmSoftNavFallback]
   );
 
-  const value = useMemo(
-    (): PrimaryNavContextValue => ({
-      activeId: pendingNavId ?? pathnameId,
-      beginNav,
-    }),
-    [pendingNavId, pathnameId, beginNav]
-  );
+  const value = useMemo((): PrimaryNavContextValue => {
+    const activeId = pendingNavId ?? pathnameId;
+    return { activeId, mobileActiveId: foldMobileNavId(activeId), beginNav };
+  }, [pendingNavId, pathnameId, beginNav]);
 
   return (
     <PrimaryNavContext.Provider value={value}>

@@ -2,7 +2,7 @@
 // Drawn on a 24px grid. Fill = currentColor, so tint via CSS `color`.
 // Negative-space details (gauge needle, garage door, keylines) use
 // --jrc-icon-cutout, which must match the surface the icon sits on.
-// Set it once per surface — see `.bottom-nav` / `.sidebar` in globals.css.
+// Set it once per surface — see `.bottom-nav-slab` / `.top-rail` in globals.css.
 //
 // Solid in both states by design: active vs inactive is a colour swap
 // (primary vs muted), never an outline→filled swap.
@@ -141,6 +141,27 @@ export const IconTools = ({ size = 24, ...props }: IconProps) => (
   </svg>
 );
 
+/**
+ * The overflow destination — the only glyph in the set that names no place.
+ *
+ * Three dots and nothing else: every other icon here draws the thing it leads to,
+ * and the moment this one draws something (a grid, a stack, a chevron) it starts
+ * claiming to be a place too, which it is not. Dots are the one shape that reads
+ * as "and the rest" rather than as a destination.
+ *
+ * No `--jrc-icon-cutout` — there is no negative space to keep in step with the
+ * surface, so this is the one glyph that needs no per-surface variable.
+ */
+export const IconMore = ({ size = 24, ...props }: IconProps) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" {...props}>
+    <g fill="currentColor">
+      <circle cx="5.4" cy="12" r="1.85" />
+      <circle cx="12" cy="12" r="1.85" />
+      <circle cx="18.6" cy="12" r="1.85" />
+    </g>
+  </svg>
+);
+
 export const navIcons = {
   dashboard: IconDashboard,
   analysis: IconAnalysis,
@@ -150,4 +171,5 @@ export const navIcons = {
   teams: IconTeams,
   settings: IconSettings,
   addRun: IconAddRun,
+  more: IconMore,
 } as const;

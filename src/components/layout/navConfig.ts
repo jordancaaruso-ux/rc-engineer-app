@@ -5,6 +5,7 @@ import {
   IconEngineer,
   IconEvents,
   IconGarage,
+  IconMore,
   IconSettings,
   IconTeams,
   IconTools,
@@ -20,6 +21,7 @@ export type PrimaryNavId =
   | "engineer"
   | "teams"
   | "tools"
+  | "more"
   | "settings";
 
 export type PrimaryNavItem = {
@@ -129,6 +131,7 @@ export function resolveActiveNavId(pathname: string): PrimaryNavId | null {
     { id: "assets", score: sectionMatchScore(pathname, ASSETS_PREFIXES) },
     { id: "engineer", score: matchPrefixScore(pathname, "/engineer") },
     { id: "teams", score: matchPrefixScore(pathname, "/teams") },
+    { id: "more", score: matchPrefixScore(pathname, "/more") },
     { id: "settings", score: matchPrefixScore(pathname, "/settings") },
   ];
 
@@ -139,6 +142,42 @@ export function resolveActiveNavId(pathname: string): PrimaryNavId | null {
     }
   }
   return best?.id ?? null;
+}
+
+/**
+ * The sections the phone reaches through `More` rather than through a cell of
+ * its own. They keep their real nav id everywhere else — this is only about
+ * which of the five dock cells lights up.
+ */
+const BEHIND_MORE: readonly PrimaryNavId[] = ["events", "assets", "tools"];
+
+/**
+ * Which of the five DOCK cells is active — not which section you are in.
+ *
+ * `resolveActiveNavId` answers the second question and is shared with desktop,
+ * where Events, Garage and Tools each own a tab. On the phone they sit behind
+ * `More`, and without this fold a driver on `/events` would watch every cell go
+ * dark and the indicator fade out: technically "no cell matches", but it reads as
+ * having navigated out of the app rather than one level into it.
+ *
+ * Returns the section id untouched for everything the dock shows directly, so the
+ * two functions agree on all five cells and differ only on the overflow.
+ */
+export function resolveActiveMobileNavId(pathname: string): PrimaryNavId | null {
+  return foldMobileNavId(resolveActiveNavId(pathname));
+}
+
+/**
+ * The same fold applied to an id you already have.
+ *
+ * `PrimaryNavProvider` needs this rather than the path-based version above: the
+ * dock's active cell is `pendingNavId ?? pathnameId`, and the optimistic half is
+ * an id with no path to resolve. Folding only the resolved half would make a tap
+ * on More flicker through "no cell active" before landing.
+ */
+export function foldMobileNavId(id: PrimaryNavId | null): PrimaryNavId | null {
+  if (id && BEHIND_MORE.includes(id)) return "more";
+  return id;
 }
 
 const DASHBOARD: PrimaryNavItem = { id: "dashboard", href: "/", label: "Dashboard", icon: IconDashboard };
@@ -181,48 +220,89 @@ const ASSETS: PrimaryNavItem = { id: "assets", href: "/cars", label: "Garage", i
 const ENGINEER: PrimaryNavItem = { id: "engineer", href: "/engineer", label: "Engineer", icon: IconEngineer };
 const TEAMS: PrimaryNavItem = { id: "teams", href: "/teams", label: "Teams", icon: IconTeams };
 const SETTINGS: PrimaryNavItem = { id: "settings", href: "/settings", label: "Settings", icon: IconSettings };
-
-export const PRIMARY_NAV: PrimaryNavItem[] = [
-  DASHBOARD,
-  ADD_RUN,
-  ANALYSIS,
-  EVENTS,
-  ENGINEER,
-  ASSETS,
-  TEAMS,
-  SETTINGS,
-];
+/**
+ * The phone's overflow door (nav restructure 2026-08-12). Not a section — a page
+ * listing the three sections the dock has no room for. Desktop never shows it:
+ * the top rail carries all seven destinations on one line.
+ */
+const MORE: PrimaryNavItem = { id: "more", href: "/more", label: "More", icon: IconMore };
 
 /**
- * Desktop sidebar: full section list, natural top-to-bottom order. Analysis
- * points at the workbench here (see `ANALYSIS_DESKTOP`), and Tools exists only on
- * this list — the phone reaches the same destinations as doors on `/analysis`,
- * and the mobile dock has no slot to spare.
+ * The two items that left the destination lists for the desktop rail's utility
+ * cluster (2026-08-12). Exported as items rather than inlined as hrefs in
+ * `TopRail` so the cluster is still built from this file — `smartDraft` on Add run
+ * in particular is behaviour, not a URL, and it must not fork.
+ */
+export const NAV_ADD_RUN = ADD_RUN;
+export const NAV_SETTINGS = SETTINGS;
+
+/**
+ * Desktop top rail: seven destinations on one line, left to right.
+ *
+ * `ADD_RUN` and `SETTINGS` are NOT here any more (2026-08-12) — they moved to the
+ * rail's right-hand utility cluster as the yellow Log-run button and the gear.
+ * That is not a demotion: it is the same split the phone has always had, where
+ * logging a run is a circle beside the dock and Settings lives behind the avatar.
+ * Putting a verb and a preference in the same list as seven places was the thing
+ * the rail could not justify once it went horizontal and every item cost width.
+ *
+ * Analysis points at the workbench here (see `ANALYSIS_DESKTOP`). Tools is on this
+ * list and not in the dock; the phone reaches it through `More`.
  */
 export const DESKTOP_NAV: PrimaryNavItem[] = [
   DASHBOARD,
-  ADD_RUN,
   ANALYSIS_DESKTOP,
   EVENTS,
   ENGINEER,
   ASSETS,
   TOOLS,
   TEAMS,
-  SETTINGS,
 ];
 
 /**
- * Mobile bottom dock: six pure destinations. `Add run` is a circular FAB
- * (`LogRunFab`) rendered beside the bar and `Settings` lives behind the account
- * avatar (`AccountMenu`), so neither sits in the dock. See `shouldShowLogRunFab`.
+ * Mobile bottom dock: five destinations, the last of which is a door to the rest.
  *
- * Six is a deliberate squeeze (2026-07-29): with the Ideas cap and the Log-run
- * circle both kept, cells land at ~42.7px at 390px — 1.3px under the 44px tap
- * guideline, tolerable only because the row is 56px tall. If it reads too tight
- * on device, the levers in order of cost are: drop the Ideas cap (→51.3px), move
- * the FAB above the bar (→53.7px, but `--mobile-tab-bar-height` goes 84→150px).
+ * Was six pure destinations squeezed to ~42.7px each — under the 44px tap
+ * guideline, and that was BEFORE the row had to hold anything else. Five cells in
+ * the full-bleed slab land at 60px at 390px:
+ *
+ *     (390 − 28 padding − 52 log-run circle − 10 gap) ÷ 5 = 60px
+ *
+ * which is what buys the labels back. `Add run` is still the circle beside the
+ * cells (`LogRunFab`, see `shouldShowLogRunFab`) and Settings still lives behind
+ * the account avatar (`AccountMenu`), so neither takes a cell. Events, Garage and
+ * Tools moved behind `More` — see `resolveActiveMobileNavId`, which keeps the More
+ * cell lit while you are inside any of them.
+ *
+ * Adding a sixth destination here costs ~10px off every cell and puts "Dashboard"
+ * back into truncation at 9.5px. Add it to `/more` instead.
  */
-export const MOBILE_NAV: PrimaryNavItem[] = [DASHBOARD, ANALYSIS, EVENTS, ENGINEER, ASSETS, TEAMS];
+export const MOBILE_NAV: PrimaryNavItem[] = [DASHBOARD, ANALYSIS, ENGINEER, TEAMS, MORE];
+
+/**
+ * What `/more` lists. The three sections the dock gave up, in the order the rail
+ * shows them, each landing exactly where its desktop tab lands.
+ */
+export const MORE_HUB_LINKS: NavHubLink[] = [
+  {
+    href: "/events",
+    label: "Events",
+    description: "Race meetings and club days — planned and reviewed.",
+    icon: "calendar",
+  },
+  {
+    href: "/cars",
+    label: "Garage",
+    description: "Your cars and their setups.",
+    icon: "car",
+  },
+  {
+    href: "/tools",
+    label: "Tools",
+    description: "Compare setups, model geometry, and review video.",
+    icon: "wrench",
+  },
+];
 
 export type NavHubIconKey =
   | "car"
