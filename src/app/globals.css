@@ -1934,10 +1934,11 @@ html.video-overlay-fullscreen-active body {
   /* Dim is the page ground at 0.78, NOT black — the page is Ash warm, and a
      black scrim reads as a colour shift at the hole's edge. */
   box-shadow: 0 0 0 var(--rc-tour-spread) rgb(var(--page-bg-rgb) / 0.78);
-  /* A white hairline, deliberately not yellow: yellow is action-only in this
-     palette (see the DemoBanner ruling), and the tour spends its one yellow on
-     the Next button. */
-  outline: 1px solid rgb(255 255 255 / 0.16);
+  /* A hairline, deliberately not yellow: yellow is action-only in this palette
+     (see the DemoBanner ruling), and the tour spends its one yellow on the Next
+     button. `elevate`, not literal white — white is the correct lift on charcoal
+     and invisible on paper, which is the whole reason that token exists. */
+  outline: 1px solid rgb(var(--color-elevate) / 0.16);
   transition:
     top 0.28s cubic-bezier(0.3, 0.9, 0.35, 1),
     left 0.28s cubic-bezier(0.3, 0.9, 0.35, 1),
@@ -1947,6 +1948,14 @@ html.video-overlay-fullscreen-active body {
 
 .rc-tour-pop {
   animation: rc-tour-in 0.22s cubic-bezier(0.3, 0.9, 0.35, 1) both;
+  /* Lives here rather than as an arbitrary Tailwind class so it can differ per
+     theme. An 85%-black drop is right when the popover floats over charcoal and
+     reads as soot when it floats over paper. */
+  box-shadow: 0 24px 55px -20px rgb(0 0 0 / 0.85);
+}
+
+:root[data-theme="light"] .rc-tour-pop {
+  box-shadow: 0 18px 40px -18px rgb(var(--color-foreground) / 0.22);
 }
 
 @keyframes rc-tour-in {
@@ -1977,7 +1986,10 @@ html.video-overlay-fullscreen-active body {
   height: 4px;
   width: calc(100% / var(--rc-tour-n, 7));
   left: calc(var(--rc-tour-i, 0) * (100% / var(--rc-tour-n, 7)));
-  background: rgb(var(--color-primary));
+  /* `primary-ink`, matching `.page-title::before` above — this rail is a copy of
+     that sector, and it carries location, which makes it ink and not fill. Plain
+     `primary` is 1.4:1 on a pale card, so on paper the progress mark vanished. */
+  background: rgb(var(--color-primary-ink));
   transform: skewX(-21deg);
   transition: left 0.34s cubic-bezier(0.3, 0.9, 0.35, 1);
 }
