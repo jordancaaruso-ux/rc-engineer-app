@@ -435,6 +435,9 @@ export function RunHistoryTable({
             <tr
               role="button"
               tabIndex={0}
+              // The row navigates through `openRun`, not an href, so the demo walkthrough has
+              // nothing to read when it needs to open a run. This is that handle. Inert markup.
+              data-run-id={run.id}
               draggable={enableReorder && !reorderBusy}
               onDragStart={
                 enableReorder

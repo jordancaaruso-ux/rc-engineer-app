@@ -123,6 +123,16 @@ test("capture every page on the demo account", async ({ page }) => {
   for (const s of PUBLIC_SURFACES) await capture(s);
 
   // ── Sign in as the demo account ────────────────────────────────────────────
+  // Suppress the demo walkthrough first: it auto-starts for this account and would dim and
+  // cover every screenshot this spec exists to take.
+  await page.addInitScript(() => {
+    try {
+      sessionStorage.setItem("jrc-demo-tour", JSON.stringify({ status: "done", stepIndex: 0 }));
+    } catch {
+      /* storage blocked — nothing to suppress with; captures would show the tour */
+    }
+  });
+
   const out = execFileSync(
     "npx",
     ["dotenv-cli", "-e", ".env.local", "--", "node", "--conditions=react-server", "--import", "tsx",

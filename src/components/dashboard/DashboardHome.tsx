@@ -207,7 +207,7 @@ export function DashboardHome({
                     todayRunCount={todayRunCount}
                   />
                 ) : (
-                  <CardPanel>
+                  <CardPanel dataTour="things-to-try">
                     <ActionItemListPanel
                       list="try"
                       title="Things to try"

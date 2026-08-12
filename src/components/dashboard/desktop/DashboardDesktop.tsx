@@ -97,6 +97,9 @@ export function DashboardDesktop({
           subtitle="what to try next time out"
           count={thingsToTry.length}
           footer={{ label: "Book your next track day", href: "/events" }}
+          // Demo walkthrough's last stop. The phone's equivalent is the `things-to-try`
+          // anchor, which is a different card — see `tourSteps.ts`.
+          dataTour="test-plan"
         >
           <ActionItemListPanel
             list="try"

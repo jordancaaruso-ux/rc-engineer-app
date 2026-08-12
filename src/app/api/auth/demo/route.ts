@@ -71,12 +71,21 @@ export async function GET(request: Request): Promise<Response> {
     (process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? new URL(request.url).origin)
       .trim()
       .replace(/\/$/, "");
-  // Demo drops into Sessions first (decision-board pick 7C — graphs before anything
-  // else; the surface that pick names moved to /runs/history). Hard-coding /analysis
-  // sent desktop demo visitors to the pre-workbench page, bypassing ANALYSIS_DESKTOP
-  // in navConfig, which already routes this nav slot to /runs/history.
+  /*
+   * Demo lands on the dashboard (founder call 2026-08-11), reversing the earlier drop into
+   * Sessions (decision-board pick 7C, "graphs before anything else").
+   *
+   * The walkthrough is why: it opens on the dashboard's "Log a run" CTA and walks outward
+   * through Sessions, a run, and the Engineer before returning here, so the visitor ends on
+   * the screen they started on. Landing them mid-tour on stop 3's page would mean either
+   * starting the tour somewhere it does not begin, or navigating them away from the first
+   * thing they were shown.
+   *
+   * If the tour is ever removed, reconsider this rather than leaving it by inertia — pick 7C's
+   * reasoning about leading with the graphs still stands on its own.
+   */
   const params = new URLSearchParams({
-    callbackUrl: `${origin}/runs/history`,
+    callbackUrl: `${origin}/`,
     token,
     email: demoEmail,
   });

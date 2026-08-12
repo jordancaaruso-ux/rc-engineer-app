@@ -74,6 +74,8 @@ export function DashboardStartRunCta({
         onPointerEnter={() => warmLogRun(primaryHref)}
         onTouchStart={() => warmLogRun(primaryHref)}
         aria-label={hasDraft ? "Finish today's run" : "Start a new run"}
+        // Demo walkthrough stop 1. Inert for everyone else.
+        data-tour="log-run"
         className="tap-active logrun-glow relative isolate flex w-full flex-col overflow-visible rounded-2xl bg-primary px-[18px] pb-4 pt-[15px] text-left text-primary-foreground shadow-[0_10px_26px_-12px_rgba(255,214,10,0.55),inset_0_1px_0_rgba(255,255,255,0.35)] transition hover:brightness-105 active:brightness-95"
       >
         {/* Moving-hotspot face layer — drifts behind the content, clipped to the

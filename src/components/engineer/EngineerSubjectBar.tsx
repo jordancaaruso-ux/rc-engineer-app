@@ -52,7 +52,8 @@ export function EngineerSubjectBar({
   onPickGeneralCar: (carId: string | null) => void;
 }) {
   return (
-    <div className="space-y-2">
+    // Demo walkthrough stop 5 — what the Engineer has attached to the conversation.
+    <div className="space-y-2" data-tour="engineer-subject">
       <div
         role="group"
         aria-label="Engineer subject"
