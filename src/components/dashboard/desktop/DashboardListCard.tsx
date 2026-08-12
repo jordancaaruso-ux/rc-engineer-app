@@ -16,15 +16,18 @@ export function DashboardListCard({
   count,
   footer,
   children,
+  dataTour,
 }: {
   title: string;
   subtitle?: string;
   count: number;
   footer?: { label: string; href: string; sparkle?: boolean };
   children: ReactNode;
+  /** `data-tour` anchor for the demo walkthrough — see `SurfaceCard`. */
+  dataTour?: string;
 }) {
   return (
-    <SurfaceCard contentClassName="p-0" className="rounded-xl">
+    <SurfaceCard contentClassName="p-0" className="rounded-xl" dataTour={dataTour}>
       <div className="flex items-baseline gap-3 border-b border-border px-[18px] py-3.5">
         <span className="font-mono text-[10px] font-bold uppercase tracking-[.2em] text-faint">
           {title}

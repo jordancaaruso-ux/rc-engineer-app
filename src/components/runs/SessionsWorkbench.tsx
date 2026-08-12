@@ -255,6 +255,10 @@ function RailPanel({
     <div
       role="listbox"
       aria-label="Sessions"
+      // Demo walkthrough stop 3 on desktop. The phone's session list is the accordion card in
+      // `app/runs/history/page.tsx`, which carries the same anchor id — only one of the two is
+      // ever visible, and the tour resolves whichever that is.
+      data-tour="sessions"
       className="overflow-y-auto overscroll-contain rounded-xl border border-border bg-card [scrollbar-gutter:stable] lg:max-h-[calc(100vh-11.5rem)]"
     >
       {groups.map((group, index) => {
@@ -374,6 +378,9 @@ function RunRail({
             role="option"
             tabIndex={0}
             aria-selected={active}
+            // Neither this row nor the phone's table row is an <a>, so the demo walkthrough has
+            // no href to read when it needs to open a run. This is that handle. Inert markup.
+            data-run-id={run.id}
             onClick={() => onSelect(run.id)}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {

@@ -54,7 +54,9 @@ export function DashboardNextOutingCard({
     : "/events";
 
   return (
-    <SurfaceCard variant="hero">
+    // Carries the Things-to-try list on the phone, so it is the walkthrough's last stop there
+    // — the desktop's `test-plan` card does not exist below xl.
+    <SurfaceCard variant="hero" dataTour="things-to-try">
       {event ? (
         <>
           <div className="eyebrow-root mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">

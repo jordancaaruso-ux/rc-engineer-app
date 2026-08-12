@@ -963,6 +963,10 @@ export default async function RunHistoryPage({
               variant="panel"
               contentClassName={cn("p-0", !workbenchActive && "sessions-split")}
               className={cn("min-w-0 max-w-full", workbenchActive && "lg:hidden")}
+              // Demo walkthrough stop 3 on the phone. The desktop's session list is the
+              // workbench rail, which carries the same id — when the workbench is active this
+              // card is `lg:hidden`, so exactly one of the two ever resolves.
+              dataTour="sessions"
             >
               {viewAll ? (
                 groups.map((group, idx) => renderSessionGroup(group, idx))

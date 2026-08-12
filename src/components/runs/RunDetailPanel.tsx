@@ -785,10 +785,23 @@ export function RunDetailPanel({
    * Deliberately NOT a nested grid: the columns have to be the *page's* tracks or
    * they can't align with the rail or scroll independently of each other.
    */
+  /*
+   * `data-tour="run-detail"` goes on the card that CARRIES the record, not on a section inside
+   * it: the demo walkthrough's stop 4 describes the whole thing — Session details, the lap
+   * figures, the setup diff since the previous run, and the notes — and an anchor on the first
+   * of those four spotlighted the header alone. Inert for everyone but the tour.
+   *
+   * On a phone this card is taller than the viewport; `useTourPlacement` top-aligns an
+   * over-tall anchor rather than centring it, so the section headings stay on screen.
+   */
   if (layout === "split") {
     return (
       <>
-        <CardPanel className={cn(className, columnClassName)} contentClassName={CONTENT}>
+        <CardPanel
+          className={cn(className, columnClassName)}
+          contentClassName={CONTENT}
+          dataTour="run-detail"
+        >
           {record}
         </CardPanel>
         <CardPanel className={cn(className, columnClassName)} contentClassName={CONTENT}>
@@ -799,7 +812,7 @@ export function RunDetailPanel({
   }
 
   return (
-    <CardPanel className={className} contentClassName={CONTENT}>
+    <CardPanel className={className} contentClassName={CONTENT} dataTour="run-detail">
       {record}
       {log}
     </CardPanel>
