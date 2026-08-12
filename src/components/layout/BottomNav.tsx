@@ -94,11 +94,12 @@ export const BottomNav = memo(function BottomNav() {
           <LogRunFab />
         </div>
         {/*
-          Home indicator. Inside the slab and below the row, so on a gesture phone
-          the bar owns the whole bottom edge instead of ending just above the
-          system's own bar.
+          No drawn "home indicator" here. The handoff specified one (134×5px inside
+          the slab, below the row) but that was the PROTOTYPE drawing iOS's own
+          indicator so the mockup looked like a phone. Shipping it paints a second
+          one above the real system bar — which is exactly what it looks like on
+          device (founder, 2026-08-12: "why is there the horizontal line?").
         */}
-        <span className="dock-home-indicator" aria-hidden />
       </div>
     </nav>
   );

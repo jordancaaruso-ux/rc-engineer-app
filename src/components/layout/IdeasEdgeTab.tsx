@@ -38,9 +38,9 @@ export function openIdeasPanel(): void {
 }
 
 /**
- * "Ideas & reminders" — a persistent edge tab on the right of the phone screen,
- * and on desktop the lightbulb in the top rail's utility cluster. Both open the
- * same right-docked panel (nav restructure 2026-08-12).
+ * "Ideas & reminders" — a small tab on the phone's bottom-left edge, just above
+ * the dock, and on desktop the lightbulb in the top rail's utility cluster. Both
+ * open the same right-docked panel (nav restructure 2026-08-12).
  *
  * Same three rules it has always had (founder lock 2026-07-14): a utility and
  * never a destination, never an active state, available app-wide. Only the
@@ -50,9 +50,11 @@ export function openIdeasPanel(): void {
  * edge it costs nothing horizontal, and it finally has a desktop home, which as a
  * dock cap it could never have had.
  *
- * **The tab rides out with the panel** rather than being buried under it, so the
- * control you pressed to open is the control you press to close, and the count
- * stays readable while you read the list.
+ * Bottom-left rather than centred on the right edge (founder, 2026-08-12): the
+ * centred version floated in the middle of the reading column, over whatever you
+ * were looking at. Down here it is clear of the text and beside the bar it belongs
+ * with — and the right-docked panel never reaches it, so the control you pressed
+ * to open stays the control you press to close, with the count still readable.
  *
  * Lists load on first open via GET /api/action-items. The badge shows what those
  * two lists total once loaded, and is simply absent before that rather than
@@ -136,7 +138,7 @@ export function IdeasEdgeTab() {
         aria-expanded={open}
         /* Breakpoint is in the CSS, not a `md:hidden` here — see the note on
            `.ideas-edge-tab` in globals.css for why the utility loses. */
-        className={cn("ideas-edge-tab", open && "is-out")}
+        className="ideas-edge-tab"
       >
         <Lightbulb size={16} weight="fill" aria-hidden />
         {count !== null && count > 0 ? <span className="ideas-edge-count">{count}</span> : null}

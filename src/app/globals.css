@@ -134,17 +134,15 @@
    *   10px slab padding-top
    * + 52px row — the CELLS are 46px, but the log-run circle is 52 and it is in
    *              the same centred flex row, so the circle sets the height
-   * +  9px gap to the home indicator
-   * +  5px home indicator
    * + 12px slab padding-bottom (the `max(12px, safe-area)` floor)
    * ---------------------------------------------------------------
-   *   88px of slab, measured, + 1rem breathing room = 104px
+   *   74px of slab, + 1rem breathing room = 90px
    *
    * The safe-area inset is NOT counted here: `AppShell` adds `env(...)` on top of
    * this value, and the slab's own bottom padding is the same `max()`, so on a
    * notched phone the two agree and on a flat one this is the floor.
    */
-  --mobile-tab-bar-height: 6.5rem;
+  --mobile-tab-bar-height: 5.625rem;
 
   /*
    * Vertical anchor for the fixed mobile corner chrome (JRC pill + account
@@ -624,16 +622,6 @@ html.pwa-splash-done[data-standalone="true"] #pwa-splash {
   font-weight: 700;
 }
 
-/* The system home-indicator line, inside the slab so the bar owns the bottom edge. */
-.dock-home-indicator {
-  display: block;
-  width: 134px;
-  height: 5px;
-  margin: 9px auto 0;
-  border-radius: 9999px;
-  background-color: rgb(var(--color-foreground) / 0.28);
-}
-
 /*
  * The active mark, shared by both platforms: 28×2, primary-ink, with a glow that
  * only exists in dark. `primary-ink` and never `primary` — this is yellow doing a
@@ -958,30 +946,54 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
   }
 }
 
+/*
+ * The dock slab's real height, so things stacked above it can clear it without
+ * guessing. Must stay in step with `.bottom-nav-slab`'s own padding + row:
+ * 10px top + 52px row (the log-run circle, not the 46px cells) = 62px, then its
+ * bottom padding.
+ */
+:root {
+  --dock-slab-h: calc(62px + max(12px, env(safe-area-inset-bottom)));
+}
+
 .ideas-edge-tab {
   position: fixed;
-  right: 0;
-  top: 50%;
+  /*
+   * Bottom-left, sitting just above the dock (founder, 2026-08-12). Centred on
+   * the right edge put it in the middle of the reading column, where it hovered
+   * over whatever you were actually looking at; down here it is out of the text
+   * and next to the bar it belongs with. The 10px gap is deliberate — flush
+   * against the slab it reads as a piece of the dock, which is exactly what this
+   * pattern replaced.
+   */
+  left: 0;
+  bottom: calc(var(--dock-slab-h) + 10px);
   z-index: 45;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
   width: 26px;
-  height: 98px;
-  border-radius: 12px 0 0 12px;
+  height: 80px;
+  /* Rounded on the inward side only — it is anchored to the left edge now. */
+  border-radius: 0 12px 12px 0;
   background-color: rgb(var(--color-primary));
   /* On yellow, always the dark ink — in both themes. */
   color: rgb(var(--color-primary-foreground));
-  box-shadow: -4px 0 18px rgb(var(--glow-shadow-rgb) / 0.26);
-  transform: translateY(-50%);
-  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.3, 1);
+  box-shadow: 4px 0 18px rgb(var(--glow-shadow-rgb) / 0.26);
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Rides out with the panel rather than being buried under it. */
-.ideas-edge-tab.is-out {
-  transform: translateY(-50%) translateX(calc(-1 * var(--ideas-panel-w)));
+/*
+ * No ride-out any more. It existed because a right-edge tab was buried under a
+ * right-docked panel; on the left the panel never reaches it, so the control you
+ * pressed to open is still the control you press to close — the same goal, now
+ * for free. The panel is 296px of a 390px screen, leaving this clear.
+ */
+
+/* The log-run wizard owns the bottom edge; the dock yields there and so does this. */
+body[data-logrun-wizard-chrome] .ideas-edge-tab {
+  display: none;
 }
 
 .ideas-edge-count {
