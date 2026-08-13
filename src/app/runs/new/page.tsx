@@ -64,14 +64,14 @@ export default async function NewRunPage({
   // `?resume=1` is the "new run — tap to log it" notification landing: offer to continue
   // today's in-progress draft (preserving pre-run setup) before falling through to a blank form.
   const resumeDraft = typeof sp.resume === "string" && sp.resume.trim() === "1";
-  // Roll Center Lab export: geometry field values to merge into the setup sheet
+  // Geometry Lab export: geometry field values to merge into the setup sheet
   // (docs/ROLL_CENTER_NORTH_STAR.md Phase 3 "Lab state → draft setup").
   const labSetupPrefill =
     typeof sp.labSetup === "string" && sp.labSetup.length > 0 ? decodeLabFields(sp.labSetup) : null;
 
   // Log-run wizard is the primary flow for a manual "new run" (founder 2026-07-16).
   // Deep-link flows that only the classic single-page form renders — imported-lap
-  // attach, resume-draft, Roll Center lab export, focus=setup, import error — fall
+  // attach, resume-draft, Geometry Lab export, focus=setup, import error — fall
   // back to classic. `?wizard=0` (or NEXT_PUBLIC_LOGRUN_WIZARD=0) forces classic
   // anywhere; `?wizard=1` forces the wizard even in those deep-link contexts.
   //

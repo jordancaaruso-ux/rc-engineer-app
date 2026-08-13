@@ -1,5 +1,5 @@
 /**
- * Roll Center Lab state — the geometry slice of a setup sheet as a flat
+ * Geometry Lab state — the geometry slice of a setup sheet as a flat
  * pseudo-snapshot, plus the URL codec that carries it into the Lab.
  *
  * The Lab deliberately works in SHEET VOCABULARY (the same field keys the

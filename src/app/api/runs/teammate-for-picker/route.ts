@@ -6,7 +6,7 @@ import { listTeamPeerUserIds } from "@/lib/teamAccess";
 import { withIncludedBestLapForPicker } from "@/lib/lapAnalysis";
 
 /**
- * Teammate-visible runs for unanchored pickers (Roll Center Lab setup slots).
+ * Teammate-visible runs for unanchored pickers (Geometry Lab setup slots).
  * Unlike {@link file://./../teammate-for-setup-compare}, there is no anchor run
  * or sheet scope — callers filter to what they can use (the Lab keeps only
  * snapshots that fingerprint a geometry pack). Peers come from mutual team

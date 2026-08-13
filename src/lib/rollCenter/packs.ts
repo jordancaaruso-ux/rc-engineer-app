@@ -130,7 +130,7 @@ const A800_FINGERPRINT_KEYS = [
 /**
  * Resolve a pack by sniffing snapshot field names.
  *
- * **Only for the Roll Center Lab**, which is seeded from URL-encoded fields and has no car context.
+ * **Only for the Geometry Lab**, which is seeded from URL-encoded fields and has no car context.
  * Everywhere a car is known, use {@link resolvePackForTemplateKey} instead: these key names are
  * generic part names ("upper inner shims"), not Awesomatix-specific, and the box-first naming flow
  * mints them from typed labels — so two matching rows on any brand's sheet would otherwise render

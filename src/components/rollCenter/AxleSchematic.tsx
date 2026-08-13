@@ -4,7 +4,7 @@
  * Clean-schematic front-view suspension drawing for one axle (founder-picked style,
  * 2026-07-12): arms, knuckles, wheels, ground line, RC marker, and the true arm
  * angles labeled on the arms they measure. Deliberately NO instant-centre / force-line
- * construction rays — those belong to the Roll Center Lab (docs/ROLL_CENTER_NORTH_STAR.md).
+ * construction rays — those belong to the Geometry Lab (docs/ROLL_CENTER_NORTH_STAR.md).
  *
  * Draws directly from the engine's solved hardpoints, so what you see IS the solve
  * that produced the numbers. Shared by the setup-sheet geometry block and the Lab.

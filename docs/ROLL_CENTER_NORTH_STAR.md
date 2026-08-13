@@ -2,6 +2,8 @@
 
 **Status:** **Locked** (founder approved via outline review, 2026-07-11 — "build what you've said"). **Owner:** Jordan.
 
+**Renamed 2026-08-13:** the tool is called the **Geometry Lab** everywhere a driver can read it. "Roll centre" stays the name of the *quantity* — it is what the Lab computes, not what the Lab is. The route (`/analysis/roll-center`), this file, and the `rollCenter` modules keep the old word so existing links and deep-links from setup sheets still resolve.
+
 The behavioral spec for **computed suspension geometry as a first-class setup signal** — geometric roll center, roll axis, and camber gain calculated automatically from every setup sheet, expressed honestly to the driver, and fed to the Engineer as deterministic evidence. When a geometry feature feels off-scope or an accuracy claim feels optimistic, check here.
 
 ---
@@ -98,7 +100,7 @@ RC F/R, rake, camber gain, and arm angles persist on (or derive cheaply from) ea
 | **Setup sheet view** | **Collapsed by default (founder 2026-07-12):** a one-liner — front/rear RC + rake + grade tag — expanding on tap. Expanded: **clean-schematic front-view diagram** (arms, knuckle, wheel, ground line, RC marker; **arm angles labeled on the arms they measure**; no construction rays — those are Lab territory), front/rear toggle, camber gain **front and rear**, roll-axis strip, assumptions note, "Open in Lab" deep link. |
 | **Run compare / setup compare** | RC + rake **delta chips** ("front RC +0.8mm") — neutral ink per the volume-delta rule; geometry deltas are direction, not good/bad. |
 | **Run detail** | Compact geometry line — each run's record includes its computed RC state. |
-| **Roll Center Lab** | The prototype ported as an Analysis-hub tool page: interactive diagram, shim sliders, live roll animation, charts, snapshot deltas. Deep-linked from every sheet's geometry block, loading that sheet as the starting state. |
+| **Geometry Lab** | The prototype ported as an Analysis-hub tool page: interactive diagram, shim sliders, live roll animation, charts, snapshot deltas. Deep-linked from every sheet's geometry block, loading that sheet as the starting state. |
 
 **Roll axis expression:** side-view strip (front dot, rear dot, connecting line, heights labeled) + "rear +0.6mm higher — rakes down to front." Angle-in-degrees rejected (imperceptibly small numbers).
 

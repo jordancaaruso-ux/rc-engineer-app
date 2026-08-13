@@ -41,7 +41,7 @@ function signedInSurfaces(ids: Record<string, string>): Surface[] {
   const s: Surface[] = [
     { slug: "dashboard", path: "/", caption: "Dashboard — the day at a glance: pace, what changed, what to try." },
     { slug: "analysis", path: "/analysis", caption: "Analysis — the season's shape rather than a single run." },
-    { slug: "roll-center", path: "/analysis/roll-center", caption: "Roll Centre Lab — geometry worked out visually." },
+    { slug: "roll-center", path: "/analysis/roll-center", caption: "Geometry Lab — suspension worked out visually." },
     { slug: "sessions", path: "/runs/history", caption: "Sessions — every run logged, filterable and comparable." },
     { slug: "log-run", path: "/runs/new", caption: "Log a run — the six-step wizard." },
     { slug: "engineer", path: "/engineer", caption: "Engineer — ask about your own car, grounded in your own runs." },

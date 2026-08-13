@@ -25,7 +25,7 @@ import { encodeLabFields, extractGeometryFields } from "@/lib/rollCenter/labStat
 
 export type RollCenterSolves = ReturnType<typeof solveRollCenterDiagram>;
 
-/** Deep link into the Roll Center Lab seeded with this sheet (+ optional ghost slot). */
+/** Deep link into the Geometry Lab seeded with this sheet (+ optional ghost slot). */
 export function labHref(
   value: Record<string, unknown>,
   ghostValue?: Record<string, unknown> | null,

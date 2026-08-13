@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Roll Center Lab — the interactive what-if surface (Phase 3,
+ * Geometry Lab — the interactive what-if surface (Phase 3,
  * docs/ROLL_CENTER_NORTH_STAR.md). Two setup SLOTS, A and B: fill either from
  * URL seeds (`s`/`g` + `sl`/`gl` labels), the setup picker (own runs ·
  * downloaded sheets · teammate-shared runs), or by freezing the current

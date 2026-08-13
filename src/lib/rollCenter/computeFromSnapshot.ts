@@ -200,7 +200,7 @@ export type SnapshotGeometryInputs = {
 
 /**
  * Shared derivation: pack + per-axle adjustments + assumption notes from a snapshot.
- * Exported for the Roll Center Lab, which needs the raw adjustments to run rolled
+ * Exported for the Geometry Lab, which needs the raw adjustments to run rolled
  * solves and sensitivity sweeps beyond the static metrics.
  */
 export function deriveRollCenterInputs(
