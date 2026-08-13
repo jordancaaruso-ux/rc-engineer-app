@@ -246,7 +246,7 @@ const AUDIT = () => {
   return out;
 };
 
-test("audit every page in both themes", async ({ page }) => {
+test("audit every page in both themes", async ({ page, baseURL }) => {
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
 
@@ -304,9 +304,16 @@ test("audit every page in both themes", async ({ page }) => {
   if (ids.EVENT_ID) SURFACES.push({ slug: "event-detail", path: `/events/${ids.EVENT_ID}` });
   if (ids.TRACK_ID) SURFACES.push({ slug: "track-detail", path: `/tracks/${ids.TRACK_ID}` });
 
+  /*
+   * Scoped by `url`, never a hardcoded domain. Cookies are host-only, so a
+   * `domain: "localhost"` cookie is simply not sent once `AUTH_URL` points at a
+   * LAN IP for phone testing — the theme silently stayed dark and all 25 pages
+   * failed the stamp check at once (2026-08-13). Same trap the Playwright config
+   * header describes for the auth cookie.
+   */
   const setTheme = async (theme: "dark" | "light") => {
     await page.context().addCookies([
-      { name: "rc_theme", value: theme, domain: "localhost", path: "/" },
+      { name: "rc_theme", value: theme, url: baseURL ?? "http://localhost:3000" },
     ]);
   };
 
