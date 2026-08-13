@@ -34,7 +34,7 @@ npx next build            # LOCAL production build
   nothing, and scratch-dev is a copy-on-write clone, so it holds real users' rows: isolated, not
   anonymised. Drift repair is `npm run db:migrate:reconcile` or `prisma migrate resolve` — never
   `db push`. Use `DATABASE_URL_UNPOOLED` for `prisma migrate`; the pooler throws P1002 lock timeouts.
-- Slow and costly, only when asked: `engineer:eval`, `engineer:bench*`, `setup-extract:eval`.
+- Slow and costly, only when asked: `engineer:eval*` (the rebuilt harness), `setup-extract:eval`.
 - iOS shell: `npm run cap:sync` / `npm run cap:open`.
 
 Verification order before calling something done: `npx tsc --noEmit` → the matching `test:*` →
@@ -86,12 +86,13 @@ thin over it. Four subsystems carry most of the weight:
    model; a `SetupSheetCalibration` maps one PDF layout onto its field keys. The driver fills boxes
    over a **server-rendered picture** of the page, never a client-side PDF engine. Images and
    flat/scanned PDFs are refused at the door by design. Details in the north star.
-4. **The Engineer** — the LLM assistant. `src/lib/engineerChat/` is the current chat path (v0,
-   2026-08-05) and is only five files: the KB, a short system prompt, and the conversation.
-   `src/lib/engineerPhase5/` is the older, larger home (historical name, not product-facing) and
-   still owns KB retrieval, run/context builders, quick-fix and between-run hints. **The order of
-   the payload is load-bearing and v0 deliberately runs on less than it used to** — read the north
-   star before changing either.
+4. **The Engineer** — the LLM assistant, rebuilt ground-up 2026-08-13. `src/lib/engineer/` is
+   the whole thing: KB loader, short prompt, block-based payload builder, transport
+   (`DEBUG_ENGINEER_WIRE=1` dumps the real request), persist + ratings. Chat is the only
+   surface; the old satellites (quick-fix, hints, dashboard suggestions) are deleted, not
+   dormant. **The payload's cache-stable-prefix order is enforced in code** and every
+   behaviour change lands through the eval harness first — read the north star before touching
+   prompt, payload, KB, or nets.
 
 **Materialised data.** `bestLapSeconds`/`avgTop5LapSeconds` on `Run`, the setup aggregations in
 `src/lib/setupAggregations/`, and the sheet page images are all caches with their own staleness.
@@ -113,8 +114,7 @@ read it first; if nothing matches, you don't need one. A spec is intent, not shi
 | Task touches | Read |
 |---|---|
 | Any `.tsx` — styling, layout, visual rework | `docs/VISUAL_NORTH_STAR.md` |
-| Engineer prompts, context, retrieval, chat UX | `docs/ENGINEER_NORTH_STAR.md` |
-| Engineer answer quality, evals, benchmarks | `docs/ENGINEER_SUGGESTION_QUALITY_PLAN.md`, `docs/ENGINEER_ITERATION.md` |
+| Engineer — anything: prompts, payload, KB, nets, evals, chat UX | `docs/ENGINEER_NORTH_STAR.md` (rewritten 2026-08-13; the old quality/iteration docs are deleted) |
 | Setup sheet upload, import, OCR, calibration | `docs/SETUP_UPLOAD_NORTH_STAR.md` |
 | What to build next / is this in scope | `docs/PRODUCT_NORTH_STAR.md` |
 | Dashboard | `docs/DASHBOARD_NORTH_STAR.md` |
