@@ -1,0 +1,441 @@
+{
+  "generatedAtIso": "2026-07-28T06:13:47.171Z",
+  "userId": "cmpvzjtvy0000le04xm3icfhy",
+  "goldPath": "C:\\Users\\Jordan\\rc-engineer-app\\scripts\\engineer-eval\\gold-set.json",
+  "goldSources": [
+    "C:\\Users\\Jordan\\rc-engineer-app\\scripts\\engineer-eval\\gold-set.json"
+  ],
+  "summary": {
+    "total": 15,
+    "avgReviewerScore": 4.8,
+    "failCount": 0,
+    "errorCount": 0,
+    "wrongPhysicsCount": 0,
+    "shipBarPass": true,
+    "elapsedMs": 643994,
+    "caseDelayMs": 18000
+  },
+  "results": [
+    {
+      "id": "push-mid-corner",
+      "tags": [
+        "handling",
+        "test-day"
+      ],
+      "question": "Car has understeer mid corner — what should I try first on this run?",
+      "runId": "cms1k6wih0005l504yeb0yrm9",
+      "compareRunId": "cms1dk7w00005l604ct6u1tbi",
+      "answer": "Try **softening the front ARB first: 1.2 → 1.1**.\n\nARB = anti-roll bar, the bar that links the left/right wheels and adds roll stiffness only in roll. Your front bar is **1.2**, while the community median for this A800RR context is **1.1** from 142 uploads, so you’re already on the stiff/front-supported side. Per `arb.md` and `roll-stiffness.md`, a softer front bar reduces the front end’s share of elastic roll stiffness, which should let the front tyre pair stay a bit more evenly loaded mid-corner.\n\n**Prediction:** expect more mid-corner steering and a car that finishes the corner easier; if it gains roll but still won’t rotate, or starts feeling lazy on direction change, the front ARB wasn’t the right first lever.\n\nI’d keep it to that one change because this run was otherwise strong: same setup as the previous run, better pace, and you were P1 vs the field on avg top 10. Also, your rear is already very stable on paper — rear toe **3.5** vs median **2.5**, rear oil **450** vs median **350** — so I wouldn’t add rear grip first for a mid-corner push.",
+      "kbSections": [
+        "upper-link-geometry (vehicle-dynamics/upper-link-geometry.md)",
+        "under-hub (vehicle-dynamics/under-hub.md)",
+        "droop-downstop (vehicle-dynamics/droop-downstop.md)",
+        "Bump steer (front) (vehicle-dynamics/bump-steer-toe-gain.md)"
+      ],
+      "review": {
+        "score": 5,
+        "tags": [
+          "good_grounding",
+          "good_hedge"
+        ],
+        "rationale": "The assistant provides a well-grounded recommendation by referencing the effects of anti-roll bar stiffness on roll stiffness and tire loading, which aligns with vehicle dynamics principles. The prediction includes appropriate hedging regarding potential outcomes, acknowledging that the change may not fully resolve the understeer issue. Additionally, the context of the previous run's performance is effectively utilized to justify the recommendation."
+      },
+      "pass": true,
+      "latencyMs": 34695,
+      "error": null
+    },
+    {
+      "id": "rear-loose-entry",
+      "tags": [
+        "handling",
+        "test-day"
+      ],
+      "question": "I lose the rear on entry. what are some small changes to try?",
+      "runId": "cms1k6wih0005l504yeb0yrm9",
+      "compareRunId": "cms1dk7w00005l604ct6u1tbi",
+      "answer": "Because your last run was still strong — **8/10**, P1 on avg top 10 vs the field, and no setup change from the previous run — I’d treat this as a **small verification change**, not a rebuild. The track was also cool at **12°C**, so oils will already feel thicker than normal.\n\n**Try first: add rear lower-arm support — +0.5 mm under both rear inner lower-arm pickups RF/RR.**  \n“Under lower arm” = the shims under the chassis-side lower arm pickups; raising both rear stacks together raises rear roll-centre/support without changing the anti-squat split. You’re at **3.0 / 3.0 mm rear**, community median is about **2.5 mm** with a broad IQR, so you’re not wildly outside the window. Per `under-lower-arm.md`, raising this pickup raises rear RC and adds support; keep RF and RR equal so you don’t introduce anti-squat split per `anti-dive-anti-squat.md`.  \n**Expect:** rear to stay more supported as you brake/turn in, with less “fall over then rotate”; **if it becomes snappy or skates mid-corner**, you over-supported the rear — go back.\n\nSecond choice, only if you want the safest/easiest feel: **add a tiny bit more rear toe-in — only +0.25° if your sheet sign means positive = toe-in.**  \nYou’re already high at **3.5° rear toe** vs community median **2.5°**, so I would not jump straight to a big toe change. Rear toe is static wheel angle at ride height; more toe adds scrub and generally calms the rear, but costs speed/rotation (`toe.md`, `toe-and-scrub.md`).  \n**Expect:** safer entry and less rear step, but slightly slower rotation/exit speed; **if it just feels bound-up or lazy**, undo it.\n\nI would **not** start with thicker rear oil here: you’re already **450 cSt rear** vs community median **350 cSt**, and in 12°C conditions that’s already a calming direction (`damper-oil.md`, `oil-viscosity-temperature.md`).",
+      "kbSections": [
+        "upper-link-geometry (vehicle-dynamics/upper-link-geometry.md)",
+        "under-hub (vehicle-dynamics/under-hub.md)",
+        "arb (vehicle-dynamics/arb.md)",
+        "droop-downstop (vehicle-dynamics/droop-downstop.md)"
+      ],
+      "review": {
+        "score": 5,
+        "tags": [
+          "good_grounding",
+          "good_hedge"
+        ],
+        "rationale": "The assistant provides well-grounded advice based on vehicle dynamics principles, correctly cites relevant KB sections, and appropriately hedges the recommendations based on the context of the previous run and current conditions. The suggestions for setup changes are logical and align with established conventions in RC vehicle dynamics."
+      },
+      "pass": true,
+      "latencyMs": 53941,
+      "error": null
+    },
+    {
+      "id": "upper-inner-direction",
+      "tags": [
+        "physics",
+        "kb-grounding"
+      ],
+      "question": "If I raise front upper inner shims 0.5mm, what happens to the handling?",
+      "runId": "cms1k6wih0005l504yeb0yrm9",
+      "compareRunId": "cms1dk7w00005l604ct6u1tbi",
+      "answer": "Raising the **front upper inner shims** — the chassis-side pickup of the front upper link — by **0.5 mm** would **flatten the front upper link**. On this car that tends to **lower the front roll-centre contribution and reduce front camber gain** (`upper-link-geometry.md`, `roll-center.md`, `camber-gain.md`).\n\nYour current front upper inner is already **3.5 mm**, versus a community median around **2.0 mm** for this A800RR template, so going to **4.0 mm** is pushing further into the high side rather than coming back toward the field.\n\nHandling-wise, expect:\n\n- **Less initial front bite / less sharp entry.** The car should feel smoother and less “on top of the track.”\n- **More “in the track” front feel.** It may roll in more gently and be easier over bumps or edgy low-grip sections.\n- **Potentially better mid-corner hold**, if the current car is too pointy and over-responding on entry.\n- **But** if the car already feels lazy or won’t rotate, it can make it worse: more entry push, slower response, and less support at the front.\n\nSo I’d only test this if the complaint is **too much front bite / nervous entry / edgy front over bumps**.  \n**Prediction:** expect calmer turn-in and a more rolled-in front; if it simply understeers on entry and won’t place the nose, the 0.5 mm raise was the wrong direction.",
+      "kbSections": [
+        "upper-link-geometry (vehicle-dynamics/upper-link-geometry.md)",
+        "Bump steer (front) (vehicle-dynamics/bump-steer-toe-gain.md)",
+        "under-hub (vehicle-dynamics/under-hub.md)",
+        "droop-downstop (vehicle-dynamics/droop-downstop.md)"
+      ],
+      "review": {
+        "score": 4,
+        "tags": [
+          "good_grounding",
+          "good_hedge"
+        ],
+        "rationale": "The answer provides a solid grounding in vehicle dynamics by explaining the effects of raising the front upper inner shims on roll-centre and camber gain, referencing relevant KB sections. It also appropriately hedges by noting that the outcome may vary depending on the car's current handling characteristics, which is important given the context of the setup. However, it could have better addressed the specific context of the comparison run to enhance clarity."
+      },
+      "pass": true,
+      "latencyMs": 20069,
+      "error": null
+    },
+    {
+      "id": "under-lower-vs-upper",
+      "tags": [
+        "physics",
+        "kb-grounding"
+      ],
+      "question": "What's the difference between raising under lower arm shims vs upper inner on the rear?",
+      "runId": "cms1k6wih0005l504yeb0yrm9",
+      "compareRunId": "cms1dk7w00005l604ct6u1tbi",
+      "answer": "They are almost opposite levers on the rear, even though both are “inner pickup shims.”\n\n**Rear under-lower-arm shims** = shims under the rear lower arm inner pickups, RF/RR.  \nRaising them raises the **lower arm inner pickup**, which **raises rear roll centre** and adds rear **geometric support**. It is a strong roll-centre lever. Expect the rear to sit more “on top of the track”: more supported, more immediate rear response, less roll, and potentially more bite — but if you go too far it can get over-supported/snappy or give up hold mid-corner. Per `under-lower-arm.md` and `roll-center.md`.\n\n**Rear upper-inner shims** = shims at the chassis side of the rear upper link.  \nRaising them, with the upper outer unchanged, makes the upper link **flatter**, which tends to **lower rear roll centre** and reduce camber gain. That usually moves the rear more “in the track”: smoother, more rolled-in, more forgiving/hold-oriented, but less initial support and less immediate bite. Per `upper-link-geometry.md`, `roll-center.md`, and `camber-gain.md`.\n\nSo the short version:\n\n- **Raise rear under-lower-arm shims** → higher rear RC, more support, more on-track, more immediate.\n- **Raise rear upper-inner shims** → flatter upper link, lower rear RC tendency, smoother/more in-track, less initial support.\n\nOne important detail: on your A800R sheet, RF/RR are the two rear chassis-side pickup stacks, not left/right wheels. If you raise **both RF and RR equally**, you mainly move the rear axle’s average roll-centre/support. If you change RF vs RR differently, that also changes rear side-view pickup split, i.e. anti-squat geometry, which is a separate effect (`anti-dive-anti-squat.md`).",
+      "kbSections": [
+        "upper-link-geometry (vehicle-dynamics/upper-link-geometry.md)",
+        "under-hub (vehicle-dynamics/under-hub.md)",
+        "under-lower-arm (vehicle-dynamics/under-lower-arm.md)",
+        "anti-dive-anti-squat (vehicle-dynamics/anti-dive-anti-squat.md)"
+      ],
+      "review": {
+        "score": 5,
+        "tags": [
+          "good_grounding"
+        ],
+        "rationale": "The answer accurately describes the effects of raising under lower arm shims and upper inner shims on the rear roll center and vehicle dynamics, citing relevant knowledge base sections. It provides a clear comparison of the two setups and their implications on handling characteristics, while also addressing the context of the specific vehicle setup."
+      },
+      "pass": true,
+      "latencyMs": 22179,
+      "error": null
+    },
+    {
+      "id": "compare-setup-diff",
+      "tags": [
+        "compare",
+        "test-day"
+      ],
+      "question": "Summarize the main setup changes between my compare run and primary run and what handling effect they might explain.",
+      "runId": "cms1k6wih0005l504yeb0yrm9",
+      "compareRunId": "cms1dk7w00005l604ct6u1tbi",
+      "answer": "The headline is: **there were no chassis/setup changes** between the compare run and the primary run.\n\nCompare → primary:\n\n- **Setup keys changed:** **0**\n- Upper-inner pickup splits: unchanged front and rear\n- Under–lower-arm anti-dive / anti-squat splits: unchanged front and rear\n- Front/rear average lower-arm and upper-inner shim balance: unchanged\n- Same car, same track, same tyre set — but tyre run index moved **19 → 20**\n\nSo there isn’t a setup change here that I’d credit for a handling difference. If the car felt different, the likely explanations are **session state, tyre scrub/wear progression, track rubber, driving errors/distractions**, or conditions — not a shim/spring/oil change.\n\nPace-wise, the primary run was better:\n\n- Best lap: **17.411 → 17.170** = **0.241s faster**\n- Avg top 5: **17.447 → 17.289** = **0.158s faster**\n- Avg top 10: **17.506 → 17.434** = **0.072s faster**\n\nThat shape says: **peak pace improved more than usable average pace**. So the car/setup looks good, but the run maybe wasn’t fully clean — which matches your note: “Driver errors due to distractions.”\n\nMy call: **bank this setup as a known-good reference and run it again before changing anything.**  \nPrediction: expect the car to stay in the same pace window if the track is similar; if the next run feels worse with no setup change, we should look first at tyre/track/driver execution rather than chasing geometry.",
+      "kbSections": [
+        "upper-link-geometry (vehicle-dynamics/upper-link-geometry.md)",
+        "under-hub (vehicle-dynamics/under-hub.md)",
+        "damper-oil (vehicle-dynamics/damper-oil.md)",
+        "under-lower-arm (vehicle-dynamics/under-lower-arm.md)"
+      ],
+      "review": {
+        "score": 5,
+        "tags": [
+          "good_grounding",
+          "good_hedge"
+        ],
+        "rationale": "The assistant accurately summarizes that there were no setup changes between the compare run and the primary run, grounding their analysis in vehicle dynamics by discussing potential external factors affecting handling. They appropriately hedge against uncertainties related to session state and driver performance, while also providing a clear recommendation based on the observed data."
+      },
+      "pass": true,
+      "latencyMs": 18074,
+      "error": null
+    },
+    {
+      "id": "lap-regression",
+      "tags": [
+        "laps",
+        "test-day"
+      ],
+      "question": "Why might my best lap be slower than the previous session on the same tire run?",
+      "runId": "cms1k6wih0005l504yeb0yrm9",
+      "compareRunId": "cms1dk7w00005l604ct6u1tbi",
+      "answer": "In the two sessions I can see here, that premise looks flipped:\n\n- Latest run `cms1k6wih...` at **26/07/2026, 06:50 pm**: best **17.170**\n- Previous run `cms1dk7w...` at **26/07/2026, 03:45 pm**: best **17.411**\n\nSo your best lap was actually **0.241s faster**, not slower. Avg top 5 also improved **0.158s**, and avg top 10 improved **0.072s**.\n\nAlso, it was **not the same tire run index**: latest was tire run **20**, previous was **19** on the same tire set. There were **no setup changes**, so I would not read this as a chassis/setup effect. The clean read is: same car/setup, same track, older tire index, and you still found better peak pace. Your note says “driver errors due to distractions,” which likely explains why the gain was much bigger on best lap than avg top 10.\n\nIf you meant a different pair where best lap was slower on the same tire run, the usual suspects would be: traffic/driver execution, track rubber or temperature shift, additive timing, battery/motor performance, or simply not getting a clean lap. But for the focused pair here, I’d **bank this setup as known-good and re-run it before changing anything**.\n\nPrediction: expect the same setup to be capable of low **17.1s** again if the run is cleaner; if avg top 10 drops back while the car still feels good, look at track/traffic/tire prep before touching setup.",
+      "kbSections": [
+        "[draft] Damper percent (Awesomatix damping / pack) (vehicle-dynamics/drafts/awesomatix-spring-gap-damper.md)",
+        "[draft] Motion ratio — mounting position and angle (vehicle-dynamics/drafts/shock-geometry.md)",
+        "[draft] Servo horn height (steering response) (vehicle-dynamics/drafts/servo-horn-steering-response.md)",
+        "[draft] Upstop (compression-travel limit) (vehicle-dynamics/drafts/upstop-compression-travel.md)",
+        "[draft] > **AI-drafted baseline (unverified).** Researched and written by the… (vehicle-dynamics/drafts/shock-geometry.md)",
+        "[draft] Shock length and travel window (vehicle-dynamics/drafts/shock-geometry.md)",
+        "[draft] > **AI-drafted baseline (unverified).** Researched and written by the… (vehicle-dynamics/drafts/track-width-wheel-spacers.md)",
+        "[draft] Track width (wheel spacers / offset) (vehicle-dynamics/drafts/track-width-wheel-spacers.md)",
+        "[draft] Bump stops, packing, and internal limiters (vehicle-dynamics/drafts/shock-geometry.md)",
+        "camber (vehicle-dynamics/camber.md)",
+        "camber-grip (vehicle-dynamics/concepts/camber-grip.md)",
+        "camber-gain (vehicle-dynamics/concepts/camber-gain.md)",
+        "roll-stiffness (vehicle-dynamics/concepts/roll-stiffness.md)",
+        "roll-center (vehicle-dynamics/concepts/roll-center.md)",
+        "load-transfer (vehicle-dynamics/concepts/load-transfer.md)",
+        "tyre-load-sensitivity (vehicle-dynamics/concepts/tyre-load-sensitivity.md)"
+      ],
+      "review": {
+        "score": 4,
+        "tags": [
+          "good_grounding",
+          "good_hedge"
+        ],
+        "rationale": "The assistant correctly identifies the improvement in lap times and provides a logical explanation for the observed performance, grounding the response in the context of tire run indices and driver execution. However, while the response hedges appropriately regarding potential factors affecting lap times, it could have included more specific vehicle dynamics mechanisms related to tire performance and setup effects for a higher score."
+      },
+      "pass": true,
+      "latencyMs": 15739,
+      "error": null
+    },
+    {
+      "id": "community-spread",
+      "tags": [
+        "community",
+        "setup"
+      ],
+      "question": "Which suspension parameters am I far from community median at this track grip level?",
+      "runId": "cms1k6wih0005l504yeb0yrm9",
+      "compareRunId": "cms1dk7w00005l604ct6u1tbi",
+      "answer": "For your A800R at TFTR, the main places you’re far from the community median are:\n\n- **Damper package is much heavier than typical**\n  - Front oil: **400 cSt** vs community median **300 cSt** — high.\n  - Rear oil: **450 cSt** vs median **350 cSt** — high.\n  - Damper percent: **100% front / 100% rear** vs median **60% / 60%** — above typical.\n  - Mechanically, thicker oil means more damping force for a given shaft speed (`damper-oil.md`); on Awesomatix, damper percent is an unverified platform-specific damping/pack control — draft `awesomatix-spring-gap-damper.md`.\n\n- **Both ARBs are above the field**\n  - Front ARB: **1.2** vs median **1.1**.\n  - Rear ARB: **1.3** vs median **1.1**.\n  - ARBs add roll stiffness at that end without changing heave stiffness (`arb.md`, `roll-stiffness.md`). Worth noting the community IQR is basically zero here, so most logged setups cluster tightly around 1.1.\n\n- **Upper-link angles are flatter than typical**\n  - Front upper link angle: **5.07°** vs median **7.12°** — low.\n  - Rear upper link angle: **4.75°** vs median **6.95°** — low.\n  - “Upper link angle” means how flat or angled the top suspension link sits. Flatter upper links generally tend toward lower RC / less camber gain contribution than a more angled link, judging net link geometry (`upper-link-geometry.md`). Your computed roll-centre balance itself is still in the middle of the field, so this is not screaming “wrong,” just a clear geometry style difference.\n\n- **Front spring gap is well below typical**\n  - Front spring gap: **0 mm** vs median **2.8 mm** — below typical.\n  - On Awesomatix, bigger spring gap is treated as stiffer effective spring rate in the draft platform note; this is not founder-approved KB ground truth, so I’d treat it as a comparison flag rather than a must-change item — draft `awesomatix-spring-gap-damper.md`.\n\nTwo rows look “far” numerically but I would **not trust the community comparison**:\n\n- **Diff oil:** your **5000** vs median **8** — that is almost certainly a unit / sheet convention mismatch.\n- **Downstops:** front **23.4** vs median **5.8**, rear **22.4** vs median **4.6** — also looks like different measuring conventions.\n\nThe big caveat: the spread served here is **awesomatix_a800rr · asphalt + carpet merged · any grip**, because the setup sheet hasn’t locked a track surface bucket. TFTR is tagged **Low · Medium grip**, but these rows are not purely “low/medium asphalt only.”\n\nGiven this run was rated good and you were P1 on avg top 10 vs the field, I’d treat these as **identity markers of your current known-good setup**, not automatic fixes. The only ones I’d keep an eye on first are the heavy damping package and high bars if the car starts feeling too sharp, skippy, or hard to drive as grip/temperature changes.",
+      "kbSections": [
+        "upper-link-geometry (vehicle-dynamics/upper-link-geometry.md)",
+        "under-hub (vehicle-dynamics/under-hub.md)",
+        "under-lower-arm (vehicle-dynamics/under-lower-arm.md)",
+        "damper-oil (vehicle-dynamics/damper-oil.md)"
+      ],
+      "review": {
+        "score": 5,
+        "tags": [
+          "good_grounding"
+        ],
+        "rationale": "The assistant provides a detailed analysis of the suspension parameters, accurately referencing vehicle dynamics mechanisms and citing relevant knowledge base sections. The response appropriately contextualizes the setup in relation to community medians and acknowledges the potential variability in the data, demonstrating a strong understanding of the subject matter."
+      },
+      "pass": true,
+      "latencyMs": 24250,
+      "error": null
+    },
+    {
+      "id": "tire-life",
+      "tags": [
+        "tires",
+        "test-day"
+      ],
+      "question": "Given my tire run number, should I expect pace drop — what setup compensations are reasonable?",
+      "runId": "cms1k6wih0005l504yeb0yrm9",
+      "compareRunId": "cms1dk7w00005l604ct6u1tbi",
+      "answer": "Given this run was **tire run 20**, I’d expect the *risk* of drop-off to be real, but I would **not pre-compensate yet**.\n\nYour latest run on the same set, one run older than the reference, was still quicker: **17.433 avg top 10 vs 17.506** before, and you were **P1 vs the field on avg top 10** by about **0.29s faster than the session mean**. There was **no setup change**, so the clean read is: the current package is still working. Also, I don’t have enough tire-life-prior data here to quote your normal run-19→20 drop-off, so I’d treat tire age as a watch item, not a guaranteed loss.\n\n**Try this first: no setup change — bank this as the known-good baseline.**  \nPrediction: expect similar pace if the track/rubber state is comparable; if avg top 10 drops while the car specifically feels lazy, skatey, or loses rear drive, then compensate rather than guessing now.\n\nIf the tyre does start dropping, I’d make only a small compensation, and choose it based on the symptom:\n\n1. **If rear grip / exit drive fades:** add a touch of rear support, not more rear toe first. Rear toe is already **3.5° vs community median 2.5°** and above typical, so I wouldn’t keep piling toe into it unless it’s really stepping out. A cleaner test is rear inner lower arm height — your RF/RR under-lower-arm shims are **3.0 / 3.0 mm vs median about 2.5 mm**, still only mid-range; raising the rear inner lower arm slightly raises rear roll centre/support (`under-lower-arm.md`).  \n   Prediction: expect the rear to sit up and hold shape better under load; if it becomes snappy mid-corner, you added support faster than the worn tyre can use.\n\n2. **If it gets nervous/rotates too easily:** leave rear toe-gain alone for now. Your rear toe-gain shims are already **2.0 mm vs median 3.0 mm**, i.e. already on the low side; per the platform direction, fewer rear toe-gain shims add more bump-in/toe gain and rear grip mid–exit (`bump-steer-toe-gain.md`).  \n   Prediction if you did go lower: more rear security from mid-corner to exit; if it feels bound-up or won’t rotate, you’ve over-stabilised the rear.\n\n3. **If the whole car feels sharp/skatey over bumps as the tyre ages:** don’t thicken oil first — you’re already high: front oil **400 cSt vs 300 median**, rear **450 cSt vs 350 median**. Thicker oil raises damping force (`damper-oil.md`), but because you’re already above the field, I’d only go thicker if the car is clearly too reactive rather than simply lacking tyre.  \n   Prediction: thicker would calm inputs; if lap time drops because the car stops taking a set or skips over the low-grip surface, damping was the wrong compensation.\n\nSo my call: **run it again unchanged first**. If tire run 20+ starts costing pace, compensate with the smallest rear-support or rear-stability move that matches the feel, not a broad setup swing.",
+      "kbSections": [
+        "upper-link-geometry (vehicle-dynamics/upper-link-geometry.md)",
+        "under-hub (vehicle-dynamics/under-hub.md)",
+        "damper-oil (vehicle-dynamics/damper-oil.md)",
+        "under-lower-arm (vehicle-dynamics/under-lower-arm.md)"
+      ],
+      "review": {
+        "score": 5,
+        "tags": [
+          "good_grounding"
+        ],
+        "rationale": "The assistant provides a thorough analysis based on the tire run context, correctly cites vehicle dynamics mechanisms, and offers reasonable setup compensations while hedging appropriately about the uncertainty of tire performance. The predictions align well with established KB conventions, demonstrating a solid understanding of the dynamics involved."
+      },
+      "pass": true,
+      "latencyMs": 32965,
+      "error": null
+    },
+    {
+      "id": "hypothetical-stiffer-rear",
+      "tags": [
+        "hypothetical"
+      ],
+      "question": "Hypothetically on a high-grip carpet track, would a stiffer rear spring usually help rotation or hurt mid-corner?",
+      "runId": "cms1k6wih0005l504yeb0yrm9",
+      "compareRunId": "cms1dk7w00005l604ct6u1tbi",
+      "answer": "Usually, **a stiffer rear spring helps rotation but can hurt mid-corner hold**.\n\nMechanically: a stiffer rear spring raises **rear elastic roll stiffness** — the rear resists roll more and takes load faster. That shifts more of the steady cornering load transfer onto the rear axle, loading the outside rear harder and unloading the inside rear more. Because tyres are load-sensitive, that normally reduces total rear grip from the pair, so the car rotates more. Springs also affect **heave and roll**, not just roll like an ARB does (`spring-rate.md`, `roll-stiffness.md`, `load-transfer.md`, `tyre-load-sensitivity.md`).\n\nOn **high-grip carpet**, the caveat is support. If the rear is too soft and falling over / over-rolling, a stiffer rear spring can make the car sit up better and feel cleaner, even if the “textbook” balance move is toward more rotation. But if you are already supported, going stiffer rear will usually make mid-corner more nervous or reduce the rear’s ability to hold a long loaded corner.\n\nSo my read:\n\n1. **Need more rotation / car stuck mid-corner:** stiffer rear spring is a valid test.  \n   Prediction: expect the car to point earlier from mid-corner; if it starts stepping out or loses drive off the apex, you went past the grip window.\n\n2. **Already rotating but lacking rear security:** don’t stiffen rear spring first.  \n   Prediction: it will likely make the rear flatter and sharper, but reduce the “lean on it” feeling through the middle.\n\nIn short: **stiffer rear = more rotation tendency; softer rear = more rear hold tendency**, unless the soft rear is under-supported in high grip.",
+      "kbSections": [
+        "upper-link-geometry (vehicle-dynamics/upper-link-geometry.md)",
+        "under-hub (vehicle-dynamics/under-hub.md)",
+        "arb (vehicle-dynamics/arb.md)",
+        "damper-oil (vehicle-dynamics/damper-oil.md)"
+      ],
+      "review": {
+        "score": 4,
+        "tags": [
+          "good_grounding",
+          "good_hedge"
+        ],
+        "rationale": "The answer provides a solid grounding in vehicle dynamics by explaining how a stiffer rear spring affects roll stiffness and load transfer, which aligns with established knowledge. It also appropriately hedges by discussing the context of high-grip carpet and the potential effects of support on handling. However, it could improve by explicitly referencing the conventions for roll-centre adjustments and shimming, which would enhance the KB grounding further."
+      },
+      "pass": true,
+      "latencyMs": 18068,
+      "error": null
+    },
+    {
+      "id": "hypothetical-droop",
+      "tags": [
+        "hypothetical"
+      ],
+      "question": "If grip drops mid-day, is adding droop always the right move?",
+      "runId": "cms1k6wih0005l504yeb0yrm9",
+      "compareRunId": "cms1dk7w00005l604ct6u1tbi",
+      "answer": "No — **adding droop is not always the right move when grip drops**.\n\n**Droop** means how far the wheel can extend before it hits the downstop. More droop can help when the car is running out of extension travel: the wheel can “reach down” and keep contact as the car rolls or goes over bumps. If it tops out, that corner goes rigid in droop and load transfers through a stiff path (`droop-downstop.md`).\n\nBut a mid-day grip drop can also be tyres, additive window, track temperature, dust, or the rubber moving — not automatically a droop problem.\n\n**Try this first:** leave the setup alone for one run and confirm the symptom.  \nExpect: if the car is still balanced but just slower / lower grip everywhere, it’s probably conditions or tyre window; if it starts picking up inside wheels, skating over bumps, or snapping as it unloads, then droop becomes more likely.\n\nIf you do change droop, make it symptom-based:\n\n1. **If the car feels like it’s unloading or topping out** — add a small amount of droop/extension travel at the end that is losing contact.  \n   Expect: more contact and a calmer, more forgiving car over bumps/roll; if it becomes lazy, rolls too far, or loses direction change, you added too much or droop wasn’t the issue.\n\n2. **If the car just feels vague and slow to take a set** — adding droop may make that worse. In that case I’d look at response/support knobs instead, not more travel.  \n   Expect: if the car already feels floaty, more droop usually won’t give you the sharper bite you’re missing.\n\nAlso be careful with the sheet convention: some cars show droop as downstop height, where a bigger number can mean **less** actual travel. So tune the **extension travel**, not just “bigger number = more droop.”",
+      "kbSections": [
+        "upper-link-geometry (vehicle-dynamics/upper-link-geometry.md)",
+        "under-hub (vehicle-dynamics/under-hub.md)",
+        "under-lower-arm (vehicle-dynamics/under-lower-arm.md)",
+        "arb (vehicle-dynamics/arb.md)"
+      ],
+      "review": {
+        "score": 5,
+        "tags": [
+          "good_grounding",
+          "good_hedge"
+        ],
+        "rationale": "The assistant provides a well-rounded explanation of droop and its implications on vehicle dynamics, correctly grounding the advice in established vehicle-dynamics mechanisms. It also appropriately hedges by suggesting to confirm symptoms before making changes, acknowledging that grip drops can be due to various factors beyond droop."
+      },
+      "pass": true,
+      "latencyMs": 22869,
+      "error": null
+    },
+    {
+      "id": "one-change-discipline",
+      "tags": [
+        "process"
+      ],
+      "question": "I changed rear spring, rear camber, and rear toe between runs — how should I interpret handling now?",
+      "runId": "cms1k6wih0005l504yeb0yrm9",
+      "compareRunId": "cms1dk7w00005l604ct6u1tbi",
+      "answer": "For the focused pair I can see here, the setup table shows **no chassis changes** between the 03:45 pm and 06:50 pm runs, so I would not attribute that latest pace gain to rear spring / camber / toe. The car was rated good, peak pace improved, and avg top 10 improved only slightly; tyre index also went 19 → 20 on the same set, so the clean interpretation is: **bank this setup and verify it once more before changing anything.**  \n**Prediction:** expect the car to feel repeatable rather than suddenly transformed; if the same setup next run loses rear confidence or pace, then we start separating chassis from tyre/run-condition effects.\n\nIf you mean an earlier pair where those three rear items did change, interpret them as a **rear-grip/stability bundle**, not three independent causes:\n\n- **Rear toe** — static rear wheel angle at ride height. You’re currently at **3.5** versus a community median of **2.5** for this A800RR pool, so it’s on the high/rear-safe side. If that is toe-in on your sheet, it should make the rear more secure and easier mid-corner to exit, with more scrub/drag as the tradeoff (`toe.md`, `toe-and-scrub.md`).  \n  **Feel-for:** more confidence picking up throttle; if the car feels lazy or won’t rotate, rear toe may now be too much.\n\n- **Rear camber** — tyre tilt. You’re at **-2**, exactly around the community median **-2**. That’s not an outlier, so I’d read camber as a tyre-contact trim rather than the main handling story. More negative can help until the tyre’s optimum, then it loses grip; the optimum is tyre-specific (`camber.md`, `camber-grip.md`).  \n  **Feel-for:** better loaded-rear side bite through the middle; if exit grip is worse or the car slides flat rather than rolling onto the tyre, camber may be past the tyre’s happy point.\n\n- **Rear spring / spring gap** — rear elastic stiffness. Your logged rear spring rate is **117.1 gf/mm** versus median **109.7**, and rear spring gap is **3.0** versus median **2.6**; both sit in the mid band, but on the firmer side numerically. Stiffer rear resists heave and roll more at the rear and lets that end take load faster (`spring-rate.md`; draft `awesomatix-spring-gap-damper.md` says bigger Awesomatix spring gap = stiffer, general theory not yet verified for this KB).  \n  **Feel-for:** more platform support and response; if the rear now snaps or loses hold in long corners, the rear spring side is the suspect.\n\nMy read: if the car now feels **safer on throttle but still rotates**, the rear toe/camber package is probably helping and the spring is not too stiff. If it feels **secure but dull**, rear toe is the first thing I’d suspect. If it feels **pointy then breaks away**, suspect the rear spring/gap side before blaming camber.",
+      "kbSections": [
+        "upper-link-geometry (vehicle-dynamics/upper-link-geometry.md)",
+        "Toe gain (rear) (vehicle-dynamics/bump-steer-toe-gain.md)",
+        "toe (vehicle-dynamics/toe.md)",
+        "under-hub (vehicle-dynamics/under-hub.md)"
+      ],
+      "review": {
+        "score": 5,
+        "tags": [
+          "good_grounding"
+        ],
+        "rationale": "The answer effectively utilizes vehicle dynamics principles to interpret the handling changes based on the adjustments made to rear spring, camber, and toe. It accurately references community medians and provides a thorough analysis of how each change impacts handling, demonstrating a strong grounding in the knowledge base without any contradictions or overconfidence."
+      },
+      "pass": true,
+      "latencyMs": 31298,
+      "error": null
+    },
+    {
+      "id": "front-bite-entry",
+      "tags": [
+        "handling",
+        "response-vs-sustained"
+      ],
+      "question": "I want more bite on entry without killing mid-corner — which end do I tune first?",
+      "runId": "cms1k6wih0005l504yeb0yrm9",
+      "compareRunId": "cms1dk7w00005l604ct6u1tbi",
+      "answer": "Tune the **front first**, but use a **rate/response knob**, not a big front roll-centre change.\n\nYour car is already good — rated 8/10, quickest on avg top 10 in that session — so I’d make a small, reversible change:\n\n**Try front damper oil one step lighter: 400 cSt → 375 cSt.**  \nYou’re currently **400 cSt front**, while the community median for this A800RR context is **300 cSt** with a 50 cSt IQR, so you’re on the high side already. Lighter oil gives less damping force for the same shaft speed, so the front can take load faster and give more initial bite without changing steady-state geometry as much as an RC/link move would (`damper-oil.md`, `damping.md`).  \n**Prediction:** expect sharper first rotation and better entry pick-up; if it becomes nervous over the first steering input or starts washing mid-corner, you went too far or the issue was not damping.\n\nI would **not** start with rear tuning for this symptom. Rear changes can help rotation, but they’re more likely to change exit security or mid-corner balance. Since you specifically want **entry bite without killing mid**, add a little front response first and leave the rear as the reference.\n\nIf the lighter front oil helps entry but costs too much calmness, put the oil back and then test a small geometry trim:\n\n**Alternate: raise front under-hub shims slightly, only as a test.**  \nFront under-hub is currently **0 mm**, same as the community median **0 mm**; adding shim raises front roll centre, which tends toward more bite/response and “on the track” feel (`under-hub.md`, `roll-center.md`). But because the field is clustered at 0, I’d treat this as a sharper experiment, not the first move.  \n**Prediction:** expect more immediate front bite; if it feels pointy early but gives up mid-corner support/hold, back it out.",
+      "kbSections": [
+        "upper-link-geometry (vehicle-dynamics/upper-link-geometry.md)",
+        "under-hub (vehicle-dynamics/under-hub.md)",
+        "arb (vehicle-dynamics/arb.md)",
+        "droop-downstop (vehicle-dynamics/droop-downstop.md)"
+      ],
+      "review": {
+        "score": 5,
+        "tags": [
+          "good_grounding"
+        ],
+        "rationale": "The assistant provides a well-grounded response by suggesting a front damper oil change to improve entry bite while maintaining mid-corner stability. The reasoning is supported by relevant vehicle dynamics concepts, and the predictions align with expected outcomes based on the changes proposed. The context of the car's current performance and setup is appropriately considered, making the advice practical and relevant."
+      },
+      "pass": true,
+      "latencyMs": 31005,
+      "error": null
+    },
+    {
+      "id": "damper-direction",
+      "tags": [
+        "setup",
+        "kb-grounding"
+      ],
+      "question": "Should I go heavier or lighter on front damper oil if the car feels lazy on turn-in?",
+      "runId": "cms1k6wih0005l504yeb0yrm9",
+      "compareRunId": "cms1dk7w00005l604ct6u1tbi",
+      "answer": "Go **lighter on front damper oil** first.\n\nYour front oil is **400 cSt**, which is already **high vs the community median of 300 cSt** for A800RR uploads in this pooled any-grip context, with a healthy sample size. Per `damper-oil.md`, thicker oil gives more damping force; per `damping.md`, more damping slows how quickly the car rolls/takes a set. So if the car feels **lazy on turn-in**, I’d try **375 cSt front** rather than heavier.\n\nBecause it was **12°C / cool**, the same oil will feel thicker early in the run, so this symptom may be worse on cold tyres/oil than later.\n\n**Prediction:** expect the front to take a set quicker and feel sharper into the corner; if it becomes nervous/edgy or loses mid-corner stability, 400 was probably giving useful control and I’d go back.",
+      "kbSections": [
+        "upper-link-geometry (vehicle-dynamics/upper-link-geometry.md)",
+        "damper-oil (vehicle-dynamics/damper-oil.md)",
+        "droop-downstop (vehicle-dynamics/droop-downstop.md)",
+        "arb (vehicle-dynamics/arb.md)"
+      ],
+      "review": {
+        "score": 5,
+        "tags": [
+          "good_grounding",
+          "good_hedge"
+        ],
+        "rationale": "The assistant correctly identifies the need to lighten the front damper oil based on established vehicle dynamics principles, citing relevant KB sections and providing a well-reasoned prediction. The mention of temperature effects on oil viscosity demonstrates appropriate hedging given the context of the run conditions."
+      },
+      "pass": true,
+      "latencyMs": 14705,
+      "error": null
+    },
+    {
+      "id": "anti-dive-split",
+      "tags": [
+        "physics"
+      ],
+      "question": "Explain anti-dive split on the front bulkhead and when I'd change FF vs FR pickup.",
+      "runId": "cms1k6wih0005l504yeb0yrm9",
+      "compareRunId": "cms1dk7w00005l604ct6u1tbi",
+      "answer": "**Anti-dive split** is the front lower-arm pickup difference in side view: **FF = front-forward inner lower pickup**, **FR = front-rearward inner lower pickup**. It is not left/right — it’s the two chassis-side pickups along the front bulkhead.\n\nOn your current A800R you’re at **FF 2.5 / FR 2.5**, so the split is **zero**: no anti-dive differential in the sheet. For context, FF is a bit high vs the community median **2.0 mm** and FR is around the median-ish range **2.0 mm** for the pooled A800RR data, but the split itself is the important bit here.\n\nMechanically:\n\n- **Average FF+FR height** = front lower-arm inner height → front roll-centre/support tendency. Raising both together raises the front roll-centre/support direction, per `under-lower-arm.md`.\n- **Difference FF vs FR** = side-view anti-dive geometry. Raising the **rearward front pickup** — FR — relative to FF gives **more anti-dive**, per `anti-dive-anti-squat.md`.\n\nSo:\n\n- **More anti-dive:** raise **FR** relative to FF, or lower **FF** relative to FR.  \n  Effect: less brake dive, quicker fore-aft load reaction through the links, more supported braking platform. Tradeoff: less bump compliance under brakes, so it can get sharper or skatey on bumpy brake zones.\n- **Less anti-dive:** lower **FR** relative to FF, or raise **FF** relative to FR.  \n  Effect: more natural pitch/dive, more suspension compliance under braking, usually easier over bumps or into low-grip entries. Tradeoff: can feel lazier or less held up on hard brake entry.\n\nIf you wanted to test it without also moving front roll-centre much, I’d do a **split pair** rather than one shim only: for example **FF 2.5 → 2.25 and FR 2.5 → 2.75** if your shim steps allow. That keeps the average close while adding anti-dive. **Expect** a flatter, more supported car on hard brake entry; **feel for** whether it lets you brake deeper without the nose collapsing; **disprove it** if the car gets nervous, skips over bumps, or loses entry rotation.\n\nGiven your latest run was rated good and the setup matched a known-good reference, I would **not change this first** unless you specifically have a braking-entry problem. Bank the zero-split setup as the baseline.",
+      "kbSections": [
+        "upper-link-geometry (vehicle-dynamics/upper-link-geometry.md)",
+        "anti-dive-anti-squat (vehicle-dynamics/anti-dive-anti-squat.md)",
+        "under-lower-arm (vehicle-dynamics/under-lower-arm.md)",
+        "under-hub (vehicle-dynamics/under-hub.md)"
+      ],
+      "review": {
+        "score": 5,
+        "tags": [
+          "good_grounding"
+        ],
+        "rationale": "The answer effectively explains the concept of anti-dive split with appropriate citations from the knowledge base, accurately describes the mechanics involved, and provides context-specific advice based on the user's current setup and run data. It also appropriately hedges recommendations based on the user's previous performance."
+      },
+      "pass": true,
+      "latencyMs": 28420,
+      "error": null
+    },
+    {
+      "id": "plan-next-change",
+      "tags": [
+        "planning",
+        "test-day"
+      ],
+      "question": "Based on my notes and handling ratings, what's the highest-confidence next setup experiment?",
+      "runId": "cms1k6wih0005l504yeb0yrm9",
+      "compareRunId": "cms1dk7w00005l604ct6u1tbi",
+      "answer": "Highest-confidence next “setup experiment” is actually a **control run: change nothing**.\n\nYour latest A800R run was rated good, the note points to **driver errors/distractions rather than a chassis problem**, and the pace agrees: best lap improved by **0.241s**, avg top 5 by **0.158s**, and avg top 10 by **0.072s** versus the prior TFTR run. You were also **P1 vs the imported field** on avg top 10, about **0.287s faster than the field mean**. The setup comparison shows **zero chassis changes**, and the brain notes this setup matches a previous **9/10 known-good TFTR reference** exactly.\n\nSo I would bank this as the baseline and do one more clean run on the same setup before touching geometry, springs, oil, or bars.\n\n**Experiment:** repeat the current setup exactly, same tyre prep/additive process if possible, and log only whether the car still feels 8–9/10 when you get a cleaner run.  \n**Prediction:** expect the car to feel basically the same but the usable average should tighten if the distractions disappear; if the car suddenly feels worse with no setup change, we should suspect track/tyre/conditions before changing the car.\n\nIf you want to make it more “test-like,” write one target question before the run: **“Do I need more steering, more rear security, or is it already raceable?”** Right now there’s no high-confidence symptom telling us which knob to move.",
+      "kbSections": [
+        "upper-link-geometry (vehicle-dynamics/upper-link-geometry.md)",
+        "under-hub (vehicle-dynamics/under-hub.md)",
+        "damper-oil (vehicle-dynamics/damper-oil.md)",
+        "arb (vehicle-dynamics/arb.md)"
+      ],
+      "review": {
+        "score": 5,
+        "tags": [
+          "good_grounding"
+        ],
+        "rationale": "The assistant provides a well-reasoned response based on the context of previous runs and handling ratings, correctly identifying that the driver errors are the primary concern rather than chassis setup. The recommendation to conduct a control run aligns with best practices in setup experimentation, and the prediction is grounded in logical reasoning about driver performance and vehicle behavior. The use of specific metrics and comparisons further supports the decision-making process."
+      },
+      "pass": true,
+      "latencyMs": 22508,
+      "error": null
+    }
+  ]
+}

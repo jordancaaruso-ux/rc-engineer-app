@@ -73,3 +73,8 @@ share-shots/
 
 # Sibling git worktrees for parallel sessions — never part of this checkout
 .claude/worktrees/
+
+# Engineer eval harness artifacts (answers, verdicts, founder ratings) stay local
+scripts/engineer-eval/answers/
+scripts/engineer-eval/verdicts/
+scripts/engineer-eval/ratings/
