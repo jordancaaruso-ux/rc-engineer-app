@@ -10,6 +10,7 @@ import {
   type SetupSnapshotData,
 } from "@/lib/runSetup";
 import { computeSetupDeltaForAudit } from "@/lib/setup/resolveSetupSnapshot";
+import { revalidateAfterRunMutation } from "@/lib/revalidateUser";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -96,7 +97,16 @@ export async function PATCH(request: Request, { params }: Params) {
       tireAgeKnown: true,
       tireType: { select: { id: true, displayName: true } },
       setupSnapshotId: true,
-      setupSnapshot: { select: { id: true, data: true } },
+      setupSnapshot: {
+        select: {
+          id: true,
+          data: true,
+          // The setup this run was logged AGAINST — the previous run's, usually. Carried forward
+          // below so a correction doesn't rewrite what this run changed.
+          baseSetupSnapshotId: true,
+          baseSetupSnapshot: { select: { id: true, data: true } },
+        },
+      },
     },
   });
   if (!run) return NextResponse.json({ error: "Run not found" }, { status: 404 });
@@ -108,9 +118,6 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!body.setupData || typeof body.setupData !== "object" || Array.isArray(body.setupData)) {
     return NextResponse.json({ error: "setupData is required" }, { status: 400 });
   }
-
-  const previousData = normalizeSetupSnapshotForStorage(run.setupSnapshot?.data ?? {});
-  const previousId = run.setupSnapshot?.id ?? null;
 
   let resolvedData = normalizeSetupSnapshotForStorage(body.setupData as SetupSnapshotData);
 
@@ -129,8 +136,22 @@ export async function PATCH(request: Request, { params }: Params) {
     tires: tireValue || resolvedData.tires,
   });
 
-  const setupDeltaJson = previousId
-    ? computeSetupDeltaForAudit(previousData, resolvedData)
+  /*
+   * A correction replaces the run's snapshot, but it must not replace what the run CHANGED.
+   *
+   * `setupDeltaJson` is the audit of "what moved since the setup this run was logged against", and
+   * the car page filters and chips its whole run history on it. Basing the new delta on the
+   * snapshot being replaced would rewrite that to "what I just retyped" — fix one camber value and
+   * the run's row stops listing the shock oil and spring it actually changed that day. So the
+   * ORIGINAL baseline travels with the correction, and the delta is recomputed against it.
+   *
+   * A run with no baseline at all is the first setup recorded on that car, which the history reads
+   * as "a change by definition" from the null. Keep it null, or correcting a typo would demote it.
+   */
+  const baseline = run.setupSnapshot?.baseSetupSnapshot ?? null;
+  const baselineId = run.setupSnapshot?.baseSetupSnapshotId ?? null;
+  const setupDeltaJson = baseline
+    ? computeSetupDeltaForAudit(normalizeSetupSnapshotForStorage(baseline.data), resolvedData)
     : null;
 
   const snapshot = await prisma.setupSnapshot.create({
@@ -138,7 +159,7 @@ export async function PATCH(request: Request, { params }: Params) {
       userId: userId,
       carId: run.carId,
       data: resolvedData as object,
-      baseSetupSnapshotId: previousId,
+      baseSetupSnapshotId: baselineId,
       setupDeltaJson:
         setupDeltaJson && Object.keys(setupDeltaJson).length > 0
           ? (setupDeltaJson as object)
@@ -155,6 +176,13 @@ export async function PATCH(request: Request, { params }: Params) {
       renderedSetupPdfGeneratedAt: null,
     },
   });
+
+  /*
+   * The community pool reads setup values THROUGH runs, so a corrected run changes what everyone
+   * else is compared against. Drop the cached reads here; the aggregation tables themselves are
+   * rebuilt by `POST /api/setup-aggregations/rebuild`, same as any other run mutation.
+   */
+  revalidateAfterRunMutation(userId);
 
   return NextResponse.json({
     ok: true,

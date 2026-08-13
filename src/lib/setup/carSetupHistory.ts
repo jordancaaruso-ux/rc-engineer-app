@@ -120,6 +120,10 @@ export type SetupHistoryLibraryInput = {
   createdAt: Date;
   valueCount: number;
   runCount: number;
+  /** Where its numbers started, when a person chose to fork them. Shown as "Edited from …". */
+  editedFrom?: string | null;
+  /** A published baseline it was copied from. Shown as "Copied from …". */
+  copiedFrom?: string | null;
 };
 
 export type SetupHistoryBaselineInput = {
@@ -221,7 +225,16 @@ export function buildCarSetupHistory(input: {
       at: lib.createdAt.toISOString(),
       dateLabel: input.formatDate(lib.createdAt),
       title: lib.name ?? "Untitled setup",
-      meta: `${lib.valueCount} value${lib.valueCount === 1 ? "" : "s"}`,
+      meta: [
+        `${lib.valueCount} value${lib.valueCount === 1 ? "" : "s"}`,
+        lib.copiedFrom
+          ? `Copied from ${lib.copiedFrom}`
+          : lib.editedFrom
+            ? `Edited from ${lib.editedFrom}`
+            : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
       changedLabels: [],
       href: `/cars/${input.carId}/setups/${lib.id}`,
       saved: true,
@@ -239,7 +252,9 @@ export function buildCarSetupHistory(input: {
       title: b.name,
       meta: [b.kindLabel, `${b.valueCount} values`, b.contextLabel].filter(Boolean).join(" · "),
       changedLabels: [],
-      href: null,
+      // Opens read-only against this car: a global row can be read on your sheet, and copied from
+      // there, but never edited in place. The row used to open nothing at all.
+      href: `/cars/${input.carId}/baselines/${b.id}`,
       // Published globally, so there is nothing of yours to flag — taking one writes a copy.
       saved: false,
       saveAction: "copy",

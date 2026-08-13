@@ -71,10 +71,18 @@ export default async function CarSetupViewPage(props: {
       createdAt: true,
       setupDeltaJson: true,
       baseSetupSnapshot: { select: { id: true, name: true } },
+      sourceBaseline: { select: { id: true, name: true } },
+      _count: { select: { runs: true } },
       sourceDocuments: {
         orderBy: { createdAt: "desc" },
         take: 1,
-        select: { id: true, originalFilename: true },
+        // parseStatus + diagnostic decide whether the review screen is still owed a human answer.
+        select: {
+          id: true,
+          originalFilename: true,
+          parseStatus: true,
+          importDiagnosticJson: true,
+        },
       },
       runs: {
         orderBy: { createdAt: "desc" },
@@ -110,6 +118,21 @@ export default async function CarSetupViewPage(props: {
   const changedKeys = chassisChangedKeys(setup.setupDeltaJson);
   const run = setup.runs[0] ?? null;
   const document = setup.sourceDocuments[0] ?? null;
+  const runCount = setup._count.runs;
+
+  /*
+   * `/setup-documents/[id]` is the IMPORT REVIEW screen — "check the imported values look right",
+   * with the car picker and the calibration list. Once a sheet has produced a setup, that screen is
+   * not what "show me my sheet" means, so the only door left to it is the one case where it still
+   * owes the driver something: the read never finished, or the chassis was ambiguous.
+   */
+  const documentNeedsReview = document
+    ? (document.parseStatus !== "PARSED" && document.parseStatus !== "PARTIAL") ||
+      (typeof document.importDiagnosticJson === "object" &&
+        document.importDiagnosticJson !== null &&
+        (document.importDiagnosticJson as { kind?: string }).kind ===
+          "needs_chassis_disambiguation_v1")
+    : false;
 
   const title = setup.isLibrary
     ? (setup.name ?? "Untitled setup")
@@ -118,9 +141,21 @@ export default async function CarSetupViewPage(props: {
           fallback: "Testing run",
         })}`
       : (document?.originalFilename.replace(/\.[a-z0-9]+$/i, "") ?? "Setup");
+  /*
+   * Where this setup's numbers came from, when a person chose them. Deliberately NOT shown for a
+   * plain run snapshot: every run points at the previous run's setup through the same field, and
+   * "edited from" would then read as an edit on every run the driver ever logged.
+   */
+  const cameFrom = setup.sourceBaseline
+    ? `Copied from ${setup.sourceBaseline.name}`
+    : setup.isLibrary && setup.baseSetupSnapshot
+      ? `Edited from ${setup.baseSetupSnapshot.name ?? "another setup"}`
+      : null;
+
   const subtitle = [
     car.name,
     setup.isLibrary ? "Saved baseline" : run ? "From a run" : "From an uploaded sheet",
+    cameFrom,
     run?.track?.name ?? null,
     formatRunCreatedAtDateTime(run?.createdAt ?? setup.createdAt, displayTimeZone),
   ]
@@ -142,13 +177,14 @@ export default async function CarSetupViewPage(props: {
       <section className="page-body max-w-4xl">
         <div className="flex flex-wrap items-center gap-2">
           {/*
-            Editing is only ever offered for a setup no run points at. A saved run setup is that
-            run's own record: saving marks the snapshot rather than copying it, so its values are
-            frozen and the door here is Save / Rename, not Edit.
+            Every setup of yours opens an editor — an uploaded sheet is not history just because it
+            arrived as a PDF. What changes is what a save MEANS, and the editor says so: a setup no
+            run points at saves over itself; a run's own record cannot, so its door corrects the run
+            (a new snapshot, the run repointed) or writes a separate setup.
           */}
-          {setup.isLibrary && setup.runs.length === 0 ? (
-            <ButtonLink href={`/cars/${car.id}/setups/${setup.id}/edit`}>Edit</ButtonLink>
-          ) : null}
+          <ButtonLink href={`/cars/${car.id}/setups/${setup.id}/edit`}>
+            {runCount === 0 ? "Edit" : runCount === 1 ? "Correct this run" : "Edit a copy"}
+          </ButtonLink>
           <KeepSetupButton setupId={setup.id} name={title} initialSaved={setup.isLibrary} />
           {setup.isLibrary ? (
             <ButtonLink href={`/engineer?pin=setup:${setup.id}`} variant="outline">
@@ -170,9 +206,24 @@ export default async function CarSetupViewPage(props: {
               Open run
             </ButtonLink>
           ) : null}
+          {/*
+            The file the driver uploaded, as they uploaded it. This used to point at
+            `/setup-documents/[id]` — the import-review workbench — so tapping "Open the sheet" on a
+            perfectly good setup landed on "Review setup: check the imported values look right".
+          */}
           {document ? (
+            <a
+              href={`/api/setup-documents/${encodeURIComponent(document.id)}/file`}
+              target="_blank"
+              rel="noreferrer"
+              className={outlineButtonClassName()}
+            >
+              Original PDF
+            </a>
+          ) : null}
+          {document && documentNeedsReview ? (
             <ButtonLink href={`/setup-documents/${document.id}`} variant="outline">
-              Open the sheet
+              Finish importing this sheet
             </ButtonLink>
           ) : null}
         </div>

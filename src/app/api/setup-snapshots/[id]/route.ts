@@ -9,18 +9,27 @@ type Ctx = { params: Promise<{ id: string }> };
 const MAX_NAME_LENGTH = 80;
 
 /**
- * Rename / re-save / delete a **library** setup (`SetupSnapshot.isLibrary`).
+ * Rename / re-save / delete one of the caller's own setups.
  *
- * Per-run snapshots are deliberately out of reach here: they are run history, edited through
- * `/api/runs/[id]/setup-snapshot`. Every handler below requires `isLibrary: true` *and* the
- * requester's own userId, so neither route can touch the other's rows.
+ * The gate used to be `isLibrary: true`, which made a setup an uploaded sheet created — the kind
+ * with no runs and nothing depending on it — permanently unopenable, purely because nobody had
+ * bookmarked it. The rule is now the one that describes the actual risk: **values may be written in
+ * place when no run points at them.** A run's own record still cannot be written here; it is edited
+ * through `/api/runs/[id]/setup-snapshot`, which writes a new snapshot and repoints the run rather
+ * than rewriting what that run claims to have raced.
  */
 
-/** Load the row only if it is the caller's own library setup. */
-async function loadOwnedLibrarySetup(id: string, userId: string) {
+/** Load the row only if it is the caller's own setup. */
+async function loadOwnedSetup(id: string, userId: string) {
   return prisma.setupSnapshot.findFirst({
-    where: { id, userId, isLibrary: true },
-    select: { id: true, name: true, data: true, _count: { select: { runs: true } } },
+    where: { id, userId },
+    select: {
+      id: true,
+      name: true,
+      data: true,
+      isLibrary: true,
+      _count: { select: { runs: true } },
+    },
   });
 }
 
@@ -39,7 +48,7 @@ export async function PATCH(request: Request, ctx: Ctx): Promise<NextResponse> {
     return NextResponse.json({ error: "Expected a JSON body" }, { status: 400 });
   }
 
-  const existing = await loadOwnedLibrarySetup(id, userId);
+  const existing = await loadOwnedSetup(id, userId);
   if (!existing) return NextResponse.json({ error: "Setup not found" }, { status: 404 });
 
   const patch: { name?: string; data?: ReturnType<typeof normalizeSetupSnapshotForStorage> } = {};
@@ -63,7 +72,7 @@ export async function PATCH(request: Request, ctx: Ctx): Promise<NextResponse> {
       return NextResponse.json(
         {
           error:
-            "This setup is a record of a logged run, so its values can't be changed. Rename it, or start a new setup from it.",
+            "This setup is what a logged run recorded, so it can't be written over. Correct the run, or save a new setup from it.",
         },
         { status: 409 }
       );
@@ -95,8 +104,18 @@ export async function DELETE(_request: Request, ctx: Ctx): Promise<NextResponse>
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await ctx.params;
 
-  const existing = await loadOwnedLibrarySetup(id, userId);
+  const existing = await loadOwnedSetup(id, userId);
   if (!existing) return NextResponse.json({ error: "Setup not found" }, { status: 404 });
+
+  /*
+   * Delete stays library-only, and deliberately did not follow the PATCH gate down. A setup an
+   * upload created is the only record that the sheet was ever read: `SetupDocument.createdSetupId`
+   * points at it, and deleting it would leave that row pointing at nothing while the file itself
+   * survives. Un-bookmarking is the driver's door for "I don't want this in my list".
+   */
+  if (!existing.isLibrary) {
+    return NextResponse.json({ error: "Setup not found" }, { status: 404 });
+  }
 
   // `Run.setupSnapshot` is a required relation, so deleting a snapshot a run points at would fail
   // at the FK anyway — refuse with a message the UI can show instead of a 500.

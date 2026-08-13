@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -11,12 +11,21 @@ import { chassisFillsAsSheet } from "@/lib/setupSheetModels/sheetPlan";
 import { normalizeSetupData } from "@/lib/runSetup";
 import { LibrarySetupEditorClient } from "@/components/setup/LibrarySetupEditorClient";
 import { SheetSetupEditorClient } from "@/components/setup/SheetSetupEditorClient";
+import type { SetupSaveMode } from "@/lib/setup/setupSaveMode";
 
 /**
- * Edit a saved baseline on the full grid sheet (the sequential flow is for a blank fill only).
- * Only library rows are editable — run and sheet setups are history.
+ * Edit any setup of the driver's on the full grid sheet (the sequential flow is for a blank fill
+ * only). Every setup opens here — a saved baseline, a sheet the driver uploaded, and a run's own
+ * record. What differs is what a save is allowed to mean, and that is decided once here and handed
+ * to the editor as `saveMode`:
  *
- * Every saved-setup row in the app lands here directly now, so this page carries the doors the
+ * - `inPlace`    — nothing points at these values, so they save over themselves (autosave).
+ * - `correctRun` — one run's record. Saving writes a NEW snapshot and repoints that run, so the
+ *                  numbers the run claims to have raced change only when the driver says so.
+ * - `copyOnly`   — several runs share this snapshot; correcting one would silently rewrite the
+ *                  others, so the only door out is a separate setup.
+ *
+ * Every saved-setup row in the app lands here directly, so this page carries the doors the
  * read-only view used to be the only route to: the PDF, and the setup's own detail page.
  */
 export default async function CarSetupEditPage(props: {
@@ -50,22 +59,38 @@ export default async function CarSetupEditPage(props: {
   if (!car) notFound();
 
   const setup = await prisma.setupSnapshot.findFirst({
-    where: { id: setupId, userId: user.id, carId, isLibrary: true },
-    select: { id: true, name: true, data: true, _count: { select: { runs: true } } },
+    where: { id: setupId, userId: user.id, carId },
+    select: {
+      id: true,
+      name: true,
+      data: true,
+      isLibrary: true,
+      _count: { select: { runs: true } },
+      // Which run to correct, and the filename an uploaded sheet was named after.
+      runs: { orderBy: { createdAt: "desc" }, take: 1, select: { id: true } },
+      sourceDocuments: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { originalFilename: true },
+      },
+    },
   });
   if (!setup) notFound();
 
-  /*
-   * A saved setup that a run points at is that run's own record — read it, don't edit it.
-   *
-   * Saving from "All setups" marks the run's existing snapshot rather than copying it, so these
-   * rows now reach the editor's URL for the first time. Send them to the read-only view, which
-   * offers the copy door ("Save as new setup") for anyone who wants to change the numbers. The
-   * API refuses the same write, so this redirect is the courtesy, not the enforcement.
-   */
-  if (setup._count.runs > 0) {
-    redirect(`/cars/${car.id}/setups/${setup.id}`);
-  }
+  const runCount = setup._count.runs;
+  const saveMode: SetupSaveMode =
+    runCount === 0
+      ? // Only a setup the driver saved as their own autosaves; an uploaded sheet's imported
+        // values are a record of their paper, so replacing them is an explicit press.
+        { kind: "inPlace", autosave: setup.isLibrary }
+      : runCount === 1 && setup.runs[0]
+        ? { kind: "correctRun", runId: setup.runs[0].id }
+        : { kind: "copyOnly", runCount };
+
+  const title =
+    setup.name ??
+    setup.sourceDocuments[0]?.originalFilename.replace(/\.[a-z0-9]+$/i, "") ??
+    "Setup";
 
   const template = await getSetupSheetTemplateForCar(user.id, car, "setup");
 
@@ -84,7 +109,7 @@ export default async function CarSetupEditPage(props: {
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <PageBackLink href={`/cars/${car.id}`} />
           <div className="min-w-0">
-            <h1 className="page-title truncate">{setup.name ?? "Untitled setup"}</h1>
+            <h1 className="page-title truncate">{title}</h1>
             <p className="page-subtitle truncate">{car.name}</p>
           </div>
         </div>
@@ -108,7 +133,8 @@ export default async function CarSetupEditPage(props: {
             <SheetSetupEditorClient
               carId={car.id}
               setupId={setup.id}
-              setupName={setup.name}
+              setupName={title}
+              saveMode={saveMode}
               setupSheetModelId={car.setupSheetModelId}
               initialValues={normalizeSetupData(setup.data)}
               templateKey={template.templateKey}
@@ -117,7 +143,8 @@ export default async function CarSetupEditPage(props: {
             <LibrarySetupEditorClient
               carId={car.id}
               setupId={setup.id}
-              setupName={setup.name}
+              setupName={title}
+              saveMode={saveMode}
               initialValues={normalizeSetupData(setup.data)}
               template={template}
             />

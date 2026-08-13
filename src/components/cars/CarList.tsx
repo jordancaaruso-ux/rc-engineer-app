@@ -510,8 +510,18 @@ export function CarList({
                         <ul>
                           {setups.map((s) => (
                             <li key={s.id}>
+                              {/*
+                                Straight to the editor for a setup nothing depends on. One a run
+                                points at opens its detail page first, the same as the car page's
+                                saved list — the editor there means "correct that run", which is
+                                not what tapping a name from the Garage is asking for.
+                              */}
                               <Link
-                                href={`/cars/${c.id}/setups/${s.id}/edit`}
+                                href={
+                                  s.usedInRuns > 0
+                                    ? `/cars/${c.id}/setups/${s.id}`
+                                    : `/cars/${c.id}/setups/${s.id}/edit`
+                                }
                                 onClick={() => haptic("light")}
                                 className="tap-active flex items-center gap-3 border-b border-border/50 py-2 last:border-0"
                               >

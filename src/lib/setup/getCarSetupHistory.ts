@@ -138,7 +138,15 @@ export async function getCarSetupHistory(input: {
       },
       orderBy: { createdAt: "desc" },
       take: 60,
-      select: { id: true, name: true, createdAt: true, data: true },
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+        data: true,
+        // Where a forked setup started, so the row can say so instead of appearing from nowhere.
+        baseSetupSnapshot: { select: { name: true } },
+        sourceBaseline: { select: { name: true } },
+      },
     }),
     // Baselines are global rows published against the chassis — never scope this read by userId.
     input.car.setupSheetModelId
@@ -183,6 +191,8 @@ export async function getCarSetupHistory(input: {
       createdAt: s.createdAt,
       valueCount: Object.keys(normalizeSetupData(s.data)).length,
       runCount: 0,
+      editedFrom: s.baseSetupSnapshot?.name ?? null,
+      copiedFrom: s.sourceBaseline?.name ?? null,
     })),
     baselines: sortBaselineSetups(
       baselineRows.map((b) => ({ ...b, kind: b.kind as BaselineSetupKindValue }))

@@ -192,7 +192,7 @@ test("a sheet whose values could not be read has nothing to save", () => {
   assert.equal(entries[0].saved, false);
 });
 
-test("a baseline can only be copied, opens nothing, and is never 'saved'", () => {
+test("a baseline opens read-only against the car, can only be copied, and is never 'saved'", () => {
   const entries = buildCarSetupHistory({
     carId: CAR_ID,
     runs: [],
@@ -214,7 +214,11 @@ test("a baseline can only be copied, opens nothing, and is never 'saved'", () =>
   assert.equal(entries[0].kind, "baseline");
   assert.equal(entries[0].saveAction, "copy");
   assert.equal(entries[0].saved, false, "a global row is nobody's saved setup");
-  assert.equal(entries[0].href, null, "there is no page for a baseline, so it must not pretend");
+  assert.equal(
+    entries[0].href,
+    `/cars/${CAR_ID}/baselines/b1`,
+    "a baseline reads on the car's own sheet — it is the copy, not the row, that is editable"
+  );
   assert.equal(entries[0].baselineId, "b1");
 });
 
@@ -239,6 +243,39 @@ test("a saved setup with no run and no sheet behind it gets its own kind", () =>
   assert.equal(entries[0].saved, true);
   assert.equal(entries[0].meta, "31 values");
   assert.equal(entries[0].href, `/cars/${CAR_ID}/setups/lib1`);
+});
+
+test("a forked setup says where its numbers started", () => {
+  const entries = buildCarSetupHistory({
+    carId: CAR_ID,
+    runs: [],
+    documents: [],
+    librarySetups: [
+      {
+        id: "lib1",
+        name: "Round 3 rear",
+        createdAt: new Date("2026-06-10T00:00:00Z"),
+        valueCount: 31,
+        runCount: 0,
+        editedFrom: "Cold morning base",
+      },
+      {
+        id: "lib2",
+        name: "Kit, tweaked",
+        createdAt: new Date("2026-06-09T00:00:00Z"),
+        valueCount: 42,
+        runCount: 0,
+        // A baseline copy that was then forked again reads as the copy: the published row is the
+        // more useful answer to "where did this come from".
+        editedFrom: "Round 3 rear",
+        copiedFrom: "Kit setup",
+      },
+    ],
+    labelForKey: (k) => k,
+    formatDate: (at) => at.toISOString().slice(0, 10),
+  });
+  assert.equal(entries[0].meta, "31 values · Edited from Cold morning base");
+  assert.equal(entries[1].meta, "42 values · Copied from Kit setup");
 });
 
 // ---- the chips ---------------------------------------------------------------------------------
