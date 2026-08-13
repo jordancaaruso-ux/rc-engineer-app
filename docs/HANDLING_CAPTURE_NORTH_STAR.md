@@ -153,41 +153,22 @@ Follow the existing `parseV5Raw` / `migrate*` pattern; add `parseV6Raw` and rout
 
 ## Engineer consumption
 
-- `engineerPhase5/engineeringRead.ts` — `FeelReadV1.traits` gains `onPower`, drops
-  `feelGeneral`; `summarizeEngineeringReadAsLines` learns to surface flagged traits +
-  their speed tags. Signed magnitudes already flow through, so hypothesis/strategy logic
-  is largely unchanged.
+> **2026-08-13:** the code this section referenced (`engineerPhase5/engineeringRead.ts`,
+> `openaiEngineer.ts`, `scripts/engineer-bench/`) was deleted in the Engineer rebuild —
+> see `docs/ENGINEER_NORTH_STAR.md`. Handling data will reach the rebuilt Engineer as a
+> driver-data payload block (Phase 4 of the rebuild), and handling-read changes are
+> measured by the new harness (`scripts/engineer-eval/`) with synthetic seed questions.
+> What survives of this section as intent:
+
 - `runHandlingAssessment.ts` formatters (`formatHandlingTraitAxisForEngineer`,
   `formatHandlingAssessmentForEngineer`) — update trait vocabulary; emit speed context
   ("understeer, mid — **slow corners**").
-- Prompt (`engineerPhase5/openaiEngineer.ts`) — teach: rating is **bands** not points;
-  a flagged trait is a *problem the driver chose to report* (weight it, but as fallible
-  feel per the confidence ladder); speed tag narrows the knob set. No new false
-  confidence — chips are driver feel, still fallible evidence.
-
----
-
-## Measurability — synthetic handling fixtures (the gap that blocks all of the above)
-
-Today the bench (`scripts/engineer-bench/`) can't measure any of this: `BenchCase` is
-`{question, mode, runPolicy}`, the symptom lives in the **question text**, and any real
-chips come uncontrolled from whichever latest run gets anchored. **You cannot score a
-handling-read change** — the exact gap flagged this session.
-
-Fix, and it ships **first** (build sequence step 1):
-
-- Extend `BenchCase` with an optional **synthetic handling payload**: a known
-  `RunHandlingAssessmentParsed` (rating + balance + flagged traits + speed tags) plus an
-  optional synthetic **reference** run, so the harness builds the engineering read from
-  controlled input instead of the DB anchor.
-- Add crafted cases exercising the vocabulary with **exact chip values** (e.g. rated 5,
-  mid −2 understeer tagged *slow*, felt worse, front-spring changed) so a read/prompt
-  change produces a measurable score delta.
-- Add rubric/failure tags — `ignored_chips`, `over_trusted_rating` — into the failure
-  taxonomy (`engineerFeedback/failureTaxonomy.ts`) so the judge + `engineer:bench:failures`
-  catch this failure class independently.
-- Optionally surface the anchored run's handling details in the rating page / blind
-  artifact so founder stars account for them.
+- When the driver-data block ships: rating is **bands** not points; a flagged trait is a
+  *problem the driver chose to report* (weight it, but as fallible feel); speed tag
+  narrows the knob set. No new false confidence — chips are driver feel, still fallible
+  evidence.
+- The harness's seed set should carry handling-payload cases with **exact chip values**
+  so a read/prompt change produces a measurable score delta.
 
 ---
 

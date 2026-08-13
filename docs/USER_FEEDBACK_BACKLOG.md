@@ -101,4 +101,4 @@ Work through in **Priority** order from the table (after you fill it in). Check 
 | FB-11 | `src/lib/setupAggregations/`, rebuild via `POST /api/setup-aggregations/rebuild` per `AGENTS.md` |
 | FB-23 | `src/components/ui/PagedCard.tsx` (add a car axis), `DashboardSummaryCard.tsx`, `DashboardPreviousRunCard.tsx`, `SessionTrendCard.tsx`; per-car data already grouped in `dashboardSummary.ts` / `analysisHomeModel.ts` (`carOptions`) |
 
-Do not treat `content/vehicle-dynamics/` or `src/lib/engineerPhase5/parameterEffects/catalog.ts` as part of this backlog unless an item explicitly targets KB text.
+Do not treat `content/vehicle-dynamics/` or `content/nets/` as part of this backlog unless an item explicitly targets KB or nets text.

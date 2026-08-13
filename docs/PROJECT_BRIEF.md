@@ -127,7 +127,7 @@ typed by hand, and none of it should be quoted from memory in a later conversati
 
 ## `src/lib` — where the logic lives
 
-`account` · `additives` · `aiUsage` · `analysis` · `assets` · `auth` · `baselineSetups` · `billing` · `brand` · `cars` · `demo` · `engineerChat` · `engineerFeedback` · `engineerPhase5` · `eventLapDetection` · `eventLapDiscovery` · `events` · `http` · `lapField` · `lapImageExtract` · `lapImport` · `lapSession` · `lapUrlParsers` · `lapWatch` · `legal` · `location` · `manualVideoAnalysis` · `mylaps` · `nativePush` · `onboarding` · `perf` · `petitrc` · `profileImage` · `pwa` · `rcPwmLogger` · `rollCenter` · `runs` · `search` · `setup` · `setupAggregations` · `setupCalculations` · `setupCalibrations` · `setupCompare` · `setupComparison` · `setupDocuments` · `setupExtractAi` · `setupSheetModels` · `speedhive` · `teams` · `theme` · `tires` · `tracks` · `videoAnalysis` · `videos` · `weather` · `webPush`
+`account` · `additives` · `aiUsage` · `analysis` · `assets` · `auth` · `baselineSetups` · `billing` · `brand` · `cars` · `demo` · `engineer` · `eventLapDetection` · `eventLapDiscovery` · `events` · `http` · `lapField` · `lapImageExtract` · `lapImport` · `lapSession` · `lapUrlParsers` · `lapWatch` · `legal` · `location` · `manualVideoAnalysis` · `mylaps` · `nativePush` · `onboarding` · `perf` · `petitrc` · `profileImage` · `pwa` · `rcPwmLogger` · `rollCenter` · `runs` · `search` · `setup` · `setupAggregations` · `setupCalculations` · `setupCalibrations` · `setupCompare` · `setupComparison` · `setupDocuments` · `setupExtractAi` · `setupSheetModels` · `speedhive` · `teams` · `theme` · `tires` · `tracks` · `videoAnalysis` · `videos` · `weather` · `webPush`
 
 ## Prisma models
 
