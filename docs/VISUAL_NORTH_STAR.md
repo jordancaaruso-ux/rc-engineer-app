@@ -1,8 +1,17 @@
 # Visual North Star — Technical v2
 
-**Status:** Locked (June 2026). **Branch:** `design/visual-rework`.
+**Status:** Live. Typography and surfaces reconciled against `globals.css` on **2026-08-12**.
 
-This document is the **single source of truth** for UI/visual work in JRC Race Engineer. When a screen feels off-brand or inconsistent, check here before inventing new patterns.
+This document holds the **intent** — why a surface looks the way it does, and what was tried and
+rejected. **`src/app/globals.css` holds the truth.** Where a number here disagrees with the CSS, the
+CSS wins and this line is a bug; fix it rather than "fixing" the code to match. Four rows had
+already drifted that way once (the eyebrow recipe, the data-label voice, the glass values, and a
+photo wash that no longer ships), so check before you trust a figure.
+
+**Light mode shipped 2026-08-12** — opt-in per device, dark unchanged. Every colour is a token, and
+the split that matters is `primary` (the yellow itself) vs `primary-ink` (the ink you can actually
+read on the page's background). Never reach for a raw hex; a hardcoded `#FFD60A` is invisible on
+warm ash paper. `e2e/light-mode-audit.spec.ts` is the regression net.
 
 **Hard rule for agents:** Visual changes must not alter behavior, data flow, or API contracts. Restyle only.
 
@@ -97,7 +106,13 @@ Loaded in `src/app/layout.tsx`:
 | Tier | Font | Weights used | CSS hook |
 |------|------|--------------|----------|
 | **1 — UI sans** | **Sora** (Google Fonts via `next/font`) | 400 body · 500 inactive nav · 600 micro headings · 700 sections/nav active/buttons/**hero `PanelTitle`** · **600 semibold entity names** | `--font-ui`, `font-sans`, `PanelTitle`, `.page-title`, `.hub-row-title` / `HubRowTitle`, `.section-title`, `.session-group-title`, `.run-details-tab`, `.ui-title`, `.ui-label-*`, `.ui-control`, `.primary-action-chip`, nav labels, chat body + speaker tags |
-| **2 — Data** | **JetBrains Mono** | 400–500 labels/values · 500 stat values | `font-mono`, `.type-data-label`, `.type-timestamp`, `.table-col-header`, `<Eyebrow>`, `<StatTile>` |
+| **2 — Data** | **JetBrains Mono** | 500 stat values · 400–500 lap figures | `font-mono`, `.lap-figure`, `<StatTile>` value |
+
+**The one-voice pass (2026-07-16) shrank tier 2 to almost nothing.** `.type-data-label`,
+`.type-timestamp`, `.table-col-header` and `<Eyebrow>` were all mono and are now **Sora** — mono
+labels blended into their own (also-mono) values and stopped reading as labels. Mono now survives
+only where a *figure* needs tabular alignment: `.lap-figure` and the `StatTile` value. Verify
+against `globals.css` before adding anything to tier 2.
 
 Sora and JetBrains Mono are SIL OFL.
 
@@ -110,10 +125,11 @@ Sora and JetBrains Mono are SIL OFL.
 | Hero card title (`PanelTitle`) | Sora | 20–22px | **700** | Sentence · `tracking-tight` |
 | Section header (`.section-title`, `SectionTitle`, `.run-details-tab`) | Sora | 13–14px | 700 | Sentence · `tracking-tight` |
 | Primary nav label (sidebar only — mobile dock is icon-only since 2026-07-03) | Sora | 10px | 500 inactive / 700 active | Sentence · `tracking-tight` |
-| Section label / eyebrow (`<Eyebrow>`, `.type-data-label`, StatTile label) | JetBrains Mono | 10px | 400 | **Uppercase** · **`0.28em`** |
-| Table column header (`.table-col-header`) | JetBrains Mono | 10px | 400 | **Uppercase** · **`0.28em`** · faint |
-| Stat value (`StatTile` value) | JetBrains Mono | 18px | 500 | Tabular nums |
-| Timestamps (`.type-timestamp`, `<RelativeTime>`) | JetBrains Mono | 10px | 400 | Sentence · tabular nums · faint |
+| Section signpost (`<Eyebrow>`, `.eyebrow-label`) | **Sora** | **17px** | **700 bold** | Uppercase · `tracking-normal` · **3px `bg-primary-ink` tick** before it, hairline rule under (`.eyebrow-root`). Redesigned 2026-07-16 from 10px mono `0.28em` yellow, because sections were being glanced over. Leading dots removed — `Eyebrow`'s `dot` prop is a no-op kept for call sites |
+| Stat / field micro-label (`.type-data-label`, StatTile label) | **Sora** | **12px** | **600** | Sentence · `tracking-normal` · muted grey. Grey so the label recedes under its value; was mono, then white, and both blended |
+| Table column header (`.table-col-header`) | **Sora** | **12px** | **600** | Sentence · `tracking-normal` · muted grey |
+| Stat value (`StatTile` value) | JetBrains Mono | 18px | 500 | Tabular nums — one of the last two mono survivors |
+| Timestamps (`.type-timestamp`, `<RelativeTime>`) | **Sora** | **11px** | 400 | Sentence · tabular nums · muted grey |
 | Lap times, deltas, run IDs, setup values | JetBrains Mono | varies | 400–500 | Tabular nums |
 | Body / form copy | Sora | 13–15px | 400 | Sentence |
 | Page subtitle (`.page-subtitle`, `PanelSubtitle`) | Sora | 13px | 400 | Sentence |
@@ -125,10 +141,10 @@ Sora and JetBrains Mono are SIL OFL.
 
 ### Rules
 
-1. **Never mix tiers on the same semantic role** — e.g. section labels are always `<Eyebrow>` (mono), never `.ui-title`.
+1. **Never mix tiers on the same semantic role** — e.g. section signposts are always `<Eyebrow>`, never `.ui-title`.
 2. **One display face, one place** — Space Grotesk (`--font-display`) is used for `.page-title` only (uppercase, timing line). Everything else is Sora or JetBrains Mono; do not spread the display face to cards, nav, or body.
-3. **Mono tracking is always `0.28em`** for uppercase micro labels (`.type-data-label`, `.table-col-header`). Do not use `0.2em` / `0.14em` one-offs.
-4. **Prefer `font-mono` over `font-sans tabular-nums`** for numeric data (setup sheet values, tables, metrics).
+3. **Micro labels are Sora, sentence case, `tracking-normal`, muted grey** (`.type-data-label`, `.table-col-header`). The old `0.28em` mono uppercase recipe is retired — do not reintroduce it, and do not add `0.2em` / `0.14em` one-offs.
+4. **Reach for `font-mono` only when a figure needs to align in a column** — `.lap-figure`, `StatTile` values. Setup-sheet values and inline numbers are Sora with `tabular-nums`.
 5. **Do not set inline `fontFamily`** in components — globals + shared classes win.
 6. **Chat inline numbers stay Sora** — only dedicated metric/setup/table/timestamp surfaces use mono.
 
@@ -157,10 +173,10 @@ Sora and JetBrains Mono are SIL OFL.
 
 | Context | Treatment |
 |---------|-----------|
-| App shell (all screens) | **TITC sunset photo wash** — `public/brand/track-hero.jpg` on `.page-bg` children (`-img/-tint/-warm/-dark/-vig` in `layout.tsx`). Knobs live as `--tune-*` vars in `:root` (final in-app tune 2026-07-03: **blur 16px · yellow 0.15 · dark 0.76**); fixed position, same clarity everywhere. Charcoal gradients on `.page-bg` remain as the loading fallback. Dev-only `AppearanceTuner` (AppShell) overrides the vars live. |
-| Cards / panels | **Liquid glass** — `SurfaceCard` uses `.glass-card`: `card/`**0.7** + `backdrop-blur(`**78px**`) saturate(1.3)`, white/0.10 border, specular top rim. Legibility over the photo is the tuning limit — do not drop card alpha below ~0.6. |
+| App shell (all screens) | **One flat fill. No photo.** `.page-bg` is a single fixed layer painted `--page-bg-base` (`#1B1A17` dark · `#EAE7E0` warm ash paper in light) so every `.glass-card` composites over a uniform backdrop. Full viewport height on iOS (`lvh` + `-webkit-fill-available`) so it reaches under the Dynamic Island and home indicator. The photo survives on **`/welcome` only** (`track-hero-baked.jpg`). |
+| Cards / panels | **Liquid glass** — `SurfaceCard` uses `.glass-card`: `card/`**`--tune-glass-alpha`** + `backdrop-blur(`**`--tune-glass-blur`**`) saturate(1.3)`, specular top rim. Current values: **alpha 0.6 · blur 30px** in dark, **alpha 0.78** in light. Read the vars, never hardcode — and never hand-write `-webkit-backdrop-filter`. |
 | Mobile dock | Liquid glass bar — Ideas cap + 5 destinations behind a hairline, with the yellow Log-run circle beside it at matched 56px height (`BottomNav.tsx`, 2026-07-14 one-row chrome). Same glass recipe as before (`card/0.32` + `backdrop-blur(40px) saturate(1.9)`, bright inset rim). |
-| Retired (2026-07-03) | ~~Flat-charcoal-only shell; "no photography on data screens"~~ — superseded by the uniform photo wash + glass surfaces. |
+| Retired (2026-07-03, then reinstated) | The flat shell came back. The photo wash that replaced it was itself removed — glass reads cleanly over one flat fill and not over a photograph. "No photography on data screens" is the rule again. |
 
 ---
 

@@ -4,6 +4,7 @@ import {
   getLiveRcDriverNameSetting,
   getMyNameSetting,
   getSpeedhiveDriverNameSetting,
+  getSpeedhiveTransponderLoanerSetting,
   getSpeedhiveTransponderNumbersSetting,
 } from "@/lib/appSettings";
 import { SettingsClient } from "@/components/settings/SettingsClient";
@@ -41,14 +42,21 @@ export default async function SettingsPage() {
   // Same cookie the root layout stamps <html> from — passed down so the client
   // component never has to guess, and server and client agree on first paint.
   const theme = parseTheme((await cookies()).get(RC_THEME_COOKIE)?.value);
-  const [myName, liveRcDriverName, liveRcDriverId, speedhiveDriverName, speedhiveTransponderRaw] =
-    await Promise.all([
-      getMyNameSetting(user.id),
-      getLiveRcDriverNameSetting(user.id),
-      getLiveRcDriverIdSetting(user.id),
-      getSpeedhiveDriverNameSetting(user.id),
-      getSpeedhiveTransponderNumbersSetting(user.id),
-    ]);
+  const [
+    myName,
+    liveRcDriverName,
+    liveRcDriverId,
+    speedhiveDriverName,
+    speedhiveTransponderRaw,
+    speedhiveTransponderLoaner,
+  ] = await Promise.all([
+    getMyNameSetting(user.id),
+    getLiveRcDriverNameSetting(user.id),
+    getLiveRcDriverIdSetting(user.id),
+    getSpeedhiveDriverNameSetting(user.id),
+    getSpeedhiveTransponderNumbersSetting(user.id),
+    getSpeedhiveTransponderLoanerSetting(user.id),
+  ]);
   const speedhiveTransponderNumbersText = formatSpeedhiveTransponderNumbersForSetting(
     parseSpeedhiveTransponderNumbersSetting(speedhiveTransponderRaw)
   );
@@ -69,6 +77,7 @@ export default async function SettingsPage() {
             liveRcDriverId: liveRcDriverId ?? "",
             speedhiveDriverName: speedhiveDriverName ?? "",
             speedhiveTransponderNumbers: speedhiveTransponderNumbersText,
+            speedhiveTransponderLoaner,
             }}
           />
         </div>

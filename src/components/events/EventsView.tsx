@@ -66,7 +66,7 @@ export function EventsView({
 
   return (
     <>
-      <header className="page-header events-header">
+      <header className="page-header events-header is-echo">
         <div className="min-w-0">
           <h1 className="page-title">Events</h1>
         </div>

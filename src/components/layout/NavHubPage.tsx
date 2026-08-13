@@ -17,15 +17,23 @@ export function NavHubPage({
   subtitle,
   links,
   sections,
+  echoesNav = false,
 }: {
   title: string;
   subtitle: string;
   links?: NavHubLink[];
   sections?: NavHubSection[];
+  /**
+   * True when `title` is a word the desktop top rail already shows as a tab, so
+   * the `<h1>` goes screen-reader-only from md up (globals.css, `is-echo`).
+   * Opt-in per hub rather than always-on: `/tools` is a rail tab, `/more` is the
+   * phone's overflow door and has no tab to duplicate.
+   */
+  echoesNav?: boolean;
 }) {
   return (
     <>
-      <header className="page-header">
+      <header className={`page-header${echoesNav ? " is-echo" : ""}`}>
         <div className="min-w-0">
           <h1 className="page-title">{title}</h1>
           <p className="page-subtitle">{subtitle}</p>

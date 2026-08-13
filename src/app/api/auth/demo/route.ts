@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
 import { clientIpKey } from "@/lib/clientIp";
+import { redirectSignedIn } from "@/lib/auth/devSessionCookie";
 
 /**
  * Demo sign-in (MONETISATION_NORTH_STAR.md Phase 3): signs any visitor into the shared
@@ -54,6 +55,20 @@ export async function GET(request: Request): Promise<Response> {
     update: {},
     select: { id: true },
   });
+
+  /*
+   * Dev takes a different road to the same account. `.env.local` pins AUTH_URL to
+   * `http://localhost:3000`, and Auth.js builds its post-callback redirect from AUTH_URL — so on a
+   * phone at `http://192.168.x.x:3000` the token was consumed, the session cookie was set, and the
+   * browser was then sent to a localhost URL it cannot reach. Passing a LAN `callbackUrl` does not
+   * help: @auth/core's default `redirect` callback replaces any origin that isn't the base URL with
+   * the base URL. Minting the cookie here keeps the redirect relative to the request.
+   *
+   * Production is deliberately untouched below — real visitors stay on the audited magic-link path.
+   */
+  if (process.env.NODE_ENV !== "production") {
+    return redirectSignedIn({ request, userId: demoUser.id, email: demoEmail });
+  }
 
   // Same token scheme as scripts/dev-fresh-onboarding.ts — if the callback ever rejects
   // these links, @auth/core's hash input or provider id changed; fix both together.

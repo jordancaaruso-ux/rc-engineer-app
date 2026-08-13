@@ -20,6 +20,8 @@ type InitialSettings = {
   speedhiveDriverName: string;
   /** Comma-separated MYLAPS transponder numbers for Speedhive discovery at a track. */
   speedhiveTransponderNumbers: string;
+  /** They race a club or loaner chip, so there is no number that stays theirs. */
+  speedhiveTransponderLoaner: boolean;
 };
 
 export type SaveState =
@@ -43,12 +45,14 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
   const [savingSpeedhiveTransponder, setSavingSpeedhiveTransponder] = useState<SaveState>({
     kind: "idle",
   });
+  const [transponderLoaner, setTransponderLoaner] = useState(initial.speedhiveTransponderLoaner);
+  const [savingLoaner, setSavingLoaner] = useState<SaveState>({ kind: "idle" });
 
   const MAX_RETRIES = 3;
 
   async function postSetting(
     url: string,
-    payload: Record<string, string | null>,
+    payload: Record<string, string | boolean | null>,
     setState: (s: SaveState) => void,
     attempt = 0
   ): Promise<boolean> {
@@ -124,6 +128,9 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
         hint="Add every chip you own — race, practice, spare, the one in a loaner. Any of them matches a session, so you only do this once."
         onSave={(text) => {
           setSpeedhiveTransponderNumbers(text ?? "");
+          // The server clears the loaner flag the moment a real number lands; mirror that here
+          // so the box doesn't sit ticked against a number that supersedes it.
+          if (parseSpeedhiveTransponderNumbersSetting(text).length > 0) setTransponderLoaner(false);
           return postSetting(
             "/api/settings/speedhive-driver",
             { speedhiveTransponderNumbers: text },
@@ -131,6 +138,47 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
           );
         }}
       />
+
+      {/*
+       * The way out for a driver who has no number of their own.
+       *
+       * `speedhiveTransponderLoanerAt` has always satisfied `hasTimingIdentity`, and the API has
+       * always accepted it — but nothing ever put it on screen, so a club or loaner-chip racer was
+       * asked for a number they cannot give and had no way to say so. Their timing row could never
+       * be completed. Found by driving the first-run flow, 2026-08-13.
+       *
+       * Ticking it is a statement, not a preference, so it saves immediately like every other
+       * field here — there is no Save button on this page.
+       */}
+      <label className="flex cursor-pointer items-start gap-2.5 pt-1">
+        <input
+          type="checkbox"
+          checked={transponderLoaner}
+          disabled={parseSpeedhiveTransponderNumbersSetting(speedhiveTransponderNumbers).length > 0}
+          onChange={(e) => {
+            const next = e.target.checked;
+            setTransponderLoaner(next);
+            void postSetting(
+              "/api/settings/speedhive-driver",
+              { speedhiveTransponderLoaner: next },
+              setSavingLoaner
+            );
+          }}
+          className="mt-0.5 size-4 shrink-0 accent-primary disabled:opacity-50"
+        />
+        <span className="min-w-0">
+          <span className="block text-sm text-foreground">
+            I don&rsquo;t have my own chip &mdash; the number changes
+          </span>
+          <span className="block text-[11.5px] leading-snug text-muted-foreground">
+            Club or loaner transponder. We&rsquo;ll match your sessions on your name instead.
+            {parseSpeedhiveTransponderNumbersSetting(speedhiveTransponderNumbers).length > 0
+              ? " Not needed while you have a number saved above."
+              : ""}
+            {savingLoaner.kind === "error" ? ` ${savingLoaner.text}` : ""}
+          </span>
+        </span>
+      </label>
 
       {/* Not redundant with the chips above: a transponder only matches when
           MYLAPS actually publishes one on the classification row, and plenty of

@@ -13,6 +13,7 @@ import { chassisFillsAsSheet } from "@/lib/setupSheetModels/sheetPlan";
 import { ReadOnlySetupSheet } from "@/components/setup/ReadOnlySetupSheet";
 import { ReadOnlySheetSurface } from "@/components/setup/ReadOnlySheetSurface";
 import { KeepSetupButton } from "@/components/setup/KeepSetupButton";
+import { ShareSetupButton } from "@/components/share/ShareSetupButton";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { ButtonLink, outlineButtonClassName } from "@/components/ui/ButtonLink";
 import { PageBackLink } from "@/components/ui/PageBackLink";
@@ -162,6 +163,8 @@ export default async function CarSetupViewPage(props: {
           >
             View as PDF
           </a>
+          {/* Beside the PDF on purpose: same artifact, one for filing and one for sending. */}
+          <ShareSetupButton setupSnapshotId={setup.id} label={title} />
           {run ? (
             <ButtonLink href={`/runs/${run.id}`} variant="outline">
               Open run

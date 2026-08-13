@@ -45,7 +45,7 @@ export default async function CarManagerPage({
   if (!hasDatabaseUrl()) {
     return (
       <>
-        <header className="page-header">
+        <header className="page-header is-echo">
           <div className="min-w-0">
             <h1 className="page-title">Garage</h1>
             <p className="page-subtitle">Database not configured.</p>
@@ -158,7 +158,7 @@ export default async function CarManagerPage({
 
   return (
     <>
-      <header className="page-header">
+      <header className="page-header is-echo">
         <div className="min-w-0">
           <h1 className="page-title">Garage</h1>
           <p className="page-subtitle">Your cars and every setup on them.</p>

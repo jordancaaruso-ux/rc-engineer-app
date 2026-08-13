@@ -39,6 +39,7 @@ export function TrackCombobox({
   placeholder = "Select track…",
   "aria-label": ariaLabel = "Track",
   disabled,
+  onCreateRequest,
 }: {
   tracks: TrackOption[];
   value: string;
@@ -49,6 +50,16 @@ export function TrackCombobox({
   placeholder?: string;
   "aria-label"?: string;
   disabled?: boolean;
+  /**
+   * Add a track that isn't listed, carrying whatever was typed into the search.
+   *
+   * Measured 2026-08-13: a driver whose track was missing opened this sheet, found no way to add
+   * one, and had to close it again — the "New track" chip lives on the page *behind* the sheet.
+   * That was the only recorded dead end in ten new-account walks. The tyre picker has had both a
+   * footer and a no-matches action all along, which is why the same situation costs nothing there.
+   * Omit the prop and the sheet behaves exactly as before.
+   */
+  onCreateRequest?: (query: string) => void;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -112,6 +123,38 @@ export function TrackCombobox({
         sections={sections}
         searchPlaceholder="Search tracks or towns…"
         clearRow={{ label: placeholder }}
+        footer={
+          onCreateRequest
+            ? (query) => (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    onCreateRequest(query);
+                  }}
+                  className="tap-active w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-primary-ink transition hover:bg-white/5"
+                >
+                  + Add a track that isn&rsquo;t listed…
+                </button>
+              )
+            : null
+        }
+        emptyAction={
+          onCreateRequest
+            ? (query) => (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    onCreateRequest(query);
+                  }}
+                  className="tap-active rounded-lg border border-border px-3 py-2 text-sm font-semibold text-primary-ink transition hover:bg-white/5"
+                >
+                  {query ? `Add “${query}”` : "Add a track"}
+                </button>
+              )
+            : undefined
+        }
       />
     </>
   );

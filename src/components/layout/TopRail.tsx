@@ -175,7 +175,7 @@ export const TopRail = memo(function TopRail() {
               aria-label={logRunLabel}
               className={cn("top-rail-logrun", isDashboard && "is-quiet")}
             >
-              <IconAddRun size={17} aria-hidden />
+              <IconAddRun size={17} aria-hidden className="shrink-0" />
               <span>{logRunLabel}</span>
             </Link>
           ) : null}

@@ -62,5 +62,14 @@ sheet-fill-shots/
 roll-center-strip-shots/
 roll-center-lab-shots/
 
+# Onboarding friction audit (regenerate with e2e/onboarding-friction.spec.ts)
+onboarding-friction/
+
+# Light/dark parity captures (regenerate with e2e/light-mode-audit.spec.ts)
+light-mode-audit/
+
+# Share-card captures (regenerate with scripts/dev-share-card-shot.ts)
+share-shots/
+
 # Sibling git worktrees for parallel sessions — never part of this checkout
 .claude/worktrees/

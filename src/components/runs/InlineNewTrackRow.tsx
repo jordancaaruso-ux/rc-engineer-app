@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TrackTimingUrls } from "@/lib/tracks/trackTimingUrl";
@@ -36,14 +36,23 @@ export type InlineCreatedTrack = {
  * TrackTimingSourceNotice further down the same form remains the second chance, and
  * the only prompt for tracks somebody else added.
  */
-export function InlineNewTrackRow({
-  onCreated,
-  className,
-}: {
-  /** Hand back the new track so the caller can add it to its list and select it. */
-  onCreated: (track: InlineCreatedTrack) => void;
-  className?: string;
-}) {
+export type InlineNewTrackRowHandle = {
+  /**
+   * Open the form with the name already filled in. Used when the driver went looking for their
+   * track in the picker, didn't find it, and asked to add it from in there — carrying what they
+   * typed across means they don't type it twice.
+   */
+  openWith: (name: string) => void;
+};
+
+export const InlineNewTrackRow = forwardRef<
+  InlineNewTrackRowHandle,
+  {
+    /** Hand back the new track so the caller can add it to its list and select it. */
+    onCreated: (track: InlineCreatedTrack) => void;
+    className?: string;
+  }
+>(function InlineNewTrackRow({ onCreated, className }, ref) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
@@ -51,6 +60,14 @@ export function InlineNewTrackRow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timingFieldRef = useRef<TrackTimingUrlsFieldHandle>(null);
+
+  useImperativeHandle(ref, () => ({
+    openWith: (seedName: string) => {
+      setName(seedName);
+      setError(null);
+      setOpen(true);
+    },
+  }));
 
   async function create() {
     const trimmed = name.trim();
@@ -195,4 +212,4 @@ export function InlineNewTrackRow({
       </div>
     </div>
   );
-}
+});

@@ -248,7 +248,7 @@ export default async function RunHistoryPage({
   if (!hasDatabaseUrl()) {
     return (
       <>
-        <header className="page-header">
+        <header className="page-header is-echo">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <PageBackLink href="/analysis" className="md:hidden" />
             <div>
@@ -859,7 +859,7 @@ export default async function RunHistoryPage({
   if (teamAccessDenied) {
     return (
       <>
-        <header className="page-header">
+        <header className="page-header is-echo">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <PageBackLink href="/analysis" className="md:hidden" />
             <div>
@@ -881,7 +881,7 @@ export default async function RunHistoryPage({
 
   return (
     <>
-      <header className="page-header">
+      <header className="page-header is-echo">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {/*
             Phone only, and the breakpoint is the whole point (2026-08-08).

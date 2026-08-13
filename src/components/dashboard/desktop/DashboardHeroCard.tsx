@@ -34,6 +34,7 @@ export function DashboardHeroCard({
   todayRunCount,
   recentRun,
   lastChange,
+  dayStamp,
 }: {
   isTrackDay: boolean;
   hero: NonNullable<DashboardHomeModel["heroPace"]>;
@@ -42,6 +43,8 @@ export function DashboardHeroCard({
   todayRunCount: number;
   recentRun: DashboardHomeModel["recentRun"];
   lastChange: NonNullable<DashboardHomeModel["todayVerdict"]>["lastChange"] | null;
+  /** Today's date ("FRI 07 AUG"), off-day flag included — see `DashboardHome`. */
+  dayStamp: string;
 }) {
   const isLapSeries = hero.seriesKind === "laps";
 
@@ -95,10 +98,16 @@ export function DashboardHeroCard({
           {eyebrow}
         </span>
         {meta ? <span className="truncate text-[12px] text-faint">{meta}</span> : null}
+        {/* The date, moved off the page title (2026-08-13) — the rail says
+            "Dashboard", it never says which day this is. `ml-auto` moved here so
+            the stamp and the door still sit as one group on the right. */}
+        <span className="ml-auto shrink-0 font-mono text-[11px] uppercase tracking-[.12em] text-faint">
+          {dayStamp}
+        </span>
         <Link
           href={doorHref}
           prefetch={false}
-          className="tap-active ml-auto inline-flex shrink-0 items-center gap-1 text-[12px] font-semibold text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+          className="tap-active inline-flex shrink-0 items-center gap-1 text-[12px] font-semibold text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
         >
           {doorLabel}
           <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />

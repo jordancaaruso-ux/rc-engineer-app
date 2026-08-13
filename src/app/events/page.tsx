@@ -34,7 +34,7 @@ export default async function EventsPage({
   if (!hasDatabaseUrl()) {
     return (
       <>
-        <header className="page-header">
+        <header className="page-header is-echo">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <PageBackLink href="/" />
             <div>

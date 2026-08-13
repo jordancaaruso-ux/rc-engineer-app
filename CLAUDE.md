@@ -1,6 +1,8 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Counts and paths below were verified against the tree on 2026-08-12; if one disagrees with the code,
+the code is right — fix the line.
 
 RC car race-engineering app for competitive 1/10-scale radio-control racing: log every on-track run,
 import lap times from public timing sites, read setup sheets out of manufacturer PDFs, and ask an
@@ -13,21 +15,25 @@ live with paying users — production is not a hypothetical.
 ```
 npx tsc --noEmit          # typecheck — the first gate
 npm run lint              # eslint
-npm run dev               # dev server (Jordan runs this himself, see below)
+npm run dev               # dev server
 npx next build            # LOCAL production build
 ```
 
 - **`npm run build` is the Vercel pipeline**, not a local build: it runs `scripts/vercel-build.cjs`,
   which does `prisma migrate deploy` first. Denied at the harness level. Use `npx next build`.
 - **No test runner.** No Jest, no Vitest. Tests are plain `node:test` or bare `tsx` scripts, one npm
-  script per area — 88 of them (`npm run test:nav`, `test:blank-upload`, `test:engineer-chat`, …).
+  script per area — 90 of them (`npm run test:nav`, `test:blank-upload`, `test:engineer-chat`, …).
   Run the one matching what you changed; `grep test: package.json` to find it.
 - **One test file directly:** `npx tsx --test path/to/x.test.ts`. Anything importing a `server-only`
   module needs `node --conditions=react-server --import tsx path/to/x.test.ts` — that's why the
   scripts look inconsistent. Copy the invocation from the nearest existing `test:*` script.
-- **Every `db:*` script hardcodes `dotenv-cli -e .env.local`**, and `.env.local` has pointed at the
-  live production database. Reaching prod is those commands' default, not an opt-in. Drift repair is
-  `npm run db:migrate:reconcile` or `prisma migrate resolve` — never `db push`.
+- **`db:*` scripts point at whatever `.env.local` points at.** 7 of the 13 hardcode
+  `dotenv-cli -e .env.local`, so reaching a real database is their default, not an opt-in.
+  Since 2026-07-31 `.env.local` points at the Neon **scratch-dev** branch (`ep-muddy-unit`);
+  **production is `ep-hidden-rice`**. Grep the host before running one — the filename tells you
+  nothing, and scratch-dev is a copy-on-write clone, so it holds real users' rows: isolated, not
+  anonymised. Drift repair is `npm run db:migrate:reconcile` or `prisma migrate resolve` — never
+  `db push`. Use `DATABASE_URL_UNPOOLED` for `prisma migrate`; the pooler throws P1002 lock timeouts.
 - Slow and costly, only when asked: `engineer:eval`, `engineer:bench*`, `setup-extract:eval`.
 - iOS shell: `npm run cap:sync` / `npm run cap:open`.
 
@@ -37,13 +43,14 @@ Verification order before calling something done: `npx tsc --noEmit` → the mat
 ## Guards you will meet
 
 Safety lives in `.claude/settings.json` + `.claude/hooks/`, not in prose. Hooks fire below the
-permission layer, so they still prompt under `bypassPermissions`.
+permission layer, so they still prompt under `bypassPermissions`. Three are wired up in
+`settings.json`; `.claude/hooks/guard-test.cjs` is present but registered nowhere and does nothing.
 
 - `prod-guard.cjs` — any production-DB or deploy-pipeline command raises a prompt.
-- `kb-guard.cjs` — writes to `content/vehicle-dynamics/*.md` (top level) or
-  `src/lib/engineerPhase5/parameterEffects/catalog.ts` raise a prompt. That prose is quoted verbatim
-  to paying drivers as ground truth, so edit it only when the user's latest message asks for it;
-  otherwise propose the diff in chat. Drafts under `content/vehicle-dynamics/drafts/` are open.
+- `kb-guard.cjs` — writes to `content/vehicle-dynamics/*.md` (top level) raise a prompt. That prose
+  is quoted verbatim to paying drivers as ground truth, so edit it only when the user's latest
+  message asks for it; otherwise propose the diff in chat. Drafts under
+  `content/vehicle-dynamics/drafts/` are open. The `audit-kb` skill carries the real rules.
 - `uncommitted-guard.cjs` — end-of-turn warning listing dirty git worktrees. Jordan runs several
   sessions in parallel, so **check `git branch --show-current` before committing**; another session
   may have moved HEAD.
@@ -60,14 +67,14 @@ nothing is clickable.
 ## Architecture
 
 **Request path.** `src/middleware.ts` (edge, uses the Prisma-free `src/auth.config.ts`) gates
-everything except `/login/*`, `/privacy`, `/terms`, `/api/health/*`, `/api/_debug/version` and the
-Stripe webhook — unauthenticated APIs get 401 JSON, pages get redirected. `src/auth.ts` (Node)
+everything except `/login/*`, `/privacy`, `/terms`, `/api/health/*`, `/api/_debug/version` and
+`/api/stripe/webhook` — unauthenticated APIs get 401 JSON, pages get redirected. `src/auth.ts` (Node)
 holds the real NextAuth v5 config: magic-link email + optional Google, with a sign-in allowlist
 (`AuthAllowedEmail` table + `AUTH_ALLOWED_EMAILS`). Pages call `requireCurrentUser()`, routes call
 `getAuthenticatedApiUser()` (`src/lib/currentUser.ts`). Entitlement is always derived server-side in
 `src/lib/entitlement.ts` from the Stripe webhook's `Subscription` row — never trusted from a client.
 
-**`src/lib` is where the logic lives** (~47 domain folders); `src/components` and `src/app` are
+**`src/lib` is where the logic lives** (56 domain folders); `src/components` and `src/app` are
 thin over it. Four subsystems carry most of the weight:
 
 1. **Runs** — a `Run` is one 5–8 minute on-track session and the atomic unit of the whole product.
@@ -76,18 +83,15 @@ thin over it. Four subsystems carry most of the weight:
 2. **Lap import** — `src/lib/lapUrlParsers/` scrapes LiveRC / MyRCM / MyLaps Speedhive into an
    `ImportedLapTimeSession`; `lapWatch/` polls watched URLs and pushes "new run detected" nudges.
 3. **Setup sheets** — a chassis (`SetupSheetModel`) is global and shared by everyone racing that
-   model; its `schemaJson` defines the fields, and a `SetupSheetCalibration` maps a specific PDF or
-   image layout onto those field keys. Uploading a blank manufacturer sheet derives the schema from
-   the PDF's AcroForm (`setupSheetModels/deriveSchemaFromAcroForm.ts`); the driver then fills boxes
-   over a **server-rendered picture** of the page, never a client-side PDF engine
-   (`setupSheetModels/sheetPageImages.ts` → `setupDocuments/pdfServerRaster.ts`, cached per chassis).
-   Images and flat/scanned PDFs are refused at the door by design — see the north star.
+   model; a `SetupSheetCalibration` maps one PDF layout onto its field keys. The driver fills boxes
+   over a **server-rendered picture** of the page, never a client-side PDF engine. Images and
+   flat/scanned PDFs are refused at the door by design. Details in the north star.
 4. **The Engineer** — the LLM assistant. `src/lib/engineerChat/` is the current chat path (v0,
-   2026-08-05): the vehicle-dynamics KB, a short system prompt, and the conversation, in that order.
-   The KB goes first because its bytes never vary and OpenAI's prompt cache serves the ~14K-token
-   prefix on every later turn; anything spliced ahead of it silently doubles the input bill.
+   2026-08-05) and is only five files: the KB, a short system prompt, and the conversation.
    `src/lib/engineerPhase5/` is the older, larger home (historical name, not product-facing) and
-   still owns KB retrieval, run/context builders, parameter effects, quick-fix and between-run hints.
+   still owns KB retrieval, run/context builders, quick-fix and between-run hints. **The order of
+   the payload is load-bearing and v0 deliberately runs on less than it used to** — read the north
+   star before changing either.
 
 **Materialised data.** `bestLapSeconds`/`avgTop5LapSeconds` on `Run`, the setup aggregations in
 `src/lib/setupAggregations/`, and the sheet page images are all caches with their own staleness.
@@ -102,9 +106,9 @@ on Vercel, check the trace before anything else.
 
 ## Read the north star before you build
 
-`docs/` holds ~30 spec documents that are the product source of truth. Find the one that matches and
+`docs/` holds 34 spec documents that are the product source of truth. Find the one that matches and
 read it first; if nothing matches, you don't need one. A spec is intent, not shipped code —
-`docs/NOT_YET_BUILT.md` says what isn't real yet.
+`docs/NOT_YET_BUILT.md` says what isn't real yet, and no feature is real because a doc describes it.
 
 | Task touches | Read |
 |---|---|
@@ -126,10 +130,12 @@ read it first; if nothing matches, you don't need one. A spec is intent, not shi
 
 ## Conventions that aren't guessable
 
-- **UI primitives already exist** — `SurfaceCard`, `CardPanel`, `panel.tsx` (`Eyebrow`, `StatStrip`,
-  `StatTile`), `Button`/`ButtonLink`. Use semantic tokens (`bg-background`, `text-primary`), never
-  new raw hex. Yellow = actions only; green/red = pace and quality deltas only (volume deltas are
-  neutral). Everything must work at 390px with the bottom dock visible.
+- **UI primitives already exist** — `SurfaceCard`, `CardPanel`, `HeroPanel`, `PagedCard`,
+  `panel.tsx` (`PanelTitle`, `PanelSubtitle`, `HubRowTitle`, `Eyebrow`, `StatStrip`, `StatTile`),
+  `Button`/`ButtonLink`. Check `src/components/ui/` before writing a new one. Use semantic tokens
+  (`bg-background`, `text-primary`), never new raw hex. Yellow = actions only; green/red = pace and
+  quality deltas only (volume deltas are neutral). Everything must work at 390px with the bottom
+  dock visible, in both dark and light mode.
 - **Delta sign convention:** lap deltas are `cell − anchor`, so **positive = slower**. Pace vs field
   is user − field, so **negative = faster than the field**.
 - **Canonical units:** lap times in seconds, temperatures °C, wind km/h, geometry mm and degrees,
@@ -142,3 +148,5 @@ read it first; if nothing matches, you don't need one. A spec is intent, not shi
 - Field names ending `Iso` are UTC machine timestamps; never show them to a user unconverted.
 - Files sometimes come back double-encoded (UTF-8 mojibake) and feed garbage into the Engineer
   context. Grep for it before committing prose changes.
+- `next dev` has served stale CSS through repeated restarts. Verify a `globals.css` change against
+  `npx next build`, not the dev server.

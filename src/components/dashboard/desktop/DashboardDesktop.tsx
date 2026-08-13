@@ -25,9 +25,16 @@ import { DashboardListCard } from "@/components/dashboard/desktop/DashboardListC
 export function DashboardDesktop({
   model,
   isTrackDay,
+  dayStamp,
 }: {
   model: DashboardHomeModel;
   isTrackDay: boolean;
+  /**
+   * "FRI 07 AUG", or "FRI 07 AUG · Off day". Built in `DashboardHome` and shown on
+   * whichever card takes the hero slot — it used to sit beside the page title,
+   * which is now screen-reader-only on desktop (globals.css, `is-echo`).
+   */
+  dayStamp: string;
 }) {
   const {
     heroPace,
@@ -65,6 +72,7 @@ export function DashboardDesktop({
             todayRunCount={todayRunCount}
             recentRun={recentRun}
             lastChange={todayVerdict?.lastChange ?? null}
+            dayStamp={dayStamp}
           />
         ) : isTrackDay && todayStrip.length > 0 ? (
           // No lap times anywhere today, so there is no hero to build. The day still has
@@ -73,6 +81,7 @@ export function DashboardDesktop({
             strip={todayStrip}
             todayContext={todayContext}
             todayRunCount={todayRunCount}
+            dayStamp={dayStamp}
           />
         ) : null}
 

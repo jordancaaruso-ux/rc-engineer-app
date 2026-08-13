@@ -24,6 +24,13 @@ const VIEW_W = 360;
 const RC_DOT_R = 2;
 /** How close a pinned (off-scale) roll-centre marker may sit to the frame edge. */
 const RC_EDGE_PAD = 5;
+/**
+ * How far below the ground line the frame always reaches, in mm. FIXED on purpose: this is
+ * the floor of the drawing, and anything that moves with the setup would resize the car every
+ * time a knob turned. 20mm covers the roll centres these cars actually run (measured -9.1mm
+ * front / -8.5mm rear on the blank A800 car); a lower one still shows, pinned and off-scale.
+ */
+const RC_WINDOW_BELOW_MM = 20;
 
 const armAngleDeg = (inner: Vec2, outer: Vec2): number =>
   (Math.atan2(outer.z - inner.z, outer.x - inner.x) * 180) / Math.PI;
@@ -162,14 +169,19 @@ export function AxleSchematic({ solved, ghost, extraPoints, fitBox, axleLabel, s
      * cross, so as it nears ground level those lines approach parallel and the crossing point
      * runs away sideways (measured +163mm lateral on a 94mm contact patch at 3mm under the lower
      * arm, 2.5mm bump, 3° roll). Letting that into the extents shrank the car and slid it off
-     * centre. Horizontally the marker is now ignored outright; vertically it may extend the view
-     * by at most the car's own height, and beyond that it is pinned and drawn as off-scale.
+     * centre. The marker is ignored by BOTH axes now and pinned by `markFor` instead.
+     *
+     * Vertically it used to be allowed down to one car-height below ground, and that was the
+     * whole bug behind "the car changes size": the floor of the frame tracked the RC, so 3mm
+     * under the lower arm lifted RC from -9.1mm to above ground, the box shortened from 181.6
+     * to 168.6 units, and the browser re-fitted that shorter box into the same on-screen
+     * rectangle — scaling the whole car up 7.5%. Measured on the tyre, which is a fixed 64mm
+     * object and therefore the honest ruler: 87.65px -> 94.24px at 390, 233.72 -> 251.32 at
+     * 1760. The floor is now a FIXED window, so nothing a knob does can resize the car.
      */
-    const rcFloor = -tireTopZ;
-    const rcZs = [main.rc.z, ...(gh ? [gh.rc.z] : [])].map((z) => Math.max(z, rcFloor));
     const xMin = Math.min(...contacts) - 16;
     const xMax = Math.max(...contacts) + 16;
-    const zMin = Math.min(0, ...rcZs, ...extraZs) - 8;
+    const zMin = -RC_WINDOW_BELOW_MM;
     // Camber labels sit above the tire tops — reserve headroom for them.
     const zMax = Math.max(tireTopZ, solved.right.innerUpper.z, ...extraZs) + (showCamber ? 12 : 5);
 

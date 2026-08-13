@@ -22,6 +22,7 @@ export default function ToolsHubPage(): ReactNode {
       title="Tools"
       subtitle="Compare setups, model geometry, and review video."
       links={TOOLS_HUB_LINKS}
+      echoesNav
     />
   );
 }

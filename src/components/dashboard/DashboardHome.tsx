@@ -106,8 +106,15 @@ export function DashboardHome({
   const ob = onboarding;
   const showGetSetUp = ob ? showGetSetUpCard(ob) : false;
 
-  // "FRI 07 AUG" beside the desktop title. Rendered from the rc_tz zone so it agrees
-  // with the day the model bucketed today's runs into.
+  // "FRI 07 AUG" on the desktop hero card's header row. Rendered from the rc_tz zone
+  // so it agrees with the day the model bucketed today's runs into.
+  //
+  // It sat beside the page title until 2026-08-13, when the title went
+  // screen-reader-only on desktop (globals.css, `is-echo`) because the top rail
+  // already says "Dashboard". The stamp is real information the rail does NOT
+  // carry, so it moved down onto the first card rather than going with the title.
+  // The venue went the other way: the hero's own meta line already names the
+  // track on a track day, and printing it twice on one card is worse than once.
   const todayStamp = new Intl.DateTimeFormat("en-GB", {
     weekday: "short",
     day: "2-digit",
@@ -117,23 +124,20 @@ export function DashboardHome({
     .format(new Date())
     .replace(/,/g, "")
     .toUpperCase();
+  const dayStamp = isTrackDay ? todayStamp : `${todayStamp} · Off day`;
 
   return (
     <>
-      <header className="page-header dash-header">
+      {/*
+        Title-only header: `is-echo` hides it from md up and collapses its padding,
+        so on desktop the first card starts straight under the rail. The `<h1>`
+        stays in the DOM for assistive tech and for `MobileTitleCondenser`, which
+        reads its text to draw the phone's compact title.
+      */}
+      <header className="page-header dash-header is-echo">
         <div className="min-w-0">
           <h1 className="page-title">Dashboard</h1>
         </div>
-        {/* Desktop only — the handoff's timestamp line beside the title. Track/venue
-            only when the day's runs share one, otherwise just the date. */}
-        <span className="hidden font-mono text-[11px] uppercase tracking-[.12em] text-faint xl:inline">
-          {[
-            todayStamp,
-            isTrackDay ? (todayContext?.trackName ?? null) : "Off day",
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </span>
       </header>
 
       <section className="page-body dash-wide max-w-3xl">
@@ -163,7 +167,7 @@ export function DashboardHome({
             hero's numeral, dials and chart have no phone equivalent, and the phone's
             verdict / next-outing cards have no desktop slot. Same call as
             SessionsWorkbench. Everything below is `xl:hidden` and untouched. */}
-        <DashboardDesktop model={model} isTrackDay={isTrackDay} />
+        <DashboardDesktop model={model} isTrackDay={isTrackDay} dayStamp={dayStamp} />
 
         {/* The primary action always leads — the single unmissable run entry point. */}
         <Reveal index={0} className="xl:hidden">

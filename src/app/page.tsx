@@ -12,7 +12,7 @@ export default async function DashboardPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
     return (
       <>
-        <header className="page-header">
+        <header className="page-header is-echo">
           <div>
             <h1 className="page-title">Dashboard</h1>
             <p className="page-subtitle">Database not configured.</p>

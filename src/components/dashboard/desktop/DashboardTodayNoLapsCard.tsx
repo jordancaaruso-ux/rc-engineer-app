@@ -26,11 +26,14 @@ export function DashboardTodayNoLapsCard({
   strip,
   todayContext,
   todayRunCount,
+  dayStamp,
 }: {
   /** Today's runs, latest first — `model.todayStrip`. */
   strip: DashboardHomeModel["todayStrip"];
   todayContext: DashboardHomeModel["todayContext"];
   todayRunCount: number;
+  /** Today's date ("FRI 07 AUG") — see `DashboardHome`. Always a track day here. */
+  dayStamp: string;
 }) {
   const latest = strip[0];
   const first = strip[strip.length - 1];
@@ -61,10 +64,14 @@ export function DashboardTodayNoLapsCard({
           Today
         </span>
         {meta ? <span className="truncate text-[12px] text-faint">{meta}</span> : null}
+        {/* Same handoff as the real hero — see `DashboardHeroCard`. */}
+        <span className="ml-auto shrink-0 font-mono text-[11px] uppercase tracking-[.12em] text-faint">
+          {dayStamp}
+        </span>
         <Link
           href="/runs/history?expandLatest=1"
           prefetch={false}
-          className="tap-active ml-auto inline-flex shrink-0 items-center gap-1 text-[12px] font-semibold text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+          className="tap-active inline-flex shrink-0 items-center gap-1 text-[12px] font-semibold text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
         >
           Open in Sessions
           <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />

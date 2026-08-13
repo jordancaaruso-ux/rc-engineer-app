@@ -278,17 +278,77 @@ Everything an agent needs to continue without this doc's originating chat:
 
 | Concern | Where it lives |
 |---|---|
-| Chat system prompt + mode addons | `src/lib/engineerPhase5/openaiEngineer.ts` (`CHAT_SYSTEM` + addon pattern) |
-| Context assembly | `engineerRichContext.ts`, `contextPacket.ts`, `engineerChatPipeline.ts` |
-| Context tiering (today: keyword light/full) | `engineerChatContextTier.ts` |
+Verified 2026-08-12. The v0 rebuild deleted five entries that used to sit here — `openaiEngineer.ts`,
+`contextPacket.ts`, `engineerChatPipeline.ts`, `engineerChatContextTier.ts` and `fullKbInContext.ts`
+are gone, along with `parameterEffects/catalog.ts`. Anything below still exists.
+
+| Chat system prompt | `src/lib/engineerChat/prompt.ts` — the whole instruction set, ~10 sentences |
+| Chat turn + client | `src/lib/engineerChat/runChatTurn.ts`, `openaiChatClient.ts` |
+| The lab (switched-off rungs) | `src/lib/engineerChat/lab/labFlags.ts`, `factBlocks.ts` |
+| Context builders (still used by proactive surfaces) | `engineerRichContext.ts` |
 | Deterministic read + confidence machinery | `engineeringBrain.ts` (`recommendationStrategy`), `engineeringRead.ts` |
-| History memory | `knownGoodMemory.ts`, `setupOutcomeMemory.ts` |
+| History memory | `engineerPhase5/knownGoodMemory.ts`, `setupOutcomeMemory.ts` |
 | Proactive surfaces | `quickFix/`, `betweenRunHints/`, `dashboardSuggestions/` |
-| KB + retrieval | `content/vehicle-dynamics/`, `vehicleDynamicsKb.ts`, `fullKbInContext.ts` (full-KB advice turns), `parameterEffects/catalog.ts` |
+| KB | `content/vehicle-dynamics/`, `vehicleDynamicsKb.ts` |
 | Chat UI | `src/components/engineer/EngineerPageClient.tsx`, `EngineerChatPanel.tsx` |
 | Quality loop | `docs/ENGINEER_ITERATION.md`, `scripts/engineer-eval/` |
+| Wire dump | `DEBUG_ENGINEER_WIRE=1` — prints the exact payload. Never quote a token count without it |
 
 ---
+
+## The v0 ladder — what is switched off, and how each thing comes back
+
+Read this before proposing an Engineer capability. Half of what looks missing was removed on
+purpose, and the two kinds of "off" below come back by completely different routes.
+
+**v0 (2026-08-05) ships with nothing but the KB**, a ten-sentence prompt and the conversation. The
+deal was: start from the least that could possibly work and add back one rung at a time, each
+earning its place against a blind rating.
+
+**Word warning.** *Rung* means two different things in this subsystem. In the confidence ladder
+above it's how sure an answer is allowed to sound. Here it's a switched-off input. Same word, no
+relation.
+
+### On the ladder — three rungs, switchable per account
+
+`src/lib/engineerChat/lab/labFlags.ts`. Gated by an admin check **and** a per-user setting that
+defaults off, so a rung can be lit for one person, judged in real use, and switched back. When no
+rung is active the request is byte-for-byte the shipped one.
+
+| Rung | Gives the model |
+|---|---|
+| `setupSheet` | The pinned run's actual setup values — tuning parameters only, no motor or electronics |
+| `sessionFacts` | Track, layout, grip, tyre, conditions, lap count, the driver's rating |
+| `comparableRuns` | Nearest earlier runs on this car by tyre, grip and layout, and how close each is |
+
+### Off the ladder — two things with no rung to climb back onto
+
+**1 — Community position and thin-data caution.** Deliberate (founder, 2026-08-12), but note it is
+*dropped*, not parked: there is no lab rung for it, so it cannot currently be switched on for
+anyone. What the pre-v0 Engineer did and today's does not:
+
+- Every numeric spread row carried a `positionBand` (`below_typical` … `above_typical`), and pushing
+  a parameter that was already `above_typical` further out had to be flagged and justified.
+- `sampleCount` gated trust — roughly ≤6 setups behind a band made it *"a WEAK HINT, not a fact"*,
+  and the model leant on mechanism instead. *"Moving away from a thin median is not going against
+  the field, because there is barely a field."*
+- **The median was never a target.** Some of the best setups sit well off it.
+- A wild gap between the driver's value and the median (22.4 vs 4.6 on `downstop_rear`) was read as
+  a **scale mismatch between sheet conventions**, not as a real difference — caveat it, then advise
+  from theory anyway rather than dropping the parameter.
+- Grip trends were computed deterministically, never judged by the model: Cliff's delta with bands
+  (<0.147 negligible · <0.33 small · <0.474 medium · ≥0.474 large), a per-parameter floor from
+  `trendMinimumDeltas.ts` (1000 cSt for diff oil, 0.25° for camber), fused into `flat`/`slight`/
+  `material`. Claiming a trend on `flat` was forbidden.
+- A grip bucket needed 10 samples to appear at all; at ≥50% frequency the model preferred the
+  **modal** value over the median.
+
+Bringing it back means building the rung, not editing the prompt.
+
+**2 — Predictions attached to every change.** Also deliberate. The old rule: every suggested change
+ships with **(a)** the expected effect, **(b)** what the driver should feel for on track, and
+**(c)** what outcome would tell us it did *not* work. This was prompt text, never a fact block, so
+it returns as a sentence in `prompt.ts` — it will never be a rung, and looking for one wastes time.
 
 ## How to use this doc
 

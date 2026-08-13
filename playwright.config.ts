@@ -1,4 +1,33 @@
+import { readFileSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
+
+/**
+ * Browse the same origin the suite signs in through.
+ *
+ * `auth.setup.ts` mints its magic link from `AUTH_URL`, and Auth.js issues the session cookie for
+ * whatever host that link lands on — host-only, so a cookie set on `192.168.50.91` is never sent
+ * to `localhost`. When AUTH_URL was repointed at the LAN IP for phone testing (2026-08-13), the
+ * setup project kept passing and then EVERY spec using the shared state silently landed on
+ * /login: nineteen failures, one cause, and none of them where the breakage was.
+ *
+ * `.env.local` is read directly because Playwright configs don't load it, and only the origin is
+ * taken. `E2E_BASE_URL` still wins when set.
+ */
+function signInOrigin(): string {
+  if (process.env.E2E_BASE_URL) return process.env.E2E_BASE_URL;
+  try {
+    const line = readFileSync(".env.local", "utf8")
+      .split(/\r?\n/)
+      .find((l) => l.trimStart().startsWith("AUTH_URL="));
+    const value = line?.slice(line.indexOf("=") + 1).trim().replace(/^["']|["']$/g, "");
+    if (value) return new URL(value).origin;
+  } catch {
+    // No .env.local, or an AUTH_URL that isn't a URL — fall through to the default.
+  }
+  return "http://localhost:3000";
+}
+
+const BASE_URL = signInOrigin();
 
 /**
  * Browser verification for the app. This exists so an agent can see its own work render
@@ -22,7 +51,7 @@ export default defineConfig({
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : [["list"]],
 
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
+    baseURL: BASE_URL,
     viewport: { width: 390, height: 844 },
     deviceScaleFactor: 2,
     trace: "retain-on-failure",
@@ -46,7 +75,7 @@ export default defineConfig({
 
   webServer: {
     command: "npm run dev",
-    url: "http://localhost:3000/login",
+    url: `${BASE_URL}/login`,
     reuseExistingServer: true,
     timeout: 180_000,
     stdout: "pipe",

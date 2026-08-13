@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function TeamsPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
     return (
-      <header className="page-header">
+      <header className="page-header is-echo">
         <div>
           <h1 className="page-title">Teams</h1>
           <p className="page-subtitle">Database not configured.</p>
@@ -34,7 +34,7 @@ export default async function TeamsPage(): Promise<ReactNode> {
 
   return (
     <>
-      <header className="page-header">
+      <header className="page-header is-echo">
         <div>
           <h1 className="page-title">Teams</h1>
           <p className="page-subtitle">

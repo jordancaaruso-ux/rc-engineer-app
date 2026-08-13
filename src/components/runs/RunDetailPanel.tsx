@@ -57,6 +57,9 @@ import {
   hasRenderableHandlingReadback,
 } from "@/components/runs/HandlingAssessmentFields";
 import { RUN_HISTORY_DATA_CLASS } from "@/components/runs/runHistoryTableColumns";
+import { ShareRunButton } from "@/components/share/ShareRunButton";
+import { runIsShareable } from "@/lib/share/shareCardModel";
+import { formatRunSessionDisplay } from "@/lib/runSession";
 
 const LapComparePanel = dynamic(
   () =>
@@ -487,6 +490,15 @@ export function RunDetailPanel({
 
   const runInstant = resolveRunDisplayInstant(run);
   const dateTimeLabel = formatRunDateTime(runInstant, displayTimeZone);
+  // No laps and no setup means the picture would be a title and nothing else — so no button.
+  const shareable = runIsShareable(run, Boolean(run.setupSnapshot?.id));
+  const shareLabel = [
+    run.event?.name ?? null,
+    formatRunSessionDisplay(run, { fallback: "Testing run" }),
+    run.track?.name ?? run.trackNameSnapshot ?? null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const tireSetDisplay = run.tireType
     ? `${run.tireType.displayName} · run ${run.tireRunNumber}${run.tireAgeKnown === false ? " (age unknown)" : ""}`
     : "—";
@@ -653,6 +665,20 @@ export function RunDetailPanel({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {headerActions}
+            {/*
+              Sharing is owner-only, so it rides on `allowRunMutations` — the same flag that hides
+              Edit on a peer's run in team Sessions. A teammate may read your run; publishing it
+              outward under the app's branding is yours to decide. The render route enforces the
+              same rule, so this is the affordance, not the guard.
+            */}
+            {allowRunMutations && shareable ? (
+              <ShareRunButton
+                compact
+                runId={run.id}
+                runLabel={shareLabel}
+                setupSnapshotId={run.setupSnapshot?.id ?? null}
+              />
+            ) : null}
             {allowRunMutations ? (
               <Link
                 href={`/runs/${encodeURIComponent(run.id)}/edit`}

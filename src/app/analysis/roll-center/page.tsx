@@ -30,7 +30,9 @@ export default async function RollCenterLabPage({
           </p>
         </div>
       </header>
-      <section className="page-body max-w-2xl">
+      {/* `lab-wide` raises the cap to 1760px at xl+ (globals.css); `max-w-2xl`
+          still governs below that, so the phone column is untouched. */}
+      <section className="page-body lab-wide max-w-2xl">
         <RollCenterLabClient
           seed={seed}
           seedLabel={seedLabel}

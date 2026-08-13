@@ -589,14 +589,13 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     return pts;
   }, [geo, adj, ghostGeo, ghostAdj, staticRh]);
 
-  /** RC sweep paths + bump extremes folded in, so neither slider ever rescales the view. */
-  const schematicExtraPoints = useMemo(
-    () => [
-      ...[...(sweep ?? []), ...(ghostSweep ?? [])].map((p) => ({ x: p.x, z: p.z })),
-      ...bumpExtent,
-    ],
-    [sweep, ghostSweep, bumpExtent]
-  );
+  /**
+   * Bump extremes only, so the bump slider never rescales the view. The RC sweep paths used to
+   * be folded in here too — an attempt to hold the frame still against a roll centre that was
+   * allowed to set the frame's floor. The schematic no longer lets RC touch the extents at all
+   * (fixed window, marker pinned), so feeding the sweep in would only re-introduce the drift.
+   */
+  const schematicExtraPoints = useMemo(() => bumpExtent, [bumpExtent]);
 
   const sensitivities = useMemo(() => {
     if (!geo || !adj) return null;
@@ -660,7 +659,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
 
   /* ── Setups card (slot chips + picker) ── */
   const setupsCard = (
-    <CardPanel contentClassName="space-y-2">
+    <CardPanel className="lab-setups" contentClassName="space-y-2">
       <Eyebrow>Setups</Eyebrow>
       <div className="flex items-center gap-2">
         <SlotChip id="a" slot={slots.a} selected={activeId === "a"} onSelect={() => setSel("a")} />
@@ -802,13 +801,31 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     );
   };
 
+  /*
+   * Phone: one column, in this source order. Desktop (xl+): the same DOM re-flowed
+   * into an instrument — controls on the left, the drawing and its readout in the
+   * middle, the slower reading (migration, sensitivities, change list) beneath at
+   * xl and beside at 2xl. The columns are placed EXPLICITLY (`col-start`/`row-start`)
+   * rather than by source order, because the desktop order is not the phone order:
+   * on a phone you meet the drawing before the knobs, on a desktop the knobs are the
+   * hand you keep on the tool.
+   *
+   * The desktop geometry itself lives in globals.css under `.lab-grid`, not in
+   * utilities here, for the reason `.dash-wide` and `.engineer-wide` exist: a
+   * three-column rule at 1400px has to beat the two-column rule at 1280px, and
+   * Tailwind 4 sorts an arbitrary `min-[1400px]:` variant BEFORE the named `xl:`
+   * — so the utility version silently rendered two columns at every width (class
+   * present in the DOM, layout unchanged). Unlayered CSS wins outright. These
+   * class names are the hooks it places; nothing below 1280px reads them, so
+   * 390px is byte-identical (docs/VISUAL_NORTH_STAR.md).
+   */
   return (
-    <div className="flex flex-col gap-3">
+    <div className="lab-grid flex flex-col gap-3">
       {/* ── Setups (A/B slots + picker) ────────────────────────────── */}
       {setupsCard}
 
       {/* ── The instrument ─────────────────────────────────────────── */}
-      <CardPanel contentClassName="space-y-3">
+      <CardPanel className="lab-instrument" contentClassName="space-y-3">
         <Eyebrow>Roll centre</Eyebrow>
         <div className="flex items-center gap-2">
           <SegmentedControl
@@ -830,8 +847,17 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
           </span>
         </div>
 
+        {/*
+         * Phone: a 12:5 letterbox, so the drawing is a fixed slice of a 390px column.
+         * Desktop: capped by HEIGHT instead. At a 1000px-wide centre track the 12:5
+         * box would be 415px tall and push the roll-centre numbers off the bottom of
+         * the screen — which is the one thing this layout exists to prevent. `vh` so
+         * a short laptop screen gets a shorter drawing rather than a scrollbar.
+         * `AxleSchematic` is `h-full w-full` on a viewBox with the default
+         * `xMidYMid meet`, so it just letterboxes centred in whatever box it is given.
+         */}
         {solved && (
-          <div className="aspect-[12/5] w-full">
+          <div className="aspect-[12/5] w-full xl:aspect-auto xl:h-[min(40vh,24rem)]">
             <AxleSchematic
               solved={solved}
               ghost={ghostSolved}
@@ -927,7 +953,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
       </CardPanel>
 
       {/* ── Adjustments (edit the selected slot) ───────────────────── */}
-      <CardPanel contentClassName="space-y-3">
+      <CardPanel className="lab-adjust" contentClassName="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <Eyebrow>
             Adjustments · {axle}
@@ -986,8 +1012,11 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
           onChange={(v) => setKnob([axle === "front" ? "camber_front" : "camber_rear"], v)}
         />
 
-        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-          <span className="type-data-label shrink-0 sm:w-[9.5rem]">Chassis</span>
+        {/* Label beside the control from sm, but back above it at xl: the desktop
+            Adjustments column is 21rem, and a 9.5rem label leaves the three chassis
+            options ~148px to share, which clipped the last one off the card. */}
+        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3 xl:flex-col xl:items-stretch xl:gap-1.5">
+          <span className="type-data-label shrink-0 sm:w-[9.5rem] xl:w-auto">Chassis</span>
           <SegmentedControl
             size="sm"
             className="sm:flex-1"
@@ -1002,74 +1031,83 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
         </div>
       </CardPanel>
 
-      {/* ── Migration + sensitivities ──────────────────────────────── */}
-      <CardPanel contentClassName="space-y-3">
-        <Eyebrow>RC migration in roll · {axle}</Eyebrow>
-        {sweep && (
-          <MigrationPathChart
-            sweep={sweep}
-            ghostSweep={ghostSweep}
-            ghostName={comparing ? otherId.toUpperCase() : null}
-            current={rcAtRoll}
-          />
-        )}
-        <Eyebrow>Shim sensitivity · {axle}</Eyebrow>
-        <div className="space-y-1">
-          {sensitivities?.map((s) => (
-            <div key={s.label} className="flex items-baseline justify-between gap-2">
-              <span className="type-data-label">{s.label}</span>
-              <span className="font-mono text-[11px] tabular-nums">
-                {s.perMm != null ? `${fmtMm(s.perMm)}mm RC / mm shim` : "—"}
-              </span>
-            </div>
-          ))}
-        </div>
-      </CardPanel>
-
-      {/* ── Differences ────────────────────────────────────────────── */}
-      <CardPanel contentClassName="space-y-3">
-        <Eyebrow>{comparing ? "Differences" : "Changes"}</Eyebrow>
-
-        {changes.length > 0 ? (
-          <div className="rounded-md border border-border bg-secondary/60 p-2.5">
-            <div className="type-data-label mb-1 truncate">
-              {comparing ? `${otherName} → ${activeName}` : "Changes vs loaded sheet"}
-            </div>
-            <ul className="space-y-0.5">
-              {changes.map((c) => (
-                <li key={c} className="font-mono text-[10px] leading-relaxed text-muted-foreground">
-                  {c}
-                </li>
-              ))}
-            </ul>
+      {/*
+       * The slower reading. `display: contents` on a phone, so these two cards stay
+       * direct children of the flex column and the `gap-3` between them is untouched;
+       * at xl `.lab-aside` gives the wrapper a real box so both travel together —
+       * under the drawing while there are only two columns, beside it once there
+       * are three.
+       */}
+      <div className="lab-aside contents">
+        {/* ── Migration + sensitivities ──────────────────────────────── */}
+        <CardPanel contentClassName="space-y-3">
+          <Eyebrow>RC migration in roll · {axle}</Eyebrow>
+          {sweep && (
+            <MigrationPathChart
+              sweep={sweep}
+              ghostSweep={ghostSweep}
+              ghostName={comparing ? otherId.toUpperCase() : null}
+              current={rcAtRoll}
+            />
+          )}
+          <Eyebrow>Shim sensitivity · {axle}</Eyebrow>
+          <div className="space-y-1">
+            {sensitivities?.map((s) => (
+              <div key={s.label} className="flex items-baseline justify-between gap-2">
+                <span className="type-data-label">{s.label}</span>
+                <span className="font-mono text-[11px] tabular-nums">
+                  {s.perMm != null ? `${fmtMm(s.perMm)}mm RC / mm shim` : "—"}
+                </span>
+              </div>
+            ))}
           </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            {comparing
-              ? "The two setups have identical geometry."
-              : active.loaded
-                ? "No edits vs the loaded sheet yet."
-                : "Load a setup — or compare two — to see differences here."}
-          </p>
-        )}
+        </CardPanel>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            className="px-3 py-1 text-xs"
-            onClick={copyChanges}
-            disabled={changes.length === 0}
-          >
-            {copied ? "Copied" : comparing ? "Copy differences" : "Copy change list"}
-          </Button>
-        </div>
+        {/* ── Differences ────────────────────────────────────────────── */}
+        <CardPanel contentClassName="space-y-3">
+          <Eyebrow>{comparing ? "Differences" : "Changes"}</Eyebrow>
 
-        {computed.assumptions.length > 0 && (
-          <p className="text-[10px] leading-relaxed text-faint">
-            Assumed: {computed.assumptions.join(" · ")}
-          </p>
-        )}
-      </CardPanel>
+          {changes.length > 0 ? (
+            <div className="rounded-md border border-border bg-secondary/60 p-2.5">
+              <div className="type-data-label mb-1 truncate">
+                {comparing ? `${otherName} → ${activeName}` : "Changes vs loaded sheet"}
+              </div>
+              <ul className="space-y-0.5">
+                {changes.map((c) => (
+                  <li key={c} className="font-mono text-[10px] leading-relaxed text-muted-foreground">
+                    {c}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {comparing
+                ? "The two setups have identical geometry."
+                : active.loaded
+                  ? "No edits vs the loaded sheet yet."
+                  : "Load a setup — or compare two — to see differences here."}
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              className="px-3 py-1 text-xs"
+              onClick={copyChanges}
+              disabled={changes.length === 0}
+            >
+              {copied ? "Copied" : comparing ? "Copy differences" : "Copy change list"}
+            </Button>
+          </div>
+
+          {computed.assumptions.length > 0 && (
+            <p className="text-[10px] leading-relaxed text-faint">
+              Assumed: {computed.assumptions.join(" · ")}
+            </p>
+          )}
+        </CardPanel>
+      </div>
     </div>
   );
 }

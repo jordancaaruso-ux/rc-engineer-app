@@ -110,6 +110,7 @@
     "test:event-active": "npx tsx src/lib/eventActive.test.ts",
     "test:nav": "node --import tsx --test src/components/layout/navConfig.test.ts",
     "test:teams": "node --import tsx --test src/lib/teams/teamInviteRules.test.ts",
+    "test:share": "node --import tsx --test src/lib/share/shareCardModel.test.ts",
     "test:extract-normalize": "npx tsx src/lib/setupExtractAi/normalizeExtractedValue.test.ts",
     "test:auth-access-code": "npx tsx src/lib/auth/signupAccessCode.test.ts",
     "test:ai-usage": "npx tsx src/lib/aiUsage/budgets.test.ts",
@@ -167,7 +168,8 @@
     "cap:sync": "cap sync ios",
     "cap:open": "cap open ios",
     "shots:desktop": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/dev-desktop-shots.ts",
-    "layout:probe": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/dev-layout-probe.ts"
+    "layout:probe": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/dev-layout-probe.ts",
+    "brief": "node scripts/generate-project-brief.cjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",

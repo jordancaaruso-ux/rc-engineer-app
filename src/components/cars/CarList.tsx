@@ -110,6 +110,8 @@ export function CarList({
   const [importedSetup, setImportedSetup] = useState<Record<string, unknown> | null>(null);
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  /** Set when the car just added was the driver's first, so the confirmation can lead somewhere. */
+  const [firstCarId, setFirstCarId] = useState<string | null>(null);
 
   const selectedModel = setupSheetModels.find((m) => m.id === setupSheetModelId) ?? null;
   const sortedModels = [...setupSheetModels].sort((a, b) => a.name.localeCompare(b.name));
@@ -234,10 +236,14 @@ export function CarList({
         }
       }
 
+      // Their first car is the moment the app stops being empty — worth saying so, and worth
+      // pointing at what it unlocks. Read before `setCars` or it is always false.
+      const wasFirstCar = cars.length === 0;
       setCars((prev) => [car, ...prev]);
       const hadImport = Boolean(importedSetup && Object.keys(importedSetup).length > 0);
       resetForm();
       setAddOpen(false);
+      setFirstCarId(wasFirstCar ? car.id : null);
       setMessage(
         hadImport && importedSetupSaved
           ? "Car added, with the setup from your sheet saved on it."
@@ -397,20 +403,36 @@ export function CarList({
                 >
                   {adding ? "Adding…" : "Add car"}
                 </button>
-                {message && (
-                  <span
-                    className={cn(
-                      "text-xs",
-                      message.startsWith("Car added") ? "text-primary-ink" : "text-muted-foreground"
-                    )}
-                  >
-                    {message}
-                  </span>
+                {/* Only the failures belong here. Success collapses this form, so a
+                    "Car added" written into it was never seen by anyone — the confirmation
+                    now lives below, outside the Collapse. */}
+                {message && !message.startsWith("Car added") && (
+                  <span className="text-xs text-muted-foreground">{message}</span>
                 )}
               </div>
             </form>
           </Collapse>
         </li>
+
+        {/*
+         * The confirmation, and — for their first car — the thing it unlocks.
+         *
+         * Measured 2026-08-13 across ten new-account walks: adding a car left the driver on
+         * this page with no message (the old one was written into the form that had just
+         * collapsed) and nothing pointing onward. The dashboard flipped to "You're ready — log
+         * your first run", which they only ever saw if they thought to navigate back. That was
+         * two of the two detours every single walk paid. Linking straight to the run skips both.
+         */}
+        {message?.startsWith("Car added") && (
+          <li className="flex flex-col gap-2.5 px-3 py-3.5 sm:px-4" role="status">
+            <p className="text-sm text-primary-ink">{message}</p>
+            {firstCarId && (
+              <Link href="/runs/new" className={cn(buttonLinkClassName("primary"), "self-start")}>
+                Log your first run
+              </Link>
+            )}
+          </li>
+        )}
 
         {cars.length === 0 ? (
           <li className="px-4 py-4 text-sm text-muted-foreground">

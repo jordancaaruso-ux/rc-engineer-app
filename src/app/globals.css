@@ -774,6 +774,17 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
   opacity: 0.85;
 }
 
+/*
+ * On paper the yellow mark is an action colour sitting where nothing is being
+ * asked of the driver, and at 17px on a near-white rail it reads washed out.
+ * Same fix as the mobile pill (`.mobile-brand-mark img`): the asset is a single
+ * flat fill, so `brightness(0)` renders it as ink without a second file to keep
+ * in sync. Yellow stays the meaning of "action" — see VISUAL_NORTH_STAR.
+ */
+:root[data-theme="light"] .top-rail-brand img {
+  filter: brightness(0);
+}
+
 .top-rail-nav {
   position: relative;
   display: flex;
@@ -872,12 +883,24 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
   background-color: rgb(var(--color-border));
 }
 
+/*
+ * Padding and gap are asymmetric on purpose — they are set against the INK, not
+ * the boxes. `IconAddRun`'s plus fills only 15.4 of its 24 viewBox units, so at
+ * size 17 there is 3.05px of empty box on every side of it. With a symmetric
+ * `0 16px` the label was geometrically perfect (cluster offset measured 0.00px)
+ * and still looked pushed right, because the eye sees 19.05px of yellow to the
+ * left of the plus against 15.68px to the right of the "n" — and reads the 8px
+ * gap as 11.05px. So the left padding carries the icon's dead space (13 + 3.05
+ * = 16.05 ≈ the right's 15.68) and the gap does the same (5 + 3.05 = 8.05).
+ * Change either one if the icon ever changes, and re-measure rather than guess.
+ */
 .top-rail-logrun {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 5px;
   height: 38px;
-  padding: 0 16px;
+  padding: 0 16px 0 13px;
   border-radius: 8px;
   font-size: 13.5px;
   font-weight: 700;
@@ -1128,6 +1151,64 @@ html[data-nav-pending] .page {
 /* Descriptive subtitle retired from page chrome — the centered title stands alone. */
 .page-header .page-subtitle {
   display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   `is-echo` — the title the desktop rail already says (founder call 2026-08-13)
+
+   From md up, `TopRail` names the destination you are on: seven labelled tabs
+   with the active one ticked. On the seven pages that ARE those destinations the
+   `<h1>` then says the same word a second time, ~62px lower and 30px tall, and
+   the first card starts below both. That is the only thing this class removes.
+
+   Marked per page, never derived. The rail carries SECTION labels, so only a
+   title that is literally the tab's word qualifies: `/cars` is "Garage" and goes,
+   `/cars/<id>` is the car's name and stays.
+
+   `/runs/history` joins on a SECOND ground (founder call 2026-08-13), not this
+   one — its title is "Sessions" under an "Analysis" tab, a different word. It
+   echoes the page's own scope control instead of the rail: `SessionsFilterBar`
+   already draws the scope as the leading segment of the search bar, reading
+   "My sessions" or the team's name (`SessionsFilterBar.tsx:250`). Pick a team and
+   the `<h1>` changes to that team's name too, so the page said it twice. If a
+   third page wants this class, check which of the two duplications it has.
+
+   Hidden, not deleted. The rail's active tab is a link, not a heading, so
+   `display: none` would leave a desktop page with no `<h1>` at all. The title
+   block goes screen-reader-only and the header's own padding does the collapsing
+   — a 0×0 child in a padded flex row is still a 40px band.
+
+   Not collapsed to nothing, though. `.top-rail` is 64px, sticky, IN FLOW and
+   carries a bottom border, so at zero padding the first card would butt straight
+   onto that hairline with only `.page-body`'s `pt-2` between them. 1rem here + that
+   0.5rem is 24px, which is exactly the title→card gap this header was built around
+   (see the rhythm note above) — so the cards keep their distance and only the
+   title's own ~40px comes out.
+
+   Below md nothing here applies. There is no rail on a phone, and
+   `MobileTitleCondenser` reads `.page-title`'s text out of the DOM to draw the
+   compact title in the top band — no `<h1>`, no compact title.
+--------------------------------------------------------------------------- */
+@media (min-width: 768px) {
+  .page-header.is-echo {
+    padding-top: 1rem;
+    padding-bottom: 0;
+  }
+
+  /* Descendant, not `> div`. The six original pages put the title block directly
+     under the header, but `/runs/history` wraps it with the phone back-link, so a
+     direct-child selector silently did nothing there — class in the DOM, title
+     still on screen. `div:has(> .page-title)` matches the title's own parent and
+     only that, so it lands on exactly one element either way. */
+  .page-header.is-echo div:has(> .page-title) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 /*
@@ -1492,7 +1573,8 @@ html[data-nav-pending] .page {
   .page-header:has(+ .page-body.max-w-4xl) { max-width: 56rem; }
   .page-header:has(+ .page-body.max-w-6xl) { max-width: 72rem; }
   .page-header:has(+ .page-body.dash-wide),
-  .page-header:has(+ .page-body.events-wide) { max-width: 110rem; }
+  .page-header:has(+ .page-body.events-wide),
+  .page-header:has(+ .page-body.lab-wide) { max-width: 110rem; }
   /* Engineer's clamp is `lg:`-prefixed; the escaped class name is not something to
      put in a selector, so the page carries a plain marker for the mirror. */
   .page-header:has(+ .page-body.engineer-wide) { max-width: 72rem; }
@@ -1690,6 +1772,93 @@ html[data-nav-pending] .page {
 @media (min-width: 1280px) {
   .events-wide {
     max-width: 110rem; /* 1760px */
+  }
+
+  /*
+   * Events is the one `is-echo` header with something left in it. The title is
+   * gone from md up like the other six, but the season meta line and the
+   * YearToggle / Add-event group appear at xl and are `hidden` below it — so the
+   * padding `is-echo` zeroed has to come back exactly here, or the controls sit
+   * flush against the rail and the first card. Same values as `.page-header`.
+   */
+  .page-header.events-header.is-echo {
+    padding-top: 1.5rem;
+    padding-bottom: 1rem;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Roll Centre Lab desktop shell (2026-08-13). Third page on the 1760px axis.
+
+   The Lab was a 672px phone column at every width, so on a desktop you turned a
+   shim knob at the bottom of the page and had to scroll up to see the schematic
+   move — the one thing the tool exists to show. At xl it becomes a three-region
+   instrument (knobs | drawing | readouts) laid out by `RollCenterLabClient`'s
+   own `xl:grid`; only the cap lives here.
+
+   Same `@layer` trap as `.dash-wide` and `.events-wide`: `.page-body` is
+   UNLAYERED and Tailwind 4 utilities sit in `@layer utilities`, so an
+   `xl:max-w-*` would lose regardless of source order. Plain CSS, and registered
+   in the `.page-header:has(+ .page-body.lab-wide)` mirror above so the title
+   stays on the cards' axis.
+--------------------------------------------------------------------------- */
+@media (min-width: 1280px) {
+  .lab-wide {
+    max-width: 110rem; /* 1760px */
+  }
+
+  /* Two tracks: knobs on the left, the drawing and its readout on the right, the
+     slower reading (migration, sensitivities, change list) beneath. Explicit
+     placement, not source order — on a phone you meet the drawing before the
+     knobs, on a desktop the knobs are the hand you keep on the tool. */
+  .lab-grid {
+    display: grid;
+    grid-template-columns: 21rem minmax(0, 1fr);
+    /* Row 1 is exactly the setups card. Without this the instrument's `span 2`
+       makes the browser share its height across two `auto` rows, which pushed
+       Adjustments 41px below the card it should sit under. */
+    grid-template-rows: min-content auto;
+    align-items: start;
+    gap: 1rem;
+  }
+  .lab-setups {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .lab-adjust {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .lab-instrument {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  /* `display: contents` below this breakpoint (a utility on the element), so the
+     two cards it holds are plain flex items in the phone column. Here it becomes
+     a real box so they travel together. */
+  .lab-aside {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    grid-column: 2;
+    grid-row: 3;
+  }
+}
+
+/* The third track. The schematic decides this number at both ends: at 1280 three
+   tracks leave a 496px centre and the drawing comes out SMALLER than the 582px it
+   has today, so 1280 stays at two; at 1440-on-two-tracks the centre is 1024px but
+   the drawing letterboxes at ~864px, so 134px is spent on nothing while the
+   sensitivities sit below the fold. 1400 rather than 1440 because the house
+   desktop review width is 1440 (scripts/dev-desktop-shots.ts) and a 1440 window
+   has only ~1425px of client width once the scrollbar is out. */
+@media (min-width: 1400px) {
+  .lab-grid {
+    grid-template-columns: 21rem minmax(0, 1fr) 22rem;
+  }
+  .lab-aside {
+    grid-column: 3;
+    grid-row: 1 / span 2;
   }
 }
 

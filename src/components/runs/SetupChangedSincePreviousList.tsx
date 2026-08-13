@@ -55,30 +55,34 @@ export function SetupChangedSincePreviousList({
   return (
     <div
       className={cn(
-        // `w-fit` so the frame hugs the tracks. Without it the box stays full
-        // width while the packed tracks don't, and the sticky header band stops
-        // half way across.
-        "max-h-48 w-fit max-w-full overflow-y-auto rounded-md border border-border bg-muted/70",
+        // Full width, capped. The parameter column below is `1fr`, so the tracks
+        // fill the frame and the sticky header band reaches the right edge — the
+        // reason this box used to be `w-fit`. The cap stops a one-row diff in a
+        // wide pane from stranding the label and its value half a screen apart.
+        "max-h-48 w-full max-w-[30rem] overflow-y-auto rounded-md border border-border bg-muted/70",
         className
       )}
     >
       {/* Single grid so NOW / WAS align in fixed columns across every row —
           the widest value in each column sets its width (instrument table).
 
-          The parameter column is `max-content`, not `1fr`, and the tracks pack
-          left. As `1fr` it ate every spare pixel, so in a wide pane a one-row
-          diff put "Toe (Rear)" against the left wall and "3.5" against the right
-          with 500px of nothing between them — the change and its value stopped
-          reading as one fact. `minmax(0, …)` keeps it able to shrink and truncate
-          when the column is genuinely narrow.
+          The parameter column takes the slack (`1fr`), which pins NOW / WAS to
+          the right edge and lets the header band span the whole frame. The
+          `minmax(0, …)` keeps it able to shrink and truncate when the column is
+          genuinely narrow; the frame's `max-w` above is what stops the label and
+          its value drifting apart in a wide pane.
 
           The fourth column is the opener. It collapses to nothing on a chassis
           with no sheet, which is most of them. */}
-      <div className="grid grid-cols-[minmax(0,max-content)_auto_auto_auto] items-baseline justify-start">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-baseline">
         <div className={cn(HEAD_CELL, "pl-3.5 pr-2 text-left")}>Parameter</div>
         <div className={cn(HEAD_CELL, "px-2 text-right")}>Now</div>
         <div className={cn(HEAD_CELL, "pl-2 pr-3.5 text-right")}>Was</div>
-        <div className={cn(HEAD_CELL, cropByKey ? "pr-2" : "")} />
+        {/* Empty, so it has no text baseline to align on and the browser makes
+            one up from its own bottom edge — which parked its underline ~10px
+            above the other three. `self-stretch` opts it out of baseline
+            alignment and gives it the row's full height, so the line is straight. */}
+        <div className={cn(HEAD_CELL, "self-stretch", cropByKey ? "pr-2" : "")} />
         {rows.map((row, i) => {
           const divider = i > 0 ? "border-t border-border/50" : undefined;
           const crop = cropByKey?.get(row.key);

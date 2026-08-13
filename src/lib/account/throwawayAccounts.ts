@@ -42,6 +42,19 @@ export function throwawayEmailWhere(): {
   };
 }
 
+/**
+ * `jordancaaruso@gmail.com` → `jordancaaruso+ob0727-4f2a@gmail.com`. Unique per call.
+ *
+ * Shared by `scripts/dev-fresh-onboarding.ts` and `/api/auth/dev-new-user` so the two ways of
+ * minting a throwaway produce the same shape — and `throwawayEmailWhere()` keeps matching both.
+ * `randomSuffix` is injected because the route runs in the app (no `node:crypto` import needed
+ * on the edge-adjacent path); callers pass 4 hex chars.
+ */
+export function freshThrowawayAlias(randomSuffix: string, now: Date): string {
+  const stamp = `${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  return `${THROWAWAY_EMAIL_PREFIX}${stamp}-${randomSuffix}${THROWAWAY_EMAIL_SUFFIX}`;
+}
+
 /** Same rule in plain TS, for callers holding an email rather than building a query. */
 export function isThrowawayEmail(email: string | null | undefined): boolean {
   const normalized = email?.trim().toLowerCase();

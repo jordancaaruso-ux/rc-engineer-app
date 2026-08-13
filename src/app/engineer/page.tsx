@@ -30,7 +30,7 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
     return (
       <>
-        <header className="page-header">
+        <header className="page-header is-echo">
           <div>
             <h1 className="page-title">Engineer</h1>
             <p className="page-subtitle">Database not configured.</p>
@@ -50,7 +50,7 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
 
   return (
     <>
-      <header className="page-header">
+      <header className="page-header is-echo">
         <div className="min-w-0">
           <h1 className="page-title">Engineer</h1>
           <p className="page-subtitle">Setup guidance from your runs and knowledge base.</p>

@@ -200,7 +200,9 @@ export function RollCenterDetail({
       <div className="flex flex-wrap items-center gap-2 border-t border-border/80 px-2 py-2">
         <Link
           href={labHref(value, baselineValue, labLabels)}
-          className="tap-active inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:border-accent/40 hover:bg-muted/60"
+          /* `primary-ink`, not `accent`: yellow doing a foreground job has to darken on paper,
+             which is the whole reason that token exists (light mode, main @ 4275087). */
+          className="tap-active inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:border-primary-ink/40 hover:bg-muted/60"
         >
           Open in Lab
         </Link>

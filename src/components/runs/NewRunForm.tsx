@@ -69,7 +69,10 @@ import {
   type WizardStepStatus,
 } from "@/lib/runs/wizardWalk";
 import { runHasLapTimes } from "@/lib/runs/lapImportPrompt";
-import { InlineNewTrackRow } from "@/components/runs/InlineNewTrackRow";
+import {
+  InlineNewTrackRow,
+  type InlineNewTrackRowHandle,
+} from "@/components/runs/InlineNewTrackRow";
 import { deriveContinueEntry, type NewRunWizardEntry } from "@/lib/runs/wizardEntry";
 import { planCarSwap, type CarSwapPlan } from "@/lib/runs/carSwap";
 import type { EntryCandidate } from "@/lib/runs/entryCandidate";
@@ -827,6 +830,11 @@ export function NewRunForm(props: {
   const [copyTrackWarning, setCopyTrackWarning] = useState<string | null>(null);
   const [copyTireWarning, setCopyTireWarning] = useState<string | null>(null);
   const [pickerRuns, setPickerRuns] = useState<RunPickerRun[]>([]);
+  /** Car id whose past-run + saved-setup lists have actually come back, so "both empty" can be
+   *  told apart from "not fetched yet". */
+  const [setupOptionsLoadedFor, setSetupOptionsLoadedFor] = useState<string | null>(null);
+  /** Lets the track sheet's "add a track that isn't listed" open the chip below it, prefilled. */
+  const newTrackRowRef = useRef<InlineNewTrackRowHandle>(null);
   const [loadSetupSelection, setLoadSetupSelection] = useState("");
   const [loadOtherSetupSelection, setLoadOtherSetupSelection] = useState("");
   const [setupSource, setSetupSource] = useState<"previous_runs" | "other" | "new">("previous_runs");
@@ -2230,17 +2238,54 @@ export function NewRunForm(props: {
         setPickerRuns(Array.isArray(runsRes.runs) ? runsRes.runs : []);
         setDownloadedSetups(Array.isArray(dlRes.downloadedSetups) ? dlRes.downloadedSetups : []);
         setSupportsSheetUpload(dlRes.supportsSheetUpload === true);
+        setSetupOptionsLoadedFor(carId);
       })
       .catch(() => {
         if (!alive) return;
         setPickerRuns([]);
         setDownloadedSetups([]);
         setSupportsSheetUpload(false);
+        setSetupOptionsLoadedFor(carId);
       });
     return () => {
       alive = false;
     };
   }, [carId]);
+
+  /*
+   * Land the setup card on a face that has something in it.
+   *
+   * It always opened on "Previous runs", which for a first-time driver is empty by construction —
+   * they have never logged a run — so the Setup step's opening words were "No past runs yet",
+   * under a heading promising a sheet, above a screenful of nothing. Measured 2026-08-13: it
+   * happened in all ten new-account walks, and was the most common thing wrong with the first run.
+   *
+   * Waits for `setupOptionsLoadedFor` because both lists start empty: acting on that initial
+   * state would move every driver to "New" for a moment, including one whose runs are still in
+   * flight. Only the DEFAULT moves — an explicit pick (`setupTouchedByUserRef`), an edit, or a
+   * resumed draft already means something and is left alone. The seed mirrors
+   * `handleSetupSourceChange("new")` minus the expand: the driver did not ask to come here, so
+   * the sheet stays rolled up until they open it.
+   */
+  useEffect(() => {
+    if (!carId || setupOptionsLoadedFor !== carId) return;
+    if (props.editRun?.id || setupTouchedByUserRef.current) return;
+    if (setupSource !== "previous_runs") return;
+    if (pickerRuns.length > 0 || downloadedSetups.length > 0) return;
+    setSetupSource("new");
+    const empty = setupSnapshotWithDerived({});
+    setSetupData(empty);
+    setActiveSetupData(empty, carId);
+    setSetupBaselineSnapshotId(null);
+    setSetupBaselineData(cloneSetupSnapshot(empty));
+  }, [
+    carId,
+    setupOptionsLoadedFor,
+    pickerRuns,
+    downloadedSetups,
+    setupSource,
+    props.editRun?.id,
+  ]);
 
   function handleSetupSourceChange(next: "previous_runs" | "other" | "new") {
     if (next === setupSource) return;
@@ -3221,7 +3266,29 @@ export function NewRunForm(props: {
         const parts: string[] = [];
         if (missingCarRating) parts.push("rate the car 1–10");
         if (missingSetup) {
-          parts.push("attach a setup — copy last run, load a past setup, or upload a sheet");
+          /*
+           * Lead with the one thing that always works, and name only the doors that are
+           * actually open.
+           *
+           * The old line offered three fixed ways — "copy last run, load a past setup, or
+           * upload a sheet" — and measured 2026-08-13, a first-time driver has none of them:
+           * no runs to copy, no saved setups, and usually no fillable PDF. Being refused and
+           * then handed three impossible instructions is worse than being refused plainly.
+           *
+           * What the check actually wants is one populated field (`setupData` non-empty), so
+           * that is what it now asks for. Landing on a blank sheet is NOT enough on its own —
+           * an untouched blank normalizes back to nothing.
+           */
+          const alternatives = [
+            pickerRuns.length ? "copy a past run" : null,
+            downloadedSetups.length ? "load a saved setup" : null,
+            supportsSheetUpload ? "upload your sheet" : null,
+          ].filter((w): w is string => w !== null);
+          parts.push(
+            `attach a setup — put one value on the sheet${
+              alternatives.length ? `, or ${alternatives.join(", or ")}` : ""
+            }`
+          );
         }
         setCompleteValidation({
           show: true,
@@ -4120,6 +4187,15 @@ export function NewRunForm(props: {
                     favouriteTracks={favouriteTracks}
                     placeholder="Select track…"
                     aria-label="Track"
+                    onCreateRequest={
+                      isEditing
+                        ? undefined
+                        : (query) => {
+                            // The chip below owns the form; the sheet just points at it, carrying
+                            // whatever they typed so the name isn't entered twice.
+                            newTrackRowRef.current?.openWith(query);
+                          }
+                    }
                   />
                   {!isEditing ? (
                     <div className="flex flex-wrap items-center gap-2">
@@ -4148,6 +4224,7 @@ export function NewRunForm(props: {
                         </button>
                       )}
                       <InlineNewTrackRow
+                        ref={newTrackRowRef}
                         onCreated={(t) => {
                           // Merge rather than skip: on a duplicate name the row hands back the
                           // *existing* track, and its timing URLs are what the lap panel scans.
