@@ -29,9 +29,20 @@ export const RUN_HISTORY_DATA_CLASS = "font-mono text-[11px] tabular-nums";
 /** Muted mobile column headers (Date / Best / Top 5 / Median). */
 export const RUN_HISTORY_DATA_HEADER_CLASS = "type-data-label";
 
-/** Desktop-only action column — mobile buttons live in the flex row shell. */
+/**
+ * Desktop-only action column — mobile buttons live in the flex row shell.
+ *
+ * The width is NOT cosmetic. `table-fixed` honours the colgroup, so the `w-[1%]`
+ * this used to carry really did hand the column ~10px; the button group wrapped
+ * onto three lines and an 81px-tall stack set the height of every run row (98px
+ * measured in the team master-detail pane, 2026-08-13). It must stay wide enough
+ * for tire disc + setup + laps side by side: 3 × 24px + 2 × 2px gap + 8px cell
+ * padding = 80px. Every px beyond that comes straight out of Session, which is
+ * the only column that flexes — at 100px wide it collapsed Session to nothing
+ * in the 621px team pane.
+ */
 export const RUN_HISTORY_ACTION_CELL_CLASS =
-  "hidden md:table-cell whitespace-nowrap w-[1%] px-2 py-2 text-right";
+  "hidden md:table-cell whitespace-nowrap w-[5.25rem] px-1 py-1 text-right";
 
 /** Fixed date column width on mobile (~3.5rem). */
 export const RUN_HISTORY_MOBILE_DATE_CLASS = "w-14 shrink-0 min-w-0 text-left";
@@ -136,15 +147,26 @@ export function RunHistoryColGroup({ layout }: { layout: RunHistoryColumnLayout 
   return (
     <colgroup className="max-md:hidden">
       {showReorderColumn ? <col className="w-6" /> : null}
-      {showMemberColumn ? <col className="w-[15%]" /> : null}
-      <col className="w-[5.5rem]" />
+      {/* Both of these truncate at any width, so extra % buys nothing and Session
+          pays for it. Member is "You (Alex Marino)"; Car is the same chassis on
+          every row of a session. */}
+      {showMemberColumn ? <col className="w-[12%]" /> : null}
+      {/* "19 Jul" at 11px mono is ~36px; 72 − 16 of cell padding leaves 56. */}
+      <col className="w-[4.5rem]" />
+      {/* Session is the ONLY column without a width, so it absorbs whatever the
+          others leave. Widen anything below and this is what pays for it. The
+          tightest case is the team master-detail pane at lg, where the 21rem
+          rail leaves the table 621px — Session is the first thing to vanish. */}
       {showSessionColumn ? <col /> : null}
-      <col className="w-[14%]" />
-      <col className="w-[4.25rem]" />
-      <col className="w-[4.25rem]" />
-      <col className="w-[4.25rem]" />
-      <col className="w-[4.25rem]" />
-      <col className="w-[1%]" />
+      <col className="w-[10%]" />
+      {/* "16.039" at 11px mono is ~40px; 60 − 16 of cell padding leaves 44. */}
+      <col className="w-[3.75rem]" />
+      <col className="w-[3.75rem]" />
+      <col className="w-[3.75rem]" />
+      <col className="w-[3.75rem]" />
+      {/* See RUN_HISTORY_ACTION_CELL_CLASS — a starved action column wraps its
+          buttons into a stack and triples the height of every row. */}
+      <col className="w-[5.25rem]" />
     </colgroup>
   );
 }

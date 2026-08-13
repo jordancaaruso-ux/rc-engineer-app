@@ -551,31 +551,39 @@ export default async function RunHistoryPage({
                 />
               ) : null}
               {columnLayout.showMemberColumn ? (
-                <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 max-w-[4.5rem] md:max-w-none">
+                <th className="table-col-header px-2 py-1.5 md:px-2 md:py-2 max-w-[4.5rem] md:max-w-none">
                   <span className="hidden sm:inline">Member</span>
                   <span className="sm:hidden">Who</span>
                 </th>
               ) : null}
-              <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+              <th className="table-col-header px-2 py-1.5 md:px-2 md:py-2 whitespace-nowrap">
                 Date
               </th>
               {showSessionColumn ? (
-                <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 min-w-0">
+                <th className="table-col-header px-2 py-1.5 md:px-2 md:py-2 min-w-0">
                   Session
                 </th>
               ) : null}
-              <th className="table-col-header hidden md:table-cell px-4 py-2">Car</th>
-              <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+              <th className="table-col-header hidden md:table-cell px-2 py-2">Car</th>
+              <th className="table-col-header px-1.5 py-1.5 md:px-2 md:py-2 whitespace-nowrap">
                 Best
               </th>
-              <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
-                <span className="md:hidden">Top 5</span>
-                <span className="hidden md:inline">Avg top 5</span>
+              {/* "Top 5" / "Top 10", not "Avg top 5" — the long labels are wider
+                  than the columns they head and were already overlapping each
+                  other at 1440. The phone header has always said this. */}
+              <th
+                className="table-col-header px-1.5 py-1.5 md:px-2 md:py-2 whitespace-nowrap"
+                title="Average of the 5 best laps"
+              >
+                Top 5
               </th>
-              <th className="table-col-header hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
-                Avg top 10
+              <th
+                className="table-col-header hidden md:table-cell px-1.5 py-1.5 md:px-2 md:py-2 whitespace-nowrap"
+                title="Average of the 10 best laps"
+              >
+                Top 10
               </th>
-              <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+              <th className="table-col-header px-1.5 py-1.5 md:px-2 md:py-2 whitespace-nowrap">
                 Median
               </th>
               <th
@@ -785,25 +793,33 @@ export default async function RunHistoryPage({
                   />
                 ) : null}
                 {teamMode ? (
-                  <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 max-w-[4.5rem] md:max-w-none">
+                  <th className="table-col-header px-2 py-1.5 md:px-2 md:py-2 max-w-[4.5rem] md:max-w-none">
                     <span className="hidden sm:inline">Member</span>
                     <span className="sm:hidden">Who</span>
                   </th>
                 ) : null}
-                <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap">Date</th>
+                <th className="table-col-header px-2 py-1.5 md:px-2 md:py-2 whitespace-nowrap">Date</th>
                 {showSessionColumn ? (
-                  <th className="table-col-header px-2 py-1.5 md:px-3 md:py-2 min-w-0">Session</th>
+                  <th className="table-col-header px-2 py-1.5 md:px-2 md:py-2 min-w-0">Session</th>
                 ) : null}
-                <th className="table-col-header hidden md:table-cell px-4 py-2">Car</th>
-                <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">Best</th>
-                <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
-                  <span className="md:hidden">Top 5</span>
-                  <span className="hidden md:inline">Avg top 5</span>
+                <th className="table-col-header hidden md:table-cell px-2 py-2">Car</th>
+                <th className="table-col-header px-1.5 py-1.5 md:px-2 md:py-2 whitespace-nowrap">Best</th>
+                {/* "Top 5" / "Top 10", not "Avg top 5" — the long labels are wider
+                    than the columns they head and were already overlapping each
+                    other at 1440. The phone header has always said this. */}
+                <th
+                  className="table-col-header px-1.5 py-1.5 md:px-2 md:py-2 whitespace-nowrap"
+                  title="Average of the 5 best laps"
+                >
+                  Top 5
                 </th>
-                <th className="table-col-header hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
-                  Avg top 10
+                <th
+                  className="table-col-header hidden md:table-cell px-1.5 py-1.5 md:px-2 md:py-2 whitespace-nowrap"
+                  title="Average of the 10 best laps"
+                >
+                  Top 10
                 </th>
-                <th className="table-col-header px-1.5 py-1.5 md:px-3 md:py-2 whitespace-nowrap">
+                <th className="table-col-header px-1.5 py-1.5 md:px-2 md:py-2 whitespace-nowrap">
                   Median
                 </th>
                 <th

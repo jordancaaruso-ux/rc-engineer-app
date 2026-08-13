@@ -126,7 +126,9 @@ function RunHistoryActionButtons({
       className={cn(
         mobile
           ? RUN_HISTORY_MOBILE_ACTIONS_CLASS
-          : "inline-flex w-fit flex-row flex-wrap items-center justify-end gap-1",
+          // `flex-nowrap`, deliberately: wrapping here is what made every desktop
+          // run row 98px tall. The column is sized to fit these three side by side.
+          : "inline-flex w-fit flex-row flex-nowrap items-center justify-end gap-0.5",
         className
       )}
     >
@@ -158,26 +160,24 @@ function RunHistoryActionButtons({
         onClick={onSetup}
         aria-label="View setup"
         className={cn(
-          mobile
-            ? "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-muted/80 transition"
-            : "ui-strong shrink-0 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[10px] text-foreground hover:bg-muted/80 transition"
+          "inline-flex shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-muted/80 transition",
+          mobile ? "h-8 w-8" : "h-6 w-6"
         )}
         title="View setup sheet for this run; compare to another run from the modal"
       >
-        {mobile ? <Wrench className="h-4 w-4" aria-hidden /> : "View setup"}
+        <Wrench className={mobile ? "h-4 w-4" : "h-3.5 w-3.5"} aria-hidden />
       </button>
       <button
         type="button"
         onClick={onLaps}
         aria-label="View laps"
         className={cn(
-          mobile
-            ? "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-muted/80 transition"
-            : "ui-strong shrink-0 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-[10px] text-foreground hover:bg-muted/80 transition"
+          "inline-flex shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-muted/80 transition",
+          mobile ? "h-8 w-8" : "h-6 w-6"
         )}
         title="Open lap column compare for this run"
       >
-        {mobile ? <Timer className="h-4 w-4" aria-hidden /> : "Lap times"}
+        <Timer className={mobile ? "h-4 w-4" : "h-3.5 w-3.5"} aria-hidden />
       </button>
     </div>
   );
@@ -595,7 +595,7 @@ export function RunHistoryTable({
               </td>
               {enableReorder ? (
                 <td
-                  className="hidden md:table-cell w-6 px-1 py-1.5 md:py-2 align-middle text-center text-muted-foreground"
+                  className="hidden md:table-cell w-6 px-1 py-1.5 md:py-1 align-middle text-center text-muted-foreground"
                   onClick={(e) => e.stopPropagation()}
                   onKeyDown={(e) => e.stopPropagation()}
                   title="Drag to reorder"
@@ -606,13 +606,13 @@ export function RunHistoryTable({
               ) : null}
               {showMemberColumn ? (
                 <td
-                  className="hidden md:table-cell px-2 py-1.5 md:px-3 md:py-2 align-middle text-xs text-muted-foreground max-w-[4.5rem] md:max-w-[10rem] truncate"
+                  className="hidden md:table-cell px-2 py-1.5 md:px-2 md:py-1 align-middle text-xs text-muted-foreground max-w-[4.5rem] md:max-w-[10rem] truncate"
                   title={memberLabel ?? ""}
                 >
                   {memberLabel}
                 </td>
               ) : null}
-              <td className={cn("hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-foreground leading-snug md:whitespace-nowrap", RUN_HISTORY_DATA_CLASS)}>
+              <td className={cn("hidden md:table-cell px-1.5 py-1.5 md:px-2 md:py-1 align-middle text-foreground leading-snug md:whitespace-nowrap", RUN_HISTORY_DATA_CLASS)}>
                 <span title={formatRunDateTime(runInstant, displayTimeZone)}>
                   {formatRunDateShort(runInstant, displayTimeZone)}
                 </span>
@@ -629,7 +629,7 @@ export function RunHistoryTable({
                 ) : null}
               </td>
               {showSessionColumn ? (
-                <td className="hidden md:table-cell px-2 py-1.5 md:px-3 md:py-2 min-w-0 align-middle">
+                <td className="hidden md:table-cell px-2 py-1.5 md:px-2 md:py-1 min-w-0 align-middle">
                   <div className="flex flex-row flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
                     <span className="text-xs text-foreground leading-snug line-clamp-1 break-words min-w-0">
                       {sessionDisplay === "—" ? "" : sessionDisplay}
@@ -652,19 +652,19 @@ export function RunHistoryTable({
                   </div>
                 </td>
               ) : null}
-              <td className="hidden md:table-cell px-4 py-2 align-middle text-xs text-foreground">
+              <td className="hidden md:table-cell px-2 py-1 align-middle text-xs text-foreground">
                 {carDisplay}
               </td>
-              <td className={cn("hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-foreground whitespace-nowrap", RUN_HISTORY_DATA_CLASS)}>
+              <td className={cn("hidden md:table-cell px-1.5 py-1.5 md:px-2 md:py-1 align-middle text-foreground whitespace-nowrap", RUN_HISTORY_DATA_CLASS)}>
                 {bestLapDisplay}
               </td>
-              <td className={cn("hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-foreground whitespace-nowrap", RUN_HISTORY_DATA_CLASS)}>
+              <td className={cn("hidden md:table-cell px-1.5 py-1.5 md:px-2 md:py-1 align-middle text-foreground whitespace-nowrap", RUN_HISTORY_DATA_CLASS)}>
                 {avg5Display}
               </td>
-              <td className={cn("hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-foreground whitespace-nowrap", RUN_HISTORY_DATA_CLASS)}>
+              <td className={cn("hidden md:table-cell px-1.5 py-1.5 md:px-2 md:py-1 align-middle text-foreground whitespace-nowrap", RUN_HISTORY_DATA_CLASS)}>
                 {avg10Display}
               </td>
-              <td className={cn("hidden md:table-cell px-1.5 py-1.5 md:px-3 md:py-2 align-middle text-foreground whitespace-nowrap", RUN_HISTORY_DATA_CLASS)}>
+              <td className={cn("hidden md:table-cell px-1.5 py-1.5 md:px-2 md:py-1 align-middle text-foreground whitespace-nowrap", RUN_HISTORY_DATA_CLASS)}>
                 {medianLapDisplay}
               </td>
               <td
