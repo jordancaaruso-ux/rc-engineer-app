@@ -49,11 +49,11 @@ import {
   type LabFields,
 } from "@/lib/rollCenter/labState";
 import {
-  formatRunPickerLine,
-  formatRunPickerLineWithDriver,
-  formatRunPickerWhenSegment,
+  formatRunCreatedRelativeWhen,
+  formatRunPickerParts,
   type RunPickerRun,
 } from "@/lib/runPickerFormat";
+import Link from "next/link";
 
 const ROLL_MAX_DEG = 3;
 
@@ -61,14 +61,38 @@ const ROLL_MAX_DEG = 3;
 const POSE_ICON_BUTTON =
   "tap-active grid size-5 shrink-0 place-items-center rounded border border-border text-muted-foreground transition hover:border-primary-ink/40 hover:text-foreground disabled:pointer-events-none disabled:opacity-30";
 
-/** One searchable setup source: own run, downloaded sheet, or teammate run. */
+/** Which list a row belongs to. One tab each; a row never appears in two. */
+type PickerSource = "mine" | "teammates" | "setups";
+
+/**
+ * One searchable setup row. `title` answers "which session", `detail` answers
+ * "which car, where, how fast" — two lines, because one line at 390px clips
+ * exactly the half that tells two rows apart. `label` is the flattened form,
+ * kept for the slot chip and the shareable URL.
+ */
 type SetupPickerEntry = {
   id: string;
-  kind: "run" | "sheet" | "team";
+  kind: "run" | "sheet" | "saved" | "team";
+  source: PickerSource;
   label: string;
+  title: string;
+  detail: string;
   when: string;
   fields: LabFields;
 };
+
+/** Per-source row cap: no source can crowd out another, unlike the old shared 30. */
+const PICKER_ROWS_PER_SOURCE = 40;
+
+const PICKER_SOURCE_LABEL: Record<PickerSource, string> = {
+  mine: "Mine",
+  teammates: "Teammates",
+  setups: "Setups",
+};
+
+function flattenPickerLabel(title: string, detail: string): string {
+  return detail ? `${title} · ${detail}` : title;
+}
 
 function isJsonObject(v: unknown): v is Record<string, unknown> {
   return v != null && typeof v === "object" && !Array.isArray(v);
@@ -367,86 +391,185 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
   const activeName = slotName(active);
   const otherName = comparing && other ? slotName(other) : null;
 
-  /* ── Setup picker (own runs + downloaded sheets + teammates) ── */
+  /* ── Setup picker (own runs + teammates + saved setups & sheets) ── */
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerQuery, setPickerQuery] = useState("");
+  const [pickerTab, setPickerTab] = useState<PickerSource>("mine");
   const [pickerSources, setPickerSources] = useState<SetupPickerEntry[] | null>(null);
   const [pickerLoading, setPickerLoading] = useState(false);
   const [pickerError, setPickerError] = useState<string | null>(null);
+  /** In-flight guard (a ref, so two taps in one render can't both fire the fetch). */
+  const pickerFetching = useRef(false);
+  /** True while the picker is open, so each fresh open refetches exactly once. */
+  const pickerOpenedRef = useRef(false);
 
   const loadPickerSources = async () => {
-    if (pickerSources || pickerLoading) return;
+    if (pickerFetching.current) return;
+    pickerFetching.current = true;
     setPickerLoading(true);
     setPickerError(null);
     const safeJson = (url: string) =>
       fetch(url)
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null);
-    const [runsRes, docsRes, teamRes] = await Promise.all([
+    const [runsRes, docsRes, teamRes, libRes] = await Promise.all([
       safeJson("/api/runs/for-picker") as Promise<{ runs?: RunPickerRun[] } | null>,
       safeJson("/api/setup/options") as Promise<{
-        downloadedSetups?: { id: string; originalFilename?: string | null; createdAt?: string; setupData?: unknown }[];
+        downloadedSetups?: {
+          id: string;
+          originalFilename?: string | null;
+          createdAt?: string;
+          setupData?: unknown;
+          documentSetupTemplate?: string | null;
+          baselineSetupSnapshotId?: string | null;
+        }[];
       } | null>,
       safeJson("/api/runs/teammate-for-picker") as Promise<{
         runs?: (RunPickerRun & { userId?: string | null })[];
         memberDisplayByUserId?: Record<string, string>;
       } | null>,
+      safeJson("/api/setups/library-for-picker") as Promise<{
+        setups?: {
+          id: string;
+          name?: string | null;
+          createdAt?: string;
+          carName?: string | null;
+          setupData?: unknown;
+        }[];
+      } | null>,
     ]);
-    if (!runsRes && !docsRes && !teamRes) {
+    if (!runsRes && !docsRes && !teamRes && !libRes) {
+      // Keep whatever is already on screen — a failed refetch must not blank a usable list.
       setPickerError("Couldn't load your setups — check you're signed in.");
       setPickerLoading(false);
+      pickerFetching.current = false;
       return;
     }
     const entries: SetupPickerEntry[] = [];
+    const push = (
+      id: string,
+      kind: SetupPickerEntry["kind"],
+      source: PickerSource,
+      title: string,
+      detail: string,
+      when: string,
+      data: Record<string, unknown>
+    ) => {
+      entries.push({
+        id,
+        kind,
+        source,
+        label: flattenPickerLabel(title, detail),
+        title,
+        detail,
+        when,
+        fields: extractGeometryFields(data),
+      });
+    };
     for (const run of runsRes?.runs ?? []) {
       const data = run.setupSnapshot?.data;
       if (!isJsonObject(data) || !resolvePackForSnapshot(data)) continue;
-      entries.push({
-        id: `run-${run.id}`,
-        kind: "run",
-        label: formatRunPickerLine(run),
-        when: formatRunPickerWhenSegment(run),
-        fields: extractGeometryFields(data),
-      });
-    }
-    for (const sheet of docsRes?.downloadedSetups ?? []) {
-      const data = sheet.setupData;
-      if (!isJsonObject(data) || !resolvePackForSnapshot(data)) continue;
-      entries.push({
-        id: `sheet-${sheet.id}`,
-        kind: "sheet",
-        label: sheet.originalFilename?.trim() || "Downloaded setup",
-        when: sheet.createdAt ? new Date(sheet.createdAt).toLocaleDateString() : "",
-        fields: extractGeometryFields(data),
-      });
+      const parts = formatRunPickerParts(run);
+      push(`run-${run.id}`, "run", "mine", parts.title, parts.detail, parts.when, data);
     }
     for (const run of teamRes?.runs ?? []) {
       const data = run.setupSnapshot?.data;
       if (!isJsonObject(data) || !resolvePackForSnapshot(data)) continue;
-      entries.push({
-        id: `team-${run.id}`,
-        kind: "team",
-        label: formatRunPickerLineWithDriver(run, teamRes?.memberDisplayByUserId),
-        when: formatRunPickerWhenSegment(run),
-        fields: extractGeometryFields(data),
-      });
+      const parts = formatRunPickerParts(run, teamRes?.memberDisplayByUserId);
+      push(`team-${run.id}`, "team", "teammates", parts.title, parts.detail, parts.when, data);
+    }
+    const savedIds = new Set<string>();
+    for (const saved of libRes?.setups ?? []) {
+      const data = saved.setupData;
+      if (!isJsonObject(data) || !resolvePackForSnapshot(data)) continue;
+      savedIds.add(saved.id);
+      push(
+        `saved-${saved.id}`,
+        "saved",
+        "setups",
+        saved.name?.trim() || "Untitled setup",
+        // Car only. A value count reads as detail but answers nothing you'd ask here,
+        // and it cost a second wrapped line on names that are already long.
+        saved.carName?.trim() || "",
+        saved.createdAt ? formatRunCreatedRelativeWhen(saved.createdAt) : "",
+        data
+      );
+    }
+    for (const sheet of docsRes?.downloadedSetups ?? []) {
+      const data = sheet.setupData;
+      if (!isJsonObject(data) || !resolvePackForSnapshot(data)) continue;
+      // An imported sheet whose snapshot was later saved is the SAME setup — it was
+      // listing twice, once under each name. The saved row wins: it carries the name
+      // the driver chose.
+      if (sheet.baselineSetupSnapshotId && savedIds.has(sheet.baselineSetupSnapshotId)) continue;
+      push(
+        `sheet-${sheet.id}`,
+        "sheet",
+        "setups",
+        sheet.originalFilename?.replace(/\.(pdf|jpe?g|png|webp)$/i, "").trim() || "Downloaded setup",
+        sheet.documentSetupTemplate?.trim() || "Imported sheet",
+        // Relative, like every other row — this one used to be a bare locale date.
+        sheet.createdAt ? formatRunCreatedRelativeWhen(sheet.createdAt) : "",
+        data
+      );
     }
     setPickerSources(entries);
     setPickerLoading(false);
+    pickerFetching.current = false;
   };
 
-  const pickerResults = useMemo(() => {
-    if (!pickerSources) return [];
+  const openPicker = () => {
+    if (!pickerOpenedRef.current) {
+      pickerOpenedRef.current = true;
+      // Refetch on each fresh open: a run logged since the Lab loaded should be here.
+      void loadPickerSources();
+    }
+    setPickerOpen(true);
+  };
+
+  const closePicker = () => {
+    pickerOpenedRef.current = false;
+    setPickerOpen(false);
+    setPickerQuery("");
+  };
+
+  /** How many rows each source holds before the search box narrows anything. */
+  const pickerPoolCounts = useMemo(() => {
+    const counts: Record<PickerSource, number> = { mine: 0, teammates: 0, setups: 0 };
+    for (const e of pickerSources ?? []) counts[e.source] += 1;
+    return counts;
+  }, [pickerSources]);
+
+  /** Filtered rows per source, each capped on its own, with the pre-cap total. */
+  const pickerBuckets = useMemo(() => {
     const tokens = pickerQuery.toLowerCase().split(/\s+/).filter(Boolean);
-    const matches =
-      tokens.length === 0
-        ? pickerSources
-        : pickerSources.filter((e) => {
-            const hay = `${e.label} ${e.when} ${e.kind}`.toLowerCase();
-            return tokens.every((t) => hay.includes(t));
-          });
-    return matches.slice(0, 30);
+    const out: Record<PickerSource, { rows: SetupPickerEntry[]; total: number }> = {
+      mine: { rows: [], total: 0 },
+      teammates: { rows: [], total: 0 },
+      setups: { rows: [], total: 0 },
+    };
+    for (const e of pickerSources ?? []) {
+      if (tokens.length) {
+        const hay = `${e.title} ${e.detail} ${e.when} ${e.kind}`.toLowerCase();
+        if (!tokens.every((t) => hay.includes(t))) continue;
+      }
+      const bucket = out[e.source];
+      bucket.total += 1;
+      if (bucket.rows.length < PICKER_ROWS_PER_SOURCE) bucket.rows.push(e);
+    }
+    return out;
   }, [pickerSources, pickerQuery]);
+
+  /**
+   * A source with nothing in it hides — except Teammates, which stays with an empty
+   * state, because "I have no teammates" and "this app has no teams" must not look
+   * the same. Availability reads the unfiltered pool so tabs don't flicker as you type.
+   */
+  const pickerTabs: PickerSource[] = ["mine", "teammates", "setups"].filter(
+    (s) => s === "teammates" || pickerPoolCounts[s as PickerSource] > 0
+  ) as PickerSource[];
+  const activeTab: PickerSource = pickerTabs.includes(pickerTab) ? pickerTab : pickerTabs[0] ?? "mine";
+  const activeBucket = pickerBuckets[activeTab];
 
   /** Keep the URL shareable: mirror slot A (`s`/`sl`) and slot B (`g`/`gl`) into the query string. */
   const syncUrl = (slotId: SlotId, nextFields: LabFields | null, label: string | null) => {
@@ -480,8 +603,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
   /** Main row tap: load into the selected slot and close the picker. */
   const loadEntry = (entry: SetupPickerEntry) => {
     loadEntryIntoSlot(activeId, entry);
-    setPickerOpen(false);
-    setPickerQuery("");
+    closePicker();
   };
 
   /** "vs" tap: load into the other slot (starts the comparison); picker stays open. */
@@ -686,46 +808,89 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
         type="search"
         value={pickerQuery}
         placeholder={`Search setups → load into ${activeId.toUpperCase()}…`}
-        onFocus={() => {
-          setPickerOpen(true);
-          void loadPickerSources();
-        }}
-        onClick={() => {
-          // Reopen on tap even when the input never lost focus (post-load state).
-          setPickerOpen(true);
-          void loadPickerSources();
-        }}
+        onFocus={openPicker}
+        onClick={openPicker}
         onChange={(e) => {
           setPickerQuery(e.target.value);
-          setPickerOpen(true);
-          void loadPickerSources();
+          openPicker();
         }}
-        aria-label="Search runs, downloaded setups, and teammate setups"
+        aria-label="Search your runs, teammate runs, and saved setups"
         className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
       />
       {pickerOpen && (
-        <div className="space-y-1">
-          {pickerLoading && <p className="text-xs text-muted-foreground">Loading your setups…</p>}
-          {pickerError && <p className="text-xs text-muted-foreground">{pickerError}</p>}
-          {!pickerLoading && !pickerError && pickerSources && pickerResults.length === 0 && (
-            <p className="text-xs text-muted-foreground">
-              No matching setups with computable geometry.
+        <div className="space-y-1.5">
+          {pickerTabs.length > 1 && (
+            <SegmentedControl
+              size="sm"
+              ariaLabel="Setup source"
+              value={activeTab}
+              onChange={setPickerTab}
+              segmentClassName="px-2 py-1 text-[11px]"
+              options={pickerTabs.map((s) => ({
+                value: s,
+                ariaLabel: PICKER_SOURCE_LABEL[s],
+                label: (
+                  <span className="flex items-baseline gap-1">
+                    {PICKER_SOURCE_LABEL[s]}
+                    {pickerBuckets[s].total > 0 && (
+                      <span className="font-mono text-[9px] tabular-nums opacity-60">
+                        {pickerBuckets[s].total}
+                      </span>
+                    )}
+                  </span>
+                ),
+              }))}
+            />
+          )}
+          {pickerLoading && !pickerSources && (
+            <p className="text-xs text-muted-foreground">Loading your setups…</p>
+          )}
+          {pickerError && !pickerSources && (
+            <p className="text-xs text-muted-foreground">{pickerError}</p>
+          )}
+          {pickerSources && activeBucket.rows.length === 0 && (
+            <p className="px-1 py-2 text-xs leading-relaxed text-muted-foreground">
+              {/* The Teams nudge only makes sense to someone who already has setups of
+                  their own. To a brand-new account with nothing, "no teammates" is not
+                  the problem, so they get the plain line. */}
+              {activeTab === "teammates" &&
+              pickerPoolCounts.teammates === 0 &&
+              pickerPoolCounts.mine + pickerPoolCounts.setups > 0 ? (
+                <>
+                  No teammates are sharing runs yet. Set up a team and their setups show up here —{" "}
+                  <Link href="/teams" className="text-primary-ink underline underline-offset-2">
+                    Teams
+                  </Link>
+                  .
+                </>
+              ) : (
+                "No matching setups with computable geometry."
+              )}
             </p>
           )}
-          <ul className="max-h-72 space-y-0.5 overflow-y-auto">
-            {pickerResults.map((entry) => (
-              <li key={entry.id} className="flex items-center gap-1.5">
+          <ul className="max-h-[420px] space-y-0.5 overflow-y-auto">
+            {activeBucket.rows.map((entry) => (
+              <li key={entry.id} className="flex items-stretch gap-1.5">
                 <button
                   type="button"
                   onClick={() => loadEntry(entry)}
                   title={`Load into setup ${activeId.toUpperCase()}`}
-                  className="flex min-w-0 flex-1 items-baseline gap-2 rounded-md px-2 py-1.5 text-left transition hover:bg-muted"
+                  className="grid min-w-0 flex-1 grid-cols-[2.1rem_minmax(0,1fr)_auto] items-start gap-2 rounded-md px-2 py-1.5 text-left transition hover:bg-muted"
                 >
-                  <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.18em] text-faint">
+                  <span className="pt-0.5 font-mono text-[9px] uppercase tracking-[0.16em] text-faint">
                     {entry.kind}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-xs">{entry.label}</span>
-                  <span className="shrink-0 font-mono text-[10px] tabular-nums text-faint">
+                  {/* break-words, not truncate: a filename-shaped setup name is one
+                      unbreakable token and would otherwise paint over the date column. */}
+                  <span className="min-w-0">
+                    <span className="block break-words text-xs leading-snug">{entry.title}</span>
+                    {entry.detail && (
+                      <span className="block break-words font-mono text-[10px] leading-snug text-muted-foreground">
+                        {entry.detail}
+                      </span>
+                    )}
+                  </span>
+                  <span className="whitespace-nowrap pt-0.5 font-mono text-[10px] tabular-nums text-faint">
                     {entry.when}
                   </span>
                 </button>
@@ -733,20 +898,22 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
                   type="button"
                   onClick={() => loadEntryAsComparison(entry)}
                   title={`Load into setup ${otherId.toUpperCase()} as the comparison`}
-                  className="shrink-0 rounded-md border border-border px-1.5 py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground transition hover:text-foreground"
+                  className="shrink-0 self-center rounded-md border border-border px-1.5 py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground transition hover:text-foreground"
                 >
                   vs
                 </button>
               </li>
             ))}
           </ul>
+          {activeBucket.rows.length < activeBucket.total && (
+            <p className="px-2 font-mono text-[10px] text-faint">
+              Showing {activeBucket.rows.length} of {activeBucket.total} — search to narrow
+            </p>
+          )}
           <button
             type="button"
             className="text-xs font-medium text-muted-foreground transition hover:text-foreground"
-            onClick={() => {
-              setPickerOpen(false);
-              setPickerQuery("");
-            }}
+            onClick={closePicker}
           >
             Close
           </button>

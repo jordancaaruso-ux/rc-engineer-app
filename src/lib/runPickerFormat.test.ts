@@ -6,7 +6,11 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { formatRunPickerLine, type RunPickerRun } from "@/lib/runPickerFormat";
+import {
+  formatRunPickerLine,
+  formatRunPickerParts,
+  type RunPickerRun,
+} from "@/lib/runPickerFormat";
 import { withIncludedBestLapForPicker } from "@/lib/lapAnalysis";
 
 function pickerRun(overrides: Partial<RunPickerRun>): RunPickerRun {
@@ -86,4 +90,77 @@ test("withIncludedBestLapForPicker prefers the stored exclusion-aware column whe
     bestLapSeconds: 14.5,
   });
   assert.equal(out.bestLapSeconds, 14.5);
+});
+
+/* ── Two-line parts (Geometry Lab picker) ── */
+
+test("parts split a testing run into which-session and which-car", () => {
+  const parts = formatRunPickerParts(
+    pickerRun({ sessionLabel: "Run 3", bestLapSeconds: 14.921 })
+  );
+  assert.equal(parts.title, "Testing · Run 3");
+  assert.equal(parts.detail, "Track A · Car A · 14.921");
+  // The date lives in `when` only — repeating it in the title wrapped every row.
+  assert.match(parts.when, /2026|ago|Today|Yesterday/, parts.when);
+});
+
+test("parts lead with the event name for a meeting run", () => {
+  const parts = formatRunPickerParts(
+    pickerRun({
+      sessionType: "RACE_MEETING",
+      sessionLabel: null,
+      meetingSessionType: "QUALIFIER",
+      meetingSessionCode: "Q2",
+      eventId: "e1",
+      event: { name: "Winter Series Rd 3" },
+    })
+  );
+  assert.ok(parts.title.startsWith("Winter Series Rd 3 · "), parts.title);
+  assert.ok(!parts.title.includes("Testing"), parts.title);
+});
+
+test("parts keep the date out of the title so it isn't printed twice", () => {
+  const parts = formatRunPickerParts(pickerRun({ sessionLabel: null }));
+  assert.equal(parts.title, "Testing");
+  assert.ok(!/2026/.test(parts.title), parts.title);
+});
+
+test("parts drop missing track and car instead of showing placeholders", () => {
+  const parts = formatRunPickerParts(
+    pickerRun({ track: null, car: null, bestLapSeconds: 14.5 })
+  );
+  assert.equal(parts.detail, "14.500");
+  assert.ok(!parts.detail.includes("—"), parts.detail);
+});
+
+test("parts leave detail empty when nothing about the car is known", () => {
+  const parts = formatRunPickerParts(pickerRun({ track: null, car: null }));
+  assert.equal(parts.detail, "");
+});
+
+test("parts honor per-lap exclusions in the detail line", () => {
+  const parts = formatRunPickerParts(
+    pickerRun({
+      lapTimes: [14.2, 22.9, 14.5],
+      lapSession: lapSessionWithFlags([14.2, 22.9, 14.5], [false, true, true]),
+    })
+  );
+  assert.equal(parts.detail, "Track A · Car A · 14.500");
+});
+
+test("parts prefix the driver name for a teammate run", () => {
+  const parts = formatRunPickerParts(
+    { ...pickerRun({ sessionLabel: "Run 3" }), userId: "u2" },
+    { u2: "Ben Carter" }
+  );
+  assert.ok(parts.title.startsWith("Ben Carter · Testing"), parts.title);
+});
+
+test("parts skip the driver prefix when the display map has no entry", () => {
+  const parts = formatRunPickerParts(
+    { ...pickerRun({ sessionLabel: "Run 3" }), userId: "u2" },
+    { u9: "Someone Else" }
+  );
+  assert.ok(parts.title.startsWith("Testing "), parts.title);
+  assert.ok(parts.title.endsWith(" · Run 3"), parts.title);
 });
