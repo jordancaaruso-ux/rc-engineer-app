@@ -49,6 +49,7 @@
     "test:condition-signature": "npx tsx src/lib/trackConditionSignature.test.ts",
     "test:engineer-chat": "node --conditions=react-server --import tsx src/lib/engineer/minimalChat.test.ts",
     "test:kb-manifest": "npx tsx src/lib/engineer/kbCoverageManifest.test.ts",
+    "nets:check": "npx tsx scripts/validate-nets.ts",
     "test:video-analysis": "npx tsx src/lib/videoAnalysis/sectorStats.test.ts && npx tsx src/lib/videoAnalysis/lapCompare.test.ts && npx tsx src/lib/videoAnalysis/manualCompareAdapter.test.ts",
     "test:manual-video-analysis": "npx tsx src/lib/manualVideoAnalysis/sync.test.ts",
     "test:sheet-recognition": "npx tsx --test src/lib/setupCalibrations/sheetRecognition.test.ts",
@@ -210,7 +211,8 @@
     "sharp": "^0.34.5",
     "stripe": "^22.3.2",
     "tailwind-merge": "^2.2.1",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.3.1",
