@@ -16,7 +16,8 @@ const cases = [
   // [hook, label, tool_input, expected]
   ["kb-guard.cjs", "Edit locked prose (Windows abs)", { file_path: `${WIN}\\content\\vehicle-dynamics\\roll-centre.md` }, "ASK"],
   ["kb-guard.cjs", "Edit locked prose (POSIX rel)", { file_path: "content/vehicle-dynamics/roll-centre.md" }, "ASK"],
-  ["kb-guard.cjs", "Edit catalog.ts", { file_path: "src/lib/engineerPhase5/parameterEffects/catalog.ts" }, "ASK"],
+  ["kb-guard.cjs", "Edit reviewed net", { file_path: "content/nets/touring/front-arb.yaml" }, "ASK"],
+  ["kb-guard.cjs", "Edit nets draft", { file_path: "content/nets/drafts/rear-toe.yaml" }, "ALLOW"],
   ["kb-guard.cjs", "Edit DRAFT (Windows abs)", { file_path: `${WIN}\\content\\vehicle-dynamics\\drafts\\upstop.md` }, "ALLOW"],
   ["kb-guard.cjs", "Edit DRAFT (POSIX rel)", { file_path: "content/vehicle-dynamics/drafts/upstop.md" }, "ALLOW"],
   ["kb-guard.cjs", "Edit unrelated source", { file_path: "src/lib/runs/tirePrep.ts" }, "ALLOW"],
@@ -24,7 +25,7 @@ const cases = [
   ["kb-guard.cjs", "Bash tee into locked", { command: "cat f | tee content/vehicle-dynamics/bite.md" }, "ASK"],
   ["kb-guard.cjs", "Bash sed -i on locked", { command: "sed -i s/a/b/ content/vehicle-dynamics/bite.md" }, "ASK"],
   ["kb-guard.cjs", "Bash rm locked", { command: "rm content/vehicle-dynamics/bite.md" }, "ASK"],
-  ["kb-guard.cjs", "Bash overwrite catalog.ts", { command: "echo x > src/lib/engineerPhase5/parameterEffects/catalog.ts" }, "ASK"],
+  ["kb-guard.cjs", "Bash overwrite reviewed net", { command: "echo x > content/nets/touring/front-arb.yaml" }, "ASK"],
   ["kb-guard.cjs", "Bash redirect into DRAFT", { command: "echo x > content/vehicle-dynamics/drafts/upstop.md" }, "ALLOW"],
   ["kb-guard.cjs", "Bash grep locked (read only)", { command: "grep -n camber content/vehicle-dynamics/roll-centre.md" }, "ALLOW"],
 

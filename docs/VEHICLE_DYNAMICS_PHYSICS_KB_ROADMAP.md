@@ -4,7 +4,7 @@ This document is a **working scaffold** for expanding [`content/vehicle-dynamics
 
 ## Goal
 
-Keep **stamped KB** prose **mechanics- and physics-forward**: what changes do to geometry, loads, kinematics, and documented *tendencies*. Reserve **driver level**, **feel vs lap time**, **when to bundle changes**, and **community vs outlier** framing for the **system prompt** and rich context (see [`src/lib/engineerPhase5/openaiEngineer.ts`](../src/lib/engineerPhase5/openaiEngineer.ts) — `REASONING STANCE`).
+Keep **stamped KB** prose **mechanics- and physics-forward**: what changes do to geometry, loads, kinematics, and documented *tendencies*. Reserve **driver level**, **feel vs lap time**, **when to bundle changes**, and **community vs outlier** framing for the **system prompt** (see [`src/lib/engineer/prompt.ts`](../src/lib/engineer/prompt.ts)).
 
 ## Entry structure — Physics / Handling split (adopted 2026-07-08)
 
@@ -109,6 +109,5 @@ Update the **Status** column as each file is drafted and approved in chat.
 
 ## Related code
 
-- Engineer system prompt: [`openaiEngineer.ts`](../src/lib/engineerPhase5/openaiEngineer.ts) (`CHAT_SYSTEM`)
-- Retrieval: [`vehicleDynamicsKb.ts`](../src/lib/engineerPhase5/vehicleDynamicsKb.ts)
-- Structured effects (KB-locked): [`parameterEffects/catalog.ts`](../src/lib/engineerPhase5/parameterEffects/catalog.ts)
+- Engineer system prompt: [`prompt.ts`](../src/lib/engineer/prompt.ts) (`ENGINEER_CHAT_SYSTEM_PROMPT`)
+- KB loader (full corpus in context, no retrieval): [`kb.ts`](../src/lib/engineer/kb.ts)

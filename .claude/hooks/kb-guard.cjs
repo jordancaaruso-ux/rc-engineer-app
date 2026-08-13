@@ -38,17 +38,18 @@ process.stdin.on("end", () => {
   };
 
   const REASON =
-    "This is a locked Engineer KB file — the Engineer quotes it to drivers as ground truth. " +
-    "Only edit it if the user's most recent message explicitly asked for KB content changes " +
+    "This is a locked Engineer knowledge file — the Engineer quotes it to drivers as ground " +
+    "truth. Only edit it if the user's most recent message explicitly asked for content changes " +
     "to THIS file. Otherwise cancel and propose the diff in chat first. (Drafts under " +
-    "content/vehicle-dynamics/drafts/ are open and not gated.)";
+    "content/vehicle-dynamics/drafts/ and content/nets/drafts/ are open and not gated.)";
 
-  /** Locked = top-level KB prose, or the parameter-effects catalog. Drafts are open. */
+  /** Locked = KB prose or reviewed nets entries. Both drafts tiers are open. */
   function isLocked(p) {
     const inKb = /(^|\/)content\/vehicle-dynamics\//.test(p);
-    const isDraft = /(^|\/)content\/vehicle-dynamics\/drafts\//.test(p);
-    const isCatalog = /(^|\/)parameterEffects\/catalog\.ts$/.test(p);
-    return (inKb && !isDraft) || isCatalog;
+    const isKbDraft = /(^|\/)content\/vehicle-dynamics\/drafts\//.test(p);
+    const inNets = /(^|\/)content\/nets\//.test(p);
+    const isNetsDraft = /(^|\/)content\/nets\/drafts\//.test(p);
+    return (inKb && !isKbDraft) || (inNets && !isNetsDraft);
   }
 
   // --- Edit / Write / MultiEdit -------------------------------------------------
@@ -61,7 +62,7 @@ process.stdin.on("end", () => {
     // Only flag when a locked path is combined with something that can actually write.
     // Reading (grep/cat/rg) a locked file is fine and must not prompt.
     const mentionsLocked = /content\/vehicle-dynamics\/(?!drafts\/)[^\s"';|&]+/.test(cmd)
-      || /parameterEffects\/catalog\.ts/.test(cmd);
+      || /content\/nets\/(?!drafts\/)[^\s"';|&]+/.test(cmd);
     const writes =
       />>?/.test(cmd) ||
       /\btee\b/.test(cmd) ||
