@@ -50,6 +50,12 @@
     "test:engineer-chat": "node --conditions=react-server --import tsx src/lib/engineer/minimalChat.test.ts",
     "test:kb-manifest": "npx tsx src/lib/engineer/kbCoverageManifest.test.ts",
     "nets:check": "npx tsx scripts/validate-nets.ts",
+    "engineer:eval": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/engineer-eval/generate-answers.ts",
+    "engineer:eval:page": "npx tsx scripts/engineer-eval/build-pairwise-page.ts",
+    "engineer:eval:ingest": "npx tsx scripts/engineer-eval/ingest-founder-ratings.ts",
+    "engineer:eval:judge": "npx dotenv-cli -e .env.local -- npx tsx scripts/engineer-eval/judge.ts",
+    "engineer:eval:gate": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/engineer-eval/physics-gate.ts",
+    "engineer:eval:stats": "npx tsx scripts/engineer-eval/agreement.ts",
     "test:video-analysis": "npx tsx src/lib/videoAnalysis/sectorStats.test.ts && npx tsx src/lib/videoAnalysis/lapCompare.test.ts && npx tsx src/lib/videoAnalysis/manualCompareAdapter.test.ts",
     "test:manual-video-analysis": "npx tsx src/lib/manualVideoAnalysis/sync.test.ts",
     "test:sheet-recognition": "npx tsx --test src/lib/setupCalibrations/sheetRecognition.test.ts",
@@ -215,6 +221,7 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.116.0",
     "@capacitor/cli": "^8.3.1",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.2.1",

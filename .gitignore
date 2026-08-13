@@ -103,3 +103,8 @@ compare-shots/
 
 # Root-level scratch captures from ad-hoc debugging
 /tmp-*.png
+
+# Engineer eval harness artifacts (answers, verdicts, founder ratings) stay local
+scripts/engineer-eval/answers/
+scripts/engineer-eval/verdicts/
+scripts/engineer-eval/ratings/
