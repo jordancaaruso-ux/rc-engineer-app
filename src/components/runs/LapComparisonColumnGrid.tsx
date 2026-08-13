@@ -120,6 +120,44 @@ function lapAt(series: ComparisonSeries, lapNumber: number): LapRow | undefined 
 }
 
 /**
+ * The three buckets a driver actually thinks in: what happened today, what
+ * happened at this track before, and everything else.
+ *
+ * Shared by the target dropdown and the tick-list under it so the two can never
+ * name the same session differently. Day membership uses `sameLocalCalendarDay`
+ * — the same test the `same_day` scope uses — so grouping and filtering can't
+ * disagree. It resolves the day in the READER's zone, not the driver's:
+ * `resolveRunLocalTimeZone` is the zone-correct answer and is already used by
+ * the Sessions groups, but it needs `Run.localTimeZone` plumbed onto
+ * `CompareRunShape` first. Until then a session that crosses your midnight can
+ * still land in "Earlier at …" rather than "This test day".
+ */
+type DayTrackBucket = "today" | "here" | "elsewhere";
+
+function dayTrackBucketFor(input: {
+  sortIso: string;
+  trackKey: string | null;
+  anchorTrackKey: string | null;
+  anchorInstantIso: string;
+}): DayTrackBucket {
+  // "This test day" is a day AND a place. A session run the same afternoon at a
+  // different venue filed under a heading naming this one would be a lie about
+  // where you were — so a track mismatch beats the calendar.
+  const here = !input.anchorTrackKey || input.trackKey === input.anchorTrackKey;
+  if (!here) return "elsewhere";
+  if (input.sortIso && sameLocalCalendarDay(input.sortIso, input.anchorInstantIso)) return "today";
+  return "here";
+}
+
+function dayTrackBucketLabels(anchorTrackName: string | null): Record<DayTrackBucket, string> {
+  return {
+    today: anchorTrackName ? `This test day · ${anchorTrackName}` : "This test day",
+    here: anchorTrackName ? `Earlier at ${anchorTrackName}` : "Earlier sessions",
+    elsewhere: "Other tracks and events",
+  };
+}
+
+/**
  * Is this the column's own quickest lap? Marked with a dot so the one lap everyone
  * scans for is findable without reading every row. Compared on the stored value —
  * `bestLap` comes off these same rows, so an epsilon would only mask a real mismatch.
@@ -501,8 +539,38 @@ export function LapComparisonColumnGrid({
     [anchorTrackKey, otherRuns, librarySessions]
   );
 
+  /**
+   * "How far to look", as one predicate. Both lists you can pick a session from
+   * run through it: the tick-list below and the target dropdown above. The
+   * dropdown used to read the unfiltered `seriesList`, so a sheet scoped to this
+   * track still offered every session ever run, anywhere — the two controls
+   * disagreed about what was comparable.
+   */
+  const seriesMatchesScope = useCallback(
+    (seriesId: string, sortIso: string) =>
+      lapSeriesMatchesCompareScope({
+        seriesId,
+        sortIso,
+        scope: compareScope,
+        anchorInstantIso,
+        anchorEventId: compareAnchorRun.eventId,
+        primaryRunEventId: run.eventId ?? null,
+        eventIdForHistoryRun: (rid) => otherRuns.find((o) => o.id === rid)?.eventId,
+        anchorTrackKey,
+        trackKeyForSeries,
+      }),
+    [
+      compareScope,
+      anchorInstantIso,
+      compareAnchorRun.eventId,
+      run.eventId,
+      otherRuns,
+      anchorTrackKey,
+      trackKeyForSeries,
+    ]
+  );
+
   const scopeFilteredRows = useMemo(() => {
-    const ev = compareAnchorRun.eventId;
     return seriesList
       .filter((s) => s.id !== targetId)
       .map((s) => {
@@ -510,31 +578,8 @@ export function LapComparisonColumnGrid({
         const sortIso = m?.sortIso ?? "";
         return { series: s, sortIso, label: m?.selectLabel ?? s.label };
       })
-      .filter(({ series, sortIso }) =>
-        lapSeriesMatchesCompareScope({
-          seriesId: series.id,
-          sortIso,
-          scope: compareScope,
-          anchorInstantIso,
-          anchorEventId: ev,
-          primaryRunEventId: run.eventId ?? null,
-          eventIdForHistoryRun: (rid) => otherRuns.find((o) => o.id === rid)?.eventId,
-          anchorTrackKey,
-          trackKeyForSeries,
-        })
-      );
-  }, [
-    seriesList,
-    targetId,
-    metaById,
-    compareScope,
-    anchorInstantIso,
-    compareAnchorRun.eventId,
-    run.eventId,
-    otherRuns,
-    anchorTrackKey,
-    trackKeyForSeries,
-  ]);
+      .filter(({ series, sortIso }) => seriesMatchesScope(series.id, sortIso));
+  }, [seriesList, targetId, metaById, seriesMatchesScope]);
 
   const segmentFor = useCallback(
     (seriesId: string): CompareSegmentKey => metaById.get(seriesId)?.segment ?? "driver",
@@ -592,18 +637,7 @@ export function LapComparisonColumnGrid({
   const anchorTrackName =
     compareAnchorRun.track?.name?.trim() || compareAnchorRun.trackNameSnapshot?.trim() || null;
 
-  /**
-   * The rows, cut into the three groups a driver actually thinks in: what
-   * happened today, what happened here before, and everything else.
-   *
-   * Day membership uses `sameLocalCalendarDay` — the same test the `same_day`
-   * scope uses — so the grouping and the filter can never disagree with each
-   * other. Note that it resolves the day in the READER's zone, not the driver's:
-   * `resolveRunLocalTimeZone` is the zone-correct answer and is already used by
-   * the Sessions groups, but it needs `Run.localTimeZone` plumbed onto
-   * `CompareRunShape` first. Until then a session that crosses your midnight can
-   * still land in "Earlier at …" rather than "This test day".
-   */
+  /** The rows, cut into {@link dayTrackBucketFor}'s three groups. */
   const pickerGroups = useMemo((): LapPickerGroup[] => {
     const toRow = (r: { id: string; sortIso: string; label: string }): LapPickerRow => ({
       id: r.id,
@@ -621,34 +655,25 @@ export function LapComparisonColumnGrid({
       ];
     }
 
-    const today: LapPickerRow[] = [];
-    const hereBefore: LapPickerRow[] = [];
-    const elsewhere: LapPickerRow[] = [];
+    const buckets: Record<DayTrackBucket, LapPickerRow[]> = {
+      today: [],
+      here: [],
+      elsewhere: [],
+    };
     for (const r of compareOptionRows) {
-      const trackKey = metaById.get(r.id)?.trackKey ?? null;
-      // "This test day" is a day AND a place. Under the widest scope a session run
-      // the same afternoon at a different venue would otherwise be filed under a
-      // heading naming this one — the label would be a lie about where you were.
-      const here = !anchorTrackKey || trackKey === anchorTrackKey;
-      if (here && r.sortIso && sameLocalCalendarDay(r.sortIso, anchorInstantIso)) {
-        today.push(toRow(r));
-      } else if (here && anchorTrackKey) {
-        hereBefore.push(toRow(r));
-      } else {
-        elsewhere.push(toRow(r));
-      }
+      const bucket = dayTrackBucketFor({
+        sortIso: r.sortIso,
+        trackKey: metaById.get(r.id)?.trackKey ?? null,
+        anchorTrackKey,
+        anchorInstantIso,
+      });
+      buckets[bucket].push(toRow(r));
     }
 
-    const atTrack = anchorTrackName ? ` · ${anchorTrackName}` : "";
-    return [
-      { key: "today", label: `This test day${atTrack}`, rows: today },
-      {
-        key: "here",
-        label: anchorTrackName ? `Earlier at ${anchorTrackName}` : "Earlier sessions",
-        rows: hereBefore,
-      },
-      { key: "elsewhere", label: "Other tracks and events", rows: elsewhere },
-    ].filter((g) => g.rows.length > 0);
+    const labels = dayTrackBucketLabels(anchorTrackName);
+    return (["today", "here", "elsewhere"] as const)
+      .map((key) => ({ key, label: labels[key], rows: buckets[key] }))
+      .filter((g) => g.rows.length > 0);
   }, [
     compareOptionRows,
     metaById,
@@ -668,12 +693,31 @@ export function LapComparisonColumnGrid({
     setSelectedComparisonIds((prev) => prev.filter((id) => valid.has(id) && id !== targetId));
   }, [compareOptionRows, targetId]);
 
+  /**
+   * What the target dropdown may offer: whatever "How far to look" allows, plus
+   * the run you opened — which stays selectable under every scope, because a
+   * sheet whose own laps have dropped out of its target list has nothing left to
+   * measure against.
+   */
+  const targetOptionSeries = useMemo(
+    () =>
+      seriesList.filter(
+        (s) => s.id === "run:primary" || seriesMatchesScope(s.id, metaById.get(s.id)?.sortIso ?? "")
+      ),
+    [seriesList, metaById, seriesMatchesScope]
+  );
+
+  /*
+   * Narrowing the scope can pull the current target out from under the sheet —
+   * pick a session at another track under "Everything", then switch to "This
+   * track only". Fall back to the run you opened rather than leaving a `<select>`
+   * whose value matches none of its options, which browsers draw as the first
+   * option while the grid still measures against the vanished one.
+   */
   useEffect(() => {
-    const ids = seriesList.map((s) => s.id);
-    if (!ids.includes(targetId)) {
-      setTargetId(ids[0] ?? "run:primary");
-    }
-  }, [seriesList, targetId]);
+    if (targetOptionSeries.some((s) => s.id === targetId)) return;
+    setTargetId(targetOptionSeries[0]?.id ?? "run:primary");
+  }, [targetOptionSeries, targetId]);
 
   const targetSeries = seriesList.find((s) => s.id === targetId) ?? seriesList[0];
   const comparisonSeries = useMemo(() => {
@@ -712,38 +756,58 @@ export function LapComparisonColumnGrid({
   }, [targetSeries, comparisonSeries, lapNumbers]);
 
   /*
-   * The target list is four different kinds of thing wearing one label shape
-   * ("NAME · date, time"): this run, the rest of the race field that came in on
-   * its timing import, the driver's earlier runs, and their own imported lap
-   * library. Flat, it reads as a pile of unexplained runs — worse on a
-   * teammate's session, where every name in it is a stranger. Native
-   * `<optgroup>` headings cost nothing and say which is which; skipped entirely
-   * when only one kind is present, so a plain solo run keeps a plain list.
+   * The target list wears one label shape ("NAME · date, time") over sessions
+   * from different days, different venues and different people, so flat it reads
+   * as a pile of unexplained runs — the complaint that produced this grouping.
+   *
+   * Headings are the SAME ones the tick-list below uses, from
+   * {@link dayTrackBucketLabels}, so one vocabulary covers both halves of the
+   * picker. The race field keeps a group of its own rather than being filed by
+   * day and track: it came in on this run's own timing sheet, so it shares both
+   * by construction and splitting it says nothing — while "who these strangers
+   * are" is exactly what needs saying. Native `<optgroup>`s cost nothing; they
+   * are skipped when only one group survives, so a plain solo run keeps a plain
+   * list.
    */
   const targetOptionGroups = useMemo(() => {
+    const sortIsoOf = (s: ComparisonSeries) => metaById.get(s.id)?.sortIso ?? "";
     const bySortIso = (a: ComparisonSeries, b: ComparisonSeries) =>
-      compareOptionSort(
-        { sortIso: metaById.get(a.id)?.sortIso ?? "" },
-        { sortIso: metaById.get(b.id)?.sortIso ?? "" }
-      );
-    const pick = (prefix: string) =>
-      seriesList.filter((s) => s.id.startsWith(prefix)).sort(bySortIso);
+      compareOptionSort({ sortIso: sortIsoOf(a) }, { sortIso: sortIsoOf(b) });
+
+    const buckets: Record<DayTrackBucket, ComparisonSeries[]> = {
+      today: [],
+      here: [],
+      elsewhere: [],
+    };
+    const field: ComparisonSeries[] = [];
+    const thisRun: ComparisonSeries[] = [];
+    for (const s of targetOptionSeries) {
+      if (s.id === "run:primary") {
+        thisRun.push(s);
+      } else if (s.id.startsWith("imported:")) {
+        field.push(s);
+      } else {
+        buckets[
+          dayTrackBucketFor({
+            sortIso: sortIsoOf(s),
+            trackKey: metaById.get(s.id)?.trackKey ?? null,
+            anchorTrackKey,
+            anchorInstantIso,
+          })
+        ].push(s);
+      }
+    }
+
+    const labels = dayTrackBucketLabels(anchorTrackName);
     const groups: { key: string; label: string; series: ComparisonSeries[] }[] = [
-      {
-        key: "this_run",
-        label: "This run",
-        series: seriesList.filter((s) => s.id === "run:primary"),
-      },
-      { key: "field", label: "Rest of the race field", series: pick("imported:") },
-      {
-        key: "history",
-        label: primaryIsViewer ? "My other runs" : "Other runs",
-        series: pick("history:"),
-      },
-      { key: "library", label: "My imported sessions", series: pick("library:") },
+      { key: "this_run", label: "This run", series: thisRun },
+      { key: "field", label: "Rest of the race field", series: field.sort(bySortIso) },
+      { key: "today", label: labels.today, series: buckets.today.sort(bySortIso) },
+      { key: "here", label: labels.here, series: buckets.here.sort(bySortIso) },
+      { key: "elsewhere", label: labels.elsewhere, series: buckets.elsewhere.sort(bySortIso) },
     ];
     return groups.filter((g) => g.series.length > 0);
-  }, [seriesList, metaById, primaryIsViewer]);
+  }, [targetOptionSeries, metaById, anchorTrackKey, anchorTrackName, anchorInstantIso]);
 
   function metaFor(s: ComparisonSeries): SeriesMeta {
     const fallbackIso = resolveRunDisplayInstant(compareAnchorRun).toISOString();
