@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { EngineerChatPanel, type EngineerQueuedChatPrompt } from "@/components/engineer/EngineerChatPanel";
-import { persistEngineerSessionsTargetRunId } from "@/lib/engineerSessionsTargetStorage";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 
 export function EngineerPageClient({ ratingsEnabled = false }: { ratingsEnabled?: boolean }) {
@@ -15,11 +14,6 @@ export function EngineerPageClient({ ratingsEnabled = false }: { ratingsEnabled?
     if (!promptParam || promptConsumed) return null;
     return { id: promptParam.length, text: promptParam };
   }, [promptParam, promptConsumed]);
-
-  useEffect(() => {
-    const runId = searchParams.get("runId")?.trim();
-    if (runId) persistEngineerSessionsTargetRunId(runId);
-  }, [searchParams]);
 
   useEffect(() => {
     setPromptConsumed(false);

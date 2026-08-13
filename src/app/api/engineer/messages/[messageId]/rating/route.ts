@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { canSubmitEngineerFeedback } from "@/lib/engineerFeedback/adminFeedbackAccess";
+import {
+  canSubmitEngineerFeedback,
+  mergeContextSnapshots,
+  parseRatingInput,
+} from "@/lib/engineer/ratings";
 import {
   contextSnapshotFromMessageMetadata,
   userCanAccessEngineerMessage,
-} from "@/lib/engineerFeedback/persistExchange";
-import { mergeContextSnapshots, parseRatingInput } from "@/lib/engineerFeedback/ratingValidation";
+} from "@/lib/engineer/persistExchange";
 
 type RouteParams = { params: Promise<{ messageId: string }> };
 
@@ -91,15 +94,6 @@ export async function POST(request: Request, { params }: RouteParams) {
     },
     select: { id: true, stars: true, note: true, updatedAt: true },
   });
-
-  if (process.env.NODE_ENV === "development") {
-    try {
-      const { writeFeedbackInboxFiles } = await import("@/lib/engineerFeedback/exportFeedbackInbox");
-      await writeFeedbackInboxFiles();
-    } catch (e) {
-      console.warn("[engineer feedback export]", e);
-    }
-  }
 
   return NextResponse.json({ rating }, { status: 201 });
 }

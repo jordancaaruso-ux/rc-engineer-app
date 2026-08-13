@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { engineerThreadTitleFromContent } from "@/lib/engineerFeedback/threadTitle";
+import { engineerThreadTitleFromContent } from "@/lib/engineer/threadTitle";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {

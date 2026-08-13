@@ -75,10 +75,11 @@ test("every step places on both viewports", () => {
   }
 });
 
-test("both viewports get a usable tour — desktop 7, phone 6", () => {
+test("both viewports get a usable tour — desktop 6, phone 5", () => {
   // The phone drops `day-read`: the desktop hero card has no phone equivalent by design.
-  assert.equal(stepsForViewport("desktop").length, 7);
-  assert.equal(stepsForViewport("mobile").length, 6);
+  // The engineer-subject stop died with the subject bar (Engineer rebuild, 2026-08-13).
+  assert.equal(stepsForViewport("desktop").length, 6);
+  assert.equal(stepsForViewport("mobile").length, 5);
   assert.ok(!stepsForViewport("mobile").some((s) => s.id === "day-read"));
 });
 
