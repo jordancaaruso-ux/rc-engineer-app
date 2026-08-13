@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import { contextSnapshotFromMessageMetadata } from "@/lib/engineerFeedback/persistExchange";
+import { contextSnapshotFromMessageMetadata } from "@/lib/engineer/persistExchange";
 
 type RouteParams = { params: Promise<{ threadId: string }> };
 

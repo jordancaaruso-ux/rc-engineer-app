@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { EngineerChatPanel, type EngineerQueuedChatPrompt } from "@/components/engineer/EngineerChatPanel";
-import { persistEngineerSessionsTargetRunId } from "@/lib/engineerSessionsTargetStorage";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
 
 export function EngineerPageClient({ ratingsEnabled = false }: { ratingsEnabled?: boolean }) {
   const searchParams = useSearchParams();
@@ -16,11 +16,6 @@ export function EngineerPageClient({ ratingsEnabled = false }: { ratingsEnabled?
   }, [promptParam, promptConsumed]);
 
   useEffect(() => {
-    const runId = searchParams.get("runId")?.trim();
-    if (runId) persistEngineerSessionsTargetRunId(runId);
-  }, [searchParams]);
-
-  useEffect(() => {
     setPromptConsumed(false);
   }, [promptParam]);
 
@@ -29,14 +24,14 @@ export function EngineerPageClient({ ratingsEnabled = false }: { ratingsEnabled?
        panel becomes two columns there, and 4xl would leave the conversation itself in a ~576px
        gutter) now lives on `.page-body` in app/engineer/page.tsx, so the page header can mirror it
        and the title lands on this panel's left edge. */
-    /* The panel renders its OWN two cards now (conversation + history), so there is no card
-       wrapper here — one around both would put a border round the gap between them. */
     <div className="w-full space-y-3">
-      <EngineerChatPanel
-        ratingsEnabled={ratingsEnabled}
-        queuedPrompt={queuedPrompt}
-        onQueuedPromptConsumed={() => setPromptConsumed(true)}
-      />
+      <SurfaceCard variant="panel" overflowHidden={false} contentClassName="p-0">
+        <EngineerChatPanel
+          ratingsEnabled={ratingsEnabled}
+          queuedPrompt={queuedPrompt}
+          onQueuedPromptConsumed={() => setPromptConsumed(true)}
+        />
+      </SurfaceCard>
     </div>
   );
 }

@@ -2,27 +2,17 @@ import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasOpenAiApiKey } from "@/lib/openaiServerEnv";
-import {
-  generateEngineerChatReply,
-  type EngineerChatMessage,
-} from "@/lib/engineerChat/runChatTurn";
-import { loadEngineerLabRungs } from "@/lib/engineerChat/lab/labFlags";
-import {
-  buildEngineerLabFactBlocks,
-  labRunIdFromAnchor,
-} from "@/lib/engineerChat/lab/factBlocks";
-import { engineerLabPromptVersion } from "@/lib/engineerChat/prompt";
-import { tryAnswerLapHistoryQuery } from "@/lib/engineerPhase5/lapHistoryQuery";
+import { generateEngineerChatReply } from "@/lib/engineer/chat";
+import type { EngineerChatMessage } from "@/lib/engineer/payload";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
 import { checkAiBudget, engineerQuotaSnapshot, recordAiUsage } from "@/lib/aiUsage/ledger";
 import { getEntitlement } from "@/lib/entitlement";
 import { isBillingEnforced } from "@/lib/entitlementLogic";
 import { isDemoIdentity } from "@/lib/demo/demoAccess";
 import { clientIpKey } from "@/lib/clientIp";
-import { persistEngineerChatExchange } from "@/lib/engineerFeedback/persistExchange";
-import type { EngineerMessageContextSnapshot } from "@/lib/engineerFeedback/types";
+import { persistEngineerChatExchange } from "@/lib/engineer/persistExchange";
+import type { EngineerMessageContextSnapshot } from "@/lib/engineer/types";
 import { engineerOpenAiUserMessage } from "@/lib/openAiRetry";
-import { parseChatAnchor, type EngineerChatAnchor } from "@/lib/engineerPhase5/engineerAnchor";
 
 const MAX_MESSAGE_CHARS = 4096;
 
@@ -47,30 +37,27 @@ function exceptionToClientPayload(err: unknown): { message: string; debug?: stri
 }
 
 /**
- * Fields the client sends. Most are now IGNORED — v0 of the Engineer (2026-08-05) sends the
- * model the knowledge base, a five-sentence prompt and the conversation, and nothing else. The
- * client still computes and posts the run/pattern/pace payloads; they are dropped here rather
- * than in the client so old app builds keep working. Clearing them out of the client is a
- * separate tidy-up.
+ * Fields the client sends. Most are IGNORED, deliberately and forever tolerated: stale app
+ * builds, installed PWAs and the iOS shell keep POSTing the old-era fields (`anchor`,
+ * `patternDigest`, `mode`, …), and an unknown field must never 400 an answer. The Engineer
+ * sends the model the knowledge base, a short prompt and the conversation, and nothing else
+ * (docs/ENGINEER_NORTH_STAR.md).
  */
 type ChatRequestBody = {
   messages?: Array<{ role?: unknown; content?: unknown }>;
   /** Stamped on the persisted exchange so the thread still records what was on screen. */
   runId?: unknown;
   compareRunId?: unknown;
-  /** Still parsed: it guards the lap-history path and labels the persisted thread. */
-  anchor?: unknown;
-  /** Used only by the deterministic lap-history answer below. */
-  timeZone?: unknown;
   stream?: unknown;
   threadId?: unknown;
-  /** Ignored. Old clients still send these; v0 has no context to put them in. */
+  /** Ignored — old clients still send these. */
+  anchor?: unknown;
+  timeZone?: unknown;
   includePatternDigest?: boolean;
   patternDigest?: unknown;
   includeRunCatalog?: boolean;
   paceVsFieldRunDigest?: unknown;
   paceVsFieldRunDigestSubset?: unknown;
-  /** Ignored — the quick/normal/deep mode system is retired (2026-07-29). */
   mode?: unknown;
 };
 
@@ -85,38 +72,23 @@ async function maybePersistEngineerReply(params: {
   body: ChatRequestBody | null;
   messages: EngineerChatMessage[];
   reply: string;
-  contextJson: unknown | null;
-  resolvedFocus: { runId: string; compareRunId: string | null } | null;
   runId: string;
   compareRunId: string;
   source?: string;
-  anchor?: EngineerChatAnchor | null;
-  anchorLabel?: string | null;
-  promptVersion?: string;
 }): Promise<EngineerChatFeedbackPayload | null> {
   const userQuestion = [...params.messages].reverse().find((m) => m.role === "user")?.content ?? "";
   if (!userQuestion.trim() || !params.reply.trim()) return null;
   const threadId = typeof params.body?.threadId === "string" ? params.body.threadId.trim() : null;
   try {
-    const exchange = await persistEngineerChatExchange({
+    return await persistEngineerChatExchange({
       userId: params.userId,
       threadId: threadId || null,
       userQuestion,
       assistantReply: params.reply,
-      contextJson: params.contextJson,
-      resolvedFocus: params.resolvedFocus,
       runId: params.runId,
       compareRunId: params.compareRunId,
       source: params.source,
-      anchor: params.anchor ?? null,
-      anchorLabel: params.anchorLabel ?? null,
-      promptVersion: params.promptVersion,
     });
-    // Gold-set auto-capture disconnected 2026-07-30 (founder call): the founder reviews
-    // answers directly via in-app ratings + notes for now. The candidate lib, admin API
-    // routes, and eval scripts stay in the tree — re-adding captureFounderGoldSetCandidate
-    // here (and EngineerGoldSetAdminSection in settings) turns it all back on.
-    return exchange;
   } catch (err) {
     console.error("[api/engineer/chat] persist exchange failed", err);
     return null;
@@ -162,87 +134,10 @@ export async function POST(request: Request) {
 
     const runId = typeof body?.runId === "string" ? body.runId.trim() : "";
     const compareRunId = typeof body?.compareRunId === "string" ? body.compareRunId.trim() : "";
-    const anchor = parseChatAnchor(body?.anchor);
     const useStream = body?.stream === true;
-    const timeZone =
-      typeof body?.timeZone === "string" && body.timeZone.trim() ? body.timeZone.trim() : "UTC";
 
-    const lastUserMsg = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
-    // A pinned anchor skips the deterministic lap-history path entirely: that path knows
-    // nothing about anchors, and "these laps" must mean the pinned subject, not a track query.
-    const lapHistoryAnswer = anchor?.pinned
-      ? null
-      : await tryAnswerLapHistoryQuery({
-          userId: user.id,
-          message: lastUserMsg,
-          messages,
-          timeZone,
-        });
-    if (lapHistoryAnswer) {
-      const feedback = isDemo
-        ? null
-        : await maybePersistEngineerReply({
-            userId: user.id,
-            body,
-            messages,
-            reply: lapHistoryAnswer.reply,
-            contextJson: null,
-            resolvedFocus: null,
-            runId,
-            compareRunId,
-            source: "lap_history",
-            anchor,
-          });
-      if (useStream) {
-        const encoder = new TextEncoder();
-        const stream = new ReadableStream({
-          start(controller) {
-            const send = (event: string, data: unknown) => {
-              controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
-            };
-            send("status", { phase: "done", source: "lap_history" });
-            send("done", {
-              reply: lapHistoryAnswer.reply,
-              source: "lap_history",
-              feedback,
-            });
-            controller.close();
-          },
-        });
-        return new Response(stream, {
-          headers: {
-            "Content-Type": "text/event-stream; charset=utf-8",
-            "Cache-Control": "no-cache, no-transform",
-            // Status frames are the whole point of this stream; a buffering proxy would
-            // collapse a 60s answer back into one static label.
-            "X-Accel-Buffering": "no",
-            Connection: "keep-alive",
-          },
-        });
-      }
-      return NextResponse.json({
-        reply: lapHistoryAnswer.reply,
-        contextJson: null,
-        resolvedFocus: null,
-        source: "lap_history",
-        feedback,
-      });
-    }
-
-    // Tire-comparison and planning questions used to short-circuit here to canned
-    // markdown reports with no LLM — "going to <track>" was enough to route a driver
-    // away from the Engineer entirely. Removed 2026-07-29 (Phase 2): those questions now
-    // get the real Engineer with full context; the same data still reaches it via
-    // conditionalSetupEmpirical and the compare_tires / tire_history_at_track tools.
-    // Lap history above stays deterministic — it is genuinely a database read.
-
-    // Budget check sits AFTER the deterministic route above — it answers from the DB and
-    // costs nothing, so it must never burn a user's AI allowance.
-    // Tier shaping (MONETISATION_NORTH_STAR.md Phase 2): a lapsed subscriber is blocked outright;
-    // paying tiers get their allowance (Standard 2/day, Pro 300/mo); grandfathered/comped users
-    // and dark enforcement keep the base budget untouched.
-    // Streaming clients only understand error FRAMES, so refusals ship as a 200 SSE stream with
-    // one error event; plain clients get real status codes.
+    // Streaming clients only understand error FRAMES, so refusals ship as a 200 SSE stream
+    // with one error event; plain clients get real status codes.
     const refuseAllowance = (message: string, status: number): Response => {
       if (useStream) {
         const encoder = new TextEncoder();
@@ -269,11 +164,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: message }, { status });
     };
 
-    // Demo visitors: 2 live questions a day per IP, plus a DURABLE global ceiling on the shared
-    // demo account (15/day · 100/month — founder wants this very limited, 2026-08-02). The
-    // per-IP brake is in-memory best-effort on serverless; the snapshot query is the one that
-    // actually bounds spend. Placed AFTER the free deterministic lap-history path so a database
-    // answer never burns a question, and BEFORE the budget block so refusals stay friendly.
+    // Demo visitors: 2 live questions a day per IP, plus a DURABLE global ceiling on the
+    // shared demo account (15/day · 100/month — founder wants this very limited, 2026-08-02).
+    // The per-IP brake is in-memory best-effort on serverless; the snapshot query is the one
+    // that actually bounds spend.
     if (isDemo) {
       const demoRl = checkApiRateLimit({
         key: `engineer-chat-demo:${clientIpKey(request)}`,
@@ -295,6 +189,9 @@ export async function POST(request: Request) {
       }
     }
 
+    // Tier shaping (MONETISATION_NORTH_STAR.md Phase 2): a lapsed subscriber is blocked
+    // outright; paying tiers get their allowance (Standard 2/day, Pro 300/mo);
+    // grandfathered/comped users and dark enforcement keep the base budget untouched.
     const entitlement = await getEntitlement(user);
     if (isBillingEnforced() && !entitlement.entitled) {
       return refuseAllowance(
@@ -318,29 +215,6 @@ export async function POST(request: Request) {
       return refuseAllowance(budget.message, 429);
     }
 
-    // Engineer lab (admin-only, every rung off by default — see lib/engineerChat/lab/labFlags.ts).
-    // For every other account this resolves to no rungs and no blocks, and the request below is
-    // byte-for-byte the shipped one. Failures here must never cost someone their answer, so a
-    // broken rung degrades to the shipped Engineer rather than throwing.
-    const labRungs = await loadEngineerLabRungs({ userId: user.id, email: user.email }).catch(
-      () => []
-    );
-    const factBlocks =
-      labRungs.length > 0
-        ? await buildEngineerLabFactBlocks({
-            userId: user.id,
-            runId: labRunIdFromAnchor(anchor, runId),
-            rungs: labRungs,
-          }).catch((err) => {
-            console.error("[api/engineer/chat] lab fact blocks failed", err);
-            return [] as string[];
-          })
-        : [];
-    // Stamp what actually reached the model, not what was requested: a rung that produced no
-    // facts (unanchored question, run with no setup sheet) leaves the answer identical to the
-    // shipped one, and labelling it a lab answer would put a false variant in the rating batch.
-    const promptVersion = engineerLabPromptVersion(factBlocks.length > 0 ? labRungs : []);
-
     if (useStream) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
@@ -360,7 +234,6 @@ export async function POST(request: Request) {
             send("status", { phase: "thinking" });
             const out = await generateEngineerChatReply({
               messages,
-              factBlocks,
               onToken: (t) => send("token", { t }),
             });
             await recordAiUsage({
@@ -378,18 +251,14 @@ export async function POST(request: Request) {
                   body,
                   messages,
                   reply: out.reply,
-                  contextJson: null,
-                  resolvedFocus: null,
                   runId,
                   compareRunId,
                   source: "llm",
-                  anchor,
-                  promptVersion,
                 });
             send("done", {
               reply: out.reply,
               resolvedFocus: null,
-              anchor: anchor ? { ...anchor, label: null } : null,
+              anchor: null,
               feedback,
             });
           } catch (err) {
@@ -412,7 +281,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const out = await generateEngineerChatReply({ messages, factBlocks });
+    const out = await generateEngineerChatReply({ messages });
 
     await recordAiUsage({
       userId: user.id,
@@ -430,20 +299,16 @@ export async function POST(request: Request) {
           body,
           messages,
           reply: out.reply,
-          contextJson: null,
-          resolvedFocus: null,
           runId,
           compareRunId,
           source: "llm",
-          anchor,
-          promptVersion,
         });
 
     return NextResponse.json({
       contextJson: null,
       reply: out.reply,
       resolvedFocus: null,
-      anchor: anchor ? { ...anchor, label: null } : null,
+      anchor: null,
       feedback,
     });
   } catch (err) {

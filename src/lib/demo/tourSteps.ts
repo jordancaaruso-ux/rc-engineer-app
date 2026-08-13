@@ -155,14 +155,6 @@ export const DEMO_TOUR_STEPS: readonly TourStep[] = [
     placement: { desktop: "left", mobile: "top" },
   },
   {
-    id: "engineer-subject",
-    route: "/engineer",
-    anchors: ["engineer-subject"],
-    title: "What the Engineer is reading",
-    body: "The pinned run is attached to the conversation — its setup, lap times, and conditions. There is no need to describe the car.",
-    placement: { desktop: "bottom", mobile: "bottom" },
-  },
-  {
     id: "engineer-composer",
     route: "/engineer",
     anchors: ["engineer-composer"],
@@ -191,7 +183,6 @@ export const TOUR_ANCHOR_IDS = [
   "day-read",
   "sessions",
   "run-detail",
-  "engineer-subject",
   "engineer-composer",
   "test-plan",
   "things-to-try",
