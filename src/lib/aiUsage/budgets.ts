@@ -12,7 +12,6 @@ import { TIER_LABELS } from "@/lib/brand/brandNames";
 
 export const AI_USAGE_FEATURES = [
   "engineer-chat",
-  "engineer-quick-fix",
   "setup-extract",
 ] as const;
 
@@ -129,7 +128,6 @@ export const DEFAULT_AI_BUDGET: AiBudget = {
 
 const FEATURE_DAILY_CALLS: Record<AiUsageFeature, number> = {
   "engineer-chat": 60,
-  "engineer-quick-fix": 40,
   "setup-extract": 25,
 };
 
