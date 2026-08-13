@@ -1,0 +1,40 @@
+# AI DRAFT — not founder-reviewed. Drafted from petitrc TouringCarSetting_V1 + RC CheatSheets.
+id: rear_toe_more
+discipline: touring
+change:
+  parameter: toe_rear
+  direction: increase
+  typical_step: "0.5° per side (typical range 2–3°)"
+effects:
+  - phase: entry
+    power: off-power
+    end: rear
+    feel: "more rear security into the corner — the rear stays planted under braking"
+    confidence: consensus
+  - phase: mid
+    power: any
+    end: car
+    feel: "less rotation — the car feels more stable but lazier to turn"
+    confidence: consensus
+  - phase: exit
+    power: on-power
+    end: rear
+    feel: "more forward traction confidence, slightly less steering on power"
+    confidence: consensus
+secondary_effects:
+  - "lower straight-line speed — toed tyres scrub rolling speed"
+  - "more rear tyre wear"
+dose_response: to_a_point
+modifiers:
+  - context: "high-speed flowing track"
+    action: amplifies
+    note: "the stability gain matters most where commitment is highest; the scrub cost also grows with speed"
+  - context: "tight technical track"
+    action: attenuates
+    note: "rotation matters more than stability — the lazy-car cost dominates"
+physics_link:
+  - toe.md
+  - concepts/toe-and-scrub.md
+sources:
+  - "petitrc TouringCarSetting_V1"
+  - "petitrc RC CheatSheets"

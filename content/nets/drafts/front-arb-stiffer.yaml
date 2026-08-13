@@ -1,0 +1,47 @@
+# AI DRAFT — not founder-reviewed. Drafted from petitrc RC CheatSheets + Tekno setup guide
+# + XRAY setup book; contested claims discovered via RCTech threads (never sourced from them).
+id: front_arb_stiffer
+discipline: touring
+change:
+  parameter: arb_front
+  direction: increase
+  typical_step: "one wire size (~0.1 mm)"
+effects:
+  - phase: entry
+    power: off-power
+    end: front
+    feel: "sharper initial steering response — the car takes a set faster and stays flatter"
+    confidence: consensus
+  - phase: mid
+    power: any
+    end: front
+    feel: "less front side grip once loaded — the front washes wide through the middle of the corner"
+    confidence: contested
+  - phase: exit
+    power: on-power
+    end: car
+    feel: "more stable putting power down, at the cost of steering out of the corner"
+    confidence: majority
+secondary_effects:
+  - "rear gains relative side grip — front/rear bar stiffness is a coupled axis; stiffening one end frees the other"
+  - "faster side-to-side transitions in chicanes"
+dose_response: monotonic
+modifiers:
+  - context: "very high grip (carpet, additive asphalt)"
+    action: attenuates
+    note: "high bite tolerates the bar; controlling roll and stopping traction-roll is its main use case there"
+  - context: "very low grip"
+    action: amplifies
+    note: "low grip can't afford the front side-grip loss — but see contested"
+contested:
+  claim_a: "majority: run softer or no front bar on low grip — the car needs roll to lean load into the tyre"
+  claim_b: "minority (some top drivers): run stiffer on low grip to keep the platform calm and the tyre flat"
+  discriminator: "if the car rolls to the outer edge and then snaps sideways, try claim B; if it slides progressively and gradually, stay with claim A"
+physics_link:
+  - arb.md
+  - concepts/roll-stiffness.md
+  - concepts/load-transfer.md
+sources:
+  - "petitrc RC CheatSheets"
+  - "Tekno Set Up Guide"
+  - "XRAY T1R Setup Book"
