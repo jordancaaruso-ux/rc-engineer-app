@@ -75,6 +75,11 @@ import {
 } from "@/components/runs/InlineNewTrackRow";
 import { deriveContinueEntry, type NewRunWizardEntry } from "@/lib/runs/wizardEntry";
 import { planCarSwap, type CarSwapPlan } from "@/lib/runs/carSwap";
+import {
+  resolveSetupSourceDefault,
+  setupListState,
+  type SetupSource,
+} from "@/lib/runs/setupSourceDefault";
 import type { EntryCandidate } from "@/lib/runs/entryCandidate";
 import {
   WizardPrefillCard,
@@ -496,7 +501,7 @@ export function NewRunForm(props: {
   /** Server-loaded last run for copy card (avoids client /api/runs/last-any round trip). */
   initialCopyPreviewRun?: CopyPreviewRunRecord | null;
   /**
-   * Roll Center Lab export (`/runs/new?labSetup=…`): geometry sheet-field values
+   * Geometry Lab export (`/runs/new?labSetup=…`): geometry sheet-field values
    * to merge over the starting setup, so a Lab what-if becomes a loggable run
    * (docs/ROLL_CENTER_NORTH_STAR.md Phase 3).
    */
@@ -830,14 +835,25 @@ export function NewRunForm(props: {
   const [copyTrackWarning, setCopyTrackWarning] = useState<string | null>(null);
   const [copyTireWarning, setCopyTireWarning] = useState<string | null>(null);
   const [pickerRuns, setPickerRuns] = useState<RunPickerRun[]>([]);
-  /** Car id whose past-run + saved-setup lists have actually come back, so "both empty" can be
-   *  told apart from "not fetched yet". */
-  const [setupOptionsLoadedFor, setSetupOptionsLoadedFor] = useState<string | null>(null);
+  /**
+   * Which car the two setup-option lists belong to, and whether each request actually
+   * came back — so "this car has nothing" can be told apart from "not fetched yet" and
+   * from "the request failed". A boolean marker conflated all three, and the Setup
+   * step's default read the difference as evidence (see `setupSourceDefault`).
+   *
+   * `null` while a car's lists are in flight, which is also what makes re-selecting a
+   * car safe: the marker can no longer read as ready against the previous car's lists.
+   */
+  const [setupOptionsLoad, setSetupOptionsLoad] = useState<{
+    carId: string;
+    runsOk: boolean;
+    savedOk: boolean;
+  } | null>(null);
   /** Lets the track sheet's "add a track that isn't listed" open the chip below it, prefilled. */
   const newTrackRowRef = useRef<InlineNewTrackRowHandle>(null);
   const [loadSetupSelection, setLoadSetupSelection] = useState("");
   const [loadOtherSetupSelection, setLoadOtherSetupSelection] = useState("");
-  const [setupSource, setSetupSource] = useState<"previous_runs" | "other" | "new">("previous_runs");
+  const [setupSource, setSetupSource] = useState<SetupSource>("previous_runs");
   const [newSetupMode, setNewSetupMode] = useState<"blank" | "upload">("blank");
   /**
    * Sheet upload only extracts values on a chassis whose sheet has been calibrated. Elsewhere the
@@ -955,6 +971,21 @@ export function NewRunForm(props: {
    * "edits revert on blur" bug). Reset at the top of the copy/car-change effect.
    */
   const setupTouchedByUserRef = useRef(false);
+  /**
+   * The car the driver has chosen a setup FACE for, and the car the derived default
+   * has already landed for. Both hold a car id rather than a boolean so they reset
+   * themselves on a car change — which is the point: "where does this car's setup come
+   * from" is a per-car question, and the car picker already clears the run/setup
+   * selection when the car changes, so a face carried over from another car would point
+   * at an empty picker.
+   *
+   * Deliberately NOT `setupTouchedByUserRef`, which means "the driver owns the setup
+   * DATA" and is blanket-cleared on every car change further down this file — reading it
+   * here would also hit an ordering hazard, since this effect is declared above the
+   * loader that clears it and would still see the previous car's value.
+   */
+  const setupSourceChosenForRef = useRef<string | null>(null);
+  const setupSourceDefaultedForRef = useRef<string | null>(null);
   /** After a successful "Run complete", block duplicate POST/PUT until navigation away. */
   const pendingCompleteNavigationRef = useRef(false);
   const pendingDraftNavigationRef = useRef(false);
@@ -1338,7 +1369,7 @@ export function NewRunForm(props: {
   }, [dashboardPrefill, carsList, applyTireStint]);
 
   /**
-   * Roll Center Lab export: merge the Lab's geometry field values over whatever
+   * Geometry Lab export: merge the Lab's geometry field values over whatever
    * setup the form starts with (and re-apply after "copy last run", so the
    * what-if — the reason the driver came here — survives the copy).
    */
@@ -2220,6 +2251,10 @@ export function NewRunForm(props: {
 
   /** Past-run + downloaded setup lists scoped to the selected car. */
   useEffect(() => {
+    // Clear first, always: the lists in hand are the OTHER car's until these come
+    // back, and leaving the marker up means the Setup step's default reads them as
+    // this car's answer.
+    setSetupOptionsLoad(null);
     if (!carId) {
       setPickerRuns([]);
       setDownloadedSetups([]);
@@ -2227,67 +2262,92 @@ export function NewRunForm(props: {
       return;
     }
     let alive = true;
-    Promise.all([
+    // `allSettled`, not `all`: these are two independent questions, and under `all`
+    // a blip on either one emptied BOTH lists and then reported them as loaded —
+    // which put a driver with a season of runs on a blank sheet.
+    Promise.allSettled([
       jsonFetch<{ runs: RunPickerRun[] }>(`/api/runs/for-picker?carId=${encodeURIComponent(carId)}`),
       jsonFetch<{ downloadedSetups: DownloadedSetupOption[]; supportsSheetUpload?: boolean }>(
         `/api/setup/options?carId=${encodeURIComponent(carId)}`
       ),
-    ])
-      .then(([runsRes, dlRes]) => {
-        if (!alive) return;
-        setPickerRuns(Array.isArray(runsRes.runs) ? runsRes.runs : []);
-        setDownloadedSetups(Array.isArray(dlRes.downloadedSetups) ? dlRes.downloadedSetups : []);
-        setSupportsSheetUpload(dlRes.supportsSheetUpload === true);
-        setSetupOptionsLoadedFor(carId);
-      })
-      .catch(() => {
-        if (!alive) return;
-        setPickerRuns([]);
-        setDownloadedSetups([]);
-        setSupportsSheetUpload(false);
-        setSetupOptionsLoadedFor(carId);
-      });
+    ]).then(([runsRes, dlRes]) => {
+      if (!alive) return;
+      const runsOk = runsRes.status === "fulfilled";
+      const savedOk = dlRes.status === "fulfilled";
+      setPickerRuns(
+        runsOk && Array.isArray(runsRes.value.runs) ? runsRes.value.runs : []
+      );
+      setDownloadedSetups(
+        savedOk && Array.isArray(dlRes.value.downloadedSetups) ? dlRes.value.downloadedSetups : []
+      );
+      setSupportsSheetUpload(savedOk && dlRes.value.supportsSheetUpload === true);
+      setSetupOptionsLoad({ carId, runsOk, savedOk });
+    });
     return () => {
       alive = false;
     };
   }, [carId]);
 
   /*
-   * Land the setup card on a face that has something in it.
+   * Land the setup card on a face that has something in it — recomputed per car.
    *
-   * It always opened on "Previous runs", which for a first-time driver is empty by construction —
-   * they have never logged a run — so the Setup step's opening words were "No past runs yet",
-   * under a heading promising a sheet, above a screenful of nothing. Measured 2026-08-13: it
-   * happened in all ten new-account walks, and was the most common thing wrong with the first run.
+   * It used to open on "Previous runs" always, which for a first-time driver is empty by
+   * construction, so the Setup step's opening words were "No past runs yet" above a screenful of
+   * nothing (measured 2026-08-13, ten of ten new-account walks). The first fix seeded "New" when
+   * both lists were empty, but it was one-way — once it fired, the `setupSource !== "previous_runs"`
+   * guard meant it could never come back, and nothing resets the source on a car change. Since the
+   * car picker sorts most-recently-interacted first, a car created minutes ago with no runs sorts
+   * to the top, is pre-selected, seeds "New", and "New" then stuck when the driver switched to the
+   * car they actually race (founder, 2026-08-13: "always autos to new, which majority of the time
+   * isn't what the user would want").
    *
-   * Waits for `setupOptionsLoadedFor` because both lists start empty: acting on that initial
-   * state would move every driver to "New" for a moment, including one whose runs are still in
-   * flight. Only the DEFAULT moves — an explicit pick (`setupTouchedByUserRef`), an edit, or a
-   * resumed draft already means something and is left alone. The seed mirrors
-   * `handleSetupSourceChange("new")` minus the expand: the driver did not ask to come here, so
-   * the sheet stays rolled up until they open it.
+   * So it is a derived default now, not a seed: `resolveSetupSourceDefault` answers from the facts,
+   * every time it is asked, and the two refs below record who already answered. It moves the FACE
+   * ONLY — no run selected, no setup attached, no baseline, no expand. Attaching is the explicit
+   * prefill / copy-last-run tap's job ("prefill should always be an option — never automatic",
+   * LogRunWizardHost). The old seed's blank-snapshot writes are gone for that reason: a non-null
+   * `setupBaselineData` also ticked the wizard's Setup step green and swapped the card for a "New
+   * blank setup" summary, both of which claimed a setup that was never chosen.
    */
+  const loadedForThisCar = Boolean(carId) && setupOptionsLoad?.carId === carId;
+  const previousRunsState = setupListState({
+    loadedForThisCar,
+    ok: setupOptionsLoad?.runsOk ?? false,
+    count: pickerRuns.length,
+  });
+  const savedSetupsState = setupListState({
+    loadedForThisCar,
+    ok: setupOptionsLoad?.savedOk ?? false,
+    count: downloadedSetups.length,
+  });
+
   useEffect(() => {
-    if (!carId || setupOptionsLoadedFor !== carId) return;
-    if (props.editRun?.id || setupTouchedByUserRef.current) return;
-    if (setupSource !== "previous_runs") return;
-    if (pickerRuns.length > 0 || downloadedSetups.length > 0) return;
-    setSetupSource("new");
-    const empty = setupSnapshotWithDerived({});
-    setSetupData(empty);
-    setActiveSetupData(empty, carId);
-    setSetupBaselineSnapshotId(null);
-    setSetupBaselineData(cloneSetupSnapshot(empty));
+    if (!carId) return;
+    const next = resolveSetupSourceDefault({
+      previousRuns: previousRunsState,
+      savedSetups: savedSetupsState,
+      isEditing,
+      driverChoseForThisCar: setupSourceChosenForRef.current === carId,
+      alreadyDefaultedForThisCar: setupSourceDefaultedForRef.current === carId,
+      sheetHasContent: setupBaselineData != null || Object.keys(setupData).length > 0,
+    });
+    if (!next) return;
+    setupSourceDefaultedForRef.current = carId;
+    if (next !== setupSource) setSetupSource(next);
   }, [
     carId,
-    setupOptionsLoadedFor,
-    pickerRuns,
-    downloadedSetups,
+    previousRunsState,
+    savedSetupsState,
+    isEditing,
     setupSource,
-    props.editRun?.id,
+    setupData,
+    setupBaselineData,
   ]);
 
-  function handleSetupSourceChange(next: "previous_runs" | "other" | "new") {
+  function handleSetupSourceChange(next: SetupSource) {
+    // Claimed before the early return: re-tapping the face you are already on is
+    // still the driver answering the question, and must stop the default moving it.
+    setupSourceChosenForRef.current = carId || null;
     if (next === setupSource) return;
     // Switching source is an explicit setup choice — protect it from the
     // last-run auto-apply the same way an edit or pick does.
@@ -2330,6 +2390,8 @@ export function NewRunForm(props: {
   }
 
   function applyPastSetupOnly(runId: string) {
+    // Including the clear branch below — going back to "Choose a run…" is a choice.
+    setupSourceChosenForRef.current = carId || null;
     setSetupSource("previous_runs");
     if (!runId) {
       setLoadSetupSelection("");
@@ -2351,6 +2413,7 @@ export function NewRunForm(props: {
   }
 
   function applyDownloadedSetupOnly(docId: string) {
+    setupSourceChosenForRef.current = carId || null;
     setSetupSource("other");
     if (!docId) {
       setLoadOtherSetupSelection("");
@@ -2489,6 +2552,7 @@ export function NewRunForm(props: {
       const picked = list.find((x) => x.id === documentId);
       if (!picked) return;
       setupTouchedByUserRef.current = true;
+      setupSourceChosenForRef.current = carId || null;
       setSetupSource("other");
       setLoadOtherSetupSelection(documentId);
       const next = setupSnapshotWithDerived(picked.setupData);
@@ -2972,6 +3036,8 @@ export function NewRunForm(props: {
     setNotes("");
     setLapIngest(defaultLapIngestValue());
     setLoadSetupSelection(r.id);
+    // The copy may bring its own car with it, so claim ownership for that one.
+    setupSourceChosenForRef.current = nextCarId || prevCarId || null;
     setSetupSource("previous_runs");
     setReplicateLast(true);
     // Reveal the copied setup sheet — every other load path expands it, and a

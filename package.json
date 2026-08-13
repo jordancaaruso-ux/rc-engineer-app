@@ -90,6 +90,7 @@
     "test:field-sheet": "npx tsx src/lib/lapAnalysis.fieldSheet.test.ts && npx tsx src/lib/lapImport/computeImportedSessionFieldStats.test.ts && npx tsx src/lib/lapImport/autoExcludeOutlierLaps.test.ts",
     "test:lap-compare-scope": "npx tsx --test src/lib/lapCompareScope.test.ts",
     "test:car-swap": "npx tsx --test src/lib/runs/carSwap.test.ts",
+    "test:setup-source": "npx tsx --test src/lib/runs/setupSourceDefault.test.ts",
     "test:car-discipline": "npx tsx --test src/lib/cars/disciplineForCar.test.ts",
     "test:tire-age": "npx tsx src/lib/tires/tireAgeReadout.test.ts",
     "test:tire-stint": "npx tsx src/lib/tires/deriveTireStint.test.ts",
