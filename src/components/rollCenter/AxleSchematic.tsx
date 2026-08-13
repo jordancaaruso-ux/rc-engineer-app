@@ -9,8 +9,8 @@
  * Draws directly from the engine's solved hardpoints, so what you see IS the solve
  * that produced the numbers. Shared by the setup-sheet geometry block and the Lab.
  * Accepts rolled solves (chassis-roll poses) and an optional GHOST axle — a second
- * solve drawn dashed underneath for two-setup comparison (yellow stays reserved for
- * the live RC marker; the ghost RC is a hollow outline).
+ * solve drawn dotted underneath for two-setup comparison (yellow stays reserved for
+ * the live RC marker; the ghost RC is the same dot, hollow).
  */
 
 import { useMemo } from "react";
@@ -20,6 +20,10 @@ import type { SolvedAxle, SolvedSide, Vec2 } from "@/lib/rollCenter/engine";
 /** Visual tire section half-width (mm) — matches the ~19.5mm rubber on a TC. */
 const TIRE_HALF_WIDTH = 9.8;
 const VIEW_W = 360;
+/** Roll-centre marker radius — live is filled yellow, ghost is the same size, hollow. */
+const RC_DOT_R = 2;
+/** How close a pinned (off-scale) roll-centre marker may sit to the frame edge. */
+const RC_EDGE_PAD = 5;
 
 const armAngleDeg = (inner: Vec2, outer: Vec2): number =>
   (Math.atan2(outer.z - inner.z, outer.x - inner.x) * 180) / Math.PI;
@@ -55,6 +59,28 @@ function axleDrawing(solved: SolvedAxle): AxleDrawing | null {
   return { tires: [left, right], rc: solved.rollCentre };
 }
 
+/**
+ * Live stroke weights per member (founder-picked 2026-08-13 off the stroke study).
+ * Thin and fully opaque: sharpness comes from narrow near-solid lines, never from a
+ * lighter colour — these draw in `currentColor`, which is warm ink on light paper.
+ */
+const LIVE_STROKE = {
+  chassis: 0.9,
+  post: 0.8,
+  knuckle: 0.7,
+  lower: 0.6,
+  upper: 0.5,
+} as const;
+
+/**
+ * The ghost carries its own flat weight rather than a scaled copy of the live one.
+ * Scaling used to multiply every live opacity by 0.35, which dropped the chassis plate
+ * (0.25) to 0.09 and made it invisible; a flat value keeps every member equally legible.
+ */
+const GHOST_STROKE = 0.9;
+const GHOST_OPACITY = 0.65;
+const GHOST_DASH = "1 3";
+
 /** Linkage lines for one axle: chassis bar, bulkheads, knuckles, arms. */
 function LinkageLines({
   solved,
@@ -67,68 +93,30 @@ function LinkageLines({
   Y: (z: number) => number;
   ghost?: boolean;
 }) {
-  const dash = ghost ? "4 3" : undefined;
-  const o = (full: number) => (ghost ? full * 0.35 : full);
+  const line = (a: Vec2, b: Vec2, width: number, key: string) => (
+    <line
+      key={key}
+      x1={X(a.x)}
+      y1={Y(a.z)}
+      x2={X(b.x)}
+      y2={Y(b.z)}
+      stroke="currentColor"
+      strokeOpacity={ghost ? GHOST_OPACITY : 1}
+      strokeWidth={ghost ? GHOST_STROKE : width}
+      strokeLinecap="round"
+      strokeDasharray={ghost ? GHOST_DASH : undefined}
+    />
+  );
   return (
     <g>
       {/* Chassis plate between the lower-inner mounts + bulkhead posts */}
-      <line
-        x1={X(solved.left.innerLower.x)}
-        y1={Y(solved.left.innerLower.z)}
-        x2={X(solved.right.innerLower.x)}
-        y2={Y(solved.right.innerLower.z)}
-        stroke="currentColor"
-        strokeOpacity={o(0.25)}
-        strokeWidth={3}
-        strokeLinecap="round"
-        strokeDasharray={dash}
-      />
+      {line(solved.left.innerLower, solved.right.innerLower, LIVE_STROKE.chassis, "chassis")}
       {[solved.left, solved.right].map((s, i) => (
         <g key={`legs-${i}`}>
-          <line
-            x1={X(s.innerLower.x)}
-            y1={Y(s.innerLower.z)}
-            x2={X(s.innerUpper.x)}
-            y2={Y(s.innerUpper.z)}
-            stroke="currentColor"
-            strokeOpacity={o(0.22)}
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeDasharray={dash}
-          />
-          <line
-            x1={X(s.lowerBall.x)}
-            y1={Y(s.lowerBall.z)}
-            x2={X(s.upperBall.x)}
-            y2={Y(s.upperBall.z)}
-            stroke="currentColor"
-            strokeOpacity={o(0.4)}
-            strokeWidth={2.4}
-            strokeLinecap="round"
-            strokeDasharray={dash}
-          />
-          <line
-            x1={X(s.innerLower.x)}
-            y1={Y(s.innerLower.z)}
-            x2={X(s.lowerBall.x)}
-            y2={Y(s.lowerBall.z)}
-            stroke="currentColor"
-            strokeOpacity={o(0.85)}
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeDasharray={dash}
-          />
-          <line
-            x1={X(s.innerUpper.x)}
-            y1={Y(s.innerUpper.z)}
-            x2={X(s.upperBall.x)}
-            y2={Y(s.upperBall.z)}
-            stroke="currentColor"
-            strokeOpacity={o(0.85)}
-            strokeWidth={1.6}
-            strokeLinecap="round"
-            strokeDasharray={dash}
-          />
+          {line(s.innerLower, s.innerUpper, LIVE_STROKE.post, "post")}
+          {line(s.lowerBall, s.upperBall, LIVE_STROKE.knuckle, "knuckle")}
+          {line(s.innerLower, s.lowerBall, LIVE_STROKE.lower, "lower")}
+          {line(s.innerUpper, s.upperBall, LIVE_STROKE.upper, "upper")}
         </g>
       ))}
     </g>
@@ -140,8 +128,10 @@ export function AxleSchematic({ solved, ghost, extraPoints, fitBox, axleLabel, s
   /** Optional second solve drawn dashed underneath (two-setup ghost compare). */
   ghost?: SolvedAxle | null;
   /**
-   * Extra points folded into the view extents but not drawn — the Lab passes the
-   * full roll-sweep RC path so the viewBox stays put while the RC marker migrates.
+   * Extra points folded into the VERTICAL view extents but not drawn — the Lab passes the
+   * roll-sweep RC path and both ends of the bump travel, so the viewBox stays put while the
+   * pose changes. Horizontal extents ignore these: the car frames the drawing (see the
+   * runaway-RC note in the extents memo).
    */
   extraPoints?: Vec2[];
   /**
@@ -166,11 +156,19 @@ export function AxleSchematic({ solved, ghost, extraPoints, fitBox, axleLabel, s
     const contacts = [solved.left.contact.x, solved.right.contact.x].concat(
       ghost ? [ghost.left.contact.x, ghost.right.contact.x] : []
     );
-    const extraXs = (extraPoints ?? []).map((p) => p.x);
     const extraZs = (extraPoints ?? []).map((p) => p.z);
-    const rcZs = [main.rc.z, ...(gh ? [gh.rc.z] : [])];
-    const xMin = Math.min(...contacts, ...extraXs) - 16;
-    const xMax = Math.max(...contacts, ...extraXs) + 16;
+    /*
+     * The CAR frames the drawing — the roll centre never does. RC is where the two force lines
+     * cross, so as it nears ground level those lines approach parallel and the crossing point
+     * runs away sideways (measured +163mm lateral on a 94mm contact patch at 3mm under the lower
+     * arm, 2.5mm bump, 3° roll). Letting that into the extents shrank the car and slid it off
+     * centre. Horizontally the marker is now ignored outright; vertically it may extend the view
+     * by at most the car's own height, and beyond that it is pinned and drawn as off-scale.
+     */
+    const rcFloor = -tireTopZ;
+    const rcZs = [main.rc.z, ...(gh ? [gh.rc.z] : [])].map((z) => Math.max(z, rcFloor));
+    const xMin = Math.min(...contacts) - 16;
+    const xMax = Math.max(...contacts) + 16;
     const zMin = Math.min(0, ...rcZs, ...extraZs) - 8;
     // Camber labels sit above the tire tops — reserve headroom for them.
     const zMax = Math.max(tireTopZ, solved.right.innerUpper.z, ...extraZs) + (showCamber ? 12 : 5);
@@ -183,6 +181,18 @@ export function AxleSchematic({ solved, ghost, extraPoints, fitBox, axleLabel, s
     const X = (x: number) => q((x - xMin) * S);
     const Y = (z: number) => q((zMax - z) * S);
     const P = (p: Vec2) => `${X(p.x).toFixed(1)},${Y(p.z).toFixed(1)}`;
+
+    /**
+     * Place a roll-centre marker, pinned inside the frame. `offScale` means the true point lies
+     * outside the car — the dot keeps its height but stops claiming an exact lateral position.
+     */
+    const markFor = (rc: Vec2) => {
+      const px = X(rc.x);
+      const py = Y(rc.z);
+      const cx = Math.min(Math.max(px, RC_EDGE_PAD), VIEW_W - RC_EDGE_PAD);
+      const cy = Math.min(Math.max(py, RC_EDGE_PAD), H - RC_EDGE_PAD);
+      return { cx, cy, offScale: Math.abs(cx - px) > 0.5 || Math.abs(cy - py) > 0.5 };
+    };
 
     const r = solved.right;
     const lowerMid = { x: (r.innerLower.x + r.lowerBall.x) / 2, z: (r.innerLower.z + r.lowerBall.z) / 2 };
@@ -210,6 +220,8 @@ export function AxleSchematic({ solved, ghost, extraPoints, fitBox, axleLabel, s
       lowerMid,
       upperMid,
       camberLabels,
+      mainMark: markFor(main.rc),
+      ghostMark: gh ? markFor(gh.rc) : null,
     };
   }, [solved, ghost, extraPoints, showCamber]);
 
@@ -251,24 +263,25 @@ export function AxleSchematic({ solved, ghost, extraPoints, fitBox, axleLabel, s
               points={corners.map(d.P).join(" ")}
               fill="none"
               stroke="currentColor"
-              strokeOpacity={0.18}
-              strokeWidth={1}
-              strokeDasharray="4 3"
+              strokeOpacity={0.45}
+              strokeWidth={GHOST_STROKE}
+              strokeDasharray={GHOST_DASH}
+              strokeLinecap="round"
               strokeLinejoin="round"
             />
           ))}
           <LinkageLines solved={ghost} X={d.X} Y={d.Y} ghost />
-          <rect
-            x={d.X(d.gh.rc.x) - 3.4}
-            y={d.Y(d.gh.rc.z) - 3.4}
-            width={6.8}
-            height={6.8}
-            transform={`rotate(45 ${d.X(d.gh.rc.x)} ${d.Y(d.gh.rc.z)})`}
-            fill="none"
-            stroke="currentColor"
-            strokeOpacity={0.45}
-            strokeWidth={1.2}
-          />
+          {d.ghostMark && (
+            <circle
+              cx={d.ghostMark.cx}
+              cy={d.ghostMark.cy}
+              r={RC_DOT_R}
+              fill="none"
+              stroke="currentColor"
+              strokeOpacity={d.ghostMark.offScale ? 0.4 : 0.75}
+              strokeWidth={1}
+            />
+          )}
         </g>
       )}
 
@@ -290,7 +303,7 @@ export function AxleSchematic({ solved, ghost, extraPoints, fitBox, axleLabel, s
 
       {/* Pivots + balls */}
       {joints.map((p, i) => (
-        <circle key={`joint-${i}`} cx={d.X(p.x)} cy={d.Y(p.z)} r={2.6} fill="currentColor" fillOpacity={0.85} />
+        <circle key={`joint-${i}`} cx={d.X(p.x)} cy={d.Y(p.z)} r={2} fill="currentColor" fillOpacity={0.9} />
       ))}
 
       {/* Camber per wheel, above each tire — a rolled solve splits left/right */}
@@ -331,20 +344,22 @@ export function AxleSchematic({ solved, ghost, extraPoints, fitBox, axleLabel, s
         {d.upperAngle.toFixed(1)}°
       </text>
 
-      {/* Roll center — the one yellow mark (marker only; doc's visual rule) */}
+      {/* Roll center — the one yellow mark (marker only; doc's visual rule).
+          A dot, matching how the Lab's migration chart already marks current RC. Hollow when
+          the true point is off the car and the dot has been pinned to the frame. */}
       <g className="text-primary-ink">
-        <rect
-          x={d.X(d.main.rc.x) - 3.4}
-          y={d.Y(d.main.rc.z) - 3.4}
-          width={6.8}
-          height={6.8}
-          transform={`rotate(45 ${d.X(d.main.rc.x)} ${d.Y(d.main.rc.z)})`}
-          fill="currentColor"
+        <circle
+          cx={d.mainMark.cx}
+          cy={d.mainMark.cy}
+          r={RC_DOT_R}
+          fill={d.mainMark.offScale ? "none" : "currentColor"}
+          stroke={d.mainMark.offScale ? "currentColor" : "none"}
+          strokeWidth={1}
         />
       </g>
       <text
-        x={d.X(d.main.rc.x)}
-        y={d.Y(d.main.rc.z - 5.2) + 4}
+        x={d.mainMark.cx}
+        y={d.mainMark.cy - 6}
         textAnchor="middle"
         fontSize={9.5}
         fill="currentColor"

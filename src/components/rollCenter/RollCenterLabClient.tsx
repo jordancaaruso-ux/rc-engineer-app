@@ -20,13 +20,20 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Button } from "@/components/ui/Button";
 import { Eyebrow } from "@/components/ui/panel";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { AxleSchematic } from "@/components/rollCenter/AxleSchematic";
-import { computeAxleMetrics, solveAxle, type AxleAdjustments } from "@/lib/rollCenter/engine";
+import {
+  computeAxleMetrics,
+  solveAxle,
+  type AxleAdjustments,
+  type SolvedAxle,
+  type Vec2,
+} from "@/lib/rollCenter/engine";
 import {
   computeRollCenterFromSnapshot,
   deriveRollCenterInputs,
@@ -49,6 +56,10 @@ import {
 } from "@/lib/runPickerFormat";
 
 const ROLL_MAX_DEG = 3;
+
+/** Square reset button sitting against each pose slider. */
+const POSE_ICON_BUTTON =
+  "tap-active grid size-5 shrink-0 place-items-center rounded border border-border text-muted-foreground transition hover:border-primary-ink/40 hover:text-foreground disabled:pointer-events-none disabled:opacity-30";
 
 /** One searchable setup source: own run, downloaded sheet, or teammate run. */
 type SetupPickerEntry = {
@@ -338,10 +349,14 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
   const [sel, setSel] = useState<SlotId>("a");
   const [axle, setAxle] = useState<"front" | "rear">("front");
   const [rollDeg, setRollDeg] = useState(0);
-  const [playing, setPlaying] = useState(false);
+  /**
+   * Chassis bump, held as movement from the setup's own ride height (0 = at rest) even
+   * though the slider reads absolute ride height. Storing the delta is what keeps the
+   * pose meaningful when the ride-height knob moves or the axle toggles: "2mm of squat"
+   * stays 2mm of squat, and the absolute readout re-reads itself.
+   */
+  const [bumpMm, setBumpMm] = useState(0);
   const [copied, setCopied] = useState(false);
-  const rollRef = useRef(0);
-  rollRef.current = rollDeg;
 
   // Guard: selection can never point at an empty slot.
   const activeId: SlotId = sel === "b" && slots.b ? "b" : "a";
@@ -511,38 +526,76 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
   const ghostGeo = comparing && otherInputs ? otherInputs.pack[axle] : null;
   const ghostAdj = comparing && otherInputs ? (axle === "front" ? otherInputs.frontAdj : otherInputs.rearAdj) : null;
 
+  /**
+   * The axle's own ride height, and therefore the bump slider's travel: down to 0 (chassis
+   * on the deck) and up to twice static. Same expression the ride-height knob reads.
+   */
+  const rideHeightKey: GeometrySheetKey = axle === "front" ? "ride_height_front" : "ride_height_rear";
+  const staticRh = parseNum(fields[rideHeightKey]) ?? (axle === "front" ? 5.0 : 5.2);
+
+  // Ride-height edits and axle toggles change what the travel limits are; keep the pose inside them.
+  useEffect(() => {
+    setBumpMm((b) => Math.min(staticRh, Math.max(-staticRh, b)));
+  }, [staticRh]);
+
   const solved = useMemo(
-    () => (geo && adj ? solveAxle(geo, adj, rollDeg) : null),
-    [geo, adj, rollDeg]
+    () => (geo && adj ? solveAxle(geo, adj, rollDeg, bumpMm) : null),
+    [geo, adj, rollDeg, bumpMm]
   );
   const ghostSolved = useMemo(
-    () => (ghostGeo && ghostAdj ? solveAxle(ghostGeo, ghostAdj, rollDeg) : null),
-    [ghostGeo, ghostAdj, rollDeg]
+    () => (ghostGeo && ghostAdj ? solveAxle(ghostGeo, ghostAdj, rollDeg, bumpMm) : null),
+    [ghostGeo, ghostAdj, rollDeg, bumpMm]
   );
 
   const sweep = useMemo(() => {
     if (!geo || !adj) return null;
     const pts: { roll: number; x: number; z: number }[] = [];
     for (let r = 0; r <= ROLL_MAX_DEG + 1e-6; r += 0.25) {
-      const s = solveAxle(geo, adj, r);
+      const s = solveAxle(geo, adj, r, bumpMm);
       if (s?.rollCentre) pts.push({ roll: r, x: s.rollCentre.x, z: s.rollCentre.z });
     }
     return pts.length > 1 ? pts : null;
-  }, [geo, adj]);
+  }, [geo, adj, bumpMm]);
   const ghostSweep = useMemo(() => {
     if (!ghostGeo || !ghostAdj) return null;
     const pts: { roll: number; x: number; z: number }[] = [];
     for (let r = 0; r <= ROLL_MAX_DEG + 1e-6; r += 0.25) {
-      const s = solveAxle(ghostGeo, ghostAdj, r);
+      const s = solveAxle(ghostGeo, ghostAdj, r, bumpMm);
       if (s?.rollCentre) pts.push({ roll: r, x: s.rollCentre.x, z: s.rollCentre.z });
     }
     return pts.length > 1 ? pts : null;
-  }, [ghostGeo, ghostAdj]);
+  }, [ghostGeo, ghostAdj, bumpMm]);
 
-  /** RC sweep paths folded into the schematic's extents so the view never rescales in roll. */
+  /**
+   * Both ends of the bump travel, folded into the extents but never drawn. Without this the
+   * frame mounts rise and fall out of the derived viewBox and the whole drawing rescales
+   * under the slider — the tyres are pinned to the ground, the chassis is not.
+   */
+  const bumpExtent = useMemo(() => {
+    const pts: Vec2[] = [];
+    const ends: [typeof geo, typeof adj][] = [
+      [geo, adj],
+      [ghostGeo, ghostAdj],
+    ];
+    for (const [g, a] of ends) {
+      if (!g || !a) continue;
+      for (const b of [-staticRh, staticRh]) {
+        const s = solveAxle(g, a, 0, b);
+        if (!s) continue;
+        pts.push(s.left.innerUpper, s.right.innerUpper, s.left.innerLower, s.right.innerLower);
+        if (s.rollCentre) pts.push(s.rollCentre);
+      }
+    }
+    return pts;
+  }, [geo, adj, ghostGeo, ghostAdj, staticRh]);
+
+  /** RC sweep paths + bump extremes folded in, so neither slider ever rescales the view. */
   const schematicExtraPoints = useMemo(
-    () => [...(sweep ?? []), ...(ghostSweep ?? [])].map((p) => ({ x: p.x, z: p.z })),
-    [sweep, ghostSweep]
+    () => [
+      ...[...(sweep ?? []), ...(ghostSweep ?? [])].map((p) => ({ x: p.x, z: p.z })),
+      ...bumpExtent,
+    ],
+    [sweep, ghostSweep, bumpExtent]
   );
 
   const sensitivities = useMemo(() => {
@@ -554,31 +607,6 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
       return { label, perMm: m ? m.rcHeightMm - base.rcHeightMm : null };
     });
   }, [geo, adj]);
-
-  /** Roll animation: ping-pong 0 → 3° → 0 at 1.5°/s. */
-  useEffect(() => {
-    if (!playing) return;
-    let raf = 0;
-    let last = performance.now();
-    let dir = 1;
-    let value = rollRef.current;
-    const tick = (t: number) => {
-      const dt = Math.min((t - last) / 1000, 0.1);
-      last = t;
-      value += dir * 1.5 * dt;
-      if (value >= ROLL_MAX_DEG) {
-        value = ROLL_MAX_DEG;
-        dir = -1;
-      } else if (value <= 0) {
-        value = 0;
-        dir = 1;
-      }
-      setRollDeg(value);
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [playing]);
 
   const updateActiveSlot = (update: (slot: Slot) => Slot) => {
     setSlots((s) =>
@@ -752,6 +780,14 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     );
   }
 
+  /*
+   * "At rest" needs a tolerance, not ===: bump is stored as (slider − staticRh) and the roll
+   * animation integrates real time, so both land on values like 1e-15 rather than a clean 0.
+   * Each axis resets on its own, so each knows separately whether it has anything to undo.
+   */
+  const rollAtRest = Math.abs(rollDeg) < 1e-9;
+  const bumpAtRest = Math.abs(bumpMm) < 1e-9;
+
   const rcAtRoll = solved?.rollCentre ?? null;
 
   const deltaChip = (current: number, base: number | null | undefined, unit: string) => {
@@ -813,30 +849,64 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
           </p>
         )}
 
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            className="px-3 py-1 text-xs"
-            onClick={() => setPlaying((p) => !p)}
-            aria-pressed={playing}
-          >
-            {playing ? "Pause" : "Roll"}
-          </Button>
+        {/*
+         * Pose controls — roll and bump stack, and neither touches the stored setup. The header
+         * deliberately mirrors "Adjustments · front" below, reset and all: two labelled sections
+         * with their own reset is what tells a driver which sliders change the car and which
+         * only change how it is standing.
+         */}
+        <Eyebrow>Pose</Eyebrow>
+
+        <div className="flex items-center gap-2">
+          <span className="type-data-label w-[2.5rem] shrink-0">Roll</span>
           <input
             type="range"
             min={0}
             max={ROLL_MAX_DEG}
             step={0.05}
             value={rollDeg}
-            onChange={(e) => {
-              setPlaying(false);
-              setRollDeg(Number(e.target.value));
-            }}
+            onChange={(e) => setRollDeg(Number(e.target.value))}
             aria-label="Chassis roll angle (degrees)"
             className="min-w-0 flex-1 accent-primary"
           />
-          <span className="w-[9.5rem] shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
-            {rollDeg.toFixed(1)}° · RC {rcAtRoll ? `${fmtMm(rcAtRoll.z)} / ${fmtMm(rcAtRoll.x, 0)}mm` : "—"}
+          <button
+            type="button"
+            disabled={rollAtRest}
+            onClick={() => setRollDeg(0)}
+            aria-label="Reset roll"
+            className={POSE_ICON_BUTTON}
+          >
+            <RotateCcw aria-hidden className="size-[11px]" strokeWidth={2.4} />
+          </button>
+          <span className="w-[7.5rem] shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
+            {rollDeg.toFixed(1)}° · RC {rcAtRoll ? `${fmtMm(rcAtRoll.z)}/${fmtMm(rcAtRoll.x, 0)}` : "—"}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="type-data-label w-[2.5rem] shrink-0">Bump</span>
+          <input
+            type="range"
+            min={0}
+            max={2 * staticRh}
+            step={0.1}
+            value={staticRh + bumpMm}
+            onChange={(e) => setBumpMm(Number(e.target.value) - staticRh)}
+            aria-label="Chassis bump — ride height in millimetres"
+            className="min-w-0 flex-1 accent-primary"
+          />
+          <button
+            type="button"
+            disabled={bumpAtRest}
+            onClick={() => setBumpMm(0)}
+            aria-label="Reset bump"
+            className={POSE_ICON_BUTTON}
+          >
+            <RotateCcw aria-hidden className="size-[11px]" strokeWidth={2.4} />
+          </button>
+          <span className="w-[7.5rem] shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
+            RH {(staticRh + bumpMm).toFixed(1)}mm ({bumpMm >= 0 ? "+" : ""}
+            {bumpMm.toFixed(1)})
           </span>
         </div>
 
@@ -893,11 +963,11 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
 
         <KnobRow
           label="Ride height"
-          value={parseNum(fields[axle === "front" ? "ride_height_front" : "ride_height_rear"]) ?? (axle === "front" ? 5.0 : 5.2)}
+          value={staticRh}
           min={4}
           max={7}
           step={0.1}
-          onChange={(v) => setKnob([axle === "front" ? "ride_height_front" : "ride_height_rear"], v)}
+          onChange={(v) => setKnob([rideHeightKey], v)}
         />
         <KnobRow
           label="Camber (neg °)"

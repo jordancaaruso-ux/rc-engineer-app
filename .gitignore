@@ -60,6 +60,7 @@ desktop-shots/
 # Sheet-fill captures (regenerate with e2e/sheet-fill.spec.ts)
 sheet-fill-shots/
 roll-center-strip-shots/
+roll-center-lab-shots/
 
 # Sibling git worktrees for parallel sessions — never part of this checkout
 .claude/worktrees/

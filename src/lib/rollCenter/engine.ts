@@ -288,13 +288,22 @@ function solveSide(
   return null;
 }
 
-/** Solve both sides + the roll centre at a given chassis roll angle (0 = static). */
+/**
+ * Solve both sides + the roll centre for a chassis POSE (0, 0 = the setup at rest).
+ *
+ * `rollDeg` leans the chassis, `bumpMm` moves it straight up or down — both are transient
+ * poses of the same setup, deliberately kept out of `AxleAdjustments` so they can never
+ * leak into the stored setup, its delta chips, or a draft-setup export. The tyres stay
+ * planted either way: `solveSide` re-poses the arms until the contact patch is back on
+ * the ground, so lowering the chassis swings the arms up exactly as the real car does.
+ */
 export function solveAxle(
   geo: AxleGeometry,
   adj: AxleAdjustments,
-  rollDeg = 0
+  rollDeg = 0,
+  bumpMm = 0
 ): SolvedAxle | null {
-  const toWorld = chassisTransform(adj.rideDeltaMm, rollDeg);
+  const toWorld = chassisTransform(adj.rideDeltaMm + bumpMm, rollDeg);
   const right = solveSide(geo, adj, 1, toWorld);
   const left = solveSide(geo, adj, -1, toWorld);
   if (!right || !left) return null;
