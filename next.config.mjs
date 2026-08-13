@@ -56,6 +56,12 @@ const nextConfig = {
     "/api/setup-sheet-models/**": RASTER_NATIVE_FILES,
     "/api/setup-calibrations/**": RASTER_NATIVE_FILES,
     "/api/debug/**": RASTER_NATIVE_FILES,
+    // Share images. Nothing under `/api/setup-snapshots/` rasterized until `share-image` arrived
+    // (`setup-pdf` next door just streams the stored bytes), so this whole prefix was missing from
+    // the list and the route shipped without a canvas. Prod 2026-08-13, third time in this family:
+    // "Cannot load @napi-rs/canvas … ReferenceError: DOMMatrix is not defined". Local `next build`
+    // cannot catch it — check the route's own `.nft.json` after building.
+    "/api/setup-snapshots/**": RASTER_NATIVE_FILES,
   },
   // The landing page is the Claude Design artifact served verbatim from `public/landing/` —
   // founder call 2026-08-06, to keep the design exact rather than re-implement its scroll
