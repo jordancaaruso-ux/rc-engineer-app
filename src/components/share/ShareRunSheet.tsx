@@ -122,7 +122,7 @@ export function ShareRunSheet({
   const [setupPreviewFailed, setSetupPreviewFailed] = useState(false);
 
   const sheet = useEnterExit(open, 300);
-  const { share, state, error, skipped, reset } = useShareFiles();
+  const { share, prefetch, preparing, state, error, skipped, reset } = useShareFiles();
   const pagerRef = useRef<HTMLDivElement | null>(null);
 
   // Every open starts from the driver's last choice, not a hard-coded default.
@@ -197,6 +197,23 @@ export function ShareRunSheet({
     return list;
   }, [cardUrl, includeSetup, setupImageUrl, slug]);
 
+  /*
+   * Draw the pictures before the driver asks for them.
+   *
+   * iOS only opens the share sheet while the tap is still live, and two 1080px renders take far
+   * longer than that — which is what made every share on the installed PWA come back "the request
+   * is not allowed by the user agent". Fetching here means `share()` hands the platform files it
+   * already holds. Both routes cache for 300s, so the card the preview `<img>` just loaded costs
+   * nothing to fetch a second time.
+   *
+   * Deliberately after `previewLoading` clears: kicking the blob fetch off alongside the preview
+   * would race the same render twice and pay for both.
+   */
+  useEffect(() => {
+    if (!open || previewLoading) return;
+    void prefetch(targets);
+  }, [open, previewLoading, targets, prefetch]);
+
   const pageCount = includeSetup && setupImageUrl ? 2 : 1;
 
   const onPagerScroll = useCallback(() => {
@@ -215,7 +232,15 @@ export function ShareRunSheet({
 
   if (!sheet.mounted || typeof document === "undefined") return null;
 
-  const busy = state === "working";
+  /*
+   * Busy until the picture is drawn AND in hand.
+   *
+   * `preparing` alone left a window: for the first second the preview is still rendering, the
+   * prefetch has not started, and a tap went straight down the slow path — the one iOS refuses.
+   * Including `previewLoading` also makes the button honest, since it can no longer send a picture
+   * the driver has not been shown.
+   */
+  const busy = state === "working" || preparing || previewLoading;
   // Counts what will actually arrive. Saying "2 pictures" beside a page reading "no sheet to draw"
   // is the sheet arguing with itself, so a known-undrawable sheet is not counted.
   const sendLabel = targets.length > 1 && !setupPreviewFailed ? "Share 2 pictures" : "Share picture";
@@ -385,7 +410,9 @@ export function ShareRunSheet({
           <button
             type="button"
             disabled={busy}
-            onClick={() => void share(targets, { title: runLabel, text: runLabel })}
+            // Called straight, not through an async wrapper: `share` reaches `navigator.share()`
+            // synchronously so iOS still counts this tap as the gesture that asked for it.
+            onClick={() => share(targets, { title: runLabel, text: runLabel })}
             className={primaryButtonClassName(
               "primary-action-chip-prominent w-full disabled:cursor-not-allowed disabled:opacity-60"
             )}
