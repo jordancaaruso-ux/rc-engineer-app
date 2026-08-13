@@ -41,7 +41,7 @@
     ],
     "soft_deny": [
       "$defaults",
-      "Writing to content/vehicle-dynamics/*.md (top level, not drafts/) or src/lib/engineerPhase5/parameterEffects/catalog.ts. This prose is quoted verbatim to paying users as ground truth. Allowed only when the user's most recent message names the file or asks for KB edits; otherwise propose a diff in chat first. Drafts under content/vehicle-dynamics/drafts/ are open."
+      "Writing to content/vehicle-dynamics/*.md (top level, not drafts/) or reviewed nets under content/nets/. This prose is quoted verbatim to paying users as ground truth. Allowed only when the user's most recent message names the file or asks for KB/nets edits; otherwise propose a diff in chat first. Drafts under content/vehicle-dynamics/drafts/ and content/nets/drafts/ are open."
     ]
   },
   "hooks": {
