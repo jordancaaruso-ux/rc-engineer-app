@@ -13,7 +13,12 @@ import { Eyebrow } from "@/components/ui/panel";
 import { PagedCard } from "@/components/ui/PagedCard";
 import { PillToggle } from "@/components/ui/PillToggle";
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { TireIndicatorIcon } from "@/components/runs/TireIndicatorIcon";
+import {
+  TireIndicatorIcon,
+  TireMarkGlyph,
+  TIRE_MARK_STROKE,
+} from "@/components/runs/TireIndicatorIcon";
+import { formatTireIndicatorTitle, type RunTireIndicator } from "@/lib/runs/tireSetChange";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/runs/RunHistoryModalsLazy";
 import { cn } from "@/lib/utils";
 
@@ -72,23 +77,46 @@ const BOX_DEGRADE_AT = 6.5;
  * The card sizes itself to its *container*, not the viewport — it's 560px wide on
  * /analysis and ~730px in the Sessions workbench pane, and the phone's marker
  * glyphs were drawn for a thumb at 390px. Past `SPACIOUS_AT` the plot grows and
- * the wrench + tire glyphs come up with it; below it nothing changes, so the
- * phone renders exactly as it did.
+ * the marker glyphs come up with it; below it nothing changes, so the phone
+ * renders exactly as it did.
  */
 const SPACIOUS_AT = 620;
+
+/**
+ * The gutter under the plot is one instrument, not two rows of clip-art: chassis
+ * on top, tires beneath, one column per run. Both glyphs are drawn on a *shared*
+ * grid — same optical box (`markSize`), same on-screen stroke (`MARK_STROKE`),
+ * same centre line, same ink rule (bright = changed since the last run on this
+ * car, faint = went back out as it came in).
+ *
+ * The stroke needs deriving rather than setting. Lucide's `strokeWidth` is in its
+ * own 24-unit space, so the old 22px wrench and 16px disc — both nominally
+ * `strokeWidth={2}` — landed at 1.83px and 1.33px on screen, and the wrench row
+ * read heavier as well as larger. Scaling the nominal width back out of the
+ * render size keeps both rows weighing the same however the card is sized.
+ *
+ * The tire mark owns the weight, since it is drawn identically in the sessions
+ * rows; the wrench matches it rather than the other way round.
+ */
+const MARK_STROKE = TIRE_MARK_STROKE;
 
 type ChartMetrics = {
   height: number;
   padBottom: number;
   plotBottom: number;
-  setupIcon: number;
-  tireSlot: number;
-  setupRowTop: number;
-  tireRowTop: number;
-  /** Below this px-per-run the tire row thins to changed sets only (wheels would touch). */
-  tireMinSpacing: number;
-  /** Same rule for the wrench row: below this, only setup *changes* keep a wrench. */
-  setupMinSpacing: number;
+  /** Optical box both marker glyphs are drawn inside. */
+  markSize: number;
+  /** Glyph centres, not tops — the two rows share one vertical grid. */
+  setupRowCenter: number;
+  tireRowCenter: number;
+  /**
+   * Run-label baseline, measured down from the plot rather than up from the SVG
+   * bottom, so axis → wrench → tire → label is one even rhythm. Every face uses
+   * it even where a row is absent, so the axis can't shift on a swipe.
+   */
+  labelBaseline: number;
+  /** Below this px-per-run the glyphs would touch, so both rows thin to changes only. */
+  markMinSpacing: number;
   /** Roughly how many x-axis labels fit before they collide. */
   labelBudget: number;
 };
@@ -96,18 +124,17 @@ type ChartMetrics = {
 function chartMetrics(chartWidth: number): ChartMetrics {
   const spacious = chartWidth >= SPACIOUS_AT;
   const height = spacious ? 384 : 252;
-  const padBottom = spacious ? 96 : 78;
+  const padBottom = spacious ? 84 : 68;
   const plotBottom = height - padBottom;
   return {
     height,
     padBottom,
     plotBottom,
-    setupIcon: spacious ? 22 : 17,
-    tireSlot: spacious ? 30 : 24,
-    setupRowTop: plotBottom + (spacious ? 9 : 6),
-    tireRowTop: plotBottom + (spacious ? 30 : 22),
-    tireMinSpacing: spacious ? 34 : 26,
-    setupMinSpacing: spacious ? 27 : 21,
+    markSize: spacious ? 20 : 16,
+    setupRowCenter: plotBottom + (spacious ? 20 : 17),
+    tireRowCenter: plotBottom + (spacious ? 46 : 38),
+    labelBaseline: plotBottom + (spacious ? 73 : 62),
+    markMinSpacing: spacious ? 28 : 22,
     labelBudget: spacious ? 14 : 8,
   };
 }
@@ -351,6 +378,77 @@ function buildPolylineSegments(points: Array<{ x: number; y: number } | null>): 
 }
 
 /**
+ * One tire set on the marker grid — the same glyph the sessions rows draw, on
+ * plot coordinates instead of in a DOM box. Bright / faint follows the indicator,
+ * exactly as the wrench above it does.
+ *
+ * Pointer-transparent: a tap here means "open this run", which the chart handles.
+ */
+function TireMark({
+  indicator,
+  cx,
+  cy,
+  size,
+}: {
+  indicator: RunTireIndicator;
+  cx: number;
+  cy: number;
+  size: number;
+}) {
+  return (
+    <g
+      className={indicator.changed ? "text-foreground" : "text-faint"}
+      style={{ pointerEvents: "none" }}
+    >
+      <title>{formatTireIndicatorTitle(indicator)}</title>
+      <TireMarkGlyph indicator={indicator} cx={cx} cy={cy} size={size} />
+    </g>
+  );
+}
+
+/**
+ * The tire row, under the wrench row and on every face — the gutter says the same
+ * thing whichever lens you swiped to, and the row that was Pace-only left the
+ * other faces with a hole where it should have been.
+ *
+ * Thins to changed sets only when the runs are packed tighter than the glyphs,
+ * on the same threshold the wrench row uses, so the two rows never disagree about
+ * which columns exist.
+ */
+function TireSetRow({
+  carRuns,
+  xAt,
+  dims,
+}: {
+  carRuns: AnalysisTrendRun[];
+  xAt: (index: number) => number;
+  dims: ChartMetrics;
+}) {
+  const withTires = carRuns
+    .map((run, index) => ({ run, index }))
+    .filter(({ run }) => run.tireIndicator != null);
+  if (withTires.length === 0) return null;
+  const spacing = carRuns.length > 1 ? xAt(1) - xAt(0) : Number.POSITIVE_INFINITY;
+  const shown =
+    spacing >= dims.markMinSpacing
+      ? withTires
+      : withTires.filter(({ run }) => run.tireIndicator!.changed);
+  return (
+    <>
+      {shown.map(({ run, index }) => (
+        <TireMark
+          key={`tire-${run.id}`}
+          indicator={run.tireIndicator!}
+          cx={xAt(index)}
+          cy={dims.tireRowCenter}
+          size={dims.markSize}
+        />
+      ))}
+    </>
+  );
+}
+
+/**
  * The wrench row: a wrench under *every* run, so the row reads as "here is the
  * car at each session" and any of them opens that run's setup sheet — the same
  * modal as the "View setup" button in Sessions.
@@ -382,12 +480,12 @@ function SetupChangeRow({
   loadingRunId: string | null;
 }) {
   const spacing = carRuns.length > 1 ? xAt(1) - xAt(0) : Number.POSITIVE_INFINITY;
-  const changedOnly = spacing < dims.setupMinSpacing;
+  const changedOnly = spacing < dims.markMinSpacing;
   const marks = carRuns
     .map((run, index) => ({ run, index }))
     .filter(({ run }) => run.carId != null && (!changedOnly || run.setupChange != null));
   if (marks.length === 0) return null;
-  const hitWidth = Math.min(dims.setupIcon * 2, spacing);
+  const hitWidth = Math.min(dims.markSize * 2, spacing);
   return (
     <>
       {marks.map(({ run, index }) => {
@@ -428,17 +526,18 @@ function SetupChangeRow({
             <title>{changed ? `View setup — changed: ${changedLabels}` : "View setup"}</title>
             <rect
               x={x - hitWidth / 2}
-              y={dims.setupRowTop - 4}
+              y={dims.setupRowCenter - dims.markSize / 2 - 5}
               width={hitWidth}
-              height={dims.setupIcon + 9}
+              height={dims.markSize + 10}
               rx={6}
               fill="transparent"
             />
             <Wrench
-              x={x - dims.setupIcon / 2}
-              y={dims.setupRowTop}
-              width={dims.setupIcon}
-              height={dims.setupIcon}
+              x={x - dims.markSize / 2}
+              y={dims.setupRowCenter - dims.markSize / 2}
+              width={dims.markSize}
+              height={dims.markSize}
+              strokeWidth={(MARK_STROKE * 24) / dims.markSize}
               aria-hidden
             />
           </g>
@@ -923,6 +1022,20 @@ function PaceTrendFace({
               );
             })}
 
+            {/*
+              The shelf the marker gutter hangs from: above it is lap time, below
+              it is the state of the car. Without the rule the glyph rows float
+              and their alignment to the plot is left to the eye.
+            */}
+            <line
+              x1={PAD_LEFT}
+              x2={chartWidth - PAD_RIGHT}
+              y1={dims.plotBottom}
+              y2={dims.plotBottom}
+              className="stroke-border"
+              strokeWidth={1}
+            />
+
             {carRuns.map((run, index) => {
               const step = Math.max(1, Math.ceil(carRuns.length / dims.labelBudget));
               const isLast = index === carRuns.length - 1;
@@ -932,7 +1045,7 @@ function PaceTrendFace({
                 <text
                   key={run.id}
                   x={geometry.xAt(index)}
-                  y={dims.height - 8}
+                  y={dims.labelBaseline}
                   textAnchor="middle"
                   className={cn("font-mono text-[9px]", isLast ? "fill-muted-foreground" : "fill-faint")}
                 >
@@ -941,41 +1054,7 @@ function PaceTrendFace({
               );
             })}
 
-            {(() => {
-              const withTires = carRuns
-                .map((run, index) => ({ run, index }))
-                .filter(({ run }) => run.tireIndicator != null);
-              if (withTires.length === 0) return null;
-              const spacing =
-                carRuns.length > 1
-                  ? (chartWidth - PAD_LEFT - PAD_RIGHT) / (carRuns.length - 1)
-                  : chartWidth;
-              const shown =
-                spacing >= dims.tireMinSpacing
-                  ? withTires
-                  : withTires.filter(({ run }) => run.tireIndicator!.changed);
-              return shown.map(({ run, index }) => {
-                const indicator = run.tireIndicator!;
-                const x = geometry.xAt(index);
-                // Render the real TireIndicatorIcon (disc + corner run-number
-                // badge) so the marker is identical to Sessions. It sits in a
-                // foreignObject; pointer-events off so a tap still opens the run.
-                return (
-                  <foreignObject
-                    key={`tire-${run.id}`}
-                    x={x - dims.tireSlot / 2}
-                    y={dims.tireRowTop}
-                    width={dims.tireSlot}
-                    height={dims.tireSlot}
-                    style={{ overflow: "visible", pointerEvents: "none" }}
-                  >
-                    <div className="flex items-center justify-center">
-                      <TireIndicatorIcon indicator={indicator} size="sm" />
-                    </div>
-                  </foreignObject>
-                );
-              });
-            })()}
+            <TireSetRow carRuns={carRuns} xAt={geometry.xAt} dims={dims} />
 
             <SetupChangeRow
               carRuns={carRuns}
@@ -990,7 +1069,9 @@ function PaceTrendFace({
                 x1={geometry.xAt(hoverIndex)}
                 x2={geometry.xAt(hoverIndex)}
                 y1={PAD_TOP - 2}
-                y2={dims.plotBottom + 4}
+                // Runs on through the gutter so the hovered run's wrench and tire
+                // are visibly the same column as the point you're reading.
+                y2={dims.tireRowCenter + dims.markSize / 2 + 5}
                 className="stroke-border"
                 strokeWidth={1}
                 strokeDasharray="3 3"
@@ -1306,6 +1387,16 @@ function SingleMetricTrendFace({
               </g>
             ))}
 
+            {/* Same shelf as the Pace face — see the comment there. */}
+            <line
+              x1={PAD_LEFT}
+              x2={chartWidth - PAD_RIGHT}
+              y1={dims.plotBottom}
+              y2={dims.plotBottom}
+              className="stroke-border"
+              strokeWidth={1}
+            />
+
             {carRuns.map((run, index) => {
               const step = Math.max(1, Math.ceil(carRuns.length / dims.labelBudget));
               const isLast = index === carRuns.length - 1;
@@ -1315,7 +1406,7 @@ function SingleMetricTrendFace({
                 <text
                   key={run.id}
                   x={geometry.xAt(index)}
-                  y={dims.height - 8}
+                  y={dims.labelBaseline}
                   textAnchor="middle"
                   className={cn("font-mono text-[9px]", isLast ? "fill-muted-foreground" : "fill-faint")}
                 >
@@ -1323,6 +1414,8 @@ function SingleMetricTrendFace({
                 </text>
               );
             })}
+
+            <TireSetRow carRuns={carRuns} xAt={geometry.xAt} dims={dims} />
 
             <SetupChangeRow
               carRuns={carRuns}
@@ -1337,7 +1430,9 @@ function SingleMetricTrendFace({
                 x1={geometry.xAt(hoverIndex)}
                 x2={geometry.xAt(hoverIndex)}
                 y1={PAD_TOP - 2}
-                y2={dims.plotBottom + 4}
+                // Runs on through the gutter so the hovered run's wrench and tire
+                // are visibly the same column as the point you're reading.
+                y2={dims.tireRowCenter + dims.markSize / 2 + 5}
                 className="stroke-border"
                 strokeWidth={1}
                 strokeDasharray="3 3"
