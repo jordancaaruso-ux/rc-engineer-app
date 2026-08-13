@@ -8,11 +8,55 @@ import {
   type ImportedSessionFieldDriverStatV1,
   type ImportedSessionFieldStatsV1,
 } from "@/lib/lapImport/computeImportedSessionFieldStats";
-import type {
-  ImportedSessionFieldStatsEngineerCompactV1,
-  PaceVsFieldMetricId,
-  PaceVsFieldMetricSnapshotV1,
-} from "@/lib/engineerPhase5/engineerRunSummaryTypes";
+export type PaceVsFieldMetricId = "best" | "avg_top_5" | "avg_top_10" | "avg_top_15";
+
+export type PaceVsFieldMetricSnapshotV1 = {
+  metric: PaceVsFieldMetricId;
+  label: string;
+  /** Arithmetic mean of this metric across entrants with a finite value. */
+  fieldMeanSeconds: number | null;
+  userSeconds: number | null;
+  /** User minus field mean; positive ⇒ slower than the session average. */
+  gapUserMinusFieldMeanSeconds: number | null;
+  /** 1 = best (lowest time) among entrants with a finite value for this metric. */
+  rankInField: number | null;
+  fieldEntrantCountForMetric: number;
+  meaningful: boolean;
+};
+
+/** Session-level aggregates from linked `ImportedLapTimeSession.fieldStatsJson` (full parsed field). */
+export type ImportedSessionFieldStatsEngineerCompactV1 = {
+  version: 1;
+  driverCount: number;
+  /** Min best lap among entrants with a valid best (session “pole”). */
+  sessionBestBestLapSeconds: number | null;
+  /** Min avg-top-5 among entrants with a valid average (pseudo session best sustained). */
+  sessionBestAvgTop5Seconds: number | null;
+  sessionBestAvgTop10Seconds: number | null;
+  fieldMedianBestSeconds: number | null;
+  fieldMedianAvgTop5Seconds: number | null;
+  /** Median avg-top-10 across entrants (typical sustained pace). */
+  fieldMedianAvgTop10Seconds: number | null;
+  /**
+   * Per-metric: session field **mean** vs your value, gap, and rank (when multi-driver aggregates exist).
+   * Null when fewer than two drivers or your row is unmatched.
+   */
+  paceVsFieldMeanAnalysis: PaceVsFieldMetricSnapshotV1[] | null;
+  /**
+   * Your row inferred from imported lap sets flagged `isPrimaryUser`, or lone driver fallback.
+   * Gaps vs session-best columns (**positive ⇒ you slower**) when both sides finite.
+   */
+  matchedYou: null | {
+    label: string;
+    rankByBest: number | null;
+    bestLapSeconds: number | null;
+    avgTop5Seconds: number | null;
+    avgTop10Seconds: number | null;
+    gapBestToSessionBestSeconds: number | null;
+    gapAvgTop5ToSessionBestAvg5Seconds: number | null;
+    gapAvgTop10ToSessionBestAvg10Seconds: number | null;
+  };
+};
 import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNormalize";
 
 function meanFromDrivers(
