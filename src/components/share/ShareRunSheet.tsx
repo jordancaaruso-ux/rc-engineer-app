@@ -1,42 +1,97 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Share2, X } from "lucide-react";
+import { Check, Share2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEnterExit } from "@/components/ui/Collapse";
 import { chipToggleClass } from "@/components/ui/chipToggle";
-import { Button } from "@/components/ui/Button";
+import { primaryButtonClassName } from "@/components/ui/ButtonLink";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Spinner } from "@/components/ui/Spinner";
 import {
-  defaultSectionsForMode,
+  allSectionsOn,
+  parseCardStyle,
+  parseSectionsParam,
   serializeSections,
-  type ShareMode,
+  type ShareCardStyle,
   type ShareSectionKey,
   type ShareSections,
 } from "@/lib/share/shareCardModel";
 import { useShareFiles, type ShareTarget } from "@/components/share/useShareFiles";
 
 /**
- * "Share this run" — pick how much travels, look at it, send it.
+ * "Share this run" — choose what travels, look at exactly what will be sent, send it.
  *
  * The preview is an `<img>` pointed straight at the render route, so what you look at is the
  * file that gets sent, byte for byte. Nothing is composed in the browser; there is no second
- * implementation of the card to drift.
+ * implementation of the card to drift. That is also why the preview is a horizontal pager rather
+ * than a stack: page 2 is the setup sheet, a genuinely separate file, and the sliver of it peeking
+ * at the right edge is what tells the driver a second picture exists.
  *
  * Same bottom-sheet construction as `PickerSheet`: portalled to `<body>` (this mounts inside
  * cards, and a transformed ancestor turns `fixed` into `absolute`), body scroll locked while open.
+ *
+ * Redesigned 2026-08-13. The Headline / Full mode chips are gone: they silently reset the section
+ * flags underneath the driver, which was the actual complaint. Now nothing overrides anything —
+ * a style picker on top, one flat row of chips below, and every chip means only itself.
  */
 
 const SECTION_LABELS: Record<ShareSectionKey, string> = {
-  pace: "Pace vs field",
+  details: "Session details",
   laps: "Every lap",
   graph: "Lap trace",
-  notes: "Notes & feel",
+  setup: "Setup changes",
+  notes: "Notes",
+  feel: "How it felt",
 };
 
-/** Order shown to the driver — roughly the order they appear on the picture. */
-const SECTION_ORDER: ShareSectionKey[] = ["pace", "laps", "graph", "notes"];
+/** The order they appear on the picture. */
+const SECTION_ORDER: ShareSectionKey[] = ["details", "laps", "graph", "setup", "notes", "feel"];
+
+const STYLE_OPTIONS = [
+  { value: "hero" as const, label: "Lead with the lap" },
+  { value: "report" as const, label: "Full report" },
+];
+
+/**
+ * Remembered per device, not per share (founder lean 2026-08-13). A driver who always sends the
+ * full report should not re-tick six chips every Sunday.
+ */
+const PREFS_KEY = "jrc.share.card.v1";
+
+type ShareCardPrefs = { style: ShareCardStyle; sections: ShareSections };
+
+function readPrefs(): ShareCardPrefs {
+  const fallback: ShareCardPrefs = { style: "hero", sections: allSectionsOn() };
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(PREFS_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as { style?: unknown; sections?: unknown };
+    return {
+      style: parseCardStyle(typeof parsed.style === "string" ? parsed.style : null),
+      // Round-tripped through the same parser the route uses, so an unknown name is ignored
+      // rather than throwing — a stale key from an older build must never break the sheet.
+      sections:
+        typeof parsed.sections === "string" ? parseSectionsParam(parsed.sections) : allSectionsOn(),
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function writePrefs(prefs: ShareCardPrefs): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      PREFS_KEY,
+      JSON.stringify({ style: prefs.style, sections: serializeSections(prefs.sections) })
+    );
+  } catch {
+    // A private-mode browser with no storage quota is not a reason to fail a share.
+  }
+}
 
 export function ShareRunSheet({
   open,
@@ -53,21 +108,32 @@ export function ShareRunSheet({
   /** Null when this run has no setup to attach. */
   setupSnapshotId: string | null;
 }) {
-  const [mode, setMode] = useState<ShareMode>("headline");
-  const [sections, setSections] = useState<ShareSections>(() => defaultSectionsForMode("headline"));
+  const [cardStyle, setCardStyle] = useState<ShareCardStyle>("hero");
+  const [sections, setSections] = useState<ShareSections>(allSectionsOn);
   const [includeSetup, setIncludeSetup] = useState<boolean>(Boolean(setupSnapshotId));
   const [previewLoading, setPreviewLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  /**
+   * Not every chassis has a sheet the app can draw, and the route 404s when it can't. Left alone
+   * that renders a browser's broken-image glyph as page 2 of the driver's own share — so the page
+   * says what happened instead. The chip stays on and the share still goes: `useShareFiles` treats
+   * the sheet as optional and reports the gap in `skipped`.
+   */
+  const [setupPreviewFailed, setSetupPreviewFailed] = useState(false);
 
   const sheet = useEnterExit(open, 300);
   const { share, state, error, skipped, reset } = useShareFiles();
+  const pagerRef = useRef<HTMLDivElement | null>(null);
 
-  // Every open starts from the quick path; a stale "full run with notes" from last time is a
-  // surprising thing to hit Share on.
+  // Every open starts from the driver's last choice, not a hard-coded default.
   useEffect(() => {
     if (!open) return;
-    setMode("headline");
-    setSections(defaultSectionsForMode("headline"));
+    const prefs = readPrefs();
+    setCardStyle(prefs.style);
+    setSections(prefs.sections);
     setIncludeSetup(Boolean(setupSnapshotId));
+    setPage(0);
+    setSetupPreviewFailed(false);
     reset();
   }, [open, setupSnapshotId, reset]);
 
@@ -85,43 +151,74 @@ export function ShareRunSheet({
     };
   }, [open, onClose]);
 
-  const cardUrl = useMemo(() => {
-    const query = new URLSearchParams({ mode });
+  const wantedUrl = useMemo(() => {
+    const query = new URLSearchParams({ style: cardStyle });
     const list = serializeSections(sections);
     if (list) query.set("sections", list);
     return `/api/runs/${encodeURIComponent(runId)}/share-card?${query.toString()}`;
-  }, [runId, mode, sections]);
+  }, [runId, cardStyle, sections]);
+
+  /*
+   * Every chip redraws a 1080px picture server-side, so a driver walking the row would queue six
+   * renders and watch the last one land. 150ms of quiet is enough to make a burst of taps cost one.
+   */
+  const [cardUrl, setCardUrl] = useState(wantedUrl);
+  useEffect(() => {
+    if (wantedUrl === cardUrl) return;
+    const t = window.setTimeout(() => setCardUrl(wantedUrl), 150);
+    return () => window.clearTimeout(t);
+  }, [wantedUrl, cardUrl]);
 
   useEffect(() => {
     setPreviewLoading(true);
   }, [cardUrl]);
 
+  // Persist what the driver settled on, not every intermediate tap.
+  useEffect(() => {
+    if (!open) return;
+    writePrefs({ style: cardStyle, sections });
+  }, [open, cardStyle, sections]);
+
   const slug = runLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "run";
+  const setupImageUrl = setupSnapshotId
+    ? `/api/setup-snapshots/${encodeURIComponent(setupSnapshotId)}/share-image`
+    : null;
 
   const targets: ShareTarget[] = useMemo(() => {
     const list: ShareTarget[] = [{ url: cardUrl, filename: `${slug}.png` }];
-    if (includeSetup && setupSnapshotId) {
+    if (includeSetup && setupImageUrl) {
       list.push({
-        url: `/api/setup-snapshots/${encodeURIComponent(setupSnapshotId)}/share-image`,
+        url: setupImageUrl,
         filename: `${slug}-setup.png`,
         // Not every chassis has a sheet the app can draw; losing the attachment must not lose the run.
         optional: true,
       });
     }
     return list;
-  }, [cardUrl, includeSetup, setupSnapshotId, slug]);
+  }, [cardUrl, includeSetup, setupImageUrl, slug]);
 
-  function chooseMode(next: ShareMode) {
-    setMode(next);
-    // Full run IS the expanded session view, so it brings everything with it.
-    setSections(defaultSectionsForMode(next));
+  const pageCount = includeSetup && setupImageUrl ? 2 : 1;
+
+  const onPagerScroll = useCallback(() => {
+    const el = pagerRef.current;
+    if (!el) return;
+    // Page width plus the 10px gutter — whichever page owns the left edge is the one showing.
+    const next = Math.round(el.scrollLeft / 335);
+    setPage((p) => (p === next ? p : next));
+  }, []);
+
+  function everything() {
+    setSections(allSectionsOn());
+    // "Everything" means everything in the row, and the setup sheet is the seventh chip.
+    if (setupSnapshotId) setIncludeSetup(true);
   }
 
   if (!sheet.mounted || typeof document === "undefined") return null;
 
   const busy = state === "working";
-  const sendLabel =
-    targets.length > 1 ? `Share ${targets.length} pictures` : "Share";
+  // Counts what will actually arrive. Saying "2 pictures" beside a page reading "no sheet to draw"
+  // is the sheet arguing with itself, so a known-undrawable sheet is not counted.
+  const sendLabel = targets.length > 1 && !setupPreviewFailed ? "Share 2 pictures" : "Share picture";
 
   return createPortal(
     <div
@@ -136,101 +233,145 @@ export function ShareRunSheet({
     >
       <div
         className={cn(
-          "flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-white/10 bg-card/95 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-16px_40px_-12px_rgba(0,0,0,0.7)] backdrop-blur-xl transition-transform duration-300 ease-out motion-reduce:transition-none sm:rounded-2xl sm:pb-2",
-          "max-h-[min(90dvh,46rem)]",
+          "flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-white/10 bg-card/96 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-16px_40px_-12px_rgba(0,0,0,0.7)] backdrop-blur-xl transition-transform duration-300 ease-out motion-reduce:transition-none sm:rounded-2xl sm:pb-2",
+          // The preview needs the height — it is the surface of the sheet now, not a thumbnail.
+          "max-h-[94dvh]",
           sheet.entered ? "translate-y-0" : "translate-y-full sm:translate-y-4"
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 pt-3 sm:hidden">
-          <div className="mx-auto h-1 w-9 rounded-full bg-white/15" aria-hidden />
+        <div className="flex justify-center pt-2.5 sm:hidden">
+          <div className="h-1 w-9 rounded-full bg-white/15" aria-hidden />
         </div>
 
-        <div className="flex items-start justify-between gap-2 px-4 pb-2 pt-2.5">
+        <div className="flex items-start justify-between gap-2 px-4 pb-2.5 pt-2">
           <div className="min-w-0">
-            <h2 className="truncate text-[15px] font-bold tracking-tight text-foreground">
+            <h2 className="truncate text-[18px] font-bold tracking-tight text-foreground">
               Share this run
             </h2>
-            <p className="truncate text-[12px] text-muted-foreground">{runLabel}</p>
+            <p className="truncate text-[12.5px] text-muted-foreground">{runLabel}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="tap-active -mr-1 flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+            className="tap-active -mr-1 flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"
           >
             <X className="size-5" strokeWidth={2} aria-hidden />
           </button>
         </div>
 
-        <div className="px-4 pb-2">
-          <div className="flex gap-1.5" role="group" aria-label="How much to share">
-            {(["headline", "full"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                aria-pressed={mode === m}
-                onClick={() => chooseMode(m)}
-                className={cn(chipToggleClass(mode === m), "flex-1 px-3 py-2 text-[13px]")}
-              >
-                {m === "headline" ? "Headline" : "Full run"}
-              </button>
-            ))}
-          </div>
+        <div className="px-4 pb-2.5">
+          <SegmentedControl
+            options={STYLE_OPTIONS}
+            value={cardStyle}
+            onChange={setCardStyle}
+            ariaLabel="Card style"
+            segmentClassName="!px-3 !py-[9px] !text-[13.5px] tracking-[-0.02em]"
+          />
         </div>
 
-        <div className="flex flex-wrap gap-1.5 px-4 pb-3" role="group" aria-label="What to include">
-          {SECTION_ORDER.map((key) => (
-            <button
-              key={key}
-              type="button"
-              aria-pressed={sections[key]}
-              onClick={() => setSections((s) => ({ ...s, [key]: !s[key] }))}
-              className={cn(chipToggleClass(sections[key]), "px-3 py-1.5 text-[12px]")}
+        {/* The preview IS the file. Page 2 is a second file, so it is a page, not a caption. */}
+        <div className="px-4 pb-3">
+          <div className="relative h-[236px] overflow-hidden rounded-xl border border-border bg-surface-runna-deep">
+            <div
+              ref={pagerRef}
+              onScroll={onPagerScroll}
+              className="flex h-full snap-x snap-mandatory gap-2.5 overflow-x-auto overscroll-x-contain p-2.5 pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-              {SECTION_LABELS[key]}
-            </button>
-          ))}
-          {setupSnapshotId ? (
-            <button
-              type="button"
-              aria-pressed={includeSetup}
-              onClick={() => setIncludeSetup((v) => !v)}
-              className={cn(chipToggleClass(includeSetup), "px-3 py-1.5 text-[12px]")}
-            >
-              Setup sheet
-            </button>
-          ) : null}
-        </div>
+              <div className="h-fit w-[325px] shrink-0 snap-start overflow-hidden rounded-lg border border-border">
+                {/* eslint-disable-next-line @next/next/no-img-element -- a PNG route, not an app asset */}
+                <img
+                  src={cardUrl}
+                  alt="Preview of the picture that will be shared"
+                  className={cn(
+                    "block w-full transition-opacity",
+                    previewLoading ? "opacity-0" : "opacity-100"
+                  )}
+                  onLoad={() => setPreviewLoading(false)}
+                  onError={() => setPreviewLoading(false)}
+                />
+              </div>
+              {includeSetup && setupImageUrl ? (
+                <div className="h-full w-[325px] shrink-0 snap-start overflow-hidden rounded-lg border border-border">
+                  {setupPreviewFailed ? (
+                    <div className="flex h-full flex-col items-center justify-center gap-1 px-6 pb-6 text-center">
+                      <p className="text-[12.5px] font-semibold text-muted-foreground">
+                        No sheet to draw for this car
+                      </p>
+                      <p className="text-[11.5px] text-faint">
+                        The run picture still sends on its own.
+                      </p>
+                    </div>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element -- a PNG route, not an app asset
+                    <img
+                      src={setupImageUrl}
+                      alt="Preview of your setup sheet, which sends as a second picture"
+                      className="block w-full"
+                      onError={() => setSetupPreviewFailed(true)}
+                    />
+                  )}
+                </div>
+              ) : null}
+            </div>
 
-        {/* The preview IS the file. */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-white/10 bg-background/40 px-4 py-3">
-          <div className="relative mx-auto w-full max-w-[240px]">
             {previewLoading ? (
-              <div className="absolute inset-0 flex items-center justify-center">
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <Spinner />
               </div>
             ) : null}
-            {/* eslint-disable-next-line @next/next/no-img-element -- a PNG route, not an app asset */}
-            <img
-              src={cardUrl}
-              alt="Preview of the picture that will be shared"
-              className={cn(
-                "w-full rounded-lg border border-border transition-opacity",
-                previewLoading ? "opacity-0" : "opacity-100"
-              )}
-              onLoad={() => setPreviewLoading(false)}
-              onError={() => setPreviewLoading(false)}
-            />
+
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-b from-transparent to-[rgb(var(--color-surface-runna-deep))]" />
+            {pageCount > 1 ? (
+              <div className="pointer-events-none absolute inset-x-0 bottom-2.5 flex justify-center gap-1.5">
+                {Array.from({ length: pageCount }).map((_, i) => (
+                  <span
+                    key={i}
+                    className={cn(
+                      "rounded-full",
+                      i === page ? "h-1 w-4 bg-foreground" : "size-1 bg-faint"
+                    )}
+                  />
+                ))}
+              </div>
+            ) : null}
           </div>
-          {includeSetup && setupSnapshotId ? (
-            <p className="mt-2 text-center text-[11.5px] text-muted-foreground">
-              Your setup sheet sends as a second picture.
-            </p>
-          ) : null}
         </div>
 
-        <div className="flex flex-col gap-2 px-4 pt-3">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="flex items-center justify-between px-4 pb-1.5">
+            <span className="text-[12px] font-semibold text-muted-foreground">In the picture</span>
+            <button
+              type="button"
+              onClick={everything}
+              className="tap-active text-[12px] font-semibold text-faint transition-colors hover:text-foreground"
+            >
+              Everything
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5 px-4 pb-3.5" role="group" aria-label="What to include">
+            {SECTION_ORDER.map((key) => (
+              <Chip
+                key={key}
+                active={sections[key]}
+                onClick={() => setSections((s) => ({ ...s, [key]: !s[key] }))}
+              >
+                {SECTION_LABELS[key]}
+              </Chip>
+            ))}
+            {setupSnapshotId ? (
+              <Chip active={includeSetup} onClick={() => setIncludeSetup((v) => !v)}>
+                Setup sheet
+                {/* It adds a second FILE rather than a section — say so on the chip. */}
+                <span className="font-normal text-faint">+1 pic</span>
+              </Chip>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 px-4 pt-1">
           {error ? <p className="text-[12px] text-destructive">{error}</p> : null}
           {skipped ? <p className="text-[12px] text-muted-foreground">{skipped}</p> : null}
           {state === "downloaded" ? (
@@ -238,25 +379,62 @@ export function ShareRunSheet({
               Saved to your downloads — this browser can&apos;t open the share sheet.
             </p>
           ) : null}
-          <Button
+          {/* The app's own primary chip — yellow fill, dark ink, glow — not a hand-rolled one.
+              Written out by hand first, it came out unfilled in both themes: `primary-action-chip`
+              is the type and geometry, and `primaryButtonClassName` is what carries the fill. */}
+          <button
             type="button"
             disabled={busy}
             onClick={() => void share(targets, { title: runLabel, text: runLabel })}
-          >
-            {busy ? (
-              <span className="flex items-center gap-2">
-                <Spinner /> Drawing…
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <Share2 className="size-4" strokeWidth={2} aria-hidden />
-                {sendLabel}
-              </span>
+            className={primaryButtonClassName(
+              "primary-action-chip-prominent w-full disabled:cursor-not-allowed disabled:opacity-60"
             )}
-          </Button>
+          >
+            <span className="primary-action-chip-content">
+              {busy ? (
+                <>
+                  <Spinner /> Drawing…
+                </>
+              ) : (
+                <>
+                  <Share2 className="primary-action-chip-icon" strokeWidth={2} aria-hidden />
+                  {sendLabel}
+                </>
+              )}
+            </span>
+          </button>
         </div>
       </div>
     </div>,
     document.body
+  );
+}
+
+/**
+ * The shipped chip treatment, plus one addition: a tick when it is on. Active is still raised
+ * neutral, never yellow — selection is state, and yellow means action.
+ */
+function Chip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        chipToggleClass(active),
+        "tap-active inline-flex items-center gap-1.5 px-[11px] py-[9px] text-[12.5px]"
+      )}
+    >
+      {active ? <Check className="size-3 shrink-0" strokeWidth={3} aria-hidden /> : null}
+      {children}
+    </button>
   );
 }

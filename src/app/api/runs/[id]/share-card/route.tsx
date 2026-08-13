@@ -5,13 +5,8 @@ import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { formatRunDateTime } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
-import {
-  buildShareRunCard,
-  parseSectionsParam,
-  type ShareMode,
-} from "@/lib/share/shareCardModel";
+import { buildShareRunCard, parseCardStyle, parseSectionsParam } from "@/lib/share/shareCardModel";
 import { renderRunCard } from "@/lib/share/renderRunCard";
-import { paceVsFieldSecondsForRun } from "@/lib/share/paceVsField";
 
 /**
  * The run picture, as a PNG.
@@ -81,7 +76,7 @@ export async function GET(request: Request, { params }: Params) {
 
   const { id } = await params;
   const { searchParams } = new URL(request.url);
-  const mode: ShareMode = searchParams.get("mode") === "full" ? "full" : "headline";
+  const style = parseCardStyle(searchParams.get("style"));
   const sections = parseSectionsParam(searchParams.get("sections"));
 
   const run = await prisma.run.findFirst({ where: { id, userId }, select: shareRunSelect });
@@ -94,7 +89,7 @@ export async function GET(request: Request, { params }: Params) {
    * change which run the driver is being compared against.
    */
   let previousSetupData: unknown = undefined;
-  if (mode === "full" && run.carId) {
+  if (sections.setup && run.carId) {
     const previous = await prisma.run.findFirst({
       // `setupSnapshotId` is required on Run — every run has one — so there is nothing to filter for.
       where: {
@@ -108,23 +103,34 @@ export async function GET(request: Request, { params }: Params) {
     previousSetupData = previous?.setupSnapshot?.data ?? undefined;
   }
 
-  // Only pay for the field when the card is actually going to show it.
-  const paceVsFieldSeconds = sections.pace
-    ? await paceVsFieldSecondsForRun(userId, run.id, run)
-    : null;
-
   const timeZone = await getExplicitTimeZoneForRunFormatting();
+  const instant = resolveRunDisplayInstant(run);
 
   const card = buildShareRunCard({
     run,
-    mode,
+    style,
     sections,
-    dateTimeLabel: formatRunDateTime(resolveRunDisplayInstant(run), timeZone),
+    dateTimeLabel: formatRunDateTime(instant, timeZone),
+    // The Hero masthead's stamp: `SAT 8 AUG 2026`. Formatted here, where the zone is known.
+    dateStamp: formatShareDateStamp(instant, timeZone),
     driverName: run.user?.name ?? null,
     setupData: run.setupSnapshot?.data,
     previousSetupData,
-    paceVsFieldSeconds,
   });
 
   return renderRunCard(card);
+}
+
+/** `SAT 8 AUG 2026` — the Hero masthead stamp, in the viewer's zone like every other date here. */
+function formatShareDateStamp(instant: Date, timeZone: string | undefined): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone,
+  })
+    .format(instant)
+    .replace(/,/g, "")
+    .toUpperCase();
 }

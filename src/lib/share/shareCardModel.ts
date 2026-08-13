@@ -6,10 +6,18 @@
  * driver is about to publish is answered in this file, where it can be unit-tested without a
  * font, a browser, or a database (`npm run test:share`).
  *
- * Two shapes, per the founder ruling 2026-08-13:
- *   headline — four figures (best, avg top 5, avg top 10, laps/time) and little else.
- *   full     — everything the expanded session view shows, minus the app's own furniture
- *              (the video compare panel, the edit and delete buttons).
+ * The card IS the expanded session view minus the video panel (founder ruling 2026-08-13, the
+ * share redesign). There is no longer a headline/full split: the driver picks a STYLE —
+ *
+ *   hero   — leads with the best lap, for a story or a group chat thumbnail.
+ *   report — leads with session identity, for the team chat.
+ *
+ * — and ticks which blocks travel. Nothing overrides anything: a chip is the only thing that
+ * turns a block on or off, which was the whole complaint about the old modes (they silently
+ * reset the section flags underneath the driver).
+ *
+ * Some things are never chip-controlled and must survive every combination: best lap, avg top 5,
+ * avg top 10, laps & stint, track, date, driver name, and the JRC mark.
  *
  * It also owns the card's HEIGHT. Satori lays out into a fixed box and clips whatever
  * overflows, so the height has to be known before a single pixel is drawn — see
@@ -31,9 +39,12 @@ import { runConditionsFromRecord } from "@/lib/weather/runConditionsRecord";
 import { setupChangedRowsSincePrevious } from "@/lib/setupCompare/changedSincePrevious";
 import {
   CAPTURE_TRAIT_AXIS_KEYS,
-  HANDLING_TRAIT_AXIS_UI,
+  CAR_RATING_BANDS,
+  HANDLING_TRAIT_CHIP_META,
+  carRatingBandCaption,
   parseHandlingAssessmentJson,
   uiStateFromParsed,
+  type PhaseBalance,
 } from "@/lib/runHandlingAssessment";
 import { normalizeTirePrep, tirePrepFromLegacy, type TirePrepStep } from "@/lib/runs/tirePrep";
 
@@ -45,33 +56,62 @@ const INNER = CARD_WIDTH - PAD * 2;
 /** Lap chips per row. Shared with the renderer so the height estimate can't disagree with it. */
 export const LAP_CHIPS_PER_ROW = 6;
 
-export type ShareMode = "headline" | "full";
+/** The trace's own box, in card pixels. Mirrors `LapTimeGraph`'s geometry at 2.9× scale. */
+export const TRACE = {
+  width: INNER,
+  height: 300,
+  padLeft: 72,
+  padRight: 20,
+  padTop: 24,
+  padBottom: 44,
+} as const;
 
-/** The tickable extras. `setup` is not here — it is a second picture, not a section. */
-export type ShareSectionKey = "pace" | "laps" | "graph" | "notes";
+/** Clean-pace ceiling, copied from `LapTimeGraph`: laps slower than best × this clamp to the top. */
+const CLAMP_FACTOR = 1.15;
 
-export const SHARE_SECTION_KEYS: readonly ShareSectionKey[] = ["pace", "laps", "graph", "notes"];
+export type ShareCardStyle = "hero" | "report";
+
+export function parseCardStyle(raw: string | null | undefined): ShareCardStyle {
+  return raw === "report" ? "report" : "hero";
+}
+
+/**
+ * The tickable blocks. `setup` here is the *diff* against the previous run — the setup SHEET is a
+ * second picture, not a section, and lives on the sheet's own `includeSetup` flag.
+ */
+export type ShareSectionKey = "details" | "laps" | "graph" | "setup" | "notes" | "feel";
+
+export const SHARE_SECTION_KEYS: readonly ShareSectionKey[] = [
+  "details",
+  "laps",
+  "graph",
+  "setup",
+  "notes",
+  "feel",
+];
 
 export type ShareSections = Record<ShareSectionKey, boolean>;
 
-/**
- * Full run IS the expanded session view, so choosing it turns everything on; headline turns
- * everything off. Either can then be overridden a chip at a time — this only supplies the
- * starting point when the mode changes.
- */
-export function defaultSectionsForMode(mode: ShareMode): ShareSections {
-  const on = mode === "full";
-  return { pace: false, laps: on, graph: on, notes: on };
+/** Everything travels unless the driver says otherwise. */
+export function allSectionsOn(): ShareSections {
+  return { details: true, laps: true, graph: true, setup: true, notes: true, feel: true };
 }
 
 /** `?sections=laps,graph` → flags. Unknown names are ignored, never an error. */
 export function parseSectionsParam(raw: string | null | undefined): ShareSections {
-  const wanted = new Set((raw ?? "").split(",").map((s) => s.trim()).filter(Boolean));
+  const wanted = new Set(
+    (raw ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+  );
   return {
-    pace: wanted.has("pace"),
+    details: wanted.has("details"),
     laps: wanted.has("laps"),
     graph: wanted.has("graph"),
+    setup: wanted.has("setup"),
     notes: wanted.has("notes"),
+    feel: wanted.has("feel"),
   };
 }
 
@@ -83,34 +123,68 @@ export function serializeSections(s: ShareSections): string {
 // Model
 // ---------------------------------------------------------------------------
 
-export type ShareTile = { label: string; value: string; suffix?: string };
-export type ShareWell = { label: string; value: string };
+export type ShareTile = { label: string; value: string; /** Lap-derived: draw in mono. */ mono: boolean };
+export type ShareWell = { label: string; value: string; mono?: boolean; lines?: string[] };
 export type ShareLap = { lapNumber: number; time: string; flag: "best" | "miss" | null; excluded: boolean };
-/** `heightPct` is proportional to lap TIME: taller = slower. See `barsFromLaps`. */
-export type ShareBar = { heightPct: number; flag: "best" | "miss" | null };
 export type ShareDiffRow = { label: string; from: string; to: string };
-export type ShareTrait = { label: string; neg: string; pos: string; /** −3…+3 */ value: number };
+
+/** One plotted lap on the trace, already in the SVG's own coordinates. */
+export type ShareTraceDot = { x: number; y: number; flag: "best" | "miss" | null; clamped: boolean };
+export type ShareTrace = {
+  /** `x,y x,y …` for the polyline — excluded laps are skipped and the line bridges their slot. */
+  points: string;
+  dots: ShareTraceDot[];
+  gridlines: { y: number; labelY: number; label: string }[];
+  xLabels: { x: number; label: string }[];
+};
+
+/** The four rating bands, with the driver's number lit inside its own. */
+export type ShareRatingBand = {
+  caption: string;
+  ratings: number[];
+  /** The band holding the driver's rating. */
+  active: boolean;
+};
+
+/** One answered corner phase. `value` is −3 (understeer) … +3 (oversteer); 0 is "felt neutral". */
+export type ShareBalanceRow = { label: string; value: PhaseBalance };
+
+/** One problem pole, flagged or not. Unflagged tiles stay — they are what was considered. */
+export type ShareNotable = { label: string; severity: 1 | 2 | 3 | null };
+
+export type ShareFeel = {
+  rating: number | null;
+  bandCaption: string | null;
+  bands: ShareRatingBand[];
+  balance: ShareBalanceRow[] | null;
+  notables: ShareNotable[];
+};
 
 export type ShareRunCard = {
-  mode: ShareMode;
+  style: ShareCardStyle;
+  /** Hero masthead, right side. `SAT 8 AUG 2026`. */
+  dateStamp: string;
+  /** Report eyebrow — the event. Empty when the run belongs to no event. */
   eyebrow: string;
+  /** `Qualifier 2` — the session's own name, in the display voice. */
   title: string;
+  /** Hero: the driver, on their own line, big. Null when the run has no owner name. */
+  driverName: string | null;
+  /** Hero: two lines under the driver name. Gated by the `details` chip. */
+  heroLines: string[];
+  /** Report: `track · car · driver`, under the title. */
   subtitle: string;
-  /** Best lap, avg top 5, avg top 10, laps/time — always four, always in this order. */
+  /** Report: the four-up headline well. Hero: the last three, as a strip. Always present. */
   tiles: ShareTile[];
-  /** Full-width fifth tile. Null unless the pace chip is on and a field comparison exists. */
-  pace: { label: string; value: string; note: string; faster: boolean } | null;
-  /** Headline only: the one-line conditions strip. */
-  conditionsLine: string | null;
-  /** Full only. */
+  /** Report only, `details` chip: the six session fields. */
   details: ShareWell[];
+  /** Report only, never chip-gated: the nine lap figures. */
   lapWells: ShareWell[];
   laps: ShareLap[] | null;
-  bars: ShareBar[] | null;
+  trace: ShareTrace | null;
   changed: ShareDiffRow[] | null;
   notes: string | null;
-  rating: number | null;
-  traits: ShareTrait[] | null;
+  feel: ShareFeel | null;
   /** Computed last, from everything above. */
   height: number;
 };
@@ -148,17 +222,17 @@ export type ShareRunInput = {
 
 export type BuildShareCardParams = {
   run: ShareRunInput;
-  mode: ShareMode;
+  style: ShareCardStyle;
   sections: ShareSections;
   /** Already formatted in the viewer's zone by the caller — this module never touches time zones. */
   dateTimeLabel: string;
-  /** Owner's display name. Full mode only; headline stays anonymous-ish. */
+  /** The same instant, for the Hero masthead's `SAT 8 AUG 2026` stamp. */
+  dateStamp?: string | null;
+  /** Owner's display name — always on the picture, whatever is toggled off. */
   driverName?: string | null;
   /** This run's setup and the previous run's on the same car, for the diff. */
   setupData?: unknown;
   previousSetupData?: unknown;
-  /** Seconds per lap: this driver's average minus the field's. Negative = faster. */
-  paceVsFieldSeconds?: number | null;
 };
 
 const MEETING_LABELS: Record<string, string> = {
@@ -174,53 +248,165 @@ const MEETING_LABELS: Record<string, string> = {
  * reconstruction from the legacy warmer column second. Rebuilt from the two primitives rather
  * than imported, because that helper lives in a `.tsx` component file and this module has to stay
  * free of React to be testable.
+ *
+ * One line per step: the card gives this cell two mono lines, the way the session view does.
  */
-function tirePrepSummary(run: ShareRunInput): string {
+function tirePrepLines(run: ShareRunInput): string[] {
   const stored = normalizeTirePrep(run.tirePrep);
   const steps: TirePrepStep[] =
     stored.length > 0
       ? stored
       : tirePrepFromLegacy(run.warmerTimingMinutes ?? null, Boolean(run.additiveType));
-  if (steps.length === 0) return "—";
-  return steps
-    .map((s: TirePrepStep) => {
-      const bits: string[] = [];
-      if (s.minutes != null && s.minutes > 0) bits.push(`${s.minutes}m`);
-      bits.push(s.appliedAdditive ? "additive" : "no sauce");
-      if (s.warmers) bits.push(`warmers${s.temperatureC != null ? ` ${s.temperatureC}°` : ""}`);
-      return bits.join(" ");
-    })
-    .join(" → ");
+  if (steps.length === 0) return ["—"];
+  return steps.map((s: TirePrepStep) => {
+    const bits: string[] = [];
+    if (s.minutes != null && s.minutes > 0) bits.push(`${s.minutes}m`);
+    bits.push(s.appliedAdditive ? "additive" : "no sauce");
+    if (s.warmers) bits.push(`warmers${s.temperatureC != null ? ` ${s.temperatureC}°` : ""}`);
+    // A real separator: satori collapses runs of spaces, so padding would not hold.
+    return bits.join(" · ");
+  });
 }
 
 /**
- * Bar per lap. **Taller is SLOWER** — the bar is how long the lap took.
+ * The trace, as the on-screen `LapTimeGraph` draws it, scaled into {@link TRACE}.
  *
- * This is the app's own direction, not a preference: `LapTimeGraph` plots
- * `y = PAD_TOP + ((hi - value) / (hi - lo)) * innerHeight`, and since SVG y grows downward that
- * puts the slowest lap at the top of the trace. A card that inverted it would disagree with the
- * screen it came from, which is worse than either convention on its own.
+ * **Slower plots HIGHER.** That is the app's own direction, not a preference: `LapTimeGraph`
+ * computes `y = padTop + ((hi - value) / (hi - lo)) * innerHeight`, and since SVG y grows downward
+ * that puts the slowest lap at the top. A card that inverted it would disagree with the screen it
+ * came from, which is worse than either convention on its own.
  *
- * Scaled against the session's own spread rather than zero — a 15.1 next to a 16.4 is the whole
- * story, and a zero-based axis would flatten it into one grey block.
+ * The window is the session's own clean-pace spread (best → slowest inside best × 1.15, 8%
+ * padding), never zero-based — a 15.1 next to a 16.4 is the whole story, and a zero-based axis
+ * would flatten it into one grey line. Laps past the ceiling pin to the top edge and are marked
+ * `clamped`, exactly as the on-screen graph marks them with a triangle.
  */
-function barsFromLaps(rows: LapRow[], best: Set<number>, miss: Set<number>): ShareBar[] | null {
-  const shown = rows.filter((r) => r.isIncluded !== false);
-  if (shown.length < 3) return null;
-  const times = shown.map((r) => r.lapTimeSeconds);
-  const fastest = Math.min(...times);
-  const slowest = Math.max(...times);
-  const span = slowest - fastest || 1;
-  return shown.map((r) => ({
-    // Floor of 18% at the fastest lap so the best lap is still a visible bar, 100% at the slowest.
-    heightPct: Math.round(18 + ((r.lapTimeSeconds - fastest) / span) * 82),
+function traceFromLaps(
+  rows: LapRow[],
+  best: Set<number>,
+  miss: Set<number>
+): ShareTrace | null {
+  if (rows.length < 3) return null;
+  const included = rows.filter((r) => r.isIncluded !== false).map((r) => r.lapTimeSeconds);
+  const anchor = included.length > 0 ? included : rows.map((r) => r.lapTimeSeconds);
+  const fastest = Math.min(...anchor);
+  const cap = fastest * CLAMP_FACTOR;
+  const inWindow = included.filter((t) => t <= cap);
+  let min = fastest;
+  let max = inWindow.length > 0 ? Math.max(...inWindow) : cap;
+  const anyClamped = included.some((t) => t > cap);
+  if (anyClamped) max = Math.max(max, cap);
+  if (max - min < 0.4) {
+    // Metronomic run — pad so the line doesn't collapse flat.
+    const mid = (min + max) / 2;
+    min = mid - 0.2;
+    max = mid + 0.2;
+  }
+  const padding = (max - min) * 0.08;
+  const lo = min - padding;
+  const hi = max + padding;
+
+  const innerWidth = TRACE.width - TRACE.padLeft - TRACE.padRight;
+  const innerHeight = TRACE.height - TRACE.padTop - TRACE.padBottom;
+  const n = rows.length;
+  const round = (v: number) => Math.round(v * 10) / 10;
+  const xAt = (i: number) =>
+    round(TRACE.padLeft + (n === 1 ? innerWidth / 2 : (i / (n - 1)) * innerWidth));
+  const yAt = (v: number) =>
+    round(TRACE.padTop + ((hi - Math.min(v, hi)) / (hi - lo)) * innerHeight);
+
+  const plotted = rows
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => r.isIncluded !== false);
+  if (plotted.length < 2) return null;
+
+  const dots: ShareTraceDot[] = plotted.map(({ r, i }) => ({
+    x: xAt(i),
+    y: yAt(r.lapTimeSeconds),
     flag: best.has(r.lapNumber) ? "best" : miss.has(r.lapNumber) ? "miss" : null,
+    clamped: anyClamped && r.lapTimeSeconds > cap,
   }));
+
+  const gridlines = [lo + (hi - lo) * 0.12, (lo + hi) / 2, hi - (hi - lo) * 0.12].map((tick) => ({
+    y: yAt(tick),
+    // Mono digits sit on their own baseline; nudge the label to the line's optical centre.
+    labelY: round(yAt(tick) + 7),
+    label: tick.toFixed(1),
+  }));
+
+  // Every third lap, plus the last one, so the axis never ends on a bare tick.
+  const step = Math.max(1, Math.ceil(n / 8));
+  const xLabels = rows
+    .map((r, i) => ({ r, i }))
+    .filter(({ i }) => i % step === 0 || i === n - 1)
+    .map(({ r, i }) => ({ x: xAt(i), label: String(r.lapNumber) }));
+
+  return {
+    points: dots.map((d) => `${d.x},${d.y}`).join(" "),
+    dots,
+    gridlines,
+    xLabels,
+  };
+}
+
+/**
+ * The problem poles, in capture order — the same list `HandlingAssessmentFields` builds for its
+ * tiles, rebuilt from the shared metadata rather than imported (that file is a client component).
+ */
+const NOTABLE_POLES: { axis: (typeof CAPTURE_TRAIT_AXIS_KEYS)[number]; sign: -1 | 1; label: string }[] =
+  CAPTURE_TRAIT_AXIS_KEYS.flatMap((axis) =>
+    HANDLING_TRAIT_CHIP_META[axis].problemPoles.map((pole) => ({
+      axis,
+      sign: pole.sign,
+      label: pole.label,
+    }))
+  );
+
+function feelFromRun(run: ShareRunInput): ShareFeel | null {
+  const ratingRaw = run.carRating;
+  const rating =
+    typeof ratingRaw === "number" && ratingRaw >= 1 && ratingRaw <= 10 ? Math.round(ratingRaw) : null;
+  const bandCaption = rating == null ? null : carRatingBandCaption(rating);
+
+  const ui = uiStateFromParsed(parseHandlingAssessmentJson(run.handlingAssessmentJson));
+
+  // Only answered phases are drawn — an empty row in a stored record is not information.
+  const balanceRows: ShareBalanceRow[] = [];
+  if (ui.balanceEntry != null) balanceRows.push({ label: "Entry", value: ui.balanceEntry });
+  if (ui.balanceMid != null) balanceRows.push({ label: "Mid", value: ui.balanceMid });
+  if (ui.balanceExit != null) balanceRows.push({ label: "Exit", value: ui.balanceExit });
+
+  const notables: ShareNotable[] = NOTABLE_POLES.map((pole) => {
+    const value = ui[pole.axis];
+    const severity =
+      value != null && value !== 0 && Math.sign(value) === pole.sign
+        ? (Math.abs(value) as 1 | 2 | 3)
+        : null;
+    return { label: pole.label, severity };
+  });
+  const anyNotableFlagged = notables.some((n) => n.severity != null);
+
+  // Nothing was answered anywhere: draw no block rather than an empty instrument.
+  if (rating == null && balanceRows.length === 0 && !anyNotableFlagged) return null;
+
+  return {
+    rating,
+    bandCaption,
+    bands: CAR_RATING_BANDS.map((b) => ({
+      caption: b.caption,
+      ratings: [...b.ratings],
+      active: bandCaption === b.caption,
+    })),
+    balance: balanceRows.length > 0 ? balanceRows : null,
+    // Kept even when none are flagged, as long as something else was answered: the unflagged
+    // tiles are the record of what was considered and dismissed.
+    notables,
+  };
 }
 
 export function buildShareRunCard(params: BuildShareCardParams): ShareRunCard {
-  const { run, mode, sections } = params;
-  const full = mode === "full";
+  const { run, style, sections } = params;
+  const report = style === "report";
 
   const lapRows = primaryLapRowsFromRun({ lapTimes: run.lapTimes, lapSession: run.lapSession });
   const dash = getIncludedLapDashboardMetrics(lapRows);
@@ -239,76 +425,77 @@ export function buildShareRunCard(params: BuildShareCardParams): ShareRunCard {
   const carName = run.car?.name ?? run.carNameSnapshot ?? "Deleted car";
   const trackName = run.track?.name ?? run.trackNameSnapshot ?? null;
   const conditionsChip = formatConditionsChip(runConditionsFromRecord(run));
+  const title = formatRunSessionDisplay(run, { fallback: "Testing run" });
+  const eventName = run.event?.name ?? null;
+  const driverName = params.driverName?.trim() || null;
 
-  const eyebrowParts = [run.event?.name ?? null, params.dateTimeLabel].filter(Boolean) as string[];
-  const subtitleParts = [trackName, carName, full ? params.driverName ?? null : null].filter(
-    Boolean
-  ) as string[];
+  // `Laps / time` is a headline figure, not a timing read: `19 / 4:55`, never `19 / 4:55.000`.
+  // The thousandths still travel — they are the `Stint` well, two blocks down.
+  const lapsTime =
+    dash.stintSeconds != null
+      ? `${dash.lapCount} / ${formatStintTime(dash.stintSeconds).replace(/\.\d+$/, "")}`
+      : String(dash.lapCount);
 
   const tiles: ShareTile[] = [
-    { label: "Best lap", value: formatLap(dash.bestLap) },
-    { label: "Avg top 5", value: formatLap(dash.avgTop5) },
-    { label: "Avg top 10", value: formatLap(dash.avgTop10) },
-    {
-      label: "Laps / time",
-      value: String(dash.lapCount),
-      suffix: dash.stintSeconds != null ? ` / ${formatStintTime(dash.stintSeconds)}` : undefined,
-    },
+    { label: "Best lap", value: formatLap(dash.bestLap), mono: true },
+    { label: "Avg top 5", value: formatLap(dash.avgTop5), mono: true },
+    { label: "Avg top 10", value: formatLap(dash.avgTop10), mono: true },
+    { label: "Laps / time", value: lapsTime, mono: true },
   ];
 
-  const paceSec = params.paceVsFieldSeconds;
-  const pace =
-    sections.pace && paceSec != null && Number.isFinite(paceSec)
-      ? {
-          label: "Pace vs field average",
-          // Repo convention: user − field, so negative is the good one.
-          value: `${paceSec < 0 ? "−" : "+"}${Math.abs(paceSec).toFixed(3)}`,
-          note: paceSec < 0 ? " per lap — faster" : " per lap — slower",
-          faster: paceSec < 0,
-        }
-      : null;
-
-  const details: ShareWell[] = full
-    ? [
-        { label: "Date / time", value: params.dateTimeLabel },
-        {
-          label: "Session",
-          value:
-            run.meetingSessionType === "OTHER" && run.meetingSessionCode?.trim()
-              ? run.meetingSessionCode.trim()
-              : run.meetingSessionType
-                ? MEETING_LABELS[run.meetingSessionType] ?? run.meetingSessionType
-                : "—",
-        },
-        { label: "Car", value: carName },
-        {
-          label: "Tire set",
-          value: run.tireType
-            ? `${run.tireType.displayName} · run ${run.tireRunNumber ?? "?"}${
-                run.tireAgeKnown === false ? " (age unknown)" : ""
-              }`
-            : "—",
-        },
-        { label: "Additive", value: run.additiveType?.displayName ?? "—" },
-        { label: "Tire prep", value: tirePrepSummary(run) },
-      ]
+  // Hero: two ink-2 lines under the driver's name, the session's identity in prose.
+  const heroLines = sections.details
+    ? ([[title, eventName].filter(Boolean).join(" · "), [trackName, carName].filter(Boolean).join(" · ")]
+        .filter((l) => l.length > 0) as string[])
     : [];
 
-  const lapWells: ShareWell[] = full
+  const subtitle = [trackName, carName, driverName].filter(Boolean).join(" · ");
+
+  const details: ShareWell[] =
+    report && sections.details
+      ? [
+          { label: "Date / time", value: params.dateTimeLabel },
+          {
+            label: "Session",
+            value:
+              run.meetingSessionType === "OTHER" && run.meetingSessionCode?.trim()
+                ? run.meetingSessionCode.trim()
+                : run.meetingSessionType
+                  ? MEETING_LABELS[run.meetingSessionType] ?? run.meetingSessionType
+                  : "—",
+          },
+          { label: "Car", value: carName },
+          {
+            label: "Tire set",
+            value: run.tireType
+              ? `${run.tireType.displayName} · run ${run.tireRunNumber ?? "?"}${
+                  run.tireAgeKnown === false ? " (age unknown)" : ""
+                }`
+              : "—",
+          },
+          { label: "Additive", value: run.additiveType?.displayName ?? "—" },
+          { label: "Tire prep", value: "", mono: true, lines: tirePrepLines(run) },
+        ]
+      : [];
+
+  const lapWells: ShareWell[] = report
     ? [
         { label: "Laps", value: String(dash.lapCount) },
-        { label: "Stint", value: dash.stintSeconds != null ? formatStintTime(dash.stintSeconds) : "—" },
-        { label: "Best lap", value: formatLap(dash.bestLap) },
-        { label: "Avg top 5", value: formatLap(dash.avgTop5) },
-        { label: "Avg top 10", value: formatLap(dash.avgTop10) },
-        { label: "Median", value: formatLap(dash.median) },
+        {
+          label: "Stint",
+          value: dash.stintSeconds != null ? formatStintTime(dash.stintSeconds) : "—",
+          mono: true,
+        },
+        { label: "Best lap", value: formatLap(dash.bestLap), mono: true },
+        { label: "Avg top 5", value: formatLap(dash.avgTop5), mono: true },
+        { label: "Avg top 10", value: formatLap(dash.avgTop10), mono: true },
+        { label: "Median", value: formatLap(dash.median), mono: true },
         { label: "Cond.", value: conditionsChip?.value ?? "—" },
         {
           label: "Consist.",
           value:
-            dash.consistencyScore != null
-              ? formatConsistencyScorePercent(dash.consistencyScore)
-              : "—",
+            dash.consistencyScore != null ? formatConsistencyScorePercent(dash.consistencyScore) : "—",
+          mono: true,
         },
         { label: "Mistakes", value: mistakes.eligible ? String(mistakes.mistakeCount) : "—" },
       ]
@@ -324,10 +511,10 @@ export function buildShareRunCard(params: BuildShareCardParams): ShareRunCard {
         }))
       : null;
 
-  const bars = sections.graph ? barsFromLaps(lapRows, bestNumbers, missNumbers) : null;
+  const trace = sections.graph ? traceFromLaps(lapRows, bestNumbers, missNumbers) : null;
 
   const changed =
-    full && params.previousSetupData != null
+    sections.setup && params.previousSetupData != null
       ? setupChangedRowsSincePrevious(params.setupData, params.previousSetupData).map((r) => ({
           label: r.label,
           from: r.previousValue,
@@ -338,55 +525,28 @@ export function buildShareRunCard(params: BuildShareCardParams): ShareRunCard {
   const notesText = (run.notes?.trim() || run.driverNotes?.trim() || "") || null;
   const notes = sections.notes ? notesText : null;
 
-  const ratingRaw = run.carRating;
-  const rating =
-    sections.notes && typeof ratingRaw === "number" && ratingRaw >= 1 && ratingRaw <= 10
-      ? Math.round(ratingRaw)
-      : null;
-
-  let traits: ShareTrait[] | null = null;
-  if (sections.notes) {
-    const ui = uiStateFromParsed(parseHandlingAssessmentJson(run.handlingAssessmentJson));
-    const rows: ShareTrait[] = [];
-    for (const key of CAPTURE_TRAIT_AXIS_KEYS) {
-      const v = ui[key];
-      if (v == null) continue;
-      const meta = HANDLING_TRAIT_AXIS_UI[key];
-      rows.push({ label: meta.title, neg: meta.neg, pos: meta.pos, value: v });
-    }
-    traits = rows.length > 0 ? rows : null;
-  }
+  const feel = sections.feel ? feelFromRun(run) : null;
 
   const card: ShareRunCard = {
-    mode,
-    eyebrow: eyebrowParts.join(" · "),
-    title: formatRunSessionDisplay(run, { fallback: "Testing run" }),
-    subtitle: subtitleParts.join(" · "),
+    style,
+    dateStamp: params.dateStamp?.trim() || params.dateTimeLabel,
+    eyebrow: eventName ?? "",
+    title,
+    driverName,
+    heroLines,
+    subtitle,
     tiles,
-    pace,
-    conditionsLine: full ? null : conditionsLineFrom(run),
     details,
     lapWells,
     laps,
-    bars,
+    trace,
     changed: changed && changed.length > 0 ? changed : null,
     notes,
-    rating,
-    traits,
+    feel,
     height: 0,
   };
   card.height = estimateCardHeight(card);
   return card;
-}
-
-/** Separated by a real character: satori collapses runs of spaces, so padding won't hold. */
-function conditionsLineFrom(run: ShareRunInput): string | null {
-  const parts: string[] = [];
-  if (run.conditionsAirTempC != null) parts.push(`Air ${Math.round(run.conditionsAirTempC)}°C`);
-  if (run.conditionsTrackTempC != null) parts.push(`Track ${Math.round(run.conditionsTrackTempC)}°C`);
-  if (run.conditionsWindKph != null) parts.push(`Wind ${Math.round(run.conditionsWindKph)} km/h`);
-  if (run.conditionsHumidityPct != null) parts.push(`Humidity ${Math.round(run.conditionsHumidityPct)}%`);
-  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -409,35 +569,77 @@ export function runIsShareable(run: { lapTimes: unknown; lapSession?: unknown },
 /*
  * Block heights in final pixels. These MUST track `renderRunCard.tsx` — a change to a font
  * size or a padding there without a change here means the card silently clips its own footer.
- * `share.test.ts` pins the arithmetic; only a rendered card proves the constants.
+ * `npm run test:share` pins the arithmetic; only a rendered card proves the constants.
  */
 const H = {
-  headerTop: PAD,
-  eyebrowLine: 30,
-  titleLine: 64,
-  subtitleLine: 40,
-  headerBottom: 56,
-  tileRow: 166,
-  paceRow: 166,
-  conditionsLine: 84,
-  band: 52,
-  wellRow: 92,
-  wellsPad: 26,
-  lapRow: 43,
-  lapsPad: 46,
-  bars: 228,
-  diffRow: 66,
-  diffPad: 28,
-  notesLine: 46,
-  notesPad: 68,
-  rating: 76,
-  traitRow: 82,
-  traitsPad: 24,
-  legend: 40,
-  footer: 104,
-  /* Wrapping is estimated from average glyph width, so a long word can push one line further
-     than predicted. Slack absorbs that; without it the overflow lands on the footer. */
-  slack: 24,
+  /** Report masthead: 44px padding, a 44px mark, 44px padding, 1px rule. */
+  masthead: 133,
+  /** Report title block: 48 top pad + 22 eyebrow + 16 + title + 18 rule + 16 + subtitle lines. */
+  reportTitleTop: 48 + 22 + 16,
+  reportTitleLine: 84,
+  reportTitleRule: 18,
+  reportSubtitleTop: 16,
+  reportSubtitleLine: 42,
+  /** Report headline well: 40 margin + its 1px frame + 24px padding either side of a 92px cell. */
+  reportHeadline: 40 + 2 + 48 + 92,
+
+  /** Hero block: 56 pad, masthead 52, 60 gap, 145 figure, 16 + 6 cut, 40 + name, lines, 56 pad. */
+  heroTop: 56 + 52 + 60,
+  heroFigure: 145,
+  heroCut: 22,
+  heroNameTop: 40,
+  heroNameLine: 60,
+  heroLine: 46,
+  heroBottom: 56,
+  /** Hero's 3-up strip: 64px of padding around a 104px cell, plus the 1px rule under it. */
+  heroStrip: 64 + 104 + 1,
+
+  /** A section heading: 48 top padding + 30 tick + 20 margin. */
+  section: 98,
+  /** One instrument-well row: 18 pad + 37 value + 18 pad + 1px seam. */
+  wellRow: 74,
+  /** Tire prep spends a second mono line. */
+  wellRowExtra: 34,
+  /** One lap-chip row at 23px/1.35 with the well's 8px row gap. */
+  lapRow: 39,
+  /** The lap well's own 20/16 padding, plus its 18px top margin. */
+  lapsPad: 58,
+  /** The trace SVG plus its 22px top margin and the legend under it. */
+  trace: 22 + TRACE.height,
+  legend: 8 + 20,
+  /** Setup diff: a 48px header band, then one row each. */
+  diffHead: 48,
+  diffRow: 62,
+  /** Notes at 30px/1.6. */
+  notesLine: 48,
+  /** Feel: the rating label, then the band blocks and their captions (72 + 8 + 27). */
+  feelLabel: 29,
+  feelBands: 18 + 107,
+  /** The corner-balance panel: 36 margin + 26 top padding + its own border. */
+  feelPanelTop: 36 + 26 + 1,
+  /** Each instrument inside it is labelled: a 29px line and 16px of air. */
+  feelPanelLabel: 29 + 16,
+  /** Its header band: a 24px line inside 14px of padding, plus the rule under it. */
+  feelBalanceHead: 24 + 28 + 1,
+  /** One phase: a reserved 24px word, 8px, a 31px staircase, 28px of padding, and the 1px seam. */
+  feelBalanceRow: 24 + 8 + 31 + 28 + 1,
+  /** The gap between the balance instrument and the notable tiles. */
+  feelPanelGap: 28,
+  /** A notable tile: 29px label, 16px, a 22px staircase, 40px of padding, 2px border, 12px gutter. */
+  feelNotableRow: 29 + 16 + 22 + 40 + 2 + 12,
+  feelPanelBottom: 26 + 1,
+  /** Footer: 48 margin, 1px rule, 44 + 38 + 44. */
+  footer: 175,
+  /*
+   * Wrapping is estimated from average glyph width, so a long word can push one line further than
+   * predicted. Slack absorbs that; without it the overflow lands on the footer.
+   *
+   * 44px is deliberately a hair more than one wrapped line of the largest wrapping text on the
+   * card (the 30px notes and subtitle, 42–48px a line). `scripts/dev-share-card-fit.ts` measures
+   * what every block really costs; with these constants it reports 16–34px of spare ground, so
+   * the slack is the only thing standing between a mis-predicted line and a lost footer.
+   */
+  slack: 44,
 } as const;
 
 /** Rough line count for text laid out at `fontSize` across `width`. */
@@ -451,39 +653,87 @@ export function wrappedLines(text: string, fontSize: number, width: number): num
   return lines;
 }
 
-export function estimateCardHeight(card: ShareRunCard): number {
-  let h = H.headerTop;
-
-  h += card.eyebrow ? H.eyebrowLine : 0;
-  h += wrappedLines(card.title, 52, INNER) * H.titleLine;
-  h += card.subtitle ? wrappedLines(card.subtitle, 28, INNER) * H.subtitleLine : 0;
-  h += H.headerBottom;
-
-  h += Math.ceil(card.tiles.length / 2) * H.tileRow;
-  if (card.pace) h += H.paceRow;
-
-  if (card.conditionsLine) h += H.conditionsLine;
-
-  if (card.details.length > 0) {
-    h += H.band + Math.ceil(card.details.length / 2) * H.wellRow + H.wellsPad;
-  }
-  if (card.lapWells.length > 0) {
-    h += H.band + Math.ceil(card.lapWells.length / 3) * H.wellRow + H.wellsPad;
-  }
-
+/**
+ * The lap chips and the trace, without any section heading of their own.
+ *
+ * They share one block because that is how the renderer draws them: in Report they sit under the
+ * `Laptimes` heading with the nine figures, in Hero under a single heading of their own. The
+ * legend belongs to the pair, so it is counted once when either is present.
+ */
+function lapBlockHeight(card: ShareRunCard): number {
+  let h = 0;
   if (card.laps) {
-    h += H.band + Math.ceil(card.laps.length / LAP_CHIPS_PER_ROW) * H.lapRow + H.lapsPad + H.legend;
+    h += Math.ceil(card.laps.length / LAP_CHIPS_PER_ROW) * H.lapRow + H.lapsPad;
+  }
+  if (card.trace) h += H.trace;
+  if (card.laps || card.trace) h += H.legend;
+  return h;
+}
+
+/** Everything below the lap block, in the order the renderer draws it. Shared by both styles. */
+function sharedSectionsHeight(card: ShareRunCard): number {
+  let h = 0;
+
+  if (card.changed) h += H.section + H.diffHead + card.changed.length * H.diffRow;
+
+  if (card.notes) h += H.section + wrappedLines(card.notes, 30, INNER) * H.notesLine;
+
+  if (card.feel) {
+    h += H.section + H.feelLabel + H.feelBands;
+    const hasBalance = card.feel.balance != null;
+    const hasNotables = card.feel.notables.length > 0;
+    if (hasBalance || hasNotables) {
+      h += H.feelPanelTop + H.feelPanelBottom;
+      if (hasBalance) {
+        h +=
+          H.feelPanelLabel + H.feelBalanceHead + card.feel.balance!.length * H.feelBalanceRow + 2;
+      }
+      if (hasNotables) {
+        h +=
+          (hasBalance ? H.feelPanelGap : 0) +
+          H.feelPanelLabel +
+          Math.ceil(card.feel.notables.length / 2) * H.feelNotableRow;
+      }
+    }
   }
 
-  if (card.bars) h += H.band + H.bars;
+  return h;
+}
 
-  if (card.changed) h += H.band + card.changed.length * H.diffRow + H.diffPad;
+export function estimateCardHeight(card: ShareRunCard): number {
+  let h = 0;
 
-  if (card.notes) {
-    h += H.band + wrappedLines(card.notes, 30, INNER - 60) * H.notesLine + H.notesPad;
+  if (card.style === "report") {
+    h += H.masthead;
+    h += H.reportTitleTop;
+    h += wrappedLines(card.title, 76, INNER) * H.reportTitleLine;
+    h += H.reportTitleRule;
+    h += card.subtitle
+      ? H.reportSubtitleTop + wrappedLines(card.subtitle, 30, INNER) * H.reportSubtitleLine
+      : 0;
+    h += H.reportHeadline;
+    if (card.details.length > 0) {
+      const rows = Math.ceil(card.details.length / 2);
+      h += H.section + rows * H.wellRow + H.wellRowExtra;
+    }
+    // `Laptimes` always shows the nine figures, and carries the chips and trace under its heading.
+    h += H.section + Math.ceil(card.lapWells.length / 3) * H.wellRow + lapBlockHeight(card);
+  } else {
+    h += H.heroTop;
+    h += H.heroFigure;
+    h += H.heroCut;
+    h += card.driverName ? H.heroNameTop + H.heroNameLine : 0;
+    h += card.heroLines.reduce(
+      (acc, line) => acc + wrappedLines(line, 32, INNER) * H.heroLine,
+      card.heroLines.length > 0 ? 12 : 0
+    );
+    h += H.heroBottom;
+    h += H.heroStrip;
+    // One heading over the chips and the trace, whichever of them is on.
+    if (card.laps || card.trace) h += H.section + lapBlockHeight(card);
   }
-  if (card.rating != null) h += H.band + H.rating;
-  if (card.traits) h += card.traits.length * H.traitRow + H.traitsPad;
+
+  h += sharedSectionsHeight(card);
 
   return h + H.footer + H.slack;
 }

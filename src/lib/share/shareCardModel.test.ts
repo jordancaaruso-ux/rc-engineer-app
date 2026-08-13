@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  allSectionsOn,
   buildShareRunCard,
-  defaultSectionsForMode,
   estimateCardHeight,
+  parseCardStyle,
   parseSectionsParam,
   runIsShareable,
   serializeSections,
   wrappedLines,
+  type ShareCardStyle,
   type ShareRunInput,
   type ShareSections,
 } from "@/lib/share/shareCardModel";
@@ -34,6 +36,11 @@ function run(overrides: Partial<ShareRunInput> = {}): ShareRunInput {
     lapTimes: LAPS,
     notes: "Loose on entry once the fronts came in.",
     carRating: 7,
+    handlingAssessmentJson: {
+      version: 6,
+      balanceByPhase: { entry: -2, mid: 0 },
+      onPower: -1,
+    },
     tireRunNumber: 3,
     conditionsAirTempC: 24,
     conditionsTrackTempC: 31,
@@ -47,45 +54,80 @@ function run(overrides: Partial<ShareRunInput> = {}): ShareRunInput {
   };
 }
 
-function build(mode: "headline" | "full", sections?: Partial<ShareSections>, extra = {}) {
+function build(style: ShareCardStyle, sections?: Partial<ShareSections>, extra = {}) {
   return buildShareRunCard({
     run: run(),
-    mode,
-    sections: { ...defaultSectionsForMode(mode), ...sections },
+    style,
+    sections: { ...allSectionsOn(), ...sections },
     dateTimeLabel: "9 Aug 2026, 10:42",
+    dateStamp: "SUN 9 AUG 2026",
     driverName: "Jordan Caruso",
     ...extra,
   });
 }
 
 // --------------------------------------------------------------------------
-// The four figures
+// The four figures — always on the picture, whatever is toggled off
 // --------------------------------------------------------------------------
 
-test("headline is best, avg top 5, avg top 10, laps/time — in that order", () => {
-  const card = build("headline");
+test("the four figures are best, avg top 5, avg top 10, laps/time — in that order", () => {
+  const card = build("report");
   assert.deepEqual(
     card.tiles.map((t) => t.label),
     ["Best lap", "Avg top 5", "Avg top 10", "Laps / time"]
   );
   assert.equal(card.tiles[0]!.value, "15.114");
-  assert.equal(card.tiles[3]!.value, "19");
+  assert.match(card.tiles[3]!.value, /^19 \//);
 });
 
-test("headline carries a conditions line and no session-detail wells", () => {
-  const card = build("headline");
-  assert.match(card.conditionsLine ?? "", /Air 24°C/);
-  assert.match(card.conditionsLine ?? "", /Track 31°C/);
-  assert.equal(card.details.length, 0);
-  assert.equal(card.lapWells.length, 0);
+test("the always-on set survives every chip being off", () => {
+  const off: ShareSections = {
+    details: false,
+    laps: false,
+    graph: false,
+    setup: false,
+    notes: false,
+    feel: false,
+  };
+  for (const style of ["hero", "report"] as const) {
+    const card = buildShareRunCard({
+      run: run(),
+      style,
+      sections: off,
+      dateTimeLabel: "9 Aug 2026, 10:42",
+      driverName: "Jordan Caruso",
+    });
+    assert.equal(card.tiles.length, 4, `${style}: the four figures stay`);
+    assert.equal(card.tiles[0]!.value, "15.114", `${style}: best lap stays`);
+    assert.equal(card.driverName, "Jordan Caruso", `${style}: the driver stays`);
+    assert.equal(card.title, "Qualifying · Q2", `${style}: the session stays`);
+    assert.equal(card.laps, null);
+    assert.equal(card.trace, null);
+    assert.equal(card.notes, null);
+    assert.equal(card.feel, null);
+  }
+});
+
+test("the track is on the picture in both styles, whatever is off", () => {
+  assert.match(build("report", { details: false }).subtitle, /Barton Park/);
+  assert.match(
+    buildShareRunCard({
+      run: run(),
+      style: "hero",
+      sections: { ...allSectionsOn(), details: false },
+      dateTimeLabel: "9 Aug 2026, 10:42",
+      driverName: "Jordan Caruso",
+    }).subtitle,
+    /Barton Park/
+  );
 });
 
 // --------------------------------------------------------------------------
-// Full run mirrors the expanded session view
+// Report mirrors the expanded session view
 // --------------------------------------------------------------------------
 
-test("full run shows the six session details and all nine lap figures", () => {
-  const card = build("full");
+test("report shows the six session details and all nine lap figures", () => {
+  const card = build("report");
   assert.deepEqual(
     card.details.map((d) => d.label),
     ["Date / time", "Session", "Car", "Tire set", "Additive", "Tire prep"]
@@ -96,27 +138,40 @@ test("full run shows the six session details and all nine lap figures", () => {
   );
 });
 
-test("full run brings notes, rating and every lap without being asked", () => {
-  const card = build("full");
-  assert.ok(card.notes, "notes travel with a full run");
-  assert.equal(card.rating, 7);
-  assert.ok(card.laps && card.laps.length === LAPS.length);
-  assert.ok(card.bars, "the trace comes with it too");
+test("the nine lap figures are not chip-controlled — only Session details is", () => {
+  const card = build("report", { details: false });
+  assert.equal(card.details.length, 0);
+  assert.equal(card.lapWells.length, 9, "Laptimes always travels on a report");
 });
 
-test("headline brings none of them", () => {
-  const card = build("headline");
-  assert.equal(card.notes, null);
-  assert.equal(card.rating, null);
-  assert.equal(card.laps, null);
-  assert.equal(card.bars, null);
+test("hero carries no wells; its identity is the two lines under the driver", () => {
+  const card = build("hero");
+  assert.equal(card.details.length, 0);
+  assert.equal(card.lapWells.length, 0);
+  assert.equal(card.heroLines.length, 2);
+  assert.match(card.heroLines[0]!, /Q2 · Round 4/);
+  assert.match(card.heroLines[1]!, /Barton Park Raceway · Awesomatix A800RR/);
 });
 
-test("a chip still overrides the mode — full run with notes off", () => {
-  const card = build("full", { notes: false });
-  assert.equal(card.notes, null);
-  assert.equal(card.rating, null, "the rating is part of the same answer, so it goes too");
-  assert.ok(card.laps, "and nothing else is disturbed");
+test("turning Session details off drops the hero's lines, not its lap", () => {
+  const card = build("hero", { details: false });
+  assert.deepEqual(card.heroLines, []);
+  assert.equal(card.tiles[0]!.value, "15.114");
+});
+
+// --------------------------------------------------------------------------
+// Chips mean only themselves — nothing overrides anything
+// --------------------------------------------------------------------------
+
+test("each chip governs exactly one block", () => {
+  assert.equal(build("report", { laps: false }).laps, null);
+  assert.ok(build("report", { laps: false }).trace, "the trace is a different chip");
+  assert.equal(build("report", { graph: false }).trace, null);
+  assert.ok(build("report", { graph: false }).laps, "the laps are a different chip");
+  assert.equal(build("report", { notes: false }).notes, null);
+  assert.ok(build("report", { notes: false }).feel, "how it felt is a different chip now");
+  assert.equal(build("report", { feel: false }).feel, null);
+  assert.ok(build("report", { feel: false }).notes, "and the notes are untouched");
 });
 
 // --------------------------------------------------------------------------
@@ -124,7 +179,7 @@ test("a chip still overrides the mode — full run with notes off", () => {
 // --------------------------------------------------------------------------
 
 test("the best lap is flagged and the slow ones are marked as mistakes", () => {
-  const card = build("full");
+  const card = build("report");
   const best = card.laps!.filter((l) => l.flag === "best");
   assert.equal(best.length, 1);
   assert.equal(best[0]!.time, "15.114");
@@ -132,28 +187,6 @@ test("the best lap is flagged and the slow ones are marked as mistakes", () => {
     card.laps!.some((l) => l.flag === "miss"),
     "16.398 is well off this session's median"
   );
-});
-
-// --------------------------------------------------------------------------
-// Trace direction — the app plots slow at the top (LapTimeGraph's yAt), and a card
-// that disagreed with the screen it came from would be worse than either convention.
-// --------------------------------------------------------------------------
-
-test("taller is SLOWER: the fastest lap gets the shortest bar", () => {
-  const bars = build("full").bars!;
-  const fastestIndex = LAPS.indexOf(Math.min(...LAPS));
-  const slowestIndex = LAPS.indexOf(Math.max(...LAPS));
-
-  const shortest = Math.min(...bars.map((b) => b.heightPct));
-  const tallest = Math.max(...bars.map((b) => b.heightPct));
-
-  assert.equal(bars[fastestIndex]!.heightPct, shortest, "15.114 is the shortest bar");
-  assert.equal(bars[slowestIndex]!.heightPct, tallest, "16.398 is the tallest");
-});
-
-test("even the fastest lap still draws a visible bar", () => {
-  const bars = build("full").bars!;
-  assert.ok(Math.min(...bars.map((b) => b.heightPct)) >= 15);
 });
 
 test("an excluded lap is kept on the card but marked", () => {
@@ -166,8 +199,8 @@ test("an excluded lap is kept on the card but marked", () => {
         entries: [{ perLap: LAPS.map((_, i) => ({ isIncluded: i !== 2 })) }],
       },
     }),
-    mode: "full",
-    sections: defaultSectionsForMode("full"),
+    style: "report",
+    sections: allSectionsOn(),
     dateTimeLabel: "9 Aug 2026, 10:42",
   });
   const excluded = card.laps!.filter((l) => l.excluded);
@@ -175,34 +208,103 @@ test("an excluded lap is kept on the card but marked", () => {
 });
 
 // --------------------------------------------------------------------------
-// Pace vs field — the sign convention is the whole point
+// Trace direction — the app plots slow at the top (LapTimeGraph's yAt), and a card
+// that disagreed with the screen it came from would be worse than either convention.
 // --------------------------------------------------------------------------
 
-test("faster than the field reads as a negative number", () => {
-  const card = build("headline", { pace: true }, { paceVsFieldSeconds: -0.184 });
-  assert.equal(card.pace?.value, "−0.184");
-  assert.equal(card.pace?.faster, true);
-  assert.match(card.pace!.note, /faster/);
+test("slower plots HIGHER: the fastest lap sits lowest on the trace", () => {
+  const trace = build("report").trace!;
+  const ys = trace.dots.map((d) => d.y);
+  const fastestIndex = LAPS.indexOf(Math.min(...LAPS));
+  // SVG y grows downward, so the fastest lap has the LARGEST y.
+  assert.equal(trace.dots[fastestIndex]!.y, Math.max(...ys), "15.114 is the bottom of the trace");
+  assert.ok(trace.dots[fastestIndex]!.flag === "best");
 });
 
-test("slower than the field reads as a positive one", () => {
-  const card = build("headline", { pace: true }, { paceVsFieldSeconds: 0.211 });
-  assert.equal(card.pace?.value, "+0.211");
-  assert.equal(card.pace?.faster, false);
+test("the trace stays inside its own box", () => {
+  const trace = build("report").trace!;
+  for (const d of trace.dots) {
+    assert.ok(d.x >= 72 && d.x <= 948, `x ${d.x} is inside the plot area`);
+    assert.ok(d.y >= 24 && d.y <= 256, `y ${d.y} is inside the plot area`);
+  }
+  assert.equal(trace.gridlines.length, 3);
+  assert.ok(trace.xLabels.length > 0);
 });
 
-test("no field comparison means no fifth tile, even with the chip on", () => {
-  const card = build("headline", { pace: true }, { paceVsFieldSeconds: null });
-  assert.equal(card.pace, null);
+test("a lap well off clean pace pins to the top edge as a clamped point", () => {
+  const card = buildShareRunCard({
+    run: run({ lapTimes: [...LAPS, 22.4] }),
+    style: "report",
+    sections: allSectionsOn(),
+    dateTimeLabel: "9 Aug 2026, 10:42",
+  });
+  const clamped = card.trace!.dots.filter((d) => d.clamped);
+  assert.equal(clamped.length, 1, "22.4 is past best × 1.15");
+});
+
+test("two laps are not a trace", () => {
+  const card = buildShareRunCard({
+    run: run({ lapTimes: [15.1, 15.3] }),
+    style: "report",
+    sections: allSectionsOn(),
+    dateTimeLabel: "9 Aug 2026, 10:42",
+  });
+  assert.equal(card.trace, null);
+});
+
+// --------------------------------------------------------------------------
+// How the car felt — a read-back of the capture controls, bands from the shared source
+// --------------------------------------------------------------------------
+
+test("the rating bands come from CAR_RATING_BANDS, with the driver's number lit", () => {
+  const feel = build("report").feel!;
+  assert.deepEqual(
+    feel.bands.map((b) => b.caption),
+    ["Bad", "Workable", "Good", "Dialled"]
+  );
+  assert.equal(feel.rating, 7);
+  assert.equal(feel.bandCaption, "Good");
+  assert.deepEqual(
+    feel.bands.filter((b) => b.active).map((b) => b.caption),
+    ["Good"]
+  );
+});
+
+test("only answered corner phases are drawn, and neutral is one of the answers", () => {
+  const feel = build("report").feel!;
+  assert.deepEqual(
+    feel.balance!.map((b) => [b.label, b.value]),
+    [
+      ["Entry", -2],
+      ["Mid", 0],
+    ]
+  );
+});
+
+test("unflagged notables are kept — they are what was considered and dismissed", () => {
+  const feel = build("report").feel!;
+  assert.equal(feel.notables.length, 6, "five axes, and steering feel has two poles");
+  const flagged = feel.notables.filter((n) => n.severity != null);
+  assert.deepEqual(flagged, [{ label: "Snaps on power", severity: 1 }]);
+});
+
+test("a run with nothing answered draws no felt block at all", () => {
+  const card = buildShareRunCard({
+    run: run({ carRating: null, handlingAssessmentJson: null }),
+    style: "report",
+    sections: allSectionsOn(),
+    dateTimeLabel: "9 Aug 2026, 10:42",
+  });
+  assert.equal(card.feel, null);
 });
 
 // --------------------------------------------------------------------------
 // Setup diff
 // --------------------------------------------------------------------------
 
-test("setup diff is what changed since the previous run, old value first", () => {
+test("setup diff is what changed since the previous run, new value first", () => {
   const card = build(
-    "full",
+    "report",
     {},
     {
       setupData: { camber_front: "-1.5", ride_height_rear: "5.5" },
@@ -217,7 +319,19 @@ test("setup diff is what changed since the previous run, old value first", () =>
 });
 
 test("no previous run means no diff block rather than an empty one", () => {
-  const card = build("full", {}, { setupData: { camber_front: "-1.5" } });
+  const card = build("report", {}, { setupData: { camber_front: "-1.5" } });
+  assert.equal(card.changed, null);
+});
+
+test("the setup chip off means the diff is never even asked for", () => {
+  const card = build(
+    "report",
+    { setup: false },
+    {
+      setupData: { ride_height_rear: "5.5" },
+      previousSetupData: { ride_height_rear: "5.0" },
+    }
+  );
   assert.equal(card.changed, null);
 });
 
@@ -235,35 +349,47 @@ test("laps alone, or a setup alone, is enough", () => {
 });
 
 // --------------------------------------------------------------------------
-// Section round-trip
+// Query-string round trip
 // --------------------------------------------------------------------------
 
 test("sections survive the round trip through the query string", () => {
-  const sections = { pace: true, laps: false, graph: true, notes: true };
+  const sections: ShareSections = {
+    details: true,
+    laps: false,
+    graph: true,
+    setup: false,
+    notes: true,
+    feel: true,
+  };
   assert.deepEqual(parseSectionsParam(serializeSections(sections)), sections);
 });
 
 test("an unknown section name is ignored, not an error", () => {
   assert.deepEqual(parseSectionsParam("laps,telemetry"), {
-    pace: false,
+    details: false,
     laps: true,
     graph: false,
+    setup: false,
     notes: false,
+    feel: false,
   });
 });
 
-test("full run defaults everything on, headline defaults everything off", () => {
-  assert.deepEqual(defaultSectionsForMode("full"), {
-    pace: false,
+test("the style defaults to hero and only 'report' moves it", () => {
+  assert.equal(parseCardStyle(null), "hero");
+  assert.equal(parseCardStyle("nonsense"), "hero");
+  assert.equal(parseCardStyle("hero"), "hero");
+  assert.equal(parseCardStyle("report"), "report");
+});
+
+test("everything on is everything on", () => {
+  assert.deepEqual(allSectionsOn(), {
+    details: true,
     laps: true,
     graph: true,
+    setup: true,
     notes: true,
-  });
-  assert.deepEqual(defaultSectionsForMode("headline"), {
-    pace: false,
-    laps: false,
-    graph: false,
-    notes: false,
+    feel: true,
   });
 });
 
@@ -272,30 +398,66 @@ test("full run defaults everything on, headline defaults everything off", () => 
 // --------------------------------------------------------------------------
 
 test("every section that is added makes the card taller", () => {
-  const headline = build("headline").height;
-  const withPace = build("headline", { pace: true }, { paceVsFieldSeconds: -0.184 }).height;
-  const withLaps = build("headline", { laps: true }).height;
-  const full = build("full").height;
+  const bare: ShareSections = {
+    details: false,
+    laps: false,
+    graph: false,
+    setup: false,
+    notes: false,
+    feel: false,
+  };
+  const base = buildShareRunCard({
+    run: run(),
+    style: "hero",
+    sections: bare,
+    dateTimeLabel: "9 Aug 2026, 10:42",
+  }).height;
 
-  assert.ok(withPace > headline, "the fifth tile takes a row");
-  assert.ok(withLaps > headline, "nineteen laps take several");
-  assert.ok(full > withLaps, "and the full run is taller than any single addition");
+  for (const key of ["laps", "graph", "notes", "feel"] as const) {
+    const withOne = buildShareRunCard({
+      run: run(),
+      style: "hero",
+      sections: { ...bare, [key]: true },
+      dateTimeLabel: "9 Aug 2026, 10:42",
+    }).height;
+    assert.ok(withOne > base, `${key} takes room on the card`);
+  }
+
+  const all = build("hero").height;
+  assert.ok(all > base, "and everything together is taller than any one of them");
+});
+
+test("a report is taller than a hero of the same run — it says more", () => {
+  assert.ok(build("report").height > build("hero").height);
 });
 
 test("longer notes make the card taller, so the text can't run off the bottom", () => {
-  const short = build("full").height;
+  const short = build("report").height;
   const long = buildShareRunCard({
     run: run({ notes: "x ".repeat(600) }),
-    mode: "full",
-    sections: defaultSectionsForMode("full"),
+    style: "report",
+    sections: allSectionsOn(),
     dateTimeLabel: "9 Aug 2026, 10:42",
   }).height;
   assert.ok(long > short + 400, `expected a lot more room, got ${long - short}px`);
 });
 
+test("more laps make the card taller — every lap chip has to fit", () => {
+  const short = build("report").height;
+  const long = buildShareRunCard({
+    run: run({ lapTimes: [...LAPS, ...LAPS] }),
+    style: "report",
+    sections: allSectionsOn(),
+    dateTimeLabel: "9 Aug 2026, 10:42",
+  }).height;
+  assert.ok(long > short, "38 laps take more chip rows than 19");
+});
+
 test("the height is the estimator's, not something the builder invented", () => {
-  const card = build("full");
-  assert.equal(card.height, estimateCardHeight(card));
+  for (const style of ["hero", "report"] as const) {
+    const card = build(style);
+    assert.equal(card.height, estimateCardHeight(card));
+  }
 });
 
 test("wrapping counts a hard newline as its own line", () => {

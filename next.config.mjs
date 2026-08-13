@@ -62,6 +62,10 @@ const nextConfig = {
     // "Cannot load @napi-rs/canvas … ReferenceError: DOMMatrix is not defined". Local `next build`
     // cannot catch it — check the route's own `.nft.json` after building.
     "/api/setup-snapshots/**": RASTER_NATIVE_FILES,
+    // The run card's own fonts (Sora / JetBrains Mono / Space Grotesk). `shareFonts.ts` reads them
+    // with `readFileSync`, which the tracer cannot follow — same failure mode as the rasterizers
+    // above, and it would only show up on Vercel. Satori cannot use the app's `next/font` woff2.
+    "/api/runs/**": ["./src/lib/share/fonts/*.ttf"],
   },
   // The landing page is the Claude Design artifact served verbatim from `public/landing/` —
   // founder call 2026-08-06, to keep the design exact rather than re-implement its scroll

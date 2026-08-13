@@ -45,6 +45,7 @@ export function SegmentedControl<T extends string>({
   ariaLabel,
   size = "md",
   className,
+  segmentClassName,
 }: {
   options: ReadonlyArray<SegmentedOption<T>>;
   value: T;
@@ -52,6 +53,8 @@ export function SegmentedControl<T extends string>({
   ariaLabel?: string;
   size?: "sm" | "md";
   className?: string;
+  /** Per-call-site padding / text size. Style stays identical; only the size may differ. */
+  segmentClassName?: string;
 }) {
   const activeIndex = Math.max(
     0,
@@ -114,7 +117,8 @@ export function SegmentedControl<T extends string>({
                 ? "bg-foreground font-semibold text-background shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
                 : "font-medium text-muted-foreground hover:text-foreground",
               // A "hint" segment that is inactive reads fainter, still tappable.
-              !active && opt.muted && "text-muted-foreground/45 hover:text-muted-foreground/45"
+              !active && opt.muted && "text-muted-foreground/45 hover:text-muted-foreground/45",
+              segmentClassName
             )}
           >
             {opt.icon ? (

@@ -111,6 +111,8 @@
     "test:nav": "node --import tsx --test src/components/layout/navConfig.test.ts",
     "test:teams": "node --import tsx --test src/lib/teams/teamInviteRules.test.ts",
     "test:share": "node --import tsx --test src/lib/share/shareCardModel.test.ts",
+    "test:share-fit": "node --conditions=react-server --import tsx scripts/dev-share-card-fit.ts",
+    "share:shots": "node --conditions=react-server --import tsx scripts/dev-share-card-shot.ts",
     "test:extract-normalize": "npx tsx src/lib/setupExtractAi/normalizeExtractedValue.test.ts",
     "test:auth-access-code": "npx tsx src/lib/auth/signupAccessCode.test.ts",
     "test:ai-usage": "npx tsx src/lib/aiUsage/budgets.test.ts",
