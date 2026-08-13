@@ -248,15 +248,23 @@ export const NAV_SETTINGS = SETTINGS;
  *
  * Analysis points at the workbench here (see `ANALYSIS_DESKTOP`). Tools is on this
  * list and not in the dock; the phone reaches it through `More`.
+ *
+ * Ordered daily-loop first, then the places you visit around it (founder call
+ * 2026-08-13): Dashboard → Analysis → Engineer → Teams are the four the dock also
+ * carries, in the dock's own order, so the two platforms read the same left to
+ * right; Events, Garage and Tools follow in the order `/more` lists them. Tools
+ * sits last because it is the only tab that opens a menu rather than going
+ * somewhere (`ToolsNavMenu`) — its panel hangs off the end of the row, clear of
+ * the tabs beside it.
  */
 export const DESKTOP_NAV: PrimaryNavItem[] = [
   DASHBOARD,
   ANALYSIS_DESKTOP,
-  EVENTS,
   ENGINEER,
+  TEAMS,
+  EVENTS,
   ASSETS,
   TOOLS,
-  TEAMS,
 ];
 
 /**
@@ -345,7 +353,7 @@ export const ANALYSIS_HUB_LINKS: NavHubLink[] = [
   },
   {
     href: "/analysis/roll-center",
-    label: "Roll Center Lab",
+    label: "Geometry Lab",
     description: "What-if suspension geometry — shims, roll, RC migration.",
     icon: "flask",
   },
@@ -365,7 +373,7 @@ export const TOOLS_HUB_LINKS: NavHubLink[] = [
   },
   {
     href: "/analysis/roll-center",
-    label: "Roll Center Lab",
+    label: "Geometry Lab",
     description: "What-if suspension geometry — shims, roll, RC migration.",
     icon: "flask",
   },

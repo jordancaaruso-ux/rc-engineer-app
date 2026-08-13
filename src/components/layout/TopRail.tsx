@@ -17,6 +17,7 @@ import {
 import { openIdeasPanel } from "@/components/layout/IdeasEdgeTab";
 import { PrimaryNavLink } from "@/components/layout/PrimaryNavLink";
 import { usePrimaryNav } from "@/components/layout/PrimaryNavProvider";
+import { ToolsNavMenu } from "@/components/layout/ToolsNavMenu";
 import { useTodayDraftRun } from "@/components/layout/TodayDraftRunProvider";
 import { haptic } from "@/lib/haptics";
 import { warmNewRunForm } from "@/lib/runs/warmNewRunForm";
@@ -119,6 +120,16 @@ export const TopRail = memo(function TopRail() {
             const active = activeId === item.id;
             const Icon = item.icon;
 
+            /*
+             * Tools is the one tab that opens rather than goes (2026-08-13): its
+             * destination was a page holding nothing but three links, which the
+             * rail has the width to show itself. `/tools` still exists for the
+             * phone, which reaches it through `More`.
+             */
+            if (item.id === "tools") {
+              return <ToolsNavMenu key={item.id} active={active} />;
+            }
+
             return (
               <PrimaryNavLink
                 key={item.id}
@@ -144,13 +155,17 @@ export const TopRail = memo(function TopRail() {
         </nav>
 
         <div className="top-rail-cluster">
+          {/* Labelled, unlike the gear beside it: a lightbulb alone reads as
+              "tips" or "hints", and the panel it opens is the driver's own
+              scratchpad. Settings needs no word — a gear is a gear. */}
           <button
             type="button"
             onClick={() => openIdeasPanel()}
             aria-label="Ideas and reminders"
-            className="tap-active top-rail-utility"
+            className="tap-active top-rail-utility has-label"
           >
             <Lightbulb size={18} weight="fill" aria-hidden />
+            <span>Ideas</span>
           </button>
 
           <span className="top-rail-divider" aria-hidden />

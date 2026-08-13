@@ -116,7 +116,7 @@ export const IconAddRun = ({ size = 24, ...props }: IconProps) => (
 /**
  * Tools — a toolbox. Deliberately not a wrench (that already means "setup changed
  * on this run" on the trend chart and Sessions rows), not sliders (Settings), and
- * not a flask (the Roll Center Lab's own door). A first pass used dividers and
+ * not a flask (the Geometry Lab's own door). A first pass used dividers and
  * read as a walking figure at 24px, which is the wrong idea entirely two rows
  * above Teams.
  */

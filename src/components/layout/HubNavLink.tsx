@@ -2,39 +2,12 @@
 
 import { useRef, type PointerEvent as ReactPointerEvent } from "react";
 import Link from "next/link";
-import type { LucideIcon } from "lucide-react";
-import {
-  Calendar,
-  Car,
-  ChevronRight,
-  CircleDot,
-  Disc,
-  FlaskConical,
-  GitCompare,
-  History,
-  Layers,
-  MapPin,
-  Video,
-  Wrench,
-} from "lucide-react";
-import type { NavHubIconKey, NavHubLink } from "@/components/layout/navConfig";
+import { ChevronRight } from "lucide-react";
+import type { NavHubLink } from "@/components/layout/navConfig";
+import { HUB_ICON_MAP } from "@/components/layout/hubIcons";
 import { useRouteTransition } from "@/components/layout/RouteTransitionProvider";
 import { HubRowTitle } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
-
-const HUB_ICON_MAP: Record<NavHubIconKey, LucideIcon> = {
-  car: Car,
-  disc: Disc,
-  layers: Layers,
-  "map-pin": MapPin,
-  "circle-dot": CircleDot,
-  flask: FlaskConical,
-  calendar: Calendar,
-  history: History,
-  video: Video,
-  "git-compare": GitCompare,
-  wrench: Wrench,
-};
 
 /** Past this many px of movement, the gesture is a scroll, not a tap. */
 const SCROLL_CANCEL_THRESHOLD_PX = 10;

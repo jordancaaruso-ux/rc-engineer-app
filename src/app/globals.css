@@ -823,6 +823,15 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
   font-weight: 700;
 }
 
+/* Tools opens a menu instead of going somewhere (`ToolsNavMenu`, 2026-08-13) —
+   it is the same `.top-rail-item` as every other tab, plus this arrowhead.
+   The "this drops down" tell. Muted even when the tab is lit — the label is the
+   thing being read, and a yellow arrowhead at 11px reads as a second signal. */
+.top-rail-caret {
+  margin-left: -2px;
+  color: rgb(var(--color-muted-foreground));
+}
+
 /*
  * The tick's carriage. Measured and driven by transform from `TopRail` — tab
  * widths vary with label length, so an index cannot place this (the dock can,
@@ -865,6 +874,18 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
   color: rgb(var(--color-muted-foreground));
   transition-property: background-color, color;
   transition-duration: 150ms;
+}
+
+/* Ideas carries its word (2026-08-13). Square-icon geometry above; here the
+   button grows a label, so it needs the tab's horizontal padding and gap. */
+.top-rail-utility.has-label {
+  width: auto;
+  gap: 7px;
+  padding: 0 11px;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
 .top-rail-utility:hover {
@@ -1788,7 +1809,7 @@ html[data-nav-pending] .page {
 }
 
 /* ---------------------------------------------------------------------------
-   Roll Centre Lab desktop shell (2026-08-13). Third page on the 1760px axis.
+   Geometry Lab desktop shell (2026-08-13). Third page on the 1760px axis.
 
    The Lab was a 672px phone column at every width, so on a desktop you turned a
    shim knob at the bottom of the page and had to scroll up to see the schematic

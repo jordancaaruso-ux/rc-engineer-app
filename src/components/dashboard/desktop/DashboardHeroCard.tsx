@@ -62,7 +62,14 @@ export function DashboardHeroCard({
         .join(" · ")
     : [recentRun?.carName, hero.trackName, hero.anchorLabel].filter(Boolean).join(" · ");
 
-  const doorHref = isTrackDay ? "/runs/history?expandLatest=1" : "/analysis";
+  /*
+   * Both doors land on the Sessions workbench, never `/analysis` (2026-08-13).
+   * This card is desktop-only, and on desktop `/analysis` is the phone's stacked
+   * card hub — the rail's own Analysis tab goes to `/runs/history` for exactly
+   * that reason (see `ANALYSIS_DESKTOP`). Sending the hero somewhere the tab
+   * above it refuses to go dropped you into the small-screen layout mid-page.
+   */
+  const doorHref = isTrackDay ? "/runs/history?expandLatest=1" : "/runs/history";
   const doorLabel = isTrackDay ? "Open in Sessions" : "Open Analysis";
   const lapLabel = isTrackDay ? "Best lap today" : "Best lap · last run";
 

@@ -31,7 +31,13 @@ test("mobile dock is five cells ending in More, without add-run or settings", ()
 test("the desktop rail is seven destinations; add-run and settings are utilities", () => {
   assert.deepEqual(
     DESKTOP_NAV.map((item) => item.id),
-    ["dashboard", "analysis", "events", "engineer", "assets", "tools", "teams"]
+    ["dashboard", "analysis", "engineer", "teams", "events", "assets", "tools"]
+  );
+  // The dock's four destinations lead, in the dock's order, so the rail and the
+  // dock read the same left to right (founder call 2026-08-13).
+  assert.deepEqual(
+    DESKTOP_NAV.slice(0, 4).map((item) => item.id),
+    MOBILE_NAV.filter((item) => item.id !== "more").map((item) => item.id)
   );
   // Both left the destination list for the rail's right-hand cluster — but they are
   // still defined here, so the cluster cannot drift from the nav.

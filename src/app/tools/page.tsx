@@ -4,7 +4,7 @@ import { NavHubPage } from "@/components/layout/NavHubPage";
 import { TOOLS_HUB_LINKS } from "@/components/layout/navConfig";
 
 /**
- * Tools — setup comparison, the roll-centre lab, and video analysis.
+ * Tools — setup comparison, the Geometry Lab, and video analysis.
  *
  * Split out of the Analysis hub when desktop Analysis moved to the Sessions
  * workbench (`ANALYSIS_DESKTOP`): these are destinations you open deliberately,

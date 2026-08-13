@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
  *
  * ── The Sessions door, 2026-08-09 ────────────────────────────────────────────
  * This card carries the ONLY way into Sessions from `/analysis` on a phone: the
- * hub's door tiles are filtered down to Setup comparison and Roll Center Lab
+ * hub's door tiles are filtered down to Setup comparison and Geometry Lab
  * (`src/app/analysis/page.tsx`), so the Sessions entry in `ANALYSIS_HUB_LINKS`
  * never renders, and the mobile dock's Analysis tab is `/analysis` — only the
  * desktop sidebar points straight at `/runs/history`. It used to be one 12.5px
