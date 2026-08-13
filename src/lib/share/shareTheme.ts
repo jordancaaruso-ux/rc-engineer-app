@@ -52,25 +52,9 @@ export const SHARE_DARK = {
   bar: "#3A3836",
 } as const;
 
-/**
- * Light — used ONLY for the strip stamped along the bottom of a rendered setup sheet.
- *
- * That sheet is a photograph of the driver's own paper and cannot be themed, so the footer has to
- * work on white. Values are `[data-theme="light"]` from globals.css.
+/*
+ * There is no light palette here. There was one, for a brand strip stamped under a rendered setup
+ * sheet; the founder took that footer off the setup (2026-08-13), so a shared sheet is now the
+ * driver's own page untouched and nothing the app draws is ever light. If a light surface is ever
+ * needed again, take the values from `[data-theme="light"]` in globals.css — not from a mockup.
  */
-export const SHARE_LIGHT = {
-  /** `--background` */
-  bg: "#F4F1EA",
-  /** `--surface` */
-  surface: "#FCFBF8",
-  /** `--foreground` */
-  ink: "#191815",
-  /** `--muted-fg` */
-  mut: "#6B675F",
-  /** `--faint` */
-  faint: "#9A958B",
-  /** `--border` */
-  line: "#DDD8CE",
-  /** `--primary` — same yellow on both grounds. */
-  primary: "#FFD60A",
-} as const;

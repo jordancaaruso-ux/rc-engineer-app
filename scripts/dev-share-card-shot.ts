@@ -13,8 +13,6 @@
 
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import sharp from "sharp";
-import { stampFooter } from "@/lib/share/renderSetupImage";
 import {
   buildShareRunCard,
   defaultSectionsForMode,
@@ -84,25 +82,11 @@ async function shoot(name: string, mode: "headline" | "full", overrides = {}, ou
   console.log(`${name}: ${card.height}px tall, ${(bytes.length / 1024).toFixed(0)} KB → ${file}`);
 }
 
-/**
- * The setup path's good branch needs a snapshot with a PDF template AND a calibration, which no
- * demo account has — so the composite is proved here against a stand-in page instead. What this
- * checks is the part that is new: sharp extending the canvas and pasting a footer drawn by
- * `next/og`. Everything above it (snapshot → filled PDF → PNG) is already-shipped code.
+/*
+ * There is no setup shot here on purpose. A setup share is now the driver's own PDF page,
+ * resized and otherwise untouched — nothing this script could draw would be that page, so a
+ * stand-in would only prove sharp can resize. Look at a real one through the route instead.
  */
-async function shootSetupFooter(outDir: string) {
-  const page = await sharp({
-    create: { width: 1190, height: 1683, channels: 3, background: "#FBFAF7" },
-  })
-    .png()
-    .toBuffer();
-
-  const stamped = await stampFooter(page);
-  const meta = await sharp(stamped).metadata();
-  const file = path.join(outDir, "setup-footer.png");
-  await writeFile(file, stamped);
-  console.log(`setup-footer: ${meta.width}×${meta.height} → ${file}`);
-}
 
 async function main() {
   const outDir = process.argv[2] ?? path.join(process.cwd(), "share-shots");
@@ -116,7 +100,6 @@ async function main() {
     outDir
   );
   await shoot("full", "full", {}, outDir);
-  await shootSetupFooter(outDir);
 }
 
 void main();
