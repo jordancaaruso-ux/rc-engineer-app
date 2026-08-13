@@ -57,16 +57,6 @@ export const APP_SETTING_KEYS = {
   onboardingSkippedSteps: "onboardingSkippedSteps",
   /** ISO timestamp they tapped Ignore on the dashboard resume card — it never returns. */
   onboardingResumeDismissedAt: "onboardingResumeDismissedAt",
-  /**
-   * Engineer lab rungs (see `lib/engineerChat/lab/`). "1" = on. Admin-only, default off, and
-   * off means the account gets exactly the shipped Engineer — these keys are the only way any
-   * extra context reaches the model.
-   *
-   * Per-user on purpose: adding a second admin gives them the toggles, not the behaviour.
-   */
-  engineerLabSetupSheet: "engineerLabSetupSheet",
-  engineerLabSessionFacts: "engineerLabSessionFacts",
-  engineerLabComparableRuns: "engineerLabComparableRuns",
 } as const;
 
 export type AppSettingKey = (typeof APP_SETTING_KEYS)[keyof typeof APP_SETTING_KEYS];

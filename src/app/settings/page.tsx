@@ -17,8 +17,6 @@ import { SettingsNavSection } from "@/components/settings/SettingsNavSection";
 import { DeleteAccountRow } from "@/components/settings/DeleteAccountRow";
 import { OnboardingResetSection } from "@/components/settings/OnboardingResetSection";
 import { AllowlistAdminSection } from "@/components/settings/AllowlistAdminSection";
-import { EngineerFeedbackAdminSection } from "@/components/settings/EngineerFeedbackAdminSection";
-import { EngineerLabSection } from "@/components/settings/EngineerLabSection";
 import { ManufacturerBaselineAdminSection } from "@/components/settings/ManufacturerBaselineAdminSection";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -118,13 +116,9 @@ export default async function SettingsPage() {
                 Admin
               </summary>
               <div className="mt-2">
-                <EngineerLabSection />
                 <OnboardingResetSection />
                 <AllowlistAdminSection />
                 <ManufacturerBaselineAdminSection />
-                {/* Gold-set admin section unplugged 2026-07-30 (founder call) — founder reviews
-                    via in-app ratings + notes; component kept for easy revival. */}
-                <EngineerFeedbackAdminSection />
               </div>
             </details>
           ) : null}
