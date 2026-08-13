@@ -167,6 +167,48 @@ export function formatRunPickerWhenSegment(run: RunPickerRun): string {
 }
 
 /**
+ * Same facts as {@link formatRunPickerLine}, split across two lines for pickers
+ * narrow enough that one line would be clipped (the Geometry Lab at 390px).
+ * `title` answers "which session", `detail` answers "which car, where, how fast".
+ *
+ * Two differences from the one-line form, both because the parts are laid out in
+ * a grid rather than run together:
+ *  - missing track/car are dropped rather than rendered as “—”;
+ *  - the date is NEVER in the title. The one-line form leads with `Testing <date>`
+ *    because it has nowhere else to put it; here `when` is its own column, and
+ *    printing the date twice pushed every unlabelled testing row onto three lines.
+ */
+export type RunPickerParts = { title: string; detail: string; when: string };
+
+export function formatRunPickerParts(
+  run: RunPickerRun & { userId?: string | null },
+  memberDisplayByUserId?: Record<string, string> | null
+): RunPickerParts {
+  const driver = run.userId?.trim()
+    ? memberDisplayByUserId?.[run.userId.trim()]?.trim()
+    : undefined;
+  const eventName = run.event?.name?.trim() || (run.eventId ? "Event" : null);
+  const label = run.sessionLabel?.trim();
+  const head = eventName
+    ? `${eventName} · ${formatRunPickerRunTypeSegment(run)}`
+    : run.sessionType === "TESTING"
+      ? label
+        ? `Testing · ${label}`
+        : "Testing"
+      : formatRunPickerRunTypeSegment(run);
+  const track = run.track?.name ?? run.trackNameSnapshot ?? null;
+  const car = run.car?.name ?? run.carNameSnapshot ?? null;
+  const lap = pickerBestLap(run);
+  return {
+    title: driver ? `${driver} · ${head}` : head,
+    detail: [track, car, lap != null ? formatLap(lap) : null]
+      .filter((p): p is string => Boolean(p?.trim()))
+      .join(" · "),
+    when: formatRunPickerWhenSegment(run),
+  };
+}
+
+/**
  * Load-setup control + New Run picker (same scan order as {@link formatRunPickerLine}; name kept for call sites).
  */
 export function formatRunPickerLineRelativeWhen(run: RunPickerRun): string {
