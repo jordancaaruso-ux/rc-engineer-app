@@ -18,6 +18,8 @@
  * decided where the box's drawn height is actually known.
  */
 
+import { zapfMarkForCharacter, type ZapfMarkPlacement } from "@/lib/setupDocuments/zapfDingbatMarks";
+
 export type PdfTextAlignment = "left" | "center" | "right";
 
 export type PdfFieldAppearance = {
@@ -272,4 +274,213 @@ export const DEFAULT_CHECK_MARK = "✔";
 export function checkMarkForCaption(caption: string | undefined | null): string {
   if (!caption) return DEFAULT_CHECK_MARK;
   return DINGBAT_MARKS[caption.trim()] ?? DEFAULT_CHECK_MARK;
+}
+
+/**
+ * Where a tick box's ON picture puts its mark, read out of the picture itself.
+ *
+ * WHY THE CAPTION IS NOT ENOUGH. `/MK /CA` names the mark and says nothing about how big it is or
+ * where it goes, so the app sized every mark to the box and centred it. That is not what the sheet
+ * does. Measured across the three repo blanks (2026-08-14, 419 tick widgets): the A800RR draws a
+ * 14pt glyph inside a 12.3pt box and lets a clip window cut the overflowing corner off, and its
+ * shock-position boxes draw a 75pt glyph clipped to a 4.8pt-wide slot — which is why a "square"
+ * mark prints there as a tall bar. Centring a box-sized glyph gets all three wrong.
+ *
+ * The picture is a content stream, so everything needed is stated in it: `Tf` the size, `Td` the
+ * baseline, `re W n` the clip. Operands come before their operator, and `Td` is RELATIVE, so the
+ * offsets add up — the Mugen blank writes `0.6241 1.6788 Td … 0 0 Td` and means the first one.
+ * `Tm` sets the position outright and therefore restarts the sum.
+ *
+ * Returns undefined for a picture that states no glyph or an auto size, because there is then
+ * nothing to place and the caller's own sizing is the honest answer.
+ */
+export function markPlacementFromAppearanceStream(input: {
+  stream: string | undefined | null;
+  /** The picture's `/BBox`, or the widget's rectangle when it declares none. */
+  boxWidth: number;
+  boxHeight: number;
+}): ZapfMarkPlacement | undefined {
+  const { stream, boxWidth, boxHeight } = input;
+  if (!stream || !(boxWidth > 0) || !(boxHeight > 0)) return undefined;
+
+  const tokens = stream.split(/[\s\n\r]+/);
+  const num = (i: number, back: number) => Number(tokens[i - back]);
+
+  let size: number | undefined;
+  let x = 0;
+  let y = 0;
+  let clip: [number, number, number, number] | undefined;
+
+  for (let i = 0; i < tokens.length; i++) {
+    const op = tokens[i];
+    if (op === "Tf" && i >= 2) {
+      const s = num(i, 1);
+      if (Number.isFinite(s)) size = s;
+      continue;
+    }
+    // `Td` and `TD` both move to the start of the next line, by an offset from the current one.
+    if ((op === "Td" || op === "TD") && i >= 2) {
+      const dx = num(i, 2);
+      const dy = num(i, 1);
+      if (Number.isFinite(dx) && Number.isFinite(dy)) {
+        x += dx;
+        y += dy;
+      }
+      continue;
+    }
+    // `Tm` replaces the matrix outright; its last two operands are the position.
+    if (op === "Tm" && i >= 6) {
+      const tx = num(i, 2);
+      const ty = num(i, 1);
+      if (Number.isFinite(tx) && Number.isFinite(ty)) {
+        x = tx;
+        y = ty;
+      }
+      continue;
+    }
+    // The clip window: `x y w h re W n`. Only a rectangle that is actually clipped with counts.
+    if (op === "re" && i >= 4 && tokens[i + 1] === "W") {
+      const r: number[] = [num(i, 4), num(i, 3), num(i, 2), num(i, 1)];
+      if (r.every(Number.isFinite) && r[2]! > 0 && r[3]! > 0) {
+        clip = [r[0]!, r[1]!, r[2]!, r[3]!];
+      }
+      continue;
+    }
+  }
+
+  const box = { boxWidth, boxHeight, ...(clip ? { clip } : {}) };
+
+  const glyph = zapfMarkForCharacter(drawnGlyphCharacter(stream));
+  // `0 Tf` is "size it to the box", a decision the viewer makes that this cannot reproduce.
+  if (glyph && size && size > 0) {
+    return { ...box, kind: "glyph", glyph, size, x, y };
+  }
+
+  const d = markPathFromAppearanceStream(stream);
+  if (d) return { ...box, kind: "path", d };
+
+  return undefined;
+}
+
+/**
+ * The outline a tick box draws for itself, as SVG path data in the box's own points.
+ *
+ * WHY THIS EXISTS AT ALL. Not every sheet spells its tick as a character. 3,924 of the 13,694 tick
+ * boxes measured across the repo blanks and 25 real driver uploads draw the mark curve by curve
+ * instead, with no font in the picture — and the A800RR in production does BOTH, 90 boxes as text
+ * and 77 as outlines, which is why half of its ticks came out as a fallback until this was written.
+ *
+ * The vocabulary those streams use is tiny and, measured over all 3,924, closed: `m` `l` `c` and
+ * `f`, wrapped in `q`/`Q` pairs that never carry a `cm` — so there is no transform stack to keep,
+ * and the operators map one for one onto SVG's `M` `L` `C` and an implicit close. Anything outside
+ * that set is refused rather than half-drawn: `undefined` costs the box its exact outline and falls
+ * back to the mark it names, which is where this started and is never worse.
+ *
+ * Coordinates stay in PDF space (y up). The renderer flips once, for the whole mark.
+ */
+export function markPathFromAppearanceStream(stream: string | undefined | null): string | undefined {
+  if (!stream) return undefined;
+  const tokens = stream.split(/[\s\n\r]+/).filter(Boolean);
+  const operands: number[] = [];
+  const parts: string[] = [];
+  let painted = false;
+
+  const round = (n: number) => Number(n.toFixed(3));
+
+  for (const token of tokens) {
+    const asNumber = Number(token);
+    if (Number.isFinite(asNumber) && /^[-+.\d]/.test(token)) {
+      operands.push(asNumber);
+      continue;
+    }
+    // Names and arrays are operands too — `/GS0 gs`, `[] 0 d`. They carry no geometry, and they
+    // must not clear what the numbers before them are for.
+    if (/^[/[\]]/.test(token)) continue;
+    switch (token) {
+      case "m":
+        if (operands.length < 2) return undefined;
+        parts.push(`M${round(operands.at(-2)!)} ${round(operands.at(-1)!)}`);
+        break;
+      case "l":
+        if (operands.length < 2) return undefined;
+        parts.push(`L${round(operands.at(-2)!)} ${round(operands.at(-1)!)}`);
+        break;
+      case "c": {
+        if (operands.length < 6) return undefined;
+        const c = operands.slice(-6).map(round);
+        parts.push(`C${c[0]} ${c[1]} ${c[2]} ${c[3]} ${c[4]} ${c[5]}`);
+        break;
+      }
+      case "h":
+        parts.push("Z");
+        break;
+      case "re": {
+        if (operands.length < 4) return undefined;
+        const [x, y, w, h] = operands.slice(-4).map(round);
+        parts.push(`M${x} ${y}L${x! + w!} ${y}L${x! + w!} ${y! + h!}L${x} ${y! + h!}Z`);
+        break;
+      }
+      // `f` closes every subpath and fills with the non-zero rule, which is SVG's default.
+      case "f":
+      case "F":
+      case "f*":
+        painted = true;
+        parts.push("Z");
+        break;
+      // Colour, graphics state and the empty save/restore pairs these streams open with: no effect
+      // on the shape, and the colour is read separately by `markColorFromAppearanceStream`.
+      case "q":
+      case "Q":
+      case "n":
+      case "W":
+      case "W*":
+      case "rg":
+      case "g":
+      case "k":
+      case "RG":
+      case "G":
+      case "K":
+      case "w":
+      case "d":
+      case "i":
+      case "j":
+      case "J":
+      case "M":
+      case "gs":
+      case "cs":
+      case "CS":
+      case "sc":
+      case "scn":
+      case "SC":
+      case "SCN":
+        break;
+      default:
+        // An operator this has never seen could mean anything — a transform, a nested form, text.
+        // Drawing what is understood and ignoring the rest would put a wrong mark on the paper.
+        return undefined;
+    }
+    operands.length = 0;
+  }
+
+  if (!painted || parts.length === 0) return undefined;
+  return parts.join("");
+}
+
+/**
+ * The character the picture actually draws — `(4) Tj`.
+ *
+ * Asked of the picture rather than of `/MK /CA` because the picture is what a viewer paints. The
+ * caption is a note about what the box is FOR; a sheet whose two disagree draws what the picture
+ * says, and a sheet whose caption is missing or is a style this app has never seen still draws
+ * something, instead of quietly falling back to a check mark.
+ */
+export function drawnGlyphCharacter(stream: string | undefined | null): string | undefined {
+  if (!stream) return undefined;
+  let last: string | undefined;
+  // A literal string, then `Tj`. `\(` and `\)` are escaped inside, so they cannot end it early.
+  for (const m of stream.matchAll(/\(((?:\\.|[^\\()])*)\)\s*Tj/g)) {
+    const text = (m[1] ?? "").replace(/\\(.)/g, "$1");
+    if (text) last = text;
+  }
+  return last;
 }

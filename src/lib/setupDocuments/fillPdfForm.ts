@@ -12,6 +12,7 @@ import {
   StandardFonts,
 } from "pdf-lib";
 import { acroFieldTypeName, orderedFieldWidgets } from "@/lib/setupDocuments/pdfFormFields";
+import { parseDefaultAppearance, parsePdfFontName } from "@/lib/setupDocuments/pdfFieldAppearance";
 
 /**
  * Write a driver's answers back into the manufacturer's own blank, so what comes out is their
@@ -50,30 +51,85 @@ export type PdfFillResult = {
 const OFF = PDFName.of("Off");
 
 /**
- * Draw every text value into the file with a standard font, for readers that show only what is
- * already drawn.
+ * The nearest of the fourteen fonts every PDF reader must have, to a font this sheet names.
+ *
+ * WHY NOT JUST THE ONE FONT. The baked drawing below used plain Helvetica for every sheet. In
+ * Acrobat that is invisible — `NeedAppearances` makes it redraw in the sheet's own face — but in
+ * Preview, Chrome's viewer and iOS Quick Look, none of which honour that flag, a sheet printed in
+ * navy Verdana Italic came back with its values in upright Helvetica. Measured on the A800RR blank
+ * 2026-08-14: the field says `/Verdana,Italic 0 Tf 1 0 0 rg`, the baked stream said `/Helvetica`.
+ *
+ * Verdana itself cannot be embedded — it is not ours to ship, and the blank does not carry it — so
+ * the closest honest answer is the base-14 face of the right CLASS: serif stays serif, fixed stays
+ * fixed, and italic stays italic. Upright-vs-italic is the difference a driver actually notices.
+ */
+function nearestStandardFont(fontName: string | undefined): StandardFonts {
+  const { family, bold, italic } = parsePdfFontName(fontName ?? "Helv");
+  const f = family.toLowerCase();
+  if (f.includes("courier") || f.includes("mono") || f.includes("consol")) {
+    if (bold && italic) return StandardFonts.CourierBoldOblique;
+    if (bold) return StandardFonts.CourierBold;
+    if (italic) return StandardFonts.CourierOblique;
+    return StandardFonts.Courier;
+  }
+  // Times covers the serif faces a setup sheet is likely to name — Times, Georgia, Garamond, Book.
+  if (f.includes("times") || f.includes("georgia") || f.includes("garamond") || f.includes("serif")
+      || f.includes("roman") || f.includes("book") || f.includes("minion")) {
+    if (bold && italic) return StandardFonts.TimesRomanBoldItalic;
+    if (bold) return StandardFonts.TimesRomanBold;
+    if (italic) return StandardFonts.TimesRomanItalic;
+    return StandardFonts.TimesRoman;
+  }
+  if (bold && italic) return StandardFonts.HelveticaBoldOblique;
+  if (bold) return StandardFonts.HelveticaBold;
+  if (italic) return StandardFonts.HelveticaOblique;
+  return StandardFonts.Helvetica;
+}
+
+/**
+ * Draw every text value into the file, for readers that show only what is already drawn.
  *
  * The field's own instructions are put back afterwards. pdf-lib rewrites them to name the font it
  * just used, which would leave a viewer that redraws — Acrobat, with `NeedAppearances` set — using
- * plain Helvetica instead of the manufacturer's Verdana Italic. Restoring them costs nothing and
- * keeps the good case good.
+ * a substitute instead of the manufacturer's Verdana Italic. Restoring them costs nothing and keeps
+ * the good case good; `nearestStandardFont` is what the other readers get.
+ *
+ * Fonts are embedded once each and reused: a sheet has one or two faces across two hundred fields,
+ * and embedding per field would put two hundred copies of Helvetica in the file.
  */
 async function bakeTextAppearances(
   pdfDoc: PDFDocument,
-  form: ReturnType<PDFDocument["getForm"]>
+  form: ReturnType<PDFDocument["getForm"]>,
+  formDa: string | undefined
 ): Promise<void> {
-  let font: Awaited<ReturnType<PDFDocument["embedFont"]>> | null = null;
+  const embedded = new Map<StandardFonts, Awaited<ReturnType<PDFDocument["embedFont"]>>>();
   for (const field of form.getFields()) {
     if (!(field instanceof PDFTextField)) continue;
     if (!field.getText()) continue;
     try {
-      font ??= await pdfDoc.embedFont(StandardFonts.Helvetica);
       const originalDa = field.acroField.getDefaultAppearance();
+      const named = parseDefaultAppearance(originalDa ?? formDa).fontName;
+      const standard = nearestStandardFont(named);
+      let font = embedded.get(standard);
+      if (!font) {
+        font = await pdfDoc.embedFont(standard);
+        embedded.set(standard, font);
+      }
       field.defaultUpdateAppearances(font);
       if (originalDa) field.acroField.setDefaultAppearance(originalDa);
     } catch {
       // A field pdf-lib cannot draw still carries its value; a viewer that redraws will show it.
     }
+  }
+}
+
+/** The default appearance the whole form declares, for fields that state none of their own. */
+function formDefaultAppearance(form: ReturnType<PDFDocument["getForm"]>): string | undefined {
+  try {
+    const da = form.acroForm.dict.lookup(PDFName.of("DA")) as { asString?: () => string } | undefined;
+    return da?.asString?.();
+  } catch {
+    return undefined;
   }
 }
 
@@ -198,7 +254,7 @@ export async function fillPdfForm(input: {
    * cross, Mugen's bullet — because redrawing those would replace the sheet's own marks with plain
    * squares, and nothing is gained: flipping which appearance is showing is enough.
    */
-  await bakeTextAppearances(pdfDoc, form);
+  await bakeTextAppearances(pdfDoc, form, formDefaultAppearance(form));
   form.acroForm.dict.set(PDFName.of("NeedAppearances"), PDFBool.True);
 
   const bytes = await pdfDoc.save({ updateFieldAppearances: false });

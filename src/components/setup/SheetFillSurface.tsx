@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ import {
   optionSelectedInSurfaceValue,
   toggleOptionInSurfaceValue,
 } from "@/lib/setupSheetModels/sheetSurfaceValues";
+import { ZAPF_MARKS, type ZapfMarkPlacement } from "@/lib/setupDocuments/zapfDingbatMarks";
 
 /**
  * Filling in the manufacturer's own setup sheet, on a phone.
@@ -63,6 +64,12 @@ export type SheetFillBoxStyle = {
   fontSizeFrac: number;
   /** Tick boxes: the mark this box makes. Not always a check. */
   checkMark?: string;
+  /**
+   * Tick boxes: the sheet's own placement of that mark. When it is here the mark is drawn as the
+   * real ZapfDingbats outline, at the size and position the PDF states — see `SheetMark`. When it
+   * is not, `checkMark` is printed as a character and centred, which is the older, looser drawing.
+   */
+  markPlacement?: ZapfMarkPlacement;
   /** The PDF marks this box as multiline — it wraps rather than shrinking. See `autoFontSize`. */
   multiline?: boolean;
 };
@@ -282,6 +289,93 @@ function autoFontSize(input: {
     size -= 0.5;
   }
   return Math.max(size, 3);
+}
+
+/**
+ * A ticked box's mark, drawn the way the sheet draws it.
+ *
+ * ============================== WHY THIS IS NOT A CHARACTER ==============================
+ *
+ * The mark used to be printed as the nearest Unicode character — `✔` — in whatever font the page
+ * was set in, sized to a share of the box and centred. Three things were wrong with that, and all
+ * three are visible next to the same sheet open in Acrobat:
+ *
+ *  1. **The shape.** A browser has no ZapfDingbats, so `✔` came out of the UI font: a thinner,
+ *     straighter check than the one the PDF names. The outlines in `zapfDingbatMarks` are the real
+ *     glyphs, so this draws the sheet's own mark rather than a lookalike.
+ *  2. **The size and position.** The sheet states both — the A800RR draws a 14pt mark in a 12.3pt
+ *     box, deliberately overflowing — and centring a box-sized character states neither.
+ *  3. **The clip.** That overflow is cut off by a window the sheet also states. Without it the
+ *     A800RR's check has a corner it should not have, and its shock-position boxes, which draw a
+ *     75pt glyph through a 4.8pt-wide slot, print as a small square instead of the tall red bar the
+ *     driver is used to.
+ *
+ * The whole thing is one `<svg>` in the box's own point space, stretched to the box with
+ * `preserveAspectRatio="none"` exactly as a viewer maps an appearance box onto a widget rectangle.
+ * PDF space has y going UP, so the group flips it; that is the only conversion in here.
+ */
+function SheetMark({
+  placement,
+  color,
+  borderWidth,
+}: {
+  placement: ZapfMarkPlacement;
+  color: string;
+  /**
+   * The box's own border, in CSS pixels. A box being filled draws one to say it is a box; the
+   * widget rectangle is the BORDER box, so the mark is pulled out over it — otherwise every mark
+   * is squeezed by two pixels that have nothing to do with the sheet.
+   */
+  borderWidth: number;
+}) {
+  const clip = placement.clip;
+  // Unique per mark on the page: two `clipPath`s sharing an id would silently clip to the first,
+  // and a sheet draws a hundred of these.
+  const clipId = useId();
+
+  /*
+   * Two kinds of mark, one drawing.
+   *
+   * A sheet that spells its tick as a ZapfDingbats character gives a size and a baseline, so the
+   * traced outline is scaled from its 1000-unit em and moved there. A sheet that draws its own
+   * curves has already said everything, in the box's own points, so it is drawn as it is. Either
+   * way the result is in PDF space, and the flip below is the only conversion.
+   */
+  const path =
+    placement.kind === "glyph"
+      ? {
+          d: ZAPF_MARKS[placement.glyph].d,
+          transform: `translate(${placement.x} ${placement.boxHeight - placement.y}) scale(${placement.size / 1000} ${-placement.size / 1000})`,
+        }
+      : {
+          d: placement.d,
+          transform: `translate(0 ${placement.boxHeight}) scale(1 -1)`,
+        };
+
+  return (
+    <svg
+      className="pointer-events-none absolute block"
+      style={{ inset: -borderWidth }}
+      viewBox={`0 0 ${placement.boxWidth} ${placement.boxHeight}`}
+      preserveAspectRatio="none"
+      aria-hidden
+      focusable="false"
+    >
+      {clip ? (
+        <clipPath id={clipId}>
+          <rect
+            x={clip[0]}
+            y={placement.boxHeight - (clip[1] + clip[3])}
+            width={clip[2]}
+            height={clip[3]}
+          />
+        </clipPath>
+      ) : null}
+      <g clipPath={clip ? `url(#${clipId})` : undefined}>
+        <path d={path.d} fill={color} transform={path.transform} />
+      </g>
+    </svg>
+  );
 }
 
 /** Structural, so it takes both React's synthetic touches and the DOM's. */
@@ -1166,18 +1260,27 @@ export function SheetFillSurface({
                 >
                   {/* The box being typed into draws its own value, in the input sitting over it. */}
                   {filled && !editingHere ? (
-                    <span
-                      className="pointer-events-none block max-w-full overflow-hidden whitespace-nowrap px-[1px] leading-none"
-                      style={{
-                        fontSize,
-                        fontFamily: isTick ? undefined : s.fontFamily,
-                        fontStyle: s.italic && !isTick ? "italic" : undefined,
-                        fontWeight: s.bold && !isTick ? 700 : undefined,
-                        color: s.color,
-                      }}
-                    >
-                      {isTick ? s.checkMark ?? "✔" : value}
-                    </span>
+                    isTick && s.markPlacement ? (
+                      // The sheet's own mark, at the sheet's own size and position. See `SheetMark`.
+                      <SheetMark
+                        placement={s.markPlacement}
+                        color={s.color}
+                        borderWidth={readOnly ? 0 : isFocused ? 2 : 1}
+                      />
+                    ) : (
+                      <span
+                        className="pointer-events-none block max-w-full overflow-hidden whitespace-nowrap px-[1px] leading-none"
+                        style={{
+                          fontSize,
+                          fontFamily: isTick ? undefined : s.fontFamily,
+                          fontStyle: s.italic && !isTick ? "italic" : undefined,
+                          fontWeight: s.bold && !isTick ? 700 : undefined,
+                          color: s.color,
+                        }}
+                      >
+                        {isTick ? s.checkMark ?? "✔" : value}
+                      </span>
+                    )
                   ) : null}
                 </button>
               );

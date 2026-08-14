@@ -69,6 +69,7 @@ function boxFor(
       alignment: a.alignment,
       fontSizeFrac: a.fontSize > 0 ? a.fontSize / widget.pageHeight : 0,
       ...(widget.checkMark ? { checkMark: widget.checkMark } : {}),
+      ...(widget.markPlacement ? { markPlacement: widget.markPlacement } : {}),
       ...(a.multiline ? { multiline: true } : {}),
     },
     ...(optionValue !== undefined ? { optionValue } : {}),

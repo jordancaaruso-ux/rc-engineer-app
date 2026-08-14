@@ -1,5 +1,6 @@
 import type { PdfFormFieldEntry, PdfFormFieldsExtraction } from "@/lib/setupDocuments/pdfFormFields";
 import { DEFAULT_PDF_FIELD_APPEARANCE } from "@/lib/setupDocuments/pdfFieldAppearance";
+import type { ZapfMarkPlacement } from "@/lib/setupDocuments/zapfDingbatMarks";
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
 import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import { inferUiTypeFromAcroType, suggestKeyFromPdfFieldName } from "@/lib/setupCalibrations/customFieldCatalog";
@@ -100,6 +101,16 @@ export type DerivedBoxStyle = {
   fontSizeFrac: number;
   /** Tick boxes only: the mark this box makes when it is ticked. */
   checkMark?: string;
+  /**
+   * Tick boxes: the sheet's own placement of that mark — its size, its baseline, and the window it
+   * is clipped to, in the box's own points. See {@link ZapfMarkPlacement}.
+   *
+   * With it the app draws the real outline where and at the size the PDF draws it, which is what
+   * makes a filled sheet on screen the same sheet the driver sees in Acrobat. Without it — a box
+   * stored before this existed, or one whose picture auto-sizes its mark — the nearest Unicode
+   * character is centred in the box instead, which is where this started.
+   */
+  markPlacement?: ZapfMarkPlacement;
   /**
    * The field is multiline — a notes or comments box. It wraps its text instead of shrinking it, so
    * an auto size taken from the box's height would be several times too big. See `autoFontSize`.
@@ -510,6 +521,7 @@ export function deriveSchemaFromAcroForm(
           alignment: a.alignment,
           fontSizeFrac: a.fontSize > 0 ? a.fontSize / widget.pageHeight : 0,
           ...(widget.checkMark ? { checkMark: widget.checkMark } : {}),
+          ...(widget.markPlacement ? { markPlacement: widget.markPlacement } : {}),
           ...(a.multiline ? { multiline: true } : {}),
         },
       });

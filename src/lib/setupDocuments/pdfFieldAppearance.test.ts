@@ -2,10 +2,13 @@ import assert from "node:assert/strict";
 import {
   checkMarkForCaption,
   describePdfFieldAppearance,
+  drawnGlyphCharacter,
   markColorFromAppearanceStream,
+  markPlacementFromAppearanceStream,
   parseDefaultAppearance,
   parsePdfFontName,
 } from "@/lib/setupDocuments/pdfFieldAppearance";
+import { ZAPF_MARK_BY_CHARACTER, ZAPF_MARKS } from "@/lib/setupDocuments/zapfDingbatMarks";
 
 // --- The three real blanks in the repo, as they actually read (measured 2026-08-10) ---
 {
@@ -101,6 +104,108 @@ import {
   assert.equal(markColorFromAppearanceStream("BT /ZaDb 9 Tf (4) Tj ET"), undefined);
   assert.equal(markColorFromAppearanceStream(""), undefined);
   assert.equal(markColorFromAppearanceStream(undefined), undefined);
+}
+
+// --- The mark's SHAPE also comes from the picture, not from the caption ---
+{
+  assert.equal(drawnGlyphCharacter("q 1 0 0 rg BT /ZaDb 14 Tf (4) Tj ET Q"), "4");
+  assert.equal(drawnGlyphCharacter("BT (l) Tj ET"), "l");
+  // A stream that draws twice means the last one; a stream that draws nothing says nothing.
+  assert.equal(drawnGlyphCharacter("(4) Tj (n) Tj"), "n");
+  assert.equal(drawnGlyphCharacter("q 0 0 10 10 re f Q"), undefined);
+  assert.equal(drawnGlyphCharacter(undefined), undefined);
+  // An escaped bracket inside the string does not end it early.
+  assert.equal(drawnGlyphCharacter("(\\)) Tj"), ")");
+}
+
+// --- Where the mark goes: the sheet says, in the box's own points ---
+{
+  // The A800RR's own tick, as it is actually written (measured 2026-08-14).
+  const a800 = markPlacementFromAppearanceStream({
+    stream: "q 1 1 10.3196 10.3468 re W n 1 0 0 rg BT /ZaDb 14 Tf 0.2378 1.4345 Td 13.482 TL (4) Tj ET Q",
+    boxWidth: 12.32,
+    boxHeight: 12.35,
+  });
+  assert.equal(a800?.kind, "glyph");
+  assert.ok(a800?.kind === "glyph");
+  assert.equal(a800.glyph, "check");
+  assert.equal(a800.size, 14, "a 14pt mark in a 12.35pt box — it overflows on purpose");
+  assert.equal(a800.x, 0.2378);
+  assert.equal(a800.y, 1.4345);
+  assert.deepEqual(a800.clip, [1, 1, 10.3196, 10.3468]);
+
+  // The Mugen writes a second, zero `Td`. They ADD UP, so the first one is still the answer.
+  const mugen = markPlacementFromAppearanceStream({
+    stream: "q 1 1 10.3221 10.8355 re W n 1 0 0 rg BT /ZaDb 14 Tf 0.6241 1.6788 Td 13.482 TL 0 0 Td (l) Tj ET Q",
+    boxWidth: 12.32,
+    boxHeight: 12.84,
+  });
+  assert.ok(mugen?.kind === "glyph");
+  assert.equal(mugen.glyph, "circle");
+  assert.equal(mugen.x, 0.6241);
+  assert.equal(mugen.y, 1.6788);
+
+  // `Tm` states the position outright, so it replaces whatever was accumulating.
+  const withMatrix = markPlacementFromAppearanceStream({
+    stream: "BT /ZaDb 9 Tf 5 5 Td 1 0 0 1 2 3 Tm (n) Tj ET",
+    boxWidth: 10,
+    boxHeight: 10,
+  });
+  assert.ok(withMatrix?.kind === "glyph");
+  assert.equal(withMatrix.x, 2);
+  assert.equal(withMatrix.y, 3);
+
+  // A rectangle that is not clipped with is not a clip — it is a background or a border.
+  const painted = markPlacementFromAppearanceStream({
+    stream: "0.75 g 0 0 12 12 re f 1 1 10 10 re W n BT /ZaDb 9 Tf 1 2 Td (4) Tj ET",
+    boxWidth: 12,
+    boxHeight: 12,
+  });
+  assert.deepEqual(painted?.clip, [1, 1, 10, 10]);
+}
+
+// --- What cannot be placed says so, rather than being placed wrongly ---
+{
+  // `0 Tf` is "size it to the box" — a decision the viewer makes, which this cannot reproduce.
+  assert.equal(
+    markPlacementFromAppearanceStream({
+      stream: "BT /ZaDb 0 Tf 1 1 Td (4) Tj ET",
+      boxWidth: 12,
+      boxHeight: 12,
+    }),
+    undefined
+  );
+  // A glyph with no outline here.
+  assert.equal(
+    markPlacementFromAppearanceStream({
+      stream: "BT /ZaDb 9 Tf 1 1 Td (z) Tj ET",
+      boxWidth: 12,
+      boxHeight: 12,
+    }),
+    undefined
+  );
+  // Nothing to read, and a box with no size, are both non-answers rather than crashes.
+  assert.equal(markPlacementFromAppearanceStream({ stream: "", boxWidth: 12, boxHeight: 12 }), undefined);
+  assert.equal(
+    markPlacementFromAppearanceStream({ stream: "BT /ZaDb 9 Tf (4) Tj ET", boxWidth: 0, boxHeight: 0 }),
+    undefined
+  );
+}
+
+// --- The outlines are the real glyphs, and every mark the app names has one ---
+{
+  for (const [character, name] of Object.entries(ZAPF_MARK_BY_CHARACTER)) {
+    const mark = ZAPF_MARKS[name];
+    assert.ok(mark, `${name} (${character}) has no outline`);
+    assert.match(mark.d, /^M[-\d.]/, `${name}'s path does not start with a move`);
+    assert.match(mark.d, /Z$/, `${name}'s path is not closed`);
+    const [left, bottom, right, top] = mark.bbox;
+    assert.ok(right > left && top > bottom, `${name}'s bounding box is inside out`);
+    // Traced in the font's own 1000-unit em box, so nothing may wander far outside it.
+    assert.ok(left >= -50 && right <= 1050 && bottom >= -100 && top <= 1000, `${name} is out of its em box`);
+  }
+  // Every one of Acrobat's six styles is covered — an unmapped one used to become a check mark.
+  assert.deepEqual(Object.keys(ZAPF_MARKS).sort(), ["check", "circle", "cross", "diamond", "square", "star"]);
 }
 
 console.log("pdfFieldAppearance.test.ts ok");

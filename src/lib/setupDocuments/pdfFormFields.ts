@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   decodePDFRawStream,
+  PDFArray,
   PDFButton,
   PDFCheckBox,
   PDFDict,
@@ -9,6 +10,7 @@ import {
   PDFDropdown,
   PDFField,
   PDFName,
+  PDFNumber,
   PDFOptionList,
   PDFRadioGroup,
   PDFRawStream,
@@ -20,8 +22,10 @@ import {
   checkMarkForCaption,
   describePdfFieldAppearance,
   markColorFromAppearanceStream,
+  markPlacementFromAppearanceStream,
   type PdfFieldAppearance,
 } from "@/lib/setupDocuments/pdfFieldAppearance";
+import { UNICODE_FOR_ZAPF_MARK, type ZapfMarkPlacement } from "@/lib/setupDocuments/zapfDingbatMarks";
 import { normalizeTemplateExtractedValue } from "@/lib/setupCalibrations/applyTextTemplate";
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import { AWESOMATIX_MULTI_SELECT_GROUPS, AWESOMATIX_SINGLE_CHOICE_GROUPS } from "@/lib/setupDocuments/awesomatixWidgetGroups";
@@ -60,6 +64,12 @@ export type PdfFormFieldWidgetRect = {
    * cannot be read, and the field's appearance is then the honest fallback.
    */
   markColor?: string;
+  /**
+   * How big the mark is and where it sits, in the box's own points — the sheet's placement, not a
+   * guess. See `markPlacementFromAppearanceStream`; absent when the picture auto-sizes its mark or
+   * draws a glyph this app has no outline for, and the caller then centres one as it always did.
+   */
+  markPlacement?: ZapfMarkPlacement;
 };
 
 export type PdfFormFieldEntry = {
@@ -143,8 +153,19 @@ function normalizeRect(rect: { x: number; y: number; width: number; height: numb
   };
 }
 
-/** The ZapfDingbats character this tick box marks itself with, if it names one. */
-function widgetCheckMark(widget: AcroWidget): string {
+/**
+ * The mark this tick box makes, as the nearest Unicode character.
+ *
+ * The PICTURE wins over the caption. `/MK /CA` is a note about what the box is for and the ON
+ * appearance is what a viewer paints, so a sheet whose two disagree — or whose caption is missing —
+ * draws what the picture draws rather than quietly falling back to a check mark.
+ *
+ * Still carried alongside `markPlacement` because it is what an older stored sheet has, and what a
+ * box whose picture auto-sizes its mark still needs.
+ */
+function widgetCheckMark(widget: AcroWidget, placement: ZapfMarkPlacement | undefined): string {
+  // A mark the sheet draws as its own outline names no character, so the caption is all there is.
+  if (placement?.kind === "glyph") return UNICODE_FOR_ZAPF_MARK[placement.glyph];
   try {
     return checkMarkForCaption(widget.getAppearanceCharacteristics?.()?.CA?.()?.asString?.());
   } catch {
@@ -166,17 +187,22 @@ function widgetAppearanceIsOn(widget: AcroWidget): boolean {
 }
 
 /**
- * The colour this tick box's ON picture paints in — read out of the picture itself.
+ * What this tick box's ON picture actually paints — colour, mark and where the mark goes.
  *
- * The stream is usually Flate-compressed, so it has to be decoded before it is text. Every step is
- * wrapped: an unreadable or unusually-encoded stream costs this one box its colour and nothing else,
- * and the caller falls back to the field's default appearance exactly as it did before.
+ * All of it comes from the one place because it comes from the one stream: decoding it is the
+ * expensive part (it is usually Flate-compressed), and the colour, the glyph and the placement are
+ * three readings of the same few hundred bytes. Every step is wrapped: an unreadable or unusually
+ * encoded stream costs this one box its appearance and nothing else, and the caller falls back to
+ * the field's default exactly as it did before.
  */
-function widgetMarkColor(widget: AcroWidget): string | undefined {
+function widgetMarkAppearance(
+  widget: AcroWidget,
+  rect: { width: number; height: number }
+): { color?: string; placement?: ZapfMarkPlacement } {
   try {
     const normal = (widget as unknown as { getAppearances?: () => { normal?: unknown } })
       .getAppearances?.()?.normal;
-    if (!normal) return undefined;
+    if (!normal) return {};
 
     // A checkbox's normal appearance is a dictionary of states — `/Off` plus one ON state, whose
     // name varies per file (`/On`, `/Yes`, `/1`…). Anything that isn't Off is the mark.
@@ -189,10 +215,46 @@ function widgetMarkColor(widget: AcroWidget): string | undefined {
         break;
       }
     }
-    if (!(onStream instanceof PDFRawStream)) return undefined;
+    if (!(onStream instanceof PDFRawStream)) return {};
 
     const bytes = decodePDFRawStream(onStream).decode();
-    return markColorFromAppearanceStream(Buffer.from(bytes).toString("latin1"));
+    const text = Buffer.from(bytes).toString("latin1");
+    const box = appearanceBoxSize(onStream) ?? rect;
+    return {
+      color: markColorFromAppearanceStream(text),
+      placement: markPlacementFromAppearanceStream({
+        stream: text,
+        boxWidth: box.width,
+        boxHeight: box.height,
+      }),
+    };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * The picture's own `/BBox`, which is the space its `Td` and clip are measured in.
+ *
+ * Measured on all three repo blanks: every one is `[0 0 w h]` with w and h the widget rectangle, so
+ * this agrees with the rectangle 419 times out of 419. It is read anyway because a viewer maps the
+ * BBox onto the rectangle rather than assuming they match, and a sheet where they differ would put
+ * every mark in the wrong place if this guessed.
+ */
+function appearanceBoxSize(stream: PDFRawStream): { width: number; height: number } | undefined {
+  try {
+    const bbox = stream.dict.lookup(PDFName.of("BBox"));
+    if (!(bbox instanceof PDFArray) || bbox.size() < 4) return undefined;
+    const n = (i: number) => {
+      const v = bbox.lookup(i);
+      return v instanceof PDFNumber ? v.asNumber() : NaN;
+    };
+    const width = Math.abs(n(2) - n(0));
+    const height = Math.abs(n(3) - n(1));
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      return undefined;
+    }
+    return { width, height };
   } catch {
     return undefined;
   }
@@ -297,6 +359,8 @@ export function orderedFieldWidgets(
 
       const page = pages[pageIdx]!;
       const pageHeight = page.getHeight();
+      // One decode of the ON picture, three readings of it — see `widgetMarkAppearance`.
+      const mark = perWidget ? widgetMarkAppearance(w, rect) : {};
 
       items.push({
         widget: w,
@@ -310,8 +374,9 @@ export function orderedFieldWidgets(
           width: rect.width,
           height: rect.height,
           checked: perWidget ? widgetAppearanceIsOn(w) : undefined,
-          ...(perWidget ? { checkMark: widgetCheckMark(w) } : {}),
-          ...(perWidget ? withMarkColor(widgetMarkColor(w)) : {}),
+          ...(perWidget ? { checkMark: widgetCheckMark(w, mark.placement) } : {}),
+          ...(perWidget ? withMarkColor(mark.color) : {}),
+          ...(mark.placement ? { markPlacement: mark.placement } : {}),
         },
       });
     }
