@@ -55,6 +55,7 @@ export function SheetModeFill({
   initialValues,
   initialName,
   startChoices,
+  parkedDraft,
   templateKey,
 }: {
   carId: string;
@@ -76,6 +77,14 @@ export function SheetModeFill({
    * immediately, as it always has.
    */
   startChoices?: SheetStartGroup[];
+  /**
+   * A fill already parked on this car, when there is one AND the driver came through the start-from
+   * door. It has to be offered rather than assumed: a draft used to skip the picker entirely, so a
+   * driver who asked to start from an existing setup was silently dropped onto their half-finished
+   * sheet instead — and since a draft is written the moment anyone types a box, that was nearly
+   * everyone. Reported from prod 2026-08-15.
+   */
+  parkedDraft?: { answeredCount: number; stepCount: number } | null;
 }) {
   const router = useRouter();
   const startGroups = useMemo(
@@ -253,6 +262,35 @@ export function SheetModeFill({
           whole chassis are different kinds of thing to start from, and a driver scanning one list
           for "the one I ran at Mount Barker" should not have to read past three kit sheets.
         */}
+        {/*
+          The draft goes first, because it is the only choice on this list that is already open —
+          picking anything else pours over what they had. Declining it is the two lines underneath.
+        */}
+        {parkedDraft ? (
+          <section className="space-y-1.5">
+            <h3 className="micro-caps px-1 text-faint">Where you left off</h3>
+            <ul className="divide-y divide-border rounded-lg border border-amber-500/40 bg-amber-500/5">
+              <li>
+                <button
+                  type="button"
+                  onClick={() => startFrom(null)}
+                  className="tap-active flex w-full items-center gap-3 px-3 py-3 text-left"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-foreground">
+                      Carry on with your draft
+                    </span>
+                    <span className="block truncate tabular-nums text-[11px] text-muted-foreground">
+                      {parkedDraft.answeredCount} of {parkedDraft.stepCount} boxes filled
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-muted-foreground">›</span>
+                </button>
+              </li>
+            </ul>
+          </section>
+        ) : null}
+
         {startGroups.map((group) => (
           <section key={group.title} className="space-y-1.5">
             <h3 className="micro-caps px-1 text-faint">{group.title}</h3>
@@ -282,12 +320,24 @@ export function SheetModeFill({
           </section>
         ))}
 
+        {/*
+          With a draft parked, "empty" has to actually empty the boxes — otherwise this line and
+          the draft row above it would do the same thing, and one of them would be lying.
+        */}
         <button
           type="button"
-          onClick={() => startFrom(null)}
+          onClick={() => {
+            if (parkedDraft) {
+              setStartValues({});
+              setValues({});
+            }
+            startFrom(null);
+          }}
           className="px-1 text-[12.5px] text-muted-foreground underline hover:text-foreground"
         >
-          Start from an empty sheet instead
+          {parkedDraft
+            ? "Start from an empty sheet instead — this replaces your draft"
+            : "Start from an empty sheet instead"}
         </button>
       </div>
     );

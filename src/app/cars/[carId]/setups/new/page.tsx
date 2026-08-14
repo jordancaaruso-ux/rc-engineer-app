@@ -273,7 +273,19 @@ export default async function NewCarSetupPage(props: {
               chassisName={template.label ?? car.name}
               templateKey={template.templateKey}
               initialValues={fillDraft?.values}
-              startChoices={startFromExisting && !fillDraft ? sheetStartGroups : undefined}
+              /*
+               * A parked draft no longer swallows this door. It used to short-circuit the picker
+               * entirely, so a driver who asked to start from a setup they already had was dropped
+               * onto their half-finished sheet with no explanation — and a draft is written the
+               * moment anyone types a box, so that was nearly every driver. The draft is now the
+               * first row on the picker instead. Reported from prod 2026-08-15.
+               */
+              startChoices={startFromExisting ? sheetStartGroups : undefined}
+              parkedDraft={
+                startFromExisting && fillDraft
+                  ? { answeredCount: fillDraft.answeredCount, stepCount: fillDraft.stepCount }
+                  : null
+              }
             />
           ) : (
             <NewCarSetupClient
