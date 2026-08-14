@@ -7,11 +7,11 @@ import { canManageCatalogRow, type CatalogAccessUser } from "@/lib/assets/catalo
 /**
  * Setup sheet models are global. Only an admin — or the creator while the model is still
  * unauthorized — may edit a shared model's name/schema or delete it. Authorizing is admin-only.
- * Single source of truth for the API route and the schema editor page.
+ * Single source of truth for the API route and the surfaces that show an edit affordance.
  *
- * OPTIMISTIC: this is the right rule for deciding whether to *show* an edit affordance, and it is
- * what `/setup-sheet-models/[id]/schema` gates on. It deliberately does not know whether anyone
- * else depends on the model — for anything destructive use `canManageSetupSheetModel` below.
+ * OPTIMISTIC: this is the right rule for deciding whether to *show* an edit affordance. It
+ * deliberately does not know whether anyone else depends on the model — for anything destructive
+ * use `canManageSetupSheetModel` below.
  */
 export function canEditSetupSheetModel(
   user: { id: string; email: string | null },

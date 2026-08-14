@@ -3078,7 +3078,6 @@ export function SetupCalibrationEditorClient({
               <SetupCalibrationModelSidebar
                 schema={setupSheetModelSchema}
                 modelId={initialSetupSheetModelId}
-                calibrationId={calibrationId}
                 formFieldMappings={formFieldMappings}
                 armedKey={armedKey}
                 armedAssignments={armedAssignments}

@@ -225,12 +225,6 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
                     >
                       Workbench
                     </Link>
-                    <Link
-                      href={`/setup-sheet-models/${m.id}/schema`}
-                      className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
-                    >
-                      {canManage ? "Edit schema" : "View schema"}
-                    </Link>
                     {isAdmin ? (
                       <SetupSheetModelAuthorizeToggle modelId={m.id} isAuthorized={m.isAuthorized} />
                     ) : null}

@@ -192,7 +192,6 @@ test("shouldShowLogRunFab is visible on destinations, hidden inside create/edit 
   for (const path of [
     "/runs/new",
     "/runs/abc/edit",
-    "/setup-sheet-models/xyz/schema",
     "/setup-documents/xyz",
   ]) {
     assert.equal(shouldShowLogRunFab(path), false, `expected no FAB on ${path}`);

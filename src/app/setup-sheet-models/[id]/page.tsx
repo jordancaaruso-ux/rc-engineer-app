@@ -197,24 +197,25 @@ export default async function SetupSheetModelWorkbenchPage({
           )}
         </CardPanel>
 
-        <CardPanel contentClassName="space-y-3">
-          <Eyebrow>Edit</Eyebrow>
-          <div className="flex flex-wrap gap-2">
-            {calibration ? (
-              <ButtonLink href={`/setup-calibrations/${calibration.id}`} variant="primary">
-                Open mapping editor
-              </ButtonLink>
-            ) : null}
-            {boxEditorHref ? (
-              <ButtonLink href={boxEditorHref} variant="outline">
-                Edit boxes on the blank
-              </ButtonLink>
-            ) : null}
-            <ButtonLink href={`/setup-sheet-models/${model.id}/schema`} variant="outline">
-              Arrange the setup sheet
-            </ButtonLink>
-          </div>
-        </CardPanel>
+        {/* Both doors run off the PDF. With no calibration there is nothing to edit yet, so the
+            card stays away rather than showing an empty row. */}
+        {calibration || boxEditorHref ? (
+          <CardPanel contentClassName="space-y-3">
+            <Eyebrow>Edit</Eyebrow>
+            <div className="flex flex-wrap gap-2">
+              {calibration ? (
+                <ButtonLink href={`/setup-calibrations/${calibration.id}`} variant="primary">
+                  Open mapping editor
+                </ButtonLink>
+              ) : null}
+              {boxEditorHref ? (
+                <ButtonLink href={boxEditorHref} variant="outline">
+                  Edit boxes on the blank
+                </ButtonLink>
+              ) : null}
+            </div>
+          </CardPanel>
+        ) : null}
 
         <ChassisBaselineList
           modelId={model.id}

@@ -61,7 +61,6 @@ export function isHiddenNavRoute(pathname: string | null | undefined): boolean {
 const LOG_RUN_FAB_HIDDEN_PATTERNS: readonly RegExp[] = [
   /^\/runs\/new(?:\/|$)/, // logging a run — you're already here
   /^\/runs\/[^/]+\/edit(?:\/|$)/, // editing a run
-  /^\/setup-sheet-models\/[^/]+\/schema(?:\/|$)/, // schema editor (own Save)
   /^\/setup-documents\/[^/]+(?:\/|$)/, // setup document editor (own Save)
 ];
 

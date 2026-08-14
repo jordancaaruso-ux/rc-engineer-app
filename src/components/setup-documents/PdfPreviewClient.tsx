@@ -15,7 +15,18 @@ import { Document, Page, pdfjs } from "react-pdf";
  * `new URL(..., import.meta.url)` makes the bundler emit the worker as a build asset and hand back
  * its local path. Deliberately not a copy into `public/`: a copied worker silently drifts out of
  * step when `pdfjs-dist` is upgraded, and pdf.js answers a version mismatch by refusing to render.
- * Resolved through the bundler, the worker and the library cannot disagree.
+ *
+ * That resolution is NOT self-consistent, and this is the trap. The bare specifier is resolved from
+ * *this file*, so it finds the hoisted top-level `pdfjs-dist` — while the library `react-pdf` runs
+ * comes from `react-pdf`'s own dependency, which it pins to an EXACT version. The moment those two
+ * differ, every PDF in the app dies on
+ *   `UnknownErrorException: The API version "x" does not match the Worker version "y"`
+ * and the driver sees "Failed to load PDF file." — a message that reads like a broken upload.
+ * (Happened 2026-08-14: top-level `^5.5.207` floated to 5.7.284, react-pdf 10.4.1 pins 5.4.296.)
+ *
+ * The guarantee is in `package.json`, not here: `pdfjs-dist` is pinned to the EXACT version
+ * `react-pdf` depends on, so npm hoists ONE copy and the worker cannot disagree with the library.
+ * Bumping `react-pdf` means re-reading its pinned `pdfjs-dist` and moving ours to match.
  */
 const PDF_WORKER_SRC = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",

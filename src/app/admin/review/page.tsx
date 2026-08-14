@@ -342,7 +342,7 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
             <li key={m.id} className="flex items-center justify-between gap-2 px-4 py-2">
               <div className="min-w-0">
                 <Link
-                  href={`/setup-sheet-models/${m.id}/schema`}
+                  href={`/setup-sheet-models/${m.id}`}
                   className="block truncate text-xs text-foreground hover:underline"
                 >
                   {m.name}

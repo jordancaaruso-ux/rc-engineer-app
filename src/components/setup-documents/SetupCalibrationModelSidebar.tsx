@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import {
   isModelParameterMapped,
   modelFieldOptionEntries,
@@ -30,7 +29,6 @@ export type NewParameterInput = {
 export function SetupCalibrationModelSidebar(props: {
   schema: SetupSheetModelSchema;
   modelId: string;
-  calibrationId: string;
   formFieldMappings: Record<string, PdfFormFieldMappingRule>;
   armedKey: string | null;
   armedAssignments: ModelOptionAssignment[];
@@ -49,7 +47,6 @@ export function SetupCalibrationModelSidebar(props: {
   const {
     schema,
     modelId,
-    calibrationId,
     formFieldMappings,
     armedKey,
     armedAssignments,
@@ -111,7 +108,6 @@ export function SetupCalibrationModelSidebar(props: {
     () => modelMappingProgress(schema, formFieldMappings),
     [schema, formFieldMappings]
   );
-  const allMapped = progress.total > 0 && progress.mapped === progress.total;
 
   const armedField = useMemo(
     () => (armedKey ? schema.fields.find((f) => f.key === armedKey) ?? null : null),
@@ -445,18 +441,6 @@ export function SetupCalibrationModelSidebar(props: {
                 {progress.mapped}/{progress.total} mapped
               </span>
             </div>
-            {/* Mapping first, then arrange the sheet — the layout pass comes after the boxes are read. */}
-            <Link
-              href={`/setup-sheet-models/${modelId}/schema?returnTo=${encodeURIComponent(`/setup-calibrations/${calibrationId}`)}`}
-              className={cn(
-                "block rounded border px-3 py-1.5 text-center text-xs font-medium",
-                allMapped
-                  ? "border-primary-ink/60 bg-accent/15 text-foreground"
-                  : "border-border text-muted-foreground hover:bg-muted"
-              )}
-            >
-              Arrange the setup sheet →
-            </Link>
           </div>
         )}
       </CardPanel>

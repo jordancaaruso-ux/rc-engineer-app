@@ -217,7 +217,6 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
 
   const schema = normalizeSchema(parseSetupSheetModelSchema(model.schemaJson));
   revalidatePath("/cars");
-  revalidatePath(`/setup-sheet-models/${id}/schema`);
   revalidatePath("/setup-sheet-models");
   return NextResponse.json({
     model: {
@@ -268,6 +267,5 @@ export async function DELETE(_request: Request, ctx: RouteCtx) {
 
   revalidatePath("/cars");
   revalidatePath("/setup-sheet-models");
-  revalidatePath(`/setup-sheet-models/${id}/schema`);
   return NextResponse.json({ ok: true, deletedId: id, name: existing.name });
 }
