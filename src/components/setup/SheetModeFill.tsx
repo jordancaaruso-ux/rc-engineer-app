@@ -13,8 +13,22 @@ import {
   storedValuesToSurface,
   surfaceValuesToStored,
 } from "@/lib/setupSheetModels/sheetSurfaceValues";
-import type { BaselineStartChoice } from "@/components/setup/NewCarSetupClient";
 import type { SetupSnapshotData } from "@/lib/runSetup";
+
+/** One setup a new sheet can be started from, whatever it is: kept, run, read from a PDF, or global. */
+export type SheetStartChoice = {
+  id: string;
+  label: string;
+  /** The second line — a date, a track, a baseline's kind. Absent when there is nothing to add. */
+  meta?: string;
+  data: SetupSnapshotData;
+};
+
+/** Choices under a heading, so "my setups" and "published baselines" never read as one list. */
+export type SheetStartGroup = {
+  title: string;
+  choices: SheetStartChoice[];
+};
 
 /**
  * Filling a setup on a chassis that came from somebody's own PDF: their sheet, on screen, in the
@@ -40,7 +54,7 @@ export function SheetModeFill({
   chassisName,
   initialValues,
   initialName,
-  baselines,
+  startChoices,
   templateKey,
 }: {
   carId: string;
@@ -56,19 +70,23 @@ export function SheetModeFill({
   initialValues?: Record<string, unknown>;
   initialName?: string;
   /**
-   * Set ONLY when the driver came through the "start from a baseline" door. The baselines are then
-   * offered before the sheet, and whichever one they pick is poured into the boxes. Undefined —
-   * which is every other way onto this page — opens the sheet immediately, as it always has.
+   * Set ONLY when the driver came through the "start from one you already have" door: this car's
+   * own setups first, then the baselines published for its chassis. Whichever they pick is poured
+   * into the boxes. Undefined — which is every other way onto this page — opens the sheet
+   * immediately, as it always has.
    */
-  baselines?: BaselineStartChoice[];
+  startChoices?: SheetStartGroup[];
 }) {
   const router = useRouter();
+  const startGroups = useMemo(
+    () => (startChoices ?? []).filter((g) => g.choices.length > 0),
+    [startChoices]
+  );
   /**
-   * Which baseline to pour in, when there is a choice to make. `null` means "not chosen yet" and is
-   * the only thing standing between the driver and their sheet — an empty list, or no `baselines`
-   * prop at all, never holds the sheet up.
+   * Whether the "what do I start from" question is still standing between the driver and their
+   * sheet. Answered by picking one or by declining; an empty list never asks it at all.
    */
-  const [pickingBaseline, setPickingBaseline] = useState(Boolean(baselines?.length));
+  const [picking, setPicking] = useState(startGroups.length > 0);
   const [values, setValues] = useState<Record<string, string>>(() =>
     initialValues ? storedValuesToSurface(initialValues) : {}
   );
@@ -189,8 +207,6 @@ export function SheetModeFill({
     }
   }
 
-  const filled = Object.keys(withoutEmptySheetValues(values)).length;
-
   /*
    * What the geometry strip reads: the boxes as they stand, and the boxes as they opened.
    *
@@ -208,49 +224,63 @@ export function SheetModeFill({
     [startValues, planFields]
   );
 
-  /** Pour a baseline into the boxes, then get out of the way — the sheet is what they came for. */
-  function startFrom(choice: BaselineStartChoice | null) {
+  /** Pour a setup into the boxes, then get out of the way — the sheet is what they came for. */
+  function startFrom(choice: SheetStartChoice | null) {
     if (choice) {
-      // Through the same bridge every stored setup takes: a baseline's arrays and preset objects
-      // must land in the boxes, not print as "[object Object]".
+      // Through the same bridge every stored setup takes: arrays and preset objects must land in
+      // the boxes, not print as "[object Object]".
       const poured = storedValuesToSurface(choice.data);
       setStartValues(poured);
       setValues(poured);
       setName(choice.label);
     }
-    setPickingBaseline(false);
+    setPicking(false);
   }
 
-  if (pickingBaseline && baselines?.length) {
+  if (picking && startGroups.length > 0) {
     return (
       <div className="space-y-3">
         <div className="px-1">
-          <h2 className="text-[15px] font-semibold tracking-tight">Start from a baseline</h2>
+          <h2 className="text-[15px] font-semibold tracking-tight">Start from one you already have</h2>
           <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted-foreground">
             Its values go into the boxes on your {chassisName} sheet. Change whatever you want from
-            there — nothing is locked.
+            there — the setup you copied is untouched.
           </p>
         </div>
 
-        <ul className="divide-y divide-border rounded-lg border border-border bg-card">
-          {baselines.map((b) => (
-            <li key={b.id}>
-              <button
-                type="button"
-                onClick={() => startFrom(b)}
-                className="tap-active flex w-full items-center gap-3 px-3 py-3 text-left"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-foreground">{b.label}</span>
-                  <span className="block truncate tabular-nums text-[11px] text-muted-foreground">
-                    {[b.kindLabel, b.contextLabel].filter(Boolean).join(" · ")}
-                  </span>
-                </span>
-                <span className="shrink-0 text-muted-foreground">›</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        {/*
+          Grouped, never merged. A setup off last weekend's run and a baseline published for the
+          whole chassis are different kinds of thing to start from, and a driver scanning one list
+          for "the one I ran at Mount Barker" should not have to read past three kit sheets.
+        */}
+        {startGroups.map((group) => (
+          <section key={group.title} className="space-y-1.5">
+            <h3 className="micro-caps px-1 text-faint">{group.title}</h3>
+            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+              {group.choices.map((choice) => (
+                <li key={choice.id}>
+                  <button
+                    type="button"
+                    onClick={() => startFrom(choice)}
+                    className="tap-active flex w-full items-center gap-3 px-3 py-3 text-left"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-foreground">
+                        {choice.label}
+                      </span>
+                      {choice.meta ? (
+                        <span className="block truncate tabular-nums text-[11px] text-muted-foreground">
+                          {choice.meta}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="shrink-0 text-muted-foreground">›</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
 
         <button
           type="button"
@@ -263,8 +293,95 @@ export function SheetModeFill({
     );
   }
 
+  /*
+   * The clip at the top of the paper: what this sheet is called, whether what they have typed is
+   * safe, and the way out.
+   *
+   * All three used to sit UNDER the surface — which on a phone is under a full A4 page of boxes, so
+   * naming a setup meant scrolling past two hundred of them to reach the field, and saving meant
+   * scrolling back down there again (founder, 2026-08-14).
+   *
+   * NOT `position: sticky`, however much it wants to be. `.app-shell` is `overflow-x: hidden`, and
+   * the spec computes `overflow-y` from `visible` to `auto` for that — making the shell a scrollport
+   * that never actually scrolls, so a sticky child resolves its offsets against a container that
+   * stays put and simply scrolls away. That is why `TopRail` lives outside the shell. A sticky bar
+   * here would read correctly in the source and do nothing on the page.
+   *
+   * The box count is deliberately NOT repeated here: `SheetFillSurface` already draws it directly
+   * below, as a bar with a denominator (`98 / 233`), which is the better of the two.
+   */
+  const clip = (
+    <div className="rounded-xl border border-border bg-card px-3 py-2.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="micro-caps text-faint">Name this setup</span>
+        {/*
+         * Draft state, where they can see it while filling rather than a page-scroll away. Never
+         * green: green and red are pace and quality deltas everywhere else in the app, and a
+         * saved draft is neither.
+         */}
+        {draftState === "idle" ? null : (
+          <span
+            className={cn(
+              "flex shrink-0 items-center gap-1.5 text-[11px]",
+              draftState === "failed" ? "text-warning" : "text-muted-foreground"
+            )}
+          >
+            <span className="size-1.5 rounded-full bg-current" aria-hidden />
+            {draftState === "saving"
+              ? "Saving"
+              : draftState === "saved"
+                ? "Draft saved"
+                : "Draft didn't save"}
+          </span>
+        )}
+      </div>
+
+      <div className="mt-1 flex items-end gap-3">
+        {/*
+         * Ruled, not boxed. The paper this screen exists to draw writes its NAME on a rule, and the
+         * title of the document is the one place worth borrowing the sheet's own vocabulary.
+         *
+         * `type="text"` is load-bearing rather than tidiness: the app's focus ring is
+         * `input[type="text"]:focus-visible`, which never matched this field while it carried no
+         * type attribute at all — so it had no visible keyboard focus.
+         *
+         * The placeholder is smaller than the typed value on purpose. It is the name this setup
+         * GETS if they type nothing, so it has to fit — at the typed size "Awesomatix A800RR setup"
+         * clipped to "…A800RR setu" — and a lighter voice is the honest one for a suggestion.
+         */}
+        <input
+          type="text"
+          className="min-h-11 min-w-0 flex-1 rounded-none border-0 border-b border-border bg-transparent px-0 pb-1.5 text-[15px] font-semibold tracking-tight text-foreground outline-none placeholder:text-[13px] placeholder:font-normal placeholder:tracking-normal placeholder:text-faint"
+          placeholder={`${chassisName} setup`}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          aria-label="Setup name"
+        />
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={saving}
+          className={cn(
+            buttonLinkClassName("primary"),
+            "min-h-11 shrink-0 px-5 text-[13px]",
+            saving && "pointer-events-none opacity-70"
+          )}
+        >
+          {saving ? "Saving…" : "Save setup"}
+        </button>
+      </div>
+
+      {error ? (
+        <p role="alert" className="mt-2 text-[11px] text-warning">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+
   return (
     <div className="space-y-3">
+      {clip}
       {geometryValue ? (
         <SheetGeometryStrip
           value={geometryValue}
@@ -283,42 +400,6 @@ export function SheetModeFill({
           setPlanFields(p.fields);
         }}
       />
-
-      <div className="space-y-2 px-3">
-        <div>
-          <label className="mb-1 block text-[11px] text-muted-foreground">Name this setup</label>
-          <input
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-            placeholder={`${chassisName} setup`}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            aria-label="Setup name"
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void save()}
-            disabled={saving}
-            className={cn(buttonLinkClassName("primary"), saving && "pointer-events-none opacity-70")}
-          >
-            {saving ? "Saving…" : "Save setup"}
-          </button>
-          <span className="text-[11px] text-muted-foreground">
-            {filled} {filled === 1 ? "box" : "boxes"} filled
-            {draftState === "saving"
-              ? " · saving"
-              : draftState === "saved"
-                ? " · saved"
-                : draftState === "failed"
-                  ? " · not saved yet"
-                  : ""}
-          </span>
-        </div>
-
-        {error ? <p className="text-[11px] text-warning">{error}</p> : null}
-      </div>
     </div>
   );
 }

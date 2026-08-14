@@ -36,15 +36,17 @@ const UPLOADABLE_CAR: UploadSetupCar = {
   chassisName: "Mugen MTC3",
   supportsUpload: true,
   baselineCount: 3,
+  priorSetupCount: 4,
 };
 
-/** No calibration and no baselines — the fill-a-blank-sheet door alone, the other two greyed. */
+/** Nothing to read a sheet with and nothing to copy — fill-a-blank alone, the other two greyed. */
 const HAND_BUILD_CAR: UploadSetupCar = {
   id: "preview_car_handbuild",
   name: "Awesomatix A800",
   chassisName: "Awesomatix A800",
   supportsUpload: false,
   baselineCount: 0,
+  priorSetupCount: 0,
 };
 
 const EMPTY: OnboardingFacts = {

@@ -20,6 +20,7 @@ import { CarCurrentSetupCard } from "@/components/setup/CarCurrentSetupCard";
 import { CarAllSetups } from "@/components/setup/CarAllSetups";
 import { getCarSetupHistory } from "@/lib/setup/getCarSetupHistory";
 import { UploadSetupSheetBar } from "@/components/setup/UploadSetupSheetBar";
+import { priorSetupCountsByCarId } from "@/lib/setup/priorSetupCounts";
 import { carSupportsSheetUpload } from "@/lib/setupCalibrations/carSupportsSheetUpload";
 
 export default async function CarDetailPage(props: {
@@ -133,17 +134,18 @@ export default async function CarDetailPage(props: {
    * 2026-08-11. It was the card's only reader, and on a chassis with no default it cost a second
    * round trip — so both are gone rather than left fetching for nobody.
    */
-  const [setupHistory, baselineCount] = await Promise.all([
+  const [setupHistory, baselineCount, priorSetupCounts] = await Promise.all([
     /*
      * Everything this car can be set up with, in one list: runs where the chassis changed, sheets
      * uploaded for it, baselines published for its chassis, and setups the driver kept. The
      * baselines used to be read again here for their own card — `getCarSetupHistory` owns them now.
      */
     getCarSetupHistory({ userId: user.id, car, displayTimeZone }),
-    // Only the count, for the upload panel's "start from a baseline" door.
+    // Both counts feed the upload panel's "start from one you already have" door — it adds them.
     car.setupSheetModelId
       ? prisma.baselineSetup.count({ where: { setupSheetModelId: car.setupSheetModelId } })
       : 0,
+    priorSetupCountsByCarId(user.id, [car.id]),
   ]);
 
   // Whether this car's chassis can be READ from a filled-in sheet. It never hides the upload door
@@ -203,6 +205,7 @@ export default async function CarDetailPage(props: {
                 chassisName: car.setupSheetModel?.name ?? null,
                 supportsUpload,
                 baselineCount,
+                priorSetupCount: priorSetupCounts.get(car.id) ?? 0,
               },
             ]}
             preselectCarId={car.id}

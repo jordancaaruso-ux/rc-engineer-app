@@ -26,7 +26,7 @@ import { formatRunDateShort } from "@/lib/formatDate";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { NewCarSetupClient } from "@/components/setup/NewCarSetupClient";
-import { SheetModeFill } from "@/components/setup/SheetModeFill";
+import { SheetModeFill, type SheetStartGroup } from "@/components/setup/SheetModeFill";
 import { chassisFillsAsSheet } from "@/lib/setupSheetModels/sheetPlan";
 
 /**
@@ -71,14 +71,19 @@ export default async function NewCarSetupPage(props: {
   const user = await requireCurrentUser();
   const { carId } = await props.params;
   /*
-   * `?start=baseline` is the "Start from a baseline" door on the Create / Upload setup sheet panel.
+   * `?start=existing` is the "Start from one you already have" door on the Create / Upload setup
+   * sheet panel.
    *
-   * It only means "offer the baselines first". Everything else about this page is unchanged, and a
-   * chassis with no baselines published simply opens the way it always did — the door that sent
-   * them here is greyed out in that case anyway, so arriving with nothing to pick means somebody
-   * typed the URL.
+   * It only means "ask what to start from, before the sheet". Everything else about this page is
+   * unchanged, and a car with nothing to offer simply opens the way it always did — the door that
+   * sent them here is greyed out in that case anyway, so arriving with nothing to pick means
+   * somebody typed the URL.
+   *
+   * `?start=baseline` is the same door's old name, kept working: it was in the wild for three days
+   * and costs one comparison to honour.
    */
-  const startFromBaseline = (await props.searchParams).start === "baseline";
+  const startParam = (await props.searchParams).start;
+  const startFromExisting = startParam === "existing" || startParam === "baseline";
 
   const car = await prisma.car.findFirst({
     where: { id: carId, userId: user.id },
@@ -204,6 +209,40 @@ export default async function NewCarSetupPage(props: {
     };
   });
 
+  /*
+   * The same two sources the form-mode page has always offered, as the sheet's start-from list.
+   *
+   * Kept apart rather than merged: a setup off last weekend's run and a baseline published for the
+   * whole chassis are different kinds of thing to copy. Their order is the order a driver reaches
+   * for them — their own first, because "the one I ran on Sunday" is the common case and a kit
+   * sheet is the rare one.
+   */
+  const sheetStartGroups: SheetStartGroup[] = [
+    {
+      title: "Setups on this car",
+      choices: previousSetups.map((s) => ({
+        id: s.id,
+        label: s.label,
+        meta: [
+          s.kind === "saved" ? "Saved" : s.kind === "run" ? "From a run" : "From a sheet",
+          s.dateLabel,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        data: s.data,
+      })),
+    },
+    {
+      title: "Baselines for this chassis",
+      choices: baselines.map((b) => ({
+        id: b.id,
+        label: b.label,
+        meta: [b.kindLabel, b.contextLabel].filter(Boolean).join(" · "),
+        data: b.data,
+      })),
+    },
+  ];
+
   return (
     <>
       <header className="page-header">
@@ -234,7 +273,7 @@ export default async function NewCarSetupPage(props: {
               chassisName={template.label ?? car.name}
               templateKey={template.templateKey}
               initialValues={fillDraft?.values}
-              baselines={startFromBaseline && !fillDraft ? baselines : undefined}
+              startChoices={startFromExisting && !fillDraft ? sheetStartGroups : undefined}
             />
           ) : (
             <NewCarSetupClient

@@ -35,8 +35,13 @@ export type UploadSetupCar = {
    * values. False greys the upload door and says why, rather than removing it.
    */
   supportsUpload: boolean;
-  /** Baselines published against this car's chassis. Zero greys the baseline door and says why. */
+  /** Baselines published against this car's chassis. Counted into the "start from" door below. */
   baselineCount: number;
+  /**
+   * Setups already on this car — kept ones, run setups, sheets read from a PDF. Added to
+   * `baselineCount` to decide whether the "start from one you already have" door is live.
+   */
+  priorSetupCount: number;
 };
 
 type UploadStage = "idle" | "uploading" | "matching" | "creating";
@@ -57,7 +62,12 @@ function stageLabel(stage: UploadStage): string {
  * ============================== WHY THREE DOORS, ALWAYS ==============================
  *
  * There are exactly three ways a driver gets a setup, and they are all real: fill an empty sheet,
- * upload one they have already filled, or start from a published baseline and adjust it.
+ * upload one they have already filled, or start from a setup that exists and adjust it.
+ *
+ * The third door widened on 2026-08-14. It used to offer published baselines only — the rarest of
+ * its sources — while the two a driver reaches for constantly, the setup they ran last weekend and
+ * the one they keep going back to, were reachable only by knowing that the create page had a
+ * dropdown on it. All of them are behind the one door now.
  *
  * Between 2026-08-10 and today this screen showed **one** door, and silently routed cars that
  * couldn't be read from a sheet somewhere else entirely — so which of the three you were offered
@@ -181,7 +191,7 @@ export function UploadSetupSheetBar({
    * Both land on the same screen. `?start=baseline` is what tells it to offer the published
    * baselines first instead of opening straight into empty boxes.
    */
-  function goToCreateSetup(id: string, start?: "baseline") {
+  function goToCreateSetup(id: string, start?: "existing") {
     setOpen(false);
     router.push(`/cars/${id}/setups/new${start ? `?start=${start}` : ""}`);
   }
@@ -468,20 +478,23 @@ export function UploadSetupSheetBar({
                             }
                             onClick={() => fileInputRef.current?.click()}
                           />
+                          {/*
+                           * Was "Start from a baseline", which offered the rarest of the three
+                           * sources and hid the two a driver reaches for constantly: the setup
+                           * they ran last weekend, and the one they keep coming back to. All
+                           * three live behind this door now — the next screen lists them
+                           * together, newest first, with the baselines under them.
+                           */}
                           <DoorRow
                             icon={<Layers className="size-4" strokeWidth={2} aria-hidden />}
-                            title="Start from a baseline"
-                            hint={
-                              selectedCar && selectedCar.baselineCount > 0
-                                ? `${selectedCar.baselineCount} published for this chassis — kit, base and pro`
-                                : undefined
-                            }
+                            title="Start from one you already have"
+                            hint={startFromHint(selectedCar)}
                             disabledReason={
-                              selectedCar && selectedCar.baselineCount > 0
+                              startFromTotal(selectedCar) > 0
                                 ? null
-                                : "No baselines published for this chassis yet."
+                                : "Nothing to copy yet — no setups on this car, and no baselines published for its chassis."
                             }
-                            onClick={() => goToCreateSetup(selectedCar!.id, "baseline")}
+                            onClick={() => goToCreateSetup(selectedCar!.id, "existing")}
                           />
                         </ul>
                       )}
@@ -500,6 +513,29 @@ export function UploadSetupSheetBar({
         : null}
     </>
   );
+}
+
+/** Everything this car could be started from: its own setups, plus its chassis's baselines. */
+function startFromTotal(car: UploadSetupCar | null): number {
+  if (!car) return 0;
+  return car.priorSetupCount + car.baselineCount;
+}
+
+/**
+ * Name the sources, in the order the next screen lists them, and only the ones that are really
+ * there. "3 setups on this car · 2 baselines" beats a bare total, because it tells a driver which
+ * of the two they are about to be shown.
+ */
+function startFromHint(car: UploadSetupCar | null): string | undefined {
+  if (!car || startFromTotal(car) === 0) return undefined;
+  const parts: string[] = [];
+  if (car.priorSetupCount > 0) {
+    parts.push(`${car.priorSetupCount} setup${car.priorSetupCount === 1 ? "" : "s"} on this car`);
+  }
+  if (car.baselineCount > 0) {
+    parts.push(`${car.baselineCount} baseline${car.baselineCount === 1 ? "" : "s"}`);
+  }
+  return parts.join(" · ");
 }
 
 /**

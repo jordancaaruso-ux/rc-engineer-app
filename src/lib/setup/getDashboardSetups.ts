@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { setupSheetModelIdsSupportingUpload } from "@/lib/setupCalibrations/carSupportsSheetUpload";
 import { baselineCountsByModelId } from "@/lib/baselineSetups/baselineCounts";
+import { priorSetupCountsByCarId } from "@/lib/setup/priorSetupCounts";
 import type { UploadSetupCar } from "@/components/setup/UploadSetupSheetBar";
 
 /**
@@ -56,12 +57,16 @@ export async function loadDashboardSetups(userId: string): Promise<DashboardSetu
   });
   if (cars.length === 0) return null;
 
-  const [hasAnySetup, uploadableModelIds, baselineCounts] = await Promise.all([
+  const [hasAnySetup, uploadableModelIds, baselineCounts, priorSetupCounts] = await Promise.all([
     userHasAnySetup(userId),
     // Same green-lit rule as the Garage hub. It decides whether the upload door is offered or
     // greyed with a reason — never whether we ask, and never which doors exist.
     setupSheetModelIdsSupportingUpload(cars.map((c) => c.setupSheetModelId)),
     baselineCountsByModelId(cars.map((c) => c.setupSheetModelId)),
+    priorSetupCountsByCarId(
+      userId,
+      cars.map((c) => c.id)
+    ),
   ]);
 
   return {
@@ -72,6 +77,7 @@ export async function loadDashboardSetups(userId: string): Promise<DashboardSetu
       chassisName: c.setupSheetModel?.name ?? null,
       supportsUpload: Boolean(c.setupSheetModelId && uploadableModelIds.has(c.setupSheetModelId)),
       baselineCount: c.setupSheetModelId ? (baselineCounts.get(c.setupSheetModelId) ?? 0) : 0,
+      priorSetupCount: priorSetupCounts.get(c.id) ?? 0,
     })),
   };
 }

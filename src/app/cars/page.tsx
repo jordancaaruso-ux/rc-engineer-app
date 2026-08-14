@@ -12,6 +12,7 @@ import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAuthorizedCatalog";
 import { setupSheetModelIdsSupportingUpload } from "@/lib/setupCalibrations/carSupportsSheetUpload";
 import { baselineCountsByModelId } from "@/lib/baselineSetups/baselineCounts";
+import { priorSetupCountsByCarId } from "@/lib/setup/priorSetupCounts";
 import { getCachedCarManagerData } from "@/lib/cachedReads";
 import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerModels";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
@@ -144,9 +145,13 @@ export default async function CarManagerPage({
   // Every car gets all three doors, so the bar lists them all. `supportsUpload` (a green-lit
   // calibration) and the baseline count only decide which doors are live and which are greyed
   // with a reason under them.
-  const [uploadableModelIds, baselineCounts] = await Promise.all([
+  const [uploadableModelIds, baselineCounts, priorSetupCounts] = await Promise.all([
     setupSheetModelIdsSupportingUpload(cars.map((c) => c.setupSheetModelId ?? null)),
     baselineCountsByModelId(cars.map((c) => c.setupSheetModelId ?? null)),
+    priorSetupCountsByCarId(
+      user.id,
+      cars.map((c) => c.id)
+    ),
   ]);
   const uploadCars: UploadSetupCar[] = cars.map((c) => ({
     id: c.id,
@@ -154,6 +159,7 @@ export default async function CarManagerPage({
     chassisName: c.setupSheetModel?.name ?? null,
     supportsUpload: Boolean(c.setupSheetModelId && uploadableModelIds.has(c.setupSheetModelId)),
     baselineCount: c.setupSheetModelId ? (baselineCounts.get(c.setupSheetModelId) ?? 0) : 0,
+    priorSetupCount: priorSetupCounts.get(c.id) ?? 0,
   }));
 
   return (
