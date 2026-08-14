@@ -100,6 +100,11 @@ export type DerivedBoxStyle = {
   fontSizeFrac: number;
   /** Tick boxes only: the mark this box makes when it is ticked. */
   checkMark?: string;
+  /**
+   * The field is multiline — a notes or comments box. It wraps its text instead of shrinking it, so
+   * an auto size taken from the box's height would be several times too big. See `autoFontSize`.
+   */
+  multiline?: boolean;
 };
 
 export type DerivedSheetStats = {
@@ -499,10 +504,13 @@ export function deriveSchemaFromAcroForm(
           fontFamily: a.fontFamily,
           bold: a.bold,
           italic: a.italic,
-          color: a.color,
+          // A tick box's own ON picture beats the field's default appearance — see
+          // `markColorFromAppearanceStream`. Text widgets never carry one, so they are unaffected.
+          color: widget.markColor ?? a.color,
           alignment: a.alignment,
           fontSizeFrac: a.fontSize > 0 ? a.fontSize / widget.pageHeight : 0,
           ...(widget.checkMark ? { checkMark: widget.checkMark } : {}),
+          ...(a.multiline ? { multiline: true } : {}),
         },
       });
     }

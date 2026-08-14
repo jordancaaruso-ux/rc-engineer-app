@@ -63,10 +63,13 @@ function boxFor(
       fontFamily: a.fontFamily,
       bold: a.bold,
       italic: a.italic,
-      color: a.color,
+      // A tick box's own ON picture beats the field's default appearance — see
+      // `markColorFromAppearanceStream`. Text widgets never carry one, so they are unaffected.
+      color: widget.markColor ?? a.color,
       alignment: a.alignment,
       fontSizeFrac: a.fontSize > 0 ? a.fontSize / widget.pageHeight : 0,
       ...(widget.checkMark ? { checkMark: widget.checkMark } : {}),
+      ...(a.multiline ? { multiline: true } : {}),
     },
     ...(optionValue !== undefined ? { optionValue } : {}),
   };

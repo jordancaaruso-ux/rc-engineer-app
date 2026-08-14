@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
 import { extractPdfFormFields } from "@/lib/setupDocuments/pdfFormFields";
+import { boxesFromCalibrationMappings } from "@/lib/setupSheetModels/boxesFromCalibration";
 import { parseStoredBoxes } from "@/lib/setupSheetModels/sheetPlan";
 import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import { unionDerivedWithCalibration } from "@/lib/setupSheetModels/unionDerivedWithCalibration";
@@ -24,14 +25,39 @@ import { unionDerivedWithCalibration } from "@/lib/setupSheetModels/unionDerived
  * no new answer, and would let one driver's revised sheet reshape a chassis everybody shares.
  */
 
+/**
+ * A box's look, to the precision a person could see.
+ *
+ * `fontSizeFrac` is a division that round-trips through JSON, and 151 of the A800RR's 271 boxes come
+ * back differing in the seventeenth decimal place. Comparing the raw objects called every one of
+ * them restyled and buried the one box that genuinely changed.
+ */
+function styleFingerprint(style: unknown): string {
+  if (!style || typeof style !== "object") return "";
+  const s = style as Record<string, unknown>;
+  return Object.keys(s)
+    .sort()
+    .map((k) => `${k}=${typeof s[k] === "number" ? (s[k] as number).toFixed(6) : String(s[k])}`)
+    .join("|");
+}
+
 export type UnionApplyResult = {
   /** Boxes that already had a key — nothing to do for these. */
   claimedWidgetCount: number;
   /** Parameters this run created. Zero on a re-run over an unchanged blank. */
   addedFieldCount: number;
   addedBoxCount: number;
+  /**
+   * Of those, keys the CALIBRATION already mapped but the schema never declared — the printed header
+   * strip. They had no box and no export until this ran; see `fieldsForCalibrationOnlyKeys`.
+   */
+  calibrationOnlyKeys: string[];
   /** Keys that collided with something already on the chassis and were suffixed. Permanent. */
   collidedKeys: string[];
+  /** Existing boxes whose look changed because the blank is being read better than it was. */
+  restyledBoxCount: number;
+  /** Boxes on the chassis after this run — the whole sheet, not just the additions. */
+  totalBoxCount: number;
   /** Written, or previewed only. */
   applied: boolean;
 };
@@ -94,18 +120,54 @@ export async function applyUnionToChassis(input: {
     label: model.name,
   });
 
+  const nextSchema = { ...schema, fields: [...schema.fields, ...union.fields] };
+  const nextDerived = { ...existingDerived, ...union.mappings };
+
+  /*
+   * ================== THE WHOLE SHEET IS REDRAWN, NOT JUST THE ADDITIONS ==================
+   *
+   * Every box's geometry AND look is read off this blank — nobody authored them — so the stored
+   * boxes are a cache of what the PDF says, and rebuilding them from the same file is how a fix to
+   * the reading reaches boxes that already exist. Two landed on 2026-08-14 that a purely additive
+   * run would have left stranded on the boxes that most need them: a tick's colour now comes from
+   * the box's own ON picture rather than the field's default-appearance string, and a multiline
+   * comments box is marked as one so it wraps instead of being sized to its height.
+   *
+   * Safe because it is the same call that placed them: `derivedMappingsJson` is key → PDF field, the
+   * exact shape `boxesFromCalibrationMappings` reads, so a derived box comes back on the same widget
+   * it was minted from. A key that has lost its PDF field simply produces no box, which is what an
+   * additive run would leave behind anyway.
+   */
+  const rebuilt = boxesFromCalibrationMappings({
+    extraction,
+    // Calibration last so a named parameter wins a key a derived rule also claims.
+    formFieldMappings: { ...nextDerived, ...calibrationMappings },
+    schema: nextSchema,
+    extraSimpleKeys: input.extraSimpleKeys,
+  });
+
+  const before = new Map(
+    parseStoredBoxes(blank.boxesJson).map((b) => [`${b.key}#${b.optionValue ?? ""}`, b] as const)
+  );
+  let restyledBoxCount = 0;
+  for (const box of rebuilt.boxes) {
+    const old = before.get(`${box.key}#${box.optionValue ?? ""}`);
+    if (old && styleFingerprint(old.style) !== styleFingerprint(box.style)) restyledBoxCount += 1;
+  }
+
   const result: UnionApplyResult = {
     claimedWidgetCount: union.claimedWidgetCount,
     addedFieldCount: union.fields.length,
     addedBoxCount: union.boxes.length,
+    calibrationOnlyKeys: union.calibrationOnlyKeys,
     collidedKeys: union.stats.collidedKeys,
+    restyledBoxCount,
+    totalBoxCount: rebuilt.boxes.length,
     applied: false,
   };
-  if (!input.apply || union.fields.length === 0) return result;
+  if (!input.apply || (union.fields.length === 0 && restyledBoxCount === 0)) return result;
 
-  const nextSchema = { ...schema, fields: [...schema.fields, ...union.fields] };
-  const nextBoxes = [...parseStoredBoxes(blank.boxesJson), ...union.boxes];
-  const nextDerived = { ...existingDerived, ...union.mappings };
+  const nextBoxes = rebuilt.boxes;
 
   // One transaction: a schema carrying keys whose boxes never landed would draw a sheet with holes
   // in it, and a box pointing at a key the schema doesn't declare is dropped by `buildSheetPlan`.

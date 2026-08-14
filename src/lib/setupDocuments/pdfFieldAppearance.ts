@@ -172,6 +172,59 @@ export function parseDefaultAppearance(da: string | undefined | null): {
   return out;
 }
 
+/**
+ * The colour a tick box's ON picture actually paints its mark in.
+ *
+ * WHY THE DEFAULT-APPEARANCE STRING IS THE WRONG PLACE TO ASK. A tick box carries two descriptions
+ * of itself: the `/DA` string, which says how a viewer should draw a value it types into the field,
+ * and the `/AP /N` appearance stream, which is a little picture the PDF has already drawn of the box
+ * ticked. Acrobat paints the picture; it never consults the `/DA` for a tick. Most sheets keep the
+ * two in step, so reading the `/DA` looked right — but 4 of the 146 tick boxes on the Xray X4 '22
+ * blank have an EMPTY `/DA` while their picture paints red, so the app drew those four in black
+ * (measured 2026-08-14). Ask the picture.
+ *
+ * A content stream sets colour with the same operators as a `/DA`, operands first: `1 0 0 rg` fills
+ * red, `0 g` fills black, `k` is CMYK, and the capitals (`RG`, `G`, `K`) set the STROKE colour for
+ * outlined marks. Fill wins when both are present — a ZapfDingbats glyph is filled text.
+ *
+ * Returns undefined when the stream states no colour at all, which is a real answer: the mark then
+ * inherits, and the field's own appearance is the right thing to fall back to.
+ */
+export function markColorFromAppearanceStream(stream: string | undefined | null): string | undefined {
+  if (!stream) return undefined;
+  const tokens = stream.split(/[\s\n\r]+/);
+  let fill: string | undefined;
+  let stroke: string | undefined;
+
+  for (let i = 0; i < tokens.length; i++) {
+    const op = tokens[i];
+    const num = (offset: number) => Number(tokens[i - offset]);
+    const isFill = op === "g" || op === "rg" || op === "k";
+    const isStroke = op === "G" || op === "RG" || op === "K";
+    if (!isFill && !isStroke) continue;
+
+    let color: string | undefined;
+    const lower = op!.toLowerCase();
+    if (lower === "g" && i >= 1) {
+      const v = num(1);
+      if (Number.isFinite(v)) color = toHex(v, v, v);
+    } else if (lower === "rg" && i >= 3) {
+      const [r, g, b] = [num(3), num(2), num(1)];
+      if ([r, g, b].every(Number.isFinite)) color = toHex(r, g, b);
+    } else if (lower === "k" && i >= 4) {
+      const [c, m, y, kk] = [num(4), num(3), num(2), num(1)];
+      if ([c, m, y, kk].every(Number.isFinite)) {
+        color = toHex((1 - c) * (1 - kk), (1 - m) * (1 - kk), (1 - y) * (1 - kk));
+      }
+    }
+    if (!color) continue;
+    if (isFill) fill = color;
+    else stroke = color;
+  }
+
+  return fill ?? stroke;
+}
+
 export function describePdfFieldAppearance(input: {
   /** The field's own default appearance, if it has one. */
   da?: string | null;

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   checkMarkForCaption,
   describePdfFieldAppearance,
+  markColorFromAppearanceStream,
   parseDefaultAppearance,
   parsePdfFontName,
 } from "@/lib/setupDocuments/pdfFieldAppearance";
@@ -81,6 +82,25 @@ import {
   // An unknown or missing caption falls back to the one everybody recognises.
   assert.equal(checkMarkForCaption(undefined), "✔");
   assert.equal(checkMarkForCaption("?"), "✔");
+}
+
+// --- The mark's colour lives in the box's own ON picture, not its default-appearance string ---
+// Measured 2026-08-14: 18 of the 434 tick widgets across the three repo blanks have a black or
+// absent `/DA` while their picture paints red, and those 18 used to draw black.
+{
+  assert.equal(markColorFromAppearanceStream("q 1 0 0 rg BT /ZaDb 9 Tf (4) Tj ET Q"), "#ff0000");
+  assert.equal(markColorFromAppearanceStream("0 g BT (8) Tj ET"), "#000000");
+  // Fill wins over stroke — a ZapfDingbats mark is filled text.
+  assert.equal(markColorFromAppearanceStream("0 0 1 RG 1 0 0 rg (4) Tj"), "#ff0000");
+  // Stroke alone is still an answer, for a mark drawn as an outline.
+  assert.equal(markColorFromAppearanceStream("0 1 0 RG 2 w 0 0 m 5 5 l S"), "#00ff00");
+  // CMYK, and the last colour set is the one the mark ends up painted in.
+  assert.equal(markColorFromAppearanceStream("0 1 1 0 k (4) Tj"), "#ff0000");
+  assert.equal(markColorFromAppearanceStream("1 0 0 rg 0 0 1 rg (4) Tj"), "#0000ff");
+  // No colour stated is a real answer: the caller falls back to the field's own appearance.
+  assert.equal(markColorFromAppearanceStream("BT /ZaDb 9 Tf (4) Tj ET"), undefined);
+  assert.equal(markColorFromAppearanceStream(""), undefined);
+  assert.equal(markColorFromAppearanceStream(undefined), undefined);
 }
 
 console.log("pdfFieldAppearance.test.ts ok");

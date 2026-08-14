@@ -45,6 +45,14 @@ async function main() {
   console.log(`chassis: ${model.name}`);
   console.log(`boxes the calibration already owns: ${result.claimedWidgetCount}`);
   console.log(`parameters added: ${result.addedFieldCount} (${result.addedBoxCount} boxes)`);
+  if (result.calibrationOnlyKeys.length > 0) {
+    console.log(
+      `  ...of which the calibration already mapped but the schema never declared: ${JSON.stringify(result.calibrationOnlyKeys)}`
+    );
+  }
+  console.log(
+    `boxes on the sheet after this run: ${result.totalBoxCount} (${result.restyledBoxCount} existing boxes restyled from the blank)`
+  );
   if (result.collidedKeys.length > 0) {
     console.log(`keys suffixed to avoid a collision (permanent): ${JSON.stringify(result.collidedKeys)}`);
   }

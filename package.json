@@ -67,7 +67,7 @@
     "test:picker-models": "npx tsx src/lib/setupSheetModels/pickerModels.test.ts && npx tsx --test src/lib/setupSheetModels/modelAccess.test.ts",
     "test:new-parameter": "npx tsx --test src/lib/setupSheetModels/newParameterDef.test.ts src/lib/setupSheetModels/parameterNameSuggestions.test.ts src/lib/setupSheetModels/pendingBoxGrid.test.ts",
     "test:setup-fill-order": "npx tsx --test src/lib/setup/setupFillOrder.test.ts",
-    "test:setup-pdf-fill": "npx tsx --test src/lib/setup/fillMappingFromCalibration.test.ts",
+    "test:setup-pdf-fill": "npx tsx --test src/lib/setup/fillMappingFromCalibration.test.ts src/lib/setup/geometrySignNormalize.test.ts",
     "test:setup-fill-draft": "npx tsx --test src/lib/setup/setupFillDraft.test.ts",
     "test:setup-history": "npx tsx --test src/lib/setup/carSetupHistory.test.ts",
     "test:preset-with-other": "npx tsx --test src/lib/setup/presetWithOther.test.ts",

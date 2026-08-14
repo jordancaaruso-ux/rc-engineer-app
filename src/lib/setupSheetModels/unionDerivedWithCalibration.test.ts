@@ -194,3 +194,73 @@ test("added parameters sort after everything already on the chassis", () => {
   });
   assert.equal(result.fields[0]!.sortOrder, 58);
 });
+
+/*
+ * ================= THE CALIBRATION NAMED A KEY THE SCHEMA NEVER DECLARED =================
+ *
+ * Measured on the A800RR, 2026-08-14: eight of its calibration's keys — date, name, race, class,
+ * track, country, air_temp, track_temp — had no schema field, so `boxesFromCalibrationMappings`
+ * skipped them and the printed header strip drew blank and exported blank.
+ */
+test("a mapped key the schema never declared gets a parameter and a box", () => {
+  const result = unionDerivedWithCalibration({
+    extraction: extraction([
+      { name: "Text1", widgets: 1 },
+      { name: "Text99", widgets: 1 },
+    ]),
+    schema: { fields: [field({ key: "camber_front", sortOrder: 12 })] },
+    formFieldMappings: { name: { pdfFieldName: "Text1" } as PdfFormFieldMappingRule },
+    label: "A800RR",
+  });
+
+  assert.deepEqual(result.calibrationOnlyKeys, ["name"]);
+  const minted = result.fields.find((f) => f.key === "name");
+  assert.ok(minted, "the missing key becomes a parameter");
+  assert.equal(minted.displayLabel, "Name");
+  // Document metadata, not tuning: a track name must never read as a setup change.
+  assert.equal(minted.showInLogRun, false);
+  assert.equal(minted.showInAnalysis, false);
+  assert.equal(minted.showInSetupSheet, true);
+  assert.ok(result.boxes.some((b) => b.key === "name"), "and gets geometry on the paper");
+
+  // Its rule stays the calibration's — copying it into the derived map would give one box two readers.
+  assert.equal(result.mappings.name, undefined);
+  // The derived box for the unclaimed field still sorts after everything, header included.
+  const derived = result.fields.find((f) => f.key !== "name")!;
+  assert.ok(derived.sortOrder > minted.sortOrder);
+});
+
+test("keys the schema already declares are left alone, so a second run adds nothing", () => {
+  const result = unionDerivedWithCalibration({
+    extraction: extraction([{ name: "Text1", widgets: 1 }]),
+    schema: { fields: [field({ key: "name" })] },
+    formFieldMappings: { name: { pdfFieldName: "Text1" } as PdfFormFieldMappingRule },
+    label: "A800RR",
+  });
+  assert.deepEqual(result.calibrationOnlyKeys, []);
+  assert.deepEqual(result.fields, []);
+  assert.deepEqual(result.boxes, []);
+});
+
+test("a mapped choice row the schema lacks keeps its options rather than becoming free text", () => {
+  const result = unionDerivedWithCalibration({
+    extraction: extraction([{ name: "Surface", widgets: 2, type: "CheckBox" }]),
+    schema: { fields: [] },
+    formFieldMappings: {
+      surface: {
+        mode: "singleChoiceWidgetGroup",
+        pdfFieldName: "Surface",
+        options: { Carpet: { widgetInstanceIndex: 0 }, Asphalt: { widgetInstanceIndex: 1 } },
+      } as PdfFormFieldMappingRule,
+    },
+    label: "A800RR",
+  });
+  const minted = result.fields.find((f) => f.key === "surface")!;
+  assert.equal(minted.valueType, "enum");
+  assert.deepEqual(minted.groupedOptionValues, ["Carpet", "Asphalt"]);
+  // One box per printed choice, each carrying which option it stands for.
+  assert.deepEqual(
+    result.boxes.filter((b) => b.key === "surface").map((b) => b.optionValue),
+    ["Carpet", "Asphalt"]
+  );
+});

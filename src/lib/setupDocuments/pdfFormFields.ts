@@ -1,19 +1,23 @@
 import "server-only";
 
 import {
+  decodePDFRawStream,
   PDFCheckBox,
+  PDFDict,
   PDFDocument,
   PDFDropdown,
   PDFField,
   PDFName,
   PDFOptionList,
   PDFRadioGroup,
+  PDFRawStream,
   PDFTextField,
 } from "pdf-lib";
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
 import {
   checkMarkForCaption,
   describePdfFieldAppearance,
+  markColorFromAppearanceStream,
   type PdfFieldAppearance,
 } from "@/lib/setupDocuments/pdfFieldAppearance";
 import { normalizeTemplateExtractedValue } from "@/lib/setupCalibrations/applyTextTemplate";
@@ -46,6 +50,14 @@ export type PdfFormFieldWidgetRect = {
    * See `pdfFieldAppearance`: the Xray X4 '26 blank crosses 131 boxes and ticks none.
    */
   checkMark?: string;
+  /**
+   * `#rrggbb` the box's own ON picture paints that mark in, when it says.
+   *
+   * Separate from the field's `appearance.color` because they are different statements and can
+   * disagree — see `markColorFromAppearanceStream`. Absent when the picture states no colour or
+   * cannot be read, and the field's appearance is then the honest fallback.
+   */
+  markColor?: string;
 };
 
 export type PdfFormFieldEntry = {
@@ -148,6 +160,44 @@ function widgetAppearanceIsOn(widget: AcroWidget): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * The colour this tick box's ON picture paints in — read out of the picture itself.
+ *
+ * The stream is usually Flate-compressed, so it has to be decoded before it is text. Every step is
+ * wrapped: an unreadable or unusually-encoded stream costs this one box its colour and nothing else,
+ * and the caller falls back to the field's default appearance exactly as it did before.
+ */
+function widgetMarkColor(widget: AcroWidget): string | undefined {
+  try {
+    const normal = (widget as unknown as { getAppearances?: () => { normal?: unknown } })
+      .getAppearances?.()?.normal;
+    if (!normal) return undefined;
+
+    // A checkbox's normal appearance is a dictionary of states — `/Off` plus one ON state, whose
+    // name varies per file (`/On`, `/Yes`, `/1`…). Anything that isn't Off is the mark.
+    let onStream: unknown = normal;
+    if (normal instanceof PDFDict) {
+      onStream = undefined;
+      for (const k of normal.keys()) {
+        if (k.toString() === "/Off") continue;
+        onStream = normal.lookup(k);
+        break;
+      }
+    }
+    if (!(onStream instanceof PDFRawStream)) return undefined;
+
+    const bytes = decodePDFRawStream(onStream).decode();
+    return markColorFromAppearanceStream(Buffer.from(bytes).toString("latin1"));
+  } catch {
+    return undefined;
+  }
+}
+
+/** Keeps `markColor` off the object entirely when the picture didn't say — absent means inherit. */
+function withMarkColor(color: string | undefined): { markColor?: string } {
+  return color ? { markColor: color } : {};
 }
 
 /** A malformed field should cost its own appearance, never the whole extraction. */
@@ -258,6 +308,7 @@ export function orderedFieldWidgets(
           height: rect.height,
           checked: perWidget ? widgetAppearanceIsOn(w) : undefined,
           ...(perWidget ? { checkMark: widgetCheckMark(w) } : {}),
+          ...(perWidget ? withMarkColor(widgetMarkColor(w)) : {}),
         },
       });
     }

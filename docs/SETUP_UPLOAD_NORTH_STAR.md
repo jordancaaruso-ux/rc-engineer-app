@@ -784,6 +784,53 @@ fields and keeps its fonts and tick marks.
   pdf-lib's `flatten()` also throws on all three repo blanks, because an unticked box stores no
   `/Off` appearance.
 
+### A mapped key with no schema field is a box that cannot exist
+
+The calibration's left-hand side is a schema key, and nothing ever checked that the schema had one.
+Eight of the A800RR's didn't — `date`, `name`, `race`, `class`, `track`, `country`, `air_temp`,
+`track_temp`, exactly the printed header strip. `boxesFromCalibrationMappings` skips a mapped key the
+schema doesn't declare (it has no label, no type, nothing to match an option against), so those eight
+drew blank on screen and exported blank. Reported from prod 2026-08-14.
+
+The union pass cannot reach them: their widgets *are* claimed — by the calibration — so it correctly
+leaves them alone. The gap is on the schema side. `fieldsForCalibrationOnlyKeys` mints the missing
+parameter, keeping the calibration's key **verbatim** so anything an older import already stored
+still points at it; only the label, type and visibility are new. Header boxes are document metadata,
+so they are kept off Log your run and out of analysis — a track name is not a setup change.
+
+### The union redraws the whole sheet, not just its additions
+
+Box geometry *and* look are read off the blank — nobody authored them — so `boxesJson` is a cache of
+what that PDF says, and `applyUnionToChassis` rebuilds all of it from the same file on every run.
+That is how a fix to the *reading* reaches boxes that already exist. Safe because it is the same call
+that placed them: `derivedMappingsJson` is key → PDF field, exactly the shape
+`boxesFromCalibrationMappings` reads. Still idempotent — a second run over an unchanged blank adds
+nothing and restyles nothing.
+
+### Looking like the sheet: what is measured, and what is still a guess
+
+- **A tick's colour comes from the box's own ON picture** (`/AP /N`), not its `/DA` string. Acrobat
+  paints the picture and never consults the `/DA` for a tick. 18 of the 434 tick widgets across the
+  three repo blanks have a black or absent `/DA` while their picture paints red, and those 18 drew
+  black. None of them are on the A800RR — this is an Xray fix.
+- **Auto-sized text was measured, not chosen.** Every text field on these sheets says `0 Tf`, so the
+  app decides every value's size. A real filled A800RR carries a baked appearance stream per box
+  stating the size its viewer committed to: across 77 such boxes the size came to a median **0.723**
+  of the box height (0.734 over the 73 whose height was the binding limit), and the implied character
+  advance to 0.536. `AUTO_TEXT_HEIGHT_RATIO` moved 0.66 → 0.73 and `AVERAGE_ADVANCE` 0.55 → 0.54;
+  the old numbers drew every value about 1.1pt small.
+- **A multiline box wraps, so it is not sized to its height.** The same sheet's comments box is
+  78.6pt tall and its viewer drew 11pt in it — a ratio of 0.14. The height rule made it five times
+  too big and the one-imaginary-line width rule made it half size, which is what shipped. Multiline
+  is now carried on the box (`DerivedBoxStyle.multiline`) and capped at a share of the *page* height.
+  **Fitted to one real sample; Acrobat's multiline rule is not published.**
+- **Camber and toe print unsigned.** The sign is the app's, added at import so every stored angle
+  compares the same way across cars. No manufacturer sheet prints one — the printed caption carries
+  the direction. `unsignedGeometryValueForPaper` strips it on the way to the PDF only, never in
+  storage and never on screen, so a sheet uploaded reading 1.75 downloads reading 1.75.
+- **Not attempted:** matching Acrobat's text rendering exactly. Both renderers are guessing at a size
+  the file never states, and only one of the two algorithms is published.
+
 ---
 
 ## Confidence doctrine

@@ -63,6 +63,8 @@ export type SheetFillBoxStyle = {
   fontSizeFrac: number;
   /** Tick boxes: the mark this box makes. Not always a check. */
   checkMark?: string;
+  /** The PDF marks this box as multiline — it wraps rather than shrinking. See `autoFontSize`. */
+  multiline?: boolean;
 };
 
 export type SheetFillBox = {
@@ -190,9 +192,33 @@ const FIELD_TINT_BORDER = "rgba(112, 152, 200, 0.55)";
 const FOCUS_TINT = "rgba(255, 214, 10, 0.42)";
 const FOCUS_HALO = "0 0 0 2px rgba(255, 214, 10, 0.95), 0 0 0 5px rgba(255, 214, 10, 0.18)";
 
-/** A viewer sizes an auto-sized value to the box; this is that, near enough to read the same. */
-const AUTO_TEXT_HEIGHT_RATIO = 0.66;
+/**
+ * A viewer sizes an auto-sized value to the box; this is that, near enough to read the same.
+ *
+ * MEASURED, NOT CHOSEN (2026-08-14). A real filled A800RR sheet carries a baked appearance stream
+ * per box stating the size the viewer committed to. Across its 77 auto-sized filled boxes, the size
+ * the viewer picked came to a median **0.723** of the box height — 0.734 across the 73 whose height
+ * was the binding limit. The app's previous 0.66 drew every value about 1.1pt small, which is what
+ * "the text looks slightly different" was.
+ */
+const AUTO_TEXT_HEIGHT_RATIO = 0.73;
 const AUTO_MARK_HEIGHT_RATIO = 0.78;
+
+/**
+ * A note box is not sized to its height — it wraps.
+ *
+ * The same sheet's comments box is 78.6pt tall and its viewer drew 11pt in it, a ratio of 0.14: a
+ * multiline field gets a comfortable reading size and as many lines as it needs, not one enormous
+ * line. Applying the height ratio there produced text five times too big, and capping it by width on
+ * one imaginary line produced text half the size it should be, which is what actually shipped.
+ *
+ * So a multiline box is capped at a share of the PAGE height rather than its own — 11pt on this
+ * sheet's 842pt page is 0.0131, and the cap sits just above it. Fitted to one real sample, which is
+ * one more than the old number had; Acrobat's multiline rule is not published.
+ */
+const AUTO_MULTILINE_MAX_PAGE_FRAC = 0.0143;
+/** Line box as a share of font size — ordinary text leading, used when wrapping. */
+const AUTO_LINE_HEIGHT = 1.15;
 
 const DEFAULT_BOX_STYLE: SheetFillBoxStyle = {
   fontFamily: "Helvetica, Arial, sans-serif",
@@ -208,22 +234,54 @@ function keepKeyboard(e: React.MouseEvent) {
   e.preventDefault();
 }
 
-/** Roughly how wide a character is, as a share of its size, in the fonts these sheets use. */
-const AVERAGE_ADVANCE = 0.55;
+/**
+ * Roughly how wide a character is, as a share of its size, in the fonts these sheets use.
+ *
+ * Measured the same way as {@link AUTO_TEXT_HEIGHT_RATIO}: on the four filled boxes whose WIDTH was
+ * the binding limit, the advance implied by the size the viewer chose came to a median 0.536.
+ */
+const AVERAGE_ADVANCE = 0.54;
 
 /**
  * The size a viewer picks when the field says `0 Tf` — big enough to read, small enough to fit.
  *
  * Sizing by the box's height alone is not enough: setup-sheet boxes are short and narrow, so "0.5"
- * at two-thirds of the box height overflows a bump-steer box and gets cut off. A viewer shrinks the
+ * at nearly the full box height overflows a bump-steer box and gets cut off. A viewer shrinks the
  * text until the whole value fits, and so does this.
+ *
+ * A multiline box is the other way round — it wraps instead of shrinking, so the width limit is
+ * shared across however many lines fit, and the whole thing is capped at a readable size rather than
+ * grown to the box. See {@link AUTO_MULTILINE_MAX_PAGE_FRAC}.
  */
-function autoFontSize(text: string, boxWidth: number, boxHeight: number, isTick: boolean): number {
+function autoFontSize(input: {
+  text: string;
+  boxWidth: number;
+  boxHeight: number;
+  isTick: boolean;
+  multiline?: boolean;
+  /** Rendered height of the whole page, for the multiline cap. Omitted disables it. */
+  pageHeight?: number;
+}): number {
+  const { text, boxWidth, boxHeight, isTick } = input;
   const byHeight = boxHeight * (isTick ? AUTO_MARK_HEIGHT_RATIO : AUTO_TEXT_HEIGHT_RATIO);
   const chars = Math.max(text.length, 1);
   const inner = Math.max(boxWidth - 2, 1);
-  const byWidth = inner / (chars * AVERAGE_ADVANCE);
-  return Math.max(Math.min(byHeight, byWidth), 3);
+
+  if (!input.multiline || isTick) {
+    return Math.max(Math.min(byHeight, inner / (chars * AVERAGE_ADVANCE)), 3);
+  }
+
+  const cap = input.pageHeight ? input.pageHeight * AUTO_MULTILINE_MAX_PAGE_FRAC : byHeight;
+  // Largest size at which the wrapped text still fits the box's height. Solved by walking down from
+  // the cap rather than in closed form, because the line count is a ceiling and the closed form
+  // rounds the wrong way — it returned a size whose fourth line fell off the bottom of the box.
+  let size = Math.min(cap, byHeight);
+  while (size > 3) {
+    const perLine = Math.max(Math.floor(inner / (size * AVERAGE_ADVANCE)), 1);
+    if (Math.ceil(chars / perLine) * size * AUTO_LINE_HEIGHT <= boxHeight) break;
+    size -= 0.5;
+  }
+  return Math.max(size, 3);
 }
 
 /** Structural, so it takes both React's synthetic touches and the DOM's. */
@@ -1033,7 +1091,14 @@ export function SheetFillSurface({
               const boxWidth = Math.max(b.width * fitted.width, 5);
               const fontSize = s.fontSizeFrac
                 ? Math.max(s.fontSizeFrac * fitted.height, 3)
-                : autoFontSize(isTick ? "✔" : value, boxWidth, boxHeight, isTick);
+                : autoFontSize({
+                    text: isTick ? "✔" : value,
+                    boxWidth,
+                    boxHeight,
+                    isTick,
+                    multiline: s.multiline,
+                    pageHeight: fitted.height,
+                  });
               const editingHere = desktopEditing && isFocused;
               return (
                 <button
@@ -1116,7 +1181,14 @@ export function SheetFillSurface({
               const boxHeight = Math.max(focusedBox.height * fitted.height, 5);
               const fontSize = s.fontSizeFrac
                 ? Math.max(s.fontSizeFrac * fitted.height, 3)
-                : autoFontSize(value, boxWidth, boxHeight, false);
+                : autoFontSize({
+                    text: value,
+                    boxWidth,
+                    boxHeight,
+                    isTick: false,
+                    multiline: s.multiline,
+                    pageHeight: fitted.height,
+                  });
               return (
                 <input
                   ref={inputRef}

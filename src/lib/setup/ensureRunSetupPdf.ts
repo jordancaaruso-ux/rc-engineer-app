@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { normalizeSetupData } from "@/lib/runSetup";
 import { flattenFillMappings } from "@/lib/setup/fillMappingFromCalibration";
+import { unsignedGeometryValueForPaper } from "@/lib/setup/geometrySignNormalize";
 import { SETUP_PDF_RENDER_PIPELINE_VERSION } from "@/lib/setup/renderTypes";
 import { getEffectiveCalibrationProfileId, ensureSetupDocumentCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
 import { buildDerivedRenderPatch } from "@/lib/setup/deriveRenderValues";
@@ -168,8 +169,13 @@ async function fillSetupPdf(input: {
   for (const k of derivedPatch.clear) delete renderValues[k];
   for (const [k, v] of Object.entries(derivedPatch.set)) renderValues[k] = v;
 
-  // The same bridge the on-screen sheet uses, so a box the driver sees filled exports filled.
+  // The same bridge the on-screen sheet uses, so a box the driver sees filled exports filled...
   const surfaceValues = storedValuesToSurface(renderValues);
+  // ...except for the sign the app puts on camber and toe, which no manufacturer's sheet prints.
+  // See `unsignedGeometryValueForPaper`: paper only, never storage and never the screen.
+  for (const [key, value] of Object.entries(surfaceValues)) {
+    surfaceValues[key] = unsignedGeometryValueForPaper(key, value);
+  }
   const flat = flattenFillMappings({
     formFieldMappings: input.source.mappings,
     surfaceValues,

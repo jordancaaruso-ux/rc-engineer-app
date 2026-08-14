@@ -1,7 +1,10 @@
+import { inferUiTypeFromAcroType } from "@/lib/setupCalibrations/customFieldCatalog";
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
 import type { PdfFormFieldsExtraction } from "@/lib/setupDocuments/pdfFormFields";
+import { boxesFromCalibrationMappings } from "@/lib/setupSheetModels/boxesFromCalibration";
 import {
   deriveSchemaFromAcroForm,
+  labelFromAcroFieldName,
   type DerivedBox,
   type DerivedSheetStats,
   type WidgetRef,
@@ -55,12 +58,101 @@ export type UnionResult = {
   fields: SetupSheetModelFieldDef[];
   /** Geometry for those parameters, to merge into `SetupSheetBlank.boxesJson`. */
   boxes: DerivedBox[];
-  /** Schema key -> where it sits on this blank. Stored apart from the calibration — see above. */
+  /**
+   * Schema key -> where it sits on this blank, for the DERIVED parameters only. The
+   * calibration-only keys are deliberately absent: the calibration already maps them and is already
+   * read for them, so copying the rule here would give one printed box two readers.
+   */
   mappings: Record<string, PdfFormFieldMappingRule>;
+  /** Which of `fields` are calibration-only keys rather than newly-derived boxes. */
+  calibrationOnlyKeys: string[];
   /** Boxes the calibration already owns, so a run can report coverage honestly. */
   claimedWidgetCount: number;
   stats: DerivedSheetStats;
 };
+
+/**
+ * The calibration names a key the schema never declared — mint the parameter it was missing.
+ *
+ * ================================ WHY THESE EXIST AT ALL ================================
+ *
+ * A calibration's left-hand side is a schema key, and nothing ever checked that the schema actually
+ * had one. On the A800RR eight did not: `date`, `name`, `race`, `class`, `track`, `country`,
+ * `air_temp`, `track_temp` — the printed header strip. `boxesFromCalibrationMappings` skips a mapped
+ * key with no schema field (it has no label, no type and nothing to compare an option against), so
+ * those eight had no box on screen and nothing to export, and a driver downloading their sheet got a
+ * blank NAME / RACE / TRACK / DATE row. Measured 2026-08-14.
+ *
+ * The main union pass cannot reach them: their widgets ARE claimed — by the calibration — so it
+ * correctly leaves them alone. The gap is on the schema side, and this closes it.
+ *
+ * The key is taken from the calibration verbatim, never minted, so it stays what any older import
+ * already wrote into a saved setup. Only the label, type and visibility are new.
+ *
+ * Header boxes are document metadata, not tuning: they are kept off Log your run and out of
+ * analysis, so a track name never turns up as a setup change or in a cross-car comparison.
+ */
+function fieldsForCalibrationOnlyKeys(input: {
+  extraction: PdfFormFieldsExtraction;
+  schema: Pick<SetupSheetModelSchema, "fields">;
+  formFieldMappings: Record<string, PdfFormFieldMappingRule>;
+  extraSimpleKeys?: Record<string, string>;
+  sortBase: number;
+}): SetupSheetModelFieldDef[] {
+  const declared = new Set(input.schema.fields.map((f) => f.key));
+  const byName = new Map(input.extraction.fields.map((f) => [f.name, f] as const));
+
+  const missing: Array<{ key: string; rule?: PdfFormFieldMappingRule; pdfFieldName?: string }> = [];
+  for (const [key, rule] of Object.entries(input.formFieldMappings)) {
+    if (!declared.has(key)) missing.push({ key, rule });
+  }
+  for (const [key, pdfFieldName] of Object.entries(input.extraSimpleKeys ?? {})) {
+    if (!declared.has(key) && !missing.some((m) => m.key === key)) missing.push({ key, pdfFieldName });
+  }
+
+  return missing.map(({ key, rule, pdfFieldName }, i) => {
+    const r = (rule ?? {}) as {
+      mode?: string;
+      pdfFieldName?: string;
+      options?: Record<string, unknown>;
+    };
+    const grouped =
+      r.mode === "singleChoiceWidgetGroup"
+      || r.mode === "multiSelectWidgetGroup"
+      || r.mode === "singleChoiceNamedFields"
+      || r.mode === "multiSelectNamedFields";
+    const entry = byName.get(r.pdfFieldName ?? pdfFieldName ?? "");
+    const uiType = grouped ? "select" : inferUiTypeFromAcroType(entry?.type ?? "");
+
+    const base: SetupSheetModelFieldDef = {
+      key,
+      // `air_temp` → "Air temp". The key was written by whoever mapped the box, so it already says
+      // what the box is; nothing better is available, since a calibration carries no labels.
+      displayLabel: labelFromAcroFieldName(key) || key,
+      sectionId: "grp_other",
+      sectionTitle: "Other",
+      valueType: uiType === "checkbox" ? "boolean" : "string",
+      uiType,
+      showInSetupSheet: true,
+      showInLogRun: false,
+      showInAnalysis: false,
+      sortOrder: input.sortBase + i + 1,
+    };
+    if (!grouped) return base;
+
+    // The rule's option keys ARE the stored values — that is what the calibrated read writes.
+    const options = Object.keys(r.options ?? {});
+    const multi = r.mode === "multiSelectWidgetGroup" || r.mode === "multiSelectNamedFields";
+    return {
+      ...base,
+      valueType: multi ? "multi" : "enum",
+      uiType: multi ? "multiSelect" : "select",
+      groupBehaviorType: multi ? "multiChoiceGroup" : "singleSelect",
+      groupedOptionLabels: options,
+      groupedOptionValues: options,
+    };
+  });
+}
 
 /**
  * Which boxes a calibration already speaks for, across all five mapping shapes.
@@ -136,10 +228,42 @@ export function unionDerivedWithCalibration(input: {
   // parameters. Push them past the end instead; on the sheet surface order is geometry, not this.
   const sortBase = input.schema.fields.reduce((m, f) => Math.max(m, f.sortOrder ?? 0), 0);
 
+  // Keys the calibration maps that the schema never declared. Minted first so they sort ahead of the
+  // unnamed boxes — they are the header of the sheet, and they are the ones a person recognises.
+  const calibrationOnly = fieldsForCalibrationOnlyKeys({
+    extraction: input.extraction,
+    schema: input.schema,
+    formFieldMappings: input.formFieldMappings,
+    extraSimpleKeys: input.extraSimpleKeys,
+    sortBase,
+  });
+
+  /*
+   * Their geometry comes from the ordinary calibration box builder, run against a schema that now
+   * declares them — the same call the chassis was attached with, so a header box is placed by
+   * exactly the rule that placed every other calibrated box (grouped options included). Only the new
+   * keys are kept; every other box already exists in `boxesJson`.
+   */
+  const newKeys = new Set(calibrationOnly.map((f) => f.key));
+  const calibrationOnlyBoxes = newKeys.size
+    ? boxesFromCalibrationMappings({
+        extraction: input.extraction,
+        formFieldMappings: input.formFieldMappings,
+        schema: { fields: [...input.schema.fields, ...calibrationOnly] },
+        extraSimpleKeys: input.extraSimpleKeys,
+      }).boxes.filter((b) => newKeys.has(b.key))
+    : [];
+
+  const derivedSortBase = sortBase + calibrationOnly.length;
+
   return {
-    fields: derived.schema.fields.map((f) => ({ ...f, sortOrder: sortBase + (f.sortOrder ?? 0) })),
-    boxes: derived.boxes,
+    fields: [
+      ...calibrationOnly,
+      ...derived.schema.fields.map((f) => ({ ...f, sortOrder: derivedSortBase + (f.sortOrder ?? 0) })),
+    ],
+    boxes: [...calibrationOnlyBoxes, ...derived.boxes],
     mappings: derived.formFieldMappings,
+    calibrationOnlyKeys: calibrationOnly.map((f) => f.key),
     claimedWidgetCount: claimed.length,
     stats: derived.stats,
   };
