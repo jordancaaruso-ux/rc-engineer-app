@@ -420,7 +420,7 @@ export function NewParameterFromBoxesPanel(props: {
             return (
               <div key={position} className="space-y-1 border-t border-border/60 pt-2">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-[10px] text-muted-foreground">{position}</span>
+                  <span className="tabular-nums text-[10px] text-muted-foreground">{position}</span>
                   <button
                     type="button"
                     className={cn(chipToggleClass(overridden), "px-2 py-0.5 text-[10px]")}
@@ -462,7 +462,7 @@ export function NewParameterFromBoxesPanel(props: {
           <div className="space-y-1">
             {grid.map((cells, row) => (
               <div key={positions[row] ?? row} className="flex items-stretch gap-1">
-                <span className="w-10 shrink-0 self-center font-mono text-[10px] text-muted-foreground">
+                <span className="w-10 shrink-0 self-center tabular-nums text-[10px] text-muted-foreground">
                   {positions[row] ?? row + 1}
                 </span>
                 {cells.map((box, col) => {
@@ -496,7 +496,7 @@ export function NewParameterFromBoxesPanel(props: {
                       }
                     >
                       {optionLabel ? (
-                        <span className="block truncate font-mono text-[9px] opacity-70">
+                        <span className="block truncate tabular-nums text-[9px] opacity-70">
                           {optionLabel}
                         </span>
                       ) : null}
@@ -518,7 +518,7 @@ export function NewParameterFromBoxesPanel(props: {
                 onMouseEnter={() => props.onHoverBox(b?.sourceKey ?? null)}
                 onMouseLeave={() => props.onHoverBox(null)}
               >
-                <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                <span className="shrink-0 tabular-nums text-[10px] text-muted-foreground">
                   {col + 1}
                 </span>
                 {b && clickGrouped ? (
@@ -534,7 +534,7 @@ export function NewParameterFromBoxesPanel(props: {
                     placeholder={`Option ${col + 1} (e.g. CFF)`}
                   />
                 ) : (
-                  <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-muted-foreground">
+                  <span className="min-w-0 flex-1 truncate tabular-nums text-[10px] text-muted-foreground">
                     {b ? `${b.pdfFieldName}#${b.instanceIndex}` : "empty"}
                   </span>
                 )}

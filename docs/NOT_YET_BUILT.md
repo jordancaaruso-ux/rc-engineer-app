@@ -8,7 +8,7 @@ answer is *"that's planned, not built"* — don't assume a spec means shipped co
 doc or an Artifact prototype is **intent**, not implementation. Move a row to its "shipped" note (or delete it)
 only once the code actually lands and is verified. Keep this in sync with the rollout tables inside each linked spec.
 
-_Last reviewed: 2026-07-08._
+_Last reviewed: 2026-08-14._
 
 ---
 

@@ -201,11 +201,11 @@ export function EngineerGoldSetAdminSection() {
         {rows.map((row) => (
           <li key={row.id} className="rounded-lg border border-border/70 px-3 py-2 text-xs space-y-2">
             <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
-              <span className="font-mono text-foreground">{row.status}</span>
+              <span className="type-machine text-foreground">{row.status}</span>
               <span>{new Date(row.createdAt).toLocaleString()}</span>
-              {row.runId ? <span className="font-mono">run {row.runId.slice(0, 8)}…</span> : null}
+              {row.runId ? <span className="type-machine">run {row.runId.slice(0, 8)}…</span> : null}
               {row.reviewer ? (
-                <span className="font-mono text-foreground">
+                <span className="type-machine text-foreground">
                   reviewer {row.reviewer.score}/5
                 </span>
               ) : null}

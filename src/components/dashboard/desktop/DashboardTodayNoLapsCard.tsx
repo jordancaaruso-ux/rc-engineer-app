@@ -60,12 +60,12 @@ export function DashboardTodayNoLapsCard({
     <SurfaceCard variant="hero" contentClassName="p-0" className="rounded-2xl">
       <div className="flex items-center gap-3 border-b border-border px-6 py-3.5">
         <span className="h-3.5 w-[3px] shrink-0 skew-x-[-21deg] rounded-sm bg-primary" aria-hidden />
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[.2em] text-foreground">
+        <span className="micro-caps text-foreground">
           Today
         </span>
         {meta ? <span className="truncate text-[12px] text-faint">{meta}</span> : null}
         {/* Same handoff as the real hero — see `DashboardHeroCard`. */}
-        <span className="ml-auto shrink-0 font-mono text-[11px] uppercase tracking-[.12em] text-faint">
+        <span className="ml-auto shrink-0 micro-caps text-faint">
           {dayStamp}
         </span>
         <Link
@@ -83,10 +83,10 @@ export function DashboardTodayNoLapsCard({
             slot the lap numeral would have had — and the run count takes it when the
             driver rated nothing. */}
         <div className="min-w-[262px] shrink-0">
-          <div className="font-mono text-[10px] font-bold uppercase tracking-[.18em] text-faint">
+          <div className="micro-caps text-faint">
             {latest.carRating != null ? "Handling · latest run" : "Runs today"}
           </div>
-          <div className="mt-2.5 flex items-baseline gap-2 font-mono font-medium tabular-nums leading-[.84] tracking-[-.045em] text-foreground">
+          <div className="mt-2.5 flex items-baseline gap-2 font-medium tabular-nums leading-[.84] tracking-[-.045em] text-foreground">
             <span className="text-[clamp(3.5rem,4.6vw,5.5rem)]">
               {latest.carRating ?? todayRunCount}
             </span>
@@ -116,7 +116,7 @@ export function DashboardTodayNoLapsCard({
         {/* What the day was actually spent doing. */}
         <div className="min-w-0 flex-1">
           <div className="mb-2.5 flex items-baseline justify-between gap-3">
-            <span className="font-mono text-[10px] font-bold uppercase tracking-[.18em] text-faint">
+            <span className="micro-caps text-faint">
               What you changed today
             </span>
             <span className="shrink-0 text-[12px] text-faint">
@@ -137,7 +137,7 @@ export function DashboardTodayNoLapsCard({
                 <span className="w-[104px] shrink-0 truncate text-[12.5px] text-muted-foreground">
                   {run.runLabel}
                 </span>
-                <span className="w-[52px] shrink-0 font-mono text-[12.5px] tabular-nums text-faint">
+                <span className="w-[52px] shrink-0 text-[13px] tabular-nums text-faint">
                   {run.carRating != null ? `${run.carRating}/10` : "—"}
                 </span>
                 <span className="min-w-0 flex-1 text-[12.5px] leading-[1.45] text-foreground">
@@ -147,7 +147,7 @@ export function DashboardTodayNoLapsCard({
                     <ChangeSummary rows={run.changedRows} />
                   )}
                 </span>
-                <span className="shrink-0 font-mono text-[11.5px] tabular-nums text-faint">
+                <span className="shrink-0 text-[11px] tabular-nums text-faint">
                   {run.timeLabel}
                 </span>
               </li>
@@ -176,7 +176,7 @@ export function DashboardTodayNoLapsCard({
 function RatingDeltaChip({ delta }: { delta: number }) {
   if (delta === 0) {
     return (
-      <span className="rounded-md bg-muted-foreground/[.12] px-2.5 py-1 font-mono text-[13px] font-bold tabular-nums text-muted-foreground">
+      <span className="rounded-md bg-muted-foreground/[.12] px-2.5 py-1 text-[13px] font-bold tabular-nums text-muted-foreground">
         ±0
       </span>
     );
@@ -185,7 +185,7 @@ function RatingDeltaChip({ delta }: { delta: number }) {
   return (
     <span
       className={cn(
-        "rounded-md px-2.5 py-1 font-mono text-[13px] font-bold tabular-nums",
+        "rounded-md px-2.5 py-1 text-[13px] font-bold tabular-nums",
         better ? "bg-gain/[.12] text-gain" : "bg-destructive/[.12] text-destructive",
       )}
     >
@@ -208,7 +208,7 @@ function ChangeSummary({
         <span key={row.key}>
           {i > 0 ? <span className="text-faint"> · </span> : null}
           <span className="text-muted-foreground">{row.label} </span>
-          <span className="font-mono tabular-nums">
+          <span className="tabular-nums">
             {row.previous != null ? `${row.previous} → ${row.current}` : row.current}
             {row.unit ? ` ${row.unit}` : ""}
           </span>

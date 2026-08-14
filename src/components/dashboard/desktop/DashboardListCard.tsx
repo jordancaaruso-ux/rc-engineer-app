@@ -29,13 +29,13 @@ export function DashboardListCard({
   return (
     <SurfaceCard contentClassName="p-0" className="rounded-xl" dataTour={dataTour}>
       <div className="flex items-baseline gap-3 border-b border-border px-[18px] py-3.5">
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[.2em] text-faint">
+        <span className="micro-caps text-faint">
           {title}
         </span>
         {subtitle ? (
           <span className="truncate text-[11.5px] text-faint">{subtitle}</span>
         ) : null}
-        <span className="ml-auto shrink-0 font-mono text-[11px] tabular-nums text-faint">
+        <span className="ml-auto shrink-0 text-[11px] tabular-nums text-faint">
           {String(count).padStart(2, "0")}
         </span>
       </div>

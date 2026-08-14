@@ -177,7 +177,7 @@ export function AiExtractionReviewPanel({
                 reads differed
               </span>
             ) : null}
-            <span className="font-mono text-[10px] tabular-nums text-faint">
+            <span className="text-[10px] tabular-nums text-faint">
               {Math.round(f.confidence * 100)}%
             </span>
           </div>
@@ -190,7 +190,7 @@ export function AiExtractionReviewPanel({
             <select
               value={v}
               onChange={(e) => setValue(f.key, e.target.value)}
-              className="w-full rounded-md border border-border bg-input px-2 py-1.5 font-mono text-xs text-foreground"
+              className="w-full rounded-md border border-border bg-input px-2 py-1.5 tabular-nums text-xs text-foreground"
             >
               <option value="">— not set —</option>
               {f.options.map((o) => (
@@ -205,7 +205,7 @@ export function AiExtractionReviewPanel({
               value={v}
               onChange={(e) => setValue(f.key, e.target.value)}
               placeholder="empty on sheet"
-              className="w-full rounded-md border border-border bg-input px-2 py-1.5 font-mono text-xs text-foreground"
+              className="w-full rounded-md border border-border bg-input px-2 py-1.5 tabular-nums text-xs text-foreground"
             />
           )}
         </div>

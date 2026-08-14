@@ -256,7 +256,7 @@ export function LapImportWorkspace() {
           onChange={(e) => setText(e.target.value)}
           rows={5}
           placeholder={"https://…\nhttps://…"}
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground outline-none font-mono"
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground outline-none tabular-nums"
           disabled={busy}
           aria-label="Timing URLs, one per line"
         />

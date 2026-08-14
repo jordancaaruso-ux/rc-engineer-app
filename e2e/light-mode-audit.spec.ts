@@ -19,6 +19,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
+import { withDetailSurfaces } from "./surfaces";
 
 test.use({
   storageState: { cookies: [], origins: [] },
@@ -272,37 +273,8 @@ test("audit every page in both themes", async ({ page, baseURL }) => {
   await page.goto(signInUrl);
   await expect(page).not.toHaveURL(/\/login/, { timeout: 30_000 });
 
-  const SURFACES: Surface[] = [
-    { slug: "dashboard", path: "/" },
-    { slug: "analysis", path: "/analysis" },
-    { slug: "roll-center", path: "/analysis/roll-center" },
-    { slug: "sessions", path: "/runs/history" },
-    { slug: "log-run", path: "/runs/new" },
-    { slug: "engineer", path: "/engineer" },
-    { slug: "events", path: "/events" },
-    { slug: "garage", path: "/cars" },
-    { slug: "setup-hub", path: "/setup" },
-    { slug: "setup-comparison", path: "/setup/comparison" },
-    { slug: "setup-documents", path: "/setup-documents" },
-    { slug: "setup-calibrations", path: "/setup-calibrations" },
-    { slug: "chassis-types", path: "/setup-sheet-models" },
-    { slug: "tracks", path: "/tracks" },
-    { slug: "tires", path: "/tires" },
-    { slug: "additives", path: "/additives" },
-    { slug: "videos", path: "/videos" },
-    { slug: "video-analysis", path: "/videos/analysis" },
-    { slug: "lap-import", path: "/laps/import" },
-    { slug: "teams", path: "/teams" },
-    { slug: "settings", path: "/settings" },
-    { slug: "billing", path: "/billing" },
-  ];
-  if (ids.RUN_ID) SURFACES.push({ slug: "run-detail", path: `/runs/${ids.RUN_ID}` });
-  if (ids.CAR_ID) SURFACES.push({ slug: "car-detail", path: `/cars/${ids.CAR_ID}` });
-  if (ids.SETUP_CAR_ID && ids.SETUP_ID) {
-    SURFACES.push({ slug: "setup-detail", path: `/cars/${ids.SETUP_CAR_ID}/setups/${ids.SETUP_ID}` });
-  }
-  if (ids.EVENT_ID) SURFACES.push({ slug: "event-detail", path: `/events/${ids.EVENT_ID}` });
-  if (ids.TRACK_ID) SURFACES.push({ slug: "track-detail", path: `/tracks/${ids.TRACK_ID}` });
+  // Shared with e2e/typography-audit.spec.ts so the two audits cannot cover different pages.
+  const SURFACES: Surface[] = withDetailSurfaces(ids);
 
   /*
    * Scoped by `url`, never a hardcoded domain. Cookies are host-only, so a

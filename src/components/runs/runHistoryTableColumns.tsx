@@ -23,8 +23,10 @@ export function computeRunHistoryColSpan(layout: RunHistoryColumnLayout): number
   );
 }
 
-/** Lap times, dates, and stat values — matches All laps grid in RunDetail. */
-export const RUN_HISTORY_DATA_CLASS = "font-mono text-[11px] tabular-nums";
+/** Lap times, dates, and stat values — matches All laps grid in RunDetail.
+    One class now: `.fig-cell` carries the 11px step AND `tabular-nums` together, so a
+    figure can no longer be given a size without also being made tabular. */
+export const RUN_HISTORY_DATA_CLASS = "fig-cell";
 
 /** Muted mobile column headers (Date / Best / Top 5 / Median). */
 export const RUN_HISTORY_DATA_HEADER_CLASS = "type-data-label";

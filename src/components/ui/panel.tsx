@@ -4,8 +4,11 @@ import { cn } from "@/lib/utils";
 /**
  * Technical v2 shared panel vocabulary — the visual DNA that started on the
  * dashboard hero. Use these so every card/section reads as one designed system:
- * a mono uppercase eyebrow for section labels, and hairline-separated stat tiles
- * (JetBrains Mono, tabular) for numbers — the "instrument panel" feel.
+ * a Sora bold uppercase eyebrow for section labels, and hairline-separated stat tiles
+ * (`.fig-tile` — Sora 18px, tabular) for numbers — the "instrument panel" feel.
+ *
+ * One face since 2026-08-14: the instrument register comes from tabular figures on a
+ * six-step ramp, not from a second typeface.
  */
 
 /** Card headline — Sora bold (hero voice; 700, sentence case). */
@@ -30,7 +33,7 @@ export function PanelTitle({
   );
 }
 
-/** Nav hub row label — Inter semibold (`.hub-row-title` in globals.css). */
+/** Nav hub row label — Sora semibold (`.hub-row-title` in globals.css). */
 export function HubRowTitle({
   children,
   className,
@@ -59,7 +62,7 @@ export function PanelSubtitle({ children, className }: { children: ReactNode; cl
   );
 }
 
-/** Mono uppercase tracked section label with an optional accent tick. */
+/** Sora bold uppercase section label with a 3px accent tick (`.eyebrow-label`). */
 export function Eyebrow({
   children,
   className,
@@ -111,7 +114,7 @@ export function StatStrip({
   );
 }
 
-/** A single metric cell — mono label + tabular mono value. */
+/** A single metric cell — Sora micro-label + Sora tabular value on the `.fig-tile` step. */
 export function StatTile({
   label,
   value,
@@ -132,7 +135,7 @@ export function StatTile({
       <div className="type-data-label line-clamp-2 min-h-[2.6em] leading-[1.3]">{label}</div>
       <div
         className={cn(
-          "mt-1 font-mono text-[18px] font-medium tabular-nums",
+          "mt-1 fig-tile font-medium",
           accent ? "text-primary-ink" : "text-foreground"
         )}
       >

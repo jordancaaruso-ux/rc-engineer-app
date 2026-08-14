@@ -507,7 +507,7 @@ export function SetupSheetModelEditor(props: {
                       <label className="flex flex-col gap-1">
                         Key (optional)
                         <input
-                          className="rounded border border-border bg-card px-2 py-1.5 font-mono"
+                          className="rounded border border-border bg-card px-2 py-1.5 tabular-nums"
                           value={key}
                           onChange={(e) => setKeyText(e.target.value)}
                           placeholder={keyPreview || "auto from label"}
@@ -900,7 +900,7 @@ function RowItem(props: {
             <span className="min-w-0 truncate font-medium">{rowHeading(row, fieldByKey)}</span>
           )}
 
-          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{row.type}</span>
+          <span className="shrink-0 tabular-nums text-[10px] text-muted-foreground">{row.type}</span>
 
           {/* Drag is mouse-only (HTML5 DnD never fires on touch), so every reorder also has a
               button path — the only way this works on a phone, and faster than dragging anyway. */}

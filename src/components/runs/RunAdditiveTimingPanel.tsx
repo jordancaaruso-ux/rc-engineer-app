@@ -78,7 +78,7 @@ function ValueChip({
       aria-expanded={open}
       onClick={onClick}
       className={cn(
-        "min-w-[58px] flex-none rounded-lg border px-2 py-1.5 text-center font-mono text-[13px] tabular-nums transition",
+        "min-w-[58px] flex-none rounded-lg border px-2 py-1.5 text-center text-[13px] tabular-nums transition",
         open
           ? "border-primary-ink bg-accent/10 text-foreground"
           : "border-border bg-secondary hover:border-muted-foreground/40",
@@ -232,7 +232,7 @@ export function RunAdditiveTimingPanel({
       <div className="space-y-2">
         <div className="flex items-baseline justify-between">
           <span className="type-data-label">Applications</span>
-          <span className="font-mono text-[10px] text-faint">
+          <span className="tabular-nums text-[10px] text-faint">
             {tirePrep.length}/{MAX_TIRE_PREP_STEPS} · toward run
           </span>
         </div>
@@ -244,7 +244,7 @@ export function RunAdditiveTimingPanel({
             return (
               <div key={i} className="border-t border-border first:border-t-0">
                 <div className="flex min-h-[48px] items-center gap-2 py-2 pl-3 pr-2.5">
-                  <span className="w-3 flex-none font-mono text-[11px] tabular-nums text-faint">
+                  <span className="w-3 flex-none text-[11px] tabular-nums text-faint">
                     {i + 1}
                   </span>
                   <ValueChip

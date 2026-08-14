@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { xLabelStep } from "@/components/runs/chartAxis";
 
 /**
  * Lap-by-lap time graph for a single run (Sessions expanded view). Follows the
@@ -131,7 +132,7 @@ export function LapTimeGraph({
   if (!geometry) return null;
 
   const { xAt, yAt, ticks, lo, hi, cap } = geometry;
-  const labelStep = Math.max(1, Math.ceil(rows.length / 8));
+  const labelStep = xLabelStep(rows.length, chartWidth, rows[rows.length - 1]?.lapNumber ?? 0);
   // Excluded laps (timing artifacts, invalid fast laps) are skipped — the line
   // bridges straight across their slot. X stays index-aligned so lap N of the
   // baseline still sits under lap N of the main series.
@@ -165,7 +166,7 @@ export function LapTimeGraph({
               x={PAD_LEFT - 6}
               y={yAt(tick) + 3}
               textAnchor="end"
-              className="fill-faint font-mono text-[9px] tabular-nums"
+              className="fill-faint fig-tick"
             >
               {tick.toFixed(1)}
             </text>
@@ -187,7 +188,7 @@ export function LapTimeGraph({
               x={chartWidth - PAD_RIGHT}
               y={yAt(medianSeconds) - 3}
               textAnchor="end"
-              className="fill-faint font-mono text-[8px] tabular-nums"
+              className="fill-faint fig-tick"
             >
               med {medianSeconds.toFixed(3)}
             </text>
@@ -204,7 +205,7 @@ export function LapTimeGraph({
               x={xAt(i)}
               y={CHART_HEIGHT - 8}
               textAnchor={i === 0 ? "start" : isLast ? "end" : "middle"}
-              className="fill-faint font-mono text-[9px] tabular-nums"
+              className="fill-faint fig-tick"
             >
               {r.lapNumber}
             </text>

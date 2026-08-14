@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { xLabelStep } from "@/components/runs/chartAxis";
 import type { LapGraphRow } from "@/components/runs/LapTimeGraph";
 
 /**
@@ -128,7 +129,7 @@ export function LapGapGraph({
   if (!geometry) return null;
 
   const { xAt, yAt, ticks, tickDecimals, domainLength } = geometry;
-  const labelStep = Math.max(1, Math.ceil(domainLength / 8));
+  const labelStep = xLabelStep(domainLength, chartWidth, domainLength);
   const barWidth = Math.max(
     2,
     Math.min(10, (chartWidth - PAD_LEFT - PAD_RIGHT) / Math.max(domainLength, 1) - 4)
@@ -165,7 +166,7 @@ export function LapGapGraph({
               x={PAD_LEFT - 6}
               y={yAt(tick) + 3}
               textAnchor="end"
-              className="fill-faint font-mono text-[9px] tabular-nums"
+              className="fill-faint fig-tick"
             >
               {formatGap(tick, tickDecimals)}
             </text>
@@ -186,7 +187,7 @@ export function LapGapGraph({
           x={chartWidth - PAD_RIGHT}
           y={yAt(0) - 3}
           textAnchor="end"
-          className="fill-faint font-mono text-[8px]"
+          className="fill-faint fig-tick"
         >
           even
         </text>
@@ -201,7 +202,7 @@ export function LapGapGraph({
               x={xAt(p.index)}
               y={CHART_HEIGHT - 8}
               textAnchor={p.index === 0 ? "start" : isLast ? "end" : "middle"}
-              className="fill-faint font-mono text-[9px] tabular-nums"
+              className="fill-faint fig-tick"
             >
               {p.lapNumber}
             </text>

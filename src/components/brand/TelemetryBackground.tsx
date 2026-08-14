@@ -188,8 +188,12 @@ export function TelemetryBackground({ intensity = 1, speed = 1, className }: Pro
     const fgT = readTriplet(cv, "--color-foreground", "236,233,228");
     const mutedT = readTriplet(cv, "--color-muted-foreground", "160,157,150");
     const accentT = readTriplet(cv, "--color-primary", "255,214,10");
-    const monoVar = getComputedStyle(document.body).getPropertyValue("--font-mono-jb").trim();
-    const monoFont = `9px ${monoVar || "'JetBrains Mono'"}, ui-monospace, monospace`;
+    // Sora since the one-voice pass (2026-08-14); `--font-mono-jb` no longer exists.
+    // Canvas `fillText` has no font-variant-numeric, so these decorative ticker labels get
+    // Sora's proportional digits. That is fine here — it is ambient background, not a
+    // column — so don't "fix" it by reaching for a monospace.
+    const uiVar = getComputedStyle(document.body).getPropertyValue("--font-ui").trim();
+    const monoFont = `9px ${uiVar || "Sora"}, system-ui, sans-serif`;
 
     const measure = () => {
       const rect = cv.getBoundingClientRect();

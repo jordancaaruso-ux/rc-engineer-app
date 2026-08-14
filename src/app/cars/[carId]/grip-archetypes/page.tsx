@@ -105,7 +105,7 @@ export default async function CarGripArchetypesPage(props: {
       <section className="page-body">
         {setupSheetTemplate == null ? (
           <CardPanel className="max-w-2xl" contentClassName="text-sm text-muted-foreground">
-            This car has no <code className="font-mono">setupSheetTemplate</code> set, so the community archetypes can&apos;t be
+            This car has no <code className="type-machine">setupSheetTemplate</code> set, so the community archetypes can&apos;t be
             looked up. Open the car page and assign the template first.
           </CardPanel>
         ) : (

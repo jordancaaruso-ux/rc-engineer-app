@@ -613,7 +613,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
         <label>
           LiveRC / timing URLs <span className="text-muted-foreground">(optional)</span>
           <textarea
-            className="mt-0.5 w-full rounded-md border border-border px-2 py-1 min-h-[72px] font-mono text-xs"
+            className="mt-0.5 w-full rounded-md border border-border px-2 py-1 min-h-[72px] tabular-nums text-xs"
             value={timingUrls}
             onChange={(e) => setTimingUrls(e.target.value)}
             placeholder={"https://...\nhttps://... (one per line)"}
@@ -714,7 +714,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
                         <li key={lap.lapNumber}>
                           <button
                             type="button"
-                            className={`w-full text-left rounded px-1.5 py-0.5 font-mono text-[11px] border ${
+                            className={`w-full text-left rounded px-1.5 py-0.5 tabular-nums text-[11px] border ${
                               isAnchor
                                 ? "border-green-600/60 bg-green-500/15"
                                 : isCompare

@@ -171,7 +171,7 @@ export function SetupFieldDefinitionForm(p: SetupFieldDefinitionFormProps) {
       {p.fieldKindHint ? (
         <div className="rounded border border-border/60 bg-muted/30 px-2 py-1 text-[10px] text-muted-foreground">
           <span className="font-medium text-foreground">Field type</span>{" "}
-          <span className="font-mono text-foreground/90">{p.fieldKindHint}</span>
+          <span className="tabular-nums text-foreground/90">{p.fieldKindHint}</span>
         </div>
       ) : null}
       {p.error ? (
@@ -183,7 +183,7 @@ export function SetupFieldDefinitionForm(p: SetupFieldDefinitionFormProps) {
           <label className="block text-[11px] text-muted-foreground">
             Data id (from template)
             <input
-              className="mt-1 w-full rounded border border-border bg-card px-2 py-1 font-mono text-xs disabled:opacity-60"
+              className="mt-1 w-full rounded border border-border bg-card px-2 py-1 tabular-nums text-xs disabled:opacity-60"
               value={p.cfKey}
               onChange={(e) => p.setCfKey(e.target.value)}
               placeholder="driver_name"
@@ -310,7 +310,7 @@ export function SetupFieldDefinitionForm(p: SetupFieldDefinitionFormProps) {
             <label className="block text-[11px] text-muted-foreground">
               Id in saved data
               <input
-                className="mt-1 w-full rounded border border-border bg-card px-2 py-1 font-mono text-xs"
+                className="mt-1 w-full rounded border border-border bg-card px-2 py-1 tabular-nums text-xs"
                 value={p.cfKey}
                 onChange={(e) => p.setCfKey(e.target.value)}
                 placeholder="e.g. arb_front"
@@ -324,7 +324,7 @@ export function SetupFieldDefinitionForm(p: SetupFieldDefinitionFormProps) {
               <label className="text-[11px] text-muted-foreground">
                 Checked value
                 <input
-                  className="mt-1 w-full rounded border border-border bg-card px-2 py-1 font-mono text-xs"
+                className="mt-1 w-full rounded border border-border bg-card px-2 py-1 tabular-nums text-xs"
                   value={p.cfCheckedValue}
                   onChange={(e) => p.setCfCheckedValue(e.target.value)}
                 />
@@ -332,7 +332,7 @@ export function SetupFieldDefinitionForm(p: SetupFieldDefinitionFormProps) {
               <label className="text-[11px] text-muted-foreground">
                 Unchecked value
                 <input
-                  className="mt-1 w-full rounded border border-border bg-card px-2 py-1 font-mono text-xs"
+                className="mt-1 w-full rounded border border-border bg-card px-2 py-1 tabular-nums text-xs"
                   value={p.cfUncheckedValue}
                   onChange={(e) => p.setCfUncheckedValue(e.target.value)}
                 />
@@ -344,7 +344,7 @@ export function SetupFieldDefinitionForm(p: SetupFieldDefinitionFormProps) {
               <label className="text-[11px] text-muted-foreground">
                 Group key <span className="text-destructive">*</span>
                 <input
-                  className="mt-1 w-full rounded border border-border bg-card px-2 py-1 font-mono text-xs"
+                className="mt-1 w-full rounded border border-border bg-card px-2 py-1 tabular-nums text-xs"
                   value={p.cfGroupKey}
                   onChange={(e) => p.setCfGroupKey(e.target.value)}
                   placeholder="screw_group_a"
@@ -353,7 +353,7 @@ export function SetupFieldDefinitionForm(p: SetupFieldDefinitionFormProps) {
               <label className="text-[11px] text-muted-foreground">
                 Option value
                 <input
-                  className="mt-1 w-full rounded border border-border bg-card px-2 py-1 font-mono text-xs"
+                className="mt-1 w-full rounded border border-border bg-card px-2 py-1 tabular-nums text-xs"
                   value={p.cfOptionValue}
                   onChange={(e) => p.setCfOptionValue(e.target.value)}
                   placeholder="A"
@@ -474,7 +474,7 @@ export function SetupFieldDefinitionForm(p: SetupFieldDefinitionFormProps) {
                   <label className="block text-[10px] text-muted-foreground">
                     Pair group id (optional)
                     <input
-                      className="mt-1 w-full rounded border border-border bg-card px-2 py-1 font-mono text-xs"
+                className="mt-1 w-full rounded border border-border bg-card px-2 py-1 tabular-nums text-xs"
                       value={p.cfPairGroupId}
                       onChange={(e) => p.setCfPairGroupId(e.target.value)}
                       placeholder="e.g. deck_pair_front_rear"

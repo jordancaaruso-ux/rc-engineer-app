@@ -9,6 +9,7 @@ import {
   buildRunHistoryPrismaWhere,
   computeChangedKeysByRun,
   countActiveRunHistoryFilters,
+  describeRunHistoryFilters,
   filtersToSearchParams,
   parseRunHistoryFilters,
   runHistoryFiltersActive,
@@ -501,4 +502,90 @@ test("sortRunsForHistory defaults to completed_desc", () => {
   };
   const sorted = sortRunsForHistory([older, newer], "completed_desc");
   assert.equal(sorted[0], newer);
+});
+
+test("describeRunHistoryFilters names the filters in play", () => {
+  const none = parseRunHistoryFilters({});
+  assert.deepEqual(describeRunHistoryFilters(none), []);
+  // sort/layout change the view, not which runs are in it — same as the filter count.
+  assert.deepEqual(
+    describeRunHistoryFilters(parseRunHistoryFilters({ sort: "best_lap_asc", layout: "flat" })),
+    []
+  );
+
+  // Tire-type values ARE the identity string, so they need no option lookup.
+  assert.deepEqual(
+    describeRunHistoryFilters(
+      parseRunHistoryFilters({ tireTypes: encodeURIComponent("Blue compound") })
+    ),
+    ["Blue compound"]
+  );
+
+  // Ids resolve through the option lists; several of one kind collapse to a count.
+  assert.deepEqual(
+    describeRunHistoryFilters(parseRunHistoryFilters({ carIds: "c1" }), {
+      cars: [{ id: "c1", label: "A800RR" }],
+    }),
+    ["A800RR"]
+  );
+  assert.deepEqual(
+    describeRunHistoryFilters(parseRunHistoryFilters({ carIds: "c1,c2" }), {
+      cars: [{ id: "c1", label: "A800RR" }],
+    }),
+    ["2 cars"]
+  );
+  // An id with no matching option still reports *something* — a label you can't
+  // read beats a filter that silently isn't mentioned.
+  assert.deepEqual(describeRunHistoryFilters(parseRunHistoryFilters({ carIds: "c9" })), ["c9"]);
+
+  // Setup value and setup-change filters carry their condition.
+  assert.deepEqual(
+    describeRunHistoryFilters(
+      parseRunHistoryFilters({ setupField: "camber_front", setupOp: "gte", setupValue: "1.5" })
+    ),
+    ["Camber (Front) (°) ≥ 1.5"]
+  );
+  assert.deepEqual(
+    describeRunHistoryFilters(
+      parseRunHistoryFilters({ setupChangedField: "camber_front", setupChangedDir: "down" })
+    ),
+    ["Camber (Front) (°) decreased"]
+  );
+
+  // Every filter the count knows about produces a label, so the ribbon can never
+  // claim fewer reasons than the "Filters · N" button does.
+  const all = parseRunHistoryFilters({
+    q: "wet",
+    carIds: "c1",
+    trackIds: "t1",
+    tireTypes: encodeURIComponent("Blue"),
+    eventId: "e1",
+    dateFrom: "2026-07-01",
+    dateTo: "2026-07-31",
+    sessionType: "TESTING",
+    meetingSessionType: "QUALIFYING",
+    ratingBands: "dialled",
+    bestLapMin: "15",
+    bestLapMax: "16",
+    raceClass: "Modified",
+    setupField: "camber_front",
+    setupChangedField: "toe_front",
+    status: "draft",
+  });
+  const labels = describeRunHistoryFilters(all);
+  // 15 counted filters → 14 labels, and the difference is entirely accounted for:
+  // the two date bounds read as one range, the two lap bounds as one span, and `q`
+  // adds a label the count deliberately excludes. Adding a filter without a label
+  // here breaks this, which is the point.
+  assert.equal(countActiveRunHistoryFilters(all), 15);
+  assert.equal(labels.length, 14);
+  assert.ok(labels.includes("“wet”"));
+  // Same month, so the range compacts rather than saying "Jul 2026" twice.
+  assert.ok(labels.includes("1 – 31 Jul 2026"), labels.join(" | "));
+  assert.ok(
+    describeRunHistoryFilters(
+      parseRunHistoryFilters({ dateFrom: "2026-06-28", dateTo: "2026-07-01" })
+    ).includes("28 Jun 2026 – 1 Jul 2026")
+  );
+  assert.ok(labels.includes("Best 15–16s"));
 });

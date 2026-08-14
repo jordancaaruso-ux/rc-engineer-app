@@ -404,7 +404,7 @@ export function SetupFillFlow({
               ) : saveStatus === "error" ? (
                 <span className="ui-caption text-destructive">Not saved</span>
               ) : null}
-              <span className="font-mono text-[11px] text-muted-foreground">
+              <span className="tabular-nums text-[11px] text-muted-foreground">
                 {index + 1}/{steps.length}
               </span>
             </div>

@@ -249,7 +249,7 @@ export function AxleSchematic({ solved, ghost, extraPoints, fitBox, axleLabel, s
   return (
     <svg
       viewBox={`0 0 ${VIEW_W} ${d.H.toFixed(1)}`}
-      className={cn(fitBox ? "h-full w-full" : "w-full", "font-mono", className)}
+      className={cn(fitBox ? "h-full w-full" : "w-full", "tabular-nums", className)}
       role="img"
       aria-label={`${axleLabel ?? "axle"} suspension schematic, roll center ${d.main.rc.z.toFixed(1)}mm`}
     >

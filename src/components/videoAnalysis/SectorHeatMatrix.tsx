@@ -20,7 +20,7 @@ export function SectorHeatMatrix({ rows }: { rows: SectorFastestRow[] }) {
           <tr className="border-b border-border bg-muted/40">
             <th className="p-2 text-left">Sector</th>
             {ids.map((id) => (
-              <th key={id} className="p-2 text-right font-mono">
+              <th key={id} className="p-2 text-right tabular-nums">
                 Car {id}
               </th>
             ))}
@@ -37,13 +37,13 @@ export function SectorHeatMatrix({ rows }: { rows: SectorFastestRow[] }) {
                 return (
                   <td
                     key={id}
-                    className={`p-2 text-right font-mono tabular-nums ${isFast ? "text-green-400 font-semibold" : ""}`}
+                    className={`p-2 text-right tabular-nums ${isFast ?"text-green-400 font-semibold":""}`}
                   >
                     {cell?.bestSec != null ? cell.bestSec.toFixed(3) : "—"}
                   </td>
                 );
               })}
-              <td className="p-2 text-right font-mono text-green-400">
+              <td className="p-2 text-right tabular-nums text-green-400">
                 Car {row.fastestMotTrackId} · {row.fastestSec.toFixed(3)}s
               </td>
             </tr>

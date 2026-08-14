@@ -471,7 +471,7 @@ export function CarList({
                         )}
                       </span>
                       {setupMetaById?.[c.id] ? (
-                        <span className="ui-caption mt-0.5 block truncate font-mono tabular-nums">
+                        <span className="ui-caption mt-0.5 block truncate tabular-nums">
                           {setupMetaById[c.id]}
                         </span>
                       ) : null}
@@ -529,7 +529,7 @@ export function CarList({
                                   <span className="block truncate text-sm text-foreground">
                                     {s.name ?? "Untitled setup"}
                                   </span>
-                                  <span className="block font-mono text-[11px] tabular-nums text-muted-foreground">
+                                  <span className="block text-[11px] tabular-nums text-muted-foreground">
                                     {s.createdAtLabel}
                                     {s.usedInRuns > 0
                                       ? ` · ${s.usedInRuns} run${s.usedInRuns === 1 ? "" : "s"}`

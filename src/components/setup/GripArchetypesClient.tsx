@@ -167,7 +167,7 @@ export function GripArchetypesClient(props: Props) {
       <CardPanel contentClassName="text-sm text-muted-foreground space-y-2">
         <p>
           Median tuning values from all community-eligible uploads that match{" "}
-          <span className="font-mono">{setupSheetTemplate}</span> on the selected surface, split by the{" "}
+          <span className="tabular-nums">{setupSheetTemplate}</span> on the selected surface, split by the{" "}
           <strong>traction</strong> tag on each doc. A doc tagged <em>low, medium</em> contributes to both Low and Medium
           columns. Rows fall back transparently to the &quot;Any grip&quot; column when a grip bucket has fewer than 10
           samples for a parameter.
@@ -175,7 +175,7 @@ export function GripArchetypesClient(props: Props) {
         {latestRun ? (
           <p className="text-xs">
             &quot;Your value&quot; = your most recent run setup on this car (run{" "}
-            <span className="font-mono">{latestRun.runId.slice(0, 8)}</span>).
+            <span className="tabular-nums">{latestRun.runId.slice(0, 8)}</span>).
           </p>
         ) : (
           <p className="text-xs">No logged run with a setup on this car yet — the &quot;your value&quot; column will be empty.</p>
@@ -279,8 +279,8 @@ export function GripArchetypesClient(props: Props) {
                     key={row.parameterKey}
                     className="border-t border-border/60 hover:bg-muted/40"
                   >
-                    <td className="px-2 py-1.5 font-mono">{row.parameterKey}</td>
-                    <td className="px-2 py-1.5 text-right font-mono tabular-nums">
+                    <td className="px-2 py-1.5 tabular-nums">{row.parameterKey}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums">
                       {yourRaw == null
                         ? "—"
                         : yourNum != null
@@ -292,7 +292,7 @@ export function GripArchetypesClient(props: Props) {
                       return (
                         <td
                           key={c.key}
-                          className="px-2 py-1.5 text-right font-mono tabular-nums"
+                          className="px-2 py-1.5 text-right tabular-nums"
                           title={fmtRange(stats)}
                         >
                           {bucketCell(stats)}
@@ -300,7 +300,7 @@ export function GripArchetypesClient(props: Props) {
                       );
                     })}
                     <td
-                      className={`px-2 py-1.5 text-right font-mono tabular-nums ${
+                      className={`px-2 py-1.5 text-right tabular-nums ${
                         lowMed != null && lowMed !== 0
                           ? lowMed > 0
                             ? "text-emerald-600 dark:text-emerald-400"
@@ -311,7 +311,7 @@ export function GripArchetypesClient(props: Props) {
                       {lowMed == null ? "—" : (lowMed > 0 ? "+" : "") + fmtNum(lowMed)}
                     </td>
                     <td
-                      className={`px-2 py-1.5 text-right font-mono tabular-nums ${
+                      className={`px-2 py-1.5 text-right tabular-nums ${
                         medHigh != null && medHigh !== 0
                           ? medHigh > 0
                             ? "text-emerald-600 dark:text-emerald-400"

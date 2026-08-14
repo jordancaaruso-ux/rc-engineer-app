@@ -127,13 +127,13 @@ export function VideoToolsClient() {
                 {j.run ? (
                   <Link
                     href={`/runs/history`}
-                    className="shrink-0 rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-[0.18em] text-muted-foreground no-underline hover:text-foreground"
+                    className="shrink-0 rounded-md border border-border bg-muted px-1.5 py-0.5 micro-caps text-muted-foreground no-underline hover:text-foreground"
                     title={j.run.sessionLabel ?? "Linked run"}
                   >
                     Run ↗
                   </Link>
                 ) : (
-                  <span className="shrink-0 font-mono text-[8.5px] uppercase tracking-[0.18em] text-faint">
+                  <span className="shrink-0 micro-caps text-faint">
                     No run
                   </span>
                 )}
@@ -202,9 +202,9 @@ export function VideoToolsClient() {
         </summary>
         <div className="space-y-2 px-3 pb-3 text-[11.5px] leading-relaxed text-muted-foreground">
           <p>
-            Run the Python worker (<span className="font-mono">video-analysis/</span> in the
+            Run the Python worker (<span className="tabular-nums">video-analysis/</span> in the
             repo) on a computer for automatic multi-car tracking, then import its{" "}
-            <span className="font-mono">results.json</span> on the analysis session page.
+            <span className="tabular-nums">results.json</span> on the analysis session page.
             Results land in the same compare surface as manual marks.
           </p>
           <p>

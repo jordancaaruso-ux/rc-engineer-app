@@ -119,7 +119,7 @@ export function PaceChart({
         <circle cx={markX} cy={markY} r="6" fill={markColor} />
       </svg>
 
-      <div className="mt-1 flex items-baseline justify-between gap-3 font-mono text-[10px] text-faint">
+      <div className="mt-1 flex items-baseline justify-between gap-3 tabular-nums text-[10px] text-faint">
         <span className="truncate">
           {first.label} {formatLap(first.best)}
         </span>

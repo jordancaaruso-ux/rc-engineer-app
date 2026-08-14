@@ -60,7 +60,7 @@ export function ResumeDraftChooser({
                     {r.trackName ?? "—"}
                   </div>
                   <div className="text-foreground/90">{r.sessionLabel}</div>
-                  <div className="mt-1 font-mono text-[10px] text-muted-foreground tabular-nums">
+                  <div className="mt-1 text-[10px] text-muted-foreground tabular-nums">
                     Saved{" "}
                     <RelativeTime
                       iso={r.createdAt}

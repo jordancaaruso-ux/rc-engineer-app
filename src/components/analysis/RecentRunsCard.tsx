@@ -39,7 +39,7 @@ function seconds(value: number | null): string {
 function PbChip({ run }: { run: AnalysisRecentRun }) {
   if (!run.isTrackCarPb) return null;
   return (
-    <span className="inline-flex shrink-0 items-center rounded-md border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] font-medium tracking-[0.1em] text-emerald-300">
+    <span className="inline-flex shrink-0 items-center rounded-md border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 tabular-nums text-[10px] font-medium tracking-[0.1em] text-emerald-300">
       PB
     </span>
   );
@@ -137,10 +137,10 @@ export function RecentRunsCard({
             </span>
 
             <span className="flex flex-col items-end gap-px">
-              <span className="font-mono text-[17px] font-medium tabular-nums leading-none text-foreground">
+              <span className="text-[18px] font-medium tabular-nums leading-none text-foreground">
                 {seconds(run.metrics.best)}
               </span>
-              <span className="font-mono text-[10px] tabular-nums text-faint">
+              <span className="text-[10px] tabular-nums text-faint">
                 med{" "}
                 <span className="font-medium text-muted-foreground">
                   {seconds(run.metrics.median)}

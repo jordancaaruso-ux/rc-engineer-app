@@ -1,17 +1,21 @@
 # Visual North Star — Technical v2
 
-**Status:** Live. Typography and surfaces reconciled against `globals.css` on **2026-08-12**.
+**Status:** Live. Typography and surfaces reconciled against `globals.css` on **2026-08-14**.
 
 This document holds the **intent** — why a surface looks the way it does, and what was tried and
 rejected. **`src/app/globals.css` holds the truth.** Where a number here disagrees with the CSS, the
-CSS wins and this line is a bug; fix it rather than "fixing" the code to match. Four rows had
-already drifted that way once (the eyebrow recipe, the data-label voice, the glass values, and a
-photo wash that no longer ships), so check before you trust a figure.
+CSS wins and this line is a bug; fix it rather than "fixing" the code to match. **Ten rows have
+drifted that way so far** (the eyebrow recipe, the data-label voice, the glass values, a photo wash
+that no longer ships, and — found in the 2026-08-14 font audit — the page-title face named wrong in
+two places, the numeric rule stated backwards in the checklist, the display face's scope, a stale
+mono row in the element matrix, and Space Grotesk missing from the loaded-fonts table entirely).
+Check before you trust a figure. **The checklist near the bottom drifts hardest**, because nobody
+re-reads it when they change a rule — line for line it is the least reliable part of this file.
 
 **Light mode shipped 2026-08-12** — opt-in per device, dark unchanged. Every colour is a token, and
 the split that matters is `primary` (the yellow itself) vs `primary-ink` (the ink you can actually
 read on the page's background). Never reach for a raw hex; a hardcoded `#FFD60A` is invisible on
-warm ash paper. `e2e/light-mode-audit.spec.ts` is the regression net.
+warm ash paper. `e2e/light-mode-audit.spec.ts` is the colour regression net; `e2e/typography-audit.spec.ts` is the type one (one face · every figure tabular · ramp closed · `tnum` really present in the served subset). Both walk the shared page list in `e2e/surfaces.ts`.
 
 **Hard rule for agents:** Visual changes must not alter behavior, data flow, or API contracts. Restyle only.
 
@@ -19,7 +23,7 @@ warm ash paper. `e2e/light-mode-audit.spec.ts` is the regression net.
 
 ## North star sentence
 
-> A premium racing instrument: **charcoal graphite** surfaces, **electric-but-confident yellow** for every action, **Sora** for all UI type, **JetBrains Mono** for data. Two voices — friendly prose to learn, mono instrument panel to trust — never cold, never gimmicky.
+> A premium racing instrument: **charcoal graphite** surfaces, **electric-but-confident yellow** for every action, **Sora** for everything the driver reads, **Space Grotesk** for page titles alone. **One voice** — the instrument register comes from tabular figures on a six-step ramp, not from a second typeface. Friendly prose to learn, an instrument panel to trust — never cold, never gimmicky.
 
 ### Personality (locked)
 
@@ -28,7 +32,7 @@ warm ash paper. `e2e/light-mode-audit.spec.ts` is the regression net.
 | Tone | Friendly expert + premium. A hint of competition energy — **not** dated motorsport (no checkered flags, racing stripes, faux-carbon). |
 | Color | Yellow hero on charcoal graphite base. Inspired by electric sport on dark (DCL) — **not** flat #000 or club-race nostalgia. A trace of warmth remains in ink tones so the shell never reads cold. |
 | Density | Balanced — scannable tables/lists without timing-software cramming. |
-| References | [Drone Champions League](https://www.awwwards.com/sites/drone-champions-league) (yellow signal on dark), FIFA World Cup 2026 dark palette (warm browns), Charles Leclerc site (technical type pairing). |
+| References | [Drone Champions League](https://www.awwwards.com/sites/drone-champions-league) (yellow signal on dark), FIFA World Cup 2026 dark palette (warm browns), Charles Leclerc site (technical type pairing — note the pairing itself was retired 2026-08-14; the reference is for tone, not for a second face). |
 
 ### Design principles (from project brief)
 
@@ -99,22 +103,30 @@ Use **Tailwind semantic tokens** (`bg-background`, `text-foreground`, `border-bo
 
 ## Typography
 
-**Two voices.** Every text element maps to exactly one tier below — no Heebo, HK Grotesk Wide, Montserrat, Archivo, Geist, or Plus Jakarta in production UI.
+**Three faces load.** Every text element maps to exactly one tier below — no Heebo, HK Grotesk Wide, Montserrat, Archivo, Geist, or Plus Jakarta in production UI.
 
-Loaded in `src/app/layout.tsx`:
+Loaded in `src/app/layout.tsx` (lines 47–80):
 
 | Tier | Font | Weights used | CSS hook |
 |------|------|--------------|----------|
-| **1 — UI sans** | **Sora** (Google Fonts via `next/font`) | 400 body · 500 inactive nav · 600 micro headings · 700 sections/nav active/buttons/**hero `PanelTitle`** · **600 semibold entity names** | `--font-ui`, `font-sans`, `PanelTitle`, `.page-title`, `.hub-row-title` / `HubRowTitle`, `.section-title`, `.session-group-title`, `.run-details-tab`, `.ui-title`, `.ui-label-*`, `.ui-control`, `.primary-action-chip`, nav labels, chat body + speaker tags |
-| **2 — Data** | **JetBrains Mono** | 500 stat values · 400–500 lap figures | `font-mono`, `.lap-figure`, `<StatTile>` value |
+| **1 — UI sans** | **Sora** (Google Fonts via `next/font`) | 400 body · 500 inactive nav · 600 micro headings · 700 sections/nav active/buttons/**hero `PanelTitle`** · **600 semibold entity names** | `--font-ui`, `font-sans`, `PanelTitle`, `.hub-row-title` / `HubRowTitle`, `.section-title`, `.session-group-title`, `.run-details-tab`, `.ui-title`, `.ui-label-*`, `.ui-control`, `.primary-action-chip`, nav labels, chat body + speaker tags |
+| **2 — Display** | **Space Grotesk** | **700 only** | `--font-display` — **exactly three selectors**: `.page-title`, `.page-title-condensed`, `.demo-door-title`. No Tailwind utility maps to it; a `className="font-display"` is a silent no-op. |
+| **3 — Data** | **JetBrains Mono** | 500 stat values · 400–500 lap figures | `font-mono`, `.lap-figure`, `<StatTile>` value |
 
-**The one-voice pass (2026-07-16) shrank tier 2 to almost nothing.** `.type-data-label`,
-`.type-timestamp`, `.table-col-header` and `<Eyebrow>` were all mono and are now **Sora** — mono
-labels blended into their own (also-mono) values and stopped reading as labels. Mono now survives
-only where a *figure* needs tabular alignment: `.lap-figure` and the `StatTile` value. Verify
-against `globals.css` before adding anything to tier 2.
+**The one-voice pass (2026-07-16) intended to shrink tier 3 to almost nothing, and only half
+landed.** `.type-data-label`, `.type-timestamp`, `.table-col-header` and `<Eyebrow>` were all mono
+and are now **Sora** — mono labels blended into their own (also-mono) values and stopped reading as
+labels. `globals.css` still carries that pass's comment claiming mono survives *only* in
+`.lap-figure` and the `StatTile` value.
 
-Sora and JetBrains Mono are SIL OFL.
+**That claim is false, and has been since the day it was written.** The 2026-08-14 audit counted
+**~460 `font-mono` call sites across 126 files** — the pass reached the stylesheet and two
+components, and the component layer never followed. Mono is currently doing three unrelated jobs:
+aligning figures, marking machine strings (field keys, run IDs, URLs, PDF widget names, JSON dumps),
+and supplying an uppercase tracked *label* voice on ~60 desktop cards — the last of which rule 3
+below explicitly retired. **Do not read the `.lap-figure` comment as a description of the app.**
+
+Sora, Space Grotesk and JetBrains Mono are SIL OFL.
 
 ### Element → tier matrix (locked)
 
@@ -130,7 +142,12 @@ Sora and JetBrains Mono are SIL OFL.
 | Table column header (`.table-col-header`) | **Sora** | **12px** | **600** | Sentence · `tracking-normal` · muted grey |
 | Stat value (`StatTile` value) | JetBrains Mono | 18px | 500 | Tabular nums — one of the last two mono survivors |
 | Timestamps (`.type-timestamp`, `<RelativeTime>`) | **Sora** | **11px** | 400 | Sentence · tabular nums · muted grey |
-| Lap times, deltas, run IDs, setup values | JetBrains Mono | varies | 400–500 | Tabular nums |
+| Lap times (`.lap-figure`, `RUN_HISTORY_DATA_CLASS`) | JetBrains Mono | 11–13px | 400–500 | Tabular nums |
+| Machine strings (run IDs, field keys, URLs, PDF widget names, JSON/debug) | JetBrains Mono | 9–12px | 400 | — |
+| Deltas, setup values, counts, temps, dates | Sora `.fig-*` | per ramp | 400–600 | Tabular nums, baked into the class. Until 2026-08-14 these rendered *both* ways depending on the surface — a camber value was Sora in the run diff and mono in the setup sheet, a date mono when a row was collapsed and Sora when expanded. One face now. |
+| Machine identifiers (field keys, run IDs, URLs, PDF widget names) | Sora `.type-ident` | 11px | 400 | Hairline chip, `break-all`, `user-select: all` |
+| Machine text (JSON, debug, Engineer code chips) | platform mono `.type-machine` | caller's | 400 | The only monospace left, and it loads nothing |
+| Machine-chrome micro-label | Sora `.micro-caps` | 10px | 600 | Uppercase · `0.14em`. Replaced the 8/8.5/9/10px × 0.12–0.22em mono sprawl |
 | Body / form copy | Sora | 13–15px | 400 | Sentence |
 | Page subtitle (`.page-subtitle`, `PanelSubtitle`) | Sora | 13px | 400 | Sentence |
 | Entity names in lists (`.ui-title` semibold) | Sora | 13–14px | 600 | Sentence |
@@ -142,15 +159,86 @@ Sora and JetBrains Mono are SIL OFL.
 ### Rules
 
 1. **Never mix tiers on the same semantic role** — e.g. section signposts are always `<Eyebrow>`, never `.ui-title`.
-2. **One display face, one place** — Space Grotesk (`--font-display`) is used for `.page-title` only (uppercase, timing line). Everything else is Sora or JetBrains Mono; do not spread the display face to cards, nav, or body.
-3. **Micro labels are Sora, sentence case, `tracking-normal`, muted grey** (`.type-data-label`, `.table-col-header`). The old `0.28em` mono uppercase recipe is retired — do not reintroduce it, and do not add `0.2em` / `0.14em` one-offs.
-4. **Reach for `font-mono` only when a figure needs to align in a column** — `.lap-figure`, `StatTile` values. Setup-sheet values and inline numbers are Sora with `tabular-nums`.
+2. **One display face, three places** — Space Grotesk (`--font-display`) is used at `.page-title`, `.page-title-condensed` and `.demo-door-title`, in **sentence case** (not uppercase). Nowhere else; do not spread the display face to cards, nav, or body.
+3. **Micro labels are Sora, sentence case, `tracking-normal`, muted grey** (`.type-data-label`, `.table-col-header`). The old `0.28em` mono uppercase recipe is retired. Where a label genuinely needs the tracked machine-chrome voice, use `.micro-caps` — one step, not a per-site `0.2em` / `0.14em` one-off.
+4. **Never write a bare numeric font-size — pick a `.fig-*` step.** Size and `tabular-nums` are one decision, and separating them is exactly how three Sora numbers ended up sitting among six mono ones in a single nine-cell grid (`RunDetailPanel`, fixed 2026-08-14). `font-mono` no longer resolves to a webfont; if you type it you get Consolas, which is the point.
 5. **Do not set inline `fontFamily`** in components — globals + shared classes win.
 6. **Chat inline numbers stay Sora** — only dedicated metric/setup/table/timestamp surfaces use mono.
+7. **Any number set in Sora needs `tabular-nums`, always.** Measured 2026-08-14 from the font binary: Sora's digits are **proportional** by default (advances 743, 420, 618, 614, 642, 623, 659, 574, 637, 659 per 1000em — a `1` is 420, a `0` is 743). Its `tnum` feature is present and correct in all four weights, snapping every digit to a uniform 676. Without the feature a column of Sora figures visibly shifts row to row. Sora's `.` and `:` are **not** covered (262 units), so decimals only line up in right-aligned columns of equal precision.
 
 ### Retired (removed June 2026)
 
 `Heebo`, `HK Grotesk Wide`, `Montserrat`, `Geist Sans`, and **Archivo Expanded** are **no longer loaded**. Do not reintroduce a second UI sans or display-only page-title font.
+
+---
+
+### ✅ SHIPPED 2026-08-14 — the one-voice pass
+
+Built and verified the same day. `e2e/typography-audit.spec.ts` passes across 27 pages × 2 viewports
+(4,239 text elements, 54 tnum probes): one face, every figure tabular, ramp closed. `layout:probe`
+reports the 390px geometry unchanged across all 8 routes. Full audit: the *Two faces, one grid*
+artifact (2026-08-14).
+
+**What shipped.** JetBrains Mono is deleted from the app entirely. **One UI face — Sora — plus Space
+Grotesk for page titles.** Every number becomes Sora with `tabular-nums`; there is no lap-time
+exception, because "lap times are a different voice from other numbers" is the premise that produced
+the split grid. Numeric sizes collapse from 23 to six. Scope is app UI only — the landing page, the
+satori share-card renderer, email templates and PDF field stacks are untouched.
+
+**The numeric ramp — six steps, each welding size to `tabular-nums`** so that omitting the feature
+(rule 7) becomes structurally impossible rather than a thing to remember:
+
+| Class | Size | Role |
+|---|---|---|
+| `.fig-tick` | 10px | SVG axis tick, sub-figure. **The floor** — a label that doesn't fit is dropped or shortened, never shrunk. |
+| `.fig-cell` | 11px | Dense table cell — replaces `RUN_HISTORY_DATA_CLASS`, absorbs `.type-timestamp` |
+| `.fig-stat` | 13px | Stat value in a strip cell (`StatWellCell`) |
+| `.fig-tile` | 18px | `StatTile` value |
+| `.fig-hero` | 26px | Card hero figure |
+| `.fig-display` | `clamp(3.5rem, 4.6vw, 5.5rem)` | Page hero figure, desktop dashboard |
+
+Absorbed: 9.5→10 · 10.5→10 · 11.5→11 · 12.5→13 · 14→13 · 17→18 · 19→18. **No seventh step and no SVG
+sub-ramp** — the 8px/9px chart ticks exist because 9px overflowed, which was the wrong fix; drop
+labels via `labelStep` instead. **SVG type sits on the ramp in *rendered* pixels**: for a scaled
+`viewBox`, `fontSize = rampStep × (viewBox.width / renderedWidth)`.
+
+`.lap-figure` is **deleted, not renamed**. `StatWellCell`'s `mono` prop is **deleted** — that removes
+the switch that was set wrong on three of nine cells, which is the actual bug fix.
+
+**Where mono's other two jobs go.** Mono is currently carrying three unrelated signals; only one is
+about figures:
+- *Machine identifiers* (field keys, run IDs, URLs, PDF widget names) → a hairline chip with
+  `user-select: all`. Sora cannot disambiguate `0`/`O`, so replace the **affordance** (one tap selects
+  the whole ident to copy), not the glyph.
+- *Uppercase tracked chrome labels* (~60 sites) → one 10px Sora step. The **tracking** is what made
+  these read as chrome; mono was texture. Expect them to get 35–45% wider — shorten the copy rather
+  than adding a smaller step.
+- *Genuine code* (JSON dumps, debug output, Engineer inline code) → the **platform** mono stack, no
+  webfont, deliberately not a brand voice. This is the one deliberate exception to "one UI face": a
+  JSON blob on `/admin/perf` is not a product surface. A lap time is `.fig-*`, never this.
+
+**Two traps, both verified, both easy to walk into:**
+1. **Deleting the `mono` key from `tailwind.config.ts` does not remove `font-mono`.** Tailwind 4.3.2
+   defines `--font-mono` in its own `@theme default`, so removing the override reverts every missed
+   site to `ui-monospace … Consolas` — and silently retypes bare `<pre>/<code>/<kbd>/<samp>` via
+   preflight. The migration **repoints** the key at Sora plus an unlayered `.font-mono` shim first,
+   and deletes both only at the very end, where a survivor turning Consolas is how you find it.
+2. **Width changes are not where you'd guess.** Sora's tabular advance is 676 vs JetBrains Mono's
+   600 (+12.7%), but Sora's narrow `.`/`:` (262 vs 600) claw it back on time-shaped strings:
+   `1:23.456` is **−5%**, `23.456` is +1%, but `1247` and `100%` are **+13%**. The overflow risk is in
+   counts, temperatures and percentages — re-measure the fixed-width session columns (`w-12`,
+   `w-[3.25rem]`), not the lap-time ones.
+
+**Blocked on one measurement.** All the Sora figures above were parsed from the TTFs vendored in
+`src/lib/share/fonts/` for the share card. The app serves **Google's subsetted woff2** via
+`next/font`, and `pyftsubset`'s default `--layout-features` set does **not** include `tnum`. If the
+subset dropped it, the whole ramp is decorative. Probe it in the browser before phase 1; the fallback
+is `next/font/local` with self-hosted OFL statics, which touches only `layout.tsx`.
+
+**When this lands**, `e2e/typography-audit.spec.ts` becomes the regression net alongside
+`e2e/light-mode-audit.spec.ts` — asserting one face, every number tabular, the ramp closed, and the
+font feature genuinely applied. Encoding the ramp as a test rather than a doc line is the point:
+every drifted row listed at the top of this file drifted because nothing failed when it did.
 
 ---
 
@@ -190,7 +278,7 @@ Use these shared primitives so every screen reads as one system. **Do not invent
 | `CardPanel` | `src/components/ui/CardPanel.tsx` | Standard content card (wraps `SurfaceCard`) |
 | `HeroPanel` | `src/components/ui/HeroPanel.tsx` | Legacy hero wrapper — prefer `SurfaceCard variant="hero"` on new work |
 | `PanelTitle`, `PanelSubtitle`, `HubRowTitle` | `src/components/ui/panel.tsx` | Card headlines + supporting line; hub row labels |
-| `Eyebrow` | `src/components/ui/panel.tsx` | Mono uppercase section label with optional dot |
+| `Eyebrow` | `src/components/ui/panel.tsx` | Sora 17px bold uppercase section label, ink, with a 3px yellow tick and a hairline rule under (the `dot` prop is a retained no-op) |
 | `StatStrip`, `StatTile` | `src/components/ui/panel.tsx` | Hairline-separated metric strip (instrument panel) |
 | `Button` / `ButtonLink` | `src/components/ui/Button.tsx`, `ButtonLink.tsx` | Primary (yellow) and outline actions |
 | `SectionTitle` | `src/components/ui/SectionTitle.tsx` | Section headers in lists (audit when touching) |
@@ -198,7 +286,7 @@ Use these shared primitives so every screen reads as one system. **Do not invent
 ### Page chrome
 
 - **Header:** `.page-header` + `h1.page-title` + `p.page-subtitle` — title block uses `gap-1` via `:has(.page-title)`; subtitle matches `PanelSubtitle` (`13px`, `leading-relaxed`, `text-muted-foreground`).
-- **Hierarchy:** page title (Sora **uppercase**, bold) → page subtitle (Sora muted) → section `<Eyebrow>` (mono, faint, uppercase) — hero `PanelTitle` (Sora 700 sentence case) stays the in-card headline voice.
+- **Hierarchy:** page title (**Space Grotesk 700, sentence case**, timing line beneath) → page subtitle (Sora muted) → section `<Eyebrow>` (**Sora 17px bold uppercase ink, 3px yellow tick**) — hero `PanelTitle` (Sora 700 sentence case) stays the in-card headline voice.
 - **Body:** `.page-body` with `max-w-*` as appropriate; `gap-3` between major blocks (locked in CSS).
 - **Mobile dock (2026-07-14, supersedes 2026-07-06 two-row chrome):** one row — a 56px glass bar holding the **Ideas** utility cap (lightbulb, hairline divider, opens the Ideas & reminders sheet app-wide, no count badge) plus the five destinations (Dashboard · Analysis · Assets · Engineer · Teams, 26px icons), with the icon-only yellow **Log run** circle (56px, specular shine rim; draft state = flag icon + green dot) floating beside the bar's right end. Static on scroll — nothing collapses. On create/edit routes the circle is suppressed and the bar stretches (`shouldShowLogRunFab`). **Settings** lives behind the top-right account avatar (`AccountMenu`). Desktop sidebar keeps Add run + Settings and gains Teams.
 
@@ -274,11 +362,12 @@ Foundations (globals.css tokens + fonts)
 Before opening a PR or marking a screen “done”:
 
 - [ ] Uses semantic Tailwind tokens — no new raw `#c92a2a`, `#2563eb`, or cool greys.
-- [ ] Numbers and micro-labels use `font-mono` (JetBrains), not `font-sans tabular-nums`.
+- [ ] Every number carries `tabular-nums` — **always**, whichever face it is in. Sora's digits are proportional without it (rule 7).
+- [ ] Micro-labels are Sora 12px 600 sentence case, muted grey — **not** mono, and not uppercase-tracked.
 - [ ] Primary actions use `Button` / `ButtonLink` primary (yellow + dark text).
 - [ ] Cards use `CardPanel` or `SurfaceCard`, not one-off `bg-card` wrappers with different radii.
 - [ ] Section labels use `<Eyebrow>` where the dashboard does.
-- [ ] Page title uses `.page-title` (Sora bold, **UPPERCASE** +0.02em).
+- [ ] Page title uses `.page-title` (**Space Grotesk 700, sentence case, `-0.01em`**).
 - [ ] Works at 390px width with bottom tab bar — and `layout:probe` at 390px is UNCHANGED if the
       change was for desktop.
 - [ ] Works at 1440px: content centred on the same axis as the page title, no dead right margin,
@@ -295,9 +384,9 @@ Track these when prioritizing rework:
 1. **Login** — ✅ Inter + semantic tokens (June 2026 typography pass).
 2. **Logo** — ✅ Resolved 2026-07-11. On-brand yellow/white JRC marks (`public/brand/jrc-mark-{yellow,white}.svg`) replace the red→blue asset; new `JrcMark` component (variant-aware) replaces the retired `JrcRaceEngineerLogo` (deleted). Yellow = brand/hero (app icon, login, launch splash); white = working chrome (desktop sidebar, mobile top-left). App icons/favicon/apple-touch generated to `public/icons/` + `app/icon.png`/`app/apple-icon.png`. See `docs/PWA_NORTH_STAR.md`.
 3. **Partial primitive adoption** — `panel.tsx` only on dashboard + partial engineer; 37+ other routes use ad-hoc patterns.
-4. **Numeric typography** — setup sheet values migrated to `font-mono`; Tier C routes may still have stragglers.
+4. **Numeric typography** — ✅ **Resolved 2026-08-14.** Was the largest open gap: two contradictory rules at once, ~460 `font-mono` sites across 126 files, 23 distinct numeric font sizes, ~20 figures with `tabular-nums` and no font class, ~20 with `font-mono` and no `tabular-nums`. Now a six-step `.fig-*` ramp with `tabular-nums` welded to each step, enforced by `e2e/typography-audit.spec.ts`.
 5. **Theme preview switcher** — alternate themes still reference old red/blue palette; section label uses `<Eyebrow>`.
-6. **Legacy font cleanup** — Heebo + HK Grotesk Wide retired (June 2026); Sora + JetBrains two-voice system locked (Sora replaced Inter 2026-07-03). Tier C section labels migrated to `<Eyebrow>` (June 2026 pass); remaining `ui-title` is entity names, field labels, badges, and chat speaker tags only.
+6. **Legacy font cleanup** — Heebo + HK Grotesk Wide retired (June 2026); Sora replaced Inter 2026-07-03 (the `"Inter"` fallback still sitting in `tailwind.config.ts`'s `sans` stack is dead — Inter has not been loaded since). Tier C section labels migrated to `<Eyebrow>` (June 2026 pass); remaining `ui-title` is entity names, field labels, badges, and chat speaker tags only. **JetBrains Mono deleted 2026-08-14** — two faces load now (Sora + Space Grotesk), and the font payload dropped from 11 woff2 files to 5.
 7. **Figma** — screen templates for Tier A were planned but blocked by MCP rate limits; code-first rollout proceeded without full Figma component library.
 
 ---

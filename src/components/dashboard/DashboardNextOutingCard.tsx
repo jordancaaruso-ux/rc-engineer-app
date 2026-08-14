@@ -103,7 +103,7 @@ export function DashboardNextOutingCard({
               ) : event.lastVisit ? (
                 <span className="block">
                   last visit: best{" "}
-                  <span className="lap-figure text-foreground/80">
+                  <span className="tabular-nums text-foreground/80">
                     {formatLap(event.lastVisit.bestLap)}
                   </span>{" "}
                   · {event.lastVisit.runCount} {event.lastVisit.runCount === 1 ? "run" : "runs"} ·{" "}

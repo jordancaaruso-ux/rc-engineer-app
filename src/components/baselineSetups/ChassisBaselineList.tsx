@@ -104,7 +104,7 @@ export function ChassisBaselineList({
                     </span>
                     <span className="truncate text-sm text-foreground">{b.name}</span>
                   </div>
-                  <div className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                  <div className="text-[11px] tabular-nums text-muted-foreground">
                     {b.valueCount} values
                     {context ? ` · ${context}` : ""}
                     {b.copyCount > 0 ? ` · ${b.copyCount} saved` : ""}

@@ -324,7 +324,7 @@ export function DualPlayheadVideo({
           <p className="text-[10px] text-muted-foreground">
             Nudge {topLabel} earlier or later vs {bottomLabel}
             {syncNudgeSec !== 0 && (
-              <span className="font-mono">
+              <span className="tabular-nums">
                 {" "}
                 ({syncNudgeSec >= 0 ? "+" : ""}
                 {syncNudgeSec.toFixed(2)}s)
@@ -337,7 +337,7 @@ export function DualPlayheadVideo({
               <button
                 key={`nudge-${sec}`}
                 type="button"
-                className="rounded border border-border px-1.5 py-0.5 text-[10px] font-mono hover:bg-muted"
+                className="rounded border border-border px-1.5 py-0.5 text-[10px] tabular-nums hover:bg-muted"
                 onClick={() => onSyncNudge(-sec)}
               >
                 −{sec}s
@@ -349,7 +349,7 @@ export function DualPlayheadVideo({
               <button
                 key={`nudge+${sec}`}
                 type="button"
-                className="rounded border border-border px-1.5 py-0.5 text-[10px] font-mono hover:bg-muted"
+                className="rounded border border-border px-1.5 py-0.5 text-[10px] tabular-nums hover:bg-muted"
                 onClick={() => onSyncNudge(sec)}
               >
                 +{sec}s

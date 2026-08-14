@@ -72,7 +72,7 @@ export function SeasonTimeline({
     <SurfaceCard variant="hero" contentClassName="p-0" className="rounded-2xl">
       <div className="flex items-center gap-3 border-b border-border px-6 py-3.5">
         <span className="h-3.5 w-[3px] shrink-0 skew-x-[-21deg] rounded-sm bg-primary" aria-hidden />
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[.2em] text-foreground">
+        <span className="micro-caps text-foreground">
           {year == null ? "All time" : `Season ${year}`}
         </span>
         <span className="truncate text-[12px] text-faint">
@@ -91,10 +91,10 @@ export function SeasonTimeline({
           <div className="h-4" />
           {lanes.map((lane) => (
             <div key={lane.key} className="flex h-[34px] flex-col justify-center">
-              <span className="truncate font-mono text-[10.5px] font-bold uppercase tracking-[.1em] text-foreground">
+              <span className="truncate micro-caps text-foreground">
                 {lane.name}
               </span>
-              <span className="font-mono text-[9px] tracking-[.08em] text-muted-foreground">
+              <span className="tabular-nums text-[9px] tracking-[.08em] text-muted-foreground">
                 {lane.events.length} {lane.events.length === 1 ? "EVENT" : "EVENTS"}
               </span>
             </div>
@@ -105,7 +105,7 @@ export function SeasonTimeline({
           <div className="relative h-4">
             {domain.todayPct != null ? (
               <span
-                className="absolute -translate-x-1/2 font-mono text-[9px] font-bold tracking-[.14em] text-muted-foreground"
+                className="absolute -translate-x-1/2 tabular-nums text-[9px] font-bold tracking-[.14em] text-muted-foreground"
                 style={{ left: `${domain.todayPct}%` }}
               >
                 TODAY
@@ -154,7 +154,7 @@ export function SeasonTimeline({
 
           <div
             aria-hidden
-            className="mt-2 grid font-mono text-[9.5px] tracking-[.1em] text-muted-foreground"
+            className="mt-2 grid tabular-nums text-[10px] tracking-[.1em] text-muted-foreground"
             style={{ gridTemplateColumns: columns }}
           >
             {domain.ticks.map((tick, i) => (
@@ -303,7 +303,7 @@ function StatStrip({ strip }: { strip: SeasonStrip }) {
         <div key={cell.label} className={cn("px-5 py-3", i < cells.length - 1 && "border-r border-border")}>
           <div className="text-[10.5px] font-semibold text-muted-foreground">{cell.label}</div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="font-mono text-[19px] font-medium tabular-nums text-foreground">
+            <span className="text-[18px] font-medium tabular-nums text-foreground">
               {cell.value}
             </span>
             {cell.pace ? (
@@ -323,7 +323,7 @@ function VolumeDelta({ stat, format }: { stat: SeasonStat; format: (n: number) =
   const diff = stat.value - stat.prior;
   if (Math.abs(diff) < 0.5) return <span className="text-[10.5px] text-muted-foreground">±0</span>;
   return (
-    <span className="text-[10.5px] tabular-nums text-muted-foreground">
+    <span className="text-[10px] tabular-nums text-muted-foreground">
       {diff > 0 ? "↑" : "↓"} {format(Math.abs(diff))}
     </span>
   );
@@ -338,7 +338,7 @@ function PaceDelta({ stat }: { stat: SeasonStat }) {
   return (
     <span
       className={cn(
-        "font-mono text-[11px] font-bold tabular-nums",
+        "text-[11px] font-bold tabular-nums",
         faster ? "text-gain" : "text-destructive"
       )}
     >

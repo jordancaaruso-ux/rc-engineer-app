@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { formatGroupDate } from "@/lib/formatDate";
 import { getBestLap, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { formatLocalCalendarDate } from "@/lib/engineerPhase5/localCalendarInTimeZone";
@@ -11,6 +12,7 @@ import {
   RUN_RATING_UNRATED_SLUG,
   carRatingsForBandSlugs,
   normalizeRunRatingBandSlugs,
+  runRatingBandLabel,
 } from "@/lib/runHandlingAssessment";
 
 export type RunHistorySort = "completed_desc" | "completed_asc" | "best_lap_asc" | "best_lap_desc";
@@ -249,6 +251,105 @@ export function countActiveRunHistoryFilters(filters: RunHistoryFilters): number
 
 export function runHistoryFiltersActive(filters: RunHistoryFilters): boolean {
   return Boolean(filters.q) || countActiveRunHistoryFilters(filters) > 0;
+}
+
+/** Id → display name, for the filters whose values are ids rather than words. */
+export type RunHistoryFilterOptions = {
+  cars?: readonly { id: string; label: string }[];
+  tracks?: readonly { id: string; label: string }[];
+  events?: readonly { id: string; label: string }[];
+  drivers?: readonly { id: string; label: string }[];
+};
+
+/**
+ * The active filters as short human labels — "Blue compound", "Kingston", "Camber ≥ 1.5".
+ *
+ * The Sessions workbench shows a filtered *subset* of each session, so the pane says which
+ * question you asked; without it a two-run session reads as the whole day. Pure and
+ * server-safe (no handlers, no hooks) so the server page can render it — `SessionsFilterBar`
+ * builds its own chips because each one also needs a remove handler.
+ *
+ * Order follows {@link countActiveRunHistoryFilters}; keep the two in step when adding a filter.
+ * Ids that aren't in `options` fall back to the raw id rather than vanishing — a label you
+ * can't read still tells you a filter is on.
+ */
+export function describeRunHistoryFilters(
+  filters: RunHistoryFilters,
+  options: RunHistoryFilterOptions = {}
+): string[] {
+  const out: string[] = [];
+  const label = (opts: readonly { id: string; label: string }[] | undefined, id: string) =>
+    opts?.find((o) => o.id === id)?.label ?? id;
+  const list = (
+    opts: readonly { id: string; label: string }[] | undefined,
+    ids: string[],
+    plural: string
+  ) => (ids.length === 1 ? label(opts, ids[0]!) : `${ids.length} ${plural}`);
+  // Calendar dates, not instants — formatted in UTC so a `YYYY-MM-DD` never slips a day
+  // for a reader west of Greenwich.
+  const day = (ymd: string) => formatGroupDate(ymd, "UTC");
+
+  if (filters.q) out.push(`“${filters.q}”`);
+  if (filters.carIds.length) out.push(list(options.cars, filters.carIds, "cars"));
+  if (filters.trackIds.length) out.push(list(options.tracks, filters.trackIds, "tracks"));
+  if (filters.driverIds.length) out.push(list(options.drivers, filters.driverIds, "drivers"));
+  // Tire-type filter values ARE the identity strings, so they need no lookup.
+  if (filters.tireTypes.length) {
+    out.push(
+      filters.tireTypes.length === 1
+        ? filters.tireTypes[0]!
+        : `${filters.tireTypes.length} compounds`
+    );
+  }
+  if (filters.eventId) out.push(label(options.events, filters.eventId));
+  if (filters.dateFrom && filters.dateTo) {
+    // Compact the shared tail the way event date ranges do — the ribbon is one
+    // truncating line, and "1 Jul 2026 – 31 Jul 2026" says July twice.
+    const sameMonth = filters.dateFrom.slice(0, 7) === filters.dateTo.slice(0, 7);
+    const from = sameMonth ? String(Number(filters.dateFrom.slice(8, 10))) : day(filters.dateFrom);
+    out.push(`${from} – ${day(filters.dateTo)}`);
+  } else if (filters.dateFrom) out.push(`From ${day(filters.dateFrom)}`);
+  else if (filters.dateTo) out.push(`Until ${day(filters.dateTo)}`);
+  if (filters.sessionType) {
+    out.push(filters.sessionType === "TESTING" ? "Testing" : "Race meetings");
+  }
+  if (filters.meetingSessionType) {
+    const raw = filters.meetingSessionType;
+    out.push(raw.charAt(0) + raw.slice(1).toLowerCase());
+  }
+  if (filters.ratingBands.length) {
+    out.push(
+      filters.ratingBands.length === 1
+        ? runRatingBandLabel(filters.ratingBands[0]!) ?? filters.ratingBands[0]!
+        : `${filters.ratingBands.length} ratings`
+    );
+  }
+  if (filters.bestLapMin != null || filters.bestLapMax != null) {
+    out.push(`Best ${filters.bestLapMin ?? "…"}–${filters.bestLapMax ?? "…"}s`);
+  }
+  if (filters.raceClass) out.push(`Class ${filters.raceClass}`);
+  if (filters.setupField) {
+    const field = setupFieldLabel(filters.setupField);
+    const condition =
+      filters.setupOp === "between" && (filters.setupValue || filters.setupValue2)
+        ? ` ${filters.setupValue ?? "…"}–${filters.setupValue2 ?? "…"}`
+        : filters.setupValue
+          ? ` ${filters.setupOp === "gte" ? "≥" : filters.setupOp === "lte" ? "≤" : "="} ${filters.setupValue}`
+          : "";
+    out.push(`${field}${condition}`);
+  }
+  if (filters.setupChangedField) {
+    const field = setupFieldLabel(filters.setupChangedField);
+    const dir =
+      filters.setupChangedDir === "up"
+        ? " increased"
+        : filters.setupChangedDir === "down"
+          ? " decreased"
+          : " changed";
+    out.push(`${field}${dir}`);
+  }
+  if (filters.status !== "all") out.push(filters.status === "draft" ? "Drafts" : "Complete");
+  return out;
 }
 
 export function filtersToSearchParams(

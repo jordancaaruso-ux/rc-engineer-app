@@ -49,7 +49,7 @@ export function LapCompareStatTiles({
           <span className="ui-label-caps text-[9px] uppercase tracking-wider">{t.label}</span>
           <span
             className={cn(
-              "font-mono text-[17px] leading-none tabular-nums",
+              "text-[18px] leading-none tabular-nums",
               t.accent ? "text-primary-ink" : "text-foreground"
             )}
           >
@@ -60,7 +60,7 @@ export function LapCompareStatTiles({
           </span>
           <span
             className={cn(
-              "font-mono text-[10px] tabular-nums",
+              "text-[10px] tabular-nums",
               t.note == null && "opacity-0",
               t.noteTone === "good" && "text-gain",
               t.noteTone === "bad" && "text-destructive",

@@ -121,7 +121,7 @@ export default async function WelcomePage(): Promise<ReactNode> {
           <CardPanel contentClassName="p-4">
             <div className="flex items-center justify-between gap-2">
               <Eyebrow className="mb-0 border-b-0 pb-0">Session trend</Eyebrow>
-              <span className="font-mono text-[10px] text-muted-foreground">R8 · Q2 · MOD TC</span>
+              <span className="tabular-nums text-[10px] text-muted-foreground">R8 · Q2 · MOD TC</span>
             </div>
             <svg viewBox="0 0 300 90" className="mt-3 block w-full" aria-hidden="true">
               <line x1="0" y1="22" x2="300" y2="22" stroke="#282726" strokeWidth="1" />
@@ -145,7 +145,7 @@ export default async function WelcomePage(): Promise<ReactNode> {
               ).map(([label, value]) => (
                 <div key={label} className="border-r border-border px-3 py-2 last:border-r-0">
                   <div className="text-[10px] font-semibold text-muted-foreground">{label}</div>
-                  <div className="lap-figure font-mono text-[15px] font-semibold">{value}</div>
+                  <div className="fig-stat font-semibold">{value}</div>
                 </div>
               ))}
             </div>
@@ -165,10 +165,10 @@ export default async function WelcomePage(): Promise<ReactNode> {
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <CardPanel contentClassName="p-4">
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                <span className="micro-caps text-muted-foreground">
                   Racing on gut feel
                 </span>
-                <span className="font-mono text-[12px] text-muted-foreground">Δ ?</span>
+                <span className="tabular-nums text-[12px] text-muted-foreground">Δ ?</span>
               </div>
               <ul className="mt-3 flex flex-col gap-2 text-[13.5px] leading-relaxed">
                 <li>
@@ -187,13 +187,13 @@ export default async function WelcomePage(): Promise<ReactNode> {
             </CardPanel>
             <CardPanel contentClassName="p-4">
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                <span className="micro-caps text-muted-foreground">
                   Racing on data
                 </span>
-                <span className="font-mono text-[12px] text-gain">▼ −0.18s</span>
+                <span className="tabular-nums text-[12px] text-gain">▼ −0.18s</span>
               </div>
               <ul className="mt-3 flex flex-col gap-2 text-[13.5px] leading-relaxed">
-                <li className="font-mono text-[12.5px]">
+                <li className="tabular-nums text-[13px]">
                   R5 → R6: front camber −1.5° → −2.0°
                 </li>
                 <li className="text-muted-foreground">
@@ -236,7 +236,7 @@ export default async function WelcomePage(): Promise<ReactNode> {
             track, per condition. Then argue with it.
           </p>
           <CardPanel className="mt-5" contentClassName="p-4">
-            <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            <div className="micro-caps text-muted-foreground">
               Engineer · Mod TC
             </div>
             <div className="mt-3 flex flex-col gap-3">
@@ -248,7 +248,7 @@ export default async function WelcomePage(): Promise<ReactNode> {
                   Your last three runs show mid-corner speed dropping ~0.3s after lap 8 while entry
                   stays consistent — classic front grip fade. Two changes:
                 </p>
-                <div className="mt-2 grid grid-cols-2 gap-2 font-mono text-[12px]">
+                <div className="mt-2 grid grid-cols-2 gap-2 tabular-nums text-[12px]">
                   <div className="rounded-md border border-border px-2 py-1.5">
                     Front camber
                     <div className="text-foreground">−1.5° → −2.0°</div>
@@ -282,7 +282,7 @@ export default async function WelcomePage(): Promise<ReactNode> {
               ] as const
             ).map(([n, title, line]) => (
               <div key={n} className="rounded-xl border border-border p-4">
-                <div className="font-mono text-[11px] text-primary-ink">{n}</div>
+                <div className="tabular-nums text-[11px] text-primary-ink">{n}</div>
                 <p className="mt-1 text-sm font-semibold">{title}</p>
                 <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{line}</p>
               </div>
@@ -359,7 +359,7 @@ export default async function WelcomePage(): Promise<ReactNode> {
               Terms
             </Link>
           </div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em]">
+          <p className="micro-caps">
             © 2026 {COMPANY_NAME} · Built by racers
           </p>
         </footer>

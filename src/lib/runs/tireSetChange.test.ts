@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   computeTireIndicatorsByRunId,
+  formatTireIdentityLine,
   formatTireIndicatorTitle,
 } from "@/lib/runs/tireSetChange";
 
@@ -151,5 +152,60 @@ test("formatTireIndicatorTitle: changed vs steady, new + unknown-age callouts", 
       previousTireLabel: null,
     }),
     "Sweep D32"
+  );
+});
+
+test("formatTireIdentityLine: compound + wear, never the changed-from prefix", () => {
+  // Same wear callouts as the tooltip...
+  assert.equal(
+    formatTireIdentityLine({
+      tireLabel: "Sweep D32",
+      runNumber: 3,
+      ageKnown: true,
+      changed: false,
+      previousTireLabel: null,
+    }),
+    "Sweep D32 · run 3"
+  );
+  assert.equal(
+    formatTireIdentityLine({
+      tireLabel: "Sweep D32",
+      runNumber: 1,
+      ageKnown: true,
+      changed: false,
+      previousTireLabel: null,
+    }),
+    "Sweep D32 · run 1 (new)"
+  );
+  assert.equal(
+    formatTireIdentityLine({
+      tireLabel: "Sweep D32",
+      runNumber: 2,
+      ageKnown: false,
+      changed: false,
+      previousTireLabel: null,
+    }),
+    "Sweep D32 · run 2 (age unknown)"
+  );
+  assert.equal(
+    formatTireIdentityLine({
+      tireLabel: "Sweep D32",
+      runNumber: null,
+      ageKnown: false,
+      changed: false,
+      previousTireLabel: null,
+    }),
+    "Sweep D32 · age unknown"
+  );
+  // ...but a swap says only what's on the car now; the ring carries the change.
+  assert.equal(
+    formatTireIdentityLine({
+      tireLabel: "Volante V5R",
+      runNumber: 1,
+      ageKnown: true,
+      changed: true,
+      previousTireLabel: "Sweep D32",
+    }),
+    "Volante V5R · run 1 (new)"
   );
 });

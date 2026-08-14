@@ -69,13 +69,13 @@ export function TeamFeedEntryCard({
         </div>
 
         <div className="flex items-baseline gap-2.5 px-4 pb-3 pt-2">
-          <span className="font-mono text-[26px] font-medium leading-none tabular-nums text-foreground">
+          <span className="text-[26px] font-medium leading-none tabular-nums text-foreground">
             {entry.bestLapSeconds != null ? formatLap(entry.bestLapSeconds) : "—"}
           </span>
           {paceDelta ? (
             <span
               className={cn(
-                "font-mono text-[14px] font-medium tabular-nums",
+                "text-[13px] font-medium tabular-nums",
                 isGain && GAIN,
                 isLoss && "text-destructive",
                 !isGain && !isLoss && "text-muted-foreground"
@@ -99,7 +99,7 @@ export function TeamFeedEntryCard({
                 text: (
                   <>
                     <span className="text-muted-foreground">{row.label}</span>{" "}
-                    <span className="font-mono tabular-nums text-foreground">
+                    <span className="tabular-nums text-foreground">
                       {row.previousValue} → {row.value}
                     </span>
                   </>
@@ -115,7 +115,7 @@ export function TeamFeedEntryCard({
                 text: (
                   <>
                     <span className="text-muted-foreground">{row.label}</span>{" "}
-                    <span className="font-mono tabular-nums text-foreground">{row.detail}</span>
+                    <span className="tabular-nums text-foreground">{row.detail}</span>
                   </>
                 ),
               }))}

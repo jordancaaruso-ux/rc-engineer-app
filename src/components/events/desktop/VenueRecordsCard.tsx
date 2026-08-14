@@ -23,7 +23,7 @@ export function VenueRecordsCard({
   return (
     <SurfaceCard contentClassName="p-0" className="rounded-xl">
       <div className="flex items-center gap-3 border-b border-border px-5 py-3.5">
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[.2em] text-muted-foreground">
+        <span className="micro-caps text-muted-foreground">
           Your record by venue
         </span>
       </div>
@@ -61,10 +61,10 @@ export function VenueRecordsCard({
                 </span>
               </span>
               <span className="shrink-0 text-right">
-                <span className="block font-mono text-[14px] tabular-nums text-foreground">
+                <span className="block text-[13px] tabular-nums text-foreground">
                   {formatLap(venue.bestLapSeconds)}
                 </span>
-                <span className="block font-mono text-[9.5px] tracking-[.08em] text-muted-foreground">
+                <span className="block tabular-nums text-[10px] tracking-[.08em] text-muted-foreground">
                   {venue.bestYmd ? shortStamp(venue.bestYmd) : "NO TIMED LAPS"}
                 </span>
               </span>

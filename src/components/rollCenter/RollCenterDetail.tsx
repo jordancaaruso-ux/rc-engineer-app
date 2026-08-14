@@ -61,7 +61,7 @@ export function rakeWord(rakeMm: number): string {
  */
 export function GradeTag({ grade }: { grade: RollCenterComputation["verificationGrade"] }) {
   return (
-    <span className="rounded border border-border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-faint">
+    <span className="rounded border border-border px-1.5 py-0.5 micro-caps text-faint">
       {grade}
     </span>
   );
@@ -77,7 +77,7 @@ export function NeutralDelta({ current, baseline, unit, dp = 1 }: {
   const d = current - baseline;
   if (Math.abs(d) < Math.pow(10, -dp) / 2) return null;
   return (
-    <span className="font-mono text-[10px] text-muted-foreground tabular-nums">
+    <span className="text-[10px] text-muted-foreground tabular-nums">
       {d > 0 ? "↑" : "↓"} {Math.abs(d).toFixed(dp)}
       {unit}
     </span>
@@ -165,7 +165,7 @@ export function RollCenterDetail({
             Roll center F/R
           </div>
           <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5 px-2 py-1">
-            <span className="text-sm font-mono tabular-nums font-semibold text-foreground">
+            <span className="fig-stat font-semibold text-foreground">
               {fmtMm(computed.front.rcHeightMm)} / {fmtMm(computed.rear.rcHeightMm)} mm
             </span>
             <NeutralDelta current={computed.front.rcHeightMm} baseline={baseline?.front.rcHeightMm} unit="F" />
@@ -179,7 +179,7 @@ export function RollCenterDetail({
           </div>
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-0.5 px-2 py-1">
             <RollAxisStrip frontMm={computed.front.rcHeightMm} rearMm={computed.rear.rcHeightMm} />
-            <span className="font-mono text-[10px] text-muted-foreground tabular-nums">
+    <span className="text-[10px] text-muted-foreground tabular-nums">
               Δ {Math.abs(computed.rakeMm).toFixed(1)}mm · {rakeWord(computed.rakeMm)}
             </span>
           </div>
@@ -190,7 +190,7 @@ export function RollCenterDetail({
             Camber gain F/R
           </div>
           <div className="flex min-w-0 flex-1 items-center px-2 py-1">
-            <span className="text-sm font-mono tabular-nums font-semibold text-foreground">
+            <span className="fig-stat font-semibold text-foreground">
               {fmtGain(computed.front.camberGainDegPerMm)} / {fmtGain(computed.rear.camberGainDegPerMm)} °/mm
             </span>
           </div>

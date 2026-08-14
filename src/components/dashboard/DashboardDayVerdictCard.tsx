@@ -161,11 +161,11 @@ export function DashboardDayVerdictCard({
             sub={
               bestRun.bestLap != null ? (
                 <>
-                  best <span className="lap-figure text-foreground/80">{formatLap(bestRun.bestLap)}</span>
+                  best <span className="tabular-nums text-foreground/80">{formatLap(bestRun.bestLap)}</span>
                   {bestRun.avgTop5 != null ? (
                     <>
                       {" "}
-                      · avg <span className="lap-figure text-foreground/80">{formatLap(bestRun.avgTop5)}</span>
+                      · avg <span className="tabular-nums text-foreground/80">{formatLap(bestRun.avgTop5)}</span>
                     </>
                   ) : null}
                 </>
@@ -197,7 +197,7 @@ export function DashboardDayVerdictCard({
             sub={
               <>
                 top 5 laps within{" "}
-                <span className="lap-figure text-foreground/80">
+                <span className="tabular-nums text-foreground/80">
                   {consistency.spreadSeconds.toFixed(3)}
                 </span>{" "}
                 on {consistency.runLabel}

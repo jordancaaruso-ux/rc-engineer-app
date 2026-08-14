@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
  * emphasis, which the KB uses heavily.
  */
 
-const INLINE_CODE = "rounded bg-muted/60 px-1 py-[1px] font-mono text-[0.92em] text-foreground/90";
+const INLINE_CODE = "rounded bg-muted/60 px-1 py-[1px] type-machine text-[0.92em] text-foreground/90";
 
 const blockComponents: Components = {
   p: ({ children }) => <p className="leading-relaxed">{children}</p>,

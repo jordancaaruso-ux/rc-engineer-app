@@ -157,7 +157,7 @@ export function PrepSlider({
                 onPointerUp={stopHold}
                 onPointerCancel={stopHold}
                 onPointerLeave={stopHold}
-                className="h-7 w-[30px] rounded-md font-mono text-base leading-none text-faint transition active:bg-accent active:text-accent-foreground disabled:text-border disabled:active:bg-transparent disabled:active:text-border"
+                className="h-7 w-[30px] rounded-md tabular-nums text-base leading-none text-faint transition active:bg-accent active:text-accent-foreground disabled:text-border disabled:active:bg-transparent disabled:active:text-border"
               >
                 {glyph}
               </button>
@@ -166,7 +166,7 @@ export function PrepSlider({
         ) : null}
         <span
           className={cn(
-            "ml-auto origin-right font-mono text-[15px] tabular-nums transition-transform duration-150",
+            "ml-auto origin-right text-[15px] tabular-nums transition-transform duration-150",
             SPRING,
             value == null ? "text-faint" : "text-primary-ink",
             live && "scale-[1.24]"

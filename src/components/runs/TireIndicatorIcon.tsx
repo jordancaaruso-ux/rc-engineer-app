@@ -32,12 +32,13 @@ export function TireMarkGlyph({
   cy,
   size,
 }: {
-  indicator: RunTireIndicator;
+  /** Null = the run logged prep but no compound: an empty ring, no count. */
+  indicator: RunTireIndicator | null;
   cx: number;
   cy: number;
   size: number;
 }) {
-  const label = indicator.runNumber != null ? String(indicator.runNumber) : null;
+  const label = indicator?.runNumber != null ? String(indicator.runNumber) : null;
   return (
     <>
       <circle
@@ -55,7 +56,7 @@ export function TireMarkGlyph({
           textAnchor="middle"
           dominantBaseline="central"
           fontSize={label.length > 1 ? size * 0.44 : size * 0.52}
-          className="fill-current font-mono font-medium tabular-nums"
+          className="fill-current font-medium tabular-nums"
         >
           {label}
         </text>
@@ -77,14 +78,15 @@ export function TireIndicatorIcon({
   well = false,
   className,
 }: {
-  indicator: RunTireIndicator;
+  /** Null = tires weren't logged on this run; the ring still marks where prep lives. */
+  indicator: RunTireIndicator | null;
   /** lg = 28px slot / 20px ring (session-trend markers); md = 32px slot (mobile rows / cards); sm = 24px slot (desktop table rows). */
   size?: "sm" | "md" | "lg";
   /** Sit the icon on a bordered charcoal tile matching the adjacent action buttons (mobile action row). */
   well?: boolean;
   className?: string;
 }) {
-  const title = formatTireIndicatorTitle(indicator);
+  const title = indicator ? formatTireIndicatorTitle(indicator) : "Tires not logged";
   const glyph = size === "lg" ? 20 : 16;
   return (
     <span
@@ -95,7 +97,7 @@ export function TireIndicatorIcon({
         "inline-flex shrink-0 items-center justify-center",
         size === "lg" ? "h-7 w-7" : size === "md" ? "h-8 w-8" : "h-6 w-6",
         well && "rounded-md border border-border bg-background",
-        indicator.changed ? "text-foreground" : "text-faint",
+        indicator?.changed ? "text-foreground" : "text-faint",
         className
       )}
     >

@@ -92,7 +92,7 @@ export function AwesomatixScrewStrip({
               }
               onClick={() => toggle(p.id)}
               className={cn(
-                "flex min-h-[2.25rem] min-w-0 flex-1 items-center justify-center rounded border text-xs font-mono tabular-nums transition",
+                "flex min-h-[2.25rem] min-w-0 flex-1 items-center justify-center rounded border text-xs tabular-nums transition",
                 "border-border/90 bg-muted/50 text-foreground shadow-sm",
                 on && "border-primary-ink/70 bg-accent/20 font-semibold text-accent-foreground ring-1 ring-primary-ink/30",
                 !on && "text-muted-foreground",
@@ -106,7 +106,7 @@ export function AwesomatixScrewStrip({
         })}
       </div>
       {hasBaseline && baselineSelected != null && baselineSelected.length > 0 ? (
-        <div className="text-[9px] font-mono text-muted-foreground/90">
+        <div className="text-[9px] tabular-nums text-muted-foreground/90">
           Compared run:{" "}
           {variant === "motor_mount"
             ? baselineSelected.join(" · ")

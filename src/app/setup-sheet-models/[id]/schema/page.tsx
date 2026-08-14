@@ -94,7 +94,7 @@ export default async function SetupSheetModelSchemaPage({ params, searchParams }
           <PageBackLink href="/setup-sheet-models" />
           <div>
             <h1 className="page-title">{model.name}</h1>
-            <p className="page-subtitle font-mono text-xs">{model.slug}</p>
+            <p className="page-subtitle tabular-nums text-xs">{model.slug}</p>
           </div>
         </div>
       </header>

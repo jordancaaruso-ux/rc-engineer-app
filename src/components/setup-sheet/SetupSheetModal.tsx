@@ -18,18 +18,13 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { SegmentedControl, type SegmentedOption } from "@/components/ui/SegmentedControl";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { ReadOnlySheetSurface } from "@/components/setup/ReadOnlySheetSurface";
+import { SheetCompareSurface } from "@/components/setup/SheetCompareSurface";
 import { Eyebrow } from "@/components/ui/panel";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import { getGenericSetupSheetTemplate } from "@/lib/setupSheetModels/genericSetupSheetTemplate";
-import { canonicalSetupSheetTemplateId, isA800RRCar } from "@/lib/setupSheetTemplateId";
-import { GRIP_BUCKET_ANY } from "@/lib/setupAggregations/gripBuckets";
+import { isA800RRCar } from "@/lib/setupSheetTemplateId";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
-import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
-import {
-  buildNumericAggregationMapFromCommunity,
-  type SetupAggApiRow,
-} from "@/lib/setupCompare/buildNumericAggregationMap";
 
 export type SetupSheetModalRun = {
   id: string;
@@ -124,10 +119,6 @@ export function SetupSheetModal({
   const [teammateRuns, setTeammateRuns] = useState<SetupSheetModalRun[]>([]);
   const [teammateDisplay, setTeammateDisplay] = useState<Record<string, string>>({});
   const [hasTeammates, setHasTeammates] = useState(false);
-  const [numericAggregationByKey, setNumericAggregationByKey] = useState<Map<
-    string,
-    NumericAggregationCompareSlice
-  > | null>(null);
   const [portalReady, setPortalReady] = useState(false);
   const [loadedSetupData, setLoadedSetupData] = useState<unknown>(null);
   const [baselineSetupData, setBaselineSetupData] = useState<unknown | null>(null);
@@ -220,38 +211,6 @@ export function SetupSheetModal({
       alive = false;
     };
   }, [open, carId]);
-
-  // Community stats bucket by the car's template key (model slug). No fallback: showing another
-  // chassis' spread would color compare deltas with wrong data.
-  const communityTemplateKey = useMemo(() => {
-    return canonicalSetupSheetTemplateId(run?.car?.setupSheetTemplate ?? null);
-  }, [run?.car?.setupSheetTemplate]);
-
-  useEffect(() => {
-    if (!open || !communityTemplateKey) {
-      setNumericAggregationByKey(null);
-      return;
-    }
-    let alive = true;
-    const q = new URLSearchParams({
-      setupSheetTemplate: communityTemplateKey,
-      trackSurface: "asphalt",
-      gripLevel: GRIP_BUCKET_ANY,
-    }).toString();
-    void fetch(`/api/setup-aggregations/community?${q}`)
-      .then((res) => res.json())
-      .then((data: { aggregations?: SetupAggApiRow[] }) => {
-        if (!alive) return;
-        const rows = Array.isArray(data.aggregations) ? data.aggregations : [];
-        setNumericAggregationByKey(buildNumericAggregationMapFromCommunity(rows));
-      })
-      .catch(() => {
-        if (alive) setNumericAggregationByKey(null);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [open, communityTemplateKey]);
 
   const fallbackPickerRuns = pickerRuns ?? [];
 
@@ -673,28 +632,40 @@ export function SetupSheetModal({
                     ) : null}
                     {compareActive && baselineLabel ? (
                       <p className="text-[11px] text-muted-foreground">
-                        Showing this run&apos;s setup vs {baselineLabel}. Changed fields show{" "}
-                        <span className="font-medium text-foreground/80">vs …</span> with the other value.{" "}
-                        <span className="text-destructive/90">Darker red</span> = larger difference vs
-                        community spread for that parameter; parameters without enough community samples use a
-                        fixed lighter red.
+                        Hold the sheet to see {baselineLabel} in the same boxes. Only the values that
+                        differ will move.
                       </p>
                     ) : null}
                   </div>
                 ) : null}
               </div>
 
-              {sheetModelId && !compareActive ? (
+              {/*
+                The setup, on the driver's own sheet (founder ruling 2026-08-11: on a chassis that
+                draws one, the sheet IS the setup view). The changed-since-previous list above stays
+                — that is the session view's question and its carve-out.
+              */}
+              {compareActive && baselineValue ? (
                 /*
-                 * The setup, on the driver's own sheet (founder ruling 2026-08-11: on a chassis
-                 * that draws one, the sheet IS the setup view). The changed-since-previous list
-                 * above stays — that is the session view's question and its carve-out. Comparing
-                 * to another run falls back to the field list: highlights and community-spread
-                 * colouring live there, and a compare without them answers nothing.
+                 * Comparing used to drop to the field list, because the red highlights and the
+                 * community-spread colouring lived there. Founder ruling 2026-08-14: no highlights
+                 * and no spread — a comparison is answered by FLIPPING between the two setups on
+                 * one sheet, so compare stays on the paper like everything else.
                  */
-                /* No baseline here by construction: picking one is what turns `compareActive` on,
-                   and that routes to the field list instead. Geometry deltas for a comparison live
-                   in `RollCenterCompareStrip` on the compare panel. */
+                sheetModelId ? (
+                  <SheetCompareSurface
+                    setupSheetModelId={sheetModelId}
+                    a={{ label: "This run", values: runSetup }}
+                    b={{ label: baselineLabel ?? "Comparison", values: baselineValue }}
+                    templateKey={template.templateKey}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    This car has no setup sheet yet, so there is no sheet to compare on. Add its
+                    sheet from the car page and this comparison works.
+                  </p>
+                )
+              ) : sheetModelId ? (
                 <ReadOnlySheetSurface
                   setupSheetModelId={sheetModelId}
                   values={runSetup}
@@ -708,9 +679,6 @@ export function SetupSheetModal({
                   onChange={() => {}}
                   readOnly
                   template={template}
-                  baselineValue={baselineValue}
-                  compareHighlightOnly={compareActive}
-                  numericAggregationByKey={compareActive ? numericAggregationByKey : null}
                 />
               )}
             </>

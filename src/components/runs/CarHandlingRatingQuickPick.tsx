@@ -25,10 +25,11 @@ import { CAR_RATING_BANDS, carRatingBandCaption } from "@/lib/runHandlingAssessm
  * - **The −21° skew is gone here.** Skewed plates in a ~30px column read as tall slivers,
  *   and the lean on the end plates was clipped by the panel edge — the brand cut needs
  *   room it doesn't have at this size. It survives elsewhere (wizard bar, page title).
- * - **Numerals are Sora 600, not JetBrains Mono.** A deliberate exception to
- *   VISUAL_NORTH_STAR's "prefer font-mono for numeric data": mono at this size went thin
- *   and undersized inside the block, and these are one-glyph labels on a control, not
- *   tabular data being compared down a column. `tabular-nums` still holds the width.
+ * - **Numerals are Sora 600 and stay OFF the `.fig-*` ramp.** These are one-glyph labels
+ *   on a control, not figures being compared down a column, so they take the control's own
+ *   size rather than a ramp step. `tabular-nums` still holds the width so the row doesn't
+ *   reflow as the value changes. (Until 2026-08-14 this was an exception to a mono rule;
+ *   there is no mono rule any more, but the sizing exception still stands.)
  * - Yellow is still nowhere near this control — it stays reserved for actions.
  */
 type Props = {
@@ -153,7 +154,7 @@ export function CarHandlingRatingQuickPick({
           >
             {value ?? "—"}
           </span>
-          <span className="font-sans text-xs font-medium text-faint">{value == null ? "" : " / 10"}</span>
+          <span className="font-sans text-xs font-medium tabular-nums text-faint">{value == null ? "" : " / 10"}</span>
           <div
             className={cn(
               "mt-0.5 font-sans text-[11px] font-semibold tracking-tight",

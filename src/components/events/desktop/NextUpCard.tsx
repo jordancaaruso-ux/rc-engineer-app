@@ -33,10 +33,10 @@ export function NextUpCard({ nextUp }: { nextUp: NextUp }) {
     <SurfaceCard variant="hero" contentClassName="p-0" className="rounded-2xl">
       <div className="flex items-center gap-3 border-b border-border px-5 py-3.5">
         <span className="h-3.5 w-[3px] shrink-0 skew-x-[-21deg] rounded-sm bg-primary" aria-hidden />
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[.2em] text-foreground">
+        <span className="micro-caps text-foreground">
           Next up
         </span>
-        <span className="ml-auto font-mono text-[9.5px] font-bold uppercase tracking-[.14em] text-muted-foreground">
+        <span className="ml-auto micro-caps text-muted-foreground">
           Booked
         </span>
       </div>
@@ -44,10 +44,10 @@ export function NextUpCard({ nextUp }: { nextUp: NextUp }) {
       <div className="px-5 pb-4 pt-5">
         <div className="flex items-start gap-4">
           <div className="shrink-0 rounded-lg border border-border bg-background/45 px-3 py-2 text-center">
-            <div className="font-mono text-[26px] font-medium leading-none tabular-nums text-foreground">
+            <div className="text-[26px] font-medium leading-none tabular-nums text-foreground">
               {date.day}
             </div>
-            <div className="mt-1 font-mono text-[9.5px] tracking-[.1em] text-muted-foreground">
+            <div className="mt-1 tabular-nums text-[10px] tracking-[.1em] text-muted-foreground">
               {date.month}
             </div>
           </div>
@@ -69,7 +69,7 @@ export function NextUpCard({ nextUp }: { nextUp: NextUp }) {
                 .filter(Boolean)
                 .join(" · ")}
             </div>
-            <div className="mt-2 font-mono text-[11px] uppercase tracking-[.1em] text-muted-foreground">
+            <div className="mt-2 micro-caps text-muted-foreground">
               {nextUp.daysUntil === 0
                 ? "Today"
                 : `In ${nextUp.daysUntil} ${nextUp.daysUntil === 1 ? "day" : "days"}`}
@@ -80,7 +80,7 @@ export function NextUpCard({ nextUp }: { nextUp: NextUp }) {
         <div className="mt-4 grid grid-cols-2 overflow-hidden rounded-lg border border-border bg-background/45">
           <div className="border-r border-border px-3 py-2.5">
             <div className="text-[10.5px] font-semibold text-muted-foreground">To beat here</div>
-            <div className="mt-1 font-mono text-[17px] font-medium tabular-nums text-foreground">
+            <div className="mt-1 text-[18px] font-medium tabular-nums text-foreground">
               {formatLap(nextUp.toBeatSeconds)}
             </div>
           </div>
@@ -89,7 +89,7 @@ export function NextUpCard({ nextUp }: { nextUp: NextUp }) {
                 counts days you turned a wheel, and two different numbers for Boronia on
                 one screen is worse than the smaller one being right. */}
             <div className="text-[10.5px] font-semibold text-muted-foreground">Days here</div>
-            <div className="mt-1 font-mono text-[17px] font-medium tabular-nums text-foreground">
+            <div className="mt-1 text-[18px] font-medium tabular-nums text-foreground">
               {nextUp.visitsHere}
             </div>
           </div>
@@ -138,7 +138,7 @@ function CarryRow({ label, value, divider }: { label: string; value: string; div
       }`}
     >
       <span className="text-[12.5px] text-muted-foreground">{label}</span>
-      <span className="font-mono text-[12.5px] tabular-nums text-foreground">{value}</span>
+      <span className="text-[13px] tabular-nums text-foreground">{value}</span>
     </div>
   );
 }
@@ -167,7 +167,7 @@ export function NothingBookedCard({
     <SurfaceCard variant="hero" contentClassName="p-0" className="rounded-2xl">
       <div className="flex items-center gap-3 border-b border-border px-5 py-3.5">
         <span className="h-3.5 w-[3px] shrink-0 skew-x-[-21deg] rounded-sm bg-primary" aria-hidden />
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[.2em] text-foreground">
+        <span className="micro-caps text-foreground">
           Nothing booked
         </span>
       </div>
@@ -182,7 +182,7 @@ export function NothingBookedCard({
         </p>
 
         {cadence.suggestedLabel ? (
-          <p className="mt-3 font-mono text-[11px] uppercase tracking-[.1em] text-muted-foreground">
+          <p className="mt-3 micro-caps text-muted-foreground">
             Next one would be {cadence.suggestedLabel}
           </p>
         ) : null}

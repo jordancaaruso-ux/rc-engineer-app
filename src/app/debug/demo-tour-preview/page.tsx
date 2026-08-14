@@ -136,7 +136,7 @@ export default function DemoTourPreviewPage() {
         <p className="text-sm text-muted-foreground">
           Dev only. The real overlay against fabricated anchors — route pushes, late-settling
           anchors and the handover are not covered here. Drive those on the real app with{" "}
-          <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-xs">?tour=1</code>.
+          <code className="rounded bg-secondary px-1.5 py-0.5 type-machine text-xs">?tour=1</code>.
         </p>
       </header>
 
@@ -206,7 +206,7 @@ export default function DemoTourPreviewPage() {
             className="rounded-xl border border-border bg-card p-4"
           >
             <div className="mb-1 flex items-baseline gap-2">
-              <span className="font-mono text-[11px] text-faint">
+              <span className="type-machine text-[11px] text-faint">
                 {String(index + 1).padStart(2, "0")}
               </span>
               <h3 className="text-[15px] font-bold">{entry.title}</h3>

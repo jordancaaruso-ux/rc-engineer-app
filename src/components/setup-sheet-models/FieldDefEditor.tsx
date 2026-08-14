@@ -41,10 +41,10 @@ export function FieldDefEditor(props: {
   return (
     <div className="mt-2 w-full space-y-2 rounded border border-border/80 bg-card p-2">
       <div className="flex items-center gap-2">
-        <span className="font-mono text-[10px] text-muted-foreground">{field.key}</span>
+        <span className="tabular-nums text-[10px] text-muted-foreground">{field.key}</span>
         <span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">{kind}</span>
         {isAdmin && field.universalParameterId ? (
-          <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-mono text-sky-200">
+          <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] tabular-nums text-sky-200">
             ↗ {field.universalParameterId}
           </span>
         ) : null}

@@ -106,7 +106,7 @@ export function PickerTrigger({
       <span
         className={cn(
           "min-w-0 flex-1 truncate",
-          mono && "font-mono",
+          mono && "tabular-nums",
           placeholder ? "text-muted-foreground" : "text-foreground"
         )}
       >
@@ -247,7 +247,7 @@ export function PickerSheet<T extends SearchableOption>({
   const rowClass = (selected: boolean, disabled: boolean) =>
     cn(
       "tap-active flex w-full items-center gap-2 rounded-lg px-3 py-3 text-left text-sm transition-colors",
-      mono && "font-mono text-[12.5px]",
+      mono && "tabular-nums text-[13px]",
       disabled && "pointer-events-none opacity-40",
       selected ? "bg-primary/10 font-semibold text-foreground" : "text-foreground hover:bg-muted/60"
     );

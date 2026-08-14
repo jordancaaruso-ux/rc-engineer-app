@@ -71,7 +71,7 @@ function EventEvidence({
   const { runCount, bestLapSeconds, vsVenueSeconds } = stats;
   const faster = vsVenueSeconds != null && vsVenueSeconds < 0;
   return (
-    <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[11px] tabular-nums text-muted-foreground">
+    <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] tabular-nums text-muted-foreground">
       <span>
         {runCount} {runCount === 1 ? "run" : "runs"}
       </span>

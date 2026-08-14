@@ -599,8 +599,8 @@ export function EngineerCompareAndPattern({
         <div className="border-t border-border pt-3 space-y-2">
           <Eyebrow>URL selection · setup &amp; laps</Eyebrow>
           <p className="text-[11px] text-muted-foreground">
-            Target session (<span className="font-mono">runId</span>) vs comparison session (
-            <span className="font-mono">compareRunId</span>).
+            Target session (<span className="type-machine">runId</span>) vs comparison session (
+            <span className="type-machine">compareRunId</span>).
           </p>
           <EngineerRunPairVisualCompare
             runIdA={runIdUrl}
@@ -635,7 +635,7 @@ export function EngineerCompareAndPattern({
                       onChange={() => toggleDigestRunSelected(r.id)}
                     />
                     <span className="min-w-0">
-                      <span className="font-mono text-foreground/90">{r.id.slice(0, 8)}…</span>
+                      <span className="type-machine text-foreground/90">{r.id.slice(0, 8)}…</span>
                       {" · "}
                       {formatRunPickerLine(r)}
                     </span>
@@ -719,21 +719,21 @@ export function EngineerCompareAndPattern({
                   <tbody>
                     {digest.runs.map((r) => (
                       <tr key={r.runId} className="border-b border-border/60 align-top">
-                        <td className="px-1.5 py-1 font-mono tabular-nums text-muted-foreground whitespace-nowrap">
+                        <td className="px-1.5 py-1 type-machine tabular-nums text-muted-foreground whitespace-nowrap">
                           {r.sortIso.slice(0, 16)}
                         </td>
                         <td className="px-1.5 py-1">{r.trackName}</td>
-                        <td className="px-1.5 py-1 font-mono tabular-nums">
+                        <td className="px-1.5 py-1 type-machine tabular-nums">
                           {r.lapSummary.bestLapSeconds != null && Number.isFinite(r.lapSummary.bestLapSeconds)
                             ? formatLap(r.lapSummary.bestLapSeconds)
                             : "—"}
                         </td>
-                        <td className="px-1.5 py-1 font-mono tabular-nums">
+                        <td className="px-1.5 py-1 type-machine tabular-nums">
                           {r.lapSummary.avgTop5Seconds != null && Number.isFinite(r.lapSummary.avgTop5Seconds)
                             ? formatLap(r.lapSummary.avgTop5Seconds)
                             : "—"}
                         </td>
-                        <td className="px-1.5 py-1 font-mono tabular-nums">
+                        <td className="px-1.5 py-1 type-machine tabular-nums">
                           {r.lapSummary.avgTop10Seconds != null && Number.isFinite(r.lapSummary.avgTop10Seconds)
                             ? formatLap(r.lapSummary.avgTop10Seconds)
                             : "—"}

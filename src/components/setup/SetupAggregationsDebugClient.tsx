@@ -223,10 +223,10 @@ export function SetupAggregationsDebugClient(props: { initialCars: CarRow[] }) {
               rows.map((r) => (
                 <tr key={`${r.carId}-${r.parameterKey}`} className="border-b border-border/60 align-top">
                   <td className="p-2 font-medium">{carLabel(r.carId)}</td>
-                  <td className="p-2 font-mono text-xs">{r.parameterKey}</td>
+                  <td className="p-2 type-machine text-xs">{r.parameterKey}</td>
                   <td className="p-2">{r.valueType}</td>
                   <td className="p-2 tabular-nums">{r.sampleCount}</td>
-                  <td className="p-2 font-mono text-[11px] text-muted-foreground">
+                  <td className="p-2 type-machine text-[11px] text-muted-foreground">
                     <pre className="whitespace-pre-wrap break-all">
                       {JSON.stringify(
                         r.numericStatsJson ?? r.categoricalStatsJson ?? null,

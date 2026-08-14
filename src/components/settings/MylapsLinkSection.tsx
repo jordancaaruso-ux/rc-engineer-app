@@ -121,13 +121,13 @@ export function MylapsLinkSection() {
             {status.accountId ? (
               <>
                 {" "}
-                · account <span className="font-mono text-foreground/80">{status.accountId}</span>
+                · account <span className="tabular-nums text-foreground/80">{status.accountId}</span>
               </>
             ) : null}
             {status.chipCount > 0 ? ` · ${status.chipCount} transponder(s)` : null}
           </p>
           {status.chipNumbers.length > 0 ? (
-            <p className="text-[10px] font-mono text-muted-foreground break-all">
+            <p className="text-[10px] tabular-nums text-muted-foreground break-all">
               {status.chipNumbers.join(", ")}
             </p>
           ) : null}
@@ -185,7 +185,7 @@ export function MylapsLinkSection() {
               <li>Paste below and save. Tokens expire — link again if imports stop working.</li>
             </ol>
             <textarea
-              className="mt-2 w-full min-h-[72px] rounded-md border border-border bg-card px-3 py-2 text-[11px] font-mono outline-none"
+              className="mt-2 w-full min-h-[72px] rounded-md border border-border bg-card px-3 py-2 text-[11px] tabular-nums outline-none"
               placeholder="Paste Bearer token…"
               value={tokenInput}
               onChange={(e) => setTokenInput(e.target.value)}

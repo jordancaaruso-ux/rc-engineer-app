@@ -2647,7 +2647,7 @@ export function SetupCalibrationEditorClient({
         <div className="flex flex-wrap items-center gap-3">
           {modelLinkedMode && modelProgress ? (
             <>
-              <span className="font-mono text-xs tabular-nums text-foreground">
+              <span className="text-xs tabular-nums text-foreground">
                 {modelProgress.mapped}
                 <span className="text-muted-foreground"> / {modelProgress.total} mapped</span>
               </span>
@@ -2661,7 +2661,7 @@ export function SetupCalibrationEditorClient({
               </div>
             </>
           ) : (
-            <span className="font-mono text-xs text-muted-foreground">
+            <span className="tabular-nums text-xs text-muted-foreground">
               {formCount} form · {textCount} text · {regionCount} region
             </span>
           )}
@@ -2751,7 +2751,7 @@ export function SetupCalibrationEditorClient({
                 <label className="flex flex-col gap-1 text-muted-foreground">
                   <span className="ui-title text-[10px]">Choose document</span>
                   <select
-                    className="max-w-full rounded border border-border bg-card px-2 py-1.5 font-mono text-xs text-foreground"
+                    className="max-w-full rounded border border-border bg-card px-2 py-1.5 tabular-nums text-xs text-foreground"
                     disabled={attachLinking}
                     value=""
                     onChange={(e) => {
@@ -2834,7 +2834,7 @@ export function SetupCalibrationEditorClient({
             ) : pdfFormMeta?.loadError && pdfFormRows.length === 0 ? (
               <div className="space-y-2 rounded border border-rose-500/40 bg-rose-500/10 px-3 py-3 text-xs text-rose-200">
                 <div>Could not read PDF form fields.</div>
-                <div className="font-mono text-[10px]">{pdfFormMeta.loadError}</div>
+                <div className="tabular-nums text-[10px]">{pdfFormMeta.loadError}</div>
               </div>
             ) : !previewUrl ? (
               <div className="rounded border border-border/70 bg-muted/40 px-3 py-6 text-xs text-muted-foreground">
@@ -2873,7 +2873,7 @@ export function SetupCalibrationEditorClient({
                           <div className="space-y-1 text-muted-foreground">
                             <div>URL: {resolvedFileUrl || previewUrl || "—"}</div>
                             {pdfLoadDetail ? (
-                              <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded border border-border/60 bg-muted/40 p-2 font-mono text-[10px]">
+                              <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded border border-border/60 bg-muted/40 p-2 tabular-nums text-[10px]">
                                 {pdfLoadDetail}
                               </pre>
                             ) : null}
@@ -2984,11 +2984,11 @@ export function SetupCalibrationEditorClient({
                                 key={row.name}
                                 className={`rounded border p-2 transition ${isMapped ? "ring-1 ring-emerald-500/40" : "border-border/60 bg-card/90"}`}
                               >
-                                <div className="font-mono text-sm font-semibold tabular-nums text-foreground">
+                              <div className="fig-stat font-semibold tabular-nums text-foreground">
                                   {formatPdfFieldDisplayValue(row)}
                                 </div>
                                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
-                                  <span className="font-mono text-foreground/80">{row.name}</span>
+                                  <span className="tabular-nums text-foreground/80">{row.name}</span>
                                   <span>·</span>
                                   <span>{row.type}</span>
                                   {row.pageNumber != null ? (
@@ -3022,7 +3022,7 @@ export function SetupCalibrationEditorClient({
                                           type="button"
                                           title={`#${instanceIndex} p${w.pageNumber} ${chk}`}
                                           onClick={() => onAcroWidgetClick(row.name, instanceIndex)}
-                                          className={`rounded border px-1.5 py-0.5 font-mono text-[10px] ${
+                                          className={`rounded border px-1.5 py-0.5 tabular-nums text-[10px] ${
                                             sel ? "border-amber-400/80 bg-amber-500/20" : "border-border bg-muted/50 hover:bg-muted"
                                           }`}
                                         >
@@ -3115,7 +3115,7 @@ export function SetupCalibrationEditorClient({
               {pdfMappingConflict.conflicts.map((c) => (
                 <li key={`${c.canonicalKey}-${c.optionValue ?? ""}-${c.context}`}>
                   <span className="font-medium text-foreground">{mergedLabelMap[c.canonicalKey] ?? c.canonicalKey}</span>
-                  <span className="font-mono text-[10px] text-foreground/80"> ({c.canonicalKey})</span>
+                  <span className="tabular-nums text-[10px] text-foreground/80"> ({c.canonicalKey})</span>
                   {c.context ? <span> · {c.context}</span> : null}
                 </li>
               ))}
@@ -3125,9 +3125,9 @@ export function SetupCalibrationEditorClient({
               <span className="font-medium text-foreground">
                 {mergedLabelMap[pdfMappingConflict.targetCanonicalKey] ?? pdfMappingConflict.targetCanonicalKey}
               </span>
-              <span className="font-mono text-[10px] text-foreground/80"> ({pdfMappingConflict.targetCanonicalKey})</span>
+              <span className="tabular-nums text-[10px] text-foreground/80"> ({pdfMappingConflict.targetCanonicalKey})</span>
               {pdfMappingConflict.kind === "groupChip" ? (
-                <span className="font-mono"> · stored value {pdfMappingConflict.optionValue}</span>
+                <span className="tabular-nums"> · stored value {pdfMappingConflict.optionValue}</span>
               ) : null}
             </div>
             <div className="mt-4 flex flex-wrap justify-end gap-2">

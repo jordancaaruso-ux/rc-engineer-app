@@ -917,7 +917,7 @@ export function SetupDocumentReviewClient({
         {showDebug ? (
         <div className="mt-2 rounded border border-border/70 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
           Review state:{" "}
-          <span className="font-mono text-foreground">
+          <span className="tabular-nums text-foreground">
             {reviewState === "awaiting_calibration"
               ? "uploaded_no_calibration"
               : reviewState === "selected_not_processed"
@@ -1077,11 +1077,11 @@ export function SetupDocumentReviewClient({
             </div>
             <div>
               <span className="text-foreground">Last completed stage:</span>{" "}
-              <span className="font-mono">{liveDoc.lastCompletedStage ?? "—"}</span>
+              <span className="tabular-nums">{liveDoc.lastCompletedStage ?? "—"}</span>
             </div>
             <div className="md:col-span-2">
               <span className="text-foreground">Current stage:</span>{" "}
-              <span className="font-mono">{liveDoc.currentStage ?? "—"}</span>
+              <span className="tabular-nums">{liveDoc.currentStage ?? "—"}</span>
               {stuck ? <span className="ml-2 text-amber-200/90">(stuck &gt; 60s)</span> : null}
             </div>
             {liveDoc.importStatus === "FAILED" && liveDoc.importErrorMessage ? (
@@ -1104,11 +1104,11 @@ export function SetupDocumentReviewClient({
                     </div>
                     <div>
                       <span className="text-foreground">Calibration attempted:</span>{" "}
-                      <span className="font-mono">{diagnostic.calibrationAttemptedId ?? "—"}</span>{" "}
+                      <span className="tabular-nums">{diagnostic.calibrationAttemptedId ?? "—"}</span>{" "}
                       {diagnostic.calibrationAttemptedName ? `(${diagnostic.calibrationAttemptedName})` : ""}
                     </div>
                     {Array.isArray(diagnostic.pdfFieldNamesSample) ? (
-                      <div className="font-mono text-[10px] whitespace-pre-wrap break-words">
+                      <div className="tabular-nums text-[10px] whitespace-pre-wrap break-words">
                         {diagnostic.pdfFieldNamesSample.slice(0, 80).join("\n")}
                       </div>
                     ) : null}
@@ -1125,7 +1125,7 @@ export function SetupDocumentReviewClient({
                         {Array.isArray(diagnostic.mapping?.unmatched?.expectedFormKeys) ? (
                           <div className="mt-1">
                             <span className="text-foreground">Missing expected form keys (sample):</span>{" "}
-                            <span className="font-mono text-[10px]">
+                            <span className="tabular-nums text-[10px]">
                               {diagnostic.mapping.unmatched.expectedFormKeys.slice(0, 25).join(", ") || "—"}
                             </span>
                           </div>
@@ -1138,7 +1138,7 @@ export function SetupDocumentReviewClient({
             ) : null}
             <div className="md:col-span-2">
               <span className="text-foreground">Calibration chosen:</span>{" "}
-              <span className="font-mono">{liveDoc.calibrationResolvedProfileId ?? liveDoc.effectiveCalibration?.calibrationId ?? "—"}</span>{" "}
+              <span className="tabular-nums">{liveDoc.calibrationResolvedProfileId ?? liveDoc.effectiveCalibration?.calibrationId ?? "—"}</span>{" "}
               <span className="opacity-80">
                 ({liveDoc.calibrationResolvedSource ?? liveDoc.effectiveCalibration?.source ?? "unknown"})
               </span>
@@ -1146,7 +1146,7 @@ export function SetupDocumentReviewClient({
             {liveDoc.calibrationResolvedDebug ? (
               <div className="md:col-span-2">
                 <span className="text-foreground">Calibration debug:</span>{" "}
-                <span className="font-mono break-all">{liveDoc.calibrationResolvedDebug}</span>
+                <span className="tabular-nums break-all">{liveDoc.calibrationResolvedDebug}</span>
               </div>
             ) : null}
             <div>
@@ -1177,7 +1177,7 @@ export function SetupDocumentReviewClient({
         {formImportDebug?.length ? (
           <details className="mt-2 rounded border border-border/70 bg-muted/30 p-2 text-xs">
             <summary className="cursor-pointer font-medium text-muted-foreground">PDF form import debug</summary>
-            <ul className="mt-2 max-h-48 space-y-1.5 overflow-auto font-mono text-[10px] text-muted-foreground">
+            <ul className="mt-2 max-h-48 space-y-1.5 overflow-auto tabular-nums text-[10px] text-muted-foreground">
               {formImportDebug.map((row) => (
                 <li key={row.appKey} className="border-b border-border/40 pb-1 last:border-0">
                   <span className="text-foreground">{row.appKey}</span>
@@ -1208,13 +1208,13 @@ export function SetupDocumentReviewClient({
           </div>
           <div className="rounded border border-border/70 bg-muted/40 px-2 py-1.5 md:col-span-3">
             <span className="text-foreground">Calibration in use:</span>{" "}
-            <span className="font-mono">
+            <span className="tabular-nums">
               {storedCalibration ? `${storedCalibration.name} (${storedCalibration.id})` : forcedCalibrationLabel}
             </span>
           </div>
           <div className="rounded border border-border/70 bg-muted/40 px-2 py-1.5 md:col-span-3">
             <span className="text-foreground">Parsed with calibration:</span>{" "}
-            <span className="font-mono">{parseStamp}</span>
+            <span className="tabular-nums">{parseStamp}</span>
             {parseIsStale ? (
               <span className="ml-2 text-amber-200/90">
                 (stale parse — reparse to apply current calibration)
@@ -1224,19 +1224,19 @@ export function SetupDocumentReviewClient({
           {useA800 && liveDerived.diagnostics ? (
           <div className="mt-2 rounded border border-border/70 bg-card/30 px-2 py-1.5 text-[11px] text-muted-foreground">
             <span className="text-foreground">Derived (canonical inputs):</span>{" "}
-            <span className="font-mono">
+            <span className="tabular-nums">
               front={liveDerived.diagnostics.computed.frontSpringRateGfMm != null ? `${liveDerived.diagnostics.computed.frontSpringRateGfMm.toFixed(2)} gf/mm` : "—"}{" "}
               · rear={liveDerived.diagnostics.computed.rearSpringRateGfMm != null ? `${liveDerived.diagnostics.computed.rearSpringRateGfMm.toFixed(2)} gf/mm` : "—"}{" "}
               · final drive={liveDerived.diagnostics.computed.finalDriveRatio != null ? liveDerived.diagnostics.computed.finalDriveRatio.toFixed(4) : "—"}
             </span>
-            <div className="mt-1 font-mono text-[10px] text-muted-foreground/95">
+            <div className="mt-1 tabular-nums text-[10px] text-muted-foreground/95">
               status: spring front={derivedStatuses.front_spring_rate_gf_mm ?? "—"} · spring rear=
               {derivedStatuses.rear_spring_rate_gf_mm ?? "—"} · final drive={derivedStatuses.final_drive_ratio ?? "—"}
             </div>
             <span className="mt-0.5 block text-[10px] opacity-80">
               Imported PDF display fields (text91/text93/ratio) are comparison-only, not canonical.
             </span>
-            <div className="mt-1 font-mono text-[10px] opacity-90">
+            <div className="mt-1 tabular-nums text-[10px] opacity-90">
               validate front=
               {formatDerivedValidationLine(derivedValidation?.frontSpringRateGfMm)} · rear=
               {formatDerivedValidationLine(derivedValidation?.rearSpringRateGfMm)} · ratio=

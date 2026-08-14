@@ -174,7 +174,7 @@ export default async function SetupAdminPage(): Promise<ReactNode> {
                       </div>
                       <div className="text-[10px] text-muted-foreground">{s.calls} calls</div>
                     </div>
-                    <div className="font-mono text-xs text-foreground">
+                    <div className="tabular-nums text-xs text-foreground">
                       ${s.costUsd.toFixed(2)}
                     </div>
                   </li>

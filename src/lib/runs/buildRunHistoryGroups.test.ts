@@ -3,7 +3,11 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildDayRunNumberMap, buildRunHistoryGroups } from "@/lib/runs/buildRunHistoryGroups";
+import {
+  buildDayRunNumberMap,
+  buildRunHistoryGroups,
+  sessionGroupKey,
+} from "@/lib/runs/buildRunHistoryGroups";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 
 test("buildRunHistoryGroups groups by event and orders newest first", () => {
@@ -203,5 +207,68 @@ test("formatRunSessionDisplay names unlabeled testing runs from dayRunNumber, la
       { dayRunNumber: 4 }
     ),
     "Qualifying"
+  );
+});
+
+test("sessionGroupKey agrees with the group a run lands in", () => {
+  // The workbench counts a session's unfiltered runs from a separate, minimal
+  // query and matches them to groups by this key. A minimal row must therefore
+  // produce the same key as the full run does — otherwise "2 of 8" counts a
+  // different set of runs than the one on screen.
+  const full = {
+    id: "r1",
+    userId: "u1",
+    createdAt: new Date("2025-03-01T10:00:00Z"),
+    sortAt: new Date("2025-03-01T10:00:00Z"),
+    eventId: null,
+    localTimeZone: "Australia/Sydney",
+    trackNameSnapshot: "Kingston",
+    track: { name: "Kingston" },
+    event: null,
+  };
+  const groups = buildRunHistoryGroups([full]);
+  assert.equal(sessionGroupKey(full), groups[0]!.id);
+
+  // The count query selects fewer fields — same key, no `event` relation.
+  const minimal = {
+    id: full.id,
+    userId: full.userId,
+    createdAt: full.createdAt,
+    sortAt: full.sortAt,
+    eventId: full.eventId,
+    localTimeZone: full.localTimeZone,
+    trackNameSnapshot: full.trackNameSnapshot,
+    track: full.track,
+  };
+  assert.equal(sessionGroupKey(minimal), groups[0]!.id);
+
+  // Event runs key on the event alone, and the day/track key never collides with it.
+  const eventRun = { ...full, eventId: "e1" };
+  assert.equal(sessionGroupKey(eventRun), "event-e1");
+  assert.notEqual(sessionGroupKey(eventRun), sessionGroupKey(full));
+});
+
+test("sessionGroupKey resolves the day in the driver's zone, not the reader's", () => {
+  // 05:00 UTC on 2 Mar is still 21:00 on 1 Mar in Los Angeles. Both sides of the ratio
+  // must agree on which day that is, or a session splits between them.
+  const run = {
+    id: "r1",
+    userId: "u1",
+    createdAt: new Date("2025-03-02T05:00:00Z"),
+    sortAt: new Date("2025-03-02T05:00:00Z"),
+    eventId: null,
+    localTimeZone: "America/Los_Angeles",
+    trackNameSnapshot: "Kingston",
+    track: { name: "Kingston" },
+  };
+  const asDriver = sessionGroupKey(run, { viewerTimeZone: "Australia/Sydney" });
+  assert.match(asDriver, /^day-2025-03-01-/);
+  // The reader's zone must not move it.
+  assert.equal(sessionGroupKey(run, { viewerTimeZone: "UTC" }), asDriver);
+  // Falling back to the owner's account zone gives the same answer as the run's own.
+  const noRunZone = { ...run, localTimeZone: null };
+  assert.equal(
+    sessionGroupKey(noRunZone, { ownerTimeZoneByUserId: { u1: "America/Los_Angeles" } }),
+    asDriver
   );
 });

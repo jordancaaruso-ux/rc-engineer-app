@@ -20,7 +20,7 @@ export default async function DashboardPage(): Promise<ReactNode> {
         </header>
         <section className="page-body">
           <CardPanel className="max-w-2xl" contentClassName="text-sm text-muted-foreground">
-            Set <span className="font-mono">DATABASE_URL</span> in <span className="font-mono">.env</span>{" "}
+            Set <span className="type-machine">DATABASE_URL</span> in <span className="type-machine">.env</span>{" "}
             to load your dashboard.
           </CardPanel>
         </section>

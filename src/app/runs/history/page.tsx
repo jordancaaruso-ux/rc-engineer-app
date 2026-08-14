@@ -20,11 +20,18 @@ import {
 import { RunHistoryViewMore } from "@/components/runs/RunHistoryViewMore";
 import { OPEN_GROUP_PARAM } from "@/lib/runs/sessionsReturn";
 import { SessionsFilterBar } from "@/components/runs/SessionsFilterBar";
-import { buildDayRunNumberMap, buildRunHistoryGroups, type RunHistoryGroup } from "@/lib/runs/buildRunHistoryGroups";
+import {
+  buildDayRunNumberMap,
+  buildRunHistoryGroups,
+  runSessionSortInstant,
+  sessionGroupKey,
+  type RunHistoryGroup,
+} from "@/lib/runs/buildRunHistoryGroups";
 import {
   applyRunHistoryPostFiltersWithReasons,
   buildRunHistoryPrismaWhere,
   computeChangedKeysByRun,
+  describeRunHistoryFilters,
   filtersToSearchParams,
   parseRunHistoryFilters,
   runHistoryFiltersActive,
@@ -219,6 +226,71 @@ async function loadRunHistoryPage(opts: {
 // reintroduce this on render.
 
 type Group = RunHistoryGroup<RunInGroup>;
+
+/**
+ * Above this many rows the totals query stops and reports nothing. A ratio built
+ * from a truncated count would understate the denominator — "2 of 5" when it was
+ * really 2 of 8 — and a quietly wrong number is worse than no number.
+ */
+const SESSION_TOTALS_TAKE_CAP = 5000;
+/** Slack on the lower bound so a session straddling the boundary is counted whole. */
+const SESSION_TOTALS_LOOKBACK_MS = 2 * 24 * 60 * 60 * 1000;
+
+/**
+ * Unfiltered run count per session, for the workbench rail's "2 of 8 runs".
+ *
+ * Solo scope only — the workbench itself is solo-only, so this never has to reason
+ * about team visibility. Selects just the fields {@link sessionGroupKey} reads, and
+ * bounds itself to the span already on screen: without a filter this isn't called
+ * at all, and with one it reads a few scalar columns rather than whole runs.
+ *
+ * Returns null whenever the number can't be trusted (disabled, nothing displayed,
+ * cap hit) — the rail then prints the plain "N runs" it always has.
+ */
+async function loadSessionRunTotals(input: {
+  enabled: boolean;
+  userId: string;
+  displayTimeZone: string | null;
+  ownerTimeZoneByUserId: Record<string, string | null>;
+  oldestDisplayed: RunInGroup | null;
+}): Promise<Map<string, number> | null> {
+  if (!input.enabled || !input.oldestDisplayed) return null;
+  const since = new Date(
+    runSessionSortInstant(input.oldestDisplayed).getTime() - SESSION_TOTALS_LOOKBACK_MS
+  );
+  const rows = await perfSpan("countSessionRunTotals", () =>
+    prisma.run.findMany({
+      // `sortAt` is non-null in the schema (`@default(now())`) and is the axis
+      // `runSessionSortInstant` uses, so it's the only bound needed here — the
+      // `sortAt: Date | null` in `RunForHistoryGroup` is defensive typing, not a
+      // shape the database produces.
+      where: { userId: input.userId, sortAt: { gte: since } },
+      select: {
+        id: true,
+        userId: true,
+        eventId: true,
+        createdAt: true,
+        sortAt: true,
+        localTimeZone: true,
+        trackNameSnapshot: true,
+        track: { select: { name: true } },
+      },
+      take: SESSION_TOTALS_TAKE_CAP + 1,
+    })
+  );
+  if (rows.length > SESSION_TOTALS_TAKE_CAP) return null;
+
+  const zones = {
+    ownerTimeZoneByUserId: input.ownerTimeZoneByUserId,
+    viewerTimeZone: input.displayTimeZone,
+  };
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    const key = sessionGroupKey(row, zones);
+    totals.set(key, (totals.get(key) ?? 0) + 1);
+  }
+  return totals;
+}
 
 export default async function RunHistoryPage({
   searchParams,
@@ -494,6 +566,18 @@ export default async function RunHistoryPage({
   // first, which is a different shape than "sessions → runs" and would need its
   // own rail — team keeps the accordion until that's designed.
   const workbenchActive = !teamMode && filters.layout !== "flat" && groups.length > 0;
+  // "2 of 8 runs" needs the session's UNFILTERED size, which nothing above has:
+  // `groups` is built from rows both the Prisma where and the JS post-filters have
+  // already thinned. One extra query, only when a filter is on, selecting just the
+  // fields `sessionGroupKey` reads — bounded to the span already on screen so it
+  // never walks the whole archive.
+  const sessionTotalsByGroupId = await loadSessionRunTotals({
+    enabled: workbenchActive && filtersActive,
+    userId: user.id,
+    displayTimeZone,
+    ownerTimeZoneByUserId,
+    oldestDisplayed: groups.at(-1)?.runs.at(-1) ?? null,
+  });
   const workbenchGroups: WorkbenchGroup[] = workbenchActive
     ? groups.map((group) => ({
         id: group.id,
@@ -505,8 +589,20 @@ export default async function RunHistoryPage({
         dateLabel: group.dateLabel,
         runs: buildGroupRunRows(group),
         trend: buildGroupTrendModel(group, { setupDataByRunId }),
+        totalRuns: sessionTotalsByGroupId?.get(group.id) ?? null,
       }))
     : [];
+  // Short labels for the workbench's filter ribbon. Tire-type values are already
+  // human ("Blue compound"); the rest need the same option lists the bar uses.
+  const workbenchFilterLabels =
+    workbenchActive && filtersActive
+      ? describeRunHistoryFilters(filters, {
+          cars: filterCars,
+          tracks: filterTracks,
+          events: filterEvents,
+          drivers: filterDrivers,
+        })
+      : [];
   const pageTitle = teamAccessDenied ? "Sessions" : teamMode ? `Team — ${teamTitle}` : "Sessions";
   const mySessionsViewDescription =
     "Your runs grouped by session. Filter, compare, and drag to reorder within a group.";
@@ -968,6 +1064,8 @@ export default async function RunHistoryPage({
                 runListSource="my_runs"
                 displayTimeZone={displayTimeZone}
                 userDisplayName={userDisplayName}
+                filtersActive={filtersActive}
+                filterLabels={workbenchFilterLabels}
                 railFooter={viewMore}
               />
             ) : null}

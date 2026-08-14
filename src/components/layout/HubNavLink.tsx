@@ -99,7 +99,7 @@ export function HubNavLink({
               </HubRowTitle>
             </span>
             {typeof count === "number" ? (
-              <span className="shrink-0 font-mono text-sm tabular-nums text-muted-foreground">
+              <span className="shrink-0 fig-stat text-muted-foreground">
                 {count}
               </span>
             ) : null}

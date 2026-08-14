@@ -121,12 +121,12 @@ export default async function TrackDetailPage(props: {
       </header>
       <section className="page-body">
         <div className="max-w-2xl space-y-4">
-          <CardPanel contentClassName="text-sm">
+          <CardPanel contentClassName="text-[13px]">
             <div className="grid gap-2">
-              <div><span className="text-sm font-medium text-muted-foreground">Created</span> <span className="ml-2">{formatRunCreatedAtDateTime(track.createdAt, displayTimeZone)}</span></div>
-              <div><span className="text-sm font-medium text-muted-foreground">Runs</span> <span className="ml-2">{runCount}</span></div>
+              <div><span className="font-medium text-muted-foreground">Created</span> <span className="ml-2 fig-stat">{formatRunCreatedAtDateTime(track.createdAt, displayTimeZone)}</span></div>
+              <div><span className="font-medium text-muted-foreground">Runs</span> <span className="ml-2 fig-stat">{runCount}</span></div>
               {track.location ? (
-                <div><span className="text-sm font-medium text-muted-foreground">Location</span> <span className="ml-2">{track.location}</span></div>
+                <div><span className="font-medium text-muted-foreground">Location</span> <span className="ml-2">{track.location}</span></div>
               ) : null}
             </div>
           </CardPanel>

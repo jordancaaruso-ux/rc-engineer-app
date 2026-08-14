@@ -38,8 +38,8 @@ export default async function NewRunPage({
         </header>
         <section className="page-body">
           <CardPanel className="max-w-3xl" contentClassName="text-sm text-muted-foreground">
-            Set <span className="font-mono">DATABASE_URL</span> in a{" "}
-            <span className="font-mono">.env</span> file (Postgres) to enable
+            Set <span className="type-machine">DATABASE_URL</span> in a{" "}
+            <span className="type-machine">.env</span> file (Postgres) to enable
             saving runs.
           </CardPanel>
         </section>

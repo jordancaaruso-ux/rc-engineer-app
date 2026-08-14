@@ -18,6 +18,7 @@ import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import { TirePrepStepsList, resolveTirePrepSteps } from "@/components/runs/TirePrepStepsList";
 import {
   computeTireIndicatorsByRunId,
+  formatTireIdentityLine,
   type RunTireIndicator,
 } from "@/lib/runs/tireSetChange";
 import { TireIndicatorIcon } from "@/components/runs/TireIndicatorIcon";
@@ -108,6 +109,7 @@ function RunHistoryActionButtons({
   onTirePrep,
   tirePrepOpen = false,
   tireIndicator,
+  hasTirePrep = false,
   layout,
   className,
 }: {
@@ -117,10 +119,14 @@ function RunHistoryActionButtons({
   onTirePrep?: () => void;
   tirePrepOpen?: boolean;
   tireIndicator: RunTireIndicator | null;
+  /** Prep steps exist even though no compound was logged — still worth a way in. */
+  hasTirePrep?: boolean;
   layout: "mobile" | "desktop";
   className?: string;
 }) {
   const mobile = layout === "mobile";
+  // A run with neither compound nor prep gets no button: it would open an empty box.
+  const showTireMark = tireIndicator != null || hasTirePrep;
   return (
     <div
       className={cn(
@@ -132,14 +138,14 @@ function RunHistoryActionButtons({
         className
       )}
     >
-      {tireIndicator ? (
+      {showTireMark ? (
         onTirePrep ? (
           <button
             type="button"
             onClick={onTirePrep}
             aria-expanded={tirePrepOpen}
-            aria-label="Show tire prep"
-            title="Tire prep for this run"
+            aria-label="Show tires and prep"
+            title="Tires and prep for this run"
             className={cn(
               "inline-flex shrink-0 items-center justify-center rounded-md transition",
               tirePrepOpen && "bg-accent/10 ring-1 ring-primary-ink/50",
@@ -426,6 +432,8 @@ export function RunHistoryTable({
         const runOwnedByViewer = !run.userId || !viewerUserId || run.userId === viewerUserId;
         const showLapImportWarning =
           runOwnedByViewer && runNeedsLapImport(run) && !dismissedLapPromptIds.has(run.id);
+        const tireIndicator = tireIndicatorsByRunId.get(run.id) ?? null;
+        const tirePrepSteps = resolveTirePrepSteps(run);
         const isDragging = draggingId === run.id;
         const showDropAbove = dropTarget?.runId === run.id && dropTarget.edge === "above";
         const showDropBelow = dropTarget?.runId === run.id && dropTarget.edge === "below";
@@ -586,7 +594,8 @@ export function RunHistoryTable({
                             setPrepOpenRunId((cur) => (cur === run.id ? null : run.id))
                           }
                           tirePrepOpen={prepOpenRunId === run.id}
-                          tireIndicator={tireIndicatorsByRunId.get(run.id) ?? null}
+                          tireIndicator={tireIndicator}
+                          hasTirePrep={tirePrepSteps.length > 0}
                         />
                       </div>
                     }
@@ -680,7 +689,8 @@ export function RunHistoryTable({
                     setPrepOpenRunId((cur) => (cur === run.id ? null : run.id))
                   }
                   tirePrepOpen={prepOpenRunId === run.id}
-                  tireIndicator={tireIndicatorsByRunId.get(run.id) ?? null}
+                  tireIndicator={tireIndicator}
+                  hasTirePrep={tirePrepSteps.length > 0}
                 />
               </td>
               {showComparePairColumn ? <RunComparePairCell runId={run.id} /> : null}
@@ -689,12 +699,21 @@ export function RunHistoryTable({
               <tr className="border-b border-border/80">
                 <td colSpan={totalCols} className="px-3 pb-2.5 pt-0 md:px-4">
                   <div className="rounded-lg border border-border bg-secondary/60 px-3 py-2.5">
+                    {/* What's on the car first, then what went on it. The additive
+                        brand used to be the only heading here, which read as the
+                        tire's name — the compound was in a hover title the phone
+                        can never show. */}
+                    <div className="text-xs font-semibold text-foreground">
+                      {tireIndicator ? formatTireIdentityLine(tireIndicator) : "Tires not logged"}
+                    </div>
                     {run.additiveType?.displayName ? (
-                      <div className="mb-1.5 text-xs font-semibold text-foreground">
+                      <div className="text-[11px] text-muted-foreground">
                         {run.additiveType.displayName}
                       </div>
                     ) : null}
-                    <TirePrepStepsList steps={resolveTirePrepSteps(run)} />
+                    <div className="mt-1.5">
+                      <TirePrepStepsList steps={tirePrepSteps} />
+                    </div>
                   </div>
                 </td>
               </tr>

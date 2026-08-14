@@ -30,11 +30,11 @@ export function RecentFormCard({
   return (
     <SurfaceCard contentClassName="p-0" className="rounded-xl">
       <div className="flex items-center gap-3 border-b border-border px-5 py-3.5">
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[.2em] text-muted-foreground">
+        <span className="micro-caps text-muted-foreground">
           Recent form
         </span>
         {hidden > 0 ? (
-          <span className="ml-auto font-mono text-[11px] tabular-nums text-faint">
+          <span className="ml-auto text-[11px] tabular-nums text-faint">
             {rows.length} of {totalCount}
           </span>
         ) : null}
@@ -42,7 +42,7 @@ export function RecentFormCard({
 
       <div
         className={cn(
-          "grid gap-3 border-b border-border bg-background/35 px-5 py-2.5 font-mono text-[9px] font-bold uppercase tracking-[.16em] text-muted-foreground",
+          "grid gap-3 border-b border-border bg-background/35 px-5 py-2.5 micro-caps text-muted-foreground",
           GRID
         )}
       >
@@ -73,7 +73,7 @@ export function RecentFormCard({
               event.runCount === 0 && "opacity-55"
             )}
           >
-            <span className="font-mono text-[11.5px] uppercase tracking-[.06em] text-muted-foreground">
+        <span className="micro-caps text-muted-foreground">
               {shortStamp(event.startYmd)}
             </span>
             <span className="min-w-0">
@@ -86,10 +86,10 @@ export function RecentFormCard({
                   .join(" · ")}
               </span>
             </span>
-            <span className="text-right font-mono text-[12.5px] tabular-nums text-muted-foreground">
+            <span className="text-right text-[13px] tabular-nums text-muted-foreground">
               {event.runCount}
             </span>
-            <span className="text-right font-mono text-[13px] tabular-nums text-foreground">
+            <span className="text-right text-[13px] tabular-nums text-foreground">
               {formatLap(event.bestLapSeconds)}
             </span>
             <span className="text-right">
@@ -110,17 +110,17 @@ export function RecentFormCard({
 function VsVenue({ seconds, hasPace }: { seconds: number | null; hasPace: boolean }) {
   if (seconds == null) {
     return (
-      <span className="font-mono text-[11px] text-faint">{hasPace ? "first visit" : "—"}</span>
+      <span className="tabular-nums text-[11px] text-faint">{hasPace ? "first visit" : "—"}</span>
     );
   }
   if (Math.abs(seconds) < 0.0005) {
-    return <span className="font-mono text-[12px] tabular-nums text-muted-foreground">±0</span>;
+    return <span className="text-[12px] tabular-nums text-muted-foreground">±0</span>;
   }
   const faster = seconds < 0;
   return (
     <span
       className={cn(
-        "font-mono text-[12px] font-bold tabular-nums",
+        "text-[12px] font-bold tabular-nums",
         faster ? "text-gain" : "text-destructive"
       )}
     >

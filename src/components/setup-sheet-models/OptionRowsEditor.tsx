@@ -61,7 +61,7 @@ export function OptionRowsEditor({
           </button>
         </div>
         <textarea
-          className="min-h-[5rem] w-full rounded border border-border bg-card px-2 py-1.5 font-mono"
+          className="min-h-[5rem] w-full rounded border border-border bg-card px-2 py-1.5 tabular-nums"
           value={pasteText}
           onChange={(e) => setPasteText(e.target.value)}
           placeholder={"1\n2\n3\n4"}
@@ -101,7 +101,7 @@ export function OptionRowsEditor({
             −
           </button>
           <input
-            className="w-12 rounded border border-border bg-card px-1.5 py-1 text-center font-mono"
+            className="w-12 rounded border border-border bg-card px-1.5 py-1 text-center tabular-nums"
             inputMode="numeric"
             value={options.length}
             onChange={(e) => {
@@ -137,7 +137,7 @@ export function OptionRowsEditor({
         <ul className="space-y-1">
           {options.map((opt, i) => (
             <li key={`${idPrefix}-opt-${i}`} className="flex items-center gap-1.5">
-              <span className="w-4 shrink-0 text-right font-mono text-[10px] text-muted-foreground">
+              <span className="w-4 shrink-0 text-right tabular-nums text-[10px] text-muted-foreground">
                 {i + 1}
               </span>
               <input

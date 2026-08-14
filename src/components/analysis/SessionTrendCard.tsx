@@ -341,17 +341,17 @@ function SpreadReadoutValues({ run }: { run: AnalysisTrendRun }) {
     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
       {cells.map(([label, value]) => (
         <span key={label} className="flex items-baseline gap-1">
-          <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-faint">{label}</span>
-          <span className="font-mono text-[11.5px] font-medium tabular-nums text-foreground">
+          <span className="micro-caps text-faint">{label}</span>
+          <span className="text-[11px] font-medium tabular-nums text-foreground">
             {seconds(value)}
           </span>
         </span>
       ))}
       {distribution.mistakes.length > 0 ? (
         <span className="flex items-baseline gap-1">
-          <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-faint">miss</span>
+          <span className="micro-caps text-faint">miss</span>
           <span
-            className="font-mono text-[11.5px] font-medium tabular-nums"
+            className="text-[11px] font-medium tabular-nums"
             style={{ color: MISTAKE_COLOR }}
           >
             {distribution.mistakes.length}
@@ -923,7 +923,7 @@ function PaceTrendFace({
         <div className="rounded-lg border border-border/60 bg-secondary/40 px-2.5 py-1.5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+              <span className="micro-caps text-muted-foreground">
                 {displayRun.shortLabel}
               </span>
               {displayRun.tireIndicator ? (
@@ -954,7 +954,7 @@ function PaceTrendFace({
                     style={{ backgroundColor: series.color }}
                     aria-hidden
                   />
-                  <span className="font-mono text-[11.5px] font-medium tabular-nums text-foreground">
+          <span className="text-[11px] font-medium tabular-nums text-foreground">
                     {seconds(displayRun.metrics[series.key])}
                   </span>
                 </span>
@@ -1012,7 +1012,7 @@ function PaceTrendFace({
                         x={PAD_LEFT - 6}
                         y={scale.yAt(tick) + 3}
                         textAnchor="end"
-                        className="fill-faint font-mono text-[9px] tabular-nums"
+                        className="fill-faint text-[9px] tabular-nums"
                       >
                         {tick.toFixed(2)}
                       </text>
@@ -1047,7 +1047,7 @@ function PaceTrendFace({
                   x={geometry.xAt(index)}
                   y={dims.labelBaseline}
                   textAnchor="middle"
-                  className={cn("font-mono text-[9px]", isLast ? "fill-muted-foreground" : "fill-faint")}
+                  className={cn("tabular-nums text-[9px]", isLast ? "fill-muted-foreground" : "fill-faint")}
                 >
                   {run.shortLabel}
                 </text>
@@ -1328,7 +1328,7 @@ function SingleMetricTrendFace({
       {geometry && displayRun ? (
         <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-secondary/40 px-2.5 py-1.5">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+              <span className="micro-caps text-muted-foreground">
               {displayRun.shortLabel}
             </span>
             <span className="flex items-center gap-1.5">
@@ -1337,7 +1337,7 @@ function SingleMetricTrendFace({
                 style={{ backgroundColor: color }}
                 aria-hidden
               />
-              <span className="font-mono text-[11.5px] font-medium tabular-nums text-foreground">
+          <span className="text-[11px] font-medium tabular-nums text-foreground">
                 {displayValue == null ? "—" : formatValue(displayValue)}
               </span>
             </span>
@@ -1380,7 +1380,7 @@ function SingleMetricTrendFace({
                   x={PAD_LEFT - 6}
                   y={geometry.yAt(tick) + 3}
                   textAnchor="end"
-                  className="fill-faint font-mono text-[9px] tabular-nums"
+                        className="fill-faint text-[9px] tabular-nums"
                 >
                   {formatValue(tick)}
                 </text>
@@ -1408,7 +1408,7 @@ function SingleMetricTrendFace({
                   x={geometry.xAt(index)}
                   y={dims.labelBaseline}
                   textAnchor="middle"
-                  className={cn("font-mono text-[9px]", isLast ? "fill-muted-foreground" : "fill-faint")}
+                  className={cn("tabular-nums text-[9px]", isLast ? "fill-muted-foreground" : "fill-faint")}
                 >
                   {run.shortLabel}
                 </text>

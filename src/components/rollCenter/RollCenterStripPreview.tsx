@@ -64,7 +64,7 @@ export function RollCenterStripPreview() {
               step="0.25"
               value={values[k.key] ?? ""}
               onChange={(e) => setValues((v) => ({ ...v, [k.key]: e.target.value }))}
-              className="w-full rounded-md border border-border bg-input px-2 py-1.5 font-mono text-sm outline-none"
+              className="w-full rounded-md border border-border bg-input px-2 py-1.5 fig-stat outline-none"
             />
             <span className="text-[10px] text-faint">{k.note}</span>
           </label>

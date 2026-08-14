@@ -76,8 +76,8 @@ export default async function AdminPerfPage({
     <PerfShell days={days} env={env} envCounts={envCounts}>
       {!PERF_ENABLED ? (
         <CardPanel contentClassName="text-sm text-muted-foreground">
-          Instrumentation is <span className="font-mono">off</span> — set{" "}
-          <span className="font-mono">PERF_INSTRUMENTATION=1</span> to record new samples.
+          Instrumentation is <span className="type-machine">off</span> — set{" "}
+          <span className="type-machine">PERF_INSTRUMENTATION=1</span> to record new samples.
           Anything below is historical.
         </CardPanel>
       ) : null}
@@ -85,7 +85,7 @@ export default async function AdminPerfPage({
       {counts.serverSamples === 0 && counts.clientSamples === 0 ? (
         <CardPanel contentClassName="text-sm text-muted-foreground">
           No samples in this window. Use the app for a while with{" "}
-          <span className="font-mono">PERF_INSTRUMENTATION=1</span> set, then come back.
+          <span className="type-machine">PERF_INSTRUMENTATION=1</span> set, then come back.
         </CardPanel>
       ) : null}
 
@@ -114,7 +114,7 @@ export default async function AdminPerfPage({
         <Table headers={["Route", "n", "p50", "p75", "p95", "db", "q"]}>
           {routes.map((row) => (
             <tr key={`${row.kind}-${row.route}`} className="border-t border-border/60">
-              <Cell className="max-w-[220px] truncate font-mono text-[11px]" title={row.route}>
+              <Cell className="max-w-[220px] truncate type-machine text-[11px]" title={row.route}>
                 <span className="text-muted-foreground">{row.kind === "api" ? "api " : "page "}</span>
                 {row.route}
               </Cell>
@@ -137,8 +137,8 @@ export default async function AdminPerfPage({
         <Table headers={["Model", "Op", "n", "p95", "total"]}>
           {queries.map((row) => (
             <tr key={`${row.model}-${row.operation}`} className="border-t border-border/60">
-              <Cell className="font-mono text-[11px]">{row.model}</Cell>
-              <Cell className="font-mono text-[11px] text-muted-foreground">{row.operation}</Cell>
+              <Cell className="type-machine text-[11px]">{row.model}</Cell>
+              <Cell className="type-machine text-[11px] text-muted-foreground">{row.operation}</Cell>
               <Num>{row.appearances}</Num>
               <Num emphasis>{ms(row.p95)}</Num>
               <Num>{ms(row.totalMs)}</Num>
@@ -158,8 +158,8 @@ export default async function AdminPerfPage({
               key={`${row.name}-${row.route}-${row.platform ?? ""}`}
               className="border-t border-border/60"
             >
-              <Cell className="font-mono text-[11px]">{row.name}</Cell>
-              <Cell className="max-w-[180px] truncate font-mono text-[11px]" title={row.route}>
+              <Cell className="type-machine text-[11px]">{row.name}</Cell>
+              <Cell className="max-w-[180px] truncate type-machine text-[11px]" title={row.route}>
                 {row.route}
               </Cell>
               <Cell className="text-[11px] text-muted-foreground">{row.platform ?? "—"}</Cell>
@@ -220,7 +220,7 @@ function PerfShell({
           ))}
         </div>
         {tally ? (
-          <p className="-mt-2 font-mono text-[10px] text-muted-foreground">
+          <p className="-mt-2 type-machine text-[10px] text-muted-foreground">
             in window: {tally}
           </p>
         ) : null}
@@ -244,8 +244,8 @@ function Chip({
       href={href}
       className={
         active
-          ? "rounded-full border border-border bg-card px-3 py-1 font-mono text-[11px] text-foreground"
-          : "rounded-full border border-border/60 px-3 py-1 font-mono text-[11px] text-muted-foreground"
+          ? "rounded-full border border-border bg-card px-3 py-1 type-machine text-[11px] text-foreground"
+          : "rounded-full border border-border/60 px-3 py-1 type-machine text-[11px] text-muted-foreground"
       }
     >
       {children}
@@ -286,7 +286,7 @@ function Table({ headers, children }: { headers: string[]; children: ReactNode }
           {headers.map((header, index) => (
             <th
               key={header}
-              className={`pb-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground ${
+              className={`pb-1 type-machine text-[10px] uppercase tracking-wide text-muted-foreground ${
                 index === 0 ? "text-left" : "text-right"
               }`}
             >
@@ -319,7 +319,7 @@ function Cell({
 function Num({ children, emphasis }: { children: ReactNode; emphasis?: boolean }): ReactNode {
   return (
     <td
-      className={`py-1.5 pl-2 text-right align-top font-mono text-[11px] tabular-nums ${
+      className={`py-1.5 pl-2 text-right align-top type-machine text-[11px] tabular-nums ${
         emphasis ? "text-foreground" : "text-muted-foreground"
       }`}
     >

@@ -30,6 +30,14 @@ import { cn } from "@/lib/utils";
  *
  * Below lg this renders nothing — the server page's `<details>` accordion owns
  * the phone, byte for byte as before.
+ *
+ * **Filtered sessions land on a run, not the day.** Unfiltered, picking a session
+ * opens its trend, because reading the whole day is the point. The moment a filter
+ * is on it isn't a whole day any more — a session comes back holding 2 of its 8
+ * runs, and a "trend" through two points is a toll gate charging you a click to
+ * reach the runs you filtered for. So with filters on the pane opens the newest
+ * matching run and the session name toggles run ⇄ trend. `filtersActive === false`
+ * collapses every branch of that back to the original behaviour.
  */
 
 /** Selection lives in the URL so a pane is linkable; `g` = session group, `r` = run. */
@@ -38,12 +46,20 @@ const RUN_PARAM = "r";
 
 type Selection = { groupId: string; runId: string | null };
 
-function readSelection(fallbackGroupId: string | null): Selection {
-  if (typeof window === "undefined") return { groupId: fallbackGroupId ?? "", runId: null };
+function readSelection(
+  fallbackGroupId: string | null,
+  fallbackRunId: string | null
+): Selection {
+  if (typeof window === "undefined") {
+    return { groupId: fallbackGroupId ?? "", runId: fallbackRunId };
+  }
   const params = new URLSearchParams(window.location.search);
+  const groupParam = params.get(GROUP_PARAM);
   return {
-    groupId: params.get(GROUP_PARAM) ?? fallbackGroupId ?? "",
-    runId: params.get(RUN_PARAM),
+    groupId: groupParam ?? fallbackGroupId ?? "",
+    // `?g=` with no `?r=` is what the trend toggle writes, so it means "the day",
+    // not "nothing chosen" — only a URL naming no session at all takes the default.
+    runId: params.get(RUN_PARAM) ?? (groupParam ? null : fallbackRunId),
   };
 }
 
@@ -54,6 +70,8 @@ export function SessionsWorkbench({
   runListSource,
   displayTimeZone,
   userDisplayName,
+  filtersActive = false,
+  filterLabels = [],
   railFooter,
 }: {
   groups: WorkbenchGroup[];
@@ -63,6 +81,10 @@ export function SessionsWorkbench({
   runListSource: RunCompareListSource;
   displayTimeZone: string | null;
   userDisplayName: string | null;
+  /** Any filter is on, so every session here is a subset. Drives the landing and the ribbon. */
+  filtersActive?: boolean;
+  /** Short labels for the filters in play, from `describeRunHistoryFilters`. */
+  filterLabels?: string[];
   /**
    * "View more · N older runs". It belongs to the archive, not to the page, so it
    * rides at the end of the rail's own scroll rather than centred under all three
@@ -71,6 +93,13 @@ export function SessionsWorkbench({
   railFooter?: ReactNode;
 }) {
   const firstGroupId = groups[0]?.id ?? null;
+  // The run a session opens on. Null unfiltered — that's the day trend, unchanged.
+  const defaultRunFor = useCallback(
+    (group: WorkbenchGroup | null | undefined): string | null =>
+      filtersActive ? group?.runs[0]?.id ?? null : null,
+    [filtersActive]
+  );
+  const firstGroupDefaultRunId = defaultRunFor(groups[0]);
   const [selection, setSelection] = useState<Selection>({
     groupId: firstGroupId ?? "",
     runId: null,
@@ -78,15 +107,15 @@ export function SessionsWorkbench({
 
   // Read the URL after mount so the server and first client render agree.
   useEffect(() => {
-    setSelection(readSelection(firstGroupId));
-  }, [firstGroupId]);
+    setSelection(readSelection(firstGroupId, firstGroupDefaultRunId));
+  }, [firstGroupId, firstGroupDefaultRunId]);
 
   // Back/forward should walk selections, not leave the page.
   useEffect(() => {
-    const onPop = () => setSelection(readSelection(firstGroupId));
+    const onPop = () => setSelection(readSelection(firstGroupId, firstGroupDefaultRunId));
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [firstGroupId]);
+  }, [firstGroupId, firstGroupDefaultRunId]);
 
   const select = useCallback((next: Selection) => {
     setSelection(next);
@@ -126,6 +155,21 @@ export function SessionsWorkbench({
   // leave the pane blank — fall back to the day rather than showing nothing.
   const paneMode: "run" | "day" = activeRun ? "run" : "day";
 
+  // Picking a session: closed → open it on its landing view; already open → toggle
+  // between the run and the day. Unfiltered, `defaultRunFor` is null and all three
+  // branches say `{ groupId, runId: null }`, which is exactly what it did before.
+  const selectGroup = (group: WorkbenchGroup) => {
+    if (group.id !== activeGroup?.id) {
+      select({ groupId: group.id, runId: defaultRunFor(group) });
+      return;
+    }
+    select({ groupId: group.id, runId: selection.runId ? null : defaultRunFor(group) });
+  };
+
+  const ribbon = filtersActive && activeGroup ? (
+    <FilterRibbon group={activeGroup} labels={filterLabels} />
+  ) : null;
+
   if (groups.length === 0) return null;
 
   return (
@@ -135,7 +179,11 @@ export function SessionsWorkbench({
         // Two tracks up to 2xl, three from 1536 — see RUN_COLUMNS for why the
         // third one only appears when the middle can still afford 520px.
         "lg:grid-cols-[16.5rem_minmax(0,1fr)]",
-        "2xl:grid-cols-[16.5rem_minmax(0,1fr)_19.5rem]"
+        "2xl:grid-cols-[16.5rem_minmax(0,1fr)_19.5rem]",
+        // Only when the ribbon is there. It takes row 1 of the pane's columns and
+        // the rail spans both rows; without it the grid is single-row as before,
+        // so the unfiltered layout is untouched rather than merely equivalent.
+        ribbon && "lg:grid-rows-[auto_minmax(0,1fr)]"
       )}
     >
       {/* `sr-only` is absolutely positioned, so it never claims a track. */}
@@ -152,8 +200,12 @@ export function SessionsWorkbench({
         selection={selection}
         activeGroupId={activeGroup?.id ?? null}
         onSelect={select}
+        onSelectGroup={selectGroup}
+        rowSpanClassName={ribbon ? "lg:row-span-2" : undefined}
         footer={railFooter}
       />
+
+      {ribbon}
 
       {/* No title row in either mode. The rail names the open session — its
           title, date, track and run count are all in the header two inches to
@@ -214,6 +266,37 @@ export function SessionsWorkbench({
   );
 }
 
+/** How many filter labels the ribbon spells out before it starts counting them. */
+const RIBBON_LABEL_LIMIT = 2;
+
+/**
+ * One line above the pane naming the filter that produced what you're reading.
+ *
+ * Without it a session holding 2 of its 8 runs reads as the whole day — the chart
+ * still says "Session trend" and the runs beside it look like all of them. The
+ * pills at the top of the page say which filters are on; this says what they did
+ * to *this* session, which is the part you can't see.
+ *
+ * Muted, hairline, no colour: orientation, not a warning. Sits in row 1 of the
+ * pane's columns so it shows above the run and the trend alike.
+ */
+function FilterRibbon({ group, labels }: { group: WorkbenchGroup; labels: string[] }) {
+  const shown = labels.slice(0, RIBBON_LABEL_LIMIT);
+  const rest = labels.length - shown.length;
+  const parts = [
+    group.totalRuns != null && group.totalRuns > group.runs.length
+      ? `${group.runs.length} of ${group.totalRuns} runs`
+      : `${group.runs.length} run${group.runs.length !== 1 ? "s" : ""} match`,
+    ...shown,
+    ...(rest > 0 ? [`+${rest} more`] : []),
+  ];
+  return (
+    <p className="min-w-0 truncate border-b border-border pb-2 text-[11px] leading-none text-muted-foreground lg:col-start-2 2xl:col-span-2">
+      {parts.join(" · ")}
+    </p>
+  );
+}
+
 /**
  * The pane's two shapes.
  *
@@ -237,18 +320,44 @@ const RUN_COLUMNS = {
   ),
 };
 
+/**
+ * One session's line in the rail: "19 Jul · Kingston · 2 runs".
+ *
+ * Under a filter the group only holds the runs that matched, so the bare count
+ * would quietly under-report the session — "2 runs" for a day you ran eight times.
+ * `totalRuns` is the unfiltered size when the page could count it; when it's null,
+ * or when nothing was filtered out, the line reads exactly as it always has.
+ *
+ * "2/8", not "2 of 8": the whole line truncates at 264px and the spelled-out form
+ * cost enough width to clip the count off the first row. The ribbon above the pane
+ * spells it out for the open session, so the rail only has to carry the ratio.
+ */
+function railRunCount(group: WorkbenchGroup): string {
+  const shown = group.runs.length;
+  if (group.totalRuns != null && group.totalRuns > shown) {
+    return `${shown}/${group.totalRuns} runs`;
+  }
+  return `${shown} run${shown !== 1 ? "s" : ""}`;
+}
+
 /** The archive rail — sessions, each opening to its runs, with the spine down the edge. */
 function RailPanel({
   groups,
   selection,
   activeGroupId,
   onSelect,
+  onSelectGroup,
+  rowSpanClassName,
   footer,
 }: {
   groups: WorkbenchGroup[];
   selection: Selection;
   activeGroupId: string | null;
   onSelect: (next: Selection) => void;
+  /** Picking the session itself — opens it, or toggles run ⇄ trend when already open. */
+  onSelectGroup: (group: WorkbenchGroup) => void;
+  /** Set when the filter ribbon claims row 1, so the rail spans both rows. */
+  rowSpanClassName?: string;
   footer?: ReactNode;
 }) {
   return (
@@ -259,7 +368,10 @@ function RailPanel({
       // `app/runs/history/page.tsx`, which carries the same anchor id — only one of the two is
       // ever visible, and the tour resolves whichever that is.
       data-tour="sessions"
-      className="overflow-y-auto overscroll-contain rounded-xl border border-border bg-card [scrollbar-gutter:stable] lg:max-h-[calc(100vh-11.5rem)]"
+      className={cn(
+        "overflow-y-auto overscroll-contain rounded-xl border border-border bg-card [scrollbar-gutter:stable] lg:max-h-[calc(100vh-11.5rem)]",
+        rowSpanClassName
+      )}
     >
       {groups.map((group, index) => {
         const open = group.id === activeGroupId;
@@ -280,7 +392,7 @@ function RailPanel({
               type="button"
               role="option"
               aria-selected={open && selection.runId == null}
-              onClick={() => onSelect({ groupId: group.id, runId: null })}
+              onClick={() => onSelectGroup(group)}
               className="flex w-full min-w-0 items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-inset"
             >
               <span
@@ -307,10 +419,9 @@ function RailPanel({
                 >
                   {group.title}
                 </span>
-                <span className="mt-1 block truncate font-mono text-[10px] leading-none text-faint">
+                <span className="mt-1 block truncate tabular-nums text-[10px] leading-none text-faint">
                   {group.dateLabel}
-                  {group.trackName ? ` · ${group.trackName}` : ""} · {group.runs.length} run
-                  {group.runs.length !== 1 ? "s" : ""}
+                  {group.trackName ? ` · ${group.trackName}` : ""} · {railRunCount(group)}
                 </span>
               </span>
               <ChevronRight
@@ -427,12 +538,12 @@ function RunRail({
                 <TriangleAlert className="h-3 w-3" aria-hidden />
               </button>
             ) : null}
-            <span className="shrink-0 font-mono text-[9.5px] text-faint">{run.lapCount} laps</span>
+            <span className="shrink-0 tabular-nums text-[10px] text-faint">{run.lapCount} laps</span>
             <span
               className={cn(
                 // Gain green, matching every other "this is the fast one" mark in
                 // the app. It's a CSS var, not a Tailwind colour — hence the literal.
-                "shrink-0 font-mono text-[11px] tabular-nums",
+                "shrink-0 text-[11px] tabular-nums",
                 run.isGroupBest ? "text-gain" : "text-foreground"
               )}
               title={run.isGroupBest ? "Fastest lap of this session" : undefined}

@@ -147,7 +147,7 @@ export function VideoAnalysisJobClient({ jobId }: { jobId: string }) {
             Run the Python worker locally, then paste <code>results.json</code> here.
           </p>
           <textarea
-            className="w-full h-40 rounded-md border border-border bg-background p-2 font-mono text-[10px]"
+            className="w-full h-40 rounded-md border border-border bg-background p-2 tabular-nums text-[10px]"
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
             placeholder='{ "version": 1, "tracks": [...] }'
@@ -203,10 +203,10 @@ export function VideoAnalysisJobClient({ jobId }: { jobId: string }) {
             <div className="mt-2 space-y-3 max-h-64 overflow-auto">
               {data.result.tracks.map((tr) => (
                 <div key={tr.motTrackId}>
-                  <p className="text-xs font-mono font-medium">
+                  <p className="text-xs tabular-nums font-medium">
                     Car {tr.motTrackId} — best {tr.bestLapSec.toFixed(3)}s ({tr.lapCount} laps)
                   </p>
-                  <ul className="text-[10px] text-muted-foreground font-mono">
+                  <ul className="text-[10px] text-muted-foreground tabular-nums">
                     {tr.laps.slice(0, 8).map((l) => (
                       <li key={l.lapIndex}>
                         Lap {l.lapIndex}: {l.lapTimeSec.toFixed(3)}s

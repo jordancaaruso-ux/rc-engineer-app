@@ -56,7 +56,7 @@ export function DashboardLastRunReadCard({
   return (
     <SurfaceCard contentClassName="p-0" className="hidden rounded-xl xl:block">
       <div className="flex items-center gap-3 border-b border-border px-5 py-3">
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[.2em] text-faint">
+        <span className="micro-caps text-faint">
           {headline ?? "Last run read"}
         </span>
         {meta ? <span className="truncate text-[11.5px] text-faint">{meta}</span> : null}
@@ -85,7 +85,7 @@ export function DashboardLastRunReadCard({
                   <span className="min-w-0 truncate text-[12.5px] text-muted-foreground">
                     {row.label}
                   </span>
-                  <span className="shrink-0 font-mono text-[13px] tabular-nums text-foreground">
+                  <span className="shrink-0 text-[13px] tabular-nums text-foreground">
                     {row.previous != null ? `${row.previous} → ${row.current}` : row.current}
                     {row.unit ? ` ${row.unit}` : ""}
                   </span>

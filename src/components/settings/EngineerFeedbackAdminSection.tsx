@@ -141,14 +141,14 @@ export function EngineerFeedbackAdminSection() {
               <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
                 <span
                   className={
-                    r.stars <= 6 ? "font-mono text-destructive" : "font-mono text-foreground"
+                    r.stars <= 6 ? "type-machine text-destructive" : "type-machine text-foreground"
                   }
                 >
                   {r.stars}/10
                 </span>
                 <span>{r.user.email ?? r.user.id}</span>
                 <span>{new Date(r.createdAt).toLocaleString()}</span>
-                {ctx.runId ? <span className="font-mono">run {ctx.runId.slice(0, 8)}…</span> : null}
+                {ctx.runId ? <span className="type-machine">run {ctx.runId.slice(0, 8)}…</span> : null}
               </div>
               <p className="text-foreground/90">
                 <span className="text-muted-foreground">Q:</span> {question}

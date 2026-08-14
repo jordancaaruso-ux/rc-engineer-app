@@ -348,7 +348,7 @@ export const ANALYSIS_HUB_LINKS: NavHubLink[] = [
   {
     href: "/setup/comparison",
     label: "Setup comparison",
-    description: "Compare setups across runs and community data.",
+    description: "Put two setups on one sheet and swap between them.",
     icon: "git-compare",
   },
   {
@@ -368,7 +368,7 @@ export const TOOLS_HUB_LINKS: NavHubLink[] = [
   {
     href: "/setup/comparison",
     label: "Setup comparison",
-    description: "Compare setups across runs and community data.",
+    description: "Put two setups on one sheet and swap between them.",
     icon: "git-compare",
   },
   {

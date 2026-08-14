@@ -137,12 +137,12 @@ export function EngineerRunSummaryPanel({
           ) : null}
 
           <div className="text-muted-foreground">
-            Included laps: <span className="text-foreground/90 font-mono">{summary.lapCountIncluded.current}</span>
+            Included laps: <span className="text-foreground/90 tabular-nums">{summary.lapCountIncluded.current}</span>
             {summary.lapCountIncluded.reference != null ? (
               <>
                 {" "}
                 {hasCompareInUrl ? "vs cmp " : "vs ref "}
-                <span className="text-foreground/90 font-mono">{summary.lapCountIncluded.reference}</span>
+                <span className="text-foreground/90 tabular-nums">{summary.lapCountIncluded.reference}</span>
               </>
             ) : null}
           </div>

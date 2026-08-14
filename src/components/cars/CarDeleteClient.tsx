@@ -62,7 +62,7 @@ export function CarDeleteClient(props: { carId: string; carName: string; runCoun
       ) : (
         <div className="rounded-md border border-border bg-muted/60 p-3 space-y-2">
           <div className="text-xs text-muted-foreground">
-            Type <span className="font-mono">DELETE</span> to confirm.
+            Type <span className="tabular-nums">DELETE</span> to confirm.
           </div>
           <input
             className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"

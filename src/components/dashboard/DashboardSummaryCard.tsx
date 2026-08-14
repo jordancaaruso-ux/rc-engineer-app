@@ -80,8 +80,8 @@ function NewPbBanner({ newPb }: { newPb: DashboardNewPb }) {
           {newPb.trackName}
           {newPb.className ? ` · ${newPb.className}` : ""}
         </span>{" "}
-        <span className="font-mono tabular-nums text-gain">{formatLap(newPb.value)}</span>{" "}
-        <span className="font-mono tabular-nums text-muted-foreground">(−{improvement.toFixed(2)}s)</span>
+        <span className="tabular-nums text-gain">{formatLap(newPb.value)}</span>{""}
+        <span className="tabular-nums text-muted-foreground">(−{improvement.toFixed(2)}s)</span>
       </div>
     </div>
   );
@@ -180,7 +180,7 @@ function RecordRow({ record, className }: { record: DashboardRecord; className?:
           {record.className ? ` · ${record.className}` : ""}
         </div>
         {record.freshPbMetric ? (
-          <span className="shrink-0 rounded-md bg-gain/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-gain">
+          <span className="shrink-0 rounded-md bg-gain/15 px-1.5 py-0.5 micro-caps text-gain">
             New PB
           </span>
         ) : (
@@ -210,10 +210,10 @@ function RecordCell({
 }) {
   return (
     <div>
-      <div className="font-mono text-[8px] uppercase tracking-[0.16em] text-faint">{label}</div>
+      <div className="micro-caps text-faint">{label}</div>
       <div
         className={cn(
-          "mt-0.5 font-mono text-[13px] tabular-nums",
+          "mt-0.5 text-[13px] tabular-nums",
           fresh ? "text-gain" : "text-foreground"
         )}
       >

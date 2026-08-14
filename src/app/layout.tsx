@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 
-import { Sora, Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import { Sora, Space_Grotesk } from "next/font/google";
 
 import Script from "next/script";
 
@@ -44,7 +44,10 @@ import { WebVitalsReporterMount } from "@/components/perf/WebVitalsReporterMount
 
 
 
-/** UI sans — Sora for all body, nav, titles, and controls (display voice; JetBrains Mono is data). */
+/** The one UI face — Sora for everything the user reads, figures included.
+    Numbers are Sora + `tabular-nums` (see the `.fig-*` ramp in globals.css), not a second
+    typeface: its digits are proportional by default and only snap to a uniform 676/1000em
+    under `tnum`, which the served woff2 subset does carry (measured 2026-08-14). */
 
 const sora = Sora({
 
@@ -67,17 +70,11 @@ const spaceGrotesk = Space_Grotesk({
 
 
 
-/** Data — lap times, deltas, tracked labels, table headers. */
-
-const jetBrainsMono = JetBrains_Mono({
-
-  subsets: ["latin"],
-
-  variable: "--font-mono-jb",
-
-  weight: ["400", "500", "700"],
-
-});
+/* JetBrains Mono was deleted 2026-08-14 (one-voice pass). It had drifted onto ~460 call
+   sites doing three unrelated jobs — aligning figures, marking machine strings, and an
+   uppercase-tracked label voice the north star had already retired. Figures are now Sora
+   on the `.fig-*` ramp; genuine machine text uses the platform mono stack via
+   `.type-machine`, which loads nothing. Do not reintroduce a webfont for data. */
 
 
 
@@ -204,7 +201,7 @@ export default async function RootLayout({
 
       data-theme={theme}
 
-      className={`${sora.variable} ${spaceGrotesk.variable} ${jetBrainsMono.variable}`}
+      className={`${sora.variable} ${spaceGrotesk.variable}`}
 
     >
 

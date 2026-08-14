@@ -65,7 +65,7 @@ export function WizardPrefillCard({
         <span className="text-[14px] font-bold tracking-tight text-foreground">
           {applied ? "Prefilled from your last run" : "Prefill from your last run"}
         </span>
-        <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+        <span className="shrink-0 micro-caps text-faint">
           {kindLabel} · {relativeWhen(whenIso)}
         </span>
       </div>
@@ -82,7 +82,7 @@ export function WizardPrefillCard({
               {r.value}
             </span>
             {applied && r.jump && onJump ? (
-              <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.12em] text-faint">
+        <span className="shrink-0 micro-caps text-faint">
                 {r.label} →
               </span>
             ) : null}
@@ -174,7 +174,7 @@ export function WizardDraftsCard({ drafts }: { drafts: WizardDraftRow[] }) {
           <span className="text-sm font-semibold text-foreground">
             {d.sessionLabel || "Run"} — {d.carName}
           </span>
-          <span className="font-mono text-[10px] text-muted-foreground">
+          <span className="tabular-nums text-[10px] text-muted-foreground">
             {[d.trackName, d.eventName, relativeWhen(d.createdAt)].filter(Boolean).join(" · ")}
           </span>
           <span className="mt-1 text-[11px] text-warning">

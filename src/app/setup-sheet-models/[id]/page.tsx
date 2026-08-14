@@ -121,7 +121,7 @@ export default async function SetupSheetModelWorkbenchPage({
           <div>
             <h1 className="page-title">Chassis workbench</h1>
             <p className="page-subtitle">
-              {model.name} · <span className="font-mono">{model.slug}</span>
+              {model.name} · <span className="tabular-nums">{model.slug}</span>
               {model.isAuthorized ? " · catalog" : " · unreviewed"}
             </p>
           </div>
@@ -138,7 +138,7 @@ export default async function SetupSheetModelWorkbenchPage({
                 <span className="text-xs text-muted-foreground">({calibration.sourceType})</span>
               </div>
               {counts ? (
-                <div className="font-mono text-xs text-muted-foreground">
+                <div className="tabular-nums text-xs text-muted-foreground">
                   {counts.imageFields} image regions · {counts.formFields} PDF form ·{" "}
                   {counts.textFields} text · schema {schema?.fields.length ?? "?"} fields
                 </div>
@@ -147,7 +147,7 @@ export default async function SetupSheetModelWorkbenchPage({
                 {isGreenLit && greenLitAt ? (
                   <span className="text-emerald-300">
                     Verified — green-lit{" "}
-                    <span className="font-mono text-xs">
+                    <span className="tabular-nums text-xs">
                       {new Date(greenLitAt).toLocaleDateString()}
                     </span>
                     . Uploads for this chassis import silently.
@@ -165,7 +165,7 @@ export default async function SetupSheetModelWorkbenchPage({
                   <span className="text-muted-foreground">
                     (geometry changed after the green-light):
                   </span>{" "}
-                  <span className="font-mono">{recheckKeys.slice(0, 12).join(", ")}</span>
+                  <span className="tabular-nums">{recheckKeys.slice(0, 12).join(", ")}</span>
                   {recheckKeys.length > 12 ? ` +${recheckKeys.length - 12} more` : ""}
                 </div>
               ) : null}
@@ -251,7 +251,7 @@ export default async function SetupSheetModelWorkbenchPage({
                   >
                     {d.originalFilename}
                   </Link>
-                  <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                  <span className="shrink-0 tabular-nums text-[10px] text-muted-foreground">
                     {d.parseStatus} · {new Date(d.createdAt).toLocaleDateString()}
                   </span>
                 </li>

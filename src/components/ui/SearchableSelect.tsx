@@ -125,7 +125,7 @@ export function SearchableSelect({
       onChange={(e) => onChange(e.target.value)}
       className={cn(
         "form-control w-full px-3 py-2 text-sm disabled:opacity-60",
-        triggerMono && "font-mono",
+        triggerMono && "tabular-nums",
         className
       )}
     >

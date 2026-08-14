@@ -165,7 +165,7 @@ export function SetupDocumentLibraryClient({
                           >
                           {doc.importStatus}
                         </span>
-                        {doc.lastCompletedStage ? <span className="ml-1 font-mono text-[10px] opacity-80">({doc.lastCompletedStage})</span> : null}
+                        {doc.lastCompletedStage ? <span className="ml-1 tabular-nums text-[10px] opacity-80">({doc.lastCompletedStage})</span> : null}
                       </>
                     ) : null}
                     {doc.createdSetupId ? " · setup created" : ""}

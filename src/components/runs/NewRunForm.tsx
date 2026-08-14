@@ -478,7 +478,7 @@ function prefillFieldClass(_active: boolean) {
 function PrefillBadge({ show }: { show?: boolean }) {
   if (!show) return null;
   return (
-    <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-primary-ink/90">Prefilled</span>
+    <span className="micro-caps text-primary-ink/90">Prefilled</span>
   );
 }
 
@@ -5238,7 +5238,7 @@ export function NewRunForm(props: {
                     <li key={r.key} className="flex flex-wrap items-baseline gap-1">
                       <span className="truncate font-medium text-foreground">{r.label}</span>
                       {r.unit ? <span className="text-[10px] text-muted-foreground">({r.unit})</span> : null}
-                      <span className="ml-auto font-mono tabular-nums text-muted-foreground">
+                      <span className="ml-auto tabular-nums text-muted-foreground">
                         <span className="line-through opacity-70">{r.previous ?? "—"}</span>
                         <span className="mx-1 text-foreground/60">→</span>
                         <span className="font-semibold text-foreground">{r.current || "—"}</span>
@@ -5365,7 +5365,7 @@ export function NewRunForm(props: {
                     <li key={r.key} className="flex flex-wrap items-baseline gap-1">
                       <span className="truncate font-medium text-foreground">{r.label}</span>
                       {r.unit ? <span className="text-[10px] text-muted-foreground">({r.unit})</span> : null}
-                      <span className="ml-auto font-mono tabular-nums text-muted-foreground">
+                      <span className="ml-auto tabular-nums text-muted-foreground">
                         <span className="line-through opacity-70">{r.previous ?? "—"}</span>
                         <span className="mx-1 text-foreground/60">→</span>
                         <span className="font-semibold text-foreground">{r.current || "—"}</span>

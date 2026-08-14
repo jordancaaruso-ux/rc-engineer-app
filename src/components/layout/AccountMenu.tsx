@@ -110,7 +110,7 @@ export function AccountMenu({ variant = "floating" }: { variant?: "floating" | "
                   {name}
                 </span>
               ) : null}
-              <span className="block truncate font-mono text-[10.5px] text-muted-foreground">
+              <span className="block truncate tabular-nums text-[10px] text-muted-foreground">
                 {email ?? "Signed in"}
               </span>
             </span>

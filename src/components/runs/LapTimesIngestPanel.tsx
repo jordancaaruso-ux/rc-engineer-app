@@ -257,7 +257,7 @@ function SessionImportListRow({
       {bestLapSeconds != null ? (
         <span className="flex shrink-0 flex-col items-end leading-tight">
           <span className="text-[9px] font-medium uppercase tracking-wide text-faint">Best</span>
-          <span className="lap-figure text-[12.5px] font-medium text-foreground">
+          <span className="fig-stat font-medium text-foreground">
             {formatLap(bestLapSeconds)}
           </span>
         </span>
@@ -1378,7 +1378,7 @@ export function LapTimesIngestPanel({
                           }))
                         );
                       return (
-                        <ul className="font-mono text-xs max-h-48 overflow-y-auto rounded-md border border-border bg-surface-runna p-2 space-y-1">
+                        <ul className="tabular-nums text-xs max-h-48 overflow-y-auto rounded-md border border-border bg-surface-runna p-2 space-y-1">
                           {rows.map((row, i) => (
                             <li
                               key={`${active.driverId}-${row.lapNumber}-${i}`}
@@ -1465,7 +1465,7 @@ export function LapTimesIngestPanel({
           {photoBusy ? <p className="ui-label-meta">Processing…</p> : null}
           {photoConfidence ? (
             <p className="ui-label-meta">
-              Model confidence: <span className="font-mono text-foreground/90">{photoConfidence}</span>
+              Model confidence: <span className="tabular-nums text-foreground/90">{photoConfidence}</span>
             </p>
           ) : null}
           {photoNote ? <p className="text-[11px] text-muted-foreground">{photoNote}</p> : null}
@@ -1482,7 +1482,7 @@ export function LapTimesIngestPanel({
           </label>
           <textarea
             id="lap-times-edit"
-            className="h-32 w-full resize-none rounded-md border border-border bg-surface-runna-inset px-3 py-2 text-sm outline-none font-mono"
+            className="h-32 w-full resize-none rounded-md border border-border bg-surface-runna-inset px-3 py-2 fig-stat outline-none tabular-nums"
             placeholder={"12.341 12.298 12.410\nor comma / line separated"}
             value={value.manualText}
             onChange={(e) => {
@@ -1506,7 +1506,7 @@ export function LapTimesIngestPanel({
               <p className="text-[10px] leading-snug text-muted-foreground mb-1">
                 Fast laps well below the session median start excluded; slow laps only when far above median.
               </p>
-              <ul className="font-mono text-xs max-h-48 overflow-y-auto rounded-md border border-border bg-surface-runna p-2 space-y-1">
+                        <ul className="tabular-nums text-xs max-h-48 overflow-y-auto rounded-md border border-border bg-surface-runna p-2 space-y-1">
                 {value.manualLapRows.map((row, i) => (
                   <li
                     key={`manual-${row.lapNumber}-${i}`}

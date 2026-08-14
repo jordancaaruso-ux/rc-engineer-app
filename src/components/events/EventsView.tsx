@@ -70,7 +70,7 @@ export function EventsView({
         <div className="min-w-0">
           <h1 className="page-title">Events</h1>
         </div>
-        <span className="hidden shrink-0 font-mono text-[11px] uppercase tracking-[.12em] text-muted-foreground xl:inline">
+        <span className="hidden shrink-0 micro-caps text-muted-foreground xl:inline">
           {metaLine}
         </span>
         <div className="ml-auto hidden shrink-0 items-center gap-3.5 xl:flex">
@@ -173,7 +173,7 @@ function FirstRunCard({ onNewEvent }: { onNewEvent: () => void }) {
     <SurfaceCard variant="hero" contentClassName="p-0" className="rounded-2xl">
       <div className="flex items-center gap-3 border-b border-border px-6 py-3.5">
         <span className="h-3.5 w-[3px] shrink-0 skew-x-[-21deg] rounded-sm bg-primary" aria-hidden />
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[.2em] text-foreground">
+        <span className="micro-caps text-foreground">
           No events yet
         </span>
       </div>

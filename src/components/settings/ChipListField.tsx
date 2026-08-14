@@ -107,7 +107,7 @@ export function ChipListField<T extends string | number>({
               <span
                 className={cn(
                   "inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-muted/60 py-1 pl-2.5 pr-1 text-[12.5px] text-foreground",
-                  chipMono && "font-mono"
+                  chipMono && "tabular-nums"
                 )}
               >
                 <span className="min-w-0 truncate">{String(v)}</span>

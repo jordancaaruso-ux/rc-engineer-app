@@ -37,7 +37,7 @@ export function AssetListRow({
           <HubRowTitle as="span" className="block truncate">
             {title}
           </HubRowTitle>
-          <span className="ui-caption mt-0.5 block font-mono tabular-nums">{meta}</span>
+          <span className="ui-caption mt-0.5 block tabular-nums">{meta}</span>
         </span>
         <ChevronRight
           className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"

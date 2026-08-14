@@ -119,8 +119,8 @@ export function DemoEntryScreen({ facts }: { facts: DemoSeasonFacts }) {
             className="rc-reveal flex items-baseline justify-between gap-4 border-b border-border/60 py-3"
             style={{ "--rc-delay": `${firstRowDelay + i * 120}ms` } as React.CSSProperties}
           >
-            {/* Sora, not JetBrains Mono: the one-voice pass left mono to racing-clock
-                figures only (`.lap-figure`), and none of these are lap times. */}
+            {/* Deliberately off the `.fig-*` ramp: these are setup labels on a marketing
+                panel, not figures compared down a column. */}
             <dt className="text-[11px] font-medium uppercase tracking-[0.14em] text-faint">
               {row.key}
             </dt>

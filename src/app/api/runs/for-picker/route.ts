@@ -41,7 +41,7 @@ export async function GET(request: Request) {
       lapSession: true,
       bestLapSeconds: true,
       setupSnapshot: { select: { id: true, data: true } },
-      car: { select: { name: true, setupSheetTemplate: true } },
+      car: { select: { name: true, setupSheetTemplate: true, setupSheetModelId: true } },
       track: { select: { name: true } },
       event: { select: { name: true } },
     },

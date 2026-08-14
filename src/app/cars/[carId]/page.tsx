@@ -300,7 +300,7 @@ export default async function CarDetailPage(props: {
                     className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/60 pb-2 last:border-0 last:pb-0"
                   >
                     <span className="text-foreground">{ts.label}</span>
-                    <span className="text-[11px] text-muted-foreground font-mono tabular-nums">
+                    <span className="text-[11px] text-muted-foreground tabular-nums">
                       {runsOnCarByTire.get(ts.id) ?? 0} run{runsOnCarByTire.get(ts.id) === 1 ? "" : "s"} on this car ·
                       taken to run {furthestRunByTire.get(ts.id) ?? "—"}
                     </span>
@@ -312,16 +312,16 @@ export default async function CarDetailPage(props: {
 
           <CardPanel contentClassName="space-y-3">
             <Eyebrow>Car</Eyebrow>
-            <div className="grid gap-2 text-sm">
+            <div className="grid gap-2 text-[13px]">
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-muted-foreground">Added</span>
-                <span className="font-mono tabular-nums">
+                <span className="fig-stat">
                   {formatRunCreatedAtDateTime(car.createdAt, displayTimeZone)}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-muted-foreground">Runs</span>
-                <span className="font-mono tabular-nums">{runCount}</span>
+                <span className="fig-stat">{runCount}</span>
               </div>
               {car.chassis ? (
                 <div className="flex items-baseline justify-between gap-3">

@@ -110,7 +110,7 @@ function SheetCell({
             <button
               type="button"
               className={cn(
-                "rounded-md border border-border bg-surface-runna-inset px-2 py-1 text-[11px] font-mono hover:bg-surface-runna transition",
+                "rounded-md border border-border bg-surface-runna-inset px-2 py-1 text-[11px] tabular-nums hover:bg-surface-runna transition",
                 getBoolFromSetupString(value) && "border-primary-ink/60 bg-accent/10"
               )}
               aria-pressed={getBoolFromSetupString(value)}
@@ -126,7 +126,7 @@ function SheetCell({
         ) : multiline ? (
           <textarea
             className={cn(
-              "w-full min-h-[2.5rem] resize-y bg-transparent px-2 py-1 text-xs font-mono outline-none rounded",
+              "w-full min-h-[2.5rem] resize-y bg-transparent px-2 py-1 text-xs tabular-nums outline-none rounded",
               focused && "ring-1 ring-primary-ink/50 bg-surface-runna-inset"
             )}
             placeholder="—"
@@ -146,7 +146,7 @@ function SheetCell({
         ) : (
           <input
             className={cn(
-              "w-full bg-transparent px-2 py-1 text-sm font-mono outline-none rounded",
+              "w-full bg-transparent px-2 py-1 fig-stat outline-none rounded",
               focused && "ring-1 ring-primary-ink/50 bg-surface-runna-inset"
             )}
             inputMode="decimal"
@@ -167,10 +167,10 @@ function SheetCell({
             aria-label={field.label}
           />
         ) : (
-          <span className="px-2 py-1 text-sm font-mono tabular-nums text-muted-foreground">{value || "—"}</span>
+          <span className="px-2 py-1 fig-stat text-muted-foreground">{value ||"—"}</span>
         )}
         {baseline !== "" && baseline !== value ? (
-          <span className="px-2 text-[9px] font-mono text-muted-foreground/80 truncate" title={baseline}>
+          <span className="px-2 text-[9px] tabular-nums text-muted-foreground/80 truncate" title={baseline}>
             vs {baseline}
           </span>
         ) : null}

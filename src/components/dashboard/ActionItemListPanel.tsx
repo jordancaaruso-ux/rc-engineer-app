@@ -286,7 +286,7 @@ export function ActionItemListPanel({
                   className={cn(
                     "shrink-0 cursor-grab select-none leading-none",
                     isLedger
-                      ? "relative w-5 text-center font-mono text-[11px] tabular-nums text-faint"
+                      ?"relative w-5 text-center text-[11px] tabular-nums text-faint"
                       : "px-0.5 text-muted-foreground/70"
                   )}
                   title="Drag to reorder"

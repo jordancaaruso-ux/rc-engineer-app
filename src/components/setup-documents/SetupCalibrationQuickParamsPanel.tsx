@@ -123,7 +123,7 @@ export function SetupCalibrationQuickParamsPanel(props: {
             <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
               <span className="ui-title text-[10px] text-foreground/90">Internal key (snake_case)</span>
               <input
-                className="rounded-md border border-border bg-card px-2 py-1.5 font-mono text-xs"
+                className="rounded-md border border-border bg-card px-2 py-1.5 tabular-nums text-xs"
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
                 placeholder="auto-filled from label if empty"
@@ -166,7 +166,7 @@ export function SetupCalibrationQuickParamsPanel(props: {
             <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
               <span className="ui-title text-[10px] text-foreground/90">Option labels (one per line, at least 2)</span>
               <textarea
-                className="min-h-[4.5rem] rounded-md border border-border bg-card px-2 py-1.5 font-mono text-xs"
+                className="min-h-[4.5rem] rounded-md border border-border bg-card px-2 py-1.5 tabular-nums text-xs"
                 value={optionLines}
                 onChange={(e) => setOptionLines(e.target.value)}
                 placeholder={"Screw A\nScrew B\nScrew C"}
@@ -227,7 +227,7 @@ export function SetupCalibrationQuickParamsPanel(props: {
                       >
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <span className="font-medium text-foreground">{def.displayLabel}</span>
-                        <span className="font-mono text-[10px] text-muted-foreground">{def.key}</span>
+                        <span className="tabular-nums text-[10px] text-muted-foreground">{def.key}</span>
                       </div>
                       <div className="mt-1 text-[10px] text-muted-foreground">
                         {def.valueType} · {def.uiType}
@@ -242,7 +242,7 @@ export function SetupCalibrationQuickParamsPanel(props: {
                       {!g ? (
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           <select
-                            className="max-w-full flex-1 rounded border border-border bg-card px-1.5 py-1 font-mono text-[10px]"
+                            className="max-w-full flex-1 rounded border border-border bg-card px-1.5 py-1 tabular-nums text-[10px]"
                             defaultValue=""
                             onChange={(e) => {
                               const v = e.target.value;
@@ -271,7 +271,7 @@ export function SetupCalibrationQuickParamsPanel(props: {
                                 {entry.label}
                               </span>
                               <select
-                                className="min-w-0 flex-1 rounded border border-border bg-card px-1.5 py-1 font-mono text-[10px]"
+                                className="min-w-0 flex-1 rounded border border-border bg-card px-1.5 py-1 tabular-nums text-[10px]"
                                 defaultValue=""
                                 onChange={(e) => {
                                   const v = e.target.value;

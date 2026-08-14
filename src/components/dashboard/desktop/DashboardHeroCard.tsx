@@ -101,14 +101,14 @@ export function DashboardHeroCard({
     >
       <div className="flex items-center gap-3 border-b border-border px-6 py-3.5">
         <span className="h-3.5 w-[3px] shrink-0 skew-x-[-21deg] rounded-sm bg-primary" aria-hidden />
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[.2em] text-foreground">
+        <span className="micro-caps text-foreground">
           {eyebrow}
         </span>
         {meta ? <span className="truncate text-[12px] text-faint">{meta}</span> : null}
         {/* The date, moved off the page title (2026-08-13) — the rail says
             "Dashboard", it never says which day this is. `ml-auto` moved here so
             the stamp and the door still sit as one group on the right. */}
-        <span className="ml-auto shrink-0 font-mono text-[11px] uppercase tracking-[.12em] text-faint">
+        <span className="ml-auto shrink-0 micro-caps text-faint">
           {dayStamp}
         </span>
         <Link
@@ -124,10 +124,10 @@ export function DashboardHeroCard({
       <div className="flex items-start gap-9 px-6 pb-[22px] pt-[26px]">
         {/* Block 1 — the anchor of the whole page. */}
         <div className="min-w-[262px] shrink-0">
-          <div className="font-mono text-[10px] font-bold uppercase tracking-[.18em] text-faint">
+          <div className="micro-caps text-faint">
             {lapLabel}
           </div>
-          <div className="mt-2.5 font-mono font-medium tabular-nums leading-[.84] tracking-[-.045em] text-foreground text-[clamp(3.5rem,4.6vw,5.5rem)]">
+          <div className="mt-2.5 font-medium tabular-nums leading-[.84] tracking-[-.045em] text-foreground text-[clamp(3.5rem,4.6vw,5.5rem)]">
             {formatLap(hero.bestLap)}
           </div>
           {hero.deltaSeconds != null ? (
@@ -182,7 +182,7 @@ export function DashboardHeroCard({
         {/* Block 3 — the trend. */}
         <div className="min-w-0 flex-1">
           <div className="mb-2.5 flex items-baseline justify-between gap-3">
-            <span className="font-mono text-[10px] font-bold uppercase tracking-[.18em] text-faint">
+            <span className="micro-caps text-faint">
               {isTrackDay
                 ? "Pace · per run today"
                 : isLapSeries
@@ -218,7 +218,7 @@ function DeltaChip({ seconds }: { seconds: number }) {
   return (
     <span
       className={cn(
-        "rounded-md px-2.5 py-1 font-mono text-[13px] font-bold tabular-nums",
+        "rounded-md px-2.5 py-1 text-[13px] font-bold tabular-nums",
         faster ? "bg-gain/[.12] text-gain" : "bg-destructive/[.12] text-destructive",
       )}
     >
@@ -255,7 +255,7 @@ function StatStripSixUp({ summary }: { summary: DashboardSummary }) {
         >
           <div className="text-[10.5px] font-semibold text-faint">{cell.label}</div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="font-mono text-[19px] font-medium tabular-nums text-foreground">
+            <span className="text-[18px] font-medium tabular-nums text-foreground">
               {cell.value}
             </span>
             {cell.delta && cell.format ? (
@@ -280,7 +280,7 @@ function VolumeDelta({
     return <span className="text-[10.5px] text-muted-foreground">±0</span>;
   }
   return (
-    <span className="text-[10.5px] tabular-nums text-muted-foreground">
+    <span className="text-[10px] tabular-nums text-muted-foreground">
       {direction === "up" ? "↑" : "↓"} {format(Math.abs(diff))}
     </span>
   );

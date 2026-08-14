@@ -24,7 +24,7 @@ export function CarCurrentSetupCard({
 
       <div className="min-w-0">
         <p className="truncate text-base font-semibold text-foreground">{current.title}</p>
-        <p className="ui-caption mt-0.5 truncate font-mono tabular-nums">{current.meta}</p>
+        <p className="ui-caption mt-0.5 truncate tabular-nums">{current.meta}</p>
       </div>
 
       {current.changedLabels.length > 0 ? (
@@ -38,7 +38,7 @@ export function CarCurrentSetupCard({
             </span>
           ))}
           {current.changedLabels.length > MAX_CHIPS ? (
-            <span className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+            <span className="rounded border border-border px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
               +{current.changedLabels.length - MAX_CHIPS} more
             </span>
           ) : null}

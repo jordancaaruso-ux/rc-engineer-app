@@ -65,15 +65,28 @@ export function computeTireIndicatorsByRunId(
   return indicators;
 }
 
-export function formatTireIndicatorTitle(indicator: RunTireIndicator): string {
-  let wear = "";
+/** " · run 3", " · run 1 (new)", " · run 3 (age unknown)", or "" when nothing is known. */
+function formatTireWearSuffix(indicator: RunTireIndicator): string {
   if (indicator.runNumber != null) {
-    wear = ` · run ${indicator.runNumber}`;
+    let wear = ` · run ${indicator.runNumber}`;
     if (!indicator.ageKnown) wear += " (age unknown)";
     else if (indicator.runNumber === 1) wear += " (new)";
-  } else if (!indicator.ageKnown) {
-    wear = " · age unknown";
+    return wear;
   }
+  return indicator.ageKnown ? "" : " · age unknown";
+}
+
+/**
+ * Compound + wear, the one phrasing used wherever tires are named on screen —
+ * "Sweep D32 32R · run 3". No changed-from: that belongs in the icon's tooltip,
+ * where the bright/faint ring is already making the same point.
+ */
+export function formatTireIdentityLine(indicator: RunTireIndicator): string {
+  return `${indicator.tireLabel}${formatTireWearSuffix(indicator)}`;
+}
+
+export function formatTireIndicatorTitle(indicator: RunTireIndicator): string {
+  const wear = formatTireWearSuffix(indicator);
   if (indicator.changed && indicator.previousTireLabel) {
     return `Tires changed · ${indicator.previousTireLabel} → ${indicator.tireLabel}${wear}`;
   }

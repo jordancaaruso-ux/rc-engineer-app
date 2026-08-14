@@ -68,6 +68,9 @@ onboarding-friction/
 # Light/dark parity captures (regenerate with e2e/light-mode-audit.spec.ts)
 light-mode-audit/
 
+# Type audit report (regenerate with e2e/typography-audit.spec.ts)
+typography-audit/
+
 # Share-card captures (regenerate with scripts/dev-share-card-shot.ts)
 share-shots/
 

@@ -141,7 +141,7 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
             <div className="font-medium text-amber-200">Duplicate chassis names detected</div>
             <p className="mt-1 text-xs text-amber-100/90 max-w-3xl">
               Legacy rows share a name. Run{" "}
-              <code className="font-mono text-[11px]">npx tsx scripts/dedupe-setup-sheet-models.ts</code>{" "}
+              <code className="type-machine text-[11px]">npx tsx scripts/dedupe-setup-sheet-models.ts</code>{" "}
               (dry-run first) to merge them; new duplicates can no longer be created.
             </p>
           </div>
@@ -179,7 +179,7 @@ export default async function SetupSheetModelsPage(): Promise<ReactNode> {
                         </span>
                       ) : null}
                     </div>
-                    <div className="text-xs text-muted-foreground font-mono">{m.slug}</div>
+                    <div className="text-xs text-muted-foreground tabular-nums">{m.slug}</div>
                     <div className="text-xs text-muted-foreground">
                       {m._count.cars} car{m._count.cars === 1 ? "" : "s"}
                       {" · "}

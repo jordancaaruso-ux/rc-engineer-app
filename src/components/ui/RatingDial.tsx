@@ -183,7 +183,7 @@ export function RatingDial({
         </svg>
         {numeral ? (
           <span
-            className="absolute inset-0 flex items-center justify-center font-mono font-medium tabular-nums"
+            className="absolute inset-0 flex items-center justify-center font-medium tabular-nums"
             style={{
               fontSize: numeralSize,
               letterSpacing: "-.03em",

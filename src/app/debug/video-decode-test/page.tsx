@@ -330,7 +330,7 @@ export default function VideoDecodeTestPage() {
         >
           <p
             className={
-              "font-mono text-[20px] font-bold uppercase tracking-[0.1em] " +
+              "type-machine text-[20px] font-bold uppercase tracking-[0.1em] " +
               (report.verdict === "pass"
                 ? "text-gain"
                 : report.verdict === "marginal"
@@ -340,7 +340,7 @@ export default function VideoDecodeTestPage() {
           >
             {report.verdict}
           </p>
-          <p className="mt-2 font-mono text-[11.5px] leading-relaxed text-foreground">{report.summary}</p>
+          <p className="mt-2 type-machine text-[11.5px] leading-relaxed text-foreground">{report.summary}</p>
           <p className="mt-2 text-[11.5px] leading-relaxed text-muted-foreground">
             {report.verdict === "pass"
               ? "This phone can feed the auto-marker. Screenshot this and send it over."
@@ -354,7 +354,7 @@ export default function VideoDecodeTestPage() {
       {progress.length ? (
         <div className="rounded-xl border border-border bg-secondary/50 p-3">
           {progress.map((line, i) => (
-            <p key={i} className="font-mono text-[10.5px] leading-relaxed text-muted-foreground">
+            <p key={i} className="type-machine text-[10.5px] leading-relaxed text-muted-foreground">
               {line}
             </p>
           ))}

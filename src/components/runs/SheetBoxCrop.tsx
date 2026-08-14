@@ -180,7 +180,7 @@ export function SheetBoxCrop({
         ) : null}
       </div>
       {showPage ? (
-        <figcaption className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+        <figcaption className="micro-caps text-faint">
           Page {crop.pageNumber}
         </figcaption>
       ) : null}

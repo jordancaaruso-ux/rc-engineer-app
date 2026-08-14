@@ -100,7 +100,7 @@ export function TrackLocationEditor({
       {hasGps ? (
         <p className="text-muted-foreground leading-snug">
           GPS set:{" "}
-          <span className="font-mono text-foreground">
+          <span className="fig-stat text-foreground">
             {saved.latitude!.toFixed(5)}, {saved.longitude!.toFixed(5)}
           </span>
           {saved.locationSource ? (
@@ -117,7 +117,7 @@ export function TrackLocationEditor({
       <div className="space-y-1">
         <label className="block text-[11px] text-muted-foreground">Coordinates (latitude, longitude)</label>
         <input
-          className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm font-mono outline-none"
+          className="w-full rounded-md border border-border bg-card px-3 py-2 fig-stat outline-none"
           value={coordsPaste}
           onChange={(e) => setCoordsPaste(e.target.value)}
           placeholder="-37.75347, 145.13890"

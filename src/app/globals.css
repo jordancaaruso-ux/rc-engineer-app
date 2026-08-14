@@ -28,7 +28,13 @@
   --color-accent: 255 214 10; /* #FFD60A */
   --color-accent-foreground: 18 17 16; /* #121110 */
   --color-destructive: 229 100 78; /* #E5644E */
-  --color-border: 40 39 38; /* #282726 */
+  /* Tier 2 of the card hairline ladder (see `.glass-card`). Was #282726, which
+     measured 1.19:1 against the card fill — fainter than the card's own rim, so
+     inner structure read as fog instead of as a level below it. #383734 is
+     1.49:1, sits under `--color-faint` (2.91:1) so a divider never competes with
+     text, and leaves the `/70` and `/60` variants already in use as tier 3 at
+     1.30 and 1.25. Light has its own value and is unchanged. */
+  --color-border: 56 55 52; /* #383734 */
   --color-input: 21 20 19; /* #151413 */
   --color-ring: 255 214 10; /* #FFD60A */
   --color-faint: 100 98 94; /* #64625E */
@@ -337,21 +343,43 @@ body {
 }
 
 /*
- * Liquid-glass card surface (founder-tuned 2026-07-06: 0.6 card alpha ·
- * 30px backdrop blur — see `--tune-*`).
- * Reads as frosted glass over the photo wash; the high alpha keeps stat values
- * legible and degrades to near-solid charcoal where backdrop-filter is
- * unsupported. Owns the border color + full shadow stack (specular top rim).
+ * Card surface. The EDGE carries the card, not the fill (founder 2026-08-14,
+ * "outlines feel weak/muddy" — and the tokens agreed before anyone opened the
+ * app). At the page ground the fill composites to #191816, which is 1.02:1
+ * against #1B1A17, and no plausible value fixes that: lifting the card to
+ * #2A2926 or dropping the page to #0B0A09 both top out around 1.20, because
+ * perceived contrast is compressed down in near-black. So fill separation is
+ * off the table and the rim has to be legible on its own.
+ *
+ * Tier 1 of the hairline ladder lives here: white/0.24 = 2.18:1 against the
+ * fill. Tiers 2 and 3 are `--color-border` (1.49:1) and its `/70` alpha variant
+ * (1.30:1), so nesting reads as three levels instead of one 0.3-wide band.
+ *
+ * The old recipe asked a 1.33:1 rim to do this job and propped it up with
+ * `0 24px 55px -26px` of black — on a ground already at value 27 that had
+ * nowhere to go and landed as a 55px pool with no defined edge. Wide and weak
+ * is the recipe for haze, so the drop is now short and close: it grounds the
+ * card, it does not try to draw it. The two insets are gone with it; the
+ * specular top rim was dimmer than the new border and inverted the light logic,
+ * and the bottom bevel measured 1.05:1 and was never visible.
+ *
+ * The blur STAYS, even though `.page-bg` is a single flat fill and blurring a
+ * constant returns the constant. `.glass-card` is also used on fixed overlays
+ * that float over page content (`PwaInstallPrompt`), and at 0.6 alpha the blur
+ * is the only thing keeping their text legible. It is dead weight on a card and
+ * load-bearing on an overlay — do not remove it without making the fill opaque.
+ *
+ * Light is untouched and overrides both properties below: on paper the fill
+ * already separates at 1.15:1, which is why this fault was dark-only.
  */
 .glass-card {
   background-color: rgb(var(--color-card) / var(--tune-glass-alpha));
   /* Standard property only — the build auto-generates -webkit- for Safari. */
   backdrop-filter: blur(var(--tune-glass-blur)) saturate(1.3);
-  border-color: rgb(255 255 255 / 0.1);
+  border-color: rgb(255 255 255 / 0.24);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.14),
-    inset 0 -1px 0 rgb(0 0 0 / 0.2),
-    0 24px 55px -26px rgb(0 0 0 / 0.7);
+    0 2px 5px -2px rgb(0 0 0 / 0.55),
+    0 10px 20px -16px rgb(0 0 0 / 0.9);
 }
 
 /*
@@ -1412,7 +1440,8 @@ html[data-nav-pending] .page {
 
 /* Small metric/field labels — Sora sentence case, muted grey (2026-07-16 one-voice pass).
    Grey so the label recedes under its (also-Sora) value; was mono, then white — both blended
-   with the value. Only lap/stint figures keep mono now (see .lap-figure). */
+   with the value. Since 2026-08-14 the value is Sora too, on a `.fig-*` step — the label/value
+   distinction is now size and colour, not typeface. */
 .type-data-label {
   @apply font-sans text-[12px] font-semibold tracking-normal text-muted-foreground;
 }
@@ -1442,11 +1471,89 @@ html[data-nav-pending] .page {
   @apply font-sans text-[12px] font-semibold tracking-normal text-muted-foreground;
 }
 
-/* Lap-figure — the ONLY surviving JetBrains Mono voice (2026-07-16 one-voice pass):
-   racing-clock figures (best lap, avg top 5/10, median, stint). Apply to those values only;
-   every other number is Sora with tabular-nums. */
-.lap-figure {
-  @apply font-mono tabular-nums;
+/* ── The numeric ramp (2026-08-14 one-voice pass) ─────────────────────────────────────
+ * Six steps, one voice, and one rule: a figure never picks a size without also picking
+ * `tabular-nums`, because here they are the same decision.
+ *
+ * This is not stylistic. Sora's digits are PROPORTIONAL by default — a `1` is 420 units and
+ * a `0` is 743 — and only become uniform under the `tnum` feature, which is present and
+ * correct in the served woff2 subset (measured in-browser 2026-08-14: 67.61px per 100px em
+ * at 400/500/600/700). A column of Sora figures WITHOUT `tabular-nums` visibly shifts row to
+ * row. Welding the feature to the size makes "forgot tabular-nums" structurally impossible;
+ * that omission is precisely what left three Sora numbers sitting among six mono ones in one
+ * nine-cell grid for a month.
+ *
+ * CAVEAT: Sora's `.` and `:` are NOT covered by tnum (262 units, narrow). Decimals align only
+ * in RIGHT-ALIGNED columns of EQUAL precision — right-align the column, don't assume.
+ *
+ * Weight and colour are deliberately absent: a figure is muted or ink, medium or bold,
+ * depending on the card it sits in. Compose with `text-*` / `font-*`. Leading is baked in
+ * only at hero scale, where it is part of the role.
+ *
+ * Absorbed from the pre-migration 23-size sprawl:
+ *   9.5, 10.5 → .fig-tick  ·  11.5 → .fig-cell  ·  12.5, 14 → .fig-stat  ·  17, 19 → .fig-tile
+ * See docs/VISUAL_NORTH_STAR.md § Typography for the element → step matrix.
+ */
+
+/** 10px — SVG axis ticks, sub-figures, sparkline endpoint labels. The ramp floor. */
+.fig-tick { @apply font-sans text-[10px] tabular-nums; }
+
+/** 11px — dense table cells. Sessions grid, all-laps grid, run field sheet. */
+.fig-cell { @apply font-sans text-[11px] tabular-nums; }
+
+/** 13px — stat value in a strip cell (StatWellCell), inline figures in prose rows. */
+.fig-stat { @apply font-sans text-[13px] tabular-nums; }
+
+/** 18px — StatTile value; the instrument-panel headline number. */
+.fig-tile { @apply font-sans text-[18px] tabular-nums; }
+
+/** 26px — card hero figure (NextUpCard countdown, TeamFeedEntryCard lap). */
+.fig-hero { @apply font-sans text-[26px] leading-none tabular-nums; }
+
+/** Page hero figure, desktop dashboard. Tracking is negative because at this size Sora's
+    default sidebearings read as gaps between digits rather than as one number. */
+.fig-display {
+  @apply font-sans tabular-nums;
+  font-size: clamp(3.5rem, 4.6vw, 5.5rem);
+  line-height: 0.84;
+  letter-spacing: -0.045em;
+}
+
+/* ── Machine text — the one place a monospace is still correct, because column alignment
+ * IS the content: JSON dumps, debug output, Engineer code chips, PDF widget names.
+ * Uses the PLATFORM stack, never a webfont — zero payload, and deliberately NOT a brand
+ * voice: it should look like a terminal, not like the product.
+ * NEVER use this on a product surface. A lap time is `.fig-*`, not this.
+ *
+ * Family only — NO font-size. These rules are unlayered and would beat a co-located
+ * `text-[11px]` utility, silently resizing every table cell that uses this. Callers size it. */
+.type-machine {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  @apply tabular-nums;
+}
+
+/* Machine identifiers — setup/chassis field keys, run IDs, URLs, PDF widget names.
+   Mono used to say "read this literally"; a hairline chip says it without a second face,
+   and `user-select: all` does the job mono was really doing — one tap selects the whole
+   ident to copy. Sora cannot disambiguate 0/O, so replace the AFFORDANCE, not the glyph.
+   `break-all` because identifiers have no word boundaries. */
+.type-ident {
+  @apply inline-block max-w-full break-all rounded border border-border/60 bg-background/60
+         px-1 py-px text-[11px] leading-[1.35] tabular-nums text-muted-foreground;
+  user-select: all;
+}
+
+/* Machine-chrome micro-label — the uppercase tracked voice that used to be mono.
+   TRACKING, not a second face, is what makes these read as chrome; mono was only texture.
+   Collapses the 8 / 8.5 / 9 / 10px × 0.12–0.22em sprawl into one step at the ramp floor,
+   where Sora semibold is legible and 8.5px mono was not. If a label no longer fits, shorten
+   the copy — do not add a smaller step.
+
+   NOTE no colour here on purpose. These rules are UNLAYERED, so they beat Tailwind's
+   layered utilities — baking `text-faint` in would silently override a caller's
+   `text-primary-ink`. Colour stays the caller's decision. */
+.micro-caps {
+  @apply text-[10px] font-semibold uppercase leading-none tracking-[0.14em];
 }
 
 /* Strong emphasis (.ui-strong / .btn-brand): Sora bold, normal case. */

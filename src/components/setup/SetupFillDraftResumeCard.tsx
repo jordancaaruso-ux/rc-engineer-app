@@ -29,7 +29,7 @@ export function SetupFillDraftResumeCard({
   return (
     <CardPanel contentClassName="space-y-2" className="border-amber-500/40">
       <Eyebrow>Draft in progress</Eyebrow>
-      <p className="font-mono text-[11px] text-muted-foreground">
+      <p className="tabular-nums text-[11px] text-muted-foreground">
         {setupFillDraftProgressLabel(answeredCount, stepCount)} ·{" "}
         {/* Server-safe fallback: this renders inside a server-rendered page. */}
         <RelativeTime iso={updatedAt} fallback="recently" />

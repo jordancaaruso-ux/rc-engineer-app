@@ -120,16 +120,16 @@ function LapPairTable({
               ) : null;
             return (
               <tr key={n} className="border-b border-border/70">
-                <td className="px-2 py-1 font-mono tabular-nums">{n}</td>
-                <td className="px-2 py-1 font-mono tabular-nums">
+                <td className="px-2 py-1 tabular-nums">{n}</td>
+                <td className="px-2 py-1 tabular-nums">
                   {ta != null ? formatLap(ta) : "—"}
                   {incNote(a)}
                 </td>
-                <td className="px-2 py-1 font-mono tabular-nums">
+                <td className="px-2 py-1 tabular-nums">
                   {tb != null ? formatLap(tb) : "—"}
                   {incNote(b)}
                 </td>
-                <td className="px-2 py-1 font-mono tabular-nums text-muted-foreground">
+                <td className="px-2 py-1 tabular-nums text-muted-foreground">
                   {delta != null ? `${delta >= 0 ? "+" : ""}${delta.toFixed(3)}` : "—"}
                 </td>
               </tr>

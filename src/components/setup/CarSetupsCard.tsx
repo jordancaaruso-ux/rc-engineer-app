@@ -130,7 +130,7 @@ export function CarSetupsCard({
         >
           <span className="min-w-0">
             <span className="block text-sm text-foreground">Draft in progress</span>
-            <span className="block font-mono text-[11px] text-muted-foreground">
+            <span className="block tabular-nums text-[11px] text-muted-foreground">
               {setupFillDraftProgressLabel(fillDraft.answeredCount, fillDraft.stepCount)} ·{" "}
               <RelativeTime iso={fillDraft.updatedAt} fallback="recently" />
             </span>
@@ -161,7 +161,7 @@ export function CarSetupsCard({
                 className="min-w-0 flex-1"
               >
                 <div className="truncate text-sm text-foreground">{s.name ?? "Untitled setup"}</div>
-                <div className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                <div className="text-[11px] tabular-nums text-muted-foreground">
                   {s.createdAtLabel}
                   {s.usedInRuns > 0
                     ? ` · ${s.usedInRuns} run${s.usedInRuns === 1 ? "" : "s"}`

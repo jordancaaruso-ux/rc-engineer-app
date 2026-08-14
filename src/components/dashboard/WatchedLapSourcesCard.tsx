@@ -295,7 +295,7 @@ export function WatchedLapSourcesCard() {
                     <span className="text-muted-foreground font-normal"> · {r.lapCount} laps</span>
                   ) : null}
                   {r.bestLapSeconds != null ? (
-                    <span className="text-muted-foreground font-normal font-mono">
+                    <span className="text-muted-foreground font-normal tabular-nums">
                       {" "}
                       · best {r.bestLapSeconds.toFixed(3)}s
                     </span>

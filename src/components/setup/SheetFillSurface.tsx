@@ -235,6 +235,8 @@ export function SheetFillSurface({
   pageImageUrl,
   planUrl,
   initialValues,
+  alternateValues,
+  showAlternate = false,
   onChange,
   storageKey,
   readOnly = false,
@@ -252,6 +254,22 @@ export function SheetFillSurface({
    */
   planUrl: string;
   initialValues?: Record<string, string>;
+  /**
+   * The other setup in a comparison, in the same surface shape as `initialValues`.
+   *
+   * A second value set rather than a second surface, because a comparison here is answered by
+   * FLIPPING: the same page picture, the same boxes, the same fonts, and only the strings inside
+   * the boxes different. That is what makes the changed values the only thing on the page that
+   * moves when you flip — nothing has to be drawn on the paper to point them out.
+   *
+   * It cannot be done by swapping `initialValues`: that seeds state once (see below), so the sheet
+   * would never re-read it. Remounting with a `key` would re-read it and reset zoom, pan and page
+   * — and a view that shifts by one pixel between the two sides makes every box look like it moved,
+   * which is exactly the signal being read.
+   */
+  alternateValues?: Record<string, string> | null;
+  /** Draw `alternateValues` instead of `values`. Read-only only — see the guard below. */
+  showAlternate?: boolean;
   onChange?: (values: Record<string, string>) => void;
   /** When set, values survive a reload — a sheet is filled over a whole day, not in one sitting. */
   storageKey?: string;
@@ -273,6 +291,14 @@ export function SheetFillSurface({
   const [pageImage, setPageImage] = useState<"loading" | "ready" | "failed">("loading");
 
   const [values, setValues] = useState<Record<string, string>>(initialValues ?? {});
+
+  /**
+   * Which value set the boxes draw from.
+   *
+   * Guarded on `readOnly`: an editable sheet must never print another setup's values, or the next
+   * keystroke saves them onto this one.
+   */
+  const drawnValues = readOnly && showAlternate && alternateValues ? alternateValues : values;
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
   const [page, setPage] = useState(1);
 
@@ -986,7 +1012,7 @@ export function SheetFillSurface({
         {fitted.width > 0
           ? pageBoxes.map((b, boxIndex) => {
               const f = fieldByKey.get(b.key);
-              const value = values[b.key] ?? "";
+              const value = drawnValues[b.key] ?? "";
               /*
                * An option box is one printed CHOICE of a grouped row: it draws its tick when the
                * row's value matches ITS option, never the value text itself.
@@ -1202,7 +1228,7 @@ export function SheetFillSurface({
               style={{ width: `${order.length ? (filledCount / order.length) * 100 : 0}%` }}
             />
           </div>
-          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+          <span className="text-[11px] tabular-nums text-muted-foreground">
             {filledCount} / {order.length}
           </span>
         </>
@@ -1219,7 +1245,7 @@ export function SheetFillSurface({
           >
             ‹
           </button>
-          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+          <span className="text-[11px] tabular-nums text-muted-foreground">
             p{page}/{pageCount}
           </span>
           <button
@@ -1255,7 +1281,7 @@ export function SheetFillSurface({
         >
           {focused.label}
         </span>
-        <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
           {focusIndex! + 1} / {order.length}
         </span>
       </div>
@@ -1384,7 +1410,7 @@ export function SheetFillSurface({
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <span className="truncate font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">
+        <span className="truncate micro-caps text-faint">
           {focused.sectionTitle}
         </span>
         <button
@@ -1446,7 +1472,7 @@ export function SheetFillSurface({
       */}
       {/* Desktop keeps this while focused: with no bar, it is the only thing telling you about tab. */}
       {!isFocusMode || finePointer ? (
-        <p className="text-center font-mono text-[10.5px] uppercase tracking-[0.16em] text-muted-foreground">
+        <p className="text-center micro-caps text-muted-foreground">
           {readOnly
             ? finePointer
               ? "Scroll to zoom · drag to move"

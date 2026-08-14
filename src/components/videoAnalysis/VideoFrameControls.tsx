@@ -129,20 +129,20 @@ export function VideoFrameControls({
               <button
                 key={`back-${sec}`}
                 type="button"
-                className="rounded-md border border-border px-1.5 py-0.5 hover:bg-muted font-mono tabular-nums"
+                className="rounded-md border border-border px-1.5 py-0.5 hover:bg-muted tabular-nums"
                 onClick={() => jumpSec(-sec)}
               >
                 −{sec}s
               </button>
             ))}
-            <span className="font-mono text-muted-foreground tabular-nums px-1">
+            <span className="text-muted-foreground tabular-nums px-1">
               {timeSec.toFixed(2)}s
             </span>
             {jumpIntervalsSec.map((sec) => (
               <button
                 key={`fwd-${sec}`}
                 type="button"
-                className="rounded-md border border-border px-1.5 py-0.5 hover:bg-muted font-mono tabular-nums"
+                className="rounded-md border border-border px-1.5 py-0.5 hover:bg-muted tabular-nums"
                 onClick={() => jumpSec(sec)}
               >
                 +{sec}s
@@ -183,7 +183,7 @@ export function VideoFrameControls({
           <button
             key={rate}
             type="button"
-            className={`rounded-md border px-2 py-1 font-mono tabular-nums ${
+            className={`rounded-md border px-2 py-1 tabular-nums ${
               playbackRate === rate
                 ? "border-primary-ink bg-primary/15"
                 : "border-border hover:bg-muted"
@@ -194,7 +194,7 @@ export function VideoFrameControls({
           </button>
         ))}
         {!compareScrub && (
-          <span className="font-mono text-muted-foreground tabular-nums">
+          <span className="text-muted-foreground tabular-nums">
             {timeSec.toFixed(3)}s
           </span>
         )}

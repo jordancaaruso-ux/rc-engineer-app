@@ -1,625 +1,507 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Eyebrow } from "@/components/ui/panel";
-import { CardPanel } from "@/components/ui/CardPanel";
+/**
+ * Setup comparison — two setups, one sheet, flipped between.
+ *
+ * Rebuilt 2026-08-14. What this page used to be: four native `<select>`s, two more for a
+ * "community spread" bucket, and a single field table tinted red in proportion to how far apart the
+ * two values sat within the community's interquartile range. Founder ruling: none of that. No
+ * severity, no spread, no ink on the paper. A comparison is answered by putting both setups in the
+ * same boxes and flipping — see `SheetCompareSurface`, which both this page and the session modal
+ * render, so the two surfaces cannot drift apart again.
+ *
+ * Two consequences shape everything below.
+ *
+ * The paper is real, so BOTH SIDES MUST SHARE A SHEET. Values are looked up by key into boxes
+ * printed on one chassis' page; a setup from another chassis would leave boxes blank and read as
+ * "they run nothing there" rather than "this box does not exist on their car". So the picker only
+ * offers setups whose car draws a sheet, and a mismatched pair is refused with a reason.
+ *
+ * The picker is the Geometry Lab's, deliberately (`RollCenterLabClient`): two slots you fill, source
+ * tabs with counts, two-line rows, and a `vs` action that loads the other slot without closing.
+ * Same job, same shape — a driver who has used one has used both.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
-import { getActiveSetupCarId, getActiveSetupData } from "@/lib/activeSetupContext";
-import { SetupSheetView } from "@/components/runs/SetupSheetView";
-import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
-import { type SetupSheetTemplate } from "@/lib/setupSheetTemplate";
+import { cn } from "@/lib/utils";
+import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow } from "@/components/ui/panel";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { SheetCompareSurface } from "@/components/setup/SheetCompareSurface";
+import { normalizeSetupData } from "@/lib/runSetup";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
-import type { RunPickerRun } from "@/lib/runPickerFormat";
-import { formatRunPickerLineRelativeWhen } from "@/lib/runPickerFormat";
-import { compareSetupSnapshots } from "@/lib/setupCompare/compare";
-import type { NumericAggregationCompareSlice } from "@/lib/setupCompare/numericAggregationCompare";
 import {
-  buildNumericAggregationMapFromCommunity,
-  COMMUNITY_AGGREGATION_PSEUDO_CAR_ID,
-  type SetupAggApiRow,
-} from "@/lib/setupCompare/buildNumericAggregationMap";
-import {
-  buildRawNumericStatsJsonMap,
-  collectNumericUnknownDiagnostics,
-  listNumericGradientCompareKeys,
-  summarizeAggregationRowsForCar,
-  tallyPrimaryReasons,
-} from "@/lib/setupCompare/compareNumericDiagnostics";
-import {
-  ALL_GRIP_BUCKETS,
-  GRIP_BUCKET_ANY,
-  gripBucketLabel,
-  type GripBucket,
-} from "@/lib/setupAggregations/gripBuckets";
+  formatRunCreatedRelativeWhen,
+  formatRunPickerParts,
+  type RunPickerRun,
+} from "@/lib/runPickerFormat";
 
-type AggregationFetchBundle = {
-  parsedMap: Map<string, NumericAggregationCompareSlice>;
-  rawNumericJsonByKey: Map<string, unknown>;
-  summaries: ReturnType<typeof summarizeAggregationRowsForCar>;
-};
+/** Which list a row belongs to. One tab each; a row never appears in two. */
+type PickerSource = "mine" | "teammates" | "setups";
 
-type DownloadedSetupOption = {
+type SlotId = "a" | "b";
+
+/**
+ * One pickable setup. `title` answers "which session", `detail` answers "which car, where, how
+ * fast" — two lines, because one line at 390px clips exactly the half that tells two rows apart.
+ */
+type SetupEntry = {
   id: string;
-  originalFilename: string;
-  createdAt: string;
-  setupData: unknown;
-  /** From `createdSetup.carId` when the document was applied to a car. */
-  carId?: string | null;
+  kind: "run" | "team" | "saved";
+  source: PickerSource;
+  title: string;
+  detail: string;
+  when: string;
+  /** The setup as stored. Normalized once here so the compare surface never has to. */
+  values: Record<string, unknown>;
+  /** The sheet this setup is drawn on. Rows without one are not offered — there is no paper. */
+  setupSheetModelId: string;
+  /** Chassis-type key, for the geometry strip above the paper. */
+  templateKey: string | null;
 };
 
-type SetupSourceKind = "none" | "current_setup" | "run" | "downloaded_setup";
+const PICKER_ROWS_PER_SOURCE = 40;
 
-type SelectedSetup = {
-  kind: SetupSourceKind;
-  label: string;
-  data: SetupSnapshotData | null;
+const SOURCE_LABEL: Record<PickerSource, string> = {
+  mine: "Mine",
+  teammates: "Teammates",
+  setups: "Setups",
 };
 
-type TrackSurface = "asphalt" | "carpet";
-
-async function jsonFetch<T>(input: string): Promise<T> {
-  const res = await fetch(input);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as any)?.error || `Request failed (${res.status})`);
-  return data as T;
+function isJsonObject(v: unknown): v is Record<string, unknown> {
+  return v != null && typeof v === "object" && !Array.isArray(v);
 }
 
-function emptySelection(): SelectedSetup {
-  return { kind: "none", label: "—", data: null };
+/** A setup with no values in it compares to nothing; keep it off the list rather than in it. */
+function hasAnyValue(data: Record<string, unknown>): boolean {
+  return Object.values(data).some((v) => v != null && v !== "");
 }
 
-export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const compareDebug = searchParams.get("compareDebug") === "1";
+function entryLabel(e: SetupEntry): string {
+  return e.detail ? `${e.title} · ${e.detail}` : e.title;
+}
 
-  const [runs, setRuns] = useState<RunPickerRun[]>([]);
-  const [downloaded, setDownloaded] = useState<DownloadedSetupOption[]>([]);
-  const [err, setErr] = useState<string | null>(null);
-  const [sourcesReloading, setSourcesReloading] = useState(false);
-  const [sourcesRefreshedAt, setSourcesRefreshedAt] = useState<number | null>(null);
-
-  const [aKind, setAKind] = useState<SetupSourceKind>("none");
-  const [bKind, setBKind] = useState<SetupSourceKind>("none");
-  const [aId, setAId] = useState<string>("");
-  const [bId, setBId] = useState<string>("");
-  const [compareTemplate, setCompareTemplate] = useState<SetupSheetTemplate>(A800RR_SETUP_SHEET_V1);
-  /** Community-aggregation bucket key for side A's car (model slug); null = unknown, skip lookups. */
-  const [compareTemplateKey, setCompareTemplateKey] = useState<string | null>(null);
-
-  const reloadSources = useCallback(async () => {
-    if (!dbReady) return;
-    setSourcesReloading(true);
-    setErr(null);
-    try {
-      const [r, d] = await Promise.all([
-        jsonFetch<{ runs: RunPickerRun[] }>("/api/runs/for-picker").catch(() => ({ runs: [] })),
-        jsonFetch<{ downloadedSetups: DownloadedSetupOption[] }>("/api/setup/options").catch(() => ({ downloadedSetups: [] })),
-      ]);
-      setRuns(Array.isArray(r.runs) ? r.runs : []);
-      setDownloaded(Array.isArray(d.downloadedSetups) ? d.downloadedSetups : []);
-      setSourcesRefreshedAt(Date.now());
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Failed to load setup sources");
-    } finally {
-      setSourcesReloading(false);
-    }
-  }, [dbReady]);
-
-  // Initial load + refetch when the tab regains focus / becomes visible, so freshly downloaded
-  // setups show up without a manual refresh.
-  useEffect(() => {
-    if (!dbReady) return;
-    void reloadSources();
-    const onFocus = () => {
-      void reloadSources();
-    };
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") void reloadSources();
-    };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [dbReady, reloadSources]);
-
-  const selectionA: SelectedSetup = useMemo(() => {
-    if (aKind === "current_setup") {
-      const cur = normalizeSetupData(getActiveSetupData() ?? {});
-      return { kind: aKind, label: "Current setup", data: cur };
-    }
-    if (aKind === "run") {
-      const r = runs.find((x) => x.id === aId);
-      return r
-        ? { kind: aKind, label: formatRunPickerLineRelativeWhen(r), data: normalizeSetupData(r.setupSnapshot?.data ?? {}) }
-        : emptySelection();
-    }
-    if (aKind === "downloaded_setup") {
-      const d = downloaded.find((x) => x.id === aId);
-      return d
-        ? { kind: aKind, label: `${d.originalFilename} · ${new Date(d.createdAt).toLocaleDateString()}`, data: normalizeSetupData(d.setupData ?? {}) }
-        : emptySelection();
-    }
-    return emptySelection();
-  }, [aKind, aId, runs, downloaded]);
-
-  const selectionB: SelectedSetup = useMemo(() => {
-    if (bKind === "current_setup") {
-      const cur = normalizeSetupData(getActiveSetupData() ?? {});
-      return { kind: bKind, label: "Current setup", data: cur };
-    }
-    if (bKind === "run") {
-      const r = runs.find((x) => x.id === bId);
-      return r
-        ? { kind: bKind, label: formatRunPickerLineRelativeWhen(r), data: normalizeSetupData(r.setupSnapshot?.data ?? {}) }
-        : emptySelection();
-    }
-    if (bKind === "downloaded_setup") {
-      const d = downloaded.find((x) => x.id === bId);
-      return d
-        ? { kind: bKind, label: `${d.originalFilename} · ${new Date(d.createdAt).toLocaleDateString()}`, data: normalizeSetupData(d.setupData ?? {}) }
-        : emptySelection();
-    }
-    return emptySelection();
-  }, [bKind, bId, runs, downloaded]);
-
-  const canCompare = Boolean(selectionA.data && selectionB.data);
-
-  const compareCarId = useMemo(() => {
-    if (aKind === "run") {
-      return runs.find((r) => r.id === aId)?.carId ?? null;
-    }
-    if (aKind === "current_setup") {
-      return getActiveSetupCarId();
-    }
-    if (aKind === "downloaded_setup") {
-      return downloaded.find((d) => d.id === aId)?.carId ?? null;
-    }
-    return null;
-  }, [aKind, aId, runs, downloaded]);
-
-  useEffect(() => {
-    if (!compareCarId) {
-      setCompareTemplate(A800RR_SETUP_SHEET_V1);
-      setCompareTemplateKey(null);
-      return;
-    }
-    let cancelled = false;
-    fetch(`/api/cars/${compareCarId}/setup-sheet-template?view=analysis`, { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d: { template?: SetupSheetTemplate; templateKey?: string | null }) => {
-        if (cancelled) return;
-        if (d.template) setCompareTemplate(d.template);
-        setCompareTemplateKey(d.templateKey ?? null);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setCompareTemplate(A800RR_SETUP_SHEET_V1);
-        setCompareTemplateKey(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [compareCarId]);
-
-  // Engineer-compare button is only meaningful when both selections are saved runs — the Engineer
-  // backend resolves the pair from runId + compareRunId URL params today. If either side is the
-  // in-memory "Current setup" or a downloaded setup document, we disable it with a tooltip.
-  const engineerCompareState = useMemo<{
-    enabled: boolean;
-    reason: string | null;
-    runIdA: string | null;
-    runIdB: string | null;
-  }>(() => {
-    if (!canCompare) return { enabled: false, reason: "Pick both setups first.", runIdA: null, runIdB: null };
-    if (aKind !== "run" || bKind !== "run") {
-      return {
-        enabled: false,
-        reason: "Both setups need to be saved runs to use Engineer compare.",
-        runIdA: null,
-        runIdB: null,
-      };
-    }
-    const runA = runs.find((r) => r.id === aId) ?? null;
-    const runB = runs.find((r) => r.id === bId) ?? null;
-    if (!runA || !runB) return { enabled: false, reason: "Run not found.", runIdA: null, runIdB: null };
-    if (runA.id === runB.id) {
-      return { enabled: false, reason: "Pick two different runs.", runIdA: null, runIdB: null };
-    }
-    if (runA.carId && runB.carId && runA.carId !== runB.carId) {
-      return {
-        enabled: false,
-        reason: "Runs are on different cars — Engineer setup-compare needs the same car.",
-        runIdA: runA.id,
-        runIdB: runB.id,
-      };
-    }
-    return { enabled: true, reason: null, runIdA: runA.id, runIdB: runB.id };
-  }, [canCompare, aKind, bKind, aId, bId, runs]);
-
-  const openEngineerCompare = useCallback(() => {
-    if (!engineerCompareState.enabled || !engineerCompareState.runIdA || !engineerCompareState.runIdB) {
-      return;
-    }
-    const params = new URLSearchParams();
-    params.set("runId", engineerCompareState.runIdA);
-    params.set("compareRunId", engineerCompareState.runIdB);
-    router.push(`/engineer?${params.toString()}`);
-  }, [engineerCompareState, router]);
-
-  /**
-   * Community IQR uses the same (template, surface, grip) buckets as
-   * `CommunitySetupParameterAggregation`. Null = unknown or cross-chassis — skip community
-   * lookups rather than color deltas with another chassis' spread.
-   */
-  const communityTemplateKey = useMemo(() => {
-    if (aKind === "run" && bKind === "run" && aId && bId) {
-      const runA = runs.find((r) => r.id === aId) ?? null;
-      const runB = runs.find((r) => r.id === bId) ?? null;
-      const tA = canonicalSetupSheetTemplateId(runA?.car?.setupSheetTemplate ?? null);
-      const tB = canonicalSetupSheetTemplateId(runB?.car?.setupSheetTemplate ?? null);
-      if (tA && tB && tA !== tB) return null;
-      return tA ?? tB ?? compareTemplateKey;
-    }
-    return compareTemplateKey;
-  }, [aKind, bKind, aId, bId, runs, compareTemplateKey]);
-  const [trackSurface, setTrackSurface] = useState<TrackSurface>("asphalt");
-  const [gripLevel, setGripLevel] = useState<GripBucket>(GRIP_BUCKET_ANY);
-
-  const [aggregationBundle, setAggregationBundle] = useState<AggregationFetchBundle | null>(null);
-
-  useEffect(() => {
-    if (!dbReady || communityTemplateKey == null) {
-      setAggregationBundle(null);
-      return;
-    }
-    let alive = true;
-    const q = new URLSearchParams({
-      setupSheetTemplate: communityTemplateKey,
-      trackSurface,
-      gripLevel,
-    }).toString();
-    fetch(`/api/setup-aggregations/community?${q}`)
-      .then((res) => res.json())
-      .then((data: { aggregations?: SetupAggApiRow[] }) => {
-        if (!alive) return;
-        const rows = Array.isArray(data.aggregations) ? data.aggregations : [];
-        setAggregationBundle({
-          parsedMap: buildNumericAggregationMapFromCommunity(rows),
-          rawNumericJsonByKey: buildRawNumericStatsJsonMap(rows, COMMUNITY_AGGREGATION_PSEUDO_CAR_ID),
-          summaries: summarizeAggregationRowsForCar(rows, COMMUNITY_AGGREGATION_PSEUDO_CAR_ID),
-        });
-      })
-      .catch(() => {
-        if (alive) setAggregationBundle(null);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [dbReady, communityTemplateKey, trackSurface, gripLevel]);
-
-  const numericAggregationByKey = aggregationBundle?.parsedMap ?? null;
-  const communitySampleCount = useMemo(() => {
-    if (!aggregationBundle) return 0;
-    let max = 0;
-    for (const s of aggregationBundle.summaries) {
-      if (s.sampleCount > max) max = s.sampleCount;
-    }
-    return max;
-  }, [aggregationBundle]);
-
-  const compareMap = useMemo(() => {
-    if (!canCompare || !selectionA.data || !selectionB.data) return null;
-    return compareSetupSnapshots(selectionA.data, selectionB.data, {
-      numericAggregationByKey,
-    });
-  }, [canCompare, selectionA.data, selectionB.data, numericAggregationByKey]);
-
-  const gradientCompareKeys = useMemo(() => [...listNumericGradientCompareKeys()].sort(), []);
-
-  const numericAggregationParameterKeys = useMemo(() => {
-    if (!aggregationBundle) return [];
-    return aggregationBundle.summaries
-      .filter((s) => s.valueType === "NUMERIC")
-      .map((s) => s.parameterKey)
-      .sort();
-  }, [aggregationBundle]);
-
-  const numericUnknownDiagnostics = useMemo(() => {
-    if (
-      !compareDebug ||
-      !compareMap ||
-      !selectionA.data ||
-      !selectionB.data
-    ) {
-      return [];
-    }
-    return collectNumericUnknownDiagnostics({
-      compareMap,
-      dataA: selectionA.data as Record<string, unknown>,
-      dataB: selectionB.data as Record<string, unknown>,
-      numericAggregationByKey,
-      rawNumericStatsJsonByKey: aggregationBundle?.rawNumericJsonByKey ?? null,
-      aggregationSummariesForCar: aggregationBundle?.summaries ?? [],
-      aggregationCarId: COMMUNITY_AGGREGATION_PSEUDO_CAR_ID,
-    });
-  }, [
-    compareDebug,
-    compareMap,
-    selectionA.data,
-    selectionB.data,
-    numericAggregationByKey,
-    aggregationBundle?.rawNumericJsonByKey,
-    aggregationBundle?.summaries,
-  ]);
-
-  const diagnosticReasonTally = useMemo(
-    () => [...tallyPrimaryReasons(numericUnknownDiagnostics).entries()].sort((a, b) => b[1] - a[1]),
-    [numericUnknownDiagnostics]
-  );
-
-  const topDiagnosticReason = diagnosticReasonTally[0]?.[0] ?? null;
-
-  const severityCounts = useMemo(() => {
-    const counts = { same: 0, minor: 0, moderate: 0, major: 0, unknown: 0 };
-    if (!compareMap) return counts;
-    for (const r of compareMap.values()) counts[r.severity]++;
-    return counts;
-  }, [compareMap]);
-
+/** One slot chip: tap to make this the slot the picker loads into. */
+function SlotChip({
+  id,
+  entry,
+  selected,
+  onSelect,
+  onClear,
+}: {
+  id: SlotId;
+  entry: SetupEntry | null;
+  selected: boolean;
+  onSelect: () => void;
+  onClear?: () => void;
+}) {
   return (
-    <div className="space-y-4">
-      {!dbReady ? (
-        <CardPanel contentClassName="text-sm text-muted-foreground">
-          Database not configured — only “Current setup” can be compared.
-        </CardPanel>
-      ) : null}
-
-      {err ? <div className="rounded-md border border-border bg-destructive/10 p-3 text-xs">{err}</div> : null}
-
-      <CardPanel contentClassName="space-y-3">
-        <Eyebrow>Pick two setups</Eyebrow>
-        <div className="flex flex-wrap items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={openEngineerCompare}
-              disabled={!engineerCompareState.enabled}
-              className="rounded-md border border-primary-ink/60 bg-primary/90 px-2 py-1 text-xs font-medium text-primary-foreground shadow-sm transition hover:bg-primary disabled:cursor-default disabled:opacity-40"
-              title={
-                engineerCompareState.reason ??
-                "Open the Engineer chat with these two runs and auto-run the compare-setups prompt"
-              }
-            >
-              Use Engineer to compare
-            </button>
-            <button
-              type="button"
-              onClick={() => void reloadSources()}
-              disabled={!dbReady || sourcesReloading}
-              className="rounded-md border border-border bg-card px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:cursor-default disabled:opacity-50"
-              title={
-                sourcesRefreshedAt
-                  ? `Last refreshed ${new Date(sourcesRefreshedAt).toLocaleTimeString()}`
-                  : "Reload run and downloaded setup lists"
-              }
-            >
-              {sourcesReloading ? "Refreshing…" : "Refresh sources"}
-            </button>
-            <Link href="/cars" className="text-xs text-muted-foreground hover:text-foreground">
-              Back to cars
-            </Link>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div className="space-y-2">
-            <div className="text-xs font-medium text-muted-foreground">Setup A</div>
-            <select className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs" value={aKind} onChange={(e) => { setAKind(e.target.value as SetupSourceKind); setAId(""); }}>
-              <option value="none">Select source…</option>
-              <option value="current_setup">Current setup</option>
-              <option value="run">Run setup</option>
-              <option value="downloaded_setup">Downloaded setup</option>
-            </select>
-            {aKind === "run" ? (
-              <select className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs font-mono" value={aId} onChange={(e) => setAId(e.target.value)}>
-                <option value="">Choose run…</option>
-                {runs.map((r) => (
-                  <option key={r.id} value={r.id}>{formatRunPickerLineRelativeWhen(r)}</option>
-                ))}
-              </select>
-            ) : null}
-            {aKind === "downloaded_setup" ? (
-              <select className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs font-mono" value={aId} onChange={(e) => setAId(e.target.value)}>
-                <option value="">Choose setup…</option>
-                {downloaded.map((d) => (
-                  <option key={d.id} value={d.id}>{`${d.originalFilename} · ${new Date(d.createdAt).toLocaleDateString()}`}</option>
-                ))}
-              </select>
-            ) : null}
-            <div className="text-[11px] text-muted-foreground break-words">{selectionA.label}</div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-xs font-medium text-muted-foreground">Setup B</div>
-            <select className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs" value={bKind} onChange={(e) => { setBKind(e.target.value as SetupSourceKind); setBId(""); }}>
-              <option value="none">Select source…</option>
-              <option value="current_setup">Current setup</option>
-              <option value="run">Run setup</option>
-              <option value="downloaded_setup">Downloaded setup</option>
-            </select>
-            {bKind === "run" ? (
-              <select className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs font-mono" value={bId} onChange={(e) => setBId(e.target.value)}>
-                <option value="">Choose run…</option>
-                {runs.map((r) => (
-                  <option key={r.id} value={r.id}>{formatRunPickerLineRelativeWhen(r)}</option>
-                ))}
-              </select>
-            ) : null}
-            {bKind === "downloaded_setup" ? (
-              <select className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs font-mono" value={bId} onChange={(e) => setBId(e.target.value)}>
-                <option value="">Choose setup…</option>
-                {downloaded.map((d) => (
-                  <option key={d.id} value={d.id}>{`${d.originalFilename} · ${new Date(d.createdAt).toLocaleDateString()}`}</option>
-                ))}
-              </select>
-            ) : null}
-            <div className="text-[11px] text-muted-foreground break-words">{selectionB.label}</div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 border-t border-border/60 pt-3 sm:grid-cols-2">
-          <div className="space-y-1">
-            <div className="text-xs font-medium text-muted-foreground">Spread source · surface</div>
-            <select
-              className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs"
-              value={trackSurface}
-              onChange={(e) => setTrackSurface(e.target.value as TrackSurface)}
-            >
-              <option value="asphalt">Asphalt</option>
-              <option value="carpet">Carpet</option>
-            </select>
-          </div>
-          <div className="space-y-1">
-            <div className="text-xs font-medium text-muted-foreground">Spread source · grip</div>
-            <select
-              className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs"
-              value={gripLevel}
-              onChange={(e) => setGripLevel(e.target.value as GripBucket)}
-            >
-              {ALL_GRIP_BUCKETS.map((g) => (
-                <option key={g} value={g}>{gripBucketLabel(g)}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {compareMap ? (
-          <div className="text-[11px] text-muted-foreground space-y-1">
-            <div>
-              Same: {severityCounts.same} · Minor: {severityCounts.minor} · Moderate: {severityCounts.moderate} · Major:{" "}
-              {severityCounts.major} · Unknown: {severityCounts.unknown}
-            </div>
-            <div>
-              Spread scale from all eligible setups in the community (template{" "}
-              <span className="text-foreground/80">
-                {communityTemplateKey ?? "mixed — community IQR off"}
-              </span>{" "}
-              · {trackSurface} · {gripBucketLabel(gripLevel)}
-              {communitySampleCount > 0 ? ` · ~${communitySampleCount} docs in bucket` : " · no docs in bucket yet"}
-              ). Fields without enough community samples fall back to low-confidence grey.
-            </div>
-          </div>
-        ) : (
-          <div className="text-[11px] text-muted-foreground">Select both setups to compare.</div>
-        )}
-      </CardPanel>
-
-      {compareDebug && canCompare && selectionA.data && selectionB.data ? (
-        <div className="rounded-lg border border-dashed border-border bg-muted/30 p-4 text-xs space-y-3 font-mono">
-          <div className="text-[11px] font-sans font-medium text-foreground">
-            Temporary diagnostics <span className="text-muted-foreground">(?compareDebug=1)</span>
-          </div>
-          <div className="text-muted-foreground font-sans">
-            IQR compare keys ({gradientCompareKeys.length}):{" "}
-            <span className="text-foreground/90 break-all">{gradientCompareKeys.join(", ")}</span>
-          </div>
-          <div className="text-muted-foreground font-sans">
-            NUMERIC aggregation keys in community bucket{" "}
-            <span className="text-foreground/90">
-              {communityTemplateKey ?? "mixed (off)"} · {trackSurface} · {gripBucketLabel(gripLevel)}
-            </span>{" "}
-            ({numericAggregationParameterKeys.length}):{" "}
-            <span className="text-foreground/90 break-all">{numericAggregationParameterKeys.join(", ") || "—"}</span>
-          </div>
-          <div className="text-muted-foreground font-sans">
-            Most common unknown reason:{" "}
-            <span className="text-foreground/90">{topDiagnosticReason ?? "—"}</span>
-            {diagnosticReasonTally.length ? (
-              <pre className="mt-2 max-h-40 overflow-auto rounded border border-border bg-card p-2 text-[10px] whitespace-pre-wrap">
-                {diagnosticReasonTally.map(([k, n]) => `${n}\t${k}`).join("\n")}
-              </pre>
-            ) : null}
-          </div>
-          {numericUnknownDiagnostics.length ? (
-            <div className="overflow-x-auto rounded border border-border bg-card">
-              <table className="w-full min-w-[720px] border-collapse text-left text-[10px]">
-                <thead className="border-b border-border bg-muted/50 text-muted-foreground">
-                  <tr>
-                    <th className="p-1.5">uiKey</th>
-                    <th className="p-1.5">matchedAggKey</th>
-                    <th className="p-1.5">rows</th>
-                    <th className="p-1.5">aggType</th>
-                    <th className="p-1.5">rawN</th>
-                    <th className="p-1.5">inMap</th>
-                    <th className="p-1.5">parseOk</th>
-                    <th className="p-1.5">p25</th>
-                    <th className="p-1.5">p75</th>
-                    <th className="p-1.5">iqr</th>
-                    <th className="p-1.5">Δ</th>
-                    <th className="p-1.5">primaryReason</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {numericUnknownDiagnostics.map((d) => (
-                    <tr key={d.uiKey} className="border-b border-border/60 align-top">
-                      <td className="p-1.5">{d.uiKey}</td>
-                      <td className="p-1.5">{d.matchedAggregationKey ?? "null"}</td>
-                      <td className="p-1.5">{d.aggregationRowsForExactKey}</td>
-                      <td className="p-1.5">{d.aggregationValueType ?? "—"}</td>
-                      <td className="p-1.5">{d.rawJsonSampleCount ?? "—"}</td>
-                      <td className="p-1.5">{d.inClientCompareMap ? "y" : "n"}</td>
-                      <td className="p-1.5">{d.rawJsonParsesToPercentileSlice ? "y" : "n"}</td>
-                      <td className="p-1.5">{d.p25 ?? "—"}</td>
-                      <td className="p-1.5">{d.p75 ?? "—"}</td>
-                      <td className="p-1.5">{d.iqr ?? "—"}</td>
-                      <td className="p-1.5">{d.deltaAbs ?? "—"}</td>
-                      <td className="p-1.5 whitespace-pre-wrap break-all">{d.primaryReason}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="text-muted-foreground font-sans">No unknown IQR-scored fields in this compare.</div>
+    <div
+      className={cn(
+        "flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border px-2 py-1.5 transition",
+        selected ? "border-primary-ink/60 bg-secondary" : "border-dashed border-border text-muted-foreground"
+      )}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={selected}
+        className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+        title={entry ? entryLabel(entry) : "Empty — search below to fill it"}
+      >
+        <span
+          className={cn(
+"shrink-0 rounded border px-1 micro-caps",
+            selected ? "border-primary-ink/60 text-foreground" : "border-border text-faint"
           )}
-        </div>
-      ) : null}
-
-      {canCompare && selectionA.data && selectionB.data ? (
-        <CardPanel contentClassName="space-y-2">
-          <Eyebrow>Setup A vs B</Eyebrow>
-          <div className="text-xs text-muted-foreground space-y-1">
-            <div>
-              <span className="font-medium text-foreground/90">Setup A</span>
-              <span className="mx-1">·</span>
-              {selectionA.label}
-            </div>
-            <div>
-              Compared to <span className="font-medium text-foreground/90">Setup B</span>
-              <span className="mx-1">·</span>
-              {selectionB.label}
-            </div>
-            <p className="text-[11px]">
-              Changed fields show <span className="font-medium text-foreground/80">vs …</span> with the other value.{" "}
-              <span className="text-destructive/90">Darker red</span> = larger difference vs community
-              spread; parameters without enough community samples use a fixed lighter red.
-            </p>
-          </div>
-          <SetupSheetView
-            value={selectionA.data}
-            onChange={() => {}}
-            readOnly
-            template={compareTemplate}
-            baselineValue={selectionB.data}
-            numericAggregationByKey={numericAggregationByKey}
-            compareHighlightOnly
-          />
-        </CardPanel>
+        >
+          {id}
+        </span>
+        <span className="truncate text-xs font-semibold">{entry ? entry.title : "Pick a setup"}</span>
+      </button>
+      {entry && onClear ? (
+        <button
+          type="button"
+          onClick={onClear}
+          aria-label={`Clear setup ${id.toUpperCase()}`}
+          className="shrink-0 rounded p-0.5 text-muted-foreground transition hover:text-foreground"
+        >
+          <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden="true">
+            <path d="M3 3l6 6M9 3l-6 6" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+          </svg>
+        </button>
       ) : null}
     </div>
   );
 }
 
+export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
+  const [slots, setSlots] = useState<{ a: SetupEntry | null; b: SetupEntry | null }>({ a: null, b: null });
+  const [sel, setSel] = useState<SlotId>("a");
+
+  const [entries, setEntries] = useState<SetupEntry[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [tab, setTab] = useState<PickerSource>("mine");
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  /** In-flight guard, as a ref so two taps in one render can't both fire the fetch. */
+  const fetching = useRef(false);
+  const openedRef = useRef(false);
+
+  const otherId: SlotId = sel === "a" ? "b" : "a";
+
+  const loadSources = useCallback(async () => {
+    if (!dbReady || fetching.current) return;
+    fetching.current = true;
+    setLoading(true);
+    setLoadError(null);
+    const safeJson = (url: string) =>
+      fetch(url)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+
+    const [runsRes, teamRes, libRes] = await Promise.all([
+      safeJson("/api/runs/for-picker") as Promise<{ runs?: RunPickerRun[] } | null>,
+      safeJson("/api/runs/teammate-for-picker") as Promise<{
+        runs?: (RunPickerRun & { userId?: string | null })[];
+        memberDisplayByUserId?: Record<string, string>;
+      } | null>,
+      safeJson("/api/setups/library-for-picker") as Promise<{
+        setups?: {
+          id: string;
+          name?: string | null;
+          createdAt?: string;
+          carName?: string | null;
+          setupSheetModelId?: string | null;
+          setupSheetTemplate?: string | null;
+          setupData?: unknown;
+        }[];
+      } | null>,
+    ]);
+
+    if (!runsRes && !teamRes && !libRes) {
+      // Keep whatever is already on screen — a failed refetch must not blank a usable list.
+      setLoadError("Couldn't load your setups — check you're signed in.");
+      setLoading(false);
+      fetching.current = false;
+      return;
+    }
+
+    const out: SetupEntry[] = [];
+    const pushRun = (
+      run: RunPickerRun,
+      source: PickerSource,
+      kind: SetupEntry["kind"],
+      displayByUserId?: Record<string, string>
+    ) => {
+      const data = run.setupSnapshot?.data;
+      const modelId = run.car?.setupSheetModelId?.trim();
+      // No sheet, no paper to draw on — and this page is the sheet.
+      if (!modelId || !isJsonObject(data)) return;
+      const values = normalizeSetupData(data) as Record<string, unknown>;
+      if (!hasAnyValue(values)) return;
+      const parts = formatRunPickerParts(run, displayByUserId);
+      out.push({
+        id: `${kind}-${run.id}`,
+        kind,
+        source,
+        title: parts.title,
+        detail: parts.detail,
+        when: parts.when,
+        values,
+        setupSheetModelId: modelId,
+        templateKey: canonicalSetupSheetTemplateId(run.car?.setupSheetTemplate ?? null),
+      });
+    };
+
+    for (const run of runsRes?.runs ?? []) pushRun(run, "mine", "run");
+    for (const run of teamRes?.runs ?? []) {
+      pushRun(run, "teammates", "team", teamRes?.memberDisplayByUserId);
+    }
+    for (const saved of libRes?.setups ?? []) {
+      const modelId = saved.setupSheetModelId?.trim();
+      if (!modelId || !isJsonObject(saved.setupData)) continue;
+      const values = normalizeSetupData(saved.setupData) as Record<string, unknown>;
+      if (!hasAnyValue(values)) continue;
+      out.push({
+        id: `saved-${saved.id}`,
+        kind: "saved",
+        source: "setups",
+        title: saved.name?.trim() || "Untitled setup",
+        detail: saved.carName?.trim() || "",
+        when: saved.createdAt ? formatRunCreatedRelativeWhen(saved.createdAt) : "",
+        values,
+        setupSheetModelId: modelId,
+        templateKey: canonicalSetupSheetTemplateId(saved.setupSheetTemplate ?? null),
+      });
+    }
+
+    setEntries(out);
+    setLoading(false);
+    fetching.current = false;
+  }, [dbReady]);
+
+  const openPicker = () => {
+    if (!openedRef.current) {
+      openedRef.current = true;
+      // Refetch on each fresh open: a run logged since this page loaded should be here.
+      void loadSources();
+    }
+    setPickerOpen(true);
+  };
+
+  const closePicker = () => {
+    openedRef.current = false;
+    setPickerOpen(false);
+    setQuery("");
+  };
+
+  // The list is the whole point of the page, so it loads before anyone asks for it.
+  useEffect(() => {
+    void loadSources();
+  }, [loadSources]);
+
+  /** How many rows each source holds before the search box narrows anything. */
+  const poolCounts = useMemo(() => {
+    const counts: Record<PickerSource, number> = { mine: 0, teammates: 0, setups: 0 };
+    for (const e of entries ?? []) counts[e.source] += 1;
+    return counts;
+  }, [entries]);
+
+  /** Filtered rows per source, each capped on its own, with the pre-cap total. */
+  const buckets = useMemo(() => {
+    const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+    const out: Record<PickerSource, { rows: SetupEntry[]; total: number }> = {
+      mine: { rows: [], total: 0 },
+      teammates: { rows: [], total: 0 },
+      setups: { rows: [], total: 0 },
+    };
+    for (const e of entries ?? []) {
+      if (tokens.length) {
+        const hay = `${e.title} ${e.detail} ${e.when} ${e.kind}`.toLowerCase();
+        if (!tokens.every((t) => hay.includes(t))) continue;
+      }
+      const bucket = out[e.source];
+      bucket.total += 1;
+      if (bucket.rows.length < PICKER_ROWS_PER_SOURCE) bucket.rows.push(e);
+    }
+    return out;
+  }, [entries, query]);
+
+  /**
+   * A source with nothing in it hides — except Teammates, which keeps an empty state, because
+   * "I have no teammates" and "this app has no teams" must not look the same. Availability reads
+   * the unfiltered pool so the tabs don't flicker as you type.
+   */
+  const tabs: PickerSource[] = (["mine", "teammates", "setups"] as PickerSource[]).filter(
+    (s) => s === "teammates" || poolCounts[s] > 0
+  );
+  /*
+   * Falling back to `tabs[0]` opened the picker on an EMPTY tab: with no runs of your own, "mine"
+   * drops out, and Teammates — the one tab kept even when it has nothing — becomes first. You met
+   * "No teammates are sharing runs yet" with your saved setups sitting one tab over. So the
+   * fallback is the first tab that actually holds something; an explicit choice still wins.
+   */
+  const activeTab: PickerSource = tabs.includes(tab)
+    ? tab
+    : tabs.find((s) => poolCounts[s] > 0) ?? tabs[0] ?? "mine";
+  const activeBucket = buckets[activeTab];
+
+  const setSlot = (slotId: SlotId, entry: SetupEntry | null) => {
+    setSlots((s) => ({ ...s, [slotId]: entry }));
+  };
+
+  const both = slots.a && slots.b ? { a: slots.a, b: slots.b } : null;
+  const sameSheet = both ? both.a.setupSheetModelId === both.b.setupSheetModelId : false;
+
+  return (
+    <div className="space-y-4">
+      {!dbReady ? (
+        <CardPanel contentClassName="text-sm text-muted-foreground">
+          Database not configured — there are no setups to compare.
+        </CardPanel>
+      ) : null}
+
+      <CardPanel contentClassName="space-y-2">
+        <Eyebrow>Setups</Eyebrow>
+        <div className="flex items-center gap-2">
+          <SlotChip
+            id="a"
+            entry={slots.a}
+            selected={sel === "a"}
+            onSelect={() => setSel("a")}
+            onClear={() => setSlot("a", null)}
+          />
+          <SlotChip
+            id="b"
+            entry={slots.b}
+            selected={sel === "b"}
+            onSelect={() => setSel("b")}
+            onClear={() => setSlot("b", null)}
+          />
+        </div>
+
+        <input
+          type="search"
+          value={query}
+          placeholder={`Search setups → load into ${sel.toUpperCase()}…`}
+          onFocus={openPicker}
+          onClick={openPicker}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            openPicker();
+          }}
+          aria-label="Search your runs, teammate runs, and saved setups"
+          className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+        />
+
+        {pickerOpen ? (
+          <div className="space-y-1.5">
+            {tabs.length > 1 ? (
+              <SegmentedControl
+                size="sm"
+                ariaLabel="Setup source"
+                value={activeTab}
+                onChange={setTab}
+                segmentClassName="px-2 py-1 text-[11px]"
+                options={tabs.map((s) => ({
+                  value: s,
+                  ariaLabel: SOURCE_LABEL[s],
+                  label: (
+                    <span className="flex items-baseline gap-1">
+                      {SOURCE_LABEL[s]}
+                      {buckets[s].total > 0 ? (
+                        <span className="text-[9px] tabular-nums opacity-60">
+                          {buckets[s].total}
+                        </span>
+                      ) : null}
+                    </span>
+                  ),
+                }))}
+              />
+            ) : null}
+
+            {loading && !entries ? (
+              <p className="text-xs text-muted-foreground">Loading your setups…</p>
+            ) : null}
+            {loadError && !entries ? <p className="text-xs text-muted-foreground">{loadError}</p> : null}
+
+            {entries && activeBucket.rows.length === 0 ? (
+              <p className="px-1 py-2 text-xs leading-relaxed text-muted-foreground">
+                {activeTab === "teammates" &&
+                poolCounts.teammates === 0 &&
+                poolCounts.mine + poolCounts.setups > 0 ? (
+                  <>
+                    No teammates are sharing runs yet. Set up a team and their setups show up here —{" "}
+                    <Link href="/teams" className="text-primary-ink underline underline-offset-2">
+                      Teams
+                    </Link>
+                    .
+                  </>
+                ) : (
+                  "No matching setups on a car that draws its own sheet."
+                )}
+              </p>
+            ) : null}
+
+            <ul className="max-h-[420px] space-y-0.5 overflow-y-auto">
+              {activeBucket.rows.map((entry) => (
+                <li key={entry.id} className="flex items-stretch gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSlot(sel, entry);
+                      closePicker();
+                    }}
+                    title={`Load into setup ${sel.toUpperCase()}`}
+                    className="grid min-w-0 flex-1 grid-cols-[2.1rem_minmax(0,1fr)_auto] items-start gap-2 rounded-md px-2 py-1.5 text-left transition hover:bg-muted"
+                  >
+                  <span className="pt-0.5 micro-caps text-faint">
+                      {entry.kind}
+                    </span>
+                    {/* break-words, not truncate: a filename-shaped setup name is one unbreakable
+                        token and would otherwise paint over the date column. */}
+                    <span className="min-w-0">
+                      <span className="block break-words text-xs leading-snug">{entry.title}</span>
+                      {entry.detail ? (
+                        <span className="block break-words tabular-nums text-[10px] leading-snug text-muted-foreground">
+                          {entry.detail}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="whitespace-nowrap pt-0.5 text-[10px] tabular-nums text-faint">
+                      {entry.when}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSlot(otherId, entry)}
+                    title={`Load into setup ${otherId.toUpperCase()} as the comparison`}
+                    className="shrink-0 self-center rounded-md border border-border px-1.5 py-1 micro-caps text-muted-foreground transition hover:text-foreground"
+                  >
+                    vs
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            {activeBucket.rows.length < activeBucket.total ? (
+              <p className="px-2 tabular-nums text-[10px] text-faint">
+                Showing {activeBucket.rows.length} of {activeBucket.total} — search to narrow
+              </p>
+            ) : null}
+
+            <button
+              type="button"
+              className="text-xs font-medium text-muted-foreground transition hover:text-foreground"
+              onClick={closePicker}
+            >
+              Close
+            </button>
+          </div>
+        ) : null}
+      </CardPanel>
+
+      {both && sameSheet ? (
+        <CardPanel contentClassName="space-y-2">
+          <Eyebrow>On the sheet</Eyebrow>
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            Hold the sheet to swap between the two setups. Both draw into the same boxes, so the only
+            values that move are the ones that differ.
+          </p>
+          <SheetCompareSurface
+            // Slot changes rebuild the surface: a different setup is a different comparison, and
+            // starting it at page 1, fit to the stage, is the right place to start reading.
+            key={`${both.a.id}|${both.b.id}`}
+            setupSheetModelId={both.a.setupSheetModelId}
+            a={{ label: entryLabel(both.a), values: both.a.values }}
+            b={{ label: entryLabel(both.b), values: both.b.values }}
+            templateKey={both.a.templateKey ?? both.b.templateKey}
+          />
+        </CardPanel>
+      ) : both && !sameSheet ? (
+        <CardPanel contentClassName="space-y-1.5">
+          <Eyebrow>Different sheets</Eyebrow>
+          <p className="text-sm text-muted-foreground">
+            These two setups are on different chassis, so they don&apos;t share a sheet to compare on.
+            A box printed on one car&apos;s sheet often isn&apos;t on the other&apos;s at all — showing
+            them together would read as &ldquo;they run nothing there&rdquo; rather than &ldquo;there
+            is no such setting&rdquo;.
+          </p>
+          <p className="text-sm text-muted-foreground">Pick two setups on the same chassis.</p>
+        </CardPanel>
+      ) : (
+        <CardPanel contentClassName="space-y-1.5">
+          <Eyebrow>Nothing to compare yet</Eyebrow>
+          <p className="text-sm text-muted-foreground">
+            Fill both slots with setups from the same chassis. They go on one sheet, and holding it
+            swaps between them.
+          </p>
+        </CardPanel>
+      )}
+    </div>
+  );
+}

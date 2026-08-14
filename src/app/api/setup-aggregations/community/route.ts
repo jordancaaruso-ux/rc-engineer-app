@@ -65,8 +65,7 @@ export async function GET(request: Request) {
   });
 
   const aggregations = rows.map((r) => ({
-    // Synthetic carId so downstream consumers (buildNumericAggregationMapForCar,
-    // diagnostics) that key off carId continue to work unchanged.
+    // Synthetic carId so consumers that key off carId continue to work unchanged.
     carId: "__community__",
     parameterKey: r.parameterKey,
     valueType: r.valueType,

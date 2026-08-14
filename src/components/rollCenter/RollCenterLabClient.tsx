@@ -177,7 +177,7 @@ function KnobRow({
         value={Number.isFinite(value) ? String(value) : ""}
         onChange={(e) => onChange(e.target.value)}
         aria-label={`${label} exact value (${unit})`}
-        className="w-16 shrink-0 rounded-md border border-border bg-secondary px-1.5 py-1 text-right font-mono text-[11px] tabular-nums"
+        className="w-16 shrink-0 rounded-md border border-border bg-secondary px-1.5 py-1 text-right text-[11px] tabular-nums"
       />
     </div>
   );
@@ -217,7 +217,7 @@ function MigrationPathChart({
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
-      className="w-full font-mono"
+      className="w-full tabular-nums"
       role="img"
       aria-label="Roll center migration path under chassis roll"
     >
@@ -330,7 +330,7 @@ function SlotChip({
       >
         <span
           className={cn(
-            "shrink-0 rounded border px-1 font-mono text-[9px] uppercase tracking-[0.18em]",
+            "shrink-0 rounded border px-1 micro-caps",
             selected ? "border-primary-ink/60 text-foreground" : "border-border text-faint"
           )}
         >
@@ -833,7 +833,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
                   <span className="flex items-baseline gap-1">
                     {PICKER_SOURCE_LABEL[s]}
                     {pickerBuckets[s].total > 0 && (
-                      <span className="font-mono text-[9px] tabular-nums opacity-60">
+                      <span className="text-[9px] tabular-nums opacity-60">
                         {pickerBuckets[s].total}
                       </span>
                     )}
@@ -877,7 +877,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
                   title={`Load into setup ${activeId.toUpperCase()}`}
                   className="grid min-w-0 flex-1 grid-cols-[2.1rem_minmax(0,1fr)_auto] items-start gap-2 rounded-md px-2 py-1.5 text-left transition hover:bg-muted"
                 >
-                  <span className="pt-0.5 font-mono text-[9px] uppercase tracking-[0.16em] text-faint">
+                  <span className="pt-0.5 micro-caps text-faint">
                     {entry.kind}
                   </span>
                   {/* break-words, not truncate: a filename-shaped setup name is one
@@ -885,12 +885,12 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
                   <span className="min-w-0">
                     <span className="block break-words text-xs leading-snug">{entry.title}</span>
                     {entry.detail && (
-                      <span className="block break-words font-mono text-[10px] leading-snug text-muted-foreground">
+                      <span className="block break-words tabular-nums text-[10px] leading-snug text-muted-foreground">
                         {entry.detail}
                       </span>
                     )}
                   </span>
-                  <span className="whitespace-nowrap pt-0.5 font-mono text-[10px] tabular-nums text-faint">
+                  <span className="whitespace-nowrap pt-0.5 text-[10px] tabular-nums text-faint">
                     {entry.when}
                   </span>
                 </button>
@@ -898,7 +898,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
                   type="button"
                   onClick={() => loadEntryAsComparison(entry)}
                   title={`Load into setup ${otherId.toUpperCase()} as the comparison`}
-                  className="shrink-0 self-center rounded-md border border-border px-1.5 py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground transition hover:text-foreground"
+                  className="shrink-0 self-center rounded-md border border-border px-1.5 py-1 micro-caps text-muted-foreground transition hover:text-foreground"
                 >
                   vs
                 </button>
@@ -906,7 +906,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
             ))}
           </ul>
           {activeBucket.rows.length < activeBucket.total && (
-            <p className="px-2 font-mono text-[10px] text-faint">
+            <p className="px-2 tabular-nums text-[10px] text-faint">
               Showing {activeBucket.rows.length} of {activeBucket.total} — search to narrow
             </p>
           )}
@@ -961,7 +961,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     const d = current - base;
     if (Math.abs(d) < 0.05) return null;
     return (
-      <span className="font-mono text-[10px] text-muted-foreground tabular-nums">
+      <span className="text-[10px] text-muted-foreground tabular-nums">
         {d > 0 ? "↑" : "↓"} {Math.abs(d).toFixed(1)}
         {unit}
       </span>
@@ -1007,7 +1007,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
             onChange={setAxle}
           />
           <span
-            className="ml-auto font-mono text-[9px] uppercase tracking-[0.18em] text-faint border border-border rounded px-1.5 py-0.5"
+            className="ml-auto micro-caps text-faint border border-border rounded px-1.5 py-0.5"
             title="Trust grade for absolute values; deltas are exact regardless"
           >
             {computed.verificationGrade}
@@ -1037,7 +1037,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
           </div>
         )}
         {comparing && (
-          <p className="truncate text-right font-mono text-[9px] uppercase tracking-[0.18em] text-faint">
+          <p className="truncate text-right micro-caps text-faint">
             solid = {activeId} · dashed = {otherId}
           </p>
         )}
@@ -1071,7 +1071,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
           >
             <RotateCcw aria-hidden className="size-[11px]" strokeWidth={2.4} />
           </button>
-          <span className="w-[7.5rem] shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
+          <span className="w-[7.5rem] shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
             {rollDeg.toFixed(1)}° · RC {rcAtRoll ? `${fmtMm(rcAtRoll.z)}/${fmtMm(rcAtRoll.x, 0)}` : "—"}
           </span>
         </div>
@@ -1097,7 +1097,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
           >
             <RotateCcw aria-hidden className="size-[11px]" strokeWidth={2.4} />
           </button>
-          <span className="w-[7.5rem] shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
+          <span className="w-[7.5rem] shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
             RH {(staticRh + bumpMm).toFixed(1)}mm ({bumpMm >= 0 ? "+" : ""}
             {bumpMm.toFixed(1)})
           </span>
@@ -1111,7 +1111,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
           ].map((s) => (
             <div key={s.label} className="space-y-0.5">
               <div className="type-data-label">{s.label}</div>
-              <div className="font-mono text-sm tabular-nums">{fmtMm(s.value)} mm</div>
+                <div className="fig-stat">{fmtMm(s.value)} mm</div>
               {/* Fixed-height slot: chips appearing/vanishing must not reflow the card */}
               <div className="h-4">{deltaChip(s.value, s.base, "")}</div>
             </div>
@@ -1222,7 +1222,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
             {sensitivities?.map((s) => (
               <div key={s.label} className="flex items-baseline justify-between gap-2">
                 <span className="type-data-label">{s.label}</span>
-                <span className="font-mono text-[11px] tabular-nums">
+                <span className="text-[11px] tabular-nums">
                   {s.perMm != null ? `${fmtMm(s.perMm)}mm RC / mm shim` : "—"}
                 </span>
               </div>
@@ -1241,7 +1241,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
               </div>
               <ul className="space-y-0.5">
                 {changes.map((c) => (
-                  <li key={c} className="font-mono text-[10px] leading-relaxed text-muted-foreground">
+                  <li key={c} className="tabular-nums text-[10px] leading-relaxed text-muted-foreground">
                     {c}
                   </li>
                 ))}

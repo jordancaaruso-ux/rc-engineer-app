@@ -169,7 +169,7 @@ export function IdeasEdgeTab() {
             <h2 className="text-[15px] font-bold tracking-tight text-foreground">
               Ideas &amp; reminders
               {count !== null ? (
-                <span className="ml-2 font-mono text-[11px] font-semibold text-muted-foreground">
+                <span className="ml-2 tabular-nums text-[11px] font-semibold text-muted-foreground">
                   {count}
                 </span>
               ) : null}

@@ -90,7 +90,7 @@ export function DashboardStartRunCta({
               the headline text's left edge. */}
           <span
             suppressHydrationWarning
-            className="ml-[14.5px] block text-[10.5px] font-bold uppercase tracking-[0.09em] text-[rgba(18,17,16,0.55)] tabular-nums"
+            className="ml-[14.5px] block text-[10px] font-bold uppercase tracking-[0.09em] text-[rgba(18,17,16,0.55)] tabular-nums"
           >
             {hasDraft && todayDraftSavedAt ? (
               <>

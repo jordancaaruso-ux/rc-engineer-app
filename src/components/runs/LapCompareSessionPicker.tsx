@@ -124,7 +124,7 @@ function PickerRow({
         </span>
         {/* Best lap earns the right-hand column: it is the one number that decides
             whether a session is worth ticking at all. */}
-        <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
           {formatLap(row.bestLap)}
         </span>
       </label>
@@ -163,7 +163,7 @@ export function LapCompareSessionList({
               {target.when}
             </span>
           </span>
-          <span className="shrink-0 font-mono text-[11px] tabular-nums text-primary-ink">
+          <span className="shrink-0 text-[11px] tabular-nums text-primary-ink">
             {formatLap(target.bestLap)}
           </span>
         </div>

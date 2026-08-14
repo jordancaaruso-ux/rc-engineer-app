@@ -520,7 +520,6 @@ export function RunDetailPanel({
           title="Sum of included lap times"
           value={lapDash.stintSeconds != null ? formatStintTime(lapDash.stintSeconds) : "—"}
           alignValue
-          mono
         />
         <StatWellCell
           label="Best lap"
@@ -529,7 +528,6 @@ export function RunDetailPanel({
           expanded={expandedLapStat === "best"}
           onToggle={() => toggleLapStat("best")}
           alignValue
-          mono
         />
         <StatWellCell
           label="Avg top 5"
@@ -538,7 +536,6 @@ export function RunDetailPanel({
           expanded={expandedLapStat === "avg5"}
           onToggle={() => toggleLapStat("avg5")}
           alignValue
-          mono
         />
         <StatWellCell
           label="Avg top 10"
@@ -547,9 +544,8 @@ export function RunDetailPanel({
           expanded={expandedLapStat === "avg10"}
           onToggle={() => toggleLapStat("avg10")}
           alignValue
-          mono
         />
-        <StatWellCell label="Median" value={formatLap(lapDash.median)} alignValue mono />
+        <StatWellCell label="Median" value={formatLap(lapDash.median)} alignValue />
         {conditionsChip ? (
           <StatWellCell
             label="Cond."
@@ -567,7 +563,6 @@ export function RunDetailPanel({
               : "—"
           }
           alignValue
-          mono
         />
         <StatWellCell
           label="Mistakes"

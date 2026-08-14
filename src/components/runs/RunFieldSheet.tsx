@@ -54,22 +54,20 @@ export function driverSurname(name: string): string {
 export function FieldAverageWells({ sheet }: { sheet: FieldSheet }) {
   const avg = sheet.averages;
   const over = `Field average across ${avg.driverCount} ranked car${avg.driverCount === 1 ? "" : "s"}`;
-  const cells: Array<{ label: string; value: string; mono?: boolean }> = [
+  const cells: Array<{ label: string; value: string }> = [
     { label: "Laps", value: avg.lapCount != null ? avg.lapCount.toFixed(1) : "—" },
     {
       label: "Stint",
       value: avg.stintSeconds != null ? formatStintTime(avg.stintSeconds) : "—",
-      mono: true,
     },
-    { label: "Best lap", value: formatLap(avg.bestLap), mono: true },
-    { label: "Avg top 5", value: formatLap(avg.avgTop5), mono: true },
-    { label: "Avg top 10", value: formatLap(avg.avgTop10), mono: true },
-    { label: "Median", value: formatLap(avg.median), mono: true },
+    { label: "Best lap", value: formatLap(avg.bestLap) },
+    { label: "Avg top 5", value: formatLap(avg.avgTop5) },
+    { label: "Avg top 10", value: formatLap(avg.avgTop10) },
+    { label: "Median", value: formatLap(avg.median) },
     {
       label: "Consist.",
       value:
         avg.consistencyScore != null ? formatConsistencyScorePercent(avg.consistencyScore) : "—",
-      mono: true,
     },
     { label: "Mistakes", value: avg.mistakeCount != null ? avg.mistakeCount.toFixed(1) : "—" },
   ];
@@ -83,7 +81,6 @@ export function FieldAverageWells({ sheet }: { sheet: FieldSheet }) {
           value={cell.value}
           title={`${cell.label} — ${over}`}
           alignValue
-          mono={cell.mono}
         />
       ))}
     </StatWellGrid>
@@ -259,7 +256,7 @@ export function RunFieldSheet({
                 >
                   <td
                     className={cn(
-                      "py-1 pl-1 font-mono text-[10px] tabular-nums",
+                      "py-1 pl-1 text-[10px] tabular-nums",
                       row.isUser ? "text-primary-ink" : "text-faint"
                     )}
                   >

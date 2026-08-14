@@ -177,7 +177,7 @@ export function DashboardGetSetUpCard({ hasCar, hasTimingIdentity, hasSetup, set
 
           {!hasTimingIdentity || !hasSetup ? (
             <>
-              <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              <p className="mt-4 micro-caps text-muted-foreground">
                 Make it better
               </p>
               <div className="mt-2 flex flex-col gap-2">

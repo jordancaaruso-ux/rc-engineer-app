@@ -236,7 +236,7 @@ export function LapComparePanel({
           <span className="min-w-0 truncate text-[12px] font-semibold tracking-tight">
             {job.profileName}
           </span>
-          <span className="rounded-md border border-gain/25 bg-gain/10 px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-[0.18em] text-gain">
+          <span className="rounded-md border border-gain/25 bg-gain/10 px-1.5 py-0.5 micro-caps text-gain">
             Analyzed
           </span>
           <Link
@@ -252,7 +252,7 @@ export function LapComparePanel({
           <span className="min-w-0 truncate text-[12px] font-semibold tracking-tight">
             {job.profileName}
           </span>
-          <span className="rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-[0.18em] text-muted-foreground">
+          <span className="rounded-md border border-border bg-muted px-1.5 py-0.5 micro-caps text-muted-foreground">
             {job.analysisMode === "manual" ? "Sync in progress" : job.status}
           </span>
           <Link
@@ -331,11 +331,11 @@ export function LapComparePanel({
         }}
         className="flex min-w-0 flex-1 flex-col items-start gap-0.5 rounded-lg border border-border bg-secondary px-2.5 py-2 text-left transition-colors hover:border-foreground/30"
       >
-        <span className="truncate font-mono text-[9px] uppercase tracking-[0.18em] text-faint">
+        <span className="truncate micro-caps text-faint">
           {crossCar ? `${lap.carLabel} · ` : ""}L{lap.lapIndex}
           {tag ? <span className={cn("ml-1", tag === "BEST" && GAIN_TEXT)}>{tag}</span> : null}
         </span>
-        <span className="font-mono text-sm tabular-nums text-foreground">
+        <span className="fig-stat text-foreground">
           {formatLap(lap.lapTimeSec)}
         </span>
       </button>
@@ -352,7 +352,7 @@ export function LapComparePanel({
         <div className="flex items-end justify-between gap-3">
           <div
             className={cn(
-              "font-mono text-3xl font-medium leading-none tabular-nums",
+              "text-3xl font-medium leading-none tabular-nums",
               deltaTextClass(rep.totalDeltaSec)
             )}
           >
@@ -366,7 +366,7 @@ export function LapComparePanel({
 
         <div className="flex items-stretch gap-2">
           {lapChip(la, "a")}
-          <span className="self-center font-mono text-[10px] text-faint">VS</span>
+          <span className="self-center tabular-nums text-[10px] text-faint">VS</span>
           {lapChip(lb, "b")}
         </div>
 
@@ -374,7 +374,7 @@ export function LapComparePanel({
         <Collapse open={pickerOpen}>
           <div className="space-y-2 border-t border-border pt-2.5">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-faint">
+              <span className="micro-caps text-faint">
                 Set lap {pickerSlot === "a" ? "A" : "B"} from
               </span>
               {d.cars.map((car) => (
@@ -403,7 +403,7 @@ export function LapComparePanel({
                       key={lap.lapIndex}
                       type="button"
                       onClick={() => pickLap(lap)}
-                      className={cn(chipToggleClass(active), "px-2 py-1 font-mono text-[11px] tabular-nums")}
+                      className={cn(chipToggleClass(active),"px-2 py-1 text-[11px] tabular-nums")}
                     >
                       L{lap.lapIndex} · {formatLap(lap.lapTimeSec)}
                     </button>
@@ -442,14 +442,14 @@ export function LapComparePanel({
                   className="flex min-w-0 items-center justify-center bg-secondary transition-[filter] hover:brightness-125"
                   style={{ flexGrow: Math.max(seg.aSec, 0.1), flexBasis: 0, ...(bg ? { background: bg } : {}) }}
                 >
-                  <span className="truncate px-0.5 font-mono text-[9px] text-foreground/80">
+                  <span className="truncate px-0.5 tabular-nums text-[9px] text-foreground/80">
                     {seg.name}
                   </span>
                 </button>
               );
             })}
           </div>
-          <div className="flex justify-between font-mono text-[8.5px] tracking-[0.12em] text-faint">
+          <div className="flex justify-between tabular-nums text-[8.5px] tracking-[0.12em] text-faint">
             <span>START</span>
             <span>{totalASec.toFixed(1)}s LAP</span>
             <span>FINISH</span>
@@ -495,7 +495,7 @@ export function LapComparePanel({
                 <span className="text-[12.5px] font-medium text-muted-foreground">
                   {seg.name} — even
                 </span>
-                <span className="ml-auto font-mono text-[11px] tabular-nums text-muted-foreground">
+                <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
                   {formatSignedDeltaSec(seg.deltaSec)}
                 </span>
               </div>
@@ -520,12 +520,12 @@ export function LapComparePanel({
                   <span className="text-[13px] font-semibold tracking-tight text-foreground">
                     {seg.name}
                   </span>
-                  <span className="truncate font-mono text-[9px] tracking-[0.08em] text-faint">
+                  <span className="truncate tabular-nums text-[9px] tracking-[0.08em] text-faint">
                     {routeCaption}
                   </span>
                   <span
                     className={cn(
-                      "ml-auto font-mono text-[15px] font-medium tabular-nums",
+                      "ml-auto text-[15px] font-medium tabular-nums",
                       deltaTextClass(seg.deltaSec)
                     )}
                   >
@@ -535,7 +535,7 @@ export function LapComparePanel({
                 <div className="mt-1.5 flex items-center gap-2">
                   <span
                     className={cn(
-                      "rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em]",
+                      "rounded-md border px-1.5 py-0.5 micro-caps",
                       gained
                         ? "border-gain/25 bg-gain/10 text-gain"
                         : "border-destructive/25 bg-destructive/10 text-destructive"
@@ -577,7 +577,7 @@ export function LapComparePanel({
         })}
       </div>
 
-      <p className="text-center font-mono text-[9px] uppercase tracking-[0.14em] leading-relaxed text-faint">
+      <p className="text-center micro-caps leading-relaxed text-faint">
         {d.source === "manual"
           ? "Sector timing from your video marks · lap times from transponder"
           : d.transponder &&

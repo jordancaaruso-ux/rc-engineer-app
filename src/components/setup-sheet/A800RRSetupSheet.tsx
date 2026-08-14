@@ -64,7 +64,7 @@ function MetadataRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex border-b border-black/20 last:border-b-0">
       <div className="w-24 shrink-0 py-0.5 pr-2 text-[10px] text-black/70">{label}</div>
-      <div className="min-w-0 flex-1 py-0.5 text-[11px] font-mono">{value}</div>
+      <div className="min-w-0 flex-1 py-0.5 text-[11px] tabular-nums">{value}</div>
     </div>
   );
 }
@@ -80,13 +80,13 @@ function PrintFieldRow({
 }) {
   return (
     <div className="flex min-h-[1.75rem] items-stretch border-b border-black/15 last:border-b-0">
-      <div className="flex w-[40%] shrink-0 items-center border-r border-black/15 px-2 py-1 text-[10px] font-mono tracking-tight text-black/70">
+      <div className="flex w-[40%] shrink-0 items-center border-r border-black/15 px-2 py-1 text-[10px] tabular-nums tracking-tight text-black/70">
         {label}
         {unit ? (
           <span className="normal-case ml-0.5 text-[9px] opacity-70">({unit})</span>
         ) : null}
       </div>
-      <div className="flex min-w-0 flex-1 items-center px-2 py-1 text-[11px] font-mono">{value}</div>
+      <div className="flex min-w-0 flex-1 items-center px-2 py-1 text-[11px] tabular-nums">{value}</div>
     </div>
   );
 }
@@ -110,7 +110,7 @@ function PrintPairRow({
   const right = printCell(data, rightKey, fieldKind);
   return (
     <div className="flex min-h-[1.75rem] items-stretch border-b border-black/15 last:border-b-0">
-      <div className="flex w-[40%] shrink-0 items-center border-r border-black/15 px-2 py-1 text-[10px] font-mono tracking-tight text-black/70">
+      <div className="flex w-[40%] shrink-0 items-center border-r border-black/15 px-2 py-1 text-[10px] tabular-nums tracking-tight text-black/70">
         {label}
         {unit ? (
           <span className="normal-case ml-0.5 text-[9px] opacity-70">({unit})</span>
@@ -119,11 +119,11 @@ function PrintPairRow({
       <div className="grid min-w-0 flex-1 grid-cols-2 divide-x divide-black/15">
         <div className="px-2 py-1">
           <div className="text-[9px] font-medium text-black/60">Front</div>
-          <div className="text-[11px] font-mono">{left}</div>
+          <div className="text-[11px] tabular-nums">{left}</div>
         </div>
         <div className="px-2 py-1">
           <div className="text-[9px] font-medium text-black/60">Rear</div>
-          <div className="text-[11px] font-mono">{right}</div>
+          <div className="text-[11px] tabular-nums">{right}</div>
         </div>
       </div>
     </div>
@@ -157,7 +157,7 @@ function PrintCornerRow({
   ];
   return (
     <div className="border-b border-black/15 last:border-b-0">
-      <div className="border-b border-black/15 px-2 py-1 text-[10px] font-mono tracking-tight text-black/70">
+      <div className="border-b border-black/15 px-2 py-1 text-[10px] tabular-nums tracking-tight text-black/70">
         {label}
         {unit ? (
           <span className="normal-case ml-0.5 text-[9px] opacity-70">({unit})</span>
@@ -167,7 +167,7 @@ function PrintCornerRow({
         {cells.map(({ k, lab }) => (
           <div key={k} className="bg-white p-1.5">
             <div className="text-[9px] font-medium text-black/60">{lab}</div>
-            <div className="text-[11px] font-mono">{printCell(data, k, fieldKind)}</div>
+            <div className="text-[11px] tabular-nums">{printCell(data, k, fieldKind)}</div>
           </div>
         ))}
       </div>
@@ -191,7 +191,7 @@ function PrintSlotsRow({
 }) {
   return (
     <div className="border-b border-black/15 last:border-b-0">
-      <div className="border-b border-black/15 px-2 py-1 text-[10px] font-mono tracking-tight text-black/70">
+      <div className="border-b border-black/15 px-2 py-1 text-[10px] tabular-nums tracking-tight text-black/70">
         {label}
         {unit ? (
           <span className="normal-case ml-0.5 text-[9px] opacity-70">({unit})</span>
@@ -204,7 +204,7 @@ function PrintSlotsRow({
         {slots.map((slot) => (
           <div key={slot.key} className="bg-white p-1.5">
             <div className="text-[9px] font-medium text-black/60">{slot.label || " "}</div>
-            <div className="text-[11px] font-mono">{printCell(data, slot.key, fieldKind)}</div>
+            <div className="text-[11px] tabular-nums">{printCell(data, slot.key, fieldKind)}</div>
           </div>
         ))}
       </div>
@@ -218,7 +218,7 @@ function PrintTopDeckBlock({ data }: { data: SetupSnapshotData }) {
     <div className="divide-y divide-black/15">
       <PrintPairRow label="Top deck" leftKey="top_deck_front" rightKey="top_deck_rear" data={data} />
       <div className="flex min-h-[2rem] items-stretch border-b border-black/15 last:border-b-0">
-        <div className="flex w-[40%] shrink-0 items-center border-r border-black/15 px-2 py-1 text-[10px] font-mono tracking-tight text-black/70">
+      <div className="flex w-[40%] shrink-0 items-center border-r border-black/15 px-2 py-1 text-[10px] tabular-nums tracking-tight text-black/70">
           Top deck cuts
         </div>
         <div className="min-w-0 flex-1 px-2 py-1.5">
@@ -295,7 +295,7 @@ function StructuredRowView({ row, data }: { row: StructuredRow; data: SetupSnaps
     const sel = readSetupScrewSelection(data, row.key);
     return (
       <div className="flex min-h-[2rem] items-stretch border-b border-black/15 last:border-b-0">
-        <div className="flex w-[40%] shrink-0 items-center border-r border-black/15 px-2 py-1 text-[10px] font-mono tracking-tight text-black/70">
+      <div className="flex w-[40%] shrink-0 items-center border-r border-black/15 px-2 py-1 text-[10px] tabular-nums tracking-tight text-black/70">
           {row.label}
         </div>
         <div className="min-w-0 flex-1 px-2 py-1.5">
@@ -350,7 +350,7 @@ export function A800RRSetupSheet({ run, className }: { run: A800RRSetupSheetRun;
       </div>
 
       <div className="mb-3 border-b-2 border-black/30 pb-1.5 text-center">
-        <div className="font-mono text-[10px] tracking-tight text-black/70">Setup sheet</div>
+        <div className="tabular-nums text-[10px] tracking-tight text-black/70">Setup sheet</div>
         <div className="text-sm font-medium">Awesomatix A800RR</div>
       </div>
 

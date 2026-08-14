@@ -54,7 +54,7 @@ function NewJobForm() {
       <label className="text-xs">
         Local video path (reminder only — worker uses this on your PC)
         <input
-          className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1 text-sm font-mono"
+          className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1 fig-stat"
           value={localPath}
           onChange={(e) => setLocalPath(e.target.value)}
           placeholder="C:\Videos\heat.mp4"

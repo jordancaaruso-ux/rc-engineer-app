@@ -48,7 +48,7 @@ export function BetweenRunRecentSessionsThings({
               )}
             >
               <div className="font-medium text-foreground/95">{s.displayLabel}</div>
-              <div className="mt-1.5 space-y-0.5 font-mono text-[10px] text-foreground/90 tabular-nums">
+              <div className="mt-1.5 space-y-0.5 text-[10px] text-foreground/90 tabular-nums">
                 <div>
                   <span className="text-muted-foreground font-sans">Best lap</span> {fmtSec(s.bestLapSeconds)}s
                 </div>

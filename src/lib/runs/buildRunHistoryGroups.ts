@@ -126,26 +126,39 @@ export function buildDayRunNumberMap(
   return map;
 }
 
+/**
+ * The session a run belongs to, as a stable key.
+ *
+ * Non-event runs group by day AND track: a single calendar day can span two
+ * venues (especially in team view, where teammates run different tracks the
+ * same day) — keying on day alone merged them and mislabelled the group with
+ * one track. Events keep their own single-venue grouping.
+ *
+ * The day is resolved in the DRIVER's zone (see `resolveRunLocalTimeZone`), so the
+ * same key comes out no matter who is reading the list.
+ *
+ * Exported because the Sessions workbench counts a session's *unfiltered* runs from
+ * a separate, minimal query — if that side keyed sessions differently, "2 of 8" would
+ * be counting a different set of runs than the one on screen.
+ */
+export function sessionGroupKey(
+  run: RunForHistoryGroup,
+  zones?: RunGroupZoneOptions
+): string {
+  return run.eventId
+    ? `event-${run.eventId}`
+    : `day-${dateKey(runSessionSortInstant(run), resolveRunLocalTimeZone(run, zones))}-${trackKey(run)}`;
+}
+
 export function buildRunHistoryGroups<T extends RunForHistoryGroup>(
   runs: T[],
   timeZone?: string | null,
   opts?: Pick<RunGroupZoneOptions, "ownerTimeZoneByUserId">
 ): RunHistoryGroup<T>[] {
   const zones: RunGroupZoneOptions = { ...opts, viewerTimeZone: timeZone };
-  // The day is resolved in the DRIVER's zone (see `resolveRunLocalTimeZone`), so the
-  // same key comes out no matter who is reading the list.
-  const groupKeyFor = (run: T): string =>
-    run.eventId
-      ? `event-${run.eventId}`
-      : `day-${dateKey(runSessionSortInstant(run), resolveRunLocalTimeZone(run, zones))}-${trackKey(run)}`;
-
-  // Non-event runs group by day AND track: a single calendar day can span two
-  // venues (especially in team view, where teammates run different tracks the
-  // same day) — keying on day alone merged them and mislabelled the group with
-  // one track. Events keep their own single-venue grouping.
   const byKey = new Map<string, T[]>();
   for (const run of runs) {
-    const key = groupKeyFor(run);
+    const key = sessionGroupKey(run, zones);
     const list = byKey.get(key) ?? [];
     list.push(run);
     byKey.set(key, list);

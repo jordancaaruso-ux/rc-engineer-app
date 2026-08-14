@@ -215,7 +215,7 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
             readOnly
             value={liveRcDriverId}
             placeholder="(not set yet)"
-            className="w-full min-w-[260px] flex-1 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm font-mono text-muted-foreground outline-none"
+            className="w-full min-w-[260px] flex-1 rounded-md border border-border bg-muted/40 px-3 py-2 fig-stat text-muted-foreground outline-none"
           />
           <button
             type="button"

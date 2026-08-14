@@ -207,7 +207,7 @@ export function CarAllSetups({
               {label}
               <span
                 className={cn(
-                  "font-mono text-[10px] tabular-nums",
+                  "text-[10px] tabular-nums",
                   filter === value ? "text-foreground/70" : "text-faint"
                 )}
               >
@@ -225,7 +225,7 @@ export function CarAllSetups({
             const busy = busyId === entry.id;
             const body = (
               <>
-                <span className="w-11 shrink-0 pt-0.5 text-right font-mono text-[11px] leading-tight tabular-nums text-muted-foreground">
+                <span className="w-11 shrink-0 pt-0.5 text-right text-[11px] leading-tight tabular-nums text-muted-foreground">
                   {entry.dateLabel}
                 </span>
                 <span className="min-w-0 flex-1">
@@ -235,7 +235,7 @@ export function CarAllSetups({
                     </span>
                     <span className="truncate text-sm text-foreground">{entry.title}</span>
                   </span>
-                  <span className="ui-caption mt-0.5 block truncate font-mono tabular-nums">
+                  <span className="ui-caption mt-0.5 block truncate tabular-nums">
                     {entry.meta}
                   </span>
                   {entry.notes ? (
@@ -252,7 +252,7 @@ export function CarAllSetups({
                         </span>
                       ))}
                       {entry.changedLabels.length > MAX_CHIPS ? (
-                        <span className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+                        <span className="rounded border border-border px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
                           +{entry.changedLabels.length - MAX_CHIPS} more
                         </span>
                       ) : null}

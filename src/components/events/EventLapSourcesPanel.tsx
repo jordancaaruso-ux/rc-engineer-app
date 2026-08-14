@@ -227,7 +227,7 @@ export function EventLapSourcesPanel(props: {
                         {diag.practice.sampleRows.map((r, i) => (
                           <tr key={`${r.sessionUrl}-${i}`} className="border-b border-border/60">
                             <td className="py-1 pr-2 align-top">{r.driverName}</td>
-                            <td className="py-1 pr-2 align-top font-mono tabular-nums">
+                            <td className="py-1 pr-2 align-top tabular-nums">
                               {r.sessionCompletedAtIso ?? "—"}
                             </td>
                             <td className="py-1 pr-2 align-top">{r.passesWatermark ? "yes" : "no"}</td>
@@ -272,9 +272,9 @@ export function EventLapSourcesPanel(props: {
                         {diag.race.rows.map((r, i) => (
                           <tr key={`${r.sessionUrl}-${i}`} className="border-b border-border/60">
                             <td className="max-w-[10rem] py-1 pr-2 align-top break-words">{r.raceClass ?? "—"}</td>
-                            <td className="py-1 pr-2 align-top font-mono text-[9px]">{r.raceClassNormalized ?? "—"}</td>
+                            <td className="py-1 pr-2 align-top tabular-nums text-[9px]">{r.raceClassNormalized ?? "—"}</td>
                             <td className="py-1 pr-2 align-top">{r.classMatchesEvent ? "yes" : "no"}</td>
-                            <td className="py-1 pr-2 align-top font-mono tabular-nums">{r.sessionCompletedAtIso ?? "—"}</td>
+                            <td className="py-1 pr-2 align-top tabular-nums">{r.sessionCompletedAtIso ??"—"}</td>
                             <td className="py-1 pr-2 align-top">{r.passesWatermark ? "yes" : "no"}</td>
                           </tr>
                         ))}

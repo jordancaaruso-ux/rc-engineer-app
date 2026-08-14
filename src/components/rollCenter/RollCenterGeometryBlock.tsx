@@ -77,7 +77,7 @@ export function RollCenterGeometryBlock({
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
           {/* Name the pack: these are one car's measured hardpoints, not a universal calculation. */}
           <span className="eyebrow-label">Geometry · {computed.packDisplayName}</span>
-          <span className="font-mono text-[11px] tabular-nums font-semibold text-foreground">
+          <span className="text-[11px] tabular-nums font-semibold text-foreground">
             RC {fmtMm(computed.front.rcHeightMm)} / {fmtMm(computed.rear.rcHeightMm)}mm · rake {fmtMm(computed.rakeMm)}
           </span>
         </span>
@@ -131,7 +131,7 @@ export function RollCenterCompareStrip({ a, b, rightLabel, templateKey, classNam
     return (
       <div className="flex items-baseline justify-between gap-2">
         <span className="type-data-label">{label}</span>
-        <span className="font-mono text-[11px] tabular-nums">
+        <span className="text-[11px] tabular-nums">
           {fmtMm(va)} vs {fmtMm(vb)} mm
           <span className="text-muted-foreground">
             {" "}

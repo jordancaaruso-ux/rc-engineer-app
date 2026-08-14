@@ -239,7 +239,7 @@ export function RunComparePanel({
           <div className="grid gap-4 sm:grid-cols-2 text-xs">
             <div className="rounded-md border border-border bg-muted/70 p-3 space-y-1">
               <Eyebrow>This run (history)</Eyebrow>
-              <div className="font-mono text-[11px] break-words">{formatRunPickerLine(baseRun)}</div>
+              <div className="tabular-nums text-[11px] break-words">{formatRunPickerLine(baseRun)}</div>
             </div>
             <div className="rounded-md border border-border bg-muted/70 p-3 space-y-1">
               <Eyebrow>{rightLabel}</Eyebrow>
@@ -248,7 +248,7 @@ export function RunComparePanel({
                   Values from Log your run (last saved locally).
                 </p>
               ) : baselineRun ? (
-                <div className="font-mono text-[11px] break-words">{formatRunPickerLine(baselineRun)}</div>
+                <div className="tabular-nums text-[11px] break-words">{formatRunPickerLine(baselineRun)}</div>
               ) : null}
             </div>
           </div>
@@ -362,8 +362,8 @@ export function RunComparePanel({
                             <span className="text-muted-foreground text-xs ml-1">({r.unit})</span>
                           ) : null}
                         </td>
-                        <td className="px-3 py-2 font-mono text-xs tabular-nums">{r.current}</td>
-                        <td className="px-3 py-2 font-mono text-xs tabular-nums text-muted-foreground">
+                        <td className="px-3 py-2 text-xs tabular-nums">{r.current}</td>
+                        <td className="px-3 py-2 text-xs tabular-nums text-muted-foreground">
                           {r.previous ?? "—"}
                         </td>
                       </tr>
@@ -424,10 +424,10 @@ function LapBlock({
       <Eyebrow>{title}</Eyebrow>
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
         <span>
-          This run: <span className="font-mono text-foreground">{left}</span>
+          This run: <span className="tabular-nums text-foreground">{left}</span>
         </span>
         <span>
-          {rightLabel}: <span className="font-mono text-foreground">{right}</span>
+          {rightLabel}: <span className="tabular-nums text-foreground">{right}</span>
         </span>
       </div>
     </div>

@@ -162,7 +162,7 @@ export function LogRunProgressRail({ sections }: { sections: RunProgressSection[
                 req > 0 ? (
                   <span
                     aria-hidden
-                    className="flex h-3.5 min-w-[0.875rem] items-center justify-center rounded-full bg-destructive px-1 font-mono text-[9px] font-medium text-[#2a0e09]"
+                    className="flex h-3.5 min-w-[0.875rem] items-center justify-center rounded-full bg-destructive px-1 tabular-nums text-[9px] font-medium text-[#2a0e09]"
                   >
                     {req}
                   </span>
@@ -177,7 +177,7 @@ export function LogRunProgressRail({ sections }: { sections: RunProgressSection[
               {isPassed && req === 0 && rec > 0 ? (
                 <span
                   aria-hidden
-                  className="flex h-3.5 min-w-[0.875rem] items-center justify-center rounded-full border border-faint px-1 font-mono text-[9px] font-medium text-muted-foreground"
+                  className="flex h-3.5 min-w-[0.875rem] items-center justify-center rounded-full border border-faint px-1 tabular-nums text-[9px] font-medium text-muted-foreground"
                 >
                   {rec}
                 </span>
@@ -188,7 +188,7 @@ export function LogRunProgressRail({ sections }: { sections: RunProgressSection[
 
         {allRequiredDone ? (
           <span
-            className="run-rail-pop pointer-events-none flex shrink-0 items-center gap-1 rounded-full border border-gain/35 bg-gain/[0.08] px-2.5 py-1.5 font-mono text-[10px] font-medium leading-none text-gain"
+            className="run-rail-pop pointer-events-none flex shrink-0 items-center gap-1 rounded-full border border-gain/35 bg-gain/[0.08] px-2.5 py-1.5 tabular-nums text-[10px] font-medium leading-none text-gain"
             role="status"
           >
             <span aria-hidden>🏁</span> ready

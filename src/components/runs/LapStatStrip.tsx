@@ -102,11 +102,13 @@ export function StatWellGrid({
 }
 
 /**
- * A single strip cell — Sora micro-label + value. Values are Sora by default
- * (one-voice pass, 2026-07-16); pass `mono` to render lap-derived racing-clock
- * figures (best lap, avg top 5/10, median, stint, consistency) in the surviving
- * JetBrains Mono voice via `.lap-figure`. Everything else — car, tire, additive,
- * dates, counts, conditions, ratings, setup values — stays Sora.
+ * A single strip cell — Sora micro-label + Sora value on the `.fig-stat` step.
+ *
+ * There used to be a `mono` prop here selecting JetBrains Mono for "racing-clock"
+ * figures. It was deleted 2026-08-14, and the deletion IS the bug fix: callers set it
+ * on six of nine cells in one grid, so a lap count and a temperature rendered in a
+ * different typeface from the lap times beside them at identical size. A lap time is
+ * not a different kind of number from a lap count, so there is no longer a switch.
  *
  * When `onToggle` is supplied the cell is a button (tap-to-expand lap breakdown)
  * and lights an inset yellow ring while expanded.
@@ -120,7 +122,6 @@ export function StatWellCell({
   onToggle,
   valueClassName,
   alignValue = false,
-  mono = false,
 }: {
   label: string;
   value: ReactNode;
@@ -136,11 +137,6 @@ export function StatWellCell({
    * there, where the reserve would just add a gap).
    */
   alignValue?: boolean;
-  /**
-   * Render the value in JetBrains Mono (`.lap-figure`). Reserve for lap-derived
-   * performance figures only — the sole surviving mono surface. Defaults to Sora.
-   */
-  mono?: boolean;
 }) {
   const base = "min-w-0 border-l border-t border-border px-3 py-2 text-left @[30rem]:py-[7px]";
   const labelNode = (
@@ -160,9 +156,8 @@ export function StatWellCell({
   const valueNode = (
     <div
       className={cn(
-        "mt-1 text-[13px] font-medium tabular-nums text-foreground",
+        "mt-1 fig-stat font-medium text-foreground",
         "@[30rem]:mt-0 @[30rem]:min-w-0 @[30rem]:text-right",
-        mono && "lap-figure",
         valueClassName
       )}
     >

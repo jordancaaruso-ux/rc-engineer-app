@@ -136,14 +136,14 @@ function Verdict({ f }: { f: OnboardingFacts }) {
           key={name}
           className={
             on
-              ? "rounded border border-primary-ink/50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-primary-ink"
-              : "rounded border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground"
+              ? "rounded border border-primary-ink/50 px-1.5 py-0.5 type-machine text-[10px] uppercase tracking-[0.08em] text-primary-ink"
+              : "rounded border border-border px-1.5 py-0.5 type-machine text-[10px] uppercase tracking-[0.08em] text-muted-foreground"
           }
         >
           {name} {on ? "✓" : "✗"}
         </span>
       ))}
-      <span className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+      <span className="rounded border border-border px-1.5 py-0.5 type-machine text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
         {f.hasCar ? "payoff face" : "ask face"}
       </span>
     </div>

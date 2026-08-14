@@ -221,7 +221,7 @@ function ColumnHeaderBlock({
         </div>
         <SetupHint series={series} run={meta.setupRun} onView={onViewSetup} />
       </div>
-      <div className="mt-1 flex flex-wrap items-baseline gap-x-1 font-mono text-[10px] tabular-nums">
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-1 text-[10px] tabular-nums">
         <span className="text-muted-foreground">best</span>
         <span className={cn("font-medium", isTarget ? "text-primary-ink" : "text-foreground")}>
           {formatLap(series.bestLap)}
@@ -1246,7 +1246,7 @@ export function LapComparisonColumnGrid({
                   {targetSeries ? (
                     <td
                       className={cn(
-                        "px-1.5 sm:px-2 py-1 font-mono border-l border-border",
+                        "px-1.5 sm:px-2 py-1 tabular-nums border-l border-border",
                         !targetMirrorStyle && "bg-muted/60",
                         tLap && (!tLap.isIncluded || tLap.lapNumber === 0) && "opacity-50 line-through"
                       )}
@@ -1272,7 +1272,7 @@ export function LapComparisonColumnGrid({
                           ) : null}
                         </span>
                         {targetMirrorDelta != null ? (
-                          <span className="text-[10px] font-mono text-foreground/80 tabular-nums">
+                          <span className="text-[10px] text-foreground/80 tabular-nums">
                             {formatLapDelta(targetMirrorDelta)}
                           </span>
                         ) : null}
@@ -1301,7 +1301,7 @@ export function LapComparisonColumnGrid({
                       <td
                         key={s.id}
                         className={cn(
-                          "px-1.5 sm:px-2 py-1 font-mono border-l border-border align-top",
+                          "px-1.5 sm:px-2 py-1 tabular-nums border-l border-border align-top",
                           excluded && "opacity-50 line-through text-muted-foreground"
                         )}
                         style={cellStyle}
@@ -1323,7 +1323,7 @@ export function LapComparisonColumnGrid({
                             ) : null}
                           </span>
                           {showDelta ? (
-                            <span className="text-[10px] font-mono text-foreground/80 tabular-nums">
+                          <span className="text-[10px] text-foreground/80 tabular-nums">
                               {formatLapDelta(delta)}
                             </span>
                           ) : null}
@@ -1348,7 +1348,7 @@ export function LapComparisonColumnGrid({
                   {row.label}
                 </td>
                 {targetSeries ? (
-                  <td className="border-l border-border px-1.5 py-1 font-mono text-[11px] tabular-nums text-foreground sm:px-2">
+                  <td className="border-l border-border px-1.5 py-1 text-[11px] tabular-nums text-foreground sm:px-2">
                     {formatLap(row.pick(targetSeries))}
                   </td>
                 ) : null}
@@ -1358,7 +1358,7 @@ export function LapComparisonColumnGrid({
                   return (
                     <td
                       key={s.id}
-                      className="border-l border-border px-1.5 py-1 font-mono text-[11px] tabular-nums text-foreground sm:px-2"
+                      className="border-l border-border px-1.5 py-1 text-[11px] tabular-nums text-foreground sm:px-2"
                     >
                       <div className="flex flex-col leading-tight">
                         <span>{formatLap(row.pick(s))}</span>

@@ -12,7 +12,7 @@ export function UnverifiedBadge({ className }: { className?: string }) {
     <span
       className={cn(
         "inline-flex items-center rounded-md border border-border bg-muted/40 px-1.5 py-0.5",
-        "font-mono text-[10px] uppercase tracking-wide text-muted-foreground",
+        "tabular-nums text-[10px] uppercase tracking-wide text-muted-foreground",
         className
       )}
       title="Unverified — user-created and not yet confirmed by an admin. Usable now; excluded from community data until verified."

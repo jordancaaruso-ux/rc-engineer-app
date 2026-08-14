@@ -27,8 +27,8 @@ export default async function AnalysisHubPage(): Promise<ReactNode> {
         </header>
         <section className="page-body">
           <CardPanel className="max-w-2xl" contentClassName="text-sm text-muted-foreground">
-            Set <span className="font-mono">DATABASE_URL</span> in{" "}
-            <span className="font-mono">.env</span> to load your analysis.
+            Set <span className="type-machine">DATABASE_URL</span> in{" "}
+            <span className="type-machine">.env</span> to load your analysis.
           </CardPanel>
         </section>
       </>

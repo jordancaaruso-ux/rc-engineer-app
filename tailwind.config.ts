@@ -69,9 +69,17 @@ const config: Config = {
         sm: "0.25rem"
       },
       fontFamily: {
-        /** Inter — body, nav, page titles, hero PanelTitle, controls */
-        sans: ["var(--font-ui)", "Inter", "system-ui", "sans-serif"],
-        mono: ["var(--font-mono-jb)", "JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"]
+        /** Sora — body, nav, page titles, hero PanelTitle, controls, and every figure. */
+        sans: ["var(--font-ui)", "system-ui", "sans-serif"],
+        /**
+         * No `mono` key: the one-voice pass (2026-08-14) removed the last `font-mono` call
+         * site, so this no longer overrides anything. `font-mono` still EXISTS as a utility
+         * — Tailwind v4 defines `--font-mono` in its own `@theme default` — and now resolves
+         * to the platform stack (ui-monospace … Consolas). That is deliberate: it means a
+         * reintroduced `font-mono` looks obviously wrong instead of quietly passing, and it
+         * gives bare <pre>/<code>/<kbd>/<samp> the same stack as `.type-machine` via
+         * preflight. Do not add a webfont back here — machine text loads nothing.
+         */
       },
       boxShadow: {
         glow: "0 0 24px -4px rgb(var(--glow-shadow-rgb) / 0.28)",

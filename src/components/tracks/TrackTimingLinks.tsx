@@ -19,7 +19,7 @@ function TimingLinkRow(props: { label: string; url: string }) {
     >
       <span className="min-w-0">
         <span className="block text-sm font-medium text-foreground">Open in {props.label} ↗</span>
-        <span className="block truncate font-mono text-[11px] text-muted-foreground">{hostLabel(props.url)}</span>
+        <span className="block truncate tabular-nums text-[11px] text-muted-foreground">{hostLabel(props.url)}</span>
       </span>
     </a>
   );

@@ -27,7 +27,9 @@ export async function GET() {
       name: true,
       createdAt: true,
       data: true,
-      car: { select: { name: true } },
+      carId: true,
+      // Setup compare draws on a sheet, so it has to know which sheet this setup belongs to.
+      car: { select: { name: true, setupSheetModelId: true, setupSheetTemplate: true } },
     },
   });
 
@@ -36,7 +38,10 @@ export async function GET() {
       id: s.id,
       name: s.name,
       createdAt: s.createdAt,
+      carId: s.carId,
       carName: s.car?.name ?? null,
+      setupSheetModelId: s.car?.setupSheetModelId ?? null,
+      setupSheetTemplate: s.car?.setupSheetTemplate ?? null,
       setupData: s.data,
     })),
   });

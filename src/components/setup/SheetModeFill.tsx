@@ -242,7 +242,7 @@ export function SheetModeFill({
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-foreground">{b.label}</span>
-                  <span className="block truncate font-mono text-[11px] text-muted-foreground">
+                  <span className="block truncate tabular-nums text-[11px] text-muted-foreground">
                     {[b.kindLabel, b.contextLabel].filter(Boolean).join(" · ")}
                   </span>
                 </span>

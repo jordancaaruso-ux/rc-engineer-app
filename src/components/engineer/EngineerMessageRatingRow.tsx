@@ -95,7 +95,7 @@ export function EngineerMessageRatingRow({ messageId, disabled, initialContext }
             aria-pressed={score === n}
             onClick={() => void submit(n)}
             className={cn(
-              "min-w-[1.35rem] rounded px-0.5 font-mono text-[10px] leading-none transition",
+              "min-w-[1.35rem] rounded px-0.5 tabular-nums text-[10px] leading-none transition",
               score === n
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground/70 hover:bg-muted/50 hover:text-foreground"

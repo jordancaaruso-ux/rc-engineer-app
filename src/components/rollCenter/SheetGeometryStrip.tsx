@@ -133,7 +133,7 @@ export function SheetGeometryStrip({
         )}
       >
         <span className="eyebrow-label shrink-0">RC</span>
-        <span className="min-w-0 flex-1 font-mono text-[11px] font-semibold tabular-nums text-foreground">
+        <span className="min-w-0 flex-1 text-[11px] font-semibold tabular-nums text-foreground">
           {fmtMm(computed.front.rcHeightMm)} / {fmtMm(computed.rear.rcHeightMm)}
           <span className="font-normal text-muted-foreground"> mm · rake </span>
           {fmtMm(computed.rakeMm)}

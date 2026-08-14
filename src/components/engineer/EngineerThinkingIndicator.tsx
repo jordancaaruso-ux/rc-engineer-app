@@ -82,7 +82,7 @@ export function EngineerThinkingIndicator({ statusPhase }: { statusPhase: string
             {label}
           </span>
           {elapsedSec >= SHOW_TIMER_SEC ? (
-            <span className="mt-0.5 shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+            <span className="mt-0.5 shrink-0 text-[11px] tabular-nums text-muted-foreground">
               {formatElapsed(elapsedSec)}
             </span>
           ) : null}

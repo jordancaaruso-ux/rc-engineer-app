@@ -137,10 +137,10 @@ export function SectorClipPlayer({
           }}
         />
         <div className="pointer-events-none absolute inset-x-2 top-2 flex justify-between">
-          <span className="rounded bg-background/70 px-1.5 py-0.5 font-mono text-[9px] tracking-[0.15em] text-foreground backdrop-blur-sm">
+          <span className="rounded bg-background/70 px-1.5 py-0.5 tabular-nums text-[9px] tracking-[0.15em] text-foreground backdrop-blur-sm">
             {aLabel}
           </span>
-          <span className="rounded bg-background/70 px-1.5 py-0.5 font-mono text-[9px] tracking-[0.15em] text-muted-foreground backdrop-blur-sm">
+          <span className="rounded bg-background/70 px-1.5 py-0.5 tabular-nums text-[9px] tracking-[0.15em] text-muted-foreground backdrop-blur-sm">
             {bLabel} · GHOST
           </span>
         </div>
@@ -168,7 +168,7 @@ export function SectorClipPlayer({
           aria-label="Scrub sector clip"
           className="min-w-0 flex-1 accent-primary-ink"
         />
-        <span className="shrink-0 font-mono text-[10px] tabular-nums text-faint">
+        <span className="shrink-0 text-[10px] tabular-nums text-faint">
           {Math.min(clock, clipDur).toFixed(1)} / {clipDur.toFixed(1)}s
         </span>
       </div>

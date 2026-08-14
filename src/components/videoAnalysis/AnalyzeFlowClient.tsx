@@ -981,7 +981,7 @@ export function AnalyzeFlowClient({
       {overlayLines.map((l) => (
         <span
           key={`lbl-${l.lineKey}`}
-          className="pointer-events-none absolute -translate-x-1/2 -translate-y-[150%] rounded bg-background/70 px-1 py-px font-mono text-[9px] text-foreground backdrop-blur-sm"
+          className="pointer-events-none absolute -translate-x-1/2 -translate-y-[150%] rounded bg-background/70 px-1 py-px tabular-nums text-[9px] text-foreground backdrop-blur-sm"
           style={{ left: `${((l.x1 + l.x2) / 2) * 100}%`, top: `${((l.y1 + l.y2) / 2) * 100}%` }}
         >
           {l.label}
@@ -1044,7 +1044,7 @@ export function AnalyzeFlowClient({
         />
         <span
           ref={timecodeElRef}
-          className="pointer-events-none absolute bottom-2 left-2 rounded bg-background/70 px-2 py-0.5 font-mono text-[12px] tabular-nums text-foreground backdrop-blur-sm"
+          className="pointer-events-none absolute bottom-2 left-2 rounded bg-background/70 px-2 py-0.5 text-[12px] tabular-nums text-foreground backdrop-blur-sm"
         >
           {fmtClock(lastSeekRef.current)}
         </span>
@@ -1073,10 +1073,10 @@ export function AnalyzeFlowClient({
       />
       <FineWheel onDelta={(dxPx) => nudge(dxPx * FINE_SEC_PER_PX)} />
       <div className="flex gap-2">
-        <button type="button" onClick={() => nudge(-FRAME_SEC)} className="h-11 flex-1 rounded-lg border border-border bg-secondary font-mono text-[12px] text-foreground active:bg-muted">
+        <button type="button" onClick={() => nudge(-FRAME_SEC)} className="h-11 flex-1 rounded-lg border border-border bg-secondary tabular-nums text-[12px] text-foreground active:bg-muted">
           −1 frame
         </button>
-        <button type="button" onClick={() => nudge(FRAME_SEC)} className="h-11 flex-1 rounded-lg border border-border bg-secondary font-mono text-[12px] text-foreground active:bg-muted">
+        <button type="button" onClick={() => nudge(FRAME_SEC)} className="h-11 flex-1 rounded-lg border border-border bg-secondary tabular-nums text-[12px] text-foreground active:bg-muted">
           +1 frame
         </button>
       </div>
@@ -1092,12 +1092,12 @@ export function AnalyzeFlowClient({
     >
       {/* header */}
       <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 truncate font-mono text-[10px] uppercase tracking-[0.22em] text-faint">
+        <span className="min-w-0 truncate micro-caps text-faint">
           Analyze · {data.job.track.name}
         </span>
         <span className="flex items-center gap-2">
           {saving ? (
-            <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-faint">Saving…</span>
+            <span className="micro-caps text-faint">Saving…</span>
           ) : null}
           <Link
             href={backHref}
@@ -1130,7 +1130,7 @@ export function AnalyzeFlowClient({
             />
             <span
               className={cn(
-                "font-mono text-[8.5px] uppercase tracking-[0.14em]",
+                "micro-caps",
                 s === step ? "text-foreground" : "text-faint"
               )}
             >
@@ -1229,7 +1229,7 @@ export function AnalyzeFlowClient({
                 onChange={(e) => setTimingUrls(e.target.value)}
                 rows={3}
                 placeholder="https://…liverc… (one per line)"
-                className="w-full rounded-lg border border-border bg-secondary p-2.5 font-mono text-[11px] text-foreground"
+                className="w-full rounded-lg border border-border bg-secondary p-2.5 tabular-nums text-[11px] text-foreground"
               />
               <button
                 type="button"
@@ -1257,7 +1257,7 @@ export function AnalyzeFlowClient({
                       onClick={() => toggleSelectedLap("me", l.lapNumber)}
                       className={cn(
                         chipToggleClass(session.selectedLaps.me.includes(l.lapNumber)),
-                        "px-2.5 py-1.5 font-mono text-[11px] tabular-nums"
+                        "px-2.5 py-1.5 text-[11px] tabular-nums"
                       )}
                     >
                       L{l.lapNumber} · {l.lapTimeSec.toFixed(3)}
@@ -1279,7 +1279,7 @@ export function AnalyzeFlowClient({
                           onClick={() => toggleSelectedLap("competitor", l.lapNumber)}
                           className={cn(
                             chipToggleClass(session.selectedLaps.competitor.includes(l.lapNumber)),
-                            "px-2.5 py-1.5 font-mono text-[11px] tabular-nums"
+                        "px-2.5 py-1.5 text-[11px] tabular-nums"
                           )}
                         >
                           L{l.lapNumber} · {l.lapTimeSec.toFixed(3)}
@@ -1328,7 +1328,7 @@ export function AnalyzeFlowClient({
                   }}
                   className={cn(
                     chipToggleClass(anchorLap === l.lapNumber),
-                    "shrink-0 px-3 py-2 font-mono text-[11px] tabular-nums"
+                    "shrink-0 px-3 py-2 text-[11px] tabular-nums"
                   )}
                 >
                   L{l.lapNumber} · {l.lapTimeSec.toFixed(3)}
@@ -1400,7 +1400,7 @@ export function AnalyzeFlowClient({
           <div className="space-y-1.5">
             {draftLines.map((l, idx) => (
               <div key={l.lineKey} className="flex items-center gap-1.5">
-                <span className="w-7 shrink-0 text-center font-mono text-[10px] uppercase tracking-[0.1em] text-faint">
+                <span className="w-7 shrink-0 text-center micro-caps text-faint">
                   {l.lineKey === "sf" ? "SF" : idx}
                 </span>
                 <input
@@ -1417,7 +1417,7 @@ export function AnalyzeFlowClient({
                   aria-label={`Line ${idx} name`}
                 />
                 {l.lineKey === "sf" ? (
-                  <span className="shrink-0 pr-1 font-mono text-[9px] uppercase tracking-[0.14em] text-faint">
+                  <span className="shrink-0 pr-1 micro-caps text-faint">
                     synced
                   </span>
                 ) : (
@@ -1517,7 +1517,7 @@ export function AnalyzeFlowClient({
                     <span className="w-full truncate text-[12.5px] font-semibold text-foreground">
                       {s.name}
                     </span>
-                    <span className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-faint">
+                    <span className="micro-caps text-faint">
                       {corners === 0 ? "no corner lines" : `${corners} corner${corners === 1 ? "" : "s"}`}
                       {inUse ? " · in use" : ""}
                     </span>
@@ -1626,7 +1626,7 @@ export function AnalyzeFlowClient({
         <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-5 lg:items-start">
           <div className="space-y-2.5 lg:sticky lg:top-4">
             {markQueue[markCursor] ? (
-              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-primary-ink">
+              <p className="micro-caps text-primary-ink">
                 {markQueue[markCursor]!.role === "competitor" ? `${compDriver?.driverName ?? "Rival"} · ` : ""}
                 L{markQueue[markCursor]!.lapNumber} · {markQueue[markCursor]!.label} line
               </p>
@@ -1687,7 +1687,7 @@ export function AnalyzeFlowClient({
                   const cells = nonSfLines.map((l) => l.lineKey);
                   return (
                     <tr key={key}>
-                      <td className="py-1 pr-2 font-mono text-[10.5px] text-muted-foreground">
+                      <td className="py-1 pr-2 tabular-nums text-[10px] text-muted-foreground">
                         {role === "competitor" ? "R·" : ""}L{lapNumber}
                       </td>
                       {cells.map((lineKey) => {
@@ -1757,7 +1757,7 @@ export function AnalyzeFlowClient({
               <div className="flex items-end justify-between gap-3">
                 <span
                   className={cn(
-                    "font-mono text-2xl font-medium tabular-nums",
+                    "text-2xl font-medium tabular-nums",
                     doneReport.totalDeltaSec < 0 ? "text-gain" : "text-destructive"
                   )}
                 >
@@ -1768,7 +1768,7 @@ export function AnalyzeFlowClient({
                   {doneReport.summary}
                 </span>
               </div>
-              <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-faint">
+              <p className="micro-caps text-faint">
                 L{doneReport.a.lapIndex} vs L{doneReport.b.lapIndex} ·{" "}
                 {doneReport.segments.length} segments
               </p>
@@ -1852,7 +1852,7 @@ function FineWheel({ onDelta }: { onDelta: (dxPx: number) => void }) {
         }}
       />
       <div className="absolute bottom-0 left-1/2 top-0 w-[2px] bg-primary shadow-[0_0_8px_rgba(255,214,10,0.5)]" />
-      <span className="absolute inset-x-0 bottom-1 text-center font-mono text-[8.5px] tracking-[0.18em] text-faint">
+      <span className="absolute inset-x-0 bottom-1 text-center tabular-nums text-[8.5px] tracking-[0.18em] text-faint">
         DRAG · 1PX = 4MS
       </span>
     </div>

@@ -50,7 +50,7 @@ function fmtField(n: number | null | undefined): string {
 }
 
 const LABEL_CLASS = "block text-xs font-medium text-muted-foreground";
-const INPUT_CLASS = "form-control w-full px-3 py-2 text-sm font-mono tabular-nums";
+const INPUT_CLASS ="form-control w-full px-3 py-2 fig-stat";
 
 export function RunConditionsSection({
   value,

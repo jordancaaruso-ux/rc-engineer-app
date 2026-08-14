@@ -5,7 +5,7 @@ import { SetupComparisonClient } from "@/components/setup/SetupComparisonClient"
 import { PageBackLink } from "@/components/ui/PageBackLink";
 
 export default async function SetupComparisonPage(): Promise<ReactNode> {
-  // Comparison can still work without DB for “current setup vs …”, but selectors need DB sources.
+  // Every setup on offer is read from the database — with no DB there is nothing to compare.
   const dbReady = hasDatabaseUrl();
   return (
     <>
@@ -14,7 +14,7 @@ export default async function SetupComparisonPage(): Promise<ReactNode> {
           <PageBackLink href="/analysis" />
           <div>
             <h1 className="page-title">Setup comparison</h1>
-            <p className="page-subtitle">Compare any two setups using graded differences.</p>
+            <p className="page-subtitle">Put two setups on one sheet and hold it to swap between them.</p>
           </div>
         </div>
       </header>

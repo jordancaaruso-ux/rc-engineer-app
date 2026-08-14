@@ -153,7 +153,7 @@ export function TourOverlay({
       </div>
 
       <div className="flex items-center gap-2">
-        <span className="type-timestamp mr-auto text-[10.5px] tabular-nums text-faint">
+        <span className="type-timestamp mr-auto text-[10px] tabular-nums text-faint">
           {String(stepIndex + 1).padStart(2, "0")} / {String(stepCount).padStart(2, "0")}
         </span>
         <button

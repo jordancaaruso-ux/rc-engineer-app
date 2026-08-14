@@ -205,4 +205,11 @@ export type WorkbenchGroup = {
   dateLabel: string;
   runs: WorkbenchRunRow[];
   trend: AnalysisTrendModel | null;
+  /**
+   * Runs in this session before any filter — the denominator in "2 of 8 runs".
+   * Null when it wasn't counted (no filter on, or the count query hit its cap):
+   * the rail then falls back to the plain "N runs" rather than printing a ratio
+   * it can't stand behind.
+   */
+  totalRuns: number | null;
 };
