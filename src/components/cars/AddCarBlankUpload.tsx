@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Upload } from "lucide-react";
+import { Check, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptics";
+import { primaryButtonClassName } from "@/components/ui/ButtonLink";
 import {
   uploadBlankSheetForChassis,
   type BlankUploadModel,
@@ -20,7 +21,17 @@ import {
  * has boxes to type in, and only the editable one can become a chassis. A driver who picks the
  * wrong one gets a refusal that reads like the app is broken — so the ask names the file before
  * they go looking, and the refusal names it again.
+ *
+ * The panel is a gate, not a form: the file picker stays off until the chassis has a name, and
+ * choosing a file surfaces the one commit button ("Create chassis") instead of a submit that sat
+ * there disabled the whole time. Both inputs stay on screen in every state so a typo in the name
+ * never costs the chosen file.
  */
+
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
 
 export function AddCarBlankUpload({
   onCreated,
@@ -48,10 +59,11 @@ export function AddCarBlankUpload({
   const [offerNoSheet, setOfferNoSheet] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const canSubmit = chassisName.trim().length > 0 && file !== null && !busy;
+  const named = chassisName.trim().length > 0;
+  const canCreate = named && file !== null && !busy;
 
   async function submit() {
-    if (!file || busy) return;
+    if (!file || !named || busy) return;
     haptic("light");
     setBusy(true);
     setError(null);
@@ -104,38 +116,89 @@ export function AddCarBlankUpload({
 
       <div>
         <label className="mb-1 block text-[11px] text-muted-foreground">Setup sheet (fillable PDF)</label>
+        {/*
+          Hidden native input behind a styled trigger: the native "Choose file" control can't be
+          greyed out or restyled, and the chosen file needs to render as a chip with a Change
+          affordance. Value is cleared after every pick so re-choosing the same file still fires.
+        */}
         <input
           ref={fileRef}
           type="file"
           accept="application/pdf,.pdf"
-          className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-secondary file:px-3 file:py-1.5 file:text-xs file:text-foreground"
+          className="hidden"
           onChange={(e) => {
             setFile(e.target.files?.[0] ?? null);
             setError(null);
             setOfferNoSheet(false);
+            e.target.value = "";
           }}
-          aria-label="Setup sheet (fillable PDF)"
+          aria-hidden
+          tabIndex={-1}
         />
+        {file ? (
+          <div className="flex items-center gap-2">
+            <span className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-xs text-foreground">
+              <Check className="h-3.5 w-3.5 shrink-0 text-primary-ink" aria-hidden />
+              <span className="truncate">{file.name}</span>
+            </span>
+            <button
+              type="button"
+              className="shrink-0 px-1 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => fileRef.current?.click()}
+              disabled={busy}
+            >
+              Change
+            </button>
+          </div>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="tap-active rounded-md border border-border bg-secondary px-3 py-1.5 text-xs text-foreground transition disabled:cursor-default disabled:opacity-50"
+              onClick={() => fileRef.current?.click()}
+              disabled={!named}
+              aria-label="Choose setup sheet file"
+            >
+              Choose file
+            </button>
+            {!named ? (
+              <p className="mt-1 text-[11px] text-muted-foreground">Name your chassis first.</p>
+            ) : null}
+          </>
+        )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      {file ? (
+        <div className="rounded-md border border-border bg-background p-2.5">
+          <p className="text-xs font-medium text-foreground">
+            {named ? (
+              <>Create &ldquo;{chassisName.trim()}&rdquo;?</>
+            ) : (
+              <>Name your chassis to create it.</>
+            )}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            from <span className="text-foreground">{file.name}</span> · {formatFileSize(file.size)}
+          </p>
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={!canCreate}
+            className={primaryButtonClassName("mt-2 gap-1.5 disabled:opacity-60")}
+          >
+            <Upload className="h-3.5 w-3.5" aria-hidden />
+            {busy ? "Reading your sheet…" : "Create chassis"}
+          </button>
+        </div>
+      ) : (
         <button
           type="button"
-          onClick={() => void submit()}
-          disabled={!canSubmit}
-          className="btn-surface inline-flex items-center gap-1.5 px-2 py-1 text-xs disabled:opacity-60"
-        >
-          <Upload className="h-3.5 w-3.5" aria-hidden />
-          {busy ? "Reading your sheet…" : "Add chassis from sheet"}
-        </button>
-        <button
-          type="button"
-          className="px-2 text-xs text-muted-foreground hover:text-foreground"
+          className="px-1 text-xs text-muted-foreground hover:text-foreground"
           onClick={onAddWithoutSheet}
         >
           I don&rsquo;t have the sheet
         </button>
-      </div>
+      )}
 
       {busy ? (
         <p className="text-[11px] text-muted-foreground">

@@ -12,6 +12,8 @@ import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Collapse } from "@/components/ui/Collapse";
 import { AddCarBlankUpload } from "@/components/cars/AddCarBlankUpload";
 import { UploadSetupSheetBar, type UploadSetupCar } from "@/components/setup/UploadSetupSheetBar";
+import { PickerSheet, PickerTrigger } from "@/components/ui/PickerSheet";
+import type { OptionSection } from "@/lib/search/optionSearch";
 
 type SetupSheetModelOption = { id: string; name: string; slug: string; isAuthorized?: boolean };
 
@@ -101,6 +103,7 @@ export function CarList({
   const [setupSheetModelId, setSetupSheetModelId] = useState("");
   const [pending, setPending] = useState(false); // no setup sheet — the fallback, not the offer
   const [showUpload, setShowUpload] = useState(false); // "isn't listed" → upload your sheet
+  const [chassisPickerOpen, setChassisPickerOpen] = useState(false);
   /**
    * What the uploaded sheet already had in its boxes, waiting for a car to belong to.
    *
@@ -114,7 +117,30 @@ export function CarList({
   const [firstCarId, setFirstCarId] = useState<string | null>(null);
 
   const selectedModel = setupSheetModels.find((m) => m.id === setupSheetModelId) ?? null;
-  const sortedModels = [...setupSheetModels].sort((a, b) => a.name.localeCompare(b.name));
+
+  /*
+   * The flag goes on the UNREVIEWED rows, not the curated ones. Drivers can author their own
+   * chassis types and those go live for everyone immediately, so the catalog is now
+   * mostly-curated with driver rows mixed in — badging the good ones made every unbadged row
+   * look equally trustworthy. Same rule as tracks and tires.
+   */
+  const chassisSections = useMemo<OptionSection[]>(
+    () => [
+      {
+        key: "all",
+        label: null,
+        options: [...setupSheetModels]
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((m) => ({
+            value: m.id,
+            label: m.name,
+            detail: m.isAuthorized ? null : "Unreviewed",
+            keywords: m.slug.replace(/_/g, " "),
+          })),
+      },
+    ],
+    [setupSheetModels]
+  );
 
   /** Keep the auto-filled name in sync until the user hand-edits it. */
   function onNameChange(value: string) {
@@ -297,62 +323,80 @@ export function CarList({
           </button>
 
           <Collapse open={addOpen}>
-            {/* overflow visible on the card so the native select menu isn't clipped */}
+            {/* overflow stays visible on the card — legacy of the native select era, harmless now
+                that the picker sheet portals to <body> */}
             <form onSubmit={handleAdd} className="space-y-3 px-3 pb-4 pt-1 sm:px-4">
               {/* Chassis type — the required, schema-driving field, first. */}
               <div className="relative">
                 <label className="block text-[11px] text-muted-foreground mb-1">
                   Chassis type <span className="text-warning">*</span>
                 </label>
-                {/* Native select (founder decision 2026-07-14): the OS draws the menu —
-                    no portal, no JS re-pin, no iOS rubber-banding. Sentinel values map
-                    the old menu actions. */}
-                <select
-                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-                  value={pending || showUpload ? "__upload_blank__" : setupSheetModelId}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v === "__upload_blank__") return chooseUploadBlank();
-                    if (!v) {
+                {/* A `PickerSheet`, same as tire compound and track on the log-run form (founder
+                    call 2026-08-14, replacing the 2026-07-14 native select): the catalog is
+                    growing past the iOS five-row wheel, and the sheet brings type-to-search and
+                    a real "isn't listed" affordance with it. */}
+                <PickerTrigger
+                  onClick={() => setChassisPickerOpen(true)}
+                  open={chassisPickerOpen}
+                  aria-label="Chassis type"
+                  placeholder={!selectedModel && !pending && !showUpload}
+                  className="rounded-md border border-border bg-card"
+                >
+                  {selectedModel
+                    ? selectedModel.name
+                    : pending || showUpload
+                      ? "My chassis isn’t listed — upload your setup sheet"
+                      : "Select chassis type…"}
+                </PickerTrigger>
+                <PickerSheet
+                  open={chassisPickerOpen}
+                  onClose={() => setChassisPickerOpen(false)}
+                  title="Chassis type"
+                  value={pending || showUpload ? "" : setupSheetModelId}
+                  onSelect={(id) => {
+                    setChassisPickerOpen(false);
+                    if (!id) {
                       setSetupSheetModelId("");
                       setPending(false);
                       setShowUpload(false);
                       return;
                     }
-                    const m = setupSheetModels.find((x) => x.id === v);
+                    const m = setupSheetModels.find((x) => x.id === id);
                     if (m) selectModel(m);
                   }}
-                  aria-label="Chassis type"
-                >
-                  <option value="">Select chassis type…</option>
-                  {/*
-                    The flag goes on the UNREVIEWED rows, not the curated ones. Drivers can author
-                    their own chassis types and those go live for everyone immediately, so the
-                    catalog is now mostly-curated with driver rows mixed in — badging the good ones
-                    made every unbadged row look equally trustworthy. Same rule as tracks and tires.
-                  */}
-                  {sortedModels.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.isAuthorized ? m.name : `${m.name} · Unreviewed`}
-                    </option>
-                  ))}
-                  {/*
-                    Was "add without a setup sheet", which made a car that could not hold one and
-                    told nobody. Now it opens the upload panel: the driver's own blank sheet becomes
-                    the chassis. The no-sheet car still exists, one step further in, for when the
-                    sheet cannot be read.
-                  */}
-                  {/*
-                    ONE way past the list, for everybody.
-                    There used to be a second, admin-only entry here — "+ Create new chassis type…"
-                    — which minted an empty chassis by name and left the founder to hand-build every
-                    parameter. Two "not listed" options in one menu is a choice nobody should have to
-                    make, and the upload is the better half of it anyway: the same chassis arrives
-                    with its boxes and their positions already read off the paper. Hand-building an
-                    empty one still exists, on the page that is for exactly that — /setup-sheet-models/new.
-                  */}
-                  <option value="__upload_blank__">My chassis isn’t listed — upload your setup sheet</option>
-                </select>
+                  sections={chassisSections}
+                  searchPlaceholder="Search chassis types…"
+                  clearRow={{ label: "Select chassis type…" }}
+                  // ONE way past the list, for everybody — the footer, exactly where the tire and
+                  // track sheets keep theirs. It opens the blank-sheet upload panel: the driver's
+                  // own PDF becomes the chassis, boxes and positions read off the paper. The
+                  // no-sheet car still exists, one step further in, for when the sheet cannot be
+                  // read. Hand-building an empty chassis stays on /setup-sheet-models/new.
+                  footer={
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setChassisPickerOpen(false);
+                        chooseUploadBlank();
+                      }}
+                      className="tap-active w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-primary-ink transition hover:bg-white/5"
+                    >
+                      + My chassis isn&rsquo;t listed — upload your setup sheet…
+                    </button>
+                  }
+                  emptyAction={() => (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setChassisPickerOpen(false);
+                        chooseUploadBlank();
+                      }}
+                      className="tap-active rounded-lg border border-border px-3 py-2 text-sm font-semibold text-primary-ink transition hover:bg-white/5"
+                    >
+                      Upload your setup sheet
+                    </button>
+                  )}
+                />
                 {showUpload ? (
                   <AddCarBlankUpload
                     onCreated={onChassisCreatedFromBlank}
