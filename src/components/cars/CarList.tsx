@@ -162,15 +162,19 @@ export function CarList({
     selectModel(model);
     // Held until the car exists — a setup needs a car to hang off. Saved by `handleAdd`.
     setImportedSetup(summary.filledCount > 0 ? summary.values : null);
-    // Say what they got, in boxes. "289 parameters derived" is our word for it, not theirs.
-    // A merge is said out loud: they typed one name and are now on a row called something else.
-    const where = summary.merged
-      ? `We already had this exact sheet — your car goes on “${model.name}”, with everyone else running it.`
-      : `Chassis added from your sheet — ${summary.totalBoxes} boxes, where they sit on the paper.`;
+    /*
+     * Nothing is announced for the ordinary case. A box count and a promise about a first setup was
+     * a paragraph of small print beside the Add car button, describing work the driver could
+     * already see land: the chassis field now holds their chassis, the name filled itself in, and
+     * "Car added, with the setup from your sheet saved on it" says the rest a moment later.
+     *
+     * A MERGE still speaks, because it is the one thing the screen does not show: they typed one
+     * name and are now on a row called something else, shared with everyone running that sheet.
+     */
     setMessage(
-      summary.filledCount > 0
-        ? `${where} ${summary.filledCount} boxes already had something in them, so that becomes your first setup.`
-        : where
+      summary.merged
+        ? `We already had this exact sheet — your car goes on “${model.name}”, with everyone else running it.`
+        : null
     );
   }
 
@@ -395,11 +399,22 @@ export function CarList({
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              {/*
+                The committing action of the form, sized like one. It used to be the same small
+                chip the card uses for a link, with whatever the form had to say wrapped alongside
+                it — so the row's height moved with the length of a sentence and the button was the
+                smaller half of it. Full width and a 44px tap target on a phone, its natural width
+                once there is room; anything the form has to say goes underneath, on its own line.
+              */}
+              <div className="space-y-2 pt-1">
                 <button
                   type="submit"
                   disabled={adding}
-                  className={cn(buttonLinkClassName("primary"), adding && "opacity-70 pointer-events-none")}
+                  className={cn(
+                    buttonLinkClassName("primary"),
+                    "min-h-11 w-full px-4 text-sm sm:w-auto sm:min-w-44",
+                    adding && "pointer-events-none opacity-70"
+                  )}
                 >
                   {adding ? "Adding…" : "Add car"}
                 </button>
@@ -407,7 +422,9 @@ export function CarList({
                     "Car added" written into it was never seen by anyone — the confirmation
                     now lives below, outside the Collapse. */}
                 {message && !message.startsWith("Car added") && (
-                  <span className="text-xs text-muted-foreground">{message}</span>
+                  <p role="status" className="text-xs text-warning">
+                    {message}
+                  </p>
                 )}
               </div>
             </form>

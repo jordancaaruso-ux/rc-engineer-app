@@ -30,6 +30,9 @@ import { setupFillDraftProgressLabel } from "@/lib/setup/setupFillDraft";
  * 2026-08-11: "they're not really related").
  */
 
+/** `busyId` holds a snapshot id; the draft has none, so it borrows a value no id can be. */
+const DRAFT_BUSY_ID = "fill-draft";
+
 export type CarLibrarySetup = {
   id: string;
   name: string | null;
@@ -61,6 +64,28 @@ export function CarSetupsCard({
   const [pending, startTransition] = useTransition();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  /** The draft is not a setup, so it has no snapshot id to key `busyId` on. */
+  const discardDraft = async () => {
+    if (!window.confirm("Discard this draft? What you have filled so far is not kept.")) return;
+    setBusyId(DRAFT_BUSY_ID);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/setup-fill-drafts?${new URLSearchParams({ carId }).toString()}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? "Could not discard this draft.");
+      }
+      startTransition(() => router.refresh());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not discard this draft.");
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const rename = async (setup: CarLibrarySetup) => {
     const next = window.prompt("Setup name", setup.name ?? "");
@@ -118,25 +143,40 @@ export function CarSetupsCard({
       </div>
 
       {/*
-        A detour, not a list item — this isn't a saved setup, it's an unfinished action. Link only:
-        Resume and Start over both live on the page it goes to, which is also the page that can
-        recount the progress against today's chassis schema (these counts are the client's last
-        report and can drift by a field or two if that schema changed).
+        A detour, not a list item — this isn't a saved setup, it's an unfinished action. It carries
+        its own Discard because the only other way to be rid of it was to open the fill and start
+        over, which is a strange errand: a driver who no longer wants the draft has to walk INTO it.
+        Resume still hands off to that page, which is also the page that can recount progress
+        against today's chassis schema (these counts are the client's last report and can drift by a
+        field or two if that schema changed).
       */}
       {fillDraft ? (
-        <Link
-          href={`/cars/${carId}/setups/new`}
-          className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 transition hover:border-amber-500/60"
-        >
-          <span className="min-w-0">
-            <span className="block text-sm text-foreground">Draft in progress</span>
-            <span className="block tabular-nums text-[11px] text-muted-foreground">
-              {setupFillDraftProgressLabel(fillDraft.answeredCount, fillDraft.stepCount)} ·{" "}
-              <RelativeTime iso={fillDraft.updatedAt} fallback="recently" />
+        <div className="flex items-stretch gap-1 rounded-lg border border-amber-500/30 bg-amber-500/5 transition focus-within:border-amber-500/60 hover:border-amber-500/60">
+          <Link
+            href={`/cars/${carId}/setups/new`}
+            className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-2.5"
+          >
+            <span className="min-w-0">
+              <span className="block text-sm text-foreground">Draft in progress</span>
+              <span className="block tabular-nums text-[11px] text-muted-foreground">
+                {setupFillDraftProgressLabel(fillDraft.answeredCount, fillDraft.stepCount)} ·{" "}
+                <RelativeTime iso={fillDraft.updatedAt} fallback="recently" />
+              </span>
             </span>
-          </span>
-          <span className="ui-caption shrink-0 text-warning">Resume →</span>
-        </Link>
+            <span className="ui-caption shrink-0 text-warning">Resume →</span>
+          </Link>
+          <button
+            type="button"
+            onClick={discardDraft}
+            disabled={busyId === DRAFT_BUSY_ID}
+            aria-label="Discard this draft"
+            className="shrink-0 px-3 text-muted-foreground transition hover:text-foreground disabled:opacity-60"
+          >
+            <span aria-hidden className="text-base leading-none">
+              {busyId === DRAFT_BUSY_ID ? "…" : "×"}
+            </span>
+          </button>
+        </div>
       ) : null}
 
       {setups.length === 0 ? (
