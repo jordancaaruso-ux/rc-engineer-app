@@ -54,10 +54,20 @@ test("fill surface — Xray sheet, named boxes", async ({ page }) => {
     }
   }
 
-  // Tick boxes: the sheet decides its own mark, and this one crosses rather than ticks.
+  /*
+   * Tick boxes: the sheet decides its own mark, and this one crosses rather than ticks.
+   *
+   * ONE tap does it, on a phone as on a desktop (founder, 2026-08-14). This used to take two — the
+   * tap only focused the box and the mark was made by pressing "Not ticked" in the bar — which read
+   * as a checkbox that would not check. The bar must still be showing the box afterwards, because
+   * dropping focus here is what closes the keyboard mid-sheet.
+   */
   await page.getByRole("button", { name: "Fr caster · box 1 of 3", exact: true }).click();
   await page.waitForTimeout(500);
-  await page.getByRole("button", { name: "Not ticked" }).click();
+  await expect(
+    page.getByRole("button", { name: "Ticked", exact: true }),
+    "one tap ticks the box, and the bar says so"
+  ).toBeVisible();
   await page.waitForTimeout(300);
   await page.screenshot({ path: `${OUT}/07-xray-tick.png` });
 

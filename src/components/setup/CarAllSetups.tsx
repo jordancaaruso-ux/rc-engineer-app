@@ -168,29 +168,34 @@ export function CarAllSetups({
     }
   };
 
+  /*
+   * The heading, the hint and the chips live INSIDE the card.
+   *
+   * They used to float above it, which made this the only section on the car page whose title sat
+   * on the page background while "Saved setups", "Tires", "Car" and "Delete" all wore theirs inside
+   * their own card (founder, 2026-08-14). One list, one container: the chips filter what is in the
+   * card, so they belong in it.
+   */
   if (entries.length === 0) {
     return (
-      <div className="space-y-2">
-        <div className="px-1">
-          <Eyebrow>All setups</Eyebrow>
-        </div>
-        <SurfaceCard variant="panel" contentClassName="text-sm text-muted-foreground">
-          Nothing yet. Log a run or upload a setup sheet and every setup this car has been on shows
-          up here.
-        </SurfaceCard>
-      </div>
+      <SurfaceCard variant="panel" contentClassName="text-sm text-muted-foreground">
+        <Eyebrow>All setups</Eyebrow>
+        Nothing yet. Log a run or upload a setup sheet and every setup this car has been on shows up
+        here.
+      </SurfaceCard>
     );
   }
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2 px-1">
-        <Eyebrow>All setups</Eyebrow>
+      <SurfaceCard variant="panel" contentClassName="p-0">
+      <div className="flex items-center justify-between gap-2 px-4 pt-4">
+        <Eyebrow className="mb-0">All setups</Eyebrow>
         <span className="ui-caption">Bookmark one to save it</span>
       </div>
 
       {chips.length > 1 ? (
-        <div className="flex gap-1.5 overflow-x-auto px-0.5 pb-0.5">
+        <div className="flex gap-1.5 overflow-x-auto px-4 pb-3.5 pt-3">
           {chips.map(([value, label, count]) => (
             <button
               key={value}
@@ -216,10 +221,16 @@ export function CarAllSetups({
             </button>
           ))}
         </div>
-      ) : null}
+      ) : (
+        <div className="pb-3.5" />
+      )}
 
-      <SurfaceCard variant="panel" contentClassName="p-0">
-        <ul className="divide-y divide-border">
+        {shown.length === 0 ? (
+          <p className="ui-caption border-t border-border px-4 py-3">
+            Nothing of that kind on this car yet.
+          </p>
+        ) : (
+        <ul className="divide-y divide-border border-t border-border">
           {shown.map((entry) => {
             const saved = isSaved(entry);
             const busy = busyId === entry.id;
@@ -335,11 +346,8 @@ export function CarAllSetups({
             );
           })}
         </ul>
+        )}
       </SurfaceCard>
-
-      {shown.length === 0 ? (
-        <p className="ui-caption px-1">Nothing of that kind on this car yet.</p>
-      ) : null}
 
       {error ? <p className="px-1 text-xs text-destructive">{error}</p> : null}
 

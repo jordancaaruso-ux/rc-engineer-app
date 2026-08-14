@@ -911,14 +911,33 @@ export function SheetFillSurface({
         return;
       }
       /*
-       * On a desktop the click IS the answer for a tick box or a row of choices.
+       * A lone tick box IS its answer too, on any pointer — but it STAYS FOCUSED on a phone.
        *
-       * There is no value bar there to answer them in, and a mouse hits the box it means. So this
-       * behaves the way ticking a box in any PDF reader behaves: the mark goes on, a second click
-       * takes it off, and a row of choices steps to the next one and then back to none. Nothing is
-       * focused afterwards, because there is nothing to type.
+       * It used to take two taps there: one to focus, one to press "Ticked" in the bar, while the
+       * printed choice boxes sitting right beside it ticked on the first (founder, 2026-08-14).
+       * The mark now goes on with the tap and a second tap takes it off.
+       *
+       * Focus is deliberately kept rather than dropped the way an option box drops it. Two reasons,
+       * and both only bite on a phone: the one input must never blur or the keyboard closes and the
+       * screen resizes mid-sheet (`sheet-fill.spec.ts` guards exactly this), and the bar flipping to
+       * "Ticked" is the only confirmation a 7px square can give that the tap landed at all. On a
+       * desktop there is no bar to keep, and `focusBox`'s caller clears it below.
        */
-      if (finePointer && (field.uiType === "checkbox" || field.options?.length)) {
+      if (field.uiType === "checkbox") {
+        answerWithoutTyping(field);
+        if (finePointer) setFocusIndex(null);
+        else setFocusIndex(i);
+        return;
+      }
+      /*
+       * A ROW of choices still steps on a desktop only.
+       *
+       * There is no value bar there to answer it in, and a mouse hits the box it means, so a click
+       * walks to the next option and then back to none — the way any PDF reader behaves. On a phone
+       * the bar is the better answer: its chips let a thumb pick the option it means outright,
+       * instead of tapping a 7px square four times to walk round to it.
+       */
+      if (finePointer && field.options?.length) {
         answerWithoutTyping(field);
         setFocusIndex(null);
         return;
@@ -1344,7 +1363,7 @@ export function SheetFillSurface({
    */
   const dock = focused && !finePointer ? (
     <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-secondary px-3 pb-3 pt-2.5">
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <span
           className={cn(
             "min-w-0 flex-1 truncate text-[15px] font-semibold",
@@ -1353,9 +1372,21 @@ export function SheetFillSurface({
         >
           {focused.label}
         </span>
-        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-          {focusIndex! + 1} / {order.length}
-        </span>
+        {/*
+          Done is the way OUT of the sheet's one modal state, so it sits top-right of the bar with a
+          border and a thumb-sized target (founder, 2026-08-14). It used to be muted 12px text in the
+          bottom-right corner — 34×19px, right where the iPhone home indicator lives, reading as a
+          caption beside the yellow ‹ › keys rather than as the button it is. The box counter took
+          its old place on the bottom row, where it belongs with the section name.
+        */}
+        <button
+          type="button"
+          onMouseDown={keepKeyboard}
+          onClick={exitFocus}
+          className="tap-active -my-2 grid min-h-[44px] shrink-0 place-items-center rounded-md border border-border bg-card px-4 text-[13px] font-medium text-foreground"
+        >
+          Done
+        </button>
       </div>
 
       {focused.options?.length ? (
@@ -1482,16 +1513,12 @@ export function SheetFillSurface({
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <span className="truncate micro-caps text-faint">
+        <span className="min-w-0 truncate micro-caps text-faint">
           {focused.sectionTitle}
         </span>
-        <button
-          type="button"
-          onClick={exitFocus}
-          className="shrink-0 text-[12.5px] text-muted-foreground hover:text-foreground"
-        >
-          Done
-        </button>
+        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+          {focusIndex! + 1} / {order.length}
+        </span>
       </div>
     </div>
   ) : null;
