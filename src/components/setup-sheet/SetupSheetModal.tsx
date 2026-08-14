@@ -671,6 +671,7 @@ export function SetupSheetModal({
                   values={runSetup}
                   templateKey={template.templateKey}
                   labLabels={{ s: "This run" }}
+                  labSource={{ kind: "run", id: run.id }}
                 />
               ) : (
                 <SetupSheetView

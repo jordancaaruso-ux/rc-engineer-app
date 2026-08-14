@@ -1971,6 +1971,12 @@ html[data-nav-pending] .page {
     grid-column: 2;
     grid-row: 3;
   }
+  /* The sheet is a zoom-and-pan stage the width of a page — it cannot live in the 21rem
+     Adjustments column, so it spans every track and takes whichever row auto-placement can
+     fit a full-width item into (row 4 at xl, row 3 once the aside moves to a third track). */
+  .lab-sheet {
+    grid-column: 1 / -1;
+  }
 }
 
 /* The third track. The schematic decides this number at both ends: at 1280 three

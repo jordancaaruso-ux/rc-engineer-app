@@ -19,14 +19,16 @@
  * instrument-grade; absolutes carry the pack grade.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Button } from "@/components/ui/Button";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 import { Eyebrow } from "@/components/ui/panel";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { AxleSchematic } from "@/components/rollCenter/AxleSchematic";
+import { LabSheetPane } from "@/components/rollCenter/LabSheetPane";
 import {
   computeAxleMetrics,
   solveAxle,
@@ -40,14 +42,18 @@ import {
 } from "@/lib/rollCenter/computeFromSnapshot";
 import { resolvePackForSnapshot } from "@/lib/rollCenter/packs";
 import {
+  GEOMETRY_SHEET_KEYS,
   LAB_DEFAULT_FIELDS,
-  decodeLabFields,
+  decodeLabSlot,
   encodeLabFields,
+  encodeLabSlot,
   extractGeometryFields,
   labChangeList,
   type GeometrySheetKey,
   type LabFields,
+  type LabSource,
 } from "@/lib/rollCenter/labState";
+import { loadLabSource, saveLabSlot, type LabWriteTarget } from "@/lib/rollCenter/labSource";
 import {
   formatRunCreatedRelativeWhen,
   formatRunPickerParts,
@@ -79,6 +85,16 @@ type SetupPickerEntry = {
   detail: string;
   when: string;
   fields: LabFields;
+  /*
+   * The picker's own APIs already return the whole snapshot and the chassis it belongs to — the Lab
+   * used to keep the geometry slice and drop both. Keeping them is what lets a picked setup draw its
+   * sheet and be saved back to, with no second round trip.
+   */
+  setupSheetModelId: string | null;
+  fullData: Record<string, unknown> | null;
+  /** Where a save may land. Resolved from what this row IS, not from anything the driver picks. */
+  write: LabWriteTarget | null;
+  labSource: LabSource | null;
 };
 
 /** Per-source row cap: no source can crowd out another, unlike the old shared 30. */
@@ -100,6 +116,19 @@ function isJsonObject(v: unknown): v is Record<string, unknown> {
 
 function fmtMm(v: number, dp = 1): string {
   return `${v >= 0 ? "+" : ""}${v.toFixed(dp)}`;
+}
+
+/**
+ * Which pin of the arm a per-leg key drives.
+ *
+ * The suffix is two letters: the axle, then the pin. `upper_inner_shims_ff` is the FRONT axle's
+ * FRONT pin; `_fr` the front axle's rear pin. The axle half is already in the section heading, so
+ * only the pin is worth the width.
+ */
+function legLabel(key: GeometrySheetKey): string | undefined {
+  if (/_(?:f|r)f$/.test(key)) return "front pin";
+  if (/_(?:f|r)r$/.test(key)) return "rear pin";
+  return undefined;
 }
 
 function parseNum(v: string | undefined): number | null {
@@ -137,8 +166,8 @@ const SENSITIVITY_KNOBS: { label: string; adjKey: keyof AxleAdjustments }[] = [
 /** One knob row: label + 0.25-detent slider + free-typed mm box (founder rulings). */
 function KnobRow({
   label,
+  sublabel,
   value,
-  legsDiffer,
   min = 0,
   max,
   step = 0.25,
@@ -146,8 +175,9 @@ function KnobRow({
   onChange,
 }: {
   label: string;
+  /** Which leg this row drives, on the split rows only. */
+  sublabel?: string;
   value: number;
-  legsDiffer?: boolean;
   min?: number;
   max: number;
   step?: number;
@@ -158,7 +188,9 @@ function KnobRow({
     <div className="flex items-center gap-3">
       <span className="type-data-label w-[9.5rem] shrink-0">
         {label}
-        {legsDiffer ? <span className="block text-faint normal-case tracking-normal">legs differ · mean shown</span> : null}
+        {sublabel ? (
+          <span className="block text-faint normal-case tracking-normal">{sublabel}</span>
+        ) : null}
       </span>
       <input
         type="range"
@@ -167,7 +199,7 @@ function KnobRow({
         step={step}
         value={Math.min(Math.max(value, min), max)}
         onChange={(e) => onChange(e.target.value)}
-        aria-label={`${label} (${unit})`}
+        aria-label={`${label}${sublabel ? ` ${sublabel}` : ""} (${unit})`}
         className="min-w-0 flex-1 accent-primary"
       />
       <input
@@ -176,7 +208,7 @@ function KnobRow({
         step={0.05}
         value={Number.isFinite(value) ? String(value) : ""}
         onChange={(e) => onChange(e.target.value)}
-        aria-label={`${label} exact value (${unit})`}
+        aria-label={`${label}${sublabel ? ` ${sublabel}` : ""} exact value (${unit})`}
         className="w-16 shrink-0 rounded-md border border-border bg-secondary px-1.5 py-1 text-right text-[11px] tabular-nums"
       />
     </div>
@@ -287,11 +319,61 @@ type Slot = {
   /** The as-loaded state when the slot came from a real setup; null = blank car. */
   loaded: LabFields | null;
   label: string | null;
+  /** Which chassis's sheet this setup draws on. Null on a bare geometry link — no sheet, knobs only. */
+  setupSheetModelId: string | null;
+  /** The row these values came from, kept so the URL stays re-shareable and reloads intact. */
+  source: LabSource | null;
+  /**
+   * Every stored value, when the slot came from a row we could read whole.
+   *
+   * Sheet mode and the save path both stand on this. Nineteen geometry keys cannot draw a sheet —
+   * they would leave 260 boxes blank on the driver's own paper — and writing nineteen keys back as a
+   * setup would erase everything they don't mention. No full data, no sheet and no save.
+   */
+  fullData: Record<string, unknown> | null;
+  /** Where a save from this slot may land. Null while unknown, or when nothing may be written. */
+  write: LabWriteTarget | null;
+  /**
+   * A box was edited on the sheet.
+   *
+   * The change list only tracks the nineteen geometry keys, which is right for the readouts — but in
+   * sheet mode the driver can type into any of the ~300 boxes, and a spring change they made here is
+   * still a change they expect to be able to save. Without this the save button would sit disabled
+   * over an edit they can see on the paper in front of them.
+   */
+  sheetDirty: boolean;
 };
 
-function slotFromFields(rawFields: LabFields, label: string | null): Slot {
+function slotFromFields(
+  rawFields: LabFields,
+  label: string | null,
+  origin?: Partial<Pick<Slot, "setupSheetModelId" | "source" | "fullData" | "write">>
+): Slot {
   const merged = { ...LAB_DEFAULT_FIELDS, ...rawFields };
-  return { fields: merged, loaded: { ...merged }, label };
+  return {
+    fields: merged,
+    loaded: { ...merged },
+    label,
+    setupSheetModelId: origin?.setupSheetModelId ?? null,
+    source: origin?.source ?? null,
+    fullData: origin?.fullData ?? null,
+    write: origin?.write ?? null,
+    sheetDirty: false,
+  };
+}
+
+/** The blank no-shim car — not a setup, so it carries no sheet, no data and nowhere to save. */
+function blankSlot(): Slot {
+  return {
+    fields: { ...LAB_DEFAULT_FIELDS },
+    loaded: null,
+    label: null,
+    setupSheetModelId: null,
+    source: null,
+    fullData: null,
+    write: null,
+    sheetDirty: false,
+  };
 }
 
 function slotName(slot: Slot): string {
@@ -361,15 +443,70 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
   ghostSeedLabel?: string | null;
 }) {
   const [slots, setSlots] = useState<{ a: Slot; b: Slot | null }>(() => {
-    const aDecoded = seed ? decodeLabFields(seed) : null;
-    const bDecoded = ghostSeed ? decodeLabFields(ghostSeed) : null;
+    const aDecoded = seed ? decodeLabSlot(seed) : null;
+    const bDecoded = ghostSeed ? decodeLabSlot(ghostSeed) : null;
     return {
       a: aDecoded
-        ? slotFromFields(aDecoded, seedLabel ?? null)
-        : { fields: { ...LAB_DEFAULT_FIELDS }, loaded: null, label: null },
-      b: bDecoded ? slotFromFields(bDecoded, ghostSeedLabel ?? null) : null,
+        ? slotFromFields(aDecoded.fields, seedLabel ?? null, {
+            setupSheetModelId: aDecoded.setupSheetModelId,
+            source: aDecoded.source,
+          })
+        : blankSlot(),
+      b: bDecoded
+        ? slotFromFields(bDecoded.fields, ghostSeedLabel ?? null, {
+            setupSheetModelId: bDecoded.setupSheetModelId,
+            source: bDecoded.source,
+          })
+        : null,
     };
   });
+
+  /*
+   * A seeded slot arrives holding the geometry slice and a reference. Follow the reference once, on
+   * mount, to fill in the rest of the sheet and work out whether this row may be written to.
+   *
+   * The fetch is deliberately not awaited before first paint: geometry is computable from the slice
+   * alone, so the Lab draws immediately and the sheet becomes available a moment later. A reference
+   * that can't be read — stale link, deleted setup, a teammate's row that stopped being shared —
+   * leaves the slot exactly as the URL described it, which still works.
+   */
+  useEffect(() => {
+    const seeds: [SlotId, string | null][] = [
+      ["a", seed],
+      ["b", ghostSeed],
+    ];
+    let cancelled = false;
+    for (const [slotId, raw] of seeds) {
+      const decoded = raw ? decodeLabSlot(raw) : null;
+      if (!decoded?.source) continue;
+      void loadLabSource(decoded.source).then((loaded) => {
+        if (cancelled || !loaded) return;
+        setSlots((s) => {
+          const slot = slotId === "a" ? s.a : s.b;
+          if (!slot) return s;
+          /*
+           * The URL's slice wins over the fetched row on the keys it carries. A link can encode a
+           * what-if that was never saved ("open in Lab with this shim change"), and re-reading the
+           * stored values over the top would silently undo it.
+           */
+          const merged = { ...loaded.fields, ...decoded.fields };
+          const next: Slot = {
+            ...slot,
+            fields: { ...LAB_DEFAULT_FIELDS, ...merged },
+            loaded: { ...LAB_DEFAULT_FIELDS, ...merged },
+            label: slot.label ?? loaded.label,
+            setupSheetModelId: slot.setupSheetModelId ?? loaded.setupSheetModelId,
+            fullData: loaded.fullData,
+            write: loaded.write,
+          };
+          return slotId === "a" ? { ...s, a: next } : { ...s, b: next };
+        });
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [seed, ghostSeed]);
   const [sel, setSel] = useState<SlotId>("a");
   const [axle, setAxle] = useState<"front" | "rear">("front");
   const [rollDeg, setRollDeg] = useState(0);
@@ -381,6 +518,10 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
    */
   const [bumpMm, setBumpMm] = useState(0);
   const [copied, setCopied] = useState(false);
+  /** Knobs or the setup's own sheet. Knobs is the default — see the toggle's note below. */
+  const [inputMode, setInputMode] = useState<"knobs" | "sheet">("knobs");
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
   // Guard: selection can never point at an empty slot.
   const activeId: SlotId = sel === "b" && slots.b ? "b" : "a";
@@ -390,6 +531,14 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
   const comparing = slots.b != null;
   const activeName = slotName(active);
   const otherName = comparing && other ? slotName(other) : null;
+
+  /*
+   * The sheet needs both halves: a chassis to draw, and the whole snapshot to draw INTO it. A slot
+   * seeded from a bare geometry link has neither, and the toggle simply doesn't appear — the Lab
+   * behaves exactly as it did before this existed.
+   */
+  const sheetAvailable = Boolean(active.setupSheetModelId && active.fullData);
+  const sheetMode = sheetAvailable && inputMode === "sheet";
 
   /* ── Setup picker (own runs + teammates + saved setups & sheets) ── */
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -433,8 +582,11 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
           id: string;
           name?: string | null;
           createdAt?: string;
+          carId?: string | null;
           carName?: string | null;
+          setupSheetModelId?: string | null;
           setupData?: unknown;
+          runCount?: number;
         }[];
       } | null>,
     ]);
@@ -453,7 +605,12 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
       title: string,
       detail: string,
       when: string,
-      data: Record<string, unknown>
+      data: Record<string, unknown>,
+      origin?: {
+        setupSheetModelId?: string | null;
+        labSource?: LabSource | null;
+        write?: LabWriteTarget | null;
+      }
     ) => {
       entries.push({
         id,
@@ -464,19 +621,34 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
         detail,
         when,
         fields: extractGeometryFields(data),
+        setupSheetModelId: origin?.setupSheetModelId ?? null,
+        // The row already holds the whole snapshot; keeping it is free and is what sheet mode needs.
+        fullData: data,
+        labSource: origin?.labSource ?? null,
+        write: origin?.write ?? null,
       });
     };
     for (const run of runsRes?.runs ?? []) {
       const data = run.setupSnapshot?.data;
       if (!isJsonObject(data) || !resolvePackForSnapshot(data)) continue;
       const parts = formatRunPickerParts(run);
-      push(`run-${run.id}`, "run", "mine", parts.title, parts.detail, parts.when, data);
+      push(`run-${run.id}`, "run", "mine", parts.title, parts.detail, parts.when, data, {
+        setupSheetModelId: run.car?.setupSheetModelId ?? null,
+        labSource: { kind: "run", id: run.id },
+        // Your own run: correctable, never overwritable — the correction writes a new snapshot.
+        write: { kind: "run", runId: run.id },
+      });
     }
     for (const run of teamRes?.runs ?? []) {
       const data = run.setupSnapshot?.data;
       if (!isJsonObject(data) || !resolvePackForSnapshot(data)) continue;
       const parts = formatRunPickerParts(run, teamRes?.memberDisplayByUserId);
-      push(`team-${run.id}`, "team", "teammates", parts.title, parts.detail, parts.when, data);
+      push(`team-${run.id}`, "team", "teammates", parts.title, parts.detail, parts.when, data, {
+        setupSheetModelId: run.car?.setupSheetModelId ?? null,
+        labSource: { kind: "run", id: run.id },
+        // Readable, never writable. Copying it onto your own car is the only move.
+        write: { kind: "copy", carId: run.carId ?? null },
+      });
     }
     const savedIds = new Set<string>();
     for (const saved of libRes?.setups ?? []) {
@@ -492,7 +664,20 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
         // and it cost a second wrapped line on names that are already long.
         saved.carName?.trim() || "",
         saved.createdAt ? formatRunCreatedRelativeWhen(saved.createdAt) : "",
-        data
+        data,
+        {
+          setupSheetModelId: saved.setupSheetModelId ?? null,
+          labSource: { kind: "setup", id: saved.id },
+          /*
+           * A saved setup with runs behind it is one of those runs' own records (saving marks, it
+           * does not copy), so it carries history and cannot be written in place. Which run to
+           * correct is ambiguous past the first, so copy is the only unambiguous answer.
+           */
+          write:
+            (saved.runCount ?? 0) > 0
+              ? { kind: "copy", carId: saved.carId ?? null }
+              : { kind: "in-place", setupId: saved.id },
+        }
       );
     }
     for (const sheet of docsRes?.downloadedSetups ?? []) {
@@ -571,15 +756,28 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
   const activeTab: PickerSource = pickerTabs.includes(pickerTab) ? pickerTab : pickerTabs[0] ?? "mine";
   const activeBucket = pickerBuckets[activeTab];
 
-  /** Keep the URL shareable: mirror slot A (`s`/`sl`) and slot B (`g`/`gl`) into the query string. */
-  const syncUrl = (slotId: SlotId, nextFields: LabFields | null, label: string | null) => {
+  /**
+   * Keep the URL shareable: mirror slot A (`s`/`sl`) and slot B (`g`/`gl`) into the query string.
+   *
+   * The chassis and the source ride inside the encoded blob, so reloading or sharing a Lab URL keeps
+   * the sheet drawable and the save door open — without either, a refresh would silently drop the
+   * driver back to knobs on the setup they were just editing.
+   */
+  const syncUrl = (slotId: SlotId, slot: Slot | null) => {
     try {
       const url = new URL(window.location.href);
       const fieldsParam = slotId === "a" ? "s" : "g";
       const labelParam = slotId === "a" ? "sl" : "gl";
-      if (nextFields) {
-        url.searchParams.set(fieldsParam, encodeLabFields(nextFields));
-        if (label) url.searchParams.set(labelParam, label.slice(0, 60));
+      if (slot) {
+        url.searchParams.set(
+          fieldsParam,
+          encodeLabSlot({
+            fields: slot.fields,
+            setupSheetModelId: slot.setupSheetModelId,
+            source: slot.source,
+          })
+        );
+        if (slot.label) url.searchParams.set(labelParam, slot.label.slice(0, 60));
         else url.searchParams.delete(labelParam);
       } else {
         url.searchParams.delete(fieldsParam);
@@ -593,11 +791,19 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
 
   const setSlot = (slotId: SlotId, slot: Slot | null) => {
     setSlots((s) => (slotId === "a" ? { ...s, a: slot ?? s.a } : { ...s, b: slot }));
-    syncUrl(slotId, slot?.fields ?? null, slot?.label ?? null);
+    syncUrl(slotId, slot);
   };
 
   const loadEntryIntoSlot = (slotId: SlotId, entry: SetupPickerEntry) => {
-    setSlot(slotId, slotFromFields(entry.fields, entry.label));
+    setSlot(
+      slotId,
+      slotFromFields(entry.fields, entry.label, {
+        setupSheetModelId: entry.setupSheetModelId,
+        source: entry.labSource,
+        fullData: entry.fullData,
+        write: entry.write,
+      })
+    );
   };
 
   /** Main row tap: load into the selected slot and close the picker. */
@@ -617,6 +823,16 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
       fields: { ...active.fields },
       loaded: { ...active.fields },
       label: active.label ? `${active.label} · copy` : "What-if copy",
+      /*
+       * The chassis and the full sheet come along so the frozen copy still draws as paper. What does
+       * NOT come along is anywhere to save it: this is a what-if the driver made up, and writing it
+       * back to the row the original came from would put unsaved fiddling into a stored setup.
+       */
+      setupSheetModelId: active.setupSheetModelId,
+      source: null,
+      fullData: active.fullData,
+      write: null,
+      sheetDirty: false,
     });
   };
 
@@ -743,6 +959,28 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     });
   };
 
+  /**
+   * A box edit on the sheet, folded into the selected slot.
+   *
+   * Both halves are kept: the geometry slice drives the solve and the knobs, and the full stored
+   * setup replaces what the slot is holding — so a later save writes the sheet the driver actually
+   * edited rather than nineteen keys over the top of a stale snapshot.
+   */
+  const applySheetEdit = useCallback(
+    (next: { fields: LabFields; fullData: Record<string, unknown> }) => {
+      updateActiveSlot((slot) => ({
+        ...slot,
+        // Blank box means "not recorded", which is the doctrine's assumed-zero, not a stored value.
+        fields: { ...LAB_DEFAULT_FIELDS, ...next.fields },
+        fullData: next.fullData,
+        sheetDirty: true,
+      }));
+    },
+    // `updateActiveSlot` closes over `activeId`, which is the only thing that changes it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeId]
+  );
+
   const knobValue = (keys: GeometrySheetKey[]): { value: number; legsDiffer: boolean } => {
     const nums = keys.map((k) => parseNum(fields[k]) ?? 0);
     const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
@@ -767,6 +1005,44 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     if (active.loaded) return labChangeList(fields, active.loaded);
     return [];
   }, [comparing, otherFields, fields, active.loaded]);
+
+  /**
+   * The selected slot's whole setup, with this session's geometry edits merged in.
+   *
+   * Merges the CHANGED keys only, over the stored snapshot — not the geometry slice over the top.
+   * Two reasons. A slice written as the setup would erase the ~260 boxes it says nothing about. And
+   * the slice is flattened for the URL: `chassis` travels as text, while storage holds it as a
+   * preset object, so re-writing an untouched chassis would turn a real value into its own JSON.
+   * Only what the driver actually moved gets written, which sidesteps both.
+   */
+  const mergedSaveData = useMemo(() => {
+    if (!active.fullData) return null;
+    const changed: Record<string, string> = {};
+    for (const key of GEOMETRY_SHEET_KEYS) {
+      const now = (active.fields[key] ?? "").trim();
+      const before = (active.loaded?.[key] ?? "").trim();
+      if (now !== before) changed[key] = now;
+    }
+    return { data: { ...active.fullData, ...changed }, changedCount: Object.keys(changed).length };
+  }, [active.fullData, active.fields, active.loaded]);
+
+  /** `/runs/new` reads this back through the same codec — the universal exit, needing no stored row. */
+  const nextRunHref = `/runs/new?labSetup=${encodeLabFields(fields)}`;
+
+  const runSave = async () => {
+    if (!active.write || !mergedSaveData) return;
+    setSaving(true);
+    setSaveMsg(null);
+    const result = await saveLabSlot(active.write, mergedSaveData.data);
+    setSaving(false);
+    if (result.ok) {
+      // The edits are now the stored state, so "changes vs loaded" has to start counting again.
+      updateActiveSlot((slot) => ({ ...slot, loaded: { ...slot.fields }, sheetDirty: false }));
+      setSaveMsg(active.write.kind === "run" ? "Run corrected." : "Saved to this setup.");
+    } else {
+      setSaveMsg(result.error);
+    }
+  };
 
   const copyChanges = async () => {
     const text = changes.length > 0 ? changes.join("\n") : "no geometry changes";
@@ -936,7 +1212,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
           <Button
             variant="outline"
             onClick={() =>
-              updateActiveSlot(() => ({ fields: { ...LAB_DEFAULT_FIELDS }, loaded: null, label: null }))
+              updateActiveSlot(() => blankSlot())
             }
           >
             Reset {activeId.toUpperCase()} to A800 baseline
@@ -1140,20 +1416,74 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
           </button>
         </div>
 
-        {AXLE_KNOBS[axle].map((knob) => {
-          const { value, legsDiffer } = knobValue(knob.keys);
-          return (
-            <KnobRow
-              key={knob.label}
-              label={knob.label}
-              value={value}
-              legsDiffer={legsDiffer}
-              max={knob.max}
-              onChange={(v) => setKnob(knob.keys, v)}
-            />
-          );
-        })}
+        {/*
+         * Two ways in, one state. The knobs stay the default because they are the fast surface: four
+         * sliders beat panning a page picture to find one box, which is what a driver is doing
+         * between runs. The sheet appears only when this slot came from a real setup on a chassis the
+         * app can draw — without the whole snapshot behind it the paper would render mostly empty.
+         *
+         * Mutually exclusive on purpose. The fill surface reads its values once and then owns them
+         * (see `LabSheetPane`), so a knob turned while the sheet was on screen could not reach it;
+         * switching modes remounts the sheet and re-seeds it, which makes that impossible to hit.
+         */}
+        {sheetAvailable && (
+          <SegmentedControl
+            size="sm"
+            ariaLabel="How to adjust this setup"
+            options={[
+              { value: "knobs", label: "Knobs" },
+              { value: "sheet", label: "Sheet" },
+            ]}
+            value={inputMode}
+            onChange={(v) => setInputMode(v as "knobs" | "sheet")}
+          />
+        )}
 
+        {sheetMode ? (
+          <p className="ui-caption">
+            Your sheet is below — type a stack into any box and the geometry moves with it.
+          </p>
+        ) : null}
+
+        {/*
+         * One row while the two legs agree; two rows the moment they don't.
+         *
+         * The inner shim keys are per-leg — the front and rear pin of the same arm — and a car often
+         * runs them equal, so a single knob is the honest control for the common case. When they are
+         * NOT equal, one knob cannot represent them: it used to show the mean and write that mean
+         * into both legs, quietly flattening a real difference on the first touch. Splitting is what
+         * makes the Lab safe to save from, and it keeps the per-leg data the side-view model wants.
+         *
+         * The front view still solves on the mean of the two (`legMean` in computeFromSnapshot) —
+         * this is about not destroying what was stored, not about changing the geometry.
+         */}
+        {!sheetMode &&
+          AXLE_KNOBS[axle].flatMap((knob) => {
+            const { value, legsDiffer } = knobValue(knob.keys);
+            if (!legsDiffer) {
+              return [
+                <KnobRow
+                  key={knob.label}
+                  label={knob.label}
+                  value={value}
+                  max={knob.max}
+                  onChange={(v) => setKnob(knob.keys, v)}
+                />,
+              ];
+            }
+            return knob.keys.map((key) => (
+              <KnobRow
+                key={key}
+                label={knob.label}
+                sublabel={legLabel(key)}
+                value={parseNum(fields[key]) ?? 0}
+                max={knob.max}
+                onChange={(v) => setKnob([key], v)}
+              />
+            ));
+          })}
+
+        {!sheetMode && (
         <KnobRow
           label="Ride height"
           value={staticRh}
@@ -1162,6 +1492,8 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
           step={0.1}
           onChange={(v) => setKnob([rideHeightKey], v)}
         />
+        )}
+        {!sheetMode && (
         <KnobRow
           label="Camber (neg °)"
           value={(() => {
@@ -1178,10 +1510,12 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
           unit="°"
           onChange={(v) => setKnob([axle === "front" ? "camber_front" : "camber_rear"], v)}
         />
+        )}
 
         {/* Label beside the control from sm, but back above it at xl: the desktop
             Adjustments column is 21rem, and a 9.5rem label leaves the three chassis
             options ~148px to share, which clipped the last one off the card. */}
+        {!sheetMode && (
         <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3 xl:flex-col xl:items-stretch xl:gap-1.5">
           <span className="type-data-label shrink-0 sm:w-[9.5rem] xl:w-auto">Chassis</span>
           <SegmentedControl
@@ -1196,7 +1530,28 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
             onChange={(code) => setKnob(["chassis"], code)}
           />
         </div>
+        )}
       </CardPanel>
+
+      {/* The sheet itself — a full-width row, because a page picture cannot live in a 21rem column. */}
+      {sheetMode && active.setupSheetModelId && active.fullData && (
+        <CardPanel className="lab-sheet" contentClassName="space-y-2">
+          {/* Setup names run long ("A800RR_Caruso_Bayside_Starting…"), and this one is a whole
+              heading rather than a chip — without the clamp it runs off the card at 390px. */}
+          <Eyebrow className="min-w-0 [&>span]:truncate">
+            {activeName} · sheet
+            {comparing ? ` · ${activeId.toUpperCase()}` : ""}
+          </Eyebrow>
+          <LabSheetPane
+            /* Remount when the slot or its chassis changes: the surface seeds its values once, so a
+               new setup has to arrive as a new surface or it would keep drawing the old one. */
+            key={`${activeId}-${active.setupSheetModelId}`}
+            setupSheetModelId={active.setupSheetModelId}
+            values={active.fullData}
+            onChange={applySheetEdit}
+          />
+        </CardPanel>
+      )}
 
       {/*
        * The slower reading. `display: contents` on a phone, so these two cards stay
@@ -1257,7 +1612,30 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
             </p>
           )}
 
+          {/*
+           * The way out. Which door exists is settled by what this slot IS, not by anything the
+           * driver picks here: a setup no run points at can be written in place; a run's own record
+           * never can, and is corrected by writing a new snapshot and repointing the run. Everything
+           * else — a teammate's setup, a frozen what-if, the blank car — leaves through the next run,
+           * which needs no stored row at all and so is always offered.
+           */}
           <div className="flex flex-wrap items-center gap-2">
+            {active.write && mergedSaveData ? (
+              <Button
+                className="px-3 py-1 text-xs"
+                onClick={runSave}
+                disabled={saving || (mergedSaveData.changedCount === 0 && !active.sheetDirty)}
+              >
+                {saving
+                  ? "Saving…"
+                  : active.write.kind === "run"
+                    ? "Correct this run"
+                    : "Save to this setup"}
+              </Button>
+            ) : null}
+            <ButtonLink href={nextRunHref} variant="outline" className="px-3 py-1 text-xs">
+              Use for next run
+            </ButtonLink>
             <Button
               variant="outline"
               className="px-3 py-1 text-xs"
@@ -1267,6 +1645,8 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
               {copied ? "Copied" : comparing ? "Copy differences" : "Copy change list"}
             </Button>
           </div>
+
+          {saveMsg ? <p className="ui-caption">{saveMsg}</p> : null}
 
           {computed.assumptions.length > 0 && (
             <p className="text-[10px] leading-relaxed text-faint">

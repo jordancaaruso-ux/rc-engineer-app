@@ -28,7 +28,45 @@ async function loadOwnedSetup(id: string, userId: string) {
       name: true,
       data: true,
       isLibrary: true,
+      carId: true,
+      car: { select: { setupSheetModelId: true } },
       _count: { select: { runs: true } },
+    },
+  });
+}
+
+/**
+ * Read one of the caller's own setups in full.
+ *
+ * Exists for the Geometry Lab, which is seeded by a URL carrying only the geometry slice — 19 keys
+ * of a sheet that has getting on for 300 boxes. Drawing that sheet from the slice alone would show a
+ * driver their own setup with every non-geometry box blank, and saving from it would write that
+ * emptiness back. So the Lab follows the seed's reference and fetches the row.
+ *
+ * `runCount` rides along because it is the fact that decides what the Lab may offer: a snapshot a run
+ * points at is that run's record and cannot be written in place (see PATCH below). The client needs
+ * to know that before it draws a button, not after the 409.
+ */
+export async function GET(_request: Request, ctx: Ctx): Promise<NextResponse> {
+  if (!hasDatabaseUrl()) {
+    return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
+  }
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await ctx.params;
+
+  const existing = await loadOwnedSetup(id, userId);
+  if (!existing) return NextResponse.json({ error: "Setup not found" }, { status: 404 });
+
+  return NextResponse.json({
+    setup: {
+      id: existing.id,
+      name: existing.name,
+      data: existing.data,
+      isLibrary: existing.isLibrary,
+      carId: existing.carId,
+      setupSheetModelId: existing.car?.setupSheetModelId ?? null,
+      runCount: existing._count.runs,
     },
   });
 }

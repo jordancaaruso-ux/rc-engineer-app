@@ -30,6 +30,12 @@ export async function GET() {
       carId: true,
       // Setup compare draws on a sheet, so it has to know which sheet this setup belongs to.
       car: { select: { name: true, setupSheetModelId: true, setupSheetTemplate: true } },
+      /*
+       * Saving from "All setups" marks the run's existing row rather than copying it, so a library
+       * setup can also be a run's own record — and those can never be written in place. The Geometry
+       * Lab needs that fact to label its save door honestly instead of discovering it via a 409.
+       */
+      _count: { select: { runs: true } },
     },
   });
 
@@ -43,6 +49,7 @@ export async function GET() {
       setupSheetModelId: s.car?.setupSheetModelId ?? null,
       setupSheetTemplate: s.car?.setupSheetTemplate ?? null,
       setupData: s.data,
+      runCount: s._count.runs,
     })),
   });
 }

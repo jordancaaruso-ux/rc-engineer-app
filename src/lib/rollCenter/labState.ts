@@ -112,23 +112,102 @@ export function encodeLabFields(fields: LabFields): string {
   return toBase64Url(JSON.stringify(fields));
 }
 
+/** Pull the geometry slice out of an already-parsed JSON object, allowlisted. */
+function fieldsFromObject(parsed: Record<string, unknown>): LabFields {
+  const out: LabFields = {};
+  const allowed = new Set<string>(GEOMETRY_SHEET_KEYS);
+  for (const [k, v] of Object.entries(parsed)) {
+    if (!allowed.has(k)) continue;
+    if (typeof v !== "string" && typeof v !== "number") continue;
+    out[k as GeometrySheetKey] = String(v).slice(0, MAX_FIELD_CHARS);
+  }
+  return out;
+}
+
 export function decodeLabFields(encoded: string): LabFields | null {
+  const slot = decodeLabSlot(encoded);
+  return slot && Object.keys(slot.fields).length > 0 ? slot.fields : null;
+}
+
+/* ── Slot seeds: the geometry slice, plus where it came from ───────────────
+ *
+ * The Lab used to be a pure URL state — the geometry slice and nothing else — because a shared link
+ * has no car context and no session. That is still true of the slice, and still what makes a link
+ * work for anyone. What it could never do is draw the sheet: a page picture and a box plan are both
+ * keyed by chassis, and a save has to know which row it is allowed to touch.
+ *
+ * So a seed now optionally carries two REFERENCES — never data. `setupSheetModelId` says which
+ * chassis to draw; `source` says which snapshot the values came from, so the Lab can fetch the other
+ * ~260 boxes it does not carry and can work out whether that row is writable. Both are ids the
+ * viewer's own session is re-checked against server-side; neither grants access to anything.
+ *
+ * Wire shape is `{ f, m, s }` so it can be told apart from the old bare `{ fieldKey: value }` blob.
+ * Old links keep working — they decode as fields with no source, which is exactly what they are.
+ */
+
+export type LabSource = { kind: "run" | "setup"; id: string };
+
+export type LabSlotSeed = {
+  fields: LabFields;
+  /** `Car.setupSheetModelId` — the chassis whose sheet this setup draws on. */
+  setupSheetModelId: string | null;
+  /** Which stored row these values came from, when they came from one at all. */
+  source: LabSource | null;
+};
+
+/** Ids are cuids; cap and charset-check them so a hand-edited link can't smuggle a path. */
+const MAX_ID_CHARS = 40;
+const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
+
+function cleanId(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const s = v.slice(0, MAX_ID_CHARS);
+  return ID_RE.test(s) ? s : null;
+}
+
+export function encodeLabSlot(seed: LabSlotSeed): string {
+  const payload: Record<string, unknown> = { f: seed.fields };
+  if (seed.setupSheetModelId) payload.m = seed.setupSheetModelId;
+  if (seed.source) payload.s = { k: seed.source.kind, i: seed.source.id };
+  return toBase64Url(JSON.stringify(payload));
+}
+
+export function decodeLabSlot(encoded: string): LabSlotSeed | null {
   const json = fromBase64Url(encoded);
   if (!json) return null;
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(json);
-    if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    const out: LabFields = {};
-    const allowed = new Set<string>(GEOMETRY_SHEET_KEYS);
-    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
-      if (!allowed.has(k)) continue;
-      if (typeof v !== "string" && typeof v !== "number") continue;
-      out[k as GeometrySheetKey] = String(v).slice(0, MAX_FIELD_CHARS);
-    }
-    return Object.keys(out).length > 0 ? out : null;
+    parsed = JSON.parse(json);
   } catch {
     return null;
   }
+  if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const obj = parsed as Record<string, unknown>;
+
+  // Old shape: the object IS the fields. No `f`, so nothing else can be present either.
+  if (!isJsonObject(obj.f)) {
+    const fields = fieldsFromObject(obj);
+    return Object.keys(fields).length > 0
+      ? { fields, setupSheetModelId: null, source: null }
+      : null;
+  }
+
+  const fields = fieldsFromObject(obj.f);
+  const setupSheetModelId = cleanId(obj.m);
+  let source: LabSource | null = null;
+  if (isJsonObject(obj.s)) {
+    const id = cleanId(obj.s.i);
+    const kind = obj.s.k;
+    if (id && (kind === "run" || kind === "setup")) source = { kind, id };
+  }
+  // A seed carrying only a reference is still a seed — the full values arrive from the fetch.
+  return Object.keys(fields).length > 0 || setupSheetModelId || source
+    ? { fields, setupSheetModelId, source }
+    : null;
+}
+
+function isJsonObject(v: unknown): v is Record<string, unknown> {
+  return v != null && typeof v === "object" && !Array.isArray(v);
 }
 
 /** Sheet-vocabulary change list (Lab state vs its seeded baseline). */

@@ -21,18 +21,37 @@ import type {
   RollCenterComputation,
   solveRollCenterDiagram,
 } from "@/lib/rollCenter/computeFromSnapshot";
-import { encodeLabFields, extractGeometryFields } from "@/lib/rollCenter/labState";
+import { encodeLabSlot, extractGeometryFields, type LabSource } from "@/lib/rollCenter/labState";
 
 export type RollCenterSolves = ReturnType<typeof solveRollCenterDiagram>;
 
-/** Deep link into the Geometry Lab seeded with this sheet (+ optional ghost slot). */
+/**
+ * Deep link into the Geometry Lab seeded with this sheet (+ optional ghost slot).
+ *
+ * `origin` is optional and additive: the geometry slice alone still opens the Lab for anyone, exactly
+ * as before. When a surface knows which chassis it is drawing and which row it is showing, passing
+ * that along is what lets the Lab draw the actual sheet and offer a way back to the setup — see
+ * `labState.ts`. A surface that doesn't know simply doesn't say.
+ */
 export function labHref(
   value: Record<string, unknown>,
   ghostValue?: Record<string, unknown> | null,
-  labels?: { s?: string; g?: string }
+  labels?: { s?: string; g?: string },
+  origin?: { setupSheetModelId?: string | null; source?: LabSource | null }
 ): string {
-  const s = encodeLabFields(extractGeometryFields(value));
-  const g = ghostValue ? encodeLabFields(extractGeometryFields(ghostValue)) : null;
+  const s = encodeLabSlot({
+    fields: extractGeometryFields(value),
+    setupSheetModelId: origin?.setupSheetModelId ?? null,
+    source: origin?.source ?? null,
+  });
+  // The ghost is read-only by definition, so it carries the chassis but never a writable source.
+  const g = ghostValue
+    ? encodeLabSlot({
+        fields: extractGeometryFields(ghostValue),
+        setupSheetModelId: origin?.setupSheetModelId ?? null,
+        source: null,
+      })
+    : null;
   const sl = labels?.s ? `&sl=${encodeURIComponent(labels.s.slice(0, 60))}` : "";
   const gl = g && labels?.g ? `&gl=${encodeURIComponent(labels.g.slice(0, 60))}` : "";
   return `/analysis/roll-center?s=${s}${sl}${g ? `&g=${g}` : ""}${gl}`;
@@ -120,6 +139,7 @@ export function RollCenterDetail({
   baselineValue,
   baseline,
   labLabels,
+  labOrigin,
   className,
 }: {
   computed: RollCenterComputation;
@@ -131,6 +151,8 @@ export function RollCenterDetail({
   /** The comparison snapshot's computation, for the neutral deltas. */
   baseline?: RollCenterComputation | null;
   labLabels?: { s?: string; g?: string };
+  /** Which chassis and which stored row this is, when the host knows — see `labHref`. */
+  labOrigin?: { setupSheetModelId?: string | null; source?: LabSource | null };
   className?: string;
 }) {
   const [axle, setAxle] = useState<"front" | "rear">("front");
@@ -199,7 +221,7 @@ export function RollCenterDetail({
 
       <div className="flex flex-wrap items-center gap-2 border-t border-border/80 px-2 py-2">
         <Link
-          href={labHref(value, baselineValue, labLabels)}
+          href={labHref(value, baselineValue, labLabels, labOrigin)}
           /* `primary-ink`, not `accent`: yellow doing a foreground job has to darken on paper,
              which is the whole reason that token exists (light mode, main @ 4275087). */
           className="tap-active inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:border-primary-ink/40 hover:bg-muted/60"

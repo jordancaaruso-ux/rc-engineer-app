@@ -20,7 +20,9 @@ import {
 import {
   LAB_DEFAULT_FIELDS,
   decodeLabFields,
+  decodeLabSlot,
   encodeLabFields,
+  encodeLabSlot,
   extractGeometryFields,
   labChangeList,
 } from "./labState";
@@ -181,6 +183,81 @@ test("lab codec: extract → encode → decode roundtrips; garbage rejected", ()
   assert.equal(decodeLabFields("not-base64url-json!!"), null);
   const smuggled = encodeLabFields({ evil_key: "x", camber_front: "2" } as never);
   assert.deepEqual(decodeLabFields(smuggled), { camber_front: "2" });
+});
+
+test("lab slot codec: carries chassis + source, and still reads the old fields-only links", () => {
+  const fields = { under_hub_shims_front: "0.5", camber_front: "2.0" };
+
+  // New shape: the slice plus the two references the sheet and the save door need.
+  const encoded = encodeLabSlot({
+    fields,
+    setupSheetModelId: "cm0chassis123",
+    source: { kind: "setup", id: "cm0setup456" },
+  });
+  assert.deepEqual(decodeLabSlot(encoded), {
+    fields,
+    setupSheetModelId: "cm0chassis123",
+    source: { kind: "setup", id: "cm0setup456" },
+  });
+
+  // Every link ever shared before this existed is a bare `{key: value}` blob and must still open.
+  const legacy = encodeLabFields(fields);
+  assert.deepEqual(decodeLabSlot(legacy), {
+    fields,
+    setupSheetModelId: null,
+    source: null,
+  });
+  // ...and the old reader keeps working against the new shape, so /runs/new needs no change.
+  assert.deepEqual(decodeLabFields(encoded), fields);
+
+  // A reference is an id, not a path: anything else is dropped rather than followed.
+  const hostile = encodeLabSlot({
+    fields,
+    setupSheetModelId: "../../etc/passwd",
+    source: { kind: "setup", id: "ok" },
+  });
+  assert.equal(decodeLabSlot(hostile)?.setupSheetModelId, null);
+  // An unknown source kind is not a source at all.
+  const badKind = encodeLabSlot({
+    fields,
+    setupSheetModelId: null,
+    source: { kind: "elsewhere" as never, id: "x" },
+  });
+  assert.equal(decodeLabSlot(badKind)?.source, null);
+});
+
+test("per-leg shims survive a Lab edit: only the touched leg moves", () => {
+  /*
+   * The regression this locks: one knob used to write its value into BOTH legs, so a sheet with
+   * ff 0.5 / fr 0.25 lost the split on first touch. Harmless while the Lab was a dead end — real
+   * data loss now that it can write back. The Lab splits the knob when the legs differ; this asserts
+   * the state that split produces, and that the front-view solve still reads their mean.
+   */
+  const stored: Record<string, unknown> = {
+    ...LAB_DEFAULT_FIELDS,
+    under_lower_arm_shims_ff: "0.5",
+    under_lower_arm_shims_fr: "0.25",
+  };
+  const fields = extractGeometryFields(stored);
+
+  // Editing one leg leaves the other exactly where it was.
+  const edited = { ...fields, under_lower_arm_shims_ff: "0.75" };
+  assert.equal(edited.under_lower_arm_shims_fr, "0.25");
+
+  // And the geometry keeps averaging the pair (north star: front view uses the mean of the legs).
+  const meanOfSplit = computeRollCenterFromSnapshot(
+    { ...stored, under_lower_arm_shims_ff: "0.5", under_lower_arm_shims_fr: "0.25" },
+    AWESOMATIX_A800_PACK
+  );
+  const bothAtMean = computeRollCenterFromSnapshot(
+    { ...stored, under_lower_arm_shims_ff: "0.375", under_lower_arm_shims_fr: "0.375" },
+    AWESOMATIX_A800_PACK
+  );
+  assert.ok(meanOfSplit && bothAtMean);
+  assert.ok(
+    Math.abs(meanOfSplit.front.rcHeightMm - bothAtMean.front.rcHeightMm) < 1e-9,
+    "split legs must solve identically to both legs at their mean"
+  );
 });
 
 test("lab defaults solve to the VSUSP baseline; derive inputs exposed", () => {

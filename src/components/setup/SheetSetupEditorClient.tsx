@@ -85,6 +85,7 @@ export function SheetSetupEditorClient({
           baselineValue={initialValues}
           templateKey={templateKey}
           labLabels={{ s: setupName ?? "This setup", g: "As opened" }}
+          labOrigin={{ setupSheetModelId, source: { kind: "setup", id: setupId } }}
         />
       ) : null}
       <SheetFillSurface

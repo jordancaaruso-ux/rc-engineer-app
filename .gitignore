@@ -61,6 +61,7 @@ desktop-shots/
 sheet-fill-shots/
 roll-center-strip-shots/
 roll-center-lab-shots/
+roll-center-lab-sheet-shots/
 
 # Onboarding friction audit (regenerate with e2e/onboarding-friction.spec.ts)
 onboarding-friction/

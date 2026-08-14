@@ -39,22 +39,15 @@ import {
   solveRollCenterDiagram,
 } from "@/lib/rollCenter/computeFromSnapshot";
 import { resolvePackForTemplateKey } from "@/lib/rollCenter/packs";
+import type { LabSource } from "@/lib/rollCenter/labState";
 import { RollCenterDetail, fmtMm } from "@/components/rollCenter/RollCenterDetail";
-
-/**
- * Open or closed, remembered per device.
- *
- * Phase 2.5 ruled collapsed-by-default and that still holds — but a driver who wants the schematic
- * up wants it up on every sheet they open, not once per page. One key, not one per setup: the
- * preference is about how this driver reads geometry, not about a particular sheet.
- */
-const OPEN_STORAGE_KEY = "rc:sheetGeometryOpen";
 
 export function SheetGeometryStrip({
   value,
   baselineValue,
   templateKey,
   labLabels,
+  labOrigin,
   className,
 }: {
   /** The setup in STORED shapes. Fill surfaces bridge their strings before handing them over. */
@@ -68,6 +61,14 @@ export function SheetGeometryStrip({
    */
   templateKey?: string | null;
   labLabels?: { s?: string; g?: string };
+  /**
+   * Which chassis this sheet belongs to and which stored row it is, when the host knows.
+   *
+   * `templateKey` above answers "does this car have a geometry pack" — it is a chassis *type*. This
+   * answers "which sheet, which row", which is what the Lab needs to draw the paper and to know
+   * whether it may write back. A host that has neither passes nothing and the Lab behaves as before.
+   */
+  labOrigin?: { setupSheetModelId?: string | null; source?: LabSource | null };
   className?: string;
 }) {
   const pack = useMemo(() => resolvePackForTemplateKey(templateKey), [templateKey]);
@@ -81,29 +82,18 @@ export function SheetGeometryStrip({
   );
 
   /*
-   * Starts closed on the server and on the first client paint, then reads the remembered choice in
-   * an effect. Reading localStorage during render would hydrate a different tree than the server
-   * sent, and the sheet page has enough SSR sharp edges already (see the Lab's quantised SVG coords).
+   * Always closed when a sheet opens (founder call 2026-08-14, reversing the remembered-per-device
+   * behaviour this shipped with).
+   *
+   * The drawer used to write its state to localStorage and re-open on every sheet after. What a
+   * driver actually opens a sheet to see is the sheet — a schematic that unfolds itself above the
+   * paper pushes the boxes down the screen on a phone, every single time, for a reading they asked
+   * for once. Opening it is one tap; having to close it is one tap on every sheet forever.
    */
   const [expanded, setExpanded] = useState(false);
-  useEffect(() => {
-    try {
-      if (window.localStorage.getItem(OPEN_STORAGE_KEY) === "1") setExpanded(true);
-    } catch {
-      // Private mode, or storage disabled. Collapsed is the documented default; carry on.
-    }
-  }, []);
 
   function toggle() {
-    setExpanded((v) => {
-      const next = !v;
-      try {
-        window.localStorage.setItem(OPEN_STORAGE_KEY, next ? "1" : "0");
-      } catch {
-        // Not remembering the choice is survivable; not opening the drawer is not.
-      }
-      return next;
-    });
+    setExpanded((v) => !v);
   }
 
   // The diagram solve only runs once the drawer is open — it is the expensive half of the engine.
@@ -162,6 +152,7 @@ export function SheetGeometryStrip({
             baselineValue={baselineValue}
             baseline={baseline}
             labLabels={labLabels}
+            labOrigin={labOrigin}
           />
         </div>
       )}

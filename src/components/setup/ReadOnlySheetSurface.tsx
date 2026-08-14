@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { SheetFillSurface } from "@/components/setup/SheetFillSurface";
 import { SheetGeometryStrip } from "@/components/rollCenter/SheetGeometryStrip";
 import { storedValuesToSurface } from "@/lib/setupSheetModels/sheetSurfaceValues";
+import type { LabSource } from "@/lib/rollCenter/labState";
 
 /**
  * A saved setup shown ON THE SHEET — the driver's own paper with their values in its boxes.
@@ -23,6 +24,7 @@ export function ReadOnlySheetSurface({
   templateKey,
   baselineValue,
   labLabels,
+  labSource,
 }: {
   setupSheetModelId: string;
   /** The snapshot's data as stored — arrays, preset objects, numbers. */
@@ -32,6 +34,8 @@ export function ReadOnlySheetSurface({
   /** What the geometry deltas count from, where the surface knows of one. */
   baselineValue?: Record<string, unknown> | null;
   labLabels?: { s?: string; g?: string };
+  /** Which stored row this is, so the Lab can draw its sheet and offer a way back. */
+  labSource?: LabSource | null;
 }) {
   const surfaceValues = useMemo(() => storedValuesToSurface(values), [values]);
   return (
@@ -42,6 +46,7 @@ export function ReadOnlySheetSurface({
         baselineValue={baselineValue}
         templateKey={templateKey}
         labLabels={labLabels}
+        labOrigin={{ setupSheetModelId, source: labSource ?? null }}
       />
       <SheetFillSurface
         planUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-plan`}
