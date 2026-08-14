@@ -4,6 +4,8 @@ import {
   type StructuredSection,
 } from "@/lib/a800rrSetupDisplayConfig";
 import { A800RR_STRUCTURED_SECTIONS } from "@/lib/a800rrSetupDisplayConfig";
+// Type-only, so this module stays reachable from the client even though the extractor is server-only.
+import type { PdfAcroFieldType } from "@/lib/setupDocuments/pdfFormFields";
 import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import type { SetupFieldMeta } from "@/lib/setupFieldCatalog";
 import { buildCatalogFromTemplate } from "@/lib/setupFieldCatalog";
@@ -70,11 +72,17 @@ export function suggestKeyFromPdfFieldName(name: string): string {
   return `f_${s}`;
 }
 
-export function inferUiTypeFromAcroType(rowType: string): CustomFieldUiType {
-  const t = rowType.trim();
-  if (t === "CheckBox" || t === "RadioGroup") return "checkbox";
-  if (t === "Ch" || t === "Btn") return "checkbox";
-  return "text";
+/**
+ * A box's control, from what the PDF says the box is. Never from a guess about what it is near.
+ *
+ * `"Ch"` and `"Btn"` — the raw PDF spec's own codes — used to be tested here and never once
+ * matched: the extractor speaks pdf-lib's names (`acroFieldTypeName`), not the file's. Dropdowns
+ * and option lists stay text on purpose. They carry their choices in the PDF, but the derivation
+ * only builds a one-of-many out of a row of TOGGLES, so calling one a checkbox would draw a tick
+ * box over a list.
+ */
+export function inferUiTypeFromAcroType(rowType: PdfAcroFieldType): CustomFieldUiType {
+  return rowType === "CheckBox" || rowType === "RadioGroup" ? "checkbox" : "text";
 }
 
 export function mergeCustomFieldsIntoCatalog(

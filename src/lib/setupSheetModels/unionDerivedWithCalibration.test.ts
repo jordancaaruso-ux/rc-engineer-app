@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
-import type { PdfFormFieldsExtraction } from "@/lib/setupDocuments/pdfFormFields";
+import type { PdfAcroFieldType, PdfFormFieldsExtraction } from "@/lib/setupDocuments/pdfFormFields";
 import {
   claimedWidgetsFromMappings,
   unionDerivedWithCalibration,
@@ -23,7 +23,7 @@ function widget(instanceIndex: number) {
 }
 
 function extraction(
-  fields: Array<{ name: string; widgets: number; type?: string; options?: string[] }>
+  fields: Array<{ name: string; widgets: number; type?: PdfAcroFieldType; options?: string[] }>
 ): PdfFormFieldsExtraction {
   return {
     hasFormFields: true,

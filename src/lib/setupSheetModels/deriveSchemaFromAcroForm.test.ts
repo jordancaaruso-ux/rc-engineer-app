@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
-import type { PdfFormFieldEntry, PdfFormFieldsExtraction } from "@/lib/setupDocuments/pdfFormFields";
+import type {
+  PdfAcroFieldType,
+  PdfFormFieldEntry,
+  PdfFormFieldsExtraction,
+} from "@/lib/setupDocuments/pdfFormFields";
 import {
   deriveSchemaFromAcroForm,
   isGenericAcroFieldName,
@@ -28,7 +32,7 @@ function widget(input: { page?: number; x?: number; y?: number; index?: number }
 
 function field(input: {
   name: string;
-  type?: string;
+  type?: PdfAcroFieldType;
   widgets: Array<ReturnType<typeof widget>>;
   options?: string[];
 }): PdfFormFieldEntry {

@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   decodePDFRawStream,
+  PDFButton,
   PDFCheckBox,
   PDFDict,
   PDFDocument,
@@ -11,6 +12,7 @@ import {
   PDFOptionList,
   PDFRadioGroup,
   PDFRawStream,
+  PDFSignature,
   PDFTextField,
 } from "pdf-lib";
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
@@ -62,7 +64,8 @@ export type PdfFormFieldWidgetRect = {
 
 export type PdfFormFieldEntry = {
   name: string;
-  type: string;
+  /** What the PDF says this box is. A closed set, so a comparison against it cannot silently miss. */
+  type: PdfAcroFieldType;
   value: string;
   booleanValue?: boolean | null;
   widgets: PdfFormFieldWidgetRect[];
@@ -457,6 +460,43 @@ function inferMultiSelectFromSimpleMultiWidget(input: {
   return { value: picked.join(", "), rawNote: raw };
 }
 
+/**
+ * What kind of box the PDF says this is.
+ *
+ * ===================== NEVER ASK A CLASS WHAT ITS NAME IS =====================
+ *
+ * This used to read `field.constructor.name`, which is correct under `tsx` and wrong on Vercel.
+ * `pdf-lib` is bundled and minified into the server build, where `class PDFCheckBox` becomes
+ * `function e` — so every field reported the type `"e"`, nothing matched `"CheckBox"`, and every
+ * box a driver derived from their own sheet in production came out a free-text box: no ticks, and
+ * no rows of ticks ever merged into a one-of-many (`isChoiceGroup`). Measured 2026-08-14 on the
+ * Xray '26 blank — `tsx` gave `{Text:106, CheckBox:94, Button:1}`, `next start` gave `{e:201}`.
+ *
+ * `instanceof` compares the imported class itself, so a mangled name cannot break it. Order
+ * matters only in that every branch is a distinct pdf-lib class; `Unknown` is reachable only if
+ * pdf-lib grows a field kind, and reads as text downstream exactly as an unnamed box always did.
+ */
+export type PdfAcroFieldType =
+  | "Text"
+  | "CheckBox"
+  | "RadioGroup"
+  | "Dropdown"
+  | "OptionList"
+  | "Button"
+  | "Signature"
+  | "Unknown";
+
+export function acroFieldTypeName(field: PDFField): PdfAcroFieldType {
+  if (field instanceof PDFTextField) return "Text";
+  if (field instanceof PDFCheckBox) return "CheckBox";
+  if (field instanceof PDFRadioGroup) return "RadioGroup";
+  if (field instanceof PDFDropdown) return "Dropdown";
+  if (field instanceof PDFOptionList) return "OptionList";
+  if (field instanceof PDFButton) return "Button";
+  if (field instanceof PDFSignature) return "Signature";
+  return "Unknown";
+}
+
 /** The default appearance the whole form declares, inherited by fields that state none. */
 function formDefaultAppearance(form: ReturnType<PDFDocument["getForm"]>): string | undefined {
   try {
@@ -476,7 +516,7 @@ export async function extractPdfFormFields(buffer: Buffer): Promise<PdfFormField
     const fields: PdfFormFieldEntry[] = rawFields.map((field) => {
       const name = field.getName();
       const { value, readError } = readFieldValue(field);
-      const type = field.constructor.name.replace(/^PDF/, "").replace(/Field$/, "") || "Field";
+      const type = acroFieldTypeName(field);
       const widgets = collectWidgetLayouts(pdfDoc, field);
       const perWidget = fieldSupportsPerWidgetToggle(field);
       const anyChecked = perWidget ? widgets.some((w) => w.checked) : null;
@@ -734,7 +774,7 @@ export async function applyPdfFormFieldMappings(input: {
     if (multiWidgetToggle && idx !== undefined && idx >= 0 && idx < widgets.length) {
       const w = widgets[idx]!;
       const on = Boolean(w.checked);
-      const rawNote = `${pdfFieldName} widget #${idx} (${field.constructor.name.replace(/^PDF/, "")}) ${on ? "on" : "off"}`;
+      const rawNote = `${pdfFieldName} widget #${idx} (${acroFieldTypeName(field)}) ${on ? "on" : "off"}`;
 
       if (field instanceof PDFCheckBox) {
         const v = on ? "1" : "";
@@ -827,7 +867,7 @@ export async function applyPdfFormFieldMappings(input: {
     finalizeAwesomatixStringImport(
       appKey,
       v,
-      `${pdfFieldName} ${field.constructor.name.replace(/^PDF/, "")}: ${JSON.stringify(raw)}`,
+      `${pdfFieldName} ${acroFieldTypeName(field)}: ${JSON.stringify(raw)}`,
       undefined,
       parsedData,
       importedKeys,

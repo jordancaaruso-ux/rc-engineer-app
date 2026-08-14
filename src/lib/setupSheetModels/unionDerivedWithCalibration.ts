@@ -122,7 +122,9 @@ function fieldsForCalibrationOnlyKeys(input: {
       || r.mode === "singleChoiceNamedFields"
       || r.mode === "multiSelectNamedFields";
     const entry = byName.get(r.pdfFieldName ?? pdfFieldName ?? "");
-    const uiType = grouped ? "select" : inferUiTypeFromAcroType(entry?.type ?? "");
+    // No entry means the calibration names a box this PDF does not have: nothing to read a kind
+    // from, so it falls to text exactly as an unrecognised field kind does.
+    const uiType = grouped ? "select" : inferUiTypeFromAcroType(entry?.type ?? "Unknown");
 
     const base: SetupSheetModelFieldDef = {
       key,

@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
-import type { PdfFormFieldEntry, PdfFormFieldsExtraction } from "@/lib/setupDocuments/pdfFormFields";
+import type {
+  PdfAcroFieldType,
+  PdfFormFieldEntry,
+  PdfFormFieldsExtraction,
+} from "@/lib/setupDocuments/pdfFormFields";
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
 import { readDerivedSheetValues } from "@/lib/setupSheetModels/readDerivedSheetValues";
 import { rewriteImportedCalculatedDisplayKey } from "@/lib/setup/derivedFields";
@@ -26,7 +30,7 @@ function widget(input: { index?: number; checked?: boolean }) {
 
 function field(input: {
   name: string;
-  type?: string;
+  type?: PdfAcroFieldType;
   value?: string;
   booleanValue?: boolean | null;
   widgets: Array<ReturnType<typeof widget>>;

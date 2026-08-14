@@ -157,8 +157,8 @@ function field(p: Partial<SetupSheetModelFieldDef> & { key: string }): SetupShee
     { name: "Check Box31", widgets: 1 },
     { name: "Text75", widgets: 1 },
   ]);
-  // extraction() types everything "Text"; make the tick a button like the real file.
-  ex.fields[0]!.type = "Btn";
+  // extraction() types everything "Text"; make the tick what the real file's tick is.
+  ex.fields[0]!.type = "CheckBox";
   const result = boxesFromCalibrationMappings({
     extraction: ex,
     formFieldMappings: {

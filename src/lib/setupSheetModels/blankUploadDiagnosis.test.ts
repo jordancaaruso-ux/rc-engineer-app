@@ -19,7 +19,7 @@ function fakeExtraction(input: Partial<PdfFormFieldsExtraction>): PdfFormFieldsE
 function fakeFields(n: number) {
   return Array.from({ length: n }, (_, i) => ({
     name: `f${i}`,
-    type: "Text",
+    type: "Text" as const,
     value: "",
     widgets: [],
     pageNumber: 1,

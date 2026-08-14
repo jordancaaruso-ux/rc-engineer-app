@@ -11,7 +11,7 @@ import {
   PDFTextField,
   StandardFonts,
 } from "pdf-lib";
-import { orderedFieldWidgets } from "@/lib/setupDocuments/pdfFormFields";
+import { acroFieldTypeName, orderedFieldWidgets } from "@/lib/setupDocuments/pdfFormFields";
 
 /**
  * Write a driver's answers back into the manufacturer's own blank, so what comes out is their
@@ -179,7 +179,8 @@ export async function fillPdfForm(input: {
       continue;
     }
 
-    for (const e of filled) skipped.push(`${e.key}: "${name}" is a ${field.constructor.name}`);
+    // Not `constructor.name`: minified in the server build, where every class answers to a letter.
+    for (const e of filled) skipped.push(`${e.key}: "${name}" is a ${acroFieldTypeName(field)}`);
   }
 
   /*
