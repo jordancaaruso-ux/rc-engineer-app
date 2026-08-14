@@ -197,7 +197,7 @@ const FIELD_TINT_BORDER = "rgba(112, 152, 200, 0.55)";
  * inside worth looking at.
  */
 const FOCUS_TINT = "rgba(255, 214, 10, 0.42)";
-const FOCUS_HALO = "0 0 0 2px rgba(255, 214, 10, 0.95), 0 0 0 5px rgba(255, 214, 10, 0.18)";
+const FOCUS_HALO = "0 0 0 1px rgba(255, 214, 10, 0.95), 0 0 0 3px rgba(255, 214, 10, 0.16)";
 
 /**
  * A viewer sizes an auto-sized value to the box; this is that, near enough to read the same.
@@ -1235,7 +1235,7 @@ export function SheetFillSurface({
                   className={cn(
                     "absolute box-border flex items-center overflow-hidden rounded-[1px]",
                     !readOnly && "border",
-                    isFocused && !readOnly ? "z-20 border-[2px] border-primary-ink" : "z-0"
+                    isFocused && !readOnly ? "z-20 border-primary-ink" : "z-0"
                   )}
                   style={{
                     left: b.x * fitted.width,
