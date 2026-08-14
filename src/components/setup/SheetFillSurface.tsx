@@ -992,16 +992,20 @@ export function SheetFillSurface({
        *
        * On a calibrated sheet each option of a one-of-many row is its own box on the paper, and
        * the tap that lands on one says which choice is meant — the same gesture as ticking the
-       * paper. The mark goes on (or off) right there and nothing is focused, because there is
-       * nothing to type. Phone included: these are the sheet's printed tick boxes, not its
-       * six-pixel text lines, so a thumb hits the one it means.
+       * paper. The mark goes on (or off) right there. On a desktop nothing stays focused, because
+       * there is nothing to type; on a phone the box KEEPS focus for the same two reasons a lone
+       * tick box does below — the one input must never blur or the keyboard closes and the screen
+       * resizes mid-sheet, and the bar is the only confirmation a 7px square can give. Dropping it
+       * here while the lone boxes beside it kept theirs was the "some checkboxes close the
+       * keyboard" bug on the Mi10 sheet (founder, 2026-08-15).
        */
       if (optionValue !== undefined) {
         setValues((prev) => ({
           ...prev,
           [key]: toggleOptionInSurfaceValue(prev[key] ?? "", optionValue, Boolean(field.multi)),
         }));
-        setFocusIndex(null);
+        if (finePointer) setFocusIndex(null);
+        else setFocusIndex(i);
         return;
       }
       /*
