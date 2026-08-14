@@ -1,7 +1,12 @@
 import "server-only";
 
 import type { SetupSnapshotData } from "@/lib/runSetup";
-import { normalizeCalibrationData, type SetupSheetCalibrationData } from "@/lib/setupCalibrations/types";
+import {
+  normalizeCalibrationData,
+  type PdfFormFieldMappingRule,
+  type SetupSheetCalibrationData,
+} from "@/lib/setupCalibrations/types";
+import { readDerivedSheetValues } from "@/lib/setupSheetModels/readDerivedSheetValues";
 import { applyAllTextFieldMappings, normalizeTemplateExtractedValue } from "@/lib/setupCalibrations/applyTextTemplate";
 import { getCalibrationFieldKind } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import { interpretAwesomatixSetupSnapshot } from "@/lib/setupDocuments/awesomatixImportPostProcess";
@@ -184,6 +189,13 @@ export type CalibrationMappingDiagnostic = {
   expected: { formRules: number; textRules: number; regionRules: number };
   used: { form: boolean; text: boolean; region: boolean };
   matched: { keys: number; keysSample: string[] };
+  /**
+   * The rest of the sheet: `rules` is how many printed boxes the calibration doesn't name, `keys`
+   * is how many of them this document actually had a value in. `rules: 0` means the chassis has not
+   * been unioned yet, which is the difference between "the sheet was blank there" and "we weren't
+   * looking".
+   */
+  derived?: { rules: number; keys: number };
   unmatched: {
     expectedFormKeys: string[];
     expectedTextKeys: string[];
@@ -206,6 +218,14 @@ export async function mapExtractedPdfWithCalibration(input: {
    * filled gold — otherwise the convention rewrite (front toe/camber negative) reads as a miss.
    */
   postProcess?: "awesomatix" | "none";
+  /**
+   * Mappings for the printed boxes the calibration does NOT name —
+   * `SetupSheetBlank.derivedMappingsJson`, built by `unionDerivedWithCalibration`.
+   *
+   * Passed separately rather than merged into the calibration because they must be read with the
+   * raw reader; see the comment at the read site below.
+   */
+  derivedMappings?: Record<string, PdfFormFieldMappingRule>;
 }): Promise<{
   parsedData: SetupSnapshotData;
   importedKeys: string[];
@@ -311,6 +331,36 @@ export async function mapExtractedPdfWithCalibration(input: {
           input.onStage
         );
 
+  /*
+   * The rest of the sheet — the printed boxes the calibration does not name.
+   *
+   * READ AFTER THE INTERPRETER, NEVER THROUGH IT. `interpretAwesomatixSetupSnapshot` and the
+   * finishers above apply this app's canonical conventions: front toe and camber come back
+   * negative, `text91`/`text93` are rewritten onto Awesomatix spring-rate keys, values are parsed
+   * against part-number lists. A derived key has none of that meaning — nobody has said what the
+   * box IS — so putting one through would silently change or relocate what the driver typed. See
+   * the header of `readDerivedSheetValues.ts`, which is the reader used here for the same reason.
+   *
+   * A calibrated key always wins: by construction the union never derives a box the calibration
+   * claims, so a clash means the two disagree about the sheet, and the named one is the one a human
+   * checked.
+   */
+  const derivedMappings = input.derivedMappings ?? {};
+  let derivedKeys: string[] = [];
+  if (Object.keys(derivedMappings).length > 0) {
+    const { values } = readDerivedSheetValues({
+      extraction: input.extracted.formFields,
+      formFieldMappings: derivedMappings,
+    });
+    for (const [k, v] of Object.entries(values)) {
+      const existing = interpreted[k];
+      if (existing != null && String(existing).trim() !== "") continue;
+      interpreted[k] = v;
+      derivedKeys.push(k);
+    }
+    importedKeys.push(...derivedKeys.filter((k) => !importedKeys.includes(k)));
+  }
+
   const presentPdfFieldNamesSample = input.extracted.formFields.fields
     .map((f) => f.name)
     .slice(0, 50);
@@ -329,6 +379,7 @@ export async function mapExtractedPdfWithCalibration(input: {
       region: Boolean(input.extracted.rawPages?.length) && Object.keys(regionRules).length > 0,
     },
     matched: { keys: importedKeys.length, keysSample: importedKeys.slice(0, 50) },
+    derived: { rules: Object.keys(derivedMappings).length, keys: derivedKeys.length },
     unmatched: {
       expectedFormKeys: Object.keys(formMappings).filter((k) => !importedKeys.includes(k)).slice(0, 60),
       expectedTextKeys: Object.keys(textMappings).filter((k) => !importedKeys.includes(k)).slice(0, 60),

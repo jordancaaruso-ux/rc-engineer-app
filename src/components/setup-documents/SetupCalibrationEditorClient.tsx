@@ -60,7 +60,6 @@ import {
   POSITION_LABELS,
   buildNewParameterField,
   buildPositionSplitFields,
-  groupTitleChoices,
   type NewParameterInput as BoxParameterInput,
   type PositionSplit,
 } from "@/lib/setupSheetModels/newParameterDef";
@@ -1926,7 +1925,6 @@ export function SetupCalibrationEditorClient({
     const built = buildNewParameterField(
       {
         displayLabel: input.displayLabel,
-        groupTitle: input.sectionTitle || input.sectionId,
         kind: input.kind === "value" ? "text" : input.kind,
         optionLabels: input.optionLabels,
       },
@@ -3058,7 +3056,6 @@ export function SetupCalibrationEditorClient({
                   onSplitChange={changePositionSplit}
                   onOptionCountsChange={setPendingGridShape}
                   schema={setupSheetModelSchema}
-                  groupTitles={groupTitleChoices(setupSheetModelSchema)}
                   busy={newParamBusy}
                   error={newParamError}
                   onRemoveBox={clearPendingSlot}

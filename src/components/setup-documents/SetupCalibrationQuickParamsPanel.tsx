@@ -6,7 +6,6 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import type { CustomSetupFieldDefinition } from "@/lib/setupCalibrations/types";
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
-import { CUSTOM_FIELD_SECTION_PRESETS } from "@/lib/setupCalibrations/customFieldCatalog";
 import { customFieldGroupedChipContext } from "@/lib/setupCalibrations/customFieldGroupedChips";
 import type { QuickCalibrationFieldKind } from "@/lib/setupCalibrations/quickCalibrationField";
 
@@ -49,7 +48,6 @@ export function SetupCalibrationQuickParamsPanel(props: {
     key: string;
     kind: QuickCalibrationFieldKind;
     optionLines: string;
-    sectionId: string;
   }) => { ok: true } | { ok: false; error: string };
   /** Map a simple (non-grouped) custom field to one Acro widget. */
   onAssignSimple: (canonicalKey: string, pdfFieldName: string, instanceIndex: number) => void;
@@ -76,18 +74,9 @@ export function SetupCalibrationQuickParamsPanel(props: {
   const [key, setKey] = useState("");
   const [kind, setKind] = useState<QuickCalibrationFieldKind>("number");
   const [optionLines, setOptionLines] = useState("");
-  const [sectionId, setSectionId] = useState("tuning");
   const [localError, setLocalError] = useState<string | null>(null);
 
   const customOnly = useMemo(() => customFieldDefinitions, [customFieldDefinitions]);
-
-  const sectionChoices = useMemo(() => {
-    const m = new Map(CUSTOM_FIELD_SECTION_PRESETS.map((p) => [p.id, p.title] as const));
-    for (const c of customFieldDefinitions) {
-      if (c.sectionId && !m.has(c.sectionId)) m.set(c.sectionId, c.sectionTitle || c.sectionId);
-    }
-    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [customFieldDefinitions]);
 
   const groupedCtx = (def: CustomSetupFieldDefinition) => customFieldGroupedChipContext(def);
 
@@ -131,7 +120,7 @@ export function SetupCalibrationQuickParamsPanel(props: {
             </label>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2">
             <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
               <span className="ui-title text-[10px] text-foreground/90">Value type</span>
               <select
@@ -144,20 +133,6 @@ export function SetupCalibrationQuickParamsPanel(props: {
                 <option value="checkbox">Checkbox (on/off)</option>
                 <option value="one_of_many">One of many (pick one option)</option>
                 <option value="many_of_many">Many of many (any subset of options)</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
-              <span className="ui-title text-[10px] text-foreground/90">Section</span>
-              <select
-                className="rounded-md border border-border bg-card px-2 py-1.5 text-xs"
-                value={sectionId}
-                onChange={(e) => setSectionId(e.target.value)}
-              >
-                {sectionChoices.map(([id, title]) => (
-                  <option key={id} value={id}>
-                    {title}
-                  </option>
-                ))}
               </select>
             </label>
           </div>
@@ -189,7 +164,6 @@ export function SetupCalibrationQuickParamsPanel(props: {
                   key: key.trim(),
                   kind,
                   optionLines: lines.join("\n"),
-                  sectionId,
                 });
                 if (!res.ok) {
                   setLocalError(res.error);

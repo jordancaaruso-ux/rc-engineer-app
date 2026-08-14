@@ -6,6 +6,7 @@ import { loadSetupDocumentFileFromStorage, sourceTypeFromMime } from "@/lib/setu
 import { normalizeParsedSetupData } from "@/lib/setupDocuments/normalize";
 import { getEffectiveCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
 import { extractPdfRawDataFromFile, mapExtractedPdfWithCalibration } from "@/lib/setupCalibrations/pdfExtractPipeline";
+import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
 import {
   extractImageRawDataFromFile,
   mapExtractedImageWithCalibration,
@@ -210,6 +211,9 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
       mimeType: true,
       sourceType: true,
       calibrationProfileId: true,
+      // Which chassis this sheet is, so the import can also read the boxes the calibration
+      // doesn't name — those mappings live on the chassis's blank.
+      setupSheetModelId: true,
     },
   });
   if (!doc) throw new Error("Setup document not found");
@@ -377,6 +381,24 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
       });
       if (!calRow) throw new Error(`Calibration not found: ${effectiveCalibration.calibrationId}`);
 
+      /*
+       * The printed boxes the calibration does not name.
+       *
+       * Without these the import keeps only what a human named — on a curated chassis that is a
+       * fraction of the sheet, and everything else the driver filled in is read and dropped. The
+       * mappings live on the chassis's blank rather than in the calibration because they must be
+       * read raw; see `unionDerivedWithCalibration.ts`. A chassis nobody has unioned yet simply has
+       * none, and the import behaves exactly as it did before.
+       */
+      const derivedMappings = doc.setupSheetModelId
+        ? (((
+            await prisma.setupSheetBlank.findUnique({
+              where: { setupSheetModelId: doc.setupSheetModelId },
+              select: { derivedMappingsJson: true },
+            })
+          )?.derivedMappingsJson ?? {}) as Record<string, PdfFormFieldMappingRule>)
+        : {};
+
       // Extract once, then map calibrations against the extracted dataset (no PDF re-read during mapping).
       const tExtract = procDbg() ? performance.now() : 0;
       const raw = await withTimeout(
@@ -432,6 +454,7 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
           extracted: raw,
           calibrationDataJson: calRow.calibrationDataJson,
           calibrationProfileId: effectiveCalibration.calibrationId,
+          derivedMappings,
           onStage: async (s, e, data) => {
             const label = `pdf_map:${s}`;
             if (e === "start") {

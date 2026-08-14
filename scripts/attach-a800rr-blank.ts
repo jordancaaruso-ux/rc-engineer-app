@@ -21,21 +21,10 @@ import { prisma } from "@/lib/prisma";
 import { extractPdfFormFields } from "@/lib/setupDocuments/pdfFormFields";
 import { boxesFromCalibrationMappings } from "@/lib/setupSheetModels/boxesFromCalibration";
 import { normalizeSetupSheetModelName } from "@/lib/setupSheetModels/normalizeModelName";
+import { A800RR_EXTRA_SIMPLE_KEYS as EXTRA_SIMPLE_KEYS } from "@/lib/setupSheetModels/a800rrExtraSimpleKeys";
 import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
 import { guardDatabaseTarget } from "./lib/neonEnvGuard";
-
-/**
- * Printed boxes the calibration never mapped because the import path COMPUTES their values.
- * Confirmed against Jordan's own filled sheet 2026-08-11: Text91/Text93 held the computed
- * spring rates, `ratio` held 4.318, Text17 held his to-test notes.
- */
-const EXTRA_SIMPLE_KEYS: Record<string, string> = {
-  front_spring_rate_gf_mm: "Text91",
-  rear_spring_rate_gf_mm: "Text93",
-  final_drive_ratio: "ratio",
-  notes: "Text17",
-};
 
 async function main() {
   const args = process.argv.slice(2);

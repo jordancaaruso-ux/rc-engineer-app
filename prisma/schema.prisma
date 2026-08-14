@@ -420,6 +420,12 @@ model SetupSheetBlank {
   boxesJson Json?
   /// DerivedSheetStats, so a re-derivation can be compared against what this sheet produced.
   statsJson Json?
+  /// Record<schemaKey, PdfFormFieldMappingRule> for boxes the CALIBRATION does not name - the
+  /// printed boxes a curated chassis prints but nobody named. Deliberately not in the calibration's
+  /// own `formFieldMappings`: values read through that map are finished by the Awesomatix
+  /// canonical-key rewrites, and a derived key like `text91` lands straight in one of them. These
+  /// are read with `readDerivedSheetValues` instead. See `unionDerivedWithCalibration.ts`.
+  derivedMappingsJson Json?
   /// page number -> storage ref for the cached page image.
   pageImagesJson Json?
   /// Names a driver volunteered for a box. Never applied to the shared schema automatically -

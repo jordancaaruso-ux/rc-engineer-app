@@ -307,10 +307,48 @@ function isChoiceGroup(entry: PdfFormFieldEntry): boolean {
   return toggle && entry.widgets.length > 1 && (entry.options?.length ?? 0) >= entry.widgets.length;
 }
 
+/**
+ * One box on the paper, as the exclusion set addresses it: the PDF's own field name plus which of
+ * that field's widgets. `widgetInstanceIndex` absent means the WHOLE field — every widget it owns.
+ */
+export type WidgetRef = { pdfFieldName: string; widgetInstanceIndex?: number };
+
+/** `name` alone excludes the whole field; `name#index` excludes one box of it. */
+function widgetRefTokens(ref: WidgetRef): string {
+  return ref.widgetInstanceIndex === undefined
+    ? ref.pdfFieldName
+    : `${ref.pdfFieldName}#${ref.widgetInstanceIndex}`;
+}
+
+export type DeriveOptions = {
+  /**
+   * Boxes to leave alone — someone already owns them.
+   *
+   * Set when unioning a derivation onto a chassis that a CALIBRATION already maps: those boxes have
+   * schema keys with seasons of history behind them, and deriving over the top would mint a second
+   * parameter for the same printed box. Excluding a whole field takes all its widgets; excluding
+   * one widget of a multi-widget field leaves its siblings derivable.
+   */
+  excludeWidgets?: readonly WidgetRef[];
+  /**
+   * Keys that are already spoken for, seeded into the collision check before a single key is minted.
+   *
+   * Without this a derivation onto an existing chassis can mint `camber_front` a second time — the
+   * key is permanent the moment one setup saves, so the collision has to be prevented, not detected.
+   * A seeded collision is counted in `stats.collidedKeys` like any other.
+   */
+  reservedKeys?: Iterable<string>;
+};
+
 export function deriveSchemaFromAcroForm(
   extraction: PdfFormFieldsExtraction,
-  label: string
+  label: string,
+  options?: DeriveOptions
 ): DerivedSheet {
+  const excluded = new Set((options?.excludeWidgets ?? []).map(widgetRefTokens));
+  const isExcluded = (name: string, widgetIndex: number): boolean =>
+    excluded.has(name) || excluded.has(`${name}#${widgetIndex}`);
+
   const usable = extraction.fields.filter((f) => f.widgets.length > 0);
 
   // One `Placed` per parameter-to-be, so ordering and sectioning work on the same units the schema
@@ -320,11 +358,17 @@ export function deriveSchemaFromAcroForm(
   for (const entry of usable) {
     if (entry.widgets.length === 1 || isChoiceGroup(entry)) {
       const w = entry.widgets[0]!;
+      // A choice group is ONE parameter over several boxes, so any claimed box claims the row —
+      // splitting a printed one-of-many between a calibration and a derivation would give the
+      // driver two controls for one answer.
+      if (entry.widgets.some((x) => isExcluded(entry.name, x.instanceIndex))) continue;
       placed.push({ entry, pageNumber: w.pageNumber, y: w.y, x: w.x });
       continue;
     }
+    const free = entry.widgets.filter((w) => !isExcluded(entry.name, w.instanceIndex));
+    if (free.length === 0) continue;
     splitFieldCount += 1;
-    for (const w of entry.widgets) {
+    for (const w of free) {
       placed.push({ entry, widgetIndex: w.instanceIndex, pageNumber: w.pageNumber, y: w.y, x: w.x });
     }
   }
@@ -336,7 +380,7 @@ export function deriveSchemaFromAcroForm(
   const fields: SetupSheetModelFieldDef[] = [];
   const boxes: DerivedBox[] = [];
   const formFieldMappings: Record<string, PdfFormFieldMappingRule> = {};
-  const takenKeys = new Set<string>();
+  const takenKeys = new Set<string>(options?.reservedKeys ?? []);
   const stats: DerivedSheetStats = {
     fieldCount: extraction.fields.length,
     parameterCount: 0,

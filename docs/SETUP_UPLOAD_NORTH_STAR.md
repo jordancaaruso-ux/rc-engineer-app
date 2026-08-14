@@ -705,6 +705,87 @@ thing was the **AI-identification** front door, not creating a chassis from a fi
 
 ---
 
+## The sheet is the whole sheet — import, edit and export every printed box (2026-08-14)
+
+Founder call. Now that the sheet PICTURE is the surface a driver reads and edits a setup on, a
+printed box with no key is a box they can see and cannot touch — and one that never survives an
+upload or reaches an export. Three decisions, all shipped together.
+
+### 1. The calibration menu no longer asks for a group
+
+The Section control is gone from the naming panel, the sidebar's "New parameter…" and the quick-add
+panel. A parameter's location is now its box on the paper, so typing a group bought nothing.
+
+- New parameters land in `"Other"` (`DEFAULT_SECTION_TITLE`, `newParameterDef.ts`).
+  `groupTitleChoices`, `sectionChoicesForSheet`, `suggestGroupTitleForLabel` and
+  `existingGroupTitles` are **deleted** — do not bring them back for a future form.
+- `sectionId` stays on the field def. It still feeds `groupFieldsBySection`, which buckets a
+  flat-field model's form and drives `setupFillOrder`'s per-section progress.
+- **What this costs, stated once.** A model with `structuredSections` is unaffected — its display is
+  regrouped into the universal seven by `groupForFieldKey`, from the key and label, never
+  `sectionId`. A **flat-field** model that falls back to the form loses its group blocks: everything
+  new arrives in one "Other" bucket. That is a surface the sheet replaces, and the trade was taken
+  deliberately.
+- The AcroForm derivation still writes its own geometric sections (`sectionsByGeometry`) — that is
+  not the menu, it is free, and the union below depends on it.
+
+### 2. A calibrated chassis gets every box, not just the named ones
+
+`unionDerivedWithCalibration.ts` runs the existing total derivation over a curated chassis's blank
+while **excluding** every box the calibration already claims and **reserving** every existing schema
+key, then appends a parameter + box + mapping for the remainder. Additive only: nothing is renamed,
+re-pointed or removed, and the permanent keys behind two seasons of runs are untouched.
+
+- Unnamed boxes arrive `showInLogRun: false`, `showInAnalysis: false`, labelled by position ("Box 47
+  · page 2, upper right"). Naming one later is a `displayLabel` change, never a key change.
+- Run it with `npm run union-boxes -- --slug <slug> [--apply] [--prod]`, or `applyUnionToChassis`.
+  Safe to re-run: a box that already has a key is claimed.
+- **The derived mappings live on `SetupSheetBlank.derivedMappingsJson`, NOT in the calibration.**
+  Values read through the calibration's `formFieldMappings` are finished by
+  `finalizeAwesomatixStringImport`, whose `rewriteImportedCalculatedDisplayKey` hard-codes `text91`
+  and `text93` onto Awesomatix spring-rate keys — and derived keys live in exactly that namespace on
+  a generically-named sheet. They are read with `readDerivedSheetValues` instead. Second reason:
+  `normalizeCalibrationData` is a whitelist rebuilt on every calibration save, which is what
+  `SetupSheetBlank` exists to survive.
+- The A800RR's four **computed** boxes (`A800RR_EXTRA_SIMPLE_KEYS` — spring rates, final drive,
+  notes) are claimed by the union and deliberately kept OUT of `derivedMappingsJson`: putting them
+  there would make the import read a stale printed number in front of the value the app works out.
+  They are added at export time only.
+
+### 3. One export engine — fill the manufacturer's blank
+
+`src/lib/setup/pdfRender.ts` is **deleted**. It painted white rectangles over every widget, drew the
+values itself, flattened the file, and was wired to the Awesomatix readers — a dead picture that
+really knew one car. Export now goes through `fillPdfForm`, which writes into the blank's own form
+fields and keeps its fonts and tick marks.
+
+- **The substrate is the CHASSIS's blank** (`SetupSheetBlank.setupDocument`), not the driver's
+  upload. So every driver on a car exports the same paper, and a driver who never uploaded anything
+  gets a PDF at all. The per-user document walk survives only as the fallback for a car with no
+  chassis model — those still 404, honestly.
+- Values reach the paper through `storedValuesToSurface`, the same bridge the on-screen sheet uses,
+  so what a driver sees in a box and what lands in the PDF cannot drift apart.
+  `flattenFillMappings` resolves a calibration's four grouped rule shapes ("which box is ticked")
+  into the one-box-one-value pairs `fillPdfForm` writes.
+- **The paper is emptied before it is filled — but how much depends on whose paper it is.**
+  - *A chassis blank is cleared entirely.* It is whichever PDF created the chassis, very often
+    somebody's finished sheet — the A800RR's is the calibration's own example document. Caught in
+    the browser on 2026-08-14: the first export printed "Jordan Caruso / TFTR / 13.5T" and a full
+    set of geometry onto a setup holding none of it, under the current driver's own values.
+    `sheetPageImages` already cleared the PICTURE for this reason; export now clears the paper.
+  - *A driver's own upload is cleared only where the app maps it* (`blankPdfFormValues`'
+    `onlyFieldNames`). There is no one else's data in it to hide, so clearing everything would
+    silently blank every box the calibration doesn't name — ~109 of them on an A800RR. The engine
+    this replaced whited out exactly the mapped widgets and no others; this keeps that.
+- `SETUP_PDF_RENDER_PIPELINE_VERSION` is 3; every cached PDF from the old engine re-renders.
+- **Do not flatten on the way to a picture.** Tried and rejected the same day: pdfjs draws the live
+  form widgets fine (checked on the Xray '26 and Mugen MTC3 blanks, manufacturer marks and all), and
+  flattening makes the picture *worse* — an auto-sized box gets its text burnt in at the wrong size.
+  pdf-lib's `flatten()` also throws on all three repo blanks, because an unticked box stores no
+  `/Off` appearance.
+
+---
+
 ## Confidence doctrine
 
 Mirrors the Engineer's trust ethos (`ENGINEER_NORTH_STAR.md`): never bluff. Flag a

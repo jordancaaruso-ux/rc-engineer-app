@@ -79,12 +79,6 @@ export function readSetupField(data: SetupSnapshotData, key: string): string {
   return "";
 }
 
-export function readSetupMultiSelection(data: SetupSnapshotData, key: string): string[] {
-  const raw = data[key];
-  if (raw != null) return normalizeMultiSelectValue(key, raw);
-  return normalizeMultiSelectValue(key, readSetupField(data, key));
-}
-
 export function valuesEqual(a: string, b: string): boolean {
   return a.trim() === b.trim();
 }
@@ -123,36 +117,14 @@ export function readPresetWithOtherDisplay(data: SetupSnapshotData, key: string)
   return displayPresetWithOther(pov);
 }
 
-const normForPdfToken = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
-
-/**
- * Single-choice PDF: match calibration option keys to a chip token. Uses
- * `selectedPreset` when set; if empty, matches full display (e.g. otherText-only
- * "C27MMX") to the catalog so export matches what the in-app field shows. Import
- * from a tick-heavy PDF can leave only free text — this still maps to a chip.
+/*
+ * DELETED 2026-08-14 with the old PDF engine: `readSetupMultiSelection` and
+ * `readSetupSingleChoiceForPdf`, whose only caller was `pdfRender.ts`.
+ *
+ * Export no longer reads a setup through Awesomatix-specific helpers at all. It goes through
+ * `storedValuesToSurface` — the same bridge the on-screen sheet uses — so what a driver sees in a
+ * box and what lands in the exported PDF cannot drift apart, on any chassis.
  */
-export function readSetupSingleChoiceForPdf(data: SetupSnapshotData, key: string): string {
-  if (!isPresetWithOtherFieldKey(key)) return readSetupField(data, key);
-  const opts = getSingleSelectChipOptions(key);
-  const pov = getPresetWithOtherFromData(data as Record<string, unknown>, key, opts);
-  if (isEmptyPresetWithOther(pov)) return "";
-  const presel = readPresetWithOtherSelection(data, key);
-  if (presel) {
-    if (opts?.length) {
-      for (const o of opts) {
-        if (normForPdfToken(presel) === normForPdfToken(o)) return o;
-      }
-    }
-    return presel;
-  }
-  const display = readPresetWithOtherDisplay(data, key).trim();
-  if (!display || !opts?.length) return "";
-  for (const o of opts) {
-    if (normForPdfToken(o) === "other") continue;
-    if (normForPdfToken(o) === normForPdfToken(display)) return o;
-  }
-  return "";
-}
 
 export function setupValuesDiffer(
   current: SetupSnapshotData,

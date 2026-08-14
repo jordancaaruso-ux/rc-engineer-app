@@ -34,8 +34,10 @@ import { renderPdfFirstPageToPng } from "@/lib/setupDocuments/pdfServerRaster";
  * The driver's sheet as a PNG, or `null` when this chassis has no sheet the app can draw.
  *
  * Null is a real answer, not a failure to handle: the caller turns it into a sentence naming what
- * is missing. Measured 2026-08-13 on scratch-dev, 112 of 1,203 snapshots (9%) land here — every
- * one of them on a car with no chassis-model link, which is the thing to fix.
+ * is missing. Measured 2026-08-13 on scratch-dev, 112 of 1,203 snapshots (9%) landed here, every one
+ * on a car with no chassis-model link. Since 2026-08-14 the PDF is filled from the CHASSIS's own
+ * blank rather than the driver's upload, so a car WITH a chassis model always has paper now; what
+ * is left here is genuinely the cars linked to no model at all.
  */
 export async function renderSetupSheetImage(params: {
   userId: string;
@@ -49,6 +51,16 @@ export async function renderSetupSheetImage(params: {
 
   try {
     const pdf = await readBytesFromStorageRef(ensured.relativePath);
+    /*
+     * Rasterized with its form layer LIVE, not flattened.
+     *
+     * Since 2026-08-14 the exported PDF keeps its values in real form fields so a driver can carry
+     * on filling it. The worry was that pdfjs wouldn't draw those. Checked by rendering both ways
+     * on the Xray '26 and Mugen MTC3 blanks: pdfjs draws the widgets, marks and all — and the
+     * FLATTENED copy is the worse picture, because a box the sheet sizes automatically (Xray's
+     * comments line) gets its text burnt in at the wrong size. So the live file is the better
+     * source as well as the simpler one.
+     */
     const sheet = await renderPdfFirstPageToPng(pdf);
     // One predictable width for every chassis, and a smaller file over a club's wifi.
     return await sharp(sheet).resize({ width: CARD_WIDTH }).png().toBuffer();

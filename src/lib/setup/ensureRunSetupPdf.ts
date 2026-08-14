@@ -1,33 +1,211 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
-import { renderSetupPdfSnapshot } from "@/lib/setup/pdfRender";
+import { normalizeSetupData } from "@/lib/runSetup";
+import { flattenFillMappings } from "@/lib/setup/fillMappingFromCalibration";
 import { SETUP_PDF_RENDER_PIPELINE_VERSION } from "@/lib/setup/renderTypes";
 import { getEffectiveCalibrationProfileId, ensureSetupDocumentCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
 import { buildDerivedRenderPatch } from "@/lib/setup/deriveRenderValues";
+import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
+import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
+import { fillPdfForm } from "@/lib/setupDocuments/fillPdfForm";
+import { blankPdfFormValues } from "@/lib/setupDocuments/pdfBlankForm";
 import {
   readBytesFromStorageRef,
   storeRunRenderedSetupPdf,
   storeSetupSnapshotRenderedSetupPdf,
   storageRefIsReadable,
 } from "@/lib/setupDocuments/storage";
+import { A800RR_EXTRA_SIMPLE_KEYS } from "@/lib/setupSheetModels/a800rrExtraSimpleKeys";
+import { claimedWidgetsFromMappings } from "@/lib/setupSheetModels/unionDerivedWithCalibration";
+import { storedValuesToSurface } from "@/lib/setupSheetModels/sheetSurfaceValues";
 
 /**
- * Resolves base PDF + calibration when Run rows predate source links:
- * walks setupSnapshot.baseSetupSnapshotId chain and finds a SetupDocument whose createdSetupId matches.
+ * ============================ HOW A SETUP BECOMES A PDF ============================
+ *
+ * The manufacturer's own blank, with the driver's answers written into its form fields — see
+ * `fillPdfForm`. The blank already knows how it wants to look: the font and colour of every value,
+ * the mark every tick box makes. Filling it is what a viewer does when you fill the sheet in
+ * Acrobat, and what comes out is still a sheet somebody can keep filling in.
+ *
+ * The previous engine (`pdfRender.ts`, deleted 2026-08-14) went the other way: it painted white
+ * rectangles over every widget, drew the values itself, and flattened the file. That produced a
+ * dead picture, it was wired to the Awesomatix readers so it only really knew one car, and it drew
+ * only what a calibration named — which is a fraction of what a sheet prints.
+ *
+ * ============================ WHICH BLANK, AND WHY IT MATTERS ============================
+ *
+ * The substrate is the CHASSIS's stored blank (`SetupSheetBlank.setupDocument`), not the driver's
+ * own upload. The chassis is shared and the blank outlives any one account, so every driver on that
+ * car exports the same paper — and a driver who never uploaded anything (built their setup in the
+ * app) gets a PDF at all, which they previously could not. The per-user document walk survives
+ * below only as the fallback for a car with no chassis model.
  */
-async function resolvePdfSourceForRun(
+
+/**
+ * Every PDF field a set of rules touches, across all five mapping shapes — the boxes the app is
+ * about to take responsibility for, and therefore the only ones worth clearing on a driver's own
+ * file. `claimedWidgetsFromMappings` answers the same question at widget granularity; clearing is
+ * per FIELD, because that is the unit pdf-lib empties.
+ */
+function mappedFieldNames(mappings: Record<string, PdfFormFieldMappingRule>): Set<string> {
+  return new Set(
+    claimedWidgetsFromMappings(mappings)
+      .map((w) => w.pdfFieldName)
+      .filter(Boolean)
+  );
+}
+
+type PdfSource = {
+  /** The blank to write into. */
+  bytes: Buffer;
+  /** Schema key -> where it lives on that blank. Calibration rules and derived rules, merged. */
+  mappings: Record<string, PdfFormFieldMappingRule>;
+  /** For the derived-value patch, which still reads the calibration's own shape. */
+  calibrationJson: unknown;
+  /** Set only on the fallback path, so a run can back-link the document it used. */
+  documentId?: string;
+  calibrationId?: string;
+};
+
+/**
+ * The chassis's own blank plus every mapping that points at it.
+ *
+ * Null when the car has no chassis model, or the chassis has no blank, or the blank's document went
+ * with a deleted account — all of which mean there is no shared paper to fill, and the caller falls
+ * back to the driver's own upload.
+ */
+async function resolveChassisBlankSource(carId: string | null): Promise<PdfSource | null> {
+  if (!carId) return null;
+
+  const car = await prisma.car.findUnique({
+    where: { id: carId },
+    select: {
+      setupSheetModel: {
+        select: {
+          slug: true,
+          derivedFromBlank: {
+            select: {
+              derivedMappingsJson: true,
+              setupDocument: { select: { storagePath: true } },
+            },
+          },
+          defaultCalibration: { select: { calibrationDataJson: true } },
+        },
+      },
+    },
+  });
+  const model = car?.setupSheetModel;
+  const storagePath = model?.derivedFromBlank?.setupDocument?.storagePath;
+  if (!model || !storagePath) return null;
+
+  let bytes: Buffer;
+  try {
+    /*
+     * EMPTIED FIRST, ALWAYS.
+     *
+     * A chassis's "blank" is whichever PDF created it, and that is very often somebody's FINISHED
+     * sheet — the A800RR's is the calibration's own example document. Filling it as-is prints the
+     * first uploader's setup into every box the current driver left empty, and their name in the
+     * name box. `sheetPageImages` clears it for the same reason before rendering the picture; the
+     * full argument is in `blankPdfFormValues`.
+     *
+     * Nothing is lost: what that file contained was read into values at upload, so it is drawn
+     * rather than printed.
+     */
+    const raw = await readBytesFromStorageRef(storagePath);
+    bytes = Buffer.from(await blankPdfFormValues(new Uint8Array(raw)));
+  } catch {
+    return null;
+  }
+
+  const calibrationJson = model.defaultCalibration?.calibrationDataJson ?? {};
+  const calibrationMappings = normalizeCalibrationData(calibrationJson).formFieldMappings ?? {};
+  const derivedMappings = (model.derivedFromBlank?.derivedMappingsJson ?? {}) as Record<
+    string,
+    PdfFormFieldMappingRule
+  >;
+
+  /*
+   * The computed boxes, added here and NOWHERE ELSE.
+   *
+   * Awesomatix's spring rates and final drive ratio are printed boxes whose values the app works
+   * out rather than reads, which is why no calibration rule points at them and why the union pass
+   * leaves them alone. They still have to reach the paper — a driver's exported sheet with the
+   * spring rates blank is not their sheet. Deliberately not in `derivedMappingsJson`: putting them
+   * there would make the IMPORT read them raw off an uploaded sheet and stand a stale printed
+   * number in front of the computed one.
+   */
+  const computedBoxes: Record<string, PdfFormFieldMappingRule> =
+    model.slug === "awesomatix_a800rr"
+      ? Object.fromEntries(
+          Object.entries(A800RR_EXTRA_SIMPLE_KEYS).map(([key, pdfFieldName]) => [key, { pdfFieldName }])
+        )
+      : {};
+
+  return {
+    bytes,
+    // Calibration first so a named parameter always wins a key the derivation also produced.
+    mappings: { ...derivedMappings, ...computedBoxes, ...calibrationMappings },
+    calibrationJson,
+  };
+}
+
+/** Write a driver's setup into a blank. Null when nothing about the pair is usable. */
+async function fillSetupPdf(input: {
+  source: PdfSource;
+  data: unknown;
+  debugLabel: string;
+}): Promise<Uint8Array | null> {
+  const setupValues = normalizeSetupData(input.data);
+  // Computed render values, so a stale imported number never reaches the paper ahead of the one the
+  // app works out from the canonical setup.
+  const derivedPatch = buildDerivedRenderPatch({
+    setup: setupValues,
+    calibrationJson: input.source.calibrationJson,
+  });
+  const renderValues = { ...setupValues } as Record<string, unknown>;
+  for (const k of derivedPatch.clear) delete renderValues[k];
+  for (const [k, v] of Object.entries(derivedPatch.set)) renderValues[k] = v;
+
+  // The same bridge the on-screen sheet uses, so a box the driver sees filled exports filled.
+  const surfaceValues = storedValuesToSurface(renderValues);
+  const flat = flattenFillMappings({
+    formFieldMappings: input.source.mappings,
+    surfaceValues,
+  });
+  if (Object.keys(flat.mappings).length === 0) return null;
+
+  const filled = await fillPdfForm({
+    blank: new Uint8Array(input.source.bytes),
+    mappings: flat.mappings,
+    values: flat.values,
+  });
+  if (filled.skipped.length > 0 || filled.conflicts.length > 0) {
+    console.log(
+      `[setup-pdf/fill] ${input.debugLabel} wrote=${filled.written} skipped=${filled.skipped.length} conflicts=${filled.conflicts.length}`
+    );
+  }
+  return filled.bytes;
+}
+
+/**
+ * FALLBACK ONLY: the driver's own uploaded PDF, for a car with no chassis model (or whose chassis
+ * has no blank). Walks `setupSnapshot.baseSetupSnapshotId` to find the SetupDocument this setup came
+ * from, because Run rows predating the source links have no direct pointer.
+ *
+ * Its coverage is only ever what the calibration names — there are no derived mappings for a
+ * one-off upload — so a sheet exported this way still has the gaps the chassis path closes. It
+ * exists so those drivers get a PDF at all.
+ */
+async function resolveUploadedPdfSourceForRun(
   userId: string,
   run: {
     setupSnapshot: { baseSetupSnapshotId: string | null; data: unknown };
     sourceSetupDocumentId: string | null;
     sourceSetupCalibrationId: string | null;
   }
-): Promise<{
-  document: { id: string; storagePath: string; sourceType: string; mimeType: string };
-  calibration: { id: string; calibrationDataJson: unknown };
-} | null> {
+): Promise<PdfSource | null> {
   let doc =
     run.sourceSetupDocumentId != null
       ? await prisma.setupDocument.findFirst({
@@ -81,37 +259,32 @@ async function resolvePdfSourceForRun(
   console.log(
     `[run-setup-pdf/resolve] doc=${doc.id} calibration=${cal.id} (${cal.name ?? "cal"}) source=${effective.source}`
   );
-  try {
-    const calNorm = (cal.calibrationDataJson ?? {}) as unknown;
-    // NOTE: lightweight debug: print spring-related mapping keys so we can wire derived values correctly.
-    const { normalizeCalibrationData } = await import("@/lib/setupCalibrations/types");
-    const parsed = normalizeCalibrationData(calNorm);
-    const keys = [
-      ...Object.keys(parsed.fields ?? {}),
-      ...Object.keys(parsed.formFieldMappings ?? {}),
-    ];
-    const springKeys = keys.filter((k) => /spring/i.test(k) && /(gf|rate)/i.test(k)).slice(0, 30);
-    if (springKeys.length) {
-      console.log(`[run-setup-pdf/calibration-keys] ${springKeys.join(", ")}`);
-    }
-  } catch {
-    /* ignore debug */
-  }
 
-  return { document: doc, calibration: cal };
+  const mappings = normalizeCalibrationData(cal.calibrationDataJson).formFieldMappings ?? {};
+  let bytes: Buffer;
+  try {
+    const raw = await readBytesFromStorageRef(doc.storagePath);
+    bytes = Buffer.from(await blankPdfFormValues(new Uint8Array(raw), mappedFieldNames(mappings)));
+  } catch {
+    return null;
+  }
+  return {
+    bytes,
+    mappings,
+    calibrationJson: cal.calibrationDataJson,
+    documentId: doc.id,
+    calibrationId: cal.id,
+  };
 }
 
 /**
- * Resolves base PDF + calibration for a {@link SetupSnapshot} without a run: document whose
- * `createdSetupId` matches the snapshot, or the same baseline walk as runs.
+ * FALLBACK ONLY, the no-run twin of {@link resolveUploadedPdfSourceForRun}: the document whose
+ * `createdSetupId` is this snapshot, or the same baseline walk.
  */
-async function resolvePdfSourceForSetupSnapshot(
+async function resolveUploadedPdfSourceForSetupSnapshot(
   userId: string,
   setupSnapshotId: string
-): Promise<{
-  document: { id: string; storagePath: string; sourceType: string; mimeType: string };
-  calibration: { id: string; calibrationDataJson: unknown; name: string | null };
-} | null> {
+): Promise<PdfSource | null> {
   let currentId: string | null = setupSnapshotId;
   const seen = new Set<string>();
   while (currentId && !seen.has(currentId)) {
@@ -136,7 +309,23 @@ async function resolvePdfSourceForSetupSnapshot(
         select: { id: true, calibrationDataJson: true, name: true },
       });
       if (!cal?.calibrationDataJson) return null;
-      return { document: createdDoc, calibration: cal };
+      const mappings = normalizeCalibrationData(cal.calibrationDataJson).formFieldMappings ?? {};
+      let bytes: Buffer;
+      try {
+        const raw = await readBytesFromStorageRef(createdDoc.storagePath);
+        bytes = Buffer.from(
+          await blankPdfFormValues(new Uint8Array(raw), mappedFieldNames(mappings))
+        );
+      } catch {
+        return null;
+      }
+      return {
+        bytes,
+        mappings,
+        calibrationJson: cal.calibrationDataJson,
+        documentId: createdDoc.id,
+        calibrationId: cal.id,
+      };
     }
     const nextBase: { baseSetupSnapshotId: string | null } | null = await prisma.setupSnapshot.findFirst({
       where: { id: currentId, userId },
@@ -160,6 +349,7 @@ export async function ensureRenderedSetupSnapshotPdf(params: {
     select: {
       id: true,
       data: true,
+      carId: true,
       renderedSetupPdfPath: true,
       setupPdfRenderVersion: true,
     },
@@ -173,44 +363,22 @@ export async function ensureRenderedSetupSnapshotPdf(params: {
     }
   }
 
-  const resolved = await resolvePdfSourceForSetupSnapshot(params.userId, snap.id);
-  if (!resolved) return null;
+  const source =
+    (await resolveChassisBlankSource(snap.carId))
+    ?? (await resolveUploadedPdfSourceForSetupSnapshot(params.userId, snap.id));
+  if (!source) return null;
 
-  let baseBytes: Buffer;
-  try {
-    baseBytes = await readBytesFromStorageRef(resolved.document.storagePath);
-  } catch {
-    return null;
-  }
+  const bytes = await fillSetupPdf({ source, data: snap.data, debugLabel: `snapshot=${snap.id}` });
+  if (!bytes) return null;
 
-  const setupValues = normalizeSetupData(snap.data);
-  const derivedPatch = buildDerivedRenderPatch({
-    setup: setupValues,
-    calibrationJson: resolved.calibration.calibrationDataJson,
-  });
-  const renderSetupValues = { ...setupValues } as Record<string, unknown>;
-  for (const k of derivedPatch.clear) delete renderSetupValues[k];
-  for (const [k, v] of Object.entries(derivedPatch.set)) renderSetupValues[k] = v;
-
-  if (derivedPatch.debug.length) {
-    console.log(`[setup-snapshot-pdf/derived] snapshot=${snap.id} ${derivedPatch.debug.join(" | ")}`);
-  }
-
-  const rendered = await renderSetupPdfSnapshot({
-    basePdfBytes: baseBytes,
-    calibrationJson: resolved.calibration.calibrationDataJson,
-    setupValues: renderSetupValues as unknown as SetupSnapshotData,
-  });
-  if (!rendered) return null;
-
-  const storageRef = await storeSetupSnapshotRenderedSetupPdf(snap.id, Buffer.from(rendered.pdfBytes));
+  const storageRef = await storeSetupSnapshotRenderedSetupPdf(snap.id, Buffer.from(bytes));
 
   await prisma.setupSnapshot.update({
     where: { id: snap.id },
     data: {
       renderedSetupPdfPath: storageRef,
       renderedSetupPdfGeneratedAt: new Date(),
-      setupPdfRenderVersion: rendered.pipelineVersion,
+      setupPdfRenderVersion: SETUP_PDF_RENDER_PIPELINE_VERSION,
     },
   });
 
@@ -234,7 +402,7 @@ export async function ensureRenderedRunSetupPdf(params: {
       sourceSetupDocumentId: true,
       sourceSetupCalibrationId: true,
       setupSnapshot: {
-        select: { baseSetupSnapshotId: true, data: true },
+        select: { baseSetupSnapshotId: true, data: true, carId: true },
       },
     },
   });
@@ -247,46 +415,33 @@ export async function ensureRenderedRunSetupPdf(params: {
     }
   }
 
-  const resolved = await resolvePdfSourceForRun(params.userId, run);
-  if (!resolved) return null;
+  const source =
+    (await resolveChassisBlankSource(run.setupSnapshot.carId))
+    ?? (await resolveUploadedPdfSourceForRun(params.userId, run));
+  if (!source) return null;
 
-  let baseBytes: Buffer;
-  try {
-    baseBytes = await readBytesFromStorageRef(resolved.document.storagePath);
-  } catch {
-    return null;
-  }
-
-  const setupValues = normalizeSetupData(run.setupSnapshot.data);
-  // Derived render values: computed from canonical setup (prevents stale imported/calculated fields).
-  const derivedPatch = buildDerivedRenderPatch({
-    setup: setupValues,
-    calibrationJson: resolved.calibration.calibrationDataJson,
+  const bytes = await fillSetupPdf({
+    source,
+    data: run.setupSnapshot.data,
+    debugLabel: `run=${run.id}`,
   });
-  const renderSetupValues = { ...setupValues } as Record<string, unknown>;
-  for (const k of derivedPatch.clear) delete renderSetupValues[k];
-  for (const [k, v] of Object.entries(derivedPatch.set)) renderSetupValues[k] = v;
+  if (!bytes) return null;
 
-  if (derivedPatch.debug.length) {
-    console.log(`[run-setup-pdf/derived] run=${run.id} ${derivedPatch.debug.join(" | ")}`);
-  }
-  const rendered = await renderSetupPdfSnapshot({
-    basePdfBytes: baseBytes,
-    calibrationJson: resolved.calibration.calibrationDataJson,
-    setupValues: renderSetupValues as unknown as typeof setupValues,
-  });
-  if (!rendered) return null;
-
-  const storageRef = await storeRunRenderedSetupPdf(run.id, Buffer.from(rendered.pdfBytes));
+  const storageRef = await storeRunRenderedSetupPdf(run.id, Buffer.from(bytes));
 
   await prisma.run.update({
     where: { id: run.id },
     data: {
       renderedSetupPdfPath: storageRef,
       renderedSetupPdfGeneratedAt: new Date(),
-      setupPdfRenderVersion: rendered.pipelineVersion,
-      ...(run.sourceSetupDocumentId == null ? { sourceSetupDocumentId: resolved.document.id } : {}),
-      ...(run.sourceSetupCalibrationId == null ? { sourceSetupCalibrationId: resolved.calibration.id } : {}),
+      setupPdfRenderVersion: SETUP_PDF_RENDER_PIPELINE_VERSION,
+      // Only the fallback path knows a document; a chassis blank belongs to no user's upload.
+      ...(run.sourceSetupDocumentId == null && source.documentId
+        ? { sourceSetupDocumentId: source.documentId }
+        : {}),
+      ...(run.sourceSetupCalibrationId == null && source.calibrationId
+        ? { sourceSetupCalibrationId: source.calibrationId }
+        : {}),
     },
   });
 

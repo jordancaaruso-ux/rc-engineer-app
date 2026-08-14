@@ -203,3 +203,18 @@ export async function fillPdfForm(input: {
   const bytes = await pdfDoc.save({ updateFieldAppearances: false });
   return { bytes, written, skipped, conflicts };
 }
+
+/*
+ * DO NOT FLATTEN THIS FILE ON THE WAY TO A PICTURE. Tried and rejected 2026-08-14.
+ *
+ * The worry was that pdfjs — which turns a sheet into the PNG a driver shares — might not draw form
+ * widgets when it rasterizes. Checked by rendering the Xray '26 and Mugen MTC3 blanks both ways:
+ * pdfjs draws them, manufacturer marks and all. And flattening makes the picture WORSE, because a
+ * box the sheet sizes automatically (Xray's comments line) gets its text burnt in at the wrong size,
+ * while the live file lets the renderer size it as the sheet intends.
+ *
+ * pdf-lib's `flatten()` also throws outright on all three repo blanks (`Failed to extract appearance
+ * ref`): an unticked box carries `/AS /Off` and stores no `/Off` appearance, because an unticked box
+ * draws nothing. That is ordinary, valid PDF — 182 such widgets on the Xray '26 sheet alone — and
+ * pdf-lib insists on a stream anyway. So flattening costs a workaround AND a worse result.
+ */

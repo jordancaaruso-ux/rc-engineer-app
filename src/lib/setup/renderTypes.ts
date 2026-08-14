@@ -1,12 +1,12 @@
 /**
- * Shared types for run setup PDF rendering (single pipeline for view + download).
+ * Version of the setup-PDF pipeline (one pipeline for view, download and share image).
+ *
+ * Persisted on `Run.setupPdfRenderVersion` / `SetupSnapshot.setupPdfRenderVersion`; a cached PDF
+ * whose version doesn't match is re-made on the next request. Bump it whenever what comes out
+ * changes.
+ *
+ * 3 — 2026-08-14: fill the manufacturer's blank through `fillPdfForm` instead of whiting out every
+ *     widget and drawing over the top. Every cached PDF from the old engine is a flattened picture
+ *     and must be replaced.
  */
-
-export type SetupPdfRenderResult = {
-  /** Written PDF bytes (derived snapshot; never mutates the original upload). */
-  pdfBytes: Uint8Array;
-  /** Bump when drawing logic changes; persisted on Run for invalidation. */
-  pipelineVersion: number;
-};
-
-export const SETUP_PDF_RENDER_PIPELINE_VERSION = 2;
+export const SETUP_PDF_RENDER_PIPELINE_VERSION = 3;

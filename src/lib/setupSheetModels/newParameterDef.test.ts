@@ -2,13 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  DEFAULT_SECTION_TITLE,
   buildNewParameterField,
   buildPositionSplitFields,
-  existingGroupTitles,
-  groupTitleChoices,
-  sectionChoicesForSheet,
   sectionIdForGroupTitle,
-  suggestGroupTitleForLabel,
   uniqueParameterKey,
 } from "@/lib/setupSheetModels/newParameterDef";
 import { SETUP_SHEET_GROUPS } from "@/lib/setupSheetModels/setupSheetGroups";
@@ -92,14 +89,38 @@ test("a group title already on the sheet reuses its section id", () => {
   assert.equal(sectionIdForGroupTitle("4WD bits", existing), "s_4wd_bits");
 });
 
-test("group chips list each title once, in first-seen order", () => {
-  const s = schema([
-    field({ key: "a", sectionTitle: "Front end" }),
-    field({ key: "b", sectionTitle: "Diffs" }),
-    field({ key: "c", sectionTitle: "front end" }),
-    field({ key: "d", sectionTitle: "" }),
-  ]);
-  assert.deepEqual(existingGroupTitles(s), ["Front end", "Diffs"]);
+/**
+ * Nothing asks for a group any more (founder call 2026-08-14) — the sheet picture is where a
+ * parameter lives. So the common call omits `groupTitle` entirely, and every such parameter must
+ * land in one bucket rather than each minting its own.
+ */
+test("a parameter created without a group lands in Other, sharing one section id", () => {
+  const first = buildNewParameterField({ displayLabel: "Front ride height", kind: "number" }, schema());
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  assert.equal(first.field.sectionTitle, DEFAULT_SECTION_TITLE);
+  assert.equal(first.field.sectionId, "other");
+
+  const second = buildNewParameterField(
+    { displayLabel: "Rear ride height", kind: "number" },
+    schema([first.field])
+  );
+  assert.equal(second.ok, true);
+  if (!second.ok) return;
+  assert.equal(second.field.sectionId, first.field.sectionId);
+});
+
+/**
+ * The AcroForm derivation files its unnamed boxes under `grp_other`/"Other". A box named afterwards
+ * must join that section, not open a second "Other" beside it — two buckets with one title read as
+ * a bug in the form and split the guided fill's progress in half.
+ */
+test("a named box joins the derivation's own Other section rather than minting a second", () => {
+  const derived = schema([field({ key: "text91", sectionId: "grp_other", sectionTitle: "Other" })]);
+  const res = buildNewParameterField({ displayLabel: "Bump steer", kind: "number" }, derived);
+  assert.equal(res.ok, true);
+  if (!res.ok) return;
+  assert.equal(res.field.sectionId, "grp_other");
 });
 
 test("one-of-many keeps one option per clicked box, in click order", () => {
@@ -411,95 +432,14 @@ test("a grouped split needs one option list per position, and 2 options in each"
   assert.match(tooFew.error, /^Rear:/);
 });
 
-test("a brand-new chassis type already offers every universal group as a chip", () => {
-  const choices = groupTitleChoices(schema());
-  assert.deepEqual(choices, SETUP_SHEET_GROUPS.map((g) => g.title));
-});
-
-test("a sheet's own group names follow the universal ones, never duplicated", () => {
-  const choices = groupTitleChoices(
-    schema([
-      field({ key: "srs_front", sectionId: "srs", sectionTitle: "SRS" }),
-      // Same title as a universal group, differently cased — must not appear twice.
-      field({ key: "diff", sectionId: "dt", sectionTitle: "drivetrain" }),
-    ])
-  );
-  assert.deepEqual(choices.slice(0, SETUP_SHEET_GROUPS.length), SETUP_SHEET_GROUPS.map((g) => g.title));
-  assert.deepEqual(choices.slice(SETUP_SHEET_GROUPS.length), ["SRS"]);
-});
-
 /**
- * Load bearing: a parameter is STORED under the section id slugified from its group title, and
- * DISPLAYED under the group `setupSheetGroups` resolves. Building a sheet from these chips is only
- * uniform if those two agree, so the slug of every universal title must equal its group id.
+ * Still load bearing after the Section control went: a parameter is STORED under the section id
+ * slugified from its title, and a flat-field model is DISPLAYED under the group `setupSheetGroups`
+ * resolves. Any sheet still carrying the old titles only reads uniformly if those two agree, so the
+ * slug of every universal title must equal its group id.
  */
 test("every universal group title slugifies onto its own group id", () => {
   for (const group of SETUP_SHEET_GROUPS) {
     assert.equal(sectionIdForGroupTitle(group.title, schema()), group.id, group.title);
   }
-});
-
-test("the group is suggested from the parameter's name, and left alone when nothing matches", () => {
-  assert.equal(suggestGroupTitleForLabel("Front spring"), "Shocks & springs");
-  assert.equal(suggestGroupTitleForLabel("PSS"), "Shocks & springs");
-  assert.equal(suggestGroupTitleForLabel("Camber"), "Suspension geometry");
-  assert.equal(suggestGroupTitleForLabel("Belt tension"), "Drivetrain");
-  assert.equal(suggestGroupTitleForLabel("Top deck screws"), "Chassis & flex");
-  assert.equal(suggestGroupTitleForLabel("Upper inner shims"), "Links & shims");
-  assert.equal(suggestGroupTitleForLabel("Bodyshell"), "Body, tyres & weight");
-  assert.equal(suggestGroupTitleForLabel("Notes"), "Other");
-  assert.equal(suggestGroupTitleForLabel("Zzz unknowable"), undefined);
-  assert.equal(suggestGroupTitleForLabel("   "), undefined);
-});
-
-test("a suggested group title lands the parameter in that group's section id", () => {
-  const title = suggestGroupTitleForLabel("Front spring")!;
-  const res = buildNewParameterField(
-    { displayLabel: "Front spring", groupTitle: title, kind: "text" },
-    schema()
-  );
-  assert.equal(res.ok, true);
-  if (!res.ok) return;
-  assert.equal(res.field.sectionId, "shocks_springs");
-  assert.equal(res.field.sectionTitle, "Shocks & springs");
-});
-
-test("a blank sheet's section dropdown is exactly the universal groups", () => {
-  assert.deepEqual(
-    sectionChoicesForSheet(schema()),
-    SETUP_SHEET_GROUPS.map((g) => ({ id: g.id, title: g.title }))
-  );
-});
-
-test("a sheet's own sections lead, universal groups fill in behind them", () => {
-  const s: SetupSheetModelSchema = {
-    version: 1,
-    label: "Test sheet",
-    structuredSections: [{ id: "front_end", title: "Front end", rows: [] }],
-    fields: [field({ key: "diff_oil", sectionId: "diffs", sectionTitle: "Diffs" })],
-  };
-  const choices = sectionChoicesForSheet(s);
-  assert.deepEqual(choices.slice(0, 2), [
-    { id: "front_end", title: "Front end" },
-    { id: "diffs", title: "Diffs" },
-  ]);
-  // Every universal group still reachable, none dropped.
-  for (const g of SETUP_SHEET_GROUPS) {
-    assert.ok(choices.some((c) => c.id === g.id), `${g.id} offered`);
-  }
-});
-
-test("a section that already uses a universal title is not offered twice", () => {
-  const s: SetupSheetModelSchema = {
-    version: 1,
-    label: "Test sheet",
-    // Same word, different id — offering both would split one group across two sections.
-    structuredSections: [{ id: "dt", title: "drivetrain", rows: [] }],
-    fields: [],
-  };
-  const choices = sectionChoicesForSheet(s);
-  assert.deepEqual(choices.filter((c) => c.title.toLowerCase() === "drivetrain"), [
-    { id: "dt", title: "drivetrain" },
-  ]);
-  assert.equal(choices.length, SETUP_SHEET_GROUPS.length);
 });

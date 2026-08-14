@@ -11,7 +11,6 @@ import {
   listModelParameters,
   modelMappingProgress,
 } from "@/lib/setupSheetModels/modelCalibrationMapping";
-import { sectionChoicesForSheet } from "@/lib/setupSheetModels/newParameterDef";
 import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
 import type { SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 import { CardPanel } from "@/components/ui/CardPanel";
@@ -20,8 +19,6 @@ import { cn } from "@/lib/utils";
 
 export type NewParameterInput = {
   displayLabel: string;
-  sectionId: string;
-  sectionTitle: string;
   kind: "value" | "one_of_many" | "many_of_many";
   optionLabels: string[];
 };
@@ -67,7 +64,6 @@ export function SetupCalibrationModelSidebar(props: {
   const [addOpen, setAddOpen] = useState(false);
   const [addBusy, setAddBusy] = useState(false);
   const [addLabel, setAddLabel] = useState("");
-  const [addSection, setAddSection] = useState("");
   const [addKind, setAddKind] = useState<NewParameterInput["kind"]>("value");
   const [addOptions, setAddOptions] = useState("");
 
@@ -98,11 +94,6 @@ export function SetupCalibrationModelSidebar(props: {
     }
     return [...m.entries()];
   }, [rows]);
-
-  // This sheet's own sections, then the universal groups. Built only from `schema.fields` before,
-  // so a brand-new chassis type offered an empty dropdown and every parameter silently landed in
-  // "General" — a section that is not one of the groups the sheet renders in.
-  const sections = useMemo(() => sectionChoicesForSheet(schema), [schema]);
 
   const progress = useMemo(
     () => modelMappingProgress(schema, formFieldMappings),
@@ -137,7 +128,6 @@ export function SetupCalibrationModelSidebar(props: {
   async function submitNewParameter() {
     const label = addLabel.trim();
     if (!label || addBusy) return;
-    const section = sections.find((s) => s.id === addSection) ?? sections[0];
     const optionLabels = addOptions
       .split("\n")
       .map((s) => s.trim())
@@ -146,8 +136,6 @@ export function SetupCalibrationModelSidebar(props: {
     setAddBusy(true);
     const ok = await onCreateParameter({
       displayLabel: label,
-      sectionId: section?.id ?? "general",
-      sectionTitle: section?.title ?? "General",
       kind: addKind,
       optionLabels,
     });
@@ -369,17 +357,6 @@ export function SetupCalibrationModelSidebar(props: {
               onChange={(e) => setAddLabel(e.target.value)}
               autoFocus
             />
-            <select
-              className="w-full rounded border border-border bg-card px-2 py-1.5 text-xs"
-              value={addSection || sections[0]?.id || ""}
-              onChange={(e) => setAddSection(e.target.value)}
-            >
-              {sections.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.title}
-                </option>
-              ))}
-            </select>
             <div className="flex flex-wrap gap-1">
               {(
                 [

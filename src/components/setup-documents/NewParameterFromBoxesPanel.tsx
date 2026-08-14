@@ -15,7 +15,6 @@ import {
 } from "@/lib/setupSheetModels/universalParameters";
 import {
   POSITION_LABELS,
-  suggestGroupTitleForLabel,
   type NewParameterInput,
   type NewParameterKind,
   type PositionSplit,
@@ -73,8 +72,6 @@ export function NewParameterFromBoxesPanel(props: {
   onOptionCountsChange: (counts: number[]) => void;
   /** Read for name suggestions — stems already on this sheet come first. */
   schema: Pick<SetupSheetModelSchema, "fields">;
-  /** Group names to offer as one-tap chips — the universal groups, plus this sheet's own. */
-  groupTitles: string[];
   busy: boolean;
   error: string | null;
   onRemoveBox: (row: number, col: number) => void;
@@ -82,13 +79,11 @@ export function NewParameterFromBoxesPanel(props: {
   onCancel: () => void;
   onSubmit: (input: NewParameterInput, optionLabelsByPosition?: string[][]) => void;
 }) {
-  const { grid, split, schema, groupTitles, busy, error } = props;
+  const { grid, split, schema, busy, error } = props;
   const splitActive = split !== "single";
   const positions = POSITION_LABELS[split];
 
   const [displayLabel, setDisplayLabel] = useState("");
-  const [groupTitle, setGroupTitle] = useState("");
-  const [groupTouched, setGroupTouched] = useState(false);
   const [valueKind, setValueKind] = useState<NewParameterKind>("number");
   const [groupKind, setGroupKind] = useState<NewParameterKind>("one_of_many");
   const [splitKind, setSplitKind] = useState<NewParameterKind>("number");
@@ -147,18 +142,6 @@ export function NewParameterFromBoxesPanel(props: {
     setUniversalId(suggestedUniversalId ?? null);
   }, [suggestedUniversalId, universalTouched]);
 
-  // Pre-select the group the name implies ("Front spring" -> Shocks & springs), until he picks a
-  // chip himself. A name that matches nothing leaves the field alone rather than guessing — the
-  // chips are right there, and a silently wrong group is worse than an unset one.
-  const suggestedGroupTitle = useMemo(
-    () => suggestGroupTitleForLabel(displayLabel),
-    [displayLabel]
-  );
-  useEffect(() => {
-    if (groupTouched || !suggestedGroupTitle) return;
-    setGroupTitle(suggestedGroupTitle);
-  }, [suggestedGroupTitle, groupTouched]);
-
   /** What a Front/Rear split will pool stats as — the ids are derived per generated label. */
   const splitUniversalLabels = useMemo(() => {
     if (split !== "front_rear" || splitGrouped) return [];
@@ -206,7 +189,6 @@ export function NewParameterFromBoxesPanel(props: {
     props.onSubmit(
       {
         displayLabel,
-        groupTitle,
         kind,
         optionLabels: clickGrouped
           ? singleRow.map((b) => (b ? optionLabelBySourceKey[b.sourceKey] ?? "" : ""))
@@ -343,41 +325,6 @@ export function NewParameterFromBoxesPanel(props: {
             Creates {positions.length} parameters —{" "}
             {positions.map((p) => `${displayLabel.trim() || "Name"} (${p})`).join(", ")}.
           </p>
-        ) : null}
-      </div>
-
-      <div className="space-y-1">
-        <div className="text-muted-foreground">Group</div>
-        <input
-          className="w-full rounded border border-border bg-card px-2 py-1.5 text-xs text-foreground"
-          value={groupTitle}
-          onChange={(e) => {
-            setGroupTouched(true);
-            setGroupTitle(e.target.value);
-          }}
-          placeholder="e.g. Front end"
-        />
-        {groupTitles.length > 0 ? (
-          <div className="flex flex-wrap gap-1 pt-0.5">
-            {groupTitles.map((t) => (
-              <button
-                key={t}
-                type="button"
-                className={cn(
-                  "rounded border px-2 py-0.5 text-[10px]",
-                  t.toLowerCase() === groupTitle.trim().toLowerCase()
-                    ? "border-primary-ink/70 bg-accent/20 text-foreground"
-                    : "border-border text-muted-foreground hover:bg-muted"
-                )}
-                onClick={() => {
-                  setGroupTouched(true);
-                  setGroupTitle(t);
-                }}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
         ) : null}
       </div>
 

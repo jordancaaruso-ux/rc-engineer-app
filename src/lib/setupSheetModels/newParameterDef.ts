@@ -1,10 +1,6 @@
 import { suggestKeyFromPdfFieldName } from "@/lib/setupCalibrations/customFieldCatalog";
 import { groupedOptionValueFromLabel } from "@/lib/setupSheetModels/enrichGroupedFieldOptions";
 import { suggestUniversalParameterId } from "@/lib/setupSheetModels/matchUniversalParameter";
-import {
-  SETUP_SHEET_GROUPS,
-  groupForFieldKey,
-} from "@/lib/setupSheetModels/setupSheetGroups";
 import type { SetupSheetModelFieldDef, SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
 
 /**
@@ -19,8 +15,18 @@ export type NewParameterKind = "number" | "text" | "checkbox" | "one_of_many" | 
 
 export type NewParameterInput = {
   displayLabel: string;
-  /** Free text — the driver groups the sheet however he wants ("Front end", "Diffs"). */
-  groupTitle: string;
+  /**
+   * Which structural section the parameter is filed under, as a free-text title.
+   *
+   * **Nothing in the app asks for this any more** (founder call 2026-08-14). The sheet picture is
+   * where a parameter lives now — its position on the paper says where it belongs, so typing a
+   * group while naming a box bought nothing. Omitted means {@link DEFAULT_SECTION_TITLE}.
+   *
+   * The property survives because `sectionId` is still read downstream — `groupFieldsBySection`
+   * buckets a flat-field model's form and feeds `setupFillOrder`'s per-section progress — and
+   * because the AcroForm derivation writes its own geometric sections, which is a different path.
+   */
+  groupTitle?: string;
   kind: NewParameterKind;
   /** One label per clicked box, in click order. Grouped kinds only. */
   optionLabels?: string[];
@@ -32,6 +38,15 @@ export type NewParameterInput = {
 export type NewParameterResult =
   | { ok: true; field: SetupSheetModelFieldDef }
   | { ok: false; error: string };
+
+/**
+ * Where a parameter created without a stated group lands.
+ *
+ * "Other" rather than "General" so it slugifies onto the catch-all the display layer already owns
+ * (`SETUP_SHEET_GROUPS`' `other` / "Other"), and so it reuses the section the AcroForm derivation
+ * files its unnamed boxes under instead of minting a second bucket beside it.
+ */
+export const DEFAULT_SECTION_TITLE = "Other";
 
 /** Free-text group name → a stable sectionId, reusing the existing section when the title matches. */
 export function sectionIdForGroupTitle(
@@ -53,85 +68,15 @@ export function sectionIdForGroupTitle(
   return /^[a-z]/.test(slug) ? slug : `s_${slug}`;
 }
 
-/**
- * Group chips offered while building a sheet: the app's universal groups first, then anything this
- * sheet already invented.
+/*
+ * DELETED 2026-08-14 with the Section control: `groupTitleChoices`, `sectionChoicesForSheet`,
+ * `suggestGroupTitleForLabel` and `existingGroupTitles`.
  *
- * A brand-new chassis type starts with zero fields, so "titles already on the sheet" was an empty
- * row of chips — every group had to be typed, and a typo minted a private section that never lined
- * up with the display groups. Offering the canonical set up front means a sheet is built into the
- * same six-plus-catch-all vocabulary it will later be *rendered* in (`setupSheetGroups.ts`).
- *
- * The titles are load bearing: `sectionIdForGroupTitle` slugifies each one straight onto its
- * `SetupSheetGroupId` ("Shocks & springs" -> `shocks_springs`), so the structural section id a
- * parameter is stored under matches the display group it regroups into. `newParameterDef.test.ts`
- * pins that.
+ * All four existed to fill a group picker while naming a box, and nothing picks a group any more —
+ * the sheet picture is where a parameter lives. Do not bring them back to "help" a future form:
+ * a parameter's section is now either the geometry the AcroForm derivation reads off the paper, or
+ * {@link DEFAULT_SECTION_TITLE}. See `docs/SETUP_UPLOAD_NORTH_STAR.md`.
  */
-export function groupTitleChoices(schema: Pick<SetupSheetModelSchema, "fields">): string[] {
-  const canonical = SETUP_SHEET_GROUPS.map((g) => g.title);
-  const taken = new Set(canonical.map((t) => t.toLowerCase()));
-  const extras = existingGroupTitles(schema).filter((t) => !taken.has(t.toLowerCase()));
-  return [...canonical, ...extras];
-}
-
-/**
- * The same vocabulary as {@link groupTitleChoices}, for the surfaces that pick a section by **id**
- * rather than by typing a title: the layout canvas's add-parameter form and the calibration
- * sidebar's "New parameter…".
- *
- * Order differs from `groupTitleChoices` on purpose. These forms sit in front of a sheet that is
- * usually already built, and a parameter must be addable into the section the canvas is full of, so
- * the sheet's own sections lead and the universal groups fill in behind them. On a brand-new
- * chassis type there are no own sections, so the universal seven are simply what you get.
- *
- * Deduped by id *and* by title: a sheet that already has "Drivetrain" under some other id must not
- * offer the word twice, or the driver splits one group across two sections without noticing.
- */
-export function sectionChoicesForSheet(
-  schema: Pick<SetupSheetModelSchema, "fields" | "structuredSections">
-): Array<{ id: string; title: string }> {
-  const out: Array<{ id: string; title: string }> = [];
-  const seenIds = new Set<string>();
-  const seenTitles = new Set<string>();
-  const push = (id: string, title: string) => {
-    if (!id || seenIds.has(id) || seenTitles.has(title.trim().toLowerCase())) return;
-    seenIds.add(id);
-    seenTitles.add(title.trim().toLowerCase());
-    out.push({ id, title });
-  };
-
-  for (const sec of schema.structuredSections) push(sec.id, sec.title || sec.id);
-  for (const f of schema.fields) push(f.sectionId, f.sectionTitle || f.sectionId);
-  for (const g of SETUP_SHEET_GROUPS) push(g.id, g.title);
-  return out;
-}
-
-/**
- * The group a parameter's name implies, as a title from {@link groupTitleChoices}. Undefined when
- * nothing matches, so the caller leaves the driver's own choice alone rather than guessing.
- */
-export function suggestGroupTitleForLabel(displayLabel: string): string | undefined {
-  const label = displayLabel.trim();
-  if (!label) return undefined;
-  const id = groupForFieldKey(suggestKeyFromPdfFieldName(label), label);
-  if (!id) return undefined;
-  return SETUP_SHEET_GROUPS.find((g) => g.id === id)?.title;
-}
-
-/** Distinct group titles already used on this sheet, in first-seen order (chips in the name panel). */
-export function existingGroupTitles(schema: Pick<SetupSheetModelSchema, "fields">): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const f of schema.fields) {
-    const title = (f.sectionTitle ?? "").trim();
-    if (!title) continue;
-    const norm = title.toLowerCase();
-    if (seen.has(norm)) continue;
-    seen.add(norm);
-    out.push(title);
-  }
-  return out;
-}
 
 /** Unique snake_case key from a label, suffixed until it no longer collides. */
 export function uniqueParameterKey(displayLabel: string, existingKeys: Iterable<string>): string {
@@ -161,7 +106,7 @@ export function buildNewParameterField(
   }
 
   const key = uniqueParameterKey(displayLabel, schema.fields.map((f) => f.key));
-  const sectionTitle = input.groupTitle.trim() || "General";
+  const sectionTitle = input.groupTitle?.trim() || DEFAULT_SECTION_TITLE;
   const sectionId = sectionIdForGroupTitle(sectionTitle, schema);
   const sortOrder = schema.fields.reduce((m, f) => Math.max(m, f.sortOrder ?? 0), 0) + 1;
 
