@@ -1,8 +1,9 @@
-import { createHash, randomBytes } from "node:crypto";
 import { createTransport } from "nodemailer";
 import { prisma } from "@/lib/prisma";
 import { isMagicLinkSmtpConfigured } from "@/lib/emailAuthEnv";
 import { renderMagicLinkEmail } from "@/lib/auth/magicLinkEmail";
+import { mintMagicLinkUrl } from "@/lib/auth/mintMagicLinkUrl";
+import { issueSignInCode } from "@/lib/auth/signInCode";
 import { DEV_EMAIL_FROM } from "@/lib/brand/brandNames";
 
 /**
@@ -51,44 +52,23 @@ export async function provisionPaidUser(
 }
 
 /**
- * The magic link Auth.js would have emailed, minted directly — same scheme as
- * `scripts/dev-fresh-onboarding.ts`: store SHA-256(rawToken + AUTH_SECRET), raw token in the URL,
- * provider id `nodemailer`. If the callback ever rejects these links, `@auth/core`'s
- * `send-token.js` hash input or provider id has changed — fix the dev script and this together.
- */
-async function mintMagicLinkUrl(email: string): Promise<string> {
-  const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
-  if (!secret) throw new Error("AUTH_SECRET is not set — cannot mint a sign-in link");
-  const baseUrl = (process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000")
-    .trim()
-    .replace(/\/$/, "");
-
-  const token = randomBytes(32).toString("hex");
-  await prisma.verificationToken.create({
-    data: {
-      identifier: email,
-      token: createHash("sha256").update(`${token}${secret}`).digest("hex"),
-      expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
-    },
-  });
-
-  const params = new URLSearchParams({ callbackUrl: `${baseUrl}/`, token, email });
-  return `${baseUrl}/api/auth/callback/nodemailer?${params}`;
-}
-
-/**
- * Mint and email the post-payment sign-in link. Throws on send failure so the webhook 500s and
+ * Mint and email the post-payment way in. Throws on send failure so the webhook 500s and
  * Stripe retries the event (provisioning is idempotent; an extra VerificationToken row just
- * expires). Without SMTP config (dev) the link is logged instead, matching `auth.ts`.
+ * expires). Without SMTP config (dev) both credentials are logged instead, matching `auth.ts`.
+ *
+ * A payer gets the same email everyone else does — code first, link under it. They are the most
+ * likely person of all to be stranded by the wrong browser: they arrive from Stripe Checkout,
+ * often on a phone, with no account yet and no other way in.
  */
 export async function sendPaidSignupSignInLink(email: string): Promise<void> {
   const url = await mintMagicLinkUrl(email);
+  const code = await issueSignInCode(email);
   if (!isMagicLinkSmtpConfigured()) {
-    console.info(`[paid-signup] Magic link for ${email}:\n${url}\n`);
+    console.info(`[paid-signup] Sign-in code for ${email}: ${code}\nMagic link:\n${url}\n`);
     return;
   }
   const transport = createTransport(process.env.EMAIL_SERVER?.trim());
-  const rendered = renderMagicLinkEmail(url, email);
+  const rendered = renderMagicLinkEmail(url, email, code);
   const result = await transport.sendMail({
     to: email,
     from: process.env.EMAIL_FROM?.trim() || DEV_EMAIL_FROM,

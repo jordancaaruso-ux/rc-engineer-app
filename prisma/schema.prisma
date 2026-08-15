@@ -307,6 +307,24 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+/// Short numeric sign-in code, emailed beside the magic link so a driver whose mail app opened
+/// the link in the wrong browser can still get in. Deliberately NOT a VerificationToken: six
+/// digits is only safe behind the durable `attempts` cap below, and Auth.js's callback is public
+/// with no rate limiting we can hook (the middleware matcher excludes `api/auth` wholesale).
+model SignInCode {
+  id         String   @id @default(cuid())
+  /// Normalised (trimmed, lowercased) email — same key space as VerificationToken.identifier.
+  identifier String
+  /// SHA256(code + AUTH_SECRET). The plaintext code exists only in the email.
+  codeHash   String
+  expires    DateTime
+  attempts   Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([identifier])
+  @@index([expires])
+}
+
 enum ActionItemSourceType {
   RUN
   MANUAL

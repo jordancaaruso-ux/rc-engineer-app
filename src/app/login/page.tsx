@@ -138,10 +138,13 @@ function LoginForm() {
         );
         return;
       }
-      const verifyUrl = smtpConfigured
-        ? "/login/verify-request"
-        : "/login/verify-request?delivery=console";
-      router.push(verifyUrl);
+      // Carry both forward. The email is what the typed code is checked against, and `from` is
+      // where they were headed before the login wall — it used to be dropped at this hop, so
+      // everyone landed on the dashboard no matter what they'd clicked.
+      const verifyParams = new URLSearchParams({ email: normalized });
+      if (callbackUrl !== "/") verifyParams.set("from", callbackUrl);
+      if (!smtpConfigured) verifyParams.set("delivery", "console");
+      router.push(`/login/verify-request?${verifyParams}`);
       router.refresh();
     } finally {
       setPending(false);
@@ -265,7 +268,7 @@ function LoginForm() {
                 "primary-action-chip-prominent w-full px-4 py-3 text-[13px] uppercase tracking-[0.14em] disabled:cursor-not-allowed disabled:opacity-60"
               )}
             >
-              {pending ? "Sending…" : "Email me a link"}
+              {pending ? "Sending…" : "Email me a code"}
             </button>
           </form>
 

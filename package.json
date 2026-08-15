@@ -120,6 +120,7 @@
     "share:shots": "node --conditions=react-server --import tsx scripts/dev-share-card-shot.ts",
     "test:extract-normalize": "npx tsx src/lib/setupExtractAi/normalizeExtractedValue.test.ts",
     "test:auth-access-code": "npx tsx src/lib/auth/signupAccessCode.test.ts",
+    "test:sign-in-code": "npx tsx src/lib/auth/signInCodeLogic.test.ts",
     "test:ai-usage": "npx tsx src/lib/aiUsage/budgets.test.ts",
     "test:entitlement": "npx tsx src/lib/entitlementLogic.test.ts && npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx src/lib/entitlement.test.ts",
     "test:paid-signup": "npx tsx src/lib/billing/paidSignupLogic.test.ts",

@@ -3,11 +3,19 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+const POLL_MS = 2500;
+/** Long enough to cover a slow inbox, short enough that a forgotten tab stops hammering. */
+const MAX_POLL_MS = 6 * 60 * 1000;
+
 /**
  * When the magic link is opened in this same browser (usually a new tab), the session cookie
- * lands on this origin too. Poll for it and send the user straight into the app instead of
- * leaving them stranded on "Check your email". A link opened on a *different* device can't be
- * seen from here and simply never advances — which is the correct behaviour.
+ * lands on this origin too. Poll for it and send the user straight into the app, so nobody types
+ * a code they no longer need.
+ *
+ * This can only ever see THIS browser's cookie — `/api/auth/session` reads the jar of whoever
+ * asked. A link opened in another browser or on another device is invisible from here, and that
+ * is precisely the gap the code box next to this component exists to close. Bounded, because an
+ * unbounded loop meant a tab left open on a phone polled until the battery went.
  */
 export function VerifyRequestAutoAdvance({ callbackUrl }: { callbackUrl: string }): null {
   const router = useRouter();
@@ -15,6 +23,7 @@ export function VerifyRequestAutoAdvance({ callbackUrl }: { callbackUrl: string 
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const startedAt = Date.now();
 
     async function check(): Promise<boolean> {
       try {
@@ -32,12 +41,14 @@ export function VerifyRequestAutoAdvance({ callbackUrl }: { callbackUrl: string 
     }
 
     async function loop(): Promise<void> {
-      if (cancelled) return;
+      if (cancelled || Date.now() - startedAt > MAX_POLL_MS) return;
       const done = await check();
-      if (!done && !cancelled) timer = setTimeout(loop, 2500);
+      if (!done && !cancelled) timer = setTimeout(loop, POLL_MS);
     }
 
     // Re-check the instant the user returns to this tab (they clicked the link elsewhere).
+    // Still worth doing past the cap — it costs one request and it's exactly when a session
+    // most often exists.
     function onVisible(): void {
       if (document.visibilityState === "visible") void check();
     }

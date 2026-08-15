@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { isEmailAuthAllowed } from "@/lib/authAllowlist";
 import { isMagicLinkSmtpConfigured } from "@/lib/emailAuthEnv";
 import { renderMagicLinkEmail } from "@/lib/auth/magicLinkEmail";
+import { issueSignInCode } from "@/lib/auth/signInCode";
 
 const hasSmtpConfig = isMagicLinkSmtpConfigured();
 const googleId = process.env.AUTH_GOOGLE_ID?.trim();
@@ -36,13 +37,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!(await isEmailAuthAllowed(identifier))) {
           return;
         }
+        // After the allowlist gate on purpose — a declined address must never get a live code.
+        // The code is what makes sign-in survive the mail app opening the link in a different
+        // browser than the one that asked (see `lib/auth/signInCodeLogic.ts`).
+        const code = await issueSignInCode(identifier);
         if (!hasSmtpConfig) {
-          console.info(`[auth] Magic link for ${identifier}:\n${url}\n`);
+          console.info(`[auth] Sign-in code for ${identifier}: ${code}\nMagic link:\n${url}\n`);
           return;
         }
         const transport = createTransport(provider.server);
         // Rendered in `lib/auth/magicLinkEmail.ts`, shared with the paid-signup webhook send.
-        const email = renderMagicLinkEmail(url, identifier);
+        const email = renderMagicLinkEmail(url, identifier, code);
         const result = await transport.sendMail({
           to: identifier,
           from: provider.from,
