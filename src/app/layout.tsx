@@ -11,7 +11,7 @@ import "./globals.css";
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/layout/AppShell";
-import { PRODUCT_NAME } from "@/lib/brand/brandNames";
+import { BRAND_DOMAIN, PRODUCT_NAME } from "@/lib/brand/brandNames";
 
 import { auth } from "@/auth";
 
@@ -78,7 +78,39 @@ const spaceGrotesk = Space_Grotesk({
 
 
 
+/* The link preview, and the one place it exists for anything that is not /welcome.
+ *
+ * /welcome is rewritten to the static public/landing/index.html (next.config.mjs), which carries
+ * its own hand-written head. Everything else — the bare domain most of all — reached crawlers with
+ * no og: tags at all, so a pasted https://www.jrcdynamics.com rendered as a title and a line of
+ * grey text with no picture. Racers pass links around in Discord and WhatsApp; that is the form
+ * most of them see the product in first.
+ *
+ * The strings below are deliberately byte-identical to the ones in public/landing/index.html.
+ * They drifted apart once already: the card image said "your own setups and lap times" while the
+ * og:description said "your own data". If one changes, change all three (here, the landing head,
+ * and scripts/og-card/card.html) or the picture stops matching its own caption again.
+ */
+
+const OG_TITLE = `${PRODUCT_NAME} — your race engineer, in your pocket`;
+
+const OG_DESCRIPTION =
+
+  "Log a run in a minute. Ask what to change next — the answer is built from your own setups and lap times, not the internet.";
+
+const OG_IMAGE_ALT =
+
+  "Two matching phone screens: a logged race — the 2026 QLD State Titles A-main, its lap graph comparing your run against another driver — and the JRC Trackside Engineer answering a question about that run, beside the line: your race engineer, in your pocket.";
+
+/* Bumped with the picture. Preview images are cached by URL by iMessage, WhatsApp, Slack and
+   Discord, so a changed card always ships under a new filename rather than overwriting. */
+const OG_IMAGE = "/landing/assets/og-card-v3.jpg";
+
 export const metadata: Metadata = {
+
+  /* Required for the relative OG_IMAGE path above to resolve. Without it Next emits a relative
+     og:image, which most crawlers refuse to follow. */
+  metadataBase: new URL(`https://www.${BRAND_DOMAIN}`),
 
   title: PRODUCT_NAME,
 
@@ -87,6 +119,32 @@ export const metadata: Metadata = {
     "Track runs, setups, and engineering-style guidance for competitive RC touring car drivers.",
 
   applicationName: PRODUCT_NAME,
+
+  openGraph: {
+
+    type: "website",
+
+    siteName: PRODUCT_NAME,
+
+    title: OG_TITLE,
+
+    description: OG_DESCRIPTION,
+
+    images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: OG_IMAGE_ALT }],
+
+  },
+
+  twitter: {
+
+    card: "summary_large_image",
+
+    title: OG_TITLE,
+
+    description: OG_DESCRIPTION,
+
+    images: [{ url: OG_IMAGE, alt: OG_IMAGE_ALT }],
+
+  },
 
   /*
    * iOS home-screen behaviour. `capable` renders full-screen (no Safari chrome);

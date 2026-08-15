@@ -11,8 +11,8 @@
      of being injected by the client runtime after paint — a crawler never runs that script.
      HTML entities rather than literal em dashes: this repo has a standing double-encoding
      hazard with UTF-8 punctuation, and a mojibake'd <title> is the one place it would show. -->
-<title>JRC Trackside &mdash; your next tenth is in the data</title>
-<meta name="description" content="Log a run in a minute. Ask how to make the car quicker &mdash; the answer comes from your own data." />
+<title>JRC Trackside &mdash; your race engineer, in your pocket</title>
+<meta name="description" content="Log a run in a minute. Ask what to change next &mdash; the answer is built from your own setups and lap times, not the internet." />
 <link rel="canonical" href="https://www.jrcdynamics.com/welcome" />
 <meta name="theme-color" content="#171614" />
 <link rel="icon" href="/icons/icon-192.png" />
@@ -20,21 +20,22 @@
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="JRC Trackside" />
 <meta property="og:url" content="https://www.jrcdynamics.com/welcome" />
-<meta property="og:title" content="JRC Trackside &mdash; your next tenth is in the data" />
-<meta property="og:description" content="Log a run in a minute. Ask how to make the car quicker &mdash; the answer comes from your own data." />
+<meta property="og:title" content="JRC Trackside &mdash; your race engineer, in your pocket" />
+<meta property="og:description" content="Log a run in a minute. Ask what to change next &mdash; the answer is built from your own setups and lap times, not the internet." />
 <!-- Versioned filename on purpose: iMessage, WhatsApp and Slack cache preview images by URL and
-     hold them a long time, so replacing og-card.jpg in place would keep showing the old picture to
-     everyone who has already seen the link. Regenerate with `node scripts/generate-og-card.mjs`;
-     if the card changes again, bump to -v3 here and in that script. -->
-<meta property="og:image" content="https://www.jrcdynamics.com/landing/assets/og-card-v2.jpg" />
+     hold them a long time, so replacing og-card-v2.jpg in place would keep showing the old picture
+     to everyone who has already seen the link. Regenerate with `node scripts/generate-og-card.mjs`;
+     if the card changes again, bump to -v4 in that script, here, and in the openGraph block in
+     src/app/layout.tsx, which serves the same card for every route that is not /welcome. -->
+<meta property="og:image" content="https://www.jrcdynamics.com/landing/assets/og-card-v3.jpg" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:image:alt" content="The JRC Trackside Engineer answering a setup question on a phone, beside the line: your next tenth is in the data." />
+<meta property="og:image:alt" content="Two matching phone screens: a logged race &mdash; the 2026 QLD State Titles A-main, its lap graph comparing your run against another driver &mdash; and the JRC Trackside Engineer answering a question about that run, beside the line: your race engineer, in your pocket." />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="JRC Trackside &mdash; your next tenth is in the data" />
-<meta name="twitter:description" content="Log a run in a minute. Ask how to make the car quicker &mdash; the answer comes from your own data." />
-<meta name="twitter:image" content="https://www.jrcdynamics.com/landing/assets/og-card-v2.jpg" />
-<meta name="twitter:image:alt" content="The JRC Trackside Engineer answering a setup question on a phone, beside the line: your next tenth is in the data." />
+<meta name="twitter:title" content="JRC Trackside &mdash; your race engineer, in your pocket" />
+<meta name="twitter:description" content="Log a run in a minute. Ask what to change next &mdash; the answer is built from your own setups and lap times, not the internet." />
+<meta name="twitter:image" content="https://www.jrcdynamics.com/landing/assets/og-card-v3.jpg" />
+<meta name="twitter:image:alt" content="Two matching phone screens: a logged race &mdash; the 2026 QLD State Titles A-main, its lap graph comparing your run against another driver &mdash; and the JRC Trackside Engineer answering a question about that run, beside the line: your race engineer, in your pocket." />
 <script src="/landing/support.js"></script>
 </head>
 <body>
@@ -161,7 +162,7 @@
 
     <div style="position:relative;z-index:4;width:100%;max-width:1360px;margin:0 auto;display:flex;flex-direction:column;align-items:center;text-align:center">
       <h1 data-rv style="max-width:34rem;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(2.4rem,5.6vw,4.3rem);line-height:0.98;letter-spacing:-0.025em;opacity:0;transform:translateY(22px);transition:opacity .8s cubic-bezier(.2,.6,.2,1),transform .8s cubic-bezier(.2,.6,.2,1)">Your race engineer, <span style="color:#FFD60A">in your pocket.</span></h1>
-      <p data-rv data-rv-delay="80" style="margin-top:1.35rem;max-width:31rem;font-size:clamp(1.05rem,1.5vw,1.2rem);line-height:1.6;color:#B4B4AB;text-wrap:pretty;opacity:0;transform:translateY(22px);transition:opacity .8s cubic-bezier(.2,.6,.2,1),transform .8s cubic-bezier(.2,.6,.2,1)">Log a run in a minute. Ask how to make the car quicker &mdash; the answer comes from your own data.</p>
+      <p data-rv data-rv-delay="80" style="margin-top:1.35rem;max-width:31rem;font-size:clamp(1.05rem,1.5vw,1.2rem);line-height:1.6;color:#B4B4AB;text-wrap:pretty;opacity:0;transform:translateY(22px);transition:opacity .8s cubic-bezier(.2,.6,.2,1),transform .8s cubic-bezier(.2,.6,.2,1)">Log a run in a minute. Ask what to change next &mdash; the answer is built from your own setups and lap times, not the internet.</p>
       <div data-rv data-rv-delay="160" style="margin-top:2.1rem;display:flex;flex-wrap:wrap;gap:0.9rem;align-items:center;justify-content:center;opacity:0;transform:translateY(22px);transition:opacity .8s cubic-bezier(.2,.6,.2,1),transform .8s cubic-bezier(.2,.6,.2,1)">
         <a href="/demo" style="display:inline-flex;align-items:center;gap:0.6rem;font-weight:600;font-size:15px;padding:1rem 1.9rem;border-radius:9px;border:1px solid #FFD60A;background:#FFD60A;color:#171614;white-space:nowrap;transition:transform .2s ease,box-shadow .3s ease" style-hover="transform:translateY(-1px);box-shadow:0 10px 30px rgba(255,214,10,0.22)"><span style="width:6px;height:6px;border-radius:50%;background:#171614;animation:jrcPulse 2.2s ease-in-out infinite"></span>Try the demo</a>
         <a href="/join" style="display:inline-flex;align-items:center;font-weight:600;font-size:15px;padding:1rem 1.4rem;border-radius:9px;border:1px solid transparent;color:#A5A59C;white-space:nowrap;transition:color .3s ease,border-color .3s ease" style-hover="color:#EDE8DF;border-color:#34332F">Get started</a>

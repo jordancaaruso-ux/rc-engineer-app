@@ -11,6 +11,20 @@
   falls back to DejaVu for any <text> — the headline would ship in the wrong typeface and nothing
   would fail. A browser fetches Sora properly, and gets real backdrop blur, gradients and shadows
   for free.
+
+  Two screens, not one: the product is a loop, and a single screenshot of a chat is
+  indistinguishable from every other AI app shipped this year. Left is the run you logged — the
+  2026 QLD State Titles A-main, 19 laps, your lap trace against another driver's, and the setup
+  parameters that changed since the previous run. Right is the Engineer's answer about that same
+  run. They are matched boxes at matched size, which is what makes them read as one sentence.
+
+  Both are the real app on real data, captured by driving it signed in. Never mock either up by
+  hand: the answer is the product's actual output and has to stay that way.
+
+  One deliberate exception. The competitors' names are replaced with finishing positions (P2, P3,
+  …) and the graph legend with "2ND PLACE" at capture time, so the shipped picture shows text the
+  app itself never renders. The field in a real race result is other people, and their names are
+  not ours to publish on a marketing image. Keep that swap in any recapture.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -50,50 +64,64 @@
     padding: 0 64px;                      /* safe area — Slack and Discord crop 1200x630 differently */
   }
 
-  .copy { width: 592px; flex: none; }
+  /* 496 not 592: the answer panel now starts at x=576, and the headline needs a hard stop well
+     clear of it. "Your race engineer," is a much longer line than the headline this replaced, so
+     the type came down from 62px to fit two lines in a narrower column. */
+  .copy { width: 496px; flex: none; }
 
   .mark { height: 40px; width: auto; display: block; opacity: 0.96; }
 
   h1 {
-    margin-top: 30px;
-    font-size: 62px; font-weight: 700; line-height: 1.06;
-    letter-spacing: -0.022em; color: #FFFFFF;
+    margin-top: 28px;
+    font-size: 47px; font-weight: 700; line-height: 1.08;
+    letter-spacing: -0.024em; color: #FFFFFF;
   }
+  h1 .yel { color: #FFD60A; }             /* same split as the live hero at index.html:163 */
 
   /* The nav-sector rule from .page-title — 4px yellow bar on a hairline track, skewed to the
      angle of the cut in the JRC glyph. */
-  .rule { margin-top: 26px; width: 300px; height: 2px; background: rgba(255,255,255,0.16); position: relative; }
+  .rule { margin-top: 24px; width: 280px; height: 2px; background: rgba(255,255,255,0.16); position: relative; }
   .rule::after {
     content: ""; position: absolute; left: 0; top: -1px;
     width: 74px; height: 4px; background: #FFD11A; transform: skewX(-21deg);
   }
 
   .sub {
-    margin-top: 26px;
-    font-size: 23px; font-weight: 400; line-height: 1.42;
-    color: rgba(255,255,255,0.72); max-width: 520px;
+    margin-top: 24px;
+    font-size: 20px; font-weight: 400; line-height: 1.45;
+    color: rgba(255,255,255,0.72); max-width: 470px;
   }
 
-  /* The phone bleeds off the bottom edge so it reads as a device continuing past the frame
-     rather than a rectangle pasted onto it. */
-  .phone {
-    position: absolute; right: 64px; top: 54px;
-    /* Width is load-bearing, not taste: at 440 the 640x1385 source scales by 0.6875, so the 636px
-       of visible box lands the crop just past the composer. Narrower and the cut falls inside the
-       History list, which is the one part of the screen that says nothing to a stranger. */
-    width: 440px; height: 636px;          /* taller than the card on purpose */
-    border-radius: 26px; overflow: hidden;
+  .duo { position: absolute; left: 576px; right: 64px; top: 0; bottom: 0; }
+
+  .ph {
+    position: absolute; overflow: hidden;
+    border-radius: 22px;
     border: 1px solid rgba(255,255,255,0.14);
-    box-shadow: 0 40px 90px rgba(0,0,0,0.62), 0 0 0 1px rgba(0,0,0,0.35);
     background: #0E0D0C;
   }
-  .phone img {
-    width: 100%; display: block;
-    /* 640x1385 source: show the header through the composer, which is the whole pitch in one
-       frame — a real question, a real answer, and the car it is about. */
-    margin-top: 0;
+  .ph img { width: 100%; display: block; }
+
+  /* Both screens are the SAME box. They are two halves of one sentence — the run you logged, then
+     the answer about it — and any difference in size or proportion reads as one being an
+     afterthought. Both screenshots are therefore cropped to an identical 780x1436, tall enough
+     that the run side carries the setup parameters that changed since the previous run, which is
+     the part that shows this is a logbook and not a chatbot. The cost is on the Engineer side:
+     past that height its pinned composer gives way to the History list. Accepted deliberately —
+     two real earlier questions read as a product in use.
+
+     Box height is the natural height of a 780x1436 image at this width. Recrop the screenshots
+     and this number moves with them, or the frame fills with empty phone. */
+  .ph-run, .ph-ans {
+    top: 74px; width: 262px; height: 482px;
+    box-shadow: 0 34px 76px rgba(0,0,0,0.62), 0 0 0 1px rgba(0,0,0,0.35);
   }
-</style>
+  .ph-run { left: 0; }
+  .ph-ans { right: 0; }
+
+  /* There was a skewed yellow bar in the gap here, drawing the run into the answer. Cut on the
+     founder's call — two matched screens already read as a pair, and the mark was the only yellow
+     on the card not doing brand work. Don't put it back. */</style>
 </head>
 <body>
   <div class="bg"></div>
@@ -103,14 +131,19 @@
   <div class="frame">
     <div class="copy">
       <img class="mark" src="../../public/landing/assets/jrc-mark-white.svg" alt="" />
-      <h1>Your next tenth<br />is in the data</h1>
+      <h1>Your race engineer,<br /><span class="yel">in your pocket.</span></h1>
       <div class="rule"></div>
-      <p class="sub">Log a run in a minute. Ask how to make the car quicker &mdash; the answer comes from your own setups and lap times.</p>
+      <p class="sub">Log a run in a minute. Ask what to change next &mdash; the answer is built from your own setups and lap times, not the internet.</p>
     </div>
   </div>
 
-  <div class="phone">
-    <img src="../../public/landing/assets/shot-engineer.jpg" alt="" />
+  <!-- Left: the run. 2026 QLD State Titles A-main at Bayside, 19 laps, the lap graph and the
+       field switcher in frame. Right: the Engineer answering a question about that same run.
+       Both captured from the running app signed in, never mocked up. -->
+  <div class="duo">
+    <div class="ph ph-run"><img src="../../public/landing/assets/shot-race-run.jpg" alt="" /></div>
+    <div class="ph ph-ans"><img src="../../public/landing/assets/shot-engineer-v2.jpg" alt="" /></div>
   </div>
+
 </body>
 </html>

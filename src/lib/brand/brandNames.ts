@@ -12,9 +12,15 @@
  * Pure module — no `server-only`, no Next imports — so the edge middleware, client components
  * and `metadata` exports can all read it.
  *
- * FOUR FILES CANNOT IMPORT THIS and carry the literal instead; grep them when the name moves:
+ * SIX FILES CANNOT IMPORT THIS and carry the literal instead; grep them when the name moves:
  *   - `public/sw.js`        (served verbatim as a static asset, never bundled)
  *   - `public/offline.html` (same)
+ *   - `public/landing/index.html` (the /welcome page, rewritten to by next.config.mjs and served
+ *                            as a static file. Carries the name five times: <title>, og:site_name,
+ *                            og:title, twitter:title and the two image alts.)
+ *   - `scripts/og-card/card.html` (screenshotted into the link-preview JPEG, so the name is baked
+ *                            into pixels — a rename also means `node scripts/generate-og-card.mjs`
+ *                            and a new versioned filename, never an overwrite)
  *   - `capacitor.config.ts` (read by the Capacitor CLI outside the app's module graph;
  *                            changing `appName` also renames the installed native app)
  *   - `ios/App/App/Info.plist` (`CFBundleDisplayName` — the actual iOS home-screen label, and

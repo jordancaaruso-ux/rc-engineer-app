@@ -7,9 +7,10 @@
 // backdrop blur, gradients and layered shadows come for free.
 //
 // IMPORTANT — the filename is versioned on purpose. iMessage, WhatsApp, Slack and Discord cache
-// preview images by URL and hold them for a long time. Overwriting og-card.jpg in place would keep
-// showing the old picture to everyone who has already seen the link. When this card changes
-// again, bump to -v3 and repoint the two meta tags in public/landing/index.html.
+// preview images by URL and hold them for a long time. Overwriting og-card-v2.jpg in place would
+// keep showing the old picture to everyone who has already seen the link. When this card changes
+// again, bump to -v4 and repoint the meta tags — now in two places, public/landing/index.html
+// (the /welcome card) and the openGraph block in src/app/layout.tsx (everything else).
 //
 // Run:  node scripts/generate-og-card.mjs
 
@@ -19,7 +20,7 @@ import { dirname, join } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CARD = join(ROOT, "scripts/og-card/card.html");
-const OUT = join(ROOT, "public/landing/assets/og-card-v2.jpg");
+const OUT = join(ROOT, "public/landing/assets/og-card-v3.jpg");
 
 const WIDTH = 1200;
 const HEIGHT = 630;
@@ -27,9 +28,9 @@ const HEIGHT = 630;
 const browser = await chromium.launch();
 const page = await browser.newPage({
   viewport: { width: WIDTH, height: HEIGHT },
-  // Render at 2x and let the JPEG encoder downsample: the phone screenshot is being scaled to
-  // ~62% and the answer text inside it has to survive a message bubble rendering the whole card
-  // near 360px wide.
+  // Render at 2x and let the JPEG encoder downsample. The card is routinely drawn near 400px wide
+  // in a Discord embed, so the answer panel's headline is the one thing that has to stay legible
+  // through that reduction — check it there, not at full size.
   deviceScaleFactor: 2,
 });
 

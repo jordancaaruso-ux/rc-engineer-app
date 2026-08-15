@@ -9,7 +9,7 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { getPricePlansWithAmounts } from "@/lib/stripe";
 import { COMPANY_NAME, PRODUCT_NAME, TIER_LABELS } from "@/lib/brand/brandNames";
 
-export const metadata = { title: `${PRODUCT_NAME} — your next tenth is in the data` };
+export const metadata = { title: `${PRODUCT_NAME} — your race engineer, in your pocket` };
 
 /**
  * SUPERSEDED 2026-08-06 AND UNREACHABLE. `/welcome` is rewritten to `public/landing/index.html`
