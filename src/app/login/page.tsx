@@ -33,15 +33,27 @@ function GoogleMark(): ReactNode {
   );
 }
 
+/**
+ * What a stranger sees instead of a code box. `/join` is the pricing page and is deliberately
+ * public in `middleware.ts` — it is the door people are meant to come through.
+ */
+const noAccountYet = (
+  <>
+    That email doesn&rsquo;t have an account yet.{" "}
+    <Link href="/join" className="underline underline-offset-4 hover:text-foreground">
+      See plans
+    </Link>
+    .
+  </>
+);
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
-  const [accessCode, setAccessCode] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ReactNode>(null);
   const [pending, setPending] = useState(false);
   const [googleOAuthConfigured, setGoogleOAuthConfigured] = useState(false);
-  const [accessCodeEnabled, setAccessCodeEnabled] = useState(false);
   const [openSignup, setOpenSignup] = useState(false);
   const [smtpConfigured, setSmtpConfigured] = useState(true);
   const [configLoaded, setConfigLoaded] = useState(false);
@@ -49,12 +61,20 @@ function LoginForm() {
   const from = searchParams.get("from") || "/";
   const callbackUrl = from.startsWith("/") ? from : "/";
 
+  /**
+   * The invite code rides in the URL now, not in a box on the form. Nearly everyone arrives here
+   * either already invited or having paid, so a field asking for a code they've never heard of
+   * read as a locked door on a product they just bought. Comping someone is a conversation you're
+   * already having, so send them `/login?code=jrc-xxxx` and they never see it either.
+   */
+  const accessCode = searchParams.get("code")?.trim() ?? "";
+
   useEffect(() => {
     if (searchParams.get("error") === "AccessDenied") {
       setError(
         openSignup
           ? "That sign-in didn't go through. Please try again."
-          : "That sign-in is not allowed. Enter your access code below, or ask for an invite."
+          : noAccountYet
       );
     }
   }, [searchParams, openSignup]);
@@ -66,13 +86,11 @@ function LoginForm() {
         const hintRes = await fetch("/api/auth/config-hint");
         const hint = (await hintRes.json()) as {
           googleOAuthConfigured?: boolean;
-          accessCodeEnabled?: boolean;
           smtpConfigured?: boolean;
           openSignup?: boolean;
         };
         if (cancelled) return;
         if (hint.googleOAuthConfigured === true) setGoogleOAuthConfigured(true);
-        if (hint.accessCodeEnabled === true) setAccessCodeEnabled(true);
         if (hint.openSignup === true) setOpenSignup(true);
         setSmtpConfigured(hint.smtpConfigured === true);
       } catch {
@@ -87,21 +105,26 @@ function LoginForm() {
   }, []);
 
   /**
-   * Add this email to the allowlist if the access code is valid (or it's already allowed).
-   * Runs before both sign-in paths — otherwise a non-allowlisted address silently gets no
-   * magic link (`sendVerificationRequest` declines to send) and the user waits forever.
-   * Returns false and sets the error when the code is missing or wrong.
+   * Add this email to the allowlist if an invite code came in on the URL (or it's already
+   * allowed). Runs before both sign-in paths — otherwise a non-allowlisted address silently gets
+   * no magic link (`sendVerificationRequest` declines to send) and the user waits forever.
    */
   async function redeemAccess(normalizedEmail: string): Promise<boolean> {
     try {
       const res = await fetch("/api/auth/redeem-access-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: normalizedEmail, code: accessCode.trim() }),
+        body: JSON.stringify({ email: normalizedEmail, code: accessCode }),
       });
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        needsAccount?: boolean;
+      };
       if (res.ok && data.ok === true) return true;
-      setError(data.error ?? "That access code isn't valid.");
+      // `needsAccount` means "no invite code was offered and this address isn't known" — the
+      // ordinary stranger. Point them at the paid door rather than at a code they don't have.
+      setError(data.needsAccount === true ? noAccountYet : (data.error ?? noAccountYet));
       return false;
     } catch {
       setError("Could not reach the server. Check your connection and try again.");
@@ -131,7 +154,7 @@ function LoginForm() {
           res.error === "AccessDenied"
             ? openSignup
               ? "That sign-in didn't go through. Please try again."
-              : "That email isn't allowed yet. Check your access code, or ask for an invite."
+              : noAccountYet
             : googleOAuthConfigured
               ? "We couldn't send the sign-in email. Try “Continue with Google” instead."
               : "We couldn't send the sign-in email just now. Please try again shortly."
@@ -243,23 +266,6 @@ function LoginForm() {
                 className="ui-control w-full rounded-lg border border-border bg-input px-3.5 py-3 text-foreground outline-none transition-colors placeholder:text-faint focus:border-primary-ink"
               />
             </label>
-            {accessCodeEnabled ? (
-              <label className="block">
-                <span className="type-data-label mb-2 block">Access code</span>
-                <input
-                  type="text"
-                  name="accessCode"
-                  value={accessCode}
-                  onChange={(e) => setAccessCode(e.target.value)}
-                  autoComplete="off"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder="Only needed the first time"
-                  className="ui-control w-full rounded-lg border border-border bg-input px-3.5 py-3 text-foreground outline-none transition-colors placeholder:text-faint focus:border-primary-ink"
-                />
-              </label>
-            ) : null}
             {error ? <p className="text-[13px] leading-snug text-destructive">{error}</p> : null}
             <button
               type="submit"

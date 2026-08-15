@@ -81,15 +81,22 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ ok: true, redeemed: false });
   }
 
-  if (!isSignupAccessCodeConfigured()) {
+  // Nothing was offered and the address isn't known — the ordinary stranger who just typed their
+  // email in. Since 2026-08-15 the code field is gone from the form (it rides in the URL instead),
+  // so telling this person their code is wrong would point at a box that no longer exists.
+  // `needsAccount` lets the form send them to the paid door instead.
+  const suppliedCode = typeof body?.code === "string" ? body.code.trim() : "";
+  if (!suppliedCode || !isSignupAccessCodeConfigured()) {
     return NextResponse.json(
-      { ok: false, error: "Sign-up is invite-only right now." },
+      { ok: false, needsAccount: true, error: "That email doesn't have an account yet." },
       { status: 403 }
     );
   }
 
+  // A code WAS offered and didn't match — they followed an invite link that's wrong or revoked,
+  // and that is worth saying plainly rather than hiding behind the generic message above.
   return NextResponse.json(
-    { ok: false, error: "That access code isn't valid." },
+    { ok: false, error: "That invite link isn't valid any more. Ask for a new one." },
     { status: 403 }
   );
 }
