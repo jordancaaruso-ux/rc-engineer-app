@@ -1,5 +1,6 @@
 import { isTireFieldKey } from "@/lib/tires/tireSelectionValue";
 import { allTirePrepBooleanKeys } from "@/lib/tires/tirePrepFields";
+import { isRunContextSetupKey } from "@/lib/setup/runContextSetupKeys";
 import { isDocumentMetadataField } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 
 /**
@@ -30,4 +31,18 @@ export function isExcludedSetupChangeKey(key: string): boolean {
  */
 export function isSetupChangeNoiseKey(key: string): boolean {
   return isExcludedSetupChangeKey(key) || isDocumentMetadataField(key);
+}
+
+/**
+ * What a **run-to-run** setup diff must ignore, used by the car page's "All setups" list to decide
+ * whether a run changed the car at all.
+ *
+ * Wider than `isSetupChangeNoiseKey` by exactly two keys — `additive` and `additive_time`. Those are
+ * written by the run form's Tires tab, not the chassis sheet, and they move nearly every run; a list
+ * whose job is "what did I change on the car" cannot treat picking today's additive as a change.
+ * The narrower filter is left alone because the team feed and the analysis trend row report additive
+ * deliberately.
+ */
+export function isRunToRunSetupNoiseKey(key: string): boolean {
+  return isRunContextSetupKey(key) || isDocumentMetadataField(key);
 }

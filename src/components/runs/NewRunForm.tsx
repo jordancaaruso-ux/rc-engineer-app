@@ -11,6 +11,7 @@ import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow, PanelSubtitle } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { ActionToast } from "@/components/ui/ActionToast";
 import { coerceSetupValue, normalizeSetupData, parseLapTimes, type SetupSnapshotData } from "@/lib/runSetup";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { isRunContextSetupKey } from "@/lib/setup/runContextSetupKeys";
@@ -1000,6 +1001,18 @@ export function NewRunForm(props: {
     trackId: string;
     trackName: string;
     runId: string;
+  } | null>(null);
+  /**
+   * Correcting how many runs are on a set moves every later run on that same
+   * rubber (server side — see `lib/tires/cascadeTireRunNumber`). That is the
+   * behaviour the driver wants, but it rewrites sessions they did not open, so
+   * it has to be said out loud. `navigateToRunId` holds the usual departure
+   * until the toast has been read; the toast times out on its own, so the
+   * driver is never left standing on a saved form.
+   */
+  const [tireCascadeNotice, setTireCascadeNotice] = useState<{
+    message: string;
+    navigateToRunId: string | null;
   } | null>(null);
   const [nearbyTrackSuggestions, setNearbyTrackSuggestions] = useState<
     { trackId: string; trackName: string; distanceM: number; isFavourite?: boolean }[]
@@ -3473,11 +3486,18 @@ export function NewRunForm(props: {
       const importedLapSets = buildImportedLapSetsFromIngest(lapIngest);
       // A stay-save's minted run counts as "the run being edited" from then on — PUT, not POST.
       const effectiveEditId = editRun?.id ?? createdRunId;
-      const { run, tireStintId: savedStintId, promptMarkTrackLocation } = await jsonFetch<{
+      const {
+        run,
+        tireStintId: savedStintId,
+        promptMarkTrackLocation,
+        tireRunNumberCascade,
+      } = await jsonFetch<{
         run: { id: string; createdAt: string };
         /** The stint the run landed on — freshly minted when the client sent null. */
         tireStintId?: string | null;
         promptMarkTrackLocation?: { trackId: string; trackName: string } | null;
+        /** Present when correcting this run's tire count also moved later runs on the set. */
+        tireRunNumberCascade?: { updatedRuns: number; delta: number } | null;
       }>("/api/runs", {
         method: effectiveEditId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -3604,6 +3624,12 @@ export function NewRunForm(props: {
       // stay or not: it can only make a later save MORE correct.
       if (!editRun?.id) setCreatedRunId(run.id);
 
+      const cascadedRuns = tireRunNumberCascade?.updatedRuns ?? 0;
+      const cascadeMessage =
+        cascadedRuns > 0
+          ? `Tire count corrected — ${cascadedRuns} later ${cascadedRuns === 1 ? "run" : "runs"} on this set renumbered too.`
+          : null;
+
       if (intent === "completed" && promptMarkTrackLocation) {
         setTrackLocationPrompt({
           trackId: promptMarkTrackLocation.trackId,
@@ -3614,6 +3640,19 @@ export function NewRunForm(props: {
         setStatus("Run saved.");
         setSaving(false);
         return;
+      }
+
+      // Sessions the driver never opened just changed. Hold the departure until the
+      // toast has said so, then leave exactly as this save would have.
+      if (cascadeMessage && intent === "completed" && !opts?.stay) {
+        setTireCascadeNotice({ message: cascadeMessage, navigateToRunId: run.id });
+        setSaveSuccess(true);
+        setStatus("Changes saved.");
+        setSaving(false);
+        return;
+      }
+      if (cascadeMessage) {
+        setTireCascadeNotice({ message: cascadeMessage, navigateToRunId: null });
       }
 
       // Never in stay mode: this ref both blocks future saves (the guard at the top of
@@ -4437,6 +4476,27 @@ export function NewRunForm(props: {
       onSkip={() => {
         const runId = trackLocationPrompt?.runId;
         setTrackLocationPrompt(null);
+        if (runId) navigateAfterRunComplete(runId);
+      }}
+    />
+    <ActionToast
+      raised={wizardActive}
+      message={tireCascadeNotice?.message ?? null}
+      action={
+        tireCascadeNotice?.navigateToRunId
+          ? {
+              label: "Done",
+              onClick: () => {
+                const runId = tireCascadeNotice.navigateToRunId;
+                setTireCascadeNotice(null);
+                if (runId) navigateAfterRunComplete(runId);
+              },
+            }
+          : null
+      }
+      onDismiss={() => {
+        const runId = tireCascadeNotice?.navigateToRunId ?? null;
+        setTireCascadeNotice(null);
         if (runId) navigateAfterRunComplete(runId);
       }}
     />
@@ -5695,8 +5755,8 @@ export function NewRunForm(props: {
 
       {editingCompletedRun ? (
         <p className="text-[11px] text-muted-foreground leading-snug sm:max-w-md">
-          Saves your changes to this run only. It stays marked complete; the tire run number is not
-          updated (it was set when you first clicked Run complete).
+          The run stays marked complete. Correcting how many runs are on the tires also renumbers
+          every later run on that same set.
         </p>
       ) : null}
 
@@ -5773,7 +5833,7 @@ export function NewRunForm(props: {
               onClick={(e) => saveRun(e, "completed")}
               disabled={!canSave || saving}
               aria-busy={saving && !saveSuccess}
-              title="Save changes without affecting completion or the tire run count."
+              title="Save changes — the run stays complete."
             >
               {saveSuccess ? "Saved ✓" : saving ? "Saving…" : "Save edits"}
             </button>

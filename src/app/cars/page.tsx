@@ -14,6 +14,7 @@ import { setupSheetModelIdsSupportingUpload } from "@/lib/setupCalibrations/carS
 import { baselineCountsByModelId } from "@/lib/baselineSetups/baselineCounts";
 import { priorSetupCountsByCarId } from "@/lib/setup/priorSetupCounts";
 import { getCachedCarManagerData } from "@/lib/cachedReads";
+import { lastRunAtMsByCarId, orderCarsByRecentUse } from "@/lib/cars/orderCarsByRecentUse";
 import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerModels";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { DRIVER_VISIBLE_SETUP_DOCUMENT_WHERE } from "@/lib/setupDocuments/driverVisibleDocuments";
@@ -67,7 +68,7 @@ export default async function CarManagerPage({
   // Seed must run each load (it may create catalog rows) — keep it out of the cache.
   await ensureAuthorizedSetupSheetCatalog();
 
-  const [[allModels, cars], librarySetups, sheetCounts, unlinkedSheetCount, lastRunByCar] =
+  const [[allModels, carsByCreated], librarySetups, sheetCounts, unlinkedSheetCount, lastRunByCar] =
     await Promise.all([
       getCachedCarManagerData(user.id),
       // Every saved setup in one query — it feeds both the per-car meta line and the inline list.
@@ -128,6 +129,17 @@ export default async function CarManagerPage({
   }
   const sheetsByCar = new Map(sheetCounts.map((r) => [r.carId ?? "", r._count._all]));
   const lastRunAt = new Map(lastRunByCar.map((r) => [r.carId ?? "", r._max.createdAt]));
+
+  /*
+   * Most recently used first — the car you actually drive is the one you came here for. The list
+   * was ordered by when each car was ADDED, so a car bought later and never run sat above the one
+   * every run in the app belongs to (founder call 2026-08-15).
+   *
+   * Sorted HERE and not in the query: `getCachedCarManagerData` is invalidated by carsTag, which
+   * logging a run does not touch, so an order baked into that query would lag a run by up to the
+   * 30s window. `lastRunByCar` is fetched fresh above for the meta line and costs nothing extra.
+   */
+  const cars = orderCarsByRecentUse(carsByCreated, lastRunAtMsByCarId(lastRunByCar), (c) => c.createdAtMs);
 
   const setupMetaById: Record<string, string> = {};
   for (const car of cars) {

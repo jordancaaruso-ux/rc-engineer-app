@@ -1,5 +1,6 @@
 import { formatRunSessionDisplay } from "@/lib/runSession";
-import { chassisChangedKeys } from "@/lib/setup/runContextSetupKeys";
+import { setupChangedRowsSincePrevious } from "@/lib/setupCompare/changedSincePrevious";
+import { isRunToRunSetupNoiseKey } from "@/lib/setupCompare/setupChangeNoise";
 
 /**
  * Every setup this car can offer, in one list — "All setups" on the car page.
@@ -29,10 +30,29 @@ import { chassisChangedKeys } from "@/lib/setup/runContextSetupKeys";
  *
  * ============================== WHAT EARNS A ROW ==============================
  *
- * Two rules keep the list readable (founder call 2026-07-22, still standing):
- *  - a run earns a row only when something outside `RUN_CONTEXT_SETUP_KEYS` changed, so picking
- *    tires or bumping additive time never reads as a setup change;
- *  - an uploaded sheet that produced a setup is *one* row — the setup, with the PDF hung off it.
+ * **A run earns a row unless its setup values are identical to the previous run's on this car.**
+ * One rule, no exceptions — the first run on a car has no previous run, so it differs, so it gets a
+ * row like any other (founder call 2026-08-15: "setups are living, you don't need a base; reference
+ * a setup to a run for every run, unless it remains identical in consecutive runs").
+ *
+ * The comparison chain is RUNS ONLY, and it compares stored VALUES:
+ *
+ *  - Sheets, saved setups and baselines never suppress a run row. Uploading a sheet and then driving
+ *    it unchanged shows both rows, because "I uploaded this" and "the car ran this" are different
+ *    facts. They still get their own rows in the list; they are just not links in the chain.
+ *  - The previous run is the one before it by `sortAt` — the app's stable ordering axis — so a
+ *    re-imported or reordered run diffs against the run that actually preceded it on track.
+ *  - `SetupSnapshot.setupDeltaJson` is NOT consulted. It records the diff against whatever setup the
+ *    wizard happened to load, which answers a different question: load a saved setup from three
+ *    weeks ago and change nothing and that delta is empty, while the car changed completely since
+ *    the last run. That run used to vanish from this list. Now it doesn't.
+ *  - Tires, additive, prep booleans and sheet-header fields are filtered out
+ *    (`isRunToRunSetupNoiseKey`), so picking today's rubber is never a setup change — founder call
+ *    2026-07-22, still standing.
+ *  - Circling back to an old setup after three days of tweaking IS a change, because it differs from
+ *    the run before it. The list never looks further back than one run.
+ *
+ * An uploaded sheet that produced a setup stays *one* row — the setup, with the PDF hung off it.
  *
  * Pure on purpose: the DB reads live in `getCarSetupHistory.ts`.
  */
@@ -87,7 +107,10 @@ export type CarSetupCounts = {
 
 export type SetupHistoryRunInput = {
   id: string;
-  createdAt: Date;
+  /** Ordering axis (`Run.sortAt`) — also what places the row in the merged date list. */
+  sortAt: Date;
+  /** Wallclock to show, from `resolveRunDisplayInstant`. Never `sortAt`: a drag must not relabel. */
+  displayAt: Date;
   sessionType: string;
   meetingSessionType: string | null;
   meetingSessionCode: string | null;
@@ -96,8 +119,8 @@ export type SetupHistoryRunInput = {
   track: { name: string } | null;
   event: { name: string } | null;
   setupSnapshot: {
-    setupDeltaJson: unknown;
-    baseSetupSnapshotId: string | null;
+    /** The resolved values this run ran. The diff is computed from these, not from a stored delta. */
+    data: unknown;
     isLibrary?: boolean;
     name?: string | null;
   } | null;
@@ -149,10 +172,29 @@ function sheetMeta(doc: SetupHistoryDocumentInput): string {
   return `Uploaded sheet · ${status} read, needs review`;
 }
 
+/**
+ * Setup fields that moved between two runs, with everything the run form writes by itself removed.
+ * Exported so `getCarSetupHistory` can label the "current setup" card with the same rule.
+ */
+export function runToRunChangedKeys(current: unknown, previous: unknown): string[] {
+  return setupChangedRowsSincePrevious(current, previous)
+    .filter((row) => !isRunToRunSetupNoiseKey(row.key))
+    .map((row) => row.key);
+}
+
 export function buildCarSetupHistory(input: {
   carId: string;
+  /** Newest first, by `sortAt`. The order is load-bearing: run `i + 1` is run `i`'s baseline. */
   runs: SetupHistoryRunInput[];
   documents: SetupHistoryDocumentInput[];
+  /**
+   * The setup of the run immediately before the OLDEST run in `runs`, when the read window stopped
+   * short of the car's first run. Null/absent means `runs` reaches the beginning of the history.
+   *
+   * Without it the oldest run on screen has nothing to diff against and would report as a change on
+   * every single page load — a row that appears only because the window ended there.
+   */
+  setupBeforeOldestRun?: unknown | null;
   /** Saved setups that no run and no sheet accounts for. */
   librarySetups?: SetupHistoryLibraryInput[];
   /** Published for this chassis. Global rows, so they can only ever be copied. */
@@ -162,12 +204,25 @@ export function buildCarSetupHistory(input: {
 }): CarSetupHistoryEntry[] {
   const entries: CarSetupHistoryEntry[] = [];
 
-  for (const run of input.runs) {
+  for (let i = 0; i < input.runs.length; i += 1) {
+    const run = input.runs[i];
     const snapshot = run.setupSnapshot;
-    const changed = chassisChangedKeys(snapshot?.setupDeltaJson);
-    // No baseline at all = the first setup recorded on this car, which is a change by definition.
-    const isFirstSetup = !snapshot?.baseSetupSnapshotId;
-    if (changed.length === 0 && !isFirstSetup) continue;
+
+    /*
+     * The run before this one. Inside the window it is simply the next element (the list is newest
+     * first); at the oldest element it is the anchor the caller fetched beyond the window. `null`
+     * there means there is no earlier run at all — this is the car's first, and it earns a row with
+     * nothing to compare against rather than a row claiming every field changed.
+     */
+    const previousSetup =
+      i + 1 < input.runs.length
+        ? (input.runs[i + 1].setupSnapshot?.data ?? null)
+        : (input.setupBeforeOldestRun ?? null);
+
+    const changed =
+      previousSetup == null ? null : runToRunChangedKeys(snapshot?.data, previousSetup);
+    // Identical to the run before it — the same setup twice is not two setups.
+    if (changed != null && changed.length === 0) continue;
 
     const session = formatRunSessionDisplay(
       {
@@ -182,15 +237,14 @@ export function buildCarSetupHistory(input: {
     entries.push({
       id: run.setupSnapshotId,
       kind: "run",
-      at: run.createdAt.toISOString(),
-      dateLabel: input.formatDate(run.createdAt),
+      at: run.sortAt.toISOString(),
+      dateLabel: input.formatDate(run.displayAt),
       // Once saved, the name the driver gave it wins: that is the name they will look for.
       title: saved && snapshot?.name ? snapshot.name : run.event?.name ? `${run.event.name} · ${session}` : session,
-      meta:
-        changed.length === 0 && isFirstSetup
-          ? [run.track?.name, "first setup on this car"].filter(Boolean).join(" · ")
-          : (run.track?.name ?? "No track"),
-      changedLabels: changed.map(input.labelForKey),
+      meta: run.track?.name ?? "No track",
+      // Empty for the car's first run: there is no earlier run, so nothing "changed" — the row is
+      // the setup itself, not a diff.
+      changedLabels: (changed ?? []).map(input.labelForKey),
       href: `/cars/${input.carId}/setups/${run.setupSnapshotId}`,
       saved,
       saveAction: "mark",

@@ -21,6 +21,7 @@ import { decodeLabFields } from "@/lib/rollCenter/labState";
 import { LogRunWizardHost } from "@/components/runs/LogRunWizardHost";
 import { toEntryCandidate } from "@/lib/runs/entryCandidate";
 import { platformForChassisSlug } from "@/lib/cars/chassisPlatform";
+import { lastRunAtMsByCarId, orderCarsByRecentUse } from "@/lib/cars/orderCarsByRecentUse";
 
 export default async function NewRunPage({
   searchParams,
@@ -146,18 +147,11 @@ export default async function NewRunPage({
     getLastRunForCopyPreview(user.id),
   ]);
 
-  // Car picker order: most recently interacted first — the car's latest run
-  // (runs are logged live, so run.createdAt ≈ when it was driven) or the car's
-  // creation, whichever is newer. Top car doubles as the pre-selected default.
-  const lastRunAtByCar = new Map(
-    carLastRuns.map((g) => [g.carId, g._max.createdAt?.getTime() ?? 0]),
-  );
-  const cars = [...carsByCreated]
-    .sort(
-      (a, b) =>
-        Math.max(lastRunAtByCar.get(b.id) ?? 0, b.createdAt.getTime()) -
-        Math.max(lastRunAtByCar.get(a.id) ?? 0, a.createdAt.getTime()),
-    )
+  // Car picker order: most recently used first — see `orderCarsByRecentUse`, which the Garage
+  // list shares. Top car doubles as the pre-selected default.
+  const cars = orderCarsByRecentUse(carsByCreated, lastRunAtMsByCarId(carLastRuns), (c) =>
+    c.createdAt.getTime(),
+  )
     .map(({ setupSheetModel, ...c }) => ({
       ...c,
       // Unknown chassis → null → treated as the same platform, so tires still carry.

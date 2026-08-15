@@ -39,11 +39,18 @@ export function ActionToast({
   message,
   action,
   onDismiss,
+  raised = false,
 }: {
   /** Null hides the toast. Changing the message restarts the timer. */
   message: string | null;
   action?: ToastAction | null;
   onDismiss: () => void;
+  /**
+   * Sit clear of a fixed bottom bar rather than under it. The log-run wizard's
+   * bar is 132px tall at 390px wide (measured), so 9rem leaves a gap without
+   * floating the toast into the middle of the screen.
+   */
+  raised?: boolean;
 }) {
   const [mounted, setMounted] = useState(false);
   const [shown, setShown] = useState(false);
@@ -72,7 +79,12 @@ export function ActionToast({
 
   return createPortal(
     <div
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-[70] flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+      className={cn(
+        "pointer-events-none fixed inset-x-0 bottom-0 z-[70] flex justify-center px-4",
+        raised
+          ? "pb-[max(9rem,calc(env(safe-area-inset-bottom)+9rem))]"
+          : "pb-[max(1rem,env(safe-area-inset-bottom))]"
+      )}
       // Polite: a save the driver just asked for is not an interruption worth cutting speech for.
       role="status"
       aria-live="polite"

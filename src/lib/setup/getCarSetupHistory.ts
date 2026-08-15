@@ -1,11 +1,11 @@
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { formatRunCreatedAtDateTime, formatRunDateOnly } from "@/lib/formatDate";
 import { formatRunSessionDisplay } from "@/lib/runSession";
-import { chassisChangedKeys } from "@/lib/setup/runContextSetupKeys";
+import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import {
   buildCarSetupHistory,
   carSetupCounts,
+  runToRunChangedKeys,
   type CarSetupCounts,
   type CarSetupHistoryEntry,
 } from "@/lib/setup/carSetupHistory";
@@ -20,10 +20,23 @@ import { setupFieldLabel } from "@/lib/setupCompare/changedSincePrevious";
 import { buildCatalogFromTemplate, buildFieldMetaMap } from "@/lib/setupFieldCatalog";
 import { getSetupSheetTemplateForCar } from "@/lib/setupSheetModels/getTemplateForCar";
 
-/** Runs are filtered in JS (the delta is JSON), so the candidate read is bounded. */
-export const CAR_SETUP_HISTORY_CANDIDATE_CAP = 200;
+/**
+ * How many runs back the list looks.
+ *
+ * Every candidate now costs its whole `SetupSnapshot.data` blob — a filled A800RR sheet is ~280
+ * fields — because "did this run change the car" is answered by comparing values, not by reading a
+ * stored delta. 200 candidates was affordable when the read was one small JSON column per run; it is
+ * not affordable now, and the old cap was pointless anyway: the card only ever rendered 20 rows.
+ *
+ * One extra run beyond the window is read as the diff anchor (see `setupBeforeOldestRun`).
+ */
+export const CAR_SETUP_HISTORY_CANDIDATE_CAP = 60;
 
-const DEFAULT_LIMIT = 20;
+/**
+ * Hard ceiling on entries handed to the card — a backstop, not the display length. The card draws a
+ * short head and expands on tap, and the run window above is what actually bounds the list.
+ */
+const DEFAULT_LIMIT = 200;
 
 /**
  * What the car is set up with right now: the newest run's setup, whether or not that run changed
@@ -44,9 +57,7 @@ export type CarSetupHistory = {
   entries: CarSetupHistoryEntry[];
   /** Counts before the limit, so a chip says how much is really behind it. */
   counts: CarSetupCounts;
-  /** More entries exist than `limit` let through. */
-  hasMore: boolean;
-  /** The candidate read hit its cap — older runs exist beyond what was considered. */
+  /** The run window hit its cap — older runs exist that were never checked for changes. */
   truncated: boolean;
 };
 
@@ -59,36 +70,26 @@ export async function getCarSetupHistory(input: {
   const limit = input.limit ?? DEFAULT_LIMIT;
   const carId = input.car.id;
 
-  const [latestRun, runs, documents, librarySetups, baselineRows, template] = await Promise.all([
-    prisma.run.findFirst({
-      where: { userId: input.userId, carId },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        createdAt: true,
-        sessionType: true,
-        meetingSessionType: true,
-        meetingSessionCode: true,
-        sessionLabel: true,
-        setupSnapshotId: true,
-        track: { select: { name: true } },
-        event: { select: { name: true } },
-        setupSnapshot: { select: { setupDeltaJson: true, isLibrary: true, name: true } },
-      },
-    }),
+  const [runRows, documents, librarySetups, baselineRows, template] = await Promise.all([
+    /*
+     * EVERY run on the car, newest first — no "did the delta have keys" filter any more. Whether a
+     * run changed the car is decided by comparing its values with the run before it, which means
+     * every run is a candidate and none can be excluded in SQL.
+     *
+     * `sortAt` is the ordering axis so "the run before it" means the run that actually preceded it
+     * on track, not the row that happened to be written first. One extra row past the cap is the
+     * anchor the oldest visible run diffs against.
+     */
     prisma.run.findMany({
-      where: {
-        userId: input.userId,
-        carId,
-        setupSnapshot: {
-          OR: [{ setupDeltaJson: { not: Prisma.DbNull } }, { baseSetupSnapshotId: null }],
-        },
-      },
-      orderBy: { createdAt: "desc" },
-      take: CAR_SETUP_HISTORY_CANDIDATE_CAP,
+      where: { userId: input.userId, carId },
+      orderBy: { sortAt: "desc" },
+      take: CAR_SETUP_HISTORY_CANDIDATE_CAP + 1,
       select: {
         id: true,
+        sortAt: true,
         createdAt: true,
+        sessionCompletedAt: true,
+        loggingCompletedAt: true,
         sessionType: true,
         meetingSessionType: true,
         meetingSessionCode: true,
@@ -98,8 +99,7 @@ export async function getCarSetupHistory(input: {
         event: { select: { name: true } },
         setupSnapshot: {
           select: {
-            setupDeltaJson: true,
-            baseSetupSnapshotId: true,
+            data: true,
             // Saving a run's setup flags this very row rather than copying it, so the list has to
             // read the flag to know which bookmarks are filled.
             isLibrary: true,
@@ -172,9 +172,33 @@ export async function getCarSetupHistory(input: {
   const fieldMeta = buildFieldMetaMap(buildCatalogFromTemplate(template));
   const labelForKey = (key: string): string => fieldMeta.get(key)?.label ?? setupFieldLabel(key);
 
+  /*
+   * The extra row past the cap is the anchor, not an entry. It never earns a row of its own — it
+   * exists so the oldest run in the window has something to be compared against. When the read came
+   * back short of the cap there is no anchor, and the oldest run is genuinely the car's first.
+   */
+  const truncated = runRows.length > CAR_SETUP_HISTORY_CANDIDATE_CAP;
+  const windowRuns = truncated ? runRows.slice(0, CAR_SETUP_HISTORY_CANDIDATE_CAP) : runRows;
+  const anchorRun = truncated ? runRows[CAR_SETUP_HISTORY_CANDIDATE_CAP] : null;
+
+  const runs = windowRuns.map((r) => ({
+    id: r.id,
+    sortAt: r.sortAt,
+    displayAt: resolveRunDisplayInstant(r),
+    sessionType: r.sessionType,
+    meetingSessionType: r.meetingSessionType,
+    meetingSessionCode: r.meetingSessionCode,
+    sessionLabel: r.sessionLabel,
+    setupSnapshotId: r.setupSnapshotId,
+    track: r.track,
+    event: r.event,
+    setupSnapshot: r.setupSnapshot,
+  }));
+
   const entries = buildCarSetupHistory({
     carId,
     runs,
+    setupBeforeOldestRun: anchorRun?.setupSnapshot?.data ?? null,
     documents: documents.map((d) => ({
       ...d,
       createdSetup: d.createdSetup
@@ -209,6 +233,12 @@ export async function getCarSetupHistory(input: {
     formatDate: (at) => formatRunDateOnly(at, input.displayTimeZone),
   });
 
+  /*
+   * What the car is on right now = the newest run, changed or not. It comes off the same read as the
+   * list (the newest row by `sortAt`), so the card and the list can never disagree about which run
+   * is latest — they used to be two queries ordered on two different columns.
+   */
+  const latestRun = windowRuns[0] ?? null;
   const current: CarCurrentSetup | null = latestRun
     ? {
         setupId: latestRun.setupSnapshotId,
@@ -222,11 +252,21 @@ export async function getCarSetupHistory(input: {
         })(),
         meta: [
           latestRun.track?.name,
-          formatRunCreatedAtDateTime(latestRun.createdAt, input.displayTimeZone),
+          formatRunCreatedAtDateTime(resolveRunDisplayInstant(latestRun), input.displayTimeZone),
         ]
           .filter(Boolean)
           .join(" · "),
-        changedLabels: chassisChangedKeys(latestRun.setupSnapshot?.setupDeltaJson).map(labelForKey),
+        /*
+         * The same run-to-run rule the list uses, so the card's chips and the top row's chips agree.
+         * With no second run there is nothing to diff against, and the chips are empty — comparing
+         * against "nothing" would list every field on the sheet as a change.
+         */
+        changedLabels: windowRuns[1]
+          ? runToRunChangedKeys(
+              latestRun.setupSnapshot?.data,
+              windowRuns[1].setupSnapshot?.data ?? null
+            ).map(labelForKey)
+          : [],
         saved: Boolean(latestRun.setupSnapshot?.isLibrary),
       }
     : null;
@@ -236,7 +276,6 @@ export async function getCarSetupHistory(input: {
     entries: entries.slice(0, limit),
     // Counted before the slice: a chip must report what the car has, not what this page shows.
     counts: carSetupCounts(entries),
-    hasMore: entries.length > limit,
-    truncated: runs.length >= CAR_SETUP_HISTORY_CANDIDATE_CAP,
+    truncated,
   };
 }

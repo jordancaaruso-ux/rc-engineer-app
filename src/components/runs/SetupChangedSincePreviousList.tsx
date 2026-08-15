@@ -63,60 +63,68 @@ export function SetupChangedSincePreviousList({
         className
       )}
     >
-      {/* Single grid so NOW / WAS align in fixed columns across every row —
-          the widest value in each column sets its width (instrument table).
+      {/* Single grid so NOW / WAS align in fixed columns across every row
+          (instrument table) — but the value columns are `fit-content`, not
+          `auto`: they hug their widest value yet can never take more than 30%
+          of the frame each. Before the cap, one long value anywhere in the
+          list (even scrolled out of view) starved the parameter column down
+          to a couple of characters. The parameter column takes the slack and
+          WRAPS rather than truncates — two rows both reading "R…" is worse
+          than a taller row.
 
-          The parameter column takes the slack (`1fr`), which pins NOW / WAS to
-          the right edge and lets the header band span the whole frame. The
-          `minmax(0, …)` keeps it able to shrink and truncate when the column is
-          genuinely narrow; the frame's `max-w` above is what stops the label and
-          its value drifting apart in a wide pane.
+          Each body row is a `subgrid` wrapper carrying the divider, so the
+          line is one continuous stroke. Per-cell borders drew at different
+          heights, because `items-baseline` shifts each cell box by its own
+          font size — the 12px WAS cell by ~1px, the baseline-less opener cell
+          by ~6px (same bug the header's empty cell had, fixed there earlier).
 
           The fourth column is the opener. It collapses to nothing on a chassis
           with no sheet, which is most of them. */}
-      <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-baseline">
+      <div className="grid grid-cols-[minmax(0,1fr)_fit-content(30%)_fit-content(30%)_auto]">
         <div className={cn(HEAD_CELL, "pl-3.5 pr-2 text-left")}>Parameter</div>
         <div className={cn(HEAD_CELL, "px-2 text-right")}>Now</div>
         <div className={cn(HEAD_CELL, "pl-2 pr-3.5 text-right")}>Was</div>
-        {/* Empty, so it has no text baseline to align on and the browser makes
-            one up from its own bottom edge — which parked its underline ~10px
-            above the other three. `self-stretch` opts it out of baseline
-            alignment and gives it the row's full height, so the line is straight. */}
-        <div className={cn(HEAD_CELL, "self-stretch", cropByKey ? "pr-2" : "")} />
+        <div className={cn(HEAD_CELL, cropByKey ? "pr-2" : "")} />
         {rows.map((row, i) => {
-          const divider = i > 0 ? "border-t border-border/50" : undefined;
           const crop = cropByKey?.get(row.key);
           const open = openKey === row.key;
           return (
             <Fragment key={`${row.label}:${row.value}:${row.previousValue}`}>
-              <div className={cn("min-w-0 truncate pl-3.5 pr-2 py-[7px] text-[13px] leading-tight text-muted-foreground", divider)}>
-                {row.label}
-              </div>
-              <div className={cn("px-2 py-[7px] text-right text-[13px] tabular-nums leading-tight text-foreground", divider)}>
-                {row.value}
-              </div>
-              <div className={cn("pl-2 pr-3.5 py-[7px] text-right text-[12px] tabular-nums leading-tight text-faint line-through", divider)}>
-                {row.previousValue}
-              </div>
-              <div className={cn("py-[3px]", divider, crop ? "pr-2" : "")}>
-                {crop ? (
-                  <button
-                    type="button"
-                    onClick={() => setOpenKey(open ? null : row.key)}
-                    aria-expanded={open}
-                    aria-label={
-                      open
-                        ? `Hide ${row.label} on the setup sheet`
-                        : `Show ${row.label} on the setup sheet`
-                    }
-                    className={cn(
-                      "flex h-6 w-6 items-center justify-center rounded text-faint transition-colors hover:bg-border/60 hover:text-foreground",
-                      open && "bg-border/60 text-foreground"
-                    )}
-                  >
-                    <Maximize2 className="h-3 w-3" aria-hidden />
-                  </button>
-                ) : null}
+              <div
+                className={cn(
+                  "col-span-4 grid grid-cols-subgrid items-baseline",
+                  i > 0 && "border-t border-border/50"
+                )}
+              >
+                <div className="min-w-0 break-words pl-3.5 pr-2 py-[7px] text-[13px] leading-tight text-muted-foreground">
+                  {row.label}
+                </div>
+                <div className="min-w-0 break-words px-2 py-[7px] text-right text-[13px] tabular-nums leading-tight text-foreground">
+                  {row.value}
+                </div>
+                <div className="min-w-0 break-words pl-2 pr-3.5 py-[7px] text-right text-[12px] tabular-nums leading-tight text-faint line-through">
+                  {row.previousValue}
+                </div>
+                <div className={cn("flex items-center self-stretch", crop ? "pr-2" : "")}>
+                  {crop ? (
+                    <button
+                      type="button"
+                      onClick={() => setOpenKey(open ? null : row.key)}
+                      aria-expanded={open}
+                      aria-label={
+                        open
+                          ? `Hide ${row.label} on the setup sheet`
+                          : `Show ${row.label} on the setup sheet`
+                      }
+                      className={cn(
+                        "flex h-6 w-6 items-center justify-center rounded text-faint transition-colors hover:bg-border/60 hover:text-foreground",
+                        open && "bg-border/60 text-foreground"
+                      )}
+                    >
+                      <Maximize2 className="h-3 w-3" aria-hidden />
+                    </button>
+                  ) : null}
+                </div>
               </div>
               {crop && open ? (
                 <div className="col-span-4 border-t border-border/50 bg-background/40 px-3.5 py-2">

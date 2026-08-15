@@ -244,7 +244,6 @@ export default async function CarDetailPage(props: {
             carId={car.id}
             entries={setupHistory.entries}
             counts={setupHistory.counts}
-            hasMore={setupHistory.hasMore}
             truncated={setupHistory.truncated}
           />
 

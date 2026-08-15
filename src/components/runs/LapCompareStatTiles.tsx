@@ -1,14 +1,13 @@
 "use client";
 
 /**
- * The five numbers a lap sheet is opened to find, across the top of the desktop
- * layout: best lap, race pace, consistency, how many laps actually counted, and
- * where that sat in the field.
+ * The numbers a lap sheet is opened to find, across the top of the desktop
+ * layout: best lap, pace over five and over ten, consistency, and where the best
+ * sat in the field.
  *
- * Desktop only, deliberately. On a 390px phone this row would be the second
- * thing pushing lap times below the fold — the first was the column headers, and
- * cutting those down was the point. The phone reads the same figures off the
- * column header (best) and the table footer (the averages).
+ * Desktop only, deliberately — the phone reads the same three pace figures off
+ * the column headers, which carry them for every ticked session rather than only
+ * for the target.
  *
  * Each tile is a stat tile, not a chart: one magnitude, no plot, so no hover
  * layer. The sub-line carries its comparison, tinted only where the direction
@@ -40,9 +39,17 @@ export function LapCompareStatTiles({
   return (
     <div
       className={cn(
-        "grid grid-cols-5 gap-px overflow-hidden rounded-md border border-border bg-border",
+        "grid gap-px overflow-hidden rounded-md border border-border bg-border",
         className
       )}
+      /*
+       * Columns follow the tiles, rather than a hardcoded 5. "Vs field" only
+       * exists on a session with a timing import, so on every other run the
+       * fixed grid left a fifth cell with nothing in it — and since the wrapper
+       * is painted in the border colour to draw the hairlines, that empty cell
+       * rendered as a solid block of border.
+       */
+      style={{ gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }}
     >
       {tiles.map((t) => (
         <div key={t.label} className="flex flex-col gap-1 bg-surface-runna px-3 py-2.5">

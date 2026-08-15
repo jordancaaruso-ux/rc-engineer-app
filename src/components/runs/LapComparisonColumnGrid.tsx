@@ -12,7 +12,6 @@ import {
   filterDuplicateImportedSeries,
   formatLapDelta,
   getDeltaStyle,
-  getIncludedLaps,
   importedSetToLapRows,
   primaryLapRowsFromRun,
   resolveDeltaTintRange,
@@ -166,14 +165,22 @@ function isBestLapOf(series: ComparisonSeries, lap: LapRow): boolean {
   return series.bestLap != null && lap.lapTimeSeconds === series.bestLap;
 }
 
-/** Whole-session summary rows under the laps — see the `<tfoot>` that renders them. */
-const SUMMARY_FOOTER_ROWS: Array<{
+/**
+ * The three whole-session numbers every column carries, in the order the header
+ * stacks them. Best lap says what the car had in it; the two averages say what it
+ * did with that for a run — and a column can win one and lose the other, which is
+ * the comparison you opened the sheet to make.
+ */
+const HEADER_METRIC_ROWS: Array<{
   label: string;
   pick: (s: ComparisonSeries) => number | null;
   delta: (d: SummaryMetricDeltas) => number | null;
+  /** Best lap is the headline: it wears the target's accent, the averages don't. */
+  accent?: boolean;
 }> = [
-  { label: "Avg 5", pick: (s) => s.avgTop5, delta: (d) => d.avgTop5Delta },
-  { label: "Avg 10", pick: (s) => s.avgTop10, delta: (d) => d.avgTop10Delta },
+  { label: "best", pick: (s) => s.bestLap, delta: (d) => d.bestDelta, accent: true },
+  { label: "avg5", pick: (s) => s.avgTop5, delta: (d) => d.avgTop5Delta },
+  { label: "avg10", pick: (s) => s.avgTop10, delta: (d) => d.avgTop10Delta },
 ];
 
 /** Gain green / loss red for delta text where there is no background tint (header metrics). */
@@ -183,14 +190,15 @@ function deltaTextClass(delta: number): string {
 }
 
 /**
- * A column's identity and its one headline number — three lines, not fifteen.
+ * A column's identity and the three numbers that decide whether it is worth
+ * reading: best, avg5, avg10, each against the target.
  *
- * This block used to stack name, meta line, a setup note, and Best / Avg top 5 /
- * Avg top 10 each with its own delta: about 400px of header on a 390px phone, so
- * the sheet opened on a screen of column headings with no lap times on it at all.
- * Best lap is the number that decides whether a column is worth reading; the two
- * averages moved to the table footer, where they compare just as well and cost
- * nothing until you have scrolled the laps you came for.
+ * They lived in the table footer for a while, after a header that also carried a
+ * meta line and a setup note ran to about 400px on a 390px phone and opened the
+ * sheet on nothing but column headings. Those two lines are gone for good, so the
+ * three metrics cost ~26px here — and they cost it ONCE, however many columns are
+ * ticked, because headers sit side by side. A number you have to scroll past the
+ * laps to reach is not one you compare with.
  */
 function ColumnHeaderBlock({
   series,
@@ -205,7 +213,6 @@ function ColumnHeaderBlock({
   summaryDelta: ReturnType<typeof computeSummaryDeltas> | null;
   onViewSetup?: (r: CompareRunShape) => void;
 }) {
-  const bestDelta = isTarget ? null : summaryDelta?.bestDelta ?? null;
   return (
     <>
       <div className="flex items-start gap-1">
@@ -221,16 +228,33 @@ function ColumnHeaderBlock({
         </div>
         <SetupHint series={series} run={meta.setupRun} onView={onViewSetup} />
       </div>
-      <div className="mt-1 flex flex-wrap items-baseline gap-x-1 text-[10px] tabular-nums">
-        <span className="text-muted-foreground">best</span>
-        <span className={cn("font-medium", isTarget ? "text-primary-ink" : "text-foreground")}>
-          {formatLap(series.bestLap)}
-        </span>
-        {bestDelta != null && Number.isFinite(bestDelta) ? (
-          <span className={cn("text-[9px]", deltaTextClass(bestDelta))}>
-            {formatLapDelta(bestDelta)}
-          </span>
-        ) : null}
+      {/* Label, value and delta share a line and wrap together — at the 108px
+          column floor "avg10 15.240 +0.012" has almost nothing spare, so a long
+          one drops its delta to a second line rather than overflowing. */}
+      <div className="mt-1 space-y-0.5 text-[10px] tabular-nums">
+        {HEADER_METRIC_ROWS.map((row) => {
+          // The target is what everything else is measured against, so it has
+          // nothing of its own to show a delta for.
+          const delta = isTarget || !summaryDelta ? null : row.delta(summaryDelta);
+          return (
+            <div key={row.label} className="flex flex-wrap items-baseline gap-x-1">
+              <span className="text-muted-foreground">{row.label}</span>
+              <span
+                className={cn(
+                  "font-medium",
+                  isTarget && row.accent ? "text-primary-ink" : "text-foreground"
+                )}
+              >
+                {formatLap(row.pick(series))}
+              </span>
+              {delta != null && Number.isFinite(delta) ? (
+                <span className={cn("text-[9px]", deltaTextClass(delta))}>
+                  {formatLapDelta(delta)}
+                </span>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
     </>
   );
@@ -846,6 +870,11 @@ export function LapComparisonColumnGrid({
    * The desktop tile row. Comparisons are read against the FIRST ticked column —
    * the same one the lap trace draws — so the tiles, the trace and the grid are
    * all answering "versus what?" with the same session rather than three.
+   *
+   * There is no "Laps counted" tile: Avg top 10 took its slot. The count it
+   * carried is legible from the grid itself (a lap per row, excluded ones struck
+   * through), while pace over ten laps is not derivable by eye from anything on
+   * screen.
    */
   const statTiles = useMemo((): LapStatTile[] => {
     if (!targetSeries) return [];
@@ -866,8 +895,6 @@ export function LapComparisonColumnGrid({
 
     const targetAnalysis = analyzeLapRows(targetSeries.laps);
     const vsAnalysis = vs ? analyzeLapRows(vs.laps) : null;
-    const included = getIncludedLaps(targetSeries.laps).length;
-    const total = targetSeries.laps.filter((l) => l.lapNumber !== 0).length;
 
     const consistencyDelta =
       targetAnalysis.consistencyStdDev != null && vsAnalysis?.consistencyStdDev != null
@@ -909,6 +936,7 @@ export function LapComparisonColumnGrid({
         ...noteFor(d?.bestDelta),
       },
       { label: "Avg top 5", value: formatLap(targetSeries.avgTop5), ...noteFor(d?.avgTop5Delta) },
+      { label: "Avg top 10", value: formatLap(targetSeries.avgTop10), ...noteFor(d?.avgTop10Delta) },
       {
         label: "Consistency",
         value:
@@ -921,13 +949,6 @@ export function LapComparisonColumnGrid({
               noteTone: (-consistencyDelta < 0 ? "good" : "bad") as "good" | "bad",
             }
           : { note: null }),
-      },
-      {
-        label: "Laps counted",
-        value: String(included),
-        valueSuffix: `/${total}`,
-        note: total > included ? `${total - included} excluded` : null,
-        noteTone: "muted",
       },
     ];
     if (fieldTile) tiles.push(fieldTile);
@@ -1174,9 +1195,9 @@ export function LapComparisonColumnGrid({
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="border-b border-border bg-muted/80">
-              {/* w-12, not w-9: the footer's "Avg 10" label lives in this column and
-                  wrapped to two lines at the old width. */}
-              <th className="w-12 text-left text-xs sm:text-sm font-medium text-muted-foreground px-1.5 sm:px-2 py-2 align-bottom sticky left-0 bg-muted/80 z-10">
+              {/* Back to w-9 now the footer's "Avg 10" label — the only thing that
+                  needed w-12 — has gone up into the column headers. */}
+              <th className="w-9 text-left text-xs sm:text-sm font-medium text-muted-foreground px-1.5 sm:px-2 py-2 align-bottom sticky left-0 bg-muted/80 z-10">
                 Lap
               </th>
               {targetSeries ? (
@@ -1335,45 +1356,9 @@ export function LapComparisonColumnGrid({
               );
             })}
           </tbody>
-          {/*
-           * Where Avg top 5 / Avg top 10 went when the column headers were cut down.
-           * A footer is the right home for a whole-session summary anyway: it reads
-           * after the laps it summarises, and it stays out of the way of the first
-           * screen. Same comparison, same deltas, none of the opening cost.
-           */}
-          <tfoot>
-            {SUMMARY_FOOTER_ROWS.map((row) => (
-              <tr key={row.label} className="border-t border-border bg-muted/70">
-                <td className="sticky left-0 z-10 whitespace-nowrap bg-muted/70 px-1.5 py-1 text-[10px] font-medium text-muted-foreground sm:px-2">
-                  {row.label}
-                </td>
-                {targetSeries ? (
-                  <td className="border-l border-border px-1.5 py-1 text-[11px] tabular-nums text-foreground sm:px-2">
-                    {formatLap(row.pick(targetSeries))}
-                  </td>
-                ) : null}
-                {comparisonSeries.map((s) => {
-                  const d = targetSeries ? computeSummaryDeltas(targetSeries, s) : null;
-                  const dv = d ? row.delta(d) : null;
-                  return (
-                    <td
-                      key={s.id}
-                      className="border-l border-border px-1.5 py-1 text-[11px] tabular-nums text-foreground sm:px-2"
-                    >
-                      <div className="flex flex-col leading-tight">
-                        <span>{formatLap(row.pick(s))}</span>
-                        {dv != null && Number.isFinite(dv) ? (
-                          <span className={cn("text-[9px]", deltaTextClass(dv))}>
-                            {formatLapDelta(dv)}
-                          </span>
-                        ) : null}
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tfoot>
+          {/* No summary footer: best / avg5 / avg10 are in the column headers, where
+              they are on screen when you decide which column to read rather than
+              behind a scroll past the laps they summarise. */}
         </table>
       </div>
 

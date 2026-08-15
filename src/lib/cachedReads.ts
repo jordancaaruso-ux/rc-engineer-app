@@ -65,7 +65,15 @@ export async function getCachedAnalysisHomeModel(userId: string, timeZone: strin
  * (PATCH/DELETE /api/cars/[carId]); the 30s window covers rare admin model-catalog
  * changes, which aren't carsTag-invalidated. The catalog seed
  * (ensureAuthorizedSetupSheetCatalog) stays OUTSIDE this cache — it must run each load.
- * No Date fields are selected, so unstable_cache's JSON round trip is lossless here.
+ *
+ * NO `Date` SURVIVES THIS FUNCTION. unstable_cache round-trips its value through JSON, so a
+ * `Date` field comes back a `Date` on a miss and an ISO *string* on a hit, with the type still
+ * claiming `Date` — which blows up the first time anything calls `.getTime()` on it. `Car.createdAt`
+ * is therefore converted to epoch ms (`createdAtMs`) inside the cached function, before the value
+ * is ever stored.
+ *
+ * v2 (2026-08-15): gained `createdAtMs`, so /cars can order by most recent use. A v1 entry has no
+ * such field, which would sort every car as if it were created at the epoch — hence the bump.
  */
 export async function getCachedCarManagerData(userId: string) {
   return perfSpan("cachedCarManager", () =>
@@ -82,21 +90,28 @@ export async function getCachedCarManagerData(userId: string) {
               _count: { select: { cars: true, calibrations: true } },
             },
           }),
-          prisma.car.findMany({
-            where: { userId },
-            orderBy: { createdAt: "desc" },
-            select: {
-              id: true,
-              name: true,
-              chassis: true,
-              notes: true,
-              setupSheetTemplate: true,
-              setupSheetModelId: true,
-              setupSheetModel: { select: { id: true, name: true } },
-            },
-          }),
+          prisma.car
+            .findMany({
+              where: { userId },
+              // Only the tie-break: the page re-sorts by most recent use, which this cache
+              // cannot see (a new run doesn't dirty carsTag).
+              orderBy: { createdAt: "desc" },
+              select: {
+                id: true,
+                name: true,
+                chassis: true,
+                notes: true,
+                createdAt: true,
+                setupSheetTemplate: true,
+                setupSheetModelId: true,
+                setupSheetModel: { select: { id: true, name: true } },
+              },
+            })
+            .then((rows) =>
+              rows.map(({ createdAt, ...car }) => ({ ...car, createdAtMs: createdAt.getTime() }))
+            ),
         ]),
-      [`car-manager-v1-${userId}`],
+      [`car-manager-v2-${userId}`],
       { tags: [carsTag(userId)], revalidate: 30 }
     )()
   );

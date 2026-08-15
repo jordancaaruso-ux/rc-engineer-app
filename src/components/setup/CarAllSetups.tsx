@@ -49,6 +49,15 @@ type Filter = "all" | "run" | "sheet" | "baseline" | "saved";
 
 const MAX_CHIPS = 4;
 
+/**
+ * Rows drawn before the "Show all" button.
+ *
+ * Since 2026-08-15 a run earns a row whenever its setup differs from the run before it, so a car
+ * that gets fiddled with every session has a row for nearly every run — the list is long by design
+ * now. It still opens short: a wall of 60 rows buries the sheets and saved setups underneath it.
+ */
+const HEAD_ROWS = 25;
+
 const KIND_BADGE: Record<CarSetupHistoryEntry["kind"], string> = {
   run: "Run",
   sheet: "Sheet",
@@ -60,18 +69,17 @@ export function CarAllSetups({
   carId,
   entries,
   counts,
-  hasMore,
   truncated,
 }: {
   carId: string;
   entries: CarSetupHistoryEntry[];
   counts: CarSetupCounts;
-  hasMore: boolean;
   truncated: boolean;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [filter, setFilter] = useState<Filter>("all");
+  const [expanded, setExpanded] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; setupId: string; name: string } | null>(
@@ -82,12 +90,15 @@ export function CarAllSetups({
 
   const isSaved = (e: CarSetupHistoryEntry) => savedOverride[e.id] ?? e.saved;
 
-  const shown = useMemo(() => {
+  const matching = useMemo(() => {
     if (filter === "all") return entries;
     if (filter === "saved") return entries.filter((e) => isSaved(e));
     return entries.filter((e) => e.kind === filter);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- isSaved reads savedOverride below
   }, [entries, filter, savedOverride]);
+
+  const shown = expanded ? matching : matching.slice(0, HEAD_ROWS);
+  const hidden = matching.length - shown.length;
 
   const chips = useMemo(() => {
     const live = { ...counts, saved: entries.filter((e) => isSaved(e)).length };
@@ -347,6 +358,16 @@ export function CarAllSetups({
           })}
         </ul>
         )}
+
+        {hidden > 0 ? (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="tap-active w-full border-t border-border px-4 py-3 text-xs font-medium text-primary-ink"
+          >
+            Show all {matching.length}
+          </button>
+        ) : null}
       </SurfaceCard>
 
       {error ? <p className="px-1 text-xs text-destructive">{error}</p> : null}
@@ -358,12 +379,9 @@ export function CarAllSetups({
       */}
       {filter === "all" ? (
         <p className="ui-caption px-1">
-          {hasMore || truncated
-            ? `Showing the ${shown.length} most recent${
-                truncated ? " of the last 200 runs considered" : ""
-              }. `
-            : ""}
-          Runs that changed nothing, or only tires and additive, are left out.
+          A run is listed when its setup differs from the run before it. Tires and additive don’t
+          count as a setup change.
+          {truncated ? " Only the last 60 runs were checked." : ""}
         </p>
       ) : null}
 

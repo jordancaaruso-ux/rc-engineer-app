@@ -6,13 +6,21 @@ import {
   type SetupHistoryDocumentInput,
   type SetupHistoryRunInput,
 } from "@/lib/setup/carSetupHistory";
-import { chassisChangedKeys } from "@/lib/setup/runContextSetupKeys";
 
 const CAR_ID = "car1";
 
+/** A minimal chassis setup. Runs below vary one or two keys off this. */
+const BASE_SETUP = { camber_front: -1, toe_rear: 3, rear_hrb_setting: 2.5 };
+
 function run(
-  over: Omit<Partial<SetupHistoryRunInput>, "createdAt"> & { id: string; createdAt: string }
+  over: Omit<Partial<SetupHistoryRunInput>, "sortAt" | "displayAt"> & {
+    id: string;
+    /** ISO instant — used for both the ordering axis and the displayed date unless overridden. */
+    at: string;
+    setup?: Record<string, unknown>;
+  }
 ): SetupHistoryRunInput {
+  const { at, setup, ...rest } = over;
   return {
     sessionType: "TESTING",
     meetingSessionType: null,
@@ -21,84 +29,139 @@ function run(
     setupSnapshotId: `snap-${over.id}`,
     track: { name: "TFTR" },
     event: null,
-    setupSnapshot: { setupDeltaJson: {}, baseSetupSnapshotId: "base" },
-    ...over,
-    createdAt: new Date(over.createdAt),
+    ...rest,
+    setupSnapshot: rest.setupSnapshot ?? { data: { ...BASE_SETUP, ...(setup ?? {}) } },
+    sortAt: new Date(at),
+    displayAt: new Date(at),
   };
 }
 
-function build(runs: SetupHistoryRunInput[], documents: SetupHistoryDocumentInput[] = []) {
+function build(
+  runs: SetupHistoryRunInput[],
+  documents: SetupHistoryDocumentInput[] = [],
+  setupBeforeOldestRun: unknown = null
+) {
   return buildCarSetupHistory({
     carId: CAR_ID,
     runs,
     documents,
+    setupBeforeOldestRun,
     labelForKey: (k) => `L:${k}`,
     formatDate: (at) => at.toISOString().slice(0, 10),
   });
 }
 
-test("tire additive and prep keys never count as a setup change", () => {
+// ---- what earns a run row: it differs from the run before it -----------------------------------
+
+test("a run whose setup matches the run before it earns no row", () => {
+  const entries = build([
+    run({ id: "r2", at: "2026-07-20T06:00:00Z" }),
+    run({ id: "r1", at: "2026-07-19T06:00:00Z" }),
+  ]);
   assert.deepEqual(
-    chassisChangedKeys({
-      at15_front: 1,
-      at15_rear: 1,
-      st205_front: 1,
-      st205_rear: 1,
-      additive_time: 10,
-      additive: "XTR",
-      tires: { label: "set 4" },
-    }),
-    []
+    entries.map((e) => e.id),
+    ["snap-r1"],
+    "the same setup twice is one setup — only the run that introduced it is listed"
   );
 });
 
-test("an additive-only run earns no row", () => {
+test("tires, additive and prep moving on their own is not a setup change", () => {
   const entries = build([
     run({
-      id: "r1",
-      createdAt: "2026-07-19T06:48:41Z",
-      setupSnapshot: {
-        setupDeltaJson: { at15_front: 1, at15_rear: 1, additive_time: 10 },
-        baseSetupSnapshotId: "base",
+      id: "r2",
+      at: "2026-07-20T06:00:00Z",
+      setup: {
+        tires: { tireTypeId: "t2", tireRunNumber: 1 },
+        additive: "XTR",
+        additive_time: 10,
+        at15_front: 1,
+        at15_rear: 1,
       },
     }),
+    run({
+      id: "r1",
+      at: "2026-07-19T06:00:00Z",
+      setup: { tires: { tireTypeId: "t1", tireRunNumber: 4 }, additive: "Juice", additive_time: 15 },
+    }),
   ]);
-  assert.equal(entries.length, 0);
+  assert.deepEqual(
+    entries.map((e) => e.id),
+    ["snap-r1"]
+  );
+});
+
+test("the sheet header — date, track, temps — is not a setup change either", () => {
+  const entries = build([
+    run({
+      id: "r2",
+      at: "2026-07-20T06:00:00Z",
+      setup: { date: "2026-07-20", track: "Boronia", air_temp: 24, track_temp: 31 },
+    }),
+    run({
+      id: "r1",
+      at: "2026-07-19T06:00:00Z",
+      setup: { date: "2026-07-19", track: "TFTR", air_temp: 18, track_temp: 22 },
+    }),
+  ]);
+  assert.deepEqual(
+    entries.map((e) => e.id),
+    ["snap-r1"]
+  );
 });
 
 test("a chassis change earns a row with human labels", () => {
   const entries = build([
     run({
-      id: "r1",
-      createdAt: "2026-07-15T11:44:59Z",
+      id: "r2",
+      at: "2026-07-15T11:44:59Z",
       sessionType: "RACE_MEETING",
       meetingSessionType: "RACE",
       event: { name: "Clubday" },
       track: { name: "Boronia" },
-      setupSnapshot: {
-        setupDeltaJson: { toe_rear: 3, rear_hrb_setting: 2.75, at15_front: 1, additive_time: 15 },
-        baseSetupSnapshotId: "base",
-      },
+      setup: { toe_rear: 3.5, rear_hrb_setting: 2.75, additive_time: 15 },
     }),
+    run({ id: "r1", at: "2026-07-14T11:44:59Z" }),
   ]);
-  assert.equal(entries.length, 1);
+  assert.equal(entries.length, 2);
   assert.equal(entries[0].kind, "run");
   assert.equal(entries[0].title, "Clubday · Race");
   assert.equal(entries[0].meta, "Boronia");
-  assert.deepEqual(entries[0].changedLabels, ["L:toe_rear", "L:rear_hrb_setting"]);
-  assert.equal(entries[0].href, `/cars/${CAR_ID}/setups/snap-r1`);
+  assert.deepEqual(entries[0].changedLabels, ["L:rear_hrb_setting", "L:toe_rear"]);
+  assert.equal(entries[0].href, `/cars/${CAR_ID}/setups/snap-r2`);
 });
 
-test("a run with no baseline is the first setup on the car, so it earns a row", () => {
-  const entries = build([
-    run({
-      id: "r1",
-      createdAt: "2026-06-02T02:00:00Z",
-      setupSnapshot: { setupDeltaJson: null, baseSetupSnapshotId: null },
-    }),
-  ]);
+test("the first run on a car earns a row, with nothing to compare against", () => {
+  const entries = build([run({ id: "r1", at: "2026-06-02T02:00:00Z" })]);
   assert.equal(entries.length, 1);
-  assert.match(entries[0].meta, /first setup on this car/);
+  assert.deepEqual(
+    entries[0].changedLabels,
+    [],
+    "no earlier run, so no diff — not 'every field changed'"
+  );
+  assert.equal(entries[0].meta, "TFTR");
+});
+
+test("circling back to an earlier setup is still a change from the run before it", () => {
+  const entries = build([
+    // Three days of tweaking that land back exactly where they started.
+    run({ id: "r3", at: "2026-07-21T06:00:00Z", setup: { camber_front: -1 } }),
+    run({ id: "r2", at: "2026-07-20T06:00:00Z", setup: { camber_front: -1.5 } }),
+    run({ id: "r1", at: "2026-07-19T06:00:00Z", setup: { camber_front: -1 } }),
+  ]);
+  assert.deepEqual(
+    entries.map((e) => e.id),
+    ["snap-r3", "snap-r2", "snap-r1"],
+    "the list only ever looks back one run, so returning to an old setup is recorded"
+  );
+  assert.deepEqual(entries[0].changedLabels, ["L:camber_front"]);
+});
+
+test("the oldest run in a capped window diffs against the anchor read beyond it", () => {
+  const runs = [run({ id: "r61", at: "2026-07-20T06:00:00Z" })];
+  // Anchor identical to it: the window ended here, but nothing actually changed.
+  assert.equal(build(runs, [], { ...BASE_SETUP }).length, 0);
+  // Anchor different: a real change that happens to sit at the edge of the window.
+  assert.equal(build(runs, [], { ...BASE_SETUP, toe_rear: 2 }).length, 1);
 });
 
 test("a sheet that created a setup is one row pointing at the setup", () => {
@@ -145,13 +208,8 @@ test("a saved run is one row with its bookmark filled, not two", () => {
   const entries = build([
     run({
       id: "r1",
-      createdAt: "2026-07-15T11:44:59Z",
-      setupSnapshot: {
-        setupDeltaJson: { toe_rear: 3 },
-        baseSetupSnapshotId: "base",
-        isLibrary: true,
-        name: "Bayside qualifier",
-      },
+      at: "2026-07-15T11:44:59Z",
+      setupSnapshot: { data: BASE_SETUP, isLibrary: true, name: "Bayside qualifier" },
     }),
   ]);
   assert.equal(entries.length, 1, "marking must not mint a second row");
@@ -164,12 +222,7 @@ test("a saved run is one row with its bookmark filled, not two", () => {
 
 test("an unsaved run keeps its session title and an empty bookmark", () => {
   const entries = build([
-    run({
-      id: "r1",
-      createdAt: "2026-07-15T11:44:59Z",
-      event: { name: "Clubday" },
-      setupSnapshot: { setupDeltaJson: { toe_rear: 3 }, baseSetupSnapshotId: "base" },
-    }),
+    run({ id: "r1", at: "2026-07-15T11:44:59Z", event: { name: "Clubday" } }),
   ]);
   assert.equal(entries[0].saved, false);
   assert.equal(entries[0].title, "Clubday · Testing run");
@@ -285,20 +338,17 @@ test("chip counts read kind for origin and the flag for saved", () => {
     carId: CAR_ID,
     runs: [
       run({
-        id: "r1",
-        createdAt: "2026-07-15T00:00:00Z",
-        setupSnapshot: { setupDeltaJson: { toe_rear: 3 }, baseSetupSnapshotId: "base" },
-      }),
-      run({
         id: "r2",
-        createdAt: "2026-07-16T00:00:00Z",
+        at: "2026-07-16T00:00:00Z",
+        // Camber is stored signed; `normalizeSetupData` forces it negative, so a positive fixture
+        // would normalize straight back onto the previous run's value and drop the row.
         setupSnapshot: {
-          setupDeltaJson: { camber_front: 1 },
-          baseSetupSnapshotId: "base",
+          data: { ...BASE_SETUP, camber_front: -1.5 },
           isLibrary: true,
           name: "Kept one",
         },
       }),
+      run({ id: "r1", at: "2026-07-15T00:00:00Z" }),
     ],
     documents: [
       {
@@ -339,16 +389,8 @@ test("chip counts read kind for origin and the flag for saved", () => {
 test("runs and sheets interleave newest first", () => {
   const entries = build(
     [
-      run({
-        id: "r1",
-        createdAt: "2026-07-15T11:44:59Z",
-        setupSnapshot: { setupDeltaJson: { toe_rear: 3 }, baseSetupSnapshotId: "base" },
-      }),
-      run({
-        id: "r2",
-        createdAt: "2026-07-22T11:44:59Z",
-        setupSnapshot: { setupDeltaJson: { camber_front: 1.5 }, baseSetupSnapshotId: "base" },
-      }),
+      run({ id: "r2", at: "2026-07-22T11:44:59Z", setup: { camber_front: -1.5 } }),
+      run({ id: "r1", at: "2026-07-15T11:44:59Z" }),
     ],
     [
       {

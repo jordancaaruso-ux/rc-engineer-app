@@ -19,6 +19,10 @@ import {
   parseWarmerTimingMinutes,
 } from "@/lib/runs/applyRunContextToSetupSnapshot";
 import { normalizeTirePrep, derivedWarmerTimingMinutes } from "@/lib/runs/tirePrep";
+import {
+  planTireRunNumberCascade,
+  withTireRunNumberInSnapshot,
+} from "@/lib/tires/cascadeTireRunNumber";
 import { getSetupSheetFieldKeysForCarRow } from "@/lib/runs/setupSheetFieldKeysForCar";
 import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
 import { linkImportedSessionsToRun } from "@/lib/lapImport/service";
@@ -47,7 +51,11 @@ type RunUpsertBody = {
   trackLayoutId?: string | null;
   trackDirection?: "CW" | "CCW" | null;
   tireTypeId?: string | null;
-  /** Null means different rubber went on — the server mints a fresh stint. */
+  /**
+   * Null means different rubber went on — the server mints a fresh stint. On an
+   * update that keeps the same compound the stored stint is kept instead: there,
+   * a changed count is a correction, not a tire change.
+   */
   tireStintId?: string | null;
   /** False when the driver said "not sure how many runs" (e.g. a set they were given). */
   tireAgeKnown?: boolean;
@@ -106,8 +114,7 @@ type RunUpsertBody = {
   /**
    * `draft` = save progress without marking logging complete.
    * Omitted or `completed` = treat as logging complete (backward compatible).
-   * On PUT, if the run was already `loggingComplete`, `draft` is ignored: logging stays complete
-   * and stored tire run numbers are not overwritten from the body.
+   * On PUT, if the run was already `loggingComplete`, `draft` is ignored: logging stays complete.
    */
   loggingIntent?: "draft" | "completed";
   /** True when opening Log your run from dashboard detected-session prefill (metadata only; does not affect completion). */
@@ -193,6 +200,9 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     loggingComplete: boolean;
     loggingCompletedAt: Date | null;
     tireRunNumber: number;
+    tireTypeId: string | null;
+    tireStintId: string | null;
+    sortAt: Date;
   } | null = null;
   if (params.mode === "update") {
     const runId = typeof body.runId === "string" ? body.runId.trim() : "";
@@ -207,6 +217,11 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         loggingComplete: true,
         loggingCompletedAt: true,
         tireRunNumber: true,
+        // The stored tire identity: what the correction below is measured against,
+        // and what keeps an edit on the stint it already belongs to.
+        tireTypeId: true,
+        tireStintId: true,
+        sortAt: true,
       },
     });
     if (!ex) {
@@ -215,7 +230,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     existingUpdate = ex;
   }
 
-  /** Editing a run already marked complete: never revert to draft or rewrite the tire run # from the client. */
+  /** Editing a run already marked complete never reverts it to draft. */
   const loggingWasAlreadyComplete = existingUpdate?.loggingComplete === true;
   const loggingComplete = loggingWasAlreadyComplete ? true : body.loggingIntent !== "draft";
 
@@ -251,15 +266,26 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   let conditionsColumns: RunConditionsRecord | null =
     "conditions" in body ? (normalizedConditions ?? NULL_RUN_CONDITIONS_COLUMNS) : null;
 
+  /**
+   * How many runs are on the rubber.
+   *
+   * A completed run used to have this frozen at whatever the database already
+   * held (`a227467`), so a driver correcting the count from the edit wizard
+   * watched the save succeed and change nothing. The count is a fact about the
+   * session like any other and is editable for the life of the run.
+   *
+   * What that guard was actually worth keeping is the case below: a body that
+   * says nothing about tires must not reset the run to 1. Absent now means
+   * "leave it", which is what every other optional field on an update does.
+   */
   const tireRunNumberFromBody =
     typeof body.tireRunNumber === "number" && Number.isFinite(body.tireRunNumber)
       ? Math.max(1, Math.floor(body.tireRunNumber))
-      : 1;
+      : null;
 
   const tireRunNumber =
-    loggingWasAlreadyComplete && existingUpdate
-      ? Math.max(1, Math.floor(Number(existingUpdate.tireRunNumber) || 1))
-      : tireRunNumberFromBody;
+    tireRunNumberFromBody ??
+    (existingUpdate ? Math.max(1, Math.floor(Number(existingUpdate.tireRunNumber) || 1)) : 1);
 
   const lapTimes = Array.isArray(body.lapTimes)
     ? body.lapTimes.filter((n) => typeof n === "number" && Number.isFinite(n))
@@ -391,10 +417,25 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     return NextResponse.json({ error: "Tire type not found" }, { status: 400 });
   }
   const tireAgeKnown = body.tireAgeKnown !== false;
+  /**
+   * On a NEW run a count that differs from the carried-forward one means
+   * different rubber went on, so the panel sends a null stint and a fresh one is
+   * minted here. On an EDIT the same gesture means the opposite: the driver is
+   * correcting the record of rubber that is already on the car, and forking the
+   * stint would cut the run out of the very set it belongs to — taking the
+   * Engineer's wear chain with it, and leaving nothing to carry a correction
+   * along. So an edit that keeps the compound keeps the stint.
+   *
+   * The cost of that choice: "same compound, different set" is not expressible
+   * from the edit form. It needs its own affordance rather than being inferred
+   * from a number changing.
+   */
+  const keepsStoredCompound =
+    existingUpdate != null && tireTypeId != null && existingUpdate.tireTypeId === tireTypeId;
   const tireStintId = tireTypeId
     ? typeof body.tireStintId === "string" && body.tireStintId.trim()
       ? body.tireStintId.trim()
-      : randomUUID()
+      : (keepsStoredCompound ? existingUpdate!.tireStintId : null) ?? randomUUID()
     : null;
 
   // Run-context tires MUST be applied before persisting the snapshot; otherwise loaded
@@ -526,6 +567,8 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       : null;
 
   let run: { id: string; createdAt: Date };
+  /** Non-null only when correcting this run's count also moved later runs on the same set. */
+  let tireRunNumberCascade: { updatedRuns: number; delta: number } | null = null;
   if (params.mode === "create") {
     run = await prisma.run.create({
       data: {
@@ -644,6 +687,80 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     await prisma.runImportedLapSet.deleteMany({
       where: { runId: run.id },
     });
+
+    /**
+     * Carry the correction down the rest of the set. See
+     * `lib/tires/cascadeTireRunNumber` for why this is a shift rather than a
+     * renumber, and why the stint boundary is the stop condition.
+     *
+     * Only ever runs when the stint survived the edit: a run that forked onto
+     * fresh rubber has no later runs of its own to move, and the set it left is
+     * none of its business. `sortAt` is the ordering axis (stamped once at
+     * create, so re-imports never reshuffle a day) — `createdAt` would move
+     * backfilled runs in the wrong direction.
+     */
+    const tireRunNumberDelta = tireRunNumber - existing.tireRunNumber;
+    if (
+      tireStintId != null &&
+      existing.tireStintId != null &&
+      tireStintId === existing.tireStintId &&
+      tireRunNumberDelta !== 0
+    ) {
+      const laterRuns = await prisma.run.findMany({
+        where: {
+          userId: params.userId,
+          tireStintId,
+          id: { not: existing.id },
+          sortAt: { gt: existing.sortAt },
+        },
+        select: { id: true, tireRunNumber: true, setupSnapshotId: true },
+        orderBy: { sortAt: "asc" },
+      });
+      const steps = planTireRunNumberCascade(tireRunNumberDelta, laterRuns);
+      if (steps.length > 0) {
+        const snapshots = await prisma.setupSnapshot.findMany({
+          where: {
+            id: { in: steps.map((s) => s.setupSnapshotId).filter((id): id is string => id != null) },
+          },
+          select: { id: true, data: true },
+        });
+        const snapshotById = new Map(snapshots.map((s) => [s.id, s.data]));
+
+        const writes: PrismaTypes.PrismaPromise<unknown>[] = [];
+        for (const step of steps) {
+          writes.push(
+            prisma.run.update({
+              where: { id: step.runId },
+              data: {
+                tireRunNumber: step.tireRunNumber,
+                // Their Engineer read was computed against the old position on the
+                // set, so it is no longer an answer to this run.
+                engineerSummaryJson: Prisma.JsonNull,
+                engineerSummaryRefRunId: null,
+                engineerSummaryComputedAt: null,
+              },
+            })
+          );
+          if (!step.setupSnapshotId) continue;
+          const patched = withTireRunNumberInSnapshot(
+            snapshotById.get(step.setupSnapshotId),
+            step.tireRunNumber
+          );
+          if (!patched) continue;
+          writes.push(
+            prisma.setupSnapshot.update({
+              where: { id: step.setupSnapshotId },
+              data: { data: patched as object },
+            })
+          );
+        }
+        await prisma.$transaction(writes);
+        await prisma.engineerBetweenRunHint.deleteMany({
+          where: { primaryRunId: { in: steps.map((s) => s.runId) } },
+        });
+        tireRunNumberCascade = { updatedRuns: steps.length, delta: tireRunNumberDelta };
+      }
+    }
   }
 
   const importedLapSets = Array.isArray(body.importedLapSets) ? body.importedLapSets : [];
@@ -755,7 +872,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   });
 
   return NextResponse.json(
-    { run, tireStintId, promptMarkTrackLocation },
+    { run, tireStintId, promptMarkTrackLocation, tireRunNumberCascade },
     { status: params.mode === "create" ? 201 : 200 }
   );
 }
