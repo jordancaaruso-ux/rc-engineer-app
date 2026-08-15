@@ -45,7 +45,9 @@ export async function POST(request: Request): Promise<Response> {
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${origin}/join/success`,
+    // The template literal is Stripe's, filled at redirect time — the success page uses it to
+    // look up the payer's email so the sign-in code box can be offered right there.
+    success_url: `${origin}/join/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/join?status=cancel`,
     // Testers redeem their 100%-off comp codes through this same door — one provisioning path.
     allow_promotion_codes: true,
