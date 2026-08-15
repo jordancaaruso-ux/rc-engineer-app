@@ -1,7 +1,7 @@
 "use client";
 
 import { GripVertical, Plus, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { DashboardActionItemRow } from "@/lib/dashboardServer";
 import { primarySegmentButtonClassName } from "@/components/ui/ButtonLink";
@@ -18,6 +18,7 @@ export function ActionItemListPanel({
   initialItems,
   embedded = false,
   variant = "pill",
+  onItemsChange,
 }: {
   list: ListParam;
   title: string;
@@ -26,6 +27,16 @@ export function ActionItemListPanel({
   addPlaceholder: string;
   initialItems: DashboardActionItemRow[];
   embedded?: boolean;
+  /**
+   * Report the working list back to whoever seeded it, after every add, remove and reorder.
+   *
+   * Needed by any owner that outlives this component. `IdeasEdgeTab` unmounts the whole panel
+   * on close, so without this its edits died with the mount and reopening re-seeded from the
+   * snapshot fetched on first open — adds vanished, removed items came back, and only a page
+   * reload agreed with the database (measured 2026-08-15). Owners re-rendered from the server
+   * on every visit — the dashboard cards — don't need it and don't pass it.
+   */
+  onItemsChange?: (items: DashboardActionItemRow[]) => void;
   /**
    * "ledger" is the desktop column's hairline row (design handoff 2026-08-08): no pill,
    * a numbered index in place of the grip, and a heavier line of text. Behaviour is
@@ -51,6 +62,25 @@ export function ActionItemListPanel({
   useEffect(() => {
     setItems(initialItems);
   }, [initialItems]);
+
+  // Held in a ref so an owner that passes an inline arrow doesn't re-fire the report below
+  // on every one of its own renders.
+  const report = useRef(onItemsChange);
+  useEffect(() => {
+    report.current = onItemsChange;
+  });
+
+  // Skip the mount pass: the owner supplied `initialItems`, so echoing it straight back is
+  // noise. Owners must store the array they are handed *by identity* — hand back a copy and
+  // the reset effect above sees a new prop, sets state, and reports again, forever.
+  const reported = useRef(false);
+  useEffect(() => {
+    if (!reported.current) {
+      reported.current = true;
+      return;
+    }
+    report.current?.(items);
+  }, [items]);
 
   async function persistOrder(next: DashboardActionItemRow[]) {
     setReorderErr(null);

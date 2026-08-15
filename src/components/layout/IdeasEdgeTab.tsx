@@ -58,10 +58,17 @@ export function openIdeasPanel(): void {
  * start from. The tab rides out with the panel rather than being buried under it,
  * so the control you pressed to open stays the control you press to close.
  *
- * Lists load on first open via GET /api/action-items — which is why the tab shows
+ * Lists load on EVERY open via GET /api/action-items — which is why the tab shows
  * no count. A badge could only be truthful after you had already opened the panel
  * once, and making it truthful on arrival would cost that fetch on every page load
  * for every user. The panel header carries the total instead, where it is known.
+ *
+ * It fetched only on the first open until 2026-08-15, and the panel is unmounted on
+ * close, so reopening re-seeded it from that first snapshot: adds disappeared, removed
+ * items came back, and only a reload agreed with the database. The rows had been saved
+ * the whole time. Two changes fixed it and both are load-bearing — the fetch here, and
+ * `onItemsChange` on the panel keeping `lists` current so the reopen is right before the
+ * refetch lands. Drop either and the old list flashes back for a beat.
  */
 export function IdeasEdgeTab() {
   const [mounted, setMounted] = useState(false);
@@ -96,10 +103,22 @@ export function IdeasEdgeTab() {
     }
   }, []);
 
+  /**
+   * Both lists follow every edit (`onItemsChange`), so the panel is correct on reopen without
+   * touching the network. The fetch on every open is for the edits this component cannot see:
+   * the dashboard's own copy of the same list, another tab, another device.
+   */
+  const handleTryChange = useCallback((items: DashboardActionItemRow[]) => {
+    setLists((prev) => (prev ? { ...prev, try: items } : prev));
+  }, []);
+  const handleDoChange = useCallback((items: DashboardActionItemRow[]) => {
+    setLists((prev) => (prev ? { ...prev, do: items } : prev));
+  }, []);
+
   const openPanel = useCallback(() => {
     setOpen(true);
-    if (!lists && !loading) void loadLists();
-  }, [lists, loading, loadLists]);
+    if (!loading) void loadLists();
+  }, [loading, loadLists]);
 
   useEffect(() => {
     const onOpen = () => openPanel();
@@ -194,21 +213,40 @@ export function IdeasEdgeTab() {
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {loadError ? (
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
-                <p className="text-[12px] text-muted-foreground">{loadError}</p>
-                <button
-                  type="button"
-                  onClick={() => void loadLists()}
-                  className="tap-active rounded-md px-2.5 py-1.5 text-[12px] font-semibold text-foreground hover:bg-muted"
-                >
-                  Retry
-                </button>
-              </div>
-            ) : !lists ? (
-              <p className="px-1 py-2 text-[12px] text-muted-foreground">Loading…</p>
+            {/* A refresh that fails must never take the list off the screen: once we have
+                lists they are shown regardless, and the failure is a line above them. Only a
+                cold open with nothing to show gets the full banner. */}
+            {!lists ? (
+              loadError ? (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+                  <p className="text-[12px] text-muted-foreground">{loadError}</p>
+                  <button
+                    type="button"
+                    onClick={() => void loadLists()}
+                    className="tap-active rounded-md px-2.5 py-1.5 text-[12px] font-semibold text-foreground hover:bg-muted"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                <p className="px-1 py-2 text-[12px] text-muted-foreground">Loading…</p>
+              )
             ) : (
               <>
+                {loadError ? (
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <p className="text-[11px] text-muted-foreground">
+                      Couldn&apos;t refresh — showing your last known list.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void loadLists()}
+                      className="tap-active shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-muted"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : null}
                 <div className={cn(tab === "try" ? "block" : "hidden")}>
                   <ActionItemListPanel
                     list="try"
@@ -216,6 +254,7 @@ export function IdeasEdgeTab() {
                     addPlaceholder="Jot an idea…"
                     initialItems={lists.try}
                     embedded
+                    onItemsChange={handleTryChange}
                   />
                 </div>
                 <div className={cn(tab === "do" ? "block" : "hidden")}>
@@ -225,6 +264,7 @@ export function IdeasEdgeTab() {
                     addPlaceholder="Add a reminder…"
                     initialItems={lists.do}
                     embedded
+                    onItemsChange={handleDoChange}
                   />
                 </div>
               </>
