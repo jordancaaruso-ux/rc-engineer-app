@@ -75,8 +75,16 @@ Auto only — no manual toggle. (Revisit if the "reviewing at the track café" c
      ±0.05 s reads as steady), which run was the best, and a per-run sparkline.
    - **Last change** — the most recent run that changed setup, and whether it helped
      (metric delta vs the run before it; inside the noise band = "effect unclear").
-   - **Consistency** — spread of the latest run's five best laps, judged relative to lap
-     length (≤1 % tight · ≤2.5 % fair · beyond scrappy).
+   - **Handling** (2026-08-15) — the driver's own 1–10 ratings across today, as a
+     `RatingDial` plus the arc ("5 → 6 → 8 across today"); direction is last minus first,
+     the same convention Pace uses. **Replaced Consistency**, which was the spread of the
+     latest run's five *fastest* laps: it scored a run with five clean laps and fifteen
+     messy ones as "Tight", and it needed ≥5 imported laps to say anything, so it went
+     blank on a club night with no timing import. A rating is required to mark a run
+     complete, so the new row speaks whenever the day has one completed run.
+     Consistency is untouched on **desktop** — the hero's second dial still reads
+     `consistencyWord` / `consistencyPercent`, and the honest all-laps version (100 − CV)
+     still lives in Analysis, which is what the Engineer reads.
    - Footer: **"✦ Ask the Engineer about today"** → chat in **quick mode** with a queued
      read-my-day prompt. This is the only Engineer entry on the card — always on demand.
    - Tapping the card anywhere else → Sessions with today expanded (the evidence).

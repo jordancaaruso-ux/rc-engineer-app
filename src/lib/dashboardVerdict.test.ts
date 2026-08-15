@@ -14,7 +14,7 @@ function run(partial: Partial<VerdictRunInput> & { runLabel: string }): VerdictR
   return {
     bestLap: null,
     avgTop5: null,
-    top5SpreadSeconds: null,
+    carRating: null,
     changedRows: [],
     ...partial,
   };
@@ -34,14 +34,16 @@ test("no runs → null", () => {
 
 test("single run: no trend, best run named, no change verdict", () => {
   const v = computeTodayVerdict([
-    run({ runLabel: "Run 1", bestLap: 15.1, avgTop5: 15.3, top5SpreadSeconds: 0.12 }),
+    run({ runLabel: "Run 1", bestLap: 15.1, avgTop5: 15.3, carRating: 7 }),
   ]);
   assert.ok(v);
   assert.equal(v.runCount, 1);
   assert.equal(v.trend, null);
   assert.equal(v.bestRun?.runLabel, "Run 1");
   assert.equal(v.lastChange, null);
-  assert.equal(v.consistency?.word, "Tight");
+  assert.equal(v.handling?.rating, 7);
+  // One rating is a level, not a direction.
+  assert.equal(v.handling?.direction, null);
 });
 
 test("day trend prefers avg-top-5 and reads faster/slower/steady", () => {
@@ -131,25 +133,61 @@ test("change on the first run of the day → unclear (nothing to compare inside 
   assert.equal(v?.lastChange?.delta, null);
 });
 
-test("consistency: percent-of-lap thresholds and latest-run-with-laps wins", () => {
-  const tight = computeTodayVerdict([
-    run({ runLabel: "Run 1", bestLap: 15.0, top5SpreadSeconds: 0.4 }),
-    run({ runLabel: "Run 2", bestLap: 15.0, top5SpreadSeconds: 0.12 }),
+test("handling: the arc is today's ratings in order, dial points at the latest", () => {
+  const v = computeTodayVerdict([
+    run({ runLabel: "Run 1", carRating: 5 }),
+    run({ runLabel: "Run 2", carRating: 6 }),
+    run({ runLabel: "Run 3", carRating: 8 }),
   ]);
-  assert.equal(tight?.consistency?.runLabel, "Run 2");
-  assert.equal(tight?.consistency?.word, "Tight");
-
-  const fair = computeTodayVerdict([run({ runLabel: "Run 1", bestLap: 15.0, top5SpreadSeconds: 0.3 })]);
-  assert.equal(fair?.consistency?.word, "Fair");
-
-  const scrappy = computeTodayVerdict([run({ runLabel: "Run 1", bestLap: 15.0, top5SpreadSeconds: 0.6 })]);
-  assert.equal(scrappy?.consistency?.word, "Scrappy");
-
-  const none = computeTodayVerdict([run({ runLabel: "Run 1", bestLap: 15.0 })]);
-  assert.equal(none?.consistency, null);
+  assert.deepEqual(v?.handling?.arc, [5, 6, 8]);
+  assert.equal(v?.handling?.rating, 8);
+  assert.equal(v?.handling?.runLabel, "Run 3");
+  assert.equal(v?.handling?.direction, "improving");
 });
 
-test("consistency percent: 100 minus the spread's share of the lap", () => {
+test("handling: direction is last minus first, so a dip in the middle doesn't flip it", () => {
+  const fading = computeTodayVerdict([
+    run({ runLabel: "Run 1", carRating: 8 }),
+    run({ runLabel: "Run 2", carRating: 6 }),
+    run({ runLabel: "Run 3", carRating: 5 }),
+  ]);
+  assert.equal(fading?.handling?.direction, "fading");
+
+  const flat = computeTodayVerdict([
+    run({ runLabel: "Run 1", carRating: 7 }),
+    run({ runLabel: "Run 2", carRating: 7 }),
+  ]);
+  assert.equal(flat?.handling?.direction, "flat");
+
+  // Ends level after a dip — still flat, same convention as the pace trend.
+  const roundTrip = computeTodayVerdict([
+    run({ runLabel: "Run 1", carRating: 7 }),
+    run({ runLabel: "Run 2", carRating: 4 }),
+    run({ runLabel: "Run 3", carRating: 7 }),
+  ]);
+  assert.equal(roundTrip?.handling?.direction, "flat");
+});
+
+test("handling: unrated runs are skipped, and no ratings at all → null", () => {
+  const v = computeTodayVerdict([
+    run({ runLabel: "Run 1", carRating: 6 }),
+    run({ runLabel: "Run 2" }), // draft, not yet completed
+    run({ runLabel: "Run 3", carRating: 9 }),
+  ]);
+  assert.deepEqual(v?.handling?.arc, [6, 9]);
+  assert.equal(v?.handling?.runLabel, "Run 3");
+
+  const none = computeTodayVerdict([run({ runLabel: "Run 1", bestLap: 15.0 })]);
+  assert.equal(none?.handling, null);
+});
+
+test("handling: survives a run with no laps at all — the old consistency row could not", () => {
+  const v = computeTodayVerdict([run({ runLabel: "Run 1", carRating: 4 })]);
+  assert.equal(v?.handling?.rating, 4);
+  assert.equal(v?.bestRun?.bestLap, null);
+});
+
+test("consistency percent: 100 minus the spread's share of the lap (desktop hero only)", () => {
   // The worked example from the hero card: 0.084 s off a 15.04 s lap is 0.56% of the lap.
   assert.equal(consistencyPercent(0.084, 15.04), 99.4);
 

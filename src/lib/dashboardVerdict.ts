@@ -1,9 +1,13 @@
 /**
  * Track-day verdict math — the computed-only "three instruments" behind the
  * dashboard's day-verdict card (docs/DASHBOARD_NORTH_STAR.md, v2 2026-07-19):
- * pace trend across today's runs, whether the last setup change helped, and
- * lap consistency. Pure functions, no AI, no DB — dashboardServer builds the
- * inputs from today's runs.
+ * pace trend across today's runs, whether the last setup change helped, and how
+ * the car felt across the day. Pure functions, no AI, no DB — dashboardServer
+ * builds the inputs from today's runs.
+ *
+ * The consistency helpers below no longer serve this card (see `handling`); they
+ * stay here because the DESKTOP hero's second dial still reads them, and moving
+ * them would touch a surface this change deliberately leaves alone.
  */
 
 export type VerdictChangedRow = {
@@ -18,8 +22,8 @@ export type VerdictRunInput = {
   runLabel: string;
   bestLap: number | null;
   avgTop5: number | null;
-  /** Spread (max − min) of the run's five best included laps; null when the run has fewer than 5 laps. */
-  top5SpreadSeconds: number | null;
+  /** The driver's own 1–10 rating from "Run complete"; null on drafts and legacy runs. */
+  carRating: number | null;
   changedRows: VerdictChangedRow[];
 };
 
@@ -30,9 +34,8 @@ export type ConsistencyWord = "Tight" | "Fair" | "Scrappy";
  * get the same bar: within 1% of the best lap is tight, within 2.5% fair, beyond
  * that scrappy. Falls back to absolute seconds when there is no best lap to scale by.
  *
- * Exported because the desktop hero's consistency dial reads the same scale — two
- * copies of these cutoffs would drift, and then the dial and the verdict card would
- * disagree about the same run on the same screen.
+ * DESKTOP HERO ONLY since 2026-08-15. The phone's verdict card used to show this word
+ * and now shows `handling` instead; the hero's second dial is the last reader.
  */
 export function consistencyWord(
   top5SpreadSeconds: number,
@@ -103,11 +106,25 @@ export type TodayVerdict = {
     metric: "avg" | "best";
     verdict: "helped" | "hurt" | "unclear";
   };
-  /** Lap repeatability of the latest run with enough laps to judge. */
-  consistency: null | {
+  /**
+   * How the car felt across today — the driver's own ratings, in the order they
+   * were given. Null until one run today carries a rating.
+   *
+   * Founder call 2026-08-15: this replaced the top-5-spread "Consistency" row on the
+   * phone card. That number measured the five FASTEST laps, so a run with five clean
+   * laps and fifteen messy ones scored "Tight" — and it needed ≥5 imported laps to say
+   * anything at all. A rating is required to mark a run complete (the runs API 400s
+   * without one), so this row still speaks on a club night with no timing import,
+   * where the old one went blank.
+   */
+  handling: null | {
+    /** The latest rated run's rating — what the dial points at. */
+    rating: number;
     runLabel: string;
-    spreadSeconds: number;
-    word: "Tight" | "Fair" | "Scrappy";
+    /** Today's ratings, chronological, one per rated run. */
+    arc: number[];
+    /** Last rated run minus first; null when only one run today carries a rating. */
+    direction: null | "improving" | "fading" | "flat";
   };
 };
 
@@ -198,17 +215,24 @@ export function computeTodayVerdict(runs: VerdictRunInput[]): TodayVerdict | nul
     break;
   }
 
-  let consistency: TodayVerdict["consistency"] = null;
-  for (let i = runs.length - 1; i >= 0; i--) {
-    const r = runs[i];
-    if (r.top5SpreadSeconds == null) continue;
-    consistency = {
-      runLabel: r.runLabel,
-      spreadSeconds: r.top5SpreadSeconds,
-      word: consistencyWord(r.top5SpreadSeconds, r.bestLap),
+  const ratedRuns = runs.filter(
+    (r): r is VerdictRunInput & { carRating: number } => r.carRating != null,
+  );
+  let handling: TodayVerdict["handling"] = null;
+  if (ratedRuns.length > 0) {
+    const arc = ratedRuns.map((r) => r.carRating);
+    const latest = ratedRuns[ratedRuns.length - 1];
+    const swing = arc[arc.length - 1] - arc[0];
+    handling = {
+      rating: latest.carRating,
+      runLabel: latest.runLabel,
+      arc,
+      // Last minus first, the same convention the pace trend uses. No noise band
+      // here: a rating is a whole number the driver chose, so any move is a move.
+      direction:
+        arc.length < 2 ? null : swing > 0 ? "improving" : swing < 0 ? "fading" : "flat",
     };
-    break;
   }
 
-  return { runCount: runs.length, trend, bestRun, lastChange, consistency };
+  return { runCount: runs.length, trend, bestRun, lastChange, handling };
 }

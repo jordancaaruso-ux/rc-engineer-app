@@ -3,8 +3,10 @@ import { ArrowUpRight } from "lucide-react";
 import type { DashboardHomeModel } from "@/lib/dashboardServer";
 import type { TodayVerdict } from "@/lib/dashboardVerdict";
 import { formatLap } from "@/lib/runLaps";
+import { carRatingBandCaption } from "@/lib/runHandlingAssessment";
 import { cn } from "@/lib/utils";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { RatingDial } from "@/components/ui/RatingDial";
 
 const GAIN = "text-gain";
 const LOSS = "text-destructive";
@@ -31,6 +33,40 @@ function changedLine(rows: NonNullable<TodayVerdict["lastChange"]>["rows"]): str
   });
   const extra = rows.length - shown.length;
   return extra > 0 ? `${shown.join(" · ")} · +${extra} more` : shown.join(" · ");
+}
+
+/**
+ * Today's ratings as an arrow chain. Four values is what fits beside the dial on one
+ * line at 390px — measured, not guessed — so a longer day collapses to both ENDS with
+ * an ellipsis between. Both ends, because the direction word is computed from exactly
+ * those two: trimming the first number would make the word look wrong.
+ */
+function handlingArcLine(arc: number[]): string {
+  if (arc.length <= 4) return arc.join(" → ");
+  return `${arc[0]} → … → ${arc[arc.length - 1]}`;
+}
+
+/**
+ * The bold line for the handling row — DIRECTION only.
+ *
+ * It deliberately never says the band word. `RatingDial` in verdict mode always prints
+ * that word beside the ring (there is no prop to suppress it), so a headline of "Good
+ * all day" put "Good" on the row twice. The division of labour: bold line = which way
+ * the car went, dial = where it ended up.
+ */
+function handlingHeadline(handling: NonNullable<TodayVerdict["handling"]>, runCount: number): string {
+  switch (handling.direction) {
+    case "improving":
+      return "Coming to you";
+    case "fading":
+      return "Going away";
+    case "flat":
+      return "Same all day";
+    default:
+      // One rating so far. More runs than ratings means a draft is still open, so
+      // "first run of the day" would be a lie.
+      return runCount === 1 ? "First run of the day" : `Only ${handling.runLabel} rated`;
+  }
 }
 
 /** Per-run pace sparkline — faster laps plot lower, so an improving day slopes down. */
@@ -124,7 +160,7 @@ export function DashboardDayVerdictCard({
       ? "One run logged"
       : "On the board";
 
-  const { trend, bestRun, lastChange, consistency } = verdict;
+  const { trend, bestRun, lastChange, handling } = verdict;
 
   const changeSub =
     lastChange?.verdict === "helped"
@@ -176,7 +212,7 @@ export function DashboardDayVerdictCard({
             right={trend && trend.spark.length >= 2 ? (
               <Sparkline values={trend.spark} direction={trend.direction} />
             ) : undefined}
-            last={!lastChange && !consistency}
+            last={!lastChange && !handling}
           />
         ) : null}
 
@@ -186,23 +222,30 @@ export function DashboardDayVerdictCard({
             main={changedLine(lastChange.rows)}
             sub={changeSub}
             right={lastChange.delta != null ? <DeltaChip delta={lastChange.delta} /> : undefined}
-            last={!consistency}
+            last={!handling}
           />
         ) : null}
 
-        {consistency ? (
+        {handling ? (
           <InstrumentRow
-            label="Consistency"
-            main={consistency.word}
+            label="Handling"
+            main={handlingHeadline(handling, verdict.runCount)}
             sub={
-              <>
-                top 5 laps within{" "}
-                <span className="tabular-nums text-foreground/80">
-                  {consistency.spreadSeconds.toFixed(3)}
-                </span>{" "}
-                on {consistency.runLabel}
-              </>
+              handling.arc.length >= 2 ? (
+                <>
+                  <span className="tabular-nums text-foreground/80">
+                    {handlingArcLine(handling.arc)}
+                  </span>{" "}
+                  across today
+                </>
+              ) : (
+                "the day's arc starts here"
+              )
             }
+            // Bare ring: the bold line above already carries the word, and the dial's
+            // own aria-label reads "Handling 8 of 10 — Good" for anything that can't
+            // see the colour. 44px fits inside the row's existing height.
+            right={<RatingDial size={44} value={handling.rating} min={1} label="Handling" />}
             last
           />
         ) : null}

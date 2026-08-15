@@ -1033,21 +1033,11 @@ export async function loadDashboardHomeModel(
       });
       if (best != null) prevBest = best;
 
-      // Verdict input: spread of the run's five best laps (needs the raw laps).
-      let top5SpreadSeconds: number | null = null;
-      const includedLaps = getIncludedLaps(primaryLapRowsFromRun(r));
-      if (includedLaps.length >= 5) {
-        const top5 = includedLaps
-          .map((l) => l.lapTimeSeconds)
-          .sort((a, b) => a - b)
-          .slice(0, 5);
-        top5SpreadSeconds = top5[4] - top5[0];
-      }
       verdictInputs.push({
         runLabel: todayRunLabel(r),
         bestLap: best,
         avgTop5: avg5,
-        top5SpreadSeconds,
+        carRating: r.carRating ?? null,
         changedRows,
       });
     }
