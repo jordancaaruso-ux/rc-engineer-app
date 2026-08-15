@@ -1,6 +1,7 @@
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { setupChangedRowsSincePrevious } from "@/lib/setupCompare/changedSincePrevious";
 import { isRunToRunSetupNoiseKey } from "@/lib/setupCompare/setupChangeNoise";
+import { savedRunSetupName } from "@/lib/setup/setupSaveName";
 
 /**
  * Every setup this car can offer, in one list — "All setups" on the car page.
@@ -65,8 +66,19 @@ export type CarSetupHistoryEntry = {
   kind: CarSetupHistoryKind;
   at: string;
   dateLabel: string;
+  /**
+   * Clock time under the date ("2:41 PM"). Runs only — a sheet's upload time answers nothing, and
+   * five runs on one day at one track are otherwise the same row five times over.
+   */
+  timeLabel: string | null;
   title: string;
   meta: string;
+  /**
+   * The run's best lap, for the right-hand column. Runs only, and null when the run has no laps —
+   * or when `Run.bestLapSeconds` has not been materialised. Read straight off the column: the lap
+   * rows are not fetched here, so nothing recomputes a missing one (see `getCarSetupHistory`).
+   */
+  bestLapSeconds: number | null;
   /** Human labels for what changed. Empty for everything but runs. */
   changedLabels: string[];
   /**
@@ -124,6 +136,8 @@ export type SetupHistoryRunInput = {
     isLibrary?: boolean;
     name?: string | null;
   } | null;
+  /** `Run.bestLapSeconds` as stored. Null when the run has no laps, or the cache is stale. */
+  bestLapSeconds?: number | null;
 };
 
 export type SetupHistoryDocumentInput = {
@@ -182,6 +196,41 @@ export function runToRunChangedKeys(current: unknown, previous: unknown): string
     .map((row) => row.key);
 }
 
+/**
+ * Which run of its day each run is — "Run 3" — keyed by run id.
+ *
+ * It counts EVERY run in the window, not just the ones that earn a row. Runs 3 and 4 changed
+ * nothing, so they have no rows, and the row after them still has to read "Run 5": that is the
+ * number on the driver's own timing sheet, and a row saying "Run 3" for the fifth run out would be
+ * a lie that looks tidy. The visible numbers therefore have gaps, and the gaps are true.
+ *
+ * The day comes from `displayAt`, so it agrees with the date printed beside it; the order within
+ * the day is the incoming `sortAt` order (newest first), so the count runs backwards.
+ *
+ * KNOWN EDGE: the window is the last 60 runs. If that cutoff lands mid-day, the oldest visible run
+ * of that day is numbered 1 when it was really the 4th out. Only reachable on a car with more than
+ * 60 runs, and only on the last row or two of the list.
+ */
+function dayRunNumbers(
+  runs: readonly SetupHistoryRunInput[],
+  dayKey: (at: Date) => string
+): Map<string, number> {
+  const perDay = new Map<string, number>();
+  for (const r of runs) {
+    const key = dayKey(r.displayAt);
+    perDay.set(key, (perDay.get(key) ?? 0) + 1);
+  }
+  const numbers = new Map<string, number>();
+  const walked = new Map<string, number>();
+  for (const r of runs) {
+    const key = dayKey(r.displayAt);
+    const used = walked.get(key) ?? 0;
+    numbers.set(r.id, (perDay.get(key) ?? 0) - used);
+    walked.set(key, used + 1);
+  }
+  return numbers;
+}
+
 export function buildCarSetupHistory(input: {
   carId: string;
   /** Newest first, by `sortAt`. The order is load-bearing: run `i + 1` is run `i`'s baseline. */
@@ -201,8 +250,16 @@ export function buildCarSetupHistory(input: {
   baselines?: SetupHistoryBaselineInput[];
   labelForKey: (key: string) => string;
   formatDate: (at: Date) => string;
+  /** Clock time under the date, runs only. Omitted and the rows carry no time. */
+  formatTime?: (at: Date) => string;
+  /**
+   * Calendar day of an instant in the driver's timezone. Omitted and no run is numbered — an
+   * unlabeled testing run falls back to "Testing run" as it always did.
+   */
+  dayKey?: (at: Date) => string;
 }): CarSetupHistoryEntry[] {
   const entries: CarSetupHistoryEntry[] = [];
+  const runNumbers = input.dayKey ? dayRunNumbers(input.runs, input.dayKey) : null;
 
   for (let i = 0; i < input.runs.length; i += 1) {
     const run = input.runs[i];
@@ -224,6 +281,11 @@ export function buildCarSetupHistory(input: {
     // Identical to the run before it — the same setup twice is not two setups.
     if (changed != null && changed.length === 0) continue;
 
+    /*
+     * A run that named itself keeps its name — "Qualifying · Q2" says more than "Run 5" ever could,
+     * and `formatRunSessionDisplay` only reaches for the number when there is nothing else to say.
+     * So the number appears exactly where the row used to read "Testing run".
+     */
     const session = formatRunSessionDisplay(
       {
         sessionType: run.sessionType,
@@ -231,7 +293,7 @@ export function buildCarSetupHistory(input: {
         meetingSessionCode: run.meetingSessionCode,
         sessionLabel: run.sessionLabel,
       },
-      { fallback: "Testing run" }
+      { dayRunNumber: runNumbers?.get(run.id) ?? null, fallback: "Testing run" }
     );
     const saved = Boolean(snapshot?.isLibrary);
     entries.push({
@@ -239,8 +301,13 @@ export function buildCarSetupHistory(input: {
       kind: "run",
       at: run.sortAt.toISOString(),
       dateLabel: input.formatDate(run.displayAt),
+      timeLabel: input.formatTime ? input.formatTime(run.displayAt) : null,
+      bestLapSeconds: run.bestLapSeconds ?? null,
       // Once saved, the name the driver gave it wins: that is the name they will look for.
-      title: saved && snapshot?.name ? snapshot.name : run.event?.name ? `${run.event.name} · ${session}` : session,
+      title:
+        saved && snapshot?.name
+          ? snapshot.name
+          : savedRunSetupName({ eventName: run.event?.name, sessionDisplay: session }),
       meta: run.track?.name ?? "No track",
       // Empty for the car's first run: there is no earlier run, so nothing "changed" — the row is
       // the setup itself, not a diff.
@@ -259,6 +326,9 @@ export function buildCarSetupHistory(input: {
       kind: "sheet",
       at: doc.createdAt.toISOString(),
       dateLabel: input.formatDate(doc.createdAt),
+      // The hour a PDF was uploaded says nothing about the car, and no sheet has a lap time.
+      timeLabel: null,
+      bestLapSeconds: null,
       title: made?.isLibrary && made.name ? made.name : sheetTitle(doc.originalFilename),
       meta: sheetMeta(doc),
       changedLabels: [],
@@ -278,6 +348,8 @@ export function buildCarSetupHistory(input: {
       kind: "saved",
       at: lib.createdAt.toISOString(),
       dateLabel: input.formatDate(lib.createdAt),
+      timeLabel: null,
+      bestLapSeconds: null,
       title: lib.name ?? "Untitled setup",
       meta: [
         `${lib.valueCount} value${lib.valueCount === 1 ? "" : "s"}`,
@@ -303,6 +375,8 @@ export function buildCarSetupHistory(input: {
       kind: "baseline",
       at: b.createdAt.toISOString(),
       dateLabel: input.formatDate(b.createdAt),
+      timeLabel: null,
+      bestLapSeconds: null,
       title: b.name,
       meta: [b.kindLabel, `${b.valueCount} values`, b.contextLabel].filter(Boolean).join(" · "),
       changedLabels: [],

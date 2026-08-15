@@ -10,6 +10,7 @@ import { ActionToast } from "@/components/ui/ActionToast";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptics";
 import { keepSetup, renameSetup } from "@/lib/setup/keepSetupClient";
+import { formatLap } from "@/lib/runLaps";
 import type { CarSetupCounts, CarSetupHistoryEntry } from "@/lib/setup/carSetupHistory";
 
 /**
@@ -247,8 +248,23 @@ export function CarAllSetups({
             const busy = busyId === entry.id;
             const body = (
               <>
-                <span className="w-11 shrink-0 pt-0.5 text-right text-[11px] leading-tight tabular-nums text-muted-foreground">
+                {/*
+                  Date over time. Five testing runs on one day at one track used to draw five
+                  identical rows — same badge, same "Testing run", same track — so the only way to
+                  tell them apart was to read the changed-value chips underneath. The clock time is
+                  the cheapest fact that separates them, and it sits with the date because they
+                  answer the same question.
+                */}
+                <span className="w-12 shrink-0 pt-0.5 text-right text-[11px] leading-tight tabular-nums text-muted-foreground">
                   {entry.dateLabel}
+                  {entry.timeLabel ? (
+                    /* A size down, and never wrapped: "12:45 PM" is eight glyphs and broke over two
+                       lines at the date's size, which made every afternoon row a line taller than
+                       the morning ones. The date is the fact you scan; the time only separates. */
+                    <span className="block whitespace-nowrap text-[10px] text-faint">
+                      {entry.timeLabel}
+                    </span>
+                  ) : null}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex min-w-0 items-baseline gap-2">
@@ -279,6 +295,26 @@ export function CarAllSetups({
                         </span>
                       ) : null}
                     </span>
+                  ) : null}
+                </span>
+
+                {/*
+                  Best lap, in a column of its own so the numbers stack at one x position and the
+                  fastest run can be found by eye without re-sorting the list. The column is drawn
+                  even when empty — a sheet has no lap time, and a ragged right edge would cost more
+                  than the blank does. Empty rather than an em dash: a column of dashes reads as
+                  data, and this is the absence of it.
+                */}
+                <span className="w-12 shrink-0 pt-0.5 text-right leading-tight">
+                  {entry.bestLapSeconds != null ? (
+                    <>
+                      <span className="block text-sm tabular-nums text-foreground">
+                        {formatLap(entry.bestLapSeconds)}
+                      </span>
+                      <span className="block text-[10px] uppercase tracking-[0.08em] text-faint">
+                        best
+                      </span>
+                    </>
                   ) : null}
                 </span>
               </>

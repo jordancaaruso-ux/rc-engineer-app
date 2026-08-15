@@ -51,6 +51,114 @@ function build(
   });
 }
 
+/** Same as `build`, plus the two things that number and time-stamp a run row. UTC days. */
+function buildWithClock(runs: SetupHistoryRunInput[]) {
+  return buildCarSetupHistory({
+    carId: CAR_ID,
+    runs,
+    documents: [],
+    labelForKey: (k) => `L:${k}`,
+    formatDate: (at) => at.toISOString().slice(0, 10),
+    formatTime: (at) => at.toISOString().slice(11, 16),
+    dayKey: (at) => at.toISOString().slice(0, 10),
+  });
+}
+
+// ---- run number, time of day, best lap ---------------------------------------------------------
+
+test("an unlabeled testing run is numbered by its place in the day, oldest first", () => {
+  const entries = buildWithClock([
+    run({ id: "r3", at: "2026-07-20T08:00:00Z", setup: { camber_front: -2 } }),
+    run({ id: "r2", at: "2026-07-20T07:00:00Z", setup: { camber_front: -1.5 } }),
+    run({ id: "r1", at: "2026-07-20T06:00:00Z" }),
+  ]);
+  assert.deepEqual(
+    entries.map((e) => e.title),
+    ["Run 3", "Run 2", "Run 1"]
+  );
+});
+
+test("runs that changed nothing still consume their number, so the visible ones show gaps", () => {
+  const entries = buildWithClock([
+    // Run 5 changed the car; runs 3 and 4 repeated run 2's setup and earn no rows.
+    run({ id: "r5", at: "2026-07-20T10:00:00Z", setup: { camber_front: -2 } }),
+    run({ id: "r4", at: "2026-07-20T09:00:00Z", setup: { camber_front: -1.5 } }),
+    run({ id: "r3", at: "2026-07-20T08:00:00Z", setup: { camber_front: -1.5 } }),
+    run({ id: "r2", at: "2026-07-20T07:00:00Z", setup: { camber_front: -1.5 } }),
+    run({ id: "r1", at: "2026-07-20T06:00:00Z" }),
+  ]);
+  assert.deepEqual(
+    entries.map((e) => e.title),
+    ["Run 5", "Run 2", "Run 1"],
+    "the number is the run's place on the driver's own timing sheet, not its place in this list"
+  );
+});
+
+test("the number restarts each day", () => {
+  const entries = buildWithClock([
+    run({ id: "r3", at: "2026-07-21T06:00:00Z", setup: { camber_front: -2 } }),
+    run({ id: "r2", at: "2026-07-20T07:00:00Z", setup: { camber_front: -1.5 } }),
+    run({ id: "r1", at: "2026-07-20T06:00:00Z" }),
+  ]);
+  assert.deepEqual(
+    entries.map((e) => e.title),
+    ["Run 1", "Run 2", "Run 1"]
+  );
+});
+
+test("a run that named itself keeps its name — the number never overwrites it", () => {
+  const entries = buildWithClock([
+    run({
+      id: "r2",
+      at: "2026-07-20T07:00:00Z",
+      sessionType: "RACE_MEETING",
+      meetingSessionType: "QUALIFYING",
+      sessionLabel: "Q2",
+      setup: { camber_front: -1.5 },
+    }),
+    run({ id: "r1", at: "2026-07-20T06:00:00Z" }),
+  ]);
+  assert.equal(entries[0].title, "Qualifying · Q2");
+  assert.equal(entries[1].title, "Run 1");
+});
+
+test("without a dayKey nothing is numbered and the old fallback stands", () => {
+  const entries = build([run({ id: "r1", at: "2026-07-20T06:00:00Z" })]);
+  assert.equal(entries[0].title, "Testing run");
+  assert.equal(entries[0].timeLabel, null, "no formatTime, no time");
+});
+
+test("a run row carries its clock time and best lap; nothing else does", () => {
+  const entries = buildCarSetupHistory({
+    carId: CAR_ID,
+    runs: [run({ id: "r1", at: "2026-07-20T06:41:00Z", bestLapSeconds: 14.982 })],
+    documents: [
+      {
+        id: "doc1",
+        originalFilename: "sheet.pdf",
+        createdAt: new Date("2026-07-21T02:44:34Z"),
+        parseStatus: "PARSED",
+        createdSetupId: "snap-sheet",
+      },
+    ],
+    labelForKey: (k) => k,
+    formatDate: (at) => at.toISOString().slice(0, 10),
+    formatTime: (at) => at.toISOString().slice(11, 16),
+    dayKey: (at) => at.toISOString().slice(0, 10),
+  });
+  const sheet = entries.find((e) => e.kind === "sheet");
+  const runRow = entries.find((e) => e.kind === "run");
+  assert.equal(runRow?.timeLabel, "06:41");
+  assert.equal(runRow?.bestLapSeconds, 14.982);
+  assert.equal(sheet?.timeLabel, null, "the hour a PDF was uploaded says nothing about the car");
+  assert.equal(sheet?.bestLapSeconds, null);
+});
+
+test("a run with no laps has no lap figure — never a zero", () => {
+  const entries = buildWithClock([run({ id: "r1", at: "2026-07-20T06:00:00Z" })]);
+  assert.equal(entries[0].bestLapSeconds, null);
+});
+
 // ---- what earns a run row: it differs from the run before it -----------------------------------
 
 test("a run whose setup matches the run before it earns no row", () => {

@@ -152,6 +152,25 @@ export function formatRunDateShort(
 }
 
 /**
+ * Time-only sibling of {@link formatRunDateTime}: **"2:41 PM"**. For list rows that already print
+ * the date and only need the clock time to tell two runs of the same day apart. Prefer passing
+ * `timeZone` (IANA) so SSR matches the signed-in device once `rc_tz` is set.
+ */
+export function formatRunTimeOnly(d: string | Date, timeZone?: string | null): string {
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return "—";
+  const tz = timeZone?.trim();
+  return new Intl.DateTimeFormat(LOCALE, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    ...(tz ? { timeZone: tz } : {}),
+  })
+    .format(dt)
+    .replace(/\b([ap])m\b/i, (_, p) => `${p.toUpperCase()}M`);
+}
+
+/**
  * Date with weekday for printable/setup sheet headers.
  */
 export function formatRunCreatedAtDateWeekday(d: string | Date): string {

@@ -1,5 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { formatRunCreatedAtDateTime, formatRunDateOnly } from "@/lib/formatDate";
+import {
+  calendarYmdInTimeZone,
+  formatRunCreatedAtDateTime,
+  formatRunDateShort,
+  formatRunTimeOnly,
+} from "@/lib/formatDate";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import {
@@ -95,6 +100,13 @@ export async function getCarSetupHistory(input: {
         meetingSessionCode: true,
         sessionLabel: true,
         setupSnapshotId: true,
+        /*
+         * The materialised best lap, for the row's right-hand column. The column alone: the lap
+         * rows are NOT read here. This query already pulls 60 whole setup blobs (~280 fields each)
+         * and adding every run's laps on top is the expensive part of the car page. A run whose
+         * cache is stale shows an empty cell rather than costing the page a second read.
+         */
+        bestLapSeconds: true,
         track: { select: { name: true } },
         event: { select: { name: true } },
         setupSnapshot: {
@@ -193,7 +205,19 @@ export async function getCarSetupHistory(input: {
     track: r.track,
     event: r.event,
     setupSnapshot: r.setupSnapshot,
+    bestLapSeconds: r.bestLapSeconds,
   }));
+
+  /*
+   * The zone the driver's day is measured in. Without the `rc_tz` cookie this falls back to the
+   * server's calendar — UTC on Vercel — which would cut an Australian evening meeting in half and
+   * restart the run numbering at midnight UTC. Same exposure the date labels beside them already
+   * carry, so it is one fallback, not two.
+   */
+  const dayZone =
+    input.displayTimeZone?.trim() ||
+    (typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC") ||
+    "UTC";
 
   const entries = buildCarSetupHistory({
     carId,
@@ -230,7 +254,14 @@ export async function getCarSetupHistory(input: {
       notes: b.notes,
     })),
     labelForKey,
-    formatDate: (at) => formatRunDateOnly(at, input.displayTimeZone),
+    /*
+     * "8 Jun", not "8 June 2026". With the clock time under it the gutter now carries two lines,
+     * and the long form wrapped to three ("8 June" / "2026" / "6:31 PM") on a 390px screen. The
+     * short form keeps the year on anything outside this calendar year, so nothing is ambiguous.
+     */
+    formatDate: (at) => formatRunDateShort(at, input.displayTimeZone),
+    formatTime: (at) => formatRunTimeOnly(at, input.displayTimeZone),
+    dayKey: (at) => calendarYmdInTimeZone(at, dayZone),
   });
 
   /*

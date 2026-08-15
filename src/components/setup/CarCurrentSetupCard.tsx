@@ -47,16 +47,24 @@ export function CarCurrentSetupCard({
         <p className="ui-caption">Unchanged from the run before it.</p>
       )}
 
+      {/*
+        No yellow here. This card reports what the car is on; it does not ask for anything. Both
+        links are doors to a longer read, and the only real action is Save — which earns the one
+        tint in the row when it is on. "View sheet" was also a promise the destination cannot always
+        keep: it only draws a sheet for a sheet-mode chassis, otherwise it is a list of values.
+      */}
       <div className="flex flex-wrap items-center gap-2">
-        <ButtonLink href={`/cars/${carId}/setups/${current.setupId}`}>View sheet</ButtonLink>
+        <ButtonLink href={`/cars/${carId}/setups/${current.setupId}`} variant="outline">
+          View setup
+        </ButtonLink>
+        <ButtonLink href={`/runs/${current.runId}`} variant="outline">
+          View run
+        </ButtonLink>
         <KeepSetupButton
           setupId={current.setupId}
           name={current.title}
           initialSaved={current.saved}
         />
-        <ButtonLink href={`/runs/${current.runId}`} variant="outline">
-          Open run
-        </ButtonLink>
       </div>
     </SurfaceCard>
   );

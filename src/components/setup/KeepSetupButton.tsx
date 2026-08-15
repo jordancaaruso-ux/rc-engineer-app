@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Bookmark } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { outlineButtonClassName } from "@/components/ui/ButtonLink";
 import { haptic } from "@/lib/haptics";
 import { ActionToast } from "@/components/ui/ActionToast";
 import { keepSetup, renameSetup } from "@/lib/setup/keepSetupClient";
@@ -70,11 +71,17 @@ export function KeepSetupButton({
         onClick={() => void toggle()}
         disabled={busy}
         aria-pressed={saved}
-        className={cn(
-          "tap-active inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition disabled:opacity-50",
-          saved
-            ? "border-primary-ink/40 bg-primary/10 text-primary-ink"
-            : "border-border bg-card text-foreground hover:bg-muted"
+        className={outlineButtonClassName(
+          cn(
+            /*
+             * The outline recipe, not a copy of it. This used to hand-roll its own border, radius
+             * and padding, so it sat beside real outline buttons at a different corner radius
+             * (6px vs 8px) and a different width — visible in every row it appears in.
+             */
+            "gap-1.5 disabled:opacity-50",
+            saved &&
+              "border-primary-ink/40 bg-primary/10 text-primary-ink hover:border-primary-ink/40 hover:bg-primary/15"
+          )
         )}
       >
         <Bookmark

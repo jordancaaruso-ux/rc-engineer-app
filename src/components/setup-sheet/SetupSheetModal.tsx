@@ -20,6 +20,8 @@ import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { ReadOnlySheetSurface } from "@/components/setup/ReadOnlySheetSurface";
 import { SheetCompareSurface } from "@/components/setup/SheetCompareSurface";
 import { Eyebrow } from "@/components/ui/panel";
+import { SessionSetupSaveButton } from "@/components/setup/SessionSetupSaveButton";
+import type { SetupSaveContext } from "@/lib/setup/setupSaveContext";
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import { getGenericSetupSheetTemplate } from "@/lib/setupSheetModels/genericSetupSheetTemplate";
@@ -121,6 +123,8 @@ export function SetupSheetModal({
   const [hasTeammates, setHasTeammates] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
   const [loadedSetupData, setLoadedSetupData] = useState<unknown>(null);
+  /** Null until the server has said whether this viewer may save this setup, and how. */
+  const [saveContext, setSaveContext] = useState<SetupSaveContext | null>(null);
   const [baselineSetupData, setBaselineSetupData] = useState<unknown | null>(null);
   const [baselineSetupLoading, setBaselineSetupLoading] = useState(false);
   const [modelTemplate, setModelTemplate] = useState<SetupSheetTemplate | null>(null);
@@ -157,25 +161,32 @@ export function SetupSheetModal({
   useEffect(() => {
     if (!open || !run?.setupSnapshot?.id) {
       setLoadedSetupData(null);
+      setSaveContext(null);
       return;
     }
-    if (run.setupSnapshot.data !== undefined) {
-      setLoadedSetupData(run.setupSnapshot.data);
-      return;
-    }
+    const haveValues = run.setupSnapshot.data !== undefined;
     // Drop the last run's values before going for this one's. The modal is not unmounted between
     // opens, so without this, opening run B after run A paints A's setup on B's sheet for as long
     // as the fetch takes — wrong numbers, presented as this run's, with nothing to say so.
-    setLoadedSetupData(null);
+    setLoadedSetupData(haveValues ? run.setupSnapshot.data : null);
+    setSaveContext(null);
     let alive = true;
+    /*
+     * This call runs even when the caller already handed us the values, because it answers a second
+     * question the row can't: may this viewer save this setup, is it saved already, and — on a
+     * teammate's run — which of their cars could hold a copy. All three are decided server-side
+     * after the access check, so the button is never guessing.
+     */
     void fetch(`/api/runs/${encodeURIComponent(run.id)}/setup-snapshot`)
       .then((res) => res.json())
-      .then((payload: { setupSnapshot?: { data?: unknown } }) => {
+      .then((payload: { setupSnapshot?: { data?: unknown }; save?: SetupSaveContext }) => {
         if (!alive) return;
-        setLoadedSetupData(payload.setupSnapshot?.data ?? {});
+        if (!haveValues) setLoadedSetupData(payload.setupSnapshot?.data ?? {});
+        setSaveContext(payload.save ?? null);
       })
       .catch(() => {
-        if (alive) setLoadedSetupData({});
+        if (!alive) return;
+        if (!haveValues) setLoadedSetupData({});
       });
     return () => {
       alive = false;
@@ -527,17 +538,36 @@ export function SetupSheetModal({
         className="setup-sheet-modal-panel bg-background border border-border rounded-lg shadow-xl max-h-[90vh] overflow-auto w-full max-w-4xl"
         onClick={(e) => e.stopPropagation()}
       >
+        {/*
+          The Save control hangs its panel off this bar rather than portalling it. No `relative` is
+          needed and none is wanted — `position: sticky` already makes this the containing block for
+          absolute children, and adding `relative` would set `position` twice on one element.
+        */}
         <div className="setup-sheet-modal-close sticky top-0 z-10 flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-background/95">
           <div className="ui-title text-sm text-muted-foreground truncate min-w-0 normal-case">
             {run ? formatPickerLine(run) : "Setup"}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted/90 transition shrink-0"
-          >
-            Close
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {/*
+              Keyed by snapshot: opening a second session reuses this component (the modal is never
+              unmounted), and without a fresh key the new setup would inherit the last one's
+              "Saved" state.
+            */}
+            {run?.setupSnapshot?.id && saveContext ? (
+              <SessionSetupSaveButton
+                key={run.setupSnapshot.id}
+                setupId={run.setupSnapshot.id}
+                save={saveContext}
+              />
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted/90 transition shrink-0"
+            >
+              Close
+            </button>
+          </div>
         </div>
 
         <div className="p-4 space-y-4 print:p-0">

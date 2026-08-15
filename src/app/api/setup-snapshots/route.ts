@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { normalizeSetupSnapshotForStorage } from "@/lib/runSetup";
+import { viewerMayAccessRun } from "@/lib/teams/teamRunAccess";
+import { chassisMatches } from "@/lib/setup/setupCopyTargets";
 
 /**
  * The car's setup library: named, reusable setups (`SetupSnapshot.isLibrary`).
@@ -82,7 +84,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   // Ownership check: a library setup only ever hangs off the requester's own car.
   const car = await prisma.car.findFirst({
     where: { id: carId, userId: userId },
-    select: { id: true, setupSheetModelId: true },
+    select: { id: true, setupSheetModelId: true, setupSheetTemplate: true },
   });
   if (!car) return NextResponse.json({ error: "Car not found" }, { status: 404 });
 
@@ -102,10 +104,55 @@ export async function POST(request: Request): Promise<NextResponse> {
   let sourceData: unknown = body.data;
   if (fromId) {
     const source = await prisma.setupSnapshot.findFirst({
-      where: { id: fromId, userId: userId },
-      select: { data: true },
+      where: { id: fromId },
+      select: {
+        data: true,
+        userId: true,
+        car: { select: { setupSheetModelId: true, setupSheetTemplate: true } },
+      },
     });
     if (!source) return NextResponse.json({ error: "Setup not found" }, { status: 404 });
+
+    /*
+     * ============================== COPYING A TEAMMATE'S SETUP ==============================
+     *
+     * This read used to be scoped `{ id, userId }` — your own snapshots only. Saving from inside a
+     * teammate's session (founder call, 2026-08-15) needs one more door, and it is the narrowest
+     * one that opens it: a snapshot is readable here only when a run points at it that
+     * `viewerMayAccessRun` already lets this viewer open. That is the same gate the Setup panel
+     * passed to show them these numbers in the first place, so nothing new becomes visible — the
+     * copy just writes down what was already on their screen.
+     *
+     * A bare snapshot id is NOT enough on its own. Snapshot ids are cuids handed out across every
+     * user, and a library setup of someone else's has no run behind it and therefore no share
+     * decision attached; without this, guessing an id would lift a stranger's setup. Hence the
+     * lookup goes THROUGH runs, and a snapshot with no accessible run is a 404 like any other.
+     *
+     * `ASSET_ACCESS_NORTH_STAR.md` keeps snapshots owner-only for create/edit/delete. A copy is the
+     * viewer creating their own row, which is why it is allowed and why it is a copy: their values
+     * are frozen at this moment and the teammate can edit or delete theirs without touching it.
+     */
+    if (source.userId !== userId) {
+      const sourceRuns = await prisma.run.findMany({
+        where: { setupSnapshotId: fromId },
+        select: { userId: true, shareWithTeam: true },
+      });
+      const visible = (
+        await Promise.all(sourceRuns.map((r) => viewerMayAccessRun(userId, r)))
+      ).some(Boolean);
+      if (!visible) return NextResponse.json({ error: "Setup not found" }, { status: 404 });
+
+      // Their values are keyed to their sheet's fields. Landing them on a car that reads a
+      // different sheet drops every key that doesn't exist there — the setup would open looking
+      // half-empty with nothing to say which half. Refuse rather than half-write it.
+      if (!chassisMatches(source.car ?? {}, car)) {
+        return NextResponse.json(
+          { error: "That setup is for a different chassis." },
+          { status: 400 }
+        );
+      }
+    }
+
     sourceData = source.data;
   }
 
