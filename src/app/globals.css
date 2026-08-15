@@ -2215,6 +2215,107 @@ html[data-nav-pending] .page {
 }
 
 /* ---------------------------------------------------------------------------
+   ===== The paid door family (2026-08-15) =====
+
+   /join, /login, /login/verify-request and /join/success share one scene: the
+   baked drivers-meeting photo (public/brand/door-scene-baked.jpg — blur and
+   grade baked at build time, same trick as track-hero-baked.jpg) with the login
+   telemetry canvas running transparently over it, then a viewport-relative
+   scrim. `DoorScene.tsx` owns the layers; these classes own the idiom.
+
+   `.door-dark` pins the charcoal palette on these four screens REGARDLESS of the
+   theme cookie (founder call 2026-08-15: dark only — they are the tail of the
+   marketing site, not the head of the app, and the photo is graded once for
+   charcoal). It re-declares the token custom properties on a wrapper, so every
+   token-consuming child — Button, inputs, text-muted-foreground — resolves dark
+   without knowing anything happened. Light mode starts inside the app, where it
+   already works. If a token is added to the light theme and used on these pages,
+   re-pin it here or paper leaks into the scene.
+--------------------------------------------------------------------------- */
+.door-dark {
+  color-scheme: dark;
+  --color-background: 18 17 16;
+  --color-foreground: 236 233 228;
+  --color-card: 24 23 22;
+  --color-card-foreground: 236 233 228;
+  --color-primary: 255 214 10;
+  --color-primary-foreground: 18 17 16;
+  --color-secondary: 21 20 19;
+  --color-secondary-foreground: 236 233 228;
+  --color-muted: 30 29 28;
+  --color-muted-foreground: 160 157 150;
+  --color-accent: 255 214 10;
+  --color-accent-foreground: 18 17 16;
+  --color-destructive: 229 100 78;
+  --color-border: 56 55 52;
+  --color-input: 21 20 19;
+  --color-ring: 255 214 10;
+  --color-faint: 100 98 94;
+  --color-primary-ink: 255 214 10;
+  --color-gain: 79 208 137;
+  --color-elevate: 255 255 255;
+  --glow-shadow-rgb: 255 214 10;
+}
+
+/* The frosted sheet — the login card's recipe, factored out so /join's plan
+   cards and the verify/success cards are literally the same surface. The blur is
+   load-bearing here (unlike .glass-card's flat-fill case): everything under it
+   is the photo. */
+.door-sheet {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgb(255 255 255 / 0.09);
+  background-color: rgb(var(--color-background) / 0.7);
+  backdrop-filter: blur(24px) saturate(1.15);
+  box-shadow:
+    0 24px 70px -28px rgb(0 0 0 / 0.75),
+    inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+/* The Race Engineer card — the one warm surface on the page. Border and glow do
+   the recommending (the "most drivers" pill was cut 2026-08-15: unverifiable). */
+.door-sheet-hero {
+  border-color: rgb(255 214 10 / 0.38);
+  background-color: rgb(25 22 16 / 0.78);
+  box-shadow:
+    0 18px 44px -26px rgb(255 214 10 / 0.3),
+    inset 0 1px 0 rgb(255 255 255 / 0.05);
+}
+
+/* Headline voice for the door — Space Grotesk at hero scale. Distinct from
+   .page-title (no underline, no centering opinion): this is the marketing tail's
+   register, shared with the landing page, not an app page header. */
+.door-headline {
+  font-family: var(--font-display), var(--font-ui), sans-serif;
+  font-weight: 700;
+  font-size: clamp(28px, 5.2vw, 44px);
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+/* Plan price — display voice so the number reads as the card's headline. */
+.door-price {
+  font-family: var(--font-display), var(--font-ui), sans-serif;
+  font-weight: 700;
+  font-size: clamp(28px, 3.4vw, 34px);
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Same voice at row scale — the phone fold's tier rows. */
+.door-price-sm {
+  font-family: var(--font-display), var(--font-ui), sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
    Log-run floating progress rail (2026-07-10)
    Chips pop in as cards dock; a jumped-to card flashes a yellow ring. The rail
    scrolls horizontally without a visible scrollbar when the chips overflow.

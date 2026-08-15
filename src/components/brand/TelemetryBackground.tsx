@@ -30,6 +30,13 @@ type Props = {
   intensity?: number;
   /** Playback rate. 1 = shipped tuning (48s loop). */
   speed?: number;
+  /**
+   * Skip the opaque background fill and baked vignette so the canvas composites
+   * over whatever sits beneath it (the door-scene photo). Added 2026-08-15 for the
+   * signed-out family redesign; default false keeps the shipped login rendering
+   * byte-identical for any other caller.
+   */
+  transparent?: boolean;
   className?: string;
 };
 
@@ -169,7 +176,12 @@ function readTriplet(el: Element, name: string, fallback: string) {
   return /^\d+\s+\d+\s+\d+$/.test(v) ? v.replace(/\s+/g, ",") : fallback;
 }
 
-export function TelemetryBackground({ intensity = 1, speed = 1, className }: Props) {
+export function TelemetryBackground({
+  intensity = 1,
+  speed = 1,
+  transparent = false,
+  className,
+}: Props) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const knobs = useRef({ intensity, speed });
   knobs.current = { intensity, speed };
@@ -219,8 +231,12 @@ export function TelemetryBackground({ intensity = 1, speed = 1, className }: Pro
     const drawFrame = (t: number) => {
       const K = knobs.current.intensity;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, w, h);
+      if (transparent) {
+        ctx.clearRect(0, 0, w, h);
+      } else {
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, w, h);
+      }
 
       // oscilloscope grid — centered so any aspect ratio stays symmetric
       const sp = 64, gA = 0.03 * (0.6 + 0.4 * K);
@@ -296,13 +312,17 @@ export function TelemetryBackground({ intensity = 1, speed = 1, className }: Pro
         }
       }
 
-      // edge vignette — frames the card, matches the login treatment
-      const R = 0.85 * Math.hypot(w, h);
-      const vg = ctx.createRadialGradient(w / 2, h * 0.32, R * 0.32, w / 2, h * 0.4, R);
-      vg.addColorStop(0, "rgba(0,0,0,0)");
-      vg.addColorStop(1, "rgba(0,0,0,0.5)");
-      ctx.fillStyle = vg;
-      ctx.fillRect(0, 0, w, h);
+      // edge vignette — frames the card, matches the login treatment. Skipped in
+      // transparent mode: there the scene's own CSS scrim does the framing, and a
+      // canvas vignette would double-darken the photo's corners.
+      if (!transparent) {
+        const R = 0.85 * Math.hypot(w, h);
+        const vg = ctx.createRadialGradient(w / 2, h * 0.32, R * 0.32, w / 2, h * 0.4, R);
+        vg.addColorStop(0, "rgba(0,0,0,0)");
+        vg.addColorStop(1, "rgba(0,0,0,0.5)");
+        ctx.fillStyle = vg;
+        ctx.fillRect(0, 0, w, h);
+      }
     };
 
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -334,7 +354,7 @@ export function TelemetryBackground({ intensity = 1, speed = 1, className }: Pro
       ro.disconnect();
       mq.removeEventListener("change", onMq);
     };
-  }, []);
+  }, [transparent]);
 
   return (
     <canvas

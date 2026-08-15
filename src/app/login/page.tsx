@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Suspense, useEffect, useState } from "react";
 import { JrcMark } from "@/components/brand/JrcMark";
-import { TelemetryBackground } from "@/components/brand/TelemetryBackground";
+import { DoorScene } from "@/components/brand/DoorScene";
 import { primaryButtonClassName } from "@/components/ui/ButtonLink";
 
 /** Official Google "G" mark — multicolor, reads cleanly on the dark surface button. */
@@ -195,27 +195,11 @@ function LoginForm() {
   const showGoogle = configLoaded && googleOAuthConfigured;
 
   return (
-    <div className="relative flex min-h-[100dvh] w-full flex-1 flex-col items-center justify-center overflow-hidden bg-background px-5 py-12">
-      {/* Animated telemetry backdrop — traces + oscilloscope grid (login only). */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <TelemetryBackground />
-      </div>
-
-      {/* Yellow hero whisper (brand, sanctioned on login). */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(115% 75% at 50% -8%, rgba(255,214,10,0.12), rgba(255,214,10,0) 55%)",
-        }}
-      />
-
-      {/* Top hairline accent. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent"
-      />
+    <div className="door-dark relative flex min-h-[100dvh] w-full flex-1 flex-col items-center justify-center overflow-hidden bg-background px-5 py-12">
+      {/* The signed-out family's shared scene (2026-08-15): the baked drivers-meeting photo
+          with the telemetry traces now compositing over it. The traces, the yellow whisper
+          and the top hairline all moved inside DoorScene — same layers, one owner. */}
+      <DoorScene variant="focus" />
 
       <div className="relative z-10 w-full max-w-[400px]">
         {/* Brand lockup — JRC mark only (Race Engineer wordline retired 2026-07-17). */}
@@ -226,8 +210,10 @@ function LoginForm() {
           <JrcMark variant="yellow" priority className="h-12" />
         </div>
 
+        {/* `.door-sheet` IS this card's old recipe, factored out (2026-08-15) so the /join plan
+            cards and the code/success cards are literally the same surface. */}
         <div
-          className="login-sheen rc-reveal relative mt-9 overflow-hidden rounded-2xl border border-border bg-background/70 p-6 shadow-[0_24px_70px_-28px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl"
+          className="door-sheet login-sheen rc-reveal mt-9 p-6"
           style={{ "--rc-delay": "170ms" } as CSSProperties}
         >
           <h1 className="page-title text-center">Sign in</h1>
@@ -274,7 +260,7 @@ function LoginForm() {
                 "primary-action-chip-prominent w-full px-4 py-3 text-[13px] uppercase tracking-[0.14em] disabled:cursor-not-allowed disabled:opacity-60"
               )}
             >
-              {pending ? "Sending…" : "Email me a code"}
+              {pending ? "Sending…" : "Continue with email"}
             </button>
           </form>
 
