@@ -142,12 +142,20 @@ export function RunSheetSetupFill({
     setOpenedFrom(seedValues);
     setDirtySinceSave(false);
   }
-  /* A save that lands clears the cue — the same render-time adjust as above. */
-  const [sawSaveSuccess, setSawSaveSuccess] = useState(saveSuccess);
-  if (sawSaveSuccess !== saveSuccess) {
-    setSawSaveSuccess(saveSuccess);
-    if (saveSuccess) setDirtySinceSave(false);
-  }
+  /**
+   * A save that lands clears the cue and shows "Saved ✓" for a beat, then the chip quietly
+   * leaves — the subtle told-you-it-worked the founder asked for (2026-08-15), not a
+   * permanent badge. `saveSuccess` itself stays true until the next save starts, so the
+   * timer, not the prop, decides how long the tick lingers.
+   */
+  const [justSaved, setJustSaved] = useState(false);
+  useEffect(() => {
+    if (!saveSuccess) return;
+    setDirtySinceSave(false);
+    setJustSaved(true);
+    const t = window.setTimeout(() => setJustSaved(false), 2400);
+    return () => window.clearTimeout(t);
+  }, [saveSuccess]);
   const handleChange = useCallback((next: Record<string, string>) => {
     setLiveValues(next);
     setDirtySinceSave(true);
@@ -181,8 +189,8 @@ export function RunSheetSetupFill({
    */
   const countLabel = `${filled} ${filled === 1 ? "box" : "boxes"} filled on ${chassisName}`;
 
-  /* The save cue stays up through its own feedback: edits pending, saving, or just saved. */
-  const showSave = dirtySinceSave || saving || saveSuccess;
+  /* The save cue stays up through its own feedback: edits pending, saving, or the saved beat. */
+  const showSave = dirtySinceSave || saving || justSaved;
 
   return (
     <div className="space-y-2">

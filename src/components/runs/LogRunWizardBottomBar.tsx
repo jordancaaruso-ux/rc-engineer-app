@@ -79,7 +79,8 @@ import {
  * not impersonate global chrome). It now serves desktop too — the old side
  * rail and desktop pill mirror are gone. While mounted it stamps
  * `data-logrun-wizard-chrome` on <body> so the global dock and brand pill
- * hide via globals.css. The bottom chrome hides while a text field has focus.
+ * hide via globals.css. The bottom chrome hides while the on-screen keyboard is
+ * genuinely up — measured from the visual viewport, see the effect below.
  */
 
 const STEP_ICONS: Record<WizardStepId, PhosphorIcon> = {
@@ -222,12 +223,41 @@ export function LogRunWizardBottomBar({
     return () => document.body.removeAttribute("data-logrun-wizard-chrome");
   }, []);
 
-  // Keyboard-hide: any focused text field suppresses the bottom chrome.
-  // focusout fires before the next focusin when tabbing between fields —
-  // debounce the re-check so the bar doesn't flicker in between. (A timer,
-  // not rAF: frames can stall while the keyboard animates.)
+  // Keyboard-hide: the bar clears the on-screen keyboard by MEASURING it, not
+  // guessing from focus (2026-08-15). The page can't see the keyboard directly,
+  // but when it comes up the visual viewport — the part actually visible — gets
+  // ~250-400px shorter than the layout viewport. The old "a text field has
+  // focus" guess was a proxy for the same fact, and the sheet-fill surface is
+  // where the proxy lies: it HOLDS one input focused for the whole editing
+  // session so the keyboard survives box-hops, and iOS can dismiss the keyboard
+  // WITHOUT dropping that focus — the guess stuck "open" and the bar never came
+  // back (founder report, the day this shipped). Measuring is honest under both:
+  // keyboard genuinely up → hidden; dismissed by any gesture → back, whoever
+  // holds focus.
+  //
+  // 120px threshold: safely above iOS URL-bar show/hide noise (~60px), well
+  // under any keyboard. Pinch-zoom also shrinks the visual viewport, but zoom is
+  // locked app-wide (viewport meta + gesture guard), so it can't fake a
+  // keyboard here. Old browsers without visualViewport keep the focus guess,
+  // including the persistent-editor exemption for the sheet's held input.
+  // (Debounced: the resize streams while the keyboard animates.)
   useEffect(() => {
+    const vv = window.visualViewport;
     let t: number | undefined;
+    if (vv) {
+      const sync = () => {
+        window.clearTimeout(t);
+        t = window.setTimeout(() => {
+          setKeyboardOpen(vv.height < window.innerHeight - 120);
+        }, 50);
+      };
+      vv.addEventListener("resize", sync);
+      sync();
+      return () => {
+        window.clearTimeout(t);
+        vv.removeEventListener("resize", sync);
+      };
+    }
     const sync = () => {
       window.clearTimeout(t);
       t = window.setTimeout(() => setKeyboardOpen(isTextEntry(document.activeElement)), 80);

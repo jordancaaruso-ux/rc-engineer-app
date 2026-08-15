@@ -17,6 +17,7 @@ import { isRunContextSetupKey } from "@/lib/setup/runContextSetupKeys";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { RunSheetSetupFill } from "@/components/runs/RunSheetSetupFill";
+import { haptic } from "@/lib/haptics";
 import {
   mergeSheetValuesIntoSnapshot,
   sheetValuesFromSnapshot,
@@ -416,6 +417,12 @@ type NewRunDraftSnapshot = {
   carRating: number | null;
   shareWithTeam: boolean;
   conditions: RunConditions;
+  /**
+   * The run a stay-on-page save already created from this exact content (2026-08-15). Restored
+   * into `createdRunId` so a resurrected draft UPDATES that run — without it, restore-then-save
+   * would POST a twin of a run that already exists on the server.
+   */
+  savedRunId?: string | null;
 };
 
 /**
@@ -1035,6 +1042,14 @@ export function NewRunForm(props: {
   ]);
   const editRun = props.editRun ?? null;
   const isEditing = Boolean(editRun?.id);
+  /**
+   * The run a stay-on-page save CREATED (2026-08-15, "Save to this run"). On /runs/new nothing
+   * else remembers the minted id — leaving the page was the dedupe — so without adopting it, a
+   * second save would POST a second run with the same content. Same reasoning as adopting the
+   * server-minted tire stint a few lines into saveRun. Once set, every later save is a PUT to
+   * this run, whichever button performs it.
+   */
+  const [createdRunId, setCreatedRunId] = useState<string | null>(null);
   const [conditions, setConditions] = useState<RunConditions>(
     () => editRun?.conditions ?? { ...EMPTY_RUN_CONDITIONS }
   );
@@ -1441,6 +1456,8 @@ export function NewRunForm(props: {
         if (s.carRating === null || typeof s.carRating === "number") setCarRating(s.carRating);
         if (typeof s.shareWithTeam === "boolean") setShareWithTeam(s.shareWithTeam);
         if (s.conditions) setConditions(s.conditions);
+        // A stay-save already banked this content — later saves must update that run.
+        if (typeof s.savedRunId === "string" && s.savedRunId) setCreatedRunId(s.savedRunId);
       }
     } catch {
       // Corrupt/unavailable storage — start fresh, never block the form.
@@ -1479,6 +1496,7 @@ export function NewRunForm(props: {
       carRating,
       shareWithTeam,
       conditions,
+      savedRunId: createdRunId,
     };
     if (!newRunDraftHasContent(snapshot)) {
       try {
@@ -1523,6 +1541,7 @@ export function NewRunForm(props: {
     carRating,
     shareWithTeam,
     conditions,
+    createdRunId,
   ]);
 
   const selectedCar = useMemo(() => carsList.find((c) => c.id === carId) ?? null, [carsList, carId]);
@@ -3312,7 +3331,13 @@ export function NewRunForm(props: {
 
   async function saveRun(
     e?: React.MouseEvent,
-    intent: "draft" | "completed" = "completed"
+    intent: "draft" | "completed" = "completed",
+    /**
+     * `stay` (the sheet's "Save to this run", founder 2026-08-15): bank the run and remain on
+     * the page — chip flips to "Saved ✓", a light haptic, no navigation. Every OTHER save keeps
+     * the flow's exit-on-save; `createdRunId` above is what makes staying safe.
+     */
+    opts?: { stay?: boolean }
   ) {
     e?.preventDefault();
     if (pendingCompleteNavigationRef.current || pendingDraftNavigationRef.current) return;
@@ -3446,21 +3471,23 @@ export function NewRunForm(props: {
         lapTimes = parseLapTimes(lapIngest.manualText);
       }
       const importedLapSets = buildImportedLapSetsFromIngest(lapIngest);
+      // A stay-save's minted run counts as "the run being edited" from then on — PUT, not POST.
+      const effectiveEditId = editRun?.id ?? createdRunId;
       const { run, tireStintId: savedStintId, promptMarkTrackLocation } = await jsonFetch<{
         run: { id: string; createdAt: string };
         /** The stint the run landed on — freshly minted when the client sent null. */
         tireStintId?: string | null;
         promptMarkTrackLocation?: { trackId: string; trackName: string } | null;
       }>("/api/runs", {
-        method: isEditing ? "PUT" : "POST",
+        method: effectiveEditId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           loggingIntent: intent,
           fromEventDetection:
-            !isEditing &&
+            !effectiveEditId &&
             dashboardPrefill?.mode === "imported_lap_session" &&
             dashboardPrefill.fromEventDetection === true,
-          runId: isEditing ? editRun?.id : undefined,
+          runId: effectiveEditId ?? undefined,
           carId,
           sessionType: sessionType === "RACE_MEETING" ? "RACE_MEETING" : "TESTING",
           meetingSessionType: needsEvent ? meetingSessionType : null,
@@ -3573,6 +3600,9 @@ export function NewRunForm(props: {
       // Adopt the server-minted stint immediately: a follow-up save must stay on the
       // same rubber rather than minting a second stint for the same tires.
       if (savedStintId) setTireStintId(savedStintId);
+      // Same move for the run itself — see `createdRunId`. Adopted on every create,
+      // stay or not: it can only make a later save MORE correct.
+      if (!editRun?.id) setCreatedRunId(run.id);
 
       if (intent === "completed" && promptMarkTrackLocation) {
         setTrackLocationPrompt({
@@ -3586,7 +3616,9 @@ export function NewRunForm(props: {
         return;
       }
 
-      if (intent === "completed") {
+      // Never in stay mode: this ref both blocks future saves (the guard at the top of
+      // saveRun) and keeps `saving` latched through the departure that isn't coming.
+      if (intent === "completed" && !opts?.stay) {
         pendingCompleteNavigationRef.current = true;
       }
       setSaveSuccess(true);
@@ -3626,6 +3658,16 @@ export function NewRunForm(props: {
           .catch(() => {});
       }
 
+      // A stay-save banks the run and hands the page straight back: no navigation, no
+      // autosave teardown (the snapshot keeps refreshing, now carrying `savedRunId` so even
+      // a restored classic-mode draft updates this run instead of minting a twin). The chip
+      // beside the sheet renders the "Saved ✓" beat; the haptic is the only other telling.
+      if (opts?.stay) {
+        haptic("success");
+        void todayDraftCtx?.refreshDraft();
+        return;
+      }
+
       // The run is persisted (draft or complete) — drop the local autosave so
       // returning to /runs/new starts clean instead of restoring this run.
       try {
@@ -3634,7 +3676,7 @@ export function NewRunForm(props: {
         /* ignore */
       }
 
-      // Every successful save leaves the log-run flow for the dashboard.
+      // Every OTHER successful save leaves the log-run flow for the dashboard.
       // Completing also carries ?suggestRun so the dashboard can offer
       // Engineer suggestions for the session they just saved. Draft saves
       // (new or edit) go to `/` — navigating away discards local tire
@@ -5442,9 +5484,10 @@ export function NewRunForm(props: {
                 onValues={applySheetValuesToSetup}
                 // The same save the wizard bar performs — surfaced beside the sheet because
                 // box edits land silently, and on a phone the bar itself is hidden while the
-                // sheet's always-focused input holds the keyboard.
+                // sheet's always-focused input holds the keyboard. `stay` (founder 2026-08-15):
+                // this one banks the run and hands the page straight back.
                 onSaveToRun={() =>
-                  saveRun(undefined, editingCompletedRun ? "completed" : "draft")
+                  saveRun(undefined, editingCompletedRun ? "completed" : "draft", { stay: true })
                 }
                 canSave={canSave}
                 saving={saving}
