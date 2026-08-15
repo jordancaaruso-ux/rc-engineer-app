@@ -1537,6 +1537,8 @@ export function NewRunForm(props: {
     /** Chassis-type key, so the sheet can show this car's computed geometry. */
     templateKey: string | null;
   } | null>(null);
+  /** Which car the sheet section auto-expanded for — once each, see the fetch below. */
+  const sheetAutoExpandedForRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!carId) {
@@ -1565,6 +1567,17 @@ export function NewRunForm(props: {
                 }
               : null
           );
+          /*
+           * FIRST run on a sheet-mode car: nothing has expanded the setup section — every
+           * expander fires on a load/CHANGE action, and a brand-new car arrives with source
+           * "new" already selected — so the step showed two pills and nothing else, with the
+           * sheet (which "opens by itself", founder 2026-08-12) behind a gate nothing opens.
+           * Once per car, so a deliberate collapse afterwards is respected.
+           */
+          if (d.sheetMode && d.setupSheetModelId && sheetAutoExpandedForRef.current !== carId) {
+            sheetAutoExpandedForRef.current = carId;
+            setSetupSectionExpanded(true);
+          }
         }
       )
       .catch(() => {
@@ -5427,6 +5440,15 @@ export function NewRunForm(props: {
                 seedValues={sheetSeedValues}
                 seedKey={sheetSeedKey}
                 onValues={applySheetValuesToSetup}
+                // The same save the wizard bar performs — surfaced beside the sheet because
+                // box edits land silently, and on a phone the bar itself is hidden while the
+                // sheet's always-focused input holds the keyboard.
+                onSaveToRun={() =>
+                  saveRun(undefined, editingCompletedRun ? "completed" : "draft")
+                }
+                canSave={canSave}
+                saving={saving}
+                saveSuccess={saveSuccess}
               />
             ) : (
               <SetupSheetView

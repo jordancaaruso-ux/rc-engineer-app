@@ -51,6 +51,10 @@ export function RunSheetSetupFill({
   seedValues,
   seedKey,
   onValues,
+  onSaveToRun,
+  canSave,
+  saving,
+  saveSuccess,
   templateKey,
 }: {
   setupSheetModelId: string;
@@ -66,6 +70,17 @@ export function RunSheetSetupFill({
    * boxes as `""` deletion markers — ready for `mergeSheetValuesIntoSnapshot`.
    */
   onValues: (values: Record<string, unknown>) => void;
+  /**
+   * Bank the run now — the same save the wizard bar performs (draft mid-log, "save edits" on a
+   * completed run). Surfaced HERE because sheet edits are captured silently through `onValues`,
+   * and a driver who has just filled boxes gets no sign they are kept until something says so
+   * (founder report, 2026-08-15) — and because on a phone the wizard bar is hidden while the
+   * sheet's always-focused input holds the keyboard, so this row is the visible save.
+   */
+  onSaveToRun: () => void;
+  canSave: boolean;
+  saving: boolean;
+  saveSuccess: boolean;
 }) {
   /**
    * Which setup the driver COLLAPSED this against, rather than which one they opened it for.
@@ -110,6 +125,11 @@ export function RunSheetSetupFill({
    * source itself changes.
    */
   const [openedFrom, setOpenedFrom] = useState<Record<string, string>>(seedValues);
+  /**
+   * Edits since the last successful save — what makes "Save to this run" appear. The surface
+   * skips its mount echo, so the first `handleChange` really is a driver touching a box.
+   */
+  const [dirtySinceSave, setDirtySinceSave] = useState(false);
   /*
    * Re-seed the geometry copies when the setup source changes — during render, not in an effect,
    * so the strip never paints one frame of the old setup's numbers against the new key. (React's
@@ -120,9 +140,17 @@ export function RunSheetSetupFill({
     setSeededFor(seedKey);
     setLiveValues(seedValues);
     setOpenedFrom(seedValues);
+    setDirtySinceSave(false);
+  }
+  /* A save that lands clears the cue — the same render-time adjust as above. */
+  const [sawSaveSuccess, setSawSaveSuccess] = useState(saveSuccess);
+  if (sawSaveSuccess !== saveSuccess) {
+    setSawSaveSuccess(saveSuccess);
+    if (saveSuccess) setDirtySinceSave(false);
   }
   const handleChange = useCallback((next: Record<string, string>) => {
     setLiveValues(next);
+    setDirtySinceSave(true);
     // Through the bridge before it leaves this component: the run's setup snapshot must hold the
     // same shapes a form edit writes, or "what changed since your last run" would report every
     // grouped row as changed after every sheet-logged run.
@@ -153,35 +181,53 @@ export function RunSheetSetupFill({
    */
   const countLabel = `${filled} ${filled === 1 ? "box" : "boxes"} filled on ${chassisName}`;
 
+  /* The save cue stays up through its own feedback: edits pending, saving, or just saved. */
+  const showSave = dirtySinceSave || saving || saveSuccess;
+
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-[11px] text-muted-foreground">{countLabel}</span>
-        {open ? (
-          <button
-            type="button"
-            onClick={() => setCollapsedFor(seedKey)}
-            className="btn-surface px-2 py-1 text-[11px]"
-          >
-            Collapse the sheet
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              haptic("light");
-              // Re-opening reads the setup that is current NOW — a collapsed spell may have seen
-              // named fields edited through the ordinary form — so the sheet and the geometry
-              // baseline both restart there.
-              setLiveValues(seedValues);
-              setOpenedFrom(seedValues);
-              setCollapsedFor(null);
-            }}
-            className={buttonLinkClassName("outline")}
-          >
-            Open the sheet
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {showSave ? (
+            <button
+              type="button"
+              onClick={onSaveToRun}
+              disabled={!canSave || saving}
+              className={buttonLinkClassName(
+                "primary",
+                "px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-60"
+              )}
+            >
+              {saving ? "Saving…" : dirtySinceSave ? "Save to this run" : "Saved ✓"}
+            </button>
+          ) : null}
+          {open ? (
+            <button
+              type="button"
+              onClick={() => setCollapsedFor(seedKey)}
+              className="btn-surface px-2 py-1 text-[11px]"
+            >
+              Collapse the sheet
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                haptic("light");
+                // Re-opening reads the setup that is current NOW — a collapsed spell may have
+                // seen named fields edited through the ordinary form — so the sheet and the
+                // geometry baseline both restart there.
+                setLiveValues(seedValues);
+                setOpenedFrom(seedValues);
+                setCollapsedFor(null);
+              }}
+              className={buttonLinkClassName("outline")}
+            >
+              Open the sheet
+            </button>
+          )}
+        </div>
       </div>
       {open ? (
         <>

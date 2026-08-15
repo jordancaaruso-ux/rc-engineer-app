@@ -1318,6 +1318,10 @@ export function SheetFillSurface({
               return (
                 <input
                   ref={inputRef}
+                  // The wizard bottom bar hides while a text field has focus, but this input
+                  // HOLDS focus for the whole editing session by design — the attribute tells
+                  // the bar to stay put on fine-pointer devices (LogRunWizardBottomBar).
+                  data-persistent-editor=""
                   value={typesValues ? value : ""}
                   readOnly={!typesValues}
                   onChange={(e) => {
@@ -1557,6 +1561,9 @@ export function SheetFillSurface({
         <div className="relative flex-1">
           <input
             ref={inputRef}
+            // Same contract as the over-the-box render above: keep the wizard bar on
+            // fine-pointer devices while this deliberately-never-blurred input has focus.
+            data-persistent-editor=""
             value={typesValues ? values[focused.key] ?? "" : ""}
             onChange={(e) => {
               if (typesValues) setValue(focused.key, e.target.value);

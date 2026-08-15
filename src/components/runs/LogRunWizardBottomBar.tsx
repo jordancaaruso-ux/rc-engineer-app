@@ -129,6 +129,17 @@ const PILL_DANGER =
 
 function isTextEntry(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
+  /*
+   * The sheet-fill surface holds ONE input focused for its whole editing session — that is
+   * its keyboard model (see SheetFillSurface, which stamps `data-persistent-editor`), not a
+   * keystroke. With a hardware pointer there is no virtual keyboard to make room for, so
+   * hiding the bar for that focus deleted the wizard's navigation for as long as the sheet
+   * was being edited (founder report, 2026-08-15). On touch the hide stands: the keyboard
+   * really is covering the thumb zone, and the bar returns the moment the box is left.
+   */
+  if (el.closest("[data-persistent-editor]") && window.matchMedia("(pointer: fine)").matches) {
+    return false;
+  }
   if (el.isContentEditable) return true;
   if (el instanceof HTMLTextAreaElement) return true;
   if (el instanceof HTMLInputElement) {
