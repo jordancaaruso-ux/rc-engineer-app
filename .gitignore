@@ -59,6 +59,7 @@ desktop-shots/
 
 # Sheet-fill captures (regenerate with e2e/sheet-fill.spec.ts)
 sheet-fill-shots/
+sheet-race-shots/
 roll-center-strip-shots/
 roll-center-lab-shots/
 roll-center-lab-sheet-shots/

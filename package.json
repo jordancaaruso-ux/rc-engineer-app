@@ -69,6 +69,7 @@
     "test:setup-fill-order": "npx tsx --test src/lib/setup/setupFillOrder.test.ts",
     "test:setup-pdf-fill": "npx tsx --test src/lib/setup/fillMappingFromCalibration.test.ts src/lib/setup/geometrySignNormalize.test.ts",
     "test:setup-fill-draft": "npx tsx --test src/lib/setup/setupFillDraft.test.ts",
+    "test:setup-sheet-race": "playwright test e2e/setup-sheet-values-race.spec.ts --project=mobile-chromium --no-deps",
     "test:setup-history": "npx tsx --test src/lib/setup/carSetupHistory.test.ts",
     "test:preset-with-other": "npx tsx --test src/lib/setup/presetWithOther.test.ts",
     "test:saved-setup-scope": "npx tsx --test src/lib/setup/savedSetupPickerScope.test.ts",

@@ -447,10 +447,26 @@ export function SheetFillSurface({
   /**
    * Which value set the boxes draw from.
    *
-   * Guarded on `readOnly`: an editable sheet must never print another setup's values, or the next
-   * keystroke saves them onto this one.
+   * A sheet BEING FILLED draws from its own state, seeded once — see `initialValues`. Re-reading
+   * the prop there would rewrite boxes under the driver's fingers.
+   *
+   * A sheet BEING READ draws straight from the prop, because it has no state worth protecting:
+   * nothing here can edit it (`focusBox` refuses, and no input is ever mounted), so `values` can
+   * only ever hold whatever it was seeded with.
+   *
+   * That difference is the whole bug this fixes (founder, 2026-08-15: "the setup sheet shows but
+   * it's blank"). A caller that fetches the values — the session view's Setup modal — mounts this
+   * the moment it learns the CAR draws as a sheet, which is a different request and often the
+   * faster one. Seeding once then meant the sheet kept the empty object it was born with and
+   * ignored the setup when it landed: the driver's own paper, correctly drawn, every box empty,
+   * and no error anywhere to say so. Measured on a seeded A800RR run: 0 of 279 boxes drawn.
+   *
+   * Guarded on `readOnly` in both directions: an editable sheet must never print another setup's
+   * values, or the next keystroke saves them onto this one.
    */
-  const drawnValues = readOnly && showAlternate && alternateValues ? alternateValues : values;
+  const drawnValues = readOnly
+    ? (showAlternate && alternateValues ? alternateValues : initialValues ?? values)
+    : values;
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
   const [page, setPage] = useState(1);
 

@@ -163,6 +163,10 @@ export function SetupSheetModal({
       setLoadedSetupData(run.setupSnapshot.data);
       return;
     }
+    // Drop the last run's values before going for this one's. The modal is not unmounted between
+    // opens, so without this, opening run B after run A paints A's setup on B's sheet for as long
+    // as the fetch takes — wrong numbers, presented as this run's, with nothing to say so.
+    setLoadedSetupData(null);
     let alive = true;
     void fetch(`/api/runs/${encodeURIComponent(run.id)}/setup-snapshot`)
       .then((res) => res.json())
@@ -435,6 +439,16 @@ export function SetupSheetModal({
     [loadedSetupData, run?.setupSnapshot?.data]
   );
 
+  /**
+   * This run has a setup, and it has not arrived yet.
+   *
+   * The sheet is shown anyway — its picture is the one thing already cached, so the driver gets
+   * their paper immediately and the values drop into the boxes a moment later. What this flag buys
+   * is the difference between "still coming" and "this run was logged with nothing in it", which an
+   * empty sheet cannot tell you on its own.
+   */
+  const setupValuesPending = run?.setupSnapshot?.id != null && loadedSetupData == null;
+
   const hasBaselineSelection = compareSource === "setups" ? Boolean(selectedDocId) : Boolean(otherRunId);
 
   const baselineValue = useMemo<SetupSnapshotData | null>(() => {
@@ -666,13 +680,18 @@ export function SetupSheetModal({
                   </p>
                 )
               ) : sheetModelId ? (
-                <ReadOnlySheetSurface
-                  setupSheetModelId={sheetModelId}
-                  values={runSetup}
-                  templateKey={template.templateKey}
-                  labLabels={{ s: "This run" }}
-                  labSource={{ kind: "run", id: run.id }}
-                />
+                <div className="space-y-1">
+                  {setupValuesPending ? (
+                    <p className="text-[11px] text-muted-foreground">Loading this run’s setup…</p>
+                  ) : null}
+                  <ReadOnlySheetSurface
+                    setupSheetModelId={sheetModelId}
+                    values={runSetup}
+                    templateKey={template.templateKey}
+                    labLabels={{ s: "This run" }}
+                    labSource={{ kind: "run", id: run.id }}
+                  />
+                </div>
               ) : (
                 <SetupSheetView
                   key={template.id}
