@@ -159,34 +159,60 @@ export function SetupSheetModal({
   }, [open, run?.id]);
 
   useEffect(() => {
-    if (!open || !run?.setupSnapshot?.id) {
+    if (!open || !run?.id) {
       setLoadedSetupData(null);
       setSaveContext(null);
+      setModelTemplate(null);
+      setSheetModelId(null);
       return;
     }
-    const haveValues = run.setupSnapshot.data !== undefined;
+    const haveValues = run.setupSnapshot?.data !== undefined;
     // Drop the last run's values before going for this one's. The modal is not unmounted between
     // opens, so without this, opening run B after run A paints A's setup on B's sheet for as long
     // as the fetch takes — wrong numbers, presented as this run's, with nothing to say so.
-    setLoadedSetupData(haveValues ? run.setupSnapshot.data : null);
+    setLoadedSetupData(haveValues ? (run.setupSnapshot?.data ?? null) : null);
     setSaveContext(null);
     let alive = true;
     /*
-     * This call runs even when the caller already handed us the values, because it answers a second
-     * question the row can't: may this viewer save this setup, is it saved already, and — on a
-     * teammate's run — which of their cars could hold a copy. All three are decided server-side
-     * after the access check, so the button is never guessing.
+     * This call runs even when the caller already handed us the values, because it answers three
+     * questions the row can't. May this viewer save this setup, is it saved already, and — on a
+     * teammate's run — which of their cars could hold a copy. And which SURFACE the setup is read
+     * on: its own sheet, or the field list.
+     *
+     * That last one used to be asked of `/api/cars/[carId]/setup-sheet-template`, which is scoped
+     * to the car's owner — so on a teammate's run it 404'd and every one of their setups opened as
+     * the legacy form. It is asked here now because this is the route that has already decided the
+     * viewer may see this run at all. Which also means the sheet no longer waits on a second
+     * request: paper and values land together, so neither is ever drawn against the other's run.
      */
-    void fetch(`/api/runs/${encodeURIComponent(run.id)}/setup-snapshot`)
+    void fetch(`/api/runs/${encodeURIComponent(run.id)}/setup-snapshot?sheet=1`)
       .then((res) => res.json())
-      .then((payload: { setupSnapshot?: { data?: unknown }; save?: SetupSaveContext }) => {
-        if (!alive) return;
-        if (!haveValues) setLoadedSetupData(payload.setupSnapshot?.data ?? {});
-        setSaveContext(payload.save ?? null);
-      })
+      .then(
+        (payload: {
+          setupSnapshot?: { data?: unknown };
+          save?: SetupSaveContext;
+          sheet?: {
+            sheetMode?: boolean;
+            setupSheetModelId?: string | null;
+            template?: SetupSheetTemplate | null;
+          } | null;
+        }) => {
+          if (!alive) return;
+          if (!haveValues) setLoadedSetupData(payload.setupSnapshot?.data ?? {});
+          setSaveContext(payload.save ?? null);
+          setModelTemplate(payload.sheet?.template ?? null);
+          setSheetModelId(
+            payload.sheet?.sheetMode && payload.sheet.setupSheetModelId
+              ? payload.sheet.setupSheetModelId
+              : null
+          );
+        }
+      )
       .catch(() => {
         if (!alive) return;
         if (!haveValues) setLoadedSetupData({});
+        setModelTemplate(null);
+        setSheetModelId(null);
       });
     return () => {
       alive = false;
@@ -194,38 +220,6 @@ export function SetupSheetModal({
   }, [open, run?.id, run?.setupSnapshot?.id, run?.setupSnapshot?.data]);
 
   const carId = run?.car?.id ?? run?.carId ?? null;
-
-  useEffect(() => {
-    if (!open || !carId) {
-      setModelTemplate(null);
-      return;
-    }
-    let alive = true;
-    void fetch(`/api/cars/${encodeURIComponent(carId)}/setup-sheet-template?view=setup`, {
-      cache: "no-store",
-    })
-      .then((res) => res.json())
-      .then(
-        (data: {
-          template?: SetupSheetTemplate;
-          sheetMode?: boolean;
-          setupSheetModelId?: string | null;
-        }) => {
-          if (!alive) return;
-          setModelTemplate(data.template ?? null);
-          setSheetModelId(data.sheetMode && data.setupSheetModelId ? data.setupSheetModelId : null);
-        }
-      )
-      .catch(() => {
-        if (alive) {
-          setModelTemplate(null);
-          setSheetModelId(null);
-        }
-      });
-    return () => {
-      alive = false;
-    };
-  }, [open, carId]);
 
   const fallbackPickerRuns = pickerRuns ?? [];
 
@@ -542,8 +536,15 @@ export function SetupSheetModal({
           The Save control hangs its panel off this bar rather than portalling it. No `relative` is
           needed and none is wanted — `position: sticky` already makes this the containing block for
           absolute children, and adding `relative` would set `position` twice on one element.
+
+          The z HAS to clear everything inside the modal body, because this bar's own z-index seals
+          its children into one layer: the Save panel's `z-20` only sorts it against the bar's
+          click-away backdrop, never against the sheet below. At `z-10` this bar tied with the
+          changed-fields table's sticky header row (also `z-10`, and later in the document), so the
+          car list opened UNDER that table — the bug of 2026-08-16. Everything the body draws over
+          its own paper tops out at `z-40` (SheetFillSurface's box tooltip), so 50 clears the lot.
         */}
-        <div className="setup-sheet-modal-close sticky top-0 z-10 flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-background/95">
+        <div className="setup-sheet-modal-close sticky top-0 z-50 flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-background/95">
           <div className="ui-title text-sm text-muted-foreground truncate min-w-0 normal-case">
             {run ? formatPickerLine(run) : "Setup"}
           </div>

@@ -17,6 +17,9 @@ import { carsMatchingChassis } from "@/lib/setup/setupCopyTargets";
 import { isA800RRCar, labelForSetupSheetTemplate } from "@/lib/setupSheetTemplateId";
 import type { SetupSaveContext } from "@/lib/setup/setupSaveContext";
 import { lastRunAtMsByCarId, orderCarsByRecentUse } from "@/lib/cars/orderCarsByRecentUse";
+import { getSetupSheetTemplateAndKeyForCar } from "@/lib/setupSheetModels/getTemplateForCar";
+import { chassisFillsAsSheet } from "@/lib/setupSheetModels/sheetPlan";
+import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -123,14 +126,65 @@ function buildSaveContext(
   };
 }
 
+type SheetContext = {
+  /** Does this chassis draw as a picture of its own sheet, rather than as a field list? */
+  sheetMode: boolean;
+  setupSheetModelId: string | null;
+  /** The field list — still the surface for every chassis the app cannot draw. */
+  template: SetupSheetTemplate;
+  /** Community-aggregation bucket key; null when the car has no chassis of its own. */
+  templateKey: string | null;
+};
+
+/**
+ * Which surface this run's setup is read on, decided HERE rather than from the car.
+ *
+ * The same answer used to come from `/api/cars/[carId]/setup-sheet-template`, which scopes its
+ * lookup to `where: { id, userId }` — cars are owner-only, by ruling (`ASSET_ACCESS_NORTH_STAR`).
+ * Asked about a TEAMMATE's car it therefore 404s, the caller reads no template and no model id off
+ * the error body, and the setup silently drops to the legacy field list. That is the whole of the
+ * "a teammate's sheet opens as the old form" bug: not a missing sheet, a car the viewer may not read.
+ *
+ * This route already answers "may this viewer see this run", so the car it carries is one they are
+ * allowed to look at. Everything the answer points AT is global anyway — the chassis, its box list
+ * (`/sheet-plan`) and its page picture (`/sheet-page`) are all served to any signed-in driver,
+ * because a manufacturer's blank sheet is nobody's setup.
+ */
+async function buildSheetContext(
+  userId: string,
+  car: { setupSheetModelId: string | null; setupSheetTemplate: string | null } | null
+): Promise<SheetContext> {
+  const resolved = car ?? { setupSheetModelId: null, setupSheetTemplate: null };
+  // A derived chassis is always attached by id, so no link means no sheet — nothing to resolve.
+  const blank = resolved.setupSheetModelId
+    ? await prisma.setupSheetBlank.findUnique({
+        where: { setupSheetModelId: resolved.setupSheetModelId },
+        select: { fillSurface: true, boxesJson: true },
+      })
+    : null;
+  const { template, templateKey } = await getSetupSheetTemplateAndKeyForCar(userId, resolved, "setup");
+  return {
+    sheetMode: chassisFillsAsSheet(blank),
+    setupSheetModelId: resolved.setupSheetModelId,
+    template,
+    templateKey,
+  };
+}
+
 /** Lazy-load setup snapshot + run context for sessions modal / PDF review page. */
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: Request, { params }: Params) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   }
   const userId = await getAuthenticatedApiUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
+  /*
+   * Opt-in, because the setup modal calls this route up to three times for one open — the run being
+   * read, the run it is compared against, and the previous run on the car — and only the first of
+   * those draws a surface. The other two want the values and nothing else.
+   */
+  const wantsSheet = new URL(request.url).searchParams.get("sheet") === "1";
 
   const run = await prisma.run.findFirst({
     where: { id },
@@ -186,6 +240,8 @@ export async function GET(_request: Request, { params }: Params) {
     orderCarsByRecentUse(myCars, lastRunAtMsByCarId(lastRunRows), (car) => car.createdAt.getTime())
   );
 
+  const sheet = wantsSheet ? await buildSheetContext(userId, run.car) : null;
+
   return NextResponse.json({
     runId: run.id,
     isOwner,
@@ -207,6 +263,8 @@ export async function GET(_request: Request, { params }: Params) {
         }
       : null,
     save,
+    // Null unless asked for — see `wantsSheet`.
+    sheet,
   });
 }
 

@@ -14,6 +14,13 @@ import { test, expect } from "@playwright/test";
  * Which answer wins is down to network timing, which is why this was intermittent in the wild.
  * Here the values request is deliberately held back so the losing order happens EVERY run.
  *
+ * SINCE 2026-08-16 THE RACE HAS NO STARTING LINE. Both answers now ride one response — the modal
+ * asks `/api/runs/[id]/setup-snapshot?sheet=1` and gets the surface AND the values together, because
+ * the car route that used to answer the first question is owner-scoped and 404'd on a teammate's
+ * car. The delay below now holds BOTH back, so the sheet cannot mount before its values exist.
+ * These tests therefore no longer reproduce the ordering; they stand as the net that the modal draws
+ * a run's values at all, at both doors, and that opening a second run never shows the first's.
+ *
  * Seeds its own run on a chassis that draws as a sheet, and its own account to see it with — the
  * magic link is single use, so a spec that reused one would pass once and then land on /login.
  */
