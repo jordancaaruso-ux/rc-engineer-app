@@ -26,15 +26,19 @@ export async function GET(request: Request, ctx: RouteCtx): Promise<NextResponse
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await ctx.params;
-  const raw = new URL(request.url).searchParams.get("page") ?? "1";
+  const params = new URL(request.url).searchParams;
+  const raw = params.get("page") ?? "1";
   const pageNumber = Number(raw);
   // Bounded before it reaches the renderer: an unbounded page number is an invitation to ask a
   // server to rasterise page 9,000,000 of a two-page file.
   if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > MAX_BLANK_PAGES) {
     return NextResponse.json({ error: "No such page" }, { status: 400 });
   }
+  // Which of the chassis's sheets: an EDITION's id, or absent for the primary blank. The blank
+  // must belong to this chassis — `getSheetPageImage` checks, so a foreign id serves nothing.
+  const blankId = params.get("blank");
 
-  const image = await getSheetPageImage(id, pageNumber);
+  const image = await getSheetPageImage(id, pageNumber, blankId);
   if (!image) return NextResponse.json({ error: "No sheet for this chassis" }, { status: 404 });
 
   return new NextResponse(new Uint8Array(image.bytes), {

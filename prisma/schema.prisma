@@ -381,8 +381,10 @@ model SetupSheetModel {
   setupDocuments  SetupDocument[]
   calibrations    SetupSheetCalibration[]
   setupFillDrafts SetupFillDraft[]
-  /// The blank this chassis was derived from, when it came in that way.
-  derivedFromBlank SetupSheetBlank?
+  /// The sheets this chassis draws: the primary blank it was derived/attached from, plus any
+  /// EDITIONS — rebuilt PDFs of the same sheet with renamed boxes (isEdition = true). One car,
+  /// several papers; the primary is the row with isEdition = false.
+  sheetBlanks SetupSheetBlank[]
   /** PDF calibration used for auto-pick and the car-page â€œEdit PDF calibrationâ€ link. */
   defaultCalibrationId String?                @unique
   defaultCalibration   SetupSheetCalibration? @relation("ModelDefaultCalibration", fields: [defaultCalibrationId], references: [id], onDelete: SetNull)
@@ -419,8 +421,21 @@ model SetupSheetBlank {
   source String @default("driver")
 
   /// Null when the upload was refused: there is no chassis, only a file and a name.
+  /// NOT unique since 2026-08-16: a chassis holds one PRIMARY blank (isEdition = false) plus any
+  /// number of rebuilt EDITIONS of the same sheet. See `sheetBlankResolve.ts`.
   setupSheetModel   SetupSheetModel? @relation(fields: [setupSheetModelId], references: [id], onDelete: SetNull)
-  setupSheetModelId String?          @unique
+  setupSheetModelId String?
+
+  /// A rebuilt copy of a sheet the chassis already has: same car, same printed layout, every box
+  /// renamed by whoever rebuilt the PDF. Editions carry their own boxes, their own field list
+  /// (`schemaFieldsJson`) and their own page images; the model's schema stays canonical.
+  isEdition Boolean @default(false)
+  /// SetupSheetModelFieldDef[] for an edition's own boxes. The model's schemaJson deliberately does
+  /// NOT grow these keys - an edition's vocabulary is its own until a human aliases it.
+  schemaFieldsJson Json?
+  /// `derivedSheetFingerprint` of what the derivation produced, so a second driver uploading the
+  /// same rebuilt PDF joins this edition instead of minting a twin.
+  fingerprint String?
 
   /// The stored PDF, as a normal SetupDocument named "BLANK - <name>". Goes with its uploader.
   setupDocument   SetupDocument? @relation("SetupSheetBlankDocument", fields: [setupDocumentId], references: [id], onDelete: SetNull)
@@ -458,6 +473,7 @@ model SetupSheetBlank {
 
   @@index([status, reviewedAt, createdAt])
   @@index([normalizedName])
+  @@index([setupSheetModelId, isEdition])
 }
 
 /**

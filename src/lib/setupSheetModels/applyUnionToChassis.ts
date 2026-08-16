@@ -75,7 +75,12 @@ export async function applyUnionToChassis(input: {
       id: true,
       name: true,
       schemaJson: true,
-      derivedFromBlank: {
+      // The union is a PRIMARY-blank concept: it adds the original sheet's unmapped printed
+      // boxes. Editions carry complete mappings of their own and are never unioned.
+      sheetBlanks: {
+        where: { isEdition: false },
+        orderBy: { createdAt: "asc" },
+        take: 1,
         select: {
           id: true,
           boxesJson: true,
@@ -88,7 +93,7 @@ export async function applyUnionToChassis(input: {
   });
   if (!model) throw new Error(`unknown chassis ${input.setupSheetModelId}`);
 
-  const blank = model.derivedFromBlank;
+  const blank = model.sheetBlanks[0] ?? null;
   if (!blank) throw new Error(`chassis ${model.name} has no blank — nothing to draw boxes on`);
   if (!blank.setupDocument?.storagePath) {
     throw new Error(`blank ${blank.id} has no stored PDF — its uploader's document is gone`);

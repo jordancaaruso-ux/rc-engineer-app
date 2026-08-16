@@ -30,6 +30,17 @@
  *
  * The delta is against the values as LOADED, so the arrow reads "what I have changed this session"
  * — the number a driver wants at a pit table. Read-only surfaces pass whatever baseline they hold.
+ *
+ * ============================== WHY AN EDITION SHEET GETS NO STRIP ==============================
+ *
+ * The calculator reads canonical keys (`camber_front`); a rebuilt EDITION of a sheet speaks its own
+ * (`front_camber`). Every lookup misses, so every input defaults, and the missing-data doctrine
+ * collapses: defaults stand in for boxes the driver LEFT EMPTY, but here the numbers are written on
+ * the paper an inch below — the strip would print the kit car's geometry over a sheet that visibly
+ * disagrees with it. A found-a-value gate is no gate either: one coincidentally-canonical key would
+ * show one real value dressed in seventeen defaults. So an edition hides the strip outright.
+ * FLIP THIS when the aliasing build maps edition keys onto canonical ones — once the calc reads the
+ * sheet's real values, the strip is honest again and the gate must go with the gap it covered.
  */
 
 import { useEffect, useId, useMemo, useState } from "react";
@@ -46,6 +57,7 @@ export function SheetGeometryStrip({
   value,
   baselineValue,
   templateKey,
+  editionBlankId,
   labLabels,
   labOrigin,
   className,
@@ -60,6 +72,11 @@ export function SheetGeometryStrip({
    * strip, and no empty state — a chassis without a pack looks exactly as it does today.
    */
   templateKey?: string | null;
+  /**
+   * The EDITION blank these values are written on, when not the primary. Set, the strip does not
+   * render at all — see "WHY AN EDITION SHEET GETS NO STRIP" above.
+   */
+  editionBlankId?: string | null;
   labLabels?: { s?: string; g?: string };
   /**
    * Which chassis this sheet belongs to and which stored row it is, when the host knows.
@@ -102,7 +119,7 @@ export function SheetGeometryStrip({
     [expanded, pack, value]
   );
   const bodyId = useId();
-  if (!computed) return null;
+  if (editionBlankId || !computed) return null;
 
   return (
     <div

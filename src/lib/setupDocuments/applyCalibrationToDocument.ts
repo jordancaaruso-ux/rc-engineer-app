@@ -49,7 +49,7 @@ export async function applyCalibrationToSetupDocument(input: {
     }),
     prisma.setupSheetCalibration.findFirst({
       where: calibrationReadableByIdWhere(input.calibrationId),
-      select: { id: true, calibrationDataJson: true },
+      select: { id: true, calibrationDataJson: true, exampleDocumentId: true },
     }),
   ]);
 
@@ -64,16 +64,28 @@ export async function applyCalibrationToSetupDocument(input: {
     const file = new File([new Uint8Array(bytes)], doc.originalFilename || "setup.pdf", {
       type: doc.mimeType || "application/pdf",
     });
-    // Same reason as the first import: the calibration names a fraction of the printed boxes, and
-    // the rest of the sheet's mappings live on the chassis's blank.
-    const derivedMappings = doc.setupSheetModelId
-      ? (((
-          await prisma.setupSheetBlank.findUnique({
-            where: { setupSheetModelId: doc.setupSheetModelId },
-            select: { derivedMappingsJson: true },
+    // An EDITION's calibration maps its whole file already, and the union mappings name the
+    // ORIGINAL sheet's fields — skip them, same rule as `processImport`.
+    const isEditionCalibration = calibration.exampleDocumentId
+      ? Boolean(
+          await prisma.setupSheetBlank.findFirst({
+            where: { setupDocumentId: calibration.exampleDocumentId, isEdition: true },
+            select: { id: true },
           })
-        )?.derivedMappingsJson ?? {}) as Record<string, PdfFormFieldMappingRule>)
-      : {};
+        )
+      : false;
+    // Same reason as the first import: the calibration names a fraction of the printed boxes, and
+    // the rest of the sheet's mappings live on the chassis's PRIMARY blank.
+    const derivedMappings =
+      doc.setupSheetModelId && !isEditionCalibration
+        ? (((
+            await prisma.setupSheetBlank.findFirst({
+              where: { setupSheetModelId: doc.setupSheetModelId, isEdition: false },
+              orderBy: { createdAt: "asc" },
+              select: { derivedMappingsJson: true },
+            })
+          )?.derivedMappingsJson ?? {}) as Record<string, PdfFormFieldMappingRule>)
+        : {};
     const extracted = await applyCalibrationToPdf({
       file,
       calibrationDataJson: calibration.calibrationDataJson,

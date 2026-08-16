@@ -55,12 +55,18 @@ export type CompareSide = {
 
 export function SheetCompareSurface({
   setupSheetModelId,
+  editionBlankId,
   a,
   b,
   templateKey,
   className,
 }: {
   setupSheetModelId: string;
+  /**
+   * The EDITION side A draws on, when not the primary blank. One paper for both sides — flipping
+   * is the whole design — so side B's values show only where its keys exist on this sheet.
+   */
+  editionBlankId?: string | null;
   a: CompareSide;
   b: CompareSide;
   /** Chassis-type key. Without it there is no geometry strip — see `SheetGeometryStrip`. */
@@ -165,7 +171,11 @@ export function SheetCompareSurface({
   return (
     <div className={cn("space-y-2", className)}>
       {/* Chrome above the paper, never ink on it — the strip belongs to whichever sheet is shown. */}
-      <SheetGeometryStrip value={shownSide.values} templateKey={templateKey} />
+      <SheetGeometryStrip
+        value={shownSide.values}
+        templateKey={templateKey}
+        editionBlankId={editionBlankId}
+      />
 
       <div className="flex items-center gap-2">
         <SegmentedControl
@@ -234,8 +244,8 @@ export function SheetCompareSurface({
         className="select-none"
       >
         <SheetFillSurface
-          planUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-plan`}
-          pageImageUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-page`}
+          planUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-plan${editionBlankId ? `?blank=${encodeURIComponent(editionBlankId)}` : ""}`}
+          pageImageUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-page${editionBlankId ? `?blank=${encodeURIComponent(editionBlankId)}` : ""}`}
           initialValues={surfaceA}
           alternateValues={surfaceB}
           showAlternate={shown === "b"}

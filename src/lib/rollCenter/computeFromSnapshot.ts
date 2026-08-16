@@ -6,6 +6,11 @@
  * Missing-data doctrine (docs/ROLL_CENTER_NORTH_STAR.md): compute with defaults and
  * FLAG assumptions — never block, never silently guess. Deltas between two snapshots
  * with the same gaps stay valid.
+ *
+ * The doctrine's limit: a default stands in for a box the driver LEFT EMPTY. A snapshot
+ * whose keys this file cannot read at all — an unaliased sheet EDITION — has no such
+ * gaps, only values under names the calc doesn't speak, so all-defaults there is a
+ * fabricated answer. Sheet surfaces hide the strip instead: see `SheetGeometryStrip`.
  */
 import {
   computeAxleMetrics,

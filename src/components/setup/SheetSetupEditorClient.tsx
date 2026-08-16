@@ -28,15 +28,18 @@ export function SheetSetupEditorClient({
   setupName,
   saveMode,
   setupSheetModelId,
+  editionBlankId,
   initialValues,
   templateKey,
 }: {
   carId: string;
   setupId: string;
-  /** Seeds the name prompt when copying this setup. */
+  /** Names the copy when this setup is forked, and seeds Rename. */
   setupName?: string | null;
   saveMode: SetupSaveMode;
   setupSheetModelId: string;
+  /** The EDITION this setup's keys are written on, when not the primary blank. See `sheetBlankResolve`. */
+  editionBlankId?: string | null;
   initialValues: SetupSnapshotData;
   /** Chassis-type key, for the computed-geometry strip. No key, no strip. */
   templateKey?: string | null;
@@ -44,15 +47,13 @@ export function SheetSetupEditorClient({
   const [values, setValues] = useState<Record<string, string>>(() =>
     storedValuesToSurface(initialValues)
   );
-  // Skip the save that the initial render would otherwise trigger.
-  const dirtyRef = useRef(false);
   const planRef = useRef<SheetFillPlan | null>(null);
   /** The plan as state too, so the geometry strip redraws when it lands. Fires once. */
   const [planFields, setPlanFields] = useState<SheetFillPlan["fields"] | null>(null);
 
   const toStored = useCallback((surface: Record<string, string>): Record<string, unknown> => {
     const plan = planRef.current;
-    // No plan yet means nothing has been drawn, so nothing can be dirty — but fail safe anyway.
+    // No plan yet means no boxes have been drawn, so nothing can have been edited — but fail safe.
     return plan ? surfaceValuesToStored(surface, plan.fields) : surface;
   }, []);
 
@@ -73,34 +74,35 @@ export function SheetSetupEditorClient({
     saveMode,
     values,
     getData,
-    dirtyRef,
   });
 
   return (
     <div className="space-y-3">
-      <SetupEditorSaveBar save={save} />
       {geometryValue ? (
         <SheetGeometryStrip
           value={geometryValue}
           baselineValue={initialValues}
           templateKey={templateKey}
+          editionBlankId={editionBlankId}
           labLabels={{ s: setupName ?? "This setup", g: "As opened" }}
           labOrigin={{ setupSheetModelId, source: { kind: "setup", id: setupId } }}
         />
       ) : null}
       <SheetFillSurface
-        planUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-plan`}
-        pageImageUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-page`}
+        planUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-plan${editionBlankId ? `?blank=${encodeURIComponent(editionBlankId)}` : ""}`}
+        pageImageUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-page${editionBlankId ? `?blank=${encodeURIComponent(editionBlankId)}` : ""}`}
         initialValues={values}
-        onChange={(next) => {
-          dirtyRef.current = true;
-          setValues(next);
-        }}
+        // Handed back on some renders without an edit behind it (StrictMode remounts the surface's
+        // notify effect). Harmless now: the bar compares values rather than counting these calls.
+        onChange={setValues}
         onPlanLoaded={(p) => {
           planRef.current = p;
           setPlanFields(p.fields);
         }}
       />
+      {/* Last, not first: the bar rides the bottom of the screen, and `position: sticky` with a
+          `bottom` offset only holds an element that sits at the END of its container. */}
+      <SetupEditorSaveBar save={save} />
     </div>
   );
 }

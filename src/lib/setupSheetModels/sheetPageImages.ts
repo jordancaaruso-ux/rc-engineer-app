@@ -6,6 +6,7 @@ import { renderPdfPageToPng } from "@/lib/setupDocuments/pdfServerRaster";
 import { readBytesFromStorageRef, storeSheetPageImage } from "@/lib/setupDocuments/storage";
 import { blankPdfFormValues } from "@/lib/setupDocuments/pdfBlankForm";
 import { MAX_BLANK_PAGES } from "@/lib/setupSheetModels/blankUploadDiagnosis";
+import { wherePrimarySheetBlank } from "@/lib/setupSheetModels/sheetBlankResolve";
 
 /**
  * The picture of one page of a chassis's setup sheet.
@@ -19,13 +20,17 @@ import { MAX_BLANK_PAGES } from "@/lib/setupSheetModels/blankUploadDiagnosis";
  * compression softens exactly the thing that makes showing the real sheet worth doing, which is
  * that the driver can read the caption printed beside a box when they zoom into it.
  *
- * ============================== WHY IT IS CACHED PER CHASSIS ==============================
+ * ============================== WHY IT IS CACHED PER SHEET ==============================
  *
  * Rendering is the slowest thing in this whole feature and its result never changes: a sheet is a
- * sheet. So the first driver to open a chassis pays for it once, and every driver after that gets a
- * stored image. Cached against the CHASSIS rather than the uploaded document, because the uploader
+ * sheet. So the first driver to open a sheet pays for it once, and every driver after that gets a
+ * stored image. Cached against the BLANK rather than the uploaded document, because the uploader
  * may delete their account and take the PDF with them — after which the page cannot be re-rendered
  * at all, and the stored picture is the only copy the other drivers on that chassis have.
+ *
+ * A chassis can carry several sheets since 2026-08-16 — the primary blank plus rebuilt EDITIONS
+ * with their own page pictures — so every entry point takes an optional blank id. Without one, the
+ * primary blank is meant, which is exactly what these functions served when blank↔model was 1:1.
  *
  * That is also why a failure to store is not a failure to serve: the driver gets their page either
  * way, and the next open tries again.
@@ -45,6 +50,38 @@ function storedPageRefs(pageImagesJson: unknown): Record<string, string> {
   return out;
 }
 
+/**
+ * The stored-image key. The primary blank keeps the bare model id so every picture rendered
+ * before editions existed keeps being found; an edition's pages are stored beside them.
+ */
+function pageStoreKey(setupSheetModelId: string, blank: { id: string; isEdition: boolean }): string {
+  return blank.isEdition ? `${setupSheetModelId}-${blank.id}` : setupSheetModelId;
+}
+
+const BLANK_PAGE_SELECT = {
+  id: true,
+  isEdition: true,
+  pageCount: true,
+  pageImagesJson: true,
+  fillSurface: true,
+  setupDocument: { select: { storagePath: true } },
+} as const;
+
+/** The requested blank, or the model's primary one. Null when there is nothing to draw from. */
+async function resolveBlankForPages(setupSheetModelId: string, blankId?: string | null) {
+  if (blankId) {
+    return prisma.setupSheetBlank.findFirst({
+      where: { id: blankId, setupSheetModelId },
+      select: BLANK_PAGE_SELECT,
+    });
+  }
+  return prisma.setupSheetBlank.findFirst({
+    where: wherePrimarySheetBlank(setupSheetModelId),
+    orderBy: { createdAt: "asc" },
+    select: BLANK_PAGE_SELECT,
+  });
+}
+
 export type SheetPageImage = { bytes: Buffer; cached: boolean };
 
 /**
@@ -56,16 +93,10 @@ export type SheetPageImage = { bytes: Buffer; cached: boolean };
  */
 export async function getSheetPageImage(
   setupSheetModelId: string,
-  pageNumber: number
+  pageNumber: number,
+  blankId?: string | null
 ): Promise<SheetPageImage | null> {
-  const blank = await prisma.setupSheetBlank.findUnique({
-    where: { setupSheetModelId },
-    select: {
-      id: true,
-      pageImagesJson: true,
-      setupDocument: { select: { storagePath: true } },
-    },
-  });
+  const blank = await resolveBlankForPages(setupSheetModelId, blankId);
   if (!blank) return null;
 
   const refs = storedPageRefs(blank.pageImagesJson);
@@ -96,14 +127,14 @@ export async function getSheetPageImage(
     const png = await renderPdfPageToPng(blanked, pageNumber, { scale: RENDER_SCALE });
     webp = await sharp(png).webp({ lossless: true, effort: 4 }).toBuffer();
   } catch (e) {
-    console.error("[sheet-page] render failed", { setupSheetModelId, pageNumber, e });
+    console.error("[sheet-page] render failed", { setupSheetModelId, blankId: blank.id, pageNumber, e });
     return null;
   }
 
   // Storing is best effort. The driver already has their page; a bucket that refused the write
   // costs the next driver a re-render, not this one their sheet.
   try {
-    const ref = await storeSheetPageImage(setupSheetModelId, pageNumber, webp);
+    const ref = await storeSheetPageImage(pageStoreKey(setupSheetModelId, blank), pageNumber, webp);
     await prisma.setupSheetBlank.update({
       where: { id: blank.id },
       data: { pageImagesJson: { ...refs, [String(pageNumber)]: ref } },
@@ -116,7 +147,7 @@ export async function getSheetPageImage(
 }
 
 /**
- * Draw and store every page of a chassis's sheet, at the moment the chassis is created.
+ * Draw and store every page of a chassis's sheet, at the moment the sheet is created.
  *
  * ============================== WHY NOT JUST LET THE FIRST OPEN DO IT ==============================
  *
@@ -135,18 +166,12 @@ export async function getSheetPageImage(
  * boxes came from the form layer, not from the picture — so a failure here is logged and the upload
  * carries on. The next driver to open it simply pays the old cost.
  */
-export async function prerenderSheetPages(setupSheetModelId: string): Promise<number> {
+export async function prerenderSheetPages(
+  setupSheetModelId: string,
+  blankId?: string | null
+): Promise<number> {
   try {
-    const blank = await prisma.setupSheetBlank.findUnique({
-      where: { setupSheetModelId },
-      select: {
-        id: true,
-        pageCount: true,
-        pageImagesJson: true,
-        fillSurface: true,
-        setupDocument: { select: { storagePath: true } },
-      },
-    });
+    const blank = await resolveBlankForPages(setupSheetModelId, blankId);
     // A chassis that fills as an ordinary form never shows a picture, so drawing one is pure cost.
     if (!blank || blank.fillSurface !== "sheet") return 0;
 
@@ -166,7 +191,11 @@ export async function prerenderSheetPages(setupSheetModelId: string): Promise<nu
       try {
         const png = await renderPdfPageToPng(blanked, page, { scale: RENDER_SCALE });
         const webp = await sharp(png).webp({ lossless: true, effort: 4 }).toBuffer();
-        refs[String(page)] = await storeSheetPageImage(setupSheetModelId, page, webp);
+        refs[String(page)] = await storeSheetPageImage(
+          pageStoreKey(setupSheetModelId, blank),
+          page,
+          webp
+        );
         drawn++;
       } catch (e) {
         // One page that refuses to draw must not cost the pages that would have drawn fine.
@@ -182,7 +211,7 @@ export async function prerenderSheetPages(setupSheetModelId: string): Promise<nu
     }
     return drawn;
   } catch (e) {
-    console.error("[sheet-page] prerender failed", { setupSheetModelId, e });
+    console.error("[sheet-page] prerender failed", { setupSheetModelId, blankId, e });
     return 0;
   }
 }

@@ -18,6 +18,7 @@ import {
   storageRefIsReadable,
 } from "@/lib/setupDocuments/storage";
 import { A800RR_EXTRA_SIMPLE_KEYS } from "@/lib/setupSheetModels/a800rrExtraSimpleKeys";
+import { pickSheetBlankForData } from "@/lib/setupSheetModels/sheetBlankResolve";
 import { claimedWidgetsFromMappings } from "@/lib/setupSheetModels/unionDerivedWithCalibration";
 import { storedValuesToSurface } from "@/lib/setupSheetModels/sheetSurfaceValues";
 
@@ -75,30 +76,45 @@ type PdfSource = {
  * Null when the car has no chassis model, or the chassis has no blank, or the blank's document went
  * with a deleted account — all of which mean there is no shared paper to fill, and the caller falls
  * back to the driver's own upload.
+ *
+ * WHICH of the chassis's sheets is decided by the SETUP's keys: a setup imported through a rebuilt
+ * EDITION exports on that edition's paper, written through that edition's own calibration — filling
+ * the primary blank with edition keys would print almost nothing. See `sheetBlankResolve`.
  */
-async function resolveChassisBlankSource(carId: string | null): Promise<PdfSource | null> {
+async function resolveChassisBlankSource(
+  carId: string | null,
+  setupData: unknown
+): Promise<PdfSource | null> {
   if (!carId) return null;
 
   const car = await prisma.car.findUnique({
     where: { id: carId },
     select: {
+      setupSheetModelId: true,
       setupSheetModel: {
         select: {
           slug: true,
-          derivedFromBlank: {
-            select: {
-              derivedMappingsJson: true,
-              setupDocument: { select: { storagePath: true } },
-            },
-          },
           defaultCalibration: { select: { calibrationDataJson: true } },
         },
       },
     },
   });
   const model = car?.setupSheetModel;
-  const storagePath = model?.derivedFromBlank?.setupDocument?.storagePath;
-  if (!model || !storagePath) return null;
+  const modelId = car?.setupSheetModelId;
+  if (!model || !modelId) return null;
+
+  const picked = await pickSheetBlankForData(modelId, normalizeSetupData(setupData));
+  if (!picked) return null;
+  const blank = await prisma.setupSheetBlank.findFirst({
+    where: { id: picked.id },
+    select: {
+      isEdition: true,
+      derivedMappingsJson: true,
+      setupDocument: { select: { id: true, storagePath: true } },
+    },
+  });
+  const storagePath = blank?.setupDocument?.storagePath;
+  if (!blank || !storagePath) return null;
 
   let bytes: Buffer;
   try {
@@ -120,9 +136,24 @@ async function resolveChassisBlankSource(carId: string | null): Promise<PdfSourc
     return null;
   }
 
+  if (blank.isEdition) {
+    // The edition's calibration maps every box of ITS file; the primary's calibration, union
+    // mappings and computed boxes all name the ORIGINAL sheet's fields and stay out of it.
+    const editionCal = await prisma.setupSheetCalibration.findFirst({
+      where: { setupSheetModelId: modelId, exampleDocumentId: blank.setupDocument!.id },
+      select: { calibrationDataJson: true },
+    });
+    if (!editionCal) return null;
+    return {
+      bytes,
+      mappings: normalizeCalibrationData(editionCal.calibrationDataJson).formFieldMappings ?? {},
+      calibrationJson: editionCal.calibrationDataJson,
+    };
+  }
+
   const calibrationJson = model.defaultCalibration?.calibrationDataJson ?? {};
   const calibrationMappings = normalizeCalibrationData(calibrationJson).formFieldMappings ?? {};
-  const derivedMappings = (model.derivedFromBlank?.derivedMappingsJson ?? {}) as Record<
+  const derivedMappings = (blank.derivedMappingsJson ?? {}) as Record<
     string,
     PdfFormFieldMappingRule
   >;
@@ -370,7 +401,7 @@ export async function ensureRenderedSetupSnapshotPdf(params: {
   }
 
   const source =
-    (await resolveChassisBlankSource(snap.carId))
+    (await resolveChassisBlankSource(snap.carId, snap.data))
     ?? (await resolveUploadedPdfSourceForSetupSnapshot(params.userId, snap.id));
   if (!source) return null;
 
@@ -422,7 +453,7 @@ export async function ensureRenderedRunSetupPdf(params: {
   }
 
   const source =
-    (await resolveChassisBlankSource(run.setupSnapshot.carId))
+    (await resolveChassisBlankSource(run.setupSnapshot.carId, run.setupSnapshot.data))
     ?? (await resolveUploadedPdfSourceForRun(params.userId, run));
   if (!source) return null;
 

@@ -23,7 +23,10 @@ export type ChassisCandidate = { modelId: string; modelName: string };
 export type RepickOutcome = {
   pickedCalibrationId: string | null;
   pickedCalibrationName: string | null;
-  pickSource: "exact_fingerprint" | "ambiguous_suggestion" | "needs_disambiguation" | "none";
+  /** `edition_derived`: no calibration matched, so the sheet was learned as a new EDITION of the
+   *  car's chassis and read through the calibration that minting created. See
+   *  `createSheetEditionForModel`. */
+  pickSource: "exact_fingerprint" | "ambiguous_suggestion" | "needs_disambiguation" | "edition_derived" | "none";
   pickDebug: string;
   /**
    * Set only when `pickSource === "needs_disambiguation"`: the distinct chassis models whose

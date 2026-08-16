@@ -3,6 +3,7 @@ import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { chassisFillsAsSheet, parseStoredBoxes } from "@/lib/setupSheetModels/sheetPlan";
+import { pickSheetBlankForData } from "@/lib/setupSheetModels/sheetBlankResolve";
 import { changedBoxCrops } from "@/lib/setupCompare/changedBoxRegion";
 
 export const dynamic = "force-dynamic";
@@ -42,11 +43,13 @@ export async function GET(request: Request, ctx: RouteCtx): Promise<NextResponse
     .filter(Boolean)
     .slice(0, MAX_KEYS);
 
+  // Which of the chassis's sheets prints these boxes: the keys ARE the changed values, so the
+  // same overlap pick that chooses a setup's sheet chooses the crops' sheet. See `sheetBlankResolve`.
   const blank = car.setupSheetModelId
-    ? await prisma.setupSheetBlank.findUnique({
-        where: { setupSheetModelId: car.setupSheetModelId },
-        select: { boxesJson: true, fillSurface: true },
-      })
+    ? await pickSheetBlankForData(
+        car.setupSheetModelId,
+        Object.fromEntries(keys.map((k) => [k, true]))
+      )
     : null;
 
   // Not a mistake and not an error: most chassis fill as an ordinary form and have no sheet to
@@ -58,6 +61,8 @@ export async function GET(request: Request, ctx: RouteCtx): Promise<NextResponse
   return NextResponse.json({
     sheetMode: true,
     setupSheetModelId: car.setupSheetModelId,
+    // The crop images come from the same sheet the boxes do. Null = the primary blank.
+    editionBlankId: blank?.isEdition ? blank.id : null,
     crops: changedBoxCrops(parseStoredBoxes(blank?.boxesJson), keys),
   });
 }

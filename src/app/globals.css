@@ -2002,6 +2002,49 @@ html[data-nav-pending] .page {
 }
 
 /* --------------------------------------------------------------------------
+   The setup editor's save bar (SetupEditorSaveBar).
+   Nothing in a setup autosaves, so this panel is the whole difference between
+   an edit that reached the database and one that did not. With nothing changed
+   it is a grey tray; the first real edit turns the whole width amber, which is
+   a change big enough to catch from whichever box the driver is typing in.
+   Utilities can't express either half: the wash has to stay OPAQUE (the bar
+   floats over the sheet, so a translucent amber would show the paper through
+   it) — hence a flat gradient layered on the solid background — and the wake
+   is a one-shot keyframe, which needs a rule to hang off.
+--------------------------------------------------------------------------- */
+.setup-save-panel {
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease;
+}
+
+.setup-save-panel--dirty {
+  border-color: rgb(var(--color-warning) / 0.45);
+  background-image: linear-gradient(
+    rgb(var(--color-warning) / 0.08),
+    rgb(var(--color-warning) / 0.08)
+  );
+  animation: rc-save-wake 180ms ease-out;
+}
+
+@keyframes rc-save-wake {
+  from {
+    transform: translateY(4px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .setup-save-panel,
+  .setup-save-panel--dirty {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
    Motion primitives (dashboard vertical slice, 2026-07-10)
    Pure-CSS entrance + chart draw-in so they need no JS and can't flash on
    hydration. The rolling number is the only JS-driven motion (motion.tsx).

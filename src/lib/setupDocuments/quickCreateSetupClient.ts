@@ -25,7 +25,13 @@ export type QuickCreateSetupResponse = {
   carId: string | null;
   calibrationId: string | null;
   calibrationName: string | null;
-  pickSource: "exact_fingerprint" | "ambiguous_suggestion" | "needs_disambiguation" | "none";
+  pickSource:
+    | "exact_fingerprint"
+    | "ambiguous_suggestion"
+    | "needs_disambiguation"
+    /** The sheet was learned as a new edition of the car's chassis — see server route. */
+    | "edition_derived"
+    | "none";
   pickDebug: string;
   parseStatus: "PENDING" | "PARSED" | "PARTIAL" | "FAILED";
   needsReview: boolean;
@@ -40,6 +46,11 @@ export type QuickCreateSetupResponse = {
   carCandidates?: QuickCreateCarCandidate[];
   /** No calibration anywhere matched this sheet's layout. */
   notRecognized?: boolean;
+  /**
+   * The calibration used was drawn for a different EDITION of this sheet (boxes renamed), so no
+   * setup was created. `needsReviewReason` carries the driver-facing sentence.
+   */
+  unrecognisedSheet?: boolean;
 };
 
 /** 409 payload when the server blocked on a chassis/car mismatch (blockOnModelMismatch). */
@@ -115,6 +126,7 @@ function parseQuickCreateResponse(
     detectedModelName: data.detectedModelName ?? null,
     carCandidates: Array.isArray(data.carCandidates) ? data.carCandidates : [],
     notRecognized: Boolean(data.notRecognized),
+    unrecognisedSheet: Boolean(data.unrecognisedSheet),
   };
 }
 

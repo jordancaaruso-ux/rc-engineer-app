@@ -6,10 +6,12 @@ import { prisma } from "@/lib/prisma";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { formatRunSessionDisplay } from "@/lib/runSession";
+import { savedRunSetupName } from "@/lib/setup/setupSaveName";
 import { normalizeSetupData } from "@/lib/runSetup";
 import { chassisChangedKeys } from "@/lib/setup/runContextSetupKeys";
 import { getSetupSheetTemplateForCar } from "@/lib/setupSheetModels/getTemplateForCar";
 import { chassisFillsAsSheet } from "@/lib/setupSheetModels/sheetPlan";
+import { pickSheetBlankForData } from "@/lib/setupSheetModels/sheetBlankResolve";
 import { ReadOnlySetupSheet } from "@/components/setup/ReadOnlySetupSheet";
 import { ReadOnlySheetSurface } from "@/components/setup/ReadOnlySheetSurface";
 import { KeepSetupButton } from "@/components/setup/KeepSetupButton";
@@ -20,15 +22,21 @@ import { PageBackLink } from "@/components/ui/PageBackLink";
 
 /**
  * Read a setup — a baseline, a run's, or one an uploaded sheet created — without opening an editor.
- * Run and sheet setups are history, so they have no Edit action; baselines link to the editor.
+ *
+ * Every setup here is editable, and the button says only "Edit" (founder call, 2026-08-16). What a
+ * save MEANS is settled by the door, not by this page: `?run=` is carried through to the editor
+ * when the driver arrived from a session, and its absence is what makes an edit from the garage a
+ * new setup rather than a correction. See `setupSaveMode.ts`.
  *
  * Highlighted values are the run's own chassis changes: tires and additive are excluded, matching
  * what the car page's history counts as a setup change.
  */
 export default async function CarSetupViewPage(props: {
   params: Promise<{ carId: string; setupId: string }>;
+  searchParams: Promise<{ run?: string }>;
 }): Promise<ReactNode> {
   const { carId, setupId } = await props.params;
+  const requestedRunId = (await props.searchParams).run?.trim() || null;
 
   if (!hasDatabaseUrl()) {
     return (
@@ -70,9 +78,26 @@ export default async function CarSetupViewPage(props: {
       isLibrary: true,
       createdAt: true,
       setupDeltaJson: true,
-      baseSetupSnapshot: { select: { id: true, name: true } },
+      // The run is read for its NAME only: a run's snapshot has none of its own, so "Edited from"
+      // had nothing to print and said "another setup" for every copy taken off a session.
+      baseSetupSnapshot: {
+        select: {
+          id: true,
+          name: true,
+          runs: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: {
+              sessionType: true,
+              meetingSessionType: true,
+              meetingSessionCode: true,
+              sessionLabel: true,
+              event: { select: { name: true } },
+            },
+          },
+        },
+      },
       sourceBaseline: { select: { id: true, name: true } },
-      _count: { select: { runs: true } },
       sourceDocuments: {
         orderBy: { createdAt: "desc" },
         take: 1,
@@ -108,17 +133,16 @@ export default async function CarSetupViewPage(props: {
    * 2026-08-11): the driver's own paper with their values in its boxes. The field list stays for
    * every other chassis, and for the session view's what-changed list, which this page is not.
    */
+  // Which of the chassis's sheets these values are written on: a setup imported through a rebuilt
+  // EDITION speaks that edition's keys, and drawing it on the primary blank shows empty boxes.
   const blank = car.setupSheetModelId
-    ? await prisma.setupSheetBlank.findUnique({
-        where: { setupSheetModelId: car.setupSheetModelId },
-        select: { boxesJson: true, fillSurface: true },
-      })
+    ? await pickSheetBlankForData(car.setupSheetModelId, normalizeSetupData(setup.data))
     : null;
   const sheetMode = chassisFillsAsSheet(blank);
+  const editionBlankId = blank?.isEdition ? blank.id : null;
   const changedKeys = chassisChangedKeys(setup.setupDeltaJson);
   const run = setup.runs[0] ?? null;
   const document = setup.sourceDocuments[0] ?? null;
-  const runCount = setup._count.runs;
 
   /*
    * `/setup-documents/[id]` is the IMPORT REVIEW screen — "check the imported values look right",
@@ -146,10 +170,19 @@ export default async function CarSetupViewPage(props: {
    * plain run snapshot: every run points at the previous run's setup through the same field, and
    * "edited from" would then read as an edit on every run the driver ever logged.
    */
+  const baseRun = setup.baseSetupSnapshot?.runs[0] ?? null;
+  const baseLabel =
+    setup.baseSetupSnapshot?.name ??
+    (baseRun
+      ? savedRunSetupName({
+          eventName: baseRun.event?.name,
+          sessionDisplay: formatRunSessionDisplay(baseRun, { fallback: "a testing run" }),
+        })
+      : null);
   const cameFrom = setup.sourceBaseline
     ? `Copied from ${setup.sourceBaseline.name}`
     : setup.isLibrary && setup.baseSetupSnapshot
-      ? `Edited from ${setup.baseSetupSnapshot.name ?? "another setup"}`
+      ? `Edited from ${baseLabel ?? "another setup"}`
       : null;
 
   const subtitle = [
@@ -178,12 +211,17 @@ export default async function CarSetupViewPage(props: {
         <div className="flex flex-wrap items-center gap-2">
           {/*
             Every setup of yours opens an editor — an uploaded sheet is not history just because it
-            arrived as a PDF. What changes is what a save MEANS, and the editor says so: a setup no
-            run points at saves over itself; a run's own record cannot, so its door corrects the run
-            (a new snapshot, the run repointed) or writes a separate setup.
+            arrived as a PDF, and a run's setup is not off limits just because it was raced. One
+            word, always: the run count used to spell "Correct this run" / "Edit a copy" onto this
+            button, which asked the driver to understand the storage model before they could press
+            anything. `?run=` rides along only when they got here from a session.
           */}
-          <ButtonLink href={`/cars/${car.id}/setups/${setup.id}/edit`}>
-            {runCount === 0 ? "Edit" : runCount === 1 ? "Correct this run" : "Edit a copy"}
+          <ButtonLink
+            href={`/cars/${car.id}/setups/${setup.id}/edit${
+              requestedRunId ? `?run=${encodeURIComponent(requestedRunId)}` : ""
+            }`}
+          >
+            Edit
           </ButtonLink>
           <KeepSetupButton setupId={setup.id} name={title} initialSaved={setup.isLibrary} />
           {setup.isLibrary ? (
@@ -228,6 +266,16 @@ export default async function CarSetupViewPage(props: {
           ) : null}
         </div>
 
+        {/*
+          Where these numbers came from, in the body rather than the header.
+          `.page-header .page-subtitle` is `display: none` (globals.css, the centered-title
+          restructure), so the subtitle this line used to ride in has been invisible on every page
+          that uses the chrome — and a copy made from a run therefore said nothing at all about the
+          run it was taken off. Provenance is the entire promise of "Save as new setup"; it cannot
+          live somewhere the driver can't see.
+        */}
+        {cameFrom ? <p className="ui-caption px-1">{cameFrom}</p> : null}
+
         {changedKeys.length > 0 && !sheetMode ? (
           <p className="ui-caption px-1">
             Highlighted values differ from{" "}
@@ -238,6 +286,7 @@ export default async function CarSetupViewPage(props: {
         {sheetMode && car.setupSheetModelId ? (
           <ReadOnlySheetSurface
             setupSheetModelId={car.setupSheetModelId}
+            editionBlankId={editionBlankId}
             values={normalizeSetupData(setup.data)}
             templateKey={template.templateKey}
             labLabels={{ s: title }}

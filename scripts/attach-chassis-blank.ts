@@ -37,7 +37,7 @@ const MODEL_SELECT = {
   name: true,
   slug: true,
   schemaJson: true,
-  derivedFromBlank: { select: { id: true } },
+  sheetBlanks: { where: { isEdition: false }, take: 1, select: { id: true } },
   defaultCalibration: {
     select: {
       id: true,
@@ -52,8 +52,8 @@ type ModelRow = Prisma.SetupSheetModelGetPayload<{ select: typeof MODEL_SELECT }
 /** Attach one chassis's blank. Returns false when the model can't take one (reason printed). */
 async function attachOne(model: ModelRow, apply: boolean): Promise<boolean> {
   console.log(`\n=== ${model.name} [${model.slug}] ===`);
-  if (model.derivedFromBlank) {
-    console.log(`already has blank ${model.derivedFromBlank.id} — skipped (delete it to re-attach)`);
+  if (model.sheetBlanks[0]) {
+    console.log(`already has blank ${model.sheetBlanks[0].id} — skipped (delete it to re-attach)`);
     return false;
   }
   const calibration = model.defaultCalibration;
@@ -136,7 +136,7 @@ async function main() {
   let models: ModelRow[];
   if (all) {
     models = await prisma.setupSheetModel.findMany({
-      where: { derivedFromBlank: null },
+      where: { sheetBlanks: { none: { isEdition: false } } },
       orderBy: { name: "asc" },
       select: MODEL_SELECT,
     });

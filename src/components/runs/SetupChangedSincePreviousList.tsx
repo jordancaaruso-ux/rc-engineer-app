@@ -130,6 +130,7 @@ export function SetupChangedSincePreviousList({
                 <div className="col-span-4 border-t border-border/50 bg-background/40 px-3.5 py-2">
                   <SheetBoxCrop
                     modelId={crops.kind === "ready" ? crops.modelId : ""}
+                    editionBlankId={crops.kind === "ready" ? crops.editionBlankId : null}
                     crop={crop}
                     value={row.value}
                     showPage={spansPages}

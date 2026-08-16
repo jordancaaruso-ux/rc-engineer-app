@@ -377,9 +377,25 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
     if (sourceType === "PDF" && effectiveCalibration.calibrationId) {
       const calRow = await prisma.setupSheetCalibration.findFirst({
         where: { id: effectiveCalibration.calibrationId },
-        select: { calibrationDataJson: true, name: true },
+        select: { calibrationDataJson: true, name: true, exampleDocumentId: true },
       });
       if (!calRow) throw new Error(`Calibration not found: ${effectiveCalibration.calibrationId}`);
+
+      /*
+       * An EDITION's calibration maps every box of ITS file already, and the union mappings below
+       * belong to the PRIMARY blank — they name the ORIGINAL sheet's fields, which this rebuilt
+       * file does not have (and any accidental name it does have would read a wrong box). An
+       * edition is recognised by its blank: the same uploaded document is both the calibration's
+       * example and the edition blank's source. See `createSheetEditionForModel`.
+       */
+      const isEditionCalibration = calRow.exampleDocumentId
+        ? Boolean(
+            await prisma.setupSheetBlank.findFirst({
+              where: { setupDocumentId: calRow.exampleDocumentId, isEdition: true },
+              select: { id: true },
+            })
+          )
+        : false;
 
       /*
        * The printed boxes the calibration does not name.
@@ -390,14 +406,16 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
        * read raw; see `unionDerivedWithCalibration.ts`. A chassis nobody has unioned yet simply has
        * none, and the import behaves exactly as it did before.
        */
-      const derivedMappings = doc.setupSheetModelId
-        ? (((
-            await prisma.setupSheetBlank.findUnique({
-              where: { setupSheetModelId: doc.setupSheetModelId },
-              select: { derivedMappingsJson: true },
-            })
-          )?.derivedMappingsJson ?? {}) as Record<string, PdfFormFieldMappingRule>)
-        : {};
+      const derivedMappings =
+        doc.setupSheetModelId && !isEditionCalibration
+          ? (((
+              await prisma.setupSheetBlank.findFirst({
+                where: { setupSheetModelId: doc.setupSheetModelId, isEdition: false },
+                orderBy: { createdAt: "asc" },
+                select: { derivedMappingsJson: true },
+              })
+            )?.derivedMappingsJson ?? {}) as Record<string, PdfFormFieldMappingRule>)
+          : {};
 
       // Extract once, then map calibrations against the extracted dataset (no PDF re-read during mapping).
       const tExtract = procDbg() ? performance.now() : 0;

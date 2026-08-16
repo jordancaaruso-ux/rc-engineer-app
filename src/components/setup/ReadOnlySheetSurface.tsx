@@ -20,6 +20,7 @@ import type { LabSource } from "@/lib/rollCenter/labState";
  */
 export function ReadOnlySheetSurface({
   setupSheetModelId,
+  editionBlankId,
   values,
   templateKey,
   baselineValue,
@@ -27,6 +28,12 @@ export function ReadOnlySheetSurface({
   labSource,
 }: {
   setupSheetModelId: string;
+  /**
+   * Which of the chassis's sheets these values are written on, when it is not the primary blank —
+   * a rebuilt EDITION's own boxes and page pictures. The server page picks it by key overlap
+   * (`sheetBlankResolve`); absent, the primary draws, exactly as before editions existed.
+   */
+  editionBlankId?: string | null;
   /** The snapshot's data as stored — arrays, preset objects, numbers. */
   values: Record<string, unknown>;
   /** Chassis-type key. Without it there is no geometry strip — see `SheetGeometryStrip`. */
@@ -45,12 +52,13 @@ export function ReadOnlySheetSurface({
         value={values}
         baselineValue={baselineValue}
         templateKey={templateKey}
+        editionBlankId={editionBlankId}
         labLabels={labLabels}
         labOrigin={{ setupSheetModelId, source: labSource ?? null }}
       />
       <SheetFillSurface
-        planUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-plan`}
-        pageImageUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-page`}
+        planUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-plan${editionBlankId ? `?blank=${encodeURIComponent(editionBlankId)}` : ""}`}
+        pageImageUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-page${editionBlankId ? `?blank=${encodeURIComponent(editionBlankId)}` : ""}`}
         initialValues={surfaceValues}
         readOnly
       />

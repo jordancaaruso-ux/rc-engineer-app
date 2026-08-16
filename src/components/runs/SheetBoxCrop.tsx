@@ -37,7 +37,13 @@ const PLACEHOLDER_ASPECT = 2.4;
 type CropsState =
   | { kind: "loading" }
   | { kind: "none" }
-  | { kind: "ready"; modelId: string; byKey: Map<string, ChangedBoxCrop> };
+  | {
+      kind: "ready";
+      modelId: string;
+      /** The EDITION the crops came from, when not the primary blank — see `sheet-boxes`. */
+      editionBlankId: string | null;
+      byKey: Map<string, ChangedBoxCrop>;
+    };
 
 /**
  * The crops for a set of changed keys, or nothing at all.
@@ -59,18 +65,28 @@ export function useSheetBoxCrops(carId: string | null | undefined, keys: string[
       cache: "no-store",
     })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { sheetMode?: boolean; setupSheetModelId?: string; crops?: ChangedBoxCrop[] } | null) => {
-        if (cancelled) return;
-        if (!d?.sheetMode || !d.setupSheetModelId || !d.crops?.length) {
-          setState({ kind: "none" });
-          return;
+      .then(
+        (
+          d: {
+            sheetMode?: boolean;
+            setupSheetModelId?: string;
+            editionBlankId?: string | null;
+            crops?: ChangedBoxCrop[];
+          } | null
+        ) => {
+          if (cancelled) return;
+          if (!d?.sheetMode || !d.setupSheetModelId || !d.crops?.length) {
+            setState({ kind: "none" });
+            return;
+          }
+          setState({
+            kind: "ready",
+            modelId: d.setupSheetModelId,
+            editionBlankId: d.editionBlankId ?? null,
+            byKey: new Map(d.crops.map((c) => [c.key, c] as const)),
+          });
         }
-        setState({
-          kind: "ready",
-          modelId: d.setupSheetModelId,
-          byKey: new Map(d.crops.map((c) => [c.key, c] as const)),
-        });
-      })
+      )
       .catch(() => {
         // The list is still there. A sheet that will not load is not worth an error.
         if (!cancelled) setState({ kind: "none" });
@@ -85,11 +101,14 @@ export function useSheetBoxCrops(carId: string | null | undefined, keys: string[
 
 export function SheetBoxCrop({
   modelId,
+  editionBlankId,
   crop,
   value,
   showPage,
 }: {
   modelId: string;
+  /** The EDITION whose page picture the crop indexes into. Absent = the primary blank. */
+  editionBlankId?: string | null;
   crop: ChangedBoxCrop;
   /** What the box says now. Drawn into the ring, because the cached sheet is blank. */
   value?: string;
@@ -128,7 +147,7 @@ export function SheetBoxCrop({
         */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`/api/setup-sheet-models/${modelId}/sheet-page?page=${crop.pageNumber}`}
+          src={`/api/setup-sheet-models/${modelId}/sheet-page?page=${crop.pageNumber}${editionBlankId ? `&blank=${encodeURIComponent(editionBlankId)}` : ""}`}
           alt=""
           className="absolute max-w-none select-none"
           style={{

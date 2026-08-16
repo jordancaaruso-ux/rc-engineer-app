@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { SetupEditorSaveBar } from "@/components/setup/SetupEditorSaveBar";
 import { useSetupEditorSave } from "@/components/setup/useSetupEditorSave";
@@ -26,15 +26,13 @@ export function LibrarySetupEditorClient({
 }: {
   carId: string;
   setupId: string;
-  /** Seeds the name prompt when copying this setup. */
+  /** Names the copy when this setup is forked, and seeds Rename. */
   setupName?: string | null;
   saveMode: SetupSaveMode;
   initialValues: SetupSnapshotData;
   template: SetupSheetTemplate;
 }) {
   const [values, setValues] = useState<SetupSnapshotData>(initialValues);
-  // Skip the save that the initial render would otherwise trigger.
-  const dirtyRef = useRef(false);
 
   const getData = useCallback(() => values as Record<string, unknown>, [values]);
   const save = useSetupEditorSave({
@@ -44,21 +42,21 @@ export function LibrarySetupEditorClient({
     saveMode,
     values,
     getData,
-    dirtyRef,
   });
 
   return (
     <div className="space-y-3">
-      <SetupEditorSaveBar save={save} />
       <SetupSheetView
         value={values}
         template={template}
         enableFieldSearch
-        onChange={(next) => {
-          dirtyRef.current = true;
-          setValues(next);
-        }}
+        // Every field commits on blur whether or not it was typed in, so a stray tap lands here
+        // with the values unchanged. The bar compares, so that is a no-op rather than "unsaved".
+        onChange={setValues}
       />
+      {/* Last, not first: the bar rides the bottom of the screen, and `position: sticky` with a
+          `bottom` offset only holds an element that sits at the END of its container. */}
+      <SetupEditorSaveBar save={save} />
     </div>
   );
 }

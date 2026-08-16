@@ -28,7 +28,11 @@ import { tryCreateSetupFromParsedDocument } from "@/lib/setupDocuments/tryCreate
 import { isAllowedSetupDocumentBlobUrl } from "@/lib/setupDocuments/blobStorageRef";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
 import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
-import { extractPdfFormFields } from "@/lib/setupDocuments/pdfFormFields";
+import {
+  extractPdfFormFields,
+  type PdfFormFieldsExtraction,
+} from "@/lib/setupDocuments/pdfFormFields";
+import { createSheetEditionForModel } from "@/lib/setupSheetModels/createSheetEditionForModel";
 import { calibrationsAutoPickableByUserWhere } from "@/lib/setupCalibrations/calibrationAccess";
 import {
   checkAiBudget,
@@ -95,6 +99,12 @@ type QuickCreateResponse = {
   carCandidates: Array<{ id: string; name: string }>;
   /** No calibration anywhere matched this sheet's layout. */
   notRecognized: boolean;
+  /**
+   * The calibration we used was drawn for a DIFFERENT EDITION of this sheet — most of the boxes it
+   * names are absent from the file — so no setup was created. See `sheetRecognition.ts`. The client
+   * offers the file as its own chassis instead of leaving the driver at a dead end.
+   */
+  unrecognisedSheet: boolean;
   /** PDF matches >1 chassis and hints couldn't split them — driver must pick which chassis. */
   needsChassisDisambiguation: boolean;
   /** The chassis models to offer as a tap-to-answer question when disambiguation is needed. */
@@ -269,10 +279,13 @@ export async function POST(request: Request): Promise<NextResponse> {
    * `renderPdfFirstPageToPng` is still used by `deriveImageMap` — admin tooling for authoring an
    * image calibration by hand. That is a different job and keeps working.
    */
+  // Kept past the gate: the form layer is also what a sheet EDITION is derived from, further down.
+  let pdfExtraction: PdfFormFieldsExtraction | null = null;
   if (mimeType === PDF_MIME) {
     let hasFormFields = false;
     try {
-      ({ hasFormFields } = await extractPdfFormFields(Buffer.from(bytes)));
+      pdfExtraction = await extractPdfFormFields(Buffer.from(bytes));
+      hasFormFields = pdfExtraction.hasFormFields;
     } catch (e) {
       console.warn(
         `[setup-documents/quick-create] form-layer check failed: ${e instanceof Error ? e.message : String(e)}`
@@ -588,12 +601,80 @@ export async function POST(request: Request): Promise<NextResponse> {
     `[setup-documents/quick-create] doc=${created.id} file=${originalFilename} calibration=${pickedCalibrationId ?? "none"} source=${outcome.pickSource}`
   );
 
+  /*
+   * A NEW EDITION of a sheet the chassis already has (2026-08-16, founder call: silent).
+   *
+   * The driver told us which car this is — and the file is a perfectly good fillable PDF — but no
+   * calibration matched its form layout, because somebody rebuilt the sheet and renamed every box
+   * (measured on a real A800RR upload: 2 of the calibration's 134 box names existed in the file).
+   * The old behaviour was a dead end: "pick a calibration" over a table of dashes, and a Pro
+   * driver logged eighteen runs against a six-field setup before anyone noticed.
+   *
+   * Instead, learn the sheet the way the derive door learns a brand-new chassis — every box read
+   * off the file's own form layer — but land it UNDER this chassis as an edition, so the setup
+   * still attaches to the driver's existing car and their run history stays one history. The
+   * calibration minted here is picked up like any other below (`effectiveCalibrationId`), so the
+   * ordinary import pipeline reads the values; the next upload of this layout (by anyone) matches
+   * it by fingerprint dedupe inside `createSheetEditionForModel`. See that module for the design.
+   */
+  let editionCalibrationId: string | null = null;
+  if (
+    !pickedCalibrationId
+    && mimeType === PDF_MIME
+    && setupSheetModelId
+    && detectedModelName != null
+    && !chassisBlockReason
+    && pdfExtraction?.hasFormFields
+  ) {
+    try {
+      const edition = await createSheetEditionForModel({
+        user: { id: user.id, email: user.email },
+        model: { id: setupSheetModelId, name: detectedModelName },
+        extraction: pdfExtraction,
+        documentId: created.id,
+        originalFilename,
+      });
+      if (edition.ok) {
+        editionCalibrationId = edition.calibrationId;
+        pickUserNote = `This is a different edition of the ${detectedModelName} sheet — we learned its layout and imported every box (${edition.boxCount}).`;
+        outcome = {
+          pickedCalibrationId: edition.calibrationId,
+          pickedCalibrationName: `${detectedModelName} edition`,
+          pickSource: "edition_derived",
+          pickDebug: `${outcome.pickDebug} | edition ${edition.created ? "created" : "joined"} blank=${edition.blankId} boxes=${edition.boxCount}`,
+        };
+        await prisma.setupDocument.update({
+          where: { id: created.id },
+          data: {
+            calibrationProfileId: edition.calibrationId,
+            calibrationResolvedProfileId: edition.calibrationId,
+            calibrationResolvedSource: outcome.pickSource,
+            calibrationResolvedDebug: `${outcome.pickDebug} | ${pickUserNote}`,
+            currentStage: SetupDocumentImportStages.CALIBRATION_SELECTED,
+          },
+        });
+      } else {
+        console.warn(
+          `[setup-documents/quick-create] doc=${created.id} edition refused: ${edition.reason}`
+        );
+      }
+    } catch (e) {
+      // The old dead end is still behind us: a failed edition mint leaves the document exactly
+      // where it would have been without this block, awaiting a calibration.
+      console.warn(
+        `[setup-documents/quick-create] doc=${created.id} edition derive failed: ${e instanceof Error ? e.message : String(e)}`
+      );
+    }
+  }
+  const effectiveCalibrationId = editionCalibrationId ?? pickedCalibrationId;
+
   // Run the parse/map pipeline inline so the response can report final status without the client
   // needing to poll. Failure here is non-fatal — the document still exists for manual review.
   // EXCEPT the AI front-door path: its vision read takes minutes (longer than any sane request
   // timeout), so it runs after the response and the document page live-refreshes until done.
   let needsReview = false;
   let needsReviewReason: string | null = null;
+  let unrecognisedSheet = false;
   const imageBlocked = Boolean(imageBlockReason) || imageNeedsCar;
   if (chassisBlockReason) {
     // Do NOT run the import pipeline and do NOT render any template: the PDF matches >1 chassis and
@@ -654,7 +735,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   // Decide if the document is clean enough to materialise a SetupSnapshot automatically.
   const detectedLabel = detectedModelName ?? "a known chassis";
-  if (!pickedCalibrationId && (mimeType === PDF_MIME || mimeType.startsWith("image/"))) {
+  if (!effectiveCalibrationId && (mimeType === PDF_MIME || mimeType.startsWith("image/"))) {
     needsReview = true;
     needsReviewReason =
       needsReviewReason
@@ -676,7 +757,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // template looks identical to an unsupported sheet and quietly returns a blank sheet forever.
     needsReviewReason =
       needsReviewReason
-      ?? (pickedCalibrationId
+      ?? (effectiveCalibrationId
         ? `Matched the “${outcome.pickedCalibrationName ?? "saved"}” template, but it read no values from this sheet — the template's field mapping doesn't fit this PDF. Nothing was imported.`
         : "Parse did not produce any fields.");
   }
@@ -699,6 +780,16 @@ export async function POST(request: Request): Promise<NextResponse> {
       if (createdResult.reason === "race_or_concurrent_link") {
         needsReview = true;
         needsReviewReason = "Setup was linked concurrently — re-open the document to verify.";
+      } else if (createdResult.reason === "unrecognised_sheet") {
+        // A rebuilt edition of a sheet we do know: the file is fine, the map isn't. Say so in the
+        // driver's words and flag it so the review screen can offer the sheet as its own chassis
+        // rather than leaving them at a dead end. See `sheetRecognition.ts`.
+        needsReview = true;
+        unrecognisedSheet = true;
+        needsReviewReason = createdResult.driverMessage ?? needsReviewReason;
+        console.warn(
+          `[setup-documents/quick-create] doc=${created.id} unrecognised_sheet — no setup created`
+        );
       } else {
         needsReview = true;
         needsReviewReason = `Failed to create setup: ${createdResult.reason}`;
@@ -717,7 +808,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     documentId: created.id,
     setupId,
     carId: latest?.carId ?? carId,
-    calibrationId: pickedCalibrationId,
+    calibrationId: effectiveCalibrationId,
     calibrationName: outcome.pickedCalibrationName,
     pickSource: outcome.pickSource,
     pickDebug: outcome.pickDebug,
@@ -731,6 +822,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     detectedModelName,
     carCandidates,
     notRecognized,
+    unrecognisedSheet,
     needsChassisDisambiguation: Boolean(chassisBlockReason),
     chassisCandidates: chassisCandidatesForReview,
   };

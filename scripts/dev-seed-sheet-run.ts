@@ -53,7 +53,9 @@ async function main() {
    * would draw nothing, and the test would then pass for the wrong reason.
    */
   const candidates = await prisma.run.findMany({
-    where: { car: { setupSheetModel: { derivedFromBlank: { fillSurface: "sheet" } } } },
+    where: {
+      car: { setupSheetModel: { sheetBlanks: { some: { isEdition: false, fillSurface: "sheet" } } } },
+    },
     orderBy: { createdAt: "desc" },
     take: 200,
     select: {
@@ -62,7 +64,14 @@ async function main() {
         select: {
           setupSheetModelId: true,
           setupSheetModel: {
-            select: { name: true, derivedFromBlank: { select: { pageCount: true } } },
+            select: {
+              name: true,
+              sheetBlanks: {
+                where: { isEdition: false },
+                take: 1,
+                select: { pageCount: true },
+              },
+            },
           },
         },
       },
@@ -83,7 +92,7 @@ async function main() {
   const modelId = donorRun?.car?.setupSheetModelId ?? null;
   if (!donor || !modelId) throw new Error("No run on a sheet-mode chassis to copy setup from.");
   const model = donorRun?.car?.setupSheetModel ?? null;
-  const blank = { pageCount: model?.derivedFromBlank?.pageCount ?? 1 };
+  const blank = { pageCount: model?.sheetBlanks[0]?.pageCount ?? 1 };
   const filledKeys = countFilled(donor);
 
   const email = freshAlias();

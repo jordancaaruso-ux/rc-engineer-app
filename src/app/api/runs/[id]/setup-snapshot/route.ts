@@ -19,6 +19,7 @@ import type { SetupSaveContext } from "@/lib/setup/setupSaveContext";
 import { lastRunAtMsByCarId, orderCarsByRecentUse } from "@/lib/cars/orderCarsByRecentUse";
 import { getSetupSheetTemplateAndKeyForCar } from "@/lib/setupSheetModels/getTemplateForCar";
 import { chassisFillsAsSheet } from "@/lib/setupSheetModels/sheetPlan";
+import { pickSheetBlankForData } from "@/lib/setupSheetModels/sheetBlankResolve";
 import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 
 type Params = { params: Promise<{ id: string }> };
@@ -130,6 +131,8 @@ type SheetContext = {
   /** Does this chassis draw as a picture of its own sheet, rather than as a field list? */
   sheetMode: boolean;
   setupSheetModelId: string | null;
+  /** The EDITION this run's setup keys are written on, when not the primary blank. */
+  editionBlankId: string | null;
   /** The field list — still the surface for every chassis the app cannot draw. */
   template: SetupSheetTemplate;
   /** Community-aggregation bucket key; null when the car has no chassis of its own. */
@@ -152,20 +155,26 @@ type SheetContext = {
  */
 async function buildSheetContext(
   userId: string,
-  car: { setupSheetModelId: string | null; setupSheetTemplate: string | null } | null
+  car: { setupSheetModelId: string | null; setupSheetTemplate: string | null } | null,
+  snapshotData: unknown
 ): Promise<SheetContext> {
   const resolved = car ?? { setupSheetModelId: null, setupSheetTemplate: null };
   // A derived chassis is always attached by id, so no link means no sheet — nothing to resolve.
+  // Which of the chassis's sheets is decided by the SNAPSHOT's keys: a setup imported through a
+  // rebuilt EDITION draws on that edition's paper, not the primary's. See `sheetBlankResolve`.
   const blank = resolved.setupSheetModelId
-    ? await prisma.setupSheetBlank.findUnique({
-        where: { setupSheetModelId: resolved.setupSheetModelId },
-        select: { fillSurface: true, boxesJson: true },
-      })
+    ? await pickSheetBlankForData(
+        resolved.setupSheetModelId,
+        snapshotData && typeof snapshotData === "object" && !Array.isArray(snapshotData)
+          ? (snapshotData as Record<string, unknown>)
+          : null
+      )
     : null;
   const { template, templateKey } = await getSetupSheetTemplateAndKeyForCar(userId, resolved, "setup");
   return {
     sheetMode: chassisFillsAsSheet(blank),
     setupSheetModelId: resolved.setupSheetModelId,
+    editionBlankId: blank?.isEdition ? blank.id : null,
     template,
     templateKey,
   };
@@ -240,7 +249,9 @@ export async function GET(request: Request, { params }: Params) {
     orderCarsByRecentUse(myCars, lastRunAtMsByCarId(lastRunRows), (car) => car.createdAt.getTime())
   );
 
-  const sheet = wantsSheet ? await buildSheetContext(userId, run.car) : null;
+  const sheet = wantsSheet
+    ? await buildSheetContext(userId, run.car, run.setupSnapshot?.data ?? null)
+    : null;
 
   return NextResponse.json({
     runId: run.id,

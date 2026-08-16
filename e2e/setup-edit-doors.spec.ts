@@ -128,6 +128,24 @@ test("an uploaded setup can be edited, and the edit saves", async ({ page, reque
     timeout: 30_000,
   });
 
+  /*
+   * Opening a setup is not work. The bar used to arm itself the moment the editor handed its values
+   * back — which React does on its own, with nobody touching a box — so every setup opened claiming
+   * unsaved changes. Dirty is a comparison against the values as opened now, so an untouched setup
+   * carries no amber, no count, and no filled button to press by reflex.
+   */
+  const bar = page.locator(".setup-save-panel");
+  await expect(bar, "a setup nobody has touched has nothing to save").not.toHaveAttribute(
+    "data-dirty",
+    /.*/
+  );
+  // The count specifically: "changes" also appears on the in-place button and in the mode's note.
+  await expect(bar).not.toContainText(/\d+\s+changes?\b/);
+  await expect(
+    page.locator('[data-setup-save="primary"]'),
+    "writing zero changes over a setup does nothing, so the door is not the loud one"
+  ).not.toHaveAttribute("data-loud", /.*/);
+
   // And the API agrees: a PATCH of the values is accepted, not 404'd on `isLibrary`.
   const patch = await request.patch(`/api/setup-snapshots/${setupId}`, {
     data: { data: { camber_front: "-1.7" } },
@@ -135,16 +153,150 @@ test("an uploaded setup can be edited, and the edit saves", async ({ page, reque
   expect(patch.status(), await patch.text()).toBe(200);
 });
 
-test("a run's setup refuses an in-place write, and a correction keeps what the run changed", async ({
-  request,
-}) => {
-  const { carId, setupId, values } = await makeUploadedSetup(request);
+/** A complete run on `setupId`, changing exactly one field. Returns the run and its own snapshot. */
+async function logRunAgainst(
+  request: APIRequestContext,
+  input: { carId: string; setupId: string; values: Record<string, unknown>; key: string; to: string }
+): Promise<{ runId: string; runSetupId: string }> {
+  const runRes = await request.post("/api/runs", {
+    data: {
+      carId: input.carId,
+      setupBaselineSnapshotId: input.setupId,
+      setupData: { ...input.values, [input.key]: input.to },
+      // A complete run, so it is real history rather than a draft the guards may treat differently.
+      carRating: 6,
+    },
+  });
+  const runBody = (await runRes.json()) as { run?: { id: string }; id?: string };
+  expect(runRes.status(), JSON.stringify(runBody).slice(0, 300)).toBeLessThan(400);
+  const runId = runBody.run?.id ?? runBody.id;
+  expect(runId, "no run id in the create response").toBeTruthy();
 
-  // A chassis key off the sheet itself, so this doesn't hard-code one chassis's field names.
+  const res = await request.get(`/api/runs/${runId}/setup-snapshot`);
+  const body = (await res.json()) as { setupSnapshot: { id: string } };
+  return { runId: runId!, runSetupId: body.setupSnapshot.id };
+}
+
+/** The first non-tire key the sheet actually read — so this suite pins no one chassis's names. */
+function editableKey(values: Record<string, unknown>): string {
   const key = Object.keys(values).find(
     (k) => !["tires", "tires_setup", "additive", "additive_time"].includes(k)
   );
   expect(key, "the sheet read nothing, so there is nothing to change").toBeTruthy();
+  return key!;
+}
+
+/**
+ * The door decides what a save means (founder call, 2026-08-16).
+ *
+ * Same setup, same driver, two entrances. From the garage it is a starting point and saving must
+ * leave the run alone; from the run it is that day's record and saving corrects it. Before this,
+ * one run count decided for both and the garage's loud button said "Correct this run".
+ */
+test("a run's setup edits as a copy from the garage and as a correction from the run", async ({
+  page,
+  request,
+}) => {
+  const { carId, setupId, values } = await makeUploadedSetup(request);
+  const key = editableKey(values);
+  const { runId, runSetupId } = await logRunAgainst(request, {
+    carId,
+    setupId,
+    values,
+    key,
+    to: "9.5",
+  });
+
+  // ── The garage door: no `?run=`, so nothing here may write to the run ──────────────────────
+  await page.goto(`/cars/${carId}/setups/${runSetupId}/edit`);
+  const fork = page.locator('[data-setup-save="primary"]');
+  await expect(fork, "editing from the garage saves as its own setup").toHaveText(
+    "Save as new setup",
+    { timeout: 30_000 }
+  );
+  // The correction is still reachable — one run points here, so "this run" names something — but
+  // it is the quiet second door, never the one a driver presses by reflex.
+  await expect(page.locator('[data-setup-save="secondary"]')).toHaveText("Correct this run");
+
+  /*
+   * Opening a setup is not work. The bar used to arm itself the moment the editor handed its values
+   * back — which React does on its own, with nobody touching a box — and every setup therefore
+   * opened claiming unsaved changes. Dirty is a comparison now, so an untouched setup carries no
+   * amber and no count.
+   */
+  await expect(
+    page.locator(".setup-save-panel"),
+    "a setup nobody has touched has nothing to save"
+  ).not.toHaveAttribute("data-dirty", /.*/);
+  // The count, specifically: "changes" appears in the mode's own note and on the in-place button.
+  await expect(page.locator(".setup-save-panel")).not.toContainText(/\d+\s+changes?\b/);
+
+  await fork.click();
+  /*
+   * The predicate has to exclude the setup we started on. `toHaveURL(/setups\/[^/]+\/edit$/)`
+   * passes on the FIRST poll against the URL already in the bar, so the assertion after it read the
+   * old id while the POST was still in flight — a green test that proved nothing.
+   */
+  await page.waitForURL(
+    (url) => url.pathname.endsWith("/edit") && !url.pathname.includes(runSetupId),
+    { timeout: 30_000 }
+  );
+  const forkedId = page.url().match(/setups\/([^/]+)\/edit/)?.[1];
+  expect(forkedId, "the fork must land on a setup of its own").toBeTruthy();
+
+  // The whole point: Saturday is untouched.
+  const stillPointing = await request.get(`/api/runs/${runId}/setup-snapshot`);
+  expect(
+    ((await stillPointing.json()) as { setupSnapshot: { id: string } }).setupSnapshot.id,
+    "saving from the garage must not move the run onto the copy"
+  ).toBe(runSetupId);
+
+  /*
+   * And the copy says where it came from, rather than appearing from nowhere.
+   *
+   * Scoped to the body caption on purpose: the page header computes the same words into
+   * `.page-subtitle`, which `globals.css` sets to `display: none`. A bare text match resolves to
+   * that hidden copy and can never be satisfied — which is how the invisible provenance line was
+   * found in the first place.
+   */
+  await page.goto(`/cars/${carId}/setups/${forkedId}`);
+  await expect(
+    page.locator("p.ui-caption", { hasText: /Edited from/i }),
+    "a forked setup must name its source somewhere the driver can actually see"
+  ).toBeVisible({ timeout: 30_000 });
+
+  // ── The run's door: `?run=` makes the correction the loud one ──────────────────────────────
+  await page.goto(`/cars/${carId}/setups/${runSetupId}/edit?run=${runId}`);
+  await expect(page.locator('[data-setup-save="primary"]')).toHaveText("Correct this run", {
+    timeout: 30_000,
+  });
+  await expect(page.locator('[data-setup-save="secondary"]')).toHaveText("Save as new setup");
+});
+
+/** A `?run=` naming someone else's run, or a run that isn't on these numbers, buys nothing. */
+test("a ?run= that doesn't point at this setup falls back to the garage reading", async ({
+  page,
+  request,
+}) => {
+  const { carId, setupId, values } = await makeUploadedSetup(request);
+  const key = editableKey(values);
+  const a = await logRunAgainst(request, { carId, setupId, values, key, to: "9.5" });
+  const b = await logRunAgainst(request, { carId, setupId, values, key, to: "4.5" });
+  expect(b.runSetupId, "the two runs must have separate records").not.toBe(a.runSetupId);
+
+  // Run B's id against run A's snapshot: a real run, a real setup, but not each other's.
+  await page.goto(`/cars/${carId}/setups/${a.runSetupId}/edit?run=${b.runId}`);
+  await expect(
+    page.locator('[data-setup-save="primary"]'),
+    "the loud button must never be a correction the URL only claimed"
+  ).toHaveText("Save as new setup", { timeout: 30_000 });
+});
+
+test("a run's setup refuses an in-place write, and a correction keeps what the run changed", async ({
+  request,
+}) => {
+  const { carId, setupId, values } = await makeUploadedSetup(request);
+  const key = editableKey(values);
 
   // A run logged against the uploaded setup, changing exactly one thing.
   const runRes = await request.post("/api/runs", {

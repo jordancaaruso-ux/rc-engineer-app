@@ -40,8 +40,11 @@ export async function GET(request: Request, ctx: RouteCtx) {
    * `setupSheetModelId` means no sheet.
    */
   const blank = car.setupSheetModelId
-    ? await prisma.setupSheetBlank.findUnique({
-        where: { setupSheetModelId: car.setupSheetModelId },
+    ? await prisma.setupSheetBlank.findFirst({
+        // The PRIMARY blank answers "does this car fill as a sheet"; which EDITION a given setup
+        // draws on is a per-setup question the surfaces ask through `sheet-blank-pick`.
+        where: { setupSheetModelId: car.setupSheetModelId, isEdition: false },
+        orderBy: { createdAt: "asc" },
         select: { fillSurface: true, boxesJson: true },
       })
     : null;

@@ -143,6 +143,50 @@ export function RunSheetSetupFill({
     setDirtySinceSave(false);
   }
   /**
+   * Which of the chassis's sheets the seeded setup is written on — undefined while the server is
+   * asked, then null for the primary blank or an EDITION's id (`sheet-blank-pick`).
+   *
+   * Asked here, client-side, because this is the one sheet surface whose values live in the
+   * browser at pick time: the wizard seeds from the previous setup it already holds. Keyed on
+   * `seedKey`, not on the values — the values move with every box the driver fills, and the sheet
+   * they are being filled ON must not change under them mid-run. The surface render below waits
+   * for the answer, so the fill never seeds against the wrong sheet's plan and gets remounted.
+   */
+  const [editionBlankId, setEditionBlankId] = useState<string | null | undefined>(undefined);
+  const seedValuesRef = useRef(seedValues);
+  useEffect(() => {
+    seedValuesRef.current = seedValues;
+  });
+  useEffect(() => {
+    let cancelled = false;
+    const keys = Object.entries(seedValuesRef.current)
+      .filter(([, v]) => v.trim() !== "")
+      .map(([k]) => k)
+      .slice(0, 200);
+    if (keys.length === 0) {
+      // An empty setup starts on the primary blank — the sheet everyone knows.
+      setEditionBlankId(null);
+      return;
+    }
+    setEditionBlankId(undefined);
+    fetch(
+      `/api/setup-sheet-models/${setupSheetModelId}/sheet-blank-pick?keys=${encodeURIComponent(keys.join(","))}`,
+      { cache: "no-store" }
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { editionBlankId?: string | null } | null) => {
+        if (!cancelled) setEditionBlankId(d?.editionBlankId ?? null);
+      })
+      .catch(() => {
+        // The primary blank is always a sheet that draws; a failed pick must not cost the run form.
+        if (!cancelled) setEditionBlankId(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [setupSheetModelId, seedKey]);
+
+  /**
    * A save that lands clears the cue and shows "Saved ✓" for a beat, then the chip quietly
    * leaves — the subtle told-you-it-worked the founder asked for (2026-08-15), not a
    * permanent badge. `saveSuccess` itself stays true until the next save starts, so the
@@ -237,24 +281,26 @@ export function RunSheetSetupFill({
           )}
         </div>
       </div>
-      {open ? (
+      {open && editionBlankId !== undefined ? (
         <>
           {geometryValue ? (
             <SheetGeometryStrip
               value={geometryValue}
               baselineValue={geometryBaseline}
               templateKey={templateKey}
+              editionBlankId={editionBlankId}
               labLabels={{ s: "This run", g: "Setup you started from" }}
             />
           ) : null}
           <SheetFillSurface
             /*
-             * Keyed on the setup, so replacing the setup source above remounts the surface and it
-             * re-reads `initialValues`. See "ON RE-SEEDING" — the close/open cycle used to do this.
+             * Keyed on the setup AND the sheet it draws on, so replacing the setup source above
+             * remounts the surface and it re-reads `initialValues`. See "ON RE-SEEDING" — the
+             * close/open cycle used to do this.
              */
-            key={seedKey}
-            planUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-plan`}
-            pageImageUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-page`}
+            key={`${seedKey}:${editionBlankId ?? "primary"}`}
+            planUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-plan${editionBlankId ? `?blank=${encodeURIComponent(editionBlankId)}` : ""}`}
+            pageImageUrl={`/api/setup-sheet-models/${setupSheetModelId}/sheet-page${editionBlankId ? `?blank=${encodeURIComponent(editionBlankId)}` : ""}`}
             initialValues={seedValues}
             onChange={handleChange}
             onPlanLoaded={(p) => {

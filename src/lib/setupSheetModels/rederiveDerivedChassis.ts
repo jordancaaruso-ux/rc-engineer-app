@@ -82,7 +82,11 @@ export async function rederiveDerivedChassis(input: {
       schemaJson: true,
       defaultCalibrationId: true,
       defaultCalibration: { select: { id: true, calibrationDataJson: true } },
-      derivedFromBlank: {
+      // Re-derivation replaces the PRIMARY blank's boxes; editions have their own derivations.
+      sheetBlanks: {
+        where: { isEdition: false },
+        orderBy: { createdAt: "asc" },
+        take: 1,
         select: {
           id: true,
           boxesJson: true,
@@ -98,7 +102,7 @@ export async function rederiveDerivedChassis(input: {
     );
   }
 
-  const blank = model.derivedFromBlank;
+  const blank = model.sheetBlanks[0] ?? null;
   if (!blank?.setupDocument?.storagePath) {
     throw new Error(`chassis ${model.name} has no stored blank PDF to read again`);
   }

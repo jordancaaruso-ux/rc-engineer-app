@@ -6,6 +6,10 @@ import {
   type PdfFormFieldMappingRule,
   type SetupSheetCalibrationData,
 } from "@/lib/setupCalibrations/types";
+import {
+  measureSheetNamePresence,
+  type SheetNamePresence,
+} from "@/lib/setupCalibrations/sheetRecognition";
 import { readDerivedSheetValues } from "@/lib/setupSheetModels/readDerivedSheetValues";
 import { applyAllTextFieldMappings, normalizeTemplateExtractedValue } from "@/lib/setupCalibrations/applyTextTemplate";
 import { getCalibrationFieldKind } from "@/lib/setupCalibrations/calibrationFieldCatalog";
@@ -196,6 +200,13 @@ export type CalibrationMappingDiagnostic = {
    * looking".
    */
   derived?: { rules: number; keys: number };
+  /**
+   * Whether the file is the sheet this calibration was drawn for, measured by how many of the box
+   * NAMES the rules refer to exist in the PDF at all — see `sheetRecognition.ts` for why names and
+   * not values. This is the number that separates "a mostly-blank sheet" from "a rebuilt edition
+   * whose boxes were renamed", which before 2026-08-16 both ended as COMPLETED_WITH_WARNINGS.
+   */
+  namePresence?: SheetNamePresence;
   unmatched: {
     expectedFormKeys: string[];
     expectedTextKeys: string[];
@@ -361,9 +372,12 @@ export async function mapExtractedPdfWithCalibration(input: {
     importedKeys.push(...derivedKeys.filter((k) => !importedKeys.includes(k)));
   }
 
-  const presentPdfFieldNamesSample = input.extracted.formFields.fields
-    .map((f) => f.name)
-    .slice(0, 50);
+  const allPdfFieldNames = input.extracted.formFields.fields.map((f) => f.name);
+  const presentPdfFieldNamesSample = allPdfFieldNames.slice(0, 50);
+  const namePresence = measureSheetNamePresence({
+    calibrationData,
+    pdfFieldNames: allPdfFieldNames,
+  });
 
   const diag: CalibrationMappingDiagnostic = {
     calibrationProfileId: input.calibrationProfileId,
@@ -380,6 +394,7 @@ export async function mapExtractedPdfWithCalibration(input: {
     },
     matched: { keys: importedKeys.length, keysSample: importedKeys.slice(0, 50) },
     derived: { rules: Object.keys(derivedMappings).length, keys: derivedKeys.length },
+    namePresence,
     unmatched: {
       expectedFormKeys: Object.keys(formMappings).filter((k) => !importedKeys.includes(k)).slice(0, 60),
       expectedTextKeys: Object.keys(textMappings).filter((k) => !importedKeys.includes(k)).slice(0, 60),

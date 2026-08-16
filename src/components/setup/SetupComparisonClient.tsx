@@ -317,6 +317,53 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
   const both = slots.a && slots.b ? { a: slots.a, b: slots.b } : null;
   const sameSheet = both ? both.a.setupSheetModelId === both.b.setupSheetModelId : false;
 
+  /*
+   * Which of the chassis's sheets this pair draws on — undefined while the server is asked, then
+   * null for the primary blank or an EDITION's id. Both sides' keys go into the pick, so the
+   * sheet that can draw the pair wins; the surface waits for the answer (it seeds its plan once).
+   */
+  const [compareEditionBlankId, setCompareEditionBlankId] = useState<string | null | undefined>(
+    undefined
+  );
+  const compareKey = both && sameSheet ? `${both.a.id}|${both.b.id}` : null;
+  const compareModelId = both && sameSheet ? both.a.setupSheetModelId : null;
+  const bothRef = useRef(both);
+  bothRef.current = both;
+  useEffect(() => {
+    if (!compareKey || !compareModelId) {
+      setCompareEditionBlankId(undefined);
+      return;
+    }
+    const pair = bothRef.current;
+    const keys = [
+      ...new Set([
+        ...Object.keys(pair?.a.values ?? {}),
+        ...Object.keys(pair?.b.values ?? {}),
+      ]),
+    ].slice(0, 200);
+    if (keys.length === 0) {
+      setCompareEditionBlankId(null);
+      return;
+    }
+    let cancelled = false;
+    setCompareEditionBlankId(undefined);
+    fetch(
+      `/api/setup-sheet-models/${compareModelId}/sheet-blank-pick?keys=${encodeURIComponent(keys.join(","))}`,
+      { cache: "no-store" }
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { editionBlankId?: string | null } | null) => {
+        if (!cancelled) setCompareEditionBlankId(d?.editionBlankId ?? null);
+      })
+      .catch(() => {
+        // The primary always draws; a failed pick must not cost the comparison.
+        if (!cancelled) setCompareEditionBlankId(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [compareKey, compareModelId]);
+
   return (
     <div className="space-y-4">
       {!dbReady ? (
@@ -472,15 +519,18 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
             Hold the sheet to swap between the two setups. Both draw into the same boxes, so the only
             values that move are the ones that differ.
           </p>
-          <SheetCompareSurface
-            // Slot changes rebuild the surface: a different setup is a different comparison, and
-            // starting it at page 1, fit to the stage, is the right place to start reading.
-            key={`${both.a.id}|${both.b.id}`}
-            setupSheetModelId={both.a.setupSheetModelId}
-            a={{ label: entryLabel(both.a), values: both.a.values }}
-            b={{ label: entryLabel(both.b), values: both.b.values }}
-            templateKey={both.a.templateKey ?? both.b.templateKey}
-          />
+          {compareEditionBlankId !== undefined ? (
+            <SheetCompareSurface
+              // Slot changes rebuild the surface: a different setup is a different comparison, and
+              // starting it at page 1, fit to the stage, is the right place to start reading.
+              key={`${both.a.id}|${both.b.id}|${compareEditionBlankId ?? "primary"}`}
+              setupSheetModelId={both.a.setupSheetModelId}
+              editionBlankId={compareEditionBlankId}
+              a={{ label: entryLabel(both.a), values: both.a.values }}
+              b={{ label: entryLabel(both.b), values: both.b.values }}
+              templateKey={both.a.templateKey ?? both.b.templateKey}
+            />
+          ) : null}
         </CardPanel>
       ) : both && !sameSheet ? (
         <CardPanel contentClassName="space-y-1.5">

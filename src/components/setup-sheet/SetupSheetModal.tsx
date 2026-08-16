@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { GitCompare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
@@ -130,6 +131,8 @@ export function SetupSheetModal({
   const [modelTemplate, setModelTemplate] = useState<SetupSheetTemplate | null>(null);
   /** Set when this car's chassis draws as a sheet — the setup then shows ON the sheet. */
   const [sheetModelId, setSheetModelId] = useState<string | null>(null);
+  /** The EDITION this run's setup keys draw on, when not the primary blank. Rides with the model. */
+  const [sheetEditionBlankId, setSheetEditionBlankId] = useState<string | null>(null);
 
   useEffect(() => {
     setPortalReady(true);
@@ -164,6 +167,7 @@ export function SetupSheetModal({
       setSaveContext(null);
       setModelTemplate(null);
       setSheetModelId(null);
+      setSheetEditionBlankId(null);
       return;
     }
     const haveValues = run.setupSnapshot?.data !== undefined;
@@ -194,6 +198,7 @@ export function SetupSheetModal({
           sheet?: {
             sheetMode?: boolean;
             setupSheetModelId?: string | null;
+            editionBlankId?: string | null;
             template?: SetupSheetTemplate | null;
           } | null;
         }) => {
@@ -201,11 +206,9 @@ export function SetupSheetModal({
           if (!haveValues) setLoadedSetupData(payload.setupSnapshot?.data ?? {});
           setSaveContext(payload.save ?? null);
           setModelTemplate(payload.sheet?.template ?? null);
-          setSheetModelId(
-            payload.sheet?.sheetMode && payload.sheet.setupSheetModelId
-              ? payload.sheet.setupSheetModelId
-              : null
-          );
+          const sheetOn = Boolean(payload.sheet?.sheetMode && payload.sheet?.setupSheetModelId);
+          setSheetModelId(sheetOn ? payload.sheet!.setupSheetModelId! : null);
+          setSheetEditionBlankId(sheetOn ? (payload.sheet?.editionBlankId ?? null) : null);
         }
       )
       .catch(() => {
@@ -213,6 +216,7 @@ export function SetupSheetModal({
         if (!haveValues) setLoadedSetupData({});
         setModelTemplate(null);
         setSheetModelId(null);
+        setSheetEditionBlankId(null);
       });
     return () => {
       alive = false;
@@ -550,6 +554,24 @@ export function SetupSheetModal({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {/*
+              The door into the editor from the run's own side — the only one there has ever been,
+              and until 2026-08-16 there was none at all: a driver who wanted to fix what they had
+              logged had to walk out to the garage, where editing that setup now deliberately does
+              NOT touch the run. `?run=` is what tells the editor which side of that line it is on
+              (see `setupSaveMode.ts`), so it is the whole point of this link.
+
+              Owner only: `action === "mark"` is the server's answer to "is this viewer the one who
+              logged it" — a teammate may read the setup and copy it, never correct it.
+            */}
+            {run?.setupSnapshot?.id && carId && saveContext?.action === "mark" ? (
+              <Link
+                href={`/cars/${carId}/setups/${run.setupSnapshot.id}/edit?run=${encodeURIComponent(run.id)}`}
+                className="shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-medium no-underline transition hover:bg-muted/90"
+              >
+                Edit setup
+              </Link>
+            ) : null}
+            {/*
               Keyed by snapshot: opening a second session reuses this component (the modal is never
               unmounted), and without a fresh key the new setup would inherit the last one's
               "Saved" state.
@@ -700,6 +722,7 @@ export function SetupSheetModal({
                 sheetModelId ? (
                   <SheetCompareSurface
                     setupSheetModelId={sheetModelId}
+                    editionBlankId={sheetEditionBlankId}
                     a={{ label: "This run", values: runSetup }}
                     b={{ label: baselineLabel ?? "Comparison", values: baselineValue }}
                     templateKey={template.templateKey}
@@ -717,6 +740,7 @@ export function SetupSheetModal({
                   ) : null}
                   <ReadOnlySheetSurface
                     setupSheetModelId={sheetModelId}
+                    editionBlankId={sheetEditionBlankId}
                     values={runSetup}
                     templateKey={template.templateKey}
                     labLabels={{ s: "This run" }}

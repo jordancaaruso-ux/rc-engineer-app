@@ -101,9 +101,11 @@ export default async function NewCarSetupPage(props: {
    * set — so falling back to the form on a half-named sheet would hand the driver a shorter form
    * and silently drop the rest of their sheet.
    */
+  // A NEW setup starts empty, so it starts on the PRIMARY blank — the sheet everyone knows.
   const blank = car.setupSheetModelId
-    ? await prisma.setupSheetBlank.findUnique({
-        where: { setupSheetModelId: car.setupSheetModelId },
+    ? await prisma.setupSheetBlank.findFirst({
+        where: { setupSheetModelId: car.setupSheetModelId, isEdition: false },
+        orderBy: { createdAt: "asc" },
         select: { boxesJson: true, fillSurface: true },
       })
     : null;

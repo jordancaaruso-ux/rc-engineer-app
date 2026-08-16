@@ -76,8 +76,10 @@ export default async function CarBaselineViewPage(props: {
   if (!car.setupSheetModelId || baseline.setupSheetModelId !== car.setupSheetModelId) notFound();
 
   const template = await getSetupSheetTemplateForCar(user.id, car, "setup");
-  const blank = await prisma.setupSheetBlank.findUnique({
-    where: { setupSheetModelId: car.setupSheetModelId },
+  // Baselines are authored on the canonical schema, so the PRIMARY blank is always the paper.
+  const blank = await prisma.setupSheetBlank.findFirst({
+    where: { setupSheetModelId: car.setupSheetModelId, isEdition: false },
+    orderBy: { createdAt: "asc" },
     select: { boxesJson: true, fillSurface: true },
   });
   const sheetMode = chassisFillsAsSheet(blank);

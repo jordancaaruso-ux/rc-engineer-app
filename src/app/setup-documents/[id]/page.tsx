@@ -10,6 +10,12 @@ import { SetupDocumentReviewClient } from "@/components/setup-documents/SetupDoc
 import { AutoRefreshWhileProcessing } from "@/components/setup-documents/AutoRefreshWhileProcessing";
 import { AiExtractionReviewPanel, type AiReviewField } from "@/components/setup-documents/AiExtractionReviewPanel";
 import { ChassisDisambiguationPrompt, type ChassisChoice } from "@/components/setup-documents/ChassisDisambiguationPrompt";
+import { UnrecognisedSheetPrompt } from "@/components/setup-documents/UnrecognisedSheetPrompt";
+import {
+  isUnrecognisedSheet,
+  unrecognisedSheetMessage,
+  type SheetNamePresence,
+} from "@/lib/setupCalibrations/sheetRecognition";
 import { ensureSetupDocumentCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
 import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 import { loadSetupSheetModelById } from "@/lib/setupSheetModels/resolveModelForCar";
@@ -151,6 +157,38 @@ export default async function SetupDocumentDetailPage({
   const chassisCandidates =
     Array.isArray(chassisDisambig) && !doc.setupSheetModelId ? chassisDisambig : null;
 
+  /*
+   * A rebuilt edition of a sheet we do know (2026-08-16): the file is a good fillable PDF, but the
+   * calibration we used names boxes that aren't in it, so no setup was created. Computed from the
+   * stored diagnostic rather than passed through from the upload response, so it also shows when
+   * the driver comes back to this document later.
+   */
+  const namePresence = (() => {
+    const mapping =
+      doc.importDiagnosticJson && typeof doc.importDiagnosticJson === "object"
+        ? (doc.importDiagnosticJson as { mapping?: { namePresence?: SheetNamePresence } }).mapping
+        : undefined;
+    const p = mapping?.namePresence;
+    if (!p || typeof p.referenced !== "number" || typeof p.present !== "number") return null;
+    return p;
+  })();
+  const unrecognisedSheet =
+    namePresence && !doc.createdSetupId && isUnrecognisedSheet(namePresence) ? namePresence : null;
+  let effectiveCalibrationName: string | null = null;
+  if (unrecognisedSheet && effectiveCalibration.calibrationId) {
+    // Calibrations are global/community-shared — this is a label for the message, not an access read.
+    const calRow = await prisma.setupSheetCalibration.findUnique({
+      where: { id: effectiveCalibration.calibrationId },
+      select: { name: true },
+    });
+    effectiveCalibrationName = calRow?.name ?? null;
+  }
+  // Prefill the name with the chassis they picked, marked as their own edition, so two editions of
+  // one car don't end up as two rows called the same thing.
+  const suggestedSheetName = docSetupSheetModelName
+    ? `${docSetupSheetModelName} (my sheet)`
+    : (doc.originalFilename ?? "My setup sheet").replace(/\.pdf$/i, "");
+
   // AI-read documents get the side-by-side review panel: model schema supplies labels,
   // sections, and choice options; the AI diagnostic supplies confidence + flagged keys.
   let aiReviewFields: AiReviewField[] | null = null;
@@ -287,6 +325,19 @@ export default async function SetupDocumentDetailPage({
       ) : null}
       {chassisCandidates && chassisCandidates.length > 0 ? (
         <ChassisDisambiguationPrompt docId={doc.id} candidates={chassisCandidates} />
+      ) : null}
+      {unrecognisedSheet ? (
+        <UnrecognisedSheetPrompt
+          docId={doc.id}
+          message={unrecognisedSheetMessage({
+            presence: unrecognisedSheet,
+            calibrationName: effectiveCalibrationName,
+          })}
+          suggestedName={suggestedSheetName}
+          storagePath={doc.storagePath}
+          originalFilename={doc.originalFilename ?? "sheet.pdf"}
+          mimeType={doc.mimeType ?? "application/pdf"}
+        />
       ) : null}
       <AutoRefreshWhileProcessing
         active={doc.importStatus === "PENDING" || doc.importStatus === "PROCESSING"}

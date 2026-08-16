@@ -87,6 +87,8 @@ Excluded on purpose: bump-steer and toe-gain shim fields (a steering model somed
 
 Blank shim = 0, tire = nominal, etc.; the geometry block shows a small "assumed: …" note listing exactly what was defaulted. RC always exists; deltas between two sheets with the same gaps stay valid. Never block, never silently guess.
 
+The doctrine's limit (2026-08-16): a default stands in for a box the driver **left empty**. A sheet whose keys the calc cannot read at all — an unaliased **edition** — has no gaps, only values under names the calc doesn't speak; all-defaults there is a fabricated answer, so sheet surfaces hide the strip until the edition's keys are aliased onto canonical ones. Not gated on values found: one coincidentally-canonical key must not surface a strip that is one real number in seventeen defaults.
+
 ### Store computed results per setup document
 
 RC F/R, rake, camber gain, and arm angles persist on (or derive cheaply from) each setup document — this is what makes compare surfaces, Engineer context, and aggregation queries cheap.
