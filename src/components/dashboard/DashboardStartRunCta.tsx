@@ -22,6 +22,13 @@ import { warmNewRunForm } from "@/lib/runs/warmNewRunForm";
  * measured Sora 700 metrics), arrow right. No icon disc, square corners.
  * Founder-tuned numbers: headline 20px · notch→text gap 8px · notch width 6.5px.
  *
+ * Light treatment reworked 2026-08-16 ("04 + sheen", artifact board). The face
+ * is FLAT #FFD60A and stays that way: every light source lives at the rim —
+ * cream along the top edge, bronze along the bottom, a whisper down each side —
+ * so nothing soft is ever laid over the yellow to desaturate it. The one bright
+ * thing that crosses the face is `.logrun-fx`'s hard-edged sheen band; read the
+ * note above it in globals.css for why white bleaches this particular yellow.
+ *
  * Draft-aware, mirroring the dock's Log-run circle: with an unfinished run today
  * the headline flips to "Finish today's run" (→ the draft), the micro label shows
  * the save time (wording-only tell — notch stays dark), and a quiet outlined
@@ -76,11 +83,11 @@ export function DashboardStartRunCta({
         aria-label={hasDraft ? "Finish today's run" : "Start a new run"}
         // Demo walkthrough stop 1. Inert for everyone else.
         data-tour="log-run"
-        className="tap-active logrun-glow relative isolate flex w-full flex-col overflow-visible rounded-2xl bg-primary px-[18px] pb-4 pt-[15px] text-left text-primary-foreground shadow-[0_10px_26px_-12px_rgba(255,214,10,0.55),inset_0_1px_0_rgba(255,255,255,0.35)] transition hover:brightness-105 active:brightness-95"
+        className="tap-active logrun-glow relative isolate flex w-full flex-col overflow-visible rounded-2xl bg-primary px-[18px] pb-4 pt-[15px] text-left text-primary-foreground shadow-[0_8px_20px_-10px_rgba(255,214,10,0.6),inset_0_1.5px_0_rgba(255,252,230,0.62),inset_0_-1.5px_0_rgba(122,90,0,0.3),inset_1px_0_0_rgba(255,252,230,0.18),inset_-1px_0_0_rgba(122,90,0,0.14)] transition hover:brightness-105 active:brightness-95"
       >
-        {/* Moving-hotspot face layer — drifts behind the content, clipped to the
-            bar shape; the aura ring on ::after still radiates outward. Stays a DIRECT
-            child of the link so its containing block is unchanged. */}
+        {/* Sheen face layer — a narrow band crosses behind the content, clipped to
+            the bar shape; the aura ring on ::after still radiates outward. Stays a
+            DIRECT child of the link so its containing block is unchanged. */}
         <span className="logrun-fx" aria-hidden />
         {/* The row the card has always been. The link became a column only so an
             optional footer can sit under it; with no footer this renders identically. */}

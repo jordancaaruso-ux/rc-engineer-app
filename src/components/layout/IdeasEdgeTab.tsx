@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { Lightbulb } from "@phosphor-icons/react";
+import { LightbulbFilament, ListChecks, Notepad } from "@phosphor-icons/react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DashboardActionItemRow } from "@/lib/dashboardServer";
@@ -23,7 +23,7 @@ type Lists = {
 };
 
 /**
- * How the desktop rail's lightbulb reaches this panel.
+ * How the desktop rail's Ideas button reaches this panel.
  *
  * A window event rather than a context provider, for the same reason `DemoBanner`
  * talks to the tour this way: the panel is mounted once at the shell root and the
@@ -39,9 +39,17 @@ export function openIdeasPanel(): void {
 
 /**
  * "Ideas & reminders" — a small tab on the phone's bottom-left edge, just above
- * the dock, and on desktop the lightbulb in the top rail's utility cluster. Both
+ * the dock, and on desktop the Ideas button in the top rail's utility cluster. Both
  * open the same panel, which docks to the edge its trigger lives on: left on the
  * phone, right on desktop (nav restructure 2026-08-12).
+ *
+ * Both triggers are a NOTEPAD, and the two lists inside are a filament bulb (try)
+ * and a tick list (do) — founder, 2026-08-16. It was a filled lightbulb, which at
+ * 16px on the yellow chip lost every line inside the glass and left a dome over two
+ * tapering bars: a hot air balloon. The notepad is deliberately a level up from its
+ * own contents, so neither list icon is a shrunken copy of the control you pressed.
+ * Anything that goes here has to read at 16px inside a 20px-wide sliver, so prefer
+ * marks whose OUTLINE carries the meaning over ones that hide it in interior detail.
  *
  * Same three rules it has always had (founder lock 2026-07-14): a utility and
  * never a destination, never an active state, available app-wide. Only the
@@ -152,7 +160,7 @@ export function IdeasEdgeTab() {
    */
   return createPortal(
     <>
-      {/* Mobile trigger. Desktop's is the rail lightbulb, via `openIdeasPanel`. */}
+      {/* Mobile trigger. Desktop's is the rail's Ideas button, via `openIdeasPanel`. */}
       <button
         type="button"
         onClick={() => (open ? setOpen(false) : openPanel())}
@@ -162,7 +170,7 @@ export function IdeasEdgeTab() {
            `.ideas-edge-tab` in globals.css for why the utility loses. */
         className={cn("ideas-edge-tab", open && "is-out")}
       >
-        <Lightbulb size={16} weight="fill" aria-hidden />
+        <Notepad size={16} weight="regular" aria-hidden />
       </button>
 
       {panel.mounted ? (
@@ -204,10 +212,10 @@ export function IdeasEdgeTab() {
           </div>
 
           <div className="grid grid-cols-2 gap-1 pb-3">
-            <TabButton active={tab === "try"} onClick={() => setTab("try")}>
+            <TabButton active={tab === "try"} onClick={() => setTab("try")} icon={LightbulbFilament}>
               Things to try
             </TabButton>
-            <TabButton active={tab === "do"} onClick={() => setTab("do")}>
+            <TabButton active={tab === "do"} onClick={() => setTab("do")} icon={ListChecks}>
               Things to do
             </TabButton>
           </div>
@@ -277,13 +285,24 @@ export function IdeasEdgeTab() {
   );
 }
 
+/**
+ * The icon is the second cue for which tab you are on: heavier strokes when active,
+ * lighter when it isn't.
+ *
+ * BOLD on active, never FILL. Filling was tried first and reproduced the bug this whole
+ * change exists to fix — a filled bulb at 14px has no filament and no glass, just a dome,
+ * and a filled tick list is a solid square. Fill throws away interior detail, which is the
+ * only thing distinguishing either mark at this size. Bold thickens the strokes and keeps it.
+ */
 function TabButton({
   active,
   onClick,
+  icon: Icon,
   children,
 }: {
   active: boolean;
   onClick: () => void;
+  icon: React.ComponentType<{ size?: number; weight?: "regular" | "bold"; "aria-hidden"?: boolean }>;
   children: React.ReactNode;
 }) {
   return (
@@ -291,12 +310,13 @@ function TabButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "tap-active rounded-lg px-3 py-2 text-[13px] font-semibold tracking-tight transition",
+        "tap-active flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold tracking-tight transition",
         active
           ? "bg-muted text-foreground"
           : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
       )}
     >
+      <Icon size={14} weight={active ? "bold" : "regular"} aria-hidden />
       {children}
     </button>
   );

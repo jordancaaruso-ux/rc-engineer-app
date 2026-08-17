@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Lightbulb } from "@phosphor-icons/react";
+import { Notepad } from "@phosphor-icons/react";
 import { JrcMark } from "@/components/brand/JrcMark";
 import { PRODUCT_NAME } from "@/lib/brand/brandNames";
 import { IconAddRun } from "@/components/icons/JRCIcons";
@@ -155,16 +155,21 @@ export const TopRail = memo(function TopRail() {
         </nav>
 
         <div className="top-rail-cluster">
-          {/* Labelled, unlike the gear beside it: a lightbulb alone reads as
-              "tips" or "hints", and the panel it opens is the driver's own
-              scratchpad. Settings needs no word — a gear is a gear. */}
+          {/* Labelled, unlike the gear beside it: the mark alone reads as some
+              generic "notes" surface, and the panel it opens is the driver's own
+              scratchpad. Settings needs no word — a gear is a gear.
+
+              Notepad, not a lightbulb (founder, 2026-08-16) — the filled bulb read
+              as a hot air balloon at chip size. Kept in step with the phone's edge
+              tab in `IdeasEdgeTab`; the two are never on screen together, but they
+              are the same control. */}
           <button
             type="button"
             onClick={() => openIdeasPanel()}
             aria-label="Ideas and reminders"
             className="tap-active top-rail-utility has-label"
           >
-            <Lightbulb size={18} weight="fill" aria-hidden />
+            <Notepad size={18} weight="regular" aria-hidden />
             <span>Ideas</span>
           </button>
 

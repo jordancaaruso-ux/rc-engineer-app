@@ -93,6 +93,25 @@
   /* Best-lap violet — the "purple" of timing screens. Chart dots and lap numerals. */
   --color-best-lap: 167 139 250; /* #A78BFA */
 
+  /*
+   * Categorical driver hues — the ONLY place in the app where colour means
+   * "which person", not "how fast". Three slots, assigned in fixed order as you
+   * tick drivers to compare on a team day, and never cycled: a fourth tick is
+   * refused rather than reusing slot 1, because two lines the same colour is a
+   * chart that lies.
+   *
+   * Blue / orange / violet on purpose. Green and red are reserved app-wide for
+   * pace and quality deltas (VISUAL_NORTH_STAR), so a green driver line would be
+   * read as a gain by everyone who has used the rest of the product; yellow is
+   * reserved for actions. That leaves this triad, which is also the strongest
+   * set available: validated with the dataviz palette checker against `card` in
+   * both themes — every check PASS, worst adjacent-pair separation ΔE 20.9 under
+   * simulated colour-blindness (the 3-slot warm set it replaced managed 9.2).
+   */
+  --color-series-1: 57 135 229; /* #3987E5 */
+  --color-series-2: 224 104 47; /* #E0682F */
+  --color-series-3: 160 124 232; /* #A07CE8 */
+
   /* Flat charcoal base — red/blue mesh retired. Faded hero lives only on login/dashboard. */
   --body-glow-red-strong: 0;
   --body-glow-red-soft: 0;
@@ -158,9 +177,19 @@
    * Pill top = title-centre − 17px (half the pill). Tracks the title across the
    * whole < md range where the pills are visible. If `.page-title`'s font-size
    * or line-height changes, update this. Shared by MobileBrandMark + AccountMenu.
+   *
+   * Split in two (2026-08-16): `--top-chrome-inset` is the pill's distance from
+   * the top of the CONTENT, with the safe area and the demo banner factored out.
+   * A page that draws its own title row beside the pills — Sessions inside a day
+   * — needs exactly that number to line its row up with them, and before the
+   * split there was no way to ask for it: the sum baked the datum in, so the row
+   * hand-matched a `pt-1` against it and finished 7px short, leaving the pill
+   * hanging over the card below. Anything positioning against the VIEWPORT still
+   * wants `--top-chrome-y`; only in-flow content wants the inset alone.
    */
+  --top-chrome-inset: calc(7px + 0.575 * clamp(22px, 4vw, 30px));
   --top-chrome-y: calc(
-    env(safe-area-inset-top, 0px) + var(--demo-banner-h, 0px) + 7px + 0.575 * clamp(22px, 4vw, 30px)
+    env(safe-area-inset-top, 0px) + var(--demo-banner-h, 0px) + var(--top-chrome-inset)
   );
 
   /*
@@ -263,6 +292,11 @@
   --color-elevate: 25 24 21; /* tint with ink, not white */
   --color-warning: 140 84 0; /* #8C5400 — 5.6:1 (amber-600 is 2.6:1) */
   --color-best-lap: 109 40 217; /* #6D28D9 — 6.6:1 (#A78BFA is 2.5:1) */
+  /* Driver hues, re-stepped for paper: the dark trio sits at 2.4–2.7:1 on #FCFBF8.
+     Same three families, same fixed order — validated on this surface, all PASS. */
+  --color-series-1: 42 120 214; /* #2A78D6 */
+  --color-series-2: 217 92 40; /* #D95C28 */
+  --color-series-3: 138 92 214; /* #8A5CD6 */
   /* Darker than the card here, lighter than it in dark — the bar has to sit
      AGAINST the surface, and on paper that means down, not up. */
   --color-skeleton: 226 221 210; /* #E2DDD2 on #FCFBF8 — 1.31:1 */
@@ -474,6 +508,17 @@ html[data-standalone="true"] #pwa-splash svg {
   height: auto;
   /* Gentle, consistent entrance so the cold launch reads as intentional. */
   animation: pwa-splash-mark-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+/*
+ * The splash backdrop follows the theme (`--page-bg-base`) but the mark cannot:
+ * its yellow is baked into the path data in `splashMark.ts`, so on paper it was a
+ * pale glyph on a pale sheet. Same call as the top rail and the mobile pill — on
+ * light the mark is ink, and yellow keeps meaning "action" (VISUAL_NORTH_STAR).
+ * Set `fill` rather than `filter: brightness(0)` because this one is inline SVG,
+ * so CSS can reach the path directly; the two <img> sites have no such option.
+ */
+html[data-theme="light"][data-standalone="true"] #pwa-splash svg path {
+  fill: rgb(var(--color-foreground));
 }
 @keyframes pwa-splash-mark-in {
   from {
@@ -1000,7 +1045,7 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
 }
 
 /*
- * Mobile only — desktop's trigger is the rail's lightbulb, and two triggers for
+ * Mobile only — desktop's trigger is the rail's Ideas button, and two triggers for
  * one panel is one too many.
  *
  * The breakpoint lives HERE and not as `md:hidden` in the JSX: this rule sets
@@ -1081,7 +1126,7 @@ body[data-logrun-wizard-chrome] .ideas-edge-tab {
  * No count badge (founder, 2026-08-12). It only ever appeared after you had opened
  * the panel once — that is when the lists load — so in practice it was blank, and
  * making it truthful on arrival would have cost an /api/action-items fetch on every
- * page load for every user to render one digit. The lightbulb alone, centred.
+ * page load for every user to render one digit. The mark alone, centred.
  */
 
 .ideas-scrim {
@@ -1095,7 +1140,7 @@ body[data-logrun-wizard-chrome] .ideas-edge-tab {
 /*
  * The panel docks to the edge its TRIGGER lives on, which is why it differs by
  * platform: the phone opens it from the bottom-left tab, so it comes in from the
- * left; desktop opens it from the lightbulb in the rail's right-hand cluster, so
+ * left; desktop opens it from the Ideas button in the rail's right-hand cluster, so
  * it comes in from the right. A panel that flies in from the opposite side of the
  * screen to the thing you pressed reads as a different surface arriving.
  */
@@ -1738,114 +1783,67 @@ html[data-nav-pending] .page {
   }
 }
 
+
 /* --------------------------------------------------------------------------
-   Sessions — master-detail at lg+
+   Sessions — a pushed screen takes the whole phone
    --------------------------------------------------------------------------
-   Below lg this is untouched: the same server-rendered `<details>` accordion,
-   session opens in place. That is the trackside interaction and it stays exactly
-   as it was.
+   Below lg, Sessions is a push stack: the list, then a day, then (in team scope)
+   a driver. `SessionsBrowser` publishes how deep you are on <body>; everything
+   marked `sessions-chrome` belongs to the LIST — the page header that says
+   "Sessions" and the filter ribbon — so it folds away once you are inside one.
 
-   At lg+ the SAME markup becomes two panes — session list left, the open
-   session's runs right — with no client state, no viewport JS and no second copy
-   of the DOM. The trick is that the detail pane is a child of `<details>` but
-   absolutely positioned against `.sessions-split`, so it leaves the accordion's
-   flow without leaving its element. Native `<details>` still owns open/closed, so
-   a closed session's pane is simply not rendered, and the URL still drives which
-   one is open (`?openGroup=`) — selection was already shareable, and stays so.
-
-   If a reader opens several sessions the panes stack on top of each other and the
-   last one wins. That is the correct desktop reading of "which session am I
-   looking at", and it costs nothing to allow.
+   Without this the day screen opened 340px down a 844px phone, under a heading
+   naming a screen you had already left. At lg+ nothing happens: the rail is
+   still there, so the chrome still describes what you're looking at.
 --------------------------------------------------------------------------- */
-/* Belongs to the lg+ master-detail only — the phone accordion has no second column to
-   leave empty, so this never renders there. */
-.sessions-empty {
-  display: none;
-}
-
-@media (min-width: 1024px) {
-  .sessions-split {
-    position: relative;
-    /* Width of the list column. The detail pane starts exactly here. */
-    --sessions-list-w: 21rem;
-    /* The list alone can be shorter than the pane it sits beside — a single
-       session would otherwise give the runs a ~60px-tall window. */
-    min-height: 32rem;
-  }
-
-  /* The group separator is a full-bleed border on `<details>`, which would draw a
-     hairline straight across the detail pane. Move the rule onto the summary so it
-     spans the list column only. */
-  .sessions-split > details {
-    border-top-color: transparent;
-  }
-  .sessions-split > details > summary {
-    max-width: var(--sessions-list-w);
-    border-top: 1px solid rgb(var(--color-border));
-  }
-  .sessions-split > details:first-of-type > summary {
-    border-top-width: 0;
-  }
-
-  .sessions-split > details > .session-detail {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: var(--sessions-list-w);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    border-top: 0;
-    border-left: 1px solid rgb(var(--color-border));
-    /* OPAQUE, overriding the `bg-background/60` glass the phone accordion wears. Every
-       pane is positioned into this one column, so a translucent pane is a pane you can
-       see the others through: two open sessions rendered doubled member names and lap
-       times struck over each other. SessionsDesktopMasterDetail keeps it to one open
-       session; this makes a second one harmless rather than unreadable. */
-    background-color: rgb(var(--color-background));
+@media (max-width: 1023.98px) {
+  /* The filter ribbon is list-only furniture — it goes outright. */
+  body[data-sessions-depth="deep"] .sessions-chrome:not(.page-header) {
+    display: none;
   }
 
   /*
-   * The right-hand column with nothing selected. Closing the open session used to leave
-   * a bordered void the width of the pane — the layout still promised a detail view and
-   * showed none. Pure CSS via `:has()`: no state to keep, and it cannot drift out of sync
-   * with which `<details>` is actually open.
+   * The header collapses rather than disappearing, using the same trick `is-echo`
+   * uses at md+. `display: none` would take `.page-title` out of the DOM with it,
+   * and two things read that node: `MobileTitleCondenser`, which fades the compact
+   * title into the top band on scroll, and every screen reader, which would be
+   * left on a page with no <h1> at all. So the title block goes screen-reader-only
+   * and the padding goes to zero — the band is fixed chrome and keeps its place;
+   * only the ~100px the heading occupied comes back.
+   *
+   * The back arrow goes too: it points at /analysis, and inside a day the back
+   * that matters is one level up, which the browser's own control does.
+   *
+   * The safe-area inset STAYS (2026-08-16). Below md this padding is the only
+   * thing in the app holding page content clear of the notch — `.page` takes the
+   * inset at md+ only — so zeroing it outright dropped the day screen under the
+   * status bar in the installed app while the corner pills, which carry the inset
+   * themselves via `--top-chrome-y`, stayed put. The two came apart by the full
+   * height of the status bar. Invisible in mobile Safari, where the inset is 0,
+   * which is why it survived this long. Only the 1.5rem of title air goes.
    */
-  .sessions-split:not(:has(> details[open])) > .sessions-empty {
+  body[data-sessions-depth="deep"] .page-header.sessions-chrome {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: 0;
+  }
+  body[data-sessions-depth="deep"] .page-header.sessions-chrome > div {
     position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: var(--sessions-list-w);
-    display: grid;
-    place-items: center;
-    border-left: 1px solid rgb(var(--color-border));
-    background-color: rgb(var(--color-background));
-    color: rgb(var(--color-faint));
-    font-size: 13px;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
-
-  /* The pager's "show more" footer is a sibling of the groups; keep it under the
-     list rather than letting it run the full width behind the pane. */
-  .sessions-split > div {
-    max-width: var(--sessions-list-w);
-  }
-
-  /* The open session's row reads as selected, so the pane on the right is attributable
-     to a row on the left — without that, a two-pane view is just two lists. Only needed
-     at lg+: in the accordion the content sits directly under its own summary, so what it
-     belongs to is never in question.
-
-     (Which session is open, and that only one is, is set by SessionsDesktopMasterDetail —
-     a closed `<details>` cannot be revealed from CSS, so it could not be done here.) */
-  .sessions-split > details[open] > summary > div {
-    background-color: rgb(var(--color-muted) / 0.5);
-  }
-}
-
-@media (min-width: 1536px) {
-  .sessions-split {
-    --sessions-list-w: 24rem;
+  /*
+   * The arrow, unlike the title, is not worth keeping for assistive tech: the
+   * screen-reader-only treatment above clips it visually but leaves a 36px
+   * focusable link off the top of the page, and `SessionsBrowser` has already
+   * handed the fixed corner pill a better back — one level up rather than out to
+   * /analysis. So this one goes properly.
+   */
+  body[data-sessions-depth="deep"] .page-header.sessions-chrome a[aria-label="Back"] {
+    display: none;
   }
 }
 
@@ -2443,12 +2441,25 @@ html[data-nav-pending] .page {
   }
 }
 
-/* On-face "moving hotspot" (founder pick 2026-07-16: bold + offset). A soft
-   bright spot drifts across the yellow face like a reflection sliding as the
-   phone tilts. Lives in its own overflow-clipped layer so it stays inside the
-   button shape, while the aura ring on ::after still radiates outward. Runs on a
-   7.6s beat — every 2nd aura ping ("offset"), so the two never lockstep. Sits
-   above the fill (z-1) but below content (which is lifted to z-2). */
+/* On-face sheen pass (founder pick 2026-08-16, replacing the drifting white
+   hotspot of 2026-07-16). A narrow band leaned over to the notch's angle sweeps
+   across the yellow and leaves.
+   ---------------------------------------------------------------------------
+   WHY THE HOTSPOT WENT. #FFD60A is 255 red, 214 green, 10 blue — red is pinned
+   and green is near it, so a white overlay can only really raise BLUE, which is
+   the channel that stops a colour being yellow. The old spot was white at 0.55,
+   which lands on #FFED91: saturation 96% -> 43%. It read as bleach, not shine.
+   It was also 62% as wide as the button with its falloff out at 78%, so most of
+   the bar sat inside it at any moment and it had no edge to read as a
+   reflection. The band below may go nearly white at its core precisely BECAUSE
+   it is ~14% of the width with a hard edge — that is what a specular is.
+   ---------------------------------------------------------------------------
+   Lives in its own overflow-clipped layer so it stays inside the button shape,
+   while the aura ring on ::after still radiates outward. Sits above the fill
+   (z-1) but below content (which is lifted to z-2).
+
+   Also worn by the run page's "Ask the Engineer" button (`RunPageClient`),
+   which keeps its own gradient face — the band works over that too. */
 .logrun-fx {
   position: absolute;
   inset: 0;
@@ -2457,36 +2468,53 @@ html[data-nav-pending] .page {
   pointer-events: none;
   z-index: 1;
 }
+/*
+ * 111deg leans the band the same way as the CTA's -21deg sector notch.
+ * The image is 240% of the button wide, so the band spans ~4.8% of a gradient
+ * line ~2.3x the button's width — 51px on the 354px bar, and it SCALES with its
+ * box, so the same rule is an 8px glint on the 52px dock circle.
+ */
 .logrun-fx::before {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(
-    closest-side,
-    rgba(255, 255, 255, 0.55),
-    rgba(255, 255, 255, 0.16) 46%,
-    rgba(255, 255, 255, 0) 78%
+  background-image: linear-gradient(
+    111deg,
+    rgba(255, 250, 215, 0) 47.1%,
+    rgba(255, 250, 215, 0.42) 48.6%,
+    rgba(255, 253, 238, 0.95) 50%,
+    rgba(255, 250, 215, 0.42) 51.4%,
+    rgba(255, 250, 215, 0) 52.9%
   );
   background-repeat: no-repeat;
-  background-size: 62% 240%;
-  background-position: -25% 50%;
-  animation: rc-logrun-hotspot 7.6s ease-in-out infinite;
+  background-size: 240% 100%;
+  background-position: 130% 50%;
+  animation: rc-logrun-sheen 2.6s cubic-bezier(0.42, 0, 0.4, 1) infinite;
 }
-@keyframes rc-logrun-hotspot {
+/*
+ * Counting the position DOWN sweeps the band left to right: with an image wider
+ * than its box, background-position moves the image the opposite way to the
+ * number. Travel fills 84% of the cycle, so the band still crosses in ~2.2s —
+ * the speed it always had — and only the rest between passes shortens, to 0.4s
+ * (founder call 2026-08-16, "B": twice as often, same sweep).
+ */
+@keyframes rc-logrun-sheen {
   0% {
-    background-position: -25% 50%;
+    background-position: 130% 50%;
   }
-  50% {
-    background-position: 125% 50%;
-  }
+  84%,
   100% {
-    background-position: -25% 50%;
+    background-position: -30% 50%;
   }
 }
+/*
+ * A band parked mid-face reads as a smear on the paint rather than a highlight,
+ * so with motion off the layer goes away entirely and the lit rim carries the
+ * surface on its own.
+ */
 @media (prefers-reduced-motion: reduce) {
-  .logrun-fx::before {
-    animation: none;
-    background-position: 60% 50%;
+  .logrun-fx {
+    display: none;
   }
 }
 

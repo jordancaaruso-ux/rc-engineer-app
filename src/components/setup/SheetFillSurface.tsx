@@ -628,17 +628,42 @@ export function SheetFillSurface({
    * browser scrolls the page while the sheet zooms.
    */
   const wheelRef = useRef<(e: WheelEvent) => void>(() => {});
-  const detachWheelRef = useRef<(() => void) | null>(null);
+  /**
+   * Touch, held behind refs for that reason and one more.
+   *
+   * React registers `touchstart` and `touchmove` as passive as well, so a handler mounted the React
+   * way cannot call `preventDefault` either. That cost nothing while the stage claimed every gesture
+   * with `touch-action: none` — the browser was never going to scroll, so refusing its default was
+   * a formality. It matters now the stage hands one-finger drags back to the page at fit zoom: a
+   * pinch has to be able to take a gesture back OFF the browser, and only a non-passive listener can.
+   */
+  const touchStartRef = useRef<(e: TouchEvent) => void>(() => {});
+  const touchMoveRef = useRef<(e: TouchEvent) => void>(() => {});
+  const touchEndRef = useRef<() => void>(() => {});
+  const detachStageRef = useRef<(() => void) | null>(null);
   const attachStage = useCallback((el: HTMLDivElement | null) => {
     observerRef.current?.disconnect();
     observerRef.current = null;
-    detachWheelRef.current?.();
-    detachWheelRef.current = null;
+    detachStageRef.current?.();
+    detachStageRef.current = null;
     stageElRef.current = el;
     if (!el) return;
     const onWheel = (e: WheelEvent) => wheelRef.current(e);
+    const onTouchStart = (e: TouchEvent) => touchStartRef.current(e);
+    const onTouchMove = (e: TouchEvent) => touchMoveRef.current(e);
+    const onTouchEnd = () => touchEndRef.current();
     el.addEventListener("wheel", onWheel, { passive: false });
-    detachWheelRef.current = () => el.removeEventListener("wheel", onWheel);
+    el.addEventListener("touchstart", onTouchStart, { passive: false });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
+    el.addEventListener("touchcancel", onTouchEnd);
+    detachStageRef.current = () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
+    };
     const measure = () => setStage({ width: el.clientWidth, height: el.clientHeight });
     measure();
     if (typeof ResizeObserver === "undefined") return;
@@ -649,7 +674,7 @@ export function SheetFillSurface({
   useEffect(
     () => () => {
       observerRef.current?.disconnect();
-      detachWheelRef.current?.();
+      detachStageRef.current?.();
     },
     []
   );
@@ -770,6 +795,16 @@ export function SheetFillSurface({
     // re-run this on every pinch and fight the driver for control of the zoom.
   }, [focusedBox, fitted.width, fitted.height, stage.width, stage.height, page, viewCentredOn, finePointer]);
 
+  /**
+   * The whole page is on screen: there is nothing left to pan to and nothing left to zoom out to.
+   *
+   * On a phone the stage is sized to be exactly as tall as the fitted page, so this is not "nearly
+   * nothing left to do" — `clampView` centres the page and throws every drag away. It is the state
+   * the sheet sits in until the driver zooms in, which is most of the time, and it is what decides
+   * whether a drag or a wheel belongs to the sheet or to the page it is sitting in.
+   */
+  const atFitZoom = view.zoom <= FIT_ZOOM + 0.001;
+
   const gesture = useRef<{
     mode: "none" | "pan" | "pinch";
     startX: number;
@@ -796,7 +831,18 @@ export function SheetFillSurface({
   const zoomByWheel = useCallback(
     (e: WheelEvent) => {
       if (!fitted.width || !stage.width) return;
-      // Always, so the page behind never scrolls out from under a driver aiming at a box.
+      /*
+       * Fitted, the wheel goes back to the page.
+       *
+       * Zoomed in it is the only way to move towards or away from a box, so it stays ours. Fitted,
+       * there is nothing to zoom out to, and swallowing it anyway means a sheet most of a screen
+       * tall that the page cannot be scrolled past — put the pointer on the paper and the document
+       * simply stops. Holding ctrl (or ⌘, and a trackpad pinch, which arrives as exactly that) still
+       * zooms in from here, so no way in is lost.
+       */
+      const zoomIntent = e.ctrlKey || e.metaKey;
+      if (atFitZoom && !zoomIntent) return;
+      // Otherwise: always, so the page behind never scrolls out from under a driver aiming at a box.
       e.preventDefault();
       const rate = e.ctrlKey ? PINCH_WHEEL_ZOOM_RATE : WHEEL_ZOOM_RATE;
       const factor = Math.exp(-wheelPixels(e) * rate);
@@ -810,16 +856,26 @@ export function SheetFillSurface({
         return clampView({ zoom, x: point.x - pageX * zoom, y: point.y - pageY * zoom });
       });
     },
-    [fitted.width, stage.width, stagePoint, clampView]
+    [fitted.width, stage.width, stagePoint, clampView, atFitZoom]
   );
   useEffect(() => {
     wheelRef.current = zoomByWheel;
   }, [zoomByWheel]);
 
   const onTouchStart = useCallback(
-    (e: React.TouchEvent) => {
+    (e: TouchEvent) => {
       setAnimate(false);
       if (e.touches.length === 2) {
+        /*
+         * Take the gesture back off the browser.
+         *
+         * At fit zoom the stage says `touch-action: pan-y`, so the browser is allowed to scroll the
+         * page with this gesture — and the moment it starts, every later `preventDefault` is ignored
+         * and the pinch would zoom the sheet while the page slid out from under it. Refusing the
+         * default here, on the touch-start that puts the second finger down, is the last point it
+         * can be stopped.
+         */
+        if (e.cancelable) e.preventDefault();
         const [a, b] = [e.touches[0]!, e.touches[1]!];
         const mid = stagePoint((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
         gesture.current = {
@@ -836,6 +892,22 @@ export function SheetFillSurface({
       }
       const t = e.touches[0];
       if (!t) return;
+      /*
+       * One finger at fit zoom belongs to the page, not to the sheet.
+       *
+       * There is nothing to pan to, so `clampView` threw the movement away and the finger did
+       * nothing at all — and because the stage is as tall as the page, that dead zone was most of
+       * the phone screen. Arming no gesture leaves `touch-action: pan-y` to scroll whatever the
+       * sheet sits in. Two fingers still reach the branch above, so pinching in from here works.
+       *
+       * It fixes a second thing for free: the browser cancels the click at the end of a scroll, so
+       * a flick that lifts off over a box no longer opens that box. Our own pan could not tell the
+       * difference, because `onTouchEnd` clears the gesture before the click that reads `moved`.
+       */
+      if (atFitZoom) {
+        gesture.current = null;
+        return;
+      }
       gesture.current = {
         mode: "pan",
         startX: t.clientX,
@@ -847,11 +919,11 @@ export function SheetFillSurface({
         moved: 0,
       };
     },
-    [view, stagePoint]
+    [view, stagePoint, atFitZoom]
   );
 
   const onTouchMove = useCallback(
-    (e: React.TouchEvent) => {
+    (e: TouchEvent) => {
       const g = gesture.current;
       if (!g) return;
 
@@ -863,7 +935,7 @@ export function SheetFillSurface({
         const pageX = (g.midX - g.startView.x) / g.startView.zoom;
         const pageY = (g.midY - g.startView.y) / g.startView.zoom;
         setView(clampView({ zoom, x: g.midX - pageX * zoom, y: g.midY - pageY * zoom }));
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
         return;
       }
 
@@ -874,7 +946,7 @@ export function SheetFillSurface({
         g.moved = Math.max(g.moved, Math.hypot(dx, dy));
         if (g.moved < TAP_SLOP_PX) return; // still might be a tap on a box
         setView(clampView({ zoom: g.startView.zoom, x: g.startView.x + dx, y: g.startView.y + dy }));
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
       }
     },
     [clampView]
@@ -883,6 +955,12 @@ export function SheetFillSurface({
   const onTouchEnd = useCallback(() => {
     gesture.current = null;
   }, []);
+
+  useEffect(() => {
+    touchStartRef.current = onTouchStart;
+    touchMoveRef.current = onTouchMove;
+    touchEndRef.current = onTouchEnd;
+  }, [onTouchStart, onTouchMove, onTouchEnd]);
 
   /**
    * Dragging the sheet with the mouse.
@@ -1144,10 +1222,7 @@ export function SheetFillSurface({
   const sheet = (
     <div
       ref={attachStage}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      onTouchCancel={onTouchEnd}
+      /* Touch is wired by hand in `attachStage`: React's own touch props are passive. */
       onMouseDown={onStageMouseDown}
       onMouseLeave={finePointer ? () => setHoverKey(null) : undefined}
       onScroll={onStageScroll}
@@ -1163,9 +1238,19 @@ export function SheetFillSurface({
         "relative flex-1 overflow-hidden bg-[#E8E4DC]",
         !fullscreenFocus && "rounded-lg border border-border"
       )}
-      // `none` so two fingers reach this element instead of scrolling the page. The app disables
-      // browser zoom globally, so pinching the sheet has to be handled here or not at all.
-      style={{ touchAction: "none", minHeight: 0 }}
+      /*
+       * `none` so two fingers reach this element instead of scrolling the page — the app disables
+       * browser zoom globally, so pinching the sheet is handled here or not at all.
+       *
+       * `pan-y` once the page is fitted, which hands a one-finger drag back to whatever the sheet is
+       * sitting in (`onTouchStart` disarms our pan to match). Pinch survives it because the two-finger
+       * touch-start refuses the browser's default. Focus mode keeps `none` regardless: it owns the
+       * screen and there is deliberately nothing behind it to scroll.
+       */
+      style={{
+        touchAction: atFitZoom && !fullscreenFocus ? "pan-y" : "none",
+        minHeight: 0,
+      }}
     >
       <div
         className="absolute left-0 top-0 origin-top-left"
@@ -1702,12 +1787,17 @@ export function SheetFillSurface({
       {/* Desktop keeps this while focused: with no bar, it is the only thing telling you about tab. */}
       {!isFocusMode || finePointer ? (
         <p className="text-center micro-caps text-muted-foreground">
+          {/* Fitted, the wheel scrolls the page and there is nothing to drag — so say the way in. */}
           {readOnly
             ? finePointer
-              ? "Scroll to zoom · drag to move"
+              ? atFitZoom
+                ? "Ctrl-scroll to zoom"
+                : "Scroll to zoom · drag to move"
               : "Pinch to zoom"
             : finePointer
-              ? "Click a box and type · scroll to zoom · drag to move · tab for the next box"
+              ? atFitZoom
+                ? "Click a box and type · ctrl-scroll to zoom · tab for the next box"
+                : "Click a box and type · scroll to zoom · drag to move · tab for the next box"
               : "Tap a box · pinch to zoom"}
         </p>
       ) : null}

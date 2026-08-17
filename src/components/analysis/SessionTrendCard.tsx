@@ -10,7 +10,6 @@ import type {
 } from "@/lib/analysis/analysisHomeModel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
-import { PagedCard } from "@/components/ui/PagedCard";
 import { PillToggle } from "@/components/ui/PillToggle";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import {
@@ -23,17 +22,21 @@ import { SetupSheetModal, type SetupSheetModalRun } from "@/components/runs/RunH
 import { cn } from "@/lib/utils";
 
 /**
- * Session trend — an Apple-widget paged chart: three lenses on the same
- * event/day, swiped as faces. Pace (best / avg top 5 / avg top 10 / median
- * band, lower = faster), Consistency (100 − CV, higher = steadier), and
- * Mistakes (IQR-outlier count, lower = cleaner). The car tabs are shared across
- * faces; each face owns its own orientation and units. Chart-series hues only —
- * yellow stays reserved for actions per VISUAL_NORTH_STAR.
+ * Session trend — how the pace of an event or day moved, run by run: best / avg
+ * top 5 / avg top 10 / median, lower = faster. Chart-series hues only — yellow
+ * stays reserved for actions per VISUAL_NORTH_STAR.
  *
- * The Pace face carries two views behind a toggle: the four-series Line chart,
- * and Spread — a box-and-whisker per run that shows the *shape* of a stint
- * rather than four summary numbers from it. Same axis, same units, so they read
- * as one question at two resolutions and the switch is a morph, not a swap.
+ * Two views behind the header toggle: the four-series Line chart, and Spread — a
+ * box-and-whisker per run that shows the *shape* of a stint rather than four
+ * summary numbers from it. Same axis, same units, so they read as one question
+ * at two resolutions and the switch is a morph, not a swap.
+ *
+ * This was a three-face pager (Pace / Consistency / Mistakes) until 2026-08-16.
+ * The two extra faces cost a picker row under the chart *and* pushed the
+ * Line/Spread toggle into a row of its own above it — chrome measured in tens of
+ * pixels on a 390px phone, ahead of a single lap time, for lenses nobody opened
+ * the card to read. Mistakes survive where they are legible anyway: the red dots
+ * and the count in Spread view.
  */
 
 type SeriesKey = "best" | "avgTop5" | "avgTop10" | "median";
@@ -567,6 +570,7 @@ function useChartWidth(dep: unknown): [React.RefObject<HTMLDivElement | null>, n
 export function SessionTrendCard({
   trend,
   onSelectRun,
+  onFocusRun,
 }: {
   trend: AnalysisTrendModel | null;
   /**
@@ -578,6 +582,18 @@ export function SessionTrendCard({
    * comparing against.
    */
   onSelectRun?: (runId: string) => void;
+  /**
+   * The run currently under the pointer, or null. Lets whoever placed the card
+   * light the same run in a list beside it — Sessions tints its rail row and its
+   * phone row, so the chart and the list stop being two separate readings of one
+   * day. Purely a pointer state: it fires on hover / scrub, never on selection,
+   * and null-fires on unmount so a stale row can't stay lit.
+   *
+   * NOT the same run as the readout strip, which falls back to the latest run
+   * when nothing is hovered. Lighting a row off that fallback would leave the
+   * last row permanently marked for a chart nobody is touching.
+   */
+  onFocusRun?: (runId: string | null) => void;
 }) {
   const [selectedCarId, setSelectedCarId] = useState<string | null>(trend?.defaultCarId ?? null);
   // Tapping a wrench opens the same setup sheet the "View setup" button opens in
@@ -614,6 +630,32 @@ export function SessionTrendCard({
     [trend, selectedCarId]
   );
 
+  // The Line/Spread view lives up here rather than inside the chart, because its
+  // toggle sits in the card header beside the eyebrow — the same shape
+  // TeamDayCard's "Best / Top 5" uses. A header control is always on screen and
+  // never moves, so switching views can't shift the button out from under the
+  // thumb that just tapped it, and it costs no row of its own.
+  const [view, setView] = useState<TrendView>("line");
+
+  // Read after mount so the server and first client render agree.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(PACE_VIEW_STORAGE_KEY);
+      if (saved === "spread" || saved === "line") setView(saved);
+    } catch {
+      /* storage unavailable (private mode) — stay on the line view */
+    }
+  }, []);
+
+  const chooseView = useCallback((next: TrendView) => {
+    setView(next);
+    try {
+      window.localStorage.setItem(PACE_VIEW_STORAGE_KEY, next);
+    } catch {
+      /* non-fatal */
+    }
+  }, []);
+
   if (!trend) {
     return (
       <SurfaceCard variant="hero" contentClassName="flex flex-col gap-3 p-4 sm:p-5">
@@ -631,7 +673,26 @@ export function SessionTrendCard({
 
   return (
     <SurfaceCard variant="hero" contentClassName="flex flex-col gap-3.5 p-4 sm:p-5">
-      <Eyebrow dot="accent">Session trend</Eyebrow>
+      {/* `eyebrow-root` (hairline + pad) composed by hand rather than via
+          <Eyebrow> so the view toggle can sit on the label's row — the same trick
+          RecentRunsCard and the hub doors use. Composed, NOT overridden:
+          `.eyebrow-root` is unlayered CSS while Tailwind 4 utilities live in
+          `@layer utilities`, so passing `border-b-0` to <Eyebrow> is silently a
+          no-op and the card ends up with two rules of two different lengths. */}
+      <div className="eyebrow-root flex items-center gap-3">
+        <span className="eyebrow-label min-w-0 flex-1">Session trend</span>
+        <PillToggle
+          className="w-auto shrink-0 whitespace-nowrap"
+          options={[
+            { value: "line", label: "Line" },
+            { value: "spread", label: "Spread" },
+          ]}
+          value={view}
+          onChange={chooseView}
+          role="tablist"
+          ariaLabel="Pace chart view"
+        />
+      </div>
 
       {trend.carOptions.length > 1 ? (
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Car">
@@ -656,60 +717,14 @@ export function SessionTrendCard({
         </div>
       ) : null}
 
-      <PagedCard
-        storageKey="analysis-session-trend"
-        faces={[
-          {
-            id: "pace",
-            label: "Pace",
-            content: (
-              <PaceTrendFace
-                carRuns={carRuns}
-                scopeLabel={trend.scopeLabel}
-                onOpenSetup={openSetupForRun}
-                setupLoadingRunId={setupLoadingRunId}
-                onSelectRun={onSelectRun}
-              />
-            ),
-          },
-          {
-            id: "consistency",
-            label: "Consistency",
-            content: (
-              <SingleMetricTrendFace
-                carRuns={carRuns}
-                metric="consistencyScore"
-                title="Consistency"
-                higherIsBetter
-                color="rgb(var(--color-gain))"
-                formatValue={(v) => `${v.toFixed(1)}%`}
-                emptyLabel="No consistency data for this car yet in this window."
-                onOpenSetup={openSetupForRun}
-                setupLoadingRunId={setupLoadingRunId}
-                onSelectRun={onSelectRun}
-              />
-            ),
-          },
-          {
-            id: "mistakes",
-            label: "Mistakes",
-            content: (
-              <SingleMetricTrendFace
-                carRuns={carRuns}
-                metric="mistakeCount"
-                title="Mistakes"
-                higherIsBetter={false}
-                color="rgb(var(--color-destructive))"
-                formatValue={(v) => String(Math.round(v))}
-                tickMinStep={1}
-                emptyLabel="No mistake-eligible runs for this car yet in this window."
-                onOpenSetup={openSetupForRun}
-                setupLoadingRunId={setupLoadingRunId}
-                onSelectRun={onSelectRun}
-              />
-            ),
-          },
-        ]}
+      <PaceTrendChart
+        carRuns={carRuns}
+        scopeLabel={trend.scopeLabel}
+        view={view}
+        onOpenSetup={openSetupForRun}
+        setupLoadingRunId={setupLoadingRunId}
+        onSelectRun={onSelectRun}
+        onFocusRun={onFocusRun}
       />
 
       {setupError ? <p className="text-[11px] text-destructive">{setupError}</p> : null}
@@ -726,19 +741,24 @@ export function SessionTrendCard({
   );
 }
 
-/** Face 1 — the four-series pace band with a fixed readout strip, tire row, tap-to-open. */
-function PaceTrendFace({
+/** The four-series pace band with a fixed readout strip, tire row, tap-to-open. */
+function PaceTrendChart({
   carRuns,
   scopeLabel,
+  view,
   onOpenSetup,
   setupLoadingRunId,
   onSelectRun,
+  onFocusRun,
 }: {
   carRuns: AnalysisTrendRun[];
   scopeLabel: string;
+  /** Owned by the card, because the toggle for it lives in the card header. */
+  view: TrendView;
   onOpenSetup: (runId: string) => void;
   setupLoadingRunId: string | null;
   onSelectRun?: (runId: string) => void;
+  onFocusRun?: (runId: string | null) => void;
 }) {
   const router = useRouter();
   const openRun = useCallback(
@@ -748,30 +768,10 @@ function PaceTrendFace({
     },
     [onSelectRun, router]
   );
-  const [view, setView] = useState<TrendView>("line");
   const [hidden, setHidden] = useState<Set<SeriesKey>>(new Set());
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [chartRef, chartWidth] = useChartWidth(carRuns);
   const pointerDownRef = useRef<{ x: number; y: number; sameIndex: boolean } | null>(null);
-
-  // Read after mount so the server and first client render agree.
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(PACE_VIEW_STORAGE_KEY);
-      if (saved === "spread" || saved === "line") setView(saved);
-    } catch {
-      /* storage unavailable (private mode) — stay on the line view */
-    }
-  }, []);
-
-  const chooseView = (next: TrendView) => {
-    setView(next);
-    try {
-      window.localStorage.setItem(PACE_VIEW_STORAGE_KEY, next);
-    } catch {
-      /* non-fatal */
-    }
-  };
 
   const dims = useMemo(() => chartMetrics(chartWidth), [chartWidth]);
 
@@ -905,26 +905,40 @@ function PaceTrendFace({
   // so it has a stable height and the plot itself is never covered by a tooltip.
   const displayRun = hoverRun ?? carRuns[carRuns.length - 1] ?? null;
 
+  /*
+   * Publish the hovered run so a list beside the chart can light the same row.
+   *
+   * `hoverRun`, not `displayRun`: the strip's resting fallback is the latest run,
+   * and lighting a row off that would leave the last row marked forever.
+   *
+   * Held in a ref because callers pass an inline arrow. Depending on the callback
+   * itself would re-run this effect on every parent render — publishing the same
+   * id over and over into a parent that re-renders on receiving it.
+   */
+  const focusedRunId = hoverRun?.id ?? null;
+  const onFocusRunRef = useRef(onFocusRun);
+  // Declared before the publish effect, so a commit that changes both the
+  // callback and the hovered run publishes through the new callback.
+  useEffect(() => {
+    onFocusRunRef.current = onFocusRun;
+  }, [onFocusRun]);
+  useEffect(() => {
+    onFocusRunRef.current?.(focusedRunId);
+  }, [focusedRunId]);
+  // Leaving the card must not leave a row lit — the pane swaps on selection.
+  useEffect(() => () => onFocusRunRef.current?.(null), []);
+
   return (
     <div className="flex flex-col gap-3">
-      {/* Above the readout so the control never moves when you use it. */}
-      <PillToggle
-        options={[
-          { value: "line", label: "Line" },
-          { value: "spread", label: "Spread" },
-        ]}
-        value={view}
-        onChange={chooseView}
-        role="tablist"
-        ariaLabel="Pace chart view"
-      />
-
       {ready && displayRun ? (
         <div className="rounded-lg border border-border/60 bg-secondary/40 px-2.5 py-1.5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="micro-caps text-muted-foreground">
-                {displayRun.shortLabel}
+              {/* The full name, not the axis code. This strip is full width even
+                  at 390px and exists to say what your finger is on, so "Q2" was
+                  the one place the code was costing us a word we had room for. */}
+              <span className="truncate text-[12.5px] font-semibold leading-tight tracking-tight text-foreground">
+                {displayRun.sessionName}
               </span>
               {displayRun.tireIndicator ? (
                 <span className="flex items-center gap-1">
@@ -1173,9 +1187,12 @@ function PaceTrendFace({
       )}
 
       {/* Line-view only — these toggle series the spread view doesn't draw. The
-          `hidden` set is React state, so what you switched off comes back with you. */}
+          `hidden` set is React state, so what you switched off comes back with you.
+          One row, always: a lone "Median" spilling to a second line reads as a
+          separate group of controls when it is the same group, so the labels are
+          kept short enough to fit at 390px and the row must not wrap. */}
       {view === "line" ? (
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Metrics">
+        <div className="flex flex-nowrap items-center gap-1" role="group" aria-label="Metrics">
           {SERIES.map((series) => {
             const isHidden = hidden.has(series.key);
             return (
@@ -1185,7 +1202,7 @@ function PaceTrendFace({
                 onClick={() => toggleSeries(series.key)}
                 aria-pressed={!isHidden}
                 className={cn(
-                  "tap-active flex items-center gap-1.5 rounded-md border border-border bg-secondary px-2 py-1 transition-opacity hover:border-ring/30",
+                  "tap-active flex shrink-0 items-center gap-1 rounded-md border border-border bg-secondary px-1.5 py-1 transition-opacity hover:border-ring/30",
                   isHidden && "opacity-45"
                 )}
               >
@@ -1196,7 +1213,7 @@ function PaceTrendFace({
                 />
                 <span
                   className={cn(
-                    "text-[10.5px] tracking-tight",
+                    "whitespace-nowrap text-[10.5px] tracking-tight",
                     isHidden ? "text-faint" : "text-muted-foreground"
                   )}
                 >
@@ -1207,272 +1224,6 @@ function PaceTrendFace({
           })}
         </div>
       ) : null}
-    </div>
-  );
-}
-
-/** Faces 2 & 3 — one metric per run as a single line; tap a run to open it. */
-function SingleMetricTrendFace({
-  carRuns,
-  metric,
-  title,
-  higherIsBetter,
-  color,
-  formatValue,
-  emptyLabel,
-  tickMinStep = 0,
-  onOpenSetup,
-  setupLoadingRunId,
-  onSelectRun,
-}: {
-  carRuns: AnalysisTrendRun[];
-  metric: "consistencyScore" | "mistakeCount";
-  title: string;
-  higherIsBetter: boolean;
-  color: string;
-  formatValue: (value: number) => string;
-  emptyLabel: string;
-  /** Floor for the y-tick increment — 1 for integer metrics so labels can't repeat. */
-  tickMinStep?: number;
-  onOpenSetup: (runId: string) => void;
-  setupLoadingRunId: string | null;
-  onSelectRun?: (runId: string) => void;
-}) {
-  const router = useRouter();
-  const openRun = useCallback(
-    (runId: string) => {
-      if (onSelectRun) onSelectRun(runId);
-      else router.push(`/runs/${encodeURIComponent(runId)}`);
-    },
-    [onSelectRun, router]
-  );
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
-  const [chartRef, chartWidth] = useChartWidth(carRuns);
-  const dims = useMemo(() => chartMetrics(chartWidth), [chartWidth]);
-  const pointerDownRef = useRef<{ x: number; y: number; sameIndex: boolean } | null>(null);
-
-  const values = useMemo(() => carRuns.map((run) => run.metrics[metric]), [carRuns, metric]);
-  const present = values.filter((v): v is number => v != null);
-
-  const geometry = useMemo(() => {
-    if (present.length < 2) return null;
-    let min = Math.min(...present);
-    let max = Math.max(...present);
-    if (max - min < 1e-6) {
-      // Flat metric (e.g. every run 0 mistakes) — pad so the line sits mid-height.
-      min -= 1;
-      max += 1;
-    }
-    const padding = (max - min) * 0.12;
-    const lo = min - padding;
-    const hi = max + padding;
-    const innerWidth = chartWidth - PAD_LEFT - PAD_RIGHT;
-    const innerHeight = dims.height - PAD_TOP - dims.padBottom;
-    const xAt = (index: number) =>
-      PAD_LEFT + (carRuns.length === 1 ? innerWidth / 2 : (index / (carRuns.length - 1)) * innerWidth);
-    // "Better" always plots higher: consistency up = higher score; mistakes up = fewer.
-    const yAt = (value: number) =>
-      higherIsBetter
-        ? PAD_TOP + ((hi - value) / (hi - lo)) * innerHeight
-        : PAD_TOP + ((value - lo) / (hi - lo)) * innerHeight;
-    const points = carRuns.map((run, index) => {
-      const v = run.metrics[metric];
-      return v == null ? null : { x: xAt(index), y: yAt(v) };
-    });
-    const ticks = niceTicks(lo, hi, tickMinStep);
-    return { xAt, yAt, points, ticks };
-  }, [present, carRuns, chartWidth, dims, higherIsBetter, metric, tickMinStep]);
-
-  const nearestRunIndex = (event: React.PointerEvent<SVGSVGElement>): number | null => {
-    if (!geometry || carRuns.length === 0) return null;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    let nearest = 0;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-    for (let i = 0; i < carRuns.length; i++) {
-      const distance = Math.abs(geometry.xAt(i) - x);
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearest = i;
-      }
-    }
-    return nearest;
-  };
-
-  const handlePointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
-    const index = nearestRunIndex(event);
-    if (index == null) return;
-    pointerDownRef.current = { x: event.clientX, y: event.clientY, sameIndex: hoverIndex === index };
-    setHoverIndex(index);
-  };
-
-  const handleClick = (event: React.MouseEvent<SVGSVGElement>) => {
-    const down = pointerDownRef.current;
-    pointerDownRef.current = null;
-    if (!down || hoverIndex == null) return;
-    if (Math.abs(event.clientX - down.x) > 8 || Math.abs(event.clientY - down.y) > 8) return;
-    const run = carRuns[hoverIndex];
-    if (down.sameIndex && run) {
-      openRun(run.id);
-    }
-  };
-
-  const hoverRun = hoverIndex != null ? carRuns[hoverIndex] : null;
-  // Stable readout strip (see pace face) — hovered run, else the latest with data.
-  const lastWithValue = [...carRuns].reverse().find((run) => run.metrics[metric] != null) ?? null;
-  const displayRun = hoverRun ?? lastWithValue;
-  const displayValue = displayRun ? displayRun.metrics[metric] : null;
-
-  return (
-    <div className="flex flex-col gap-3">
-      {geometry && displayRun ? (
-        <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-secondary/40 px-2.5 py-1.5">
-          <div className="flex min-w-0 items-center gap-2">
-              <span className="micro-caps text-muted-foreground">
-              {displayRun.shortLabel}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span
-                className="h-2 w-2 rounded-[2px]"
-                style={{ backgroundColor: color }}
-                aria-hidden
-              />
-          <span className="text-[11px] font-medium tabular-nums text-foreground">
-                {displayValue == null ? "—" : formatValue(displayValue)}
-              </span>
-            </span>
-          </div>
-        </div>
-      ) : null}
-      {geometry ? (
-        <div ref={chartRef} className="relative">
-          <svg
-            width="100%"
-            height={dims.height}
-            viewBox={`0 0 ${chartWidth} ${dims.height}`}
-            className="block cursor-pointer touch-pan-y"
-            role="img"
-            aria-label={`${title} trend across ${carRuns.length} runs. Tap a run to open it.`}
-            onPointerMove={(event) => {
-              const index = nearestRunIndex(event);
-              if (index != null) setHoverIndex(index);
-            }}
-            onPointerDown={handlePointerDown}
-            onPointerCancel={() => {
-              pointerDownRef.current = null;
-            }}
-            onPointerLeave={(event) => {
-              if (event.pointerType === "mouse") setHoverIndex(null);
-            }}
-            onClick={handleClick}
-          >
-            {geometry.ticks.map((tick) => (
-              <g key={tick}>
-                <line
-                  x1={PAD_LEFT}
-                  x2={chartWidth - PAD_RIGHT}
-                  y1={geometry.yAt(tick)}
-                  y2={geometry.yAt(tick)}
-                  className="stroke-border"
-                  strokeWidth={1}
-                />
-                <text
-                  x={PAD_LEFT - 6}
-                  y={geometry.yAt(tick) + 3}
-                  textAnchor="end"
-                        className="fill-faint text-[9px] tabular-nums"
-                >
-                  {formatValue(tick)}
-                </text>
-              </g>
-            ))}
-
-            {/* Same shelf as the Pace face — see the comment there. */}
-            <line
-              x1={PAD_LEFT}
-              x2={chartWidth - PAD_RIGHT}
-              y1={dims.plotBottom}
-              y2={dims.plotBottom}
-              className="stroke-border"
-              strokeWidth={1}
-            />
-
-            {carRuns.map((run, index) => {
-              const step = Math.max(1, Math.ceil(carRuns.length / dims.labelBudget));
-              const isLast = index === carRuns.length - 1;
-              const stepped = index % step === 0 && carRuns.length - 1 - index >= step;
-              if (!isLast && !stepped) return null;
-              return (
-                <text
-                  key={run.id}
-                  x={geometry.xAt(index)}
-                  y={dims.labelBaseline}
-                  textAnchor="middle"
-                  className={cn("tabular-nums text-[9px]", isLast ? "fill-muted-foreground" : "fill-faint")}
-                >
-                  {run.shortLabel}
-                </text>
-              );
-            })}
-
-            <TireSetRow carRuns={carRuns} xAt={geometry.xAt} dims={dims} />
-
-            <SetupChangeRow
-              carRuns={carRuns}
-              xAt={geometry.xAt}
-              dims={dims}
-              onOpenSetup={onOpenSetup}
-              loadingRunId={setupLoadingRunId}
-            />
-
-            {hoverIndex != null ? (
-              <line
-                x1={geometry.xAt(hoverIndex)}
-                x2={geometry.xAt(hoverIndex)}
-                y1={PAD_TOP - 2}
-                // Runs on through the gutter so the hovered run's wrench and tire
-                // are visibly the same column as the point you're reading.
-                y2={dims.tireRowCenter + dims.markSize / 2 + 5}
-                className="stroke-border"
-                strokeWidth={1}
-                strokeDasharray="3 3"
-              />
-            ) : null}
-
-            {buildPolylineSegments(geometry.points).map((segment) => (
-              <polyline
-                key={segment}
-                points={segment}
-                fill="none"
-                stroke={color}
-                strokeWidth={2.25}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            ))}
-            {geometry.points.map((point, index) =>
-              point ? (
-                <circle
-                  // eslint-disable-next-line react/no-array-index-key
-                  key={index}
-                  cx={point.x}
-                  cy={point.y}
-                  r={hoverIndex === index ? 4 : 2.75}
-                  fill={color}
-                  className="stroke-card"
-                  strokeWidth={hoverIndex === index ? 1.5 : 1}
-                />
-              ) : null
-            )}
-          </svg>
-        </div>
-      ) : (
-        <p className="text-[13px] leading-relaxed text-muted-foreground">
-          {carRuns.length <= 1
-            ? "Log another run and this trend line appears."
-            : emptyLabel}
-        </p>
-      )}
     </div>
   );
 }

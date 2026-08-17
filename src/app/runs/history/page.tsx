@@ -8,15 +8,16 @@ import { getMyNameSetting } from "@/lib/appSettings";
 import { loadTeamMemberDisplays, memberDisplayLabelRecord } from "@/lib/teams/teamMemberDisplay";
 import { RunHistoryTable } from "@/components/runs/RunHistoryTable";
 import { RunHistoryColGroup, RunHistoryMobileHeaderRow, RUN_HISTORY_ACTION_CELL_CLASS, computeRunHistoryColSpan } from "@/components/runs/runHistoryTableColumns";
-import { SessionGroupsPager } from "@/components/runs/SessionGroupsPager";
 import { SessionsFocusScroll } from "@/components/runs/SessionsFocusScroll";
-import { SessionsDesktopMasterDetail } from "@/components/runs/SessionsDesktopMasterDetail";
-import { SessionsWorkbench } from "@/components/runs/SessionsWorkbench";
+import { SessionsBrowser } from "@/components/runs/SessionsBrowser";
 import {
+  buildGroupDrivers,
+  buildGroupHeadline,
   buildGroupRunRows,
   buildGroupTrendModel,
   type WorkbenchGroup,
 } from "@/lib/runs/sessionWorkbenchModel";
+import { buildTeamDayModel } from "@/lib/runs/teamDayModel";
 import { RunHistoryViewMore } from "@/components/runs/RunHistoryViewMore";
 import { OPEN_GROUP_PARAM } from "@/lib/runs/sessionsReturn";
 import { SessionsFilterBar } from "@/components/runs/SessionsFilterBar";
@@ -40,8 +41,6 @@ import {
 } from "@/lib/runs/runHistoryFilters";
 import { trackCatalogScopeWhere } from "@/lib/tracks/communityTrackAccess";
 import { normalizeSetupData } from "@/lib/runSetup";
-import { getBestLap, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
-import { formatLap } from "@/lib/runLaps";
 import { isDocumentMetadataField } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import { setupFieldLabel } from "@/lib/setupCompare/changedSincePrevious";
 import { compareRunTimestamp } from "@/lib/runCompareCatalog";
@@ -49,7 +48,6 @@ import { toCompareRunShape } from "@/lib/runCompareShape";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import Link from "next/link";
-import { ChevronRight, Flag, Wrench } from "lucide-react";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
@@ -239,22 +237,27 @@ const SESSION_TOTALS_LOOKBACK_MS = 2 * 24 * 60 * 60 * 1000;
 /**
  * Unfiltered run count per session, for the workbench rail's "2 of 8 runs".
  *
- * Solo scope only — the workbench itself is solo-only, so this never has to reason
- * about team visibility. Selects just the fields {@link sessionGroupKey} reads, and
- * bounds itself to the span already on screen: without a filter this isn't called
- * at all, and with one it reads a few scalar columns rather than whole runs.
+ * Selects just the fields {@link sessionGroupKey} reads, and bounds itself to the
+ * span already on screen: without a filter this isn't called at all, and with one
+ * it reads a few scalar columns rather than whole runs.
+ *
+ * `userIds` is the visibility scope the page already resolved — the viewer alone
+ * in solo, the (possibly driver-narrowed) roster in team. Team scope additionally
+ * counts only runs shared with the team, matching the list's own `where`; without
+ * that the denominator would include runs the reader is not allowed to see.
  *
  * Returns null whenever the number can't be trusted (disabled, nothing displayed,
  * cap hit) — the rail then prints the plain "N runs" it always has.
  */
 async function loadSessionRunTotals(input: {
   enabled: boolean;
-  userId: string;
+  userIds: string[];
+  sharedWithTeamOnly: boolean;
   displayTimeZone: string | null;
   ownerTimeZoneByUserId: Record<string, string | null>;
   oldestDisplayed: RunInGroup | null;
 }): Promise<Map<string, number> | null> {
-  if (!input.enabled || !input.oldestDisplayed) return null;
+  if (!input.enabled || !input.oldestDisplayed || input.userIds.length === 0) return null;
   const since = new Date(
     runSessionSortInstant(input.oldestDisplayed).getTime() - SESSION_TOTALS_LOOKBACK_MS
   );
@@ -264,7 +267,11 @@ async function loadSessionRunTotals(input: {
       // `runSessionSortInstant` uses, so it's the only bound needed here — the
       // `sortAt: Date | null` in `RunForHistoryGroup` is defensive typing, not a
       // shape the database produces.
-      where: { userId: input.userId, sortAt: { gte: since } },
+      where: {
+        userId: { in: input.userIds },
+        sortAt: { gte: since },
+        ...(input.sharedWithTeamOnly ? { shareWithTeam: true } : {}),
+      },
       select: {
         id: true,
         userId: true,
@@ -377,6 +384,8 @@ export default async function RunHistoryPage({
   let filterSetupFields: { id: string; label: string }[] = [];
   /** Team scope only — the roster, as Driver filter options. Empty in solo scope. */
   let filterDrivers: { id: string; label: string }[] = [];
+  /** Whose runs this page is allowed to show — the viewer, or the (narrowed) roster. */
+  let scopedUserIds: string[] = [user.id];
 
   if (teamId) {
     const allowed = await assertUserInTeam(teamId, user.id);
@@ -399,6 +408,7 @@ export default async function RunHistoryPage({
       // roster instead of reaching their runs.
       const selectedDriverIds = filters.driverIds.filter((id) => memberIds.includes(id));
       const scopedMemberIds = selectedDriverIds.length ? selectedDriverIds : memberIds;
+      scopedUserIds = scopedMemberIds;
       const baseWhere = buildRunHistoryPrismaWhere(filters, {
         userId: { in: scopedMemberIds },
         shareWithTeam: true,
@@ -555,47 +565,86 @@ export default async function RunHistoryPage({
   const compareRunsDescending = allRunsDescending.map(toCompareRunShape);
   const focusRunId =
     openGroupParam && runs.some((r) => r.id === openGroupParam) ? openGroupParam : null;
-  const focusGroupIndex =
-    focusRunId == null ? -1 : groups.findIndex((g) => g.runs.some((r) => r.id === focusRunId));
-  const pagerInitial =
-    focusGroupIndex >= 0 ? Math.max(8, focusGroupIndex + 1) : 8;
+  // Landing target for the trip back from a run page (`?openGroup=<runId>`): the
+  // session that holds it. The browser then opens that day, so "back" returns you
+  // to the thing you were reading rather than to a cold list.
+  const focusGroupId =
+    focusRunId == null
+      ? null
+      : groups.find((g) => g.runs.some((r) => r.id === focusRunId))?.id ?? null;
 
   const teamMode = Boolean(teamId && !teamAccessDenied);
 
-  // lg+ workbench data. Solo grouped view only: a team group nests by driver
-  // first, which is a different shape than "sessions → runs" and would need its
-  // own rail — team keeps the accordion until that's designed.
-  const workbenchActive = !teamMode && filters.layout !== "flat" && groups.length > 0;
+  // The grouped view, both scopes and both layouts. Team used to fall back to the
+  // `<details>` accordion here because "a team group nests by driver first, which
+  // is a different shape than sessions → runs" — that driver level now exists
+  // (`buildGroupDrivers`), so there is one browser and one shape.
+  const browserActive = filters.layout !== "flat" && groups.length > 0;
   // "2 of 8 runs" needs the session's UNFILTERED size, which nothing above has:
   // `groups` is built from rows both the Prisma where and the JS post-filters have
   // already thinned. One extra query, only when a filter is on, selecting just the
   // fields `sessionGroupKey` reads — bounded to the span already on screen so it
   // never walks the whole archive.
   const sessionTotalsByGroupId = await loadSessionRunTotals({
-    enabled: workbenchActive && filtersActive,
-    userId: user.id,
+    enabled: browserActive && filtersActive,
+    userIds: scopedUserIds,
+    sharedWithTeamOnly: teamMode,
     displayTimeZone,
     ownerTimeZoneByUserId,
     oldestDisplayed: groups.at(-1)?.runs.at(-1) ?? null,
   });
-  const workbenchGroups: WorkbenchGroup[] = workbenchActive
-    ? groups.map((group) => ({
-        id: group.id,
-        // Same rule the accordion uses: a test day's date lives on the meta line,
-        // so "Test day – 19 Jul 2026" collapses to "Test day".
-        title: group.type === "Race Meeting" ? group.title : "Test day",
-        type: group.type,
-        trackName: group.trackName && group.trackName !== "—" ? group.trackName : null,
-        dateLabel: group.dateLabel,
-        runs: buildGroupRunRows(group),
-        trend: buildGroupTrendModel(group, { setupDataByRunId }),
-        totalRuns: sessionTotalsByGroupId?.get(group.id) ?? null,
-      }))
+  const groupZones = { ownerTimeZoneByUserId, viewerTimeZone: displayTimeZone };
+  /**
+   * Your previous session at the same track, per group — the "vs Wed 12 Aug −0.72"
+   * on a solo day header. `groups` is newest-first, so the first later index at the
+   * same track is the last time you were here. Solo only: in team scope the day
+   * belongs to the field, not to you, and the comparison has no single subject.
+   */
+  const priorRowsByGroupId = new Map<string, { dateLabel: string; rows: ReturnType<typeof buildGroupRunRows> }>();
+  if (!teamMode) {
+    const rowsByGroupId = new Map(groups.map((g) => [g.id, buildGroupRunRows(g)]));
+    groups.forEach((group, index) => {
+      for (let i = index + 1; i < groups.length; i++) {
+        const older = groups[i]!;
+        if (older.trackName !== group.trackName) continue;
+        priorRowsByGroupId.set(group.id, {
+          dateLabel: older.dateLabel,
+          rows: rowsByGroupId.get(older.id) ?? [],
+        });
+        return;
+      }
+    });
+  }
+  const browserGroups: WorkbenchGroup[] = browserActive
+    ? groups.map((group) => {
+        const rows = buildGroupRunRows(group);
+        return {
+          id: group.id,
+          // A test day's date lives on the meta line, so "Test day – 19 Jul 2026"
+          // collapses to "Test day".
+          title: group.type === "Race Meeting" ? group.title : "Test day",
+          type: group.type,
+          trackName: group.trackName && group.trackName !== "—" ? group.trackName : null,
+          dateLabel: group.dateLabel,
+          runs: rows,
+          trend: buildGroupTrendModel(group, { setupDataByRunId }),
+          headline: teamMode
+            ? null
+            : buildGroupHeadline(rows, priorRowsByGroupId.get(group.id) ?? null),
+          drivers: teamMode
+            ? buildGroupDrivers(group, { memberDisplayByUserId, setupDataByRunId })
+            : null,
+          teamDay: teamMode
+            ? buildTeamDayModel(group.runs, { memberDisplayByUserId, zones: groupZones })
+            : null,
+          totalRuns: sessionTotalsByGroupId?.get(group.id) ?? null,
+        };
+      })
     : [];
-  // Short labels for the workbench's filter ribbon. Tire-type values are already
+  // Short labels for the browser's filter ribbon. Tire-type values are already
   // human ("Blue compound"); the rest need the same option lists the bar uses.
-  const workbenchFilterLabels =
-    workbenchActive && filtersActive
+  const browserFilterLabels =
+    browserActive && filtersActive
       ? describeRunHistoryFilters(filters, {
           cars: filterCars,
           tracks: filterTracks,
@@ -605,261 +654,14 @@ export default async function RunHistoryPage({
       : [];
   const pageTitle = teamAccessDenied ? "Sessions" : teamMode ? `Team — ${teamTitle}` : "Sessions";
   const mySessionsViewDescription =
-    "Your runs grouped by session. Filter, compare, and drag to reorder within a group.";
+    "Every day you have been on track. Pick a day to read it, then a run.";
   const activeTeamViewDescription = teamTitle
-    ? `Runs shared with everyone in ${teamTitle}. Open any member’s run read-only; reordering is disabled.`
-    : "Runs shared with your team. Open any member’s run read-only; reordering is disabled.";
+    ? `Runs shared with everyone in ${teamTitle}. Pick a day to see the field, a driver to read their session.`
+    : "Runs shared with your team. Pick a day to see the field, a driver to read their session.";
   const activeViewDescription = teamMode ? activeTeamViewDescription : mySessionsViewDescription;
   const pageSubtitle = teamAccessDenied
     ? "That team was not found or you are not a member."
     : activeViewDescription;
-
-  /**
-   * The Best/Top5/Median grid table for a set of runs. Reused for solo groups,
-   * single-driver team groups, and inside each per-driver accordion. Column
-   * layout follows `showMemberColumn` (dropped when a driver sub-heading already
-   * names the member) and reorder is team-disabled.
-   */
-  function renderRunsTable(
-    tableRuns: RunInGroup[],
-    opts: { showMemberColumn: boolean }
-  ) {
-    const showSessionColumn = tableRuns.some(
-      (r) => formatRunSessionDisplay(r, { dayRunNumber: dayRunNumberByRunId[r.id] }) !== "—"
-    );
-    const columnLayout = {
-      showReorderColumn: !teamMode,
-      showMemberColumn: opts.showMemberColumn,
-      showSessionColumn,
-    };
-    const colSpan = computeRunHistoryColSpan(columnLayout);
-    return (
-      <div className="min-w-0 max-w-full max-md:overflow-x-hidden md:overflow-x-auto">
-        <table className="w-full max-w-full text-sm table-fixed">
-          <RunHistoryColGroup layout={columnLayout} />
-          <thead>
-            <RunHistoryMobileHeaderRow colSpan={colSpan} />
-            <tr className="hidden md:table-row border-b border-border bg-muted/70 text-left">
-              {!teamMode ? (
-                <th
-                  className="hidden md:table-cell w-6 px-1 py-2"
-                  aria-label="Drag to reorder"
-                />
-              ) : null}
-              {columnLayout.showMemberColumn ? (
-                <th className="table-col-header px-2 py-1.5 md:px-2 md:py-2 max-w-[4.5rem] md:max-w-none">
-                  <span className="hidden sm:inline">Member</span>
-                  <span className="sm:hidden">Who</span>
-                </th>
-              ) : null}
-              <th className="table-col-header px-2 py-1.5 md:px-2 md:py-2 whitespace-nowrap">
-                Date
-              </th>
-              {showSessionColumn ? (
-                <th className="table-col-header px-2 py-1.5 md:px-2 md:py-2 min-w-0">
-                  Session
-                </th>
-              ) : null}
-              <th className="table-col-header hidden md:table-cell px-2 py-2">Car</th>
-              <th className="table-col-header px-1.5 py-1.5 md:px-2 md:py-2 whitespace-nowrap">
-                Best
-              </th>
-              {/* "Top 5" / "Top 10", not "Avg top 5" — the long labels are wider
-                  than the columns they head and were already overlapping each
-                  other at 1440. The phone header has always said this. */}
-              <th
-                className="table-col-header px-1.5 py-1.5 md:px-2 md:py-2 whitespace-nowrap"
-                title="Average of the 5 best laps"
-              >
-                Top 5
-              </th>
-              <th
-                className="table-col-header hidden md:table-cell px-1.5 py-1.5 md:px-2 md:py-2 whitespace-nowrap"
-                title="Average of the 10 best laps"
-              >
-                Top 10
-              </th>
-              <th className="table-col-header px-1.5 py-1.5 md:px-2 md:py-2 whitespace-nowrap">
-                Median
-              </th>
-              <th
-                className={cn(RUN_HISTORY_ACTION_CELL_CLASS, "text-[10px]")}
-                aria-label="Setup and laps"
-              />
-            </tr>
-          </thead>
-          <tbody>
-            <RunHistoryTable
-              runs={tableRuns}
-              allRunsDescending={compareRunsDescending}
-              runListSource={teamMode ? "team_runs" : "my_runs"}
-              userDisplayName={userDisplayName}
-              displayTimeZone={displayTimeZone}
-              enableReorder={!teamMode}
-              viewerUserId={teamMode ? user.id : null}
-              memberDisplayByUserId={teamMode ? memberDisplayByUserId : undefined}
-              showMemberColumn={columnLayout.showMemberColumn}
-              showSessionColumn={showSessionColumn}
-              dayRunNumberByRunId={dayRunNumberByRunId}
-              matchReasonsById={matchReasonsById}
-              focusRunId={focusRunId}
-            />
-          </tbody>
-        </table>
-      </div>
-    );
-  }
-
-  function renderSessionGroup(group: Group, idx: number) {
-    const isRaceMeeting = group.type === "Race Meeting";
-    // Test days: the date now lives on the meta line, so the generic
-    // "Test day – <date>" title collapses to just "Test day".
-    const displayTitle = isRaceMeeting ? group.title : "Test day";
-    const trackDisplay =
-      group.trackName && group.trackName !== "—" ? group.trackName : null;
-    const groupHasFocus =
-      focusRunId != null && group.runs.some((r) => r.id === focusRunId);
-
-    // Team view: cluster a group's runs by driver, ranked by pace (best included
-    // lap), and expose each driver as its own accordion — the collation surface
-    // ("what's everyone running here"). Solo / single-driver groups skip the
-    // driver level and show runs directly.
-    const driverClusters = teamMode
-      ? (() => {
-          const byUser = new Map<string, RunInGroup[]>();
-          for (const r of group.runs) {
-            const uid = r.userId ?? "unknown";
-            const list = byUser.get(uid);
-            if (list) list.push(r);
-            else byUser.set(uid, [r]);
-          }
-          const clusters = [...byUser.entries()].map(([userId, driverRuns]) => {
-            const bests = driverRuns
-              .map((r) => getBestLap(primaryLapRowsFromRun(r)))
-              .filter((n): n is number => n != null);
-            return {
-              userId,
-              name: memberDisplayByUserId?.[userId] ?? "Unknown driver",
-              runs: driverRuns,
-              best: bests.length ? Math.min(...bests) : null,
-            };
-          });
-          // Fastest driver first; drivers with no timed lap fall to the bottom.
-          clusters.sort((a, b) =>
-            a.best == null && b.best == null
-              ? 0
-              : a.best == null
-                ? 1
-                : b.best == null
-                  ? -1
-                  : a.best - b.best
-          );
-          return clusters;
-        })()
-      : null;
-    const multiDriver = driverClusters != null && driverClusters.length > 1;
-    return (
-      // Track-forward session row inside the single Sessions card: icon well
-      // carries the type (flag = race meeting, wrench = testing), date + run
-      // count sit under the full (never truncated) title, track holds the
-      // right column. Approved artifact: sessions-redesign (variant C).
-      <details
-        key={group.id}
-        className="min-w-0 max-w-full group/details border-t border-border first:border-t-0"
-        open={
-          focusRunId
-            ? group.runs.some((r) => r.id === focusRunId)
-            : expandLatest && idx === 0
-        }
-      >
-        <summary className="list-none cursor-pointer overflow-x-hidden">
-          <div className="flex min-w-0 items-center gap-3 px-3 py-3 hover:bg-muted/50 transition sm:px-4">
-            <span
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-border bg-secondary text-muted-foreground"
-              title={group.type}
-              aria-label={group.type}
-            >
-              {isRaceMeeting ? (
-                <Flag className="h-4 w-4" aria-hidden />
-              ) : (
-                <Wrench className="h-4 w-4" aria-hidden />
-              )}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="session-group-title block">{displayTitle}</span>
-              <span className="type-timestamp mt-0.5 block leading-none">
-                {group.dateLabel}
-                <span className="whitespace-nowrap">
-                  {" "}· {group.runs.length} run{group.runs.length !== 1 ? "s" : ""}
-                </span>
-              </span>
-            </span>
-            {trackDisplay ? (
-              <span className="min-w-0 max-w-[45%] shrink text-right text-xs font-semibold leading-tight text-muted-foreground">
-                {trackDisplay}
-              </span>
-            ) : null}
-            <ChevronRight
-              className="h-3.5 w-3.5 shrink-0 text-faint transition-transform group-open/details:rotate-90"
-              aria-hidden
-            />
-          </div>
-        </summary>
-        {/* `session-detail` is the hook the lg+ master-detail layout uses to lift this pane out of
-            the accordion flow and into the right-hand column (see `.sessions-split` in globals.css).
-            Below lg it is an ordinary block and this class does nothing. */}
-        <div className="session-detail min-w-0 max-w-full border-t border-border bg-background/60">
-          {multiDriver && driverClusters ? (
-            driverClusters.map((driver, dIdx) => {
-              const driverHasFocus =
-                focusRunId != null && driver.runs.some((r) => r.id === focusRunId);
-              return (
-                <details
-                  key={driver.userId}
-                  className="group/driver min-w-0 max-w-full border-t border-border first:border-t-0"
-                  open={driverHasFocus}
-                >
-                  <summary className="list-none cursor-pointer overflow-x-hidden">
-                    <div className="flex min-w-0 items-center gap-3 py-2.5 pl-4 pr-3 hover:bg-muted/50 transition sm:pl-6 sm:pr-4">
-                      {/* Pace rank — the driver list is a mini leaderboard. */}
-                      <span className="type-timestamp w-4 shrink-0 text-center text-faint">
-                        {dIdx + 1}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground">
-                        {driver.name}
-                      </span>
-                      <span className="type-timestamp shrink-0 whitespace-nowrap">
-                        {driver.runs.length} run{driver.runs.length !== 1 ? "s" : ""}
-                        {driver.best != null ? (
-                          <>
-                            {" "}· best{" "}
-                            <span className="text-foreground">{formatLap(driver.best)}</span>
-                          </>
-                        ) : null}
-                      </span>
-                      <ChevronRight
-                        className="h-3.5 w-3.5 shrink-0 text-faint transition-transform group-open/driver:rotate-90"
-                        aria-hidden
-                      />
-                    </div>
-                  </summary>
-                  {renderRunsTable(driver.runs, {
-                    showMemberColumn: false,
-                  })}
-                </details>
-              );
-            })
-          ) : (
-            renderRunsTable(group.runs, {
-              // Single-driver team group keeps the member column to attribute the
-              // one driver; solo groups have no member column.
-              showMemberColumn: teamMode,
-            })
-          )}
-        </div>
-      </details>
-    );
-  }
 
   function renderFlatRunList() {
     const showSessionColumn = runs.some(
@@ -993,7 +795,9 @@ export default async function RunHistoryPage({
 
   return (
     <>
-      <header className="page-header is-echo">
+      {/* `sessions-chrome` — this header names the LIST, so on a phone it folds
+          away once you push into a day (globals.css, keyed off `data-sessions-depth`). */}
+      <header className="page-header is-echo sessions-chrome">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {/*
             Phone only, and the breakpoint is the whole point (2026-08-08).
@@ -1014,12 +818,12 @@ export default async function RunHistoryPage({
         </div>
       </header>
       <section className="page-body min-w-0 max-w-full">
-        {/* Back from a run view: centre the row that was open, don't dump them at the top. */}
-        <SessionsFocusScroll runId={focusRunId} />
-        {/* lg+ only: fill the master-detail pane on arrival, and keep exactly one session open
-            so the panes can never stack in the same column. */}
-        <SessionsDesktopMasterDetail />
+        {/* Flat-list only. In the grouped view the trip back from a run lands on
+            `?g=<session>` — the day the run belongs to — so there is no row to
+            hunt for and nothing to scroll to. */}
+        {filters.layout === "flat" ? <SessionsFocusScroll runId={focusRunId} /> : null}
         <Suspense fallback={<div className="h-20 rounded-lg border border-border bg-card animate-pulse" />}>
+          <div className="sessions-chrome">
           <SessionsFilterBar
             cars={filterCars}
             tracks={filterTracks}
@@ -1032,6 +836,7 @@ export default async function RunHistoryPage({
             openGroup={focusRunId}
             viewAll={viewAll}
           />
+          </div>
         </Suspense>
         {matchedRunCount === 0 ? (
           <CardPanel className="text-sm text-muted-foreground">
@@ -1051,53 +856,28 @@ export default async function RunHistoryPage({
             {viewMore}
           </div>
         ) : (
-          <div className="space-y-2">
-            {/* lg+ solo: the workbench replaces the accordion outright — the rail keeps
-                its place while the pane shows the day or one run. Team mode and the
-                phone keep the accordion below, which `sessions-split` still turns into
-                master-detail at lg+ for team. */}
-            {workbenchActive ? (
-              <SessionsWorkbench
-                groups={workbenchGroups}
-                runs={runs}
-                pickerRuns={compareRunsDescending}
-                runListSource="my_runs"
-                displayTimeZone={displayTimeZone}
-                userDisplayName={userDisplayName}
-                filtersActive={filtersActive}
-                filterLabels={workbenchFilterLabels}
-                railFooter={viewMore}
-              />
-            ) : null}
-            {/* One glass card holds every session group (approved artifact:
-                sessions-redesign); groups divide with hairlines inside it.
-                `sessions-split` turns that same markup into a master-detail layout at lg+ —
-                session list on the left, the open session's runs in a pane on the right. */}
-            <SurfaceCard
-              variant="panel"
-              contentClassName={cn("p-0", !workbenchActive && "sessions-split")}
-              className={cn("min-w-0 max-w-full", workbenchActive && "lg:hidden")}
-              // Demo walkthrough stop 3 on the phone. The desktop's session list is the
-              // workbench rail, which carries the same id — when the workbench is active this
-              // card is `lg:hidden`, so exactly one of the two ever resolves.
-              dataTour="sessions"
-            >
-              {viewAll ? (
-                groups.map((group, idx) => renderSessionGroup(group, idx))
-              ) : (
-                <SessionGroupsPager initial={pagerInitial} step={12}>
-                  {groups.map((group, idx) => renderSessionGroup(group, idx))}
-                </SessionGroupsPager>
-              )}
-              {/* The lg+ detail column with nothing selected. A `<p>` on purpose: the
-                  `.sessions-split > div` rule clamps the pager's footer to the list width,
-                  and this one has to span the pane instead. */}
-              <p className="sessions-empty">Pick a session to see its runs.</p>
-            </SurfaceCard>
-            {/* The workbench carries its own copy at the foot of the rail, so this
-                one is for the phone and team mode only — otherwise you'd get two. */}
-            <div className={cn(workbenchActive && "lg:hidden")}>{viewMore}</div>
-          </div>
+          /* One browser, both scopes, both layouts: the rail beside a reading pane
+             at lg+, the same selection as a push stack on a phone. "View more"
+             rides at the foot of the rail rather than under the page, because it
+             belongs to the archive — you reach it by running out of sessions. */
+          <SessionsBrowser
+            groups={browserGroups}
+            runs={runs}
+            pickerRuns={compareRunsDescending}
+            runListSource={teamMode ? "team_runs" : "my_runs"}
+            displayTimeZone={displayTimeZone}
+            userDisplayName={userDisplayName}
+            memberDisplayByUserId={memberDisplayByUserId}
+            viewerUserId={user.id}
+            teamMode={teamMode}
+            teamTitle={teamTitle}
+            teamId={teamId}
+            filtersActive={filtersActive}
+            filterLabels={browserFilterLabels}
+            railFooter={viewMore}
+            initialGroupId={focusGroupId}
+            initialRunId={focusRunId}
+          />
         )}
       </section>
     </>

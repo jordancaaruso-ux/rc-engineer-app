@@ -128,3 +128,32 @@ test("whitespace-only input is still the browse view", () => {
   const out = filterOptionSections("   ", sections([SWEEP_32], ALL));
   assert.equal(out[0]!.label, "Recently used");
 });
+
+test("equal scores keep the caller's order, so a run list stays newest-first", () => {
+  /*
+   * The picker prints "<driver> · <event> — <session> — <track>", and searching a
+   * teammate's name matches every one of their runs identically. Ranked
+   * alphabetically that put "ETS Round 1" above "Testing 16 Aug 2026" — E before
+   * T — and the newest run landed at the bottom of the list.
+   */
+  const runs: OptionSection[] = [
+    {
+      key: "all",
+      label: null,
+      options: [
+        opt("newest", "Dayne Warren · Testing 16 Aug 2026 — Run — MR33 Arena"),
+        opt("older", "Dayne Warren · ETS Round 1 — Qualifying — Apeldoorn"),
+        opt("oldest", "Dayne Warren · ETS Round 1 — Practice — Apeldoorn"),
+      ],
+    },
+  ];
+  assert.deepEqual(
+    filterOptionSections("dayne", runs)[0]!.options.map((o) => o.value),
+    ["newest", "older", "oldest"]
+  );
+});
+
+test("a better score still outranks the caller's order", () => {
+  const out = filterOptionSections("sweep 36", sections([], ALL))[0]!.options;
+  assert.equal(out[0]!.value, SWEEP_36.value, "exact match wins even though Sweep 32 is listed first");
+});

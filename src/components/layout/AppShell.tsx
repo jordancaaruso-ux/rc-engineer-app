@@ -100,7 +100,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <AccountMenu />
           {/*
            * Ideas — the edge tab on the phone, and the panel both platforms open
-           * (the rail's lightbulb reaches it through `openIdeasPanel`). Out here
+           * (the rail's Ideas button reaches it through `openIdeasPanel`). Out here
            * with BottomNav for the same fixed-position reason, and mounted once so
            * there is a single panel and a single fetch.
            */}

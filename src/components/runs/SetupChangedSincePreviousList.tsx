@@ -17,19 +17,22 @@ const HEAD_CELL =
 export function SetupChangedSincePreviousList({
   rows,
   className,
-  carId,
+  runId,
 }: {
   rows: SetupChangedRow[] | null;
   className?: string;
   /**
-   * When given, and this car's chassis came from an uploaded PDF, each row can be opened to show
-   * that box on a crop of the driver's own sheet — see `SheetBoxCrop`. Every other chassis gets no
-   * opener at all, so passing it is always safe and never changes what an ordinary car shows.
+   * When given, and this run's chassis came from an uploaded PDF, each row can be opened to show
+   * that box on a crop of the sheet — see `SheetBoxCrop`. Every other chassis gets no opener at
+   * all, so passing it is always safe and never changes what an ordinary car shows.
+   *
+   * The RUN, not the car: a car is readable only by its owner, so keying this on the car meant a
+   * teammate's run showed no opener at all while the owner's showed one on every row.
    */
-  carId?: string | null;
+  runId?: string | null;
 }) {
   // Called before the early returns below, because a hook cannot be skipped on some renders.
-  const crops = useSheetBoxCrops(carId, (rows ?? []).map((r) => r.key));
+  const crops = useSheetBoxCrops(runId, (rows ?? []).map((r) => r.key));
   const [openKey, setOpenKey] = useState<string | null>(null);
 
   if (rows == null) {

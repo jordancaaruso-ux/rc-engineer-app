@@ -630,7 +630,7 @@ export function SetupSheetModal({
                 (previousRunOnCar?.setupSnapshot?.id != null && previousSetupData == null) ? (
                   <p className="text-muted-foreground text-xs">Loading changes…</p>
                 ) : (
-                  <SetupChangedSincePreviousList rows={changedSincePrevious} carId={carId} />
+                  <SetupChangedSincePreviousList rows={changedSincePrevious} runId={run?.id ?? null} />
                 )}
                 {compareOpen ? (
                   <div className="space-y-2 pt-1">

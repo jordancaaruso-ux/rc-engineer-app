@@ -110,6 +110,14 @@ export type OptionSection<T extends SearchableOption = SearchableOption> = {
  *   what you're after, so it collapses to one ranked list. Section order still
  *   breaks ties: two options that match equally, and the one you ran last
  *   weekend comes first.
+ *
+ * Equal scores keep the order the CALLER gave them. That used to be alphabetical
+ * by label, which quietly destroyed the one thing a run list is sorted by: typing
+ * a teammate's name scores all of their runs identically, so a newest-first list
+ * re-sorted itself into "ETS Round 1" before "Testing 16 Aug" — E before T. Every
+ * caller has already sorted its options for a reason (runs newest first, tracks
+ * by name), and a tie is precisely the case where this has nothing better to say
+ * than "leave it as you found it".
  */
 export function filterOptionSections<T extends SearchableOption>(
   query: string,
@@ -133,21 +141,20 @@ export function filterOptionSections<T extends SearchableOption>(
     return deduped;
   }
 
+  // One running number across every section, in the order the caller laid them
+  // out. It carries the section ordering too — section 0's options all number
+  // below section 1's — so it is the whole tiebreak rather than a third one.
+  let position = 0;
   const scored = deduped
-    .flatMap((section, sectionIndex) =>
+    .flatMap((section) =>
       section.options.map((option) => ({
         option,
-        sectionIndex,
+        position: position++,
         score: scoreSearchMatch(q, [option.label, option.detail, option.keywords]),
       }))
     )
     .filter((m) => m.score > 0)
-    .sort(
-      (a, b) =>
-        b.score - a.score ||
-        a.sectionIndex - b.sectionIndex ||
-        a.option.label.localeCompare(b.option.label)
-    );
+    .sort((a, b) => b.score - a.score || a.position - b.position);
 
   return scored.length > 0
     ? [{ key: "results", label: null, options: scored.map((m) => m.option) }]

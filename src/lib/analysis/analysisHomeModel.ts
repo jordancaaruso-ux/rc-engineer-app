@@ -95,6 +95,12 @@ export type AnalysisTrendRun = {
   carName: string;
   /** Short x-axis label, e.g. "Q1", "A2", "R3". */
   shortLabel: string;
+  /**
+   * The session's full name — "Qualifying 2", "Run 4". For the readout strip
+   * above the plot, which is full-width and can hold it; the axis ticks share
+   * one row between every run in the session and keep `shortLabel`.
+   */
+  sessionName: string;
   createdAtIso: string;
   metrics: AnalysisRunMetrics;
   /** Lap distribution for the spread view; null when too few included laps. */

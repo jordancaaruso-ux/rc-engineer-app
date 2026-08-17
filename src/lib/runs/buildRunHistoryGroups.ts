@@ -150,6 +150,29 @@ export function sessionGroupKey(
     : `day-${dateKey(runSessionSortInstant(run), resolveRunLocalTimeZone(run, zones))}-${trackKey(run)}`;
 }
 
+/**
+ * The calendar day a run belongs to (YYYY-MM-DD), resolved in the DRIVER's zone —
+ * the same rule `sessionGroupKey` uses to decide which day a testing run lands in.
+ * Exported because the team-day chart has to split a multi-day meeting on exactly
+ * that boundary; a second day rule there would put a run in one day on the list
+ * and the next day on the chart.
+ */
+export function runLocalDayKey(
+  run: {
+    createdAt: Date | string;
+    sortAt?: Date | string | null;
+    localTimeZone?: string | null;
+    userId?: string | null;
+  },
+  zones?: RunGroupZoneOptions
+): string {
+  const instant = runSessionSortInstant({
+    createdAt: new Date(run.createdAt),
+    sortAt: run.sortAt ? new Date(run.sortAt) : null,
+  });
+  return dateKey(instant, resolveRunLocalTimeZone(run, zones));
+}
+
 export function buildRunHistoryGroups<T extends RunForHistoryGroup>(
   runs: T[],
   timeZone?: string | null,

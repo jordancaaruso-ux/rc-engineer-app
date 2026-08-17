@@ -20,6 +20,7 @@ import {
   type AnalysisVideoModel,
 } from "@/lib/analysis/analysisHomeModel";
 import { computeTireIndicatorsByRunId } from "@/lib/runs/tireSetChange";
+import { runSessionName } from "@/lib/runSession";
 
 /** Runs fetched for the recent-runs card; extras beyond the shown rows feed the delta-vs-previous lookback. */
 const RECENT_RUNS_LOOKBACK = 12;
@@ -130,6 +131,7 @@ async function loadTrendModel(
       carId: run.carId,
       carName: carNameOf(run),
       shortLabel: shortRunLabel(run, index),
+      sessionName: runSessionName(run, { dayRunNumber: index + 1 }),
       createdAtIso: run.createdAt.toISOString(),
       metrics,
       distribution: computeLapDistribution(run),

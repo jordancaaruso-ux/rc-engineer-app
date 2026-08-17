@@ -50,18 +50,22 @@ type CropsState =
  *
  * Nothing is the ordinary case, not an error: most chassis fill as a plain form and have no sheet
  * to draw. The caller shows its list and offers no picture.
+ *
+ * Asked of the RUN, not of the car. The car route was owner-only, so on a teammate's run it 404'd,
+ * the 404 read here as "no sheet", and the opener was never drawn — the driver whose run it was
+ * could open every crop and nobody else could see that the feature existed. See the route.
  */
-export function useSheetBoxCrops(carId: string | null | undefined, keys: string[]): CropsState {
+export function useSheetBoxCrops(runId: string | null | undefined, keys: string[]): CropsState {
   const [state, setState] = useState<CropsState>({ kind: "loading" });
   const keyList = keys.join(",");
 
   useEffect(() => {
-    if (!carId || !keyList) {
+    if (!runId || !keyList) {
       setState({ kind: "none" });
       return;
     }
     let cancelled = false;
-    fetch(`/api/cars/${encodeURIComponent(carId)}/sheet-boxes?keys=${encodeURIComponent(keyList)}`, {
+    fetch(`/api/runs/${encodeURIComponent(runId)}/sheet-boxes?keys=${encodeURIComponent(keyList)}`, {
       cache: "no-store",
     })
       .then((r) => (r.ok ? r.json() : null))
@@ -94,7 +98,7 @@ export function useSheetBoxCrops(carId: string | null | undefined, keys: string[
     return () => {
       cancelled = true;
     };
-  }, [carId, keyList]);
+  }, [runId, keyList]);
 
   return state;
 }
