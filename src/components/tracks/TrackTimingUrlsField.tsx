@@ -1,10 +1,10 @@
 "use client";
 
 import { forwardRef, useImperativeHandle, useId, useState } from "react";
-import { X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  TRACK_TIMING_PASTE_EXAMPLES,
+  TRACK_TIMING_PASTE_EXAMPLE_SHORT,
   classifyTrackTimingUrl,
   type TrackTimingUrls,
 } from "@/lib/tracks/trackTimingUrl";
@@ -83,6 +83,13 @@ export const TrackTimingUrlsField = forwardRef<
     return { ok: true, value: next };
   }
 
+  /** Enter and the "+" take the same path, errors included, so they can't drift apart. */
+  function commitDraft() {
+    if (!draft.trim()) return;
+    const added = addDraft();
+    if (!added.ok) onError(added.error);
+  }
+
   useImperativeHandle(ref, () => ({
     commit: () => (draft.trim() ? addDraft() : { ok: true, value }),
   }));
@@ -123,39 +130,64 @@ export const TrackTimingUrlsField = forwardRef<
       ) : null}
 
       {bothFilled ? null : (
-        <input
-          id={fieldId}
-          // Deliberately not type="url" — a bare host is what drivers paste, and the browser's
-          // own validation would reject it before submit. classifyTrackTimingUrl adds the scheme.
-          type="text"
-          inputMode="url"
-          autoComplete="off"
-          className={inputClassName}
-          placeholder={
-            filled.length > 0 ? "Paste another timing page" : "LiveRC or Speedhive page URL"
-          }
-          value={draft}
-          onChange={(e) => setDraft(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key !== "Enter") return;
-            // Inside a <form> either side of this, so never let Enter submit the whole thing.
-            e.preventDefault();
-            if (!draft.trim()) return;
-            const added = addDraft();
-            if (!added.ok) onError(added.error);
-          }}
-        />
+        // The caller's `inputClassName` dresses the whole row, and the input inside it goes bare:
+        // one box on screen, which is what `search-row-composite` is for — without it the global
+        // input focus ring draws a second border inside this one.
+        <div className={cn("search-row-composite flex items-center gap-1.5", inputClassName)}>
+          <input
+            id={fieldId}
+            // Deliberately not type="url" — a bare host is what drivers paste, and the browser's
+            // own validation would reject it before submit. classifyTrackTimingUrl adds the scheme.
+            type="text"
+            inputMode="url"
+            autoComplete="off"
+            className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+            placeholder={
+              filled.length > 0 ? "Paste another timing page" : "LiveRC or Speedhive page URL"
+            }
+            value={draft}
+            onChange={(e) => setDraft(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              // Inside a <form> either side of this, so never let Enter submit the whole thing.
+              e.preventDefault();
+              commitDraft();
+            }}
+          />
+          {/*
+           * Enter has always added the paste, and so has pressing "Add track" — but a driver
+           * looking at a lone text box has no reason to believe either, least of all on a phone
+           * where the keyboard's return key is the thing that usually submits a form. The "+" is
+           * the visible version of a rule that was only ever implied.
+           *
+           * Dimmed while empty rather than disabled: a disabled button can't be focused, so the
+           * one affordance saying "this field takes more than one" would vanish for keyboard and
+           * screen-reader users exactly when it's needed. `addDraft` already no-ops on an empty box.
+           */}
+          <button
+            type="button"
+            onClick={commitDraft}
+            aria-label="Add this timing page"
+            title="Add this timing page"
+            className={cn(
+              "tap-active -mr-1 flex size-7 shrink-0 items-center justify-center rounded-md border border-primary-ink/45 text-primary-ink transition hover:bg-primary/15",
+              !draft.trim() && "opacity-40"
+            )}
+          >
+            <Plus className="size-4" strokeWidth={2.75} aria-hidden />
+          </button>
+        </div>
       )}
 
-      {/* Only argues the case while there's still a case to argue. Once a page is in, "you
-          can skip it" is answering a question the driver has already settled. */}
+      {/* Says what filling this in buys you, because the label names the thing and the
+          placeholder names the shape — neither said why a driver should bother, which read as
+          homework. Tracks are a shared catalog and discovery matches each driver by their own
+          transponder, so one paste finds laps for everyone who races there, not just whoever
+          typed it. Gone once a page is in: by then it's been bothered with. */}
       {filled.length > 0 ? null : (
-        <p className="text-[11px] leading-snug text-muted-foreground">
-          Adding one lets us find your sessions automatically. You can skip it. Without one
-          you&apos;ll paste a results link for each run instead.
-          {/* The example holds an unbroken URL — without break-words it overflows the panel
-              and the second provider is clipped off the line. */}
-          <span className="block break-words opacity-80">{TRACK_TIMING_PASTE_EXAMPLES}</span>
+        <p className="break-words text-[11px] leading-snug text-muted-foreground">
+          Your sessions then turn up here on their own, for everyone racing here.
+          <span className="block opacity-75">{TRACK_TIMING_PASTE_EXAMPLE_SHORT}</span>
         </p>
       )}
     </div>

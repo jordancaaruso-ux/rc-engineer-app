@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, Search, X } from "lucide-react";
+import { Check, ChevronDown, Plus, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEnterExit } from "@/components/ui/Collapse";
 import {
@@ -130,6 +130,7 @@ export function PickerSheet<T extends SearchableOption>({
   panel = null,
   panelTitle,
   emptyAction,
+  searchAction,
   mono = false,
   searchable,
 }: {
@@ -154,6 +155,18 @@ export function PickerSheet<T extends SearchableOption>({
   panelTitle?: string;
   /** Offered under "Nothing matches …" — usually create-with-this-name. */
   emptyAction?: (query: string) => ReactNode;
+  /**
+   * A "+" at the right-hand end of the search row, carrying whatever has been typed. Replaces
+   * the sticky footer on the pickers that can create: one action, at the end of the bar you are
+   * already using, instead of a row competing for the last line of the sheet.
+   *
+   * Providing it forces the search row on regardless of list length. Without that, the picker
+   * that needs creating most — the one with four tracks in it — is exactly the one that hides
+   * the bar the + lives in, which is how the 2026-08-13 dead end got measured in the first place.
+   *
+   * `label` is the button's accessible name; the glyph alone says nothing to a screen reader.
+   */
+  searchAction?: { label: string; onAction: (query: string) => void };
   mono?: boolean;
   /** Force the search field on or off. Unset = decided by list length. */
   searchable?: boolean;
@@ -181,7 +194,7 @@ export function PickerSheet<T extends SearchableOption>({
   // create affordance, a "None" that isn't a wheel entry. What it doesn't earn is
   // a search field, or 85% of the screen to show four things in.
   const totalOptions = useMemo(() => countOptions(sections), [sections]);
-  const showSearch = searchable ?? totalOptions > PICKER_SEARCH_THRESHOLD;
+  const showSearch = searchable ?? (searchAction != null || totalOptions > PICKER_SEARCH_THRESHOLD);
 
   /**
    * Focus the search only where focusing is free.
@@ -339,6 +352,21 @@ export function PickerSheet<T extends SearchableOption>({
                     className="tap-active -mr-1 flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
                   >
                     <X className="size-4" strokeWidth={2} aria-hidden />
+                  </button>
+                ) : null}
+                {/* Last thing in the row, after the clear ×, and filled rather than ghosted: two
+                    icon buttons in one box directly under the sheet's own close × would otherwise
+                    read as a pair of dismissals. Yellow is the app's action colour, so the one
+                    that isn't a dismissal is the one that's painted. */}
+                {searchAction ? (
+                  <button
+                    type="button"
+                    onClick={() => searchAction.onAction(query.trim())}
+                    aria-label={searchAction.label}
+                    title={searchAction.label}
+                    className="tap-active -mr-1.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground transition hover:brightness-105"
+                  >
+                    <Plus className="size-4" strokeWidth={2.75} aria-hidden />
                   </button>
                 ) : null}
               </div>

@@ -10,6 +10,14 @@ export const TRACK_TIMING_PASTE_EXAMPLES =
   "e.g. tftr.liverc.com or speedhive.mylaps.com/practice/4591";
 
 /**
+ * The form hint shows one example, not the pair. A Speedhive practice id says nothing a driver
+ * recognises and it is the half that wraps at 390px — where the hint's real job is saying what
+ * filling the field buys you. Both providers still ship on the validation errors above, which is
+ * where the shape of an acceptable URL actually gets asked for.
+ */
+export const TRACK_TIMING_PASTE_EXAMPLE_SHORT = "e.g. tftr.liverc.com";
+
+/**
  * One pasted URL, two possible fields — tell them apart by host so the driver never has to
  * know which timing provider column they are filling in.
  *

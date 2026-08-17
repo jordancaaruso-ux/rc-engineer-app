@@ -355,22 +355,13 @@ export function TireTypeCombobox({
               )
             : undefined
         }
-        footer={
+        searchAction={
+          // Moved here from a sticky footer. The panel still opens with whatever was typed
+          // filled in — a half-typed "con" is a filter, not a name, so nothing is created from
+          // it without a second look at a catalog everybody shares.
           allowInlineCreate
-            ? (q) => (
-                <button
-                  type="button"
-                  onClick={() => beginCreate(q)}
-                  className="tap-active w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-primary-ink hover:bg-muted/60"
-                >
-                  {/* Neutral wording even mid-search: a half-typed "con" is a
-                      filter, not a name, and offering to create it as one invites
-                      junk into a catalog everybody shares. The panel still opens
-                      with it filled in to finish. */}
-                  + Add new tire type…
-                </button>
-              )
-            : null
+            ? { label: "Add new tire type", onAction: (q) => beginCreate(q) }
+            : undefined
         }
       />
     </div>

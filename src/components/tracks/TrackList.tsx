@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptics";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
@@ -153,16 +153,55 @@ export function TrackList({
     }
   }
 
+  /**
+   * Opening the form carries the search across, so a driver who searched for a track that isn't
+   * in the catalog doesn't type its name a second time. Shared by the row's own header and the
+   * "+" in the search bar — one path, so the prefill can't drift between them.
+   */
+  function openAddForm() {
+    setShowAddForm(true);
+    if (search.trim() && !name.trim()) setName(search.trim());
+  }
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <label className="block text-[11px] text-muted-foreground">Search tracks</label>
-        <input
-          className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search community catalog by name or location"
-        />
+        <label className="block text-[11px] text-muted-foreground" htmlFor="track-catalog-search">
+          Search tracks
+        </label>
+        {/* Composed like the picker sheet's search row rather than a bare box, so the two ways
+            into the same catalog look like the same control — and so "add one" has somewhere to
+            live at the top of the page. Under a long catalog on a phone the add row is below the
+            fold, which is the whole reason the + is worth having here. */}
+        <div className="search-row-composite flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-2 transition-colors focus-within:border-ring/45">
+          <Search className="size-4 shrink-0 text-muted-foreground" strokeWidth={2} aria-hidden />
+          <input
+            id="track-catalog-search"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            type="text"
+            inputMode="search"
+            enterKeyHint="search"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="Search community catalog by name or location"
+          />
+          {search ? (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              aria-label="Clear search"
+              className="tap-active -mr-1 flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+            >
+              <X className="size-4" strokeWidth={2} aria-hidden />
+            </button>
+          ) : null}
+          {/* No "+" here on purpose: "Add a new track" is the first row of the card immediately
+              below, already labelled and a bigger target, and the dock carries the log-run FAB —
+              three + glyphs in one column, two of them the same action. */}
+        </div>
       </div>
 
       <SurfaceCard variant="panel" contentClassName="p-0" overflowHidden={false}>
@@ -170,10 +209,7 @@ export function TrackList({
           <CollapsibleAddRow
             label="Add a new track"
             open={showAddForm}
-            onOpenChange={(next) => {
-              setShowAddForm(next);
-              if (next && search.trim() && !name.trim()) setName(search.trim());
-            }}
+            onOpenChange={(next) => (next ? openAddForm() : setShowAddForm(false))}
           >
             <form onSubmit={handleAdd} className="space-y-3">
               <div className="grid gap-3 md:grid-cols-2">

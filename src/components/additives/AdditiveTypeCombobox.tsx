@@ -244,18 +244,10 @@ export function AdditiveTypeCombobox({
               )
             : undefined
         }
-        footer={
+        searchAction={
           allowInlineCreate
-            ? (q) => (
-                <button
-                  type="button"
-                  onClick={() => beginCreate(q)}
-                  className="tap-active w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-primary-ink hover:bg-muted/60"
-                >
-                  + Add new additive…
-                </button>
-              )
-            : null
+            ? { label: "Add new additive", onAction: (q) => beginCreate(q) }
+            : undefined
         }
       />
     </div>

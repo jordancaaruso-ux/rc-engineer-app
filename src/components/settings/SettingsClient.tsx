@@ -124,6 +124,7 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
         // Numbers can't contain either, so both are natural separators.
         commitKeys={["Enter", ",", " "]}
         placeholder="e.g. 1234567"
+        addLabel="Add transponder number"
         invalidHint="Transponder numbers are digits only."
         hint="Add every chip you own — race, practice, spare, the one in a loaner. Any of them matches a session, so you only do this once."
         onSave={(text) => {
@@ -195,6 +196,7 @@ export function SettingsClient({ initial }: { initial: InitialSettings }) {
         // Enter only: a name contains spaces, and sheets print "Caruso, Jordan".
         commitKeys={["Enter"]}
         placeholder="e.g. Jordan Smith"
+        addLabel="Add driver name"
         invalidHint="Type the name as the timing sheet prints it."
         hint="Every spelling you show up under — each club types it differently, and a chip registered to someone else prints their name. Any one matching counts."
         onSave={(text) => {

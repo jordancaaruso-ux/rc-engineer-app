@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SaveState } from "@/components/settings/SettingsClient";
 
@@ -36,6 +36,7 @@ export function ChipListField<T extends string | number>({
   inputMode,
   commitKeys = ["Enter"],
   chipMono = false,
+  addLabel,
   id,
 }: {
   label: string;
@@ -60,6 +61,13 @@ export function ChipListField<T extends string | number>({
    */
   commitKeys?: string[];
   chipMono?: boolean;
+  /**
+   * Accessible name for the "+", singular: "Add transponder number". Defaults to the field's own
+   * label, which is a plural set name and reads as a near-duplicate of the input's label — enough
+   * of a collision that Playwright's `getByLabel` couldn't tell the two apart, which is a fair
+   * proxy for a screen reader having the same trouble.
+   */
+  addLabel?: string;
   id: string;
 }) {
   const [values, setValues] = useState<T[]>(() => parse(initialText));
@@ -126,31 +134,61 @@ export function ChipListField<T extends string | number>({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
-        <input
-          id={id}
-          type="text"
-          inputMode={inputMode}
-          value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            setNote(null);
-          }}
-          onBlur={commitDraft}
-          onKeyDown={(e) => {
-            if (commitKeys.includes(e.key)) {
+        {/* `search-row-composite` isn't decoration: without it the global
+            `input:focus-visible` ring draws a second box inside this one the moment the field is
+            focused, which is exactly what it looked like. The wrapper owns the border now. */}
+        <div className="search-row-composite flex w-full items-center gap-1.5 rounded-md border border-border bg-card px-3 py-2 transition-colors focus-within:border-ring/45 focus-within:ring-1 focus-within:ring-ring/35">
+          <input
+            id={id}
+            type="text"
+            inputMode={inputMode}
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setNote(null);
+            }}
+            onBlur={commitDraft}
+            onKeyDown={(e) => {
+              if (commitKeys.includes(e.key)) {
+                e.preventDefault();
+                commitDraft();
+                return;
+              }
+              // Backspace on an empty box takes the last pill, as every chip input does.
+              if (e.key === "Backspace" && !draft && values.length > 0) {
+                e.preventDefault();
+                remove(values[values.length - 1]!);
+              }
+            }}
+            placeholder={values.length > 0 ? addAnotherPlaceholder : placeholder}
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          />
+          {/*
+           * Enter and blur have always committed; nothing on screen said so, so the control read
+           * as a one-value text box and people entered one chip. The + adds no capability — it
+           * says out loud that this field takes a list.
+           *
+           * `onPointerDown` + `preventDefault` rather than `onClick`: the input commits on blur,
+           * so pressing an onClick button would commit, empty the box, and — if the button were
+           * disabled-when-empty — go dead mid-press, swallowing its own click. Never disabled for
+           * the same reason; `commitDraft` already no-ops on an empty draft.
+           */}
+          <button
+            type="button"
+            onPointerDown={(e) => {
               e.preventDefault();
               commitDraft();
-              return;
-            }
-            // Backspace on an empty box takes the last pill, as every chip input does.
-            if (e.key === "Backspace" && !draft && values.length > 0) {
-              e.preventDefault();
-              remove(values[values.length - 1]!);
-            }
-          }}
-          placeholder={values.length > 0 ? addAnotherPlaceholder : placeholder}
-          className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-primary-ink/50"
-        />
+            }}
+            aria-label={addLabel ?? `Add to ${label}`}
+            title={addLabel ?? `Add to ${label}`}
+            className={cn(
+              "tap-active -mr-1.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-primary-ink/45 text-primary-ink transition hover:bg-primary/15",
+              !draft.trim() && "opacity-40"
+            )}
+          >
+            <Plus className="size-4" strokeWidth={2.75} aria-hidden />
+          </button>
+        </div>
         {state.kind === "saving" ? (
           <span className="ui-caption text-muted-foreground">Saving…</span>
         ) : null}
