@@ -118,7 +118,7 @@ export async function GET(request: Request, { params }: Params) {
     previousSetupData,
   });
 
-  return renderRunCard(card);
+  return await renderRunCard(card);
 }
 
 /** `SAT 8 AUG 2026` — the Hero masthead stamp, in the viewer's zone like every other date here. */

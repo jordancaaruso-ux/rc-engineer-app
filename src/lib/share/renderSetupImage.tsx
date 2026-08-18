@@ -3,7 +3,6 @@ import "server-only";
 import sharp from "sharp";
 import { CARD_WIDTH } from "@/lib/share/shareCardModel";
 import { ensureRenderedSetupSnapshotPdf } from "@/lib/setup/ensureRunSetupPdf";
-import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
 import { renderPdfFirstPageToPng } from "@/lib/setupDocuments/pdfServerRaster";
 
 /**
@@ -50,7 +49,9 @@ export async function renderSetupSheetImage(params: {
   if (!ensured) return null;
 
   try {
-    const pdf = await readBytesFromStorageRef(ensured.relativePath);
+    // Already in hand — `ensureRenderedSetupSnapshotPdf` had to read the file to know its cache was
+    // warm, so fetching it again here was a second download of the same PDF on every share.
+    const pdf = ensured.bytes;
     /*
      * Rasterized with its form layer LIVE, not flattened.
      *

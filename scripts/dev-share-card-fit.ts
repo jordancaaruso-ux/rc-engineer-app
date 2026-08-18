@@ -132,7 +132,8 @@ async function measure(name: string, style: ShareCardStyle, overrides: Partial<B
 
   const estimate = card.height;
   const tall = { ...card, height: estimate + HEADROOM };
-  const png = Buffer.from(await renderRunCard(tall).arrayBuffer());
+  // Full scale: every measurement below is in design pixels against a 1080-wide card.
+  const png = Buffer.from(await (await renderRunCard(tall, { scale: 1 })).arrayBuffer());
   const natural = (await footerRuleY(png, 1080, tall.height)) + FOOTER_FROM_RULE;
   const slack = estimate - natural;
 

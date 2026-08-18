@@ -1,7 +1,8 @@
 import "server-only";
 
 import type { ReactNode } from "react";
-import { ImageResponse } from "next/og";
+import satori from "satori";
+import sharp from "sharp";
 import { BRAND_DOMAIN, PRODUCT_NAME } from "@/lib/brand/brandNames";
 import {
   CARD_WIDTH,
@@ -1098,12 +1099,63 @@ export function RunCard({ card }: { card: ShareRunCard }) {
   );
 }
 
-export function renderRunCard(card: ShareRunCard): ImageResponse {
-  return new ImageResponse(<RunCard card={card} />, {
+/**
+ * The card is LAID OUT at {@link CARD_WIDTH} and PAINTED at a fraction of it.
+ *
+ * Measured 2026-08-17 against a real report card (1080 × 3308): laying it out costs 65ms, painting
+ * it costs 3,060ms. Ninety-eight percent of a share's wait is filling pixels, and the cost tracks
+ * painted area, not content — the same card clipped to a 600px canvas is 354ms, and an EMPTY
+ * 3308px canvas is 90ms. No single section is to blame; each one costs 30–230ms alone. A driver's
+ * phone measured 15s against production, whose core is roughly 4× slower than a dev machine.
+ *
+ * So the only lever is pixels. `ImageResponse` was dropped for the satori it bundles (0.25.0,
+ * pinned to that exact version) plus sharp, ONLY because that pair exposes a paint resolution and
+ * `ImageResponse` does not. It is not a faster engine: at scale 1 the two agree to the byte —
+ * 0 of 14,290,560 colour channels differ — so this is the same picture by measurement rather than
+ * by argument. Re-check that with `npm run test:share-raster` if either package moves.
+ *
+ * **Never scale the tree with a CSS `transform` instead.** That was tried first and satori silently
+ * DROPS content: at 0.5 the third and fourth stat tiles, the right-hand column of every table, the
+ * entire lap trace, every value in the setup diff and the whole corner-balance panel disappeared,
+ * and the picture still looked plausible. Scaling at paint time is a true downscale; scaling the
+ * layout is a different, broken card. (It was also SLOWER at 0.75 — 6.2s against 3.1s.)
+ *
+ * 2/3 gives 720 × 2205 in ~1.6s against ~3.1s, and costs the recipient nothing: WhatsApp and
+ * Messenger recompress to roughly 1600px on the long edge and this card is 3308px tall, so full
+ * resolution never reached them anyway. 1/2 (540 × 1654) measured ~0.5s and is also complete and
+ * legible — this is one number if the wait ever matters more than the pixels do.
+ */
+export const CARD_PAINT_SCALE = 2 / 3;
+
+export async function renderRunCard(
+  card: ShareRunCard,
+  /** `scale: 1` for the fit harness, which measures in design pixels. */
+  opts?: { scale?: number }
+): Promise<Response> {
+  const svg = await satori(<RunCard card={card} />, {
     width: CARD_WIDTH,
     height: card.height,
     fonts: shareCardFonts(),
-    // The card is a snapshot of a saved run; it only changes when the run does.
-    headers: { "Cache-Control": "private, max-age=300" },
+  });
+
+  const png = await sharp(Buffer.from(svg), {
+    // A 1080 × 3308 card is a ~590KB SVG and well past libvips' default pixel ceiling.
+    unlimited: true,
+    // sharp expresses SVG raster resolution as DPI against a 72dpi baseline, so this — not a
+    // `resize()` afterwards — is what actually spares the work. Resizing would paint every pixel
+    // at full size first and then throw most of them away.
+    density: 72 * (opts?.scale ?? CARD_PAINT_SCALE),
+  })
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+
+  return new Response(new Uint8Array(png), {
+    headers: {
+      "Content-Type": "image/png",
+      "Content-Length": String(png.length),
+      // The card is a snapshot of a saved run; it only changes when the run does. Also what lets
+      // the sheet's blob prefetch reuse the render the preview `<img>` already paid for.
+      "Cache-Control": "private, max-age=300",
+    },
   });
 }

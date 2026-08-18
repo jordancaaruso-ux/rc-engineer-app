@@ -85,7 +85,8 @@ async function shoot(
     ...overrides,
   });
 
-  const bytes = Buffer.from(await renderRunCard(card).arrayBuffer());
+  // Default paint scale on purpose: these shots are meant to be exactly what a driver sends.
+  const bytes = Buffer.from(await (await renderRunCard(card)).arrayBuffer());
   const file = path.join(outDir, `${name}.png`);
   await writeFile(file, bytes);
   console.log(`${name}: ${card.height}px tall, ${(bytes.length / 1024).toFixed(0)} KB → ${file}`);
