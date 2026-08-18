@@ -27,8 +27,7 @@ export function DashboardAddSetupCard({ cars }: { cars: UploadSetupCar[] }) {
         {onlyCar ? `${onlyCar.name} has no setup yet` : "None of your cars have a setup yet"}
       </p>
       <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-        Add one and the Engineer talks about your actual springs, camber and droop instead of
-        generalities — and every change you make gets tracked run to run.
+        Add one and every change you make gets tracked run to run.
       </p>
 
       <div className="mt-3">

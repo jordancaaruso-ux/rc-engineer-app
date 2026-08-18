@@ -31,7 +31,7 @@ import { getTimeZoneFromCookies } from "@/lib/requestTimeZone";
 import { parseHandlingAssessmentJson } from "@/lib/runHandlingAssessment";
 import { buildPromptMarkTrackLocation } from "@/lib/trackLocationPrompt";
 import { communityTrackByIdWhere } from "@/lib/tracks/communityTrackAccess";
-import { ensureEventParticipation } from "@/lib/events/eventParticipation";
+import { ensureEventParticipation, userMayJoinEvent } from "@/lib/events/eventParticipation";
 import {
   normalizeRunConditionsInput,
   NULL_RUN_CONDITIONS_COLUMNS,
@@ -547,6 +547,15 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     return NextResponse.json({ error: "Event not found" }, { status: 400 });
   }
   if (event) {
+    // Saving a run is a join, so it has to pass the same gate as `/api/events/[eventId]/join`.
+    // This lookup used to be by id alone: any authenticated caller holding an event id could add
+    // themselves as a participant to it.
+    if (!(await userMayJoinEvent(params.userId, event.id))) {
+      return NextResponse.json(
+        { error: "This event belongs to someone outside your team." },
+        { status: 403 }
+      );
+    }
     await ensureEventParticipation({ userId: params.userId, eventId: event.id });
   }
 

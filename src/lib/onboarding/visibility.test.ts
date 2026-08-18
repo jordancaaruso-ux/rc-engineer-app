@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  isGarageReady,
+  isReadyToRun,
   showGetSetUpCard,
   showWelcomeScreen,
   type OnboardingFacts,
@@ -61,13 +61,8 @@ test("Ignore retires the card and only the card", () => {
   assert.equal(showWelcomeScreen(facts({ dismissed: true })), true);
 });
 
-test("the card persists while timing or setup is still missing", () => {
+test("the card persists while anything is still missing", () => {
   assert.equal(showGetSetUpCard(facts({ hasCar: true })), true);
-  assert.equal(
-    showGetSetUpCard(facts({ hasCar: true, hasTimingIdentity: true })),
-    true,
-    "setup still outstanding"
-  );
   assert.equal(
     showGetSetUpCard(facts({ hasCar: true, hasSetup: true })),
     true,
@@ -75,13 +70,34 @@ test("the card persists while timing or setup is still missing", () => {
   );
 });
 
-test("a ready garage retires the card without a run being logged", () => {
-  const ready = facts({ hasCar: true, hasTimingIdentity: true, hasSetup: true });
-  assert.equal(isGarageReady(ready), true);
-  assert.equal(showGetSetUpCard(ready), false);
+/*
+ * Amended 2026-08-18. Readiness used to require a setup sheet AND retire the card;
+ * both were wrong. A driver at the track without the manufacturer's PDF is ready to
+ * run, and the card's readiness state is the payoff, so retiring on it deleted the
+ * good news at the moment it arrived.
+ */
+test("a car plus timing is ready — the setup sheet does not gate the run", () => {
+  const ready = facts({ hasCar: true, hasTimingIdentity: true });
+  assert.equal(isReadyToRun(ready), true);
+  assert.equal(isReadyToRun(facts({ hasCar: true, hasTimingIdentity: true, hasSetup: true })), true);
 });
 
-test("garage readiness needs all three — a car alone is not ready", () => {
-  assert.equal(isGarageReady(facts({ hasCar: true })), false);
-  assert.equal(isGarageReady(facts({ hasTimingIdentity: true, hasSetup: true })), false);
+test("readiness needs both the car and the timing identity", () => {
+  assert.equal(isReadyToRun(facts({ hasCar: true })), false);
+  assert.equal(isReadyToRun(facts({ hasTimingIdentity: true })), false);
+  assert.equal(
+    isReadyToRun(facts({ hasCar: true, hasSetup: true })),
+    false,
+    "a sheet is not a substitute for the timing identity"
+  );
+});
+
+test("the ready card stays up until the run is logged", () => {
+  const ready = facts({ seen: true, hasCar: true, hasTimingIdentity: true, hasSetup: true });
+  assert.equal(
+    showGetSetUpCard(ready),
+    true,
+    "its last state is 'You're ready — log your first run'; retiring here hides the payoff"
+  );
+  assert.equal(showGetSetUpCard({ ...ready, hasAnyRun: true }), false);
 });

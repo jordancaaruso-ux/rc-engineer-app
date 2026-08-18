@@ -22,10 +22,14 @@ import { DashboardDesktop } from "@/components/dashboard/desktop/DashboardDeskto
  *
  *   Track day (run/draft today, or an active event):
  *     CTA → Day verdict (computed instruments; Engineer on demand in the
- *     footer) → Things to try → 30-day summary
+ *     footer) → Ideas → 30-day summary
  *   Off day:
- *     CTA → Next outing (event countdown + test plan; plan-only without an
- *     event) → Things to do → 30-day summary
+ *     CTA → Next outing (event countdown; a book-a-track-day nudge when nothing
+ *     is booked) → Ideas → Things to do → 30-day summary
+ *
+ * The outing card and the Ideas list were ONE tall card until 2026-08-18, when a
+ * founder call split them. The list is now the same card on every kind of day
+ * rather than moving inside the outing card whenever a meeting was running.
  *
  * Retired in v2 (2026-07-19): the Today-so-far run strip (the run list lives in
  * Sessions), the last-session digest card, the next-event-prep card, and the auto
@@ -93,14 +97,15 @@ export function DashboardHome({
     hasRunToday || Boolean(todayDraftRunId) || featuredEvent?.status === "active";
 
   const nextEvent = featuredEvent?.status === "next" ? featuredEvent : null;
-  // A meeting already under way keeps the outing card in track-day mode — it
-  // carries the Things-to-try list, so it replaces the bare panel rather than
-  // stacking a second copy of the same list (2026-07-29).
+  // A meeting already under way keeps the outing card in track-day mode (2026-07-29).
+  // Since the 2026-08-18 split it carries nothing but the countdown, so it sits above
+  // the Ideas card rather than swallowing it.
   const activeEvent = featuredEvent?.status === "active" ? featuredEvent : null;
 
-  // First-run readiness (docs/ONBOARDING_NORTH_STAR.md, reversal 2026-07-23).
-  // Only a car is required; the card carries the payoff + advised timing/setup and
-  // self-retires once the garage is ready, a run exists, or it's dismissed. The
+  // First-run readiness (docs/ONBOARDING_NORTH_STAR.md, reversal 2026-07-23,
+  // amended 2026-08-18). The card walks car → timing and only then hands over the
+  // run; a setup sheet rides along as advised. It retires on the first run or
+  // Ignore — no longer on readiness, because readiness IS its payoff state. The
   // rule itself lives in `lib/onboarding/visibility.ts` — tested there, and driven
   // across every state at /debug/onboarding-preview.
   const ob = onboarding;
@@ -125,6 +130,27 @@ export function DashboardHome({
     .replace(/,/g, "")
     .toUpperCase();
   const dayStamp = isTrackDay ? todayStamp : `${todayStamp} · Off day`;
+
+  // The driver's own list, in one place on every kind of day (founder call 2026-08-18).
+  // It is the demo walkthrough's last stop on the phone — the desktop's `test-plan` card
+  // is a different node, see `tourSteps.ts`.
+  //
+  // Called "Ideas" wherever it appears now. It used to answer to "Test plan" whenever an
+  // event was booked and "Things to try" otherwise, so booking a race quietly renamed the
+  // driver's own list.
+  const ideasCard = (
+    <CardPanel dataTour="things-to-try">
+      <ActionItemListPanel
+        list="try"
+        title="Ideas"
+        addPlaceholder="Add an idea…"
+        addLabel="Add an idea"
+        initialItems={thingsToTry}
+        embedded
+      />
+    </CardPanel>
+  );
+
 
   return (
     <>
@@ -188,9 +214,10 @@ export function DashboardHome({
         ) : null}
 
         {/* ── Phone (below xl) ──────────────────────────────────────────────────
-            The locked stack, exactly as it was before the desktop passes: verdict or
-            next-outing, the driver's list, then ambient momentum last. Nothing here
-            may move — `npm run layout:probe --width=390` is the gate. */}
+            Verdict or next-outing, then the driver's Ideas list, then ambient momentum
+            last. The outing card and the list separated on 2026-08-18; everything else
+            is the stack the desktop passes were built against, and
+            `npm run layout:probe --width=390` is still the gate. */}
         <div className="flex flex-col gap-3 xl:hidden">
           {isTrackDay ? (
             <>
@@ -200,40 +227,23 @@ export function DashboardHome({
                 </Reveal>
               ) : null}
 
-              {/* The driver's own experiment list, live during a session — inside the
-                  outing card when a meeting is running, on its own otherwise. */}
-              <Reveal index={2}>
-                {activeEvent ? (
-                  <DashboardNextOutingCard
-                    event={activeEvent}
-                    thingsToTry={thingsToTry}
-                    openTodoCount={thingsToDo.length}
-                    todayRunCount={todayRunCount}
-                  />
-                ) : (
-                  <CardPanel dataTour="things-to-try">
-                    <ActionItemListPanel
-                      list="try"
-                      title="Things to try"
-                      addPlaceholder="Add an idea…"
-                      initialItems={thingsToTry}
-                      embedded
-                    />
-                  </CardPanel>
-                )}
-              </Reveal>
+              {activeEvent ? (
+                <Reveal index={2}>
+                  <DashboardNextOutingCard event={activeEvent} todayRunCount={todayRunCount} />
+                </Reveal>
+              ) : null}
+
+              <Reveal index={3}>{ideasCard}</Reveal>
             </>
           ) : (
             <>
               <Reveal index={1}>
-                <DashboardNextOutingCard
-                  event={nextEvent}
-                  thingsToTry={thingsToTry}
-                  openTodoCount={thingsToDo.length}
-                />
+                <DashboardNextOutingCard event={nextEvent} />
               </Reveal>
 
-              <Reveal index={2}>
+              <Reveal index={2}>{ideasCard}</Reveal>
+
+              <Reveal index={3}>
                 <CardPanel>
                   <ActionItemListPanel
                     list="do"
@@ -248,7 +258,7 @@ export function DashboardHome({
           )}
 
           {/* Demoted 2026-07-16: ambient momentum rides last, never the lead. */}
-          <Reveal index={3}>
+          <Reveal index={4}>
             <DashboardSummaryCard summary={summary} records={records} newPb={newPb} />
           </Reveal>
         </div>

@@ -36,11 +36,13 @@ import { RecentFormCard } from "@/components/events/desktop/RecentFormCard";
 export function EventsView({
   model,
   tracks,
+  favouriteTrackIds = [],
   initialEvents,
   stats,
 }: {
   model: EventsSeasonModel;
   tracks: TrackOption[];
+  favouriteTrackIds?: string[];
   initialEvents: EventListItem[];
   stats: EventListStats;
 }) {
@@ -104,6 +106,7 @@ export function EventsView({
                 <div className="max-w-3xl">
                   <EventAddForm
                     tracks={tracks}
+                    favouriteTrackIds={favouriteTrackIds}
                     suggestedStartYmd={suggestedYmd}
                     onCreated={() => setAddOpen(false)}
                   />
@@ -160,7 +163,12 @@ export function EventsView({
 
         {/* ── Phone / tablet ────────────────────────────────────────────────── */}
         <div className="xl:hidden">
-          <EventList initialEvents={initialEvents} tracks={tracks} stats={stats} />
+          <EventList
+            initialEvents={initialEvents}
+            tracks={tracks}
+            favouriteTrackIds={favouriteTrackIds}
+            stats={stats}
+          />
         </div>
       </section>
     </>

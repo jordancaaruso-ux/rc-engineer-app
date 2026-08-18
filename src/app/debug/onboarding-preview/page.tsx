@@ -23,7 +23,7 @@ import { DashboardGetSetUpCard } from "@/components/dashboard/DashboardGetSetUpC
 import { WelcomeScreen } from "@/components/onboarding/WelcomeScreen";
 import type { UploadSetupCar } from "@/components/setup/UploadSetupSheetBar";
 import {
-  isGarageReady,
+  isReadyToRun,
   showGetSetUpCard,
   showWelcomeScreen,
   type OnboardingFacts,
@@ -83,7 +83,7 @@ const STATES: PreviewState[] = [
   },
   {
     label: "Car added — green-lit chassis",
-    note: "Card flips to the payoff; setup row offers the 30-second photo upload.",
+    note: "Timing is the yellow button now, not the run; setup row offers the 30-second photo upload.",
     facts: facts({ seen: true, hasCar: true }),
     cars: [UPLOADABLE_CAR],
   },
@@ -107,7 +107,7 @@ const STATES: PreviewState[] = [
   },
   {
     label: "Garage ready",
-    note: "Card retires with no run logged — nothing left to ask for.",
+    note: "Card STAYS up (amended 2026-08-18) — handing over the run is its last job.",
     facts: facts({ seen: true, hasCar: true, hasTimingIdentity: true, hasSetup: true }),
     cars: [],
   },
@@ -129,7 +129,7 @@ function Verdict({ f }: { f: OnboardingFacts }) {
   const rows: [string, boolean][] = [
     ["overlay", showWelcomeScreen(f)],
     ["card", showGetSetUpCard(f)],
-    ["garage ready", isGarageReady(f)],
+    ["ready to run", isReadyToRun(f)],
   ];
   return (
     <div className="flex flex-wrap gap-1.5">

@@ -8,10 +8,17 @@ import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { TrackCombobox } from "@/components/runs/TrackCombobox";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
 import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
 
-type TrackOption = { id: string; name: string; location?: string | null };
+type TrackOption = {
+  id: string;
+  name: string;
+  location?: string | null;
+  gripTags?: string[];
+  layoutTags?: string[];
+};
 
 type Props = {
   eventId: string;
@@ -24,12 +31,16 @@ type Props = {
   initialNotes: string | null;
   initialControlledTireTypeId: string | null;
   initialControlledAdditiveTypeId: string | null;
+  initialPracticeSourceUrl: string | null;
+  initialResultsSourceUrl: string | null;
+  initialRaceClass: string | null;
   runCount: number;
 };
 
 export function EventMetaEditor(props: Props) {
   const router = useRouter();
   const [tracks, setTracks] = useState<TrackOption[]>([]);
+  const [favouriteTrackIds, setFavouriteTrackIds] = useState<string[]>([]);
   const [name, setName] = useState(props.initialName);
   const [trackId, setTrackId] = useState(props.initialTrackId ?? "");
   const [startDate, setStartDate] = useState(eventDateToYmd(props.initialStartDate));
@@ -45,22 +56,43 @@ export function EventMetaEditor(props: Props) {
   const [controlledAdditiveTypeId, setControlledAdditiveTypeId] = useState(
     props.initialControlledAdditiveTypeId ?? ""
   );
+  const [practiceSourceUrl, setPracticeSourceUrl] = useState(props.initialPracticeSourceUrl ?? "");
+  const [resultsSourceUrl, setResultsSourceUrl] = useState(props.initialResultsSourceUrl ?? "");
+  const [raceClass, setRaceClass] = useState(props.initialRaceClass ?? "");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  // `favouritesFirst=1` is what makes the route return `favouriteIds` at all — without the
+  // flag it answers with an empty array rather than omitting the field, which reads like a
+  // driver with no favourites instead of a question that was never asked.
   useEffect(() => {
     let alive = true;
-    fetch("/api/tracks", { cache: "no-store" })
+    fetch("/api/tracks?favouritesFirst=1", { cache: "no-store" })
       .then((r) => r.json())
-      .then((d: { tracks?: TrackOption[] }) => {
+      .then((d: { tracks?: TrackOption[]; favouriteIds?: string[] }) => {
         if (!alive || !Array.isArray(d.tracks)) return;
         setTracks(d.tracks);
+        if (Array.isArray(d.favouriteIds)) setFavouriteTrackIds(d.favouriteIds);
       })
       .catch(() => {});
     return () => {
       alive = false;
     };
   }, []);
+
+  /**
+   * The catalog arrives from a client fetch, so for the first frame the picker has nothing to
+   * look this event's track up in and falls back to its placeholder — a form that reads "Select
+   * track…" over an event that has one. `initialLegacyTrackLabel` is the resolved
+   * "Name (Location)" for every event, legacy or not (the prop name predates that), so the
+   * current row can be seeded from it and merged rather than replaced: a track that has since
+   * left this driver's catalog scope then still names itself instead of blanking on arrival.
+   */
+  const trackChoices = useMemo(() => {
+    const seedId = props.initialTrackId?.trim();
+    if (!seedId || tracks.some((t) => t.id === seedId)) return tracks;
+    return [{ id: seedId, name: props.initialLegacyTrackLabel ?? "Current track" }, ...tracks];
+  }, [tracks, props.initialTrackId, props.initialLegacyTrackLabel]);
 
   const dateRangeInvalid = useMemo(
     () => isEndDateBeforeStartDateYmd(startDate, endDate),
@@ -95,6 +127,9 @@ export function EventMetaEditor(props: Props) {
           notes: notes.trim() || null,
           controlledTireTypeId: tireControlled ? controlledTireTypeId.trim() || null : null,
           controlledAdditiveTypeId: controlAdditiveEnabled ? controlledAdditiveTypeId.trim() || null : null,
+          practiceSourceUrl: practiceSourceUrl.trim() || null,
+          resultsSourceUrl: resultsSourceUrl.trim() || null,
+          raceClass: raceClass.trim() || null,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -130,7 +165,7 @@ export function EventMetaEditor(props: Props) {
         </p>
       </div>
       <div className="grid gap-3 md:grid-cols-2">
-        <div>
+        <div className="min-w-0">
           <label className="block text-[11px] text-muted-foreground mb-1">Name *</label>
           <input
             className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
@@ -139,7 +174,13 @@ export function EventMetaEditor(props: Props) {
             required
           />
         </div>
-        <div>
+        {/*
+          `min-w-0`, or a long venue name pushes this grid column past the card. A grid child's
+          default `min-width: auto` sizes to its content, and the picker's trigger is one
+          unbroken line where the `<select>` was a control with its own small intrinsic width —
+          so the blow-out only appears once the trigger is allowed to want the space.
+        */}
+        <div className="min-w-0">
           <label className="block text-[11px] text-muted-foreground mb-1">
             Track{hasLegacyTrack && !trackId.trim() ? " (legacy)" : " *"}
           </label>
@@ -149,24 +190,34 @@ export function EventMetaEditor(props: Props) {
               unchanged to keep this legacy venue.
             </p>
           ) : null}
-          <select
-            className="mt-1 w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-            value={trackId}
-            onChange={(e) => setTrackId(e.target.value)}
-            aria-label="Track"
-          >
-            <option value="">{hasLegacyTrack ? "— Keep legacy track —" : "— Select track —"}</option>
-            {tracks.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-                {t.location ? ` (${t.location})` : ""}
-              </option>
-            ))}
-          </select>
+          {/*
+            Same walk-back from the native `<select>` as the create form above — a venue list
+            is the one list that keeps growing, and re-linking an event was the other place
+            still spinning the iOS wheel.
+
+            No inline "add a track" here on purpose: this form re-points an existing meeting
+            at a track in the catalog, and the create-a-track door belongs where a driver is
+            recording somewhere new.
+
+            The `<select>`'s empty first row survives as the sheet's clear row, which labels
+            itself from `placeholder` — hence the legacy wording below. A driver who picks a
+            track and changes their mind can still choose "Keep legacy track" and land back on
+            the unlinked state, which is the only way this form ever offered it.
+          */}
+          <div className="mt-1">
+            <TrackCombobox
+              tracks={trackChoices}
+              value={trackId}
+              onChange={setTrackId}
+              favouriteTrackIds={favouriteTrackIds}
+              placeholder={hasLegacyTrack ? "Keep legacy track" : "Select track…"}
+              aria-label="Track"
+            />
+          </div>
         </div>
       </div>
       <div className="grid gap-3 md:grid-cols-2">
-        <div>
+        <div className="min-w-0">
           <label className="block text-[11px] text-muted-foreground mb-1">Start date</label>
           <input
             type="date"
@@ -176,7 +227,7 @@ export function EventMetaEditor(props: Props) {
             aria-label="Start date"
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="block text-[11px] text-muted-foreground mb-1">End date</label>
           <input
             type="date"
@@ -252,6 +303,58 @@ export function EventMetaEditor(props: Props) {
           ) : null}
         </div>
       </div>
+      {/*
+        Timing sources used to be their own "LiveRC lap detection" card on this page, debug tables
+        and all. The three settings still matter — race class is the only switch that turns on
+        race-result detection ([syncEventLapSources.ts](../../lib/eventLapDetection/syncEventLapSources.ts))
+        and has no other home — so they live here, closed, saved by the one Save button.
+      */}
+      <details className="group border-t border-border pt-3">
+        <summary className="cursor-pointer list-none text-[11px] font-medium text-muted-foreground transition hover:text-foreground">
+          <span className="inline-block transition group-open:rotate-90">›</span> Timing sources (advanced)
+        </summary>
+        <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+          Only needed when the track&rsquo;s LiveRC page isn&rsquo;t enough. Race class must match the results row, or
+          race results are skipped. Separate multiple classes with a comma or semicolon.
+        </p>
+        <div className="mt-3 grid gap-3">
+          <div className="min-w-0">
+            <label className="block text-[11px] text-muted-foreground mb-1">Practice session list URL</label>
+            <input
+              type="url"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+              value={practiceSourceUrl}
+              onChange={(e) => setPracticeSourceUrl(e.target.value)}
+              placeholder="https://…/practice?p=session_list"
+              autoComplete="off"
+              aria-label="Practice session list URL"
+            />
+          </div>
+          <div className="min-w-0">
+            <label className="block text-[11px] text-muted-foreground mb-1">Results URL</label>
+            <input
+              type="url"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+              value={resultsSourceUrl}
+              onChange={(e) => setResultsSourceUrl(e.target.value)}
+              placeholder="https://…/results or …/results/?p=view_event"
+              autoComplete="off"
+              aria-label="Results URL"
+            />
+          </div>
+          <div className="min-w-0">
+            <label className="block text-[11px] text-muted-foreground mb-1">Race class</label>
+            <input
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+              value={raceClass}
+              onChange={(e) => setRaceClass(e.target.value)}
+              placeholder="e.g. 17.5 Stock Buggy; Modified"
+              autoComplete="off"
+              aria-label="Race class"
+            />
+          </div>
+        </div>
+      </details>
       <div className="flex items-center gap-2">
         <button
           type="button"

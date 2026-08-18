@@ -1,15 +1,32 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { TrackCombobox } from "@/components/runs/TrackCombobox";
+import {
+  InlineNewTrackRow,
+  type InlineCreatedTrack,
+  type InlineNewTrackRowHandle,
+} from "@/components/runs/InlineNewTrackRow";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
 import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
 
-export type TrackOption = { id: string; name: string; location?: string | null };
+export type TrackOption = {
+  id: string;
+  name: string;
+  location?: string | null;
+  /** LiveRC track root URL. Set = the meeting's timing pages are discoverable without pasting them. */
+  liveRcUrl?: string | null;
+  /** MYLAPS Speedhive organisation URL — same story, other provider. */
+  speedhiveUrl?: string | null;
+  /** Searchable in the picker without being on screen — "carpet", "high grip". */
+  gripTags?: string[];
+  layoutTags?: string[];
+};
 
 /**
  * The create-an-event form, lifted out of `EventList` unchanged so the desktop page can
@@ -26,16 +43,28 @@ export type TrackOption = { id: string; name: string; location?: string | null }
  */
 export function EventAddForm({
   tracks,
+  favouriteTrackIds = [],
   suggestedStartYmd,
   onCreated,
 }: {
   tracks: TrackOption[];
+  /** Ordered by the catalog, grouped first in the picker — same list Log your run uses. */
+  favouriteTrackIds?: string[];
   suggestedStartYmd?: string | null;
   onCreated?: (event: unknown) => void;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [trackId, setTrackId] = useState("");
+  /**
+   * A track added from inside the picker exists on the server but not in `tracks`, which
+   * is server-rendered on desktop and refetched only on navigation on the phone. Holding it
+   * here is what makes it selectable the instant it is created, and it carries the timing
+   * URLs the row was born with — so `showTimingUrlFields` below reads the truth rather than
+   * offering boxes for a page the new track already points at.
+   */
+  const [createdTracks, setCreatedTracks] = useState<TrackOption[]>([]);
+  const newTrackRowRef = useRef<InlineNewTrackRowHandle>(null);
   const [startDate, setStartDate] = useState(suggestedStartYmd ?? "");
   const [endDate, setEndDate] = useState("");
   const [notes, setNotes] = useState("");
@@ -58,6 +87,36 @@ export function EventAddForm({
     () => isEndDateBeforeStartDateYmd(startDate, endDate),
     [startDate, endDate]
   );
+
+  /** Catalog plus anything added from inside the picker, first row of a name winning. */
+  const allTracks = useMemo(() => {
+    const byId = new Map<string, TrackOption>();
+    for (const t of [...createdTracks, ...tracks]) if (!byId.has(t.id)) byId.set(t.id, t);
+    return [...byId.values()];
+  }, [createdTracks, tracks]);
+
+  /**
+   * A track that carries a timing link needs no per-event URLs — the importer discovers the
+   * meeting from the track root. The log-run wizard has hidden these two boxes on that rule
+   * for a while (NewRunForm's newEventTrackLiveRc); this form never got it, so the Events
+   * page kept asking for something it already knows.
+   *
+   * Speedhive counts as a link even though the event URLs are LiveRC-only: syncEventLapSources
+   * ignores anything that is not a LiveRC index page, so on a Speedhive track these boxes are
+   * dead, not merely redundant. Hiding them removes a trap rather than tidying one away.
+   *
+   * Nothing is lost — the event page's "Timing sources (advanced)" row still pins a specific
+   * index page for the rare meeting discovery gets wrong.
+   */
+  const selectedTrack = useMemo(
+    () => (trackId ? allTracks.find((t) => t.id === trackId) ?? null : null),
+    [trackId, allTracks]
+  );
+  const trackTimingLink = selectedTrack
+    ? selectedTrack.liveRcUrl?.trim() || selectedTrack.speedhiveUrl?.trim() || null
+    : null;
+  /** No track chosen yet is also a no: a timing URL guessed before the venue is guesswork. */
+  const showTimingUrlFields = Boolean(selectedTrack) && !trackTimingLink;
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -88,8 +147,8 @@ export function EventAddForm({
           startDate: start,
           endDate: end,
           notes: notes.trim() || null,
-          practiceSourceUrl: practiceSourceUrl.trim() || null,
-          resultsSourceUrl: resultsSourceUrl.trim() || null,
+          practiceSourceUrl: showTimingUrlFields ? practiceSourceUrl.trim() || null : null,
+          resultsSourceUrl: showTimingUrlFields ? resultsSourceUrl.trim() || null : null,
           controlledTireTypeId: tireControlled ? controlledTireTypeId.trim() || null : null,
           controlledAdditiveTypeId: controlAdditiveEnabled
             ? controlledAdditiveTypeId.trim() || null
@@ -144,27 +203,42 @@ export function EventAddForm({
             required
           />
         </div>
-        <div>
+        <div className="min-w-0 space-y-2">
           <label className="block text-[11px] text-muted-foreground mb-1">Track *</label>
-          <select
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+          {/*
+            The searchable sheet, not a native `<select>`. The 2026-07-14 native sweep was
+            walked back for long lists (see TrackCombobox) and every other track picker moved
+            with it; this form was missed, so booking a meeting still opened the iOS wheel —
+            five rows at a time, no way to type, on the one list that grows with every venue
+            you ever travel to. Favourites-first and town/tag search come free with it.
+          */}
+          <TrackCombobox
+            tracks={allTracks}
             value={trackId}
-            onChange={(e) => setTrackId(e.target.value)}
+            onChange={setTrackId}
+            favouriteTrackIds={favouriteTrackIds}
+            placeholder="Select track…"
             aria-label="Track"
-            required
-          >
-            <option value="">— Select track —</option>
-            {tracks.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-                {t.location ? ` (${t.location})` : ""}
-              </option>
-            ))}
-          </select>
+            onCreateRequest={(query) => newTrackRowRef.current?.openWith(query)}
+          />
+          {/*
+            The "+" inside the sheet points here rather than opening a second modal over the
+            first. Same component the run wizard uses, so a track born on the Events page
+            arrives with its timing page and its favourite flag exactly as one born mid-run.
+          */}
+          <InlineNewTrackRow
+            ref={newTrackRowRef}
+            onCreated={(t: InlineCreatedTrack) => {
+              setCreatedTracks((prev) =>
+                prev.some((p) => p.id === t.id) ? prev : [...prev, t]
+              );
+              setTrackId(t.id);
+            }}
+          />
         </div>
       </div>
       <div className="grid gap-3 md:grid-cols-2">
-        <div>
+        <div className="min-w-0">
           <label className="block text-[11px] text-muted-foreground mb-1">Start date</label>
           <input
             type="date"
@@ -174,7 +248,7 @@ export function EventAddForm({
             aria-label="Start date"
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="block text-[11px] text-muted-foreground mb-1">End date</label>
           <input
             type="date"
@@ -199,30 +273,42 @@ export function EventAddForm({
           placeholder="Optional notes"
         />
       </div>
-      <div>
-        <label className="block text-[11px] text-muted-foreground mb-1">
-          Practice timing URL (optional)
-        </label>
-        <input
-          type="url"
-          className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-          value={practiceSourceUrl}
-          onChange={(e) => setPracticeSourceUrl(e.target.value)}
-          placeholder="LiveRC practice session list URL"
-        />
-      </div>
-      <div>
-        <label className="block text-[11px] text-muted-foreground mb-1">
-          Race timing URL (optional)
-        </label>
-        <input
-          type="url"
-          className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-          value={resultsSourceUrl}
-          onChange={(e) => setResultsSourceUrl(e.target.value)}
-          placeholder="LiveRC results / race timing page URL"
-        />
-      </div>
+      {showTimingUrlFields ? (
+        <>
+          <div>
+            <label className="block text-[11px] text-muted-foreground mb-1">
+              Practice timing URL (optional)
+            </label>
+            <input
+              type="url"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+              value={practiceSourceUrl}
+              onChange={(e) => setPracticeSourceUrl(e.target.value)}
+              placeholder="LiveRC practice session list URL"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-muted-foreground mb-1">
+              Race timing URL (optional)
+            </label>
+            <input
+              type="url"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+              value={resultsSourceUrl}
+              onChange={(e) => setResultsSourceUrl(e.target.value)}
+              placeholder="LiveRC results / race timing page URL"
+            />
+          </div>
+        </>
+      ) : trackTimingLink ? (
+        // Say it out loud rather than showing nothing: two boxes silently disappearing on a
+        // track change reads as a fault, and this is the page where you deliberately set an
+        // event up.
+        <p className="text-[11px] text-muted-foreground">
+          Laps pull automatically from {selectedTrack?.name ?? "this track"} — no timing links
+          needed.
+        </p>
+      ) : null}
       <div className="space-y-1.5">
         <label className="block text-[11px] text-muted-foreground">Tire</label>
         <SegmentedControl<"open" | "controlled">

@@ -408,7 +408,7 @@ export function EngineerCompareAndPattern({
             ))}
           </select>
         </div>
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <label className="text-[10px] text-muted-foreground">From</label>
           <input
             type="date"
@@ -417,7 +417,7 @@ export function EngineerCompareAndPattern({
             onChange={(e) => setDateFrom(e.target.value)}
           />
         </div>
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <label className="text-[10px] text-muted-foreground">To</label>
           <input
             type="date"

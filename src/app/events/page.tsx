@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { trackCatalogScopeWhere } from "@/lib/tracks/communityTrackAccess";
+import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
 import { EventsView } from "@/components/events/EventsView";
 import type { EventListStats } from "@/components/events/EventList";
 import { CardPanel } from "@/components/ui/CardPanel";
@@ -53,7 +54,7 @@ export default async function EventsPage({
   }
 
   const [user, params] = await Promise.all([requireCurrentUser(), searchParams]);
-  const [events, tracks, model] = await Promise.all([
+  const [events, tracks, favouriteTrackIds, model] = await Promise.all([
     loadUserScopedEvents({ userId: user.id, take: 120 }),
     // Same catalog scope as /runs/new and /tracks. Scoping this to `userId` predated the
     // community catalog and meant you could log a run at a track you could not hold an
@@ -61,8 +62,23 @@ export default async function EventsPage({
     prisma.track.findMany({
       where: trackCatalogScopeWhere(user),
       orderBy: { name: "asc" },
-      select: { id: true, name: true, location: true },
+      // liveRcUrl/speedhiveUrl are read by EventAddForm: a track that already carries a timing
+      // link makes the per-event practice/race URL boxes redundant, so they are not shown.
+      // gripTags/layoutTags are never drawn — they let the picker's search match "carpet" or
+      // "high grip", which is how the same sheet already behaves on Log your run.
+      select: {
+        id: true,
+        name: true,
+        location: true,
+        liveRcUrl: true,
+        speedhiveUrl: true,
+        gripTags: true,
+        layoutTags: true,
+      },
     }),
+    // Favourites lead the picker. Server-side here because the desktop panel is server-rendered
+    // and never refetches; the phone list refreshes both together on navigation.
+    getFavouriteTrackIdsForUser(user.id),
     loadEventsSeasonModel({ userId: user.id, year: parseYear(params.year) }),
   ]);
 
@@ -77,5 +93,13 @@ export default async function EventsPage({
     };
   }
 
-  return <EventsView model={model} tracks={tracks} initialEvents={events} stats={stats} />;
+  return (
+    <EventsView
+      model={model}
+      tracks={tracks}
+      favouriteTrackIds={favouriteTrackIds}
+      initialEvents={events}
+      stats={stats}
+    />
+  );
 }

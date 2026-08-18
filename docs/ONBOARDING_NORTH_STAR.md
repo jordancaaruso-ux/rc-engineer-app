@@ -1,6 +1,6 @@
 # Onboarding North Star — first run, first day
 
-**Status:** ⚠️ **Partly superseded — see "Reversal 2026-07-23" below.** The guide chip, the derived
+**Status:** ⚠️ **Partly superseded — see "Amendment 2026-08-18" and "Reversal 2026-07-23" below.** The guide chip, the derived
 4-step progress, the resume/payoff/intro cards and the required-up-front timing step were retired after
 the founder drove the empty account and found the chip dead-clicked, forced steps, and didn't teach.
 Original spec (2026-07-22, 2 rounds over an artifact board) kept below for history. **Owner:** Jordan.
@@ -12,7 +12,80 @@ first run never gets logged). Visual work on these screens follows `VISUAL_NORTH
 
 ---
 
-## Reversal — 2026-07-23 (current model)
+## Amendment — 2026-08-18 (current model): the car is not the payoff
+
+The 07-23 reversal made a **car** the only thing gating the payoff, so adding one flipped the card
+straight to "You're ready — log your first run". Driven again by the founder: that is both premature
+and **untrue**.
+
+- With no **timing identity**, lap times do not attach to the driver. They can log the run, but every
+  lap has to be typed in by hand — the exact chore the app exists to remove.
+- The run wizard then **refused them anyway**: completing a run needs a car rating *and* one
+  populated setup field, so "you're ready" was followed by a refusal two screens later. This was
+  finding #2 of the 2026-08-13 friction audit and had been live the whole time.
+
+**The card now walks CAR → TIMING, then hands over the run.** Three states:
+
+| State | Headline | Yellow button | Also |
+|---|---|---|---|
+| No car | "Add your car to log your first run" | — (three rows) | unchanged |
+| Car, no timing | "Car's in — one thing left" | **Continue setting up** → `/settings` | setup row under "Optional" |
+| Car + timing | "You're ready — log your first run" | **Log your first run** | setup row under "Make it better" |
+
+**A setup sheet is deliberately NOT on the path** (founder call, this amendment). It is the one item
+needing something the driver may not have on them — the manufacturer's fillable PDF — and for most
+chassis the fallback is a 36–40 box hand-build. Putting the app's longest chore before its first
+payoff is the version that loses people. It stays as an advised extra and carries on nagging from
+`DashboardAddSetupCard` once this card retires.
+
+**Nothing gates.** The dock’s run control is untouched and on screen the whole time, so somebody
+standing at the track is never held up by set-up.
+
+**Amended 2026-08-18 (founder), same day:** the yellow button on the middle state reads **“Continue
+setting up”**, not the name of the step. Naming the step made timing read as a second chore demanded
+after the car; it is the rest of the same one, and the sentence above the button already says what it
+is. The card’s own **“Log a run anyway”** link came out on both surfaces (card and `CarList`): the
+dock’s run control never leaves the screen, so the link was a second door to the same room, printed
+directly under the one thing being asked for — which read as an apology for asking. The wizard’s
+“log it anyway” exit below is a different thing and stays.
+
+**Two rule changes** in `src/lib/onboarding/visibility.ts`:
+
+- `isGarageReady` (car + timing + setup) → **`isReadyToRun`** (car + timing).
+- `showGetSetUpCard` retires on **the first run or Ignore only** — no longer on readiness. Readiness
+  is now the card's payoff state, so retiring on it deleted the good news at the moment it arrived.
+
+**The Garage page agrees with it.** The first-car confirmation in `CarList` (added 2026-08-13 to kill
+the two detours every walk paid) led with "Log your first run"; it now leads with **Continue setting
+up** → `/settings`, taking `hasTimingIdentity` as a prop from
+`src/app/cars/page.tsx`. The two surfaces must never disagree about what comes next.
+
+### "Log it anyway" — the setup gate has an exit
+
+Completing a run still wants one value on the sheet, and that stays: it is what makes a run worth
+comparing. But the refusal now carries its own way out. After a Run-complete attempt is refused on
+the setup, the Setup card shows:
+
+> Put one value on the sheet — a tyre compound counts — and this run can be completed.
+> **This run doesn't have a setup — log it anyway**
+> Laps, tyres and how it felt are all still recorded. The Engineer just won't have a setup to
+> suggest changes from.
+
+- It appears **only after a refusal**, so nobody who was going to fill the sheet in ever meets it.
+- It sits in the **Setup card**, not with the other validation copy in Feedback — a setup-only
+  refusal scrolls the driver to the Setup card, so the offer has to be where they are looking.
+- The **car rating stays required**. It is one tap and every later comparison hangs off it.
+- Implemented as `saveRun(e, "completed", { waiveSetup: true })` — an argument, not state, so the tap
+  that waives is the tap that saves and nothing sticky survives into the next run.
+- No schema change: `Run.setupSnapshotId` is already non-null and the snapshot's `data` is already
+  allowed to be empty (every wizard draft saves that way).
+- The run then reads **"No setup recorded for this run — it was logged without one"** in place of the
+  "Setup vs previous run" diff (`RunDetailPanel`). Without that case the diff reported every field of
+  the previous run as changed, which is the opposite of what happened.
+
+---
+
+## Reversal — 2026-07-23 (superseded in part by the amendment above)
 
 The founder drove the empty account and reopened the locked spec. The guide chip did nothing on a
 dead-tap (you were already on the page, and the "pulse the yellow anchor" it leaned on was never wired
@@ -72,7 +145,7 @@ creating a throwaway account. Two surfaces now cover it:
   first-run-logged, ignored. `window.fetch` is stubbed for `/api/onboarding` only, so Ignore and the
   welcome buttons behave exactly as they ship but write nothing to your account.
 - **`npm run test:onboarding`** — `src/lib/onboarding/visibility.ts` holds the gates as pure
-  functions (`showWelcomeScreen`, `showGetSetUpCard`, `isGarageReady`), consumed by
+  functions (`showWelcomeScreen`, `showGetSetUpCard`, `isReadyToRun`), consumed by
   `loadOnboardingView` and `DashboardHome` so the tested rule *is* the shipped rule.
 
 **Still needs one drive on a fresh account** (the preview can't fake it): magic-link first sign-in

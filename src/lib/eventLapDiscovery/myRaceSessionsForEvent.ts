@@ -168,7 +168,7 @@ export async function listMyPendingRaceSessionsForEvent(
   if (!pageUrl) {
     return {
       sessions: [],
-      hint: "Add a LiveRC results URL on the event (LiveRC lap detection → Results URL).",
+      hint: "Add a LiveRC results URL on the event (Event details → Timing sources → Results URL).",
       hubRowCount: 0,
       pagesChecked: 0,
     };

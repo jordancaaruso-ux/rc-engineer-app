@@ -1,5 +1,6 @@
 /**
- * First-run visibility rules — docs/ONBOARDING_NORTH_STAR.md (reversal 2026-07-23).
+ * First-run visibility rules — docs/ONBOARDING_NORTH_STAR.md (reversal 2026-07-23,
+ * amended 2026-08-18).
  *
  * The two onboarding surfaces (welcome overlay, "Get set up" card) are gated by
  * these predicates and nothing else. They lived inline — `loadOnboardingView` for
@@ -23,9 +24,20 @@ export type OnboardingFacts = {
   hasAnyRun: boolean;
 };
 
-/** Car + timing + setup all in — the card has nothing left to ask for. */
-export function isGarageReady(f: OnboardingFacts): boolean {
-  return f.hasCar && f.hasTimingIdentity && f.hasSetup;
+/**
+ * Set up enough that logging the run is the next thing to do: a car to attach the
+ * run to, and the timing identity that makes lap times land on them by themselves.
+ *
+ * A setup sheet is deliberately NOT part of this (founder 2026-08-18). It is the
+ * one item that needs something they may not have on them — the manufacturer's
+ * fillable PDF — and asking for it before the first run puts the app's longest
+ * chore in front of its first payoff. It stays on the card as an advised extra and
+ * carries on nagging from `DashboardAddSetupCard` afterwards.
+ *
+ * Was `isGarageReady` (car + timing + setup) until the same call.
+ */
+export function isReadyToRun(f: OnboardingFacts): boolean {
+  return f.hasCar && f.hasTimingIdentity;
 }
 
 /**
@@ -38,11 +50,17 @@ export function showWelcomeScreen(f: OnboardingFacts): boolean {
 }
 
 /**
- * The dashboard "Get set up" card. Retires three ways: the garage is ready, the
- * first run is logged (the card's whole purpose, so it stops asking), or Ignore.
+ * The dashboard "Get set up" card. Retires exactly two ways: the first run is
+ * logged (the card's whole purpose, so it stops asking) or Ignore.
+ *
+ * It no longer retires on a "ready" garage (amended 2026-08-18). Readiness is now
+ * car + timing, and the card's last state is the payoff — "You're ready, log your
+ * first run" — so retiring on readiness would delete the card at the exact moment
+ * it finally has the good news to deliver.
+ *
  * Note it does NOT depend on `seen` — the card leads whether or not they read the
  * overlay, which is what makes "Look around first" safe.
  */
 export function showGetSetUpCard(f: OnboardingFacts): boolean {
-  return !f.dismissed && !f.hasAnyRun && !isGarageReady(f);
+  return !f.dismissed && !f.hasAnyRun;
 }

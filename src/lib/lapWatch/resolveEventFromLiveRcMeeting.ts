@@ -39,6 +39,16 @@ export type LiveRcMeetingDetectionPayload = {
   eventHubUrl: string;
   trackOrigin: string | null;
   matchedEventId: string | null;
+  /**
+   * Name of the existing event the driver is about to be put on, when there is one.
+   *
+   * `eventLabel` is LiveRC's name for the meeting; this is the name of the row in our database,
+   * and the two are often different — the prompt used to show only the former while applying the
+   * latter, so a driver agreed to "2026 Winter Series Rd 4" and landed on "sat bash".
+   */
+  matchedEventName: string | null;
+  /** Teammate who owns the matched event. Null when it is the viewer's own, or a stranger's. */
+  matchedEventOwnerName: string | null;
 };
 
 export function buildLiveRcMeetingDetectionPayload(input: {
@@ -46,6 +56,8 @@ export function buildLiveRcMeetingDetectionPayload(input: {
   eventHubUrl: string;
   trackLiveRcUrl: string;
   matchedEventId?: string | null;
+  matchedEventName?: string | null;
+  matchedEventOwnerName?: string | null;
 }): LiveRcMeetingDetectionPayload | null {
   const eventHubUrl = normalizeLiveRcEventHubUrl(input.eventHubUrl);
   if (!eventHubUrl) return null;
@@ -55,11 +67,17 @@ export function buildLiveRcMeetingDetectionPayload(input: {
       ? input.eventLabel.trim()
       : defaultEventNameFromLiveRcLabel(input.eventLabel, null);
 
+  const matchedEventId = input.matchedEventId?.trim() || null;
+
   return {
     detected: true,
     eventLabel,
     eventHubUrl,
     trackOrigin,
-    matchedEventId: input.matchedEventId?.trim() || null,
+    matchedEventId,
+    matchedEventName: matchedEventId ? input.matchedEventName?.trim() || null : null,
+    matchedEventOwnerName: matchedEventId
+      ? input.matchedEventOwnerName?.trim() || null
+      : null,
   };
 }

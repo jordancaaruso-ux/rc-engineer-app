@@ -14,9 +14,10 @@ export function ThingsToTrySection({
   return (
     <ActionItemListPanel
       list="try"
-      title="Things to try"
+      title="Ideas"
       hint="Add items here; they stay until you remove them."
       addPlaceholder="Add an idea…"
+      addLabel="Add an idea"
       initialItems={initialItems}
       embedded={embedded}
     />

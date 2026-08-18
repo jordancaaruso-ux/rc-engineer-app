@@ -381,6 +381,18 @@ export function RunDetailPanel({
       : undefined;
 
   const setupPreview = useMemo(() => {
+    /*
+     * A run can be completed with nothing on its sheet since 2026-08-18 ("log it anyway" —
+     * see NewRunForm), so an empty setup is a real, chosen state and has to say so. Without
+     * this case the diff reads every field of the previous run as having been changed, which
+     * is the opposite of what happened: nothing was recorded at all.
+     *
+     * `undefined` means the snapshot is still being fetched, which is NOT the same as empty —
+     * checking it would flash "no setup" onto every run for a moment.
+     */
+    if (runSetupData !== undefined && Object.keys(normalizeSetupData(runSetupData)).length === 0) {
+      return { mode: "no_setup" as const, rows: [] as ReturnType<typeof setupRows> };
+    }
     if (!run.carId || prevSetupData == null) {
       return { mode: "no_baseline" as const, rows: [] as ReturnType<typeof setupRows> };
     }
@@ -736,11 +748,17 @@ export function RunDetailPanel({
   const log = (
     <>
       <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-        <Eyebrow>Setup vs previous run</Eyebrow>
-        <SetupChangedSincePreviousList
-          rows={setupPreview.mode === "no_baseline" ? null : setupPreview.rows}
-          runId={run.id}
-        />
+        <Eyebrow>{setupPreview.mode === "no_setup" ? "Setup" : "Setup vs previous run"}</Eyebrow>
+        {setupPreview.mode === "no_setup" ? (
+          <p className="text-muted-foreground text-xs">
+            No setup recorded for this run — it was logged without one.
+          </p>
+        ) : (
+          <SetupChangedSincePreviousList
+            rows={setupPreview.mode === "no_baseline" ? null : setupPreview.rows}
+            runId={run.id}
+          />
+        )}
       </div>
 
       <div className="space-y-2">

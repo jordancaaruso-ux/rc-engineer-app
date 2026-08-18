@@ -18,8 +18,10 @@ export function PwaSplashDismiss(): null {
     const el = document.documentElement;
     if (el.getAttribute("data-standalone") !== "true") return;
 
-    const MIN_VISIBLE_MS = 450; // let the logo entrance land; avoid a flash
-    const MAX_WAIT_MS = 2200; // never hold the splash longer than this
+    // The lockup builds mark -> rule -> word over ~820ms (globals.css). Dismissing
+    // before that finishes would cut the word off mid-fade, so the minimum clears it.
+    const MIN_VISIBLE_MS = 950;
+    const MAX_WAIT_MS = 2600; // never hold the splash longer than this
     const FADE_MS = 420; // matches the CSS opacity transition
 
     const start =

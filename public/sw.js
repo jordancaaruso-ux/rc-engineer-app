@@ -9,7 +9,9 @@
  * cache pages or API responses — only static brand assets + an offline fallback — so
  * there are no stale-data bugs. Registered prod-only (see ServiceWorkerRegistrar).
  */
-const VERSION = "v1";
+// Bumped to v2 on 2026-08-18 with the "2c shaded" app icon: /icons/ is served
+// cache-first, so an already-installed PWA would keep the old tile forever otherwise.
+const VERSION = "v2";
 const SHELL_CACHE = `jrc-shell-${VERSION}`;
 
 // Static, safe-to-cache assets + the offline fallback page.

@@ -51,6 +51,7 @@ export function CarList({
   setupMetaById,
   setupsByCarId,
   uploadCars = [],
+  hasTimingIdentity = true,
 }: {
   initialCars: Car[];
   setupSheetModels?: SetupSheetModelOption[];
@@ -66,6 +67,13 @@ export function CarList({
    * row can open that panel already pointed at its car. Empty falls back to a plain link.
    */
   uploadCars?: UploadSetupCar[];
+  /**
+   * Whether lap times can already find this driver. Only read by the first-car
+   * confirmation below: without it, adding a car is not the moment to hand over the
+   * run — the run would save, but every lap would have to be typed in by hand.
+   * Defaults to `true` so any other caller keeps the plain run hand-off.
+   */
+  hasTimingIdentity?: boolean;
 }) {
   const router = useRouter();
   /**
@@ -497,18 +505,42 @@ export function CarList({
         </li>
 
         {/*
-         * The confirmation, and — for their first car — the thing it unlocks.
+         * The confirmation, and — for their first car — where to go next.
          *
          * Measured 2026-08-13 across ten new-account walks: adding a car left the driver on
          * this page with no message (the old one was written into the form that had just
          * collapsed) and nothing pointing onward. The dashboard flipped to "You're ready — log
          * your first run", which they only ever saw if they thought to navigate back. That was
-         * two of the two detours every single walk paid. Linking straight to the run skips both.
+         * two of the two detours every single walk paid. Pointing onward from here skips both.
+         *
+         * What it points AT changed on 2026-08-18 (founder): a car on its own is not ready.
+         * Without the timing identity every lap has to be typed in by hand, so timing is what
+         * the button goes to — the same order the dashboard's Get-set-up card walks, and the
+         * two surfaces must not disagree.
+         *
+         * The button is worded as the journey, not the step ("Continue setting up"), and the
+         * "Log a run anyway" link under it came out the same day: the dock's run control never
+         * left the screen, so the link was a second door to the same room sitting directly
+         * under the one thing we're asking them to do.
          */}
         {message?.startsWith("Car added") && (
           <li className="flex flex-col gap-2.5 px-3 py-3.5 sm:px-4" role="status">
             <p className="text-sm text-primary-ink">{message}</p>
-            {firstCarId && (
+            {firstCarId && !hasTimingIdentity && (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  One thing left: your name and transponder, so lap times attach to you on their
+                  own.
+                </p>
+                <Link
+                  href="/settings"
+                  className={cn(buttonLinkClassName("primary"), "self-start")}
+                >
+                  Continue setting up
+                </Link>
+              </>
+            )}
+            {firstCarId && hasTimingIdentity && (
               <Link href="/runs/new" className={cn(buttonLinkClassName("primary"), "self-start")}>
                 Log your first run
               </Link>

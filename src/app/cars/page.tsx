@@ -13,6 +13,7 @@ import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAu
 import { setupSheetModelIdsSupportingUpload } from "@/lib/setupCalibrations/carSupportsSheetUpload";
 import { baselineCountsByModelId } from "@/lib/baselineSetups/baselineCounts";
 import { priorSetupCountsByCarId } from "@/lib/setup/priorSetupCounts";
+import { getTimingIdentityForUser } from "@/lib/onboarding/timingIdentity";
 import { getCachedCarManagerData } from "@/lib/cachedReads";
 import { lastRunAtMsByCarId, orderCarsByRecentUse } from "@/lib/cars/orderCarsByRecentUse";
 import { dedupeSetupSheetModelsForPicker } from "@/lib/setupSheetModels/pickerModels";
@@ -157,14 +158,18 @@ export default async function CarManagerPage({
   // Every car gets all three doors, so the bar lists them all. `supportsUpload` (a green-lit
   // calibration) and the baseline count only decide which doors are live and which are greyed
   // with a reason under them.
-  const [uploadableModelIds, baselineCounts, priorSetupCounts] = await Promise.all([
-    setupSheetModelIdsSupportingUpload(cars.map((c) => c.setupSheetModelId ?? null)),
-    baselineCountsByModelId(cars.map((c) => c.setupSheetModelId ?? null)),
-    priorSetupCountsByCarId(
-      user.id,
-      cars.map((c) => c.id)
-    ),
-  ]);
+  const [uploadableModelIds, baselineCounts, priorSetupCounts, hasTimingIdentity] =
+    await Promise.all([
+      setupSheetModelIdsSupportingUpload(cars.map((c) => c.setupSheetModelId ?? null)),
+      baselineCountsByModelId(cars.map((c) => c.setupSheetModelId ?? null)),
+      priorSetupCountsByCarId(
+        user.id,
+        cars.map((c) => c.id)
+      ),
+      // Only read for the first-car confirmation below the list: it decides whether that
+      // moment hands over the run or sends them on to their timing details first.
+      getTimingIdentityForUser(user.id),
+    ]);
   const uploadCars: UploadSetupCar[] = cars.map((c) => ({
     id: c.id,
     name: c.name,
@@ -194,6 +199,7 @@ export default async function CarManagerPage({
             setupSheetModels={setupSheetModels}
             setupMetaById={setupMetaById}
             setupsByCarId={setupsByCarId}
+            hasTimingIdentity={hasTimingIdentity}
           />
 
           <div className="flex flex-wrap items-center gap-2">

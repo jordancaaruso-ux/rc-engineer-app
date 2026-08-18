@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { hasTeamAccess } from "@/lib/teamAccess";
+import { mayJoinEvent } from "@/lib/events/eventAccessLogic";
 import {
   isLegacyEventTrack,
   resolveEventTrackLabel,
@@ -70,6 +72,40 @@ export async function userCanAccessEvent(userId: string, eventId: string): Promi
     }),
   ]);
   return Boolean(part || run);
+}
+
+/**
+ * May this user attach a run to — and so join — this event?
+ *
+ * Events are shared rows, but "shared" was never the same as "joinable by anyone holding the id".
+ * Three routes in, in order of strength:
+ *
+ *  1. They are already on it (participation row or a run), so nothing changes.
+ *  2. They created it, or a mutual teammate did — the team is the unit that deliberately races one
+ *     meeting together.
+ *  3. It carries a LiveRC results URL. That URL is a public identity claim about a real meeting, and
+ *     two strangers entering it are genuinely at the same race; `POST /api/events` has always joined
+ *     them for exactly this reason, so refusing here would regress it.
+ *
+ * A planned event with no results URL and no shared team is none of those: it is one person's note
+ * to themselves that they intend to be somewhere, and nobody else should land on it.
+ */
+export async function userMayJoinEvent(userId: string, eventId: string): Promise<boolean> {
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { userId: true, resultsSourceUrl: true },
+  });
+  if (!event) return false;
+
+  return mayJoinEvent(userId, {
+    alreadyOn: await userCanAccessEvent(userId, eventId),
+    creatorUserId: event.userId,
+    resultsSourceUrl: event.resultsSourceUrl,
+    creatorIsTeammate:
+      event.userId != null &&
+      event.userId !== userId &&
+      (await hasTeamAccess(userId, event.userId)),
+  });
 }
 
 /** Event ids the user participates in or has logged runs for. */

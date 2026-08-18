@@ -1,6 +1,7 @@
 import { eventDateToYmd } from "@/lib/eventDateParse";
 import { prisma } from "@/lib/prisma";
 import { normalizeLiveRcEventHubUrl } from "@/lib/lapWatch/resolveEventFromLiveRcMeeting";
+import { listTeamPeerUserIds } from "@/lib/teamAccess";
 
 /** Find a global event by track + normalized LiveRC results hub URL. */
 export async function findEventByTrackAndResultsUrl(
@@ -26,8 +27,17 @@ export async function findEventByTrackAndResultsUrl(
 /**
  * Planned event at this track whose calendar range includes `referenceDate`
  * and has no LiveRC results URL yet (or already matches `eventHubUrl` when provided).
+ *
+ * **Scoped to the viewer's own team.** Unlike `findEventByTrackAndResultsUrl`, this match has no
+ * identity claim behind it — "same track, overlapping dates" is a guess, and it used to reach
+ * across every user in the database. Anyone racing at a track where a stranger had already opened
+ * a planned event was folded onto that stranger's row: their event name, which only they can edit.
+ * Teammates are the only people for whom the guess is worth making, so creators are now limited to
+ * the viewer plus their mutual team peers. With no match the caller creates a fresh event, which is
+ * exactly the right outcome for two unrelated drivers who happen to share a track.
  */
 export async function findPlannedEventAtTrack(input: {
+  viewerId: string;
   trackId: string;
   referenceDate: Date;
   eventHubUrl?: string | null;
@@ -37,8 +47,13 @@ export async function findPlannedEventAtTrack(input: {
     ? normalizeLiveRcEventHubUrl(input.eventHubUrl) ?? input.eventHubUrl.trim()
     : null;
 
+  const allowedCreatorIds = [
+    input.viewerId,
+    ...(await listTeamPeerUserIds(input.viewerId)),
+  ];
+
   const candidates = await prisma.event.findMany({
-    where: { trackId: input.trackId },
+    where: { trackId: input.trackId, userId: { in: allowedCreatorIds } },
     orderBy: { startDate: "asc" },
     select: {
       id: true,

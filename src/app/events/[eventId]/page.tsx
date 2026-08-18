@@ -5,7 +5,6 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
-import { EventLapSourcesPanel } from "@/components/events/EventLapSourcesPanel";
 import { EventMetaEditor } from "@/components/events/EventMetaEditor";
 import {
   EVENT_LIST_INCLUDE,
@@ -99,14 +98,10 @@ export default async function EventDetailPage(props: {
             initialNotes={event.notes}
             initialControlledTireTypeId={event.controlledTireTypeId}
             initialControlledAdditiveTypeId={event.controlledAdditiveTypeId}
+            initialPracticeSourceUrl={event.practiceSourceUrl}
+            initialResultsSourceUrl={event.resultsSourceUrl}
+            initialRaceClass={event.raceClass}
             runCount={runCount}
-          />
-
-          <EventLapSourcesPanel
-            eventId={event.id}
-            practiceSourceUrl={event.practiceSourceUrl}
-            resultsSourceUrl={event.resultsSourceUrl}
-            raceClass={event.raceClass}
           />
         </div>
       </section>

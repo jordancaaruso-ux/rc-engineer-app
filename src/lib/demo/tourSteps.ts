@@ -12,7 +12,7 @@
  *
  * 1. Every `title` is the label that is on screen beside the cutout. Stop 4 is
  *    "Session details" because that is the eyebrow `RunDetailPanel` opens with; stop 3 is
- *    "Sessions"; stop 7 is "Test plan". A walkthrough that renames what it points at loses
+ *    "Sessions"; stop 7 is "Ideas". A walkthrough that renames what it points at loses
  *    the reader the moment it ends and they go looking for the thing it described.
  *
  * 2. No season data in the copy. A draft put the real run/track counts into the titles
@@ -54,8 +54,8 @@ export type TourStep = {
    * An array, not a string, and that is load-bearing twice over:
    *   · the dashboard renders `DashboardDesktop` (`hidden xl:grid`) AND the phone stack
    *     (`xl:hidden`) at the same time, so one id genuinely matches two live nodes;
-   *   · the phone's test-plan surface moves between `DashboardNextOutingCard` (off day) and a
-   *     plain `CardPanel` (track day) depending on the data.
+   *   · the anchor ids predate the 2026-08-18 rename to "Ideas" and are deliberately left
+   *     alone — they are internal, and `TOUR_ANCHOR_IDS` pins them.
    * Ordered candidates plus a visibility filter resolve both without a conditional in here.
    */
   anchors: readonly string[];
@@ -175,7 +175,7 @@ export const DEMO_TOUR_STEPS: readonly TourStep[] = [
     id: "test-plan",
     route: "/",
     anchors: ["test-plan", "things-to-try"],
-    title: "Test plan",
+    title: "Ideas",
     body: "Changes worth trying are kept here and carried through to the next time out.",
     placement: { desktop: "left", mobile: "top" },
   },

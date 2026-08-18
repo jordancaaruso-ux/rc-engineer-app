@@ -26,7 +26,7 @@ import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar"
 
 import { TimeZoneCookieSync } from "@/components/layout/TimeZoneCookieSync";
 
-import { PWA_SPLASH_MARK_SVG } from "@/lib/pwa/splashMark";
+import { PWA_SPLASH_LOCKUP_SVG } from "@/lib/pwa/splashLockup";
 
 import { RC_TIMEZONE_COOKIE } from "@/lib/rcTimeZoneCookie";
 
@@ -272,12 +272,13 @@ export default async function RootLayout({
          * PWA launch splash — CSS-gated to installed (standalone) launches via
          * `html[data-standalone]` (set pre-paint by the bootstrap script below), so it
          * covers the cold-launch gap; `PwaSplashDismiss` fades it once the app is ready.
-         * Plain <img> (not next/image) so it paints without a client loader.
+         * Inline SVG (not next/image) so it paints without a client loader, and the
+         * TRACKSIDE lockup builds mark → rule → word on the way in (globals.css).
          */}
         <div
           id="pwa-splash"
           aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: PWA_SPLASH_MARK_SVG }}
+          dangerouslySetInnerHTML={{ __html: PWA_SPLASH_LOCKUP_SVG }}
         />
 
         <div className="app-root">
@@ -286,10 +287,26 @@ export default async function RootLayout({
            * Mark the document when launched from the home screen (installed PWA) so
            * native-feel CSS (no rubber-band, no tap-callout) applies only there and the
            * in-browser experience is untouched. Runs pre-hydration to avoid a flash.
+           *
+           * It also publishes `--splash-vh` — the viewport height as measured on the very
+           * first frame — which is the height the launch splash uses instead of a live
+           * unit. A `100dvh`/`100svh` box is re-measured whenever the viewport changes,
+           * and a standalone launch does change it (the web view settles, the status bar
+           * strip gets reserved): the lockup was centred in the first measurement, then
+           * jumped when the second arrived. A frozen pixel height cannot move.
+           *
+           * It goes in a constructed stylesheet rather than `documentElement.style`:
+           * an adopted sheet is not part of the DOM tree, so React cannot see it, while
+           * an inline style on <html> that the server never rendered is one more root
+           * attribute for hydration to diff. (A standalone launch already logs the
+           * "attributes didn't match" warning from `data-standalone` above — verified
+           * 2026-08-18 that it predates this line; don't read it as this one's doing.)
+           * Where the API is missing the property is simply absent and the CSS falls
+           * back to `100svh` — the old behaviour, not a broken splash.
            */}
           <Script id="rc-pwa-standalone-bootstrap" strategy="beforeInteractive">
 
-            {`(function(){try{var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true;if(s){document.documentElement.setAttribute('data-standalone','true');}}catch(e){}})();`}
+            {`(function(){try{var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true;if(!s){return;}document.documentElement.setAttribute('data-standalone','true');var h=window.innerHeight;if(h&&typeof CSSStyleSheet==='function'&&'adoptedStyleSheets' in document){var sheet=new CSSStyleSheet();sheet.replaceSync(':root{--splash-vh:'+h+'px}');document.adoptedStyleSheets=document.adoptedStyleSheets.concat([sheet]);}}catch(e){}})();`}
 
           </Script>
 

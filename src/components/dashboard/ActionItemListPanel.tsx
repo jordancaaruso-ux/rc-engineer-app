@@ -16,16 +16,24 @@ export function ActionItemListPanel({
   title,
   hint,
   addPlaceholder,
+  addLabel,
   initialItems,
   embedded = false,
   variant = "pill",
   onItemsChange,
+  maxVisible,
 }: {
   list: ListParam;
   title: string;
   /** Short help line under the title. */
   hint?: string;
   addPlaceholder: string;
+  /**
+   * Accessible name for the add field. Defaults to `Add <title>`, which only reads well when
+   * the title is a plural noun ("Add Things to do"). The try list is titled "Ideas" everywhere
+   * since 2026-08-18, so it passes "Add an idea" rather than the ungrammatical "Add Ideas".
+   */
+  addLabel?: string;
   initialItems: DashboardActionItemRow[];
   embedded?: boolean;
   /**
@@ -45,9 +53,22 @@ export function ActionItemListPanel({
    * drag affordance (it swaps to the grip on hover).
    */
   variant?: "pill" | "ledger";
+  /**
+   * Show only this many rows, with the rest behind a "+N more" line that expands in place.
+   *
+   * For the desktop dashboard (2026-08-18), where both lists sit in a fixed grid row and an
+   * uncapped list is the one thing on the page that can push itself past the fold. Collapsed
+   * is the default so page height stops depending on how many ideas you happen to have; one
+   * click gets the whole list, and the driver chose that scroll.
+   *
+   * Reordering is unaffected — drag works on ids, and a hidden row cannot be dragged. Adds
+   * land at the top, so a new item is always visible even while the tail is collapsed.
+   */
+  maxVisible?: number;
 }) {
   const isLedger = variant === "ledger";
   const [items, setItems] = useState(initialItems);
+  const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -209,6 +230,12 @@ export function ActionItemListPanel({
     }
   }
 
+  // Collapsed by default when a cap is set; expanding is one-way for the life of the mount,
+  // because a list that snapped shut again after you scrolled it would fight you.
+  const cap = maxVisible && !expanded ? maxVisible : null;
+  const visibleItems = cap ? items.slice(0, cap) : items;
+  const hiddenCount = items.length - visibleItems.length;
+
   const shell =
     embedded
       ? "rounded-md border-0 bg-transparent p-0 shadow-none"
@@ -248,7 +275,7 @@ export function ActionItemListPanel({
             placeholder={addPlaceholder}
             className="min-w-0 flex-1 rounded-l-lg border-0 bg-transparent px-2.5 py-1.5 text-xs text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
             disabled={busy}
-            aria-label={`Add ${title}`}
+            aria-label={addLabel ?? `Add ${title}`}
           />
           <button
             type="submit"
@@ -269,8 +296,9 @@ export function ActionItemListPanel({
       {items.length === 0 ? (
         <p className="mt-1.5 text-[11px] text-muted-foreground">Nothing here yet — add above.</p>
       ) : (
+        <>
         <ul className="mt-1.5 space-y-1">
-          {items.map((i, rowIndex) => {
+          {visibleItems.map((i, rowIndex) => {
             const showDropAbove = dropTarget?.itemId === i.id && dropTarget.edge === "above";
             const showDropBelow = dropTarget?.itemId === i.id && dropTarget.edge === "below";
             return (
@@ -376,6 +404,20 @@ export function ActionItemListPanel({
             );
           })}
         </ul>
+
+        {hiddenCount > 0 ? (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className={cn(
+              "tap-active mt-1 flex w-full items-center gap-2 text-[12px] font-semibold text-muted-foreground transition hover:text-foreground",
+              isLedger ? "py-2" : "px-2.5 py-1.5"
+            )}
+          >
+            +{hiddenCount} more
+          </button>
+        ) : null}
+        </>
       )}
     </>
   );

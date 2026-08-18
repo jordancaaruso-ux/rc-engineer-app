@@ -2138,24 +2138,38 @@ export function NewRunForm(props: {
     };
   }
 
-  async function confirmLiveRcMeeting() {
+  /**
+   * `forceNew` is the "Make my own" path: ignore the event we matched and create one from the
+   * LiveRC name instead. Only offered for the weak same-track-same-dates match, so posting the
+   * results URL here cannot collide with an existing event that already carries it.
+   */
+  async function confirmLiveRcMeeting(forceNew = false) {
     if (!liveRcMeeting || !trackId.trim()) return;
     setLiveRcMeetingBusy(true);
     setEventError(null);
     try {
       const det = liveRcMeeting;
-      if (det.matchedEventId) {
+      if (det.matchedEventId && !forceNew) {
         let ev = events.find((e) => e.id === det.matchedEventId);
         if (!ev) {
-          const listRes = await fetch("/api/events");
-          const listData = (await listRes.json().catch(() => ({}))) as {
-            events?: Record<string, unknown>[];
+          // Not in our list because we are not on it yet — a teammate's meeting, or one matched by
+          // results URL. Joining is what makes it ours to select.
+          const joinRes = await fetch(`/api/events/${det.matchedEventId}/join`, {
+            method: "POST",
+          });
+          const joinData = (await joinRes.json().catch(() => ({}))) as {
+            error?: string;
+            event?: Record<string, unknown>;
           };
-          const list = (listData.events ?? []).map(parseEventFromApi);
-          setEvents(list);
-          ev = list.find((e) => e.id === det.matchedEventId);
+          if (!joinRes.ok || !joinData.event) {
+            throw new Error(joinData.error ?? "Could not join the matching event.");
+          }
+          const joined = parseEventFromApi(joinData.event);
+          ev = joined;
+          setEvents((prev) =>
+            prev.some((e) => e.id === joined.id) ? prev : [joined, ...prev]
+          );
         }
-        if (!ev) throw new Error("Could not find the matching event.");
         applyEventOption(ev);
       } else {
         const { startYmd, endYmd } = defaultEventDatesForLiveRcDetection();
@@ -2188,7 +2202,11 @@ export function NewRunForm(props: {
           const created = parseEventFromApi(data.event);
           setEvents((prev) => [created, ...prev]);
           applyEventOption(created);
-          setStatus("Event created from LiveRC — selected.");
+          setStatus(
+            forceNew
+              ? "Your own event created — selected."
+              : "Event created from LiveRC — selected."
+          );
         } else {
           throw new Error("Invalid response when creating event.");
         }
@@ -2235,6 +2253,9 @@ export function NewRunForm(props: {
             eventLabel?: string;
             eventHubUrl?: string;
             matchedEventId?: string | null;
+            matchedEventName?: string | null;
+            matchedEventOwnerName?: string | null;
+            matchedPlannedEventId?: string | null;
             trackName?: string;
           };
           if (!alive) return;
@@ -2253,6 +2274,9 @@ export function NewRunForm(props: {
             eventLabel: data.eventLabel?.trim() || "Race meeting",
             eventHubUrl: hubUrl,
             matchedEventId: data.matchedEventId ?? null,
+            matchedEventName: data.matchedEventName ?? null,
+            matchedEventOwnerName: data.matchedEventOwnerName ?? null,
+            matchedIsPlanned: Boolean(data.matchedPlannedEventId),
             trackName: data.trackName ?? track.name,
           });
         } catch {
@@ -3381,8 +3405,13 @@ export function NewRunForm(props: {
      * `stay` (the sheet's "Save to this run", founder 2026-08-15): bank the run and remain on
      * the page — chip flips to "Saved ✓", a light haptic, no navigation. Every OTHER save keeps
      * the flow's exit-on-save; `createdRunId` above is what makes staying safe.
+     *
+     * `waiveSetup` (founder 2026-08-18): complete the run with an empty setup. Only ever set by
+     * the driver tapping "log it anyway" on the refusal below — passed as an argument rather
+     * than held in state so the very tap that waives it is the tap that saves, with no stale
+     * closure in between and nothing sticky left behind for the next run.
      */
-    opts?: { stay?: boolean }
+    opts?: { stay?: boolean; waiveSetup?: boolean }
   ) {
     e?.preventDefault();
     if (pendingCompleteNavigationRef.current || pendingDraftNavigationRef.current) return;
@@ -3410,7 +3439,7 @@ export function NewRunForm(props: {
       const missingCarRating = carRating == null || carRating < 1 || carRating > 10;
       // A controlled additive is auto-filled (running none is allowed), so it is
       // never a save blocker.
-      const missingSetup = Object.keys(setupData).length === 0;
+      const missingSetup = !opts?.waiveSetup && Object.keys(setupData).length === 0;
       if (missingCarRating || missingSetup) {
         const parts: string[] = [];
         if (missingCarRating) parts.push("rate the car 1–10");
@@ -3446,12 +3475,20 @@ export function NewRunForm(props: {
           setup: missingSetup,
         });
         setInlineError(`Before Run complete: ${parts.join("; ")}.`);
-        // Only the setup field lives outside the feedback card — scroll there when
-        // that's the sole blocker so the amber-highlighted Setup card is in view.
-        const scrollTarget: Element | null =
-          missingSetup && !missingCarRating
-            ? document.querySelector(".run-section--setup")
-            : feedbackRequiredRef.current;
+        /*
+         * Only the setup field lives outside the feedback card — go there when that's the sole
+         * blocker so the amber-highlighted Setup card is in view.
+         *
+         * In the wizard, being in view means being on that STEP: every section but the current
+         * one is `hidden`, so the scroll alone landed on a display:none card and the driver was
+         * refused with the fix, and now the "log it anyway" way out, both off-screen. Found by
+         * driving it 2026-08-18.
+         */
+        const setupIsSoleBlocker = missingSetup && !missingCarRating;
+        if (setupIsSoleBlocker && wizardActive) goToWizardStep("setup");
+        const scrollTarget: Element | null = setupIsSoleBlocker
+          ? document.querySelector(".run-section--setup")
+          : feedbackRequiredRef.current;
         window.requestAnimationFrame(() => {
           scrollTarget?.scrollIntoView({ behavior: "smooth", block: "center" });
         });
@@ -4747,6 +4784,7 @@ export function NewRunForm(props: {
           detection={liveRcMeeting}
           busy={liveRcMeetingBusy}
           onConfirm={() => confirmLiveRcMeeting()}
+          onCreateOwn={() => confirmLiveRcMeeting(true)}
           onDismiss={() => {
             dismissedLiveRcMeetingRef.current.add(
               `${trackId.trim()}|${liveRcMeeting.eventHubUrl}`
@@ -4956,7 +4994,7 @@ export function NewRunForm(props: {
                 onChange={(e) => setNewEventName(e.target.value)}
               />
               <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <label className="block ui-label-meta">Start date</label>
                   <input
                     type="date"
@@ -4969,7 +5007,7 @@ export function NewRunForm(props: {
                     }}
                   />
                 </div>
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <label className="block ui-label-meta">End date</label>
                   <input
                     type="date"
@@ -5346,6 +5384,42 @@ export function NewRunForm(props: {
             </button>
           ) : null}
         </div>
+        {/*
+         * The way past the setup gate (founder 2026-08-18).
+         *
+         * Completing a run needs one value on the sheet, and a first-time driver at the track
+         * often has nothing to put there — no runs to copy, no saved setup, and the
+         * manufacturer's PDF at home. Being refused with no way forward is worse than a run
+         * with a thin record, so the refusal now carries its own exit. It appears ONLY after a
+         * Run-complete attempt has already been refused on the setup, so nobody meets it who
+         * was going to fill the sheet in anyway.
+         *
+         * It lives here rather than beside the other validation copy (which sits in the
+         * Feedback card) because a setup-only refusal scrolls the driver to THIS card — the
+         * offer has to be where they are looking.
+         */}
+        {completeValidation.setup ? (
+          <div
+            role="alert"
+            className="rounded-md border border-amber-500/50 bg-amber-500/15 px-2.5 py-2 text-[11px] leading-snug text-amber-950 dark:text-amber-100"
+          >
+            <p>
+              Put one value on the sheet — a tyre compound counts — and this run can be completed.
+            </p>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={(e) => void saveRun(e, "completed", { waiveSetup: true })}
+              className="mt-1.5 font-semibold underline underline-offset-4 disabled:opacity-50"
+            >
+              This run doesn’t have a setup — log it anyway
+            </button>
+            <p className="mt-1 opacity-80">
+              Laps, tyres and how it felt are all still recorded. The Engineer just won’t have a
+              setup to suggest changes from.
+            </p>
+          </div>
+        ) : null}
         {!setupSectionExpanded ? (
           isDraft ? (
             // Minimal draft view: just the diff rows vs. the loaded baseline.
@@ -5626,15 +5700,14 @@ export function NewRunForm(props: {
       (!isEditing || isDraft) ? (
         <div
           role="note"
-          className="mb-3 flex flex-col gap-2 rounded-md border border-amber-500/50 bg-amber-500/15 px-3 py-2.5"
+          className="draft-nudge mb-3 flex flex-col gap-2 rounded-md px-3 py-2.5"
         >
           <div className="space-y-0.5">
-            <p className="text-[13px] font-semibold text-amber-100">
-              Haven&apos;t driven yet? Save your draft.
+            <p className="text-[13px] font-semibold text-warning">
+              Haven&apos;t driven yet?
             </p>
-            <p className="text-[12px] leading-snug text-amber-100/80">
-              Laps come after the run. Save now and this tab is waiting for you —
-              finish it trackside when you&apos;ve got your times.
+            <p className="text-[12px] leading-snug">
+              Save now and add your lap times after the run.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

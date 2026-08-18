@@ -487,50 +487,97 @@ html[data-standalone="true"] .no-select {
 /*
  * PWA launch splash — hidden by default; shown only on installed (standalone)
  * launches. Because `data-standalone` is set pre-paint, this covers the cold-launch
- * gap with the yellow mark on the page background. `PwaSplashDismiss` fades then
- * removes it.
+ * gap with the TRACKSIDE lockup on the page background. `PwaSplashDismiss` fades
+ * then removes it.
+ *
+ * The box is deliberately NOT `inset: 0`. Its height is `--splash-vh`, the viewport
+ * height frozen on the first frame by the bootstrap script in layout.tsx: a live
+ * `100dvh`/`100svh` box is re-measured when the viewport changes, and a standalone
+ * launch does change it a beat after first paint — which centred the lockup twice,
+ * once high and once lower, and read as the logo flicking down.
  */
 #pwa-splash {
   display: none;
 }
 html[data-standalone="true"] #pwa-splash {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--splash-vh, 100svh);
   z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--page-bg-base);
+  /* The lockup is drawn in `currentColor`, so it follows the page ink. */
+  color: rgb(var(--color-foreground));
   opacity: 1;
   /*
    * Safety net: if hydration stalls or PwaSplashDismiss never runs, this clears
-   * the splash on its own after 4s so the app can never hang on the logo. The JS
-   * path (`.pwa-ready`, below) fires well before this and cancels the animation.
+   * the splash on its own so the app can never hang on the logo. The JS path
+   * (`.pwa-ready`, below) fires well before this and cancels the animation.
    */
-  animation: pwa-splash-safety 700ms ease 4000ms forwards;
+  animation: pwa-splash-safety 700ms ease 4200ms forwards;
 }
+/*
+ * Sized so the MARK lands at the width it always had (40vw, capped at 220px) — the
+ * lockup is as wide as its mark, with the rule and word hung underneath. Bigger than
+ * this and the traced glyph shows its polygon edges (founder call, 2026-08-18).
+ */
 html[data-standalone="true"] #pwa-splash svg {
   width: 40vw;
   max-width: 220px;
   height: auto;
-  /* Gentle, consistent entrance so the cold launch reads as intentional. */
-  animation: pwa-splash-mark-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 /*
- * The splash backdrop follows the theme (`--page-bg-base`) but the mark cannot:
- * its yellow is baked into the path data in `splashMark.ts`, so on paper it was a
- * pale glyph on a pale sheet. Same call as the top rail and the mobile pill — on
- * light the mark is ink, and yellow keeps meaning "action" (VISUAL_NORTH_STAR).
- * Set `fill` rather than `filter: brightness(0)` because this one is inline SVG,
- * so CSS can reach the path directly; the two <img> sites have no such option.
+ * The entrance: the lockup builds in the order it was drawn — mark, then the rule
+ * wiping out from its centre, then the word. Total ~820ms, which is why
+ * PwaSplashDismiss holds the splash for at least 950ms; the point is that a cold
+ * launch reads as the app arriving rather than as a static logo waiting on a server.
+ *
+ * Each part is a wrapper <g> (see splashLockup.ts): a CSS transform REPLACES an SVG
+ * transform attribute, so animating the placed element itself scatters the lockup.
+ * `transform-box: fill-box` makes `transform-origin: center` mean the part's own
+ * centre rather than the whole 9091x5341 canvas.
  */
-html[data-theme="light"][data-standalone="true"] #pwa-splash svg path {
-  fill: rgb(var(--color-foreground));
+html[data-standalone="true"] #pwa-splash svg > g {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+html[data-standalone="true"] #pwa-splash .splash-mark {
+  animation: pwa-splash-mark-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+html[data-standalone="true"] #pwa-splash .splash-rule {
+  animation: pwa-splash-rule-in 420ms cubic-bezier(0.22, 1, 0.36, 1) 240ms both;
+}
+html[data-standalone="true"] #pwa-splash .splash-word {
+  animation: pwa-splash-word-in 440ms cubic-bezier(0.22, 1, 0.36, 1) 380ms both;
 }
 @keyframes pwa-splash-mark-in {
   from {
     opacity: 0;
-    transform: translateY(6px) scale(0.985);
+    transform: scale(0.965);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pwa-splash-rule-in {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pwa-splash-word-in {
+  from {
+    opacity: 0;
+    transform: translateY(14%);
   }
   to {
     opacity: 1;
@@ -554,7 +601,7 @@ html.pwa-splash-done[data-standalone="true"] #pwa-splash {
   display: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  html[data-standalone="true"] #pwa-splash svg {
+  html[data-standalone="true"] #pwa-splash svg > g {
     animation: none;
   }
 }
@@ -1071,27 +1118,53 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
 }
 
 /*
- * The dock slab's real height, so things stacked above it can clear it without
- * guessing. Must stay in step with `.bottom-nav-slab`'s own padding + row:
- * 10px top + 52px row (the log-run circle, not the 46px cells) = 62px, then its
- * bottom padding.
+ * Where the tab sits on the left edge, as the height of its CENTRE measured down
+ * from the top of the screen (founder, 2026-08-18). One knob, so moving it again
+ * is one number.
+ *
+ * `svh` and not `dvh` or a bare percentage. In a browser tab the URL bar collapses
+ * as you scroll and the viewport grows under it; against `dvh` this tab would then
+ * slide up and down the edge while the page moved, which reads as a rendering fault
+ * rather than as a control. `svh` is measured against the toolbar-VISIBLE viewport,
+ * so it is the one unit here that never moves. Standalone and the iOS shell have no
+ * toolbar, so all three agree there — the difference only ever shows in a browser.
  */
 :root {
-  --dock-slab-h: calc(62px + max(12px, env(safe-area-inset-bottom)));
+  --ideas-tab-y: 42svh;
 }
 
 .ideas-edge-tab {
   position: fixed;
   /*
-   * Bottom-left, sitting just above the dock (founder, 2026-08-12). Centred on
-   * the right edge put it in the middle of the reading column, where it hovered
-   * over whatever you were actually looking at; down here it is out of the text
-   * and next to the bar it belongs with. The 10px gap is deliberate — flush
-   * against the slab it reads as a piece of the dock, which is exactly what this
-   * pattern replaced.
+   * Left edge, the CENTRE of the tab at 42% of the screen height (founder,
+   * 2026-08-18).
+   *
+   * It spent six days pinned 10px above the dock, on the reasoning that the bottom
+   * corner is the only part of the edge a thumb reaches. Driving it says otherwise —
+   * the reach is easy well past halfway — and the bottom corner was costing more than
+   * it was worth: the dashboard leads with the yellow Start-run bar and ends with the
+   * yellow dock circle, so a yellow tab down there was the third yellow object inside
+   * one quarter of the screen, and it was the last thing the eye arrived at on a
+   * surface that is read downwards.
+   *
+   * The 2026-08-12 objection to a mid-height tab was that it floated over the reading
+   * column — but that was the RIGHT edge, and before the gutter rule below existed.
+   * This one is exactly one page-gutter wide and welded to the left edge, so it is
+   * BESIDE the text at every height rather than on top of it, and height stopped
+   * being what decides that.
+   *
+   * The CENTRE is what is placed at 42%, which is what the half-height subtraction
+   * is for. Anchoring the top edge instead drifts it 28px low, and on a short phone
+   * that is enough to see.
+   *
+   * Known and accepted: in a browser tab — not the iOS shell, which leaves
+   * `allowsBackForwardNavigationGestures` off — the left edge around this height is
+   * also where a swipe inward means "go back". The tab is 20px wide and the system
+   * gesture takes precedence over it, so the cost is a back-swipe that starts on the
+   * tab occasionally doing nothing, not a wrong navigation.
    */
   left: 0;
-  bottom: calc(var(--dock-slab-h) + 10px);
+  top: calc(var(--ideas-tab-y) - 28px);
   z-index: 45;
   align-items: center;
   justify-content: center;
@@ -2173,6 +2246,46 @@ html[data-nav-pending] .page {
 }
 
 /* --------------------------------------------------------------------------
+   .draft-nudge — the "Haven't driven yet?" note on the lap-times step.
+
+   Written for the dark theme and missed by the paper sweep: its text was
+   amber-100 (near-white) on its own amber wash, which measures 1.04:1 — not
+   "hard to read", the same brightness as the ground behind it. Repainted
+   2026-08-18 off the tokens rather than off Tailwind's amber ramp, which has
+   no paper-safe step this pale.
+
+   Both colours are mixed from tokens rather than pinned to hex so they keep
+   following the palette. Two things are deliberate. The fill is the app's
+   yellow laid over the CARD surface even though the note sits on the page
+   ground — mixing into the ash it actually sits on lands duller than the
+   ground it has to lift off. And the body ink is warning pulled most of the
+   way to foreground, so it reads as secondary by going DARKER than the
+   heading; fading it toward the background is the mistake this class exists
+   to undo.
+--------------------------------------------------------------------------- */
+.draft-nudge {
+  /* The fill is the app yellow laid OVER the card surface, not mixed into the
+     ash ground the note actually sits on — mixing into the ground lands duller
+     than the thing it has to lift off. Layered as a flat gradient rather than
+     color-mix() because Lightning CSS emits a malformed rgb(rgb(...)) fallback
+     for a color-mix() whose arguments are var()s; the build proves it out but
+     the rule then depends on browsers discarding an invalid declaration. Same
+     recipe as .setup-save-panel above. */
+  background-color: rgb(var(--color-card));
+  background-image: linear-gradient(
+    rgb(var(--color-primary) / 0.14),
+    rgb(var(--color-primary) / 0.14)
+  );
+  border: 1px solid rgb(var(--color-warning) / 0.45);
+  /* #4D330C — warning pulled 55% toward foreground, 10.8:1 on the fill above.
+     Written out because it is a text colour and cannot be layered. The point is
+     that the body reads as secondary by going DARKER than the amber heading;
+     fading it toward the background is the exact mistake this class undoes. */
+  color: rgb(77 51 12);
+  box-shadow: 0 1px 2px rgb(var(--color-warning) / 0.1);
+}
+
+/* --------------------------------------------------------------------------
    Motion primitives (dashboard vertical slice, 2026-07-10)
    Pure-CSS entrance + chart draw-in so they need no JS and can't flash on
    hydration. The rolling number is the only JS-driven motion (motion.tsx).
@@ -2739,6 +2852,18 @@ select:focus-visible {
 .search-row-composite input:focus-visible {
   @apply outline-none ring-0 border-0 shadow-none;
   box-shadow: none;
+}
+
+/**
+ * Native date pickers size themselves to their own content and refuse to go narrower — and a
+ * grid or flex item is `min-width: auto` by default, so the box wins the argument with the
+ * column and pushes out past the card edge on a phone. Safari is the worst offender; Chromium
+ * fits at 390px, which is why this is easy to miss in a desktop browser at a narrow width.
+ * Let the control shrink and cap it at the column: the value stays readable either way.
+ */
+input[type="date"] {
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* Inset controls nested inside SurfaceCard panels (Log run, ingest, setup). */

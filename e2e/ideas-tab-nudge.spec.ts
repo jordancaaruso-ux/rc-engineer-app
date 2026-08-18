@@ -101,8 +101,8 @@ async function dismissWelcome(page: Page): Promise<void> {
  * The first add row actually on screen on the dashboard, outside the drawer.
  *
  * Deliberately found by its composite class rather than by label. The dashboard renders the same
- * panel under three different titles depending on what is booked — "Things to try", "Things to
- * do" and "Test plan" — so any label-based locator is really an assertion about which dashboard
+ * panel under two titles — "Ideas" (one card, every day, since the 2026-08-18 split) and
+ * "Things to do" — so any label-based locator is really an assertion about which dashboard
  * variant the seeded account happened to get, which is not what this test is about.
  *
  * Filtered to visible because the lower cards sit below the fold clipped by the dock, and an add
@@ -198,7 +198,7 @@ test.describe("ideas tab nudge", () => {
     await expect(dialog).toBeVisible({ timeout: 15_000 });
 
     const text = `NUDGE-${STAMP}`;
-    const drawerInput = dialog.getByLabel("Add Things to try", { exact: true });
+    const drawerInput = dialog.getByLabel("Add an idea", { exact: true });
     await drawerInput.fill(text);
     await drawerInput.press("Enter");
     await expect(dialog.getByText(text)).toBeVisible({ timeout: 15_000 });

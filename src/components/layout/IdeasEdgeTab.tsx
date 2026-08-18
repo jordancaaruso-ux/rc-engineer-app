@@ -62,8 +62,8 @@ const FIRST_NUDGE_MS = 1800;
 const NUDGE_EVERY_MS = 5000;
 
 /**
- * "Ideas & reminders" — a small tab on the phone's bottom-left edge, just above
- * the dock, and on desktop the Ideas button in the top rail's utility cluster. Both
+ * "Ideas & reminders" — a small tab on the phone's left edge at 42% of the screen
+ * height, and on desktop the Ideas button in the top rail's utility cluster. Both
  * open the same panel, which docks to the edge its trigger lives on: left on the
  * phone, right on desktop (nav restructure 2026-08-12).
  *
@@ -83,12 +83,18 @@ const NUDGE_EVERY_MS = 5000;
  * edge it costs nothing horizontal, and it finally has a desktop home, which as a
  * dock cap it could never have had.
  *
- * Bottom-left rather than centred on the right edge (founder, 2026-08-12): the
- * centred version floated in the middle of the reading column, over whatever you
- * were looking at. Down here it is clear of the text and beside the bar it belongs
- * with, exactly one page-gutter wide so its inner edge lands on the line the cards
- * start from. The tab rides out with the panel rather than being buried under it,
- * so the control you pressed to open stays the control you press to close.
+ * The LEFT edge rather than the right (founder, 2026-08-12), and 42% down rather
+ * than in the bottom corner (founder, 2026-08-18). The right-edge version floated in
+ * the middle of the reading column, over whatever you were looking at — and the fix
+ * for that turned out to be the WIDTH, not the height. It is exactly one page-gutter
+ * wide, so its inner edge lands on the line the cards start from and it sits beside
+ * the text rather than over it, which is true at every height. That freed height to
+ * answer a different question, and 42% is the answer: away from the two yellow
+ * objects that book-end the dashboard, and high enough to be found on a page you
+ * read downwards. Reasoning in full on `.ideas-edge-tab` in globals.css, where the
+ * height is the single `--ideas-tab-y` knob. The tab rides out with the panel rather
+ * than being buried under it, so the control you pressed to open stays the control
+ * you press to close.
  *
  * Lists load on EVERY open via GET /api/action-items — which is why the tab shows
  * no count. A badge could only be truthful after you had already opened the panel
@@ -334,7 +340,7 @@ export function IdeasEdgeTab() {
 
           <div className="grid grid-cols-2 gap-1 pb-3">
             <TabButton active={tab === "try"} onClick={() => setTab("try")} icon={LightbulbFilament}>
-              Things to try
+              Ideas
             </TabButton>
             <TabButton active={tab === "do"} onClick={() => setTab("do")} icon={ListChecks}>
               Things to do
@@ -379,8 +385,9 @@ export function IdeasEdgeTab() {
                 <div className={cn(tab === "try" ? "block" : "hidden")}>
                   <ActionItemListPanel
                     list="try"
-                    title="Things to try"
-                    addPlaceholder="Jot an idea…"
+                    title="Ideas"
+                    addPlaceholder="Add an idea…"
+                    addLabel="Add an idea"
                     initialItems={lists.try}
                     embedded
                     onItemsChange={handleTryChange}

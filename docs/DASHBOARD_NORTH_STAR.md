@@ -88,7 +88,8 @@ Auto only — no manual toggle. (Revisit if the "reviewing at the track café" c
    - Footer: **"✦ Ask the Engineer about today"** → chat in **quick mode** with a queued
      read-my-day prompt. This is the only Engineer entry on the card — always on demand.
    - Tapping the card anywhere else → Sessions with today expanded (the evidence).
-4. **Things to try** — the driver's experiment list, live on the page during a session.
+4. **Ideas** — the driver's experiment list, live on the page during a session. Its own card,
+   below the outing card when a meeting is running (split 2026-08-18).
 5. **Last 30 days card** — always last.
 
 ## The "add a setup sheet" card (both modes, position 2)
@@ -110,13 +111,30 @@ The onboarding ask, and only the ask (`DashboardAddSetupCard`; rules in `ONBOARD
 2. **"Add a setup sheet" card** — same card, same position, same retirement.
 3. **Next outing card** (`DashboardNextOutingCard`, "countdown hero" — variant D of the
    artifact board): event day-count + date, one **"last visit"** line (best lap · runs ·
-   when — this line *is* what remains of the old digest), open to-dos chip, and the
-   **Test plan** — the Things-to-try list living inside the card, editable in place.
+   when — this line *is* what remains of the old digest), and an "All events" footer.
    Countdown block taps through to the event.
-   **No event booked → plan-only degrade:** same card, no countdown; the Test plan leads
-   and the footer becomes "Book your next track day" (→ /events). The card always exists.
-4. **Things to do** — reminders list.
-5. **Last 30 days card** — always last.
+   **No event booked:** the card degrades to the single "Book your next track day" row
+   (→ /events). The card always exists.
+   **Split 2026-08-18 (founder call).** It used to carry the Ideas list AND an "N to-dos
+   open" chip as well, which made it a phone-screen-tall stack of two unrelated jobs. The
+   chip is gone for good — it counted the Things-to-do list, which has its own card two
+   rows down and printed the same number twice. The list moved out to card 4.
+4. **Ideas card** — the try list, in its own `CardPanel`, on every kind of day. Before the
+   split it lived inside the outing card whenever a meeting was running and stood alone
+   otherwise, so it moved on the driver depending on the data.
+5. **Things to do** — reminders list.
+6. **Last 30 days card** — always last.
+
+## One name for the try list: **Ideas** (2026-08-18)
+
+The same list answered to three names — "Test plan" with an event booked, "Things to try"
+without one, "Things to try" again in the side panel — so booking a race quietly renamed the
+driver's own list. It is **Ideas** everywhere now: both dashboards, the Ideas & reminders
+panel, the guided tour, and the add box ("Add an idea…"). "Things to do" is untouched; the
+panel's title, **Ideas & reminders**, is where the pairing was already right.
+
+The `data-tour` anchor ids (`test-plan`, `things-to-try`) deliberately kept their old
+spelling — internal, pinned by `TOUR_ANCHOR_IDS`, and not worth the churn.
 
 ## Desktop (≥1280px) — "timing tower", 2026-08-08
 
@@ -128,15 +146,50 @@ rows and do not earn a wide measure, which is why they are the 420px column).
 ```
 ┌──────────────────────────────────────────────┬─────────────────────┐
 │  HERO — best lap · dials · pace chart        │  START / FINISH RUN │
-│  ── 6-up stat strip ─────────────────────────│  TEST PLAN          │
-├──────────────────────────────────────────────│  THINGS TO DO       │
-│  LEDGER — you changed / how it felt          │                     │
-└──────────────────────────────────────────────┴─────────────────────┘
-   minmax(0,1fr)                                  420px
+│  ── 6-up stat strip ─────────────────────────│  NEXT OUTING        │
+├────────────────────┬─────────────────────────┼─────────────────────┤
+│  LEDGER            │  IDEAS                  │  THINGS TO DO       │
+└────────────────────┴─────────────────────────┴─────────────────────┘
+   1.18fr                1fr                      1fr
+   = 496px @1440         = 420px                  = 420px
 ```
 
 Page cap 1760px (`.dash-wide`). Header is left-aligned with a mono timestamp beside the
 title and no underrule — whitespace separates it, not a line.
+
+### Two rows, and the race (2026-08-18)
+
+The 2026-08-08 shape put three cards in the narrow column and two in the wide one, and the
+lists are the only thing on this page that grows with use. Measured on a real account at
+1440×900: left column **663px**, right column **885px** — 75px of Things-to-do below the
+fold, its Engineer link never on screen without scrolling, beside **231px of empty page**
+under the ledger. The document scrolled 85px to finish one narrow column.
+
+So three columns with the hero spanning the first two. The ratio is chosen to land on
+496 / 420 / 420 at 1440, which keeps the hero at exactly the 936px it already had and both
+lists at exactly the 420px they already had — the move re-flows nothing. The ledger narrows
+496px, which its label/figure rows read better at. All content now sits inside a 900px
+viewport; the page's remaining ~64px of scroll is trailing padding, not content.
+
+**The next outing now exists on desktop.** Before this, `xl` said `"Next out: <name>"` at the
+foot of the run button and nothing else — no date, no countdown, no track, no last visit, no
+way through to the event — and said *nothing at all* while a meeting was running, where the
+phone reads "day 2 of 3". `desktop/DashboardNextOutingCard` sits under the run button with
+the same three states and the same destinations as the phone card, drawn on the
+`DashboardListCard` frame rather than the phone's hero surface. It costs no query:
+`featuredEvent` was already built on every dashboard load and desktop read one field off it.
+
+Two things fixed on the way past:
+
+- **"Book your next track day" left the Ideas card footer.** It rendered on every load,
+  including the ones where a track day was booked and named two cards above it. It is now
+  the outing card's empty state — the only condition under which it is true.
+- **The run button's footer dropped the event name.** The card below says it properly, with
+  the date; the footer now speaks only about the run (draft in progress, or today's count).
+
+**Desktop lists cap at 6 rows** (`DESKTOP_LIST_ROWS`) with a `+N more` line that expands in
+place, so page height stops depending on how many ideas you happen to have. Phone is
+uncapped — it stacks, so a long list costs a scroll rather than a broken layout.
 
 **The hero is the point of the redesign.** Nothing on the old page answered the question
 the app exists to answer, so the hero is built around one large lap numeral with a signed
@@ -252,6 +305,13 @@ coming up and what you planned to test. If either glance says "nothing new," the
 has failed its job.
 
 **Changelog:**
+- 2026-08-18 **desktop re-cut into two rows + the next outing card** — measured, not argued:
+  663 vs 885px columns, 75px below the fold beside 231px of nothing. Grid goes to three
+  columns with the hero spanning two; ledger, Ideas and Things-to-do share the bottom row.
+  New `desktop/DashboardNextOutingCard` (three states, no new query, no cache bump — the
+  fields were already in the model). Ideas footer's permanent "book your next track day"
+  and the run button's "Next out: …" both retired. Desktop lists cap at 6 rows. Phone
+  untouched.
 - 2026-08-08 **"timing tower" redesign** — built from the `design_handoff_desktop_dashboard`
   bundle. Desktop replaced wholesale at `xl` by a hero (big lap numeral · RatingDials · pace
   chart · 6-up strip) over a ledger, beside a 420px column; 256px sidebar → 76px icon rail

@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { ArrowRight, LineChart, Sparkles, Timer, type LucideIcon } from "lucide-react";
 import { Eyebrow } from "@/components/ui/panel";
 import { primaryButtonClassName } from "@/components/ui/ButtonLink";
+import { guardTapsAfterDismiss } from "@/lib/dismissTapGuard";
 
 /**
  * Welcome screen — docs/ONBOARDING_NORTH_STAR.md (reversal 2026-07-23).
@@ -52,6 +53,8 @@ export function WelcomeScreen() {
   async function dismiss() {
     setBusy(true);
     setHidden(true);
+    // The layout closes over the finger the instant this unmounts — see the guard.
+    guardTapsAfterDismiss();
     await fetch("/api/onboarding", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

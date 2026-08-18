@@ -9,6 +9,8 @@ import {
   normalizeLiveRcEventHubUrl,
 } from "@/lib/lapWatch/resolveEventFromLiveRcMeeting";
 import { findEventByTrackAndResultsUrl, findPlannedEventAtTrack } from "@/lib/events/findEventForLiveRc";
+import { hasTeamAccess } from "@/lib/teamAccess";
+import { loadTeamMemberDisplays } from "@/lib/teams/teamMemberDisplay";
 
 export const dynamic = "force-dynamic";
 
@@ -62,17 +64,39 @@ export async function POST(request: Request) {
   const planned = existing
     ? null
     : await findPlannedEventAtTrack({
+        viewerId: userId,
         trackId,
         referenceDate,
         eventHubUrl,
       });
   const matchedEventId = existing?.id ?? planned?.id ?? null;
 
+  // The prompt has to name the event it is actually going to apply, not LiveRC's label for the
+  // meeting. Only a teammate is named alongside it: `loadTeamMemberDisplays` falls back to the
+  // account email, which must never be shown for a stranger whose event we matched on results URL.
+  const matchedEvent = matchedEventId
+    ? await prisma.event.findUnique({
+        where: { id: matchedEventId },
+        select: { name: true, userId: true },
+      })
+    : null;
+  let matchedEventOwnerName: string | null = null;
+  if (
+    matchedEvent?.userId &&
+    matchedEvent.userId !== userId &&
+    (await hasTeamAccess(userId, matchedEvent.userId))
+  ) {
+    const displays = await loadTeamMemberDisplays([matchedEvent.userId], userId);
+    matchedEventOwnerName = displays.get(matchedEvent.userId)?.name ?? null;
+  }
+
   const payload = buildLiveRcMeetingDetectionPayload({
     eventLabel: meeting.eventLabel,
     eventHubUrl,
     trackLiveRcUrl: liveRcUrl,
     matchedEventId,
+    matchedEventName: matchedEvent?.name ?? null,
+    matchedEventOwnerName,
   });
 
   if (!payload) {

@@ -41,7 +41,7 @@ test("ideas drawer keeps edits across close/reopen", async ({ page }) => {
 
   const tab = page.getByRole("button", { name: "Ideas and reminders" });
   const dialog = page.getByRole("dialog", { name: "Ideas and reminders" });
-  const input = dialog.getByLabel("Add Things to try", { exact: true });
+  const input = dialog.getByLabel("Add an idea", { exact: true });
 
   /** What the server holds, over the browser's own cookies. */
   async function serverTry(): Promise<string[]> {

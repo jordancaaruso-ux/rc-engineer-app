@@ -157,27 +157,38 @@ function EventSectionRows({
 export function EventList({
   initialEvents,
   tracks,
+  favouriteTrackIds = [],
   stats = {},
 }: {
   initialEvents: EventListItem[];
   tracks: TrackOption[];
+  favouriteTrackIds?: string[];
   stats?: EventListStats;
 }) {
   const pathname = usePathname();
   const [events, setEvents] = useState<EventListItem[]>(initialEvents);
   const [trackOptions, setTrackOptions] = useState<TrackOption[]>(tracks);
+  // Seeded from the server render, then re-read alongside the tracks — a track favourited
+  // on /tracks, or created from inside this form's picker, has to lead the list on the way back.
+  const [favouriteIds, setFavouriteIds] = useState<string[]>(favouriteTrackIds);
   const [addOpen, setAddOpen] = useState(false);
 
   const { upcoming, past } = useMemo(() => splitEvents(events), [events]);
 
-  /** Same dataset as Log your run: user-scoped GET /api/tracks, refetched whenever user lands on Events (and on tab focus). */
+  /**
+   * Same dataset as Log your run: user-scoped GET /api/tracks, refetched whenever user lands
+   * on Events (and on tab focus). `favouritesFirst=1` is what makes the route compute
+   * `favouriteIds` — without it the field comes back empty rather than absent.
+   */
+  const TRACKS_URL = "/api/tracks?favouritesFirst=1";
   useEffect(() => {
     if (pathname !== "/events") return;
     let alive = true;
-    jsonFetch<{ tracks: TrackOption[] }>("/api/tracks")
-      .then(({ tracks: list }) => {
+    jsonFetch<{ tracks: TrackOption[]; favouriteIds?: string[] }>(TRACKS_URL)
+      .then(({ tracks: list, favouriteIds: favs }) => {
         if (!alive || !Array.isArray(list)) return;
         setTrackOptions(list);
+        if (Array.isArray(favs)) setFavouriteIds(favs);
       })
       .catch(() => {
         if (!alive) return;
@@ -191,9 +202,12 @@ export function EventList({
     if (pathname !== "/events") return;
     function onVisibility() {
       if (document.visibilityState !== "visible") return;
-      void jsonFetch<{ tracks: TrackOption[] }>("/api/tracks").then(({ tracks: list }) => {
-        if (Array.isArray(list)) setTrackOptions(list);
-      });
+      void jsonFetch<{ tracks: TrackOption[]; favouriteIds?: string[] }>(TRACKS_URL).then(
+        ({ tracks: list, favouriteIds: favs }) => {
+          if (Array.isArray(list)) setTrackOptions(list);
+          if (Array.isArray(favs)) setFavouriteIds(favs);
+        }
+      );
     }
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
@@ -205,6 +219,7 @@ export function EventList({
         <CollapsibleAddRow label="New event" open={addOpen} onOpenChange={setAddOpen}>
           <EventAddForm
             tracks={trackOptions}
+            favouriteTrackIds={favouriteIds}
             onCreated={(event) => {
               const created = event as EventListItem;
               setEvents((prev) => [created, ...prev.filter((e) => e.id !== created.id)]);
