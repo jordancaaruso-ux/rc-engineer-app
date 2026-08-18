@@ -56,7 +56,12 @@ export default async function BulkImportBatchPage({
           <h1 className="page-title">{batch.name || "Import batch"}</h1>
           <p className="page-subtitle">{sub}</p>
         </div>
-        <div className="flex flex-wrap gap-2 self-start">
+      </header>
+      <section className="page-body">
+        {/* Tool navigation, moved off the header: in flow beside the `<h1>` it was
+            centred WITH the title, which is what pushed the title off the middle of
+            the page. */}
+        <div className="flex flex-wrap justify-end gap-2">
           <Link href="/setup/bulk-import" className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted">
             All batches
           </Link>
@@ -64,8 +69,6 @@ export default async function BulkImportBatchPage({
             Setup tools
           </Link>
         </div>
-      </header>
-      <section className="page-body">
         <BulkImportBatchClient batchId={batch.id} cars={cars} />
       </section>
     </>

@@ -343,7 +343,7 @@ export function NewCarSetupClient({
 
         <button
           type="button"
-          className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
+          className="w-full rounded-lg primary-face bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
           onClick={() => {
             /*
              * Starting a fresh empty fill overwrites the parked draft on the first autosave — the
@@ -420,7 +420,7 @@ function NewSetupSheetFill({
 
       <button
         type="button"
-        className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+        className="w-full rounded-lg primary-face bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
         onClick={() => onSave(values)}
         disabled={saving}
       >

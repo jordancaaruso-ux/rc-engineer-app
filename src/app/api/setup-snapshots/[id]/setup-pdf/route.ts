@@ -3,7 +3,6 @@ import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { ensureRenderedSetupSnapshotPdf } from "@/lib/setup/ensureRunSetupPdf";
 import { SETUP_PDF_RENDER_PIPELINE_VERSION } from "@/lib/setup/renderTypes";
-import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -32,13 +31,9 @@ export async function GET(request: Request, ctx: Ctx) {
     );
   }
 
-  let bytes: Buffer;
-  try {
-    bytes = await readBytesFromStorageRef(ensured.relativePath);
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Rendered PDF not found in storage";
-    return NextResponse.json({ error: message }, { status: 404 });
-  }
+  // `ensure` already read the file (that is how it knows the cache is warm), so there is nothing
+  // left to fetch and nothing left to fail — a file it could not read is a null above.
+  const bytes = ensured.bytes;
 
   const filename = `setup-snapshot-${id}.pdf`;
   return new NextResponse(new Uint8Array(bytes), {

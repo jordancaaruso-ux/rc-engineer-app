@@ -375,7 +375,7 @@ export function BaselineSetupEditorClient({
 
         <button
           type="button"
-          className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+          className="w-full rounded-lg primary-face bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
           onClick={() => {
             if (!name.trim()) {
               setError("Give this baseline a name.");
@@ -448,7 +448,7 @@ function BaselineSheetFill({
 
       <button
         type="button"
-        className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+        className="w-full rounded-lg primary-face bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
         onClick={() => onSave(values)}
         disabled={saving}
       >

@@ -191,7 +191,7 @@ export function GripArchetypesClient(props: Props) {
               onClick={() => setSurface(s)}
               className={`px-3 py-1.5 ${
                 surface === s
-                  ? "bg-primary text-primary-foreground"
+                  ? "primary-face bg-primary text-primary-foreground"
                   : "bg-card text-foreground hover:bg-muted"
               }`}
             >

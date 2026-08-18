@@ -15,7 +15,6 @@ import {
   readBytesFromStorageRef,
   storeRunRenderedSetupPdf,
   storeSetupSnapshotRenderedSetupPdf,
-  storageRefIsReadable,
 } from "@/lib/setupDocuments/storage";
 import { A800RR_EXTRA_SIMPLE_KEYS } from "@/lib/setupSheetModels/a800rrExtraSimpleKeys";
 import { pickSheetBlankForData } from "@/lib/setupSheetModels/sheetBlankResolve";
@@ -374,13 +373,37 @@ async function resolveUploadedPdfSourceForSetupSnapshot(
 }
 
 /**
+ * What a caller gets back. `bytes` is the file itself, and every caller so far wants it.
+ *
+ * It is returned rather than left to be fetched because proving the cache is warm MEANS
+ * downloading it — `storageRefIsReadable` reads the whole object — so a caller that then called
+ * `readBytesFromStorageRef` pulled the same PDF over the wire twice. That was ~300ms of the setup
+ * picture's wait on every share, spent to learn something we already knew.
+ */
+type EnsuredPdf = { relativePath: string; cacheHit: boolean; bytes: Buffer };
+
+/** The stored copy, kept if it is still there and still current. Null means draw it again. */
+async function readCurrentRenderedPdf(
+  storedPath: string | null,
+  storedVersion: number | null
+): Promise<Buffer | null> {
+  if (!storedPath || storedVersion !== SETUP_PDF_RENDER_PIPELINE_VERSION) return null;
+  try {
+    return await readBytesFromStorageRef(storedPath);
+  } catch {
+    // A row pointing at a file that is gone is a cache miss, not an error.
+    return null;
+  }
+}
+
+/**
  * Filled setup PDF for a stored snapshot (lazy cache on {@link SetupSnapshot}).
  * Same render pipeline as {@link ensureRenderedRunSetupPdf} but keyed by snapshot id.
  */
 export async function ensureRenderedSetupSnapshotPdf(params: {
   userId: string;
   setupSnapshotId: string;
-}): Promise<{ relativePath: string; cacheHit: boolean } | null> {
+}): Promise<EnsuredPdf | null> {
   const snap = await prisma.setupSnapshot.findFirst({
     where: { id: params.setupSnapshotId, userId: params.userId },
     select: {
@@ -393,11 +416,9 @@ export async function ensureRenderedSetupSnapshotPdf(params: {
   });
   if (!snap) return null;
 
-  if (snap.renderedSetupPdfPath && snap.setupPdfRenderVersion === SETUP_PDF_RENDER_PIPELINE_VERSION) {
-    const ok = await storageRefIsReadable(snap.renderedSetupPdfPath);
-    if (ok) {
-      return { relativePath: snap.renderedSetupPdfPath, cacheHit: true };
-    }
+  const cached = await readCurrentRenderedPdf(snap.renderedSetupPdfPath, snap.setupPdfRenderVersion);
+  if (cached) {
+    return { relativePath: snap.renderedSetupPdfPath!, cacheHit: true, bytes: cached };
   }
 
   const source =
@@ -408,7 +429,8 @@ export async function ensureRenderedSetupSnapshotPdf(params: {
   const bytes = await fillSetupPdf({ source, data: snap.data, debugLabel: `snapshot=${snap.id}` });
   if (!bytes) return null;
 
-  const storageRef = await storeSetupSnapshotRenderedSetupPdf(snap.id, Buffer.from(bytes));
+  const buffer = Buffer.from(bytes);
+  const storageRef = await storeSetupSnapshotRenderedSetupPdf(snap.id, buffer);
 
   await prisma.setupSnapshot.update({
     where: { id: snap.id },
@@ -419,7 +441,7 @@ export async function ensureRenderedSetupSnapshotPdf(params: {
     },
   });
 
-  return { relativePath: storageRef, cacheHit: false };
+  return { relativePath: storageRef, cacheHit: false, bytes: buffer };
 }
 
 /**
@@ -429,7 +451,7 @@ export async function ensureRenderedSetupSnapshotPdf(params: {
 export async function ensureRenderedRunSetupPdf(params: {
   userId: string;
   runId: string;
-}): Promise<{ relativePath: string; cacheHit: boolean } | null> {
+}): Promise<EnsuredPdf | null> {
   const run = await prisma.run.findFirst({
     where: { id: params.runId, userId: params.userId },
     select: {
@@ -445,11 +467,9 @@ export async function ensureRenderedRunSetupPdf(params: {
   });
   if (!run) return null;
 
-  if (run.renderedSetupPdfPath && run.setupPdfRenderVersion === SETUP_PDF_RENDER_PIPELINE_VERSION) {
-    const ok = await storageRefIsReadable(run.renderedSetupPdfPath);
-    if (ok) {
-      return { relativePath: run.renderedSetupPdfPath, cacheHit: true };
-    }
+  const cached = await readCurrentRenderedPdf(run.renderedSetupPdfPath, run.setupPdfRenderVersion);
+  if (cached) {
+    return { relativePath: run.renderedSetupPdfPath!, cacheHit: true, bytes: cached };
   }
 
   const source =
@@ -464,7 +484,8 @@ export async function ensureRenderedRunSetupPdf(params: {
   });
   if (!bytes) return null;
 
-  const storageRef = await storeRunRenderedSetupPdf(run.id, Buffer.from(bytes));
+  const buffer = Buffer.from(bytes);
+  const storageRef = await storeRunRenderedSetupPdf(run.id, buffer);
 
   await prisma.run.update({
     where: { id: run.id },
@@ -482,7 +503,7 @@ export async function ensureRenderedRunSetupPdf(params: {
     },
   });
 
-  return { relativePath: storageRef, cacheHit: false };
+  return { relativePath: storageRef, cacheHit: false, bytes: buffer };
 }
 
 /** Persisted on new runs so lazy render can skip baseline chain when possible. */

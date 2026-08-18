@@ -6,6 +6,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { canViewPeerRuns } from "@/lib/teammateRunAccess";
 import { SETUP_SHEET_TEMPLATE_A800RR, canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 import { templateKeyFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
+import { carNameTakenMessage, findCarNameClash } from "@/lib/cars/carName";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -55,6 +56,15 @@ export async function POST(request: Request) {
         { error: "name is required" },
         { status: 400 }
       );
+    }
+    // One name, one car. The form checks this too, but the API is the door that has to hold.
+    const existingCars = await prisma.car.findMany({
+      where: { userId },
+      select: { id: true, name: true },
+    });
+    const clash = findCarNameClash(existingCars, name);
+    if (clash) {
+      return NextResponse.json({ error: carNameTakenMessage(clash.name) }, { status: 409 });
     }
     const setupSheetTemplateRaw = canonicalSetupSheetTemplateId(body.setupSheetTemplate ?? null);
     let setupSheetTemplate: string | null =

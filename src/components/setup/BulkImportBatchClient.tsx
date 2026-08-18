@@ -237,7 +237,7 @@ export function BulkImportBatchClient({
             type="button"
             onClick={() => void resetAggregationsToThisBatch()}
             disabled={resetBusy || uploading}
-            className="rounded-md border border-border bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            className="rounded-md border border-border primary-face bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
             title="Clear eligibility on all your docs, include only exact-match PARSED docs from this batch, and rebuild aggregations."
           >
             {resetBusy ? "Rebuilding…" : "Use only this batch for aggregations"}

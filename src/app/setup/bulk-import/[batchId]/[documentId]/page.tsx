@@ -75,11 +75,16 @@ export default async function BulkImportDocumentPage({
           <h1 className="page-title">Dataset review</h1>
           <p className="page-subtitle">Confirm parse quality before including this setup in aggregation.</p>
         </div>
-        <Link href={`/setup/bulk-import/${batchId}`} className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted self-start">
-          Batch
-        </Link>
       </header>
       <section className="page-body">
+        {/* Tool navigation, moved off the header: in flow beside the `<h1>` it was
+            centred WITH the title, which is what pushed the title off the middle of
+            the page. */}
+        <div className="flex justify-end">
+          <Link href={`/setup/bulk-import/${batchId}`} className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted">
+            Batch
+          </Link>
+        </div>
         <BulkImportDocReviewClient
           key={`${batchId}-${doc.id}`}
           batchId={batchId}

@@ -656,7 +656,7 @@ export function ImageCalibrationEditorClient(props: Props) {
             type="button"
             onClick={onSave}
             disabled={saving}
-            className="w-full rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            className="w-full rounded-md primary-face bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save calibration & re-import"}
           </button>

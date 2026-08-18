@@ -10,10 +10,8 @@ import { Eyebrow } from "@/components/ui/panel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { CarDeleteClient } from "@/components/cars/CarDeleteClient";
 import { showLegacySetupSheetTemplateEdit } from "@/lib/setupSheetTemplateId";
-import { CarSetupSheetTemplateEdit } from "@/components/cars/CarSetupSheetTemplateEdit";
-import { CarDisciplineEdit } from "@/components/cars/CarDisciplineEdit";
+import { CarDetailsCard } from "@/components/cars/CarDetailsCard";
 import { disciplineForCar } from "@/lib/cars/chassisPlatform";
-import { chassisPlatformLabel } from "@/lib/cars/carClasses";
 import { CarSetupsCard } from "@/components/setup/CarSetupsCard";
 import { getSetupFillDraftSummaryForCar } from "@/lib/setup/getSetupFillDraft";
 import { CarCurrentSetupCard } from "@/components/setup/CarCurrentSetupCard";
@@ -157,10 +155,11 @@ export default async function CarDetailPage(props: {
    * picker (founder call 2026-08-03). Passing `carClass: null` asks what the chassis alone says
    * — when that comes back null there is nothing to infer from and the override is worth asking
    * for; otherwise the car states its own discipline and the question would be the noise that
-   * got the original picker deleted.
+   * got the original picker deleted. `CarDetailsCard` reads this to decide whether its Discipline
+   * row is a fact or a question — the page no longer resolves the answer itself, because the card
+   * that shows it is the card that changes it.
    */
   const inferredDiscipline = disciplineForCar({ ...car, carClass: null });
-  const resolvedDiscipline = disciplineForCar(car);
 
   const runsOnCarByTire = new Map<string, number>();
   /** Highest run count reached on this compound — a rough "how far you've taken it". */
@@ -264,36 +263,34 @@ export default async function CarDetailPage(props: {
             without anyone changing the rule.
           */}
 
-          {showLegacySetupSheetTemplateEdit(car.setupSheetModelId, car.setupSheetTemplate) ? (
-            <CarSetupSheetTemplateEdit carId={car.id} currentTemplate={car.setupSheetTemplate} />
-          ) : null}
-
-          {inferredDiscipline == null ? (
-            <CarDisciplineEdit carId={car.id} currentDiscipline={car.carClass} />
-          ) : null}
-
-          {car.setupSheetTemplate && !car.setupSheetModelId ? (
-            <CardPanel contentClassName="text-sm space-y-2">
-              <Eyebrow>Community tuning archetypes</Eyebrow>
-              <p className="text-xs text-muted-foreground">
-                Compare this car&apos;s latest setup against low / medium / high grip medians pooled from every
-                community-eligible upload sharing this setup sheet template.
-              </p>
-              <Link
-                href={`/cars/${car.id}/grip-archetypes`}
-                className="inline-flex rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted transition"
-              >
-                Open grip archetypes →
-              </Link>
-            </CardPanel>
-          ) : null}
+          {/*
+            One card for what the car IS — name, chassis, discipline, notes, added, runs — replacing
+            the read-only "Car" panel plus the separate discipline card that wrapped a 34-word
+            explainer around one dropdown and then echoed its own answer underneath (founder call
+            2026-08-18). Discipline used to appear three times on this screen; it appears once now,
+            in the row that changes it. The card decides for itself whether that row is a question:
+            a chassis the catalog can place states its discipline, and only a gap gets a picker.
+          */}
+          <CarDetailsCard
+            carId={car.id}
+            name={car.name}
+            sheetModelName={car.setupSheetModel?.name ?? null}
+            chassisText={car.chassis}
+            canLinkChassis={showLegacySetupSheetTemplateEdit(
+              car.setupSheetModelId,
+              car.setupSheetTemplate
+            )}
+            notes={car.notes}
+            inferredDiscipline={inferredDiscipline}
+            carClass={car.carClass}
+            addedLabel={formatRunCreatedAtDateTime(car.createdAt, displayTimeZone)}
+            runCount={runCount}
+          />
 
           <CardPanel contentClassName="space-y-3">
-            <Eyebrow>Tires used with this car</Eyebrow>
+            <Eyebrow>Tires on this car</Eyebrow>
             {tireSetsOnCar.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                No tires logged on runs for this car yet. Log a run and pick a compound.
-              </p>
+              <p className="text-xs text-muted-foreground">No tires logged yet.</p>
             ) : (
               <ul className="space-y-2 text-sm">
                 {tireSetsOnCar.map((ts) => (
@@ -302,9 +299,11 @@ export default async function CarDetailPage(props: {
                     className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/60 pb-2 last:border-0 last:pb-0"
                   >
                     <span className="text-foreground">{ts.label}</span>
+                    {/* Short enough to hold one line at 390px — the old wording ("… on this car ·
+                        taken to run 22") wrapped and the compound lost its place. */}
                     <span className="text-[11px] text-muted-foreground tabular-nums">
-                      {runsOnCarByTire.get(ts.id) ?? 0} run{runsOnCarByTire.get(ts.id) === 1 ? "" : "s"} on this car ·
-                      taken to run {furthestRunByTire.get(ts.id) ?? "—"}
+                      {runsOnCarByTire.get(ts.id) ?? 0} run{runsOnCarByTire.get(ts.id) === 1 ? "" : "s"} · to run{" "}
+                      {furthestRunByTire.get(ts.id) ?? "—"}
                     </span>
                   </li>
                 ))}
@@ -312,43 +311,28 @@ export default async function CarDetailPage(props: {
             )}
           </CardPanel>
 
-          <CardPanel contentClassName="space-y-3">
-            <Eyebrow>Car</Eyebrow>
-            <div className="grid gap-2 text-[13px]">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-muted-foreground">Added</span>
-                <span className="fig-stat">
-                  {formatRunCreatedAtDateTime(car.createdAt, displayTimeZone)}
+          {/*
+            Grip archetypes is a door, not a topic. It used to be a headed card explaining low /
+            medium / high grip medians pooled from community-eligible uploads sharing a sheet
+            template — five ideas in one sentence, on a card that only legacy cars ever see. It is a
+            row you tap now, and the explaining happens on the page it opens.
+          */}
+          {car.setupSheetTemplate && !car.setupSheetModelId ? (
+            <Link href={`/cars/${car.id}/grip-archetypes`} className="block">
+              <CardPanel contentClassName="flex items-center justify-between gap-3 text-sm">
+                <span className="min-w-0 truncate">
+                  {car.chassis
+                    ? `Compare with other ${car.chassis} cars`
+                    : "Compare with similar cars"}
                 </span>
-              </div>
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-muted-foreground">Runs</span>
-                <span className="fig-stat">{runCount}</span>
-              </div>
-              {car.chassis ? (
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-muted-foreground">Chassis</span>
-                  <span className="min-w-0 truncate">{car.chassis}</span>
-                </div>
-              ) : null}
-              {resolvedDiscipline ? (
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-muted-foreground">Discipline</span>
-                  <span className="min-w-0 truncate">
-                    {chassisPlatformLabel(resolvedDiscipline)}
-                  </span>
-                </div>
-              ) : null}
-              {car.notes ? (
-                <div className="flex flex-col gap-1">
-                  <span className="text-muted-foreground">Notes</span>
-                  <span>{car.notes}</span>
-                </div>
-              ) : null}
-            </div>
-          </CardPanel>
+                <span aria-hidden className="shrink-0 text-muted-foreground">
+                  ›
+                </span>
+              </CardPanel>
+            </Link>
+          ) : null}
 
-          <CarDeleteClient carId={car.id} carName={car.name} runCount={runCount} />
+          <CarDeleteClient carId={car.id} carName={car.name} />
         </div>
       </section>
     </>

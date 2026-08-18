@@ -331,7 +331,7 @@ export function BulkImportHubClient({
         <button
           type="submit"
           disabled={busy || cars.length === 0 || !batchCarId || (queued.length === 0 && !petitrcUrl.trim())}
-          className="rounded-md border border-border bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          className="rounded-md border border-border primary-face bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           {busy
             ? "Creating…"

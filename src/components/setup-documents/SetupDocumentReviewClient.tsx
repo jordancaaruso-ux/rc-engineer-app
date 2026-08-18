@@ -877,7 +877,7 @@ export function SetupDocumentReviewClient({
               <>
                 <button
                   type="button"
-                  className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+                  className="rounded-md primary-face bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
                   onClick={() => void confirmEdits()}
                   disabled={savingDraft}
                 >
@@ -1381,7 +1381,7 @@ export function SetupDocumentReviewClient({
             type="button"
             onClick={createSetup}
             disabled={creatingSetup || Boolean(liveDoc.createdSetupId) || savingCarLink}
-            className="tap-active flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-[13px] font-bold tracking-tight text-primary-foreground transition hover:bg-[#E6BE00] disabled:cursor-default disabled:opacity-60"
+            className="tap-active flex w-full items-center justify-center gap-2 rounded-xl primary-face bg-primary px-4 py-2.5 text-[13px] font-bold tracking-tight text-primary-foreground transition hover:bg-[#E6BE00] disabled:cursor-default disabled:opacity-60"
           >
             {liveDoc.createdSetupId
               ? "Setup saved ✓"

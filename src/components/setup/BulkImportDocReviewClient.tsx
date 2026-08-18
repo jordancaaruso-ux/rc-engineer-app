@@ -225,7 +225,7 @@ export function BulkImportDocReviewClient(input: {
             type="button"
             disabled={parsing || !selectedCalId || input.calibrations.length === 0}
             onClick={() => void runParse()}
-            className="rounded-md border border-border bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            className="rounded-md border border-border primary-face bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
             {parsing ? "Parsing…" : "Parse with selected calibration"}
           </button>
@@ -290,7 +290,7 @@ export function BulkImportDocReviewClient(input: {
                       type="button"
                       disabled={savingSetup}
                       onClick={() => void saveStructuredSetup()}
-                      className="rounded-md border border-border bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                      className="rounded-md border border-border primary-face bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
                     >
                       {savingSetup ? "Saving…" : "Save changes"}
                     </button>
@@ -340,7 +340,7 @@ export function BulkImportDocReviewClient(input: {
             type="button"
             disabled={saving || !parseOk}
             onClick={() => void saveReview("CONFIRMED_ACCURATE")}
-            className="rounded-md border border-border bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+            className="rounded-md border border-border primary-face bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
           >
             Confirmed accurate
           </button>

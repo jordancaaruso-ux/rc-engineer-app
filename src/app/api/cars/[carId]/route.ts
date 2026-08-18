@@ -5,6 +5,7 @@ import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 import { CHASSIS_PLATFORMS } from "@/lib/cars/carClasses";
 import { templateKeyFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
 import { revalidateAfterCarMutation } from "@/lib/revalidateUser";
+import { carNameTakenMessage, findCarNameClash } from "@/lib/cars/carName";
 import { hasDatabaseUrl } from "@/lib/env";
 
 export async function GET(
@@ -107,7 +108,18 @@ export async function PATCH(
   } = {};
   if (body.name !== undefined) {
     const v = body.name?.trim();
-    if (v) data.name = v;
+    if (v) {
+      // Renaming onto another car's name is the same collision as creating one — same answer.
+      const siblings = await prisma.car.findMany({
+        where: { userId },
+        select: { id: true, name: true },
+      });
+      const clash = findCarNameClash(siblings, v, carId);
+      if (clash) {
+        return NextResponse.json({ error: carNameTakenMessage(clash.name) }, { status: 409 });
+      }
+      data.name = v;
+    }
   }
   if (body.chassis !== undefined) data.chassis = body.chassis?.trim() || null;
   /*

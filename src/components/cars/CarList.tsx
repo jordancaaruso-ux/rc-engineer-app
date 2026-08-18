@@ -13,6 +13,7 @@ import { Collapse } from "@/components/ui/Collapse";
 import { AddCarBlankUpload } from "@/components/cars/AddCarBlankUpload";
 import { UploadSetupSheetBar, type UploadSetupCar } from "@/components/setup/UploadSetupSheetBar";
 import { PickerSheet, PickerTrigger } from "@/components/ui/PickerSheet";
+import { carNameTakenMessage, findCarNameClash } from "@/lib/cars/carName";
 import type { OptionSection } from "@/lib/search/optionSearch";
 
 type SetupSheetModelOption = { id: string; name: string; slug: string; isAuthorized?: boolean };
@@ -118,6 +119,17 @@ export function CarList({
 
   const selectedModel = setupSheetModels.find((m) => m.id === setupSheetModelId) ?? null;
 
+  /**
+   * The name this car would actually be saved under — what is typed, or the chassis name that
+   * auto-filled it — checked against the garage as they type, so "already taken" lands before they
+   * press Add rather than as a failure afterwards. The API refuses it either way.
+   */
+  const chosenName = name.trim() || selectedModel?.name || "";
+  const nameClash = useMemo(
+    () => findCarNameClash(cars, chosenName),
+    [cars, chosenName]
+  );
+
   /*
    * The flag goes on the UNREVIEWED rows, not the curated ones. Drivers can author their own
    * chassis types and those go live for everyone immediately, so the catalog is now
@@ -216,9 +228,12 @@ export function CarList({
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    const chosenName = name.trim() || selectedModel?.name || "";
     if (!chosenName) {
       setMessage("Name is required.");
+      return;
+    }
+    if (nameClash) {
+      setMessage(carNameTakenMessage(nameClash.name));
       return;
     }
     if (!setupSheetModelId && !pending) {
@@ -428,8 +443,14 @@ export function CarList({
                   onChange={(e) => onNameChange(e.target.value)}
                   placeholder={selectedModel?.name ?? "e.g. My MTC3"}
                   aria-label="Car name"
+                  aria-invalid={nameClash ? true : undefined}
                   required
                 />
+                {nameClash && (
+                  <p className="mt-1 text-[11px] text-warning">
+                    {carNameTakenMessage(nameClash.name)}
+                  </p>
+                )}
               </div>
 
               <div>

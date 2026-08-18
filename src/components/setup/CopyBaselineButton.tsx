@@ -55,7 +55,7 @@ export function CopyBaselineButton({
         type="button"
         onClick={() => void copy()}
         disabled={busy}
-        className="tap-active rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+        className="tap-active rounded-md primary-face bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
       >
         {busy ? "Copying…" : "Save a copy and edit"}
       </button>

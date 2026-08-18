@@ -1721,7 +1721,7 @@ export function SheetFillSurface({
           onMouseDown={keepKeyboard}
           onClick={() => step(1)}
           disabled={focusIndex === order.length - 1}
-          className="tap-active grid w-11 place-items-center rounded-md bg-primary text-lg font-semibold text-primary-foreground disabled:opacity-40"
+          className="tap-active grid w-11 place-items-center rounded-md primary-face bg-primary text-lg font-semibold text-primary-foreground disabled:opacity-40"
         >
           ›
         </button>

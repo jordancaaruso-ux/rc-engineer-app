@@ -349,7 +349,7 @@ export function SetupFillFlow({
             </button>
             <button
               type="button"
-              className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+              className="flex-1 rounded-lg primary-face bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
               onClick={() => void saveAndExit()}
               disabled={saving}
             >
@@ -567,7 +567,7 @@ export function SetupFillFlow({
           </button>
           <button
             type="button"
-            className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
+            className="flex-1 rounded-lg primary-face bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
             onClick={advance}
           >
             {index === steps.length - 1 ? "Done" : "Next"}

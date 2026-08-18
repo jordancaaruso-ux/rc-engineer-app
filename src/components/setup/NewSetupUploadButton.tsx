@@ -158,7 +158,7 @@ export function NewSetupUploadButton({
           type="button"
           onClick={openFilePicker}
           disabled={busy || needsCar}
-          className="rounded-md border border-primary-ink/60 bg-primary/90 px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-sm transition hover:bg-primary disabled:opacity-60 disabled:cursor-default"
+          className="rounded-md border border-primary-ink/60 primary-face bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition hover:bg-primary disabled:opacity-60 disabled:cursor-default"
           title={needsCar ? "Add a car first" : "Upload your setup sheet (the fillable PDF)"}
         >
           {stageLabel(stage)}
@@ -194,7 +194,7 @@ export function NewSetupUploadButton({
           <button
             type="button"
             onClick={confirmPendingImage}
-            className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+            className="rounded-md primary-face bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
           >
             Import
           </button>

@@ -302,7 +302,7 @@ export default async function SetupDocumentDetailPage({
                 ) : null}
                 <Link
                   href={`/setup-documents/${doc.id}/calibrate-image`}
-                  className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+                  className="rounded-md primary-face bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
                 >
                   Open box editor
                 </Link>

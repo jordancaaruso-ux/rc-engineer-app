@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { buildCompletePdfReviewSetupTemplate } from "@/lib/setup/buildCompletePdfReviewSetupTemplate";
@@ -163,14 +164,12 @@ export function SetupRunPdfReviewClient({ runId }: { runId: string }) {
   return (
     <>
       <header className="page-header">
+        {/* Was a text link stacked above the `<h1>` inside the title block, which put the
+            title below the header's own centre line. `PageBackLink` is the pinned control
+            every other page uses, and it leaves the title centred. */}
+        <PageBackLink href="/setup/admin" />
         <div>
-          <Link
-            href="/setup/admin"
-            className="text-xs text-muted-foreground hover:text-foreground transition"
-          >
-            ← Back to Setup tools
-          </Link>
-          <h1 className="page-title mt-2">Review setup for PDF</h1>
+          <h1 className="page-title">Review setup for PDF</h1>
           <p className="page-subtitle">
             {runTitle || "Run setup"}
             {payload ? (

@@ -61,11 +61,16 @@ export default async function BulkImportPage(): Promise<ReactNode> {
             Confirm accurate parses for a future aggregation dataset.
           </p>
         </div>
-        <Link href="/setup/admin" className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted self-start">
-          Setup tools
-        </Link>
       </header>
       <section className="page-body">
+        {/* Tool navigation, moved off the header: in flow beside the `<h1>` it was
+            centred WITH the title, which is what pushed the title off the middle of
+            the page. */}
+        <div className="flex justify-end">
+          <Link href="/setup/admin" className="rounded-md border border-border px-3 py-2 text-xs hover:bg-muted">
+            Setup tools
+          </Link>
+        </div>
         <BulkImportHubClient cars={cars} initialBatches={batchRows} />
       </section>
     </>

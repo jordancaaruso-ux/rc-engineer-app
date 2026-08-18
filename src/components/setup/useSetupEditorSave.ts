@@ -49,22 +49,62 @@ import type { SetupSaveMode } from "@/lib/setup/setupSaveMode";
  *                  named, is the quiet second door.
  *
  * A fork always records where it came from (`baseSetupSnapshotId`), so the new setup can say
- * "Edited from …" rather than appearing from nowhere. It is named without asking — the same ruling
- * that took the `window.prompt` off the All-setups bookmark (2026-08-11) — and Rename sits in the
- * bar afterwards for the drivers who care.
+ * "Edited from …" rather than appearing from nowhere.
+ *
+ * ============================== THE FORK ASKS FOR A NAME ==============================
+ *
+ * Founder call, 2026-08-17. This REVERSES the line that used to sit here — that a fork is named
+ * without asking, on the authority of the 2026-08-11 ruling which took a `window.prompt` off the
+ * All-setups bookmark. That ruling was right about the bookmark and wrong when it was carried
+ * here: keeping a row that already has a title is a question with one right answer, while a fork
+ * makes a thing with no title at all. Named for the driver, both copies of a twice-forked setup
+ * came out "Mod A (edited)", a fork of a fork came out "Mod A (edited) (edited)", and a copy taken
+ * off a session was offered "Round 2 at Kingston (edited)". The Rename link that was meant to
+ * cover it is eleven grey pixels in the corner of the bar and is gone the moment they navigate.
+ *
+ * So the fork carries a `namePrompt` and the bar collects the name in a `SetupNameSheet` before
+ * running it. The suggestion arrives selected, so accepting it is still one tap. Rename stays as it
+ * was — it edits a name that exists, which is the job the 2026-08-11 ruling was actually about.
  */
+
+/** What the bar has to collect before an action may run. Only the fork has one. */
+export type SetupEditorNamePrompt = {
+  title: string;
+  /** One line under it — what the copy is, and what it leaves alone. */
+  detail: string;
+  /** Prefilled and pre-selected, so accepting it is one tap. */
+  suggestedName: string;
+  confirmLabel: string;
+};
 
 export type SetupEditorSaveAction = {
   label: string;
   /** Present-tense word shown while it runs, e.g. "Saving…". */
   busyLabel: string;
-  run: () => Promise<void>;
+  /**
+   * Resolves TRUE when the save landed. The name sheet uses it to decide whether to close: a failed
+   * save has to leave the sheet up with the driver's typing still in it, or a 500 silently eats the
+   * name they just chose.
+   */
+  run: (name?: string) => Promise<boolean>;
   /**
    * Stays filled yellow with nothing changed. Only the fork does: copying a setup exactly as it
    * stands is a real thing to want, while writing zero changes over a setup is not.
    */
   loudWhenClean?: boolean;
+  /** Present when pressing this must ask a question first. See `SetupNameSheet`. */
+  namePrompt?: SetupEditorNamePrompt;
 };
+
+/**
+ * What the name sheet opens with. One `(edited)` suffix is stripped before another is added, so
+ * forking a fork cannot stack them — the accumulation was half the reason this stopped being
+ * automatic.
+ */
+export function suggestedForkName(sourceName?: string | null): string {
+  const base = (sourceName ?? "").trim().replace(/\s*\(edited\)$/i, "") || "Setup";
+  return `${base} (edited)`.slice(0, 80);
+}
 
 export type SetupEditorSave = {
   status: "idle" | "saving" | "saved" | "error";
@@ -174,9 +214,11 @@ export function useSetupEditorSave({
       }
       settled(values);
       router.refresh();
+      return true;
     } catch (e) {
       setStatus("error");
       setError(e instanceof Error ? e.message : "Could not save.");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -209,10 +251,12 @@ export function useSetupEditorSave({
           `/cars/${carId}/setups/${body.snapshot.id}/edit?run=${encodeURIComponent(runId)}`
         );
         router.refresh();
+        return true;
       } catch (e) {
         setStatus("error");
         setError(e instanceof Error ? e.message : "Could not update the run.");
         setBusy(false);
+        return false;
       }
     },
     [carId, router, getData, settled, values]
@@ -226,35 +270,51 @@ export function useSetupEditorSave({
    * server and quietly throw this edit away. `baseSetupSnapshotId` is the provenance, and is what
    * lets the new setup say what it was edited from.
    */
-  const saveAsNew = useCallback(async () => {
-    setBusy(true);
-    setStatus("saving");
-    setError(null);
-    try {
-      const res = await fetch("/api/setup-snapshots", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          carId,
-          name: `${setupName?.trim() || "Setup"} (edited)`,
-          data: getData(),
-          baseSetupSnapshotId: setupId,
-        }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? "Could not create the new setup.");
+  const saveAsNew = useCallback(
+    async (name?: string) => {
+      setBusy(true);
+      setStatus("saving");
+      setError(null);
+      try {
+        const res = await fetch("/api/setup-snapshots", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            carId,
+            // The sheet always sends one; the fallback only covers a caller that skipped it.
+            name: name?.trim() || suggestedForkName(setupName),
+            data: getData(),
+            baseSetupSnapshotId: setupId,
+          }),
+        });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(body.error ?? "Could not create the new setup.");
+        }
+        const body = (await res.json()) as { setup: { id: string } };
+        settled(values);
+        // No `?run=`: the copy is nobody's record, and further edits should land on it in place.
+        router.push(`/cars/${carId}/setups/${body.setup.id}/edit`);
+        /*
+         * The car page has a new row on it, and this is what says so.
+         *
+         * Without it the fork was the ONE door here that never invalidated anything — `saveOver`
+         * and `correctRun` both refresh — and `experimental.staleTimes.dynamic` (30s, next.config)
+         * hands back any page visited inside that window without re-fetching it. So backing out to
+         * the car page served the copy from BEFORE the save, and the new setup appeared only after
+         * a hard reload threw the router cache away. Founder-reported, 2026-08-17.
+         */
+        router.refresh();
+        return true;
+      } catch (e) {
+        setStatus("error");
+        setError(e instanceof Error ? e.message : "Could not create the new setup.");
+        setBusy(false);
+        return false;
       }
-      const body = (await res.json()) as { setup: { id: string } };
-      settled(values);
-      // No `?run=`: the copy is nobody's record, and further edits should land on it in place.
-      router.push(`/cars/${carId}/setups/${body.setup.id}/edit`);
-    } catch (e) {
-      setStatus("error");
-      setError(e instanceof Error ? e.message : "Could not create the new setup.");
-      setBusy(false);
-    }
-  }, [carId, setupId, setupName, router, getData, settled, values]);
+    },
+    [carId, setupId, setupName, router, getData, settled, values]
+  );
 
   /**
    * Renaming is allowed on any setup of the driver's, including a run's own record — only a run
@@ -279,12 +339,31 @@ export function useSetupEditorSave({
     }
   }, [setupId, setupName, router]);
 
+  /*
+   * What the copy leaves alone, said in the sheet rather than left to be inferred. It is different
+   * per door — off a run the reassurance the driver needs is "the session keeps its record", and
+   * off a saved setup it is "the one you opened is untouched".
+   *
+   * The run case does NOT name the source. A run snapshot's label IS the session ("Testing run",
+   * "R2 at Kingston"), and dropping it in read "The run keeps Testing run as it raced" — measured
+   * on screen, 2026-08-17.
+   */
+  const sourceLabel = setupName?.trim() || "this setup";
   const forkAction: SetupEditorSaveAction = {
     label: "Save as new setup",
     busyLabel: "Saving…",
     run: saveAsNew,
     // A copy of a teammate's setup, taken exactly as it stands, is the reason this door exists.
     loudWhenClean: true,
+    namePrompt: {
+      title: "Name this setup",
+      detail:
+        saveMode.kind === "inPlace"
+          ? `A copy with your changes. ${sourceLabel} stays as it is.`
+          : "A copy with your changes. The run keeps its own record.",
+      suggestedName: suggestedForkName(setupName),
+      confirmLabel: "Save setup",
+    },
   };
 
   let primary: SetupEditorSaveAction;

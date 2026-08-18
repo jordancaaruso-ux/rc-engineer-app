@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { SetupNameSheet } from "@/components/setup/SetupNameSheet";
 import type { SetupEditorSave } from "@/components/setup/useSetupEditorSave";
 
 /**
@@ -50,6 +51,16 @@ import type { SetupEditorSave } from "@/components/setup/useSetupEditorSave";
  *
  * The fork keeps its fill even at zero (`loudWhenClean`): copying a setup exactly as it stands is
  * the whole point of that door.
+ *
+ * ============================== THE ONE DOOR THAT ASKS SOMETHING ==============================
+ *
+ * An action carrying a `namePrompt` (the fork, and only the fork) opens `SetupNameSheet` instead of
+ * running on press — see the hook for why that reversed on 2026-08-17. Which button is prompting is
+ * held as "primary" / "secondary" rather than as the action OBJECT: the hook rebuilds those objects
+ * every render, and an object captured in state would close over the `getData` of the render the
+ * sheet opened on. The sheet is modal so nothing can be typed behind it today, but a stale reader of
+ * the editor's values is the exact bug that made "Save as a new setup" flush its edits into both
+ * rows the last time, and it is not worth leaving armed.
  */
 
 /** Above `IdeasEdgeTab` (z-40) so the bar covers it cleanly; below the dock (z-50), which wins. */
@@ -59,8 +70,13 @@ export function SetupEditorSaveBar({ save }: { save: SetupEditorSave }) {
   const [mounted, setMounted] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [panelHeight, setPanelHeight] = useState(0);
+  /** Which button is waiting on a name, resolved back to a live action at press time. */
+  const [promptFor, setPromptFor] = useState<"primary" | "secondary" | null>(null);
 
   useEffect(() => setMounted(true), []);
+
+  const promptAction =
+    promptFor === "primary" ? save.primary : promptFor === "secondary" ? save.secondary : null;
 
   // Layout effect + observer: the note and the status line change the height as the driver works,
   // and the spacer has to follow or the last field slides under the bar mid-edit.
@@ -88,7 +104,10 @@ export function SetupEditorSaveBar({ save }: { save: SetupEditorSave }) {
     return (
       <button
         type="button"
-        onClick={() => void action.run()}
+        onClick={() => {
+          if (action.namePrompt) setPromptFor(variant);
+          else void action.run();
+        }}
         disabled={save.busy}
         // Which door is LOUD is the whole of this feature, and it is a paint decision no accessible
         // name can express — so it is stated in the DOM for the suite that pins it.
@@ -97,7 +116,7 @@ export function SetupEditorSaveBar({ save }: { save: SetupEditorSave }) {
         className={cn(
           "tap-active rounded-md px-3 py-1.5 text-xs font-medium transition disabled:opacity-50",
           loud
-            ? "bg-primary text-primary-foreground hover:opacity-90"
+            ? "primary-face bg-primary text-primary-foreground hover:opacity-90"
             : "border border-border bg-card hover:bg-muted"
         )}
       >
@@ -187,6 +206,27 @@ export function SetupEditorSaveBar({ save }: { save: SetupEditorSave }) {
       {/* Holds the bar's place in the flow so the last row of the editor is never underneath it. */}
       <div aria-hidden style={{ height: panelHeight }} />
       {mounted ? createPortal(bar, document.body) : null}
+      {promptAction?.namePrompt ? (
+        <SetupNameSheet
+          open
+          title={promptAction.namePrompt.title}
+          detail={promptAction.namePrompt.detail}
+          suggestedName={promptAction.namePrompt.suggestedName}
+          confirmLabel={promptAction.namePrompt.confirmLabel}
+          busy={save.busy}
+          // The bar's own error line is behind the scrim, so a failed save has to say so in here.
+          error={save.status === "error" ? save.error : null}
+          onCancel={() => {
+            if (!save.busy) setPromptFor(null);
+          }}
+          onConfirm={(name) => {
+            // Closed only on success — a failure keeps the sheet up with the typed name in it.
+            void promptAction.run(name).then((ok) => {
+              if (ok) setPromptFor(null);
+            });
+          }}
+        />
+      ) : null}
     </>
   );
 }

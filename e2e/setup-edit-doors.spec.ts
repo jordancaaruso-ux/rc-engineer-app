@@ -231,7 +231,21 @@ test("a run's setup edits as a copy from the garage and as a correction from the
   // The count, specifically: "changes" appears in the mode's own note and on the in-place button.
   await expect(page.locator(".setup-save-panel")).not.toContainText(/\d+\s+changes?\b/);
 
+  /*
+   * The fork ASKS what to call the copy (founder call, 2026-08-17). It used to name itself
+   * "<source> (edited)" and offer Rename afterwards, which stacked suffixes on a fork of a fork and
+   * gave two copies of one setup the same name. The suggestion still arrives selected, so a driver
+   * who doesn't care saves in one tap; this one cares.
+   */
   await fork.click();
+  const nameSheet = page.getByRole("dialog", { name: "Name this setup" });
+  await expect(nameSheet, "the fork must ask what to call the copy").toBeVisible({
+    timeout: 30_000,
+  });
+  const nameInput = nameSheet.locator("#setup-name-sheet-input");
+  await expect(nameInput, "the box opens on a suggestion, not empty").toHaveValue(/\(edited\)$/);
+  await nameInput.fill("Sunday main");
+  await nameSheet.getByRole("button", { name: "Save setup" }).click();
   /*
    * The predicate has to exclude the setup we started on. `toHaveURL(/setups\/[^/]+\/edit$/)`
    * passes on the FIRST poll against the URL already in the bar, so the assertion after it read the
@@ -264,6 +278,10 @@ test("a run's setup edits as a copy from the garage and as a correction from the
     page.locator("p.ui-caption", { hasText: /Edited from/i }),
     "a forked setup must name its source somewhere the driver can actually see"
   ).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.locator("h1.page-title"),
+    "the copy is called what the driver typed, not what the app guessed"
+  ).toHaveText("Sunday main");
 
   // ── The run's door: `?run=` makes the correction the loud one ──────────────────────────────
   await page.goto(`/cars/${carId}/setups/${runSetupId}/edit?run=${runId}`);

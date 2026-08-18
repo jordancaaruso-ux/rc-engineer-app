@@ -4,7 +4,6 @@ import { useRef, useState } from "react";
 import { Check, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptics";
-import { primaryButtonClassName } from "@/components/ui/ButtonLink";
 import {
   uploadBlankSheetForChassis,
   type BlankUploadModel,
@@ -20,13 +19,30 @@ import {
  * two: a printable one and an editable one that looks identical on screen. Only the editable one
  * has boxes to type in, and only the editable one can become a chassis. A driver who picks the
  * wrong one gets a refusal that reads like the app is broken — so the ask names the file before
- * they go looking, and the refusal names it again.
+ * they go looking, and the refusal names it again. It gets **one line** to do it (2026-08-18):
+ * the previous four-line caveat was the first thing on a card that already looked like a form,
+ * and the requirement drowned in it. The field label below no longer repeats it either.
  *
- * The panel is a gate, not a form: the file picker stays off until the chassis has a name, and
- * choosing a file surfaces the one commit button ("Create chassis") instead of a submit that sat
- * there disabled the whole time. Both inputs stay on screen in every state so a typo in the name
- * never costs the chosen file.
+ * The card has exactly one yellow thing at a time, and it is always the next move: "Choose file"
+ * full-width until a file exists, then "Create chassis" in its place. Both wear
+ * `.primary-face-static` rather than `.primary-face` — a specular band crossing a button this
+ * wide reads as a screen wipe, the same call `RecentRunsCard` made.
+ *
+ * NO NAME GATE (2026-08-18). The picker used to stay disabled until the chassis had a name, which
+ * left the card opening on a greyed-out control with nothing to press — and a yellow button you
+ * cannot press is worse than a grey one. The gate bought nothing: the confirm step below already
+ * handles a file with no name ("Name your chassis to create it"), and `submit()` still refuses.
+ * Both inputs stay on screen in every state so a typo in the name never costs the chosen file.
  */
+
+/**
+ * The card's single yellow action, whichever one it currently is. Deliberately NOT
+ * `primaryButtonClassName()`: that is the toolbar chip — 30px tall, `text-xs`, and wearing
+ * `.primary-face`, whose band sweeps across it every 2.6s. Across the full width of a card the
+ * same band reads as a screen wipe, so this takes the material and holds it still.
+ */
+const wideYellowClassName =
+  "tap-active primary-face-static flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2.5 text-[13px] font-bold tracking-tight text-primary-foreground transition hover:brightness-105 active:brightness-95 disabled:opacity-60";
 
 function formatFileSize(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -92,14 +108,7 @@ export function AddCarBlankUpload({
       <div>
         <p className="text-xs text-foreground">Add your chassis from your setup sheet.</p>
         <p className="mt-1 text-[11px] text-muted-foreground">
-          {/*
-            No space is needed straight after the closing tag. JSX drops one there, which turned
-            "fillable PDF — the one" into "fillable PDF— the one" on the rendered page; leading the
-            next text node with punctuation sidesteps it rather than relying on an escape.
-          */}
-          It has to be the <span className="text-foreground">fillable PDF</span>, the one you can
-          type into. Your manufacturer&rsquo;s blank works, and so does a sheet you&rsquo;ve already
-          filled in: whatever is in the boxes comes with it.
+          Must be an editable PDF &mdash; no images.
         </p>
       </div>
 
@@ -115,7 +124,8 @@ export function AddCarBlankUpload({
       </div>
 
       <div>
-        <label className="mb-1 block text-[11px] text-muted-foreground">Setup sheet (fillable PDF)</label>
+        {/* Not "(fillable PDF)" any more — the line at the top of the card says it once. */}
+        <label className="mb-1 block text-[11px] text-muted-foreground">Setup sheet</label>
         {/*
           Hidden native input behind a styled trigger: the native "Choose file" control can't be
           greyed out or restyled, and the chosen file needs to render as a chip with a Change
@@ -151,20 +161,16 @@ export function AddCarBlankUpload({
             </button>
           </div>
         ) : (
-          <>
-            <button
-              type="button"
-              className="tap-active rounded-md border border-border bg-secondary px-3 py-1.5 text-xs text-foreground transition disabled:cursor-default disabled:opacity-50"
-              onClick={() => fileRef.current?.click()}
-              disabled={!named}
-              aria-label="Choose setup sheet file"
-            >
-              Choose file
-            </button>
-            {!named ? (
-              <p className="mt-1 text-[11px] text-muted-foreground">Name your chassis first.</p>
-            ) : null}
-          </>
+          <button
+            type="button"
+            className={wideYellowClassName}
+            onClick={() => fileRef.current?.click()}
+            disabled={busy}
+            aria-label="Choose setup sheet file"
+          >
+            <Upload className="h-3.5 w-3.5" aria-hidden />
+            Choose file
+          </button>
         )}
       </div>
 
@@ -184,7 +190,7 @@ export function AddCarBlankUpload({
             type="button"
             onClick={() => void submit()}
             disabled={!canCreate}
-            className={primaryButtonClassName("mt-2 gap-1.5 disabled:opacity-60")}
+            className={cn(wideYellowClassName, "mt-2")}
           >
             <Upload className="h-3.5 w-3.5" aria-hidden />
             {busy ? "Reading your sheet…" : "Create chassis"}

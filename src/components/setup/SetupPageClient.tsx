@@ -86,7 +86,12 @@ export function SetupPageClient() {
             App-native setup editor · structured setup data is the source of truth
           </p>
         </div>
-        <div className="flex items-center gap-2">
+      </header>
+
+      <section className="page-body">
+        {/* Two actions, moved off the header: in flow beside the `<h1>` they were centred
+            WITH the title, which is what pushed "Setup" off the middle of the page. */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Link
             href="/setup-documents"
             className="rounded-md border border-border bg-card px-3 py-2 text-xs hover:bg-muted transition"
@@ -108,9 +113,6 @@ export function SetupPageClient() {
             Clear
           </button>
         </div>
-      </header>
-
-      <section className="page-body">
         {savedToast ? (
           <div className="text-xs text-muted-foreground">{savedToast}</div>
         ) : (
