@@ -273,7 +273,7 @@ export function LapComparePanel({
           {analyzeHref ? (
             <Link
               href={analyzeHref}
-              className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-[11.5px] font-bold text-primary-foreground no-underline transition-colors hover:bg-[#E6BE00]"
+              className="shrink-0 rounded-lg primary-face bg-primary px-3 py-1.5 text-[11.5px] font-bold text-primary-foreground no-underline transition-colors hover:bg-[#E6BE00]"
               onClick={(e) => e.stopPropagation()}
             >
               Analyze video

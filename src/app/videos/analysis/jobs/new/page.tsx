@@ -62,7 +62,7 @@ function NewJobForm() {
       </label>
       <button
         type="button"
-        className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground w-fit"
+        className="rounded-md primary-face bg-primary px-3 py-2 text-sm text-primary-foreground w-fit"
         onClick={() => void createJob()}
         disabled={!trackId || !profileId}
       >

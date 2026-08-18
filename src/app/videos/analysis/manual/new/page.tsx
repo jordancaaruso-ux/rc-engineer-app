@@ -116,7 +116,7 @@ function NewLapSyncForm() {
 
       <button
         type="button"
-        className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground w-fit disabled:opacity-50"
+        className="rounded-md primary-face bg-primary px-3 py-2 text-sm text-primary-foreground w-fit disabled:opacity-50"
         disabled={creating}
         onClick={() => void createJob()}
       >

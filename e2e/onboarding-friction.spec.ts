@@ -798,18 +798,9 @@ const personas: Persona[] = [
           .map((el) => el.getAttribute("aria-label") || el.getAttribute("placeholder") || "(unlabelled)"),
       );
       d.note(`/settings shows ${settingsFields.length} fields: ${settingsFields.join(" · ")}`);
-      // Must be a CONTROL, not prose: the transponder hint already contains the word "loaner"
-      // ("…spare, the one in a loaner"), so a body-text search reports a control that isn't there.
-      const loaner = await d.page.evaluate(() =>
-        [...document.querySelectorAll("button,input[type=checkbox],label,[role=switch]")].some((el) =>
-          /loaner|club chip|number changes/i.test(el.textContent || el.getAttribute("aria-label") || ""),
-        ),
-      );
-      d.note(
-        loaner
-          ? "a loaner/club-chip CONTROL exists on /settings"
-          : "NO loaner/club-chip control on /settings — the word appears only in the transponder hint, so a driver on a borrowed chip has no number to type and no way to say so",
-      );
+      // The loaner / club-chip declaration was checked here until 2026-08-18, when it was taken
+      // off /settings by founder call — a driver on a borrowed club chip isn't who this app is
+      // for, so its absence is the decision, not a finding.
 
       await d.load("/cars");
       await d.tap('/cars — "Add car"', d.page.getByRole("button", { name: /^Add car$/ }));

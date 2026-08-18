@@ -51,7 +51,7 @@ function RowBody({
         className={cn(
           "grid size-6 shrink-0 place-items-center rounded-full border",
           done
-            ? "border-primary-ink bg-primary text-primary-foreground"
+            ? "border-primary-ink primary-face bg-primary text-primary-foreground"
             : tone === "required"
               ? "border-primary-ink/60 text-primary-ink"
               : "border-border text-muted-foreground"

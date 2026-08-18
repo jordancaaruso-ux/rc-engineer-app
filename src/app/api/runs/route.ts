@@ -820,10 +820,14 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     });
   }
 
-  const lapImportIds = Array.isArray(body.importedLapTimeSessionIds)
-    ? body.importedLapTimeSessionIds.filter((id): id is string => typeof id === "string" && id.trim().length > 0)
-    : [];
-  if (lapImportIds.length > 0) {
+  // Presence of the key is the instruction, not its length: the run form always
+  // sends the full list, so `[]` means "detach what was there". A caller that
+  // omits the field entirely is saying nothing about timing links, and leaves
+  // them alone.
+  if (Array.isArray(body.importedLapTimeSessionIds)) {
+    const lapImportIds = body.importedLapTimeSessionIds.filter(
+      (id): id is string => typeof id === "string" && id.trim().length > 0
+    );
     await linkImportedSessionsToRun({
       userId: params.userId,
       importedLapTimeSessionIds: lapImportIds,

@@ -144,7 +144,7 @@ export default function DemoTourPreviewPage() {
         <button
           type="button"
           onClick={() => setLive((value) => !value)}
-          className="rounded-md bg-primary px-3 py-1.5 text-[12px] font-bold text-primary-foreground"
+          className="rounded-md primary-face bg-primary px-3 py-1.5 text-[12px] font-bold text-primary-foreground"
         >
           {live ? "Hide overlay" : "Show overlay"}
         </button>

@@ -99,7 +99,7 @@ export function VideoLibraryClient({ initialVideos }: { initialVideos: VideoRow[
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={busy}
-            className="rounded-md border border-border bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            className="rounded-md border border-border primary-face bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
             {busy ? "Uploading…" : "Choose video…"}
           </button>

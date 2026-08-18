@@ -29,6 +29,10 @@ import { warmNewRunForm } from "@/lib/runs/warmNewRunForm";
  * thing that crosses the face is `.logrun-fx`'s hard-edged sheen band; read the
  * note above it in globals.css for why white bleaches this particular yellow.
  *
+ * That band is now on this bar and the dock's Log-run circle and NOTHING else
+ * (founder call 2026-08-18) — it spent a day on every yellow button via
+ * `.primary-face`, where ten of them on one screen made shine mean nothing at all.
+ *
  * Draft-aware, mirroring the dock's Log-run circle: with an unfinished run today
  * the headline flips to "Finish today's run" (→ the draft), the micro label shows
  * the save time (wording-only tell — notch stays dark), and a quiet outlined

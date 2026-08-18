@@ -591,7 +591,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
           <>
             <button
               type="button"
-              className="rounded-md bg-primary px-3 py-1.5 text-primary-foreground disabled:opacity-50"
+              className="rounded-md primary-face bg-primary px-3 py-1.5 text-primary-foreground disabled:opacity-50"
               disabled={!draftCrop}
               onClick={applyCrop}
             >
@@ -742,7 +742,7 @@ export function UnifiedVideoAnalysisClient({ jobId }: { jobId: string }) {
           </div>
           <button
             type="button"
-            className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-40 w-fit"
+            className="rounded-md primary-face bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-40 w-fit"
             disabled={!selectedLap || !videoSrc}
             onClick={setAnchorAtPlayhead}
           >

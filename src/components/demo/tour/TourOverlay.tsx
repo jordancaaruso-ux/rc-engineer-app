@@ -175,7 +175,7 @@ export function TourOverlay({
         <button
           type="button"
           onClick={onNext}
-          className="rounded-md bg-primary px-3 py-1.5 text-[12px] font-bold text-primary-foreground transition-transform hover:-translate-y-px"
+          className="rounded-md primary-face bg-primary px-3 py-1.5 text-[12px] font-bold text-primary-foreground transition-transform hover:-translate-y-px"
         >
           {nextLabel}
         </button>

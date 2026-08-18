@@ -68,7 +68,7 @@ export function WelcomeScreen() {
           Your race-day engineer
         </h1>
         <p className="mt-2 text-[14px] leading-relaxed text-muted-foreground">
-          Let’s get your garage ready — it takes a minute, and then logging a run is a walk.
+          Add your car and you’re ready to log runs — everything else you can fill in as you go.
         </p>
 
         <ul className="mt-7 flex flex-col gap-4">

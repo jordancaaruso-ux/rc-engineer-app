@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { notFound } from "next/navigation";
 import { TeamDayCard } from "@/components/runs/TeamDayCard";
 import { buildTeamDayModel, type TeamDayRunSource } from "@/lib/runs/teamDayModel";
@@ -57,16 +58,32 @@ const OPTS = {
 export default function TeamFocusPreviewPage() {
   if (process.env.NODE_ENV === "production") notFound();
   const field = buildTeamDayModel(FIELD, OPTS)!;
+  /*
+   * The fixture's run ids aren't real rows, so "open" can only be reported, not
+   * performed. It has to be reported LOUDLY though: `onSelectRun` was a no-op, and
+   * a no-op is indistinguishable from the tap-to-open rule being broken — the whole
+   * question this page is now used to answer.
+   */
+  const [opened, setOpened] = useState<string | null>(null);
   return (
     <main className="page-body mx-auto max-w-5xl space-y-6 p-4">
       <h1 className="page-title">Pace overview — focus follows the chart</h1>
+      <p
+        className={
+          opened
+            ? "rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-[13px] font-semibold text-foreground"
+            : "px-3 py-2 text-[13px] text-muted-foreground"
+        }
+      >
+        {opened ? `Opened run ${opened}` : "No run opened yet — one tap should read, two should open."}
+      </p>
       <section>
         <TeamDayCard
           day={field}
           title="26 Jul 2026 · TFTR"
           viewerUserId="usr_mara"
           onSelectDriver={() => {}}
-          onSelectRun={() => {}}
+          onSelectRun={setOpened}
         />
       </section>
     </main>

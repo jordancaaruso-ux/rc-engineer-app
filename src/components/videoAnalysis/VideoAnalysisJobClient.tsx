@@ -154,7 +154,7 @@ export function VideoAnalysisJobClient({ jobId }: { jobId: string }) {
           />
           <button
             type="button"
-            className="rounded-md bg-primary px-3 py-2 text-xs text-primary-foreground"
+            className="rounded-md primary-face bg-primary px-3 py-2 text-xs text-primary-foreground"
             onClick={() => void importResults()}
           >
             Import results

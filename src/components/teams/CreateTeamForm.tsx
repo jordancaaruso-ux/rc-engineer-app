@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus } from "@phosphor-icons/react";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Button } from "@/components/ui/Button";
 import { Eyebrow } from "@/components/ui/panel";
@@ -54,8 +55,21 @@ export function CreateTeamForm() {
             placeholder="e.g. Southside club group"
           />
         </div>
-        <Button type="submit" disabled={busy || !name.trim()}>
-          {busy ? "Creating…" : "Create"}
+        {/*
+          A square + matched to the field's own height (`min-h-9`), not a labelled
+          chip sitting short beside it. The label was carrying no information the
+          form doesn't already give — the heading says "New team" and the only
+          field is its name — so the word was costing width and breaking the line.
+        */}
+        <Button
+          type="submit"
+          disabled={busy || !name.trim()}
+          aria-busy={busy}
+          aria-label={busy ? "Creating team" : "Create team"}
+          title="Create team"
+          className="min-h-9 w-9 shrink-0 px-0 disabled:opacity-50"
+        >
+          <Plus size={16} weight="bold" aria-hidden />
         </Button>
       </form>
       {error ? <p className="text-[12px] text-destructive">{error}</p> : null}

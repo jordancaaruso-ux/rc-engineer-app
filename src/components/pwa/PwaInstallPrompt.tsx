@@ -154,7 +154,7 @@ export function PwaInstallPrompt(): React.ReactNode {
         <div className="flex items-start gap-3 pr-6">
           <span
             aria-hidden="true"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl primary-face bg-primary text-primary-foreground"
           >
             <BoltIcon />
           </span>

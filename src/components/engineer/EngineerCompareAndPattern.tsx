@@ -683,7 +683,7 @@ export function EngineerCompareAndPattern({
             onClick={() => void loadDigest()}
             disabled={digestLoading}
             className={cn(
-              "rounded-lg bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground shadow-glow-sm hover:brightness-105",
+              "rounded-lg primary-face bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground hover:brightness-105",
               digestLoading && "opacity-60 pointer-events-none"
             )}
           >

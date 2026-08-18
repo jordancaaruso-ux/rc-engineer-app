@@ -102,6 +102,13 @@ import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLa
 import { buildImportedIngestPlanFromPayload } from "@/lib/lapImport/importedIngestPlan";
 import { buildLapIngestFromEditRun } from "@/lib/lapImport/buildLapIngestFromEditRun";
 import {
+  orderBlocksByTrackTime,
+  primaryDriverForBlock,
+  primaryPerLapAcrossBlocks,
+  primaryRowsAcrossBlocks,
+} from "@/lib/lapImport/blockLapRows";
+import { mergeImportedLapSetsByDriver } from "@/lib/lapImport/mergeImportedLapSets";
+import {
   resolveImportedSessionDisplayTimeIso,
   resolveImportedSessionHasWallClockTime,
 } from "@/lib/lapImport/labels";
@@ -168,7 +175,7 @@ function WizardSessionGroup({
  * so the persistent actions read as one system across the app.
  */
 const fabPillPrimaryClass =
-  "pointer-events-auto tap-active inline-flex h-12 items-center gap-1.5 rounded-full bg-primary px-4 font-sans text-sm font-bold text-primary-foreground shadow-[0_12px_26px_-6px_rgba(255,214,10,0.35),0_10px_22px_-8px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.4)] transition-transform duration-150 hover:bg-[#E6BE00] active:scale-95 touch-manipulation";
+  "pointer-events-auto tap-active inline-flex h-12 items-center gap-1.5 rounded-full primary-face bg-primary px-4 font-sans text-sm font-bold text-primary-foreground shadow-[0_12px_26px_-6px_rgba(255,214,10,0.35),0_10px_22px_-8px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.4)] transition-transform duration-150 hover:bg-[#E6BE00] active:scale-95 touch-manipulation";
 const fabPillOutlineClass =
   "pointer-events-auto tap-active inline-flex h-12 items-center gap-1.5 rounded-full border border-white/10 bg-card px-4 font-sans text-sm font-bold text-foreground shadow-[0_10px_22px_-8px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.12)] transition-transform duration-150 hover:bg-muted active:scale-95 touch-manipulation";
 
@@ -1055,6 +1062,27 @@ export function NewRunForm(props: {
   ]);
   const editRun = props.editRun ?? null;
   const isEditing = Boolean(editRun?.id);
+
+  /**
+   * How many distinct drivers the saved run's imported sets cover, once the
+   * halves of a split run are joined. Gates the field recap: two rows for the
+   * same driver across two imports is one driver, not a field.
+   */
+  const importedFieldDriverCount = useMemo(
+    () =>
+      mergeImportedLapSetsByDriver(
+        (editRun?.importedLapSets ?? []).map((s) => ({
+          ...s,
+          isPrimaryUser: Boolean(s.isPrimaryUser),
+          laps: s.laps.map((l) => ({
+            lapNumber: l.lapNumber,
+            lapTimeSeconds: l.lapTimeSeconds,
+            isIncluded: l.isIncluded,
+          })),
+        }))
+      ).length,
+    [editRun?.importedLapSets]
+  );
   /**
    * The run a stay-on-page save CREATED (2026-08-15, "Save to this run"). On /runs/new nothing
    * else remembers the minted id — leaving the page was the dedupe — so without adopting it, a
@@ -3199,7 +3227,8 @@ export function NewRunForm(props: {
     laps: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded: boolean }>;
   }> {
     if (current.sourceKind !== "url") return [];
-    const blocks = current.urlImportBlocks ?? [];
+    // On-track order, so the sets of a split run read first half then second.
+    const blocks = orderBlocksByTrackTime(current.urlImportBlocks ?? []);
     if (blocks.length === 0) return [];
 
     const out: Array<{
@@ -3264,7 +3293,10 @@ export function NewRunForm(props: {
           driverId: d.driverId,
           driverName: d.driverName,
           normalizedName: d.normalizedName,
-          isPrimaryUser: Boolean(primary && bi === 0 && d.driverId === primary.driverId),
+          // Marked in every import the driver appears in — both halves of a split
+          // run are them, and the read-side join ORs the flag when it collapses
+          // the two rows into one.
+          isPrimaryUser: Boolean(primary && d.driverId === primary.driverId),
           sessionCompletedAt,
           sessionCompletedAtIsWallClock,
           laps,
@@ -3461,25 +3493,19 @@ export function NewRunForm(props: {
     }
     try {
       let lapTimes: number[];
+      // Joined across every attached import, on-track order: a run split by a
+      // break is still one run, so its best lap and averages must see both
+      // halves. One import in, this is that import's rows unchanged.
+      let mergedPrimaryRows: LapRow[] = [];
       if (lapIngest.sourceKind === "url") {
         const blocks = lapIngest.urlImportBlocks ?? [];
-        const firstBlock = blocks[0];
-        const sessionDrivers = firstBlock?.sessionDrivers ?? [];
-        const selectedIds = firstBlock?.selectedDriverIds ?? [];
-        const selectedSet = new Set(selectedIds);
-        const selectedOrdered = sessionDrivers.filter((d) => selectedSet.has(d.driverId));
-        const primary = selectedOrdered[0] ?? null;
-
-        if (!primary) {
+        if (!blocks.some((b) => primaryDriverForBlock(b))) {
           setInlineError("Select at least one driver in your imported session.");
           setSaving(false);
           return;
         }
-        const primaryRows = firstBlock?.driverLapRowsByDriverId?.[primary.driverId];
-        lapTimes =
-          primaryRows && primaryRows.length > 0
-            ? primaryRows.map((r) => r.lapTimeSeconds)
-            : primary.laps;
+        mergedPrimaryRows = primaryRowsAcrossBlocks(blocks);
+        lapTimes = mergedPrimaryRows.map((r) => r.lapTimeSeconds);
       } else {
         lapTimes = parseLapTimes(lapIngest.manualText);
       }
@@ -3541,21 +3567,8 @@ export function NewRunForm(props: {
             parserId: lapIngest.parserId,
             perLap: (() => {
               if (lapIngest.sourceKind === "url") {
-                const firstBlock = lapIngest.urlImportBlocks?.[0];
-                const sessionDrivers = firstBlock?.sessionDrivers ?? [];
-                const selectedIds = firstBlock?.selectedDriverIds ?? [];
-                const selectedOrdered = sessionDrivers.filter((d) => selectedIds.includes(d.driverId));
-                const primary = selectedOrdered[0] ?? null;
-                const primaryRows = primary ? firstBlock?.driverLapRowsByDriverId?.[primary.driverId] : null;
-                if (primaryRows && primaryRows.length === lapTimes.length) {
-                  return primaryRows.map((row, i) => ({
-                    isOutlierWarning: lapIngest.urlLapRows?.[i]?.isOutlierWarning,
-                    warningReason: lapIngest.urlLapRows?.[i]?.warningReason ?? null,
-                    isFlagged: Boolean(lapIngest.urlLapRows?.[i]?.isFlagged),
-                    flagReason: lapIngest.urlLapRows?.[i]?.flagReason ?? null,
-                    isIncluded: row.isIncluded,
-                  }));
-                }
+                const perLap = primaryPerLapAcrossBlocks(lapIngest.urlImportBlocks ?? []);
+                if (perLap.length === lapTimes.length) return perLap;
               }
               if (
                 lapIngest.urlLapRows &&
@@ -3607,12 +3620,13 @@ export function NewRunForm(props: {
           sessionLabel:
             sessionType === "RACE_MEETING" && sessionLabel?.trim() ? sessionLabel.trim() : null,
           importedLapSets,
+          // Every attached import, earliest on track first — the server takes the
+          // first as the run's primary. Always sent, so removing one detaches it.
           importedLapTimeSessionIds:
             lapIngest.sourceKind === "url"
-              ? lapIngest.urlImportBlocks
+              ? orderBlocksByTrackTime(lapIngest.urlImportBlocks)
                   .map((b) => b.importedSessionId.trim())
                   .filter(Boolean)
-                  .slice(0, 1)
               : [],
         })
       });
@@ -4555,8 +4569,11 @@ export function NewRunForm(props: {
 
       {isEditing &&
       editRun?.id &&
-      editRun.importedLapSets &&
-      editRun.importedLapSets.length >= 2 &&
+      // Distinct DRIVERS, not stored rows. A run split across two timing imports
+      // stores a set per driver *per import*, so a solo practice run would clear
+      // a raw `length >= 2` check with one driver and open a card that then
+      // renders nothing.
+      importedFieldDriverCount >= 2 &&
       // Wizard-hosted edit: the field-session recap belongs to the Laps step,
       // not floating above every other step's content.
       (!wizardActive || wizardStep === "laps") ? (
@@ -5624,7 +5641,7 @@ export function NewRunForm(props: {
             <button
               type="button"
               onClick={() => saveRun(undefined, "draft")}
-              className="rounded-md bg-primary px-3 py-1.5 text-[12px] font-bold text-primary-foreground transition hover:brightness-95"
+              className="rounded-md primary-face bg-primary px-3 py-1.5 text-[12px] font-bold text-primary-foreground transition hover:brightness-95"
             >
               Save draft
             </button>
@@ -5646,14 +5663,10 @@ export function NewRunForm(props: {
           )
         }
         editingRunId={isEditing ? editRun?.id ?? null : null}
-        onUrlImportSuccess={() => {
-          // Importing the times IS the Laps step's completion moment. Before this
-          // the "Haven't driven yet?" card unmounted and left the driver on a step
-          // with nothing to do (founder report 2026-08-08). Via goToWizardStep so
-          // the history spine holds — system back returns to Laps, not out of the
-          // wizard. Read the ref, not `wizardStep`, to avoid a stale closure.
-          if (wizardActive && wizardStepRef.current === "laps") goToWizardStep("feel");
-        }}
+        /* No forward callback: importing no longer advances the wizard, and the
+           step no longer offers its own Next. The jump had to go so a second
+           timing session could be attached; the readout fills the step the jump
+           was covering for, and the footer's Next is the only way onward. */
       />
       </div>
 

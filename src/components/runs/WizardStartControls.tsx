@@ -123,7 +123,7 @@ export function WizardPrefillCard({
           onClick={onPrefill}
           disabled={loading}
           className={cn(
-            "tap-active mt-2.5 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-bold text-primary-foreground",
+            "tap-active mt-2.5 flex w-full items-center justify-center gap-2 rounded-lg primary-face bg-primary px-4 py-2.5 text-[13px] font-bold text-primary-foreground",
             loading && "opacity-60"
           )}
         >

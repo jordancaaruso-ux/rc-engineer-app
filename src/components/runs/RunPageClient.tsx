@@ -16,9 +16,11 @@ import type { RunCompareListSource } from "@/lib/runCompareCatalog";
  * detail, so the strip is what keeps those affordances on the page.
  *
  * Split row (founder pick 2026-07-29, replacing the fused 3-segment strip): "Ask the Engineer"
- * breaks out on the left, sized to its own words — it wears the full Add-run treatment (gradient
- * face, `logrun-glow` aura, `logrun-fx` hotspot, all shared with `LogRunFab`) and is the one live
- * control on the screen. Setup + Laptimes stay welded into one inert glass pair on the right, and
+ * breaks out on the left, sized to its own words, and is the one live control on the screen. It
+ * keeps its gradient face and its `logrun-glow` aura, but NOT the crossing sheen band it used to
+ * share with `LogRunFab` — as of 2026-08-18 that band is reserved for the two surfaces that are
+ * literally the start-a-run action (the dashboard bar and the dock circle), and this is the run
+ * page's own hero rather than the app's. Setup + Laptimes stay welded into one inert glass pair on the right, and
  * the detail card floats free below with all four corners. 12.5px type and a 46px height (above
  * the 44px touch floor) are what let both utility labels survive at 360px.
  *
@@ -120,7 +122,6 @@ export function RunPageClient({
           className="tap-active relative isolate flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[linear-gradient(180deg,#ffdf3d_0%,#FFD60A_38%)] px-2.5 text-[12px] font-bold tracking-[-0.01em] text-primary-foreground shadow-[inset_0_1.5px_0_rgba(255,255,255,0.55),inset_0_-1px_0_rgba(0,0,0,0.18)]"
           title="Open the Engineer anchored to this run"
         >
-          <span className="logrun-fx" aria-hidden />
           <Sparkle className="relative z-[2] h-3.5 w-3.5" fill="currentColor" aria-hidden />
           <span className="relative z-[2] whitespace-nowrap">Ask the Engineer</span>
         </button>
@@ -204,7 +205,6 @@ export function RunPageClient({
               className="tap-active logrun-glow relative isolate flex min-h-[46px] shrink-0 items-center justify-center gap-[7px] rounded-xl bg-[linear-gradient(180deg,#ffdf3d_0%,#FFD60A_38%)] px-[13px] text-[12.5px] font-bold tracking-[-0.01em] text-primary-foreground shadow-[inset_0_1.5px_0_rgba(255,255,255,0.55),inset_0_-1px_0_rgba(0,0,0,0.18)]"
               title="Open the Engineer anchored to this run"
             >
-              <span className="logrun-fx" aria-hidden />
               <Sparkle className="relative z-[2] h-4 w-4" fill="currentColor" aria-hidden />
               <span className="relative z-[2] whitespace-nowrap">Ask the Engineer</span>
             </button>

@@ -4,6 +4,7 @@ import { GripVertical, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { DashboardActionItemRow } from "@/lib/dashboardServer";
+import { notifyIdeasItemAdded } from "@/lib/ideasTab";
 import { primarySegmentButtonClassName } from "@/components/ui/ButtonLink";
 import { Eyebrow } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
@@ -189,6 +190,17 @@ export function ActionItemListPanel({
             : i
         )
       );
+      /*
+       * Tell the edge tab something landed, so it nudges once and the driver knows
+       * where the thing they just typed now lives. Announced only after the row is
+       * actually saved — not off the optimistic insert above — because a nudge for an
+       * add that then 409s or fails would be pointing at something that is not there.
+       *
+       * This panel is rendered BOTH on the dashboard and inside the tab's own drawer;
+       * the listener ignores the event while the drawer is open, so the add rows do
+       * not need to know which one they are.
+       */
+      notifyIdeasItemAdded();
     } catch {
       setItems((prev) => prev.filter((i) => i.id !== optimisticId));
       setError("Could not add item");

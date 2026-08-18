@@ -1122,7 +1122,7 @@ export function AnalyzeFlowClient({
               className={cn(
                 "h-[3px] w-full rounded-full",
                 s === step
-                  ? "bg-primary shadow-[0_0_8px_rgba(255,214,10,0.4)]"
+                  ? "primary-face bg-primary shadow-[0_0_8px_rgba(255,214,10,0.4)]"
                   : stepDone(s)
                     ? "bg-primary/40"
                     : "bg-border"
@@ -1235,7 +1235,7 @@ export function AnalyzeFlowClient({
                 type="button"
                 disabled={timingLoading}
                 onClick={() => void loadUrlTiming()}
-                className="rounded-lg bg-primary px-3.5 py-2 text-[12px] font-bold text-primary-foreground disabled:opacity-60"
+                className="rounded-lg primary-face bg-primary px-3.5 py-2 text-[12px] font-bold text-primary-foreground disabled:opacity-60"
               >
                 {timingLoading ? "Loading…" : "Load laps"}
               </button>
@@ -1292,7 +1292,7 @@ export function AnalyzeFlowClient({
                 type="button"
                 disabled={session.selectedLaps.me.length === 0}
                 onClick={() => setStep(3)}
-                className="w-full rounded-xl bg-primary py-3.5 text-[13px] font-bold text-primary-foreground disabled:opacity-50"
+                className="w-full rounded-xl primary-face bg-primary py-3.5 text-[13px] font-bold text-primary-foreground disabled:opacity-50"
               >
                 Continue
               </button>
@@ -1345,7 +1345,7 @@ export function AnalyzeFlowClient({
               "w-full rounded-xl py-3.5 text-[13px] font-bold disabled:opacity-50",
               anchored
                 ? "border border-border bg-secondary text-foreground"
-                : "bg-primary text-primary-foreground"
+                : "primary-face bg-primary text-primary-foreground"
             )}
           >
             {anchored
@@ -1357,7 +1357,7 @@ export function AnalyzeFlowClient({
               <button
                 type="button"
                 onClick={() => setStep(5)}
-                className="w-full rounded-xl bg-primary py-3.5 text-[13px] font-bold text-primary-foreground"
+                className="w-full rounded-xl primary-face bg-primary py-3.5 text-[13px] font-bold text-primary-foreground"
               >
                 Continue to marking
               </button>
@@ -1473,7 +1473,7 @@ export function AnalyzeFlowClient({
               type="button"
               disabled={savingLines}
               onClick={() => void saveSectorLines()}
-              className="flex-1 rounded-xl bg-primary py-3 text-[13px] font-bold text-primary-foreground disabled:opacity-60"
+              className="flex-1 rounded-xl primary-face bg-primary py-3 text-[13px] font-bold text-primary-foreground disabled:opacity-60"
             >
               {savingLines ? "Saving…" : "Save lines"}
             </button>
@@ -1562,7 +1562,7 @@ export function AnalyzeFlowClient({
               <button
                 type="button"
                 onClick={() => openLineEditor()}
-                className="w-full rounded-xl bg-primary py-3.5 text-[13px] font-bold text-primary-foreground"
+                className="w-full rounded-xl primary-face bg-primary py-3.5 text-[13px] font-bold text-primary-foreground"
               >
                 Draw sector lines
               </button>
@@ -1586,7 +1586,7 @@ export function AnalyzeFlowClient({
               <button
                 type="button"
                 onClick={() => setStep(anchored ? 5 : 4)}
-                className="flex-1 rounded-xl bg-primary py-3 text-[13px] font-bold text-primary-foreground"
+                className="flex-1 rounded-xl primary-face bg-primary py-3 text-[13px] font-bold text-primary-foreground"
               >
                 {anchored ? "Continue to marking" : "Continue to sync"}
               </button>
@@ -1608,7 +1608,7 @@ export function AnalyzeFlowClient({
           <button
             type="button"
             onClick={() => setStep(3)}
-            className="w-full rounded-xl bg-primary py-3.5 text-[13px] font-bold text-primary-foreground"
+            className="w-full rounded-xl primary-face bg-primary py-3.5 text-[13px] font-bold text-primary-foreground"
           >
             Back to line sets
           </button>
@@ -1661,7 +1661,7 @@ export function AnalyzeFlowClient({
             <button
               type="button"
               onClick={confirmMark}
-              className="flex-1 rounded-xl bg-primary py-3.5 text-[13px] font-bold text-primary-foreground"
+              className="flex-1 rounded-xl primary-face bg-primary py-3.5 text-[13px] font-bold text-primary-foreground"
             >
               {markCursor >= markQueue.length ? "Finish →" : "Mark crossing"}
             </button>
@@ -1782,7 +1782,7 @@ export function AnalyzeFlowClient({
 
           <Link
             href={backHref}
-            className="block w-full rounded-xl bg-primary py-3.5 text-center text-[13px] font-bold text-primary-foreground no-underline"
+            className="block w-full rounded-xl primary-face bg-primary py-3.5 text-center text-[13px] font-bold text-primary-foreground no-underline"
           >
             {data.job.runId ? "Open in session" : "Back to Video tools"}
           </Link>

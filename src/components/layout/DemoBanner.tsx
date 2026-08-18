@@ -152,7 +152,7 @@ export function DemoBanner() {
           */}
           <Link
             href="/join"
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-3 py-1.5 text-[12px] font-bold text-primary-foreground transition-transform hover:-translate-y-px"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md primary-face bg-primary px-3 py-1.5 text-[12px] font-bold text-primary-foreground transition-transform hover:-translate-y-px"
           >
             Get your own garage →
           </Link>

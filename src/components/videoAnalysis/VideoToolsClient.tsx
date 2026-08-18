@@ -93,7 +93,7 @@ export function VideoToolsClient() {
           <Eyebrow>Recent analysis sessions</Eyebrow>
           <Link
             href="/videos/analysis/manual/new"
-            className="rounded-lg bg-primary px-3 py-1.5 text-[11.5px] font-bold text-primary-foreground no-underline transition-colors hover:bg-[#E6BE00]"
+            className="rounded-lg primary-face bg-primary px-3 py-1.5 text-[11.5px] font-bold text-primary-foreground no-underline transition-colors hover:bg-[#E6BE00]"
           >
             New analysis
           </Link>

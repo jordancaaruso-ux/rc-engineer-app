@@ -80,7 +80,7 @@ export function EventsView({
             onClick={() => (addOpen ? setAddOpen(false) : openAdd(null))}
             aria-expanded={addOpen}
             aria-controls="events-new"
-            className="tap-active inline-flex min-h-[38px] items-center gap-2 rounded-lg bg-primary px-4 text-[13px] font-bold tracking-[-.01em] text-primary-foreground shadow-glow-sm transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="tap-active inline-flex min-h-[38px] items-center gap-2 rounded-lg primary-face bg-primary px-4 text-[13px] font-bold tracking-[-.01em] text-primary-foreground transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             {addOpen ? (
               <X className="size-4" strokeWidth={2.6} aria-hidden />
@@ -189,7 +189,7 @@ function FirstRunCard({ onNewEvent }: { onNewEvent: () => void }) {
         <button
           type="button"
           onClick={onNewEvent}
-          className="tap-active mt-5 inline-flex min-h-[38px] items-center gap-2 rounded-lg bg-primary px-4 text-[13px] font-bold tracking-[-.01em] text-primary-foreground shadow-glow-sm transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="tap-active mt-5 inline-flex min-h-[38px] items-center gap-2 rounded-lg primary-face bg-primary px-4 text-[13px] font-bold tracking-[-.01em] text-primary-foreground transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           <Plus className="size-4" strokeWidth={2.6} aria-hidden />
           New event

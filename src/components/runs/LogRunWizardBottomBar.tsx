@@ -105,8 +105,23 @@ export type WizardSheetRow = {
 /** The exact yellow finish shared by every primary action — the CTA pills and
  *  the pre-run-complete save button — so they read as one control (top-light
  *  gradient, dark label/icon, soft yellow cast shadow). */
+/**
+ * The shared yellow face — solid fill and a lit rim (`.primary-face`). No sheen:
+ * that band belongs to the dashboard's Start-a-new-run bar and the dock's Log-run
+ * circle, and nothing else (founder call 2026-08-18).
+ *
+ * Was a vertical `#FFDF3D → #FFD60A → #F1C700` gradient with a white inset top,
+ * which predated 2026-08-16 when the Log-run circle dropped its own gradient for a
+ * solid fill plus a rim. This pill was the last thing still wearing the old look,
+ * and the odd one out on the button drivers press most.
+ *
+ * `bg-primary` is a background COLOUR rather than a gradient on purpose. That is
+ * now belt-and-braces rather than load-bearing — it mattered while `.primary-face`
+ * still painted a band into `background-image`, which a gradient fill here would
+ * have overwritten — but keeping the fill in one property leaves the option open.
+ */
 const YELLOW_FILL =
-  "bg-[linear-gradient(180deg,#FFDF3D_0%,#FFD60A_55%,#F1C700_100%)] text-primary-foreground shadow-[0_10px_22px_-8px_rgba(255,214,10,0.35),inset_0_1px_0_rgba(255,255,255,0.4)] hover:brightness-[0.96]";
+  "primary-face bg-primary text-primary-foreground hover:brightness-[0.96]";
 
 const PILL_PRIMARY = cn(
   "tap-active inline-flex h-10 items-center justify-center gap-1.5 rounded-full px-4 font-sans text-[12.5px] font-bold transition-transform duration-150 active:scale-95 touch-manipulation",

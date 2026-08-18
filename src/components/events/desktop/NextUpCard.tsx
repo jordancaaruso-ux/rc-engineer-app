@@ -191,17 +191,17 @@ export function NothingBookedCard({
           <button
             type="button"
             onClick={() => onNewEvent(cadence.suggestedYmd)}
-            className="tap-active inline-flex min-h-[38px] items-center gap-2 rounded-lg bg-primary px-4 text-[13px] font-bold tracking-[-.01em] text-primary-foreground shadow-glow-sm transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="tap-active inline-flex min-h-[38px] items-center gap-2 rounded-lg primary-face bg-primary px-4 text-[13px] font-bold tracking-[-.01em] whitespace-nowrap text-primary-foreground transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             <Plus className="size-4" strokeWidth={2.6} aria-hidden />
-            {cadence.suggestedLabel ? `Book ${cadence.suggestedLabel}` : "New event"}
+            {cadence.suggestedYmd ? `Book ${weekdayOf(cadence.suggestedYmd)}` : "New event"}
           </button>
           <Link
             href="/runs/new"
             prefetch={false}
-            className="text-[12.5px] font-semibold text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+            className="whitespace-nowrap text-[12.5px] font-semibold text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
           >
-            Log a past meeting instead
+            Log a past meeting
           </Link>
         </div>
       </div>

@@ -61,6 +61,9 @@ const ROWS: WorkbenchRunRow[] = BESTS.map((best, index) => ({
   label: `R${index + 1}`,
   carName: "A800 RR",
   best,
+  // 18 laps, so both averages exist — the row builder nulls them below 5 and 10.
+  avgTop5: best + 0.19,
+  avgTop10: best + 0.33,
   median: best + 0.68,
   lapCount: 18,
   isGroupBest: best === Math.min(...BESTS),

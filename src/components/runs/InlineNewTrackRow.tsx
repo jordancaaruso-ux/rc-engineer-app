@@ -198,7 +198,7 @@ export const InlineNewTrackRow = forwardRef<
           type="button"
           onClick={() => void create()}
           disabled={busy || !name.trim()}
-          className="rounded-lg bg-primary px-2.5 py-1.5 text-[11.5px] font-bold text-primary-foreground transition hover:brightness-105 disabled:opacity-50"
+          className="rounded-lg primary-face bg-primary px-2.5 py-1.5 text-[11.5px] font-bold text-primary-foreground transition hover:brightness-105 disabled:opacity-50"
         >
           {busy ? "Adding…" : "Add track"}
         </button>

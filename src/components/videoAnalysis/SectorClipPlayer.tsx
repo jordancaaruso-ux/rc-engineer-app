@@ -150,7 +150,7 @@ export function SectorClipPlayer({
           type="button"
           onClick={togglePlay}
           aria-label={playing ? "Pause clip" : "Play clip"}
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_2px_10px_rgba(255,214,10,0.3)] hover:bg-[#E6BE00] transition"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full primary-face bg-primary text-primary-foreground shadow-[0_2px_10px_rgba(255,214,10,0.3)] hover:bg-[#E6BE00] transition"
         >
           {playing ? (
             <Pause className="h-3.5 w-3.5" aria-hidden />

@@ -112,12 +112,6 @@ export default async function TrackDetailPage(props: {
             <p className="page-subtitle">Track details. Add or remove from your favourites.</p>
           </div>
         </div>
-        {isAdmin ? (
-          <CatalogVerifyToggleButton
-            endpoint={`/api/tracks/${track.id}`}
-            verified={!!track.verifiedAt}
-          />
-        ) : null}
       </header>
       <section className="page-body">
         <div className="max-w-2xl space-y-4">
@@ -136,6 +130,18 @@ export default async function TrackDetailPage(props: {
               This track&rsquo;s grip/layout tags are managed by the driver who added it (or an admin).
               Your runs at this venue: {runCount}.
             </p>
+          ) : null}
+
+          {/* Admin verify toggle. Was an in-flow sibling of the `<h1>` in the header,
+              which centres the title and the button as a PAIR — so the track name sat
+              off-centre for an admin and centred for everyone else. */}
+          {isAdmin ? (
+            <div className="flex justify-end">
+              <CatalogVerifyToggleButton
+                endpoint={`/api/tracks/${track.id}`}
+                verified={!!track.verifiedAt}
+              />
+            </div>
           ) : null}
 
           <TrackTimingLinks liveRcUrl={track.liveRcUrl} speedhiveUrl={track.speedhiveUrl} />

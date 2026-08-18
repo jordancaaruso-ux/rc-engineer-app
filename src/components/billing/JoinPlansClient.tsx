@@ -140,7 +140,7 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
               className={cn(
                 "rounded-full px-4 py-1.5 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                 on
-                  ? "bg-primary text-primary-foreground"
+                  ? "primary-face bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
