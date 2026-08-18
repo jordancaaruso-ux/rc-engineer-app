@@ -1,13 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import { LightbulbFilament, ListChecks, Notepad } from "@phosphor-icons/react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DashboardActionItemRow } from "@/lib/dashboardServer";
 import { useEnterExit } from "@/components/ui/Collapse";
+import { useReducedMotion } from "@/components/ui/motion";
+import {
+  hasOpenedIdeasPanel,
+  markIdeasPanelOpened,
+  onIdeasItemAdded,
+} from "@/lib/ideasTab";
 
 const ActionItemListPanel = dynamic(
   () =>
@@ -36,6 +43,23 @@ export function openIdeasPanel(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(IDEAS_OPEN_EVENT));
 }
+
+/** The dashboard. The only route the idle nudge runs on. */
+const DASHBOARD_PATH = "/";
+
+/**
+ * The idle nudge's timing (founder call 2026-08-18).
+ *
+ * The first one waits for the dashboard's own card entrance to finish rather than
+ * firing on mount — a tab twitching underneath cards that are still sliding in reads
+ * as a rendering fault, not as a hint. After that it is a flat 5s.
+ *
+ * These only ever run on the dashboard, and only until the driver has opened the
+ * panel once — ever, across sessions. See the effect below for why that ceiling is
+ * the load-bearing part.
+ */
+const FIRST_NUDGE_MS = 1800;
+const NUDGE_EVERY_MS = 5000;
 
 /**
  * "Ideas & reminders" — a small tab on the phone's bottom-left edge, just above
@@ -88,9 +112,42 @@ export function IdeasEdgeTab() {
   // Keeps the panel mounted through its slide-out close so the exit animates.
   const panel = useEnterExit(open, 260);
 
+  const pathname = usePathname();
+  const reducedMotion = useReducedMotion();
+  const tabRef = useRef<HTMLButtonElement | null>(null);
+  /**
+   * Starts TRUE so the tab can never nudge in the gap before storage has been read.
+   * The wrong default here is a nudge at someone who already earned their way out of
+   * it, which is the one thing this whole ceiling exists to prevent.
+   */
+  const [everOpened, setEverOpened] = useState(true);
+
   // Portals need a DOM; rendering the tab during SSR and again on the client is a
   // hydration mismatch, so nothing renders until we are definitely on the client.
-  useEffect(() => setMounted(true), []);
+  // localStorage is read in the same pass for the same reason — it does not exist
+  // during SSR, so the nudge ceiling can only be known once we are on the client.
+  useEffect(() => {
+    setMounted(true);
+    setEverOpened(hasOpenedIdeasPanel());
+  }, []);
+
+  /**
+   * Fire the "open me" nudge once.
+   *
+   * Imperative rather than through state, because re-firing a CSS animation needs the
+   * class gone, a reflow forced, and the class back. React would happily batch a
+   * false/true pair into no DOM change at all, and every nudge after the first would
+   * silently never play. Reading `offsetWidth` is what makes the browser commit the
+   * removal before the re-add.
+   */
+  const nudge = useCallback(() => {
+    if (reducedMotion) return;
+    const el = tabRef.current;
+    if (!el) return;
+    el.classList.remove("is-nudging");
+    void el.offsetWidth;
+    el.classList.add("is-nudging");
+  }, [reducedMotion]);
 
   const loadLists = useCallback(async () => {
     setLoading(true);
@@ -125,8 +182,71 @@ export function IdeasEdgeTab() {
 
   const openPanel = useCallback(() => {
     setOpen(true);
+    /*
+     * Opening it ONCE retires the idle nudge permanently — they have found the thing,
+     * so the hint has done its job and has nothing left to say. This runs for the
+     * desktop rail's button too (it routes through here), which is right: they found
+     * the panel, and which trigger they used is not the point.
+     */
+    markIdeasPanelOpened();
+    setEverOpened(true);
+    /*
+     * A nudge caught mid-flight would hold its own transform for up to 640ms and
+     * override `.is-out`, pinning the tab at the edge while the panel slides away
+     * from it.
+     */
+    tabRef.current?.classList.remove("is-nudging");
     if (!loading) void loadLists();
   }, [loading, loadLists]);
+
+  /**
+   * The idle nudge: dashboard only, every 5s, until they have opened the panel once.
+   *
+   * Every one of those conditions is load-bearing. DASHBOARD ONLY because a repeating
+   * movement is only tolerable on a surface you land on and move through — on a run
+   * page, which you sit and read, the same loop is the sheen problem again wearing a
+   * different hat. UNTIL OPENED because a hint that keeps firing after it has been
+   * understood is a nag, and this is the only stopping condition a driver cannot
+   * reach by simply waiting it out. NOT WHILE OPEN because the panel is covering the
+   * tab, so there is nothing left to point at.
+   *
+   * A chained timeout rather than setInterval, so the gap after the first (shorter)
+   * nudge is a real 5s instead of the remainder of an interval already running. The
+   * visibility check stops it firing into a backgrounded tab — without it, phones
+   * that throttle timers flush the backlog as a burst when the driver comes back.
+   */
+  useEffect(() => {
+    if (!mounted || reducedMotion || everOpened || open) return;
+    if (pathname !== DASHBOARD_PATH) return;
+
+    let timer = 0;
+    const schedule = (delay: number) => {
+      timer = window.setTimeout(() => {
+        if (document.visibilityState === "visible") nudge();
+        schedule(NUDGE_EVERY_MS);
+      }, delay);
+    };
+    schedule(FIRST_NUDGE_MS);
+    return () => window.clearTimeout(timer);
+  }, [mounted, reducedMotion, everOpened, open, pathname, nudge]);
+
+  /**
+   * The one nudge that outlives the ceiling: something new landed in a list.
+   *
+   * Deliberately NOT gated on `everOpened` or on the route. This one is not a hint
+   * that the tab exists, it is the answer to "where did that go?", and it is worth
+   * showing to someone who uses the panel every day. It IS gated on the panel being
+   * shut, because an add made from inside the open panel is already visible where it
+   * happened, and the tab is slid out of position anyway.
+   */
+  useEffect(
+    () =>
+      onIdeasItemAdded(() => {
+        if (open) return;
+        nudge();
+      }),
+    [open, nudge]
+  );
 
   useEffect(() => {
     const onOpen = () => openPanel();
@@ -162,6 +282,7 @@ export function IdeasEdgeTab() {
     <>
       {/* Mobile trigger. Desktop's is the rail's Ideas button, via `openIdeasPanel`. */}
       <button
+        ref={tabRef}
         type="button"
         onClick={() => (open ? setOpen(false) : openPanel())}
         aria-label="Ideas and reminders"
