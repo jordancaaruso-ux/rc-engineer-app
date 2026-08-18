@@ -12,7 +12,12 @@ mono row in the element matrix, and Space Grotesk missing from the loaded-fonts 
 Check before you trust a figure. **The checklist near the bottom drifts hardest**, because nobody
 re-reads it when they change a rule — line for line it is the least reliable part of this file.
 
-**Light mode shipped 2026-08-12** — opt-in per device, dark unchanged. Every colour is a token, and
+**Ash paper is THE app (2026-08-18).** Light shipped 2026-08-12 as an opt-in per-device theme; on
+2026-08-18 it became the only look and the switch came out of Settings — the `rc_theme` cookie, the
+Appearance radio group and `src/lib/theme/themeCookie.ts` are all gone, replaced by
+`src/lib/theme/appTheme.ts`, which stamps `data-theme="light"` on every render. The charcoal values
+still sit on the bare `:root` in globals.css as the ground paper overrides, and a debug script can
+still set the attribute by hand, but nothing ships on them. Every colour is a token, and
 the split that matters is `primary` (the yellow itself) vs `primary-ink` (the ink you can actually
 read on the page's background). Never reach for a raw hex; a hardcoded `#FFD60A` is invisible on
 warm ash paper. `e2e/light-mode-audit.spec.ts` is the colour regression net; `e2e/typography-audit.spec.ts` is the type one (one face · every figure tabular · ramp closed · `tnum` really present in the served subset). Both walk the shared page list in `e2e/surfaces.ts`.
@@ -137,7 +142,7 @@ Sora, Space Grotesk and JetBrains Mono are SIL OFL.
 | Hero card title (`PanelTitle`) | Sora | 20–22px | **700** | Sentence · `tracking-tight` |
 | Section header (`.section-title`, `SectionTitle`, `.run-details-tab`) | Sora | 13–14px | 700 | Sentence · `tracking-tight` |
 | Primary nav label (sidebar only — mobile dock is icon-only since 2026-07-03) | Sora | 10px | 500 inactive / 700 active | Sentence · `tracking-tight` |
-| Section signpost (`<Eyebrow>`, `.eyebrow-label`) | **Sora** | **17px** | **700 bold** | Uppercase · `tracking-normal` · **3px `bg-primary-ink` tick** before it, hairline rule under (`.eyebrow-root`). Redesigned 2026-07-16 from 10px mono `0.28em` yellow, because sections were being glanced over. Leading dots removed — `Eyebrow`'s `dot` prop is a no-op kept for call sites |
+| Section signpost (`<Eyebrow>`, `.eyebrow-label`) | **Sora** | **17px** | **700 bold** | Uppercase · `tracking-normal` · **6px −21° `bg-foreground` notch** before it (`skewX(-21deg)`, `h-[0.76em]` = Sora 700 cap height, baseline-aligned), hairline rule under (`.eyebrow-root`). Redesigned 2026-07-16 from 10px mono `0.28em` yellow, because sections were being glanced over. Tick went from a straight 3px `primary-ink` bar to the Start-run CTA's notch 2026-08-18: yellow means action-or-location here, and a signpost is neither — this was the app's only decorative yellow. **Ink, not black:** the CTA's notch is dark because its ground is yellow; on a card the same idea resolves to `foreground`, which inverts for free on paper. Leading dots removed — `Eyebrow`'s `dot` prop is a no-op kept for call sites |
 | Stat / field micro-label (`.type-data-label`, StatTile label) | **Sora** | **12px** | **600** | Sentence · `tracking-normal` · muted grey. Grey so the label recedes under its value; was mono, then white, and both blended |
 | Table column header (`.table-col-header`) | **Sora** | **12px** | **600** | Sentence · `tracking-normal` · muted grey |
 | Stat value (`StatTile` value) | JetBrains Mono | 18px | 500 | Tabular nums — one of the last two mono survivors |

@@ -215,10 +215,17 @@
  * the page rather than lifted off a dark hole.
  *
  * Kept as an RGB triplet so scrims that fade to the page (the title condenser)
- * can take an alpha. The hex is duplicated outside CSS in `themeColor`
- * (layout.tsx), `manifest.ts`, `capacitor.config.ts`, `public/offline.html` and
- * the iOS `Splash.imageset` — those paint before or outside the document, so they
- * can't read this. Move them together or a launch flashes the wrong colour.
+ * can take an alpha.
+ *
+ * NOTE: this bare `:root` block is the DARK ground, and since 2026-08-18 nothing
+ * ships on it — the app always stamps `data-theme="light"`, so the paper values
+ * below win everywhere. It stays as the base the light theme overrides (unpicking
+ * it would mean rewriting every token in this file) and as the look a debug or
+ * screenshot script can still reach by setting the attribute by hand. The hex that
+ * ships is the LIGHT one, duplicated outside CSS in `themeColor` (layout.tsx),
+ * `manifest.ts`, `capacitor.config.ts`, `public/offline.html` and the iOS
+ * `Splash.imageset` — those paint before or outside the document, so they can't
+ * read this. Move them together or a launch flashes the wrong colour.
  */
 :root {
   --page-bg-rgb: 27 26 23; /* #1B1A17 */
@@ -226,15 +233,15 @@
 }
 
 /* ---------------------------------------------------------------------------
-   ===== Light mode — "Ash paper" (2026-08-11) =====
+   ===== "Ash paper" — THE app (2026-08-11, made the only look 2026-08-18) =====
 
-   Opt-in only. `data-theme="light"` is stamped on <html> by the server from the
-   `rc_theme` cookie (see `src/lib/theme/themeCookie.ts` and `layout.tsx`), so the
-   un-stamped document is the charcoal app exactly as it shipped and nobody's
-   install changes colour on its own. Deliberately NOT wired to
-   `prefers-color-scheme`: a phone that flips itself to light at a night meeting
-   is the wrong call, and the per-device background picker was retired for the
-   same reason — the app has a look, and this is a choice you make once.
+   `data-theme="light"` is stamped on <html> by the server on every render (see
+   `src/lib/theme/appTheme.ts` and `layout.tsx`), so this block is what everyone
+   sees. It began as an opt-in per-device theme; the `rc_theme` cookie and the
+   Settings → Appearance switch are gone (founder call 2026-08-18) — the app has a
+   look, and a theme switch is a question it doesn't need to ask. Still deliberately
+   NOT wired to `prefers-color-scheme`: a phone that flips itself at a night meeting
+   would be changing the product's appearance on its own.
 
    Two things carry over from dark rather than inverting, and they are the whole
    character of the theme:
@@ -1102,9 +1109,89 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
   background-color: rgb(var(--color-primary));
   /* On yellow, always the dark ink — in both themes. */
   color: rgb(var(--color-primary-foreground));
-  box-shadow: 4px 0 18px rgb(var(--glow-shadow-rgb) / 0.26);
+  /*
+   * The rim only — lit top edge, lit INWARD edge, dark lip underneath. It does not
+   * reuse `.primary-face` because that class lights the top and bottom, which is
+   * where a wide button's profile is; this tab is 20px wide and 56 tall pinned to
+   * the screen edge, so the edges you can actually see are the top and the inward
+   * one, and the highlight wraps that corner instead.
+   *
+   * NO SHEEN (founder call 2026-08-18). It used to carry a vertical version of the
+   * Log-run band, turned 90° to cross the 56px axis, looping every 2.6s forever.
+   * Two things were wrong with that. The tab is welded to the edge of the screen
+   * and therefore ALWAYS in shot, so a permanent loop put a light flickering in the
+   * driver's peripheral vision for the whole session — the worst case of the
+   * everything-shines problem, not a mild one. And shine says "press me" whether or
+   * not there is any reason to; the tab now moves only when there is (`.is-nudging`
+   * below), so the motion carries information instead of spending attention.
+   *
+   * The outward yellow glow it used to carry is gone for the older, related reason:
+   * that spill is how the dock circle says "this is the one action", and this tab
+   * is a utility.
+   */
+  box-shadow:
+    6px 8px 20px -8px rgba(0, 0, 0, 0.6),
+    inset 0 1.5px 0 rgba(255, 252, 230, 0.62),
+    inset -1.5px 0 0 rgba(255, 252, 230, 0.42),
+    inset 0 -1.5px 0 rgba(122, 90, 0, 0.3);
   transition: transform 260ms cubic-bezier(0.2, 0.8, 0.3, 1);
   -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * "Open me" — one poke outward and it settles back dead still (founder pick
+ * 2026-08-18, chosen off a live bench against knock / peek / lean / hop / shake).
+ *
+ * WHY IT MOVES RIGHT. 7px along +X is the direction the tab actually travels when
+ * you tap it (`.is-out` above, which slides it the panel's full width). So the
+ * nudge is a preview of the gesture, not decoration — it teaches what the control
+ * does at the same time as catching the eye, which is exactly what the sheen it
+ * replaced could not do.
+ *
+ * WHY NOTHING SYMMETRICAL. The tab is pinned at `left: 0`, so it has nowhere to go
+ * the other way: the leftward half of a shake or a wobble is simply clipped by the
+ * viewport. This control can only move one direction, and a one-way move is the
+ * only honest one.
+ *
+ * The 1px overshoot on the way back is what makes it read as a physical object
+ * settling rather than a value being set. Fill mode is deliberately left at the
+ * default `none`: with `both`, the final `translateX(0)` keeps overriding the
+ * transform after the animation ends and `.is-out` can no longer slide the tab
+ * open. Re-firing is done by removing the class, forcing a reflow and re-adding it
+ * (see `IdeasEdgeTab`), so nothing here needs a fill to persist.
+ *
+ * WHEN it runs lives in `IdeasEdgeTab`, and matters more than the shape: dashboard
+ * only, every 5s until the driver has opened the panel once — ever — and then never
+ * again except when something new lands in a list.
+ */
+@keyframes rc-ideas-tab-nudge {
+  0% {
+    transform: translateX(0);
+  }
+  38% {
+    transform: translateX(7px);
+  }
+  64% {
+    transform: translateX(-1px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.ideas-edge-tab.is-nudging {
+  animation: rc-ideas-tab-nudge 640ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+/*
+ * Reduced motion gets no nudge at all. The end state of this animation is exactly
+ * where the tab already sits, so "the end state, immediately" means doing nothing.
+ * Belt and braces — `IdeasEdgeTab` also never applies the class in that case.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .ideas-edge-tab.is-nudging {
+    animation: none;
+  }
 }
 
 /*
@@ -1184,6 +1271,13 @@ body[data-logrun-wizard-chrome] .ideas-edge-tab {
   .ideas-scrim {
     transition: none;
   }
+
+  /* A band parked mid-face reads as a smear on the paint, so the lit rim carries
+     the surface alone — the same call `.logrun-fx` and `.primary-face` make. */
+  .ideas-edge-tab {
+    background-image: none;
+    animation: none;
+  }
 }
 
 .page {
@@ -1237,10 +1331,23 @@ html[data-nav-pending] .page {
 }
 
 /* Center the title on screen. Matches both the direct title block and the
-   `flex-1` wrapper that also holds the (now absolutely-pinned) back control. */
+   `flex-1` wrapper that also holds the (now absolutely-pinned) back control.
+
+   The title block must be the header's ONLY in-flow child, and on a phone it is the
+   only thing this row has room for. A second in-flow sibling makes this
+   `justify-content: center` centre the PAIR rather than the title, so the `<h1>`
+   walks left by half the sibling's width — and with an `ml-auto` on it, all the way
+   under the back arrow. Six pages shipped a button in here and every one of them had
+   an off-centre title (fixed 2026-08-18).
+
+   Pinning such a button to the right corner instead does NOT rescue it: below md both
+   corners of this row are FIXED chrome — `MobileBrandMark`/back on the left and
+   `AccountMenu`'s 34px avatar on the right, which is why `.title-condenser` insets
+   itself 44px on both sides. A page action goes in `.page-body`, not here. */
 .page-header > div:has(.page-title) {
   @apply justify-center text-center;
 }
+
 
 /* Descriptive subtitle retired from page chrome — the centered title stands alone. */
 .page-header .page-subtitle {
@@ -1491,15 +1598,38 @@ html[data-nav-pending] .page {
   @apply font-sans text-[12px] font-semibold tracking-normal text-muted-foreground;
 }
 
-/* Section signpost (redesigned 2026-07-16): Sora bold uppercase ink with a 3px accent tick.
+/* Section signpost (redesigned 2026-07-16): Sora bold uppercase ink with a leading tick.
    Was 10px mono 0.28em yellow — bumped to a readable heading so sections stop being glanced over.
-   Stat/table micro-labels stay small + faint via .type-data-label (unchanged). */
+   Stat/table micro-labels stay small + faint via .type-data-label (unchanged).
+
+   TICK RETHOUGHT 2026-08-18 (founder pick "B" off the four-option artifact): the straight
+   3px `primary-ink` bar became the Start-run CTA's −21° notch, in `foreground`.
+
+   Two reasons, and neither is taste. (1) Yellow in this app means "do this" or "you are
+   here" — the log-run circle, `.page-title::before`, `.rc-tour-rail`. A yellow bar in front
+   of the words "Recent runs" points at neither, so it was the one purely decorative yellow
+   in the palette, diluting the yellow doing real work further down the same page. (2) The
+   21° lean already runs through the JRC glyph, the CTA notch, the page-title sector and the
+   `.primary-face` sheen; wearing it here costs nothing and makes one more thing agree.
+
+   NOT literally black, which was the obvious reading of "like the button". The CTA notch is
+   `rgba(18,17,16,.88)` because its ground is #FFD60A — on a #181716 card that is invisible.
+   The shape's colour is really "the ink of whatever it sits on", which is `foreground`, and
+   that inverts correctly on paper for free.
+
+   Geometry copied from `DashboardStartRunCta`: 0.76em is Sora 700's cap height, so with
+   `items-baseline` the tick's bottom edge lands on the text baseline and its top meets the
+   cap — an empty flex item has no baseline of its own, so flexbox synthesises one from its
+   bottom border edge, which is exactly the alignment wanted. Width steps 6.5px → 6px for the
+   17px label (the CTA's is set at 20px). The skew leaves the bottom-left corner ~2.5px
+   outside the box, as it does on the CTA; that overhang is the mark, not a bug. */
 .eyebrow-label {
-  @apply inline-flex items-center gap-2 font-sans text-[17px] font-bold uppercase leading-tight tracking-normal text-foreground;
+  @apply inline-flex items-baseline gap-2 font-sans text-[17px] font-bold uppercase leading-tight tracking-normal text-foreground;
 }
 .eyebrow-label::before {
   content: "";
-  @apply h-[1em] w-[3px] flex-none rounded-[2px] bg-primary-ink;
+  @apply h-[0.76em] w-[6px] flex-none rounded-[1px] bg-foreground;
+  transform: skewX(-21deg);
 }
 /* Hairline rule under the label block — applied by the Eyebrow component wrapper. */
 .eyebrow-root {
@@ -2516,6 +2646,60 @@ html[data-nav-pending] .page {
   .logrun-fx {
     display: none;
   }
+}
+
+/*
+ * The primary face — the lit rim, and ONLY the lit rim. Cream inset along the top,
+ * bronze inset along the bottom, soft drop shadow under the whole thing. It is what
+ * stops a yellow button reading as a flat sticker, and it costs the driver nothing
+ * because it never moves.
+ *
+ * NO SHEEN (founder call 2026-08-18, narrowing the call made earlier the same day).
+ * For about a day this class also carried the Log-run circle's crossing specular, so
+ * all ~79 yellow buttons in the app shone on the same 2.6s clock. That is self-
+ * cancelling: the video-analysis flow alone puts ten of them on one screen, and when
+ * everything shines, shine stops meaning anything and just spends attention. It also
+ * quietly broke the rule the aura already follows — mark the ONE action, not every
+ * action.
+ *
+ * The band now lives on exactly two surfaces, both of them the same #1 action: the
+ * dashboard's Start-a-new-run bar and the dock's Log-run circle. Both wear it through
+ * `.logrun-fx`, an element rather than this class, which is why that sweep did not
+ * have to touch either of them.
+ *
+ * NO outward aura here either (`.logrun-glow`): that pulse is how the dock circle
+ * says "this is the one action" — repeat it on every yellow button and it says
+ * nothing. Same argument, made about the band one day later.
+ */
+.primary-face {
+  box-shadow:
+    0 10px 22px -8px rgba(0, 0, 0, 0.65),
+    inset 0 1.5px 0 rgba(255, 252, 230, 0.62),
+    inset 0 -1.5px 0 rgba(122, 90, 0, 0.3);
+}
+
+/*
+ * No reduced-motion rule is needed here any more, and its absence is deliberate
+ * rather than an oversight: with the band gone there is nothing on this class that
+ * moves. The two surfaces that still animate carry their own guard on `.logrun-fx`.
+ */
+
+/*
+ * The same face, minus the drop shadow — for a full-bleed band at the foot of a card
+ * (the Sessions door), where the surface is flush with the card rather than raised
+ * off it and an outer shadow would draw a dark line across the middle of the panel.
+ *
+ * NOTE the name is now half-historical. When it was written, `-static` meant "the
+ * primary face with its sweeping band removed", because `.primary-face` still had
+ * one. Since the band was pulled off that class entirely, both are static and the
+ * only thing separating them is the drop shadow above. Kept as-is rather than
+ * renamed because the distinction is still real and the rename is churn — but do
+ * not read `-static` as implying its sibling moves.
+ */
+.primary-face-static {
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 252, 230, 0.62),
+    inset 0 -1.5px 0 rgba(122, 90, 0, 0.3);
 }
 
 /* Instant tap feedback on mobile nav, hub rows, and buttons */

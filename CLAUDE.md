@@ -135,7 +135,9 @@ read it first; if nothing matches, you don't need one. A spec is intent, not shi
   `Button`/`ButtonLink`. Check `src/components/ui/` before writing a new one. Use semantic tokens
   (`bg-background`, `text-primary`), never new raw hex. Yellow = actions only; green/red = pace and
   quality deltas only (volume deltas are neutral). Everything must work at 390px with the bottom
-  dock visible, in both dark and light mode.
+  dock visible. **One theme since 2026-08-18** — ash paper, stamped as `data-theme="light"` by
+  `src/lib/theme/appTheme.ts`; there is no switch and no `rc_theme` cookie. The dark values remain
+  as the `:root` ground that paper overrides, so build for paper and don't add a second theme path.
 - **Delta sign convention:** lap deltas are `cell − anchor`, so **positive = slower**. Pace vs field
   is user − field, so **negative = faster than the field**.
 - **Canonical units:** lap times in seconds, temperatures °C, wind km/h, geometry mm and degrees,

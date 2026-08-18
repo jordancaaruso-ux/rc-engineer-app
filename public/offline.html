@@ -12,16 +12,17 @@
         align-items: center;
         justify-content: center;
         gap: 1.25rem;
-        /* Ash warm — the one app background (`--page-bg-base` in globals.css). */
-        background: #1b1a17;
-        color: #a09d96;
+        /* Ash paper — the one app background (`--page-bg-rgb` under
+           `[data-theme="light"]` in globals.css). */
+        background: #eae7e0;
+        color: #6b675f;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         text-align: center;
         padding: 2rem;
         padding-top: calc(2rem + env(safe-area-inset-top, 0px));
       }
-      img { width: 42vw; max-width: 200px; height: auto; opacity: 0.95; }
-      h1 { color: #ece9e4; font-size: 1.05rem; font-weight: 700; margin: 0; }
+      img { width: 42vw; max-width: 200px; height: auto; filter: brightness(0); opacity: 0.9; }
+      h1 { color: #191815; font-size: 1.05rem; font-weight: 700; margin: 0; }
       p { font-size: 0.85rem; line-height: 1.5; max-width: 20rem; margin: 0; }
       button {
         margin-top: 0.5rem;

@@ -6,10 +6,16 @@
  * decorative micro-labels), so an absolute threshold produces a wall of noise and
  * hides the four things that actually broke.
  *
- * So it renders each page TWICE — same URL, same data, same DOM — and diffs the
- * measured contrast of every text node and every SVG stroke between the themes.
- * A regression is an element that was legible on charcoal and is not on paper.
- * That signal is specific, and it is exactly the failure mode a theme introduces.
+ * So it measures each page TWICE — one load, the theme attribute flipped in place —
+ * and diffs the measured contrast of every text node and every SVG stroke between
+ * the two. A regression is an element that was legible on charcoal and is not on
+ * paper. That signal is specific, and it is exactly the failure mode a theme
+ * introduces.
+ *
+ * Paper is the ONLY theme the app ships now (2026-08-18). Charcoal survives here as
+ * the reference the paper values are judged against — it is the ground every token
+ * in globals.css is still layered over, so a paper value that goes illegible is
+ * still best caught by asking "was this fine before it was overridden?".
  *
  *   npx playwright test e2e/light-mode-audit.spec.ts --no-deps --project=mobile-chromium
  *
@@ -247,7 +253,7 @@ const AUDIT = () => {
   return out;
 };
 
-test("audit every page in both themes", async ({ page, baseURL }) => {
+test("audit every page in both themes", async ({ page }) => {
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
 
@@ -277,16 +283,26 @@ test("audit every page in both themes", async ({ page, baseURL }) => {
   const SURFACES: Surface[] = withDetailSurfaces(ids);
 
   /*
-   * Scoped by `url`, never a hardcoded domain. Cookies are host-only, so a
-   * `domain: "localhost"` cookie is simply not sent once `AUTH_URL` points at a
-   * LAN IP for phone testing — the theme silently stayed dark and all 25 pages
-   * failed the stamp check at once (2026-08-13). Same trap the Playwright config
-   * header describes for the auth cookie.
+   * The theme stopped being a cookie on 2026-08-18 — the app stamps
+   * `data-theme="light"` on every render and there is no switch — so this audit
+   * reaches the charcoal ground the only way left: by taking the attribute off the
+   * loaded page. That is a real repaint rather than a simulated one, because every
+   * colour resolves through a custom property and the bare `:root` block still
+   * holds the dark values (see globals.css).
+   *
+   * It is also strictly better than the two-navigation version this replaces: one
+   * load means the two passes measure the SAME DOM, so nothing is skipped as
+   * "not comparable" because a list re-rendered in a different order.
    */
-  const setTheme = async (theme: "dark" | "light") => {
-    await page.context().addCookies([
-      { name: "rc_theme", value: theme, url: baseURL ?? "http://localhost:3000" },
-    ]);
+  const applyTheme = async (theme: "dark" | "light") => {
+    await page.evaluate((t) => {
+      const el = document.documentElement;
+      if (t === "dark") el.removeAttribute("data-theme");
+      else el.setAttribute("data-theme", "light");
+    }, theme);
+    // Colours are custom properties, so the repaint is one frame — but transitions
+    // on some surfaces are 150ms, and a screenshot mid-fade measures neither theme.
+    await page.waitForTimeout(400);
   };
 
   const load = async (path: string) => {
@@ -307,13 +323,13 @@ test("audit every page in both themes", async ({ page, baseURL }) => {
 
   for (const s of SURFACES) {
     try {
-      await setTheme("dark");
       await load(s.path);
+
+      await applyTheme("dark");
       await page.screenshot({ path: `${OUT}/${s.slug}-dark.png`, fullPage: true });
       const darkRows = (await page.evaluate(AUDIT)) as Sample[];
 
-      await setTheme("light");
-      await load(s.path);
+      await applyTheme("light");
       await page.screenshot({ path: `${OUT}/${s.slug}-light.png`, fullPage: true });
       const lightRows = (await page.evaluate(AUDIT)) as Sample[];
 

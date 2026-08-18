@@ -62,7 +62,7 @@ export function PanelSubtitle({ children, className }: { children: ReactNode; cl
   );
 }
 
-/** Sora bold uppercase section label with a 3px accent tick (`.eyebrow-label`). */
+/** Sora bold uppercase section label with the −21° ink notch before it (`.eyebrow-label`). */
 export function Eyebrow({
   children,
   className,

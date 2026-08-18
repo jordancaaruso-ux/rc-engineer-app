@@ -47,5 +47,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- The app is ash paper for everyone (2026-08-18), so pin the shell to light rather
+	     than letting the phone's own dark mode pick white status-bar text over it. -->
+	<key>UIUserInterfaceStyle</key>
+	<string>Light</string>
 </dict>
 </plist>

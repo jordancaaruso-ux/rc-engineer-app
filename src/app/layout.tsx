@@ -4,8 +4,6 @@ import { Sora, Space_Grotesk } from "next/font/google";
 
 import Script from "next/script";
 
-import { cookies } from "next/headers";
-
 import "./globals.css";
 
 import type { ReactNode } from "react";
@@ -32,7 +30,7 @@ import { PWA_SPLASH_MARK_SVG } from "@/lib/pwa/splashMark";
 
 import { RC_TIMEZONE_COOKIE } from "@/lib/rcTimeZoneCookie";
 
-import { PAGE_BG, RC_THEME_COOKIE, parseTheme } from "@/lib/theme/themeCookie";
+import { APP_THEME, PAGE_BG } from "@/lib/theme/appTheme";
 
 import { PERF_ENABLED } from "@/lib/perf/perfConfig";
 
@@ -147,9 +145,13 @@ export const metadata: Metadata = {
   },
 
   /*
-   * iOS home-screen behaviour. `capable` renders full-screen (no Safari chrome);
-   * `black-translucent` lets the charcoal background flow under the status bar so
-   * an installed launch reads as a native app, not a web view.
+   * iOS home-screen behaviour. `capable` renders full-screen (no Safari chrome).
+   *
+   * `statusBarStyle` was `black-translucent` until 2026-08-18, which let the charcoal
+   * background flow under the status bar — but it also forces the clock, signal and
+   * battery to WHITE, and white on ash paper is invisible. `default` keeps the bar out
+   * of the page with dark text; `env(safe-area-inset-top)` then reports 0 up there,
+   * which is exactly what `.page-header` already handles.
    */
   appleWebApp: {
 
@@ -157,7 +159,7 @@ export const metadata: Metadata = {
 
     title: "JRC",
 
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
 
   },
 
@@ -177,27 +179,6 @@ export const metadata: Metadata = {
  * clear of the device's left/right bezel.
 
  */
-
-/*
- * `generateViewport` rather than a static `viewport`, purely so `themeColor` can
- * follow the chosen theme — the browser's own chrome (Safari's toolbar, the
- * Android status bar) paints from this tag, and a charcoal bar above a paper page
- * is the most visible seam a half-done theme has.
- *
- * The root layout is already per-request (it awaits `auth()`), so reading a cookie
- * here costs nothing extra.
- *
- * NOT covered by this: `manifest.ts`, `capacitor.config.ts`, `public/offline.html`
- * and the iOS `Splash.imageset`. Those are build-time assets that paint before the
- * document exists, so an installed launch shows the charcoal splash whichever theme
- * is set. That is a deliberate limit of a per-device cookie, not an oversight —
- * making it follow would mean a themed manifest per user, and the splash is on
- * screen for a few hundred milliseconds.
- */
-export async function generateViewport(): Promise<Viewport> {
-  const theme = parseTheme((await cookies()).get(RC_THEME_COOKIE)?.value);
-  return { ...baseViewport, themeColor: PAGE_BG[theme] };
-}
 
 const baseViewport: Viewport = {
 
@@ -225,9 +206,24 @@ const baseViewport: Viewport = {
 
   viewportFit: "cover",
 
-  // themeColor is set per-request in `generateViewport` above, from PAGE_BG.
+  // themeColor is set in `viewport` below, from PAGE_BG.
 
 };
+
+/*
+ * Static again (2026-08-18). This was `generateViewport` while the theme was a
+ * per-device cookie, purely so `themeColor` could follow the choice — the browser's
+ * own chrome (Safari's toolbar, the Android status bar) paints from this tag, and a
+ * charcoal bar above a paper page is the most visible seam a half-done theme has.
+ * There is one look now, so the colour is a constant and the viewport no longer has
+ * to be computed per request.
+ *
+ * `manifest.ts`, `capacitor.config.ts`, `public/offline.html` and the iOS
+ * `Splash.imageset` carry the same hex by hand — they paint before or outside the
+ * document and cannot read a token. Move them together.
+ */
+export const viewport: Viewport = { ...baseViewport, themeColor: PAGE_BG };
+
 
 
 
@@ -242,22 +238,15 @@ export default async function RootLayout({
 
   const session = await perfSpan("auth", () => auth());
 
-  /*
-   * Stamped on the server, so the very first byte of HTML already carries the
-   * theme and there is no flash. A client-side read (localStorage in an effect,
-   * or a bootstrap <script>) would repaint after hydration on every navigation —
-   * the same trap the PWA standalone bootstrap avoids by running
-   * `beforeInteractive`, except a cookie lets us skip the script entirely.
-   */
-  const theme = parseTheme((await cookies()).get(RC_THEME_COOKIE)?.value);
-
   return (
 
     <html
 
       lang="en"
 
-      data-theme={theme}
+      /* Every paper colour in globals.css hangs off this attribute, and it arrives in
+         the first byte of HTML rather than from a script, so there is no flash. */
+      data-theme={APP_THEME}
 
       className={`${sora.variable} ${spaceGrotesk.variable}`}
 

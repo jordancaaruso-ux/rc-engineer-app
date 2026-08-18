@@ -364,7 +364,7 @@ export function PickerSheet<T extends SearchableOption>({
                     onClick={() => searchAction.onAction(query.trim())}
                     aria-label={searchAction.label}
                     title={searchAction.label}
-                    className="tap-active -mr-1.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground transition hover:brightness-105"
+                    className="tap-active -mr-1.5 flex size-7 shrink-0 items-center justify-center rounded-md primary-face bg-primary text-primary-foreground transition hover:brightness-105"
                   >
                     <Plus className="size-4" strokeWidth={2.75} aria-hidden />
                   </button>

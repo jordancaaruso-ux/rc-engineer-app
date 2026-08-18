@@ -23,6 +23,12 @@ import { warmNewRunForm } from "@/lib/runs/warmNewRunForm";
  * plus `.logrun-fx`'s crossing band, matching the dashboard bar exactly. The rim
  * is still the point — flattening it to a bare disc is what's out.
  *
+ * This circle and that bar are now the ONLY two things in the app wearing the band
+ * (founder call 2026-08-18). It briefly rode every yellow button via `.primary-face`
+ * and read as noise rather than emphasis; the sweep that pulled it back deliberately
+ * left these two alone, because they are the same #1 action in two places. Adding it
+ * to a third surface undoes the point of the sweep.
+ *
  * Draft-aware: resumes today's draft run when one exists — the + swaps to a
  * flag and a green dot rides the rim (locked draft indicator) — otherwise
  * starts a new run. Suppressed on create/edit surfaces with their own primary

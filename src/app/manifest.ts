@@ -31,10 +31,13 @@ export default function manifest(): MetadataRoute.Manifest {
     // where the >=768px breakpoints would swap the bottom dock for the desktop sidebar mid-race.
     // That is a product call about the trackside experience, not a layout fix, so it stays as-is.
     orientation: "portrait",
-    // Ash warm — the one app background (matches `--page-bg-base` in globals.css /
-    // viewport themeColor) so the Android splash + status chrome never flash off-palette.
-    background_color: "#1B1A17",
-    theme_color: "#1B1A17",
+    // Ash paper — the one app background (matches `--page-bg-rgb` under
+    // `[data-theme="light"]` in globals.css / viewport themeColor) so the Android splash
+    // + status chrome never flash off-palette. Was charcoal until 2026-08-18, when light
+    // stopped being a per-device choice and became the app; a manifest has no media
+    // queries, so it could not follow the old cookie and always flashed the wrong colour.
+    background_color: "#EAE7E0",
+    theme_color: "#EAE7E0",
     icons: [
       {
         src: "/icons/icon-192.png",
