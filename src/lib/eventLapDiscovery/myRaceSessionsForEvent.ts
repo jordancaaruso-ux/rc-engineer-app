@@ -145,7 +145,7 @@ export async function listMyPendingRaceSessionsForEvent(
   if (!driverNorm) {
     return {
       sessions: [],
-      hint: "Set your LiveRC driver name in Settings so we can find your driver ID in each race result.",
+      hint: "Set your name on LiveRC in Settings so we can find your driver ID in each race result.",
       hubRowCount: 0,
       pagesChecked: 0,
     };

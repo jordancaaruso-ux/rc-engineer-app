@@ -8,7 +8,16 @@ import type { LapSourceKind } from "@/lib/lapSession/types";
 import type { LapImportLapRow, LapUrlSessionDriver } from "@/lib/lapUrlParsers/types";
 import { formatLap } from "@/lib/runLaps";
 import type { LapRow } from "@/lib/lapAnalysis";
-import { getAverageTopN, getBestLap } from "@/lib/lapAnalysis";
+import {
+  computeMistakeLaps,
+  formatMistakeLapDetail,
+  getAverageTopN,
+  getBestLap,
+  getIncludedLapDashboardMetrics,
+  getIncludedLaps,
+} from "@/lib/lapAnalysis";
+import { LapTimeGraph } from "@/components/runs/LapTimeGraph";
+import { haptic } from "@/lib/haptics";
 import {
   formatDriverSessionLabel,
   formatImportedSessionTime,
@@ -20,6 +29,10 @@ import {
 } from "@/lib/lapImport/labels";
 import { pickPrimarySessionDriver } from "@/lib/lapImport/pickPrimarySessionDriver";
 import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
+import {
+  orderBlocksByTrackTime,
+  primaryRowsAcrossBlocks,
+} from "@/lib/lapImport/blockLapRows";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
 import { PagedCard } from "@/components/ui/PagedCard";
@@ -54,7 +67,12 @@ export type LapIngestFormValue = {
   parserId: string | null;
   /** Structured laps + warnings from URL import (e.g. LiveRC) — legacy single-primary; first URL block overrides. */
   urlLapRows?: LapImportLapRow[] | null;
-  /** At most one URL import per run; maps to a persisted ImportedLapTimeSession. */
+  /**
+   * The timing imports attached to this run, each mapping to a persisted
+   * `ImportedLapTimeSession`. Usually one; a session split by a quick break comes
+   * back from the timing site as two entries and the driver attaches both, so the
+   * run's laps are these blocks joined in on-track order.
+   */
   urlImportBlocks: UrlImportBlock[];
 };
 
@@ -155,18 +173,15 @@ function formatSessionWhen(
   return null;
 }
 
+/**
+ * The run's laps as text, joined across every attached import in on-track order
+ * — the same list the save path sends. Mirrors into the manual box so switching
+ * tabs shows the whole run, not just its first half.
+ */
 function primaryLapTextFromFirstBlock(blocks: UrlImportBlock[]): string {
-  const first = blocks[0];
-  if (!first?.sessionDrivers?.length) return "";
-  const ids = first.selectedDriverIds ?? [];
-  const ordered = first.sessionDrivers.filter((d) => ids.includes(d.driverId));
-  const primary = ordered[0] ?? first.sessionDrivers[0];
-  if (!primary) return "";
-  const rows = first.driverLapRowsByDriverId?.[primary.driverId];
-  if (rows?.length) {
-    return rows.map((r) => r.lapTimeSeconds.toFixed(3)).join("\n");
-  }
-  return primary.laps.map((t) => t.toFixed(3)).join("\n");
+  const rows = primaryRowsAcrossBlocks(blocks);
+  if (rows.length === 0) return "";
+  return rows.map((r) => r.lapTimeSeconds.toFixed(3)).join("\n");
 }
 
 type ScanDayCandidate = {
@@ -206,8 +221,17 @@ type ImportPickerCandidate = {
   sortIso: string | null;
 };
 
-const REPLACE_IMPORT_CONFIRM =
-  "Replace current import? Lap times from the session you imported earlier will be removed.";
+/** Human name for a timing provider — one spelling, used by every row that names a source. */
+function timingSourceLabel(source: LapTimingSource | null | undefined): string | null {
+  if (source === "speedhive") return "Speedhive";
+  if (source === "liverc") return "LiveRC";
+  if (source === "myrcm") return "MyRCM";
+  return null;
+}
+
+function timingSourceLabelFromParserId(parserId: string | null | undefined): string | null {
+  return timingSourceLabel(timingSourceFromParserId(parserId ?? ""));
+}
 
 function SessionImportListRow({
   title,
@@ -228,15 +252,9 @@ function SessionImportListRow({
   disabled?: boolean;
   onClick: () => void;
 }) {
-  const sourceLabel =
-    timingSource === "speedhive"
-      ? "Speedhive"
-      : timingSource === "liverc"
-        ? "LiveRC"
-        : timingSource === "myrcm"
-          ? "MyRCM"
-          : null;
-  const meta = [sourceLabel, when].filter(Boolean).join(" · ");
+  // Time first: with a split run the driver picks the halves apart by when each
+  // one ran, so it must be the thing the eye lands on, not a trailing detail.
+  const meta = [when, timingSourceLabel(timingSource)].filter(Boolean).join(" · ");
   return (
     <button
       type="button"
@@ -275,6 +293,219 @@ function SessionImportListRow({
         </span>
       )}
     </button>
+  );
+}
+
+/**
+ * Reveal driver for the landing readout: 0 → 1 over ~340ms, restarted whenever
+ * `key` changes so each import plays its own. Returns 1 immediately under
+ * reduce-motion, which leaves every dependent style at its final value.
+ */
+function useLandingReveal(key: string | null): number {
+  const [progress, setProgress] = useState(0);
+  useEffect(() => {
+    if (!key) {
+      setProgress(0);
+      return;
+    }
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    ) {
+      setProgress(1);
+      return;
+    }
+    let raf = 0;
+    let start: number | null = null;
+    const step = (now: number) => {
+      if (start == null) start = now;
+      const p = Math.min(1, (now - start) / 340);
+      setProgress(p);
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    setProgress(0);
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [key]);
+  return progress;
+}
+
+/** Ease-out so figures decelerate into their final value rather than snapping. */
+function easeOutCubic(p: number): number {
+  return 1 - Math.pow(1 - p, 3);
+}
+
+/** A figure counting into place. Held at `tabular-nums` so the digits never jitter. */
+function RevealFigure({ label, value, progress }: { label: string; value: number | null; progress: number }) {
+  const shown = value == null ? null : value * (0.985 + 0.015 * easeOutCubic(progress));
+  return (
+    <div className="min-w-0 flex-1">
+      <div className="type-data-label">{label}</div>
+      <div className="fig-tile text-foreground">{shown == null ? "—" : formatLap(shown)}</div>
+    </div>
+  );
+}
+
+/**
+ * The Laps step's completion moment.
+ *
+ * Replaces the automatic jump to the next step, which had to go so a second
+ * timing session could be attached. The jump was carrying a real load — without
+ * it the step went empty and stranded the driver — so this fills the step
+ * instead: the run's laps drawn, its figures counted in, one line of meaning,
+ * and the forward action the jump used to perform, now taken deliberately.
+ */
+function LapsLandedReadout({
+  rows,
+  improvedBy,
+  sourceLabel,
+  revealKey,
+}: {
+  rows: LapRow[];
+  /** Set when this import lowered the run's best lap — the one thing worth saying in green. */
+  improvedBy: number | null;
+  sourceLabel: string | null;
+  revealKey: string | null;
+}) {
+  const progress = useLandingReveal(revealKey);
+  const metrics = getIncludedLapDashboardMetrics(rows);
+
+  // Same trace, same derivation as the Sessions expanded view — one lap graph in
+  // the product, not a second one that happens to plot the same numbers.
+  const mistakeAnalysis = useMemo(() => computeMistakeLaps(rows), [rows]);
+  const mistakeLapNumbers = useMemo(
+    () => new Set(mistakeAnalysis.mistakes.map((m) => m.lapNumber)),
+    [mistakeAnalysis.mistakes]
+  );
+  const mistakeDetailByLapNumber = useMemo(
+    () => new Map(mistakeAnalysis.mistakes.map((m) => [m.lapNumber, formatMistakeLapDetail(m)])),
+    [mistakeAnalysis.mistakes]
+  );
+  const bestLapNumbers = useMemo(() => {
+    if (metrics.bestLap == null) return new Set<number>();
+    const eps = 0.0005;
+    return new Set(
+      getIncludedLaps(rows)
+        .filter((l) => Math.abs(l.lapTimeSeconds - metrics.bestLap!) <= eps)
+        .map((l) => l.lapNumber)
+    );
+  }, [rows, metrics.bestLap]);
+
+  return (
+    <div
+      className="space-y-2.5 rounded-xl border border-border bg-card p-3 transition-opacity duration-300"
+      style={{ opacity: 0.35 + 0.65 * progress }}
+    >
+      {/* Same floor the Sessions view uses — two points is not a trace. */}
+      {rows.length >= 3 ? (
+        <LapTimeGraph
+          rows={rows}
+          bestLapNumbers={bestLapNumbers}
+          mistakeLapNumbers={mistakeLapNumbers}
+          mistakeDetailByLapNumber={mistakeDetailByLapNumber}
+          medianSeconds={null}
+        />
+      ) : null}
+
+      <div className="flex gap-3 border-t border-border pt-2">
+        <RevealFigure label="Best" value={metrics.bestLap} progress={progress} />
+        <RevealFigure label="Median" value={metrics.median} progress={progress} />
+        <div className="min-w-0 flex-1">
+          <div className="type-data-label">Laps</div>
+          <div className="fig-tile text-foreground">{metrics.lapCount}</div>
+        </div>
+      </div>
+
+      <p
+        className={cn(
+          "flex items-center gap-1.5 text-[12px] transition-opacity duration-200",
+          improvedBy != null ? "text-gain" : "text-muted-foreground"
+        )}
+        style={{ opacity: progress > 0.5 ? 1 : 0 }}
+      >
+        <span
+          aria-hidden
+          className={cn(
+            "h-1.5 w-1.5 shrink-0 rounded-full",
+            improvedBy != null ? "bg-gain" : "bg-muted-foreground"
+          )}
+        />
+        {improvedBy != null
+          ? `Best lap improved by ${improvedBy.toFixed(3)}s — it came from this session.`
+          : `Laps in${sourceLabel ? ` from ${sourceLabel}` : ""}.`}
+      </p>
+    </div>
+  );
+}
+
+/** One attached import: when it ran, what it did, and a way to drop just this one. */
+function AttachedSessionStrip({
+  title,
+  when,
+  lapCount,
+  bestLapSeconds,
+  medianSeconds,
+  sourceLabel,
+  isFocused,
+  selectable,
+  onFocus,
+  onRemove,
+}: {
+  title: string;
+  when: string | null;
+  lapCount: number;
+  bestLapSeconds: number | null;
+  medianSeconds: number | null;
+  sourceLabel: string | null;
+  isFocused: boolean;
+  selectable: boolean;
+  onFocus: () => void;
+  onRemove: () => void;
+}) {
+  // Time first and source last: when the line has to truncate at 390px, the
+  // provider is the least useful thing on it and the time is the whole point.
+  const meta = [when, `${lapCount} lap${lapCount === 1 ? "" : "s"}`, sourceLabel]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2.5 rounded-md border px-2.5 py-2 transition",
+        isFocused && selectable
+          ? "border-primary-ink/50 bg-accent/10"
+          : "border-border bg-surface-runna"
+      )}
+    >
+      <button
+        type="button"
+        onClick={onFocus}
+        disabled={!selectable}
+        className="flex min-w-0 flex-1 flex-col items-start text-left disabled:cursor-default"
+      >
+        <span className="w-full truncate text-[13px] font-semibold text-foreground">{title}</span>
+        {meta ? <span className="fig-cell mt-0.5 w-full truncate text-faint">{meta}</span> : null}
+      </button>
+      {bestLapSeconds != null ? (
+        <span className="flex shrink-0 flex-col items-end leading-tight">
+          <span className="type-data-label">Best</span>
+          <span className="fig-stat font-medium text-foreground">{formatLap(bestLapSeconds)}</span>
+        </span>
+      ) : null}
+      {medianSeconds != null ? (
+        <span className="flex shrink-0 flex-col items-end leading-tight">
+          <span className="type-data-label">Median</span>
+          <span className="fig-stat font-medium text-foreground">{formatLap(medianSeconds)}</span>
+        </span>
+      ) : null}
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Remove ${title}`}
+        className="shrink-0 rounded-md border border-border px-2 py-1 text-[12px] leading-none text-muted-foreground transition hover:border-destructive/50 hover:text-destructive"
+      >
+        ×
+      </button>
+    </div>
   );
 }
 
@@ -331,7 +562,6 @@ export function LapTimesIngestPanel({
   trackSpeedhiveUrl,
   onTrackTimingUrlsSaved,
   editingRunId,
-  onUrlImportSuccess,
 }: {
   value: LapIngestFormValue;
   onChange: (next: LapIngestFormValue) => void;
@@ -352,18 +582,6 @@ export function LapTimesIngestPanel({
   onTrackTimingUrlsSaved?: (next: TrackTimingUrls) => void;
   /** When editing a run, linked timing imports stay visible in discovery even if already imported. */
   editingRunId?: string | null;
-  /**
-   * A URL import just landed laps for at least one driver (both the discovered-session
-   * rows and the paste box route through here). The wizard uses this to move off the
-   * Laps step — importing IS that step's completion moment, and before this the driver
-   * was left on a step with nothing to do and no prompt to continue.
-   *
-   * Deliberately a callback rather than the caller watching lap state: an effect would
-   * also fire when a draft rehydrates with laps already attached, throwing the driver
-   * off Laps on mount. Photo/OCR and manual paste do not call this — those get looked
-   * over before moving on.
-   */
-  onUrlImportSuccess?: () => void;
 }) {
   const hasLiveRcTrack = Boolean(trackId?.trim() && trackLiveRcUrl?.trim());
   const hasSpeedhiveTrack = Boolean(trackId?.trim() && trackSpeedhiveUrl?.trim());
@@ -375,6 +593,8 @@ export function LapTimesIngestPanel({
   const [photoConfidence, setPhotoConfidence] = useState<string | null>(null);
   const [urlBusy, setUrlBusy] = useState(false);
   const [urlInput, setUrlInput] = useState("");
+  /** "Add another timing session" sends the driver straight back to the paste box. */
+  const urlInputRef = useRef<HTMLInputElement | null>(null);
   /** Last manually scanned discovery URL (e.g. MyRCM event) — lets Refresh re-scan it. */
   const manualScanUrlRef = useRef<string | null>(null);
   const [urlMessage, setUrlMessage] = useState<string | null>(null);
@@ -474,10 +694,32 @@ export function LapTimesIngestPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rescan when track context changes only
   }, [trackId, trackLiveRcUrl, trackSpeedhiveUrl, lapImportEventId, editingRunId]);
 
-  const activeImportBlock = value.urlImportBlocks[0] ?? null;
+  // Every attached import, earliest on track first. A run split by a quick break
+  // holds two; the ordinary run holds one and every list below is of length 1.
+  const attachedBlocks = useMemo(
+    () => orderBlocksByTrackTime(value.urlImportBlocks),
+    [value.urlImportBlocks]
+  );
+  const attachedUrls = useMemo(
+    () => new Set(attachedBlocks.map((b) => b.sourceUrl.trim()).filter(Boolean)),
+    [attachedBlocks]
+  );
+
+  // Which attached import the driver-picker and lap ticks below are editing.
+  // Defaults to the one just imported, which is the one they are looking at.
+  const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
+  // The import that just landed — drives the completion moment's one-shot reveal.
+  // Held rather than derived so it plays once per import, not on every re-render.
+  const [landedBlockId, setLandedBlockId] = useState<string | null>(null);
+  const activeImportBlock = useMemo(() => {
+    if (attachedBlocks.length === 0) return null;
+    // Falls back to the first half, not the last: a fresh import sets the focus
+    // explicitly, so this default only decides what an edit opens on.
+    return attachedBlocks.find((b) => b.blockId === focusedBlockId) ?? attachedBlocks[0] ?? null;
+  }, [attachedBlocks, focusedBlockId]);
   const activeImportUrl = activeImportBlock?.sourceUrl.trim() ?? "";
 
-  const hasLinkedLapImport = Boolean(activeImportBlock);
+  const hasLinkedLapImport = attachedBlocks.length > 0;
 
   const sortedDayScanCandidates = useMemo(() => {
     if (!dayScanCandidates?.length) return [];
@@ -697,12 +939,15 @@ export function LapTimesIngestPanel({
     }
   }
 
-  function confirmReplaceIfNeeded(targetUrl: string): boolean {
-    if (!activeImportBlock) return true;
-    const currentUrl = activeImportUrl;
-    const nextUrl = targetUrl.trim();
-    if (!nextUrl || currentUrl === nextUrl) return true;
-    return window.confirm(REPLACE_IMPORT_CONFIRM);
+  /**
+   * Importing a second session now *adds* it, so there is nothing to confirm —
+   * the old "this will replace your import" warning only earned its keep when a
+   * run could hold one. Re-importing a URL already attached refreshes that one
+   * in place rather than attaching it twice.
+   */
+  function alreadyAttached(targetUrl: string): boolean {
+    const next = targetUrl.trim();
+    return Boolean(next) && attachedUrls.has(next);
   }
 
   function clearImport() {
@@ -717,11 +962,38 @@ export function LapTimesIngestPanel({
       manualLapRows: null,
     });
     setActivePreviewKey(null);
+    setFocusedBlockId(null);
+    setLandedBlockId(null);
     setUrlMessage(null);
   }
 
+  /** Detach one attached import, leaving the others (and the run) alone. */
+  function removeImportBlock(blockId: string) {
+    const nextBlocks = value.urlImportBlocks.filter((b) => b.blockId !== blockId);
+    if (nextBlocks.length === 0) {
+      clearImport();
+      return;
+    }
+    const ordered = orderBlocksByTrackTime(nextBlocks);
+    onChange({
+      ...value,
+      urlImportBlocks: nextBlocks,
+      manualText: primaryLapTextFromFirstBlock(nextBlocks),
+      sourceDetail:
+        ordered.length === 1 ? ordered[0]!.sourceUrl : `${ordered.length} timing sessions`,
+      parserId: ordered[0]?.parserId ?? value.parserId,
+      urlLapRows: ordered.length === 1 ? ordered[0]!.urlLapRows ?? null : null,
+    });
+    if (focusedBlockId === blockId) setFocusedBlockId(null);
+    if (landedBlockId === blockId) setLandedBlockId(null);
+    setActivePreviewKey(null);
+  }
+
   async function importFromSessionUrl(sessionUrl: string) {
-    if (!confirmReplaceIfNeeded(sessionUrl)) return;
+    if (alreadyAttached(sessionUrl)) {
+      setUrlMessage("That session is already attached to this run.");
+      return;
+    }
     setUrlInput(sessionUrl);
     setUrlMessage(null);
     setDayScanStatus(null);
@@ -759,7 +1031,10 @@ export function LapTimesIngestPanel({
       await scanDayUrl(url);
       return;
     }
-    if (!confirmReplaceIfNeeded(url)) return;
+    if (alreadyAttached(url)) {
+      setUrlMessage("That session is already attached to this run.");
+      return;
+    }
     await runUrlImport(url);
   }
 
@@ -870,20 +1145,40 @@ export function LapTimesIngestPanel({
             : null,
       };
 
-      const nextBlocks = [newBlock];
+      // Add, don't replace: a run split by a break holds both halves. Re-importing
+      // a session already attached refreshes it in place, so a driver correcting a
+      // bad parse doesn't end up with the same laps counted twice.
+      const existingIdx = value.urlImportBlocks.findIndex(
+        (b) =>
+          b.sourceUrl.trim() === newBlock.sourceUrl.trim() ||
+          (b.importedSessionId && b.importedSessionId === newBlock.importedSessionId)
+      );
+      const nextBlocks =
+        existingIdx >= 0
+          ? value.urlImportBlocks.map((b, i) => (i === existingIdx ? newBlock : b))
+          : [...value.urlImportBlocks, newBlock];
+      const ordered = orderBlocksByTrackTime(nextBlocks);
 
       onChange({
         ...value,
         manualText: primaryLapTextFromFirstBlock(nextBlocks),
         sourceKind: "url",
-        sourceDetail: newBlock.sourceUrl,
+        sourceDetail:
+          ordered.length === 1 ? newBlock.sourceUrl : `${ordered.length} timing sessions`,
         parserId: newBlock.parserId ?? "liverc_deterministic_v1",
-        urlLapRows: newBlock.urlLapRows ?? null,
+        // The form-level warnings array only makes sense for a single import;
+        // with a split run each block carries its own and the save path reads those.
+        urlLapRows: ordered.length === 1 ? newBlock.urlLapRows ?? null : null,
         urlImportBlocks: nextBlocks,
       });
       const pid = newBlock.selectedDriverIds?.[0];
       if (pid) {
         setActivePreviewKey(`${newBlock.blockId}:${pid}`);
+      }
+      setFocusedBlockId(newBlock.blockId);
+      if (sessionDrivers.length > 0) {
+        setLandedBlockId(newBlock.blockId);
+        haptic("light");
       }
       setUrlInput("");
       setUrlMessage(combinedMessage);
@@ -891,10 +1186,10 @@ export function LapTimesIngestPanel({
         prev ? prev.map((c) => (c.sessionUrl === url ? { ...c, alreadyImported: true } : c)) : prev
       );
       void loadEventRaceSessions();
-      // Gated on a driver being present — that is the same condition the caller's
-      // buildImportedLapSetsFromIngest requires before it will produce any lap
-      // sets, so a driver-less parse never advances off a still-empty step.
-      if (sessionDrivers.length > 0) onUrlImportSuccess?.();
+      // Deliberately does NOT advance the wizard any more. Jumping to the next
+      // step made a second import impossible to reach, so the step now completes
+      // in place — see the landing readout below, which carries the forward
+      // action the jump used to perform.
     } catch {
       setUrlMessage("Request failed.");
     } finally {
@@ -921,7 +1216,10 @@ export function LapTimesIngestPanel({
     });
   }
 
-  function statsForDriver(block: UrlImportBlock, d: LapUrlSessionDriver): { bestLap: number | null; avgTop10: number | null } {
+  function statsForDriver(
+    block: UrlImportBlock,
+    d: LapUrlSessionDriver
+  ): { bestLap: number | null; avgTop10: number | null; median: number | null; lapCount: number } {
     const rows =
       block.driverLapRowsByDriverId?.[d.driverId] ??
       d.laps.map((t, i) => ({
@@ -929,11 +1227,42 @@ export function LapTimesIngestPanel({
         lapTimeSeconds: t,
         isIncluded: true,
       }));
+    // Median comes from the same included-laps pass as the rest, so an excluded
+    // lap can never count toward one figure and not another.
+    const metrics = getIncludedLapDashboardMetrics(rows);
     return {
       bestLap: getBestLap(rows),
       avgTop10: getAverageTopN(rows, 10),
+      median: metrics.median,
+      lapCount: metrics.lapCount,
     };
   }
+
+  /** The run's laps as saved: every attached import joined, on-track order. */
+  const mergedRunRows = useMemo(
+    () => primaryRowsAcrossBlocks(attachedBlocks),
+    [attachedBlocks]
+  );
+  /**
+   * How much the import that just landed lowered the run's best lap — null when
+   * it didn't, or when it's the only one attached. This is the whole point of the
+   * feature made visible: the quick lap that lived in the half you'd have lost.
+   */
+  const landedImprovedBy = useMemo(() => {
+    if (!landedBlockId || attachedBlocks.length < 2) return null;
+    const withLanded = getBestLap(mergedRunRows);
+    const without = getBestLap(
+      primaryRowsAcrossBlocks(attachedBlocks.filter((b) => b.blockId !== landedBlockId))
+    );
+    if (withLanded == null || without == null) return null;
+    const delta = without - withLanded;
+    return delta > 0.0005 ? delta : null;
+  }, [landedBlockId, attachedBlocks, mergedRunRows]);
+
+  const landedBlockIsAttached = useMemo(
+    () => Boolean(landedBlockId && attachedBlocks.some((b) => b.blockId === landedBlockId)),
+    [landedBlockId, attachedBlocks]
+  );
 
   const activeImportPreview = useMemo(() => {
     const block = activeImportBlock;
@@ -951,7 +1280,9 @@ export function LapTimesIngestPanel({
       bestLapSeconds: stats?.bestLap ?? null,
       timingSource,
     };
-  }, [activeImportBlock, value.urlImportBlocks]);
+    // `activeImportBlock` is already derived from the blocks, so it moves whenever
+    // they do — depending on the array as well only re-ran this for free.
+  }, [activeImportBlock]);
 
   // Visible slice of the merged list (collapsed/expanded), with the active import always surfaced.
   const importPickerRows = useMemo(() => {
@@ -1039,10 +1370,59 @@ export function LapTimesIngestPanel({
             className="ml-auto shrink-0 rounded-md border border-border bg-surface-runna px-3 py-1 text-[11px] font-medium text-muted-foreground hover:bg-surface-runna-inset hover:text-foreground transition"
             onClick={clearImport}
           >
-            Clear import
+            {attachedBlocks.length > 1 ? "Clear all" : "Clear import"}
           </button>
         ) : null}
       </div>
+      {/* What this run's laps ARE — above the tabs, because the attached imports
+          belong to the run, not to whichever method was used to find them. They
+          sat inside the URL-paste tab first, which left them in the DOM and off
+          the screen for anyone on the discovery tab. */}
+      {attachedBlocks.length > 0 ? (
+        <div className="space-y-2">
+          {/* Earliest on track first. With one attached this is a single row —
+              the strip is the run's laps, not a list UI. */}
+          <div className="space-y-1.5">
+            {attachedBlocks.map((block) => {
+              const primaryId =
+                block.selectedDriverIds?.[0] ?? block.sessionDrivers[0]?.driverId ?? null;
+              const driver = primaryId
+                ? block.sessionDrivers.find((d) => d.driverId === primaryId) ?? null
+                : null;
+              const stats = driver ? statsForDriver(block, driver) : null;
+              return (
+                <AttachedSessionStrip
+                  key={block.blockId}
+                  // Name only — the time is the meta line's job, and carrying it
+                  // in both truncated each to uselessness at 390px.
+                  title={driver ? driver.driverName : block.sourceUrl}
+                  when={formatImportedSessionTime(
+                    blockLabelTimeIso(block),
+                    blockTimeFormatOpts(block)
+                  )}
+                  lapCount={stats?.lapCount ?? 0}
+                  bestLapSeconds={stats?.bestLap ?? null}
+                  medianSeconds={stats?.median ?? null}
+                  sourceLabel={timingSourceLabelFromParserId(block.parserId)}
+                  isFocused={activeImportBlock?.blockId === block.blockId}
+                  selectable={attachedBlocks.length > 1}
+                  onFocus={() => setFocusedBlockId(block.blockId)}
+                  onRemove={() => removeImportBlock(block.blockId)}
+                />
+              );
+            })}
+          </div>
+
+          <LapsLandedReadout
+            rows={mergedRunRows}
+            improvedBy={landedImprovedBy}
+            sourceLabel={timingSourceLabelFromParserId(
+              attachedBlocks[attachedBlocks.length - 1]?.parserId ?? null
+            )}
+            revealKey={landedBlockIsAttached ? landedBlockId : "settled"}
+          />
+        </div>
+      ) : null}
       <PagedCard
         storageKey="run-form:lap-ingest"
         controlPosition="above"
@@ -1103,12 +1483,12 @@ export function LapTimesIngestPanel({
                   </p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
                     {hasSpeedhiveTrack && !hasLiveRcTrack
-                      ? "We need your MYLAPS transponder number and/or Speedhive driver name to find your sessions at this track."
+                      ? "We need your MYLAPS transponder number and/or your name on MYLAPS to find your sessions at this track."
                       : "We need your driver name (LiveRC, and/or a Speedhive transponder / name) to find your sessions at this track."}
                   </p>
                   <Link
                     href="/settings"
-                    className="mt-2 inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground transition hover:brightness-95"
+                    className="mt-2 inline-flex items-center rounded-md primary-face bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground transition hover:brightness-95"
                   >
                     Add timing details
                   </Link>
@@ -1251,6 +1631,7 @@ export function LapTimesIngestPanel({
           <div className="flex flex-col sm:flex-row gap-2">
             <input
               id="url-import-input"
+              ref={urlInputRef}
               type="url"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {

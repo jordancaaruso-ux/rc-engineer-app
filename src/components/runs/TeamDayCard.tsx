@@ -182,6 +182,29 @@ export function TeamDayCard({
   const [compare, setCompare] = useState<string[]>([]);
   const [hover, setHover] = useState<{ driverId: string; index: number } | null>(null);
 
+  /**
+   * The press that a click is about to resolve — where the finger went down, the
+   * run it landed on, and whether that run was ALREADY the one being read.
+   *
+   * Both facts gate the open, exactly as `SessionTrendCard` gates its own, and
+   * for the same two reasons a phone gave us. A tap used to open the nearest run
+   * on contact, so the readout this card exists to show was unreachable with a
+   * thumb: the numbers arrived and the run replaced them in the same gesture. And
+   * a horizontal drag doesn't scroll the page, so nothing suppressed the click at
+   * the end of a scrub — letting go opened whichever run you happened to lift
+   * over. First touch reads, second touch on the same run opens, a drag opens
+   * nothing. A mouse is unaffected: hover has already read the point, so one
+   * click still opens it.
+   *
+   * Releasing no longer clears `hover` either — that wiped the readout the instant
+   * you lifted, so "drag to read a run" was a promise only a mouse could keep and
+   * the numbers existed for exactly as long as your thumb was covering them. A
+   * mouse still clears on leave, which is the gesture that means "done" there.
+   */
+  const pressRef = useRef<{ x: number; y: number; sameHit: boolean; runId: string | null } | null>(
+    null
+  );
+
   const chartRef = useRef<HTMLDivElement | null>(null);
   const [chartWidth, setChartWidth] = useState(340);
   useEffect(() => {
@@ -445,21 +468,39 @@ export function TeamDayCard({
             aria-label={`${metric === "best" ? "Best lap" : "Average of the top 5 laps"} against time of day for ${day.drivers.length} drivers. Lower is faster.`}
             onPointerDown={(event) => {
               event.currentTarget.setPointerCapture(event.pointerId);
-              handleMove(event);
+              const pos = pointerPos(event);
+              const hit = pos ? nearest(pos.x, pos.y) : null;
+              // The run id is resolved HERE, not in the click handler, so the open
+              // can't depend on a `hover` state update landing before the click.
+              const driver = hit ? day.drivers.find((d) => d.userId === hit.driverId) : null;
+              pressRef.current = {
+                x: event.clientX,
+                y: event.clientY,
+                sameHit:
+                  hit != null &&
+                  hover?.driverId === hit.driverId &&
+                  hover?.index === hit.index,
+                runId: (hit ? driver?.points[hit.index]?.runId : null) ?? null,
+              };
+              setHover(hit ? { driverId: hit.driverId, index: hit.index } : null);
             }}
             onPointerMove={handleMove}
-            onPointerUp={() => setHover(null)}
+            onPointerCancel={() => {
+              pressRef.current = null;
+            }}
             onPointerLeave={(event) => {
               if (event.pointerType === "mouse") setHover(null);
             }}
             onClick={(event) => {
-              const pos = pointerPos(event);
-              if (!pos) return;
-              const hit = nearest(pos.x, pos.y);
-              if (!hit) return;
-              const driver = day.drivers.find((d) => d.userId === hit.driverId);
-              const runId = driver?.points[hit.index]?.runId;
-              if (runId) onSelectRun(runId);
+              const press = pressRef.current;
+              pressRef.current = null;
+              if (!press?.runId || !press.sameHit) return;
+              // 8px, the same slop `SessionTrendCard` allows: a thumb never lands
+              // perfectly still, but a scrub is unmistakably further than this.
+              if (Math.abs(event.clientX - press.x) > 8 || Math.abs(event.clientY - press.y) > 8) {
+                return;
+              }
+              onSelectRun(press.runId);
             }}
           >
             {geom.ticks.map((tick) => (
@@ -635,8 +676,15 @@ export function TeamDayCard({
                 hovered && "invisible"
               )}
             >
+              {/* "tap again", spelled out: opening a run takes two taps now, and a
+                  line that says "tap to open it" makes the first one look broken.
+                  It is stated here rather than in the readout because this line is
+                  the one on screen BEFORE you touch anything — a rule you meet
+                  after the gesture has already failed you has taught you nothing.
+                  Honest with a mouse too, where hovering does the reading and the
+                  click that follows is the second contact. */}
               {day.days.length > 1 ? "One band per day · " : ""}time of day along the bottom ·
-              drag to read a run, tap to open it
+              drag or tap to read a run, tap again to open
             </span>
             {hovered ? (
               <span className="col-start-1 row-start-1 flex min-w-0 items-baseline gap-2">

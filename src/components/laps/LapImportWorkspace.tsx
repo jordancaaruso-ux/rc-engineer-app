@@ -265,7 +265,7 @@ export function LapImportWorkspace() {
             type="button"
             disabled={busy}
             onClick={() => void onImport()}
-            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105 disabled:opacity-50"
+            className="rounded-lg primary-face bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:brightness-105 disabled:opacity-50"
           >
             {busy ? "Importing…" : "Import"}
           </button>
@@ -324,7 +324,7 @@ export function LapImportWorkspace() {
               type="button"
               disabled={busy || myRcmSelected.size === 0}
               onClick={() => void importSelectedMyRcm()}
-              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105 disabled:opacity-50"
+              className="rounded-lg primary-face bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:brightness-105 disabled:opacity-50"
             >
               {busy ? "Importing…" : `Import ${myRcmSelected.size || ""} selected`.trim()}
             </button>

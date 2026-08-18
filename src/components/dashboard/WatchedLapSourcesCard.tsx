@@ -72,7 +72,7 @@ function btnGhost(className = "") {
 }
 
 function btnPrimary(className = "") {
-  return `inline-flex items-center justify-center rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105 ${className}`;
+  return `inline-flex items-center justify-center rounded-lg primary-face bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground transition hover:brightness-105 ${className}`;
 }
 
 export function WatchedLapSourcesCard() {
@@ -171,7 +171,7 @@ export function WatchedLapSourcesCard() {
     setAddErr(null);
     const kind = inferUrlKind(sourceUrl);
     if (kind === "practice_list" && !liveRcDriverName.trim()) {
-      setAddErr("Set your LiveRC driver name first (used for practice sources).");
+      setAddErr("Set your name on LiveRC in Settings first (used for practice sources).");
       return;
     }
     if (kind === "results_index" && !raceClass.trim()) {

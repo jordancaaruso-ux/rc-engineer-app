@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Wrench } from "lucide-react";
 import type { ComparisonSeries, LapRow, SummaryMetricDeltas } from "@/lib/lapAnalysis";
+import { mergeImportedLapSetsByDriver } from "@/lib/lapImport/mergeImportedLapSets";
 import {
   alignLapsByNumber,
   analyzeLapRows,
@@ -428,8 +429,25 @@ export function LapComparisonColumnGrid({
       trackKey: anchorTrack,
     });
 
+    // A run can hold two timing imports when a break split the session, and each
+    // stores its own set per driver. Joined by driver so a rival is one column
+    // over the whole run, not two columns of half a stint each.
+    const mergedImportedSets = mergeImportedLapSetsByDriver(
+      (run.importedLapSets ?? [])
+        .filter((s) => s.laps?.length)
+        .map((s) => ({
+          ...s,
+          isPrimaryUser: Boolean(s.isPrimaryUser),
+          laps: (s.laps ?? []).map((l) => ({
+            lapNumber: l.lapNumber,
+            lapTimeSeconds: l.lapTimeSeconds,
+            isIncluded: l.isIncluded !== false,
+          })),
+        }))
+    );
+
     const rawImported: ComparisonSeries[] = [];
-    for (const s of run.importedLapSets ?? []) {
+    for (const s of mergedImportedSets) {
       if (!s.laps?.length) continue;
       const label = (s.displayName?.trim() || s.driverName).trim() || "Imported";
       const ser = buildComparisonSeries(`imported:${s.id}`, label, "imported", importedSetToLapRows(s.laps));

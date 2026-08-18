@@ -109,7 +109,7 @@ async function discoverSpeedhiveOrganizationSessionsForUser(input: {
       organizationId,
       practiceLocationId: null,
       hint:
-        "Set your MYLAPS transponder number or Speedhive driver name in Settings to find sessions at this track.",
+        "Set your MYLAPS transponder number or your name on MYLAPS in Settings to find sessions at this track.",
     };
   }
 

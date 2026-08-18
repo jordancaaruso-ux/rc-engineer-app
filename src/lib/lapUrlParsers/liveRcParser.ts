@@ -65,7 +65,7 @@ export const liveRcParser: LapUrlParser = {
           laps: [],
           candidates: [],
           discoveredRaceUrls,
-          message: `This event page lists ${discoveredRaceUrls.length} race result session(s). Import again from the lap library (or Log your run) — the server expands the hub and imports each session. Set your LiveRC driver name in Settings for the correct row.`,
+          message: `This event page lists ${discoveredRaceUrls.length} race result session(s). Import again from the lap library (or Log your run) — the server expands the hub and imports each session. Set your name on LiveRC in Settings for the correct row.`,
           errorCode: "live_rc_event_hub",
         };
       }

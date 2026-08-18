@@ -166,6 +166,16 @@ export type WorkbenchRunRow = {
   label: string;
   carName: string;
   best: number | null;
+  /**
+   * Average of the fastest 5 and 10 included laps — race pace, where `best` is
+   * one lap that came off perfectly. Both are **null unless the run actually has
+   * that many laps**, which `getAverageTopN` does not enforce: it slices to
+   * `min(n, length)`, so a 7-lap run happily returns the average of all seven
+   * and it would print under a "Top 10" heading. A column that silently means
+   * something different on short runs is worse than an empty one.
+   */
+  avgTop5: number | null;
+  avgTop10: number | null;
   median: number | null;
   lapCount: number;
   /** This run holds the group's fastest lap. */
@@ -199,6 +209,8 @@ export function buildGroupRunRows(group: WorkbenchGroupSource): WorkbenchRunRow[
       label: labelByRunId.get(run.id) ?? "Run",
       carName: carNameOf(run),
       best: metrics.best,
+      avgTop5: metrics.cleanLapCount >= 5 ? metrics.avgTop5 : null,
+      avgTop10: metrics.cleanLapCount >= 10 ? metrics.avgTop10 : null,
       median: metrics.median,
       lapCount: metrics.cleanLapCount,
       isGroupBest: false,

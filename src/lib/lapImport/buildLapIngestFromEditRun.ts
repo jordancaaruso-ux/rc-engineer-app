@@ -9,6 +9,7 @@ import {
 } from "@/lib/lapImport/fromPayload";
 import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
 import { rawSessionDriversFromImportedPayload } from "@/lib/lapImport/importedIngestPlan";
+import { primaryRowsAcrossBlocks } from "@/lib/lapImport/blockLapRows";
 import type { LapIngestFormValue, UrlImportBlock } from "@/components/runs/LapTimesIngestPanel";
 
 function defaultLapIngestValue(): LapIngestFormValue {
@@ -106,17 +107,11 @@ function selectedDriverIdsForBlock(
   return sessionDrivers[0]?.driverId ? [sessionDrivers[0].driverId] : [];
 }
 
+/** Every attached import's laps, joined — the run's list, not just its first half. */
 function primaryLapTextFromBlocks(blocks: UrlImportBlock[]): string {
-  const first = blocks[0];
-  if (!first?.sessionDrivers?.length) return "";
-  const pid = first.selectedDriverIds?.[0] ?? first.sessionDrivers[0]?.driverId;
-  if (!pid) return "";
-  const rows = first.driverLapRowsByDriverId?.[pid];
-  if (rows?.length) {
-    return rows.map((r) => r.lapTimeSeconds.toFixed(3)).join("\n");
-  }
-  const driver = first.sessionDrivers.find((d) => d.driverId === pid);
-  return driver?.laps.map((t) => t.toFixed(3)).join("\n") ?? "";
+  const rows = primaryRowsAcrossBlocks(blocks);
+  if (rows.length === 0) return "";
+  return rows.map((r) => r.lapTimeSeconds.toFixed(3)).join("\n");
 }
 
 function blockFromLinkedSession(
@@ -180,9 +175,15 @@ function dedupeLinkedSessions(sessions: EditRunLinkedImportedSession[]): EditRun
     if (!key) continue;
     if (!byUrl.has(key)) byUrl.set(key, sess);
   }
-  return [...byUrl.values()].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  // Earliest on track first. A run may hold two imports when a break split the
+  // session, and the first is the run's primary — restoring them newest-first
+  // would quietly promote the second half every time the run was edited.
+  return [...byUrl.values()].sort((a, b) => {
+    const at = new Date(a.sessionCompletedAt ?? a.createdAt).getTime();
+    const bt = new Date(b.sessionCompletedAt ?? b.createdAt).getTime();
+    if (Number.isNaN(at) || Number.isNaN(bt)) return 0;
+    return at - bt;
+  });
 }
 
 /**
@@ -217,7 +218,7 @@ export function buildLapIngestFromEditRun(input: {
       manualLapRows: existingLapRows.length ? existingLapRows : null,
       sourceKind: "url",
       sourceDetail:
-        blocks.length === 1 ? blocks[0]!.sourceUrl : `${blocks.length} timing URLs`,
+        blocks.length === 1 ? blocks[0]!.sourceUrl : `${blocks.length} timing sessions`,
       parserId: blocks[0]?.parserId ?? null,
       urlLapRows: null,
       urlImportBlocks: blocks,

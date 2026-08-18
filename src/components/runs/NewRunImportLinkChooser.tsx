@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { CardPanel } from "@/components/ui/CardPanel";
 
 function btnPrimary(className = "") {
-  return `inline-flex items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105 ${className}`;
+  return `inline-flex items-center justify-center rounded-lg primary-face bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:brightness-105 ${className}`;
 }
 
 function btnGhost(className = "") {

@@ -37,7 +37,7 @@ export type ScanDayUrlCandidateRow = {
   sessionTime: string | null;
   sessionCompletedAtIso: string | null;
   /**
-   * Practice: true when this row matches Settings → LiveRC driver name (exact normalized string,
+   * Practice: true when this row matches Settings → Name on LiveRC (exact normalized string,
    * or multi-token relaxed match — see route). Results list rows always null (no per-row driver).
    */
   matchesDriver: boolean | null;
@@ -412,7 +412,7 @@ export async function POST(request: Request) {
       matchedCount: 0,
       hasDriverNameSetting: true,
       driverFilterApplied: true,
-      scanMessage: `No practice sessions matched your LiveRC driver name “${liveRcDriverName ?? ""}”. Check Settings → LiveRC driver name against how your name appears on LiveRC.${sampleHint}`,
+      scanMessage: `No practice sessions matched your name on LiveRC “${liveRcDriverName ?? ""}”. Check Settings → Name on LiveRC against how your name appears on LiveRC.${sampleHint}`,
     });
   }
 
@@ -428,7 +428,7 @@ export async function POST(request: Request) {
       hasDriverNameSetting: false,
       driverFilterApplied: false,
       scanMessage:
-        "Set your LiveRC driver name in Settings to list only your practice sessions. Until then, every session on this day page is shown.",
+        "Set your name on LiveRC in Settings to list only your practice sessions. Until then, every session on this day page is shown.",
     });
   }
 
@@ -438,7 +438,7 @@ export async function POST(request: Request) {
   let scanMessage: string | null = null;
   if (indexKind === "results") {
     scanMessage =
-      "Results pages list sessions by class or round — your LiveRC driver name does not filter this list. Pick your session, then confirm your row on the timing page.";
+      "Results pages list sessions by class or round — your name on LiveRC does not filter this list. Pick your session, then confirm your row on the timing page.";
     if (truncated) {
       scanMessage += ` Showing first ${RESULTS_SCAN_ROW_CAP} of ${totalCandidates} rows — narrow with an event’s race class when linked.`;
     }

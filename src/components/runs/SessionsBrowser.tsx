@@ -582,15 +582,48 @@ function OneSession({
           press — the same treatment `AssetListRow` gives every openable row in
           the app. `group` is on the button so the chevron can answer a press
           anywhere on the row rather than only under the finger.
+
+          It carried ONE figure until 2026-08-17, and one figure is a single hot
+          lap. A run can hold the day's second-fastest lap and the day's third
+          top-5 at the same time, and the old row could not say so — you had to
+          open each run in turn to find out how the car actually ran. Best, top 5
+          and top 10 now sit side by side.
+
+          Fixed column widths (52/50/50) are the whole point, not tidiness: the
+          digits have to land on the same x down the whole list or you are
+          reading five rows instead of scanning one column, which is the only
+          reason to put them here rather than inside the run. `tabular-nums`
+          finishes the job — Sora's proportional digits would still wobble.
+
+          The labels are stated ONCE in a header strip rather than beside every
+          number; per-row labels would cost ~90px of a 342px row and repeat four
+          times to say the same three words.
         */}
         <SurfaceCard variant="panel" contentClassName="p-0">
+          <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-3 py-1.5">
+            <span className="min-w-0 flex-1 text-[9.5px] font-semibold uppercase tracking-wider text-faint">
+              Run
+            </span>
+            <span className="w-[52px] shrink-0 text-right text-[9.5px] font-semibold uppercase tracking-wider text-faint">
+              Best
+            </span>
+            <span className="w-[50px] shrink-0 text-right text-[9.5px] font-semibold uppercase tracking-wider text-faint">
+              Top 5
+            </span>
+            <span className="w-[50px] shrink-0 text-right text-[9.5px] font-semibold uppercase tracking-wider text-faint">
+              Top 10
+            </span>
+            {/* Holds the chevron's column open so the headings sit over their
+                own figures rather than one slot to the right. */}
+            <span className="h-4 w-4 shrink-0" aria-hidden />
+          </div>
           {rows.map((run) => (
             <button
               key={run.id}
               type="button"
               onClick={() => onOpenRun(run.id)}
               className={cn(
-                "group tap-active flex min-h-14 w-full items-center gap-3 border-b border-l-2 border-border px-3 py-2.5 text-left transition-colors last:border-b-0",
+                "group tap-active flex min-h-14 w-full items-center gap-2 border-b border-l-2 border-border px-3 py-2.5 text-left transition-colors last:border-b-0",
                 "active:bg-muted/60 hover:bg-muted/40",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40",
                 // Tapping a point on the chart above lights its row here — the
@@ -616,13 +649,23 @@ function OneSession({
                   aria-label="No lap times on this run"
                 />
               ) : null}
+              {/* Green stays on BEST alone. It means "fastest lap of this
+                  session" and it can only go on the figure that claim is about;
+                  tinting all three would turn every row into three verdicts and
+                  the mark would stop meaning anything. */}
               <span
                 className={cn(
-                  "shrink-0 text-[15px] font-semibold tabular-nums leading-tight",
+                  "w-[52px] shrink-0 text-right text-[15px] font-semibold tabular-nums leading-tight",
                   run.isGroupBest ? "text-gain" : "text-foreground"
                 )}
               >
                 {run.best != null ? formatLap(run.best) : "—"}
+              </span>
+              <span className="w-[50px] shrink-0 text-right text-[12.5px] tabular-nums leading-tight text-muted-foreground">
+                {run.avgTop5 != null ? formatLap(run.avgTop5) : "—"}
+              </span>
+              <span className="w-[50px] shrink-0 text-right text-[12.5px] tabular-nums leading-tight text-muted-foreground">
+                {run.avgTop10 != null ? formatLap(run.avgTop10) : "—"}
               </span>
               <ChevronRight
                 className="h-4 w-4 shrink-0 text-faint transition-all group-hover:translate-x-0.5 group-hover:text-foreground group-active:translate-x-0.5 group-active:text-foreground"

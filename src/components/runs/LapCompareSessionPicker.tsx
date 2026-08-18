@@ -75,7 +75,7 @@ export function LapCompareSegmentBar({
             className={cn(
               "min-w-0 flex-1 truncate rounded px-1 py-1.5 text-[10px] transition",
               on
-                ? "bg-primary font-semibold text-primary-foreground"
+                ? "primary-face bg-primary font-semibold text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground"
             )}
             onClick={() => onSelect(s.key)}
@@ -276,7 +276,7 @@ export function LapCompareSheet({
           <button
             type="button"
             onClick={onClose}
-            className="tap-active w-full rounded-md bg-primary px-3 py-2.5 text-[13px] font-semibold text-primary-foreground transition hover:opacity-90"
+            className="tap-active w-full rounded-md primary-face bg-primary px-3 py-2.5 text-[13px] font-semibold text-primary-foreground transition hover:opacity-90"
           >
             {selectedCount === 0
               ? "Done"

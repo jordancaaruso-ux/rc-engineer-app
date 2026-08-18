@@ -153,7 +153,7 @@ function buildHint(
   unimportedCount: number
 ): string | null {
   if (!driverNorm) {
-    return "Set your LiveRC driver name in Settings to find your sessions.";
+    return "Set your name on LiveRC in Settings to find your sessions.";
   }
   if (unimportedCount > 0) return null;
 
@@ -165,7 +165,7 @@ function buildHint(
     return `Could not resolve practice or race pages from LiveRC (${practice.resolveError}; ${race.resolveError}).`;
   }
   if (practice.rowsOnPage > 0 && practice.rowsMatchingDriver === 0) {
-    return `Found ${practice.rowsOnPage} practice session(s) on LiveRC but none match your driver name. Check Settings → LiveRC driver name against: ${practice.sampleDriverNamesOnPage.slice(0, 5).join(" · ") || "—"}.`;
+    return `Found ${practice.rowsOnPage} practice session(s) on LiveRC but none match your driver name. Check Settings → Name on LiveRC against: ${practice.sampleDriverNamesOnPage.slice(0, 5).join(" · ") || "—"}.`;
   }
   if (race.hubRows > 0 && race.sessionsWithDriverId === 0 && !race.canonicalDriverId) {
     return "Race sessions exist on LiveRC but your driver ID could not be resolved. Import any race once or set LiveRC driver ID in Settings.";

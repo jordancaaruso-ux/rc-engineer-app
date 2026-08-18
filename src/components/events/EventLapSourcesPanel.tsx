@@ -155,7 +155,7 @@ export function EventLapSourcesPanel(props: {
           type="button"
           disabled={saving}
           onClick={() => void save()}
-          className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-glow-sm transition hover:brightness-105 disabled:opacity-50"
+          className="rounded-lg primary-face bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:brightness-105 disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save sources"}
         </button>

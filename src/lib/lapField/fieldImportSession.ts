@@ -1,5 +1,6 @@
 import type { LapRow } from "@/lib/lapAnalysis";
 import { getIncludedLaps, getBestLap, importedSetToLapRows } from "@/lib/lapAnalysis";
+import { mergeImportedLapSetsByDriver } from "@/lib/lapImport/mergeImportedLapSets";
 
 export type FieldImportDriverInput = {
   driverName: string;
@@ -48,13 +49,30 @@ function labelForDriver(d: FieldImportDriverInput): string {
 }
 
 /**
- * Field ranking from multiple imported lap sets on one run (same timing session).
- * Returns null when fewer than two drivers — no field comparison.
+ * Field ranking from the imported lap sets on one run.
+ *
+ * A run may hold more than one timing import — a session split by a quick break
+ * comes back as two — and each import stores its own set per driver. Those are
+ * joined by driver first, or every rival would be ranked twice on half a stint
+ * each, and the fade figure would read the first half's decline as the whole
+ * run's. Returns null when fewer than two *drivers* — no field comparison.
  */
 export function computeFieldImportSessionFromSets(
   sets: FieldImportDriverInput[] | null | undefined
 ): FieldImportSession | null {
   if (!sets || sets.length < 2) return null;
+  const merged = mergeImportedLapSetsByDriver(
+    sets.map((s) => ({
+      ...s,
+      isPrimaryUser: Boolean(s.isPrimaryUser),
+      laps: s.laps.map((l) => ({
+        lapNumber: l.lapNumber,
+        lapTimeSeconds: l.lapTimeSeconds,
+        isIncluded: l.isIncluded !== false,
+      })),
+    }))
+  );
+  if (merged.length < 2) return null;
 
   type Work = {
     label: string;
@@ -64,7 +82,7 @@ export function computeFieldImportSessionFromSets(
   };
 
   const work: Work[] = [];
-  for (const s of sets) {
+  for (const s of merged) {
     const rows = importedSetToLapRows(s.laps);
     work.push({
       label: labelForDriver(s),

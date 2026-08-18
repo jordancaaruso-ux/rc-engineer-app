@@ -186,9 +186,19 @@ export async function importOneTimingUrl(
 }
 
 /**
- * Attach imported timing session(s) to a run. `Run.importedLapTimeSessionId` is @unique — only one
- * run may reference a given session. We clear that FK on any *other* run for each session id, then
- * set `linkedRunId` on the session and the primary pointer on this run, in one transaction.
+ * Set the timing session(s) attached to a run — the full list, not an addition.
+ *
+ * A run may hold several: a session split by a quick break comes back from the
+ * timing site as two entries, and the driver attaches both. `linkedRunId` on the
+ * session carries that many-to-one link; `Run.importedLapTimeSessionId` is
+ * @unique and points at the *primary* (earliest on track), which is what the
+ * session-time fallback and the Engineer's field stats read.
+ *
+ * This is a replace, so anything the driver removed in the form is detached
+ * here. Before multi-attach, clearing an import left the session still claiming
+ * the run — harmless when only one could ever be attached, wrong the moment
+ * "remove just this one" exists. An empty list is therefore a real instruction
+ * (detach everything), not a no-op.
  */
 export async function linkImportedSessionsToRun(params: {
   userId: string;
@@ -196,10 +206,26 @@ export async function linkImportedSessionsToRun(params: {
   runId: string;
 }): Promise<void> {
   const ids = [...new Set(params.importedLapTimeSessionIds.map((id) => id.trim()).filter(Boolean))];
-  if (ids.length === 0) return;
 
   await prisma.$transaction(async (tx) => {
-    let primaryIdForRun: string | null = null;
+    // Detach first: a session dropped from this run must let go before we choose
+    // a primary, or a stale row could still be holding the @unique pointer.
+    await tx.importedLapTimeSession.updateMany({
+      where: {
+        userId: params.userId,
+        linkedRunId: params.runId,
+        ...(ids.length > 0 ? { id: { notIn: ids } } : {}),
+      },
+      data: { linkedRunId: null },
+    });
+
+    if (ids.length === 0) {
+      await tx.run.updateMany({
+        where: { id: params.runId, userId: params.userId },
+        data: { importedLapTimeSessionId: null },
+      });
+      return;
+    }
 
     for (const id of ids) {
       await tx.run.updateMany({
@@ -210,28 +236,30 @@ export async function linkImportedSessionsToRun(params: {
         },
         data: { importedLapTimeSessionId: null },
       });
-
-      const sess = await tx.importedLapTimeSession.findFirst({
-        where: { id, userId: params.userId },
-        select: { id: true },
-      });
-      if (!sess) continue;
-
-      await tx.importedLapTimeSession.update({
-        where: { id: sess.id },
-        data: { linkedRunId: params.runId },
-      });
-
-      if (primaryIdForRun == null) {
-        primaryIdForRun = id;
-      }
     }
 
-    if (primaryIdForRun != null) {
-      await tx.run.update({
-        where: { id: params.runId, userId: params.userId },
-        data: { importedLapTimeSessionId: primaryIdForRun },
-      });
-    }
+    const owned = await tx.importedLapTimeSession.findMany({
+      where: { id: { in: ids }, userId: params.userId },
+      select: { id: true, sessionCompletedAt: true, createdAt: true },
+    });
+    if (owned.length === 0) return;
+
+    await tx.importedLapTimeSession.updateMany({
+      where: { id: { in: owned.map((s) => s.id) }, userId: params.userId },
+      data: { linkedRunId: params.runId },
+    });
+
+    // Earliest on track wins the primary pointer, so the run's session time and
+    // field stats come from the first half however the client ordered the list.
+    const primaryIdForRun = [...owned].sort(
+      (a, b) =>
+        (a.sessionCompletedAt ?? a.createdAt).getTime() -
+        (b.sessionCompletedAt ?? b.createdAt).getTime()
+    )[0]!.id;
+
+    await tx.run.update({
+      where: { id: params.runId, userId: params.userId },
+      data: { importedLapTimeSessionId: primaryIdForRun },
+    });
   });
 }
