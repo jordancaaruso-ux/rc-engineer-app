@@ -2,7 +2,7 @@
 
 
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ArrowUp, MessageSquarePlus } from "lucide-react";
 
@@ -34,7 +34,15 @@ import {
   type AnchorCandidate,
 } from "@/lib/engineerPhase5/anchorCandidates";
 
+import {
+  ENGINEER_STARTER_BOARD_COUNT,
+  selectEngineerStarterQuestions,
+  type EngineerStarterQuestion,
+} from "@/lib/engineerStarterQuestions";
+
 import { EngineerAnchorPicker } from "@/components/engineer/EngineerAnchorPicker";
+
+import { EngineerStarterQuestions } from "@/components/engineer/EngineerStarterQuestions";
 
 import { EngineerSubjectBar } from "@/components/engineer/EngineerSubjectBar";
 
@@ -401,6 +409,10 @@ export function EngineerChatPanel({
   const onQueuedConsumedRef = useRef(onQueuedPromptConsumed);
 
   const initialUrlThreadLoaded = useRef<string | null>(null);
+
+  // A tapped starter question lands here and leaves the caret at the end, so the
+  // driver can keep typing the detail that makes the answer good.
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
 
@@ -1214,6 +1226,49 @@ export function EngineerChatPanel({
       ? { label: latestRunCandidate.chipLabel }
       : null;
 
+  // ── Starter questions ────────────────────────────────────────────────────────
+  // Written prompts so an empty box isn't the first thing a driver meets. They
+  // exist only on an empty thread: once the Engineer has answered it emits its
+  // own follow-up chips, and two chip systems on one screen is a mess.
+  //
+  // The subject decides which show. A run has to genuinely be the subject for the
+  // "read this run" family — General mode and a setup/event pin both mean there
+  // is no run to read, and offering the question anyway is a dead end.
+  const runInFocus =
+    !generalMode && (dataAnchor?.kind === "run" || (!dataAnchor && autoFocusCandidate != null));
+  // Held back until the candidate list lands, so the chips don't reshuffle under
+  // a thumb when the run family becomes eligible a moment later.
+  const startersVisible = messages.length === 0 && !candidatesLoading;
+  const starterQuestions = useMemo(
+    () =>
+      startersVisible
+        ? selectEngineerStarterQuestions({ runInFocus, hasHistory: latestRunCandidate != null })
+        : [],
+    [startersVisible, runInFocus, latestRunCandidate],
+  );
+
+  // The composer ships as `rows={1}` with a `max-h-28` cap, which was fine while
+  // every message was typed a character at a time. A tapped starter question
+  // arrives ~90 characters at once and the second line was clipped in half, so
+  // the box grows to fit what's in it — capped by the same CSS max-height.
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
+
+  const fillFromStarter = (question: EngineerStarterQuestion) => {
+    // Fills, never sends: a mis-tap costs nothing, and it can't spend a request
+    // from the monthly cap. The driver adds which corner, which round, then sends.
+    setInput(question.text);
+    const el = composerRef.current;
+    if (!el) return;
+    el.focus();
+    const end = question.text.length;
+    el.setSelectionRange(end, end);
+  };
+
   const enterGeneral = () => {
     setPinLabelFallback(null);
     setPickerOpen(false);
@@ -1437,9 +1492,18 @@ export function EngineerChatPanel({
         <div className="hidden lg:col-start-2 lg:row-start-1 lg:flex lg:min-h-0 lg:flex-col lg:items-center lg:justify-center lg:gap-2 lg:px-8 lg:text-center">
           <p className="text-sm font-medium text-foreground">Ask the Engineer about your car.</p>
           <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
-            Open a past conversation on the left, or start a new one below. It reads the runs,
-            setups and conditions you&rsquo;ve logged.
+            It reads the runs, setups and conditions you&rsquo;ve logged. Start with one of these,
+            or type your own.
           </p>
+          {/* The board owns this row at lg; the rail below is `lg:hidden`, so the
+              same list is never on screen twice. */}
+          <EngineerStarterQuestions
+            variant="board"
+            questions={starterQuestions.slice(0, ENGINEER_STARTER_BOARD_COUNT)}
+            disabled={panelBusy}
+            onPick={fillFromStarter}
+            className="mt-2"
+          />
         </div>
       ) : null}
 
@@ -1460,6 +1524,18 @@ export function EngineerChatPanel({
           onSelectData={leaveGeneral}
           onSelectGeneral={enterGeneral}
           onPickGeneralCar={pickGeneralCar}
+        />
+
+        {/* Reads as a sentence top to bottom: what I'm asking about → things worth
+            asking → the box. Phone only; the desktop board above owns lg, and
+            wrapping three rows of chips at 390px pushes the composer under the
+            bottom dock. */}
+        <EngineerStarterQuestions
+          variant="rail"
+          questions={starterQuestions}
+          disabled={panelBusy}
+          onPick={fillFromStarter}
+          className="lg:hidden"
         />
 
         {pickerOpen && !generalMode ? (
@@ -1485,6 +1561,8 @@ export function EngineerChatPanel({
         <div className="flex items-end gap-2" data-tour="engineer-composer">
 
           <textarea
+
+            ref={composerRef}
 
             value={input}
 

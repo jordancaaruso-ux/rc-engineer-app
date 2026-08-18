@@ -3022,3 +3022,104 @@ html.video-overlay-fullscreen-active body {
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Engineer starter questions (2026-08-18)
+   Written prompts under the subject bar, so an empty box isn't the first thing
+   a driver meets. A tap fills the composer; it never sends. Two presentations
+   of one list — a drifting rail on the phone, a dealt board at lg.
+--------------------------------------------------------------------------- */
+
+/* The rail carries itself sideways (rAF in EngineerStarterQuestions.tsx) so the
+   questions past the fourth announce themselves without a "swipe for more"
+   label eating the width. The mask does the same job the drift can't once it
+   has stopped: it cuts the last chip off mid-shape, which reads as "more". A
+   mask rather than a gradient overlay because this row sits on the panel
+   surface, and any hardcoded fade colour would seam against it. */
+.engineer-starter-rail {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* Both ramps are 0 wide until the rail says otherwise (data attributes written
+     from its scroll handler), so a rail sitting at the start never fades its own
+     first chip, and one scrolled to the end never fades its last. A zero-width
+     ramp is a no-op, which is why one declaration covers all four states. */
+  --starter-fade-start: 0px;
+  --starter-fade-end: 0px;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--starter-fade-start),
+    #000 calc(100% - var(--starter-fade-end)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--starter-fade-start),
+    #000 calc(100% - var(--starter-fade-end)),
+    transparent
+  );
+}
+.engineer-starter-rail[data-fade-start="true"] {
+  --starter-fade-start: 24px;
+}
+.engineer-starter-rail[data-fade-end="true"] {
+  --starter-fade-end: 24px;
+}
+.engineer-starter-rail::-webkit-scrollbar {
+  display: none;
+}
+
+/* The board deals in when the empty transcript row appears — 70ms apart, done
+   inside half a second, once per mount and never again. Six is the whole board
+   (ENGINEER_STARTER_BOARD_COUNT), so six delays is the whole ladder. */
+@keyframes rc-starter-deal {
+  from {
+    opacity: 0;
+    transform: translateY(7px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.engineer-starter-board > * {
+  animation: rc-starter-deal 0.46s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.engineer-starter-board > *:nth-child(1) {
+  animation-delay: 0.06s;
+}
+.engineer-starter-board > *:nth-child(2) {
+  animation-delay: 0.13s;
+}
+.engineer-starter-board > *:nth-child(3) {
+  animation-delay: 0.2s;
+}
+.engineer-starter-board > *:nth-child(4) {
+  animation-delay: 0.27s;
+}
+.engineer-starter-board > *:nth-child(5) {
+  animation-delay: 0.34s;
+}
+.engineer-starter-board > *:nth-child(6) {
+  animation-delay: 0.41s;
+}
+
+/* Hover lift, so a card reads as something you press rather than something you
+   read. The rail's pills don't get it — there is no hover on a phone. */
+.engineer-starter-board > *:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px -2px rgb(var(--color-foreground) / 0.18);
+}
+
+/* The drift is already gated in JS; this covers the deal and the lift. */
+@media (prefers-reduced-motion: reduce) {
+  .engineer-starter-board > * {
+    animation: none;
+  }
+  .engineer-starter-board > *:hover {
+    transform: none;
+  }
+}

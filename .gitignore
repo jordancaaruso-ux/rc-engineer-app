@@ -78,3 +78,6 @@ share-shots/
 
 # Sibling git worktrees for parallel sessions — never part of this checkout
 .claude/worktrees/
+
+# Engineer starter-question captures (regenerate with e2e/engineer-starter-questions.spec.ts)
+e2e/.shots/
