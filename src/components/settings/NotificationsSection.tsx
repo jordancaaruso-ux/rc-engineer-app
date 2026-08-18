@@ -214,7 +214,7 @@ export function NotificationsSection() {
               type="button"
               disabled={busy || (!isNative && !VAPID)}
               onClick={() => void enable()}
-              className="rounded-md border border-primary-ink bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-[#E6BE00] disabled:opacity-50"
+              className="rounded-md border border-primary-ink primary-face bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-[#E6BE00] disabled:opacity-50"
             >
               {busy ? "Enabling…" : "Enable notifications"}
             </button>
@@ -224,7 +224,7 @@ export function NotificationsSection() {
                 type="button"
                 disabled={busy}
                 onClick={() => void sendTest()}
-                className="rounded-md border border-primary-ink bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-[#E6BE00] disabled:opacity-50"
+                className="rounded-md border border-primary-ink primary-face bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-[#E6BE00] disabled:opacity-50"
               >
                 Send test
               </button>

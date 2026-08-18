@@ -33,67 +33,64 @@ function NavRow({
   description: string;
 }) {
   return (
-    <li>
-      <Link href={href} className="tap-active block">
-        <CardPanel contentClassName="flex items-center gap-3 px-4 py-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/50 text-muted-foreground group-hover:text-foreground">
-            <Icon className="h-4 w-4" aria-hidden />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="ui-title block text-sm text-foreground">{title}</span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">{description}</span>
-          </span>
-          <ChevronRight
-            className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-foreground"
-            aria-hidden
-          />
-        </CardPanel>
+    <li className="border-t border-border first:border-t-0">
+      <Link href={href} className="tap-active group flex items-center gap-3 px-4 py-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/50 text-muted-foreground group-hover:text-foreground">
+          <Icon className="size-4" aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="ui-title block text-sm text-foreground">{title}</span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">{description}</span>
+        </span>
+        <ChevronRight
+          className="size-4 shrink-0 text-muted-foreground group-hover:text-foreground"
+          aria-hidden
+        />
       </Link>
     </li>
   );
 }
 
 /**
- * Workspace + Catalogs.
+ * Browse — everything on this page that is a link away from it.
  *
- * The catalogs moved here from the old Garage hub (founder call 2026-07-29). They're shared
- * reference data, not yours: you meet tires, tracks and additives in the run-form pickers, so these
- * pages exist for browsing and cleanup — they don't belong on a daily-loop tab.
+ * The catalogs moved here from the old Garage hub (founder call 2026-07-29): they're shared
+ * reference data, not yours — you meet tires, tracks and additives in the run-form pickers, so
+ * these pages exist for browsing and cleanup and don't belong on a daily-loop tab.
+ *
+ * They were split under two labels, "Workspace" and "Catalogs", the first of which named a group
+ * of exactly one row. One list now (2026-08-18); Teams leads it because it's the only one that is
+ * actually yours.
  */
 export function SettingsNavSection({ isAdmin = false }: { isAdmin?: boolean }) {
   const catalogs = catalogLinksForUser(isAdmin);
 
   return (
-    <div className="mt-8 space-y-6 border-t border-border pt-8">
-      <div>
-        <Eyebrow>Workspace</Eyebrow>
-        <ul className="mt-2 flex flex-col gap-2">
-          <NavRow
-            href="/teams"
-            icon={Users}
-            title="Teams"
-            description="Shared setups and team garage."
-          />
-        </ul>
+    <CardPanel contentClassName="p-0">
+      {/* Heading in the card (2026-08-18) — see the note in YouSection. */}
+      <div className="px-4 pt-3.5">
+        <Eyebrow>Browse</Eyebrow>
       </div>
-
-      <div>
-        <Eyebrow>Catalogs</Eyebrow>
-        <ul className="mt-2 flex flex-col gap-2">
-          {catalogs.map((link) => {
-            const Icon = CATALOG_ICONS[link.icon] ?? Layers;
-            return (
-              <NavRow
-                key={link.href}
-                href={link.href}
-                icon={Icon}
-                title={link.label}
-                description={link.description}
-              />
-            );
-          })}
-        </ul>
-      </div>
-    </div>
+      <ul className="flex flex-col pb-1">
+        <NavRow
+          href="/teams"
+          icon={Users}
+          title="Teams"
+          description="Shared setups and team garage."
+        />
+        {catalogs.map((link) => {
+          const Icon = CATALOG_ICONS[link.icon] ?? Layers;
+          return (
+            <NavRow
+              key={link.href}
+              href={link.href}
+              icon={Icon}
+              title={link.label}
+              description={link.description}
+            />
+          );
+        })}
+      </ul>
+    </CardPanel>
   );
 }

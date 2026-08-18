@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { SaveState } from "@/components/settings/SettingsClient";
+import type { SaveState } from "@/components/settings/saveState";
 
 /**
  * A setting whose value is a set, edited as removable pills.

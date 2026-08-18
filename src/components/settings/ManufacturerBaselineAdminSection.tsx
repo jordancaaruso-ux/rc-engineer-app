@@ -184,7 +184,7 @@ export function ManufacturerBaselineAdminSection() {
         </label>
         <button
           type="submit"
-          className="rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+          className="rounded primary-face bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
           disabled={busy}
         >
           Save baseline
