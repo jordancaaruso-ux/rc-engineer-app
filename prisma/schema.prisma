@@ -662,6 +662,22 @@ model Track {
    * future community use; grip itself is moving to per-run capture. See docs/ASSET_ACCESS_NORTH_STAR.md.
    */
   verifiedAt DateTime?
+  /** ISO-3166-1 alpha-2, lowercase. Scopes the catalog so a driver browses their own country first. */
+  countryCode String?
+  /** State or province ("CA", "NSW"). Mostly populated for US/AU/CA; null elsewhere by design. */
+  region String?
+  /**
+   * Where a pre-seeded row came from: `liverc` | `osm` | null for user-created.
+   * See seeds/track-catalog/README.md. Rows sourced from OpenStreetMap carry an ODbL attribution
+   * obligation wherever their coordinates are surfaced.
+   */
+  catalogSource String?
+  /**
+   * Identity within that source — a LiveRC host ("1upracing.liverc.com") or an OSM element
+   * ("way/12345"). Paired with catalogSource this is the seed importer's idempotency key, which is
+   * what makes re-running the import an update rather than a second copy of the catalog.
+   */
+  catalogSourceRef String?
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
@@ -675,7 +691,9 @@ model Track {
   videoAnalysisJobs VideoAnalysisJob[]
   locationRunPromptDismissals TrackLocationRunPromptDismissal[]
 
+  @@unique([catalogSource, catalogSourceRef])
   @@index([userId])
+  @@index([countryCode, name])
 }
 
 /**

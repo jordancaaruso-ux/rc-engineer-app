@@ -56,6 +56,11 @@ export function communityTrackListWhere(
     OR: [
       { name: { contains: q, mode: "insensitive" } },
       { location: { contains: q, mode: "insensitive" } },
+      // `region` joined the search with the pre-seeded catalog: with a thousand-odd tracks in it,
+      // "NSW" or "OR" is how a driver narrows to their own patch, and neither name nor the free-text
+      // location reliably carries the state. `countryCode` is deliberately absent — it is a two-letter
+      // code nobody types, and country is a browse axis on the tracks page rather than a search term.
+      { region: { contains: q, mode: "insensitive" } },
     ],
   };
 }

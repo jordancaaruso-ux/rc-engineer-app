@@ -1,0 +1,377 @@
+{
+ "builtAt": "2026-08-19T03:45:07.933Z",
+ "existingTrackCount": 21,
+ "candidateCount": 1619,
+ "counts": {
+  "confident": 6,
+  "possible": 1,
+  "noMatch": 1596,
+  "alreadySeeded": 0,
+  "intraSetFolds": 16,
+  "contestedTracks": 1,
+  "existingDuplicateClusters": 7
+ },
+ "proposals": [
+  {
+   "candidateKey": "osm:node/2685595989",
+   "candidateName": "Auto Modelbouw Club Apeldoorn",
+   "trackId": "cmol3skh40001jl042r8inzmx",
+   "trackName": "Apeldoorn",
+   "confidence": "possible",
+   "signals": [
+    "within-24m",
+    "name-overlap-1.00"
+   ],
+   "distanceM": 24,
+   "containment": 1,
+   "existing": {
+    "location": "NL",
+    "hasCoordinates": true,
+    "hasTimingLink": false,
+    "runCount": 5,
+    "eventCount": 1,
+    "favouriteCount": 0
+   }
+  },
+  {
+   "candidateKey": "liverc:brccc.liverc.com",
+   "candidateName": "Bayside",
+   "trackId": "cmphha6fc0001l404ahw28900",
+   "trackName": "Bayside",
+   "confidence": "confident",
+   "signals": [
+    "same-liverc-url"
+   ],
+   "distanceM": 395,
+   "containment": 1,
+   "existing": {
+    "location": "Brisbane",
+    "hasCoordinates": true,
+    "hasTimingLink": true,
+    "runCount": 41,
+    "eventCount": 2,
+    "favouriteCount": 0
+   }
+  },
+  {
+   "candidateKey": "liverc:borrccc.liverc.com",
+   "candidateName": "Bendigo On Road Radio Control Car Club",
+   "trackId": "cmnpeedrk0001l7042pz6b3zv",
+   "trackName": "Bendigo",
+   "confidence": "confident",
+   "signals": [
+    "same-liverc-url"
+   ],
+   "distanceM": 864,
+   "containment": 1,
+   "existing": {
+    "location": "Bendigo, Victoria",
+    "hasCoordinates": true,
+    "hasTimingLink": true,
+    "runCount": 0,
+    "eventCount": 1,
+    "favouriteCount": 0
+   }
+  },
+  {
+   "candidateKey": "liverc:brcccvic.liverc.com",
+   "candidateName": "Boronia Radio Controlled Car Club inc",
+   "trackId": "cmnpcxijj0001jp04lhcjo1h3",
+   "trackName": "Boronia",
+   "confidence": "confident",
+   "signals": [
+    "same-liverc-url"
+   ],
+   "distanceM": 3455,
+   "containment": 1,
+   "existing": {
+    "location": "Melbourne, Australia",
+    "hasCoordinates": true,
+    "hasTimingLink": true,
+    "runCount": 32,
+    "eventCount": 9,
+    "favouriteCount": 2
+   }
+  },
+  {
+   "candidateKey": "liverc:grccc.liverc.com",
+   "candidateName": "Geelong RC Racers",
+   "trackId": "cmr5sxk3v0001l704suhuozqx",
+   "trackName": "Geelong",
+   "confidence": "confident",
+   "signals": [
+    "same-liverc-url"
+   ],
+   "distanceM": 231,
+   "containment": 1,
+   "existing": {
+    "location": null,
+    "hasCoordinates": true,
+    "hasTimingLink": true,
+    "runCount": 29,
+    "eventCount": 3,
+    "favouriteCount": 0
+   }
+  },
+  {
+   "candidateKey": "liverc:serccc.liverc.com",
+   "candidateName": "South Eastern Radio Controlled Car Club",
+   "trackId": "cmp7my9w10001jx042stkmzog",
+   "trackName": "SERCCC",
+   "confidence": "confident",
+   "signals": [
+    "same-liverc-url"
+   ],
+   "distanceM": 138,
+   "containment": 0,
+   "existing": {
+    "location": "Melbourne",
+    "hasCoordinates": true,
+    "hasTimingLink": true,
+    "runCount": 6,
+    "eventCount": 0,
+    "favouriteCount": 0
+   }
+  },
+  {
+   "candidateKey": "liverc:tftr.liverc.com",
+   "candidateName": "TFTR",
+   "trackId": "cmnh0wehc0000kw04ppzcob2s",
+   "trackName": "TFTR",
+   "confidence": "confident",
+   "signals": [
+    "same-liverc-url"
+   ],
+   "distanceM": 88,
+   "containment": 1,
+   "existing": {
+    "location": "Melbourne, Australia",
+    "hasCoordinates": true,
+    "hasTimingLink": true,
+    "runCount": 120,
+    "eventCount": 9,
+    "favouriteCount": 1
+   }
+  }
+ ],
+ "intraSetFolds": [
+  {
+   "keepKey": "liverc:5280raceway.liverc.com",
+   "foldKey": "osm:node/12866084818",
+   "distanceM": 0,
+   "containment": 0
+  },
+  {
+   "keepKey": "liverc:arcr.liverc.com",
+   "foldKey": "osm:way/1082926334",
+   "distanceM": 150,
+   "containment": 0
+  },
+  {
+   "keepKey": "liverc:calraceway.liverc.com",
+   "foldKey": "osm:way/777214186",
+   "distanceM": 92,
+   "containment": 1
+  },
+  {
+   "keepKey": "liverc:chargersrc.liverc.com",
+   "foldKey": "osm:node/12919389697",
+   "distanceM": 0,
+   "containment": 1
+  },
+  {
+   "keepKey": "liverc:qrccra.liverc.com",
+   "foldKey": "osm:way/342276743",
+   "distanceM": 224,
+   "containment": 1
+  },
+  {
+   "keepKey": "liverc:mrca.liverc.com",
+   "foldKey": "osm:way/1243636507",
+   "distanceM": 1,
+   "containment": 0
+  },
+  {
+   "keepKey": "liverc:morcc.liverc.com",
+   "foldKey": "osm:way/240334086",
+   "distanceM": 158,
+   "containment": 1
+  },
+  {
+   "keepKey": "liverc:overlookraceway.liverc.com",
+   "foldKey": "osm:way/1052534719",
+   "distanceM": 200,
+   "containment": 1
+  },
+  {
+   "keepKey": "liverc:prccc.liverc.com",
+   "foldKey": "osm:way/1241019114",
+   "distanceM": 250,
+   "containment": 1
+  },
+  {
+   "keepKey": "liverc:pdxrcunderground.liverc.com",
+   "foldKey": "osm:way/440447656",
+   "distanceM": 0,
+   "containment": 0.67
+  },
+  {
+   "keepKey": "liverc:phdr.liverc.com",
+   "foldKey": "osm:node/12919505505",
+   "distanceM": 157,
+   "containment": 1
+  },
+  {
+   "keepKey": "liverc:rcplushobbies.liverc.com",
+   "foldKey": "osm:node/11342716055",
+   "distanceM": 0,
+   "containment": 0
+  },
+  {
+   "keepKey": "liverc:revolutionraceway.liverc.com",
+   "foldKey": "osm:node/11982042049",
+   "distanceM": 24,
+   "containment": 1
+  },
+  {
+   "keepKey": "liverc:southerntasmanianmodelcarclub.liverc.com",
+   "foldKey": "osm:way/607027087",
+   "distanceM": 37,
+   "containment": 0
+  },
+  {
+   "keepKey": "liverc:tftr.liverc.com",
+   "foldKey": "osm:node/6979485215",
+   "distanceM": 81,
+   "containment": 0
+  },
+  {
+   "keepKey": "liverc:brcccvic.liverc.com",
+   "foldKey": "osm:way/556683239",
+   "distanceM": 19,
+   "containment": 1
+  }
+ ],
+ "contestedTracks": [
+  {
+   "trackId": "cmnpcxijj0001jp04lhcjo1h3",
+   "keptKey": "liverc:brcccvic.liverc.com",
+   "foldedKeys": [
+    "osm:way/556683239"
+   ]
+  }
+ ],
+ "existingDuplicateClusters": [
+  {
+   "nameKey": "tftr",
+   "tracks": [
+    {
+     "id": "cmnh0wehc0000kw04ppzcob2s",
+     "name": "TFTR",
+     "runCount": 120
+    },
+    {
+     "id": "demo3e53291ab621931a71805337",
+     "name": "TFTR",
+     "runCount": 84
+    }
+   ]
+  },
+  {
+   "nameKey": "boronia",
+   "tracks": [
+    {
+     "id": "cmnpcxijj0001jp04lhcjo1h3",
+     "name": "Boronia",
+     "runCount": 32
+    },
+    {
+     "id": "demo85d35ab68787227e1d1e9488",
+     "name": "Boronia",
+     "runCount": 26
+    }
+   ]
+  },
+  {
+   "nameKey": "moorebank",
+   "tracks": [
+    {
+     "id": "cmnpdzl0n0001gw04aa71enjm",
+     "name": "Moorebank",
+     "runCount": 15
+    },
+    {
+     "id": "demo22a707d6e83120baab66bb29",
+     "name": "Moorebank",
+     "runCount": 15
+    }
+   ]
+  },
+  {
+   "nameKey": "mr33arena",
+   "tracks": [
+    {
+     "id": "cmnvpomvx000xjr047mccggbh",
+     "name": "MR33 Arena",
+     "runCount": 5
+    },
+    {
+     "id": "demo331a2e2a3eb30660990235aa",
+     "name": "MR33 Arena",
+     "runCount": 1
+    }
+   ]
+  },
+  {
+   "nameKey": "serccc",
+   "tracks": [
+    {
+     "id": "cmp7my9w10001jx042stkmzog",
+     "name": "SERCCC",
+     "runCount": 6
+    },
+    {
+     "id": "demod0807f01d52dda521f5b01d9",
+     "name": "SERCCC",
+     "runCount": 6
+    }
+   ]
+  },
+  {
+   "nameKey": "bayside",
+   "tracks": [
+    {
+     "id": "cmphha6fc0001l404ahw28900",
+     "name": "Bayside",
+     "runCount": 41
+    },
+    {
+     "id": "demo266cafe7eff772cfb0d0647b",
+     "name": "Bayside",
+     "runCount": 30
+    }
+   ]
+  },
+  {
+   "nameKey": "ironbarkraceway",
+   "tracks": [
+    {
+     "id": "cmsyoh2010001vlfwwbp9buc9",
+     "name": "Ironbark Raceway",
+     "runCount": 0
+    },
+    {
+     "id": "cmsymu7rs0001vl0kedoz2h9t",
+     "name": "Ironbark Raceway",
+     "runCount": 0
+    },
+    {
+     "id": "cmsyo59no0001vl107gkgy572",
+     "name": "Ironbark Raceway",
+     "runCount": 0
+    }
+   ]
+  }
+ ],
+ "alreadySeeded": []
+}

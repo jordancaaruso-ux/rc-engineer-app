@@ -1,0 +1,18 @@
+{
+ "liverc:1066racing.liverc.com": {
+  "verdict": "accept",
+  "at": "2026-08-19T07:06:30.605Z"
+ },
+ "osm:way/1147478640": {
+  "verdict": "reject",
+  "at": "2026-08-19T07:06:38.510Z"
+ },
+ "liverc:1066rc.liverc.com": {
+  "verdict": "reject",
+  "at": "2026-08-19T07:06:42.110Z"
+ },
+ "liverc:207rcspeedway.liverc.com": {
+  "verdict": "reject",
+  "at": "2026-08-19T07:06:58.720Z"
+ }
+}

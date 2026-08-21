@@ -1,0 +1,9297 @@
+[
+ {
+  "key": "liverc:rvjimd.liverc.com",
+  "name": "1025R Raceway",
+  "city": "Des Moines",
+  "country": "us",
+  "events": 97,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:1066racing.liverc.com",
+  "name": "1066 Racing",
+  "city": "St Leonards",
+  "country": "gb",
+  "events": 141,
+  "lat": 50.860828,
+  "lon": 0.5643812,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "1066 Racing",
+   "cat": "race_track",
+   "lat": 50.861301,
+   "lon": 0.564804,
+   "d": 60,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:1066rc.liverc.com",
+  "name": "1066rc raceway",
+  "city": "st leonards on sea",
+  "country": "gb",
+  "events": 64,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "1066RC",
+   "cat": "hobby_shop",
+   "lat": 50.868496,
+   "lon": 0.547418,
+   "d": null,
+   "weight": 0.71
+  }
+ },
+ {
+  "key": "liverc:207rcspeedway.liverc.com",
+  "name": "207 RC SPEEDWAY",
+  "city": "Greene",
+  "country": "us",
+  "events": 100,
+  "lat": 44.193024,
+  "lon": -70.148305,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "207 Rc speedway",
+   "cat": "amusement_park",
+   "lat": 44.284313,
+   "lon": -70.272408,
+   "d": 14170,
+   "where": "Turner",
+   "score": 5.91
+  }
+ },
+ {
+  "key": "liverc:360v2.liverc.com",
+  "name": "360v2",
+  "city": "City of New Rochelle",
+  "country": "us",
+  "events": 666,
+  "lat": 40.9143776,
+  "lon": -73.7768923,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:400rcraceway.liverc.com",
+  "name": "400RcRaceway",
+  "city": "Barrie",
+  "country": "ca",
+  "events": 63,
+  "lat": 44.4009155,
+  "lon": -79.6488517,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:405rcracewayandhobbies.liverc.com",
+  "name": "405 RC Raceway and Hobbies",
+  "city": "Oklahoma City",
+  "country": "us",
+  "events": 115,
+  "lat": 35.4932363,
+  "lon": -97.5685872,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "405 RC Raceway & Hobbies",
+   "cat": "hobby_shop",
+   "lat": 35.493366,
+   "lon": -97.569839,
+   "d": 114,
+   "weight": 0.86
+  }
+ },
+ {
+  "key": "liverc:412rccomplex.liverc.com",
+  "name": "412 RC Complex",
+  "city": "Pittsburgh",
+  "country": "us",
+  "events": 63,
+  "lat": 40.460284,
+  "lon": -79.8667137,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "412 RC Complex",
+   "cat": "race_track",
+   "lat": 40.460251,
+   "lon": -79.867081,
+   "d": 31,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:417raceplace.liverc.com",
+  "name": "417 Race Place",
+  "city": "Springfield",
+  "country": "us",
+  "events": 117,
+  "lat": 37.2121734,
+  "lon": -93.3352076,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "417 Race Place",
+   "cat": "race_track",
+   "lat": 37.304607,
+   "lon": -93.427773,
+   "d": 13144,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:4wayspeedway.liverc.com",
+  "name": "4wayspeedway",
+  "city": "Abilene",
+  "country": "us",
+  "events": 214,
+  "lat": 32.4527144,
+  "lon": -99.7961941,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:5280raceway.liverc.com",
+  "name": "5280 Raceway",
+  "city": "Lakewood",
+  "country": "us",
+  "events": 375,
+  "lat": 39.7434218,
+  "lon": -105.1248881,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "5280 Raceway",
+   "cat": "race_track",
+   "lat": 39.743488,
+   "lon": -105.124931,
+   "d": 8,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:5starrcraceways.liverc.com",
+  "name": "5starrcraceways",
+  "city": "Plymouth",
+  "country": "us",
+  "events": 56,
+  "lat": 41.3408997,
+  "lon": -86.2964558,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:702rconroadclub.liverc.com",
+  "name": "702 RC On-Road Club",
+  "city": "Las Vegas",
+  "country": "us",
+  "events": 1059,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "702 RC Raceway",
+   "cat": "amateur_sports_team",
+   "lat": 36.275368,
+   "lon": -115.023651,
+   "d": null,
+   "weight": 0.9
+  }
+ },
+ {
+  "key": "liverc:997rcraceway.liverc.com",
+  "name": "997 RC Raceway Carpet Off Road",
+  "city": "Washington Township",
+  "country": "us",
+  "events": 339,
+  "lat": 39.7411028,
+  "lon": -77.5757254,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "997 RC Raceway",
+   "cat": "hobby_shop",
+   "lat": 39.814148,
+   "lon": -77.57341,
+   "d": 8125,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:997rcracewayonroad.liverc.com",
+  "name": "997 RC Raceway On Road",
+  "city": "Washington Township",
+  "country": "us",
+  "events": 284,
+  "lat": 39.7411028,
+  "lon": -77.5757254,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "997 RC Raceway",
+   "cat": "hobby_shop",
+   "lat": 39.814148,
+   "lon": -77.57341,
+   "d": 8125,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:accelrc.liverc.com",
+  "name": "Accel RC",
+  "city": "Gay",
+  "country": "us",
+  "events": 82,
+  "lat": 38.7531992,
+  "lon": -81.5432784,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Accel RC",
+   "cat": "race_track",
+   "lat": 38.761852,
+   "lon": -81.56752,
+   "d": 2312,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:acotrack.liverc.com",
+  "name": "ACO Racing Track",
+  "city": "香港 Hong Kong",
+  "country": "cn",
+  "events": 59,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:acshobbies.liverc.com",
+  "name": "ACS Hobbies Raceway",
+  "city": "Monroeville",
+  "country": "us",
+  "events": 84,
+  "lat": 40.4267259,
+  "lon": -79.7954916,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "ACS Hobbies",
+   "cat": "hobby_shop",
+   "lat": 40.426689,
+   "lon": -79.795242,
+   "d": 22,
+   "weight": 0.73
+  }
+ },
+ {
+  "key": "liverc:actmcrc.liverc.com",
+  "name": "ACTMCRC",
+  "city": "Kambah",
+  "country": "au",
+  "events": 239,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:aimrc.liverc.com",
+  "name": "Adelaide Indoor Mini Speedway",
+  "city": "Holen Hill SouthAust",
+  "country": "au",
+  "events": 295,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:adirondackrcspeedway.liverc.com",
+  "name": "Adirondack RC Speedway",
+  "city": "Town of Champlain",
+  "country": "us",
+  "events": 73,
+  "lat": 44.9223408,
+  "lon": -73.4393322,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Adirondack Coast Wine Trail",
+   "cat": "winery",
+   "lat": 44.901001,
+   "lon": -73.43708,
+   "d": 2379,
+   "where": "Chazy",
+   "score": 5.21
+  }
+ },
+ {
+  "key": "liverc:plattsburghrcspeedway.liverc.com",
+  "name": "ADK RC",
+  "city": "Village of Rouses Point",
+  "country": "us",
+  "events": 68,
+  "lat": 44.9825975,
+  "lon": -73.3641296,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "ADK Game House",
+   "cat": "amusement_park",
+   "lat": 44.442318,
+   "lon": -73.672867,
+   "d": 64841,
+   "where": "Au Sable Forks",
+   "score": 5.05
+  }
+ },
+ {
+  "key": "liverc:adoberc.liverc.com",
+  "name": "Adobe RC",
+  "city": "Glendale",
+  "country": "us",
+  "events": 109,
+  "lat": 33.6901774,
+  "lon": -112.156769,
+  "verdict": "near",
+  "match": {
+   "nm": "Adobe Mountain Speedway",
+   "cat": "race_track",
+   "lat": 33.687607,
+   "lon": -112.158722,
+   "d": 338,
+   "weight": 0.68
+  }
+ },
+ {
+  "key": "liverc:adrenalinercracing.liverc.com",
+  "name": "Adrenaline RC Racing",
+  "city": "Winchester",
+  "country": "us",
+  "events": 397,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Adrenaline RC Racing LLC & Hobby",
+   "cat": "hobby_shop",
+   "lat": 39.112812,
+   "lon": -78.19957,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:alamopalmschargers.liverc.com",
+  "name": "Alamo Palms Dirt Oval",
+  "city": "Alamo",
+  "country": "us",
+  "events": 148,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Alamo Palms Race Park",
+   "cat": "race_track",
+   "lat": 26.194567,
+   "lon": -98.127464,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:asrccc.liverc.com",
+  "name": "Alice Springs Radio Control Car Club",
+  "city": "Alice Springs",
+  "country": "au",
+  "events": 119,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:orlandoalloutrc.liverc.com",
+  "name": "All Out RC",
+  "city": "Apopka",
+  "country": "us",
+  "events": 303,
+  "lat": 28.733939,
+  "lon": -81.5492882,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:allstarspeedway.liverc.com",
+  "name": "All Star Speedway",
+  "city": "Fredericktown",
+  "country": "us",
+  "events": 75,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:alnspeedway.liverc.com",
+  "name": "ALN Speedway",
+  "city": "Newark",
+  "country": "us",
+  "events": 70,
+  "lat": 39.6521524,
+  "lon": -75.7800347,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "ALN Audio Visual",
+   "cat": "audiovisual_equipment_rental",
+   "lat": 40.129627,
+   "lon": -75.527374,
+   "d": 57302,
+   "where": "Phoenixville",
+   "score": 4.51
+  }
+ },
+ {
+  "key": "liverc:alphacatraceway.liverc.com",
+  "name": "Alphacat Raceway",
+  "city": "Carbondale",
+  "country": "us",
+  "events": 247,
+  "lat": 37.730628,
+  "lon": -89.227883,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:lcrc304.liverc.com",
+  "name": "Altitude RC Indoor Raceway",
+  "city": "Beckley",
+  "country": "us",
+  "events": 151,
+  "lat": 37.8144979,
+  "lon": -81.1860081,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Altitude RC",
+   "cat": "amusement_park",
+   "lat": 37.780998,
+   "lon": -81.190529,
+   "d": 3746,
+   "where": "Beckley",
+   "score": 5.82
+  }
+ },
+ {
+  "key": "liverc:amainsdrc.liverc.com",
+  "name": "AMain.com Silver Dollar RC",
+  "city": "Chico",
+  "country": "us",
+  "events": 303,
+  "lat": 39.7197876,
+  "lon": -121.8102347,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Silver Dollar RC Raceway",
+   "cat": "racing_experience",
+   "lat": 39.719467,
+   "lon": -121.811119,
+   "d": 84,
+   "weight": 0.56
+  }
+ },
+ {
+  "key": "liverc:amarilloracewaypark.liverc.com",
+  "name": "Amarillo Raceway Park",
+  "city": "Amarillo",
+  "country": "us",
+  "events": 77,
+  "lat": 35.1909965,
+  "lon": -101.7421969,
+  "verdict": "near",
+  "match": {
+   "nm": "Amarillo Raceway Park",
+   "cat": "race_track",
+   "lat": 35.174114,
+   "lon": -101.742432,
+   "d": 1877,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:apexraceway.liverc.com",
+  "name": "APEX Raceway and Hobbies",
+  "city": "Murfreesboro",
+  "country": "us",
+  "events": 450,
+  "lat": 35.8367237,
+  "lon": -86.3969477,
+  "verdict": "near",
+  "match": {
+   "nm": "APEX Raceway and Hobbies",
+   "cat": "hobby_shop",
+   "lat": 35.831444,
+   "lon": -86.398193,
+   "d": 598,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:apexraceway2.liverc.com",
+  "name": "APEX Raceway Oval",
+  "city": "Murfreesboro",
+  "country": "us",
+  "events": 216,
+  "lat": 35.8367237,
+  "lon": -86.3969477,
+  "verdict": "near",
+  "match": {
+   "nm": "APEX Raceway and Hobbies",
+   "cat": "hobby_shop",
+   "lat": 35.831444,
+   "lon": -86.398193,
+   "d": 598,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:arcorraceway.liverc.com",
+  "name": "Arcor Raceway",
+  "city": "Albuquerque",
+  "country": "us",
+  "events": 83,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "ARCOR Raceway",
+   "cat": "race_track",
+   "lat": 35.049603,
+   "lon": -106.71093,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:arcr.liverc.com",
+  "name": "ARCR Mitchell Park",
+  "city": "Adelaide",
+  "country": "au",
+  "events": 132,
+  "lat": -35.0018586,
+  "lon": 138.5643163,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Mitchell Park Football Club",
+   "cat": "sports_club_and_league",
+   "lat": -35.001999,
+   "lon": 138.564194,
+   "d": 19,
+   "weight": 0.53
+  }
+ },
+ {
+  "key": "liverc:arcshobbies.liverc.com",
+  "name": "ARCSHobbies",
+  "city": "Ashtabula",
+  "country": "us",
+  "events": 207,
+  "lat": 41.8496098,
+  "lon": -80.7918784,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:area52rcpark.liverc.com",
+  "name": "Area 52 RC Park",
+  "city": "Tabernacle Township",
+  "country": "us",
+  "events": 106,
+  "lat": 39.8564837,
+  "lon": -74.7299579,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:arearc.liverc.com",
+  "name": "Area RC",
+  "city": "McKinney",
+  "country": "us",
+  "events": 107,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:aroarrc.liverc.com",
+  "name": "AROARA RC Club Track",
+  "city": "Anchorage",
+  "country": "us",
+  "events": 107,
+  "lat": 61.1170294,
+  "lon": -149.8994294,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:aspenpark.liverc.com",
+  "name": "Aspen Park Raceway",
+  "city": "Brandon",
+  "country": "us",
+  "events": 82,
+  "lat": 43.5836603,
+  "lon": -96.583773,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Aspen Park RC Raceway",
+   "cat": "race_track",
+   "lat": 43.585831,
+   "lon": -96.585548,
+   "d": 281,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:attitudercraceway.liverc.com",
+  "name": "Attitude RC Raceway",
+  "city": "Waupun",
+  "country": "us",
+  "events": 63,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Attitude Rc Raceway & Hobbies LLC",
+   "cat": "race_track",
+   "lat": 43.645023,
+   "lon": -88.731644,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:auburnrc.liverc.com",
+  "name": "Auburn RC",
+  "city": "Auburn",
+  "country": "us",
+  "events": 151,
+  "lat": 38.8910479,
+  "lon": -121.0755236,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Auburn Performance Raceway",
+   "cat": "race_track",
+   "lat": 38.890472,
+   "lon": -121.075035,
+   "d": 77,
+   "weight": 0.63
+  }
+ },
+ {
+  "key": "liverc:aucklandindoor.liverc.com",
+  "name": "Auckland Indoor Radio Control Car Club",
+  "city": "Henderson-Massey",
+  "country": "nz",
+  "events": 89,
+  "lat": -36.8535508,
+  "lon": 174.6371911,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Auckland Car Club",
+   "cat": "race_track",
+   "lat": -36.9063,
+   "lon": 174.731628,
+   "d": 10245,
+   "weight": 0.54
+  }
+ },
+ {
+  "key": "liverc:audevel.liverc.com",
+  "name": "audevel",
+  "city": "Santiago de Querétaro",
+  "country": "mx",
+  "events": 379,
+  "lat": 20.6139471,
+  "lon": -100.4023856,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Audevel Hobbies",
+   "cat": "hobby_shop",
+   "lat": 20.548914,
+   "lon": -100.383705,
+   "d": 7488,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:aus4rc.liverc.com",
+  "name": "Aus4RC",
+  "city": "Sawyers Valley",
+  "country": "au",
+  "events": 64,
+  "lat": -31.9173559,
+  "lon": 116.2900869,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:austintownhobbyandraceway.liverc.com",
+  "name": "austintown hobby and raceway",
+  "city": "Youngstown",
+  "country": "us",
+  "events": 409,
+  "lat": 41.1031868,
+  "lon": -80.7076225,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Austintown Hobby",
+   "cat": "hobby_shop",
+   "lat": 41.103203,
+   "lon": -80.708206,
+   "d": 49,
+   "weight": 0.65
+  }
+ },
+ {
+  "key": "liverc:bbhobbiesky.liverc.com",
+  "name": "B and B Hobbies",
+  "city": "Greenville",
+  "country": "us",
+  "events": 68,
+  "lat": 37.2048971,
+  "lon": -87.1710878,
+  "verdict": "near",
+  "match": {
+   "nm": "B&B Hobbies",
+   "cat": "hobby_shop",
+   "lat": 37.205952,
+   "lon": -87.154381,
+   "d": 1484,
+   "weight": 0.56
+  }
+ },
+ {
+  "key": "liverc:bbhobbies.liverc.com",
+  "name": "B and B Hobbies Indoor Raceway",
+  "city": "Spokane",
+  "country": "us",
+  "events": 129,
+  "lat": 47.7150227,
+  "lon": -117.4208323,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:machobbies.liverc.com",
+  "name": "B and S Association",
+  "city": "West Columbia",
+  "country": "us",
+  "events": 61,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:backcountryraceway.liverc.com",
+  "name": "backcountryrcraceway",
+  "city": "Gwinn",
+  "country": "us",
+  "events": 70,
+  "lat": 46.3450158,
+  "lon": -87.3770776,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:badfasthobbies.liverc.com",
+  "name": "Bad Fast Hobbies",
+  "city": "Sioux City",
+  "country": "us",
+  "events": 558,
+  "lat": 42.449274,
+  "lon": -96.353137,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Bad Fast Hobbies",
+   "cat": "hobby_shop",
+   "lat": 42.449501,
+   "lon": -96.354454,
+   "d": 111,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:badlandsrcpark.liverc.com",
+  "name": "Badlands RC Park",
+  "city": "West Odessa",
+  "country": "us",
+  "events": 52,
+  "lat": 31.8611733,
+  "lon": -102.5071584,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Badlands RC Park",
+   "cat": "race_track",
+   "lat": 31.860014,
+   "lon": -102.507668,
+   "d": 138,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:bakersfieldrc.liverc.com",
+  "name": "Bakersfield Rc Raceway",
+  "city": "Bakersfield",
+  "country": "us",
+  "events": 98,
+  "lat": 35.3944562,
+  "lon": -119.0188159,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Bakersfield R/C Raceway & Sales, LLC",
+   "cat": "hobby_shop",
+   "lat": 35.394466,
+   "lon": -119.020813,
+   "d": 181,
+   "weight": 0.73
+  }
+ },
+ {
+  "key": "liverc:peteralvaradorc.liverc.com",
+  "name": "BARCELONETA RC COMPLEX",
+  "city": "Barceloneta",
+  "country": "us",
+  "events": 172,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Barceloneta",
+   "cat": "tapas_bar",
+   "lat": 25.703976,
+   "lon": -80.288368,
+   "d": null,
+   "where": "South Miami",
+   "score": 4.95
+  }
+ },
+ {
+  "key": "liverc:barretownrc.liverc.com",
+  "name": "Barre Town RC",
+  "city": "Bare",
+  "country": "us",
+  "events": 120,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Barre Town Park",
+   "cat": "park",
+   "lat": 43.189342,
+   "lon": -78.192024,
+   "d": null,
+   "where": "Albion",
+   "score": 5.37
+  }
+ },
+ {
+  "key": "liverc:bayofplenty.liverc.com",
+  "name": "Bay of Plenty Radio Control Car Club",
+  "city": "Western Bay of Plenty District",
+  "country": "nz",
+  "events": 187,
+  "lat": -37.9472246,
+  "lon": 176.1532495,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Bay of Plenty Paintball Club",
+   "cat": "sporting_goods",
+   "lat": -37.938023,
+   "lon": 176.142853,
+   "d": 1370,
+   "where": "Western Bay of Plenty District",
+   "score": 6.04
+  }
+ },
+ {
+  "key": "liverc:brccc.liverc.com",
+  "name": "Bayside",
+  "city": "Redland City",
+  "country": "au",
+  "events": 116,
+  "lat": -27.4583502,
+  "lon": 153.1449007,
+  "verdict": "near",
+  "match": {
+   "nm": "Bayside BMX Club",
+   "cat": "sports_club_and_league",
+   "lat": -27.460165,
+   "lon": 153.147186,
+   "d": 303,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:bbmodsraceway.liverc.com",
+  "name": "BBmods Raceway",
+  "city": "Gibson City",
+  "country": "us",
+  "events": 77,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "BBmods Hobbies",
+   "cat": "hobby_shop",
+   "lat": 40.530869,
+   "lon": -88.286774,
+   "d": null,
+   "weight": 0.71
+  }
+ },
+ {
+  "key": "liverc:bayrc.liverc.com",
+  "name": "BBRCC Off-Road",
+  "city": "Batemans Bay",
+  "country": "au",
+  "events": 56,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:beachlineraceway.liverc.com",
+  "name": "Beachline Raceway",
+  "city": "Cocoa",
+  "country": "us",
+  "events": 1046,
+  "lat": 28.4061661,
+  "lon": -80.7635263,
+  "verdict": "near",
+  "match": {
+   "nm": "Beachline Raceway",
+   "cat": "race_track",
+   "lat": 28.406633,
+   "lon": -80.771118,
+   "d": 744,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:begorcraceway.liverc.com",
+  "name": "Bego Raceway RC",
+  "city": "Mirabel",
+  "country": "ca",
+  "events": 134,
+  "lat": 45.735636,
+  "lon": -73.9892032,
+  "verdict": "near",
+  "match": {
+   "nm": "Bego Racing RC Raceway",
+   "cat": "race_track",
+   "lat": 45.738293,
+   "lon": -73.99765,
+   "d": 719,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:borrccc.liverc.com",
+  "name": "Bendigo On Road Radio Control Car Club",
+  "city": "Bendigo",
+  "country": "au",
+  "events": 144,
+  "lat": -36.7686658,
+  "lon": 144.315041,
+  "verdict": "near",
+  "match": {
+   "nm": "Bendigo On Road Radio Control Car Club Inc.",
+   "cat": "stadium_arena",
+   "lat": -36.760212,
+   "lon": 144.317062,
+   "d": 957,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:bethelrcracearena.liverc.com",
+  "name": "Bethel RC Racearena",
+  "city": "Bethel",
+  "country": "us",
+  "events": 168,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Bethel Racearena",
+   "cat": "race_track",
+   "lat": 41.383762,
+   "lon": -73.394127,
+   "d": null,
+   "weight": 0.8
+  }
+ },
+ {
+  "key": "liverc:billsrcraceway.liverc.com",
+  "name": "Bills Rc Hobby Shop and Raceway",
+  "city": "Marion",
+  "country": "us",
+  "events": 483,
+  "lat": 40.5382011,
+  "lon": -85.6795508,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Bill's RC Hobby Shop",
+   "cat": "hobby_shop",
+   "lat": 40.538006,
+   "lon": -85.678856,
+   "d": 63,
+   "weight": 0.45
+  }
+ },
+ {
+  "key": "liverc:blastrc.liverc.com",
+  "name": "Blast RC",
+  "city": "asheville",
+  "country": "us",
+  "events": 84,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "BLAST 7D",
+   "cat": "amusement_park",
+   "lat": 40.809448,
+   "lon": -74.066933,
+   "d": null,
+   "where": "East Rutherford",
+   "score": 5.42
+  }
+ },
+ {
+  "key": "liverc:blazenracenrc.liverc.com",
+  "name": "BLAZE N RACE N 2 R.C. RACEWAY",
+  "city": "grovertown",
+  "country": "us",
+  "events": 55,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Blaze N Phaze",
+   "cat": "toy_store",
+   "lat": 29.952028,
+   "lon": -90.070358,
+   "d": null,
+   "where": "New Orleans",
+   "score": 5.42
+  }
+ },
+ {
+  "key": "liverc:bloomhobbyrc.liverc.com",
+  "name": "Bloom Hobby Center",
+  "city": "Bloomsburg",
+  "country": "us",
+  "events": 253,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Bloom Hobby Center",
+   "cat": "hobby_shop",
+   "lat": 41.009018,
+   "lon": -76.41188,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:boogsrctrack.liverc.com",
+  "name": "Boogs RC Track",
+  "city": "Binger",
+  "country": "us",
+  "events": 201,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Boogs Place",
+   "cat": "accommodation",
+   "lat": 43.12431,
+   "lon": -79.012772,
+   "d": null,
+   "where": "Niagara Falls",
+   "score": 5.56
+  }
+ },
+ {
+  "key": "liverc:brcccvic.liverc.com",
+  "name": "Boronia Radio Controlled Car Club inc",
+  "city": "Melbourne",
+  "country": "au",
+  "events": 108,
+  "lat": -37.8336213,
+  "lon": 145.2873204,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Boronia Hawks Football Netball Club - Juniors & Auskick",
+   "cat": "amateur_sports_team",
+   "lat": -37.846012,
+   "lon": 145.28685,
+   "d": 1378,
+   "where": "Melbourne",
+   "score": 6.83
+  }
+ },
+ {
+  "key": "liverc:brickhouse.liverc.com",
+  "name": "Brickhouse RC Raceway",
+  "city": "Roann",
+  "country": "us",
+  "events": 153,
+  "lat": 40.911054,
+  "lon": -85.9246688,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Brickhouse Rc Raceway",
+   "cat": "community_services_non_profits",
+   "lat": 40.911804,
+   "lon": -85.924782,
+   "d": 84,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:bristolrcspeedway.liverc.com",
+  "name": "Bristol RC Speedway",
+  "city": "Bristol",
+  "country": "us",
+  "events": 121,
+  "lat": 36.6315245,
+  "lon": -82.1391081,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Bristol Motor Speedway",
+   "cat": "race_track",
+   "lat": 36.619198,
+   "lon": -82.195145,
+   "d": 5185,
+   "weight": 0.71
+  }
+ },
+ {
+  "key": "liverc:brooklynhobbiesminiz.liverc.com",
+  "name": "Brooklyn Hobbies mini z",
+  "city": "New York",
+  "country": "us",
+  "events": 118,
+  "lat": 40.6197511,
+  "lon": -73.9372751,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Brooklyn Hobbies",
+   "cat": "hobby_shop",
+   "lat": 40.619743,
+   "lon": -73.937355,
+   "d": 7,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:brownshobbyshopandraceway.liverc.com",
+  "name": "browns hobby shop and raceway",
+  "city": "Irondale",
+  "country": "us",
+  "events": 482,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Browns Park",
+   "cat": "park",
+   "lat": 44.236259,
+   "lon": -94.981537,
+   "d": null,
+   "where": "Springfield",
+   "score": 5.39
+  }
+ },
+ {
+  "key": "liverc:bubsbackyardspeedway.liverc.com",
+  "name": "Bubs backyard Speedway",
+  "city": "Village of Youngstown",
+  "country": "us",
+  "events": 133,
+  "lat": 43.2640485,
+  "lon": -78.9864755,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:bullettownrc.liverc.com",
+  "name": "Bullet Town Rc",
+  "city": "Milan",
+  "country": "us",
+  "events": 100,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "The Bullet",
+   "cat": "bar",
+   "lat": 43.758018,
+   "lon": -96.476692,
+   "d": null,
+   "where": "Sherman",
+   "score": 4.81
+  }
+ },
+ {
+  "key": "liverc:bundyrccc.liverc.com",
+  "name": "BundyRCCC",
+  "city": "Bundaberg",
+  "country": "au",
+  "events": 140,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:rctrackwi.liverc.com",
+  "name": "Burlington Hobbies and RC Track",
+  "city": "Burlington",
+  "country": "us",
+  "events": 752,
+  "lat": 42.6795861,
+  "lon": -88.277573,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "The Track at Burlington Hobbies",
+   "cat": "hobby_shop",
+   "lat": 42.679684,
+   "lon": -88.277809,
+   "d": 22,
+   "weight": 0.68
+  }
+ },
+ {
+  "key": "liverc:bwsraceway.liverc.com",
+  "name": "BWS Raceway",
+  "city": "Moreno Valley",
+  "country": "us",
+  "events": 192,
+  "lat": 33.9101981,
+  "lon": -117.159064,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:cairnsrc.liverc.com",
+  "name": "Cairns Radio Controlled Model Car Club",
+  "city": "Gordonvale",
+  "country": "au",
+  "events": 69,
+  "lat": -17.0821281,
+  "lon": 145.779886,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Cairns Radio Controlled Model Car Club",
+   "cat": "sports_club_and_league",
+   "lat": -17.083433,
+   "lon": 145.781357,
+   "d": 213,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:calraceway.liverc.com",
+  "name": "Cal Raceway",
+  "city": "Orange",
+  "country": "us",
+  "events": 227,
+  "lat": 33.8233248,
+  "lon": -117.8400203,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Cal Raceway",
+   "cat": "race_track",
+   "lat": 33.823761,
+   "lon": -117.840302,
+   "d": 55,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:canberraoffroad.liverc.com",
+  "name": "Canberra Off Road Model Car Club",
+  "city": "Canberra",
+  "country": "au",
+  "events": 111,
+  "lat": -35.3375973,
+  "lon": 149.1557701,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Canberra Ice Dragons Dragon Boat Club",
+   "cat": "amateur_sports_team",
+   "lat": -35.301682,
+   "lon": 149.147964,
+   "d": 4056,
+   "weight": 0.45
+  }
+ },
+ {
+  "key": "liverc:canterburyradiocontrolcarclub.liverc.com",
+  "name": "Canterbury radio control car club",
+  "city": "Christchurch",
+  "country": "nz",
+  "events": 115,
+  "lat": -43.5287231,
+  "lon": 172.4883381,
+  "verdict": "near",
+  "match": {
+   "nm": "CRCCC Canterbury Radio Controlled Car Club",
+   "cat": "community_services_non_profits",
+   "lat": -43.5312,
+   "lon": 172.486526,
+   "d": 312,
+   "weight": 0.76
+  }
+ },
+ {
+  "key": "liverc:capitalcityraceway.liverc.com",
+  "name": "Capital City Raceway",
+  "city": "Tallahassee",
+  "country": "us",
+  "events": 112,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Capital City Raceway",
+   "cat": "go_kart_club",
+   "lat": 30.448765,
+   "lon": -84.21331,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:countiesrc.liverc.com",
+  "name": "Capital Model Racers",
+  "city": "Lower Hutt",
+  "country": "nz",
+  "events": 339,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Ski Racers - Ski Club",
+   "cat": "community_services_non_profits",
+   "lat": -39.273727,
+   "lon": 175.556717,
+   "d": null,
+   "where": "Tongariro",
+   "score": 3.49
+  }
+ },
+ {
+  "key": "liverc:carcarcalgary.liverc.com",
+  "name": "CARCAR - Calgary Alberta Radio Control Auto Racers",
+  "city": "Calgary",
+  "country": "ca",
+  "events": 225,
+  "lat": 50.982956,
+  "lon": -113.9739139,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Calgary Alberta RC Auto Racers",
+   "cat": "amateur_sports_team",
+   "lat": 50.982685,
+   "lon": -113.973923,
+   "d": 30,
+   "weight": 0.57
+  }
+ },
+ {
+  "key": "liverc:castlehillrc.liverc.com",
+  "name": "Castle Hill RC Onroad",
+  "city": "Sydney",
+  "country": "au",
+  "events": 335,
+  "lat": -33.7276172,
+  "lon": 150.9864619,
+  "verdict": "near",
+  "match": {
+   "nm": "Castle Hill RC On Road",
+   "cat": "sports_club_and_league",
+   "lat": -33.725903,
+   "lon": 150.983185,
+   "d": 358,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:cedarbluffrcraceway.liverc.com",
+  "name": "Cedar Bluff RC Raceway",
+  "city": "Delavan",
+  "country": "us",
+  "events": 52,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Cedar Bluff Raceway",
+   "cat": "race_track",
+   "lat": 40.42984,
+   "lon": -89.561081,
+   "d": null,
+   "weight": 0.81
+  }
+ },
+ {
+  "key": "liverc:crbullring.liverc.com",
+  "name": "Cedar Rapids RC BullRing",
+  "city": "Cedar Rapids",
+  "country": "us",
+  "events": 409,
+  "lat": 41.9566191,
+  "lon": -91.7218298,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Cedar Rapids Roughriders",
+   "cat": "amateur_sports_team",
+   "lat": 41.96587,
+   "lon": -91.688179,
+   "d": 2966,
+   "weight": 0.53
+  }
+ },
+ {
+  "key": "liverc:cedarspeedway.liverc.com",
+  "name": "Cedar Speedway",
+  "city": "Brandon",
+  "country": "us",
+  "events": 71,
+  "lat": 43.5903014,
+  "lon": -96.570643,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:centreduhobby.liverc.com",
+  "name": "Centre Du Hobby",
+  "city": "Trois-Rivières",
+  "country": "ca",
+  "events": 82,
+  "lat": 46.365624,
+  "lon": -72.6549781,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:challengerc.liverc.com",
+  "name": "ChallengeRC",
+  "city": "Terre Haute",
+  "country": "us",
+  "events": 125,
+  "lat": 39.4267379,
+  "lon": -87.4154329,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:channelislandsrcraceway.liverc.com",
+  "name": "Channel Islands RC Raceway",
+  "city": "Santa Barbara",
+  "country": "us",
+  "events": 56,
+  "lat": 34.414206,
+  "lon": -119.736314,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Channel Islands RC",
+   "cat": "park",
+   "lat": 34.414249,
+   "lon": -119.738838,
+   "d": 232,
+   "where": "Santa Barbara",
+   "score": 6.56
+  }
+ },
+ {
+  "key": "liverc:chargersrc.liverc.com",
+  "name": "Chargers RC",
+  "city": "Brisbane",
+  "country": "au",
+  "events": 192,
+  "lat": -27.6352246,
+  "lon": 152.9367597,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Chargers RC",
+   "cat": "amateur_sports_league",
+   "lat": -27.634811,
+   "lon": 152.937256,
+   "d": 67,
+   "where": "Brisbane",
+   "score": 6.25
+  }
+ },
+ {
+  "key": "liverc:cheesecity.liverc.com",
+  "name": "CheeseCity",
+  "city": "Monroe",
+  "country": "us",
+  "events": 367,
+  "lat": 42.5842017,
+  "lon": -89.6481872,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:spdaylight4449.liverc.com",
+  "name": "Chehaw RC Raceway of Albany",
+  "city": "Albany",
+  "country": "us",
+  "events": 224,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Chehaw RC Raceway",
+   "cat": "race_track",
+   "lat": 31.624184,
+   "lon": -84.136513,
+   "d": null,
+   "weight": 0.61
+  }
+ },
+ {
+  "key": "liverc:cherryvalley.liverc.com",
+  "name": "Cherry Valley RC Park",
+  "city": "Southaven",
+  "country": "us",
+  "events": 81,
+  "lat": 34.968978,
+  "lon": -90.016445,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:chieflandraceway.liverc.com",
+  "name": "Chiefland RC Raceway",
+  "city": "Chiefland",
+  "country": "us",
+  "events": 387,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Chiefland RC Raceway",
+   "cat": "race_track",
+   "lat": 29.493292,
+   "lon": -82.864876,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:chihuahuarc.liverc.com",
+  "name": "Chihuahua RC",
+  "city": "CHIHUAHUA",
+  "country": "mx",
+  "events": 69,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Fútbol Club Gladiadores Chihuahua",
+   "cat": "amateur_sports_team",
+   "lat": 28.609934,
+   "lon": -106.124321,
+   "d": null,
+   "weight": 0.63
+  }
+ },
+ {
+  "key": "liverc:circcc.liverc.com",
+  "name": "Christchurch Indoor Radio Controlled Car Club",
+  "city": "Fendalton-Waimari-Harewood Community",
+  "country": "nz",
+  "events": 151,
+  "lat": -43.4698725,
+  "lon": 172.4904196,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Christchurch Indoor Radio Controlled Car Club",
+   "cat": "race_track",
+   "lat": -43.469952,
+   "lon": 172.490372,
+   "d": 10,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:chchrcspeedway.liverc.com",
+  "name": "Christchurch RC Speedway",
+  "city": "Christchurch",
+  "country": "nz",
+  "events": 60,
+  "lat": -43.5172619,
+  "lon": 172.6595298,
+  "verdict": "near",
+  "match": {
+   "nm": "Christchurch Target Shooting",
+   "cat": "sports_club_and_league",
+   "lat": -43.525875,
+   "lon": 172.648712,
+   "d": 1295,
+   "weight": 0.46
+  }
+ },
+ {
+  "key": "liverc:ajusco.liverc.com",
+  "name": "Circuito Ajusco RRAAC",
+  "city": "La Campana",
+  "country": "mx",
+  "events": 390,
+  "lat": 19.2577412,
+  "lon": -99.2412076,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Circuito Ajusco RRAAC",
+   "cat": null,
+   "lat": 19.247625,
+   "lon": -99.242249,
+   "d": 1130,
+   "where": "Tlalpan",
+   "score": 7.27
+  }
+ },
+ {
+  "key": "liverc:touring.liverc.com",
+  "name": "Circuito Hernan Matticoli",
+  "city": "La Tablada",
+  "country": "ar",
+  "events": 75,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Circuito HERNAN MATTICOLI",
+   "cat": "stadium_arena",
+   "lat": -34.702171,
+   "lon": -58.535416,
+   "d": null,
+   "where": "Ciudad Evita",
+   "score": 6.39
+  }
+ },
+ {
+  "key": "liverc:coastalrcoffroad.liverc.com",
+  "name": "Coastal RC Speedway",
+  "city": "Chesapeake",
+  "country": "us",
+  "events": 675,
+  "lat": 36.8004639,
+  "lon": -76.2748779,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Coastal RC Speedway and Hobbies",
+   "cat": "hobby_shop",
+   "lat": 36.800499,
+   "lon": -76.274879,
+   "d": 4,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:coastalrconroad.liverc.com",
+  "name": "Coastal RC Speedway Onroad",
+  "city": "Chesapeake",
+  "country": "us",
+  "events": 374,
+  "lat": 36.8004639,
+  "lon": -76.2748779,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Coastal RC Speedway and Hobbies",
+   "cat": "hobby_shop",
+   "lat": 36.800499,
+   "lon": -76.274879,
+   "d": 4,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:colesrcclub.liverc.com",
+  "name": "Colesville RC Club",
+  "city": "City of Binghamton",
+  "country": "us",
+  "events": 162,
+  "lat": 42.1373905,
+  "lon": -75.7557921,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "West Colesville Fire Station",
+   "cat": "fire_department",
+   "lat": 42.141441,
+   "lon": -75.74118,
+   "d": 1286,
+   "where": "Binghamton",
+   "score": 6.55
+  }
+ },
+ {
+  "key": "liverc:colparraceway.liverc.com",
+  "name": "Colpar Raceway",
+  "city": "Aurora",
+  "country": "us",
+  "events": 90,
+  "lat": 39.6815924,
+  "lon": -104.867302,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Colpar's HobbyTown",
+   "cat": "hobby_shop",
+   "lat": 39.681461,
+   "lon": -104.867264,
+   "d": 15,
+   "weight": 0.7
+  }
+ },
+ {
+  "key": "liverc:coopersrc.liverc.com",
+  "name": "Cooper's RC",
+  "city": "Chatham",
+  "country": "us",
+  "events": 158,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Cooper’s RC raceway VA",
+   "cat": "race_track",
+   "lat": 36.867119,
+   "lon": -79.595894,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:corvictoria.liverc.com",
+  "name": "COR Victoria",
+  "city": "Victoria",
+  "country": "ca",
+  "events": 104,
+  "lat": 48.4376768,
+  "lon": -123.360576,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "COR Victoria",
+   "cat": "race_track",
+   "lat": 48.471085,
+   "lon": -123.500862,
+   "d": 10992,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:cosmicraceway.liverc.com",
+  "name": "Cosmic Raceway",
+  "city": "Las Vegas",
+  "country": "us",
+  "events": 74,
+  "lat": 36.2249315,
+  "lon": -115.2194435,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Cosmic Raceway/CrawLVenture",
+   "cat": "playground",
+   "lat": 36.225632,
+   "lon": -115.217247,
+   "d": 212,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:counties.liverc.com",
+  "name": "Counties RC",
+  "city": "Franklin",
+  "country": "nz",
+  "events": 167,
+  "lat": -37.2025666,
+  "lon": 174.9101169,
+  "verdict": "near",
+  "match": {
+   "nm": "Counties Manukau Rugby",
+   "cat": "sports_club_and_league",
+   "lat": -37.19862,
+   "lon": 174.907654,
+   "d": 490,
+   "weight": 0.65
+  }
+ },
+ {
+  "key": "liverc:countylinerc.liverc.com",
+  "name": "county line rc raceway",
+  "city": "Chatsworth",
+  "country": "us",
+  "events": 108,
+  "lat": 34.7948953,
+  "lon": -84.7729539,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:coyotehobbiesraceway.liverc.com",
+  "name": "Coyote Hobbies Raceway",
+  "city": "Victorville",
+  "country": "us",
+  "events": 317,
+  "lat": 34.4739178,
+  "lon": -117.2829954,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Coyote Hobbies and Raceway",
+   "cat": "race_track",
+   "lat": 34.473694,
+   "lon": -117.283333,
+   "d": 40,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:crashnbashhobbies.liverc.com",
+  "name": "Crash N Bash Hobbies Raceway",
+  "city": "Cedar Rapids",
+  "country": "us",
+  "events": 232,
+  "lat": 41.9344538,
+  "lon": -91.6761373,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Crash'n Bash Hobbies",
+   "cat": "hobby_shop",
+   "lat": 41.934082,
+   "lon": -91.675491,
+   "d": 68,
+   "weight": 0.84
+  }
+ },
+ {
+  "key": "liverc:crashleyrc.liverc.com",
+  "name": "Crashley RC",
+  "city": "Stoke-on-Trent",
+  "country": "gb",
+  "events": 99,
+  "lat": 53.0030703,
+  "lon": -2.1669237,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:crcraceway.liverc.com",
+  "name": "CRC Raceway",
+  "city": "City of Rome",
+  "country": "us",
+  "events": 606,
+  "lat": 43.1959832,
+  "lon": -75.4388451,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "CRC Raceway & Hobbies - Rome, NY",
+   "cat": "amusement_park",
+   "lat": 43.196007,
+   "lon": -75.438797,
+   "d": 5,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:creekviewrcspeedway.liverc.com",
+  "name": "Creek View Rc Speedway",
+  "city": "Brookville",
+  "country": "us",
+  "events": 75,
+  "lat": 41.1564679,
+  "lon": -79.0885515,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Creek View RC Speedway",
+   "cat": "race_track",
+   "lat": 41.156059,
+   "lon": -79.088097,
+   "d": 59,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:dorcraceway.liverc.com",
+  "name": "Crestwood rc raceway",
+  "city": "Manilla",
+  "country": "ca",
+  "events": 87,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Crestwood Park",
+   "cat": "park",
+   "lat": 49.265827,
+   "lon": -122.852371,
+   "d": null,
+   "where": "Coquitlam",
+   "score": 5.49
+  }
+ },
+ {
+  "key": "liverc:critterraceway.liverc.com",
+  "name": "Critters Raceway",
+  "city": "Fairfield",
+  "country": "us",
+  "events": 556,
+  "lat": 40.860402,
+  "lon": -74.3186534,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Crispy Critters Hobby Shop and Raceway",
+   "cat": "hobby_shop",
+   "lat": 40.860043,
+   "lon": -74.317574,
+   "d": 99,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:cruizinrc.liverc.com",
+  "name": "Cruizin With RCs",
+  "city": "Waldwick",
+  "country": "us",
+  "events": 872,
+  "lat": 41.0082258,
+  "lon": -74.119516,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Cruizin' with RC's",
+   "cat": "hobby_shop",
+   "lat": 41.008171,
+   "lon": -74.119354,
+   "d": 15,
+   "weight": 0.68
+  }
+ },
+ {
+  "key": "liverc:ctsr.liverc.com",
+  "name": "CTSR Carpet",
+  "city": "Saint-Roch-de-l'Achigan",
+  "country": "ca",
+  "events": 201,
+  "lat": 45.823104,
+  "lon": -73.6027105,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:ctsrdirt.liverc.com",
+  "name": "CTSR DIRT OVAL and CARPET OFFROAD",
+  "city": "Saint-Roch-de-l'Achigan",
+  "country": "ca",
+  "events": 92,
+  "lat": 45.8249822,
+  "lon": -73.6030419,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:philippinemasters.liverc.com",
+  "name": "CV OFF-ROAD TRACK",
+  "city": "Metro Manila",
+  "country": "ph",
+  "events": 303,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:dakotarc.liverc.com",
+  "name": "Dakota RC",
+  "city": "Jamestown",
+  "country": "us",
+  "events": 61,
+  "lat": 46.9354217,
+  "lon": -98.6955507,
+  "verdict": "near",
+  "match": {
+   "nm": "Dakota Motocross",
+   "cat": "race_track",
+   "lat": 46.934364,
+   "lon": -98.721375,
+   "d": 1964,
+   "weight": 0.63
+  }
+ },
+ {
+  "key": "liverc:dakotaslidewayzrc.liverc.com",
+  "name": "Dakota Slidewayz RC",
+  "city": "Aberdeen",
+  "country": "us",
+  "events": 421,
+  "lat": 45.4586568,
+  "lon": -98.4519641,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Dakota Slidewayz Off-Road RC Club",
+   "cat": "race_track",
+   "lat": 45.493389,
+   "lon": -98.483917,
+   "d": 4596,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:djraceway.liverc.com",
+  "name": "DandJ RC Raceway",
+  "city": "Wooster",
+  "country": "us",
+  "events": 194,
+  "lat": 40.7928847,
+  "lon": -81.9342392,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:dbcmotorsports.liverc.com",
+  "name": "DBC Motorsports",
+  "city": "Louisville",
+  "country": "us",
+  "events": 204,
+  "lat": 38.1934855,
+  "lon": -85.6449525,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Dbc Food Llc",
+   "cat": "restaurant",
+   "lat": 38.230114,
+   "lon": -85.638893,
+   "d": 4107,
+   "where": "Louisville",
+   "score": 3.83
+  }
+ },
+ {
+  "key": "liverc:deltarc.liverc.com",
+  "name": "Delta RC",
+  "city": "Antioch",
+  "country": "us",
+  "events": 294,
+  "lat": 38.011264,
+  "lon": -121.823575,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Delta RC Hobbies & Race Park",
+   "cat": "race_track",
+   "lat": 38.011562,
+   "lon": -121.824142,
+   "d": 60,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:diehardrcracing.liverc.com",
+  "name": "DieHard RC",
+  "city": "Camano Island",
+  "country": "us",
+  "events": 413,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "DieHard RC",
+   "cat": "race_track",
+   "lat": 47.886879,
+   "lon": -122.072762,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:ddspeedway.liverc.com",
+  "name": "Dirt Devil RC Speedway",
+  "city": "Emmett Charter Township",
+  "country": "us",
+  "events": 186,
+  "lat": 42.3039272,
+  "lon": -85.1589192,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Devil's Soup Bowl",
+   "cat": "skate_park",
+   "lat": 42.622665,
+   "lon": -85.478088,
+   "d": 44063,
+   "where": "Yankee Springs",
+   "score": 4.25
+  }
+ },
+ {
+  "key": "liverc:shiftysrcraceway.liverc.com",
+  "name": "Dirt Floor Raceway",
+  "city": "Broken Arrow",
+  "country": "us",
+  "events": 622,
+  "lat": 35.9839882,
+  "lon": -95.8510135,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Dirt Floor Raceway - Dirt Oval",
+   "cat": "amusement_park",
+   "lat": 35.981823,
+   "lon": -95.851395,
+   "d": 243,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:dirtrunners.liverc.com",
+  "name": "DirtRunners RC Car Club",
+  "city": "Oak Ridge",
+  "country": "us",
+  "events": 212,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:djorcraceway.liverc.com",
+  "name": "DJO Race Productions",
+  "city": "Wapakoneta",
+  "country": "us",
+  "events": 81,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "DJO R/C Raceway",
+   "cat": "race_track",
+   "lat": 40.490227,
+   "lon": -84.086205,
+   "d": null,
+   "where": "Wapakoneta",
+   "score": 5.69
+  }
+ },
+ {
+  "key": "liverc:dndrcraceway.liverc.com",
+  "name": "dndrcraceway",
+  "city": "Tucson",
+  "country": "us",
+  "events": 59,
+  "lat": 32.272742,
+  "lon": -111.0108055,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:dollarhobbyz.liverc.com",
+  "name": "Dollar Hobbyz RC Raceway",
+  "city": "Woodbury",
+  "country": "us",
+  "events": 252,
+  "lat": 44.9460783,
+  "lon": -92.9106754,
+  "verdict": "near",
+  "match": {
+   "nm": "Dollar Hobbyz",
+   "cat": "hobby_shop",
+   "lat": 44.943542,
+   "lon": -92.912018,
+   "d": 301,
+   "weight": 0.68
+  }
+ },
+ {
+  "key": "liverc:drcr.liverc.com",
+  "name": "DRCR",
+  "city": "Hazard",
+  "country": "us",
+  "events": 353,
+  "lat": 37.2468399,
+  "lon": -83.1835447,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:drracing.liverc.com",
+  "name": "drracing",
+  "city": "Kallinge",
+  "country": "se",
+  "events": 80,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:drsracing.liverc.com",
+  "name": "DRS Racing",
+  "city": "上海市",
+  "country": "cn",
+  "events": 58,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Drs.SKin美學",
+   "cat": null,
+   "lat": 22.539448,
+   "lon": 114.114571,
+   "d": null,
+   "where": "Shenzhen",
+   "score": 4.74
+  }
+ },
+ {
+  "key": "liverc:eteamhobby.liverc.com",
+  "name": "e-Team HobbyPlex",
+  "city": "Fort Collins",
+  "country": "us",
+  "events": 490,
+  "lat": 40.590942,
+  "lon": -105.0521692,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "E-Team Hobbyplex",
+   "cat": "hobby_shop",
+   "lat": 40.590919,
+   "lon": -105.052055,
+   "d": 10,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:edsrc.liverc.com",
+  "name": "Eds Rc and Hobby",
+  "city": "Parkersburg",
+  "country": "us",
+  "events": 339,
+  "lat": 39.292313,
+  "lon": -81.548261,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Eds RC & Hobby",
+   "cat": "hobby_shop",
+   "lat": 39.293827,
+   "lon": -81.54837,
+   "d": 169,
+   "weight": 0.83
+  }
+ },
+ {
+  "key": "liverc:enhobbies.liverc.com",
+  "name": "EN Hobbies",
+  "city": "Columbus",
+  "country": "us",
+  "events": 726,
+  "lat": 39.9243573,
+  "lon": -82.8331591,
+  "verdict": "near",
+  "match": {
+   "nm": "EN Hobbies",
+   "cat": "hobby_shop",
+   "lat": 39.922348,
+   "lon": -82.837616,
+   "d": 441,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:qrccra.liverc.com",
+  "name": "England Park Raceway",
+  "city": "Brisbane",
+  "country": "au",
+  "events": 483,
+  "lat": -27.3203046,
+  "lon": 152.9772986,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Piper England Dressage",
+   "cat": "amateur_sports_team",
+   "lat": -27.144733,
+   "lon": 152.766907,
+   "d": 28528,
+   "weight": 0.46
+  }
+ },
+ {
+  "key": "liverc:ercraceway.liverc.com",
+  "name": "ERC Raceway",
+  "city": "Easley",
+  "country": "us",
+  "events": 615,
+  "lat": 34.8306854,
+  "lon": -82.5117097,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "ERC Offroad",
+   "cat": "race_track",
+   "lat": 34.830708,
+   "lon": -82.511688,
+   "d": 3,
+   "weight": 0.67
+  }
+ },
+ {
+  "key": "liverc:evansvilleminiz.liverc.com",
+  "name": "Evansville Area Mini-z",
+  "city": "Evansville",
+  "country": "us",
+  "events": 50,
+  "lat": 37.9917054,
+  "lon": -87.5236636,
+  "verdict": "near",
+  "match": {
+   "nm": "Evansville Municipal Golf Courses",
+   "cat": "stadium_arena",
+   "lat": 37.999462,
+   "lon": -87.534607,
+   "d": 1290,
+   "weight": 0.6
+  }
+ },
+ {
+  "key": "liverc:excelrc.liverc.com",
+  "name": "Excel RC",
+  "city": "Garden City",
+  "country": "us",
+  "events": 305,
+  "lat": 42.3236371,
+  "lon": -83.3304341,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Excel Rc And Hobbies",
+   "cat": "hobby_shop",
+   "lat": 42.323631,
+   "lon": -83.330437,
+   "d": 1,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:exeterrcspeedway.liverc.com",
+  "name": "Exeter RC Speedway",
+  "city": "Exeter",
+  "country": "us",
+  "events": 71,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Exeter Reservoir",
+   "cat": "park",
+   "lat": 42.987133,
+   "lon": -70.934303,
+   "d": null,
+   "where": "Exeter",
+   "score": 5.4
+  }
+ },
+ {
+  "key": "liverc:familyrc.liverc.com",
+  "name": "Family RC",
+  "city": "Clinton Township",
+  "country": "us",
+  "events": 52,
+  "lat": 42.565696,
+  "lon": -82.8948559,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Family RC inc.",
+   "cat": "race_track",
+   "lat": 42.565681,
+   "lon": -82.895012,
+   "d": 13,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:farmercityrcraceway.liverc.com",
+  "name": "Farmer City RC Raceway",
+  "city": "Farmer City",
+  "country": "us",
+  "events": 59,
+  "lat": 40.2511501,
+  "lon": -88.6415578,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Farmer City Raceway",
+   "cat": "race_track",
+   "lat": 40.25251,
+   "lon": -88.640434,
+   "d": 179,
+   "weight": 0.79
+  }
+ },
+ {
+  "key": "liverc:fastandfuntoyandhobby.liverc.com",
+  "name": "Fast and Fun Toy and Hobby",
+  "city": "Green Bay",
+  "country": "us",
+  "events": 130,
+  "lat": 44.4728898,
+  "lon": -88.072947,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:fastrlaprc.liverc.com",
+  "name": "Fast-R-Lap RC",
+  "city": "Colorado Springs",
+  "country": "us",
+  "events": 67,
+  "lat": 38.8661721,
+  "lon": -104.7535737,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:fastlanehobbies.liverc.com",
+  "name": "Fastlane Raceway",
+  "city": "Blue Springs",
+  "country": "us",
+  "events": 2011,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Fastlane Raceway LLC",
+   "cat": "race_track",
+   "lat": 39.00803,
+   "lon": -94.297554,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:feiteng.liverc.com",
+  "name": "feiteng",
+  "city": "荔湾区",
+  "country": "cn",
+  "events": 159,
+  "lat": 23.1290644,
+  "lon": 113.2132779,
+  "verdict": "near",
+  "match": {
+   "nm": "Feiteng R/C Race Track",
+   "cat": "race_track",
+   "lat": 23.134739,
+   "lon": 113.213448,
+   "d": 631,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:djphlo43.liverc.com",
+  "name": "fender bender speedway",
+  "city": "Town of Islip",
+  "country": "us",
+  "events": 95,
+  "lat": 40.7974597,
+  "lon": -73.1219767,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Bender",
+   "cat": "plumbing",
+   "lat": 41.124516,
+   "lon": -73.397568,
+   "d": 43105,
+   "where": "Norwalk",
+   "score": 4.29
+  }
+ },
+ {
+  "key": "liverc:fenderbenders.liverc.com",
+  "name": "Fender Benders RC Club",
+  "city": "Weslaco",
+  "country": "us",
+  "events": 297,
+  "lat": 26.1519233,
+  "lon": -97.9824832,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Margiee Fender, Medina Real Estate - Weslaco",
+   "cat": null,
+   "lat": 26.170473,
+   "lon": -97.976669,
+   "d": 2143,
+   "where": "Weslaco",
+   "score": 3.81
+  }
+ },
+ {
+  "key": "liverc:finishlineraceway.liverc.com",
+  "name": "Finish Line Raceway",
+  "city": "Hudson",
+  "country": "us",
+  "events": 1062,
+  "lat": 41.5268587,
+  "lon": -85.1147726,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Finish Line Raceway",
+   "cat": "race_track",
+   "lat": 41.527397,
+   "lon": -85.078835,
+   "d": 2992,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:tracktimehobbies.liverc.com",
+  "name": "Finishline RC Bakersfield",
+  "city": "Bakersfield",
+  "country": "us",
+  "events": 76,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Finishline RC Raceway",
+   "cat": "race_track",
+   "lat": 35.447765,
+   "lon": -119.083786,
+   "d": null,
+   "weight": 0.64
+  }
+ },
+ {
+  "key": "liverc:firststatehobbies.liverc.com",
+  "name": "First State Hobbies",
+  "city": "Newark",
+  "country": "us",
+  "events": 464,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "First State Hobbies",
+   "cat": "hobby_shop",
+   "lat": 39.601246,
+   "lon": -75.744965,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:fivepointrcspeedway.liverc.com",
+  "name": "five point rc speedway",
+  "city": "Jeptha",
+  "country": "us",
+  "events": 95,
+  "lat": 34.1283377,
+  "lon": -83.0931106,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:flaglerrcracers.liverc.com",
+  "name": "Flagler RC Racers",
+  "city": "Palm Coast",
+  "country": "us",
+  "events": 54,
+  "lat": 29.523664,
+  "lon": -81.2059379,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Gotcha Covered of Flagler County",
+   "cat": "window_treatment_store",
+   "lat": 29.524359,
+   "lon": -81.213165,
+   "d": 704,
+   "where": "Palm Coast",
+   "score": 4.56
+  }
+ },
+ {
+  "key": "liverc:flightpathraceway.liverc.com",
+  "name": "Flightpath",
+  "city": "Fresno County",
+  "country": "us",
+  "events": 66,
+  "lat": 36.7645667,
+  "lon": -119.6458638,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Flightpath Raceway",
+   "cat": "race_track",
+   "lat": 36.763958,
+   "lon": -119.646477,
+   "d": 87,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:floravistaraceway.liverc.com",
+  "name": "Flora Vista RC Speedway",
+  "city": "Flora Vista",
+  "country": "us",
+  "events": 66,
+  "lat": 36.7984453,
+  "lon": -108.0703454,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Flora Vista RC Speedway",
+   "cat": "race_track",
+   "lat": 36.815399,
+   "lon": -108.085953,
+   "d": 2342,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:fmrc.liverc.com",
+  "name": "FMRC",
+  "city": "Dilworth",
+  "country": "us",
+  "events": 365,
+  "lat": 46.8776091,
+  "lon": -96.7123193,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "FMRC Raceways",
+   "cat": null,
+   "lat": 46.878078,
+   "lon": -96.714363,
+   "d": 164,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:forgassracing.liverc.com",
+  "name": "FORGASS",
+  "city": "Arcadia",
+  "country": "us",
+  "events": 88,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:foxtrotrcpark.liverc.com",
+  "name": "FoxTrot RC Park",
+  "city": "Johnstown",
+  "country": "us",
+  "events": 203,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Foxtrot RC Park",
+   "cat": "race_track",
+   "lat": 42.984043,
+   "lon": -74.387199,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:roadrunners.liverc.com",
+  "name": "Freedom Park Raceway",
+  "city": "Camarillo",
+  "country": "us",
+  "events": 450,
+  "lat": 34.2070142,
+  "lon": -119.0871394,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Freedom Park BMX Raceway",
+   "cat": "race_track",
+   "lat": 34.209076,
+   "lon": -119.087013,
+   "d": 230,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:forc.liverc.com",
+  "name": "Full Send RC Raceway",
+  "city": "Jonesboro",
+  "country": "us",
+  "events": 274,
+  "lat": 35.8588526,
+  "lon": -90.6534315,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:fullthrottleraceway.liverc.com",
+  "name": "Full Throttle RC Park",
+  "city": "Green Island",
+  "country": "us",
+  "events": 569,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Full Throttle Sport Fishing Eureka Ca",
+   "cat": "sports_and_recreation_venue",
+   "lat": 40.808224,
+   "lon": -124.162865,
+   "d": null,
+   "where": "Eureka",
+   "score": 5.5
+  }
+ },
+ {
+  "key": "liverc:ftrcr.liverc.com",
+  "name": "Full Throttle RC Raceway",
+  "city": "Foley",
+  "country": "us",
+  "events": 118,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Full Throttle RC Raceway",
+   "cat": "race_track",
+   "lat": 45.690559,
+   "lon": -93.948174,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:hobbyfactoryfinland.liverc.com",
+  "name": "Fullspeed RC",
+  "city": "Vantaa",
+  "country": "fi",
+  "events": 296,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Fullspeed RC Hakkilan RC-keskus",
+   "cat": "race_track",
+   "lat": 60.298622,
+   "lon": 25.088181,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:gandsraceway.liverc.com",
+  "name": "G and S Raceway",
+  "city": "Fulton",
+  "country": "us",
+  "events": 276,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:grcraceway.liverc.com",
+  "name": "Galenaro Racing Circuit",
+  "city": "김포시",
+  "country": "kr",
+  "events": 293,
+  "lat": 37.6969306,
+  "lon": 126.58503,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:gallimods.liverc.com",
+  "name": "Galli Mods Hobby Shop",
+  "city": "BALDWIN PLACE",
+  "country": "us",
+  "events": 243,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "The Mods",
+   "cat": "landmark_and_historical_building",
+   "lat": 30.666903,
+   "lon": -96.347305,
+   "d": null,
+   "where": "Bryan",
+   "score": 4.94
+  }
+ },
+ {
+  "key": "liverc:gdc.liverc.com",
+  "name": "GDC Racing",
+  "city": "guangdong",
+  "country": "cn",
+  "events": 72,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:grcor.liverc.com",
+  "name": "Geelong RC Offroaders",
+  "city": "Avalon",
+  "country": "au",
+  "events": 57,
+  "lat": -38.0167901,
+  "lon": 144.4729911,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Geelong RC Offroaders",
+   "cat": "amateur_sports_team",
+   "lat": -38.016605,
+   "lon": 144.472107,
+   "d": 80,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:grccc.liverc.com",
+  "name": "Geelong RC Racers",
+  "city": "Geelong",
+  "country": "au",
+  "events": 152,
+  "lat": -38.0631172,
+  "lon": 144.379141,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Geelong Radio Control Racers",
+   "cat": "race_track",
+   "lat": -38.061455,
+   "lon": 144.380127,
+   "d": 204,
+   "weight": 0.76
+  }
+ },
+ {
+  "key": "liverc:genesisrcraceway.liverc.com",
+  "name": "Genesis RC Raceway",
+  "city": "Marshall",
+  "country": "us",
+  "events": 88,
+  "lat": 44.4358149,
+  "lon": -95.7680853,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Genesis RC Raceway",
+   "cat": "race_track",
+   "lat": 44.435333,
+   "lon": -95.768127,
+   "d": 54,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:germantown.liverc.com",
+  "name": "germantown raceway",
+  "city": "Danville",
+  "country": "us",
+  "events": 302,
+  "lat": 40.140097,
+  "lon": -87.617562,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Germantown Raceway",
+   "cat": "race_track",
+   "lat": 40.140171,
+   "lon": -87.617165,
+   "d": 35,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:negihturaceway.liverc.com",
+  "name": "GI HobbyTown Raceway",
+  "city": "Grand Island",
+  "country": "us",
+  "events": 69,
+  "lat": 40.9197293,
+  "lon": -98.3817215,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "HobbyTown",
+   "cat": "hobby_shop",
+   "lat": 40.918903,
+   "lon": -98.38002,
+   "d": 170,
+   "where": "Grand Island",
+   "score": 6.86
+  }
+ },
+ {
+  "key": "liverc:gizzyrc.liverc.com",
+  "name": "Gizzy RC Raceway",
+  "city": "Gisborne",
+  "country": "nz",
+  "events": 94,
+  "lat": -38.6572447,
+  "lon": 178.054271,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Wabi Sabi Gizzy",
+   "cat": "tea_room",
+   "lat": -38.670052,
+   "lon": 178.042953,
+   "d": 1730,
+   "where": "Gisborne",
+   "score": 6.76
+  }
+ },
+ {
+  "key": "liverc:gkrraceway.liverc.com",
+  "name": "GKR Raceway",
+  "city": "Helenville, Auckland",
+  "country": "nz",
+  "events": 83,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "GKR Karate Region 19 Auckland, New Zealand",
+   "cat": "sports_club_and_league",
+   "lat": -37.001816,
+   "lon": 174.875214,
+   "d": null,
+   "where": "Auckland",
+   "score": 5.49
+  }
+ },
+ {
+  "key": "liverc:gobrc.liverc.com",
+  "name": "Good Ol' Boyz RC Club Raceway",
+  "city": "Bakersfield",
+  "country": "us",
+  "events": 110,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "MK BOYZ",
+   "cat": "hobby_shop",
+   "lat": 40.865688,
+   "lon": -73.862717,
+   "d": null,
+   "where": "New York",
+   "score": 5.43
+  }
+ },
+ {
+  "key": "liverc:jjsraceway.liverc.com",
+  "name": "Grand Junction Riverside Raceway",
+  "city": "Grand Junction",
+  "country": "us",
+  "events": 90,
+  "lat": 39.0564445,
+  "lon": -108.5590519,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Grand Junction Jackalopes",
+   "cat": "amateur_sports_team",
+   "lat": 39.077183,
+   "lon": -108.55072,
+   "d": 2416,
+   "weight": 0.55
+  }
+ },
+ {
+  "key": "liverc:grandriverrc.liverc.com",
+  "name": "Grand River RC",
+  "city": "Grandville",
+  "country": "us",
+  "events": 1219,
+  "lat": 42.9180409,
+  "lon": -85.7552208,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Grand River RC",
+   "cat": "hobby_shop",
+   "lat": 42.9179,
+   "lon": -85.755981,
+   "d": 64,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:rggibsonracing.liverc.com",
+  "name": "GRCR Gibson Racing",
+  "city": "Pasco",
+  "country": "us",
+  "events": 79,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Grcr, Inc",
+   "cat": "restaurant",
+   "lat": 40.775024,
+   "lon": -89.671753,
+   "d": null,
+   "where": "Peoria",
+   "score": 6.07
+  }
+ },
+ {
+  "key": "liverc:greystonespeedway.liverc.com",
+  "name": "Greystone Speedway",
+  "city": "Greeneville",
+  "country": "us",
+  "events": 82,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Greystone R/C speedway",
+   "cat": "race_track",
+   "lat": 36.37505,
+   "lon": -82.532166,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:groundswell.liverc.com",
+  "name": "Groundswell Raceway",
+  "city": "DeLand",
+  "country": "us",
+  "events": 56,
+  "lat": 29.0246918,
+  "lon": -81.3185691,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:gspeed.liverc.com",
+  "name": "GSPeed  GS Hobby",
+  "city": "Barling",
+  "country": "us",
+  "events": 298,
+  "lat": 35.3360847,
+  "lon": -94.3170128,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "GS Hobby",
+   "cat": "hobby_shop",
+   "lat": 35.33606,
+   "lon": -94.317139,
+   "d": 12,
+   "weight": 0.52
+  }
+ },
+ {
+  "key": "liverc:gsrcraceway.liverc.com",
+  "name": "GSRC RC Raceway",
+  "city": "Shippensburg Township",
+  "country": "us",
+  "events": 194,
+  "lat": 40.0407159,
+  "lon": -77.5184624,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "GSRC Greater Shippensburg RC",
+   "cat": "race_track",
+   "lat": 40.023895,
+   "lon": -77.527283,
+   "d": 2016,
+   "weight": 0.78
+  }
+ },
+ {
+  "key": "liverc:gulfcoastraceway.liverc.com",
+  "name": "Gulf Coast Raceway",
+  "city": "porter",
+  "country": "us",
+  "events": 683,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Mikes Gulf Coast RC Raceway",
+   "cat": "race_track",
+   "lat": 30.077915,
+   "lon": -95.241005,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:hackfab.liverc.com",
+  "name": "HackFab RC Raceway",
+  "city": "Village of Sherburne",
+  "country": "us",
+  "events": 82,
+  "lat": 42.678416,
+  "lon": -75.5003003,
+  "verdict": "near",
+  "match": {
+   "nm": "HackFab Hobbies",
+   "cat": "hobby_shop",
+   "lat": 42.674706,
+   "lon": -75.497299,
+   "d": 480,
+   "weight": 0.53
+  }
+ },
+ {
+  "key": "liverc:elpasorcminicrossspeedway.liverc.com",
+  "name": "Hal's RC Tracks",
+  "city": "El Paso",
+  "country": "us",
+  "events": 160,
+  "lat": 31.7974365,
+  "lon": -106.2790947,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:hamiltonrccc.liverc.com",
+  "name": "Hamilton Radio Control Car Club",
+  "city": "Hamilton",
+  "country": "nz",
+  "events": 126,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:hankperryrc.liverc.com",
+  "name": "Hank Perry Raceway",
+  "city": "Spokane Valley",
+  "country": "us",
+  "events": 75,
+  "lat": 47.6748839,
+  "lon": -117.19668,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "The Hank Perry Rc Park",
+   "cat": "race_track",
+   "lat": 47.675163,
+   "lon": -117.197609,
+   "d": 76,
+   "weight": 0.8
+  }
+ },
+ {
+  "key": "liverc:erp.liverc.com",
+  "name": "Happy Sac Raceway",
+  "city": "Tuscaloosa",
+  "country": "us",
+  "events": 90,
+  "lat": 33.189761,
+  "lon": -87.4533371,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:harewood.liverc.com",
+  "name": "Harewood Radio Control Car Club",
+  "city": "Christchurch",
+  "country": "nz",
+  "events": 243,
+  "lat": -43.4723422,
+  "lon": 172.5707941,
+  "verdict": "near",
+  "match": {
+   "nm": "Harewood Radio Controlled Car Club",
+   "cat": "race_track",
+   "lat": -43.468521,
+   "lon": 172.569107,
+   "d": 446,
+   "weight": 0.78
+  }
+ },
+ {
+  "key": "liverc:hbrc.liverc.com",
+  "name": "Hastings",
+  "city": "Hastings",
+  "country": "nz",
+  "events": 191,
+  "lat": -39.6488532,
+  "lon": 176.8525153,
+  "verdict": "near",
+  "match": {
+   "nm": "Hastings Harriers Club Hall",
+   "cat": "sports_club_and_league",
+   "lat": -39.644554,
+   "lon": 176.859436,
+   "d": 761,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:hrcridaho.liverc.com",
+  "name": "Hayden  Radio Controlled Raceway",
+  "city": "Hayden",
+  "country": "us",
+  "events": 273,
+  "lat": 47.8103615,
+  "lon": -116.7867245,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Bobcat of Hayden",
+   "cat": "industrial_equipment",
+   "lat": 47.81419,
+   "lon": -116.786873,
+   "d": 426,
+   "where": "Hayden",
+   "score": 5.99
+  }
+ },
+ {
+  "key": "liverc:socalraceway.liverc.com",
+  "name": "HBRC and SCOR Raceway",
+  "city": "Anaheim",
+  "country": "us",
+  "events": 86,
+  "lat": 33.8513996,
+  "lon": -117.8306141,
+  "verdict": "near",
+  "match": {
+   "nm": "SCOR Raceway",
+   "cat": "race_track",
+   "lat": 33.857979,
+   "lon": -117.82943,
+   "d": 740,
+   "weight": 0.48
+  }
+ },
+ {
+  "key": "liverc:heroesparadise.liverc.com",
+  "name": "Heroes Paradise Raceway",
+  "city": "Brandon",
+  "country": "us",
+  "events": 121,
+  "lat": 27.8972124,
+  "lon": -82.2748924,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Heroes Paradise",
+   "cat": "laser_tag",
+   "lat": 27.895695,
+   "lon": -82.274994,
+   "d": 169,
+   "where": "Brandon",
+   "score": 5.91
+  }
+ },
+ {
+  "key": "liverc:hnmc.liverc.com",
+  "name": "Herts Nitro Model Club - HNMC",
+  "city": "Ware",
+  "country": "gb",
+  "events": 187,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Herts L T a",
+   "cat": "sports_club_and_league",
+   "lat": 51.790722,
+   "lon": -0.213284,
+   "d": null,
+   "where": "Welwyn Garden City",
+   "score": 5.51
+  }
+ },
+ {
+  "key": "liverc:oakwoodsteam.liverc.com",
+  "name": "HFCRT",
+  "city": "Los Angeles",
+  "country": "us",
+  "events": 282,
+  "lat": 34.1649063,
+  "lon": -118.3826468,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:highbanksrcspeedway.liverc.com",
+  "name": "High Banks RC Speedway",
+  "city": "Ludington",
+  "country": "us",
+  "events": 72,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "High Banks RC Park",
+   "cat": "race_track",
+   "lat": 44.006924,
+   "lon": -86.442017,
+   "d": null,
+   "weight": 0.8
+  }
+ },
+ {
+  "key": "liverc:highvoltagegarage.liverc.com",
+  "name": "High Voltage Garage",
+  "city": "Wichita",
+  "country": "us",
+  "events": 137,
+  "lat": 37.693428,
+  "lon": -97.324338,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "High Voltage Garage",
+   "cat": "hobby_shop",
+   "lat": 37.692623,
+   "lon": -97.324844,
+   "d": 100,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:highvoltagercspeedwaycarpetoffroad.liverc.com",
+  "name": "High Voltage RC Speedway Carpet Off Road",
+  "city": "Northview",
+  "country": "us",
+  "events": 170,
+  "lat": 34.5500492,
+  "lon": -82.6929053,
+  "verdict": "near",
+  "match": {
+   "nm": "High Voltage R/C Speedway",
+   "cat": "race_track",
+   "lat": 34.541279,
+   "lon": -82.690804,
+   "d": 994,
+   "weight": 0.8
+  }
+ },
+ {
+  "key": "liverc:highvoltagercspeedway.liverc.com",
+  "name": "High Voltage RC Speedway Carpet Oval",
+  "city": "Northview",
+  "country": "us",
+  "events": 279,
+  "lat": 34.5500492,
+  "lon": -82.6929053,
+  "verdict": "near",
+  "match": {
+   "nm": "High Voltage R/C Speedway",
+   "cat": "race_track",
+   "lat": 34.541279,
+   "lon": -82.690804,
+   "d": 994,
+   "weight": 0.8
+  }
+ },
+ {
+  "key": "liverc:highsidehobbies3.liverc.com",
+  "name": "highsidehobbies3",
+  "city": "Henderson",
+  "country": "us",
+  "events": 87,
+  "lat": 37.8071184,
+  "lon": -87.5729376,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:bmbrc.liverc.com",
+  "name": "Hills Mini-z Racing",
+  "city": "Mount Barker",
+  "country": "au",
+  "events": 62,
+  "lat": -35.0673366,
+  "lon": 138.8581537,
+  "verdict": "near",
+  "match": {
+   "nm": "Adelaide Hills Judo Club",
+   "cat": "sports_club_and_league",
+   "lat": -35.070881,
+   "lon": 138.85965,
+   "d": 417,
+   "weight": 0.58
+  }
+ },
+ {
+  "key": "liverc:hillsoffroadrc.liverc.com",
+  "name": "Hills Offroad RC",
+  "city": "Sydney",
+  "country": "au",
+  "events": 177,
+  "lat": -33.7183524,
+  "lon": 150.9835742,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Hills Off Road RC",
+   "cat": "race_track",
+   "lat": -33.717758,
+   "lon": 150.98262,
+   "d": 110,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:hilltoprcraceway.liverc.com",
+  "name": "Hilltop RC Raceway",
+  "city": "Chardon",
+  "country": "us",
+  "events": 59,
+  "lat": 41.581313,
+  "lon": -81.2159717,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Hilltop RC and Hobbies, LLC",
+   "cat": "hobby_shop",
+   "lat": 41.583149,
+   "lon": -81.215828,
+   "d": 205,
+   "weight": 0.75
+  }
+ },
+ {
+  "key": "liverc:hobbyactionrcraceway.liverc.com",
+  "name": "Hobby Action RC Raceway",
+  "city": "Chandler",
+  "country": "us",
+  "events": 1058,
+  "lat": 33.3169908,
+  "lon": -111.9666922,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Hobby Action RC Raceway and Shop",
+   "cat": "hobby_shop",
+   "lat": 33.317055,
+   "lon": -111.966774,
+   "d": 10,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:etc.liverc.com",
+  "name": "Hobby Etc Hobby Shop and Raceway",
+  "city": "Manchester",
+  "country": "us",
+  "events": 172,
+  "lat": 42.9799763,
+  "lon": -71.4461145,
+  "verdict": "near",
+  "match": {
+   "nm": "Hobby Etc",
+   "cat": "hobby_shop",
+   "lat": 42.980038,
+   "lon": -71.45974,
+   "d": 1108,
+   "weight": 0.5
+  }
+ },
+ {
+  "key": "liverc:hobbyhideaway.liverc.com",
+  "name": "Hobby Hideaway",
+  "city": "Orleans",
+  "country": "ca",
+  "events": 132,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Hobby Hideaway",
+   "cat": "hobby_shop",
+   "lat": 45.463882,
+   "lon": -75.548508,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:hobbyprocenter.liverc.com",
+  "name": "Hobby Pro Center",
+  "city": "Jefferson City",
+  "country": "us",
+  "events": 77,
+  "lat": 38.5434061,
+  "lon": -92.1204219,
+  "verdict": "near",
+  "match": {
+   "nm": "Hobby Pro Center",
+   "cat": "hobby_shop",
+   "lat": 38.556408,
+   "lon": -92.125175,
+   "d": 1504,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:hobbytimerc.liverc.com",
+  "name": "Hobby Time RC Raceway",
+  "city": "Great Falls MT",
+  "country": "us",
+  "events": 102,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Hobby Time RC",
+   "cat": "hobby_shop",
+   "lat": 47.476894,
+   "lon": -111.3564,
+   "d": null,
+   "weight": 0.79
+  }
+ },
+ {
+  "key": "liverc:hobbyplexraceway.liverc.com",
+  "name": "HobbyPlex Raceway",
+  "city": "Omaha",
+  "country": "us",
+  "events": 1657,
+  "lat": 41.3257249,
+  "lon": -95.9591638,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Tekno RC 1:8 Winter Series at the Plex at the Hobbyplex",
+   "cat": "race_track",
+   "lat": 41.326199,
+   "lon": -96.067596,
+   "d": 9055,
+   "weight": 0.69
+  }
+ },
+ {
+  "key": "liverc:hobbytownstcharles.liverc.com",
+  "name": "Hobbytown Batavia",
+  "city": "Batavia",
+  "country": "us",
+  "events": 855,
+  "lat": 41.8564373,
+  "lon": -88.3405775,
+  "verdict": "near",
+  "match": {
+   "nm": "Batavia Bulldog Boosters Organization",
+   "cat": "sports_club_and_league",
+   "lat": 41.848118,
+   "lon": -88.330704,
+   "d": 1235,
+   "weight": 0.58
+  }
+ },
+ {
+  "key": "liverc:htcincyrcraceway.liverc.com",
+  "name": "HobbyTown Cincinnati RC Raceway",
+  "city": "Cincinnati",
+  "country": "us",
+  "events": 226,
+  "lat": 39.177989,
+  "lon": -84.4374405,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Hobbytown Cincinnati RC Raceway",
+   "cat": "hobby_shop",
+   "lat": 39.289097,
+   "lon": -84.299774,
+   "d": 17124,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:hobbytownlincoln.liverc.com",
+  "name": "Hobbytown Lincoln Indoor",
+  "city": "Lincoln",
+  "country": "us",
+  "events": 182,
+  "lat": 40.7712622,
+  "lon": -96.6233549,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "HobbyTown",
+   "cat": "hobby_shop",
+   "lat": 40.77132,
+   "lon": -96.623497,
+   "d": 14,
+   "weight": 0.48
+  }
+ },
+ {
+  "key": "liverc:hobbytownorland.liverc.com",
+  "name": "HobbyTown Orland Park, IL",
+  "city": "Orland Park",
+  "country": "us",
+  "events": 89,
+  "lat": 41.607463,
+  "lon": -87.848057,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "HobbyTown",
+   "cat": "hobby_shop",
+   "lat": 41.607262,
+   "lon": -87.847473,
+   "d": 53,
+   "where": "Orland Park",
+   "score": 6.86
+  }
+ },
+ {
+  "key": "liverc:hobbytownspfd.liverc.com",
+  "name": "HobbyTown Springfield",
+  "city": "Springfield",
+  "country": "us",
+  "events": 83,
+  "lat": 37.1584122,
+  "lon": -93.2628978,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "HobbyTown",
+   "cat": "hobby_shop",
+   "lat": 37.158428,
+   "lon": -93.264977,
+   "d": 184,
+   "weight": 0.46
+  }
+ },
+ {
+  "key": "liverc:hobbytownva.liverc.com",
+  "name": "HobbyTown Virginia",
+  "city": "Yorktown",
+  "country": "us",
+  "events": 94,
+  "lat": 37.112983,
+  "lon": -76.4684192,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "HobbyTown",
+   "cat": "hobby_shop",
+   "lat": 37.113297,
+   "lon": -76.468079,
+   "d": 46,
+   "weight": 0.47
+  }
+ },
+ {
+  "key": "liverc:hobbytownwaco.liverc.com",
+  "name": "Hobbytown Waco Raceway",
+  "city": "Waco",
+  "country": "us",
+  "events": 82,
+  "lat": 31.5276692,
+  "lon": -97.1710613,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Waco Lightning Volleyball Club",
+   "cat": "amateur_sports_team",
+   "lat": 31.463287,
+   "lon": -97.111778,
+   "d": 9102,
+   "weight": 0.46
+  }
+ },
+ {
+  "key": "liverc:hobbytownwest.liverc.com",
+  "name": "HobbyTown Westminster",
+  "city": "Westminster",
+  "country": "us",
+  "events": 174,
+  "lat": 39.8631646,
+  "lon": -105.0839347,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "HobbyTown",
+   "cat": "hobby_shop",
+   "lat": 39.86158,
+   "lon": -105.080284,
+   "d": 358,
+   "where": "Westminster",
+   "score": 6.86
+  }
+ },
+ {
+  "key": "liverc:hoosierrc.liverc.com",
+  "name": "Hoosier RC Hobbyplex",
+  "city": "New Albany",
+  "country": "us",
+  "events": 675,
+  "lat": 38.31591,
+  "lon": -85.804513,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Hoosier RC Hobbyplex",
+   "cat": "hobby_shop",
+   "lat": 38.314411,
+   "lon": -85.804451,
+   "d": 167,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:hoosieroval.liverc.com",
+  "name": "Hoosier RC Hobbyplex Oval",
+  "city": "New Albany",
+  "country": "us",
+  "events": 273,
+  "lat": 38.31591,
+  "lon": -85.804513,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Hoosier RC Hobbyplex",
+   "cat": "hobby_shop",
+   "lat": 38.314411,
+   "lon": -85.804451,
+   "d": 167,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:horizongrandprix.liverc.com",
+  "name": "Horizon Hydrogen Grand Prix Pro",
+  "city": "Los Angeles",
+  "country": "us",
+  "events": 168,
+  "lat": 34.051618,
+  "lon": -118.261561,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Grand prix association",
+   "cat": "corporate_office",
+   "lat": 33.812401,
+   "lon": -118.193344,
+   "d": 27334,
+   "where": "Long Beach",
+   "score": 4.24
+  }
+ },
+ {
+  "key": "liverc:hotlapsrcr.liverc.com",
+  "name": "Hot Laps RC Raceway",
+  "city": "Garden Valley",
+  "country": "us",
+  "events": 75,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Hot Laps Hobby Shop and Raceway",
+   "cat": "hobby_shop",
+   "lat": 30.080154,
+   "lon": -94.167831,
+   "d": null,
+   "where": "Beaumont",
+   "score": 5.78
+  }
+ },
+ {
+  "key": "liverc:hotrodhobbies.liverc.com",
+  "name": "Hot Rod Hobbies",
+  "city": "Saugus",
+  "country": "us",
+  "events": 1189,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Hot Rod Hobbies",
+   "cat": "hobby_shop",
+   "lat": 34.410599,
+   "lon": -118.540825,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:hotlaphobbies.liverc.com",
+  "name": "Hotlap Speedway",
+  "city": "Pueblo",
+  "country": "us",
+  "events": 442,
+  "lat": 38.289885,
+  "lon": -104.594098,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Cole's Hotlap Hobbies",
+   "cat": "hobby_shop",
+   "lat": 38.288609,
+   "lon": -104.594078,
+   "d": 142,
+   "weight": 0.69
+  }
+ },
+ {
+  "key": "liverc:houstonrc.liverc.com",
+  "name": "Houston RC",
+  "city": "Houston",
+  "country": "us",
+  "events": 756,
+  "lat": 29.847028,
+  "lon": -95.4375375,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Houston RC",
+   "cat": "hobby_shop",
+   "lat": 29.847486,
+   "lon": -95.438026,
+   "d": 69,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:houstonrcminiz.liverc.com",
+  "name": "Houston RC MiniZ",
+  "city": "Houston",
+  "country": "us",
+  "events": 58,
+  "lat": 29.847028,
+  "lon": -95.4375375,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Houston RC",
+   "cat": "hobby_shop",
+   "lat": 29.847486,
+   "lon": -95.438026,
+   "d": 69,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:huntersraceway.liverc.com",
+  "name": "Hunters Raceway",
+  "city": "Port Coquitlam",
+  "country": "ca",
+  "events": 104,
+  "lat": 49.2711717,
+  "lon": -122.7668597,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Hunters Garden Centre",
+   "cat": "nursery_and_gardening",
+   "lat": 49.133858,
+   "lon": -122.801697,
+   "d": 15477,
+   "where": "Surrey",
+   "score": 5.13
+  }
+ },
+ {
+  "key": "liverc:kippshobbies.liverc.com",
+  "name": "I 81 RC Speedway",
+  "city": "Town of Kirkwood",
+  "country": "us",
+  "events": 142,
+  "lat": 42.0713306,
+  "lon": -75.8016647,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:i41speedway.liverc.com",
+  "name": "I-41Speedway",
+  "city": "Schenectady",
+  "country": "us",
+  "events": 79,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:i70rcraceway.liverc.com",
+  "name": "I70 RC Speedway",
+  "city": "Slater-Marietta",
+  "country": "us",
+  "events": 53,
+  "lat": 35.0243937,
+  "lon": -82.4994707,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:iamrchobbyshop.liverc.com",
+  "name": "IAM-RC Raceway",
+  "city": "Manassas",
+  "country": "us",
+  "events": 90,
+  "lat": 38.7718715,
+  "lon": -77.5060936,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "IAM-RC Hobby Shop",
+   "cat": "hobby_shop",
+   "lat": 38.77346,
+   "lon": -77.505188,
+   "d": 193,
+   "weight": 0.77
+  }
+ },
+ {
+  "key": "liverc:incom.liverc.com",
+  "name": "Incom",
+  "city": "Beijing",
+  "country": "cn",
+  "events": 60,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Incom Tomra",
+   "cat": "garbage_collection_service",
+   "lat": 40.066723,
+   "lon": 116.561989,
+   "d": null,
+   "where": "Shunyi",
+   "score": 5.14
+  }
+ },
+ {
+  "key": "liverc:indoorraceway.liverc.com",
+  "name": "Indoor Raceway",
+  "city": "Stevenage, Hertfordshire",
+  "country": "gb",
+  "events": 269,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:indyrc.liverc.com",
+  "name": "Indy RC Raceway",
+  "city": "Indianapolis",
+  "country": "us",
+  "events": 1973,
+  "lat": 39.6410039,
+  "lon": -86.0827659,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "DRIFT INDY",
+   "cat": "race_track",
+   "lat": 39.67337,
+   "lon": -86.099854,
+   "d": 3885,
+   "weight": 0.47
+  }
+ },
+ {
+  "key": "liverc:kars.liverc.com",
+  "name": "INJE SPEEDIUM",
+  "city": "기린면",
+  "country": "kr",
+  "events": 76,
+  "lat": 38.0015004,
+  "lon": 128.2926135,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Inje Auto Theme Park",
+   "cat": "stadium_arena",
+   "lat": 38.001949,
+   "lon": 128.291733,
+   "d": 92,
+   "weight": 0.48
+  }
+ },
+ {
+  "key": "liverc:insanityracetrack.liverc.com",
+  "name": "Insanity Race Track",
+  "city": "Boonton Township",
+  "country": "us",
+  "events": 90,
+  "lat": 40.9399737,
+  "lon": -74.4179517,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Core Insanity Fitness",
+   "cat": "gym",
+   "lat": 40.936409,
+   "lon": -74.256783,
+   "d": 13544,
+   "where": "Wayne",
+   "score": 5.43
+  }
+ },
+ {
+  "key": "liverc:invercargillrc.liverc.com",
+  "name": "Invercargill RC Racers",
+  "city": "Invercargill",
+  "country": "nz",
+  "events": 113,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Invercargill Club",
+   "cat": "bar",
+   "lat": -46.410625,
+   "lon": 168.349304,
+   "d": null,
+   "where": "Invercargill",
+   "score": 4.93
+  }
+ },
+ {
+  "key": "liverc:iowaoutlawrc.liverc.com",
+  "name": "IORC",
+  "city": "Webster City",
+  "country": "us",
+  "events": 190,
+  "lat": 42.4683606,
+  "lon": -93.8213703,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:iftracing.liverc.com",
+  "name": "Iowa Fast Track RC",
+  "city": "Iowa City",
+  "country": "us",
+  "events": 51,
+  "lat": 41.6281019,
+  "lon": -91.4822789,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:ironcityrchobbiesoffroad.liverc.com",
+  "name": "Iron City RC Hobbies Off-road",
+  "city": "West Mifflin",
+  "country": "us",
+  "events": 130,
+  "lat": 40.3501204,
+  "lon": -79.9275089,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Iron City RC Hobbies",
+   "cat": "hobby_shop",
+   "lat": 40.34977,
+   "lon": -79.927933,
+   "d": 53,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:ironcityrchobbies.liverc.com",
+  "name": "Iron City RC Hobbies On-Road",
+  "city": "Pittsburgh",
+  "country": "us",
+  "events": 126,
+  "lat": 40.3737436,
+  "lon": -80.0482559,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Iron City RC Hobbies",
+   "cat": "hobby_shop",
+   "lat": 40.34977,
+   "lon": -79.927933,
+   "d": 10537,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:irrcmn.liverc.com",
+  "name": "IRRC",
+  "city": "Hibbing",
+  "country": "us",
+  "events": 170,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:islandspeedwayoffroad.liverc.com",
+  "name": "Island Speedway Off-Road",
+  "city": "Muscatine",
+  "country": "us",
+  "events": 161,
+  "lat": 41.4094981,
+  "lon": -91.065623,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Island Speedway Off-road",
+   "cat": "race_track",
+   "lat": 41.40781,
+   "lon": -91.066383,
+   "d": 198,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:islandspeedway.liverc.com",
+  "name": "Island Speedway Oval",
+  "city": "Muscatine",
+  "country": "us",
+  "events": 574,
+  "lat": 41.4085174,
+  "lon": -91.065783,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Island Speedway Off-road",
+   "cat": "race_track",
+   "lat": 41.40781,
+   "lon": -91.066383,
+   "d": 93,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:jacksonrcnj.liverc.com",
+  "name": "Jackson RC Raceway",
+  "city": "Jackson",
+  "country": "us",
+  "events": 166,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Jackson RC Raceway",
+   "cat": "race_track",
+   "lat": 40.149269,
+   "lon": -74.355827,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:jacksonvillercspeedway.liverc.com",
+  "name": "Jacksonville RC Speedway",
+  "city": "Jacksonville",
+  "country": "us",
+  "events": 115,
+  "lat": 39.7086577,
+  "lon": -90.210134,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Jacksonville R/C Track",
+   "cat": "race_track",
+   "lat": 39.709736,
+   "lon": -90.212975,
+   "d": 271,
+   "weight": 0.46
+  }
+ },
+ {
+  "key": "liverc:jammersraceway.liverc.com",
+  "name": "Jammers Raceway Indianapolis",
+  "city": "Indianapolis",
+  "country": "us",
+  "events": 171,
+  "lat": 39.7294484,
+  "lon": -86.0368505,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Lucas Oil Raceway at Indianapolis",
+   "cat": "race_track",
+   "lat": 39.812321,
+   "lon": -86.340965,
+   "d": 27576,
+   "weight": 0.53
+  }
+ },
+ {
+  "key": "liverc:jaxgominizsrc.liverc.com",
+  "name": "JaxGo MIni-Z's RC",
+  "city": "Jacksonville",
+  "country": "us",
+  "events": 335,
+  "lat": 30.2553767,
+  "lon": -81.6025725,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:jbrl.liverc.com",
+  "name": "JBRL",
+  "city": "Saugus",
+  "country": "us",
+  "events": 263,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "JBRL \"Jimmy Babcock Racing League\"",
+   "cat": "race_track",
+   "lat": 34.411015,
+   "lon": -118.5411,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:elite.liverc.com",
+  "name": "JConcepts INS at HobbyPlex",
+  "city": "Lake City",
+  "country": "us",
+  "events": 153,
+  "lat": 30.2277475,
+  "lon": -82.7316135,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:jerseyrcracers.liverc.com",
+  "name": "Jersey RC Racing Promotions",
+  "city": "Forked River",
+  "country": "us",
+  "events": 1001,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:jjrcraceway.liverc.com",
+  "name": "JJ RC Raceway",
+  "city": "Frankford",
+  "country": "us",
+  "events": 96,
+  "lat": 38.4914056,
+  "lon": -75.1641313,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:jmhraceway.liverc.com",
+  "name": "JMHRC RACEWAY",
+  "city": "Klamath Falls",
+  "country": "us",
+  "events": 180,
+  "lat": 42.2102185,
+  "lon": -121.7571095,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:swtour.liverc.com",
+  "name": "Joe Myers Events",
+  "city": "Hereford",
+  "country": "us",
+  "events": 77,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:johnsmobilerc.liverc.com",
+  "name": "Johns RC Raceway",
+  "city": "Pasadena",
+  "country": "us",
+  "events": 100,
+  "lat": 39.1376648,
+  "lon": -76.5729934,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:jtrcspeedway.liverc.com",
+  "name": "JT RC Speedway",
+  "city": "Arvada",
+  "country": "us",
+  "events": 215,
+  "lat": 39.8036004,
+  "lon": -105.0559807,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:kandkrcraceway.liverc.com",
+  "name": "K and K RC RACEWAY",
+  "city": "Port Charlotte",
+  "country": "us",
+  "events": 54,
+  "lat": 26.97264,
+  "lon": -82.0871992,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:kbminiracing.liverc.com",
+  "name": "KB Miniracing",
+  "city": "Roseville",
+  "country": "us",
+  "events": 254,
+  "lat": 38.7592908,
+  "lon": -121.2913894,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "KB Miniracing",
+   "cat": "race_track",
+   "lat": 38.759609,
+   "lon": -121.292725,
+   "d": 121,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:keiloroffroadcarassociation.liverc.com",
+  "name": "Keilor Electric Off Road Car Association Inc.",
+  "city": "Melbourne",
+  "country": "au",
+  "events": 198,
+  "lat": -37.7146464,
+  "lon": 144.8561092,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Keilor Electric Off Road Car Association Inc. - Keorca",
+   "cat": "race_track",
+   "lat": -37.71455,
+   "lon": 144.856049,
+   "d": 12,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:kemptonspeedway.liverc.com",
+  "name": "Kempton Speedway",
+  "city": "Kempton",
+  "country": "us",
+  "events": 62,
+  "lat": 40.9358284,
+  "lon": -88.2380895,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Kempton United Methodist",
+   "cat": "church_cathedral",
+   "lat": 40.935951,
+   "lon": -88.238609,
+   "d": 46,
+   "where": "Kempton",
+   "score": 6.07
+  }
+ },
+ {
+  "key": "liverc:kingsrc.liverc.com",
+  "name": "Kings Mountain",
+  "city": "Brewer",
+  "country": "us",
+  "events": 285,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:kingstonrc.liverc.com",
+  "name": "Kingston RC Raceway",
+  "city": "Kingston",
+  "country": "ca",
+  "events": 266,
+  "lat": 44.2402722,
+  "lon": -76.521647,
+  "verdict": "near",
+  "match": {
+   "nm": "Kingston RC Racing",
+   "cat": "race_track",
+   "lat": 44.239906,
+   "lon": -76.527931,
+   "d": 502,
+   "weight": 0.74
+  }
+ },
+ {
+  "key": "liverc:mrca.liverc.com",
+  "name": "KLiRCC",
+  "city": "Kuala Lumpur",
+  "country": "my",
+  "events": 72,
+  "lat": 3.2214676,
+  "lon": 101.6404927,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "KLIRCC Taman Metropolitan Kepong",
+   "cat": "park",
+   "lat": 3.221671,
+   "lon": 101.640503,
+   "d": 23,
+   "where": "Batu",
+   "score": 7.92
+  }
+ },
+ {
+  "key": "liverc:knox.liverc.com",
+  "name": "Knox Offroad RC Club",
+  "city": "Knoxfield VIC",
+  "country": "au",
+  "events": 154,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Knox Park",
+   "cat": "park",
+   "lat": -35.131832,
+   "lon": 138.521744,
+   "d": null,
+   "where": "Adelaide",
+   "score": 5.38
+  }
+ },
+ {
+  "key": "liverc:kongrc.liverc.com",
+  "name": "KONG RC",
+  "city": "san josde del cabo",
+  "country": "mx",
+  "events": 120,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:kootenaircracers.liverc.com",
+  "name": "Kootenai RC Racers",
+  "city": "Libby",
+  "country": "us",
+  "events": 85,
+  "lat": 48.3919823,
+  "lon": -115.5517623,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Kootenai Rc Racers",
+   "cat": "social_club",
+   "lat": 48.391796,
+   "lon": -115.551987,
+   "d": 27,
+   "where": "Libby",
+   "score": 6.2
+  }
+ },
+ {
+  "key": "liverc:lakecityflrcovalracers.liverc.com",
+  "name": "Lake City RC Club",
+  "city": "Lake City",
+  "country": "us",
+  "events": 83,
+  "lat": 30.0982325,
+  "lon": -82.581562,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:lanesraceway.liverc.com",
+  "name": "Lanes Raceway",
+  "city": "Livermore",
+  "country": "us",
+  "events": 86,
+  "lat": 37.4926989,
+  "lon": -87.1272058,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Lanes Raceway",
+   "cat": "race_track",
+   "lat": 37.491329,
+   "lon": -87.128685,
+   "d": 201,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:lapaddict.liverc.com",
+  "name": "Lap Addict",
+  "city": "Newcastle",
+  "country": "au",
+  "events": 407,
+  "lat": -32.9405447,
+  "lon": 151.7042285,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Lap Addict RC",
+   "cat": "stadium_arena",
+   "lat": -32.939964,
+   "lon": 151.705002,
+   "d": 97,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:awhobby.liverc.com",
+  "name": "Lap Paradise RC Raceway",
+  "city": "Ulu Tiram",
+  "country": "my",
+  "events": 66,
+  "lat": 1.5652291,
+  "lon": 103.8546553,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Lap Paradise",
+   "cat": "sports_and_recreation_venue",
+   "lat": 1.576857,
+   "lon": 103.836174,
+   "d": 2427,
+   "where": "Ulu Tiram",
+   "score": 5.83
+  }
+ },
+ {
+  "key": "liverc:lcrc.liverc.com",
+  "name": "LCRC Raceway",
+  "city": "Oakland Mills",
+  "country": "us",
+  "events": 254,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "LCRC Raceway",
+   "cat": "race_track",
+   "lat": 40.621704,
+   "lon": -77.305321,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:namba19.liverc.com",
+  "name": "Legg Lake at Whittier Narrows",
+  "city": "South El Monte",
+  "country": "us",
+  "events": 98,
+  "lat": 34.0372391,
+  "lon": -118.0552596,
+  "verdict": "near",
+  "match": {
+   "nm": "Whittier Narrows Archery Range",
+   "cat": "race_track",
+   "lat": 34.037834,
+   "lon": -118.070549,
+   "d": 1410,
+   "weight": 0.47
+  }
+ },
+ {
+  "key": "liverc:leightonspeedway.liverc.com",
+  "name": "leighton speedway",
+  "city": "Leighton",
+  "country": "us",
+  "events": 64,
+  "lat": 41.340006,
+  "lon": -92.788023,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Leighton Speedway",
+   "cat": "race_track",
+   "lat": 41.340057,
+   "lon": -92.788231,
+   "d": 18,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:leisurehours.liverc.com",
+  "name": "LHHR High Road",
+  "city": "Lockport",
+  "country": "us",
+  "events": 566,
+  "lat": 41.6090904,
+  "lon": -88.0457549,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:lightningspeedway.liverc.com",
+  "name": "Lightning Speedway",
+  "city": "Conway",
+  "country": "us",
+  "events": 73,
+  "lat": 33.8524796,
+  "lon": -79.0572351,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Lightning Bolt Online Solutions",
+   "cat": "marketing_agency",
+   "lat": 33.563004,
+   "lon": -79.054268,
+   "d": 32189,
+   "where": "Murrells Inlet",
+   "score": 4.27
+  }
+ },
+ {
+  "key": "liverc:lilcochranspeedway.liverc.com",
+  "name": "Lil Cochran Speedway",
+  "city": "Cochran",
+  "country": "us",
+  "events": 85,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Lil Cochran RC Speedway and Hobbies",
+   "cat": "hobby_shop",
+   "lat": 32.393875,
+   "lon": -83.333817,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:lildega.liverc.com",
+  "name": "Lil Dega RC Dirt Oval",
+  "city": "Eastaboga",
+  "country": "us",
+  "events": 185,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Lil Dega RC Dirt Oval",
+   "cat": "race_track",
+   "lat": 33.622414,
+   "lon": -86.018135,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:limestoneraceway.liverc.com",
+  "name": "Limestone Raceway",
+  "city": "Frielings",
+  "country": "us",
+  "events": 146,
+  "lat": 41.1606893,
+  "lon": -88.110402,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Limestone Raceway",
+   "cat": "race_track",
+   "lat": 41.162518,
+   "lon": -87.970634,
+   "d": 11702,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:limitlessrc42.liverc.com",
+  "name": "Limitless Speedway",
+  "city": "Millington",
+  "country": "us",
+  "events": 274,
+  "lat": 43.2801351,
+  "lon": -83.5298745,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Limitless R/C",
+   "cat": "hobby_shop",
+   "lat": 43.280117,
+   "lon": -83.530594,
+   "d": 58,
+   "weight": 0.66
+  }
+ },
+ {
+  "key": "liverc:littleforest.liverc.com",
+  "name": "Little Forest Raceway",
+  "city": "New Plymouth",
+  "country": "nz",
+  "events": 122,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:loganvillerccomplex.liverc.com",
+  "name": "Loganville RC Complex",
+  "city": "Loganville",
+  "country": "us",
+  "events": 173,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Loganville RC Complex",
+   "cat": "race_track",
+   "lat": 33.767605,
+   "lon": -83.850136,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:lrcr.liverc.com",
+  "name": "Louisville Radio Control Raceway",
+  "city": "Louisville",
+  "country": "us",
+  "events": 298,
+  "lat": 40.8355137,
+  "lon": -81.2770102,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Louisville R/C Raceway",
+   "cat": "race_track",
+   "lat": 40.835709,
+   "lon": -81.277481,
+   "d": 45,
+   "weight": 0.5
+  }
+ },
+ {
+  "key": "liverc:longmontrcraceway.liverc.com",
+  "name": "LRC Raceway",
+  "city": "Longmont",
+  "country": "us",
+  "events": 142,
+  "lat": 40.1711226,
+  "lon": -105.0464323,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "LRC Raceway",
+   "cat": "race_track",
+   "lat": 40.170715,
+   "lon": -105.045364,
+   "d": 101,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:lrccc.liverc.com",
+  "name": "LRCCC Speedway",
+  "city": "Thunder Bay",
+  "country": "ca",
+  "events": 120,
+  "lat": 48.4551869,
+  "lon": -89.1859049,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:lsrcc.liverc.com",
+  "name": "LSRCC Race Park",
+  "city": "Proctor",
+  "country": "us",
+  "events": 368,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:lubbockminiraceway.liverc.com",
+  "name": "Lubbock mini rc raceway",
+  "city": "Lubbock",
+  "country": "us",
+  "events": 123,
+  "lat": 33.4544185,
+  "lon": -101.9049605,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "West Texas Raceway Lubbock, TX",
+   "cat": "race_track",
+   "lat": 33.480671,
+   "lon": -101.841316,
+   "d": 6586,
+   "weight": 0.56
+  }
+ },
+ {
+  "key": "liverc:lucky13.liverc.com",
+  "name": "Lucky 13 Speedway",
+  "city": "Osseo",
+  "country": "us",
+  "events": 59,
+  "lat": 44.579455,
+  "lon": -91.224038,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Lucky 13 Speedway",
+   "cat": "race_track",
+   "lat": 44.592503,
+   "lon": -91.315025,
+   "d": 7350,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:madisonminirc.liverc.com",
+  "name": "Madison Mini RC Club",
+  "city": "Madison",
+  "country": "us",
+  "events": 271,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:mcrc.liverc.com",
+  "name": "Magic City RC Racers",
+  "city": "Billings",
+  "country": "us",
+  "events": 109,
+  "lat": 45.7601936,
+  "lon": -108.5252355,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:magichobbies.liverc.com",
+  "name": "Magic Hobbies",
+  "city": "Strasburg",
+  "country": "us",
+  "events": 310,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:rjsspeedromedirtoval.liverc.com",
+  "name": "Mahoning Valley RC - Dirt Oval",
+  "city": "Lehighton",
+  "country": "us",
+  "events": 249,
+  "lat": 40.8227196,
+  "lon": -75.7112092,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Mahoning Valley Speedway",
+   "cat": "race_track",
+   "lat": 40.80909,
+   "lon": -75.75544,
+   "d": 4019,
+   "weight": 0.75
+  }
+ },
+ {
+  "key": "liverc:mainlandrcraceway.liverc.com",
+  "name": "Mainland RC Raceway",
+  "city": "Selwyn District",
+  "country": "nz",
+  "events": 76,
+  "lat": -43.5911962,
+  "lon": 172.3435668,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Mainland Building Inspections",
+   "cat": "sports_and_recreation_venue",
+   "lat": -43.535187,
+   "lon": 172.531525,
+   "d": 16375,
+   "where": "Christchurch",
+   "score": 5.91
+  }
+ },
+ {
+  "key": "liverc:morcc.liverc.com",
+  "name": "Maitland",
+  "city": "Maitland",
+  "country": "au",
+  "events": 92,
+  "lat": -32.7402414,
+  "lon": 151.5645745,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Maitland Off-Road Radio Controlled Car Club Inc.",
+   "cat": "sports_and_recreation_venue",
+   "lat": -32.740696,
+   "lon": 151.565979,
+   "d": 141,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:mtxrc.liverc.com",
+  "name": "Makintraxx RC",
+  "city": "Rush",
+  "country": "us",
+  "events": 435,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "MakinTraxx RC",
+   "cat": "race_track",
+   "lat": 42.947159,
+   "lon": -77.681564,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:mansfieldrc.liverc.com",
+  "name": "Mansfield RC RaCeway",
+  "city": "Mansfield",
+  "country": "us",
+  "events": 434,
+  "lat": 40.7452007,
+  "lon": -82.5031585,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Mansfield R/C Raceway",
+   "cat": "race_track",
+   "lat": 40.745564,
+   "lon": -82.503738,
+   "d": 63,
+   "weight": 0.72
+  }
+ },
+ {
+  "key": "liverc:mapletownspeedway.liverc.com",
+  "name": "Mapletown Speedway",
+  "city": "Town of Canajoharie",
+  "country": "us",
+  "events": 60,
+  "lat": 42.8315595,
+  "lon": -74.5194551,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:marcca.liverc.com",
+  "name": "MARCCA-Madison Area Radio Control Car Association",
+  "city": "Madison",
+  "country": "us",
+  "events": 299,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:mrcr.liverc.com",
+  "name": "Maritime RC Racing",
+  "city": "City of Saint John",
+  "country": "ca",
+  "events": 313,
+  "lat": 45.3135506,
+  "lon": -65.9790564,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:marshallshilltophobbies.liverc.com",
+  "name": "Marshalls Hilltop Hobbies",
+  "city": "Honesdale",
+  "country": "us",
+  "events": 357,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Marshall's Hilltop Hobbies",
+   "cat": "hobby_shop",
+   "lat": 41.575428,
+   "lon": -75.184395,
+   "d": null,
+   "weight": 0.58
+  }
+ },
+ {
+  "key": "liverc:maximusrcraceway.liverc.com",
+  "name": "Maximus RC Raceway",
+  "city": "Seabrook",
+  "country": "us",
+  "events": 835,
+  "lat": 42.8838739,
+  "lon": -70.8661582,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Maximus R/C Raceway",
+   "cat": "race_track",
+   "lat": 42.884132,
+   "lon": -70.864494,
+   "d": 139,
+   "weight": 0.73
+  }
+ },
+ {
+  "key": "liverc:medwayrc.liverc.com",
+  "name": "Medway RC Raceway",
+  "city": "Chatham",
+  "country": "gb",
+  "events": 100,
+  "lat": 51.3689788,
+  "lon": 0.5427114,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Medway Eagles Ice Hockey Club",
+   "cat": "amateur_sports_team",
+   "lat": 51.367016,
+   "lon": 0.576288,
+   "d": 2341,
+   "weight": 0.49
+  }
+ },
+ {
+  "key": "liverc:morrcc.liverc.com",
+  "name": "Melbourne Off Road Radio Car Club",
+  "city": "Melbourne",
+  "country": "au",
+  "events": 124,
+  "lat": -37.7708567,
+  "lon": 144.8097868,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Melbourne Off Road Radio Car Club - morrcc",
+   "cat": "race_track",
+   "lat": -37.769981,
+   "lon": 144.808792,
+   "d": 131,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:rcdelmayab.liverc.com",
+  "name": "Merida Rc del Mayab Raceway",
+  "city": "Merida",
+  "country": "mx",
+  "events": 140,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "MAYAB",
+   "cat": "toy_store",
+   "lat": 18.957088,
+   "lon": -99.236671,
+   "d": null,
+   "where": "Cuernavaca",
+   "score": 5.63
+  }
+ },
+ {
+  "key": "liverc:metzrcraceway.liverc.com",
+  "name": "Metz RC Raceway",
+  "city": "Blackfoot",
+  "country": "us",
+  "events": 128,
+  "lat": 43.1832791,
+  "lon": -112.3528319,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Metz R/C raceway",
+   "cat": "sports_and_recreation_venue",
+   "lat": 43.18277,
+   "lon": -112.353874,
+   "d": 102,
+   "weight": 0.72
+  }
+ },
+ {
+  "key": "liverc:meyertonrcraceway.liverc.com",
+  "name": "MEYERTON RC RACEWAY",
+  "city": "Meyerton Valley Settelments",
+  "country": "za",
+  "events": 198,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Meyerton Squash Club",
+   "cat": "sports_club_and_league",
+   "lat": -26.577246,
+   "lon": 28.024729,
+   "d": null,
+   "where": "Meyerton",
+   "score": 5.69
+  }
+ },
+ {
+  "key": "liverc:mhorrc1.liverc.com",
+  "name": "MHOR RC Raceway",
+  "city": "Aurora",
+  "country": "us",
+  "events": 178,
+  "lat": 39.7423469,
+  "lon": -104.8075233,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "MHOR RC Raceway",
+   "cat": "hobby_shop",
+   "lat": 39.742306,
+   "lon": -104.80751,
+   "d": 5,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:mhorrc.liverc.com",
+  "name": "MHOR RC Raceway",
+  "city": "Aurora",
+  "country": "us",
+  "events": 832,
+  "lat": 39.7423469,
+  "lon": -104.8075233,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "MHOR RC Raceway",
+   "cat": "hobby_shop",
+   "lat": 39.742306,
+   "lon": -104.80751,
+   "d": 5,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:mmrcraceway.liverc.com",
+  "name": "Mid-Michigan RC Raceway",
+  "city": "Alma",
+  "country": "us",
+  "events": 255,
+  "lat": 43.3823792,
+  "lon": -84.6667827,
+  "verdict": "near",
+  "match": {
+   "nm": "Mid-Michigan RC Raceway",
+   "cat": "race_track",
+   "lat": 43.395721,
+   "lon": -84.66539,
+   "d": 1488,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:midlandsraceway.liverc.com",
+  "name": "Midlands Raceway",
+  "city": "Sandwell",
+  "country": "gb",
+  "events": 74,
+  "lat": 52.4717176,
+  "lon": -2.0899806,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Midlands Raceway",
+   "cat": "race_track",
+   "lat": 52.471169,
+   "lon": -2.089924,
+   "d": 61,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:midwestminiraceway.liverc.com",
+  "name": "Midwest Mini Raceway",
+  "city": "Topeka",
+  "country": "us",
+  "events": 84,
+  "lat": 39.056223,
+  "lon": -95.775855,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:mildurarc.liverc.com",
+  "name": "Mildura RC Car Club",
+  "city": "Mildura",
+  "country": "au",
+  "events": 104,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Mildura RC Car Club",
+   "cat": "race_track",
+   "lat": -34.173855,
+   "lon": 142.13681,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:millpondspeedway.liverc.com",
+  "name": "Millpond Speedway",
+  "city": "Millsboro",
+  "country": "us",
+  "events": 84,
+  "lat": 38.5699931,
+  "lon": -75.3321425,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Millpond Speedway",
+   "cat": "race_track",
+   "lat": 38.569454,
+   "lon": -75.334282,
+   "d": 195,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:millspondrcraceway.liverc.com",
+  "name": "Mills Pond RC Speedway",
+  "city": "Fort Lauderdale",
+  "country": "us",
+  "events": 174,
+  "lat": 26.153915,
+  "lon": -80.154592,
+  "verdict": "near",
+  "match": {
+   "nm": "Mills Pond RC Speedway",
+   "cat": "race_track",
+   "lat": 26.154184,
+   "lon": -80.164139,
+   "d": 953,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:miltondirtovalrc.liverc.com",
+  "name": "Milton Dirt Oval RC",
+  "city": "Town of Milton",
+  "country": "us",
+  "events": 64,
+  "lat": 43.0216185,
+  "lon": -73.92633,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:minizknox.liverc.com",
+  "name": "Mini-Z Knox",
+  "city": "Knoxville",
+  "country": "us",
+  "events": 97,
+  "lat": 35.8571695,
+  "lon": -84.0794393,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Knox County Sportspark",
+   "cat": "stadium_arena",
+   "lat": 35.979477,
+   "lon": -84.135841,
+   "d": 14517,
+   "where": "Knoxville",
+   "score": 5.78
+  }
+ },
+ {
+  "key": "liverc:capyraceway.liverc.com",
+  "name": "MiniautodromoGDL",
+  "city": "Pueblo Abandonado Las Juntas",
+  "country": "mx",
+  "events": 82,
+  "lat": 20.6985064,
+  "lon": -103.2914592,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:mmmilerc.liverc.com",
+  "name": "MM Mile RC",
+  "city": "Glendale",
+  "country": "us",
+  "events": 120,
+  "lat": 33.6467195,
+  "lon": -112.2125106,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:mmrdirect.liverc.com",
+  "name": "MMR",
+  "city": "Saint Louis Park",
+  "country": "us",
+  "events": 1235,
+  "lat": 44.9349147,
+  "lon": -93.3623601,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:mobilehobbiesrc13.liverc.com",
+  "name": "Mobile Hobbies",
+  "city": "Shelby",
+  "country": "us",
+  "events": 191,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Mobile Hobbies",
+   "cat": "hobby_shop",
+   "lat": 35.295345,
+   "lon": -81.633095,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:monckscornerraceway.liverc.com",
+  "name": "Moncks Corner Raceway",
+  "city": "Moncks Corner",
+  "country": "us",
+  "events": 108,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Monks Corner Raceway",
+   "cat": "race_track",
+   "lat": 33.117188,
+   "lon": -80.068596,
+   "d": null,
+   "weight": 0.51
+  }
+ },
+ {
+  "key": "liverc:mytobbies.liverc.com",
+  "name": "MTRC RACEWAY",
+  "city": "Tampa",
+  "country": "us",
+  "events": 89,
+  "lat": 28.0562318,
+  "lon": -82.4346902,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:muncierc.liverc.com",
+  "name": "Muncie Performance RC Raceway and Hobby Shop",
+  "city": "Muncie",
+  "country": "us",
+  "events": 465,
+  "lat": 40.2236647,
+  "lon": -85.3704536,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Muncie",
+   "cat": "car_wash",
+   "lat": 40.218563,
+   "lon": -85.392632,
+   "d": 1967,
+   "where": "IN",
+   "score": 6.1
+  }
+ },
+ {
+  "key": "liverc:ncontrolrc.liverc.com",
+  "name": "N-Control RC",
+  "city": "Dale",
+  "country": "us",
+  "events": 379,
+  "lat": 29.9467115,
+  "lon": -97.5583333,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "N-Control RC Racing Circuit",
+   "cat": "race_track",
+   "lat": 29.948708,
+   "lon": -97.557961,
+   "d": 225,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:ndor.liverc.com",
+  "name": "NDOR",
+  "city": "Nottingham",
+  "country": "gb",
+  "events": 65,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "NDOR",
+   "cat": "race_track",
+   "lat": 53.00198,
+   "lon": -1.294209,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:need4speed.liverc.com",
+  "name": "Need4speed RC",
+  "city": "Garden City",
+  "country": "us",
+  "events": 90,
+  "lat": 37.991347,
+  "lon": -100.88972,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Need4Speed R/C",
+   "cat": "race_track",
+   "lat": 37.991299,
+   "lon": -100.889267,
+   "d": 40,
+   "weight": 0.69
+  }
+ },
+ {
+  "key": "liverc:nemoraceway.liverc.com",
+  "name": "Nemoraceway",
+  "city": "Stratford-on-Avon",
+  "country": "gb",
+  "events": 63,
+  "lat": 52.1908494,
+  "lon": -1.4343092,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:neverenoughrc.liverc.com",
+  "name": "NERC",
+  "city": "Comstock Charter Township",
+  "country": "us",
+  "events": 127,
+  "lat": 42.2606028,
+  "lon": -85.5242605,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:nescarraceway.liverc.com",
+  "name": "NESCAR Grand Island",
+  "city": "Grand Island",
+  "country": "us",
+  "events": 59,
+  "lat": 40.9457196,
+  "lon": -98.3559555,
+  "verdict": "near",
+  "match": {
+   "nm": "Nescar - Nebraska Scale Auto Racers",
+   "cat": "race_track",
+   "lat": 40.946388,
+   "lon": -98.351616,
+   "d": 372,
+   "weight": 0.46
+  }
+ },
+ {
+  "key": "liverc:newcastleonroadrc.liverc.com",
+  "name": "Newcastle Onroad RC Raceway",
+  "city": "Newcastle",
+  "country": "au",
+  "events": 183,
+  "lat": -32.8081815,
+  "lon": 151.8508372,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Newcastle OnRoad RC Car Club",
+   "cat": "sports_club_and_league",
+   "lat": -32.807278,
+   "lon": 151.853577,
+   "d": 275,
+   "weight": 0.73
+  }
+ },
+ {
+  "key": "liverc:newfane.liverc.com",
+  "name": "Newfane Dirt Oval",
+  "city": "Town of Newfane",
+  "country": "us",
+  "events": 99,
+  "lat": 43.2901755,
+  "lon": -78.7109095,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Newfane Middle School",
+   "cat": "middle_school",
+   "lat": 43.284592,
+   "lon": -78.697952,
+   "d": 1219,
+   "where": "Newfane",
+   "score": 6.47
+  }
+ },
+ {
+  "key": "liverc:nextlevelrccars.liverc.com",
+  "name": "Next Level RC Cars",
+  "city": "Markham",
+  "country": "ca",
+  "events": 77,
+  "lat": 43.8394621,
+  "lon": -79.3224631,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "NL RC Cars - Canada",
+   "cat": "race_track",
+   "lat": 43.839802,
+   "lon": -79.322418,
+   "d": 38,
+   "weight": 0.45
+  }
+ },
+ {
+  "key": "liverc:nhminizraceway.liverc.com",
+  "name": "NH Mini Z Raceway at Maximus RC Raceway",
+  "city": "Seabrook",
+  "country": "us",
+  "events": 215,
+  "lat": 42.8838739,
+  "lon": -70.8661582,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Maximus R/C Raceway",
+   "cat": "race_track",
+   "lat": 42.884132,
+   "lon": -70.864494,
+   "d": 139,
+   "weight": 0.46
+  }
+ },
+ {
+  "key": "liverc:nitroxcross.liverc.com",
+  "name": "Nitroxcross",
+  "city": "Cross",
+  "country": "gb",
+  "events": 69,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:nohugsraceway.liverc.com",
+  "name": "No Hugs Raceway",
+  "city": "City of Lockport",
+  "country": "us",
+  "events": 75,
+  "lat": 43.2146925,
+  "lon": -78.847752,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Suds N Hugs",
+   "cat": "pet_groomer",
+   "lat": 42.973824,
+   "lon": -78.629189,
+   "d": 32129,
+   "where": "Clarence",
+   "score": 4.41
+  }
+ },
+ {
+  "key": "liverc:norcalhobbies.liverc.com",
+  "name": "Nor-Cal Hobbies",
+  "city": "San Jose",
+  "country": "us",
+  "events": 1425,
+  "lat": 37.310233,
+  "lon": -121.8578813,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Nor-Cal Hobbies",
+   "cat": "hobby_shop",
+   "lat": 37.310436,
+   "lon": -121.857742,
+   "d": 26,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:skagitriverraceway.liverc.com",
+  "name": "NORA Skagit River Raceway",
+  "city": "Burlington",
+  "country": "us",
+  "events": 576,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "NORA Skagit River Raceway",
+   "cat": "race_track",
+   "lat": 48.409687,
+   "lon": -122.340508,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:norcar.liverc.com",
+  "name": "NORCAR RC Raceway",
+  "city": "Burbank",
+  "country": "us",
+  "events": 541,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "NORCAR R/C Raceway",
+   "cat": "race_track",
+   "lat": 41.000629,
+   "lon": -81.985985,
+   "d": null,
+   "weight": 0.76
+  }
+ },
+ {
+  "key": "liverc:nznhrccc.liverc.com",
+  "name": "North Harbour Radio Controlled Car Club",
+  "city": "Devonport-Takapuna",
+  "country": "nz",
+  "events": 174,
+  "lat": -36.7818661,
+  "lon": 174.7505064,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:northshorehobbytownraceway.liverc.com",
+  "name": "NorthShore Raceway",
+  "city": "Hermantown",
+  "country": "us",
+  "events": 115,
+  "lat": 46.7931097,
+  "lon": -92.2364265,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Aa Hospitality Northshore Llc.",
+   "cat": "accommodation",
+   "lat": 46.727055,
+   "lon": -92.219955,
+   "d": 7451,
+   "where": "Proctor",
+   "score": 5.2
+  }
+ },
+ {
+  "key": "liverc:nctracing.liverc.com",
+  "name": "Northwest Championship Tour",
+  "city": "Marysville",
+  "country": "us",
+  "events": 106,
+  "lat": 48.0868275,
+  "lon": -122.1559284,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Championship Motors",
+   "cat": "used_car_dealer",
+   "lat": 47.676338,
+   "lon": -122.106819,
+   "d": 45791,
+   "where": "Redmond",
+   "score": 2.86
+  }
+ },
+ {
+  "key": "liverc:nrcracing.liverc.com",
+  "name": "NRC",
+  "city": "Nanaimo",
+  "country": "ca",
+  "events": 288,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "NRC Hobby Shop",
+   "cat": "hobby_shop",
+   "lat": 49.184959,
+   "lon": -123.984703,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:oorr.liverc.com",
+  "name": "Oatesified Offroad RC Raceway",
+  "city": "San Antonio",
+  "country": "us",
+  "events": 142,
+  "lat": 29.3701631,
+  "lon": -98.3870146,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Oatesified Offroad RC Raceway",
+   "cat": "race_track",
+   "lat": 29.339809,
+   "lon": -98.277832,
+   "d": 11107,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:offthewallsrc.liverc.com",
+  "name": "Off the Walls RC",
+  "city": "Wasilla",
+  "country": "us",
+  "events": 99,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Off the Walls RC",
+   "cat": "hobby_shop",
+   "lat": 61.613636,
+   "lon": -149.415848,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:oldmill.liverc.com",
+  "name": "Old Mill RC Raceway",
+  "city": "Tyrone Township",
+  "country": "us",
+  "events": 129,
+  "lat": 40.005301,
+  "lon": -77.2102329,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:oppositelockrc.liverc.com",
+  "name": "OLRC Raceway",
+  "city": "Camarillo",
+  "country": "us",
+  "events": 58,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "OLRC Raceway",
+   "cat": "race_track",
+   "lat": 34.222534,
+   "lon": -119.027069,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:omanrc.liverc.com",
+  "name": "Oman RC",
+  "city": "muscat",
+  "country": "om",
+  "events": 79,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Tawi Attair, Oman",
+   "cat": "park",
+   "lat": 17.107281,
+   "lon": 54.557884,
+   "d": null,
+   "where": "Mirbat",
+   "score": 5.41
+  }
+ },
+ {
+  "key": "liverc:israelileague.liverc.com",
+  "name": "Omer Ring",
+  "city": "Ganot Hadar",
+  "country": "il",
+  "events": 108,
+  "lat": 32.3201136,
+  "lon": 34.9007957,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Omer Barbershop",
+   "cat": "barber",
+   "lat": 32.317963,
+   "lon": 34.934238,
+   "d": 3152,
+   "where": "כפר יונה",
+   "score": 3.72
+  }
+ },
+ {
+  "key": "liverc:omra.liverc.com",
+  "name": "OMRA",
+  "city": "Great Britain Everywhere",
+  "country": "gb",
+  "events": 58,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:oneeighthracers.liverc.com",
+  "name": "One Eighth Racers",
+  "city": "Toledo",
+  "country": "us",
+  "events": 425,
+  "lat": 41.7171006,
+  "lon": -83.6336065,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "One Eighth Racers",
+   "cat": "race_track",
+   "lat": 41.398876,
+   "lon": -83.650063,
+   "d": 35411,
+   "where": "Bowling Green",
+   "score": 5.14
+  }
+ },
+ {
+  "key": "liverc:onioncreekrc.liverc.com",
+  "name": "Onion Creek RC",
+  "city": "Coffeyville",
+  "country": "us",
+  "events": 236,
+  "lat": 37.0290557,
+  "lon": -95.6163371,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Onion Creek RC",
+   "cat": "race_track",
+   "lat": 37.029079,
+   "lon": -95.616455,
+   "d": 11,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:ontrackrc.liverc.com",
+  "name": "OnTrack Raceway",
+  "city": "Mobile",
+  "country": "us",
+  "events": 933,
+  "lat": 30.730122,
+  "lon": -88.173505,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "OnTrack Raceway",
+   "cat": "race_track",
+   "lat": 30.728086,
+   "lon": -88.173401,
+   "d": 227,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:otagorc.liverc.com",
+  "name": "Otago Radio Control Car Club",
+  "city": "Dunedin",
+  "country": "nz",
+  "events": 94,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Otago Peninsula",
+   "cat": "park",
+   "lat": -45.7761,
+   "lon": 170.728836,
+   "d": null,
+   "where": "Dunedin",
+   "score": 5.54
+  }
+ },
+ {
+  "key": "liverc:outback.liverc.com",
+  "name": "Outback Raceway",
+  "city": "Chico",
+  "country": "us",
+  "events": 267,
+  "lat": 39.7112889,
+  "lon": -121.799937,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Outback Steakhouse",
+   "cat": "steakhouse",
+   "lat": 39.727562,
+   "lon": -121.801903,
+   "d": 1817,
+   "where": "Chico",
+   "score": 5.93
+  }
+ },
+ {
+  "key": "liverc:outlawracewaypark.liverc.com",
+  "name": "Outlaw Raceway Park LLC",
+  "city": "Jefferson",
+  "country": "us",
+  "events": 102,
+  "lat": 44.1981572,
+  "lon": -69.4799765,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:outlawrcbc.liverc.com",
+  "name": "Outlaw RC",
+  "city": "Surrey",
+  "country": "ca",
+  "events": 84,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "L'atelier Outlaw Hobby / The Outlaw Hobby Shop",
+   "cat": "hobby_shop",
+   "lat": 46.721161,
+   "lon": -79.096298,
+   "d": null,
+   "where": "Témiscaming",
+   "score": 5.44
+  }
+ },
+ {
+  "key": "liverc:overlookraceway.liverc.com",
+  "name": "Overlook Raceway",
+  "city": "White Rock",
+  "country": "us",
+  "events": 190,
+  "lat": 35.8258907,
+  "lon": -106.1857583,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Overlook Park",
+   "cat": "park",
+   "lat": 35.824997,
+   "lon": -106.186996,
+   "d": 149,
+   "where": "White Rock",
+   "score": 6.59
+  }
+ },
+ {
+  "key": "liverc:palomesaraceway.liverc.com",
+  "name": "PaloMesaRaceway",
+  "city": "Arroyo Grande",
+  "country": "us",
+  "events": 197,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:parklanehobbies.liverc.com",
+  "name": "park lane raceway",
+  "city": "Pottstown",
+  "country": "us",
+  "events": 322,
+  "lat": 40.2260174,
+  "lon": -75.6589959,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Park Lane Hobbies",
+   "cat": "hobby_shop",
+   "lat": 40.225967,
+   "lon": -75.659081,
+   "d": 9,
+   "weight": 0.71
+  }
+ },
+ {
+  "key": "liverc:rcundergroundarena.liverc.com",
+  "name": "Parking Lot Pirates",
+  "city": "Rockville",
+  "country": "us",
+  "events": 89,
+  "lat": 39.0968269,
+  "lon": -77.1812461,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Urban Pirates",
+   "cat": "boat_tours",
+   "lat": 39.281242,
+   "lon": -76.591026,
+   "d": 54845,
+   "where": "Baltimore",
+   "score": 2.79
+  }
+ },
+ {
+  "key": "liverc:prccc.liverc.com",
+  "name": "Parow Radio Control Club",
+  "city": "Parow",
+  "country": "za",
+  "events": 103,
+  "lat": -33.8954511,
+  "lon": 18.5781637,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Parow Radio Control Club",
+   "cat": "sports_club_and_league",
+   "lat": -33.893734,
+   "lon": 18.577457,
+   "d": 202,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:racingadventure.liverc.com",
+  "name": "Parque Viva Racing Circuit",
+  "city": "Guácima",
+  "country": "cr",
+  "events": 103,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:partycrashers.liverc.com",
+  "name": "Party Crashers",
+  "city": "Albertville",
+  "country": "us",
+  "events": 70,
+  "lat": 45.2289708,
+  "lon": -93.6423692,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Party Crashers Photography",
+   "cat": "professional_services",
+   "lat": 44.763168,
+   "lon": -93.624001,
+   "d": 51815,
+   "where": "Carver",
+   "score": 4.99
+  }
+ },
+ {
+  "key": "liverc:pdnr.liverc.com",
+  "name": "PDNR - Penrith District Nitro Racing Inc.",
+  "city": "Castlereagh",
+  "country": "au",
+  "events": 200,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Penrith District Nitro Racing",
+   "cat": "amateur_sports_team",
+   "lat": -33.726215,
+   "lon": 150.672272,
+   "d": null,
+   "weight": 0.53
+  }
+ },
+ {
+  "key": "liverc:pdxrcunderground.liverc.com",
+  "name": "PDX RC Raceway",
+  "city": "Portland",
+  "country": "us",
+  "events": 1129,
+  "lat": 45.4852162,
+  "lon": -122.7655515,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "PDX RC Raceway and Hobbies",
+   "cat": "hobby_shop",
+   "lat": 45.485107,
+   "lon": -122.765587,
+   "d": 12,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:pheasantlandrcracing.liverc.com",
+  "name": "pheasantland rc racing",
+  "city": "boyertown",
+  "country": "us",
+  "events": 503,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Pheasantland Roller-Drome",
+   "cat": "roller_skating_rink",
+   "lat": 40.363029,
+   "lon": -75.731476,
+   "d": null,
+   "where": "Boyertown",
+   "score": 6
+  }
+ },
+ {
+  "key": "liverc:philhurd.liverc.com",
+  "name": "Phil Hurd Raceway",
+  "city": "Savannah",
+  "country": "us",
+  "events": 172,
+  "lat": 31.9903019,
+  "lon": -81.0848602,
+  "verdict": "near",
+  "match": {
+   "nm": "Phil Hurd Raceway",
+   "cat": "race_track",
+   "lat": 31.992237,
+   "lon": -81.088394,
+   "d": 397,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:pxrc.liverc.com",
+  "name": "Phoenix RC Raceway",
+  "city": "Toronto",
+  "country": "ca",
+  "events": 507,
+  "lat": 43.73314,
+  "lon": -79.28731,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Phoenix RC Raceway",
+   "cat": "race_track",
+   "lat": 43.73315,
+   "lon": -79.28727,
+   "d": 3,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:thestable.liverc.com",
+  "name": "PHOENIX RC RACING CLUB",
+  "city": "EAST RANDOLPH",
+  "country": "us",
+  "events": 287,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:phdr.liverc.com",
+  "name": "Pine Hills Dirt Racing",
+  "city": "Brisbane",
+  "country": "au",
+  "events": 100,
+  "lat": -27.379071,
+  "lon": 152.9486806,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Pine Hills Lightning Baseball Club",
+   "cat": "amateur_sports_team",
+   "lat": -27.380796,
+   "lon": 152.94754,
+   "d": 222,
+   "weight": 0.75
+  }
+ },
+ {
+  "key": "liverc:pistalafe.liverc.com",
+  "name": "Pista La Fe Carros a Control Remoto",
+  "city": "Perímetro Urbano Medellín",
+  "country": "co",
+  "events": 62,
+  "lat": 6.227131,
+  "lon": -75.5653201,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Pista Road Track",
+   "cat": "race_track",
+   "lat": 6.265527,
+   "lon": -75.556976,
+   "d": 4368,
+   "where": "Medellín",
+   "score": 5.76
+  }
+ },
+ {
+  "key": "liverc:pitstophobbies.liverc.com",
+  "name": "Pit Stop Hobbies",
+  "city": "Mount Joy",
+  "country": "us",
+  "events": 319,
+  "lat": 40.1109356,
+  "lon": -76.5107555,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Pit Stop Hobbies",
+   "cat": "hobby_shop",
+   "lat": 40.111324,
+   "lon": -76.51075,
+   "d": 43,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:platinumhobbies.liverc.com",
+  "name": "Platinum Hobbies",
+  "city": "Middle Island",
+  "country": "us",
+  "events": 82,
+  "lat": 40.8857297,
+  "lon": -72.9258449,
+  "verdict": "near",
+  "match": {
+   "nm": "Platinum Hobbies",
+   "cat": "hobby_shop",
+   "lat": 40.887363,
+   "lon": -72.922859,
+   "d": 310,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:pprc.liverc.com",
+  "name": "Pole Position RC",
+  "city": "Fremont",
+  "country": "us",
+  "events": 69,
+  "lat": 37.5574802,
+  "lon": -121.9766318,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Pole Position \"RC\"",
+   "cat": "sports_club_and_league",
+   "lat": 37.495293,
+   "lon": -121.934593,
+   "d": 7846,
+   "where": "Fremont",
+   "score": 5.96
+  }
+ },
+ {
+  "key": "liverc:polkcountyrcraceway.liverc.com",
+  "name": "Polk County RC Raceway",
+  "city": "Bolivar",
+  "country": "us",
+  "events": 66,
+  "lat": 37.5986342,
+  "lon": -93.4323421,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Polk County R/C Raceway",
+   "cat": "race_track",
+   "lat": 37.600193,
+   "lon": -93.431862,
+   "d": 178,
+   "weight": 0.8
+  }
+ },
+ {
+  "key": "liverc:poorboyracewayandhobbies.liverc.com",
+  "name": "Poorboy Raceway and Hobbies",
+  "city": "Grants Pass",
+  "country": "us",
+  "events": 179,
+  "lat": 42.422668,
+  "lon": -123.3153379,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:potteriesrcmcc.liverc.com",
+  "name": "Potteries RCMCC",
+  "city": "Stoke-on-Trent",
+  "country": "gb",
+  "events": 177,
+  "lat": 53.007434,
+  "lon": -2.11481,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "The Potteries ",
+   "cat": "used_vintage_and_consignment",
+   "lat": 53.009872,
+   "lon": -2.20812,
+   "d": 6249,
+   "where": "Stoke-on-Trent",
+   "score": 5.53
+  }
+ },
+ {
+  "key": "liverc:powerlinerc.liverc.com",
+  "name": "Powerline RC",
+  "city": "Fredericksburg",
+  "country": "us",
+  "events": 84,
+  "lat": 38.2906242,
+  "lon": -77.5128788,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Powerline Paintball",
+   "cat": "sports_and_recreation_venue",
+   "lat": 38.494839,
+   "lon": -77.596191,
+   "d": 23840,
+   "where": "Fredericksburg",
+   "score": 5.14
+  }
+ },
+ {
+  "key": "liverc:premierhobbiesraceway.liverc.com",
+  "name": "Premier Hobbies Raceway",
+  "city": "Boyne Valley Township",
+  "country": "us",
+  "events": 98,
+  "lat": 45.1738087,
+  "lon": -84.9144725,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:prorc.liverc.com",
+  "name": "Pro RC Hobby Raceway",
+  "city": "Apalachin",
+  "country": "us",
+  "events": 379,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:cganderacers.liverc.com",
+  "name": "QCRC and TSRCAR",
+  "city": "Lebanon",
+  "country": "us",
+  "events": 338,
+  "lat": 39.4424589,
+  "lon": -84.2063972,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Tsrcar",
+   "cat": "race_track",
+   "lat": 39.20385,
+   "lon": -84.472122,
+   "d": 35020,
+   "where": "Lebanon",
+   "score": 6.22
+  }
+ },
+ {
+  "key": "liverc:quinnshobbies.liverc.com",
+  "name": "Quinn's Hobbies",
+  "city": "Ridgecrest",
+  "country": "us",
+  "events": 132,
+  "lat": 35.6516421,
+  "lon": -117.6601699,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Quinn's Hobbies",
+   "cat": "arts_and_entertainment",
+   "lat": 35.651543,
+   "lon": -117.768219,
+   "d": 9763,
+   "where": "Ridgecrest",
+   "score": 5.14
+  }
+ },
+ {
+  "key": "liverc:joplinrcclub.liverc.com",
+  "name": "Rabbit Run Rc Speedway",
+  "city": "Joplin",
+  "country": "us",
+  "events": 75,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:rcspeedfactory.liverc.com",
+  "name": "Race City Speed Factory",
+  "city": "Mooresville",
+  "country": "us",
+  "events": 544,
+  "lat": 35.6072333,
+  "lon": -80.8069471,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Race City Speed Factory",
+   "cat": "hobby_shop",
+   "lat": 35.60722,
+   "lon": -80.806938,
+   "d": 2,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:raceplacerc.liverc.com",
+  "name": "Race Place RC",
+  "city": "Oklahoma City",
+  "country": "us",
+  "events": 327,
+  "lat": 35.4611925,
+  "lon": -97.4646071,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Race Place RC",
+   "cat": "race_track",
+   "lat": 35.462463,
+   "lon": -97.463966,
+   "d": 153,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:raceplacercoffroad.liverc.com",
+  "name": "Race Place Rc Off Road",
+  "city": "Okalhoma City",
+  "country": "us",
+  "events": 99,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Race Place RC",
+   "cat": "race_track",
+   "lat": 35.462463,
+   "lon": -97.463966,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:raceparty.liverc.com",
+  "name": "Raceparty RC Complex",
+  "city": "Homestead Meadows South Number 4 Colonia",
+  "country": "us",
+  "events": 322,
+  "lat": 31.8383629,
+  "lon": -106.1792455,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Raceparty R/C Complex",
+   "cat": "amusement_park",
+   "lat": 31.83919,
+   "lon": -106.17984,
+   "d": 108,
+   "weight": 0.76
+  }
+ },
+ {
+  "key": "liverc:rachracing.liverc.com",
+  "name": "RachRacing RC track",
+  "city": "Xochimilco CXMX",
+  "country": "mx",
+  "events": 71,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:thebullring.liverc.com",
+  "name": "Racin Ray's Bull Ring",
+  "city": "Troutman",
+  "country": "us",
+  "events": 222,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Racin' at the Mason",
+   "cat": "race_track",
+   "lat": 39.722424,
+   "lon": -76.345207,
+   "d": null,
+   "where": "Delta",
+   "score": 4.44
+  }
+ },
+ {
+  "key": "liverc:rrcsa.liverc.com",
+  "name": "Radio racing cars sa",
+  "city": "Adelaide",
+  "country": "au",
+  "events": 210,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:rainmanshobby.liverc.com",
+  "name": "Rain-Mans Hobby and Raceway",
+  "city": "Bakersfield",
+  "country": "us",
+  "events": 1096,
+  "lat": 35.3150152,
+  "lon": -119.0615,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Rain for Rent",
+   "cat": "rental_service",
+   "lat": 35.405621,
+   "lon": -119.044823,
+   "d": 10188,
+   "where": "Bakersfield",
+   "score": 3.61
+  }
+ },
+ {
+  "key": "liverc:ramsrcclub.liverc.com",
+  "name": "RAMS RC Club",
+  "city": "Fremont",
+  "country": "us",
+  "events": 57,
+  "lat": 37.4951351,
+  "lon": -121.9336922,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "RAMS",
+   "cat": "counseling_and_mental_health",
+   "lat": 37.775784,
+   "lon": -122.497849,
+   "d": 58666,
+   "where": "San Francisco",
+   "score": 4.32
+  }
+ },
+ {
+  "key": "liverc:parksidept.liverc.com",
+  "name": "Rancho Cucamonga RC",
+  "city": "paris",
+  "country": "us",
+  "events": 231,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Rancho Cucamonga Quakes",
+   "cat": "sports_club_and_league",
+   "lat": 34.102428,
+   "lon": -117.548271,
+   "d": null,
+   "where": "Rancho Cucamonga",
+   "score": 5.56
+  }
+ },
+ {
+  "key": "liverc:rir.liverc.com",
+  "name": "Raukawa International Raceway",
+  "city": "Palmerston North 4470NZ",
+  "country": "nz",
+  "events": 234,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Raukawa International Raceway",
+   "cat": "sports_and_recreation_venue",
+   "lat": -40.310551,
+   "lon": 175.721161,
+   "d": null,
+   "where": "Ashhurst",
+   "score": 6.27
+  }
+ },
+ {
+  "key": "liverc:clayshobbieshop.liverc.com",
+  "name": "Rc Costa Rica",
+  "city": "Costa Rica",
+  "country": "cr",
+  "events": 172,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:rcdestination.liverc.com",
+  "name": "RC Destination",
+  "city": "Skowhegan",
+  "country": "us",
+  "events": 283,
+  "lat": 44.7630746,
+  "lon": -69.7162187,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "RC Destination",
+   "cat": "hobby_shop",
+   "lat": 44.763042,
+   "lon": -69.71611,
+   "d": 9,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:rce.liverc.com",
+  "name": "RC Excitement",
+  "city": "Fitchburg",
+  "country": "us",
+  "events": 1455,
+  "lat": 42.5694113,
+  "lon": -71.7798986,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "R C Excitement, Inc.",
+   "cat": "hobby_shop",
+   "lat": 42.569534,
+   "lon": -71.779762,
+   "d": 18,
+   "weight": 0.68
+  }
+ },
+ {
+  "key": "liverc:rcfarm.liverc.com",
+  "name": "RC Farm",
+  "city": "Crossville",
+  "country": "us",
+  "events": 141,
+  "lat": 35.9451318,
+  "lon": -85.0802567,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:silverhorserc.liverc.com",
+  "name": "RC Hobby Raceway",
+  "city": "Fuquay-Varina",
+  "country": "us",
+  "events": 273,
+  "lat": 35.5934787,
+  "lon": -78.7942648,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "RC HOBBY",
+   "cat": "hobby_shop",
+   "lat": 35.593414,
+   "lon": -78.794403,
+   "d": 14,
+   "weight": 0.69
+  }
+ },
+ {
+  "key": "liverc:rcmadness.liverc.com",
+  "name": "RC Madness",
+  "city": "Enfield",
+  "country": "us",
+  "events": 1422,
+  "lat": 41.9969958,
+  "lon": -72.5265684,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "R/C Madness",
+   "cat": "hobby_shop",
+   "lat": 41.996944,
+   "lon": -72.526535,
+   "d": 6,
+   "weight": 0.64
+  }
+ },
+ {
+  "key": "liverc:rcmadness2.liverc.com",
+  "name": "RC Madness 2",
+  "city": "Enfield",
+  "country": "us",
+  "events": 1518,
+  "lat": 41.9969958,
+  "lon": -72.5265684,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "R/C Madness",
+   "cat": "hobby_shop",
+   "lat": 41.996944,
+   "lon": -72.526535,
+   "d": 6,
+   "weight": 0.64
+  }
+ },
+ {
+  "key": "liverc:rconerace.liverc.com",
+  "name": "RC ONE RACING",
+  "city": "Macomb Township",
+  "country": "us",
+  "events": 494,
+  "lat": 42.6389146,
+  "lon": -82.8569554,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:rcpitstop.liverc.com",
+  "name": "Rc Pitstop and Raceway",
+  "city": "Newton",
+  "country": "us",
+  "events": 181,
+  "lat": 37.9981453,
+  "lon": -97.3342601,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "RC Pitstop & Raceway",
+   "cat": "hobby_shop",
+   "lat": 37.998512,
+   "lon": -97.333519,
+   "d": 77,
+   "weight": 0.82
+  }
+ },
+ {
+  "key": "liverc:rcplaygroundmia.liverc.com",
+  "name": "RC Playground",
+  "city": "miami",
+  "country": "us",
+  "events": 127,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "RC Playground Miami",
+   "cat": "hobby_shop",
+   "lat": 25.754833,
+   "lon": -80.366615,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:jcrcracebarn.liverc.com",
+  "name": "RC Race Barn",
+  "city": "Jefferson City",
+  "country": "us",
+  "events": 191,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "RC Race Barn",
+   "cat": "race_track",
+   "lat": 38.500702,
+   "lon": -92.271088,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:dsrhobbies.liverc.com",
+  "name": "RC SPEEDWAY in Dawson Springs ky",
+  "city": "Dawson Springs",
+  "country": "us",
+  "events": 257,
+  "lat": 37.1692061,
+  "lon": -87.6893166,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "RC Speedway in Dawson Springs, Ky",
+   "cat": "race_track",
+   "lat": 37.169601,
+   "lon": -87.688187,
+   "d": 109,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:rcvision.liverc.com",
+  "name": "RC Vision",
+  "city": "Uxbridge",
+  "country": "gb",
+  "events": 54,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:rcworldraceway.liverc.com",
+  "name": "RC World and Raceway",
+  "city": "Hogansburg",
+  "country": "us",
+  "events": 324,
+  "lat": 44.9762763,
+  "lon": -74.6662541,
+  "verdict": "near",
+  "match": {
+   "nm": "R/c World 🌎 & Raceway",
+   "cat": "race_track",
+   "lat": 44.974487,
+   "lon": -74.670929,
+   "d": 418,
+   "weight": 0.54
+  }
+ },
+ {
+  "key": "liverc:rczonetracks.liverc.com",
+  "name": "Rc Zone Off Road Carpet Track",
+  "city": "Cidra",
+  "country": "pr",
+  "events": 79,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:rc3racing.liverc.com",
+  "name": "RC3",
+  "city": "Huntsville",
+  "country": "us",
+  "events": 172,
+  "lat": 34.7683033,
+  "lon": -86.5729351,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:rcca.liverc.com",
+  "name": "RCCA",
+  "city": "Fort Worth",
+  "country": "us",
+  "events": 586,
+  "lat": 32.7409128,
+  "lon": -97.4339107,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:rccaoffroad.liverc.com",
+  "name": "RCCA OFFROAD",
+  "city": "Fort Worth",
+  "country": "us",
+  "events": 277,
+  "lat": 32.7409128,
+  "lon": -97.4339107,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:rcgearscalgary.liverc.com",
+  "name": "RCGEARS",
+  "city": "Calgary",
+  "country": "ca",
+  "events": 109,
+  "lat": 51.1248308,
+  "lon": -113.9721851,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:rchq.liverc.com",
+  "name": "RCHQ",
+  "city": "San Antonio",
+  "country": "us",
+  "events": 729,
+  "lat": 29.5969155,
+  "lon": -98.3503742,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "RCHQ",
+   "cat": "race_track",
+   "lat": 29.59688,
+   "lon": -98.35099,
+   "d": 60,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:rchr.liverc.com",
+  "name": "RCHR",
+  "city": "Waterbury",
+  "country": "us",
+  "events": 1082,
+  "lat": 41.5389405,
+  "lon": -73.0367438,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Rchr",
+   "cat": "race_track",
+   "lat": 41.538952,
+   "lon": -73.036644,
+   "d": 8,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:rciv3.liverc.com",
+  "name": "RCI V3 - Shanghai, China",
+  "city": "闵行区",
+  "country": "cn",
+  "events": 163,
+  "lat": 31.0734933,
+  "lon": 121.3914648,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:rcorrscvalleyraceway.liverc.com",
+  "name": "RCORRSC Valley Raceway",
+  "city": "Glenview",
+  "country": "au",
+  "events": 133,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:rcracersofsandiego.liverc.com",
+  "name": "RCP Racing",
+  "city": "San Marcos",
+  "country": "us",
+  "events": 146,
+  "lat": 33.1314762,
+  "lon": -117.1187231,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "RCP Block & Brick",
+   "cat": "building_supply_store",
+   "lat": 33.125854,
+   "lon": -117.101074,
+   "d": 1758,
+   "where": "Escondido",
+   "score": 6.13
+  }
+ },
+ {
+  "key": "liverc:rcplushobbies.liverc.com",
+  "name": "RCPlus",
+  "city": "Salem",
+  "country": "us",
+  "events": 712,
+  "lat": 44.9203376,
+  "lon": -123.011135,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:rcre.liverc.com",
+  "name": "RCRE-NASCAR",
+  "city": "Spruce Grove",
+  "country": "ca",
+  "events": 505,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Nascar Speedpark",
+   "cat": "amusement_park",
+   "lat": 43.825008,
+   "lon": -79.535362,
+   "d": null,
+   "where": "Vaughan",
+   "score": 4.05
+  }
+ },
+ {
+  "key": "liverc:rcsquared.liverc.com",
+  "name": "rcsquared",
+  "city": "Waynesville",
+  "country": "us",
+  "events": 55,
+  "lat": 37.7850859,
+  "lon": -92.2602598,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:southbay128.liverc.com",
+  "name": "Rcstreetshop",
+  "city": "Lawndale",
+  "country": "us",
+  "events": 103,
+  "lat": 33.8782087,
+  "lon": -118.352261,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Rcstreetshop – Expert Rc Cars, Parts & Services In Long Beach",
+   "cat": "hobby_shop",
+   "lat": 33.810799,
+   "lon": -118.123886,
+   "d": 22383,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:rctracks.liverc.com",
+  "name": "rctracks",
+  "city": "Stroud",
+  "country": "gb",
+  "events": 174,
+  "lat": 51.8178294,
+  "lon": -2.2181301,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:redclayrc.liverc.com",
+  "name": "Red Clay RC Raceway",
+  "city": "Stratford",
+  "country": "ca",
+  "events": 73,
+  "lat": 46.2263387,
+  "lon": -63.0985206,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:redlinercraceway.liverc.com",
+  "name": "Redline RC Raceway",
+  "city": "Johannesburg",
+  "country": "za",
+  "events": 76,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Redline RC Racing Club",
+   "cat": "sports_club_and_league",
+   "lat": -26.176071,
+   "lon": 28.109776,
+   "d": null,
+   "where": "Johannesburg",
+   "score": 5.43
+  }
+ },
+ {
+  "key": "liverc:redwoodcoastrcracingleague.liverc.com",
+  "name": "Redwood Coast Racing League",
+  "city": "Eureka",
+  "country": "us",
+  "events": 121,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Redwood Park",
+   "cat": "park",
+   "lat": 44.732288,
+   "lon": -93.244789,
+   "d": null,
+   "where": "Apple Valley",
+   "score": 5.38
+  }
+ },
+ {
+  "key": "liverc:redzone1rcspeedway.liverc.com",
+  "name": "Redzone1rc Speedway",
+  "city": "Lake Hallie",
+  "country": "us",
+  "events": 107,
+  "lat": 44.8843719,
+  "lon": -91.4248262,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:rescuercraceway.liverc.com",
+  "name": "Rescue RC Raceway",
+  "city": "Cameron Park",
+  "country": "us",
+  "events": 67,
+  "lat": 38.7100978,
+  "lon": -120.9535882,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Rescue RC Raceway",
+   "cat": "race_track",
+   "lat": 38.709023,
+   "lon": -120.953445,
+   "d": 120,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:revrace.liverc.com",
+  "name": "Revelation Raceway",
+  "city": "Montclair",
+  "country": "us",
+  "events": 116,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Revelation Raceway",
+   "cat": "hobby_shop",
+   "lat": 34.059425,
+   "lon": -117.69915,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:revolutionraceway.liverc.com",
+  "name": "Revolution Raceway Oshkosh",
+  "city": "Oshkosh",
+  "country": "us",
+  "events": 956,
+  "lat": 44.0109046,
+  "lon": -88.5427607,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Revolution Raceway",
+   "cat": "hobby_shop",
+   "lat": 44.010921,
+   "lon": -88.542908,
+   "d": 12,
+   "weight": 0.55
+  }
+ },
+ {
+  "key": "liverc:rhythmrc.liverc.com",
+  "name": "Rhythm RC Raceway",
+  "city": "Hammonton",
+  "country": "us",
+  "events": 183,
+  "lat": 39.630751,
+  "lon": -74.7906517,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Rhythm RC Raceway",
+   "cat": "race_track",
+   "lat": 39.629856,
+   "lon": -74.792824,
+   "d": 211,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:rickshobbyfarm.liverc.com",
+  "name": "Ricks Hobby Farm",
+  "city": "New Richmond",
+  "country": "us",
+  "events": 88,
+  "lat": 45.1225847,
+  "lon": -92.5693787,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Ricks Lawn Service LLC",
+   "cat": "gardener",
+   "lat": 45.273067,
+   "lon": -92.955292,
+   "d": 34559,
+   "where": "Forest Lake",
+   "score": 2.88
+  }
+ },
+ {
+  "key": "liverc:rivercityraceway.liverc.com",
+  "name": "River City Raceway",
+  "city": "Peoria",
+  "country": "us",
+  "events": 112,
+  "lat": 40.7895011,
+  "lon": -89.577561,
+  "verdict": "near",
+  "match": {
+   "nm": "River City Raceway",
+   "cat": "race_track",
+   "lat": 40.793697,
+   "lon": -89.576378,
+   "d": 477,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:riversiderc.liverc.com",
+  "name": "Riverside Rc",
+  "city": "Saint Johnsbury",
+  "country": "us",
+  "events": 95,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:rjsspeedrome.liverc.com",
+  "name": "RJ's Speedrome Carpet Oval",
+  "city": "TAMAQUA",
+  "country": "us",
+  "events": 77,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Indianapolis Speedrome",
+   "cat": "race_track",
+   "lat": 39.757507,
+   "lon": -86.055786,
+   "d": null,
+   "where": "Indianapolis",
+   "score": 6.65
+  }
+ },
+ {
+  "key": "liverc:roar.liverc.com",
+  "name": "ROAR Racing",
+  "city": "Lake Mary",
+  "country": "us",
+  "events": 94,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Hoosier Roar",
+   "cat": "sports_club_and_league",
+   "lat": 40.454117,
+   "lon": -86.857903,
+   "d": null,
+   "where": "Lafayette",
+   "score": 5.53
+  }
+ },
+ {
+  "key": "liverc:rocck.liverc.com",
+  "name": "ROCCK Racing",
+  "city": "Knoxville",
+  "country": "us",
+  "events": 279,
+  "lat": 36.0036201,
+  "lon": -83.8805024,
+  "verdict": "near",
+  "match": {
+   "nm": "ROCCK Racing",
+   "cat": "sports_club_and_league",
+   "lat": 36.000977,
+   "lon": -83.884842,
+   "d": 489,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:rockyrc.liverc.com",
+  "name": "Rockhampton Radio Control Car Club",
+  "city": "Rockhampton",
+  "country": "au",
+  "events": 141,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Totally Toys Rockhampton",
+   "cat": "toy_store",
+   "lat": -23.342659,
+   "lon": 150.521835,
+   "d": null,
+   "where": "Rockhampton",
+   "score": 5.48
+  }
+ },
+ {
+  "key": "liverc:rockymountainrc.liverc.com",
+  "name": "Rocky Mountain Raceway",
+  "city": "Salt Lake City",
+  "country": "us",
+  "events": 87,
+  "lat": 40.7259265,
+  "lon": -111.926058,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Rocky Mountain Raceways",
+   "cat": "race_track",
+   "lat": 40.72031,
+   "lon": -112.048172,
+   "d": 10310,
+   "weight": 0.76
+  }
+ },
+ {
+  "key": "liverc:rcronraceway.liverc.com",
+  "name": "Rons Raceway",
+  "city": "Brookesville",
+  "country": "us",
+  "events": 157,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Alligator Rons Saloon",
+   "cat": "bar",
+   "lat": 26.101723,
+   "lon": -80.430481,
+   "d": null,
+   "where": "Weston",
+   "score": 5
+  }
+ },
+ {
+  "key": "liverc:roostookcountycarclub.liverc.com",
+  "name": "roostookcountycarclub",
+  "city": "Limestone",
+  "country": "us",
+  "events": 56,
+  "lat": 46.93427,
+  "lon": -67.9007166,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:rcspeedway.liverc.com",
+  "name": "Rose City Speedway",
+  "city": "Welland",
+  "country": "ca",
+  "events": 457,
+  "lat": 42.974816,
+  "lon": -79.2388376,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Rose City Speedway",
+   "cat": "race_track",
+   "lat": 42.976353,
+   "lon": -79.240364,
+   "d": 211,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:rosecityscaleracing.liverc.com",
+  "name": "Rose City World of RC",
+  "city": "Portland",
+  "country": "us",
+  "events": 89,
+  "lat": 45.472974,
+  "lon": -122.5790711,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:rpmraceway.liverc.com",
+  "name": "RPM Raceway",
+  "city": "Johannesburg",
+  "country": "za",
+  "events": 57,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "RPM Raceway ",
+   "cat": "race_track",
+   "lat": -26.158098,
+   "lon": 28.165346,
+   "d": null,
+   "where": "Germiston",
+   "score": 5.4
+  }
+ },
+ {
+  "key": "liverc:rugburnspeedway.liverc.com",
+  "name": "Rug Burn Speedway",
+  "city": "Saint Marys",
+  "country": "us",
+  "events": 60,
+  "lat": 40.5496847,
+  "lon": -84.4025726,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Burn Cycle and Fitness",
+   "cat": "cycling_classes",
+   "lat": 41.019394,
+   "lon": -84.031883,
+   "d": 60843,
+   "where": "Ottawa",
+   "score": 2.74
+  }
+ },
+ {
+  "key": "liverc:rugburnerz.liverc.com",
+  "name": "Rug Burners RC Raceway",
+  "city": "Menasha",
+  "country": "us",
+  "events": 336,
+  "lat": 44.2015471,
+  "lon": -88.4575702,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Rug Burnerz RC Raceway",
+   "cat": "race_track",
+   "lat": 44.201389,
+   "lon": -88.45726,
+   "d": 30,
+   "weight": 0.64
+  }
+ },
+ {
+  "key": "liverc:rushlandrcspeedway.liverc.com",
+  "name": "Rushland RC Speedway",
+  "city": "Wrightstown Township",
+  "country": "us",
+  "events": 178,
+  "lat": 40.2583343,
+  "lon": -75.0307251,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Rushland R/C Speedway by Torodyne",
+   "cat": "race_track",
+   "lat": 40.272659,
+   "lon": -75.045486,
+   "d": 2026,
+   "weight": 0.76
+  }
+ },
+ {
+  "key": "liverc:sanluisrcraceway.liverc.com",
+  "name": "San Luis RC Raceway",
+  "city": "San Luis Río Colorado",
+  "country": "mx",
+  "events": 89,
+  "lat": 32.4270431,
+  "lon": -114.7642475,
+  "verdict": "near",
+  "match": {
+   "nm": "San Luis RC Raceway",
+   "cat": "race_track",
+   "lat": 32.429943,
+   "lon": -114.773552,
+   "d": 931,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:santanspeedwayrc.liverc.com",
+  "name": "San Tan Speedway RC",
+  "city": "San Tan Valley",
+  "country": "us",
+  "events": 116,
+  "lat": 33.2522442,
+  "lon": -111.5555741,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "San Tan Youth Football League",
+   "cat": "amateur_sports_team",
+   "lat": 33.247883,
+   "lon": -111.643021,
+   "d": 8146,
+   "weight": 0.57
+  }
+ },
+ {
+  "key": "liverc:sandhillrcraceway.liverc.com",
+  "name": "Sandhill RC Raceway",
+  "city": "Great Bend",
+  "country": "us",
+  "events": 82,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Sandhill RC Raceway",
+   "cat": "race_track",
+   "lat": 38.324516,
+   "lon": -98.673111,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:santarosaspeedway.liverc.com",
+  "name": "Santa rosa speedway fisch bowl",
+  "city": "Santa rosa",
+  "country": "us",
+  "events": 85,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "FISCH",
+   "cat": "swimwear_store",
+   "lat": 40.72086,
+   "lon": -74.005951,
+   "d": null,
+   "where": "New York",
+   "score": 4.85
+  }
+ },
+ {
+  "key": "liverc:saratogarc.liverc.com",
+  "name": "Saratoga - Flowood RC",
+  "city": "Magee",
+  "country": "us",
+  "events": 95,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Saratoga-Flowood RC Raceway",
+   "cat": "race_track",
+   "lat": 31.818024,
+   "lon": -89.659431,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:sarcarsk.liverc.com",
+  "name": "SARCAR",
+  "city": "Saskatoon",
+  "country": "ca",
+  "events": 63,
+  "lat": 52.1263345,
+  "lon": -106.6649295,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "SARCAR",
+   "cat": "race_track",
+   "lat": 52.126289,
+   "lon": -106.665543,
+   "d": 42,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:hobizone.liverc.com",
+  "name": "Saue HOBIzone",
+  "city": "Saue",
+  "country": "ee",
+  "events": 102,
+  "lat": 59.3244193,
+  "lon": 24.5631518,
+  "verdict": "near",
+  "match": {
+   "nm": "Saue Spordihoone",
+   "cat": "sports_club_and_league",
+   "lat": 59.320065,
+   "lon": 24.560461,
+   "d": 508,
+   "weight": 0.49
+  }
+ },
+ {
+  "key": "liverc:sdocs.liverc.com",
+  "name": "SC1RCC",
+  "city": "Strongstown",
+  "country": "us",
+  "events": 262,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:pensacolarcracway.liverc.com",
+  "name": "ScottKins Glen Rc racing",
+  "city": "Pensacola",
+  "country": "us",
+  "events": 131,
+  "lat": 30.4153044,
+  "lon": -87.2507004,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:sdrc.liverc.com",
+  "name": "SDRC Raceway",
+  "city": "San Diego",
+  "country": "us",
+  "events": 1426,
+  "lat": 32.8819587,
+  "lon": -117.1647642,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "San Diego Recreational Cannabis-sdrc",
+   "cat": "cannabis_dispensary",
+   "lat": 32.889156,
+   "lon": -117.209167,
+   "d": 4223,
+   "where": "San Diego",
+   "score": 5.98
+  }
+ },
+ {
+  "key": "liverc:srcrscoring.liverc.com",
+  "name": "Seattle RC Racers Onroad",
+  "city": "SeaTac",
+  "country": "us",
+  "events": 59,
+  "lat": 47.4818581,
+  "lon": -122.3070007,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:senditrc.liverc.com",
+  "name": "Send It RC Speedway",
+  "city": "Adel",
+  "country": "us",
+  "events": 212,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Send It Sales Llc",
+   "cat": "toy_store",
+   "lat": 42.133728,
+   "lon": -72.629555,
+   "d": null,
+   "where": "West Springfield",
+   "score": 5.48
+  }
+ },
+ {
+  "key": "liverc:simara.liverc.com",
+  "name": "Shanghai International Model Auto Racing Arena",
+  "city": "宝山区",
+  "country": "cn",
+  "events": 113,
+  "lat": 31.3427885,
+  "lon": 121.3560543,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:shawsrctrack.liverc.com",
+  "name": "Shaw's RC Track",
+  "city": "Ardmore",
+  "country": "us",
+  "events": 708,
+  "lat": 34.1584054,
+  "lon": -97.1038779,
+  "verdict": "near",
+  "match": {
+   "nm": "Shaw's R/C Hobby Shop race track",
+   "cat": "race_track",
+   "lat": 34.160419,
+   "lon": -97.099937,
+   "d": 426,
+   "weight": 0.73
+  }
+ },
+ {
+  "key": "liverc:shawsoval.liverc.com",
+  "name": "Shaws oval rc",
+  "city": "Ardmore",
+  "country": "us",
+  "events": 79,
+  "lat": 34.1584054,
+  "lon": -97.1038779,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:shiprcraceway.liverc.com",
+  "name": "Ship Rc",
+  "city": "BILLINGS",
+  "country": "us",
+  "events": 144,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Ship Rc",
+   "cat": "race_track",
+   "lat": 37.063,
+   "lon": -93.558723,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:siparkinglotracers.liverc.com",
+  "name": "SI Parking Lot Racers",
+  "city": "New York",
+  "country": "us",
+  "events": 97,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "B & B Racers LLC",
+   "cat": "go_kart_club",
+   "lat": 48.232876,
+   "lon": -101.260452,
+   "d": null,
+   "where": "Minot",
+   "score": 5.64
+  }
+ },
+ {
+  "key": "liverc:silverbowl.liverc.com",
+  "name": "silverbowl",
+  "city": "Henderson",
+  "country": "us",
+  "events": 91,
+  "lat": 36.0828664,
+  "lon": -115.0503683,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Silverbowl R/C Raceway",
+   "cat": "race_track",
+   "lat": 36.085114,
+   "lon": -115.024864,
+   "d": 2305,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:silverdalehobbies.liverc.com",
+  "name": "Silverdale Hobbies",
+  "city": "Silverdale",
+  "country": "us",
+  "events": 286,
+  "lat": 47.6575691,
+  "lon": -122.6900686,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Silverdale Hobbies",
+   "cat": "hobby_shop",
+   "lat": 47.658142,
+   "lon": -122.690742,
+   "d": 81,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:kenosharc.liverc.com",
+  "name": "SilverStar Speedway",
+  "city": "Kenosha",
+  "country": "us",
+  "events": 55,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Silverstar Properties Inc",
+   "cat": "accommodation",
+   "lat": 40.67144,
+   "lon": -80.57399,
+   "d": null,
+   "where": "East Liverpool",
+   "score": 5.06
+  }
+ },
+ {
+  "key": "liverc:silverstonercmcc.liverc.com",
+  "name": "Silverstone RCMCC",
+  "city": "Northampton",
+  "country": "gb",
+  "events": 386,
+  "lat": 52.3029978,
+  "lon": -0.8930637,
+  "verdict": "near",
+  "match": {
+   "nm": "Silverstone RCMCC",
+   "cat": "sports_club_and_league",
+   "lat": 52.298279,
+   "lon": -0.871747,
+   "d": 1542,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:fmraceway.liverc.com",
+  "name": "SKEGNESS MODEL RACEWAY",
+  "city": "Skegness",
+  "country": "gb",
+  "events": 121,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Skegness Water Leisure Park",
+   "cat": "park",
+   "lat": 53.17469,
+   "lon": 0.337981,
+   "d": null,
+   "where": "Ingoldmells",
+   "score": 5.57
+  }
+ },
+ {
+  "key": "liverc:skycraftrcraceway.liverc.com",
+  "name": "Skycraft RC Raceway",
+  "city": "West Lincoln Township",
+  "country": "ca",
+  "events": 66,
+  "lat": 43.0606869,
+  "lon": -79.3890122,
+  "verdict": "near",
+  "match": {
+   "nm": "Skycraft RC Raceway",
+   "cat": "race_track",
+   "lat": 43.077888,
+   "lon": -79.388687,
+   "d": 1913,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:slatevalleyraceway.liverc.com",
+  "name": "SLATE VALLEY RACEWAY",
+  "city": "Fair Haven",
+  "country": "us",
+  "events": 265,
+  "lat": 43.5769532,
+  "lon": -73.2651934,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Slate Valley Raceway",
+   "cat": "race_track",
+   "lat": 43.577019,
+   "lon": -73.265305,
+   "d": 12,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:ssspeedway.liverc.com",
+  "name": "Small Scale Speedway",
+  "city": "Town of Warwick",
+  "country": "us",
+  "events": 372,
+  "lat": 41.2234327,
+  "lon": -74.2972611,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Small Scale Speedway",
+   "cat": "hobby_shop",
+   "lat": 41.223396,
+   "lon": -74.296951,
+   "d": 26,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:smokeymounatinrc.liverc.com",
+  "name": "Smokey Mountain RC",
+  "city": "Athens",
+  "country": "us",
+  "events": 68,
+  "lat": 35.4658004,
+  "lon": -84.607498,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Smokey Mountain Rc Track",
+   "cat": "hobby_shop",
+   "lat": 35.484848,
+   "lon": -84.589325,
+   "d": 2682,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:snormexico.liverc.com",
+  "name": "Snor Mexico National",
+  "city": "Brownsville",
+  "country": "us",
+  "events": 205,
+  "lat": 25.901752,
+  "lon": -97.5104207,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:serccc.liverc.com",
+  "name": "South Eastern Radio Controlled Car Club",
+  "city": "Melbourne",
+  "country": "au",
+  "events": 85,
+  "lat": -38.3419913,
+  "lon": 145.1670535,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "SERCCC South Eastern Radio Control Car Club",
+   "cat": "sports_club_and_league",
+   "lat": -38.340839,
+   "lon": 145.167297,
+   "d": 130,
+   "weight": 0.76
+  }
+ },
+ {
+  "key": "liverc:sdmcc.liverc.com",
+  "name": "Southern Districts Model Car Club",
+  "city": "Morphett Vale",
+  "country": "au",
+  "events": 114,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Southern Districts Rugby Club",
+   "cat": "sports_club_and_league",
+   "lat": -34.024452,
+   "lon": 151.110397,
+   "d": null,
+   "where": "Sydney",
+   "score": 5.52
+  }
+ },
+ {
+  "key": "liverc:smrcr.liverc.com",
+  "name": "Southern Minnesota RC Raceway",
+  "city": "Blooming Prairie Township",
+  "country": "us",
+  "events": 151,
+  "lat": 43.8928952,
+  "lon": -93.0656773,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Southern Minnesota RC Raceway",
+   "cat": "race_track",
+   "lat": 43.857723,
+   "lon": -93.046585,
+   "d": 4200,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:dfw1rc.liverc.com",
+  "name": "SpareTime Raceway",
+  "city": "Burleson",
+  "country": "us",
+  "events": 191,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Sparetime Lanes",
+   "cat": "bowling_alley",
+   "lat": 41.169823,
+   "lon": -112.024757,
+   "d": null,
+   "where": "Roy",
+   "score": 5.41
+  }
+ },
+ {
+  "key": "liverc:speedfactoryrc.liverc.com",
+  "name": "SpeedFactoryRC",
+  "city": "Ripon",
+  "country": "us",
+  "events": 134,
+  "lat": 37.7345689,
+  "lon": -121.1286226,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:spransyraceway.liverc.com",
+  "name": "Spransy Raceway",
+  "city": "Waterloo",
+  "country": "us",
+  "events": 147,
+  "lat": 43.1670049,
+  "lon": -89.0173842,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Brian Montrey - Realty Executives Cooper Spransy",
+   "cat": "real_estate_agent",
+   "lat": 43.014374,
+   "lon": -89.454964,
+   "d": 39378,
+   "where": "Fitchburg",
+   "score": 5.45
+  }
+ },
+ {
+  "key": "liverc:sshobbies.liverc.com",
+  "name": "SS Hobbies And Raceway",
+  "city": "Tampa",
+  "country": "us",
+  "events": 200,
+  "lat": 27.9666792,
+  "lon": -82.3793833,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "SS Hobbies & Raceway",
+   "cat": "hobby_shop",
+   "lat": 27.965885,
+   "lon": -82.379005,
+   "d": 96,
+   "weight": 0.81
+  }
+ },
+ {
+  "key": "liverc:stivesrccc.liverc.com",
+  "name": "St Ives RCCC",
+  "city": "Sydney",
+  "country": "au",
+  "events": 108,
+  "lat": -33.7074264,
+  "lon": 151.1861302,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "St Ives Radio Controlled Car Club",
+   "cat": "sports_club_and_league",
+   "lat": -33.706409,
+   "lon": 151.186844,
+   "d": 131,
+   "weight": 0.54
+  }
+ },
+ {
+  "key": "liverc:stlouisdirtburners.liverc.com",
+  "name": "St Louis Dirtburners",
+  "city": "Kirkwood",
+  "country": "us",
+  "events": 222,
+  "lat": 38.5564517,
+  "lon": -90.4528619,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "St. Louis Dirt Burners",
+   "cat": "race_track",
+   "lat": 38.55629,
+   "lon": -90.453339,
+   "d": 45,
+   "weight": 0.51
+  }
+ },
+ {
+  "key": "liverc:strraceway.liverc.com",
+  "name": "STR",
+  "city": "San Angelo",
+  "country": "us",
+  "events": 94,
+  "lat": 31.3571276,
+  "lon": -100.5134771,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:stricklandrc.liverc.com",
+  "name": "Strickland RC Park",
+  "city": "Daytona Beach",
+  "country": "us",
+  "events": 61,
+  "lat": 29.239718,
+  "lon": -81.0866656,
+  "verdict": "near",
+  "match": {
+   "nm": "Robert Strickland BMX Park",
+   "cat": "stadium_arena",
+   "lat": 29.237522,
+   "lon": -81.084229,
+   "d": 340,
+   "weight": 0.74
+  }
+ },
+ {
+  "key": "liverc:sumterrcraceway.liverc.com",
+  "name": "Sumter RC Raceway",
+  "city": "Cherryvale",
+  "country": "us",
+  "events": 166,
+  "lat": 33.9652861,
+  "lon": -80.4424549,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Sumter RC Raceway",
+   "cat": "race_track",
+   "lat": 33.967693,
+   "lon": -80.441963,
+   "d": 271,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:sussexmicrorc.liverc.com",
+  "name": "Sussex Micro RC",
+  "city": "Lewes",
+  "country": "gb",
+  "events": 108,
+  "lat": 50.9205322,
+  "lon": -0.1139275,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Sussex",
+   "cat": "pub",
+   "lat": 50.82132,
+   "lon": -0.139277,
+   "d": 11174,
+   "where": "Brighton",
+   "score": 5.12
+  }
+ },
+ {
+  "key": "liverc:swrcp.liverc.com",
+  "name": "sweetwater rc park",
+  "city": "Rock Springs",
+  "country": "us",
+  "events": 67,
+  "lat": 41.6005514,
+  "lon": -109.2256436,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Sweetwater R/C Raceway Park",
+   "cat": "race_track",
+   "lat": 41.601242,
+   "lon": -109.224197,
+   "d": 143,
+   "weight": 0.74
+  }
+ },
+ {
+  "key": "liverc:sweetwaterraceway.liverc.com",
+  "name": "SWEETWATER RC RACEWAY",
+  "city": "POWDER SPRINGS",
+  "country": "us",
+  "events": 973,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Sweetwater RC Raceway",
+   "cat": "race_track",
+   "lat": 33.82317,
+   "lon": -84.757774,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:switchbackrc.liverc.com",
+  "name": "Switchback RC in the Village",
+  "city": "Lowell",
+  "country": "us",
+  "events": 382,
+  "lat": 42.6496734,
+  "lon": -71.2985299,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:tnthobbies.liverc.com",
+  "name": "T and T Hobbies",
+  "city": "Middeltown",
+  "country": "us",
+  "events": 321,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:tarcartoledo.liverc.com",
+  "name": "T.A.R.C.A.R. Toledo",
+  "city": "Toledo",
+  "country": "us",
+  "events": 228,
+  "lat": 41.6471149,
+  "lon": -83.7136358,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Toledo Golden Gloves",
+   "cat": "amateur_sports_team",
+   "lat": 41.625343,
+   "lon": -83.654556,
+   "d": 5474,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:tacomarcraceway.liverc.com",
+  "name": "Tacoma RC Raceway",
+  "city": "Tacoma",
+  "country": "us",
+  "events": 1033,
+  "lat": 47.2133212,
+  "lon": -122.4860682,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Tacoma R/C Raceway",
+   "cat": "race_track",
+   "lat": 47.213512,
+   "lon": -122.486137,
+   "d": 22,
+   "weight": 0.73
+  }
+ },
+ {
+  "key": "liverc:tamiamiparkraceway.liverc.com",
+  "name": "Tamiami Park RC",
+  "city": "Miami",
+  "country": "us",
+  "events": 239,
+  "lat": 25.7492044,
+  "lon": -80.3836197,
+  "verdict": "near",
+  "match": {
+   "nm": "Tamiami R/C Raceway",
+   "cat": "race_track",
+   "lat": 25.74675,
+   "lon": -80.376022,
+   "d": 808,
+   "weight": 0.53
+  }
+ },
+ {
+  "key": "liverc:taranaki.liverc.com",
+  "name": "Taranaki Radio Control Car Club",
+  "city": "New Plymouth",
+  "country": "nz",
+  "events": 261,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Taranaki Rugby Supporters Club",
+   "cat": "sports_club_and_league",
+   "lat": -39.070271,
+   "lon": 174.06546,
+   "d": null,
+   "where": "New Plymouth",
+   "score": 5.57
+  }
+ },
+ {
+  "key": "liverc:taurangaindoor.liverc.com",
+  "name": "Tauranga Indoor",
+  "city": "Mt Maunganui",
+  "country": "nz",
+  "events": 90,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Tauranga Lawn Tennis Club",
+   "cat": "sports_club_and_league",
+   "lat": -37.680931,
+   "lon": 176.166336,
+   "d": null,
+   "where": "Tauranga",
+   "score": 5.49
+  }
+ },
+ {
+  "key": "liverc:taylorparkraceway.liverc.com",
+  "name": "Taylor Park Raceway",
+  "city": "Yukon",
+  "country": "us",
+  "events": 104,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Taylor Park R/C Raceway",
+   "cat": "race_track",
+   "lat": 35.511799,
+   "lon": -97.766319,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:teamjoybox.liverc.com",
+  "name": "Team JOYBOX",
+  "city": "Yatomi",
+  "country": "jp",
+  "events": 144,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Joyboxゴルフスクール",
+   "cat": "active_life",
+   "lat": 43.089409,
+   "lon": 141.409317,
+   "d": null,
+   "where": "札幌市東区",
+   "score": 5.53
+  }
+ },
+ {
+  "key": "liverc:tftr.liverc.com",
+  "name": "TFTR",
+  "city": "Melbourne",
+  "country": "au",
+  "events": 167,
+  "lat": -37.7526949,
+  "lon": 145.1386962,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:falconrcraceway.liverc.com",
+  "name": "THE BARN RC RACEWAY",
+  "city": "Barnesville",
+  "country": "us",
+  "events": 61,
+  "lat": 33.0076273,
+  "lon": -84.1902157,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "The Barn R/C Raceway",
+   "cat": "race_track",
+   "lat": 33.00766,
+   "lon": -84.188873,
+   "d": 125,
+   "weight": 0.77
+  }
+ },
+ {
+  "key": "liverc:barnyard.liverc.com",
+  "name": "The Barn Yard",
+  "city": "Stratford",
+  "country": "ca",
+  "events": 185,
+  "lat": 43.3927466,
+  "lon": -80.9816291,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:bullringatupstate.liverc.com",
+  "name": "The Bullring at Upstate RC",
+  "city": "City of Gloversville",
+  "country": "us",
+  "events": 52,
+  "lat": 43.0528411,
+  "lon": -74.3443177,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Upstate Rc and Hobbies",
+   "cat": "hobby_shop",
+   "lat": 43.05278,
+   "lon": -74.344376,
+   "d": 8,
+   "where": "Gloversville",
+   "score": 6.63
+  }
+ },
+ {
+  "key": "liverc:thedirt.liverc.com",
+  "name": "The Dirt",
+  "city": "Perris",
+  "country": "us",
+  "events": 250,
+  "lat": 33.8509043,
+  "lon": -117.2038557,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "The Dirt Racepark at Perris",
+   "cat": "race_track",
+   "lat": 33.848866,
+   "lon": -117.20211,
+   "d": 278,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:thekraterraceway.liverc.com",
+  "name": "The Krater Dirt Oval Raceway",
+  "city": "Easton Township",
+  "country": "us",
+  "events": 131,
+  "lat": 42.9910161,
+  "lon": -85.1243367,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "The Krater R/C Dirt Oval Raceway",
+   "cat": "race_track",
+   "lat": 42.994503,
+   "lon": -85.067513,
+   "d": 4638,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:lowerlevelrc.liverc.com",
+  "name": "The Lower Level",
+  "city": "Niles",
+  "country": "us",
+  "events": 368,
+  "lat": 41.8364288,
+  "lon": -86.2501296,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "The Lower Level RC Raceway",
+   "cat": "race_track",
+   "lat": 41.836452,
+   "lon": -86.249992,
+   "d": 12,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:theovalofficerctrack.liverc.com",
+  "name": "The Oval Office",
+  "city": "Moro",
+  "country": "us",
+  "events": 53,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:theracersden.liverc.com",
+  "name": "The Racers Den \"Off-Road\"",
+  "city": "Rancho Cordova",
+  "country": "us",
+  "events": 231,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "The Racers Den",
+   "cat": "hobby_shop",
+   "lat": 38.574909,
+   "lon": -121.303513,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:theracersdenonroad.liverc.com",
+  "name": "The Racers Den \"On-Road\"",
+  "city": "Rancho Cordova",
+  "country": "us",
+  "events": 62,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "The Racers Den",
+   "cat": "hobby_shop",
+   "lat": 38.574909,
+   "lon": -121.303513,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:getahobby.liverc.com",
+  "name": "The Raceway at Get a Hobby",
+  "city": "Uniontown",
+  "country": "us",
+  "events": 423,
+  "lat": 39.8844548,
+  "lon": -79.7342298,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Get A Hobby",
+   "cat": "hobby_shop",
+   "lat": 39.883453,
+   "lon": -79.733604,
+   "d": 124,
+   "weight": 0.48
+  }
+ },
+ {
+  "key": "liverc:thepebble.liverc.com",
+  "name": "The ROCK RC Raceway",
+  "city": "South Bend",
+  "country": "us",
+  "events": 62,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:thestand.liverc.com",
+  "name": "The Stand RC Speedway",
+  "city": "Gansevoort",
+  "country": "us",
+  "events": 108,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "The Stand R/C Speedway",
+   "cat": "race_track",
+   "lat": 43.22197,
+   "lon": -73.638916,
+   "d": null,
+   "weight": 0.76
+  }
+ },
+ {
+  "key": "liverc:thunderdome.liverc.com",
+  "name": "The Thunderdome",
+  "city": "Daingerfield",
+  "country": "us",
+  "events": 257,
+  "lat": 33.0330765,
+  "lon": -94.74112,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:thetoybox.liverc.com",
+  "name": "The Toy Box",
+  "city": "New Richmond",
+  "country": "us",
+  "events": 466,
+  "lat": 45.1164834,
+  "lon": -92.5685783,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "The Toy Box",
+   "cat": "race_track",
+   "lat": 45.098072,
+   "lon": -92.599968,
+   "d": 3203,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:thetrackgaithersburg.liverc.com",
+  "name": "The Track in Gaithersburg Maryland",
+  "city": "Gaithersburg",
+  "country": "us",
+  "events": 705,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "OMNINET Plus | Gaithersburg Based Outsourced IT Support Company for Maryland & Washington DC Business",
+   "cat": "it_service_and_computer_repair",
+   "lat": 39.163639,
+   "lon": -77.227951,
+   "d": null,
+   "where": "Gaithersburg",
+   "score": 4.94
+  }
+ },
+ {
+  "key": "liverc:racetime.liverc.com",
+  "name": "The Wicked Weekend 2026",
+  "city": "White Pine",
+  "country": "us",
+  "events": 135,
+  "lat": 36.1295699,
+  "lon": -83.2923126,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Weekend Warriors",
+   "cat": "souvenir_shop",
+   "lat": 35.803341,
+   "lon": -83.573746,
+   "d": 44242,
+   "where": "Pigeon Forge",
+   "score": 2.76
+  }
+ },
+ {
+  "key": "liverc:thetrackkr.liverc.com",
+  "name": "TheTrack",
+  "city": "Gimpo",
+  "country": "kr",
+  "events": 377,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:thompsonrcraceway.liverc.com",
+  "name": "Thompson RC Raceway",
+  "city": "justin",
+  "country": "us",
+  "events": 119,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Thompson R/C Raceway",
+   "cat": "race_track",
+   "lat": 33.044716,
+   "lon": -97.311806,
+   "d": null,
+   "weight": 0.72
+  }
+ },
+ {
+  "key": "liverc:thompsonvalleyrc.liverc.com",
+  "name": "Thompson Valley RC Raceway",
+  "city": "Kamloops",
+  "country": "ca",
+  "events": 85,
+  "lat": 50.676246,
+  "lon": -120.262424,
+  "verdict": "near",
+  "match": {
+   "nm": "Thompson Valley RC Race Club",
+   "cat": "amateur_sports_team",
+   "lat": 50.670776,
+   "lon": -120.261566,
+   "d": 611,
+   "weight": 0.81
+  }
+ },
+ {
+  "key": "liverc:trc.liverc.com",
+  "name": "Thornhill Racing Circuit",
+  "city": "Hutto",
+  "country": "us",
+  "events": 650,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Thornhill Racing Circuit",
+   "cat": "race_track",
+   "lat": 30.623535,
+   "lon": -97.518127,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:thrillsandspillsrcraceway.liverc.com",
+  "name": "Thrills And Spills RC Raceway",
+  "city": "Memphis",
+  "country": "us",
+  "events": 66,
+  "lat": 35.1486134,
+  "lon": -89.898744,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Thrills & Spills RC Onroad Raceway",
+   "cat": "race_track",
+   "lat": 35.149082,
+   "lon": -89.899124,
+   "d": 63,
+   "weight": 0.88
+  }
+ },
+ {
+  "key": "liverc:thunderalley.liverc.com",
+  "name": "Thunder Alley RC Speedway",
+  "city": "Lucama",
+  "country": "us",
+  "events": 982,
+  "lat": 35.6547912,
+  "lon": -77.9919862,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Thunder Alley RC Track / Hobby Shop",
+   "cat": "hobby_shop",
+   "lat": 35.720024,
+   "lon": -77.977913,
+   "d": 7364,
+   "weight": 0.81
+  }
+ },
+ {
+  "key": "liverc:knkhobbies.liverc.com",
+  "name": "Thunder Road Hobbies",
+  "city": "Moline",
+  "country": "us",
+  "events": 202,
+  "lat": 41.4570623,
+  "lon": -90.5112946,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Thunder Road Hobbies",
+   "cat": "hobby_shop",
+   "lat": 41.457024,
+   "lon": -90.511337,
+   "d": 6,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:tiwillspeedway.liverc.com",
+  "name": "Ti-Will Speedway",
+  "city": "Saint-François-du-Lac",
+  "country": "ca",
+  "events": 147,
+  "lat": 46.0402223,
+  "lon": -72.8423971,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:tomracingcircuit.liverc.com",
+  "name": "Tom Racing Circuit",
+  "city": "Yuen Long, N.T",
+  "country": "hk",
+  "events": 256,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:topnotchseries.liverc.com",
+  "name": "Top Notch Series",
+  "city": "Los Angeles",
+  "country": "us",
+  "events": 104,
+  "lat": 33.989653,
+  "lon": -118.4721886,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "27 Notch",
+   "cat": "media_agency",
+   "lat": 34.097233,
+   "lon": -118.322044,
+   "d": 18289,
+   "where": "Los Angeles",
+   "score": 5.14
+  }
+ },
+ {
+  "key": "liverc:trspeedway.liverc.com",
+  "name": "TR Speedway",
+  "city": "Tarentum",
+  "country": "us",
+  "events": 410,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:trackside.liverc.com",
+  "name": "Trackside Hobbies and Raceway",
+  "city": "Brookfield",
+  "country": "us",
+  "events": 761,
+  "lat": 43.0841718,
+  "lon": -88.0670419,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Trackside Hobbies & Raceway",
+   "cat": "hobby_shop",
+   "lat": 43.084126,
+   "lon": -88.066757,
+   "d": 24,
+   "weight": 0.82
+  }
+ },
+ {
+  "key": "liverc:tracksideoval.liverc.com",
+  "name": "Trackside Hobbies and Raceway Oval",
+  "city": "Brookfield",
+  "country": "us",
+  "events": 171,
+  "lat": 43.0841718,
+  "lon": -88.0670419,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Trackside Hobbies & Raceway",
+   "cat": "hobby_shop",
+   "lat": 43.084126,
+   "lon": -88.066757,
+   "d": 24,
+   "weight": 0.82
+  }
+ },
+ {
+  "key": "liverc:trainsandlanes.liverc.com",
+  "name": "Trains and Lanes Hobbies",
+  "city": "Easton",
+  "country": "us",
+  "events": 116,
+  "lat": 40.7090127,
+  "lon": -75.2799994,
+  "verdict": "near",
+  "match": {
+   "nm": "Trains and Lanes Hobbies",
+   "cat": "hobby_shop",
+   "lat": 40.705761,
+   "lon": -75.28891,
+   "d": 834,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:tricitiesrcracing.liverc.com",
+  "name": "Tri Cities RC Racing",
+  "city": "Lavalette",
+  "country": "us",
+  "events": 169,
+  "lat": 38.3212771,
+  "lon": -82.4477837,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Tri-Cities RC Racing",
+   "cat": "active_life",
+   "lat": 38.336548,
+   "lon": -82.451698,
+   "d": 1732,
+   "where": "Lavalette",
+   "score": 5.91
+  }
+ },
+ {
+  "key": "liverc:tuffyataltoonarcspeedway.liverc.com",
+  "name": "Tuffy at Altoona RC Speedways",
+  "city": "altoona",
+  "country": "us",
+  "events": 71,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "S & S Speedways",
+   "cat": "go_kart_club",
+   "lat": 40.843807,
+   "lon": -75.470329,
+   "d": null,
+   "where": "Kunkletown",
+   "score": 6.07
+  }
+ },
+ {
+  "key": "liverc:turnburn.liverc.com",
+  "name": "Turn And Burn Raceway",
+  "city": "Winston-Salem",
+  "country": "us",
+  "events": 1080,
+  "lat": 35.9693696,
+  "lon": -80.225327,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Turn & Burn Hobby & Raceway",
+   "cat": "hobby_shop",
+   "lat": 35.969357,
+   "lon": -80.225349,
+   "d": 2,
+   "weight": 0.83
+  }
+ },
+ {
+  "key": "liverc:turn2speedway.liverc.com",
+  "name": "turn2speedway",
+  "city": "Sherkston",
+  "country": "ca",
+  "events": 222,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:twincountyspeedway.liverc.com",
+  "name": "Twin county speedway",
+  "city": "Galax",
+  "country": "us",
+  "events": 74,
+  "lat": 36.6592508,
+  "lon": -80.9202314,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Twin County Speedway",
+   "cat": "race_track",
+   "lat": 36.659023,
+   "lon": -80.919716,
+   "d": 52,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:twistedrc.liverc.com",
+  "name": "Twisted RC",
+  "city": "Holly Hill",
+  "country": "us",
+  "events": 103,
+  "lat": 29.2278402,
+  "lon": -81.0337634,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Twisted RC",
+   "cat": "race_track",
+   "lat": 29.227888,
+   "lon": -81.033859,
+   "d": 11,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:uaerc.liverc.com",
+  "name": "UAE RC",
+  "city": "Sharjah",
+  "country": "ae",
+  "events": 68,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "UAE Cycling Federation",
+   "cat": "amateur_sports_team",
+   "lat": 25.312607,
+   "lon": 55.549534,
+   "d": null,
+   "weight": 0.63
+  }
+ },
+ {
+  "key": "liverc:ultimatercpitstop.liverc.com",
+  "name": "Ultimate RC Pitstop",
+  "city": "Reading",
+  "country": "us",
+  "events": 362,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Ultimate RC Pit Stop",
+   "cat": "hobby_shop",
+   "lat": 40.325253,
+   "lon": -76.048019,
+   "d": null,
+   "weight": 0.56
+  }
+ },
+ {
+  "key": "liverc:undergroundrc.liverc.com",
+  "name": "Underground RC",
+  "city": "City of Syracuse",
+  "country": "us",
+  "events": 541,
+  "lat": 43.069617,
+  "lon": -76.173506,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Underground Rc Raceway & Hobbies",
+   "cat": "hobby_shop",
+   "lat": 43.06966,
+   "lon": -76.172684,
+   "d": 67,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:valkariarc.liverc.com",
+  "name": "Valkaria RC Raceway",
+  "city": "Malabar",
+  "country": "us",
+  "events": 90,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Valkaria RC Raceway",
+   "cat": "race_track",
+   "lat": 27.962214,
+   "lon": -80.563255,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:vallejorcraceway.liverc.com",
+  "name": "Vallejo RC 707",
+  "city": "Vallejo",
+  "country": "us",
+  "events": 89,
+  "lat": 38.102366,
+  "lon": -122.2606074,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Vallejo, CA",
+   "cat": "landmark_and_historical_building",
+   "lat": 38.117886,
+   "lon": -122.253708,
+   "d": 1828,
+   "where": "Vallejo",
+   "score": 5.97
+  }
+ },
+ {
+  "key": "liverc:vcrcraceway.liverc.com",
+  "name": "VCRC Raceway",
+  "city": "Terre Haute",
+  "country": "us",
+  "events": 50,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "VCRC Raceway",
+   "cat": "race_track",
+   "lat": 39.427765,
+   "lon": -87.378502,
+   "d": null,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:viberc.liverc.com",
+  "name": "VibeRC",
+  "city": "Mooresville",
+  "country": "us",
+  "events": 60,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:vmrc.liverc.com",
+  "name": "VMRC Raceway",
+  "city": "Väike-Maarja",
+  "country": "ee",
+  "events": 218,
+  "lat": 59.1268117,
+  "lon": 26.251123,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:waylirc.liverc.com",
+  "name": "Wayli RC information",
+  "city": "Hsinchu",
+  "country": "tw",
+  "events": 172,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:minizmadness.liverc.com",
+  "name": "West Bend Mini RC",
+  "city": "West Bend",
+  "country": "us",
+  "events": 167,
+  "lat": 43.4485361,
+  "lon": -88.1920761,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:westcoast.liverc.com",
+  "name": "West Coast Model RC",
+  "city": "Perth",
+  "country": "au",
+  "events": 700,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:wforaceway.liverc.com",
+  "name": "WFOraceway",
+  "city": "Maidsville",
+  "country": "us",
+  "events": 177,
+  "lat": null,
+  "lon": null,
+  "verdict": "still-missing",
+  "match": null
+ },
+ {
+  "key": "liverc:wheelspinraceway.liverc.com",
+  "name": "Wheelspin Raceway",
+  "city": "Cannock",
+  "country": "gb",
+  "events": 103,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Wheelspin Models",
+   "cat": "hobby_shop",
+   "lat": 52.680565,
+   "lon": -2.039289,
+   "d": null,
+   "weight": 0.71
+  }
+ },
+ {
+  "key": "liverc:whipitrc.liverc.com",
+  "name": "Whip It RC Raceway",
+  "city": "Reno",
+  "country": "us",
+  "events": 857,
+  "lat": 39.5910374,
+  "lon": -119.8211316,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Whip It RC Raceway and Hobbies",
+   "cat": "hobby_shop",
+   "lat": 39.59116,
+   "lon": -119.82077,
+   "d": 34,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:whiterosehobbies.liverc.com",
+  "name": "White Rose Hobbies RC Circuit",
+  "city": "York",
+  "country": "us",
+  "events": 135,
+  "lat": 39.9295987,
+  "lon": -76.8208357,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "White Rose Hobbies",
+   "cat": "hobby_shop",
+   "lat": 39.929634,
+   "lon": -76.820671,
+   "d": 15,
+   "weight": 0.65
+  }
+ },
+ {
+  "key": "liverc:windsorrc.liverc.com",
+  "name": "Windsor RC Raceway and SPARC RC",
+  "city": "Windsor",
+  "country": "ca",
+  "events": 176,
+  "lat": 42.3127555,
+  "lon": -83.0036494,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Windsor RC Raceway",
+   "cat": "race_track",
+   "lat": 42.313004,
+   "lon": -83.002922,
+   "d": 66,
+   "weight": 0.54
+  }
+ },
+ {
+  "key": "liverc:wnrc.liverc.com",
+  "name": "WNRC Speedway",
+  "city": "Felton",
+  "country": "us",
+  "events": 130,
+  "lat": 39.012815,
+  "lon": -75.5780698,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "WNRC Speedway",
+   "cat": "race_track",
+   "lat": 39.013874,
+   "lon": -75.578476,
+   "d": 123,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:wodongarc.liverc.com",
+  "name": "Wodonga RC Car Club",
+  "city": "Wodonga",
+  "country": "au",
+  "events": 55,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Wodonga Hockey Club",
+   "cat": "sports_club_and_league",
+   "lat": -36.160053,
+   "lon": 146.837769,
+   "d": null,
+   "where": "Huon Creek",
+   "score": 5.51
+  }
+ },
+ {
+  "key": "liverc:wolfram.liverc.com",
+  "name": "Wolfram RC Raceway",
+  "city": "Des Moines",
+  "country": "us",
+  "events": 428,
+  "lat": 41.6004779,
+  "lon": -93.699123,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "Wolfram RC",
+   "cat": "hobby_shop",
+   "lat": 41.631538,
+   "lon": -93.702057,
+   "d": 3462,
+   "weight": 0.77
+  }
+ },
+ {
+  "key": "liverc:worc.liverc.com",
+  "name": "WORC",
+  "city": "Surprise",
+  "country": "us",
+  "events": 150,
+  "lat": 33.6278245,
+  "lon": -112.3367818,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:wrcspeedway.liverc.com",
+  "name": "WRC Speedway",
+  "city": "Ogden Valley",
+  "country": "us",
+  "events": 59,
+  "lat": 41.3302092,
+  "lon": -111.8128497,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Wrc Uofu",
+   "cat": "education",
+   "lat": 40.764977,
+   "lon": -111.846092,
+   "d": 62913,
+   "where": "Salt Lake City",
+   "score": 4.52
+  }
+ },
+ {
+  "key": "liverc:wrightawayspeedway.liverc.com",
+  "name": "Wright Away Speedway",
+  "city": "Fort Madison",
+  "country": "us",
+  "events": 208,
+  "lat": 40.6334969,
+  "lon": -91.3263732,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:xcrbaycity.liverc.com",
+  "name": "X-treme Carpet Raceway",
+  "city": "Bay City",
+  "country": "us",
+  "events": 332,
+  "lat": 43.6258907,
+  "lon": -83.8906349,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "X-Treme Carpet Raceway",
+   "cat": "race_track",
+   "lat": 43.626076,
+   "lon": -83.890175,
+   "d": 42,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:xtremercraceway.liverc.com",
+  "name": "Xtreme RC and Raceway",
+  "city": "Oshawa",
+  "country": "ca",
+  "events": 291,
+  "lat": 43.8958221,
+  "lon": -78.8626026,
+  "verdict": "unverified",
+  "match": null
+ },
+ {
+  "key": "liverc:xtremercraceway843.liverc.com",
+  "name": "Xtreme Rc Raceway",
+  "city": "Ladson",
+  "country": "us",
+  "events": 510,
+  "lat": null,
+  "lon": null,
+  "verdict": "filled",
+  "match": {
+   "nm": "Xtreme RC Hobby and Himoto Distributors",
+   "cat": "hobby_shop",
+   "lat": 32.996223,
+   "lon": -80.11113,
+   "d": null,
+   "weight": 0.73
+  }
+ },
+ {
+  "key": "liverc:shorrccc.liverc.com",
+  "name": "Yerrinbool",
+  "city": "Yerrinbool",
+  "country": "au",
+  "events": 90,
+  "lat": -34.3736154,
+  "lon": 150.5376628,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Yerrinbool Oval",
+   "cat": "sports_club_and_league",
+   "lat": -34.374161,
+   "lon": 150.535339,
+   "d": 222,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:zerorc.liverc.com",
+  "name": "Zero RC Raceway",
+  "city": "Marshfield",
+  "country": "us",
+  "events": 223,
+  "lat": 44.6620934,
+  "lon": -90.1698138,
+  "verdict": "confirmed",
+  "match": {
+   "nm": "Zero RC Raceway",
+   "cat": "race_track",
+   "lat": 44.662235,
+   "lon": -90.168991,
+   "d": 67,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:zrh.liverc.com",
+  "name": "zrh raceway",
+  "city": "Saint Petersburg",
+  "country": "us",
+  "events": 51,
+  "lat": 27.8284568,
+  "lon": -82.6461958,
+  "verdict": "maybe-two-places",
+  "match": {
+   "nm": "ZRH Raceway",
+   "cat": "hobby_shop",
+   "lat": 27.811199,
+   "lon": -82.720123,
+   "d": 7519,
+   "weight": 1
+  }
+ },
+ {
+  "key": "liverc:zwartkopsrcx.liverc.com",
+  "name": "Zwartkops RCX",
+  "city": "Pretoria",
+  "country": "za",
+  "events": 97,
+  "lat": null,
+  "lon": null,
+  "verdict": "name-candidate",
+  "match": {
+   "nm": "Zwartkops RCX Raceway",
+   "cat": "race_track",
+   "lat": -25.809322,
+   "lon": 28.107338,
+   "d": null,
+   "where": "Tshwane",
+   "score": 6.29
+  }
+ }
+]

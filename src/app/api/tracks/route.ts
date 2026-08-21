@@ -25,6 +25,14 @@ export async function GET(request: Request) {
     const q = searchParams.get("q")?.trim() ?? "";
     const favouritesOnly = searchParams.get("favouritesOnly") === "1";
     const favouritesFirst = searchParams.get("favouritesFirst") === "1";
+    /**
+     * Opt-in cap, and opt-in on purpose. The pre-seeded catalog runs to ~1,500 rows, so the tracks
+     * page asks for a page at a time — but the run form and the event editors still load the whole
+     * list to filter in the browser, and defaulting to a limit would silently truncate them.
+     */
+    const limitParam = Number(searchParams.get("limit"));
+    const limit =
+      Number.isFinite(limitParam) && limitParam > 0 ? Math.min(Math.floor(limitParam), 200) : null;
 
     const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -40,11 +48,16 @@ export async function GET(request: Request) {
           : favouritesOnly
             ? { ...whereBase, id: { in: [] } }
             : whereBase,
-      orderBy: { createdAt: "desc" },
+      // A search sorts by name: "newest first" is meaningless once the catalog is mostly seeded
+      // rows written in one batch, and a driver scanning results expects alphabetical.
+      orderBy: q ? { name: "asc" } : { createdAt: "desc" },
+      ...(limit ? { take: limit } : {}),
       select: {
         id: true,
         name: true,
         location: true,
+        countryCode: true,
+        region: true,
         latitude: true,
         longitude: true,
         liveRcUrl: true,

@@ -17,6 +17,7 @@ import { TrackDeleteClient } from "@/components/tracks/TrackDeleteClient";
 import { TrackMetaTagsEditor } from "@/components/tracks/TrackMetaTagsEditor";
 import { TrackLayoutsEditor } from "@/components/tracks/TrackLayoutsEditor";
 import { TrackTimingLinks } from "@/components/tracks/TrackTimingLinks";
+import { TrackTimingLinkFinder } from "@/components/tracks/TrackTimingLinkFinder";
 import { canManageCommunityTrack } from "@/lib/tracks/trackAccess";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { UnverifiedBadge } from "@/components/assets/CatalogVerifyControl";
@@ -144,7 +145,15 @@ export default async function TrackDetailPage(props: {
             </div>
           ) : null}
 
-          <TrackTimingLinks liveRcUrl={track.liveRcUrl} speedhiveUrl={track.speedhiveUrl} />
+          {/* A track with neither link searches nothing and looks like a scan that found nothing.
+              After the catalog seed that is most of the European rows, so the gap gets an ask
+              rather than silence — any driver may donate the link, and one paste serves everyone
+              racing here. */}
+          {!track.liveRcUrl && !track.speedhiveUrl ? (
+            <TrackTimingLinkFinder trackId={track.id} trackName={track.name} />
+          ) : (
+            <TrackTimingLinks liveRcUrl={track.liveRcUrl} speedhiveUrl={track.speedhiveUrl} />
+          )}
 
           {canManage ? (
             <>

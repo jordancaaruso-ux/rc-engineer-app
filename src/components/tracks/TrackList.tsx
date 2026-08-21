@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, Search, X } from "lucide-react";
+import { ChevronRight, Search, Star, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptics";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
@@ -13,6 +13,7 @@ import { Collapse } from "@/components/ui/Collapse";
 import { CollapsibleAddRow } from "@/components/assets/CollapsibleAddRow";
 import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 import { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotSetBanner";
+import { TrackNearbyBrowse } from "@/components/tracks/TrackNearbyBrowse";
 import { TrackMetaTagsEditor } from "@/components/tracks/TrackMetaTagsEditor";
 import type { TrackTimingUrls } from "@/lib/tracks/trackTimingUrl";
 import {
@@ -46,12 +47,30 @@ async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
 export function TrackList({
   initialTracks,
   favouriteTrackIds = [],
+  focusTrackId = null,
+  catalogCount = 0,
 }: {
   initialTracks: Track[];
   favouriteTrackIds?: string[];
+  /** From `/tracks?trackId=…` — the row the Paddock band sent us to. */
+  focusTrackId?: string | null;
+  /** Size of the whole catalog. `initialTracks` is only the first screen of it. */
+  catalogCount?: number;
 }) {
-  const favSet = new Set(favouriteTrackIds);
   const router = useRouter();
+  /*
+   * Favourites are STATE here, not a set derived at render.
+   *
+   * They were derived, because the star was a read-only badge: the only way to actually set
+   * one was on the track's own page, four taps away behind a grey "Open track →" link at the
+   * bottom of an expanded row. That made a shipped feature invisible to the person it exists
+   * for (founder note on /paddock, 2026-08-18: "I can't see anywhere where to do it").
+   */
+  const [favouriteIds, setFavouriteIds] = useState<Set<string>>(
+    () => new Set(favouriteTrackIds)
+  );
+  const [pendingFavouriteIds, setPendingFavouriteIds] = useState<Set<string>>(new Set());
+  const [favouriteError, setFavouriteError] = useState<string | null>(null);
   const [tracks, setTracks] = useState<Track[]>(initialTracks);
   const [search, setSearch] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
@@ -70,18 +89,130 @@ export function TrackList({
     setTracks(initialTracks);
   }, [initialTracks]);
 
+  // Joined rather than depended on by reference: the prop is a fresh array on every server
+  // render, and re-syncing on identity would clobber an in-flight optimistic toggle.
+  const favouriteKey = favouriteTrackIds.join(",");
+  useEffect(() => {
+    setFavouriteIds(new Set(favouriteTrackIds));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [favouriteKey]);
+
+  /*
+   * `?trackId=…` opens that row and puts it on screen.
+   *
+   * The Paddock tracks band has always linked here with the id and nothing read it — so
+   * tapping "Southside · 31 runs" landed you at the top of a catalog of hundreds with the
+   * track you had just tapped nowhere in sight.
+   */
+  useEffect(() => {
+    if (!focusTrackId) return;
+    setExpandedId(focusTrackId);
+    document.getElementById(`track-row-${focusTrackId}`)?.scrollIntoView({ block: "center" });
+  }, [focusTrackId]);
+
+  /**
+   * Favourite straight from the row.
+   *
+   * Optimistic, and deliberately WITHOUT a `router.refresh()`. The server sorts favourites
+   * to the top of the catalog, so refreshing would snatch the row out from under the finger
+   * that just tapped it and lose your place in a list of hundreds. The API revalidates the
+   * page and the Paddock cache tag, so the order is right the next time you arrive — which
+   * is the moment it actually matters.
+   */
+  async function toggleFavourite(trackId: string) {
+    if (pendingFavouriteIds.has(trackId)) return;
+    const wasFavourite = favouriteIds.has(trackId);
+    haptic("light");
+    setFavouriteError(null);
+    setPendingFavouriteIds((cur) => new Set(cur).add(trackId));
+    setFavouriteIds((cur) => {
+      const next = new Set(cur);
+      if (wasFavourite) next.delete(trackId);
+      else next.add(trackId);
+      return next;
+    });
+    try {
+      const data = await jsonFetch<{ ok: true; added: boolean }>(
+        `/api/tracks/${trackId}/favourite`,
+        { method: "POST" }
+      );
+      // The server's answer wins over the guess — two quick taps can land out of order.
+      setFavouriteIds((cur) => {
+        const next = new Set(cur);
+        if (data.added) next.add(trackId);
+        else next.delete(trackId);
+        return next;
+      });
+    } catch (err) {
+      setFavouriteIds((cur) => {
+        const next = new Set(cur);
+        if (wasFavourite) next.add(trackId);
+        else next.delete(trackId);
+        return next;
+      });
+      setFavouriteError(err instanceof Error ? err.message : "Could not update favourites");
+    } finally {
+      setPendingFavouriteIds((cur) => {
+        const next = new Set(cur);
+        next.delete(trackId);
+        return next;
+      });
+    }
+  }
+
+  /*
+   * Search runs on the SERVER now.
+   *
+   * `initialTracks` used to be the entire catalog, so filtering it in the browser was the whole
+   * search. With the catalog pre-seeded to ~1,500 tracks the page only receives a first screen —
+   * favourites and the countries this driver races in — so anything else has to be asked for.
+   * A single character still filters locally, because that is instant and the server round trip
+   * for one letter would return a hundred rows nobody wanted.
+   */
+  const [remoteTracks, setRemoteTracks] = useState<Track[] | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    const q = search.trim();
+    if (q.length < 2) {
+      setRemoteTracks(null);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const data = await jsonFetch<{ tracks: Track[] }>(
+            `/api/tracks?limit=50&q=${encodeURIComponent(q)}`
+          );
+          setRemoteTracks(data.tracks);
+        } catch {
+          setRemoteTracks([]);
+        } finally {
+          setSearching(false);
+        }
+      })();
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const filteredTracks = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return tracks;
+    if (remoteTracks) return remoteTracks;
     return tracks.filter(
       (t) =>
         t.name.toLowerCase().includes(q) ||
         (t.location?.toLowerCase().includes(q) ?? false)
     );
-  }, [tracks, search]);
+  }, [tracks, search, remoteTracks]);
 
   const searchLooksUnmatched =
     search.trim().length > 0 &&
+    // Never while a lookup is in flight: the list is momentarily empty during the debounce, and
+    // auto-opening the add form there would have a driver typing a name the catalog already has.
+    !searching &&
     filteredTracks.length === 0 &&
     !tracks.some((t) => t.name.toLowerCase() === search.trim().toLowerCase());
 
@@ -186,7 +317,11 @@ export function TrackList({
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
-            placeholder="Search community catalog by name or location"
+            placeholder={
+              catalogCount > 0
+                ? `Search ${catalogCount.toLocaleString()} tracks by name, town or state`
+                : "Search community catalog by name or location"
+            }
           />
           {search ? (
             <button
@@ -203,6 +338,15 @@ export function TrackList({
               three + glyphs in one column, two of them the same action. */}
         </div>
       </div>
+
+      {favouriteError ? (
+        <p className="text-xs text-muted-foreground" role="status">
+          {favouriteError}
+        </p>
+      ) : null}
+
+      {/* Hidden while searching — a driver who has typed a name is not browsing by proximity. */}
+      {search.trim() ? null : <TrackNearbyBrowse />}
 
       <SurfaceCard variant="panel" contentClassName="p-0" overflowHidden={false}>
         <ul className="divide-y divide-border">
@@ -271,43 +415,77 @@ export function TrackList({
 
           {filteredTracks.length === 0 ? (
             <li className="px-4 py-4 text-sm text-muted-foreground">
-              {search.trim() ? "No tracks match your search." : "No tracks yet. Add one above or from Log your run."}
+              {searching
+                ? "Searching…"
+                : search.trim()
+                  ? "No tracks match your search."
+                  : "No tracks yet. Add one above or from Log your run."}
             </li>
           ) : (
             filteredTracks.map((t) => {
               const expanded = expandedId === t.id;
+              const isFavourite = favouriteIds.has(t.id);
               return (
-                <li key={t.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      haptic("light");
-                      setExpandedId((cur) => (cur === t.id ? null : t.id));
-                    }}
-                    aria-expanded={expanded}
-                    className="tap-active flex w-full items-center gap-2 px-4 py-3 text-left transition hover:bg-muted/50"
-                  >
-                    <span className="flex min-w-0 flex-1 items-center gap-2">
-                      {favSet.has(t.id) && (
-                        <span className="text-yellow-500 shrink-0" aria-label="Favourite" title="Favourite">
-                          ★
-                        </span>
+                <li key={t.id} id={`track-row-${t.id}`}>
+                  <div className="flex items-stretch transition hover:bg-muted/50">
+                    {/* A SIBLING of the disclosure button, never a child: the row is itself a
+                        <button>, and a button nested inside a button is invalid markup no two
+                        browsers treat the same. 44px wide because this control is the whole
+                        reason anyone will find the feature — 16px of glyph is a badge, not a
+                        target. */}
+                    <button
+                      type="button"
+                      onClick={() => void toggleFavourite(t.id)}
+                      aria-pressed={isFavourite}
+                      aria-label={
+                        isFavourite
+                          ? `Remove ${t.name} from favourites`
+                          : `Add ${t.name} to favourites`
+                      }
+                      className={cn(
+                        "tap-active group flex w-11 shrink-0 items-center justify-center transition",
+                        pendingFavouriteIds.has(t.id) && "opacity-50"
                       )}
-                      <span className="min-w-0">
+                    >
+                      {/* Outlined when it is not one — an empty star is what tells you the
+                          control is there at all. Filled uses `primary-ink`, yellow doing a
+                          foreground job, matching the star in the Paddock band. */}
+                      <Star
+                        className={cn(
+                          "size-[18px] transition",
+                          isFavourite
+                            ? "fill-primary-ink text-primary-ink"
+                            : "text-muted-foreground/70 group-hover:text-primary-ink"
+                        )}
+                        strokeWidth={2}
+                        aria-hidden
+                      />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptic("light");
+                        setExpandedId((cur) => (cur === t.id ? null : t.id));
+                      }}
+                      aria-expanded={expanded}
+                      className="tap-active flex min-w-0 flex-1 items-center gap-2 py-3 pr-4 text-left"
+                    >
+                      <span className="min-w-0 flex-1">
                         <HubRowTitle as="span">{t.name}</HubRowTitle>
                         {t.location ? (
                           <span className="text-muted-foreground text-sm ml-2">({t.location})</span>
                         ) : null}
                       </span>
-                    </span>
-                    <ChevronRight
-                      className={cn(
-                        "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                        expanded && "rotate-90"
-                      )}
-                      aria-hidden
-                    />
-                  </button>
+                      <ChevronRight
+                        className={cn(
+                          "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                          expanded && "rotate-90"
+                        )}
+                        aria-hidden
+                      />
+                    </button>
+                  </div>
 
                   <Collapse open={expanded}>
                     <div className="space-y-2 px-4 pb-4 pt-0">
@@ -357,6 +535,16 @@ export function TrackList({
           )}
         </ul>
       </SurfaceCard>
+
+      {/* Says out loud that this is a first screen, not the catalog — otherwise a driver whose
+          track is one of the other 1,400 concludes it isn't there and adds a duplicate, which is
+          the one outcome the seed exists to prevent. */}
+      {!search.trim() && catalogCount > filteredTracks.length ? (
+        <p className="px-1 text-xs text-muted-foreground">
+          Showing {filteredTracks.length} of {catalogCount.toLocaleString()} tracks — search to find
+          any of the rest.
+        </p>
+      ) : null}
     </div>
   );
 }

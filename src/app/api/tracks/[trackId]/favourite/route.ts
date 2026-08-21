@@ -4,10 +4,17 @@ import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { removeTrackFavourite, toggleTrackFavourite } from "@/lib/track-favourites";
+import { revalidateAfterTrackMutation } from "@/lib/revalidateUser";
 
-function revalidateFavouritePaths(trackId: string) {
-  revalidatePath("/tracks");
-  revalidatePath("/runs/new");
+/**
+ * Favourites are now set from the catalog list, not only from a track's own page, so this
+ * fires far more often — and the Paddock tracks band leads on favourites. Paths alone left
+ * that band up to 30s stale (it rides `getCachedPaddockModel`, which is tagged, not pathed),
+ * so a driver could star a track and come back to "No favourites yet".
+ */
+function revalidateFavouritePaths(userId: string, trackId: string) {
+  revalidateAfterTrackMutation(userId);
+  revalidatePath("/paddock");
   revalidatePath(`/tracks/${trackId}`);
 }
 
@@ -36,7 +43,7 @@ export async function POST(
       { status: 503 }
     );
   }
-  revalidateFavouritePaths(trackId);
+  revalidateFavouritePaths(userId, trackId);
   return NextResponse.json({ ok: true, added: result.added });
 }
 
@@ -61,6 +68,6 @@ export async function DELETE(
       { status: 503 }
     );
   }
-  revalidateFavouritePaths(trackId);
+  revalidateFavouritePaths(userId, trackId);
   return NextResponse.json({ ok: true });
 }
