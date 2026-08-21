@@ -40,6 +40,8 @@ import { perfSpan } from "@/lib/perfLog";
 
 import { WebVitalsReporterMount } from "@/components/perf/WebVitalsReporterMount";
 
+import { DevMarkupLayer } from "@/components/devtools/DevMarkupLayer";
+
 
 
 /** The one UI face — Sora for everything the user reads, figures included.
@@ -288,6 +290,13 @@ export default async function RootLayout({
            * native-feel CSS (no rubber-band, no tap-callout) applies only there and the
            * in-browser experience is untouched. Runs pre-hydration to avoid a flash.
            *
+           * It also stamps `data-native` inside the iOS shell (Capacitor injects its
+           * bridge at document start, so `window.Capacitor` is already there), and the
+           * shell counts as standalone regardless of what `display-mode` reports in a
+           * WKWebView. `data-native` is what suppresses the web launch splash: the
+           * shell has its own native one from the instant the icon is tapped, and two
+           * splashes in a row read as the app going backwards (see globals.css).
+           *
            * It also publishes `--splash-vh` — the viewport height as measured on the very
            * first frame — which is the height the launch splash uses instead of a live
            * unit. A `100dvh`/`100svh` box is re-measured whenever the viewport changes,
@@ -306,7 +315,7 @@ export default async function RootLayout({
            */}
           <Script id="rc-pwa-standalone-bootstrap" strategy="beforeInteractive">
 
-            {`(function(){try{var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true;if(!s){return;}document.documentElement.setAttribute('data-standalone','true');var h=window.innerHeight;if(h&&typeof CSSStyleSheet==='function'&&'adoptedStyleSheets' in document){var sheet=new CSSStyleSheet();sheet.replaceSync(':root{--splash-vh:'+h+'px}');document.adoptedStyleSheets=document.adoptedStyleSheets.concat([sheet]);}}catch(e){}})();`}
+            {`(function(){try{var n=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());if(n){document.documentElement.setAttribute('data-native','true');}var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true||n;if(!s){return;}document.documentElement.setAttribute('data-standalone','true');var h=window.innerHeight;if(h&&typeof CSSStyleSheet==='function'&&'adoptedStyleSheets' in document){var sheet=new CSSStyleSheet();sheet.replaceSync(':root{--splash-vh:'+h+'px}');document.adoptedStyleSheets=document.adoptedStyleSheets.concat([sheet]);}}catch(e){}})();`}
 
           </Script>
 
@@ -356,6 +365,9 @@ export default async function RootLayout({
             <ServiceWorkerRegistrar />
 
             {PERF_ENABLED ? <WebVitalsReporterMount /> : null}
+
+            {/* Dev-only markup layer: tap anything to pin a note. Never ships. */}
+            {process.env.NODE_ENV !== "production" ? <DevMarkupLayer /> : null}
 
           </AuthSessionProvider>
 
