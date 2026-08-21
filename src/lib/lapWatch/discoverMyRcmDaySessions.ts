@@ -9,6 +9,7 @@ import {
   myRcmClassMatchesConfigured,
   parseMyRcmEventClasses,
   parseMyRcmReportUrl,
+  parseMyRcmSelectedClassName,
   type MyRcmSessionLink,
 } from "@/lib/lapUrlParsers/myRcmReport";
 
@@ -56,6 +57,7 @@ export async function discoverMyRcmDaySessions(input: {
   // Resolve to one or more category (class) report URLs.
   let classes: Array<{ categoryUrl: string; className: string | null }> = [];
   let classFilterApplied = false;
+  let classesDropped = 0;
 
   if (isMyRcmEventUrl(url)) {
     const eventPage = await fetchUrlText(url);
@@ -85,6 +87,7 @@ export async function discoverMyRcmDaySessions(input: {
         classFilterApplied = true;
       }
     }
+    classesDropped = Math.max(0, eventClasses.length - MAX_CLASS_SHELLS);
     classes = eventClasses
       .slice(0, MAX_CLASS_SHELLS)
       .map((c) => ({ categoryUrl: c.categoryUrl, className: c.className }));
@@ -100,20 +103,31 @@ export async function discoverMyRcmDaySessions(input: {
     };
   }
 
-  // Fetch each class shell and enumerate its sessions (menu is static HTML — one GET per class).
+  // Fetch each class page and enumerate its runs (the accordion is static HTML — one GET per class).
   const perClass = await Promise.all(
     classes.map(async (cls) => {
       const ref = parseMyRcmReportUrl(cls.categoryUrl);
       if (!ref) return { className: cls.className, sessions: [] as MyRcmSessionLink[] };
       const shell = await fetchUrlText(cls.categoryUrl);
       if (!shell.ok) return { className: cls.className, sessions: [] as MyRcmSessionLink[] };
-      return { className: cls.className, sessions: enumerateMyRcmSessions(shell.text, ref) };
+      return {
+        // A class URL on its own doesn't say which class it is; the page does.
+        className: cls.className ?? parseMyRcmSelectedClassName(shell.text),
+        sessions: enumerateMyRcmSessions(shell.text, ref),
+      };
     })
   );
 
+  // MyRCM marks a run pending until it has results. Offering those means the driver picks a session
+  // that imports zero laps, so drop them here and account for them in the message.
+  let pendingSessions = 0;
   const rows: MyRcmDayCandidate[] = [];
   for (const cls of perClass) {
     for (const s of cls.sessions) {
+      if (!s.hasResults) {
+        pendingSessions += 1;
+        continue;
+      }
       rows.push({
         sessionId: `myrcm-${s.reportKey}-${rows.length}`,
         sessionUrl: s.url,
@@ -147,9 +161,15 @@ export async function discoverMyRcmDaySessions(input: {
 
   let scanMessage: string | null = null;
   if (totalSessions === 0) {
-    scanMessage = "No result sessions found on this MyRCM page yet.";
+    scanMessage =
+      pendingSessions > 0
+        ? `This MyRCM page lists ${pendingSessions} run${pendingSessions === 1 ? "" : "s"}, but none have results yet.`
+        : "No result sessions found on this MyRCM page yet.";
   } else if (totalSessions > capped.length) {
     scanMessage = `Showing first ${capped.length} of ${totalSessions} sessions — set the event's race class to narrow, or paste your class's results URL directly.`;
+  } else if (classesDropped > 0) {
+    // Never let a cap read as "that's everything".
+    scanMessage = `Showing ${classes.length} of ${classes.length + classesDropped} classes — paste your class's results URL directly to see the rest.`;
   }
 
   return { candidates: capped, totalSessions, classNames, classFilterApplied, scanMessage };

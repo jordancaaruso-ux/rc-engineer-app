@@ -19,6 +19,11 @@ import {
 import { normalizeSpeedhiveDriverNamesForMatch } from "@/lib/speedhive/speedhiveDriverNames";
 import { discoverSpeedhivePracticeSessionsForUser } from "@/lib/speedhive/discoverSpeedhivePracticeSessionsForUser";
 import { practiceLocationIdFromTrackUrl } from "@/lib/speedhive/speedhivePracticeUrl";
+import {
+  emptyLapDiscoveryStatus,
+  lapDiscoveryStatusMessage,
+  type LapDiscoveryStatus,
+} from "@/lib/lapWatch/lapDiscoveryStatus";
 import { organizationIdFromTrackUrl } from "@/lib/speedhive/speedhiveUrl";
 
 const MAX_EVENTS = 12;
@@ -44,6 +49,7 @@ export type DiscoverSpeedhiveSessionsResult = {
   organizationId: number | null;
   practiceLocationId: number | null;
   hint: string | null;
+  status: LapDiscoveryStatus | null;
 };
 
 function sessionSortKey(iso: string | null, startTime?: string | null): number {
@@ -71,6 +77,7 @@ export async function discoverSpeedhiveSessionsForUser(input: {
       organizationId: null,
       practiceLocationId: practice.practiceLocationId,
       hint: practice.hint,
+      status: practice.status,
     };
   }
 
@@ -92,6 +99,7 @@ async function discoverSpeedhiveOrganizationSessionsForUser(input: {
       practiceLocationId: null,
       hint:
         "Invalid Speedhive track URL — use a practice link (…/practice/4591) or an organization page (…/organizations/123).",
+      status: emptyLapDiscoveryStatus("invalid_url", "speedhive"),
     };
   }
 
@@ -110,6 +118,9 @@ async function discoverSpeedhiveOrganizationSessionsForUser(input: {
       practiceLocationId: null,
       hint:
         "Set your MYLAPS transponder number or your name on MYLAPS in Settings to find sessions at this track.",
+      status: emptyLapDiscoveryStatus("no_identity", "speedhive", {
+        timingPages: [{ source: "speedhive", url: organizationPageUrl(organizationId) }],
+      }),
     };
   }
 
@@ -185,6 +196,9 @@ async function discoverSpeedhiveOrganizationSessionsForUser(input: {
       organizationId,
       practiceLocationId: null,
       hint: e instanceof Error ? e.message : "Speedhive discovery failed.",
+      status: emptyLapDiscoveryStatus("unreachable", "speedhive", {
+        timingPages: [{ source: "speedhive", url: organizationPageUrl(organizationId) }],
+      }),
     };
   }
 
@@ -210,6 +224,27 @@ async function discoverSpeedhiveOrganizationSessionsForUser(input: {
   );
   const unimported = sorted.filter((d) => !d.alreadyImported);
 
+  /**
+   * MYLAPS results state.
+   *
+   * Race results are read from LiveRC in this product; a MYLAPS organization page is the fallback
+   * for clubs that publish nowhere else. `sawTransponderFields` is the one distinction worth
+   * keeping: where a club posts results without a transponder column, the number in Settings cannot
+   * match anything and telling a driver to go and check it wastes their time.
+   */
+  const status: LapDiscoveryStatus | null =
+    unimported.length > 0
+      ? null
+      : {
+          code: sorted.length > 0 ? "all_imported" : "no_match",
+          sources: ["speedhive"],
+          postedCount: sorted.length,
+          matchedCount: sorted.length,
+          timingPages: [{ source: "speedhive", url: organizationPageUrl(organizationId) }],
+          sessionsToday: [],
+          transponderNotPublished: userTransponders.length > 0 && !sawTransponderFields,
+        };
+
   const hasNames = driverNorms.length > 0;
   const noMatchHint =
     userTransponders.length > 0 && !sawTransponderFields && !hasNames
@@ -230,5 +265,10 @@ async function discoverSpeedhiveOrganizationSessionsForUser(input: {
         : sorted.length > 0
           ? "All matching Speedhive sessions are already imported."
           : noMatchHint,
+    status,
   };
+}
+
+function organizationPageUrl(organizationId: number): string {
+  return `https://speedhive.mylaps.com/organizations/${organizationId}`;
 }

@@ -1,141 +1,62 @@
 /**
- * MyRCM (myrcm.ch) result reports.
+ * MyRCM (myrcm.ch) result reports — reader for the **v9 site** (rebuilt 18.08.2026).
  *
- * A MyRCM "report" URL is `…/myrcm/report/<lang>/<eventId>/<categoryId>` and represents one
- * class (category). The page itself is a JS shell; every session (Free practice / Practice /
- * Qualy / Final run, per heat) loads via `AjaxCall('…?reportKey=<n>', 'Group :: Heat N - Label')`.
- * Fetching that same URL with `?reportKey=<n>` returns a self-contained HTML fragment with a
- * classification table (`#data-table`) + a "Laptimes" matrix (rows = lap #, columns = car #).
+ * MyRCM replaced its whole front end in v9.1.15 and nothing the old reader looked for survived:
+ * the address shape moved (`/myrcm/report/<lang>/<e>/<c>` → `/en/report/<e>/<c>`), the session menu
+ * stopped being `doAjaxCall(...)` JavaScript and became real buttons, and the results tables were
+ * renamed (`#data-table` + a "Laptimes" heading → `table.run-result-table` + `table.run-lap-table`).
+ * Old links still 302 to the new ones, but **the redirect drops the query string**, so an old
+ * single-session link now lands on the class page — we normalise before fetching, never after.
+ *
+ * Page shapes, all served as plain public HTML (no account, no key):
+ *  - **Event** `/en/report/<eventId>` — renders the *first* class, plus `select#reportClass`
+ *    listing every class. So an event URL is a class page that also knows its siblings.
+ *  - **Class** `/en/report/<eventId>/<categoryId>` — `button.run-button` per run, nested
+ *    `details.phase` (Qualifying/Finals) → `details.group` (Heat 19) → the run ("Qualy 1").
+ *    Each button carries an availability icon, so a run that has not happened is knowable.
+ *  - **Session** `…?reportKey=<n>&reportType=<t>` — `table.run-result-table` (the classification)
+ *    plus one or more `table.run-lap-table` chunks holding the lap matrix.
+ *
+ * MyRCM's own machine-readable outputs are **broken** since the rebuild and must not be used:
+ * `cType=XML` and `cType=JSON` return HTML with a lying Content-Type, `cType=CSV` returns HTML as
+ * UTF-16 Excel, and `/rest/v1/report-pdf/...` returns a PNG. Reading the page is the only path.
  *
  * This module is pure parsing (no network) so it is unit-testable against saved fixtures.
  */
 
 import { load } from "cheerio";
 import type { LapUrlSessionDriver } from "./types";
+import { buildMyRcmCategoryUrl, buildMyRcmSessionUrl, type MyRcmReportRef } from "./myRcmUrl";
 
-/** Menu groups that contain real result sessions (vs Heat arrangements / Participants / Timeschedule / Rankinglists). */
-export const MYRCM_RESULT_GROUPS = ["Free practice", "Practice", "Qualy", "Final"] as const;
-
-/** Meaningful-first ordering for enumerated sessions. */
-const GROUP_ORDER: Record<string, number> = {
-  Final: 0,
-  Qualy: 1,
-  Practice: 2,
-  "Free practice": 3,
+/** Phase names that hold real result runs, meaningful-first. Unknown phases sort last but are kept. */
+const PHASE_ORDER: Record<string, number> = {
+  final: 0,
+  finals: 1,
+  qualifying: 2,
+  qualy: 3,
+  practice: 4,
+  "free practice": 5,
+  training: 6,
 };
 
-export type MyRcmReportRef = {
-  lang: string;
-  eventId: string;
-  categoryId: string;
-  /** null for a category (class) URL; set for a single session. */
-  reportKey: string | null;
-};
-
-function stripHash(s: string): string {
-  const h = s.indexOf("#");
-  return h >= 0 ? s.slice(0, h) : s;
-}
-
-/** Parse `https://www.myrcm.ch/myrcm/report/en/97370/388960[?reportKey=4709]`. */
-export function parseMyRcmReportUrl(urlStr: string): MyRcmReportRef | null {
-  let u: URL;
-  try {
-    u = new URL(stripHash(urlStr.trim()));
-  } catch {
-    return null;
-  }
-  if (!isMyRcmHost(u.hostname)) return null;
-  const m = u.pathname.match(/\/myrcm\/report\/([a-z]{2})\/(\d+)\/(\d+)\/?$/i);
-  if (!m) return null;
-  const reportKeyRaw = u.searchParams.get("reportKey");
-  const reportKey = reportKeyRaw && /^\d+$/.test(reportKeyRaw.trim()) ? reportKeyRaw.trim() : null;
-  return { lang: m[1]!.toLowerCase(), eventId: m[2]!, categoryId: m[3]!, reportKey };
-}
-
-function isMyRcmHost(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  return h === "myrcm.ch" || h.endsWith(".myrcm.ch");
-}
-
-/** Any MyRCM report URL (category or single session). */
-export function isMyRcmReportUrl(urlStr: string): boolean {
-  return parseMyRcmReportUrl(urlStr) !== null;
-}
-
-/** A single-session report URL (has a `reportKey`). */
-export function isMyRcmSessionUrl(urlStr: string): boolean {
-  const ref = parseMyRcmReportUrl(urlStr);
-  return ref !== null && ref.reportKey !== null;
-}
-
-/** A category (class) report URL (no `reportKey`). */
-export function isMyRcmCategoryUrl(urlStr: string): boolean {
-  const ref = parseMyRcmReportUrl(urlStr);
-  return ref !== null && ref.reportKey === null;
-}
-
-/** The MyRCM event landing page (`/myrcm/main?…dId[E]=<id>`) — a level above a class. */
-export function isMyRcmEventUrl(urlStr: string): boolean {
-  let u: URL;
-  try {
-    u = new URL(stripHash(urlStr.trim()));
-  } catch {
-    return false;
-  }
-  if (!isMyRcmHost(u.hostname)) return false;
-  if (!/\/myrcm\/main\/?$/i.test(u.pathname)) return false;
-  return u.searchParams.has("dId[E]");
-}
-
-export function buildMyRcmSessionUrl(ref: MyRcmReportRef, reportKey: string): string {
-  return `https://www.myrcm.ch/myrcm/report/${ref.lang}/${ref.eventId}/${ref.categoryId}?reportKey=${reportKey}`;
-}
-
-export function buildMyRcmCategoryUrl(eventId: string, categoryId: string, lang = "en"): string {
-  return `https://www.myrcm.ch/myrcm/report/${lang}/${eventId}/${categoryId}`;
-}
-
-/** Event or category URL — a page we can enumerate sessions from (vs a single `reportKey` session). */
-export function isMyRcmDiscoveryUrl(urlStr: string): boolean {
-  return isMyRcmCategoryUrl(urlStr) || isMyRcmEventUrl(urlStr);
-}
-
-// ---------------------------------------------------------------------------
-// Event page — list the event's classes (categories).
-// ---------------------------------------------------------------------------
-
-export type MyRcmEventClass = {
-  eventId: string;
-  categoryId: string;
-  className: string;
-  categoryUrl: string;
-};
-
-/** Class links on an event page: `<a … onclick="javascript:openNewWindows(97370, 388960)">E10 TC SPEC</a>` */
-const OPEN_REPORT_RE = /openNewWindows\((\d+)\s*,\s*(\d+)\)[^>]*>([^<]*)/g;
-
-/** Parse the classes (categories) listed on a MyRCM event page (`main?…dId[E]=…`). */
-export function parseMyRcmEventClasses(eventPageHtml: string): MyRcmEventClass[] {
-  const seen = new Set<string>();
-  const out: MyRcmEventClass[] = [];
-  let m: RegExpExecArray | null;
-  OPEN_REPORT_RE.lastIndex = 0;
-  while ((m = OPEN_REPORT_RE.exec(eventPageHtml)) !== null) {
-    const eventId = m[1]!;
-    const categoryId = m[2]!;
-    const className = decodeMenuText(m[3] ?? "");
-    if (!className || seen.has(categoryId)) continue;
-    seen.add(categoryId);
-    out.push({
-      eventId,
-      categoryId,
-      className,
-      categoryUrl: buildMyRcmCategoryUrl(eventId, categoryId),
-    });
-  }
-  return out;
-}
+/**
+ * URL shapes live in `myRcmUrl.ts` (no cheerio, so the client can use the same rules) and are
+ * re-exported here so callers have one import for everything MyRCM.
+ */
+export {
+  buildMyRcmCategoryUrl,
+  buildMyRcmEventUrl,
+  buildMyRcmSessionUrl,
+  isMyRcmCategoryUrl,
+  isMyRcmDiscoveryUrl,
+  isMyRcmEventUrl,
+  isMyRcmHostname,
+  isMyRcmReportUrl,
+  isMyRcmSessionUrl,
+  legacyMyRcmEventIdFromUrl,
+  parseMyRcmReportUrl,
+} from "./myRcmUrl";
+export type { MyRcmReportRef } from "./myRcmUrl";
 
 /**
  * Loose class-name match against the app event's configured race class text
@@ -149,75 +70,193 @@ export function myRcmClassMatchesConfigured(className: string, configured: strin
   return a.includes(b) || b.includes(a);
 }
 
+function cleanText(raw: string | null | undefined): string {
+  return (raw ?? "").replace(/ /g, " ").replace(/\s+/g, " ").trim();
+}
+
 // ---------------------------------------------------------------------------
-// Shell enumeration — list a category's result sessions from its menu.
+// Event / class page — the class list.
+// ---------------------------------------------------------------------------
+
+export type MyRcmEventClass = {
+  eventId: string;
+  categoryId: string;
+  className: string;
+  categoryUrl: string;
+};
+
+/**
+ * Every class in the event, from the `select#reportClass` picker that both the event page and each
+ * class page render. Replaces the old `openNewWindows(...)` link scrape.
+ */
+export function parseMyRcmEventClasses(html: string, eventIdHint?: string): MyRcmEventClass[] {
+  const $ = load(html);
+  const eventId = eventIdHint ?? firstEventIdInHtml($);
+  if (!eventId) return [];
+
+  const seen = new Set<string>();
+  const out: MyRcmEventClass[] = [];
+  $("select#reportClass option").each((_, el) => {
+    const categoryId = cleanText($(el).attr("value"));
+    const className = cleanText($(el).text());
+    if (!/^\d+$/.test(categoryId) || !className || seen.has(categoryId)) return;
+    seen.add(categoryId);
+    out.push({
+      eventId,
+      categoryId,
+      className,
+      categoryUrl: buildMyRcmCategoryUrl(eventId, categoryId),
+    });
+  });
+  return out;
+}
+
+/** Any `/report/<eventId>/…` reference on the page — used when the caller has no id to hand. */
+function firstEventIdInHtml($: ReturnType<typeof load>): string | null {
+  let found: string | null = null;
+  $("a[href], button[data-href]").each((_, el) => {
+    if (found) return;
+    const href = $(el).attr("href") ?? $(el).attr("data-href") ?? "";
+    const m = href.match(/\/report\/(\d+)/);
+    if (m) found = m[1]!;
+  });
+  return found;
+}
+
+/** The class this page is currently showing (the picker's selected option / header chip). */
+export function parseMyRcmSelectedClassName(html: string): string | null {
+  const $ = load(html);
+  const selected = cleanText($("select#reportClass option[selected]").first().text());
+  if (selected) return selected;
+  const chip = cleanText($(".event-meta__class").first().text());
+  return chip || null;
+}
+
+/** Event name / venue / dates from the class or event page header. */
+export function parseMyRcmEventHeader(html: string): {
+  eventName: string | null;
+  venue: string | null;
+  dates: string | null;
+} {
+  const $ = load(html);
+  const eventName = cleanText($("h1").first().text()) || null;
+  const parts = $(".event-header .event-meta__item, .event-header span")
+    .map((_, el) => cleanText($(el).text()))
+    .get()
+    .filter(Boolean);
+  const dates = parts.find((p) => /^\d{2}\.\d{2}(\.\d{4})?([–-]\d{2}\.\d{2}\.\d{4})?$/.test(p)) ?? null;
+  const venue = parts.find((p) => p !== eventName && p !== dates && !/^(EVENT|Updated)/i.test(p)) ?? null;
+  return { eventName, venue, dates };
+}
+
+// ---------------------------------------------------------------------------
+// Class page — list the runs.
 // ---------------------------------------------------------------------------
 
 export type MyRcmSessionLink = {
   reportKey: string;
-  /** Full menu title, e.g. "Qualy :: Heat 2 - Qualy 1". */
+  /** Full title, e.g. "Qualifying · Heat 19 · Qualy 1". */
   title: string;
+  /** Phase, e.g. "Qualifying" — the old `group` field, kept under its old name for callers. */
   group: string;
-  /** Session-only label, e.g. "Heat 2 - Qualy 1". */
+  /** Session-only label, e.g. "Heat 19 · Qualy 1". */
   label: string;
   url: string;
+  /**
+   * MyRCM marks a run green once it has results and red while it is still pending. A pending run
+   * imports as an empty session, so the picker can say so instead of failing at import time.
+   */
+  hasResults: boolean;
 };
 
-/** Menu entries look like: doAjaxCall('/myrcm/report/en/97370/388960?reportKey=4709', 'Qualy :: Heat 2 - Qualy 1') */
-const AJAX_CALL_RE = /doAjaxCall\('([^']*?reportKey=(\d+))'\s*,\s*'([^']*)'\)/g;
+/** `<summary>Qualifying 5 Groups · 5 Runs AVAILABLE</summary>` → "Qualifying". */
+function summaryLabel(raw: string): string {
+  let s = cleanText(raw);
+  s = s.replace(/\b\d+\s+(Groups?|Runs?)\b/gi, " ");
+  s = s.replace(/\b(AVAILABLE|Pending|PENDING|COMPLETE|COMPLETED)\b/g, " ");
+  s = s.replace(/[·•|]+/g, " ");
+  return cleanText(s);
+}
 
-function decodeMenuText(s: string): string {
-  return s
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&#(\d+);/g, (_, d: string) => String.fromCharCode(Number(d)))
-    .replace(/\s+/g, " ")
-    .trim();
+function phaseRank(phase: string): number {
+  const key = phase.toLowerCase();
+  for (const [name, rank] of Object.entries(PHASE_ORDER)) {
+    if (key === name || key.startsWith(name)) return rank;
+  }
+  return 90;
 }
 
 /**
- * List the result sessions (Free practice / Practice / Qualy / Final) linked from a category shell.
- * Deduped by reportKey (the Bootstrap navbar renders the menu twice), ordered meaningful-first.
+ * List the result runs linked from an event or class page.
+ *
+ * MyRCM renders the run accordion more than once per page (a compact copy plus one per event day),
+ * so dedupe by `reportKey` — without it a two-day meeting lists every run three times.
  */
-export function enumerateMyRcmSessions(shellHtml: string, ref: MyRcmReportRef): MyRcmSessionLink[] {
+export function enumerateMyRcmSessions(html: string, ref: MyRcmReportRef): MyRcmSessionLink[] {
+  const $ = load(html);
   const seen = new Set<string>();
   const out: MyRcmSessionLink[] = [];
 
-  let m: RegExpExecArray | null;
-  AJAX_CALL_RE.lastIndex = 0;
-  while ((m = AJAX_CALL_RE.exec(shellHtml)) !== null) {
-    const reportKey = m[2]!;
-    const title = decodeMenuText(m[3] ?? "");
-    if (seen.has(reportKey)) continue;
+  $("button.run-button, a.run-button").each((_, el) => {
+    const btn = $(el);
+    const href = btn.attr("data-href") ?? btn.attr("href") ?? "";
+    const keyMatch = href.match(/[?&]reportKey=(\d+)/);
+    if (!keyMatch) return;
+    const reportKey = keyMatch[1]!;
+    if (seen.has(reportKey)) return;
 
-    const sep = title.indexOf(" :: ");
-    const group = sep >= 0 ? title.slice(0, sep).trim() : "";
-    if (!MYRCM_RESULT_GROUPS.includes(group as (typeof MYRCM_RESULT_GROUPS)[number])) continue;
+    const typeMatch = href.match(/[?&]reportType=([a-z]+)/i);
+    const reportType = typeMatch ? typeMatch[1]!.toLowerCase() : null;
+    // A class page can link runs belonging to a sibling class; follow the href's own ids.
+    const idMatch = href.match(/\/report\/(\d+)(?:\/(\d+))?/);
+    const linkRef: MyRcmReportRef = {
+      lang: ref.lang,
+      eventId: idMatch?.[1] ?? ref.eventId,
+      categoryId: idMatch?.[2] ?? ref.categoryId,
+      reportKey: null,
+      reportType,
+    };
+
+    const phase = summaryLabel(btn.closest("details.phase").children("summary").first().text());
+    const group = summaryLabel(btn.closest("details.group").children("summary").first().text());
+    const run = cleanText(btn.find(".run-button__copy").text()) || cleanText(btn.text());
+    const hasResults = btn.find("[class*='run-button__icon--available']").length > 0;
+
+    const labelParts = [group, run].filter(Boolean);
+    const titleParts = [phase, group, run].filter(Boolean);
 
     seen.add(reportKey);
-    const label = sep >= 0 ? title.slice(sep + 4).trim() : title;
-    out.push({ reportKey, title, group, label, url: buildMyRcmSessionUrl(ref, reportKey) });
-  }
+    out.push({
+      reportKey,
+      title: titleParts.join(" · ") || `Run ${reportKey}`,
+      group: phase,
+      label: labelParts.join(" · ") || run || `Run ${reportKey}`,
+      url: buildMyRcmSessionUrl(linkRef, reportKey, reportType),
+      hasResults,
+    });
+  });
 
   out.sort((a, b) => {
-    const ga = GROUP_ORDER[a.group] ?? 99;
-    const gb = GROUP_ORDER[b.group] ?? 99;
-    if (ga !== gb) return ga - gb;
+    const pa = phaseRank(a.group);
+    const pb = phaseRank(b.group);
+    if (pa !== pb) return pa - pb;
     return Number(a.reportKey) - Number(b.reportKey);
   });
   return out;
 }
 
 // ---------------------------------------------------------------------------
-// Session fragment parsing — classification + lap-time matrix.
+// Session page — classification + lap matrix.
 // ---------------------------------------------------------------------------
 
 export type MyRcmSessionMeta = {
+  /** The run's own name, e.g. "Heat 19". */
+  sessionName: string | null;
+  /** Not on the v9 session page — carried only when the caller resolves it from the class page. */
   className: string | null;
-  raceTime: string | null;
+  eventName: string | null;
   mode: string | null;
-  trackCondition: string | null;
-  /** Raw MyRCM start time, e.g. "11.07.2026 15:52:59". */
+  /** Raw MyRCM start time, e.g. "16.08.2026 13:48:42". */
   startTimeRaw: string | null;
   startTimeIso: string | null;
 };
@@ -225,19 +264,20 @@ export type MyRcmSessionMeta = {
 export type MyRcmParsedSession = {
   meta: MyRcmSessionMeta;
   drivers: LapUrlSessionDriver[];
+  /**
+   * True when every driver's lap column length matched the classification's own lap count. The
+   * lap matrix is joined by column order, so this is the check that the join did not slip.
+   */
+  lapCountsAgree: boolean;
 };
 
-function normalizeName(raw: string): string {
-  return raw.replace(/ /g, " ").replace(/\s+/g, " ").trim();
-}
-
 function normalizeNameKey(raw: string): string {
-  return normalizeName(raw).toLowerCase();
+  return cleanText(raw).toLowerCase();
 }
 
 /** Parse a MyRCM lap time token: "20.859" or "1:05.432" → seconds. Ignores empty / 00.000 markers. */
 export function parseMyRcmLapTime(raw: string): number | null {
-  const t = normalizeName(raw).replace(",", ".");
+  const t = cleanText(raw).replace(",", ".");
   if (!t) return null;
   const m = t.match(/^(?:(\d+):)?(\d{1,2}(?:\.\d{1,3})?)$/);
   if (!m) return null;
@@ -249,10 +289,10 @@ export function parseMyRcmLapTime(raw: string): number | null {
   return Math.round(total * 1000) / 1000;
 }
 
-/** "11.07.2026 15:52:59" → ISO. Treated as UTC (track-local tz is unknown; used only for recency/order). */
+/** "16.08.2026 13:48:42" → ISO. Treated as UTC (track-local tz is unknown; used only for recency/order). */
 export function parseMyRcmStartTimeToIso(raw: string | null | undefined): string | null {
   if (!raw) return null;
-  const m = normalizeName(raw).match(/^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+  const m = cleanText(raw).match(/^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
   if (!m) return null;
   const [, dd, mm, yyyy, hh, min, ss] = m;
   const d = Date.UTC(
@@ -267,102 +307,131 @@ export function parseMyRcmStartTimeToIso(raw: string | null | undefined): string
   return new Date(d).toISOString();
 }
 
-function parseHeaderMeta(headerText: string): MyRcmSessionMeta {
-  // "Section:  E10 TC SPEC [EC10-SPEC] - Race time:  5:00 - Mode:  Singlestart - Track Condition:  Dry - Starttime:  11.07.2026 15:52:59"
-  // The real field separator is " - " (spaces around); hyphens inside a value (e.g. "[EC10-SPEC]") have none.
-  const text = normalizeName(headerText);
-  const fields = new Map<string, string>();
-  for (const seg of text.split(" - ")) {
-    const ci = seg.indexOf(":");
-    if (ci < 0) continue;
-    const label = seg.slice(0, ci).trim();
-    const value = seg.slice(ci + 1).trim();
-    if (label) fields.set(label, value);
-  }
-  const orNull = (v: string | undefined): string | null => (v && v.trim() ? v.trim() : null);
-  // Drop the trailing "[CODE]" from the class name for display.
-  const sectionRaw = orNull(fields.get("Section"));
-  const className = sectionRaw ? sectionRaw.replace(/\s*\[[^\]]*\]\s*$/, "").trim() || sectionRaw : null;
-  const startTimeRaw = orNull(fields.get("Starttime"));
-  return {
-    className,
-    raceTime: orNull(fields.get("Race time")),
-    mode: orNull(fields.get("Mode")),
-    trackCondition: orNull(fields.get("Track Condition")),
-    startTimeRaw,
-    startTimeIso: parseMyRcmStartTimeToIso(startTimeRaw),
-  };
-}
-
 type ClassificationRow = {
+  position: number | null;
+  startNumber: string;
   carNumber: string;
-  pilotNr: string;
   driverName: string;
   normalizedName: string;
-  lapCount: number | null;
+  /** The classification's own lap count — used to verify the positional lap-matrix join. */
+  statedLapCount: number | null;
   bestTime: number | null;
-  order: number;
+  note: string;
 };
 
+function parseClassification($: ReturnType<typeof load>): ClassificationRow[] {
+  const rows: ClassificationRow[] = [];
+  $("table.run-result-table tbody tr").each((_, tr) => {
+    const cells = new Map<string, string>();
+    $(tr)
+      .find("td")
+      .each((_, td) => {
+        const label = cleanText($(td).attr("data-label"));
+        if (label) cells.set(label, cleanText($(td).text()));
+      });
+    const driverName = cells.get("Driver") ?? "";
+    if (!driverName) return;
+    const posRaw = cells.get("P") ?? "";
+    const lapsRaw = cells.get("L") ?? "";
+    rows.push({
+      position: /^\d+$/.test(posRaw) ? Number.parseInt(posRaw, 10) : null,
+      startNumber: cells.get("Start") ?? "",
+      carNumber: cells.get("No.") ?? "",
+      driverName,
+      normalizedName: normalizeNameKey(driverName),
+      statedLapCount: /^\d+$/.test(lapsRaw) ? Number.parseInt(lapsRaw, 10) : null,
+      bestTime: parseMyRcmLapTime(cells.get("Best") ?? ""),
+      note: cells.get("Note") ?? "",
+    });
+  });
+  return rows;
+}
+
+type LapColumn = { label: string; laps: number[] };
+
 /**
- * Parse a single MyRCM session fragment (the `?reportKey=<n>` response).
- * Joins the classification (car# → pilot) with the lap-time matrix (car# column → laps).
+ * The lap matrix, left to right, across every chunk.
+ *
+ * MyRCM splits the matrix into `table.run-lap-table` blocks of ten drivers, and the chunks run in
+ * classification order — so concatenating their columns reproduces the finishing order exactly.
+ * The lap-0 row is MyRCM's staging row (start-line clock, or 00.000 for everyone) and is dropped.
+ */
+function parseLapColumns($: ReturnType<typeof load>): LapColumn[] {
+  const columns: LapColumn[] = [];
+
+  $("table.run-lap-table").each((_, table) => {
+    const byLabel = new Map<string, number[]>();
+    const order: string[] = [];
+
+    $(table)
+      .find("tbody tr")
+      .each((_, tr) => {
+        const lapNumber = cleanText($(tr).find('td[data-label="Lap"]').first().text());
+        $(tr)
+          .find("td")
+          .each((_, td) => {
+            const label = cleanText($(td).attr("data-label"));
+            if (!label || label === "Lap") return;
+            if (!byLabel.has(label)) {
+              byLabel.set(label, []);
+              order.push(label);
+            }
+            if (lapNumber === "0") return; // staging row
+            const t = parseMyRcmLapTime($(td).text());
+            if (t != null) byLabel.get(label)!.push(t);
+          });
+      });
+
+    for (const label of order) columns.push({ label, laps: byLabel.get(label) ?? [] });
+  });
+
+  return columns;
+}
+
+/**
+ * Parse a single MyRCM run page (the `?reportKey=<n>` response) into the whole field.
+ *
+ * The field — not just the driver's own row — is the point: it is what feeds pace-vs-field and the
+ * Engineer's rival context, and it is the thing a Speedhive practice activity can never provide.
  */
 export function parseMyRcmSessionHtml(html: string): MyRcmParsedSession {
   const $ = load(html);
 
-  const headerText = $("h4#title").first().text();
-  const meta = parseHeaderMeta(headerText);
-
-  // --- Classification table (#data-table) ---
-  const classTable = $("#data-table").first();
-  const headerCells = classTable.find("tr").first().find("th, td");
-  const colIndex = (predicate: (label: string) => boolean): number => {
-    let idx = -1;
-    headerCells.each((i, el) => {
-      if (idx >= 0) return;
-      if (predicate(normalizeName($(el).text()))) idx = i;
-    });
-    return idx;
+  const metaSpans = $(".report-meta span")
+    .map((_, el) => cleanText($(el).text()))
+    .get()
+    .filter(Boolean);
+  const startTimeRaw = metaSpans.find((s) => /^\d{2}\.\d{2}\.\d{4}(\s|$)/.test(s)) ?? null;
+  const meta: MyRcmSessionMeta = {
+    sessionName: cleanText($("h1").first().text()) || null,
+    className: null,
+    eventName: metaSpans[0] ?? null,
+    mode: metaSpans.find((s) => s !== metaSpans[0] && s !== startTimeRaw) ?? null,
+    startTimeRaw,
+    startTimeIso: parseMyRcmStartTimeToIso(startTimeRaw),
   };
-  const carIdx = colIndex((l) => l === "Nr.");
-  const pilotNrIdx = colIndex((l) => l === "Pilot Nr");
-  const nameIdx = colIndex((l) => l === "Pilot");
-  const lapsIdx = colIndex((l) => l === "Laps");
-  const bestIdx = colIndex((l) => l === "Besttime");
 
-  const classification: ClassificationRow[] = [];
-  let order = 0;
-  classTable.find("tr").each((_, tr) => {
-    const row = $(tr);
-    if (row.find("th").length > 0) return; // header row
-    const cells = row.find("td");
-    if (cells.length === 0) return;
-    const cellText = (i: number): string => (i >= 0 && i < cells.length ? normalizeName(cells.eq(i).text()) : "");
-    const carNumber = carIdx >= 0 ? cellText(carIdx) : "";
-    const driverName = nameIdx >= 0 ? cellText(nameIdx) : "";
-    if (!carNumber && !driverName) return;
-    const lapsStr = cellText(lapsIdx);
-    const lapCount = /^\d+$/.test(lapsStr) ? Number.parseInt(lapsStr, 10) : null;
-    classification.push({
-      carNumber,
-      pilotNr: cellText(pilotNrIdx),
-      driverName,
-      normalizedName: normalizeNameKey(driverName),
-      lapCount,
-      bestTime: parseMyRcmLapTime(cellText(bestIdx)),
-      order: order++,
-    });
-  });
+  const classification = parseClassification($);
+  const columns = parseLapColumns($);
 
-  // --- Lap-time matrix (the table after the "Laptimes" heading) ---
-  const lapsByCar = parseLapMatrix($, html);
+  // Prefer an explicit label match — some events label the lap columns with the driver itself
+  // ("Kart 14") rather than an index, and then the join needs no positional trust at all.
+  const byLabel = new Map<string, LapColumn>();
+  for (const col of columns) {
+    const key = normalizeNameKey(col.label);
+    if (key && !byLabel.has(key)) byLabel.set(key, col);
+  }
+  const labelsMatchDrivers =
+    classification.length > 0 && classification.every((r) => byLabel.has(r.normalizedName));
 
-  const drivers: LapUrlSessionDriver[] = classification.map((row) => {
-    const laps = lapsByCar.get(row.carNumber) ?? [];
-    const driverId = row.pilotNr || `car-${row.carNumber}`;
+  let lapCountsAgree = true;
+  const drivers: LapUrlSessionDriver[] = classification.map((row, index) => {
+    const col = labelsMatchDrivers ? byLabel.get(row.normalizedName) : columns[index];
+    const laps = col?.laps ?? [];
+    if (row.statedLapCount != null && row.statedLapCount !== laps.length) lapCountsAgree = false;
+    const driverId = row.carNumber || row.startNumber || String(row.position ?? index + 1);
     return {
-      id: `myrcm-${driverId}-${row.carNumber}`,
+      id: `myrcm-${index + 1}-${driverId}`,
       driverId,
       driverName: row.driverName,
       normalizedName: row.normalizedName,
@@ -371,49 +440,7 @@ export function parseMyRcmSessionHtml(html: string): MyRcmParsedSession {
     };
   });
 
-  return { meta, drivers };
-}
+  if (columns.length > 0 && columns.length !== classification.length) lapCountsAgree = false;
 
-/** Map car number → lap times, from the "Laptimes" matrix. Skips the lap-0 staging row. */
-function parseLapMatrix($: ReturnType<typeof load>, html: string): Map<string, number[]> {
-  const result = new Map<string, number[]>();
-
-  // The laptime table is the one whose header first cell is "#Nr.".
-  let lapTable: ReturnType<typeof $> | null = null;
-  $("table").each((_, table) => {
-    if (lapTable) return;
-    const firstHeader = normalizeName($(table).find("tr").first().find("th, td").first().text());
-    if (firstHeader === "#Nr.") lapTable = $(table);
-  });
-  if (!lapTable) return result;
-
-  // Header: index → car number (cells like "# 4"); skip "#Nr." and the trailing empty column.
-  const colToCar = new Map<number, string>();
-  (lapTable as ReturnType<typeof $>)
-    .find("tr")
-    .first()
-    .find("th, td")
-    .each((i, el) => {
-      const t = normalizeName($(el).text());
-      const m = t.match(/^#\s*(\d+)$/);
-      if (m) {
-        colToCar.set(i, m[1]!);
-        result.set(m[1]!, []);
-      }
-    });
-
-  (lapTable as ReturnType<typeof $>).find("tr").each((ri, tr) => {
-    if (ri === 0) return; // header
-    const cells = $(tr).find("td");
-    if (cells.length === 0) return;
-    const lapNumStr = normalizeName(cells.eq(0).text());
-    if (lapNumStr === "0") return; // staging row (00.000 for everyone)
-    colToCar.forEach((car, colIdx) => {
-      const cellText = normalizeName(cells.eq(colIdx).text());
-      const t = parseMyRcmLapTime(cellText);
-      if (t != null) result.get(car)!.push(t);
-    });
-  });
-
-  return result;
+  return { meta, drivers, lapCountsAgree };
 }

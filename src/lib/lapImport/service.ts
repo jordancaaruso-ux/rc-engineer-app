@@ -93,7 +93,9 @@ export async function importOneTimingUrl(
   url: string,
   context?: {
     driverName?: string;
+    speedhiveDriverNames?: string[];
     speedhiveTransponderNumbers?: number[];
+    myRcmDriverNames?: string[];
     allowAnyPublicHost?: boolean;
   }
 ): Promise<ImportOneUrlResult> {
@@ -104,13 +106,25 @@ export async function importOneTimingUrl(
     return { url: url.trim(), success: false, error: v.error };
   }
   const normalized = v.normalized;
+  // Forward every identity the caller resolved. `speedhiveDriverNames` and `myRcmDriverNames` are
+  // each read by exactly one parser; dropping either here silently costs that parser its only way
+  // of telling the driver's row apart from the rest of the field.
   const parseContext =
     context &&
-    (context.driverName || (context.speedhiveTransponderNumbers?.length ?? 0) > 0)
+    (context.driverName ||
+      (context.speedhiveDriverNames?.length ?? 0) > 0 ||
+      (context.speedhiveTransponderNumbers?.length ?? 0) > 0 ||
+      (context.myRcmDriverNames?.length ?? 0) > 0)
       ? {
           ...(context.driverName ? { driverName: context.driverName } : {}),
+          ...(context.speedhiveDriverNames?.length
+            ? { speedhiveDriverNames: context.speedhiveDriverNames }
+            : {}),
           ...(context.speedhiveTransponderNumbers?.length
             ? { speedhiveTransponderNumbers: context.speedhiveTransponderNumbers }
+            : {}),
+          ...(context.myRcmDriverNames?.length
+            ? { myRcmDriverNames: context.myRcmDriverNames }
             : {}),
         }
       : undefined;

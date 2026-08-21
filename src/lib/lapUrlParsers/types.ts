@@ -65,6 +65,11 @@ export type LapUrlParseContext = {
   driverName?: string;
   /** Every name the driver appears under on Speedhive; any one matching is a hit. */
   speedhiveDriverNames?: string[];
+  /**
+   * Name(s) the driver appears under on MyRCM. MyRCM has no per-driver account or transponder in
+   * its public results, so this is the only way to know which row in the field is theirs.
+   */
+  myRcmDriverNames?: string[];
   /** MYLAPS transponder numbers for Speedhive session row matching. */
   speedhiveTransponderNumbers?: number[];
 };

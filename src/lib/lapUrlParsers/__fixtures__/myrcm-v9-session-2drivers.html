@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]><html class="no-js lt-ie9 lt-ie8 lt-ie7" xml:lang="en" lang="en"><![endif]-->
+<!--[if IE 7]><html class="no-js lt-ie9 lt-ie8" xml:lang="en" lang="en"><![endif]-->
+<!--[if IE 8]><html class="no-js lt-ie9" xml:lang="en" lang="en"><![endif]-->
+<!--[if gt IE 8]><!--><html class="js js flexbox canvas canvastext webgl no-touch geolocation postmessage no-websqldatabase indexeddb hashchange history draganddrop websockets rgba hsla multiplebgs backgroundsize borderimage borderradius boxshadow textshadow opacity cssanimations csscolumns cssgradients no-cssreflections csstransforms csstransforms3d csstransitions fontface generatedcontent video audio localstorage sessionstorage webworkers applicationcache svg inlinesvg smil svgclippaths wf-myriadprosemicondensed-n3-active wf-myriadpro-i4-active wf-myriadpro-n3-active wf-myriadpro-n4-active wf-myriadpro-n6-active wf-active" lang="de"><!--<![endif]-->
+<head>
+	<title>MyRCM : Reporting</title>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="description" content="MyRCM : Reporting" />
+	<meta name="keywords" content="RC-Timing,RCM,Race Control Management,race software,timekeeping,model racing,timing system,Race Control,Racecontrol,Software,Racing,Racing Control,Racing Control Software,model building,timekeeping,races,model races,AMB Decoder,RobiLab" />
+	<meta name="copyright" content="Copyright (c) 2026 - RC-Timing GmbH" />
+	<meta name="author" content="RC-Timing GmbH" />
+	<meta name="version" content="v9.1.15 (18.08.2026)" />
+	<meta name="google-site-verification" content="an1wuERuZRcgOZIF0s0DLhiHSXRqSr9nAMihZHCQzsU" />
+	
+
+	<!-- Open Graph -->
+    <meta property="og:title" content="MyRCM : Reporting">
+    <meta property="og:description" content="Online platform for model racing with timekeeping, race management and live results.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.myrcm.ch/">
+    <meta property="og:image" content="https://www.myrcm.ch/resources/img/og-image.png">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="MyRCM : Reporting">
+    <meta name="twitter:description" content="Online platform for model racing and timekeeping, race management and live results.">
+    <meta name="twitter:image" content="https://www.myrcm.ch/resources/img/og-image.png">
+	
+	<!--[if IE]>
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+	<![endif]-->
+
+	<!-- JavaScript -->
+	
+	
+	
+	
+
+    <!-- CSS -->
+	<link rel="icon" href="/resources/favicon.ico" />
+	<link rel="stylesheet" type="text/css" href="/resources/styles/jquery-ui.min.css" media="all" />
+	<link rel="stylesheet" type="text/css" href="/resources/styles/styles.css?v=v9.1.15" media="all" />
+	<link rel="stylesheet" type="text/css" href="/resources/styles/app.css?v=v9.1.15" media="all" />
+	<link rel="stylesheet" type="text/css" href="/resources/richtexteditor/rte_theme_default.css" media="all" />
+</head>
+<body>
+
+<div id="spinner" aria-live="polite" aria-busy="true">
+    <img src="/resources/img/ajax_loader_blue_128.gif" alt="Loading...">
+</div>
+<header class="top-header">
+    <div class="top-header-inner">
+      <div class="logo-area">
+        <div class="logo-box">
+          <!-- Logo-Pfad anpassen -->
+          <img class="logo-light" src="/resources/logo-black-v2.png" alt="RC-Timing GmbH">
+          <img class="logo-dark" src="/resources/logo-white-v2.png" alt="RC-Timing GmbH">
+        </div>
+        <!--<div class="portal-title">Race Management Portal</div>-->
+      </div>
+      <div class="header-actions">
+        <div class="header-action-row">
+            <div class="user-menu">
+              <button class="language-overlay-trigger" type="button" aria-haspopup="dialog" aria-controls="languageOverlay"><img src="/resources/styles/images/38x25/USA.png" alt=""><span>English</span></button>
+              <div class="auth-links">
+                <a href="https://www.myrcm.ch/en/registration">Register</a>
+                <a href="https://www.myrcm.ch/en/login">Log in</a>
+              </div>
+            </div>
+
+            <button class="global-search-trigger" type="button" aria-haspopup="dialog" aria-controls="globalSearchOverlay" aria-label="!!openSearch!!">
+                <svg></svg>
+            </button>
+
+            <div class="theme-switch" role="group" aria-label="Farbschema wählen">
+                <span class="theme-switch__thumb" aria-hidden="true"></span>
+                <button type="button" data-theme-choice="auto" aria-label="Farbschema automatisch" aria-pressed="false"><span class="theme-switch__icon">A</span><span>Auto</span></button>
+                <button type="button" data-theme-choice="light" aria-label="Helles Farbschema" aria-pressed="false"><span class="theme-switch__icon">☀</span><span>Light</span></button>
+                <button type="button" data-theme-choice="dark" aria-label="Dunkles Farbschema" aria-pressed="true" class="is-active"><span class="theme-switch__icon">☾</span><span>Dark</span></button>
+            </div>
+
+            <button class="menu-toggle" id="menuToggle" type="button" onclick="toggleMenu()" aria-label="Open menu" aria-controls="mobileMenu" aria-expanded="false">
+                ☰
+            </button>
+        </div>
+        <div class="user-session">
+          <div class="logged-in-user">&nbsp;</div>
+        </div>
+      </div>
+    </div>
+</header>
+<nav class="main-nav" id="mainNav">
+    <div class="main-nav-inner">
+        <a href="https://www.myrcm.ch/en/live" >ONLINE EVENTS</a>
+        <a href="https://www.myrcm.ch/en/upcoming" >UPCOMING EVENTS</a>
+        <a href="https://www.myrcm.ch/en/archive" >ARCHIVE EVENTS</a>
+        <a href="https://www.myrcm.ch/en/organizers" >HOST</a>
+        <a href="https://www.myrcm.ch/en/championship" >CHAMPIONSHIP</a>
+        <a href="https://www.myrcm.ch/en/subscription" >SUBSCRIPTION</a>
+    </div>
+</nav>
+<div class="mobile-overlay" id="mobileOverlay" onclick="closeMenu()"></div>
+<aside class="mobile-menu" id="mobileMenu">
+    <div class="mobile-menu-header">
+        <strong>MyRCM</strong>
+        <button type="button" onclick="closeMenu()" aria-label="Close menu">×</button>
+    </div>
+    <a href="https://www.myrcm.ch/en/live" >ONLINE EVENTS</a>
+    <a href="https://www.myrcm.ch/en/upcoming" >UPCOMING EVENTS</a>
+    <a href="https://www.myrcm.ch/en/archive" >ARCHIVE EVENTS</a>
+    <a href="https://www.myrcm.ch/en/organizers" >HOST</a>
+    <a href="https://www.myrcm.ch/en/championship" >CHAMPIONSHIP</a>
+    <a href="https://www.myrcm.ch/en/subscription" >SUBSCRIPTION</a>
+    <div class="mobile-menu-footer">
+        <div class="mobile-language">
+            <label for="mobileLanguageSelect">Language</label>
+            <button class="language-overlay-trigger" type="button" aria-haspopup="dialog" aria-controls="languageOverlay"><img src="/resources/styles/images/38x25/USA.png" alt=""><span>English</span></button>
+        </div>
+        <a href="https://www.myrcm.ch/en/registration">Register</a>
+        <a href="https://www.myrcm.ch/en/login">Log in</a>
+    </div>
+</aside>
+<section class="report-dashboard-header report-dashboard-header-compact">
+    <div>
+        <span class="entry-eyebrow">Run result</span>
+        <h1>Heat 19</h1>
+        <div class="report-meta">
+            <span>Online Event</span>
+            <span>Online</span>
+            <span>16.08.2026 13:48:42</span>
+        </div>
+    </div>
+    <div class="report-hero-actions">
+        <div class="report-download-stack">
+            <button type="button" class="btn report-image-link" data-image-url="/rest/v1/report-image/en/99719/395535/6058?reportType=qualy&compact=false" data-image-file="report-99719-395535-6058.png" data-image-blocks="true" title="Download image">
+                <svg></svg>
+                <span>Download image</span>
+            </button>
+            <button type="button" class="btn report-pdf-link" data-pdf-url="/rest/v1/report-pdf/en/99719/395535/6058?reportType=qualy&compact=false" data-pdf-file="report-99719-395535-6058.pdf" data-image-blocks="true" title="Download PDF">
+                <svg></svg>
+                <span>Download PDF</span>
+            </button>
+        </div>
+    </div>
+</section>
+<section class="report-layout report-layout-simple">
+    <div class="report-main">
+        <section class="section report-section" id="overview">
+            <div class="section-header">
+                <div>
+                    <h2>Overview</h2>
+                    <p>Result and key figures for the run.</p>
+                </div>
+                <span class="badge report">Official</span>
+            </div>
+            <div class="section-body">
+                <div class="table-wrap">
+                    <table class="table run-result-table">
+                        <colgroup>
+                            <col class="col-rank">
+                            <col class="col-start">
+                            <!--<col class="col-number">-->
+                            <!--<col class="col-country">-->
+                            <col class="col-driver">
+                            <col class="col-laps">
+                            <col class="col-total">
+                            <col class="col-besttime">
+                            <col class="col-info">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>P</th>
+                                <th>#</th>
+                                <!--<th>No.</th>-->
+                                <!--<th>&nbsp;</th>-->
+                                <th>Driver</th>
+                                <th>L</th>
+                                <th>Total</th>
+                                <th>Best</th>
+                                <th>Note</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="is-winner">
+                                <td data-label="P"><strong class="report-position">1</strong></td>
+                                <td data-label="Start">0</td>
+                                <!--<td data-label="No.">6</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver">Hansruedi <strong>Baer</strong><small></small></td>
+                                <td data-label="L">33</td>
+                                <td data-label="Total">48:17.255</td>
+                                <td data-label="Best">8.443</td>
+                                <td data-label="Note">-</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="P"><strong class="report-position">2</strong></td>
+                                <td data-label="Start">0</td>
+                                <!--<td data-label="No.">&nbsp;</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver"><strong>3342665/0</strong><small></small></td>
+                                <td data-label="L">5</td>
+                                <td data-label="Total">1:40.030</td>
+                                <td data-label="Best">18.497</td>
+                                <td data-label="Note">&nbsp;</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+        <section class="section report-section" id="laps">
+            <div class="section-header">
+                <div>
+                    <h2>Lap list</h2>
+                    <p>Lap times per driver.</p>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="table-wrap">
+                    <table class="table run-lap-table">
+                        <colgroup>
+                            <col class="col-lap">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>Lap</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td data-label="Lap"><strong>0</strong></td>
+                                <td data-label="# 2" class="">43:15.591</td>
+                                <td data-label="# 1" class="">00.000</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>1</strong></td>
+                                <td data-label="# 2" class="">12.453</td>
+                                <td data-label="# 1" class="">20.459</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>2</strong></td>
+                                <td data-label="# 2" class="">10.122</td>
+                                <td data-label="# 1" class="">21.134</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>3</strong></td>
+                                <td data-label="# 2" class="">10.377</td>
+                                <td data-label="# 1" class="">21.349</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>4</strong></td>
+                                <td data-label="# 2" class="">09.241</td>
+                                <td data-label="# 1" class="">18.591</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>5</strong></td>
+                                <td data-label="# 2" class="">09.147</td>
+                                <td data-label="# 1" class="is-best-lap">18.497</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>6</strong></td>
+                                <td data-label="# 2" class="">09.195</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>7</strong></td>
+                                <td data-label="# 2" class="">08.780</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>8</strong></td>
+                                <td data-label="# 2" class="">09.204</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>9</strong></td>
+                                <td data-label="# 2" class="">09.437</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>10</strong></td>
+                                <td data-label="# 2" class="">09.179</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>11</strong></td>
+                                <td data-label="# 2" class="">08.868</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>12</strong></td>
+                                <td data-label="# 2" class="">08.989</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>13</strong></td>
+                                <td data-label="# 2" class="">08.686</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>14</strong></td>
+                                <td data-label="# 2" class="">08.619</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>15</strong></td>
+                                <td data-label="# 2" class="">08.625</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>16</strong></td>
+                                <td data-label="# 2" class="">08.622</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>17</strong></td>
+                                <td data-label="# 2" class="">08.530</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>18</strong></td>
+                                <td data-label="# 2" class="">08.796</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>19</strong></td>
+                                <td data-label="# 2" class="">08.526</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>20</strong></td>
+                                <td data-label="# 2" class="is-best-lap">08.443</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>21</strong></td>
+                                <td data-label="# 2" class="">08.832</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>22</strong></td>
+                                <td data-label="# 2" class="">08.765</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>23</strong></td>
+                                <td data-label="# 2" class="">08.942</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>24</strong></td>
+                                <td data-label="# 2" class="">08.779</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>25</strong></td>
+                                <td data-label="# 2" class="">08.720</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>26</strong></td>
+                                <td data-label="# 2" class="">08.517</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>27</strong></td>
+                                <td data-label="# 2" class="">09.367</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>28</strong></td>
+                                <td data-label="# 2" class="">08.639</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>29</strong></td>
+                                <td data-label="# 2" class="">09.369</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>30</strong></td>
+                                <td data-label="# 2" class="">09.914</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>31</strong></td>
+                                <td data-label="# 2" class="">09.053</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>32</strong></td>
+                                <td data-label="# 2" class="">08.984</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>33</strong></td>
+                                <td data-label="# 2" class="">09.944</td>
+                                <td data-label="# 1" class="">&nbsp;</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+        <section class="section report-section report-analysis-section" id="analysis">
+            <div class="section-header">
+                <div>
+                    <h2>Analysis</h2>
+                    <p>Comparison of consistency, pace and best times.</p>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="report-analysis-chart">
+                    <div class="report-analysis-chart-header">
+                        <h3>Position history</h3>
+                        <div class="report-analysis-legend">
+                            <span><i style="background:#1f75bd"></i>Hansruedi Baer</span>
+                            <span><i style="background:#27964c"></i>3342665/0</span>
+                        </div>
+                    </div>
+                    <svg></svg>
+                </div>
+                <div class="report-analysis-grid">
+                    <article class="report-analysis-card">
+                        <h3>Pace</h3>
+                        <div class="report-analysis-bar-row">
+                            <span>Hansruedi Baer</span>
+                            <div><i style="width:100.000%;"></i></div>
+                            <strong>9.141</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>3342665/0</span>
+                            <div><i style="width:45.693%;"></i></div>
+                            <strong>20.006</strong>
+                        </div>
+                    </article>
+                    <article class="report-analysis-card">
+                        <h3>Consistency</h3>
+                        <div class="report-analysis-bar-row">
+                            <span>Hansruedi Baer</span>
+                            <div><i style="width:100.000%;"></i></div>
+                            <strong>0.754</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>3342665/0</span>
+                            <div><i style="width:61.332%;"></i></div>
+                            <strong>1.230</strong>
+                        </div>
+                    </article>
+                    <article class="report-analysis-card">
+                        <h3>Best times</h3>
+                        <div class="report-analysis-bar-row">
+                            <span>Hansruedi Baer</span>
+                            <div><i style="width:100.000%;"></i></div>
+                            <strong>8.443</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>3342665/0</span>
+                            <div><i style="width:45.645%;"></i></div>
+                            <strong>18.497</strong>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+        <section class="section report-section report-gap-chart-section" id="gap-chart">
+            <div class="section-header">
+                <div>
+                    <h2>Gap to leader</h2>
+                    <p>Progression of the gap to the current leader over the laps.</p>
+                </div>
+                <div class="report-gap-chart-legend">
+                    <span><i style="background:#1f75bd"></i># 2</span>
+                    <span><i style="background:#27964c"></i># 1</span>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="report-gap-chart">
+                    <svg></svg>
+                </div>
+            </div>
+        </section>
+        <section class="section report-section report-pace-distribution-section" id="pace-distribution">
+            <div class="section-header">
+                <div>
+                    <h2>Pace distribution</h2>
+                    <p>Comparison of fastest, average and slowest valid lap per driver.</p>
+                </div>
+                <div class="pace-distribution-legend">
+                    <span><i class="pace-legend-range"></i>Range</span>
+                    <span><i class="pace-legend-average"></i>Average</span>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="pace-distribution-list">
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong># 2</strong>
+                            <span>33 L</span>
+                        </div>
+                        <div class="pace-range" aria-label="# 2">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:0.00%; width:31.07%"></span>
+                            <span class="pace-average-marker" style="left:5.41%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>8.443</span>
+                            <span><b>Average</b>9.141</span>
+                            <span><b>Slowest</b>12.453</span>
+                        </div>
+                    </article>
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong># 1</strong>
+                            <span>5 L</span>
+                        </div>
+                        <div class="pace-range" aria-label="# 1">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:77.90%; width:22.10%"></span>
+                            <span class="pace-average-marker" style="left:89.59%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>18.497</span>
+                            <span><b>Average</b>20.006</span>
+                            <span><b>Slowest</b>21.349</span>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+        <section class="section report-section" id="records">
+            <div class="section-header">
+                <div>
+                    <h2>Records</h2>
+                    <p>Best comparison values for section and race day.</p>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="table-wrap">
+                    <table class="table report-detail-table">
+                        <colgroup>
+                            <col class="col-record">
+                            <col class="col-section">
+                            <col class="col-day">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>Evaluation</th>
+                                <th>Class</th>
+                                <th>Day Record</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td data-label="Evaluation">Best lap</td>
+                                <td data-label="Class">00:06.919 (1) (06.01.2024) Frei Dominik</td>
+                                <td data-label="Day Record">00:06.919 (1) Frei Dominik</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Evaluation">Qualy</td>
+                                <td data-label="Class">1035  22:39.127 (21.09.2025) 6308682/0</td>
+                                <td data-label="Day Record">1035  22:39.127 6308682/0</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+        <section class="section report-section report-heatmap-section" id="lap-heatmap">
+            <div class="section-header">
+                <div>
+                    <h2>Lap heatmap</h2>
+                    <p>Color overview of the lap times per driver.</p>
+                </div>
+                <div class="heatmap-legend">
+                    <span><i></i>fastest</span>
+                    <span><i class="heatmap-legend-slow"></i>slowest</span>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="table-wrap">
+                    <table class="table run-lap-heatmap-table">
+                        <colgroup>
+                            <col class="col-lap">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>Lap</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="is-zero-lap">
+                                <td data-label="Lap"><strong>0</strong></td>
+                                <td data-label="# 2" class="has-value" style="">43:15.591</td>
+                                <td data-label="# 1" class="is-empty" style="">00.000</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>1</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(95,156,208); color: #ffffff;">12.453</td>
+                                <td data-label="# 1" class="has-value" style="background-color: rgb(222,235,247); color: #17212b;">20.459</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>2</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(58,134,197); color: #ffffff;">10.122</td>
+                                <td data-label="# 1" class="has-value" style="background-color: rgb(233,242,250); color: #17212b;">21.134</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>3</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(62,136,198); color: #ffffff;">10.377</td>
+                                <td data-label="# 1" class="has-value" style="background-color: rgb(236,244,251); color: #17212b;">21.349</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>4</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(44,125,193); color: #ffffff;">09.241</td>
+                                <td data-label="# 1" class="has-value" style="background-color: rgb(192,217,238); color: #17212b;">18.591</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>5</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(42,124,192); color: #ffffff;">09.147</td>
+                                <td data-label="# 1" class="has-value" style="background-color: rgb(191,216,237); color: #17212b;">18.497</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>6</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(43,124,193); color: #ffffff;">09.195</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>7</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(36,120,191); color: #ffffff;">08.780</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>8</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(43,124,193); color: #ffffff;">09.204</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>9</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(47,127,194); color: #ffffff;">09.437</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>10</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(43,124,193); color: #ffffff;">09.179</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>11</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(38,121,191); color: #ffffff;">08.868</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>12</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(40,122,192); color: #ffffff;">08.989</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>13</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(35,119,190); color: #ffffff;">08.686</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>14</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(34,119,190); color: #ffffff;">08.619</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>15</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(34,119,190); color: #ffffff;">08.625</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>16</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(34,119,190); color: #ffffff;">08.622</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>17</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(32,118,189); color: #ffffff;">08.530</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>18</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(37,120,191); color: #ffffff;">08.796</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>19</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(32,118,189); color: #ffffff;">08.526</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>20</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(31,117,189); color: #ffffff;">08.443</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>21</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(37,121,191); color: #ffffff;">08.832</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>22</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(36,120,191); color: #ffffff;">08.765</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>23</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(39,122,191); color: #ffffff;">08.942</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>24</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(36,120,191); color: #ffffff;">08.779</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>25</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(35,120,190); color: #ffffff;">08.720</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>26</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(32,118,189); color: #ffffff;">08.517</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>27</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(46,126,193); color: #ffffff;">09.367</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>28</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(34,119,190); color: #ffffff;">08.639</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>29</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(46,126,193); color: #ffffff;">09.369</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>30</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(54,131,196); color: #ffffff;">09.914</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>31</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(41,123,192); color: #ffffff;">09.053</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>32</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(40,122,192); color: #ffffff;">08.984</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>33</strong></td>
+                                <td data-label="# 2" class="has-value" style="background-color: rgb(55,132,196); color: #ffffff;">09.944</td>
+                                <td data-label="# 1" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+</section>
+<footer class="footer">
+    (c) RC-Timing GmbH - MyRCM ·
+    2026 ·
+    <span class="footer-runtime">Cluster 2 / Node 4</span>
+</footer>
+
+</body>
+</html>

@@ -31,7 +31,7 @@ test("defaultEventNameFromLiveRcLabel falls back sensibly", () => {
   assert.equal(defaultEventNameFromLiveRcLabel("Summer Champs"), "Summer Champs");
   assert.equal(
     defaultEventNameFromLiveRcLabel("View Current Event", "HobbyTown"),
-    "HobbyTown race meeting"
+    "HobbyTown event"
   );
 });
 

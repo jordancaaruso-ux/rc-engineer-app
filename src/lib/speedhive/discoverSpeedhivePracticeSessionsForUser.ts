@@ -21,6 +21,11 @@ import { speedhiveDriverNameMatchesAny } from "@/lib/speedhive/speedhiveNameNorm
 import { normalizeSpeedhiveDriverNamesForMatch } from "@/lib/speedhive/speedhiveDriverNames";
 import { normalizeSpeedhiveTransponderNumber } from "@/lib/speedhive/speedhiveTransponder";
 import { practiceLocationIdFromTrackUrl } from "@/lib/speedhive/speedhivePracticeUrl";
+import {
+  emptyLapDiscoveryStatus,
+  lapDiscoveryStatusMessage,
+  type LapDiscoveryStatus,
+} from "@/lib/lapWatch/lapDiscoveryStatus";
 
 const MAX_ACTIVITIES_TO_EXPAND = 15;
 const MAX_DISCOVERY_RUNS = 10;
@@ -120,6 +125,7 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
   mostRecentSession: SpeedhiveDiscoveredSession | null;
   practiceLocationId: number | null;
   hint: string | null;
+  status: LapDiscoveryStatus | null;
 }> {
   const locationId = practiceLocationIdFromTrackUrl(input.trackSpeedhiveUrl);
   if (!locationId) {
@@ -129,6 +135,7 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
       mostRecentSession: null,
       practiceLocationId: null,
       hint: "Invalid Speedhive practice URL — use a link like speedhive.mylaps.com/practice/4591.",
+      status: emptyLapDiscoveryStatus("invalid_url", "speedhive"),
     };
   }
 
@@ -147,6 +154,11 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
       practiceLocationId: locationId,
       hint:
         "Set your MYLAPS transponder number in Settings to find practice sessions at this track.",
+      status: emptyLapDiscoveryStatus("no_identity", "speedhive", {
+        timingPages: [
+          { source: "speedhive", url: `https://speedhive.mylaps.com/practice/${locationId}` },
+        ],
+      }),
     };
   }
 
@@ -208,6 +220,13 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
       mostRecentSession: null,
       practiceLocationId: locationId,
       hint: e instanceof Error ? e.message : "Speedhive practice discovery failed.",
+      // The raw error stays in `hint` for logs and admin surfaces; the card reads the state and
+      // says "couldn't reach MYLAPS", because `ETIMEDOUT` has never helped anyone at a race track.
+      status: emptyLapDiscoveryStatus("unreachable", "speedhive", {
+        timingPages: [
+          { source: "speedhive", url: `https://speedhive.mylaps.com/practice/${locationId}` },
+        ],
+      }),
     };
   }
 
@@ -235,18 +254,94 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
 
   const unimported = capped.filter((d) => !d.alreadyImported);
 
+  const status = await buildPracticeStatus({
+    locationId,
+    sport: location?.sport ?? "RC",
+    matchedCount: capped.length,
+    unimportedCount: unimported.length,
+    hasChip: chipCodes.length > 0,
+  });
+
   return {
     candidates: capped,
     unimportedCandidates: unimported,
     mostRecentSession: unimported[0] ?? capped[0] ?? null,
     practiceLocationId: locationId,
-    hint:
-      unimported.length > 0
-        ? null
-        : capped.length > 0
-          ? "All matching Speedhive practice runs are already imported."
-          : chipCodes.length > 0
-            ? "No practice runs matched your transponder at this track."
-            : "No practice runs matched your name at this track.",
+    hint: status ? lapDiscoveryStatusMessage(status) : null,
+    status,
   };
+}
+
+/**
+ * Which empty state a MYLAPS practice location is in.
+ *
+ * Speedhive is asked for one transponder's runs and answers with those, so an empty answer on its
+ * own can't tell "nobody has uploaded yet" from "your transponder number is wrong" — and those want
+ * opposite advice. One extra call for the location's own activity list settles it, and it only ever
+ * runs when nothing matched, so the normal path pays nothing for it.
+ *
+ * The activities are counted, never listed. Unlike LiveRC, there is nothing for a driver to do with
+ * a stranger's practice run — you can't claim someone else's transponder.
+ */
+async function buildPracticeStatus(opts: {
+  locationId: number;
+  sport: string;
+  matchedCount: number;
+  unimportedCount: number;
+  hasChip: boolean;
+}): Promise<LapDiscoveryStatus | null> {
+  const timingPages = [
+    { source: "speedhive" as const, url: `https://speedhive.mylaps.com/practice/${opts.locationId}` },
+  ];
+  if (opts.unimportedCount > 0) return null;
+  if (opts.matchedCount > 0) {
+    return {
+      code: "all_imported",
+      sources: ["speedhive"],
+      postedCount: opts.matchedCount,
+      matchedCount: opts.matchedCount,
+      timingPages,
+      sessionsToday: [],
+    };
+  }
+
+  let postedCount = 0;
+  let postedDayIso: string | null = null;
+  try {
+    const activities = await fetchPracticeLocationActivities(opts.locationId, {
+      count: MAX_ACTIVITIES_TO_EXPAND,
+      sport: opts.sport,
+    });
+    postedCount = activities.length;
+    // The newest of them dates the list. Without it the card would say "posted today" about
+    // activities that can be weeks old — the same lie LiveRC's practice index tells.
+    postedDayIso = newestActivityDayIso(activities);
+  } catch {
+    // Couldn't ask. Fall through as "nothing posted" rather than inventing a count — the day list
+    // is only used to pick between two sentences, so a failure here is not worth its own state.
+  }
+
+  return {
+    code: postedCount > 0 ? "no_match" : "nothing_posted",
+    sources: ["speedhive"],
+    postedCount,
+    matchedCount: 0,
+    timingPages,
+    sessionsToday: [],
+    postedDayIso,
+  };
+}
+
+/** The day the most recent activity ran, as YYYY-MM-DD — what dates the count on the card. */
+function newestActivityDayIso(
+  activities: { startTime?: string | null; endTime?: string | null }[]
+): string | null {
+  let newest = 0;
+  for (const a of activities) {
+    const raw = a.endTime?.trim() || a.startTime?.trim();
+    if (!raw) continue;
+    const t = new Date(raw).getTime();
+    if (Number.isFinite(t) && t > newest) newest = t;
+  }
+  return newest > 0 ? new Date(newest).toISOString().slice(0, 10) : null;
 }

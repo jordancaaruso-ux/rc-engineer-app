@@ -21,6 +21,8 @@ import { isMyRcmDiscoveryUrl } from "@/lib/lapUrlParsers/myRcmReport";
 import { sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
 import { rawSessionDriversFromImportedPayload } from "@/lib/lapImport/importedIngestPlan";
 import { hasSpeedhiveIdentityForUser } from "@/lib/speedhive/speedhiveDriverSettings";
+import { formatRunSessionDisplay } from "@/lib/runSession";
+import { emptyLapDiscoveryStatus } from "@/lib/lapWatch/lapDiscoveryStatus";
 
 export const dynamic = "force-dynamic";
 // Same LiveRC discovery crawl as /discover-sessions — give it the full serverless headroom so a slow
@@ -49,6 +51,26 @@ export type ScanDayUrlCandidateRow = {
   linkedRunId: string | null;
   timingSource?: "liverc" | "speedhive" | "myrcm";
   bestLapSeconds?: number | null;
+  /**
+   * Only on already-imported rows: what that import is currently filed under, so the picker can say
+   * "on Run 12 · Sat afternoon" rather than making the driver guess whether taking it costs them
+   * something. Null when the import is sitting loose (the run it was on was deleted, or it was
+   * never attached to one).
+   */
+  linkedRunLabel?: string | null;
+};
+
+/**
+ * Sessions here that this driver has imported before.
+ *
+ * These used to be dropped on the floor: the picker was fed `unimportedCandidates` only, so a lap
+ * set you'd already pulled in simply vanished from the list. Import itself has always been
+ * idempotent, and deleting a run leaves its timing session behind rather than taking it along — so
+ * the laps were never gone, just unreachable. This is the door back to them.
+ */
+export type ScanDayUrlImportedRow = ScanDayUrlCandidateRow & {
+  importedSessionId: string;
+  linkedRunLabel: string | null;
 };
 
 const RESULTS_SCAN_ROW_CAP = 80;
@@ -101,6 +123,105 @@ async function linkedScanCandidatesForRun(
   });
 }
 
+/**
+ * The already-imported half of a scan, with the run each import is filed under.
+ *
+ * Two queries rather than a join through `linkedRunId`: the run label wants `sessionLabel` /
+ * meeting fields that only `formatRunSessionDisplay` knows how to combine, and the set is small
+ * (one track, one day) so the second lookup is cheap.
+ */
+async function importedRowsForScan(
+  userId: string,
+  candidates: {
+    sessionId: string;
+    sessionUrl: string;
+    label: string;
+    sessionCompletedAtIso: string | null;
+    bestLapSeconds?: number | null;
+    timingSource?: "liverc" | "speedhive" | "myrcm";
+    alreadyImported: boolean;
+  }[],
+  excludeRunId: string | null
+): Promise<ScanDayUrlImportedRow[]> {
+  const urls = [
+    ...new Set(
+      candidates.filter((c) => c.alreadyImported).map((c) => c.sessionUrl.trim()).filter(Boolean)
+    ),
+  ];
+  if (urls.length === 0) return [];
+
+  const imports = await prisma.importedLapTimeSession.findMany({
+    where: { userId, sourceUrl: { in: urls } },
+    select: { id: true, sourceUrl: true, linkedRunId: true },
+  });
+  const byUrl = new Map(imports.map((i) => [i.sourceUrl.trim(), i]));
+
+  const runIds = [...new Set(imports.map((i) => i.linkedRunId).filter(Boolean) as string[])];
+  const runs =
+    runIds.length > 0
+      ? await prisma.run.findMany({
+          where: { id: { in: runIds }, userId },
+          select: {
+            id: true,
+            sessionType: true,
+            meetingSessionType: true,
+            meetingSessionCode: true,
+            sessionLabel: true,
+            sessionCompletedAt: true,
+            sortAt: true,
+            trackNameSnapshot: true,
+          },
+        })
+      : [];
+  const runById = new Map(runs.map((r) => [r.id, r]));
+
+  const rows: ScanDayUrlImportedRow[] = [];
+  for (const c of candidates) {
+    if (!c.alreadyImported) continue;
+    const imp = byUrl.get(c.sessionUrl.trim());
+    if (!imp) continue;
+    // The run being edited already shows its own imports as attached strips above the picker.
+    // Listing them here too drew the same session twice, and the second copy couldn't be acted on.
+    if (excludeRunId && imp.linkedRunId === excludeRunId) continue;
+    const run = imp.linkedRunId ? runById.get(imp.linkedRunId) : null;
+    rows.push({
+      sessionId: c.sessionId,
+      sessionUrl: c.sessionUrl,
+      driverName: c.label,
+      sessionTime: null,
+      sessionCompletedAtIso: c.sessionCompletedAtIso,
+      matchesDriver: true,
+      alreadyImported: true,
+      linkedRunId: imp.linkedRunId,
+      timingSource: c.timingSource,
+      bestLapSeconds: c.bestLapSeconds ?? null,
+      importedSessionId: imp.id,
+      linkedRunLabel: run ? runDisplayLabel(run) : null,
+    });
+  }
+  return rows;
+}
+
+/** "Qualifying 2 · Sat 16 Aug" — enough for a driver to recognise which run they'd be taking it off. */
+function runDisplayLabel(run: {
+  sessionType: string;
+  meetingSessionType: string | null;
+  meetingSessionCode: string | null;
+  sessionLabel: string | null;
+  sessionCompletedAt: Date | null;
+  sortAt: Date;
+  trackNameSnapshot: string | null;
+}): string {
+  const session = formatRunSessionDisplay(run, { fallback: "Run" });
+  const when = run.sessionCompletedAt ?? run.sortAt;
+  const day = when.toLocaleDateString("en-AU", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  return [session, day].filter(Boolean).join(" · ");
+}
+
 function mergeLinkedScanCandidates(
   linked: ScanDayUrlCandidateRow[],
   discovered: ScanDayUrlCandidateRow[]
@@ -151,12 +272,29 @@ export async function POST(request: Request) {
     const liveRcUrl = track.liveRcUrl?.trim() ?? "";
     const speedhiveUrl = track.speedhiveUrl?.trim() ?? "";
     if (!liveRcUrl && !speedhiveUrl) {
-      return NextResponse.json(
-        {
-          error: "Add a LiveRC or Speedhive organization URL on the track page.",
-        },
-        { status: 400 }
-      );
+      // Answered, not rejected. A track with no timing page is an ordinary thing to find and it has
+      // its own card ("add a timing page"); as a 400 the client could only read it as a failed
+      // request and offered "try again", which will never help.
+      return NextResponse.json({
+        ok: true,
+        dayUrl: null,
+        indexKind: "practice" as ScanDayUrlIndexKind,
+        liveRcDriverName: null,
+        candidates: [],
+        olderCandidates: [],
+        importedCandidates: [],
+        olderCount: 0,
+        totalCandidates: 0,
+        unimportedCount: 0,
+        matchedCount: 0,
+        hasDriverNameSetting: false,
+        driverFilterApplied: false,
+        status: emptyLapDiscoveryStatus("no_timing_page", "liverc", { sources: [] }),
+        scanMessage: "This track has no timing page saved.",
+        discoveredFromTrack: true,
+        hasLiveRc: false,
+        hasSpeedhive: false,
+      });
     }
     let eventRaceClass: string | null = null;
     if (eventId) {
@@ -198,7 +336,29 @@ export async function POST(request: Request) {
         ? await linkedScanCandidatesForRun(userId, runId)
         : [];
     const candidates = mergeLinkedScanCandidates(linkedCandidates, discoveredCandidates);
+    // Fed the matched sessions *and* the day's own list. A driver whose name doesn't match takes
+    // their session out of the day list — and that session is not a "candidate", so building this
+    // from candidates alone made exactly those laps vanish again on the next scan, which is the
+    // whole failure this list exists to end.
+    const importedRows = await importedRowsForScan(
+      userId,
+      [
+        ...discovered.candidates,
+        ...(discovered.status?.sessionsToday ?? []).map((s) => ({
+          sessionId: s.sessionId,
+          sessionUrl: s.sessionUrl,
+          label: s.label,
+          sessionCompletedAtIso: s.sessionCompletedAtIso,
+          bestLapSeconds: null,
+          timingSource: s.source,
+          alreadyImported: true,
+        })),
+      ],
+      runId ?? null
+    );
     return NextResponse.json({
+      importedCandidates: importedRows,
+      status: discovered.status,
       ok: true,
       dayUrl: liveRcUrl || speedhiveUrl,
       indexKind: "practice" as ScanDayUrlIndexKind,

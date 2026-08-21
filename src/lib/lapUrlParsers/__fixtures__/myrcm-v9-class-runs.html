@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]><html class="no-js lt-ie9 lt-ie8 lt-ie7" xml:lang="en" lang="en"><![endif]-->
+<!--[if IE 7]><html class="no-js lt-ie9 lt-ie8" xml:lang="en" lang="en"><![endif]-->
+<!--[if IE 8]><html class="no-js lt-ie9" xml:lang="en" lang="en"><![endif]-->
+<!--[if gt IE 8]><!--><html class="js js flexbox canvas canvastext webgl no-touch geolocation postmessage no-websqldatabase indexeddb hashchange history draganddrop websockets rgba hsla multiplebgs backgroundsize borderimage borderradius boxshadow textshadow opacity cssanimations csscolumns cssgradients no-cssreflections csstransforms csstransforms3d csstransitions fontface generatedcontent video audio localstorage sessionstorage webworkers applicationcache svg inlinesvg smil svgclippaths wf-myriadprosemicondensed-n3-active wf-myriadpro-i4-active wf-myriadpro-n3-active wf-myriadpro-n4-active wf-myriadpro-n6-active wf-active" lang="de"><!--<![endif]-->
+<head>
+	<title>MyRCM : Reporting</title>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="description" content="MyRCM : Reporting" />
+	<meta name="keywords" content="RC-Timing,RCM,Race Control Management,race software,timekeeping,model racing,timing system,Race Control,Racecontrol,Software,Racing,Racing Control,Racing Control Software,model building,timekeeping,races,model races,AMB Decoder,RobiLab" />
+	<meta name="copyright" content="Copyright (c) 2026 - RC-Timing GmbH" />
+	<meta name="author" content="RC-Timing GmbH" />
+	<meta name="version" content="v9.1.15 (18.08.2026)" />
+	<meta name="google-site-verification" content="an1wuERuZRcgOZIF0s0DLhiHSXRqSr9nAMihZHCQzsU" />
+	
+
+	<!-- Open Graph -->
+    <meta property="og:title" content="MyRCM : Reporting">
+    <meta property="og:description" content="Online platform for model racing with timekeeping, race management and live results.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.myrcm.ch/">
+    <meta property="og:image" content="https://www.myrcm.ch/resources/img/og-image.png">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="MyRCM : Reporting">
+    <meta name="twitter:description" content="Online platform for model racing and timekeeping, race management and live results.">
+    <meta name="twitter:image" content="https://www.myrcm.ch/resources/img/og-image.png">
+	
+	<!--[if IE]>
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+	<![endif]-->
+
+	<!-- JavaScript -->
+	
+	
+	
+	
+
+    <!-- CSS -->
+	<link rel="icon" href="/resources/favicon.ico" />
+	<link rel="stylesheet" type="text/css" href="/resources/styles/jquery-ui.min.css" media="all" />
+	<link rel="stylesheet" type="text/css" href="/resources/styles/styles.css?v=v9.1.15" media="all" />
+	<link rel="stylesheet" type="text/css" href="/resources/styles/app.css?v=v9.1.15" media="all" />
+	<link rel="stylesheet" type="text/css" href="/resources/richtexteditor/rte_theme_default.css" media="all" />
+</head>
+<body>
+
+<div id="spinner" aria-live="polite" aria-busy="true">
+    <img src="/resources/img/ajax_loader_blue_128.gif" alt="Loading...">
+</div>
+<header class="top-header">
+    <div class="top-header-inner">
+      <div class="logo-area">
+        <div class="logo-box">
+          <!-- Logo-Pfad anpassen -->
+          <img class="logo-light" src="/resources/logo-black-v2.png" alt="RC-Timing GmbH">
+          <img class="logo-dark" src="/resources/logo-white-v2.png" alt="RC-Timing GmbH">
+        </div>
+        <!--<div class="portal-title">Race Management Portal</div>-->
+      </div>
+      <div class="header-actions">
+        <div class="header-action-row">
+            <div class="user-menu">
+              <button class="language-overlay-trigger" type="button" aria-haspopup="dialog" aria-controls="languageOverlay"><img src="/resources/styles/images/38x25/USA.png" alt=""><span>English</span></button>
+              <div class="auth-links">
+                <a href="https://www.myrcm.ch/en/registration">Register</a>
+                <a href="https://www.myrcm.ch/en/login">Log in</a>
+              </div>
+            </div>
+
+            <button class="global-search-trigger" type="button" aria-haspopup="dialog" aria-controls="globalSearchOverlay" aria-label="!!openSearch!!">
+                <svg></svg>
+            </button>
+
+            <div class="theme-switch" role="group" aria-label="Farbschema wählen">
+                <span class="theme-switch__thumb" aria-hidden="true"></span>
+                <button type="button" data-theme-choice="auto" aria-label="Farbschema automatisch" aria-pressed="false"><span class="theme-switch__icon">A</span><span>Auto</span></button>
+                <button type="button" data-theme-choice="light" aria-label="Helles Farbschema" aria-pressed="false"><span class="theme-switch__icon">☀</span><span>Light</span></button>
+                <button type="button" data-theme-choice="dark" aria-label="Dunkles Farbschema" aria-pressed="true" class="is-active"><span class="theme-switch__icon">☾</span><span>Dark</span></button>
+            </div>
+
+            <button class="menu-toggle" id="menuToggle" type="button" onclick="toggleMenu()" aria-label="Open menu" aria-controls="mobileMenu" aria-expanded="false">
+                ☰
+            </button>
+        </div>
+        <div class="user-session">
+          <div class="logged-in-user">&nbsp;</div>
+        </div>
+      </div>
+    </div>
+</header>
+<nav class="main-nav" id="mainNav">
+    <div class="main-nav-inner">
+        <a href="https://www.myrcm.ch/en/live" >ONLINE EVENTS</a>
+        <a href="https://www.myrcm.ch/en/upcoming" >UPCOMING EVENTS</a>
+        <a href="https://www.myrcm.ch/en/archive" >ARCHIVE EVENTS</a>
+        <a href="https://www.myrcm.ch/en/organizers" >HOST</a>
+        <a href="https://www.myrcm.ch/en/championship" >CHAMPIONSHIP</a>
+        <a href="https://www.myrcm.ch/en/subscription" >SUBSCRIPTION</a>
+    </div>
+</nav>
+<div class="mobile-overlay" id="mobileOverlay" onclick="closeMenu()"></div>
+<aside class="mobile-menu" id="mobileMenu">
+    <div class="mobile-menu-header">
+        <strong>MyRCM</strong>
+        <button type="button" onclick="closeMenu()" aria-label="Close menu">×</button>
+    </div>
+    <a href="https://www.myrcm.ch/en/live" >ONLINE EVENTS</a>
+    <a href="https://www.myrcm.ch/en/upcoming" >UPCOMING EVENTS</a>
+    <a href="https://www.myrcm.ch/en/archive" >ARCHIVE EVENTS</a>
+    <a href="https://www.myrcm.ch/en/organizers" >HOST</a>
+    <a href="https://www.myrcm.ch/en/championship" >CHAMPIONSHIP</a>
+    <a href="https://www.myrcm.ch/en/subscription" >SUBSCRIPTION</a>
+    <div class="mobile-menu-footer">
+        <div class="mobile-language">
+            <label for="mobileLanguageSelect">Language</label>
+            <button class="language-overlay-trigger" type="button" aria-haspopup="dialog" aria-controls="languageOverlay"><img src="/resources/styles/images/38x25/USA.png" alt=""><span>English</span></button>
+        </div>
+        <a href="https://www.myrcm.ch/en/registration">Register</a>
+        <a href="https://www.myrcm.ch/en/login">Log in</a>
+    </div>
+</aside>
+<main class="app-shell">
+    <section class="event-header">
+        <button class="back-button" id="back-button" type="button" onclick="javascript:history.back();">
+            <svg></svg>
+            Back to event
+        </button>
+        <div class="event-header__grid">
+            <div class="event-header__copy">
+                <h1>Online Event</h1>
+                <div class="event-meta">
+                    <span><svg></svg>16.08.2026</span>
+                    <span class="event-meta__class"><svg></svg>Online</span>
+                    <span><svg></svg>RC Race Arena</span>
+                </div>
+            </div>
+           <div class="event-state event-state--ended">
+              <strong><span></span>EVENT ENDED</strong>
+              <small>Updated:<br />n/a</small>
+           </div>
+        </div>
+    </section>
+
+    <section class="filter-bar" aria-label="Klassenauswahl">
+        <label class="filter-control" for="reportClass">
+            <span class="filter-control__icon" aria-hidden="true">
+                <svg></svg>
+            </span>
+            <span class="filter-control__copy">
+                <small>Class</small>
+                <select id="reportClass" aria-label="Class" data-language="en" data-event-key="99719">
+                    <option value="395535" selected>Online</option>
+                </select>
+            </span>
+            <span class="filter-control__chevron" aria-hidden="true">
+                <svg></svg>
+            </span>
+        </label>
+    </section>
+
+    <nav class="tabs" aria-label="Report Bereiche">
+        <button type="button" class="tab is-active" data-tab="overview" aria-current="page">
+            <svg></svg>
+             <span>Overview</span>
+        </button>
+        <button type="button" class="tab" data-tab="schedules">
+            <svg></svg>
+            <span>Schedules</span><b>0</b>
+        </button>
+        <button type="button" class="tab" data-tab="participants">
+            <svg></svg>
+            <span>Participants</span><b>2</b>
+        </button>
+        <button type="button" class="tab" data-tab="groups">
+            <svg></svg>
+            <span>Groups</span><b>1</b></button>
+        </button>
+        <button type="button" class="tab" data-tab="rankings">
+            <svg></svg>
+            <span>Results</span><b>1</b></button>
+        </button>
+        <button type="button" class="tab" data-tab="runs">
+            <svg></svg>
+            <span>Run reports</span><b>4</b></button>
+        </button>
+    </nav>
+
+    <section class="tab-pane is-active" data-pane="overview">
+        <div class="overview-layout">
+            <div class="overview-column">
+                <section class="dashboard-card" id="schedule">
+                    <header class="dashboard-card__header">
+                        <h2>Schedules</h2>
+                        <!--<button type="button" data-open-tab="schedule">Schedules</button>-->
+                    </header>
+                    <div class="overview-list">
+                    </div>
+                </section>
+                <section class="dashboard-card" id="entries">
+                    <header class="dashboard-card__header">
+                        <h2>Participants</h2>
+                        <!--<button type="button" data-open-tab="entries">Participants</button>-->
+                    </header>
+                    <div class="overview-list">
+                        <button class="overview-row load-report" type="button" data-href="/en/report/99719/395535?reportKey=100&reportType=participants">
+                            <span class="overview-row__icon" aria-hidden="true">
+                                <svg></svg>
+                            </span>
+                            <span class="overview-row__copy">
+                                <strong>Participants</strong>
+                                <small>Participant list for this class</small>
+                            </span>
+                            <span class="chip chip--green">AVAILABLE</span>
+                            <span class="overview-row__arrow" aria-hidden="true">
+                                <svg></svg>
+                            </span>
+                        </button>
+                        <button class="overview-row load-report" type="button" data-href="/en/report/99719/395535?reportKey=100&reportType=manufacturer">
+                            <span class="overview-row__icon" aria-hidden="true">
+                                <svg></svg>
+                            </span>
+                            <span class="overview-row__copy">
+                                <strong>Manufacturer data</strong>
+                                <small>Distribution of the vehicle components used</small>
+                            </span>
+                            <span class="chip chip--green">AVAILABLE</span>
+                            <span class="overview-row__arrow" aria-hidden="true">
+                                <svg></svg>
+                            </span>
+                        </button>
+                    </div>
+                </section>
+                <section class="dashboard-card" id="arrangements">
+                    <header class="dashboard-card__header">
+                        <h2>Group arrangements</h2>
+                        <!--<button type="button" data-open-tab="arrangements">Group arrangements</button>-->
+                    </header>
+                    <div class="overview-list">
+                        <button class="overview-row load-report" type="button" data-href="/en/report/99719/395535?reportKey=103&reportType=qualy">
+                            <span class="overview-row__icon" aria-hidden="true">
+                                <svg></svg>
+                            </span>
+                            <span class="overview-row__copy">
+                                <strong>Qualifying</strong>
+                                <small>Groups and start positions for qualifying</small>
+                            </span>
+                            <span class="chip chip--green">AVAILABLE</span>
+                            <span class="overview-row__arrow" aria-hidden="true">
+                                <svg></svg>
+                            </span>
+                        </button>
+                    </div>
+                </section>
+            </div>
+            <div class="overview-column overview-column--reports">
+                <section class="dashboard-card dashboard-card--overview-rankings" id="rankings">
+                    <header class="dashboard-card__header">
+                        <h2>Final rankings</h2>
+                        <!--<button type="button" data-open-tab="rankings">Final rankings</button>-->
+                    </header>
+                    <div class="overview-list">
+                        <button class="overview-row load-report" type="button" data-href="/en/report/99719/395535?reportKey=202&reportType=qualy">
+                            <span class="overview-row__icon" aria-hidden="true">
+                                <svg></svg>
+                            </span>
+                            <span class="overview-row__copy">
+                                <strong>Qualifying</strong>
+                                <small>Ranking after qualifying</small>
+                            </span>
+                            <span class="chip chip--green">AVAILABLE</span>
+                            <span class="overview-row__arrow" aria-hidden="true">
+                                <svg></svg>
+                            </span>
+                        </button>
+                    </div>
+                </section>
+                <section class="dashboard-card dashboard-card--runs" id="heats">
+                    <header class="dashboard-card__header dashboard-card__header--stats">
+                        <h2>Run reports <span>4</span></h2>
+                        <div class="report-stats">
+                            <span><strong>4</strong><small>Published</small></span>
+                            <span><strong>0</strong><small>In progress</small></span>
+                            <span><strong>1</strong><small>Planned</small></span>
+                        </div>
+                    </header>
+                    <div class="run-accordion run-accordion--compact">
+
+                <details class="phase">
+                    <summary>
+                        <span class="phase__title">
+                            <strong>Qualifying</strong>
+                            <em>5 Groups · 5 Runs</em>
+                        </span>
+                        <div class="phase__tools">
+                                <span class="chip chip--green">AVAILABLE</span>
+                            <span class="accordion-chevron" aria-hidden="true"></span>
+                        </div>
+                    </summary>
+                            <div class="phase__content">
+                                <details class="group">
+                                    <summary>
+                                        <span class="group__title">
+                                            <strong>Heat 19</strong>
+                                            <small>1 Runs</small>
+                                        </span>
+                                        <div class="group__tools">
+                                                <span class="chip chip--green">AVAILABLE</span>
+                                            <span class="accordion-chevron" aria-hidden="true"></span>
+                                        </div>
+                                    </summary>
+                                    <div class="run-list">
+                                        <button class="run-button load-report" type="button" data-href="/en/report/99719/395535?reportKey=6058&reportType=qualy">
+                                                <span class="run-button__icon run-button__icon--available" aria-hidden="true" style="color: #228c49;">
+                                                    <svg></svg>
+                                                </span>
+                                            <span class="run-button__copy">
+                                                <strong>Qualy 1</strong>
+                                            </span>
+                                                <span class="chip chip--green">AVAILABLE</span>
+                                            <span class="run-button__arrow" aria-hidden="true">
+                                                <svg></svg>
+                                            </span>
+                                        </button>
+                                    </div>
+                                </details>
+                                <details class="group">
+                                    <summary>
+                                        <span class="group__title">
+                                            <strong>Heat 20</strong>
+                                            <small>1 Runs</small>
+                                        </span>
+                                        <div class="group__tools">
+                                                <span class="chip chip--green">AVAILABLE</span>
+                                            <span class="accordion-chevron" aria-hidden="true"></span>
+                                        </div>
+                                    </summary>
+                                    <div class="run-list">
+                                        <button class="run-button load-report" type="button" data-href="/en/report/99719/395535?reportKey=6063&reportType=qualy">
+                                                <span class="run-button__icon run-button__icon--available" aria-hidden="true" style="color: #228c49;">
+                                                    <svg></svg>
+                                                </span>
+                                            <span class="run-button__copy">
+                                                <strong>Qualy 1</strong>
+                                            </span>
+                                                <span class="chip chip--green">AVAILABLE</span>
+                                            <span class="run-button__arrow" aria-hidden="true">
+                                                <svg></svg>
+                                            </span>
+                                        </button>
+                                    </div>
+                                </details>
+                                <details class="group">
+                                    <summary>
+                                        <span class="group__title">
+                                            <strong>Heat 21</strong>
+                                            <small>1 Runs</small>
+                                        </span>
+                                        <div class="group__tools">
+                                                <span class="chip chip--green">AVAILABLE</span>
+                                            <span class="accordion-chevron" aria-hidden="true"></span>
+                                        </div>
+                                    </summary>
+                                    <div class="run-list">
+                                        <button class="run-button load-report" type="button" data-href="/en/report/99719/395535?reportKey=6064&reportType=qualy">
+                                                <span class="run-button__icon run-button__icon--available" aria-hidden="true" style="color: #228c49;">
+                                                    <svg></svg>
+                                                </span>
+                                            <span class="run-button__copy">
+                                                <strong>Qualy 1</strong>
+                                            </span>
+                                                <span class="chip chip--green">AVAILABLE</span>
+                                            <span class="run-button__arrow" aria-hidden="true">
+                                                <svg></svg>
+                                            </span>
+                                        </button>
+                                    </div>
+                                </details>
+                                <details class="group">
+                                    <summary>
+                                        <span class="group__title">
+                                            <strong>Heat 22</strong>
+                                            <small>1 Runs</small>
+                                        </span>
+                                        <div class="group__tools">
+                                                <span class="chip chip--green">AVAILABLE</span>
+                                            <span class="accordion-chevron" aria-hidden="true"></span>
+                                        </div>
+                                    </summary>
+                                    <div class="run-list">
+                                        <button class="run-button load-report" type="button" data-href="/en/report/99719/395535?reportKey=6065&reportType=qualy">
+                                                <span class="run-button__icon run-button__icon--available" aria-hidden="true" style="color: #228c49;">
+                                                    <svg></svg>
+                                                </span>
+                                            <span class="run-button__copy">
+                                                <strong>Qualy 1</strong>
+                                            </span>
+                                                <span class="chip chip--green">AVAILABLE</span>
+                                            <span class="run-button__arrow" aria-hidden="true">
+                                                <svg></svg>
+                                            </span>
+                                        </button>
+                                    </div>
+                                </details>
+                                <details class="group">
+                                    <summary>
+                                        <span class="group__title">
+                                            <strong>Heat 23</strong>
+                                            <small>1 Runs</small>
+                                        </span>
+                                        <div class="group__tools">
+                                                <span class="chip chip--blue">Pending</span>
+                                            <span class="accordion-chevron" aria-hidden="true"></span>
+                                        </div>
+                                    </summary>
+                                    <div class="run-list">
+                                        <button class="run-button load-report" type="button" data-href="/en/report/99719/395535?reportKey=6066&reportType=qualy">
+                                                <span class="run-button__icon run-button__icon--unavailable" aria-hidden="true" style="color: #be2b26;">
+                                                    <svg></svg>
+                                                </span>
+                                            <span class="run-button__copy">
+                                                <strong>Qualy 1</strong>
+                                            </span>
+                                                <span class="chip chip--blue">Pending</span>
+                                            <span class="run-button__arrow" aria-hidden="true">
+                                                <svg></svg>
+                                            </span>
+                                        </button>
+                                    </div>
+                                </details>
+                            </div>
+                        </details>
+
+                    </div>
+                </section>
+            </div>
+        </div>
+    </section>
+
+    <section class="tab-pane" data-pane="schedules">
+        <div class="page-section-heading">
+            <div>
+                <span class="eyebrow">Schedules</span>
+                <h2>All event days</h2></div>
+                <p>Complete event schedule</p>
+            </div>
+            <div class="schedule-grid">
+            </div>
+        </div>
+    </section>
+
+    <section class="tab-pane" data-pane="participants">
+        <div class="page-section-heading">
+            <div>
+                <span class="eyebrow">Participants</span>
+                <h2>Participant list for this class</h2>
+            </div>
+        </div>
+        <section class="feature-card dashboard-card">
+            <span class="feature-card__icon">
+                <svg></svg>
+            </span>
+            <div>
+                <h3>Participants</h3>
+                <p>Participant list for this class</p>
+            </div>
+            <button class="primary-button load-report" type="button" data-report="100" data-section="390399" data-href="/en/report/99719/395535?reportKey=100&reportType=participants">
+                Open participants
+                <svg></svg>
+            </button>
+        </section>
+        <br/>
+        <section class="feature-card dashboard-card">
+            <span class="feature-card__icon">
+                <svg></svg>
+            </span>
+            <div>
+                <h3>Manufacturer data</h3>
+                <p>Distribution of the vehicle components used</p>
+            </div>
+            <button class="primary-button load-report" type="button" data-report="100" data-section="390399" data-href="/en/report/99719/395535?reportKey=100&reportType=manufacturer">
+                Open manufacturer data
+                <svg></svg>
+            </button>
+        </section>
+    </section>
+
+    <section class="tab-pane" data-pane="groups">
+        <div class="page-section-heading"><div><span class="eyebrow">Group arrangements</span><h2>Training to finals</h2></div></div>
+        <div class="module-grid">
+            <button class="module-card load-report" type="button" data-report="101" data-section="390399" data-href="/en/report/99719/395535?reportKey=103&reportType=qualy">
+                <span class="module-card__icon">
+                    <svg></svg>
+                </span>
+                <span>
+                    <strong>Qualifying</strong>
+                    <small>Groups and start positions for qualifying</small>
+                </span>
+                <span>
+                    <svg></svg>
+                </span>
+            </button>
+        </div>
+    </section>
+
+    <section class="tab-pane" data-pane="rankings">
+        <div class="page-section-heading">
+            <div>
+                <span class="eyebrow">Final rankings</span>
+                <h2>Rankings and results</h2>
+            </div>
+        </div>
+        <div class="module-grid">
+            <button class="module-card load-report" type="button" data-report="200" data-section="390399" data-href="/en/report/99719/395535?reportKey=202&reportType=qualy">
+                <span class="module-card__icon module-card__icon--yellow">
+                    <svg></svg>
+                </span>
+                <span>
+                    <strong>Qualifying</strong>
+                    <small>Ranking after qualifying</small>
+                </span>
+                <span>
+                    <svg></svg>
+                </span>
+            </button>
+        </div>
+    </section>
+
+    <section class="tab-pane" data-pane="runs">
+        <div class="page-section-heading"><div><span class="eyebrow">Run reports</span><h2>Phase, group and individual run</h2></div></div>
+        <section class="dashboard-card runs-page-card">
+            <header class="dashboard-card__header dashboard-card__header--stats">
+                <h2>Run reports <span>4</span></h2>
+                <div class="report-stats">
+                    <span><strong>4</strong><small>Published</small></span>
+                    <span><strong>0</strong><small>In progress</small></span>
+                    <span><strong>1</strong><small>Planned</small></span>
+                </div>
+            </header>
+            <div class="run-accordion">
+
+                <details class="phase">
+                    <summary>
+                        <span class="phase__title">
+                            <strong>Qualifying</strong>
+                            <em>5 Groups · 5 Runs</em>
+                        </span>
+                        <span class="phase__tools">
+                                <span class="chip chip--green">AVAILABLE</span>
+                            <span class="accordion-chevron" aria-hidden=\"true\"></span>
+                        </span>
+                    </summary>
+                    <div class="phase__content">
+                        <details class="group" >
+                            <summary>
+                                <span class="group__title"><strong>Heat 19</strong><small>(1 Runs)</small></span>
+                                <span class="group__tools">
+                                        <span class="chip chip--green">AVAILABLE</span>
+                                    <span class="accordion-chevron" aria-hidden="true"></span>
+                                </span>
+                            </summary>
+                            <div class="run-list">
+                                        <button class="run-button load-report" type="button" data-report="5857" data-report-type="controlledPractice" data-section="" data-run-group="Heat 1" data-run-label="Free practice 1" data-href="/en/report/99719/395535?reportKey=6058&reportType=qualy">
+                                                <span class="run-button__icon run-button__icon--available" aria-hidden="true" style="color: #228c49;"><svg></svg></span>
+                                            <span class="run-button__copy"><strong>Qualy 1</strong></span>
+                                        <span class="chip chip--green">AVAILABLE</span>
+                                    <span class="run-button__arrow"><svg></svg></span>
+                                </button>
+                            </div>
+                        </details>
+                        <details class="group" >
+                            <summary>
+                                <span class="group__title"><strong>Heat 20</strong><small>(1 Runs)</small></span>
+                                <span class="group__tools">
+                                        <span class="chip chip--green">AVAILABLE</span>
+                                    <span class="accordion-chevron" aria-hidden="true"></span>
+                                </span>
+                            </summary>
+                            <div class="run-list">
+                                        <button class="run-button load-report" type="button" data-report="5857" data-report-type="controlledPractice" data-section="" data-run-group="Heat 1" data-run-label="Free practice 1" data-href="/en/report/99719/395535?reportKey=6063&reportType=qualy">
+                                                <span class="run-button__icon run-button__icon--available" aria-hidden="true" style="color: #228c49;"><svg></svg></span>
+                                            <span class="run-button__copy"><strong>Qualy 1</strong></span>
+                                        <span class="chip chip--green">AVAILABLE</span>
+                                    <span class="run-button__arrow"><svg></svg></span>
+                                </button>
+                            </div>
+                        </details>
+                        <details class="group" >
+                            <summary>
+                                <span class="group__title"><strong>Heat 21</strong><small>(1 Runs)</small></span>
+                                <span class="group__tools">
+                                        <span class="chip chip--green">AVAILABLE</span>
+                                    <span class="accordion-chevron" aria-hidden="true"></span>
+                                </span>
+                            </summary>
+                            <div class="run-list">
+                                        <button class="run-button load-report" type="button" data-report="5857" data-report-type="controlledPractice" data-section="" data-run-group="Heat 1" data-run-label="Free practice 1" data-href="/en/report/99719/395535?reportKey=6064&reportType=qualy">
+                                                <span class="run-button__icon run-button__icon--available" aria-hidden="true" style="color: #228c49;"><svg></svg></span>
+                                            <span class="run-button__copy"><strong>Qualy 1</strong></span>
+                                        <span class="chip chip--green">AVAILABLE</span>
+                                    <span class="run-button__arrow"><svg></svg></span>
+                                </button>
+                            </div>
+                        </details>
+                        <details class="group" >
+                            <summary>
+                                <span class="group__title"><strong>Heat 22</strong><small>(1 Runs)</small></span>
+                                <span class="group__tools">
+                                        <span class="chip chip--green">AVAILABLE</span>
+                                    <span class="accordion-chevron" aria-hidden="true"></span>
+                                </span>
+                            </summary>
+                            <div class="run-list">
+                                        <button class="run-button load-report" type="button" data-report="5857" data-report-type="controlledPractice" data-section="" data-run-group="Heat 1" data-run-label="Free practice 1" data-href="/en/report/99719/395535?reportKey=6065&reportType=qualy">
+                                                <span class="run-button__icon run-button__icon--available" aria-hidden="true" style="color: #228c49;"><svg></svg></span>
+                                            <span class="run-button__copy"><strong>Qualy 1</strong></span>
+                                        <span class="chip chip--green">AVAILABLE</span>
+                                    <span class="run-button__arrow"><svg></svg></span>
+                                </button>
+                            </div>
+                        </details>
+                        <details class="group" >
+                            <summary>
+                                <span class="group__title"><strong>Heat 23</strong><small>(1 Runs)</small></span>
+                                <span class="group__tools">
+                                        <span class="chip chip--blue">Pending</span>
+                                    <span class="accordion-chevron" aria-hidden="true"></span>
+                                </span>
+                            </summary>
+                            <div class="run-list">
+                                        <button class="run-button load-report" type="button" data-report="5857" data-report-type="controlledPractice" data-section="" data-run-group="Heat 1" data-run-label="Free practice 1" data-href="/en/report/99719/395535?reportKey=6066&reportType=qualy">
+                                                <span class="run-button__icon run-button__icon--unavailable" aria-hidden="true" style="color: #be2b26;"><svg></svg></span>
+                                            <span class="run-button__copy"><strong>Qualy 1</strong></span>
+                                        <span class="chip chip--blue">Pending</span>
+                                    <span class="run-button__arrow"><svg></svg></span>
+                                </button>
+                            </div>
+                        </details>
+                    </div>
+                </details>
+
+            </div>
+        </section>
+    </section>
+</main>
+<nav class="mobile-dock" aria-label="Mobile Navigation">
+    <button type="button" class="is-active" data-tab="overview">
+        <svg></svg>
+        <span>Overview</span>
+    </button>
+    <button type="button" data-tab="schedules">
+        <svg></svg>
+        <span>Schedules</span>
+    </button>
+    <button type="button" data-tab="participants">
+        <svg></svg>
+        <span>Participants</span>
+    </button>
+    <button type="button" data-tab="groups">
+        <svg></svg>
+        <span>Groups</span>
+    </button>
+    <button type="button" data-tab="rankings">
+        <svg></svg>
+        <span>Results</span>
+    </button>
+    <button type="button" data-tab="runs">
+        <svg></svg>
+        <span>Run reports</span>
+    </button>
+</nav>
+<div class="report-overlay" id="reportOverlay" data-load-failed="The report could not be loaded." data-image-loading="Image is being generated ..." data-pdf-loading="PDF is being generated ..." data-image-blocks-title="Download report" data-image-blocks-description="Which blocks should be included in the image?" data-image-blocks-cancel="Cancel" data-image-blocks-download="Download" data-block-overview="Overview" data-block-analysis="Analysis" data-block-gap-chart="Gap to leader" data-block-pace-distribution="Pace distribution" data-block-jury="Jury" data-block-records="Records" data-block-lap-list="Lap list" data-block-lap-heatmap="Lap heatmap" hidden>
+    <button class="report-overlay-backdrop" type="button" data-report-overlay-close aria-label="Close report"></button>
+    <section class="report-overlay-panel" role="dialog" aria-modal="true" aria-label="Report">
+        <header class="report-overlay-header">
+            <button class="report-overlay-close" type="button" data-report-overlay-close aria-label="Close report">×</button>
+        </header>
+        <div class="report-overlay-body">
+            <div class="report-overlay-loading" id="reportOverlayLoading">Loading report...</div>
+            <div class="report-overlay-content" id="reportOverlayContent"></div>
+        </div>
+    </section>
+</div>
+<footer class="footer">
+    (c) RC-Timing GmbH - MyRCM ·
+    2026 ·
+    <span class="footer-runtime">Cluster 2 / Node 3</span>
+</footer>
+
+</body>
+</html>

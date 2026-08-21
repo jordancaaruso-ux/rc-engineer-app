@@ -29,8 +29,8 @@ export function defaultEventNameFromLiveRcLabel(
 ): string {
   const label = eventLabel?.trim();
   if (label && !/view current event/i.test(label)) return label;
-  if (trackName?.trim()) return `${trackName.trim()} race meeting`;
-  return "Race meeting";
+  if (trackName?.trim()) return `${trackName.trim()} event`;
+  return "Event";
 }
 
 export type LiveRcMeetingDetectionPayload = {

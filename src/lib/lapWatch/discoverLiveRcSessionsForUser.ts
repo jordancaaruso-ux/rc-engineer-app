@@ -24,6 +24,18 @@ import {
   resolveCanonicalLiveRcDriverId,
 } from "@/lib/lapWatch/liveRcDriverIdResolve";
 import { detectActiveRaceMeetingAtTrack } from "@/lib/lapWatch/detectActiveRaceMeetingAtTrack";
+import {
+  emptyLapDiscoveryStatus,
+  lapDiscoveryStatusMessage,
+  type LapDiscoverySessionRow,
+  type LapDiscoveryStatus,
+} from "@/lib/lapWatch/lapDiscoveryStatus";
+
+/**
+ * Cap on the day list the card can offer when nothing matched. It exists to be read by a human
+ * looking for their own name, not to mirror the timing site — a club day can post hundreds.
+ */
+const SESSIONS_TODAY_CAP = 60;
 
 const RACE_HUB_ROW_CAP = 40;
 const RACE_FETCH_CONCURRENCY = 5;
@@ -90,6 +102,8 @@ export type DiscoverLiveRcSessionsResult = {
   practiceIndexUrl: string | null;
   raceHubUrl: string | null;
   hint: string | null;
+  /** Same finding as `hint`, in the pieces the card lays out. Null when there is nothing to say. */
+  status: LapDiscoveryStatus | null;
   activeRaceMeeting: {
     detected: boolean;
     eventHubUrl: string | null;
@@ -97,6 +111,26 @@ export type DiscoverLiveRcSessionsResult = {
   };
   debug: LiveRcTrackDiscoveryDebug;
 };
+
+/**
+ * The transponder number LiveRC prints against a practice row, when it prints one.
+ *
+ * The matcher's row text runs name, class and transponder together — "Cooper DavisModified
+ * (4344915)" — so the number is recovered from the trailing bracket rather than shown as-is. It is
+ * worth recovering: a driver whose name doesn't match is often looking straight at their own chip
+ * number, which is the other half of what the card asks them to check.
+ */
+function transponderFromPracticeRowText(rowText: string | null | undefined): string | null {
+  const match = /\((\d{4,10})\)\s*$/.exec(rowText?.trim() ?? "");
+  return match ? `Transponder ${match[1]}` : null;
+}
+
+/** Newest first, and rows with no time last — the same order the picker draws matched sessions in. */
+function sortSessionsTodayNewestFirst(rows: LapDiscoverySessionRow[]): LapDiscoverySessionRow[] {
+  return [...rows].sort(
+    (a, b) => sessionSortKey(b.sessionCompletedAtIso) - sessionSortKey(a.sessionCompletedAtIso)
+  );
+}
 
 function sessionSortKey(iso: string | null): number {
   if (!iso?.trim()) return 0;
@@ -147,33 +181,59 @@ function emptyDebug(partial?: Partial<LiveRcTrackDiscoveryDebug>): LiveRcTrackDi
   };
 }
 
-function buildHint(
-  driverNorm: string,
-  debug: LiveRcTrackDiscoveryDebug,
-  unimportedCount: number
-): string | null {
-  if (!driverNorm) {
-    return "Set your name on LiveRC in Settings to find your sessions.";
-  }
+/**
+ * Read the scan's own debug counters back as a state the card can act on.
+ *
+ * Order matters and is not the order the old sentence used. "Nothing is posted" is checked before
+ * "nothing matched", because a driver told to go and fix their name at a track that has uploaded
+ * nothing goes and fixes something that was never broken.
+ */
+function buildStatus(opts: {
+  driverNorm: string;
+  debug: LiveRcTrackDiscoveryDebug;
+  unimportedCount: number;
+  sessionsToday: LapDiscoverySessionRow[];
+}): LapDiscoveryStatus | null {
+  const { driverNorm, debug, unimportedCount, sessionsToday } = opts;
+  const { practice, race, summary } = debug;
+
+  const resolvedPages = [practice.indexUrl, race.hubUrl].filter((u): u is string =>
+    Boolean(u?.trim())
+  );
+  // Falling back to the club's front page matters most in the state where there are no resolved
+  // pages at all: when we couldn't reach the site, "open it yourself and see" is the entire answer,
+  // and that is exactly when the practice index and race hub are both null.
+  const timingPages = (resolvedPages.length > 0
+    ? resolvedPages
+    : [debug.trackOrigin].filter((u): u is string => Boolean(u?.trim()))
+  ).map((url) => ({ source: "liverc" as const, url }));
+
+  const base = (code: LapDiscoveryStatus["code"]): LapDiscoveryStatus => ({
+    code,
+    sources: ["liverc"],
+    postedCount: practice.rowsOnPage + race.hubRows,
+    matchedCount: summary.totalMatched,
+    timingPages,
+    // Only carried where it can be used: the day list is the escape hatch from a name that
+    // doesn't match, so it is noise on any other state.
+    sessionsToday: code === "no_match" ? sessionsToday : [],
+    postedDayIso: practice.activityDate,
+  });
+
+  if (!driverNorm) return base("no_identity");
+  // Something is importable — the card lists it, and a state written over a list is just noise.
   if (unimportedCount > 0) return null;
 
-  const { practice, race, summary } = debug;
   if (summary.totalMatched > 0 && summary.alreadyImported === summary.totalMatched) {
-    return `All ${summary.totalMatched} matching session(s) are already imported.`;
+    return base("all_imported");
   }
-  if (practice.resolveError && race.resolveError) {
-    return `Could not resolve practice or race pages from LiveRC (${practice.resolveError}; ${race.resolveError}).`;
-  }
-  if (practice.rowsOnPage > 0 && practice.rowsMatchingDriver === 0) {
-    return `Found ${practice.rowsOnPage} practice session(s) on LiveRC but none match your driver name. Check Settings → Name on LiveRC against: ${practice.sampleDriverNamesOnPage.slice(0, 5).join(" · ") || "—"}.`;
-  }
-  if (race.hubRows > 0 && race.sessionsWithDriverId === 0 && !race.canonicalDriverId) {
-    return "Race sessions exist on LiveRC but your driver ID could not be resolved. Import any race once or set LiveRC driver ID in Settings.";
+  if (practice.fetchError || (practice.resolveError && race.resolveError)) {
+    return base("unreachable");
   }
   if (practice.rowsOnPage === 0 && race.hubRows === 0) {
-    return "LiveRC returned no sessions on the resolved practice day or race hub. You may need to wait until timing is posted.";
+    return base("nothing_posted");
   }
-  return "No matching sessions found at this track.";
+  return base("no_match");
 }
 
 export async function discoverLiveRcSessionsForUser(input: {
@@ -203,6 +263,7 @@ export async function discoverLiveRcSessionsForUser(input: {
       practiceIndexUrl: null,
       raceHubUrl: null,
       hint: "Invalid LiveRC track URL.",
+      status: emptyLapDiscoveryStatus("invalid_url", "liverc"),
       activeRaceMeeting: emptyMeeting,
       debug,
     };
@@ -230,6 +291,12 @@ export async function discoverLiveRcSessionsForUser(input: {
   }
 
   const discovered: DiscoveredSession[] = [];
+  /**
+   * Every row on the day's page, ours or not. Only ever surfaced when nothing matched: it is how a
+   * driver finds themselves printed as "Jordan C" and takes the session anyway, instead of being
+   * sent to Settings and back before they can log a run they finished ten minutes ago.
+   */
+  const sessionsToday: LapDiscoverySessionRow[] = [];
 
   if (practiceResolved.ok) {
     const fetched = await fetchUrlText(practiceResolved.indexUrl);
@@ -244,6 +311,16 @@ export async function discoverLiveRcSessionsForUser(input: {
 
       let practiceMatched = 0;
       for (const r of rows) {
+        if (sessionsToday.length < SESSIONS_TODAY_CAP) {
+          sessionsToday.push({
+            sessionId: r.sessionId,
+            sessionUrl: r.sessionUrl,
+            label: r.listLinkText?.trim() || "Practice session",
+            detail: transponderFromPracticeRowText(r.driverName),
+            sessionCompletedAtIso: r.sessionCompletedAtIso,
+            source: "liverc",
+          });
+        }
         if (driverNorm && !liveRcNameMatchesConfigured(r.driverName, driverNorm)) continue;
         practiceMatched++;
         discovered.push({
@@ -326,6 +403,21 @@ export async function discoverLiveRcSessionsForUser(input: {
       const canonicalId = await resolveCanonicalLiveRcDriverId(input.userId, pageRowsByUrl, driverNorm);
       debug.race.canonicalDriverId = canonicalId;
 
+      // Race rows join the day list as sessions, not as drivers: the hub prints no names, and the
+      // per-race entrant lists would run to hundreds. A driver who can't be matched picks the race
+      // they were in and chooses themselves from the session's own driver picker after import.
+      for (const r of withTime) {
+        if (sessionsToday.length >= SESSIONS_TODAY_CAP) break;
+        sessionsToday.push({
+          sessionId: r.sessionId,
+          sessionUrl: r.sessionUrl,
+          label: r.listLinkText?.trim() || r.raceClass?.trim() || "Race session",
+          detail: null,
+          sessionCompletedAtIso: r.sessionCompletedAtIso,
+          source: "liverc",
+        });
+      }
+
       let raceMatched = 0;
       if (canonicalId) {
         for (const r of withTime) {
@@ -388,7 +480,12 @@ export async function discoverLiveRcSessionsForUser(input: {
     unimported: unimportedCandidates.length,
   };
 
-  const hint = buildHint(driverNorm, debug, unimportedCandidates.length);
+  const status = buildStatus({
+    driverNorm,
+    debug,
+    unimportedCount: unimportedCandidates.length,
+    sessionsToday: sortSessionsTodayNewestFirst(sessionsToday),
+  });
 
   return {
     mostRecentSession: unimportedCandidates[0] ?? candidates[0] ?? null,
@@ -396,7 +493,8 @@ export async function discoverLiveRcSessionsForUser(input: {
     unimportedCandidates,
     practiceIndexUrl: practiceResolved.ok ? practiceResolved.indexUrl : null,
     raceHubUrl: raceResolved.ok ? raceResolved.indexUrl : null,
-    hint,
+    hint: status ? lapDiscoveryStatusMessage(status) : null,
+    status,
     activeRaceMeeting,
     debug,
   };

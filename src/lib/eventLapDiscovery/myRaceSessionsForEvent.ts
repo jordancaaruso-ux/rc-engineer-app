@@ -166,9 +166,12 @@ export async function listMyPendingRaceSessionsForEvent(
   });
   const pageUrl = event?.resultsSourceUrl?.trim() ?? "";
   if (!pageUrl) {
+    // No hint: an event without a results URL is the ordinary case, and the track
+    // scan usually finds the sessions anyway. Saying "go and configure the event"
+    // under a list that already works reads as an error the driver has to fix.
     return {
       sessions: [],
-      hint: "Add a LiveRC results URL on the event (Event details → Timing sources → Results URL).",
+      hint: null,
       hubRowCount: 0,
       pagesChecked: 0,
     };

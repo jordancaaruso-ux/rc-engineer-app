@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { runsTag } from "@/lib/cacheTags";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
-import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
+import { getLiveRcDriverNameSetting, getMyRcmDriverNamesForUser } from "@/lib/appSettings";
 import {
   getSpeedhiveDriverNamesForUser,
   getSpeedhiveTransponderNumbersForUser,
@@ -66,17 +67,19 @@ export async function POST(request: Request) {
   const eventId =
     typeof body?.eventId === "string" && body.eventId.trim() ? body.eventId.trim() : undefined;
 
-  const [liveName, speedhiveNames, transponderNumbers] = await Promise.all([
+  const [liveName, speedhiveNames, transponderNumbers, myRcmNames] = await Promise.all([
     getLiveRcDriverNameSetting(user.id).catch(() => null),
     getSpeedhiveDriverNamesForUser(user.id).catch(() => [] as string[]),
     getSpeedhiveTransponderNumbersForUser(user.id).catch(() => [] as number[]),
+    getMyRcmDriverNamesForUser(user.id).catch(() => [] as string[]),
   ]);
-  // `driverName` stays a single value: it's what the LiveRC/MyRCM parsers read.
-  // Speedhive gets the whole set alongside it.
+  // `driverName` stays a single value: it's what the LiveRC parser reads.
+  // Speedhive and MyRCM each get their own name set alongside it.
   const driverName = (speedhiveNames[0] ?? liveName)?.trim() ?? "";
   const ctx = {
     ...(driverName ? { driverName } : {}),
     ...(speedhiveNames.length > 0 ? { speedhiveDriverNames: speedhiveNames } : {}),
+    ...(myRcmNames.length > 0 ? { myRcmDriverNames: myRcmNames } : {}),
     ...(transponderNumbers.length > 0
       ? { speedhiveTransponderNumbers: transponderNumbers }
       : {}),
@@ -115,6 +118,10 @@ export async function POST(request: Request) {
   }
 
   revalidatePath("/laps/import");
+  // An import with no run behind it is exactly what the Tools lap band lists, so a fresh one
+  // has to appear there without waiting out the 30s window (`getCachedToolsModel`).
+  revalidatePath("/tools");
+  revalidateTag(runsTag(user.id), { expire: 0 });
 
   return NextResponse.json({ results });
 }

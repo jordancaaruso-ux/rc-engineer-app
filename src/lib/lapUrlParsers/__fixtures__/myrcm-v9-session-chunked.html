@@ -1,0 +1,2474 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]><html class="no-js lt-ie9 lt-ie8 lt-ie7" xml:lang="en" lang="en"><![endif]-->
+<!--[if IE 7]><html class="no-js lt-ie9 lt-ie8" xml:lang="en" lang="en"><![endif]-->
+<!--[if IE 8]><html class="no-js lt-ie9" xml:lang="en" lang="en"><![endif]-->
+<!--[if gt IE 8]><!--><html class="js js flexbox canvas canvastext webgl no-touch geolocation postmessage no-websqldatabase indexeddb hashchange history draganddrop websockets rgba hsla multiplebgs backgroundsize borderimage borderradius boxshadow textshadow opacity cssanimations csscolumns cssgradients no-cssreflections csstransforms csstransforms3d csstransitions fontface generatedcontent video audio localstorage sessionstorage webworkers applicationcache svg inlinesvg smil svgclippaths wf-myriadprosemicondensed-n3-active wf-myriadpro-i4-active wf-myriadpro-n3-active wf-myriadpro-n4-active wf-myriadpro-n6-active wf-active" lang="de"><!--<![endif]-->
+<head>
+	<title>MyRCM : Reporting</title>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="description" content="MyRCM : Reporting" />
+	<meta name="keywords" content="RC-Timing,RCM,Race Control Management,race software,timekeeping,model racing,timing system,Race Control,Racecontrol,Software,Racing,Racing Control,Racing Control Software,model building,timekeeping,races,model races,AMB Decoder,RobiLab" />
+	<meta name="copyright" content="Copyright (c) 2026 - RC-Timing GmbH" />
+	<meta name="author" content="RC-Timing GmbH" />
+	<meta name="version" content="v9.1.15 (18.08.2026)" />
+	<meta name="google-site-verification" content="an1wuERuZRcgOZIF0s0DLhiHSXRqSr9nAMihZHCQzsU" />
+	
+
+	<!-- Open Graph -->
+    <meta property="og:title" content="MyRCM : Reporting">
+    <meta property="og:description" content="Online platform for model racing with timekeeping, race management and live results.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.myrcm.ch/">
+    <meta property="og:image" content="https://www.myrcm.ch/resources/img/og-image.png">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="MyRCM : Reporting">
+    <meta name="twitter:description" content="Online platform for model racing and timekeeping, race management and live results.">
+    <meta name="twitter:image" content="https://www.myrcm.ch/resources/img/og-image.png">
+	
+	<!--[if IE]>
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+	<![endif]-->
+
+	<!-- JavaScript -->
+	
+	
+	
+	
+
+    <!-- CSS -->
+	<link rel="icon" href="/resources/favicon.ico" />
+	<link rel="stylesheet" type="text/css" href="/resources/styles/jquery-ui.min.css" media="all" />
+	<link rel="stylesheet" type="text/css" href="/resources/styles/styles.css?v=v9.1.15" media="all" />
+	<link rel="stylesheet" type="text/css" href="/resources/styles/app.css?v=v9.1.15" media="all" />
+	<link rel="stylesheet" type="text/css" href="/resources/richtexteditor/rte_theme_default.css" media="all" />
+</head>
+<body>
+
+<div id="spinner" aria-live="polite" aria-busy="true">
+    <img src="/resources/img/ajax_loader_blue_128.gif" alt="Loading...">
+</div>
+<header class="top-header">
+    <div class="top-header-inner">
+      <div class="logo-area">
+        <div class="logo-box">
+          <!-- Logo-Pfad anpassen -->
+          <img class="logo-light" src="/resources/logo-black-v2.png" alt="RC-Timing GmbH">
+          <img class="logo-dark" src="/resources/logo-white-v2.png" alt="RC-Timing GmbH">
+        </div>
+        <!--<div class="portal-title">Race Management Portal</div>-->
+      </div>
+      <div class="header-actions">
+        <div class="header-action-row">
+            <div class="user-menu">
+              <button class="language-overlay-trigger" type="button" aria-haspopup="dialog" aria-controls="languageOverlay"><img src="/resources/styles/images/38x25/USA.png" alt=""><span>English</span></button>
+              <div class="auth-links">
+                <a href="https://www.myrcm.ch/en/registration">Register</a>
+                <a href="https://www.myrcm.ch/en/login">Log in</a>
+              </div>
+            </div>
+
+            <button class="global-search-trigger" type="button" aria-haspopup="dialog" aria-controls="globalSearchOverlay" aria-label="!!openSearch!!">
+                <svg></svg>
+            </button>
+
+            <div class="theme-switch" role="group" aria-label="Farbschema wählen">
+                <span class="theme-switch__thumb" aria-hidden="true"></span>
+                <button type="button" data-theme-choice="auto" aria-label="Farbschema automatisch" aria-pressed="false"><span class="theme-switch__icon">A</span><span>Auto</span></button>
+                <button type="button" data-theme-choice="light" aria-label="Helles Farbschema" aria-pressed="false"><span class="theme-switch__icon">☀</span><span>Light</span></button>
+                <button type="button" data-theme-choice="dark" aria-label="Dunkles Farbschema" aria-pressed="true" class="is-active"><span class="theme-switch__icon">☾</span><span>Dark</span></button>
+            </div>
+
+            <button class="menu-toggle" id="menuToggle" type="button" onclick="toggleMenu()" aria-label="Open menu" aria-controls="mobileMenu" aria-expanded="false">
+                ☰
+            </button>
+        </div>
+        <div class="user-session">
+          <div class="logged-in-user">&nbsp;</div>
+        </div>
+      </div>
+    </div>
+</header>
+<nav class="main-nav" id="mainNav">
+    <div class="main-nav-inner">
+        <a href="https://www.myrcm.ch/en/live" >ONLINE EVENTS</a>
+        <a href="https://www.myrcm.ch/en/upcoming" >UPCOMING EVENTS</a>
+        <a href="https://www.myrcm.ch/en/archive" >ARCHIVE EVENTS</a>
+        <a href="https://www.myrcm.ch/en/organizers" >HOST</a>
+        <a href="https://www.myrcm.ch/en/championship" >CHAMPIONSHIP</a>
+        <a href="https://www.myrcm.ch/en/subscription" >SUBSCRIPTION</a>
+    </div>
+</nav>
+<div class="mobile-overlay" id="mobileOverlay" onclick="closeMenu()"></div>
+<aside class="mobile-menu" id="mobileMenu">
+    <div class="mobile-menu-header">
+        <strong>MyRCM</strong>
+        <button type="button" onclick="closeMenu()" aria-label="Close menu">×</button>
+    </div>
+    <a href="https://www.myrcm.ch/en/live" >ONLINE EVENTS</a>
+    <a href="https://www.myrcm.ch/en/upcoming" >UPCOMING EVENTS</a>
+    <a href="https://www.myrcm.ch/en/archive" >ARCHIVE EVENTS</a>
+    <a href="https://www.myrcm.ch/en/organizers" >HOST</a>
+    <a href="https://www.myrcm.ch/en/championship" >CHAMPIONSHIP</a>
+    <a href="https://www.myrcm.ch/en/subscription" >SUBSCRIPTION</a>
+    <div class="mobile-menu-footer">
+        <div class="mobile-language">
+            <label for="mobileLanguageSelect">Language</label>
+            <button class="language-overlay-trigger" type="button" aria-haspopup="dialog" aria-controls="languageOverlay"><img src="/resources/styles/images/38x25/USA.png" alt=""><span>English</span></button>
+        </div>
+        <a href="https://www.myrcm.ch/en/registration">Register</a>
+        <a href="https://www.myrcm.ch/en/login">Log in</a>
+    </div>
+</aside>
+<section class="report-dashboard-header report-dashboard-header-compact">
+    <div>
+        <span class="entry-eyebrow">Run result</span>
+        <h1>Heat 6</h1>
+        <div class="report-meta">
+            <span>Kartbahn Stralsund</span>
+            <span>Online</span>
+            <span>18.08.2026 12:41:50</span>
+        </div>
+    </div>
+    <div class="report-hero-actions">
+        <div class="report-download-stack">
+            <button type="button" class="btn report-image-link" data-image-url="/rest/v1/report-image/en/99745/395609/57698?reportType=qualy&compact=false" data-image-file="report-99745-395609-57698.png" data-image-blocks="true" title="Download image">
+                <svg></svg>
+                <span>Download image</span>
+            </button>
+            <button type="button" class="btn report-pdf-link" data-pdf-url="/rest/v1/report-pdf/en/99745/395609/57698?reportType=qualy&compact=false" data-pdf-file="report-99745-395609-57698.pdf" data-image-blocks="true" title="Download PDF">
+                <svg></svg>
+                <span>Download PDF</span>
+            </button>
+        </div>
+    </div>
+</section>
+<section class="report-layout report-layout-simple">
+    <div class="report-main">
+        <section class="section report-section" id="overview">
+            <div class="section-header">
+                <div>
+                    <h2>Overview</h2>
+                    <p>Result and key figures for the run.</p>
+                </div>
+                <span class="badge report">Official</span>
+            </div>
+            <div class="section-body">
+                <div class="table-wrap">
+                    <table class="table run-result-table">
+                        <colgroup>
+                            <col class="col-rank">
+                            <col class="col-start">
+                            <!--<col class="col-number">-->
+                            <!--<col class="col-country">-->
+                            <col class="col-driver">
+                            <col class="col-laps">
+                            <col class="col-total">
+                            <col class="col-besttimes-title">
+                            <col class="col-besttime">
+                            <col class="col-info">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>P</th>
+                                <th>#</th>
+                                <!--<th>No.</th>-->
+                                <!--<th>&nbsp;</th>-->
+                                <th>Driver</th>
+                                <th>L</th>
+                                <th>Total</th>
+                                <th>Best times[1]</th>
+                                <th>Best</th>
+                                <th>Note</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="is-winner">
+                                <td data-label="P"><strong class="report-position">1</strong></td>
+                                <td data-label="Start">8</td>
+                                <!--<td data-label="No.">&nbsp;</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver"><strong>Kart 14</strong><small></small></td>
+                                <td data-label="L">37</td>
+                                <td data-label="Total">14:51.482</td>
+                                <td data-label="Best times[1]">21.748</td>
+                                <td data-label="Best">21.748</td>
+                                <td data-label="Note">-</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="P"><strong class="report-position">2</strong></td>
+                                <td data-label="Start">4</td>
+                                <!--<td data-label="No.">&nbsp;</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver"><strong>Kart 5</strong><small></small></td>
+                                <td data-label="L">32</td>
+                                <td data-label="Total">15:12.797</td>
+                                <td data-label="Best times[1]">25.203</td>
+                                <td data-label="Best">25.203</td>
+                                <td data-label="Note">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="P"><strong class="report-position">3</strong></td>
+                                <td data-label="Start">1</td>
+                                <!--<td data-label="No.">&nbsp;</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver"><strong>Kart 15</strong><small></small></td>
+                                <td data-label="L">0</td>
+                                <td data-label="Total">0:00.000</td>
+                                <td data-label="Best times[1]">0.000</td>
+                                <td data-label="Best">0.000</td>
+                                <td data-label="Note"><b>DNS</b></td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="P"><strong class="report-position">4</strong></td>
+                                <td data-label="Start">2</td>
+                                <!--<td data-label="No.">&nbsp;</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver"><strong>Kart 16</strong><small></small></td>
+                                <td data-label="L">0</td>
+                                <td data-label="Total">0:00.000</td>
+                                <td data-label="Best times[1]">0.000</td>
+                                <td data-label="Best">0.000</td>
+                                <td data-label="Note"><b>DNS</b></td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="P"><strong class="report-position">5</strong></td>
+                                <td data-label="Start">3</td>
+                                <!--<td data-label="No.">&nbsp;</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver"><strong>Kart 7</strong><small></small></td>
+                                <td data-label="L">0</td>
+                                <td data-label="Total">0:00.000</td>
+                                <td data-label="Best times[1]">0.000</td>
+                                <td data-label="Best">0.000</td>
+                                <td data-label="Note"><b>DNS</b></td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="P"><strong class="report-position">6</strong></td>
+                                <td data-label="Start">5</td>
+                                <!--<td data-label="No.">&nbsp;</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver"><strong>Kart 6</strong><small></small></td>
+                                <td data-label="L">0</td>
+                                <td data-label="Total">0:00.000</td>
+                                <td data-label="Best times[1]">0.000</td>
+                                <td data-label="Best">0.000</td>
+                                <td data-label="Note"><b>DNS</b></td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="P"><strong class="report-position">7</strong></td>
+                                <td data-label="Start">6</td>
+                                <!--<td data-label="No.">&nbsp;</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver"><strong>Kart 2</strong><small></small></td>
+                                <td data-label="L">0</td>
+                                <td data-label="Total">0:00.000</td>
+                                <td data-label="Best times[1]">0.000</td>
+                                <td data-label="Best">0.000</td>
+                                <td data-label="Note"><b>DNS</b></td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="P"><strong class="report-position">8</strong></td>
+                                <td data-label="Start">7</td>
+                                <!--<td data-label="No.">&nbsp;</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver"><strong>Kart 4</strong><small></small></td>
+                                <td data-label="L">0</td>
+                                <td data-label="Total">0:00.000</td>
+                                <td data-label="Best times[1]">0.000</td>
+                                <td data-label="Best">0.000</td>
+                                <td data-label="Note"><b>DNS</b></td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="P"><strong class="report-position">9</strong></td>
+                                <td data-label="Start">9</td>
+                                <!--<td data-label="No.">&nbsp;</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver"><strong>Kart 8</strong><small></small></td>
+                                <td data-label="L">0</td>
+                                <td data-label="Total">0:00.000</td>
+                                <td data-label="Best times[1]">0.000</td>
+                                <td data-label="Best">0.000</td>
+                                <td data-label="Note"><b>DNS</b></td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="P"><strong class="report-position">10</strong></td>
+                                <td data-label="Start">10</td>
+                                <!--<td data-label="No.">&nbsp;</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver"><strong>Kart 9</strong><small></small></td>
+                                <td data-label="L">0</td>
+                                <td data-label="Total">0:00.000</td>
+                                <td data-label="Best times[1]">0.000</td>
+                                <td data-label="Best">0.000</td>
+                                <td data-label="Note"><b>DNS</b></td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="P"><strong class="report-position">11</strong></td>
+                                <td data-label="Start">11</td>
+                                <!--<td data-label="No.">&nbsp;</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver"><strong>Kart 10</strong><small></small></td>
+                                <td data-label="L">0</td>
+                                <td data-label="Total">0:00.000</td>
+                                <td data-label="Best times[1]">0.000</td>
+                                <td data-label="Best">0.000</td>
+                                <td data-label="Note"><b>DNS</b></td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="P"><strong class="report-position">12</strong></td>
+                                <td data-label="Start">12</td>
+                                <!--<td data-label="No.">&nbsp;</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver"><strong>Kart 13</strong><small></small></td>
+                                <td data-label="L">0</td>
+                                <td data-label="Total">0:00.000</td>
+                                <td data-label="Best times[1]">0.000</td>
+                                <td data-label="Best">0.000</td>
+                                <td data-label="Note"><b>DNS</b></td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="P"><strong class="report-position">13</strong></td>
+                                <td data-label="Start">13</td>
+                                <!--<td data-label="No.">&nbsp;</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver"><strong>Kart 12</strong><small></small></td>
+                                <td data-label="L">0</td>
+                                <td data-label="Total">0:00.000</td>
+                                <td data-label="Best times[1]">0.000</td>
+                                <td data-label="Best">0.000</td>
+                                <td data-label="Note"><b>DNS</b></td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="P"><strong class="report-position">14</strong></td>
+                                <td data-label="Start">14</td>
+                                <!--<td data-label="No.">&nbsp;</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver"><strong>Kart 1</strong><small></small></td>
+                                <td data-label="L">0</td>
+                                <td data-label="Total">0:00.000</td>
+                                <td data-label="Best times[1]">0.000</td>
+                                <td data-label="Best">0.000</td>
+                                <td data-label="Note"><b>DNS</b></td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="P"><strong class="report-position">15</strong></td>
+                                <td data-label="Start">15</td>
+                                <!--<td data-label="No.">&nbsp;</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver"><strong>Kart 3</strong><small></small></td>
+                                <td data-label="L">0</td>
+                                <td data-label="Total">0:00.000</td>
+                                <td data-label="Best times[1]">0.000</td>
+                                <td data-label="Best">0.000</td>
+                                <td data-label="Note"><b>DNS</b></td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="P"><strong class="report-position">16</strong></td>
+                                <td data-label="Start">16</td>
+                                <!--<td data-label="No.">&nbsp;</td>-->
+                                <!--<td data-label="Country">
+                                    &nbsp;
+                                </td>-->
+                                <td data-label="Driver"><strong>Kart 11</strong><small></small></td>
+                                <td data-label="L">0</td>
+                                <td data-label="Total">0:00.000</td>
+                                <td data-label="Best times[1]">0.000</td>
+                                <td data-label="Best">0.000</td>
+                                <td data-label="Note"><b>DNS</b></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+        <section class="section report-section" id="laps">
+            <div class="section-header">
+                <div>
+                    <h2>Lap list</h2>
+                    <p>Lap times per driver.</p>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="table-wrap">
+                    <table class="table run-lap-table">
+                        <colgroup>
+                            <col class="col-lap">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>Lap</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td data-label="Lap"><strong>0</strong></td>
+                                <td data-label=" Kart 14" class="">08.740</td>
+                                <td data-label=" Kart 5" class="">07.777</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>1</strong></td>
+                                <td data-label=" Kart 14" class="">34.533</td>
+                                <td data-label=" Kart 5" class="">34.898</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>2</strong></td>
+                                <td data-label=" Kart 14" class="">32.440</td>
+                                <td data-label=" Kart 5" class="">32.741</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>3</strong></td>
+                                <td data-label=" Kart 14" class="">26.451</td>
+                                <td data-label=" Kart 5" class="">31.074</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>4</strong></td>
+                                <td data-label=" Kart 14" class="">26.233</td>
+                                <td data-label=" Kart 5" class="">30.431</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>5</strong></td>
+                                <td data-label=" Kart 14" class="">26.658</td>
+                                <td data-label=" Kart 5" class="">30.581</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>6</strong></td>
+                                <td data-label=" Kart 14" class="">25.467</td>
+                                <td data-label=" Kart 5" class="">27.678</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>7</strong></td>
+                                <td data-label=" Kart 14" class="">25.293</td>
+                                <td data-label=" Kart 5" class="">27.002</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>8</strong></td>
+                                <td data-label=" Kart 14" class="">24.873</td>
+                                <td data-label=" Kart 5" class="">26.650</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>9</strong></td>
+                                <td data-label=" Kart 14" class="">24.297</td>
+                                <td data-label=" Kart 5" class="">27.621</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>10</strong></td>
+                                <td data-label=" Kart 14" class="">23.906</td>
+                                <td data-label=" Kart 5" class="">29.840</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>11</strong></td>
+                                <td data-label=" Kart 14" class="">24.897</td>
+                                <td data-label=" Kart 5" class="">28.952</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>12</strong></td>
+                                <td data-label=" Kart 14" class="">23.695</td>
+                                <td data-label=" Kart 5" class="">27.743</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>13</strong></td>
+                                <td data-label=" Kart 14" class="">23.671</td>
+                                <td data-label=" Kart 5" class="">27.351</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>14</strong></td>
+                                <td data-label=" Kart 14" class="">23.537</td>
+                                <td data-label=" Kart 5" class="">27.249</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>15</strong></td>
+                                <td data-label=" Kart 14" class="">22.843</td>
+                                <td data-label=" Kart 5" class="">29.458</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>16</strong></td>
+                                <td data-label=" Kart 14" class="">22.379</td>
+                                <td data-label=" Kart 5" class="">27.832</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>17</strong></td>
+                                <td data-label=" Kart 14" class="">23.893</td>
+                                <td data-label=" Kart 5" class="">26.075</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>18</strong></td>
+                                <td data-label=" Kart 14" class="">22.504</td>
+                                <td data-label=" Kart 5" class="">25.209</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>19</strong></td>
+                                <td data-label=" Kart 14" class="">22.683</td>
+                                <td data-label=" Kart 5" class="">25.371</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>20</strong></td>
+                                <td data-label=" Kart 14" class="">22.336</td>
+                                <td data-label=" Kart 5" class="">26.768</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>21</strong></td>
+                                <td data-label=" Kart 14" class="">22.550</td>
+                                <td data-label=" Kart 5" class="">29.192</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>22</strong></td>
+                                <td data-label=" Kart 14" class="">22.520</td>
+                                <td data-label=" Kart 5" class="">26.321</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>23</strong></td>
+                                <td data-label=" Kart 14" class="">22.420</td>
+                                <td data-label=" Kart 5" class="">27.738</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>24</strong></td>
+                                <td data-label=" Kart 14" class="">21.919</td>
+                                <td data-label=" Kart 5" class="">31.017</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>25</strong></td>
+                                <td data-label=" Kart 14" class="">22.099</td>
+                                <td data-label=" Kart 5" class="">28.656</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>26</strong></td>
+                                <td data-label=" Kart 14" class="">21.964</td>
+                                <td data-label=" Kart 5" class="is-best-lap">25.203</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>27</strong></td>
+                                <td data-label=" Kart 14" class="">22.376</td>
+                                <td data-label=" Kart 5" class="">25.729</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>28</strong></td>
+                                <td data-label=" Kart 14" class="">22.687</td>
+                                <td data-label=" Kart 5" class="">26.794</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>29</strong></td>
+                                <td data-label=" Kart 14" class="">22.165</td>
+                                <td data-label=" Kart 5" class="">30.485</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>30</strong></td>
+                                <td data-label=" Kart 14" class="">22.501</td>
+                                <td data-label=" Kart 5" class="">27.087</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>31</strong></td>
+                                <td data-label=" Kart 14" class="is-best-lap">21.748</td>
+                                <td data-label=" Kart 5" class="">28.279</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>32</strong></td>
+                                <td data-label=" Kart 14" class="">22.328</td>
+                                <td data-label=" Kart 5" class="">27.995</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>33</strong></td>
+                                <td data-label=" Kart 14" class="">22.410</td>
+                                <td data-label=" Kart 5" class="">&nbsp;</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>34</strong></td>
+                                <td data-label=" Kart 14" class="">23.748</td>
+                                <td data-label=" Kart 5" class="">&nbsp;</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>35</strong></td>
+                                <td data-label=" Kart 14" class="">21.874</td>
+                                <td data-label=" Kart 5" class="">&nbsp;</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>36</strong></td>
+                                <td data-label=" Kart 14" class="">22.237</td>
+                                <td data-label=" Kart 5" class="">&nbsp;</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>37</strong></td>
+                                <td data-label=" Kart 14" class="">22.607</td>
+                                <td data-label=" Kart 5" class="">&nbsp;</td>
+                                <td data-label=" Kart 15" class="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="">&nbsp;</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+        <section class="section report-section" id="laps-2">
+            <div class="section-header">
+                <div>
+                    <h2>Lap list</h2>
+                    <p>Lap times per driver.</p>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="table-wrap">
+                    <table class="table run-lap-table">
+                        <colgroup>
+                            <col class="col-lap">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>Lap</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td data-label="Lap"><strong>0</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>1</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>2</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>3</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>4</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>5</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>6</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>7</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>8</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>9</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>10</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>11</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>12</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>13</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>14</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>15</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>16</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>17</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>18</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>19</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>20</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>21</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>22</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>23</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>24</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>25</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>26</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>27</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>28</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>29</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>30</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>31</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>32</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>33</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>34</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>35</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>36</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                            <tr>
+                                <td data-label="Lap"><strong>37</strong></td>
+                                <td data-label=" Kart 10" class="">&nbsp;</td>
+                                <td data-label=" Kart 13" class="">&nbsp;</td>
+                                <td data-label=" Kart 12" class="">&nbsp;</td>
+                                <td data-label=" Kart 1" class="">&nbsp;</td>
+                                <td data-label=" Kart 3" class="">&nbsp;</td>
+                                <td data-label=" Kart 11" class="">&nbsp;</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+        <section class="section report-section report-analysis-section" id="analysis">
+            <div class="section-header">
+                <div>
+                    <h2>Analysis</h2>
+                    <p>Comparison of consistency, pace and best times.</p>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="report-analysis-chart">
+                    <div class="report-analysis-chart-header">
+                        <h3>Position history</h3>
+                        <div class="report-analysis-legend">
+                            <span><i style="background:#1f75bd"></i>Kart 14</span>
+                            <span><i style="background:#27964c"></i>Kart 5</span>
+                            <span><i style="background:#d69a22"></i>Kart 15</span>
+                            <span><i style="background:#c5579d"></i>Kart 16</span>
+                            <span><i style="background:#6f63c7"></i>Kart 7</span>
+                            <span><i style="background:#ef7d32"></i>Kart 6</span>
+                            <span><i style="background:#159a9c"></i>Kart 2</span>
+                            <span><i style="background:#7b8794"></i>Kart 4</span>
+                            <span><i style="background:#1f75bd"></i>Kart 8</span>
+                            <span><i style="background:#27964c"></i>Kart 9</span>
+                            <span><i style="background:#d69a22"></i>Kart 10</span>
+                            <span><i style="background:#c5579d"></i>Kart 13</span>
+                            <span><i style="background:#6f63c7"></i>Kart 12</span>
+                            <span><i style="background:#ef7d32"></i>Kart 1</span>
+                            <span><i style="background:#159a9c"></i>Kart 3</span>
+                            <span><i style="background:#7b8794"></i>Kart 11</span>
+                        </div>
+                    </div>
+                    <svg></svg>
+                </div>
+                <div class="report-analysis-grid">
+                    <article class="report-analysis-card">
+                        <h3>Pace</h3>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 14</span>
+                            <div><i style="width:100.000%;"></i></div>
+                            <strong>23.858</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 5</span>
+                            <div><i style="width:84.358%;"></i></div>
+                            <strong>28.282</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 15</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 16</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 7</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 6</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 2</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 4</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 8</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 9</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 10</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 13</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 12</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 1</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 3</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 11</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                    </article>
+                    <article class="report-analysis-card">
+                        <h3>Consistency</h3>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 15</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 16</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 7</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 6</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 2</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 4</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 8</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 9</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 10</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 13</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 12</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 1</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 3</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 11</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 5</span>
+                            <div><i style="width:100.000%;"></i></div>
+                            <strong>2.204</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 14</span>
+                            <div><i style="width:82.341%;"></i></div>
+                            <strong>2.676</strong>
+                        </div>
+                    </article>
+                    <article class="report-analysis-card">
+                        <h3>Best times</h3>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 14</span>
+                            <div><i style="width:100.000%;"></i></div>
+                            <strong>21.748</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 5</span>
+                            <div><i style="width:86.291%;"></i></div>
+                            <strong>25.203</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 15</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 16</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 7</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 6</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 2</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 4</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 8</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 9</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 10</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 13</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 12</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 1</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 3</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                        <div class="report-analysis-bar-row">
+                            <span>Kart 11</span>
+                            <div><i style="width:0.000%;"></i></div>
+                            <strong>-</strong>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+        <section class="section report-section report-gap-chart-section" id="gap-chart">
+            <div class="section-header">
+                <div>
+                    <h2>Gap to leader</h2>
+                    <p>Progression of the gap to the current leader over the laps.</p>
+                </div>
+                <div class="report-gap-chart-legend">
+                    <span><i style="background:#1f75bd"></i> Kart 14</span>
+                    <span><i style="background:#27964c"></i> Kart 5</span>
+                    <span><i style="background:#d69a22"></i> Kart 15</span>
+                    <span><i style="background:#c5579d"></i> Kart 16</span>
+                    <span><i style="background:#6f63c7"></i> Kart 7</span>
+                    <span><i style="background:#ef7d32"></i> Kart 6</span>
+                    <span><i style="background:#159a9c"></i> Kart 2</span>
+                    <span><i style="background:#7b8794"></i> Kart 4</span>
+                    <span><i style="background:#1f75bd"></i> Kart 8</span>
+                    <span><i style="background:#27964c"></i> Kart 9</span>
+                    <span><i style="background:#d69a22"></i> Kart 10</span>
+                    <span><i style="background:#c5579d"></i> Kart 13</span>
+                    <span><i style="background:#6f63c7"></i> Kart 12</span>
+                    <span><i style="background:#ef7d32"></i> Kart 1</span>
+                    <span><i style="background:#159a9c"></i> Kart 3</span>
+                    <span><i style="background:#7b8794"></i> Kart 11</span>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="report-gap-chart">
+                    <svg></svg>
+                </div>
+            </div>
+        </section>
+        <section class="section report-section report-pace-distribution-section" id="pace-distribution">
+            <div class="section-header">
+                <div>
+                    <h2>Pace distribution</h2>
+                    <p>Comparison of fastest, average and slowest valid lap per driver.</p>
+                </div>
+                <div class="pace-distribution-legend">
+                    <span><i class="pace-legend-range"></i>Range</span>
+                    <span><i class="pace-legend-average"></i>Average</span>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="pace-distribution-list">
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong> Kart 14</strong>
+                            <span>37 L</span>
+                        </div>
+                        <div class="pace-range" aria-label=" Kart 14">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:0.00%; width:97.22%"></span>
+                            <span class="pace-average-marker" style="left:16.04%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>21.748</span>
+                            <span><b>Average</b>23.858</span>
+                            <span><b>Slowest</b>34.533</span>
+                        </div>
+                    </article>
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong> Kart 5</strong>
+                            <span>32 L</span>
+                        </div>
+                        <div class="pace-range" aria-label=" Kart 5">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:26.27%; width:73.73%"></span>
+                            <span class="pace-average-marker" style="left:49.69%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>25.203</span>
+                            <span><b>Average</b>28.282</span>
+                            <span><b>Slowest</b>34.898</span>
+                        </div>
+                    </article>
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong> Kart 15</strong>
+                            <span>0 L</span>
+                        </div>
+                        <div class="pace-range" aria-label=" Kart 15">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:0%; width:0%"></span>
+                            <span class="pace-average-marker" style="left:0%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>-</span>
+                            <span><b>Average</b>-</span>
+                            <span><b>Slowest</b>-</span>
+                        </div>
+                    </article>
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong> Kart 16</strong>
+                            <span>0 L</span>
+                        </div>
+                        <div class="pace-range" aria-label=" Kart 16">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:0%; width:0%"></span>
+                            <span class="pace-average-marker" style="left:0%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>-</span>
+                            <span><b>Average</b>-</span>
+                            <span><b>Slowest</b>-</span>
+                        </div>
+                    </article>
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong> Kart 7</strong>
+                            <span>0 L</span>
+                        </div>
+                        <div class="pace-range" aria-label=" Kart 7">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:0%; width:0%"></span>
+                            <span class="pace-average-marker" style="left:0%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>-</span>
+                            <span><b>Average</b>-</span>
+                            <span><b>Slowest</b>-</span>
+                        </div>
+                    </article>
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong> Kart 6</strong>
+                            <span>0 L</span>
+                        </div>
+                        <div class="pace-range" aria-label=" Kart 6">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:0%; width:0%"></span>
+                            <span class="pace-average-marker" style="left:0%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>-</span>
+                            <span><b>Average</b>-</span>
+                            <span><b>Slowest</b>-</span>
+                        </div>
+                    </article>
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong> Kart 2</strong>
+                            <span>0 L</span>
+                        </div>
+                        <div class="pace-range" aria-label=" Kart 2">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:0%; width:0%"></span>
+                            <span class="pace-average-marker" style="left:0%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>-</span>
+                            <span><b>Average</b>-</span>
+                            <span><b>Slowest</b>-</span>
+                        </div>
+                    </article>
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong> Kart 4</strong>
+                            <span>0 L</span>
+                        </div>
+                        <div class="pace-range" aria-label=" Kart 4">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:0%; width:0%"></span>
+                            <span class="pace-average-marker" style="left:0%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>-</span>
+                            <span><b>Average</b>-</span>
+                            <span><b>Slowest</b>-</span>
+                        </div>
+                    </article>
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong> Kart 8</strong>
+                            <span>0 L</span>
+                        </div>
+                        <div class="pace-range" aria-label=" Kart 8">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:0%; width:0%"></span>
+                            <span class="pace-average-marker" style="left:0%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>-</span>
+                            <span><b>Average</b>-</span>
+                            <span><b>Slowest</b>-</span>
+                        </div>
+                    </article>
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong> Kart 9</strong>
+                            <span>0 L</span>
+                        </div>
+                        <div class="pace-range" aria-label=" Kart 9">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:0%; width:0%"></span>
+                            <span class="pace-average-marker" style="left:0%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>-</span>
+                            <span><b>Average</b>-</span>
+                            <span><b>Slowest</b>-</span>
+                        </div>
+                    </article>
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong> Kart 10</strong>
+                            <span>0 L</span>
+                        </div>
+                        <div class="pace-range" aria-label=" Kart 10">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:0%; width:0%"></span>
+                            <span class="pace-average-marker" style="left:0%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>-</span>
+                            <span><b>Average</b>-</span>
+                            <span><b>Slowest</b>-</span>
+                        </div>
+                    </article>
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong> Kart 13</strong>
+                            <span>0 L</span>
+                        </div>
+                        <div class="pace-range" aria-label=" Kart 13">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:0%; width:0%"></span>
+                            <span class="pace-average-marker" style="left:0%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>-</span>
+                            <span><b>Average</b>-</span>
+                            <span><b>Slowest</b>-</span>
+                        </div>
+                    </article>
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong> Kart 12</strong>
+                            <span>0 L</span>
+                        </div>
+                        <div class="pace-range" aria-label=" Kart 12">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:0%; width:0%"></span>
+                            <span class="pace-average-marker" style="left:0%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>-</span>
+                            <span><b>Average</b>-</span>
+                            <span><b>Slowest</b>-</span>
+                        </div>
+                    </article>
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong> Kart 1</strong>
+                            <span>0 L</span>
+                        </div>
+                        <div class="pace-range" aria-label=" Kart 1">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:0%; width:0%"></span>
+                            <span class="pace-average-marker" style="left:0%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>-</span>
+                            <span><b>Average</b>-</span>
+                            <span><b>Slowest</b>-</span>
+                        </div>
+                    </article>
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong> Kart 3</strong>
+                            <span>0 L</span>
+                        </div>
+                        <div class="pace-range" aria-label=" Kart 3">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:0%; width:0%"></span>
+                            <span class="pace-average-marker" style="left:0%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>-</span>
+                            <span><b>Average</b>-</span>
+                            <span><b>Slowest</b>-</span>
+                        </div>
+                    </article>
+                    <article class="pace-distribution-row">
+                        <div class="pace-driver">
+                            <strong> Kart 11</strong>
+                            <span>0 L</span>
+                        </div>
+                        <div class="pace-range" aria-label=" Kart 11">
+                            <span class="pace-range-track"></span>
+                            <span class="pace-range-bar" style="left:0%; width:0%"></span>
+                            <span class="pace-average-marker" style="left:0%"></span>
+                        </div>
+                        <div class="pace-values">
+                            <span><b>Best</b>-</span>
+                            <span><b>Average</b>-</span>
+                            <span><b>Slowest</b>-</span>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+        <section class="section report-section report-heatmap-section" id="lap-heatmap">
+            <div class="section-header">
+                <div>
+                    <h2>Lap heatmap</h2>
+                    <p>Color overview of the lap times per driver.</p>
+                </div>
+                <div class="heatmap-legend">
+                    <span><i></i>fastest</span>
+                    <span><i class="heatmap-legend-slow"></i>slowest</span>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="table-wrap">
+                    <table class="table run-lap-heatmap-table">
+                        <colgroup>
+                            <col class="col-lap">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                            <col class="col-lap-value">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>Lap</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="is-zero-lap">
+                                <td data-label="Lap"><strong>0</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="">08.740</td>
+                                <td data-label=" Kart 5" class="has-value" style="">07.777</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>1</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(230,240,249); color: #17212b;">34.533</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(236,244,251); color: #17212b;">34.898</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>2</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(198,220,239); color: #17212b;">32.440</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(202,223,241); color: #17212b;">32.741</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>3</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(104,162,211); color: #ffffff;">26.451</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(176,207,233); color: #17212b;">31.074</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>4</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(101,160,210); color: #ffffff;">26.233</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(166,201,230); color: #17212b;">30.431</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>5</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(108,164,212); color: #ffffff;">26.658</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(169,202,231); color: #17212b;">30.581</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>6</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(89,153,207); color: #ffffff;">25.467</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(123,174,217); color: #17212b;">27.678</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>7</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(86,151,206); color: #ffffff;">25.293</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(113,168,214); color: #ffffff;">27.002</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>8</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(80,147,204); color: #ffffff;">24.873</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(107,164,212); color: #ffffff;">26.650</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>9</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(71,142,201); color: #ffffff;">24.297</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(123,174,217); color: #ffffff;">27.621</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>10</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(65,138,199); color: #ffffff;">23.906</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(157,195,227); color: #17212b;">29.840</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>11</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(80,147,204); color: #ffffff;">24.897</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(143,187,223); color: #17212b;">28.952</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>12</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(61,136,198); color: #ffffff;">23.695</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(124,175,217); color: #17212b;">27.743</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>13</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(61,136,198); color: #ffffff;">23.671</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(118,171,215); color: #ffffff;">27.351</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>14</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(59,134,197); color: #ffffff;">23.537</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(117,170,215); color: #ffffff;">27.249</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>15</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(48,128,194); color: #ffffff;">22.843</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(151,191,225); color: #17212b;">29.458</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>16</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(41,123,192); color: #ffffff;">22.379</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(126,176,218); color: #17212b;">27.832</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>17</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(64,138,199); color: #ffffff;">23.893</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(98,159,209); color: #ffffff;">26.075</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>18</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(43,124,193); color: #ffffff;">22.504</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(85,150,205); color: #ffffff;">25.209</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>19</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(46,126,193); color: #ffffff;">22.683</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(87,152,206); color: #ffffff;">25.371</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>20</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(40,123,192); color: #ffffff;">22.336</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(109,165,213); color: #ffffff;">26.768</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>21</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(44,125,193); color: #ffffff;">22.550</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(147,189,224); color: #17212b;">29.192</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>22</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(43,124,193); color: #ffffff;">22.520</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(102,161,211); color: #ffffff;">26.321</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>23</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(41,123,192); color: #ffffff;">22.420</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(124,175,217); color: #17212b;">27.738</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>24</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(34,119,190); color: #ffffff;">21.919</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(175,207,233); color: #17212b;">31.017</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>25</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(36,120,191); color: #ffffff;">22.099</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(139,184,222); color: #17212b;">28.656</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>26</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(34,119,190); color: #ffffff;">21.964</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(85,150,205); color: #ffffff;">25.203</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>27</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(41,123,192); color: #ffffff;">22.376</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(93,155,208); color: #ffffff;">25.729</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>28</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(46,126,193); color: #ffffff;">22.687</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(110,166,213); color: #ffffff;">26.794</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>29</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(38,121,191); color: #ffffff;">22.165</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(167,201,230); color: #17212b;">30.485</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>30</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(43,124,193); color: #ffffff;">22.501</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(114,169,214); color: #ffffff;">27.087</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>31</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(31,117,189); color: #ffffff;">21.748</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(133,180,220); color: #17212b;">28.279</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>32</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(40,123,192); color: #ffffff;">22.328</td>
+                                <td data-label=" Kart 5" class="has-value" style="background-color: rgb(128,177,218); color: #17212b;">27.995</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>33</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(41,123,192); color: #ffffff;">22.410</td>
+                                <td data-label=" Kart 5" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>34</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(62,136,198); color: #ffffff;">23.748</td>
+                                <td data-label=" Kart 5" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>35</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(33,118,190); color: #ffffff;">21.874</td>
+                                <td data-label=" Kart 5" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>36</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(39,122,191); color: #ffffff;">22.237</td>
+                                <td data-label=" Kart 5" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                            <tr class="">
+                                <td data-label="Lap"><strong>37</strong></td>
+                                <td data-label=" Kart 14" class="has-value" style="background-color: rgb(44,125,193); color: #ffffff;">22.607</td>
+                                <td data-label=" Kart 5" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 15" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 16" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 7" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 6" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 2" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 4" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 8" class="is-empty" style="">&nbsp;</td>
+                                <td data-label=" Kart 9" class="is-empty" style="">&nbsp;</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+        <section class="section report-section report-heatmap-section" id="lap-heatmap-2">
+            <div class="section-header">
+                <div>
+                    <h2>Lap heatmap</h2>
+                    <p>Color overview of the lap times per driver.</p>
+                </div>
+                <div class="heatmap-legend">
+                    <span><i></i>fastest</span>
+                    <span><i class="heatmap-legend-slow"></i>slowest</span>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="table-wrap">
+                    <table class="table run-lap-heatmap-table">
+                        <colgroup>
+                            <col class="col-lap">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>Lap</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+</section>
+<footer class="footer">
+    (c) RC-Timing GmbH - MyRCM ·
+    2026 ·
+    <span class="footer-runtime">Cluster 2 / Node 4</span>
+</footer>
+
+</body>
+</html>

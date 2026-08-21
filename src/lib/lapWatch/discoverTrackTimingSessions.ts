@@ -3,6 +3,11 @@ import "server-only";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { discoverLiveRcSessionsForUser } from "@/lib/lapWatch/discoverLiveRcSessionsForUser";
 import { discoverSpeedhiveSessionsForUser } from "@/lib/speedhive/discoverSpeedhiveSessionsForUser";
+import {
+  emptyLapDiscoveryStatus,
+  mergeLapDiscoveryStatuses,
+  type LapDiscoveryStatus,
+} from "@/lib/lapWatch/lapDiscoveryStatus";
 
 export type TrackTimingDiscoveredSession = {
   sessionId: string;
@@ -36,6 +41,8 @@ export async function discoverTrackTimingSessions(input: {
   mostRecentSession: TrackTimingDiscoveredSession | null;
   liveRcDriverName: string | null;
   hint: string | null;
+  /** The same finding in the pieces the card lays out; null when there is something to import. */
+  status: LapDiscoveryStatus | null;
   liveRcDebug: unknown;
   speedhiveOrganizationId: number | null;
   speedhivePracticeLocationId: number | null;
@@ -58,6 +65,7 @@ export async function discoverTrackTimingSessions(input: {
       mostRecentSession: null,
       liveRcDriverName: null,
       hint: "Add a LiveRC or Speedhive organization URL on the track page.",
+      status: emptyLapDiscoveryStatus("no_timing_page", "liverc", { sources: [] }),
       liveRcDebug: null,
       speedhiveOrganizationId: null,
       speedhivePracticeLocationId: null,
@@ -126,6 +134,11 @@ export async function discoverTrackTimingSessions(input: {
   const unimportedRecent = fresh.slice(0, MAX_RECENT_RUNS);
   const hints = [lr?.hint, sh?.hint].filter(Boolean) as string[];
 
+  // Both sources get a say. Taking the first hint meant a track carrying LiveRC and MYLAPS reported
+  // whichever was listed first: fourteen LiveRC sessions posted under a name you'd typo'd, and the
+  // card would tell you MYLAPS had nothing. The merge ranks by what the driver can act on.
+  const status = mergeLapDiscoveryStatuses([lr?.status, sh?.status]);
+
   return {
     candidates: merged,
     unimportedCandidates: unimportedRecent,
@@ -135,6 +148,7 @@ export async function discoverTrackTimingSessions(input: {
     mostRecentSession: unimportedRecent[0] ?? merged[0] ?? null,
     liveRcDriverName,
     hint: unimported.length > 0 ? null : hints[0] ?? null,
+    status,
     liveRcDebug: lr?.debug ?? null,
     speedhiveOrganizationId: sh?.organizationId ?? null,
     speedhivePracticeLocationId: sh?.practiceLocationId ?? null,

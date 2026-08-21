@@ -1,3 +1,5 @@
+import { isDemoTimingSiteEnabled, serveDemoTimingPage } from "./demoTimingSite";
+
 const DEFAULT_UA =
   "RC-Engineer/1.0 (+https://github.com) Lap timing import; contact app owner";
 
@@ -5,13 +7,30 @@ export type FetchTextResult =
   | { ok: true; text: string; contentType: string; finalUrl: string }
   | { ok: false; error: string; status?: number };
 
-const MAX_BYTES = 1_500_000;
+/**
+ * Ceiling on a fetched timing page. Raised from 1.5 MB on 2026-08-21 after it started refusing
+ * MyRCM outright: their post-18.08 report pages measure ~1.51 MB, so the cap was rejecting every
+ * one of them by less than a percent, and the live canary failed with "Page too large to import"
+ * rather than anything that pointed at the real cause. 4 MB keeps the guard meaningful (it exists
+ * so a mis-typed URL pointing at a video or an archive can't be pulled into memory) while leaving
+ * MyRCM room to grow. A 4 MB string is not a memory concern in the serverless runtime; the 18 s
+ * timeout below is the binding limit on anything genuinely huge.
+ */
+const MAX_BYTES = 4_000_000;
 const DEFAULT_TIMEOUT_MS = 18_000;
 
 export async function fetchUrlText(
   url: string,
   options?: { timeoutMs?: number }
 ): Promise<FetchTextResult> {
+  // Product-video demo track (dev only, env-gated): every timing parser and every discovery
+  // crawl reads pages through here, so answering from memory replaces the whole timing site
+  // for one invented host and leaves every real one untouched. See demoTimingSite.ts.
+  if (isDemoTimingSiteEnabled()) {
+    const demo = serveDemoTimingPage(url);
+    if (demo) return demo;
+  }
+
   const controller = new AbortController();
   const timeoutMs =
     typeof options?.timeoutMs === "number" && options.timeoutMs > 0
@@ -33,7 +52,7 @@ export async function fetchUrlText(
     const ct = res.headers.get("content-type") ?? "";
     const buf = await res.arrayBuffer();
     if (buf.byteLength > MAX_BYTES) {
-      return { ok: false, error: "Page too large to import (max ~1.5 MB).", status: res.status };
+      return { ok: false, error: "Page too large to import (max ~4 MB).", status: res.status };
     }
     const text = new TextDecoder("utf-8", { fatal: false }).decode(buf);
     return { ok: true, text, contentType: ct, finalUrl: res.url };

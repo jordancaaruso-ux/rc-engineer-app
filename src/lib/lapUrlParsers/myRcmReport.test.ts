@@ -1,9 +1,19 @@
 /**
- * Run: `npx tsx src/lib/lapUrlParsers/myRcmReport.test.ts`
+ * Run: `npx tsx --test src/lib/lapUrlParsers/myRcmReport.test.ts`
  *
- * Fixtures are real MyRCM responses captured 2026-07-15 from event 97370 (EC Warm-Up, Luxembourg):
- *  - myrcm-session-4709.html   → one session fragment (E10 TC SPEC, Heat 2 - Qualy 1)
- *  - myrcm-category-shell.html  → the category (class) JS shell with the session menu
+ * Fixtures are real MyRCM **v9** responses captured 2026-08-19, the day after the site rebuild
+ * (v9.1.15, 18.08.2026). Inline `<svg>`, `<script>` and `<style>` were stripped to keep them
+ * readable; nothing the parser selects on was touched.
+ *
+ *  - myrcm-v9-event-multiclass.html  → event 97370 (EC Warm-Up, Luxembourg) — 3 classes in the picker
+ *  - myrcm-v9-class-runs.html        → event 99719 / class 395535 — 5 runs, one still pending
+ *  - myrcm-v9-session-2drivers.html  → 99719/395535 reportKey 6058 — lap columns keyed "# 2"/"# 1",
+ *                                      i.e. NOT the driver name, so the join is positional
+ *  - myrcm-v9-session-chunked.html   → 99745/395609 reportKey 57698 — 16 drivers, so the lap matrix
+ *                                      is split into two 10-column chunks
+ *
+ * The old pre-v9 fixtures are deliberately gone: they kept every test green while the feature was
+ * dead in production, which is the failure this file exists to prevent repeating.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -11,15 +21,18 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
+  buildMyRcmSessionUrl,
   enumerateMyRcmSessions,
   isMyRcmCategoryUrl,
   isMyRcmDiscoveryUrl,
   isMyRcmEventUrl,
   isMyRcmSessionUrl,
+  legacyMyRcmEventIdFromUrl,
   myRcmClassMatchesConfigured,
   parseMyRcmEventClasses,
   parseMyRcmLapTime,
   parseMyRcmReportUrl,
+  parseMyRcmSelectedClassName,
   parseMyRcmSessionHtml,
   parseMyRcmStartTimeToIso,
 } from "@/lib/lapUrlParsers/myRcmReport";
@@ -27,122 +40,178 @@ import {
 const HERE = dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) => readFileSync(join(HERE, "__fixtures__", name), "utf8");
 
-const SESSION_URL = "https://www.myrcm.ch/myrcm/report/en/97370/388960?reportKey=4709";
-const CATEGORY_URL = "https://www.myrcm.ch/myrcm/report/en/97370/388960";
-const EVENT_URL = "https://www.myrcm.ch/myrcm/main?dId[O]=51&pLa=en&dId[E]=97370&tId=E&hId[1]=org#";
+const SESSION_URL = "https://www.myrcm.ch/en/report/99719/395535?reportKey=6058&reportType=qualy";
+const CLASS_URL = "https://www.myrcm.ch/en/report/99719/395535";
+const EVENT_URL = "https://www.myrcm.ch/en/report/97370";
+const LEGACY_SESSION_URL = "https://www.myrcm.ch/myrcm/report/en/97370/388960?reportKey=4709";
+const LEGACY_EVENT_URL =
+  "https://www.myrcm.ch/myrcm/main?dId[O]=51&pLa=en&dId[E]=97370&tId=E&hId[1]=org#";
 
-test("URL classification", () => {
+test("URL classification (v9 shapes)", () => {
   assert.equal(isMyRcmSessionUrl(SESSION_URL), true);
   assert.equal(isMyRcmCategoryUrl(SESSION_URL), false);
-  assert.equal(isMyRcmCategoryUrl(CATEGORY_URL), true);
-  assert.equal(isMyRcmSessionUrl(CATEGORY_URL), false);
+
+  assert.equal(isMyRcmCategoryUrl(CLASS_URL), true);
+  assert.equal(isMyRcmSessionUrl(CLASS_URL), false);
+
   assert.equal(isMyRcmEventUrl(EVENT_URL), true);
   assert.equal(isMyRcmCategoryUrl(EVENT_URL), false);
-  assert.equal(isMyRcmSessionUrl("https://liverc.com/results/?p=view_race_result&id=1"), false);
 
+  assert.equal(isMyRcmSessionUrl("https://www.myrcm.ch/en/live/97593"), false);
+  assert.equal(isMyRcmEventUrl("https://liverc.com/results/"), false);
+});
+
+test("legacy URLs still parse — MyRCM's own redirect drops the reportKey", () => {
+  const ref = parseMyRcmReportUrl(LEGACY_SESSION_URL);
+  assert.ok(ref);
+  assert.equal(ref.eventId, "97370");
+  assert.equal(ref.categoryId, "388960");
+  assert.equal(ref.reportKey, "4709");
+
+  // Rebuilt in the v9 shape, keeping the key that the 302 would have thrown away.
+  assert.equal(
+    buildMyRcmSessionUrl(ref, ref.reportKey!),
+    "https://www.myrcm.ch/en/report/97370/388960?reportKey=4709"
+  );
+
+  assert.equal(isMyRcmEventUrl(LEGACY_EVENT_URL), true);
+  assert.equal(legacyMyRcmEventIdFromUrl(LEGACY_EVENT_URL), "97370");
+  assert.equal(legacyMyRcmEventIdFromUrl(EVENT_URL), null);
+});
+
+test("reportType survives a round trip", () => {
   const ref = parseMyRcmReportUrl(SESSION_URL);
-  assert.deepEqual(ref, { lang: "en", eventId: "97370", categoryId: "388960", reportKey: "4709" });
-  // Trailing #, extra params, and a trailing slash all normalize.
-  assert.equal(parseMyRcmReportUrl(CATEGORY_URL + "#")?.reportKey, null);
+  assert.ok(ref);
+  assert.equal(ref.reportType, "qualy");
+  assert.equal(
+    buildMyRcmSessionUrl(ref, "6063"),
+    "https://www.myrcm.ch/en/report/99719/395535?reportKey=6063&reportType=qualy"
+  );
 });
 
 test("lap-time token parsing", () => {
   assert.equal(parseMyRcmLapTime("20.859"), 20.859);
+  assert.equal(parseMyRcmLapTime("08.740"), 8.74);
   assert.equal(parseMyRcmLapTime("1:05.432"), 65.432);
-  assert.equal(parseMyRcmLapTime("00.000"), null); // staging marker
+  assert.equal(parseMyRcmLapTime("00.000"), null);
   assert.equal(parseMyRcmLapTime(""), null);
-  assert.equal(parseMyRcmLapTime("—"), null);
+  assert.equal(parseMyRcmLapTime("-"), null);
+  // The lap-0 staging cell holds a wall clock, not a lap.
+  assert.equal(parseMyRcmLapTime("43:15.591"), 2595.591);
 });
 
 test("start time → ISO", () => {
-  assert.equal(parseMyRcmStartTimeToIso("11.07.2026 15:52:59"), "2026-07-11T15:52:59.000Z");
-  assert.equal(parseMyRcmStartTimeToIso("11.07.2026"), "2026-07-11T00:00:00.000Z");
+  assert.equal(parseMyRcmStartTimeToIso("16.08.2026 13:48:42"), "2026-08-16T13:48:42.000Z");
+  assert.equal(parseMyRcmStartTimeToIso("18.08.2026"), "2026-08-18T00:00:00.000Z");
+  assert.equal(parseMyRcmStartTimeToIso("nonsense"), null);
   assert.equal(parseMyRcmStartTimeToIso(null), null);
 });
 
-test("session fragment → drivers + laps (joined on car number)", () => {
-  const { meta, drivers } = parseMyRcmSessionHtml(fixture("myrcm-session-4709.html"));
+test("session → whole field, joined positionally when columns aren't named", () => {
+  const { meta, drivers, lapCountsAgree } = parseMyRcmSessionHtml(
+    fixture("myrcm-v9-session-2drivers.html")
+  );
 
-  assert.equal(meta.className, "E10 TC SPEC");
-  assert.equal(meta.trackCondition, "Dry");
-  assert.equal(meta.startTimeIso, "2026-07-11T15:52:59.000Z");
+  assert.equal(meta.sessionName, "Heat 19");
+  assert.equal(meta.eventName, "Online Event");
+  assert.equal(meta.startTimeRaw, "16.08.2026 13:48:42");
+  assert.equal(meta.startTimeIso, "2026-08-16T13:48:42.000Z");
 
-  // 9 entrants in the classification.
-  assert.equal(drivers.length, 9);
+  assert.equal(drivers.length, 2);
+  // Lap columns here are labelled "# 2" / "# 1" — nothing to do with the driver — so the only
+  // usable join is column order, and the classification's own lap count is what proves it held.
+  assert.equal(drivers[0]!.driverName, "Hansruedi Baer");
+  assert.equal(drivers[0]!.laps.length, 33);
+  assert.equal(drivers[1]!.laps.length, 5);
+  assert.equal(lapCountsAgree, true);
 
-  // Winner: Tim Espen, car 4, 15 laps, best 20.045.
-  const espen = drivers.find((d) => d.driverName === "Tim Espen");
-  assert.ok(espen, "Tim Espen present");
-  assert.equal(espen!.laps.length, 15, "Espen lap count");
-  assert.equal(Math.min(...espen!.laps), 20.045, "Espen best lap matches classification");
-  assert.equal(espen!.laps[0], 20.859, "Espen lap 1 (lap-0 staging row dropped)");
-
-  // Name with a non-breaking space is normalized.
-  assert.ok(drivers.some((d) => d.driverName === "Amelia Le Bescond"));
-
-  // Short runner: Nathéo Ribault, car 9, only 8 laps (matrix column stops early).
-  const ribault = drivers.find((d) => d.driverName.startsWith("Nath"));
-  assert.ok(ribault, "Ribault present");
-  assert.equal(ribault!.laps.length, 8, "Ribault lap count from truncated matrix column");
-  assert.equal(Math.min(...ribault!.laps), 22.927, "Ribault best lap");
-
-  // Every driver's parsed lap count matches the classification's Laps column (cross-check).
-  const espenBest = drivers.filter((d) => d.laps.length > 0);
-  assert.ok(espenBest.length >= 8, "at least 8 drivers have laps");
+  // Baer's best per MyRCM's own classification is 8.443.
+  assert.equal(Math.min(...drivers[0]!.laps), 8.443);
+  // The lap-0 staging row (a 43-minute wall clock) must not be counted as a lap.
+  assert.ok(Math.max(...drivers[0]!.laps) < 120);
 });
 
-test("category shell → labeled result sessions only, meaningful-first", () => {
-  const ref = parseMyRcmReportUrl(CATEGORY_URL)!;
-  const sessions = enumerateMyRcmSessions(fixture("myrcm-category-shell.html"), ref);
+test("session → lap matrix split across chunks stays in classification order", () => {
+  const { drivers, lapCountsAgree } = parseMyRcmSessionHtml(
+    fixture("myrcm-v9-session-chunked.html")
+  );
 
-  assert.ok(sessions.length > 0, "sessions found");
+  // 16 drivers, so MyRCM renders two lap tables (10 + 6). Concatenating the chunks must reproduce
+  // the finishing order — get this wrong and every driver silently gets someone else's laps.
+  assert.equal(drivers.length, 16);
+  assert.equal(lapCountsAgree, true);
 
-  // Only result groups — no Participants / Heat arrangements / Timeschedule / Rankinglists.
-  const groups = new Set(sessions.map((s) => s.group));
-  for (const g of groups) {
-    assert.ok(["Free practice", "Practice", "Qualy", "Final"].includes(g), `unexpected group: ${g}`);
-  }
+  assert.equal(drivers[0]!.driverName, "Kart 14");
+  assert.equal(drivers[0]!.laps.length, 37);
+  assert.equal(drivers[1]!.driverName, "Kart 5");
+  assert.equal(drivers[1]!.laps.length, 32);
 
-  // Deduped by reportKey (the navbar renders the menu twice).
-  const keys = sessions.map((s) => s.reportKey);
-  assert.equal(new Set(keys).size, keys.length, "no duplicate reportKeys");
+  // Everyone from P3 down was a DNS: present in the field, no laps.
+  for (const d of drivers.slice(2)) assert.equal(d.laps.length, 0);
 
-  // Finals sort first.
-  assert.equal(sessions[0]!.group, "Final");
-
-  // The known session 4709 is present as "Qualy :: Heat 2 - Qualy 1".
-  const s4709 = sessions.find((s) => s.reportKey === "4709");
-  assert.ok(s4709, "session 4709 enumerated");
-  assert.equal(s4709!.group, "Qualy");
-  assert.match(s4709!.url, /reportKey=4709$/);
+  // Drivers 11-16 come from the second chunk — proof the chunk boundary was crossed correctly.
+  assert.equal(drivers[10]!.driverName, "Kart 10");
+  assert.equal(drivers[15]!.driverName, "Kart 11");
 });
 
-test("discovery URL classification (event + category yes; session no)", () => {
-  assert.equal(isMyRcmDiscoveryUrl(EVENT_URL), true);
-  assert.equal(isMyRcmDiscoveryUrl(CATEGORY_URL), true);
-  assert.equal(isMyRcmDiscoveryUrl(SESSION_URL), false);
-  assert.equal(isMyRcmDiscoveryUrl("https://liverc.com/results/"), false);
+test("class page → runs, deduped, with pending ones flagged", () => {
+  const ref = parseMyRcmReportUrl(CLASS_URL)!;
+  const sessions = enumerateMyRcmSessions(fixture("myrcm-v9-class-runs.html"), ref);
+
+  // The accordion is rendered twice on the page; without dedupe this is 10.
+  assert.equal(sessions.length, 5);
+  assert.deepEqual(
+    sessions.map((s) => s.reportKey),
+    ["6058", "6063", "6064", "6065", "6066"]
+  );
+
+  assert.equal(sessions.filter((s) => s.hasResults).length, 4);
+  assert.equal(sessions.find((s) => s.reportKey === "6066")!.hasResults, false);
+
+  const first = sessions[0]!;
+  assert.equal(first.group, "Qualifying");
+  assert.equal(first.label, "Heat 19 · Qualy 1");
+  assert.equal(first.title, "Qualifying · Heat 19 · Qualy 1");
+  assert.equal(
+    first.url,
+    "https://www.myrcm.ch/en/report/99719/395535?reportKey=6058&reportType=qualy"
+  );
 });
 
-test("event page → class list (fixture: EC Warm-Up, 3 classes)", () => {
-  const classes = parseMyRcmEventClasses(fixture("myrcm-event-page.html"));
-  assert.equal(classes.length, 3);
-  const spec = classes.find((c) => c.className === "E10 TC SPEC");
-  assert.ok(spec, "E10 TC SPEC listed");
-  assert.equal(spec!.eventId, "97370");
-  assert.equal(spec!.categoryId, "388960");
-  assert.equal(spec!.categoryUrl, "https://www.myrcm.ch/myrcm/report/en/97370/388960");
+test("class page → the class it is showing", () => {
+  assert.equal(parseMyRcmSelectedClassName(fixture("myrcm-v9-class-runs.html")), "Online");
+});
+
+test("event page → class picker (fixture: EC Warm-Up, 3 classes)", () => {
+  const classes = parseMyRcmEventClasses(fixture("myrcm-v9-event-multiclass.html"), "97370");
   assert.deepEqual(
     classes.map((c) => c.className),
     ["E10 FWD", "E10 TC SPEC", "E10 TC Modified"]
   );
+  assert.deepEqual(
+    classes.map((c) => c.categoryId),
+    ["388959", "388960", "388961"]
+  );
+  assert.equal(classes[1]!.categoryUrl, "https://www.myrcm.ch/en/report/97370/388960");
+});
+
+test("event page enumerates runs too — it renders its first class", () => {
+  const ref = parseMyRcmReportUrl(EVENT_URL)!;
+  const sessions = enumerateMyRcmSessions(fixture("myrcm-v9-event-multiclass.html"), ref);
+  // 28 buttons on the page, 14 distinct runs.
+  assert.equal(sessions.length, 14);
+  assert.ok(sessions.every((s) => /reportKey=\d+/.test(s.url)));
+});
+
+test("discovery URL classification (event + class yes; single run no)", () => {
+  assert.equal(isMyRcmDiscoveryUrl(EVENT_URL), true);
+  assert.equal(isMyRcmDiscoveryUrl(CLASS_URL), true);
+  assert.equal(isMyRcmDiscoveryUrl(SESSION_URL), false);
+  assert.equal(isMyRcmDiscoveryUrl(LEGACY_EVENT_URL), true);
 });
 
 test("loose class matching for the event race-class filter", () => {
-  assert.equal(myRcmClassMatchesConfigured("E10 TC SPEC", "tc spec"), true);
-  assert.equal(myRcmClassMatchesConfigured("EC10 TC SPEC  [EC10-SPEC]", "EC10 TC Spec"), true);
-  assert.equal(myRcmClassMatchesConfigured("E10 TC Modified", "TC SPEC"), false);
-  assert.equal(myRcmClassMatchesConfigured("E10 FWD", ""), false);
+  assert.equal(myRcmClassMatchesConfigured("E10 TC SPEC [EC10-SPEC]", "TC Spec"), true);
+  assert.equal(myRcmClassMatchesConfigured("E10 TC Modified", "TC Spec"), false);
+  assert.equal(myRcmClassMatchesConfigured("", "TC Spec"), false);
 });
-
-console.log("myRcmReport.test.ts OK");
