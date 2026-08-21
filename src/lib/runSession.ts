@@ -15,7 +15,7 @@ const MEETING_SESSION_TYPE_LABELS: Record<string, string> = {
 
 /**
  * Format run session for display (e.g. Run History).
- * Race Meeting: type label (or custom when Other) + optional sessionLabel.
+ * Event: type label (or custom when Other) + optional sessionLabel.
  * Testing: sessionLabel, else `Run <dayRunNumber>` / `opts.fallback` / "—".
  * Surfaces that know the run's position within its day should pass
  * `dayRunNumber` so unlabeled testing runs get a real name instead of a dash.

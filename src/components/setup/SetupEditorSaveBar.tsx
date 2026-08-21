@@ -66,7 +66,35 @@ import type { SetupEditorSave } from "@/components/setup/useSetupEditorSave";
 /** Above `IdeasEdgeTab` (z-40) so the bar covers it cleanly; below the dock (z-50), which wins. */
 const BAR_Z = "z-[45]";
 
-export function SetupEditorSaveBar({ save }: { save: SetupEditorSave }) {
+export function SetupEditorSaveBar({
+  save,
+  hosted = false,
+}: {
+  save: SetupEditorSave;
+  /**
+   * Render in the flow of a scrolling container instead of fixed to the viewport — for the
+   * run page's setup pop-up (2026-08-21).
+   *
+   * ============================== WHY THIS DOES NOT CONTRADICT THE HEADER ==============================
+   *
+   * The "why not sticky" argument above is about `.app-shell` specifically: it is
+   * `overflow-x: hidden`, which computes `overflow-y` to `auto`, making it a scrollport that
+   * never actually scrolls because the DOCUMENT does. Sticky offsets resolve against that
+   * stationary box and the bar scrolls away.
+   *
+   * `.setup-sheet-modal-panel` is not that. It is `max-h-[90vh] overflow-auto` and genuinely
+   * scrolls its own content, so `sticky bottom-0` resolves against a box that really moves and
+   * the bar holds the bottom of the pop-up exactly as intended.
+   *
+   * Fixed positioning is the thing that CANNOT work here: `BAR_Z` is `z-[45]` and the pop-up's
+   * overlay is `z-50`, so a portalled bar renders behind the scrim — present, dimmed, and
+   * unclickable. Raising the z instead would put a viewport-wide bar across a centred dialog
+   * on desktop, which is not the same control.
+   *
+   * The measured spacer goes with it: nothing floats, so nothing is covered.
+   */
+  hosted?: boolean;
+}) {
   const [mounted, setMounted] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [panelHeight, setPanelHeight] = useState(0);
@@ -128,11 +156,19 @@ export function SetupEditorSaveBar({ save }: { save: SetupEditorSave }) {
   const bar = (
     <div
       className={cn(
-        "pointer-events-none fixed inset-x-0 bottom-0 flex justify-center px-4",
-        // `--mobile-tab-bar-height` is the dock's own published height, and `<main>` already pads
-        // itself by it — so clearing the dock is that constant plus the safe area, nothing measured.
-        "pb-[calc(var(--mobile-tab-bar-height)_+_env(safe-area-inset-bottom)_+_0.5rem)] md:pb-4",
-        BAR_Z
+        "flex justify-center",
+        hosted
+          ? // Sticky inside the pop-up's own scrollport. `bottom-0` with no dock padding: the
+            // dock is behind the scrim and cannot be reached from in here anyway.
+            "sticky bottom-0 z-10 pointer-events-auto px-0 pb-1 pt-1"
+          : cn(
+              "pointer-events-none fixed inset-x-0 bottom-0 px-4",
+              // `--mobile-tab-bar-height` is the dock's own published height, and `<main>` already
+              // pads itself by it — so clearing the dock is that constant plus the safe area,
+              // nothing measured.
+              "pb-[calc(var(--mobile-tab-bar-height)_+_env(safe-area-inset-bottom)_+_0.5rem)] md:pb-4",
+              BAR_Z
+            )
       )}
     >
       <div
@@ -203,9 +239,10 @@ export function SetupEditorSaveBar({ save }: { save: SetupEditorSave }) {
 
   return (
     <>
-      {/* Holds the bar's place in the flow so the last row of the editor is never underneath it. */}
-      <div aria-hidden style={{ height: panelHeight }} />
-      {mounted ? createPortal(bar, document.body) : null}
+      {/* Holds the bar's place in the flow so the last row of the editor is never underneath it.
+          Hosted, the bar IS in the flow, so there is nothing to hold a place for. */}
+      {hosted ? null : <div aria-hidden style={{ height: panelHeight }} />}
+      {hosted ? bar : mounted ? createPortal(bar, document.body) : null}
       {promptAction?.namePrompt ? (
         <SetupNameSheet
           open

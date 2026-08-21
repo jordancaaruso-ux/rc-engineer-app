@@ -1,5 +1,6 @@
 "use client";
 
+import { clientId } from "@/lib/clientId";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -71,7 +72,7 @@ export function BulkImportHubClient({
         const k = pdfKey(file);
         if (seen.has(k)) continue;
         seen.add(k);
-        next.push({ id: crypto.randomUUID(), file });
+        next.push({ id: clientId(), file });
       }
       return next;
     });

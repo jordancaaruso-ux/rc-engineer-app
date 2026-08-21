@@ -35,6 +35,7 @@ import { useRouter } from "next/navigation";
 import { RunComparePairCell } from "@/components/runs/AnalysisCompareContext";
 import { type Run } from "@/components/runs/RunDetailPanel";
 import { runNeedsLapImport } from "@/lib/runs/lapImportPrompt";
+import { lapImportHref } from "@/lib/runs/lapImportHref";
 import {
   computeRunHistoryColSpan,
   RUN_HISTORY_ACTION_CELL_CLASS,
@@ -560,7 +561,7 @@ export function RunHistoryTable({
                           <LapImportWarning
                             compact
                             className="mt-0.5"
-                            onImport={() => router.push(`/runs/${run.id}/edit?step=laps`)}
+                            onImport={() => router.push(lapImportHref(run.id))}
                             onDismiss={() => void dismissLapImportPrompt(run.id)}
                           />
                         ) : null}
@@ -632,7 +633,7 @@ export function RunHistoryTable({
                   <LapImportWarning
                     compact={false}
                     className="ml-1.5"
-                    onImport={() => router.push(`/runs/${run.id}/edit?step=laps`)}
+                    onImport={() => router.push(lapImportHref(run.id))}
                     onDismiss={() => void dismissLapImportPrompt(run.id)}
                   />
                 ) : null}
@@ -654,7 +655,7 @@ export function RunHistoryTable({
                     {showLapImportWarning ? (
                       <LapImportWarning
                         compact={false}
-                        onImport={() => router.push(`/runs/${run.id}/edit?step=laps`)}
+                        onImport={() => router.push(lapImportHref(run.id))}
                         onDismiss={() => void dismissLapImportPrompt(run.id)}
                       />
                     ) : null}

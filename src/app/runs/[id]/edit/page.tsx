@@ -11,6 +11,7 @@ import { getDashboardNewRunPrefill } from "@/lib/dashboardServer";
 import { runConditionsFromRecord } from "@/lib/weather/runConditionsRecord";
 import { deriveEditEntry } from "@/lib/runs/wizardEntry";
 import { WIZARD_STEPS } from "@/lib/runs/wizardWalk";
+import { safeAppPath } from "@/lib/navigation/safeAppPath";
 
 export const dynamic = "force-dynamic";
 
@@ -211,6 +212,19 @@ export default async function EditRunPage({
       ? WIZARD_STEPS.find((s) => s.id === sp.step)?.id ?? null
       : null;
 
+  /*
+   * `?back=` — where a save lands when someone sent the driver here for one thing.
+   *
+   * The session view's "Replace link" has put this on its href since the day it was built,
+   * and until 2026-08-21 NOTHING READ IT: every save ran `navigateAway("/")` and the driver
+   * who came to swap one timing link was handed the dashboard. The comment beside that link
+   * claimed it "comes back here", which made it a doc claim rather than behaviour.
+   *
+   * Null when nobody said, which keeps the wizard's own landings exactly as they were — a
+   * run logged from the dock still finishes on the dashboard with its `?suggestRun` nudge.
+   */
+  const returnHref = safeAppPath(sp.back);
+
   return (
     <>
       <header className="page-header">
@@ -232,6 +246,7 @@ export default async function EditRunPage({
           dashboardPrefill={dashboardPrefill}
           wizard={wizardEntry}
           wizardInitialStep={wizardInitialStep}
+          returnHref={returnHref}
           editRun={{
             id: run.id,
             createdAt: run.createdAt.toISOString(),

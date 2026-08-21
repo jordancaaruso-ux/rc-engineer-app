@@ -7,7 +7,7 @@
  * only one of them. Do not fork a page-specific variant.
  */
 
-import React, { useEffect, useMemo, useState, type ReactNode } from "react";
+import React, { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Collapse } from "@/components/ui/Collapse";
 import { formatRunDateTime } from "@/lib/formatDate";
@@ -44,7 +44,7 @@ import {
 import { LapTimeGraph } from "@/components/runs/LapTimeGraph";
 import { RunRaceFieldSwitcher, RACE_IDENTITY } from "@/components/runs/RunRaceFieldSwitcher";
 import Link from "next/link";
-import { SquarePen, Trash2 } from "lucide-react";
+import { ChevronRight, SquarePen, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTodayDraftRunOptional } from "@/components/layout/TodayDraftRunProvider";
 import { CardPanel } from "@/components/ui/CardPanel";
@@ -60,6 +60,26 @@ import { RUN_HISTORY_DATA_CLASS } from "@/components/runs/runHistoryTableColumns
 import { ShareRunButton } from "@/components/share/ShareRunButton";
 import { runIsShareable } from "@/lib/share/shareCardModel";
 import { formatRunSessionDisplay } from "@/lib/runSession";
+import { InlineValueEdit } from "@/components/runs/InlineValueEdit";
+import { InlineAdditiveEdit } from "@/components/runs/InlineAdditiveEdit";
+import { InlinePickEdit } from "@/components/runs/InlinePickEdit";
+import { RunCarMoveSheet } from "@/components/runs/RunCarMoveSheet";
+import { TirePrepSheet } from "@/components/runs/TirePrepSheet";
+import { lapImportHref } from "@/lib/runs/lapImportHref";
+import type { SetupEditorSavedResult } from "@/components/setup/useSetupEditorSave";
+import { SetupCorrectionSheet } from "@/components/runs/SetupCorrectionSheet";
+import { useRunCorrections } from "@/components/runs/useRunCorrections";
+import { ActionToast } from "@/components/ui/ActionToast";
+import { AutoGrowTextarea } from "@/components/ui/AutoGrowTextarea";
+// The option LIST went with the session picker (2026-08-21); the two lookups stay, because
+// naming a stored session for a human is still this panel's job.
+import {
+  runSessionLabelOption,
+  runSessionLabelOptionIdFor,
+} from "@/lib/runs/runSessionLabel";
+import type { RunCorrectionOptions } from "@/lib/runs/runCorrectionOptions";
+import { persistedFromUiState } from "@/lib/runHandlingAssessment";
+import { skyLabelFromCloudCover, skyLabelFromWeatherCode } from "@/lib/weather/conditions";
 
 const LapComparePanel = dynamic(
   () =>
@@ -130,6 +150,8 @@ export type Run = {
   importedLapSets?: Array<{
     id: string;
     createdAt: Date | string;
+    /** Denormalised at save time; null on legacy rows. Names where the laps came from. */
+    sourceUrl?: string | null;
     sessionCompletedAt?: Date | string | null;
     driverId?: string | null;
     driverName: string;
@@ -219,6 +241,8 @@ export function RunDetailPanel({
   displayTimeZone,
   allowRunMutations = true,
   onDeleted,
+  onEditSetup,
+  cascadeFromSetupEditor,
   className,
   headerLead,
   headerActions,
@@ -236,6 +260,23 @@ export function RunDetailPanel({
    * `/runs/[id]` navigates away — the page it was on no longer exists.
    */
   onDeleted?: () => void;
+  /**
+   * Open the run's setup pop-up already in edit mode.
+   *
+   * The pop-up belongs to `RunPageClient`, not to this panel — the panel is also rendered
+   * without one — so the setup door asks rather than opens. Absent, the door falls back to
+   * the standalone editor page, which is still a working route.
+   */
+  onEditSetup?: () => void;
+  /**
+   * The "did your other runs have this wrong too?" questions from a correction made in that
+   * pop-up, which has no page in between to hand them over through.
+   *
+   * The `nonce` is load-bearing: correcting the same field to the same value twice produces
+   * a deep-equal payload, and the second time is exactly when a driver who answered "just
+   * this run" changes their mind.
+   */
+  cascadeFromSetupEditor?: { nonce: number; result: SetupEditorSavedResult } | null;
   /** Outer card override — `/runs/[id]` squares the top corners to fuse with its action strip. */
   className?: string;
   /**
@@ -258,10 +299,75 @@ export function RunDetailPanel({
 }) {
   const router = useRouter();
   const todayDraft = useTodayDraftRunOptional();
+  /*
+   * Correcting a logged run happens HERE now, not only behind the pencil that
+   * opens the six-step wizard. Owner-only — `allowRunMutations` is the same flag
+   * that hides Edit and Share on a teammate's run, and every route re-checks it.
+   */
+  const corrections = useRunCorrections({
+    runId: run.id,
+    onChanged: () => router.refresh(),
+  });
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const [setupDataByRunId, setSetupDataByRunId] = useState<Record<string, unknown>>({});
   const [expandedLapStat, setExpandedLapStat] = useState<ExpandedLapStat>(null);
+  /**
+   * Read mode is the default, and it is the whole point.
+   *
+   * A session is a record you read between heats; until 2026-08-20 every value on it
+   * was a live text box all the time, so the page read as a form you were standing in
+   * rather than the thing you came to look at (founder call: "nothing in a session
+   * should be clickable to edit until the Edit button is pressed"). Editing is now a
+   * mode you enter deliberately, and leaving it puts the paper back.
+   *
+   * Owner-only, and it resets when the panel moves to a different run — the Sessions
+   * workbench reuses this component across rows, and edit mode leaking onto the next
+   * run would arm every control on a session the driver only clicked to look at.
+   */
+  const [editing, setEditing] = useState(false);
+  useEffect(() => setEditing(false), [run.id]);
+  const canEdit = allowRunMutations && editing;
+  /** The car change the driver has picked but not yet confirmed. See `RunCarMoveSheet`. */
+  const [pendingCarMove, setPendingCarMove] = useState<{ id: string; label: string } | null>(null);
+  const [carMoveBusy, setCarMoveBusy] = useState(false);
+  const [carMoveError, setCarMoveError] = useState<string | null>(null);
+  /*
+   * Questions handed straight across from the setup pop-up, with no page in between.
+   *
+   * Keyed on the nonce alone: the payload for two identical corrections is deep-equal, so
+   * watching the result itself would swallow the second one.
+   */
+  const cascadeNonce = cascadeFromSetupEditor?.nonce ?? null;
+  useEffect(() => {
+    if (cascadeNonce == null || !cascadeFromSetupEditor) return;
+    corrections.offerCorrections(
+      cascadeFromSetupEditor.result.corrections,
+      cascadeFromSetupEditor.result.suppressed
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the nonce IS the signal; see above.
+  }, [cascadeNonce]);
+
+  /** Tire prep is corrected in its own sheet, not in its stat well. See `TirePrepSheet`. */
+  const [prepOpen, setPrepOpen] = useState(false);
+  const [prepBusy, setPrepBusy] = useState(false);
+  const [prepError, setPrepError] = useState<string | null>(null);
+  useEffect(() => setPrepOpen(false), [run.id]);
+  /**
+   * The picker lists, fetched once on the first tap of any of them.
+   *
+   * Not on mount: this panel renders inside every expanded Sessions row, and a run
+   * nobody is correcting should cost no request.
+   */
+  const [pickerOptions, setPickerOptions] = useState<RunCorrectionOptions | null>(null);
+  const loadPickerOptions = useCallback(async (): Promise<RunCorrectionOptions> => {
+    if (pickerOptions) return pickerOptions;
+    const res = await fetch(`/api/runs/${encodeURIComponent(run.id)}/correction-options`);
+    if (!res.ok) throw new Error("Couldn’t load the list");
+    const payload = (await res.json()) as RunCorrectionOptions;
+    setPickerOptions(payload);
+    return payload;
+  }, [pickerOptions, run.id]);
   // Holds the detail text through its collapse animation (the live value goes
   // null the instant a chip closes, which would otherwise pop the height to 0).
   const [lastLapStatDetail, setLastLapStatDetail] = useState<string | null>(null);
@@ -474,7 +580,74 @@ export function RunDetailPanel({
   useEffect(() => {
     if (expandedLapStatDetail !== null) setLastLapStatDetail(expandedLapStatDetail);
   }, [expandedLapStatDetail]);
-  const conditionsChip = formatConditionsChip(runConditionsFromRecord(run));
+  const runConditions = runConditionsFromRecord(run);
+  const conditionsChip = formatConditionsChip(runConditions);
+  /*
+   * The weather used to reach the page as a single "Cond." chip — readable, but
+   * nothing you could argue with. A track temperature typed from memory the next
+   * morning is one of the most commonly wrong numbers on a run, and it moves what
+   * the Engineer compares this session against, so it earns its own row.
+   *
+   * Wind direction, cloud cover and the observation stamp stay out: those are
+   * readings the app fetched, not opinions the driver holds.
+   */
+  /*
+   * Only the readings that were actually taken. A reading nobody took is not a fact about
+   * the run, and an em-dash under a heading looks like the app losing it rather than the
+   * driver never having probed it (founder call, 2026-08-21).
+   *
+   * This is the rule Sky has always followed a few lines down; the four numeric cells were
+   * the odd ones out. In practice it hides track temp, since air temp, humidity and wind
+   * arrive together from the weather service and are present or absent as a set — and track
+   * temp is precisely the one the service cannot supply, because a surface temperature comes
+   * off an IR gun.
+   */
+  const conditionCells = useMemo(
+    () =>
+      [
+        { key: "trackTempC", label: "Track temp", unit: "°C", value: runConditions.trackTempC },
+        { key: "airTempC", label: "Air temp", unit: "°C", value: runConditions.airTempC },
+        { key: "humidityPct", label: "Humidity", unit: "%", value: runConditions.humidityPct },
+        { key: "windKph", label: "Wind", unit: "km/h", value: runConditions.windKph },
+      ].filter((c) => c.value != null),
+    [runConditions.trackTempC, runConditions.airTempC, runConditions.humidityPct, runConditions.windKph]
+  );
+  const hasAnyCondition = conditionCells.length > 0;
+  /**
+   * The sky, from the weather code when the service gave one and from cloud cover when
+   * it did not — the same fallback the log-run form uses, so the two never disagree
+   * about the same run. Null when neither was recorded, which hides the cell rather
+   * than printing an em-dash for a reading that was never taken.
+   */
+  /**
+   * The timing session feeding this run, named for a human.
+   *
+   * `sourceUrl` is denormalised onto each `RunImportedLapSet` at save time, so this needs
+   * no extra request — but it is null on legacy rows, which is why the driver's own set is
+   * preferred and the label falls back to the session name rather than assuming a URL.
+   * Split runs (two imports on one run) name both, in the order they were run.
+   */
+  const lapImportSource = useMemo(() => {
+    const sets = run.importedLapSets ?? [];
+    if (sets.length === 0) return null;
+    const urls: string[] = [];
+    for (const s of sets) {
+      const url = s.sourceUrl?.trim();
+      if (url && !urls.includes(url)) urls.push(url);
+    }
+    if (urls.length === 0) return { label: "A timing import (no link recorded)" };
+    return { label: urls.join("  ·  ") };
+  }, [run.importedLapSets]);
+
+  const skyDisplay = useMemo(() => {
+    const code = run.conditionsWeatherCode;
+    if (typeof code === "number" && Number.isFinite(code)) {
+      return skyLabelFromWeatherCode(code).label;
+    }
+    const cloud = run.conditionsCloudCoverPct;
+    if (typeof cloud === "number" && Number.isFinite(cloud)) return skyLabelFromCloudCover(cloud);
+    return null;
+  }, [run.conditionsWeatherCode, run.conditionsCloudCoverPct]);
   const carRatingDisplay = useMemo(() => {
     const rating = run.carRating;
     if (typeof rating === "number" && Number.isFinite(rating) && rating >= 1 && rating <= 10) {
@@ -514,6 +687,18 @@ export function RunDetailPanel({
   const tireSetDisplay = run.tireType
     ? `${run.tireType.displayName} · run ${run.tireRunNumber}${run.tireAgeKnown === false ? " (age unknown)" : ""}`
     : "—";
+  const trackDisplay = run.track?.name ?? run.trackNameSnapshot ?? null;
+  const eventDisplay = run.event?.name ?? "Not part of an event";
+  /*
+   * The session, as one of a closed list rather than three loosely-coupled columns.
+   * `meetingType` above is the free-form read-back (it prints a custom code verbatim);
+   * this is which ROW of the picker the run is on, and the two can disagree — an "OTHER"
+   * session reads as its own code but sits on the "Something else…" row.
+   */
+  const sessionLabelOptionId = runSessionLabelOptionIdFor(run);
+  const sessionLabelDisplay = hasMeetingType
+    ? meetingType
+    : (runSessionLabelOption(sessionLabelOptionId)?.label ?? "Testing");
   // Additive well = the product; Tire prep well = the application sequence.
   // Compound toggles (ST205, ABH, AT15, …) are setup-sheet parameters, not tire
   // prep — they live on the setup sheet and are intentionally excluded here.
@@ -686,40 +871,291 @@ export function RunDetailPanel({
                 setupSnapshotId={run.setupSnapshot?.id ?? null}
               />
             ) : null}
+            {/*
+              The pencil is a MODE now, not a door.
+              It used to link to `/runs/[id]/edit` — the six-step logging wizard, whose
+              save hard-navigates to the dashboard. So "Edit" meant "re-log this run and
+              get spat out somewhere else", and fixing two digits cost nine taps and the
+              scroll position on the surface where the mistake was spotted (founder call,
+              2026-08-20). Nothing on the run page links to the wizard any more; the
+              route survives only for uploading a video and for finishing a draft.
+            */}
             {allowRunMutations ? (
-              <Link
-                href={`/runs/${encodeURIComponent(run.id)}/edit`}
-                aria-label="Edit run"
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground no-underline hover:bg-muted/80 transition"
-                title="Edit run"
-                onClick={(e) => e.stopPropagation()}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditing((v) => !v);
+                }}
+                aria-pressed={editing}
+                aria-label={editing ? "Finish editing this run" : "Edit this run"}
+                title={editing ? "Finish editing this run" : "Edit this run"}
+                className={cn(
+                  "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border transition",
+                  editing
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-foreground hover:bg-muted/80"
+                )}
               >
                 <SquarePen className="h-4 w-4" aria-hidden />
-              </Link>
+              </button>
             ) : null}
           </div>
         </div>
+
+        {/*
+          The mode's only banner. It exists because edit mode is otherwise invisible on a
+          phone once the header scrolls away — and because "Done" has to be reachable
+          without hunting for the pencil that turned it on.
+        */}
+        {canEdit ? (
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-primary-ink/40 bg-primary/10 px-2.5 py-1.5">
+            <span className="text-[11.5px] font-semibold text-primary-ink">
+              Editing — tap anything underlined
+            </span>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="tap-active shrink-0 rounded-md bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground"
+            >
+              Done
+            </button>
+          </div>
+        ) : null}
+        {/*
+          ============================== WHAT A CORRECTION MAY NOT TOUCH ==============================
+
+          Date/time, track, session and event are all read-only, in edit mode and out of it.
+
+          The first two never moved. The other two did until 2026-08-21, and the founder took them
+          back on the ground that they are not corrections at all — they are the run's IDENTITY.
+          An event re-homes the session into a different meeting, taking its track, its field and its
+          place in the day with it; the session label is stamped by the timing sheet the run came off,
+          so a driver retyping it is disagreeing with the transponder rather than fixing a slip.
+
+          Everything still editable below is the driver's own answer about their own car. That is the
+          line, and it is why the event picker's server-side track filter could be deleted with it
+          rather than kept "just in case" — there is no longer a door for it to guard.
+        */}
         <StatWellGrid cols={2} smCols={3}>
           <StatWellCell label="Date / time" value={dateTimeLabel} />
-          {hasMeetingType ? <StatWellCell label="Session" value={meetingType} /> : null}
-          <StatWellCell label="Car" value={carDisplay} valueClassName="whitespace-normal break-words" />
-          <StatWellCell label="Tire set" value={tireSetDisplay} valueClassName="whitespace-normal break-words" />
-          <StatWellCell label="Additive" value={additiveDisplay} valueClassName="whitespace-normal break-words" />
+          {trackDisplay ? <StatWellCell label="Track" value={trackDisplay} /> : null}
+          <StatWellCell label="Session" value={sessionLabelDisplay} />
+          <StatWellCell
+            label="Event"
+            value={eventDisplay}
+            valueClassName="whitespace-normal break-words"
+          />
+          <StatWellCell
+            label="Car"
+            value={
+              canEdit ? (
+                <InlinePickEdit
+                  ariaLabel="Car"
+                  value={carDisplay}
+                  valueId={run.carId ?? null}
+                  loadOptions={async () => (await loadPickerOptions()).cars}
+                  // Never writes straight away — the sheet spells out what else moves.
+                  confirm={async (option) => {
+                    if (!option) return false;
+                    setCarMoveError(null);
+                    setPendingCarMove(option);
+                    return false;
+                  }}
+                  onSave={async () => {}}
+                  align="left"
+                />
+              ) : (
+                carDisplay
+              )
+            }
+            valueClassName="whitespace-normal break-words"
+          />
+          <StatWellCell
+            label="Tire set"
+            value={
+              canEdit ? (
+                <span className="inline-flex flex-col items-start gap-0.5">
+                  <InlinePickEdit
+                    ariaLabel="Tire set"
+                    value={run.tireType?.displayName ?? "—"}
+                    valueId={run.tireType?.id ?? null}
+                    loadOptions={async () => (await loadPickerOptions()).tireTypes}
+                    allowEmpty
+                    onSave={(next) => corrections.saveFields({ tireTypeId: next })}
+                    align="left"
+                  />
+                  {/*
+                    The run number is a number, so it is typed rather than picked — and it
+                    is the one field here that moves OTHER runs: correcting it shifts every
+                    later run on the same set. The toast says so when it happens.
+                  */}
+                  <span className="text-[11px] text-muted-foreground">
+                    run{" "}
+                    <InlineValueEdit
+                      label="Tire run number"
+                      value={String(run.tireRunNumber)}
+                      numeric
+                      validate={(next) => {
+                        const n = Number(next.trim());
+                        return Number.isFinite(n) && n >= 1 ? null : "1 or more";
+                      }}
+                      onSave={(next) => corrections.saveFields({ tireRunNumber: Number(next) })}
+                    />
+                  </span>
+                </span>
+              ) : (
+                tireSetDisplay
+              )
+            }
+            valueClassName="whitespace-normal break-words"
+          />
+          <StatWellCell
+            label="Additive"
+            value={
+              canEdit ? (
+                <InlineAdditiveEdit
+                  value={additiveDisplay}
+                  valueId={run.additiveType?.id ?? null}
+                  onSave={corrections.saveAdditive}
+                />
+              ) : (
+                additiveDisplay
+              )
+            }
+            valueClassName="whitespace-normal break-words"
+          />
+          {/*
+            Tire prep is a sequence, not a value with a text box, so it cannot be an inline
+            cell like the four above it. The steps stay readable here and edit mode opens
+            `TirePrepSheet` over the run — which hosts the log-run form's own prep panel, so
+            there is one prep control in the product rather than two that can disagree.
+
+            This used to link into the wizard's prep step carrying a `?back=` that nothing
+            read, so "Change prep" meant "re-log this run and get spat out on the dashboard"
+            (founder-reported, 2026-08-21).
+          */}
           <StatWellCell
             label="Tire prep"
             value={
-              tirePrepSteps.length > 0 ? (
-                <TirePrepStepsList steps={tirePrepSteps} />
-              ) : (
-                "—"
-              )
+              <span className="inline-flex flex-col items-start gap-1">
+                {tirePrepSteps.length > 0 ? <TirePrepStepsList steps={tirePrepSteps} /> : "—"}
+                {canEdit ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPrepError(null);
+                      setPrepOpen(true);
+                    }}
+                    className="tap-active text-[11px] font-medium text-primary-ink underline decoration-dotted underline-offset-4"
+                  >
+                    Change prep
+                  </button>
+                ) : null}
+              </span>
             }
           />
         </StatWellGrid>
       </div>
 
+      {hasAnyCondition || skyDisplay ? (
+        <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+          {/*
+            ============================== WHY CONDITIONS ARE READ-ONLY ==============================
+
+            They were typeable until 2026-08-20, and the founder took it away on the right
+            grounds: these are FETCHED. Air temp, humidity, wind and sky come from the
+            weather service against the track's pin at the session time, and typing over a
+            fetched number makes the record lie about where it came from — the run would
+            still be stamped with a forecast it no longer agrees with.
+
+            Track temp is the odd one out: the service cannot supply it, so it is probed or it
+            is nothing. Its door is the log-run form's step-one conditions band, not a text box
+            here — and since 2026-08-21 an unprobed run simply does not show the cell, so the
+            surface no longer advertises a gap it has no way to fill.
+
+            The whole block is gated on there being something to show. It used to render for
+            the owner regardless, which put four em-dashes under a heading on every indoor and
+            pre-feature run.
+          */}
+          <Eyebrow>Conditions</Eyebrow>
+          <StatWellGrid cols={2} smCols={4}>
+            {conditionCells.map((cell) => (
+              <StatWellCell
+                key={cell.key}
+                label={cell.label}
+                value={`${cell.value}${cell.unit}`}
+              />
+            ))}
+            {/*
+              Sky has been captured on every run since conditions existed and shown back on
+              none of them — it fed the Engineer's context and nothing else. It is read-only
+              like the rest, but it is now at least readable (founder call, 2026-08-20).
+            */}
+            {skyDisplay ? <StatWellCell label="Sky" value={skyDisplay} /> : null}
+          </StatWellGrid>
+        </div>
+      ) : null}
+
       <div className="space-y-2">
         <Eyebrow>Laptimes</Eyebrow>
+        {/*
+          Where these laps came from, and how to change it — EDIT MODE ONLY.
+
+          Lap times themselves are never editable: they are what the transponder saw, not
+          an opinion (founder call, 2026-08-20). But the wrong heat DOES get attached, and
+          nothing on the session used to say which timing session was feeding it. So the
+          correction is "this is not the session I was in", not "this lap is wrong".
+
+          It showed while merely READING the session for one day, and the founder took it
+          back (2026-08-21): a URL is plumbing, not a fact about the run. Nobody looking at
+          their lap times wants to know which page the app scraped — they want the laps.
+          The question "is this even the right heat?" only occurs to a driver who has already
+          decided something is wrong, and that driver has pressed the pencil.
+
+          Replacing goes to the wizard's lap step, which is the real importer and already
+          knows how to pick a session and say which row of the field is you — the same
+          shape as the setup sheet: a separate page that comes back.
+
+          "Comes back" is only true since 2026-08-21. The `?back=` this href has always
+          carried was read by nobody, and every wizard save ran `navigateAway("/")`, so
+          replacing a heat handed the driver the dashboard. `lapImportHref` builds the
+          param and `/runs/[id]/edit` now honours it — see both.
+        */}
+        {canEdit && lapImportSource ? (
+          <div className="space-y-1.5 rounded-md border border-border bg-muted/70 px-2.5 py-2">
+            <Eyebrow className="mb-0">Imported from</Eyebrow>
+            <p className="break-all text-[11.5px] leading-snug text-muted-foreground">
+              {lapImportSource.label}
+            </p>
+            <div className="flex flex-wrap gap-2 pt-0.5">
+              <Link
+                href={lapImportHref(run.id)}
+                onClick={(e) => e.stopPropagation()}
+                className="tap-active rounded-md border border-border bg-background px-2 py-1 text-[10.5px] font-semibold text-foreground no-underline transition-colors hover:bg-muted/80"
+              >
+                Replace link
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      "Remove these laps from the run?\n\nThe lap times, the field and every figure worked out from them come off. The import itself is kept in your lap history."
+                    )
+                  ) {
+                    return;
+                  }
+                  void corrections.detachLapImport();
+                }}
+                className="tap-active rounded-md border border-destructive/35 bg-destructive/10 px-2 py-1 text-[10.5px] font-semibold text-destructive transition-colors hover:bg-destructive/20"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ) : null}
         <RunRaceFieldSwitcher
           runId={run.id}
           enabled={(run.importedLapSets?.length ?? 0) > 0}
@@ -754,27 +1190,108 @@ export function RunDetailPanel({
             No setup recorded for this run — it was logged without one.
           </p>
         ) : (
+          /*
+            ============================== WHY THIS COLUMN IS NO LONGER TYPEABLE ==============================
+
+            The NOW column was a text box until 2026-08-20, and beneath it sat "Fix another
+            setup value…" — a searchable list of every value on the run, each one retypable.
+            Both are gone, and the founder's reason is better than the one they were built on:
+            a setup is filled on the driver's own sheet, so it should be CORRECTED on the
+            driver's own sheet. One place, one control, one shape.
+
+            The list's original argument survives the change intact rather than being
+            overruled — it existed because a diff only lists what MOVED, and the value most
+            often wrong is one that has not moved in weeks. The sheet answers that better
+            than the list did: it shows every box on the paper, including the ones no diff
+            would ever surface, with the real control for screw patterns and multi-picks
+            that a text box could only corrupt.
+          */
           <SetupChangedSincePreviousList
             rows={setupPreview.mode === "no_baseline" ? null : setupPreview.rows}
             runId={run.id}
           />
         )}
+        {/*
+          The door. `?run=` is what tells the editor it is correcting THIS run rather than
+          forking a new setup off it, and `?back=` is what brings the driver home — without
+          it the editor's save landed on a second copy of itself holding a setup id nobody
+          had seen (fixed 2026-08-20). Both are load-bearing; neither is decoration.
+        */}
+        {canEdit && run.carId && run.setupSnapshot?.id ? (
+          <SetupSheetDoor
+            carName={run.car?.name ?? null}
+            /*
+             * A button when the host has a setup pop-up to open (the run page and the Sessions
+             * workbench, both via `RunPageClient`), a Link to the standalone editor when it
+             * does not. The pop-up is the same sheet with the same boxes, so the door reads
+             * the same either way — only the trip differs.
+             */
+            onOpen={onEditSetup}
+            href={`/cars/${encodeURIComponent(run.carId)}/setups/${encodeURIComponent(run.setupSnapshot.id)}/edit?run=${encodeURIComponent(run.id)}&back=${encodeURIComponent(`/runs/${run.id}`)}`}
+          />
+        ) : null}
       </div>
 
+      {/*
+        ============================== WHAT YOU THOUGHT OF THE RUN ==============================
+
+        All three of these are the driver's own answer about their own run, so all three
+        are editable in place (founder call, 2026-08-20). That decision is what let the
+        wizard link come off this page entirely: with notes, the rating and the handling
+        assessment fixable here, and setup on the sheet, there is nothing left that only
+        the six-step form can change.
+
+        The controls are the SAME ones used when logging — `CarHandlingRatingQuickPick`
+        and `HandlingAssessmentFields` already took `readOnly`, so edit mode simply stops
+        passing it. The driver answered by placing a dot on a lane and raising a
+        staircase; correcting it should not mean answering a different question.
+      */}
       <div className="space-y-2">
-        <DetailRow
-          label="Notes"
-          value={runNotesOnly(run) || "—"}
-          multiline
-          emptyAsDash
-          prose
-        />
+        {canEdit ? (
+          <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+            <Eyebrow>Notes</Eyebrow>
+            <AutoGrowTextarea
+              minRows={2}
+              defaultValue={runNotesOnly(run)}
+              aria-label="Run notes"
+              placeholder="What happened out there?"
+              /* Commit on blur, like every other inline correction — no save button to
+                 hunt for, and nothing lost by tapping away. */
+              onBlur={(e) => {
+                const next = e.currentTarget.value.trim();
+                if (next === runNotesOnly(run)) return;
+                void corrections.saveFields({ notes: next });
+              }}
+              className="w-full rounded-md border border-ring/40 bg-background px-2.5 py-1.5 text-[13px] leading-relaxed text-foreground outline-none focus:border-ring"
+            />
+          </div>
+        ) : (
+          <DetailRow
+            label="Notes"
+            value={runNotesOnly(run) || "—"}
+            multiline
+            emptyAsDash
+            prose
+          />
+        )}
         <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
-          <CarHandlingRatingQuickPick value={carRatingDisplay} readOnly />
+          <CarHandlingRatingQuickPick
+            value={carRatingDisplay}
+            readOnly={!canEdit}
+            onChange={(next) => void corrections.saveFields({ carRating: next })}
+          />
         </div>
-        {/* No `stopPropagation` wrapper: read-only, so there is nothing to tap and clicks
-            should behave like the rest of the panel. */}
-        {showHandlingReadback ? <HandlingAssessmentFields value={handlingUi} readOnly /> : null}
+        {showHandlingReadback || canEdit ? (
+          <div onClick={(e) => e.stopPropagation()}>
+            <HandlingAssessmentFields
+              value={handlingUi}
+              readOnly={!canEdit}
+              onChange={(next) =>
+                void corrections.saveFields({ handlingAssessmentJson: persistedFromUiState(next) })
+              }
+            />
+          </div>
+        ) : null}
         {legacyHandlingText ? (
           <DetailRow
             /* Alongside the controls this is the leftover; on its own (a pre-capture run)
@@ -794,9 +1311,14 @@ export function RunDetailPanel({
         allowMutations={allowRunMutations}
       />
 
-      {allowRunMutations || deleteError ? (
+      {/*
+        Delete lives inside edit mode now. It sat permanently on the page before, which
+        put the one irreversible control on a surface whose whole job is reading — and
+        next to nothing else that did anything.
+      */}
+      {canEdit || deleteError ? (
         <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-          {allowRunMutations ? (
+          {canEdit ? (
             <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
               <button
                 type="button"
@@ -817,6 +1339,86 @@ export function RunDetailPanel({
   );
 
   const CONTENT = "space-y-3 text-sm min-w-0 w-full";
+
+  /**
+   * Both portal to `<body>`, so where they sit in the tree doesn't matter — but
+   * they have to be in BOTH returns below, or the workbench's split layout would
+   * silently lose the question and the undo.
+   */
+  const overlays = allowRunMutations ? (
+    <>
+      <RunCarMoveSheet
+        open={pendingCarMove != null}
+        fromCarName={carDisplay}
+        toCarName={pendingCarMove?.label ?? ""}
+        hasSetup={Boolean(run.setupSnapshot?.id)}
+        busy={carMoveBusy}
+        error={carMoveError}
+        onCancel={() => {
+          setPendingCarMove(null);
+          setCarMoveError(null);
+        }}
+        onConfirm={() => {
+          const target = pendingCarMove;
+          if (!target || carMoveBusy) return;
+          setCarMoveBusy(true);
+          setCarMoveError(null);
+          void corrections
+            .saveFields({ carId: target.id })
+            .then(() => setPendingCarMove(null))
+            .catch((err: unknown) =>
+              setCarMoveError(err instanceof Error ? err.message : "Could not move that run")
+            )
+            .finally(() => setCarMoveBusy(false));
+        }}
+      />
+      <TirePrepSheet
+        open={prepOpen}
+        initialSteps={tirePrepSteps}
+        initialAdditiveTypeId={run.additiveType?.id ?? ""}
+        busy={prepBusy}
+        error={prepError}
+        onCancel={() => {
+          if (prepBusy) return;
+          setPrepOpen(false);
+          setPrepError(null);
+        }}
+        onSave={({ tirePrep, additiveTypeId }) => {
+          if (prepBusy) return;
+          setPrepBusy(true);
+          setPrepError(null);
+          /*
+           * One PATCH for both. The additive is stamped into the setup snapshot server-side
+           * as well as onto the run, so sending it separately would write the sheet twice.
+           * `additiveTypeId: ""` is how the route is told to CLEAR it — see the route's
+           * "`undefined` = the body did not mention the additive" note.
+           */
+          void corrections
+            .saveFields({ tirePrep, additiveTypeId: additiveTypeId || null })
+            .then(() => setPrepOpen(false))
+            .catch((err: unknown) =>
+              setPrepError(err instanceof Error ? err.message : "Could not save that prep")
+            )
+            .finally(() => setPrepBusy(false));
+        }}
+      />
+      <SetupCorrectionSheet
+        correction={corrections.pendingCorrection}
+        displayTimeZone={displayTimeZone}
+        onClose={corrections.dismissCorrection}
+        onApply={corrections.applyCorrection}
+      />
+      <ActionToast
+        message={corrections.toast?.message ?? null}
+        action={
+          corrections.toast?.undo
+            ? { label: "Undo", onClick: corrections.toast.undo }
+            : null
+        }
+        onDismiss={corrections.dismissToast}
+      />
+    </>
+  ) : null;
 
   /**
    * Two cards, emitted as siblings so the workbench grid can place them in its
@@ -846,15 +1448,76 @@ export function RunDetailPanel({
         <CardPanel className={cn(className, columnClassName)} contentClassName={CONTENT}>
           {log}
         </CardPanel>
+        {overlays}
       </>
     );
   }
 
   return (
-    <CardPanel className={className} contentClassName={CONTENT} dataTour="run-detail">
-      {record}
-      {log}
-    </CardPanel>
+    <>
+      <CardPanel className={className} contentClassName={CONTENT} dataTour="run-detail">
+        {record}
+        {log}
+      </CardPanel>
+      {overlays}
+    </>
+  );
+}
+
+/**
+ * The way into correcting this run's setup.
+ *
+ * One face, two mechanisms. `onOpen` raises the run page's setup pop-up, which since
+ * 2026-08-21 edits in place — the founder's call, and a fair one: reading the sheet and
+ * correcting it were the same picture behind two different page loads. Without a pop-up to
+ * raise (a host that renders this panel bare) the old standalone editor is still there,
+ * still carrying `?run=` and `?back=`.
+ *
+ * The sub-line differs because the promise differs. "Comes back here" is only worth saying
+ * about a trip that leaves.
+ */
+function SetupSheetDoor({
+  carName,
+  onOpen,
+  href,
+}: {
+  carName: string | null;
+  onOpen?: () => void;
+  href: string;
+}) {
+  const face = "tap-active flex w-full max-w-[30rem] items-center justify-between gap-3 rounded-lg border border-primary-ink/50 bg-primary/10 px-3 py-2 text-left no-underline transition-colors hover:bg-primary/20";
+  const body = (
+    <>
+      <span className="min-w-0">
+        <span className="block text-[12.5px] font-semibold text-foreground">
+          Edit setup on the sheet
+        </span>
+        <span className="block text-[10.5px] text-muted-foreground">
+          Every box on {carName ?? "this car"}’s sheet
+          {onOpen ? "" : " · comes back here"}
+        </span>
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-primary-ink" aria-hidden />
+    </>
+  );
+  if (onOpen) {
+    return (
+      <button
+        type="button"
+        className={face}
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen();
+        }}
+      >
+        {body}
+      </button>
+    );
+  }
+  return (
+    <Link href={href} onClick={(e) => e.stopPropagation()} className={face}>
+      {body}
+    </Link>
   );
 }
 

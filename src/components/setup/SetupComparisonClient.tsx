@@ -24,6 +24,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
@@ -137,6 +138,9 @@ function SlotChip({
 }
 
 export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
+  // Safe here: the page already wraps this component in `<Suspense>`, which `useSearchParams`
+  // requires — without it the whole route opts into client rendering at build time.
+  const searchParams = useSearchParams();
   const [slots, setSlots] = useState<{ a: SetupEntry | null; b: SetupEntry | null }>({ a: null, b: null });
   const [sel, setSel] = useState<SlotId>("a");
 
@@ -263,6 +267,34 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
   useEffect(() => {
     void loadSources();
   }, [loadSources]);
+
+  /*
+   * `?a=…&b=…` — arrive with both slots already filled.
+   *
+   * The Tools page sends these (2026-08-19). The bench's cost was never the comparison, it was
+   * the picking: two taps into the modal, two searches, two rows chosen out of forty, and for
+   * the common case — your last two setups on the car you just ran — every one of those choices
+   * has one obvious answer.
+   *
+   * The params carry ENTRY ids (`run-<id>` / `saved-<id>`), the same strings `loadSources`
+   * mints above, so no second id vocabulary exists and nothing new is stored. An id that
+   * doesn't match — a deleted run, a teammate who stopped sharing — simply leaves that slot
+   * empty, which is the page's normal starting state and needs no error.
+   *
+   * Applied ONCE, guarded by a ref. Without it, clearing a slot would refill it on the next
+   * render and the picker would look broken.
+   */
+  const prefilledRef = useRef(false);
+  useEffect(() => {
+    if (prefilledRef.current || !entries?.length) return;
+    const wanted = { a: searchParams.get("a"), b: searchParams.get("b") };
+    if (!wanted.a && !wanted.b) return;
+    prefilledRef.current = true;
+    setSlots({
+      a: entries.find((e) => e.id === wanted.a) ?? null,
+      b: entries.find((e) => e.id === wanted.b) ?? null,
+    });
+  }, [entries, searchParams]);
 
   /** How many rows each source holds before the search box narrows anything. */
   const poolCounts = useMemo(() => {

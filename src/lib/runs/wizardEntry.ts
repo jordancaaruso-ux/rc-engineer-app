@@ -5,8 +5,8 @@
  * the host ALWAYS derives a blank entry (deriveFreshEntry) — the form's
  * Session step offers the car's last run on a manifest card and
  * applyWizardPrefill applies it in-form, reusing deriveContinueEntry for the
- * session identity rules (a race meeting re-attaches its own event and stays a
- * race meeting; a testing run carries its track). `continuing` therefore stays
+ * session identity rules (an event day re-attaches its own event and stays an
+ * event day; a testing run carries its track). `continuing` therefore stays
  * false in the wizard payload.
  */
 
@@ -25,7 +25,7 @@ export type NewRunWizardEntry = {
   meetingSessionType: "PRACTICE" | "QUALIFYING" | "RACE" | null;
   /** "Main" when the session is a main; null otherwise. */
   sessionLabel: string | null;
-  /** Race meeting: the event this run attaches to (track derives from it). */
+  /** Event day: the event this run attaches to (track derives from it). */
   eventId: string | null;
   /** Test day: the picked/auto-detected track (null when the event carries it). */
   trackId: string | null;
@@ -44,10 +44,10 @@ export function isCandidateStale(candidate: EntryCandidate, now = Date.now()): b
 
 /**
  * Continue-from-last-run context. A deep-linked event wins; otherwise a race
- * meeting stays a race meeting and re-attaches its OWN event — even a past one,
+ * event day stays an event day and re-attaches its OWN event — even a past one,
  * since the driver is usually logging more runs from that meeting. When the run
  * had no formal event we keep the RACE_MEETING session type and carry the venue
- * instead. A race meeting never silently degrades to testing on copy (matches
+ * instead. An event day never silently degrades to testing on copy (matches
  * the classic copy-last-run path). Only a genuinely testing run carries forward
  * as testing. (A real venue change is caught later by the in-form GPS
  * venue-mismatch swap, once location resolves.)

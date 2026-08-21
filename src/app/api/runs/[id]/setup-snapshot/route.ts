@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildTireSelectionValue } from "@/lib/tires/tireSelectionValue";
+import { buildTireSelectionValue, isTireFieldKey } from "@/lib/tires/tireSelectionValue";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -10,6 +10,11 @@ import {
   type SetupSnapshotData,
 } from "@/lib/runSetup";
 import { computeSetupDeltaForAudit } from "@/lib/setup/resolveSetupSnapshot";
+import { setupFieldLabel } from "@/lib/setupCompare/changedSincePrevious";
+import { planCascadeCandidatesForRun } from "@/lib/runs/planSetupCascadeCandidates";
+import { setupKeyIsInlineEditable } from "@/lib/setup/inlineEditableKeys";
+import { changedSetupKeys } from "@/lib/setup/setupValuesFingerprint";
+import { MAX_CASCADE_QUESTIONS } from "@/lib/runs/setupCorrectionCascade";
 import { revalidateAfterRunMutation } from "@/lib/revalidateUser";
 import { loadTeamMemberDisplays } from "@/lib/teams/teamMemberDisplay";
 import { savedRunSetupName, teammateSetupCopyName } from "@/lib/setup/setupSaveName";
@@ -293,6 +298,8 @@ export async function PATCH(request: Request, { params }: Params) {
     select: {
       id: true,
       carId: true,
+      // The "logged after" axis the cascade walks forward along. See `planCascadeCandidatesForRun`.
+      sortAt: true,
       tireTypeId: true,
       tireRunNumber: true,
       tireAgeKnown: true,
@@ -385,8 +392,109 @@ export async function PATCH(request: Request, { params }: Params) {
    */
   revalidateAfterRunMutation(userId);
 
+  /*
+   * ============================== CARRYING THE CASCADE QUESTION ==============================
+   *
+   * "Did your later runs have this wrong too?" used to be asked by the inline text box on
+   * the run page, because that box was the only way to correct a setup value. Since
+   * 2026-08-20 setup is corrected on the SHEET instead, and this route is what the sheet
+   * saves through — so without this, the single most useful thing about the feature would
+   * have quietly stopped happening the moment the better door opened.
+   *
+   * ============================== WHY A FEW KEYS QUALIFY, AND SIX DO NOT ==============================
+   *
+   * The cascade answers one question: "you typed a number wrong, and the runs around it
+   * inherited the mistake." A save that moved a whole page of boxes is not that — it is a
+   * driver redoing a setup on paper, and offering to push all of them onto other runs would
+   * rewrite deliberate changes wholesale.
+   *
+   * It was ONE key until 2026-08-21, and the founder found the edge that made that wrong:
+   * spotting two stale numbers on the same sheet and fixing both before pressing save is an
+   * ordinary thing to do, and it silently bought you nothing. So the cap is
+   * `MAX_CASCADE_QUESTIONS`, asked one value at a time, and a save past the cap now SAYS it
+   * offered nothing rather than going quiet.
+   */
+  const before = normalizeSetupSnapshotForStorage(run.setupSnapshot?.data ?? null);
+  /*
+   * ============================== WHAT COUNTS AS A CHANGED BOX ==============================
+   *
+   * `changedSetupKeys` and not a hand-rolled `JSON.stringify` comparison, which is what sat
+   * here until 2026-08-21 and quietly cost the feature almost everything.
+   *
+   * The sheet hands every box back as a STRING — `surfaceValuesToStored` writes `value`, and
+   * `value` is what came out of a text box. A snapshot holding the number `5` therefore comes
+   * back as `"5"`, and `JSON.stringify(5)` is `5` while `JSON.stringify("5")` is `"5"`. On a
+   * setup stored with real numbers that marked EVERY numeric box as changed on every save, so
+   * the count was never 1 and the cascade never offered itself at all. `"5.0"` vs `"5"` and
+   * `true` vs `"1"` failed the same way.
+   *
+   * `changedSetupKeys` is the comparison the save bar already runs on (see
+   * `setupValuesFingerprint`): two setups differ when they would STORE differently, so `5`,
+   * `"5"` and `"5.00"` are one ride height. Using it here means the count means what the
+   * sentence above says it means.
+   *
+   * The tire exclusion stays on top, and for its own separate reason: THIS ROUTE rewrites
+   * `tires` a few dozen lines up, re-stamping it from the run's tire context on every save.
+   * On the first save after that context moved at all, the re-stamp landed as a second
+   * changed key and silenced a genuine single-box correction. Only a real save through the
+   * sheet showed it — the shape is invisible to a unit test that hands the route a snapshot
+   * it just built.
+   */
+  const changedKeys = changedSetupKeys(before, resolvedData).filter((key) => !isTireFieldKey(key));
+
+  type CorrectionPayload = {
+    key: string;
+    label: string;
+    previousValue: unknown;
+    value: unknown;
+    candidates: unknown[];
+  };
+
+  /*
+   * Only keys the cascade can actually carry. Applying it writes a SCALAR onto each ticked
+   * run (`buildSetupCorrectionWrites` takes a string), and `./apply` refuses anything else —
+   * so a screw pattern, a multi-select or a preset-with-other would be offered here and then
+   * rejected at the moment the driver ticked the runs. Those keep their real controls on the
+   * sheet, which is where this save just came from anyway.
+   */
+  const carryable =
+    changedKeys.length <= MAX_CASCADE_QUESTIONS
+      ? changedKeys.filter((key) => setupKeyIsInlineEditable(key))
+      : [];
+
+  // Captured, not read off `run` inside the callbacks: the `!run.carId` guard above narrows
+  // the property, and that narrowing does not survive into a closure.
+  const cascadeCarId = run.carId;
+
+  const corrections: CorrectionPayload[] = await Promise.all(
+    carryable.map(async (key) => ({
+      key,
+      label: setupFieldLabel(key),
+      previousValue: before[key] ?? null,
+      value: resolvedData[key] ?? null,
+      candidates: await planCascadeCandidatesForRun({
+        userId,
+        run: { id: run.id, carId: cascadeCarId, sortAt: run.sortAt },
+        key,
+        previousValue: before[key],
+        nextValue: resolvedData[key] == null ? "" : String(resolvedData[key]),
+      }),
+    }))
+  );
+
   return NextResponse.json({
     ok: true,
     snapshot: { id: snapshot.id, data: snapshot.data },
+    /*
+     * One question per corrected value, asked in turn. `correction` is kept as the first of
+     * them so a client that has not been redeployed still gets the behaviour it expects.
+     *
+     * `suppressedKeyCount` is how the run page can say "you changed six boxes, so nothing was
+     * offered" instead of going silent — the silence is the whole reason this was reported as
+     * a lost feature.
+     */
+    correction: corrections[0] ?? null,
+    corrections,
+    suppressedKeyCount: changedKeys.length > MAX_CASCADE_QUESTIONS ? changedKeys.length : 0,
   });
 }

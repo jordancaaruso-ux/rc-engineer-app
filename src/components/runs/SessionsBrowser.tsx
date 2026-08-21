@@ -27,6 +27,7 @@ import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
 import { useRegisterMobileBack } from "@/components/layout/MobileBackContext";
 import { BACK_PARAM } from "@/lib/runs/sessionsReturn";
+import { lapImportHref } from "@/lib/runs/lapImportHref";
 import { formatLap } from "@/lib/runLaps";
 import { cn } from "@/lib/utils";
 
@@ -46,7 +47,7 @@ import { cn } from "@/lib/utils";
  *
  * ## The three levels
  *
- * - **Session** — a day or a race meeting. Always the list.
+ * - **Session** — a day or an event. Always the list.
  * - **Driver** — team scope only, because solo's roster is one. Inserted between.
  * - **Run** — `RunPageClient` in the pane on desktop; on a phone, a real
  *   navigation to `/runs/[id]`, which is the page that already exists.
@@ -818,7 +819,7 @@ function SessionRail({
          */
         const markAlways = chosen;
         const markAtLg = open && !chosen;
-        const isRaceMeeting = group.type === "Race Meeting";
+        const isRaceMeeting = group.type === "Event";
         const lead = group.teamDay?.drivers[0] ?? null;
         const groupBest =
           group.headline?.best ??
@@ -1168,7 +1169,7 @@ function RunRail({
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation();
-                  router.push(`/runs/${run.id}/edit?step=laps`);
+                  router.push(lapImportHref(run.id));
                 }}
                 onKeyDown={(event) => event.stopPropagation()}
                 aria-label={`Lap times missing on ${run.label} — import them`}

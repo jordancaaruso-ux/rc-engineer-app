@@ -19,10 +19,7 @@ import {
   parseWarmerTimingMinutes,
 } from "@/lib/runs/applyRunContextToSetupSnapshot";
 import { normalizeTirePrep, derivedWarmerTimingMinutes } from "@/lib/runs/tirePrep";
-import {
-  planTireRunNumberCascade,
-  withTireRunNumberInSnapshot,
-} from "@/lib/tires/cascadeTireRunNumber";
+import { applyTireRunNumberCascade } from "@/lib/tires/applyTireRunNumberCascade";
 import { getSetupSheetFieldKeysForCarRow } from "@/lib/runs/setupSheetFieldKeysForCar";
 import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
 import { linkImportedSessionsToRun } from "@/lib/lapImport/service";
@@ -697,79 +694,21 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       where: { runId: run.id },
     });
 
-    /**
-     * Carry the correction down the rest of the set. See
-     * `lib/tires/cascadeTireRunNumber` for why this is a shift rather than a
-     * renumber, and why the stint boundary is the stop condition.
-     *
-     * Only ever runs when the stint survived the edit: a run that forked onto
-     * fresh rubber has no later runs of its own to move, and the set it left is
-     * none of its business. `sortAt` is the ordering axis (stamped once at
-     * create, so re-imports never reshuffle a day) — `createdAt` would move
-     * backfilled runs in the wrong direction.
+    /*
+     * Carry the correction down the rest of the set. The rule — a shift rather than a
+     * renumber, stopping at the stint boundary — lives in `lib/tires/cascadeTireRunNumber`;
+     * applying it lives in `applyTireRunNumberCascade`, which the run page's sparse
+     * correction calls too, so the two paths can never drift apart.
      */
-    const tireRunNumberDelta = tireRunNumber - existing.tireRunNumber;
-    if (
-      tireStintId != null &&
-      existing.tireStintId != null &&
-      tireStintId === existing.tireStintId &&
-      tireRunNumberDelta !== 0
-    ) {
-      const laterRuns = await prisma.run.findMany({
-        where: {
-          userId: params.userId,
-          tireStintId,
-          id: { not: existing.id },
-          sortAt: { gt: existing.sortAt },
-        },
-        select: { id: true, tireRunNumber: true, setupSnapshotId: true },
-        orderBy: { sortAt: "asc" },
-      });
-      const steps = planTireRunNumberCascade(tireRunNumberDelta, laterRuns);
-      if (steps.length > 0) {
-        const snapshots = await prisma.setupSnapshot.findMany({
-          where: {
-            id: { in: steps.map((s) => s.setupSnapshotId).filter((id): id is string => id != null) },
-          },
-          select: { id: true, data: true },
-        });
-        const snapshotById = new Map(snapshots.map((s) => [s.id, s.data]));
-
-        const writes: PrismaTypes.PrismaPromise<unknown>[] = [];
-        for (const step of steps) {
-          writes.push(
-            prisma.run.update({
-              where: { id: step.runId },
-              data: {
-                tireRunNumber: step.tireRunNumber,
-                // Their Engineer read was computed against the old position on the
-                // set, so it is no longer an answer to this run.
-                engineerSummaryJson: Prisma.JsonNull,
-                engineerSummaryRefRunId: null,
-                engineerSummaryComputedAt: null,
-              },
-            })
-          );
-          if (!step.setupSnapshotId) continue;
-          const patched = withTireRunNumberInSnapshot(
-            snapshotById.get(step.setupSnapshotId),
-            step.tireRunNumber
-          );
-          if (!patched) continue;
-          writes.push(
-            prisma.setupSnapshot.update({
-              where: { id: step.setupSnapshotId },
-              data: { data: patched as object },
-            })
-          );
-        }
-        await prisma.$transaction(writes);
-        await prisma.engineerBetweenRunHint.deleteMany({
-          where: { primaryRunId: { in: steps.map((s) => s.runId) } },
-        });
-        tireRunNumberCascade = { updatedRuns: steps.length, delta: tireRunNumberDelta };
-      }
-    }
+    tireRunNumberCascade = await applyTireRunNumberCascade({
+      userId: params.userId,
+      runId: existing.id,
+      tireStintId,
+      previousTireStintId: existing.tireStintId,
+      previousTireRunNumber: existing.tireRunNumber,
+      nextTireRunNumber: tireRunNumber,
+      sortAt: existing.sortAt,
+    });
   }
 
   const importedLapSets = Array.isArray(body.importedLapSets) ? body.importedLapSets : [];

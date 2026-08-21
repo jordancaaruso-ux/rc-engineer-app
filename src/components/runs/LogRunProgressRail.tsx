@@ -115,7 +115,7 @@ export function LogRunProgressRail({ sections }: { sections: RunProgressSection[
   };
 
   // Some cards are conditionally rendered (e.g. the Event card only exists on a
-  // Race Meeting session). A section is shown only once it has docked or its card
+  // Event session). A section is shown only once it has docked or its card
   // is actually present in the DOM — never as a ghost that can never resolve.
   const visibleSections = sections.filter((s) => passed.has(s.id) || sectionEl(s.id));
   const allRequiredDone = visibleSections.every((s) => s.requiredMissing === 0);

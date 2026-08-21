@@ -23,7 +23,7 @@ export type RunForHistoryGroup = {
 export type RunHistoryGroup<T extends RunForHistoryGroup = RunForHistoryGroup> = {
   id: string;
   title: string;
-  type: "Testing" | "Race Meeting";
+  type: "Testing" | "Event";
   trackName: string | null;
   dateLabel: string;
   runs: T[];
@@ -194,7 +194,7 @@ export function buildRunHistoryGroups<T extends RunForHistoryGroup>(
     const title = isEvent && run.event
       ? run.event.name
       : `Test day – ${formatGroupDate(runSessionSortInstant(run), runZone)}`;
-    const type: RunHistoryGroup["type"] = isEvent ? "Race Meeting" : "Testing";
+    const type: RunHistoryGroup["type"] = isEvent ? "Event" : "Testing";
     const trackName = isEvent && run.event
       ? (run.event.track?.name ?? run.event.trackNameSnapshot ?? run.track?.name ?? run.trackNameSnapshot ?? "—")
       : (run.track?.name ?? run.trackNameSnapshot ?? "—");

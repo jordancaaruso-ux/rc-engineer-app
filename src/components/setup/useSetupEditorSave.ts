@@ -5,6 +5,67 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { renameSetup } from "@/lib/setup/keepSetupClient";
 import { changedSetupKeys } from "@/lib/setup/setupValuesFingerprint";
 import type { SetupSaveMode } from "@/lib/setup/setupSaveMode";
+import {
+  stashPendingSetupCascade,
+  type PendingSetupCascadeItem,
+} from "@/lib/setup/pendingSetupCascade";
+import type { CorrectionCandidate } from "@/components/runs/SetupCorrectionSheet";
+
+/** The cascade sheet shows values as text; `—` is what it prints for "nothing recorded". */
+function displayForCascade(value: unknown): string {
+  if (value == null || value === "") return "—";
+  return String(value);
+}
+
+type CorrectionFromRoute = {
+  key: string;
+  label: string;
+  previousValue: unknown;
+  value: unknown;
+  candidates: CorrectionCandidate[];
+};
+
+type SetupCorrectionResponse = {
+  snapshot: { id: string };
+  /** The first question, kept so an un-refreshed client still works. */
+  correction?: CorrectionFromRoute | null;
+  /** Every question this save earned — one per corrected value. */
+  corrections?: CorrectionFromRoute[] | null;
+  /** Non-zero when the save moved too many boxes to offer anything. */
+  suppressedKeyCount?: number | null;
+};
+
+/**
+ * The route's questions in the shape the run page asks them in.
+ *
+ * Falls back to the single `correction` field, because this hook and the route deploy
+ * separately: a stale service worker serving yesterday's bundle against today's route (or
+ * the reverse) is an ordinary Tuesday for an installed PWA, and the failure mode without
+ * this is the feature silently doing nothing.
+ */
+function correctionItems(body: SetupCorrectionResponse): PendingSetupCascadeItem[] {
+  const raw = body.corrections ?? (body.correction ? [body.correction] : []);
+  return raw
+    .filter((c) => c && c.candidates.length > 0)
+    .map((c) => ({
+      field: { key: c.key, label: c.label },
+      previousDisplay: displayForCascade(c.previousValue),
+      nextDisplay: displayForCascade(c.value),
+      candidates: c.candidates,
+    }));
+}
+
+function suppressedCount(body: SetupCorrectionResponse): number {
+  return typeof body.suppressedKeyCount === "number" ? body.suppressedKeyCount : 0;
+}
+
+/** What a caller hosting the editor in place is handed instead of a navigation. */
+export type SetupEditorSavedResult = {
+  snapshotId: string;
+  corrections: PendingSetupCascadeItem[];
+  /** How many boxes moved, when that was too many to ask about. Zero otherwise. */
+  suppressed: number;
+};
 
 /**
  * The save behaviour both setup editors share — the grid one and the sheet one. They differ only in
@@ -115,6 +176,12 @@ export type SetupEditorSave = {
   dirty: boolean;
   /** How many boxes differ from the setup as it was opened. Zero whenever `dirty` is false. */
   changedCount: number;
+  /**
+   * Ticks once per landed save. Says nothing about the setup — it is a version to hang cached,
+   * server-drawn artifacts off, so they are re-made after an edit rather than served from before
+   * it. See `setupEditorShare`.
+   */
+  savedCount: number;
   /** The loud button. Every mode has one. */
   primary: SetupEditorSaveAction;
   /** The quiet one beside it, when the mode has a second thing worth offering. */
@@ -132,6 +199,8 @@ export function useSetupEditorSave({
   saveMode,
   values,
   getData,
+  returnHref,
+  onSaved,
 }: {
   carId: string;
   setupId: string;
@@ -146,6 +215,24 @@ export function useSetupEditorSave({
   values: unknown;
   /** Reads the editor's current values in the shape storage wants. Changes with `values`. */
   getData: () => Record<string, unknown>;
+  /**
+   * Where a run correction lands, from `?back=` (see `lib/setup/setupEditorReturn`).
+   *
+   * Null keeps the old behaviour — following the run to its NEW snapshot's editor —
+   * which is still right for a correction started from the garage, where there is
+   * no run page to go back to.
+   */
+  returnHref?: string | null;
+  /**
+   * Set when the editor is hosted ON the run page rather than being a page of its own —
+   * the setup pop-up (2026-08-21).
+   *
+   * It replaces BOTH halves of the hand-off: there is no navigation to make, because the
+   * driver is already where they were going, and no `sessionStorage` hop to make, because
+   * the cascade questions can be handed straight to the component that asks them. Absent,
+   * everything behaves exactly as it did.
+   */
+  onSaved?: (result: SetupEditorSavedResult) => void;
 }): SetupEditorSave {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -157,6 +244,8 @@ export function useSetupEditorSave({
    * a save moves it, and the bar has to repaint when it does.
    */
   const [baseline, setBaseline] = useState(values);
+  /** See the note on `SetupEditorSave.savedCount`. */
+  const [savedCount, setSavedCount] = useState(0);
   const changedCount = useMemo(() => changedSetupKeys(baseline, values).length, [baseline, values]);
   const dirty = changedCount > 0;
 
@@ -184,6 +273,7 @@ export function useSetupEditorSave({
   const settled = useCallback((written: unknown) => {
     setBaseline(written);
     setStatus("saved");
+    setSavedCount((n) => n + 1);
   }, []);
 
   /*
@@ -243,12 +333,45 @@ export function useSetupEditorSave({
           const body = (await res.json().catch(() => ({}))) as { error?: string };
           throw new Error(body.error ?? "Could not update the run.");
         }
-        const body = (await res.json()) as { snapshot: { id: string } };
+        const body = (await res.json()) as SetupCorrectionResponse;
         settled(values);
-        // The run points at a new snapshot now; the one still in the URL is no longer its record,
-        // so the driver is taken to the row that is — still on the run's side of the door.
+
+        /*
+         * Hand the "did your other runs have this wrong too?" questions back to the run.
+         *
+         * They are about the corrected run's NEIGHBOURS, so they belong on the run page,
+         * not here — and this editor is about to navigate there. The route returns one per
+         * corrected value, up to `MAX_CASCADE_QUESTIONS`; past that it returns none and
+         * says how many it declined, which the run page reports rather than swallows.
+         *
+         * `onSaved` short-circuits the whole hand-off: a caller that is ALREADY on the run
+         * page (the setup pop-up) takes the questions in memory and never navigates, so
+         * there is nothing to stash and nowhere to travel to.
+         */
+        const items = correctionItems(body);
+        if (onSaved) {
+          onSaved({ snapshotId: body.snapshot.id, corrections: items, suppressed: suppressedCount(body) });
+          return true;
+        }
+        stashPendingSetupCascade({ runId, corrections: items });
+        /*
+         * Back to where the driver came from, when they said.
+         *
+         * The run points at a new snapshot now, and the one still in the URL is no
+         * longer its record — which used to be the whole argument for pushing them
+         * to the NEW snapshot's editor. It was the wrong conclusion: a driver who
+         * came in from a run, corrected it, and pressed the primary button ended up
+         * on a second copy of the editor holding a setup id they had never seen,
+         * with nothing pointing back at the run they were reading (founder call,
+         * 2026-08-20). The stale URL is a reason to LEAVE, not a reason to open
+         * another editor.
+         *
+         * Without `?back=` the old behaviour stands: reached from the garage there
+         * is no run page to return to, and the new row is the honest destination.
+         */
         router.push(
-          `/cars/${carId}/setups/${body.snapshot.id}/edit?run=${encodeURIComponent(runId)}`
+          returnHref ??
+            `/cars/${carId}/setups/${body.snapshot.id}/edit?run=${encodeURIComponent(runId)}`
         );
         router.refresh();
         return true;
@@ -259,7 +382,7 @@ export function useSetupEditorSave({
         return false;
       }
     },
-    [carId, router, getData, settled, values]
+    [carId, router, getData, settled, values, returnHref, onSaved]
   );
 
   /**
@@ -400,6 +523,7 @@ export function useSetupEditorSave({
     busy,
     dirty,
     changedCount,
+    savedCount,
     primary,
     secondary,
     rename,

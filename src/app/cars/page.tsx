@@ -8,6 +8,7 @@ import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { CarList, type CarInlineSetup } from "@/components/cars/CarList";
 import { UploadSetupSheetBar, type UploadSetupCar } from "@/components/setup/UploadSetupSheetBar";
 import { CardPanel } from "@/components/ui/CardPanel";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { ensureAuthorizedSetupSheetCatalog } from "@/lib/setupSheetModels/seedAuthorizedCatalog";
 import { setupSheetModelIdsSupportingUpload } from "@/lib/setupCalibrations/carSupportsSheetUpload";
@@ -49,9 +50,12 @@ export default async function CarManagerPage({
     return (
       <>
         <header className="page-header is-echo">
-          <div className="min-w-0">
-            <h1 className="page-title">Garage</h1>
-            <p className="page-subtitle">Database not configured.</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <PageBackLink href="/paddock" />
+            <div>
+              <h1 className="page-title">Garage</h1>
+              <p className="page-subtitle">Database not configured.</p>
+            </div>
           </div>
         </header>
         <section className="page-body">
@@ -181,10 +185,19 @@ export default async function CarManagerPage({
 
   return (
     <>
+      {/*
+        Garage is reached from Paddock, which owns cars, tracks and meetings — but it had no
+        way back, and `is-echo` means that from md up the page has no visible title either.
+        The arrow wraps the title block so the rail-echo rule, which hides only the title's
+        own parent, cannot take the arrow with it.
+      */}
       <header className="page-header is-echo">
-        <div className="min-w-0">
-          <h1 className="page-title">Garage</h1>
-          <p className="page-subtitle">Your cars and every setup on them.</p>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <PageBackLink href="/paddock" />
+          <div>
+            <h1 className="page-title">Garage</h1>
+            <p className="page-subtitle">Your cars and every setup on them.</p>
+          </div>
         </div>
       </header>
       <section className="page-body">

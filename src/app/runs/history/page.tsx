@@ -622,7 +622,7 @@ export default async function RunHistoryPage({
           id: group.id,
           // A test day's date lives on the meta line, so "Test day – 19 Jul 2026"
           // collapses to "Test day".
-          title: group.type === "Race Meeting" ? group.title : "Test day",
+          title: group.type === "Event" ? group.title : "Test day",
           type: group.type,
           trackName: group.trackName && group.trackName !== "—" ? group.trackName : null,
           dateLabel: group.dateLabel,

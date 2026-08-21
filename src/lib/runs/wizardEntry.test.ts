@@ -79,7 +79,7 @@ test("continue: a past race event still re-attaches (driver keeps logging that m
   assert.equal(e.trackId, null);
 });
 
-test("continue: a race meeting with no formal event stays a race meeting", () => {
+test("continue: an event day with no formal event stays an event day", () => {
   const e = deriveContinueEntry(
     candidate({ sessionType: "RACE_MEETING", meetingSessionType: null, eventId: null }),
     null,
@@ -99,7 +99,7 @@ test("continue: a testing candidate carries its track", () => {
   assert.equal(e.carId, "car-1");
 });
 
-test("edit: mirrors the run's own identity (race meeting keeps event + label)", () => {
+test("edit: mirrors the run's own identity (event day keeps event + label)", () => {
   const e = deriveEditEntry({
     carId: "car-1",
     sessionType: "RACE_MEETING",

@@ -4,7 +4,11 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { SheetFillSurface, type SheetFillPlan } from "@/components/setup/SheetFillSurface";
 import { SheetGeometryStrip } from "@/components/rollCenter/SheetGeometryStrip";
 import { SetupEditorSaveBar } from "@/components/setup/SetupEditorSaveBar";
-import { useSetupEditorSave } from "@/components/setup/useSetupEditorSave";
+import {
+  useSetupEditorSave,
+  type SetupEditorSavedResult,
+} from "@/components/setup/useSetupEditorSave";
+import { useReportSetupEditorState } from "@/components/setup/setupEditorShare";
 import {
   storedValuesToSurface,
   surfaceValuesToStored,
@@ -31,6 +35,9 @@ export function SheetSetupEditorClient({
   editionBlankId,
   initialValues,
   templateKey,
+  returnHref,
+  onSaved,
+  hosted = false,
 }: {
   carId: string;
   setupId: string;
@@ -43,6 +50,12 @@ export function SheetSetupEditorClient({
   initialValues: SetupSnapshotData;
   /** Chassis-type key, for the computed-geometry strip. No key, no strip. */
   templateKey?: string | null;
+  /** Where a run correction lands. Null when nobody said where they came from. */
+  returnHref?: string | null;
+  /** Hosted in the run's setup pop-up: take the result in memory instead of navigating. */
+  onSaved?: (result: SetupEditorSavedResult) => void;
+  /** Lay the save bar out in the flow of a scrolling host rather than fixed to the viewport. */
+  hosted?: boolean;
 }) {
   const [values, setValues] = useState<Record<string, string>>(() =>
     storedValuesToSurface(initialValues)
@@ -74,7 +87,11 @@ export function SheetSetupEditorClient({
     saveMode,
     values,
     getData,
+    returnHref,
+    onSaved,
   });
+  // Tells the Share button above the editor where the setup stands. See `setupEditorShare`.
+  useReportSetupEditorState(save.dirty, save.savedCount);
 
   return (
     <div className="space-y-3">
@@ -102,7 +119,7 @@ export function SheetSetupEditorClient({
       />
       {/* Last, not first: the bar rides the bottom of the screen, and `position: sticky` with a
           `bottom` offset only holds an element that sits at the END of its container. */}
-      <SetupEditorSaveBar save={save} />
+      <SetupEditorSaveBar save={save} hosted={hosted} />
     </div>
   );
 }

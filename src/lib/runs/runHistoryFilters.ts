@@ -311,7 +311,7 @@ export function describeRunHistoryFilters(
   } else if (filters.dateFrom) out.push(`From ${day(filters.dateFrom)}`);
   else if (filters.dateTo) out.push(`Until ${day(filters.dateTo)}`);
   if (filters.sessionType) {
-    out.push(filters.sessionType === "TESTING" ? "Testing" : "Race meetings");
+    out.push(filters.sessionType === "TESTING" ? "Testing" : "Events");
   }
   if (filters.meetingSessionType) {
     const raw = filters.meetingSessionType;

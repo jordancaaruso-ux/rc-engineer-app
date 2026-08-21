@@ -486,7 +486,7 @@ export function SessionsFilterBar({
   if (filters.sessionType) {
     activeChips.push({
       key: "sessionType",
-      label: filters.sessionType === "TESTING" ? "Testing" : "Race meeting",
+      label: filters.sessionType === "TESTING" ? "Testing" : "Event",
       onRemove: () => patch({ sessionType: null }),
     });
   }
@@ -736,7 +736,7 @@ export function SessionsFilterBar({
                 >
                   <option value="">Any</option>
                   <option value="TESTING">Testing</option>
-                  <option value="RACE_MEETING">Race meeting</option>
+                  <option value="RACE_MEETING">Event</option>
                 </select>
               </PopRow>
               <PopRow label="Session" htmlFor="sessions-meeting-session">

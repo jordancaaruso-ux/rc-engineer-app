@@ -3,7 +3,11 @@
 import { useCallback, useState } from "react";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { SetupEditorSaveBar } from "@/components/setup/SetupEditorSaveBar";
-import { useSetupEditorSave } from "@/components/setup/useSetupEditorSave";
+import {
+  useSetupEditorSave,
+  type SetupEditorSavedResult,
+} from "@/components/setup/useSetupEditorSave";
+import { useReportSetupEditorState } from "@/components/setup/setupEditorShare";
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import type { SetupSaveMode } from "@/lib/setup/setupSaveMode";
 import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
@@ -23,6 +27,9 @@ export function LibrarySetupEditorClient({
   saveMode,
   initialValues,
   template,
+  returnHref,
+  onSaved,
+  hosted = false,
 }: {
   carId: string;
   setupId: string;
@@ -31,6 +38,12 @@ export function LibrarySetupEditorClient({
   saveMode: SetupSaveMode;
   initialValues: SetupSnapshotData;
   template: SetupSheetTemplate;
+  /** Where a run correction lands. Null when nobody said where they came from. */
+  returnHref?: string | null;
+  /** Hosted in the run's setup pop-up: take the result in memory instead of navigating. */
+  onSaved?: (result: SetupEditorSavedResult) => void;
+  /** Lay the save bar out in the flow of a scrolling host rather than fixed to the viewport. */
+  hosted?: boolean;
 }) {
   const [values, setValues] = useState<SetupSnapshotData>(initialValues);
 
@@ -42,7 +55,11 @@ export function LibrarySetupEditorClient({
     saveMode,
     values,
     getData,
+    returnHref,
+    onSaved,
   });
+  // Tells the Share button above the editor where the setup stands. See `setupEditorShare`.
+  useReportSetupEditorState(save.dirty, save.savedCount);
 
   return (
     <div className="space-y-3">
@@ -56,7 +73,7 @@ export function LibrarySetupEditorClient({
       />
       {/* Last, not first: the bar rides the bottom of the screen, and `position: sticky` with a
           `bottom` offset only holds an element that sits at the END of its container. */}
-      <SetupEditorSaveBar save={save} />
+      <SetupEditorSaveBar save={save} hosted={hosted} />
     </div>
   );
 }

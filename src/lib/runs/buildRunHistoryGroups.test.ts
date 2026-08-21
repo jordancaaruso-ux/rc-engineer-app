@@ -38,7 +38,7 @@ test("buildRunHistoryGroups groups by event and orders newest first", () => {
   const groups = buildRunHistoryGroups(runs);
   assert.equal(groups.length, 2);
   assert.equal(groups[0]!.id, "event-e1");
-  assert.equal(groups[0]!.type, "Race Meeting");
+  assert.equal(groups[0]!.type, "Event");
   assert.equal(groups[1]!.type, "Testing");
 });
 

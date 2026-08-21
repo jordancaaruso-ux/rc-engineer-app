@@ -3,9 +3,17 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { clientId } from "@/lib/clientId";
+import {
+  describePostedDay,
+  resolveScanStatus,
+  type ScanStatus,
+  type ScanStatusAction,
+} from "@/lib/lapImport/scanStatusCopy";
 import { parseManualLapText } from "@/lib/lapSession/parseManual";
 import type { LapSourceKind } from "@/lib/lapSession/types";
 import type { LapImportLapRow, LapUrlSessionDriver } from "@/lib/lapUrlParsers/types";
+import { isMyRcmDiscoveryUrl } from "@/lib/lapUrlParsers/myRcmUrl";
 import { formatLap } from "@/lib/runLaps";
 import type { LapRow } from "@/lib/lapAnalysis";
 import {
@@ -28,6 +36,11 @@ import {
   type LapTimingSource,
 } from "@/lib/lapImport/labels";
 import { pickPrimarySessionDriver } from "@/lib/lapImport/pickPrimarySessionDriver";
+import {
+  SOURCE_LABELS,
+  type LapDiscoverySessionRow,
+  type LapDiscoveryStatus,
+} from "@/lib/lapWatch/lapDiscoveryStatus";
 import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
 import {
   orderBlocksByTrackTime,
@@ -197,17 +210,47 @@ type ScanDayCandidate = {
   bestLapSeconds?: number | null;
 };
 
-/** MyRCM event page (`main?…dId[E]=…`) or class report URL without a reportKey — scannable, not directly importable. */
-function isMyRcmDiscoveryPaste(raw: string): boolean {
-  const url = raw.trim();
-  if (!/^https?:\/\/(www\.)?myrcm\.ch\//i.test(url)) return false;
-  if (/\/myrcm\/report\/[a-z]{2}\/\d+\/\d+/i.test(url) && !/[?&]reportKey=\d+/i.test(url)) return true;
-  if (/\/myrcm\/main\/?\?/i.test(url) && /dId(%5B|\[)E(%5D|\])=/i.test(url)) return true;
-  return false;
-}
+/**
+ * One parsed session, ready to attach.
+ *
+ * Both doors return this: `/api/lap-time-sessions/import` after a fetch from the timing site, and
+ * `/api/lap-time-sessions/[id]` reading a parse this account already stored.
+ */
+type ImportResultRow = {
+  success: true;
+  importedSessionId: string;
+  recordedAt: string;
+  sessionCompletedAtIso?: string | null;
+  sessionCompletedAtDbIso?: string | null;
+  parserId: string;
+  message?: string | null;
+  laps?: number[];
+  lapRows?: LapImportLapRow[] | null;
+  sessionDrivers?: LapUrlSessionDriver[];
+  sessionHint?: { name?: string | null } | null;
+  url?: string;
+};
+
+/** A session already imported once, and what it is currently filed under (`/api/laps/scan-day-url`). */
+type ImportedSessionRow = ScanDayCandidate & {
+  importedSessionId: string;
+  linkedRunLabel: string | null;
+};
+
+/**
+ * MyRCM event or class URL — scannable (lists its runs), not directly importable.
+ * Shares `myRcmUrl.ts` with the server so a site rebuild only has to be answered once; the regex
+ * that used to live here knew only the pre-v9 address and quietly stopped matching.
+ */
+const isMyRcmDiscoveryPaste = isMyRcmDiscoveryUrl;
 
 const RECENT_RUNS_COLLAPSED = 3;
 const RECENT_RUNS_MAX = 10;
+/**
+ * How much of the day's list to draw when nothing matched. Long enough to find yourself in a club
+ * day's practice rounds, short enough that the card stays a card — the server caps it at 60.
+ */
+const SESSIONS_TODAY_SHOWN = 12;
 
 /** A row in the unified "Sessions to import" list (event race + track scan, deduped). */
 type ImportPickerCandidate = {
@@ -238,19 +281,19 @@ function SessionImportListRow({
   when,
   bestLapSeconds,
   timingSource,
-  isActive,
   actionLabel,
   disabled,
   onClick,
+  note,
 }: {
   title: string;
   when: string | null;
   bestLapSeconds: number | null;
   timingSource?: "liverc" | "speedhive" | "myrcm";
-  isActive: boolean;
   actionLabel: string;
   disabled?: boolean;
   onClick: () => void;
+  note?: string | null;
 }) {
   // Time first: with a split run the driver picks the halves apart by when each
   // one ran, so it must be the thing the eye lands on, not a trailing detail.
@@ -260,10 +303,7 @@ function SessionImportListRow({
       type="button"
       disabled={disabled}
       className={cn(
-        "flex w-full items-center gap-2.5 rounded-md border px-2.5 py-2 text-left transition",
-        isActive
-          ? "border-primary-ink/50 bg-accent/10"
-          : "border-border bg-surface-runna hover:bg-surface-runna-inset",
+        "flex w-full items-center gap-2.5 rounded-md border border-border bg-surface-runna px-2.5 py-2 text-left transition hover:bg-surface-runna-inset",
         disabled && "opacity-60 pointer-events-none"
       )}
       onClick={onClick}
@@ -271,6 +311,13 @@ function SessionImportListRow({
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[13px] font-semibold text-foreground">{title}</span>
         {meta ? <span className="mt-0.5 block truncate text-[11px] text-faint">{meta}</span> : null}
+        {/* Its own line, not appended to the meta: where a session is currently filed is the whole
+            decision on this row, and glued onto the timestamp it was the half that got truncated. */}
+        {note ? (
+          <span className="mt-0.5 block truncate text-[11px] font-medium text-muted-foreground">
+            {note}
+          </span>
+        ) : null}
       </span>
       {bestLapSeconds != null ? (
         <span className="flex shrink-0 flex-col items-end leading-tight">
@@ -280,18 +327,9 @@ function SessionImportListRow({
           </span>
         </span>
       ) : null}
-      {isActive ? (
-        <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-foreground">
-          <span aria-hidden className="text-emerald-500">
-            ✓
-          </span>
-          Imported
-        </span>
-      ) : (
-        <span className="shrink-0 rounded-full border border-primary-ink/45 bg-accent/5 px-3 py-1 text-[11px] font-bold text-primary-ink">
-          {actionLabel}
-        </span>
-      )}
+      <span className="shrink-0 rounded-full border border-primary-ink/45 bg-accent/5 px-3 py-1 text-[11px] font-bold text-primary-ink">
+        {actionLabel}
+      </span>
     </button>
   );
 }
@@ -509,36 +547,129 @@ function AttachedSessionStrip({
   );
 }
 
-/** Empty-state headline + optional detail line for the import picker. */
-type ScanStatus = { title: string; detail: string | null };
+/**
+ * The confirm before laps move off another run.
+ *
+ * A set of laps can only be filed under one run, so this says which run it would leave and what
+ * that run does and doesn't lose — it keeps its own lap times; it only stops being the run linked
+ * to this timing session. It scrolls itself into view because the card can be taller than the
+ * screen and the wizard's bottom dock sits over the last of it.
+ */
+function MoveLapsConfirm({
+  row,
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  row: ImportedSessionRow;
+  busy: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, []);
+  return (
+    <div
+      ref={ref}
+      role="group"
+      aria-label="Move these laps to this run?"
+      className="mt-1 rounded-md border border-border bg-surface-runna-inset p-2.5"
+    >
+      <p className="text-[12px] font-semibold text-foreground">Move these laps to this run?</p>
+      <p className="mt-1 text-[11px] text-muted-foreground text-pretty">
+        {row.linkedRunLabel
+          ? `They're currently filed under ${row.linkedRunLabel}. That run keeps its lap times — it just stops being the one linked to this timing session.`
+          : "They're currently filed under another run. That run keeps its lap times — it just stops being the one linked to this timing session."}
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          disabled={busy}
+          className="inline-flex items-center rounded-md primary-face bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground transition hover:brightness-95 disabled:opacity-60"
+          onClick={onConfirm}
+        >
+          {busy ? "Moving…" : "Move them here"}
+        </button>
+        {row.linkedRunId ? (
+          <Link
+            href={`/runs/${row.linkedRunId}`}
+            className="inline-flex items-center rounded-md border border-border bg-surface-runna px-2.5 py-1 text-[11px] font-semibold transition hover:bg-surface-runna-inset"
+          >
+            Open that run
+          </Link>
+        ) : null}
+        <button
+          type="button"
+          className="inline-flex items-center rounded-md border border-border bg-surface-runna px-2.5 py-1 text-[11px] font-semibold transition hover:bg-surface-runna-inset"
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
 
-/** Scan status — prefer server hint; fall back to totals when all are imported. */
-function resolveScanStatus(opts: {
-  scanMessage: string | null;
-  totalCandidates: number;
-  unimportedCount: number;
-  candidateCount: number;
-  olderCount: number;
-}): ScanStatus | null {
-  const { scanMessage, totalCandidates, unimportedCount, candidateCount, olderCount } = opts;
-  if (scanMessage) return { title: scanMessage, detail: null };
-  if (candidateCount === 0) {
-    if (olderCount > 0) {
-      return {
-        title: "No sessions from today yet",
-        detail: `${olderCount} older session${olderCount === 1 ? "" : "s"} available below.`,
-      };
-    }
-    if (totalCandidates > 0 && unimportedCount === 0) {
-      const n = totalCandidates;
-      return {
-        title: "No new sessions to import",
-        detail: `Found ${n} session${n === 1 ? "" : "s"} for your driver — all already imported.`,
-      };
-    }
-    return { title: "No new sessions to import", detail: null };
+/**
+ * One fix, as a control.
+ *
+ * The point of the whole state rework: every empty card now ends in something pressable. "Open the
+ * timing page" is the load-bearing one — it opens the exact page the scan just read, so a driver
+ * can see for themselves whether the track is posting and what name they're printed under, instead
+ * of taking our word for it.
+ */
+function ScanStatusActionButton({
+  action,
+  busy,
+  trackId,
+  onRetry,
+  onPaste,
+}: {
+  action: ScanStatusAction;
+  busy: boolean;
+  trackId: string | null;
+  onRetry: () => void;
+  onPaste: () => void;
+}) {
+  const base =
+    "inline-flex items-center rounded-md border border-border bg-surface-runna px-2.5 py-1 text-[11px] font-semibold transition hover:bg-surface-runna-inset";
+  const primary =
+    "inline-flex items-center rounded-md primary-face bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground transition hover:brightness-95";
+
+  switch (action.kind) {
+    case "settings":
+      return (
+        <Link href="/settings" className={primary}>
+          Check timing details
+        </Link>
+      );
+    case "track":
+      return (
+        <Link href={trackId ? `/tracks/${trackId}` : "/tracks"} className={primary}>
+          Add a timing page
+        </Link>
+      );
+    case "retry":
+      return (
+        <button type="button" className={primary} disabled={busy} onClick={onRetry}>
+          {busy ? "Checking…" : "Check again"}
+        </button>
+      );
+    case "paste":
+      return (
+        <button type="button" className={base} onClick={onPaste}>
+          Paste a link
+        </button>
+      );
+    case "timingPage":
+      return (
+        <a href={action.url} target="_blank" rel="noopener noreferrer" className={base}>
+          Open {SOURCE_LABELS[action.source]} page
+        </a>
+      );
   }
-  return null;
 }
 
 /** Server: `/api/events/[eventId]/my-race-sessions` — driver verified on each race page. */
@@ -609,6 +740,18 @@ export function LapTimesIngestPanel({
   const [dayScanOlderCandidates, setDayScanOlderCandidates] = useState<ScanDayCandidate[] | null>(null);
   const [dayScanOlderTotal, setDayScanOlderTotal] = useState(0);
   const [showOlderSessions, setShowOlderSessions] = useState(false);
+  /** The day's list from the timing site, ours or not — only ever offered when nothing matched. */
+  const [sessionsToday, setSessionsToday] = useState<LapDiscoverySessionRow[]>([]);
+  const [sessionsTodayDayIso, setSessionsTodayDayIso] = useState<string | null>(null);
+  const [showSessionsToday, setShowSessionsToday] = useState(false);
+  /** Sessions here this driver has imported before — the way back to laps already pulled in. */
+  const [importedCandidates, setImportedCandidates] = useState<ImportedSessionRow[]>([]);
+  const [showAlreadyImported, setShowAlreadyImported] = useState(false);
+  /**
+   * A set of laps can only be filed under one run, so taking one that is on another run has to say
+   * so first. Held as the row itself: the confirm names the run it would come off.
+   */
+  const [moveConfirmRow, setMoveConfirmRow] = useState<ImportedSessionRow | null>(null);
   /** `${blockId}:${driverId}` for lap preview */
   const [activePreviewKey, setActivePreviewKey] = useState<string | null>(null);
 
@@ -717,7 +860,6 @@ export function LapTimesIngestPanel({
     // explicitly, so this default only decides what an edit opens on.
     return attachedBlocks.find((b) => b.blockId === focusedBlockId) ?? attachedBlocks[0] ?? null;
   }, [attachedBlocks, focusedBlockId]);
-  const activeImportUrl = activeImportBlock?.sourceUrl.trim() ?? "";
 
   const hasLinkedLapImport = attachedBlocks.length > 0;
 
@@ -734,11 +876,15 @@ export function LapTimesIngestPanel({
   // One import list: event race sessions (matched by LiveRC driver ID — precise) merged with
   // track scan candidates (practice + results across LiveRC + Speedhive, matched by name/transponder),
   // deduped by session URL. Event rows win on dedupe so ID precision is preserved.
+  //
+  // Sessions already attached to this run are filtered out: they are shown above
+  // as their own strip, with the × that takes them back off. Leaving them here
+  // too drew the same session twice, and the second copy could not be acted on.
   const mergedImportCandidates = useMemo<ImportPickerCandidate[]>(() => {
     const byUrl = new Map<string, ImportPickerCandidate>();
     for (const c of sortedEventRaceSessions) {
       const url = c.sessionUrl.trim();
-      if (!url) continue;
+      if (!url || attachedUrls.has(url)) continue;
       byUrl.set(url, {
         key: `event:${url}`,
         sessionUrl: c.sessionUrl,
@@ -752,7 +898,7 @@ export function LapTimesIngestPanel({
     }
     for (const c of sortedDayScanCandidates) {
       const url = c.sessionUrl.trim();
-      if (!url || byUrl.has(url)) continue;
+      if (!url || byUrl.has(url) || attachedUrls.has(url)) continue;
       byUrl.set(url, {
         key: `track:${c.sessionId}`,
         sessionUrl: c.sessionUrl,
@@ -765,14 +911,19 @@ export function LapTimesIngestPanel({
       });
     }
     return sortSessionsNewestFirst(Array.from(byUrl.values()), (r) => r.sortIso);
-  }, [sortedEventRaceSessions, sortedDayScanCandidates]);
+  }, [sortedEventRaceSessions, sortedDayScanCandidates, attachedUrls]);
 
   // Backlog list (unimported sessions from before today) — collapsed behind "Show older sessions".
   const olderPickerRows = useMemo<ImportPickerCandidate[]>(() => {
     if (!dayScanOlderCandidates?.length) return [];
     const seenUrls = new Set(mergedImportCandidates.map((c) => c.sessionUrl.trim()));
     return sortSessionsNewestFirst(
-      dayScanOlderCandidates.filter((c) => c.sessionUrl.trim() && !seenUrls.has(c.sessionUrl.trim())),
+      dayScanOlderCandidates.filter(
+        (c) =>
+          c.sessionUrl.trim() &&
+          !seenUrls.has(c.sessionUrl.trim()) &&
+          !attachedUrls.has(c.sessionUrl.trim())
+      ),
       (c) => c.sessionCompletedAtIso
     ).map((c) => ({
       key: `older:${c.sessionId}`,
@@ -784,12 +935,39 @@ export function LapTimesIngestPanel({
       alreadyImported: c.alreadyImported,
       sortIso: c.sessionCompletedAtIso,
     }));
-  }, [dayScanOlderCandidates, mergedImportCandidates]);
+  }, [dayScanOlderCandidates, mergedImportCandidates, attachedUrls]);
 
   const canExpandImportRows = mergedImportCandidates.length > RECENT_RUNS_COLLAPSED;
 
-  // Total for the status line — the track scan may report more unimported sessions than it returns rows for.
-  const importPickerTotal = Math.max(mergedImportCandidates.length, scanTotals?.unimported ?? 0);
+  /**
+   * Already-imported sessions, minus whatever this run is holding right now.
+   *
+   * The scan only knows what the database knows, so a session imported a minute ago and sitting in
+   * the form above still comes back as "not on a run" — offering the driver laps they are already
+   * looking at. Same rule the main picker list follows, and the same bug it was written to end.
+   */
+  const importedPickerRows = useMemo(
+    () => importedCandidates.filter((row) => !attachedUrls.has(row.sessionUrl.trim())),
+    [importedCandidates, attachedUrls]
+  );
+
+  /**
+   * "today" or the day the list is really from. LiveRC answers with the most recent day that has
+   * any sessions on it, which at a club track is often days ago.
+   */
+  const sessionsDayLabel = useMemo(() => {
+    const day = describePostedDay(sessionsTodayDayIso);
+    if (!day) return "today";
+    return day.isToday ? "today" : day.label;
+  }, [sessionsTodayDayIso]);
+
+  // Total for the status line — the track scan may report more unimported sessions
+  // than it returns rows for. The scan counted anything attached since as still
+  // unimported, so take those back off or the header reads one higher than the list.
+  const importPickerTotal = Math.max(
+    mergedImportCandidates.length,
+    (scanTotals?.unimported ?? 0) - attachedUrls.size
+  );
 
   function selectTab(id: IngestTab) {
     setTab(id);
@@ -853,8 +1031,10 @@ export function LapTimesIngestPanel({
     const useTrack = overrideDayUrl ? false : hasTrackDiscovery;
     if (!useTrack && !url) {
       setDayScanStatus({
-        title: "No timing source for this track",
-        detail: "Select a track with a LiveRC or Speedhive URL on the Tracks page.",
+        title: "This track has no timing page saved",
+        detail:
+          "Add its LiveRC or MYLAPS page once and we'll look there every time you log a run here.",
+        actions: [{ kind: "track" }, { kind: "paste" }],
       });
       return;
     }
@@ -866,6 +1046,12 @@ export function LapTimesIngestPanel({
     setDayScanOlderCandidates(null);
     setDayScanOlderTotal(0);
     setShowOlderSessions(false);
+    setSessionsToday([]);
+    setSessionsTodayDayIso(null);
+    setShowSessionsToday(false);
+    setImportedCandidates([]);
+    setShowAlreadyImported(false);
+    setMoveConfirmRow(null);
     // Manual (pasted URL) scan: render the picker area immediately so busy/error states are visible
     // even when the run has no track discovery or linked event.
     if (overrideDayUrl) setDayScanCandidates([]);
@@ -886,9 +1072,12 @@ export function LapTimesIngestPanel({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        // The server's own error text stays in the logs: at a race track, "fetch failed:
+        // ETIMEDOUT" is not something a driver can do anything with.
         setDayScanStatus({
-          title: "Scan failed",
-          detail: (data as { error?: string })?.error || null,
+          title: "Couldn't check the timing site just now",
+          detail: "Try again in a minute, or paste a link straight to your session.",
+          actions: [{ kind: "retry" }, { kind: "paste" }],
         });
         setDayScanCandidates(overrideDayUrl ? [] : null);
         return;
@@ -917,23 +1106,36 @@ export function LapTimesIngestPanel({
         typeof (data as { olderCount?: unknown }).olderCount === "number"
           ? (data as { olderCount: number }).olderCount
           : olderCandidates.length;
+      const status = ((data as { status?: unknown }).status ?? null) as LapDiscoveryStatus | null;
+      const importedRows = Array.isArray((data as { importedCandidates?: unknown }).importedCandidates)
+        ? ((data as { importedCandidates: ImportedSessionRow[] }).importedCandidates)
+        : [];
       setDayScanIndexKind(ik === "results" || ik === "practice" ? ik : null);
       setDayScanHasDriverName(hasDriver);
       setDayScanCandidates(candidates);
       setDayScanOlderCandidates(olderCandidates);
       setDayScanOlderTotal(olderCount);
+      setSessionsToday(Array.isArray(status?.sessionsToday) ? status.sessionsToday : []);
+      setSessionsTodayDayIso(typeof status?.postedDayIso === "string" ? status.postedDayIso : null);
+      setImportedCandidates(importedRows);
       setScanTotals({ total: totalCandidates, unimported: unimportedCount });
       setDayScanStatus(
         resolveScanStatus({
+          status,
           scanMessage,
           totalCandidates,
           unimportedCount,
           candidateCount: candidates.length,
           olderCount,
+          importedCount: importedRows.length,
         })
       );
     } catch {
-      setDayScanStatus({ title: "Scan failed", detail: null });
+      setDayScanStatus({
+        title: "Couldn't check the timing site just now",
+        detail: "Try again in a minute, or paste a link straight to your session.",
+        actions: [{ kind: "retry" }, { kind: "paste" }],
+      });
     } finally {
       setDayScanBusy(false);
     }
@@ -1059,20 +1261,7 @@ export function LapTimesIngestPanel({
         ? ((data as { results: unknown[] }).results as Record<string, unknown>[])
         : [];
 
-      type SuccessRow = {
-        success: true;
-        importedSessionId: string;
-        recordedAt: string;
-        sessionCompletedAtIso?: string | null;
-        sessionCompletedAtDbIso?: string | null;
-        parserId: string;
-        message?: string | null;
-        laps?: number[];
-        lapRows?: LapImportLapRow[] | null;
-        sessionDrivers?: LapUrlSessionDriver[];
-        sessionHint?: { name?: string | null } | null;
-        url?: string;
-      };
+      type SuccessRow = ImportResultRow;
 
       const successes: SuccessRow[] = [];
       const failures: { error: string }[] = [];
@@ -1090,7 +1279,32 @@ export function LapTimesIngestPanel({
         return;
       }
 
-      const row = successes[0]!;
+      attachImportRow(successes[0]!, url);
+      setDayScanCandidates((prev) =>
+        prev ? prev.map((c) => (c.sessionUrl === url ? { ...c, alreadyImported: true } : c)) : prev
+      );
+      void loadEventRaceSessions();
+      // Deliberately does NOT advance the wizard any more. Jumping to the next
+      // step made a second import impossible to reach, so the step now completes
+      // in place — see the landing readout below, which carries the forward
+      // action the jump used to perform.
+    } catch {
+      setUrlMessage("Request failed.");
+    } finally {
+      setUrlBusy(false);
+    }
+  }
+
+  /**
+   * Attach one parsed session to the run being logged.
+   *
+   * Shared by the two ways laps arrive: a fresh fetch from the timing site, and a session already
+   * stored on this account being picked up again. Both hand over the same row shape, so the driver
+   * picking, lap ticks and split-run ordering below can't drift between them.
+   */
+  function attachImportRow(row: ImportResultRow, fallbackUrl: string) {
+    {
+      const url = fallbackUrl;
       const parserId = row.parserId ?? "http_timing_v1";
       const combinedMessage = row.message ?? null;
 
@@ -1129,7 +1343,7 @@ export function LapTimesIngestPanel({
       const sourceUrl = typeof row.url === "string" && row.url.trim() ? row.url.trim() : url;
 
       const newBlock: UrlImportBlock = {
-        blockId: crypto.randomUUID(),
+        blockId: clientId(),
         importedSessionId: row.importedSessionId,
         sourceUrl,
         parserId,
@@ -1182,14 +1396,41 @@ export function LapTimesIngestPanel({
       }
       setUrlInput("");
       setUrlMessage(combinedMessage);
-      setDayScanCandidates((prev) =>
-        prev ? prev.map((c) => (c.sessionUrl === url ? { ...c, alreadyImported: true } : c)) : prev
-      );
-      void loadEventRaceSessions();
-      // Deliberately does NOT advance the wizard any more. Jumping to the next
-      // step made a second import impossible to reach, so the step now completes
-      // in place — see the landing readout below, which carries the forward
-      // action the jump used to perform.
+    }
+  }
+
+  /**
+   * Take laps this account already holds, without going back to the timing site.
+   *
+   * This is the way back to a session imported once already — the run it was on was deleted, or
+   * abandoned, or it simply never got attached. Reading the stored parse rather than re-importing
+   * the URL is the point: it still works when the club's server is asleep or the meeting page has
+   * been taken down, which is exactly when a driver is trying to salvage the run.
+   */
+  async function takeStoredImport(row: ImportedSessionRow) {
+    if (alreadyAttached(row.sessionUrl)) {
+      setUrlMessage("That session is already attached to this run.");
+      return;
+    }
+    setUrlBusy(true);
+    setUrlMessage(null);
+    try {
+      const res = await fetch(`/api/lap-time-sessions/${encodeURIComponent(row.importedSessionId)}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setUrlMessage((data as { error?: string })?.error || "Couldn't open those laps.");
+        return;
+      }
+      const importRow = (data as { importRow?: ImportResultRow }).importRow;
+      if (!importRow?.importedSessionId) {
+        setUrlMessage("Couldn't read those laps — import the session again instead.");
+        return;
+      }
+      attachImportRow(importRow, row.sessionUrl);
+      // Off the "already imported" list and onto the run: it is drawn as an attached strip above
+      // now, and leaving it in both places was how the same session got acted on twice.
+      setImportedCandidates((prev) => prev.filter((c) => c.importedSessionId !== row.importedSessionId));
+      setMoveConfirmRow(null);
     } catch {
       setUrlMessage("Request failed.");
     } finally {
@@ -1264,72 +1505,13 @@ export function LapTimesIngestPanel({
     [landedBlockId, attachedBlocks]
   );
 
-  const activeImportPreview = useMemo(() => {
-    const block = activeImportBlock;
-    if (!block) return null;
-    const primaryId = block.selectedDriverIds?.[0] ?? block.sessionDrivers[0]?.driverId ?? null;
-    const driver = primaryId ? block.sessionDrivers.find((d) => d.driverId === primaryId) ?? null : null;
-    const stats = driver ? statsForDriver(block, driver) : null;
-    const title = driver
-      ? formatDriverSessionLabel(driver.driverName, blockLabelTimeIso(block), blockTimeFormatOpts(block))
-      : block.sourceUrl;
-    const timingSource = timingSourceFromParserId(block.parserId) ?? undefined;
-    return {
-      title,
-      when: formatImportedSessionTime(blockLabelTimeIso(block), blockTimeFormatOpts(block)),
-      bestLapSeconds: stats?.bestLap ?? null,
-      timingSource,
-    };
-    // `activeImportBlock` is already derived from the blocks, so it moves whenever
-    // they do — depending on the array as well only re-ran this for free.
-  }, [activeImportBlock]);
-
-  // Visible slice of the merged list (collapsed/expanded), with the active import always surfaced.
-  const importPickerRows = useMemo(() => {
-    type Row = {
-      key: string;
-      sessionUrl: string;
-      title: string;
-      when: string | null;
-      bestLapSeconds: number | null;
-      timingSource?: "liverc" | "speedhive" | "myrcm";
-      alreadyImported: boolean;
-      isActive: boolean;
-    };
-    const limit = showAllRecentRuns ? RECENT_RUNS_MAX : RECENT_RUNS_COLLAPSED;
-    const rows: Row[] = mergedImportCandidates.slice(0, limit).map((c) => {
-      const isActive = activeImportUrl === c.sessionUrl.trim();
-      return {
-        key: c.key,
-        sessionUrl: c.sessionUrl,
-        title: c.title,
-        when: c.when,
-        bestLapSeconds: isActive ? activeImportPreview?.bestLapSeconds ?? c.bestLapSeconds : c.bestLapSeconds,
-        timingSource: c.timingSource,
-        alreadyImported: c.alreadyImported,
-        isActive,
-      };
-    });
-    if (activeImportBlock && activeImportUrl && !rows.some((r) => r.sessionUrl.trim() === activeImportUrl)) {
-      rows.unshift({
-        key: activeImportBlock.blockId,
-        sessionUrl: activeImportUrl,
-        title: activeImportPreview?.title ?? activeImportUrl,
-        when: activeImportPreview?.when ?? null,
-        bestLapSeconds: activeImportPreview?.bestLapSeconds ?? null,
-        timingSource: activeImportPreview?.timingSource,
-        alreadyImported: false,
-        isActive: true,
-      });
-    }
-    return rows;
-  }, [
-    mergedImportCandidates,
-    showAllRecentRuns,
-    activeImportBlock,
-    activeImportUrl,
-    activeImportPreview,
-  ]);
+  // Visible slice of the merged list (collapsed/expanded). Nothing attached to the
+  // run reaches here — the list is only what you have not taken yet.
+  const importPickerRows = useMemo(
+    () =>
+      mergedImportCandidates.slice(0, showAllRecentRuns ? RECENT_RUNS_MAX : RECENT_RUNS_COLLAPSED),
+    [mergedImportCandidates, showAllRecentRuns]
+  );
 
   function toggleLapInclusion(blockId: string, driverId: string, lapIndex: number) {
     const blocks = value.urlImportBlocks.map((b) => {
@@ -1357,29 +1539,25 @@ export function LapTimesIngestPanel({
   }
 
   return (
-    <SurfaceCard
-      variant="panel"
-      overflowHidden={false}
-      contentClassName="space-y-3"
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <Eyebrow>Lap times</Eyebrow>
-        {hasLinkedLapImport && isUrlTab(tab) ? (
-          <button
-            type="button"
-            className="ml-auto shrink-0 rounded-md border border-border bg-surface-runna px-3 py-1 text-[11px] font-medium text-muted-foreground hover:bg-surface-runna-inset hover:text-foreground transition"
-            onClick={clearImport}
-          >
-            {attachedBlocks.length > 1 ? "Clear all" : "Clear import"}
-          </button>
-        ) : null}
-      </div>
-      {/* What this run's laps ARE — above the tabs, because the attached imports
-          belong to the run, not to whichever method was used to find them. They
-          sat inside the URL-paste tab first, which left them in the DOM and off
-          the screen for anyone on the discovery tab. */}
+    <div className="space-y-3">
+      {/* Card one: what this run's laps ARE. Its own card, not a band sitting on
+          top of the importer — reading the laps you already have shouldn't feel
+          like part of choosing what to add next. Above the importer either way,
+          because these belong to the run, not to whichever method found them. */}
       {attachedBlocks.length > 0 ? (
-        <div className="space-y-2">
+        <SurfaceCard variant="panel" overflowHidden={false} contentClassName="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Eyebrow>Laps on this run</Eyebrow>
+            {isUrlTab(tab) ? (
+              <button
+                type="button"
+                className="ml-auto shrink-0 rounded-md border border-border bg-surface-runna px-3 py-1 text-[11px] font-medium text-muted-foreground hover:bg-surface-runna-inset hover:text-foreground transition"
+                onClick={clearImport}
+              >
+                {attachedBlocks.length > 1 ? "Clear all" : "Clear import"}
+              </button>
+            ) : null}
+          </div>
           {/* Earliest on track first. With one attached this is a single row —
               the strip is the run's laps, not a list UI. */}
           <div className="space-y-1.5">
@@ -1421,8 +1599,13 @@ export function LapTimesIngestPanel({
             )}
             revealKey={landedBlockIsAttached ? landedBlockId : "settled"}
           />
-        </div>
+        </SurfaceCard>
       ) : null}
+
+      {/* Card two: where laps come from. Separate surface so the tabs read as a
+          tool you reach for, not as more of the run's own record. */}
+      <SurfaceCard variant="panel" overflowHidden={false} contentClassName="space-y-3">
+        <Eyebrow>{hasLinkedLapImport ? "Import more laps" : "Add lap times"}</Eyebrow>
       <PagedCard
         storageKey="run-form:lap-ingest"
         controlPosition="above"
@@ -1504,13 +1687,9 @@ export function LapTimesIngestPanel({
                           when={row.when}
                           bestLapSeconds={row.bestLapSeconds}
                           timingSource={row.timingSource}
-                          isActive={row.isActive}
                           actionLabel={row.alreadyImported ? "Import again" : "Import"}
                           disabled={urlBusy}
-                          onClick={() => {
-                            if (row.isActive) return;
-                            void importFromSessionUrl(row.sessionUrl);
-                          }}
+                          onClick={() => void importFromSessionUrl(row.sessionUrl)}
                         />
                       </li>
                     ))}
@@ -1541,11 +1720,12 @@ export function LapTimesIngestPanel({
                 (() => {
                   const status: ScanStatus = dayScanStatus ??
                     (eventRaceHint
-                      ? { title: "No sessions to import yet", detail: eventRaceHint }
+                      ? { title: "No sessions to import yet", detail: eventRaceHint, actions: [] }
                       : {
                           title: "No sessions found yet",
                           detail:
-                            "Check your driver name in Settings, or add a LiveRC/Speedhive URL on the track or event.",
+                            "Check your driver name and transponder number in Settings, or add a LiveRC or MYLAPS page to this track.",
+                          actions: [{ kind: "settings" }, { kind: "track" }],
                         });
                   return (
                     <div className="px-3 py-4 text-center">
@@ -1553,7 +1733,26 @@ export function LapTimesIngestPanel({
                         {status.title}
                       </p>
                       {status.detail ? (
-                        <p className="mt-1 text-xs text-muted-foreground">{status.detail}</p>
+                        <p className="mt-1 text-xs text-muted-foreground text-pretty">{status.detail}</p>
+                      ) : null}
+                      {status.actions.length > 0 ? (
+                        <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
+                          {status.actions.map((action) => (
+                            <ScanStatusActionButton
+                              key={action.kind === "timingPage" ? `page:${action.url}` : action.kind}
+                              action={action}
+                              busy={dayScanBusy}
+                              trackId={trackId ?? null}
+                              onRetry={() => void refreshImportSources()}
+                              onPaste={() => {
+                                // "Paste a link" is only offered where the automatic scan failed,
+                                // so it has to land on the tab that takes a URL by hand.
+                                selectTab("url-manual");
+                                urlInputRef.current?.focus();
+                              }}
+                            />
+                          ))}
+                        </div>
                       ) : null}
                     </div>
                   );
@@ -1580,13 +1779,9 @@ export function LapTimesIngestPanel({
                               when={row.when}
                               bestLapSeconds={row.bestLapSeconds}
                               timingSource={row.timingSource}
-                              isActive={activeImportUrl === row.sessionUrl.trim()}
                               actionLabel="Import"
                               disabled={urlBusy}
-                              onClick={() => {
-                                if (activeImportUrl === row.sessionUrl.trim()) return;
-                                void importFromSessionUrl(row.sessionUrl);
-                              }}
+                              onClick={() => void importFromSessionUrl(row.sessionUrl)}
                             />
                           </li>
                         ))}
@@ -1597,6 +1792,116 @@ export function LapTimesIngestPanel({
                         </p>
                       ) : null}
                     </>
+                  ) : null}
+                </div>
+              ) : null}
+              {/*
+                The day's list, whoever it belongs to — LiveRC only, and only when nothing of ours
+                matched. It is the escape hatch from a name the track prints differently: find your
+                own session, take it, then fix the name in Settings so the next one finds itself.
+                Behind a tap, never automatic — the old card printed five strangers' names at you.
+              */}
+              {!dayScanBusy && sessionsToday.length > 0 ? (
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    className="w-full rounded-md border border-dashed border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-surface-runna-inset transition"
+                    onClick={() => setShowSessionsToday((prev) => !prev)}
+                  >
+                    {showSessionsToday
+                      ? `Hide the sessions from ${sessionsDayLabel}`
+                      : `See the sessions from ${sessionsDayLabel} (${sessionsToday.length})`}
+                  </button>
+                  {showSessionsToday ? (
+                    <>
+                      <p className="ui-label-meta">
+                        Everything posted at this track {sessionsDayLabel}. If one of these is yours,
+                        take it — then fix your name in Settings so the next one finds itself.
+                      </p>
+                      <ul className="space-y-1">
+                        {sessionsToday.slice(0, SESSIONS_TODAY_SHOWN).map((row) => (
+                          <li key={`today:${row.sessionId}`}>
+                            <SessionImportListRow
+                              title={row.label}
+                              when={[
+                                formatSessionWhen(row.sessionCompletedAtIso, null, row.source),
+                                row.detail,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                              bestLapSeconds={null}
+                              timingSource={row.source}
+                              actionLabel="Import"
+                              disabled={urlBusy}
+                              onClick={() => void importFromSessionUrl(row.sessionUrl)}
+                            />
+                          </li>
+                        ))}
+                      </ul>
+                      {sessionsToday.length > SESSIONS_TODAY_SHOWN ? (
+                        <p className="ui-label-meta">
+                          Showing {SESSIONS_TODAY_SHOWN} of {sessionsToday.length}.
+                        </p>
+                      ) : null}
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+              {/*
+                Sessions imported before. These used to be filtered out entirely, which made a lap
+                set feel spent once used — import a session, make a mess of the run, start over, and
+                the laps were gone from the list. They never were: the import survives the run.
+              */}
+              {!dayScanBusy && importedPickerRows.length > 0 ? (
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    className="w-full rounded-md border border-dashed border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-surface-runna-inset transition"
+                    onClick={() => setShowAlreadyImported((prev) => !prev)}
+                  >
+                    {showAlreadyImported
+                      ? "Hide sessions you've already imported"
+                      : `Show sessions you've already imported (${importedPickerRows.length})`}
+                  </button>
+                  {showAlreadyImported ? (
+                    <ul className="space-y-1">
+                      {importedPickerRows.map((row) => (
+                        <li key={`imported:${row.importedSessionId}`}>
+                          <SessionImportListRow
+                            title={row.driverName?.trim() || "Session"}
+                            when={formatSessionWhen(
+                              row.sessionCompletedAtIso,
+                              row.sessionTime,
+                              row.timingSource
+                            )}
+                            note={row.linkedRunLabel ? `On ${row.linkedRunLabel}` : "Not on a run"}
+                            bestLapSeconds={row.bestLapSeconds ?? null}
+                            timingSource={row.timingSource}
+                            // Laps sitting loose are simply taken. Laps filed under another run get
+                            // the confirm first, because taking them moves them off it.
+                            actionLabel={row.linkedRunId ? "Use here" : "Use these laps"}
+                            disabled={urlBusy}
+                            onClick={() => {
+                              if (row.linkedRunId) setMoveConfirmRow(row);
+                              else void takeStoredImport(row);
+                            }}
+                          />
+                          {/*
+                            The confirm opens against the row it belongs to, not at the foot of the
+                            card. Rendered after the list it sat below the fold behind the wizard's
+                            bottom dock, so on a phone "Use here" looked like it did nothing.
+                          */}
+                          {moveConfirmRow?.importedSessionId === row.importedSessionId ? (
+                            <MoveLapsConfirm
+                              row={moveConfirmRow}
+                              busy={urlBusy}
+                              onConfirm={() => void takeStoredImport(moveConfirmRow)}
+                              onCancel={() => setMoveConfirmRow(null)}
+                            />
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
                   ) : null}
                 </div>
               ) : null}
@@ -1925,7 +2230,8 @@ export function LapTimesIngestPanel({
           ) : null}
         </div>
       ) : null}
-    </SurfaceCard>
+      </SurfaceCard>
+    </div>
   );
 }
 

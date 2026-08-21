@@ -4,6 +4,8 @@ import { Fragment, useState } from "react";
 import { Maximize2 } from "lucide-react";
 import type { SetupChangedRow } from "@/lib/setupCompare/changedSincePrevious";
 import { SheetBoxCrop, useSheetBoxCrops } from "@/components/runs/SheetBoxCrop";
+import { InlineValueEdit } from "@/components/runs/InlineValueEdit";
+import { setupKeyIsInlineEditable } from "@/lib/setup/inlineEditableKeys";
 import { cn } from "@/lib/utils";
 
 const HEAD_CELL =
@@ -18,9 +20,19 @@ export function SetupChangedSincePreviousList({
   rows,
   className,
   runId,
+  onEditValue,
 }: {
   rows: SetupChangedRow[] | null;
   className?: string;
+  /**
+   * When given, the NOW column becomes tappable and this saves the retyped value.
+   *
+   * This list is where a driver actually notices a wrong number — it is the one
+   * place the app says "you changed this" — so it is the right place to fix it.
+   * Omitted on the read-only surfaces (the setup sheet modal, a teammate's run),
+   * where the column stays plain text.
+   */
+  onEditValue?: (key: string, next: string) => Promise<void>;
   /**
    * When given, and this run's chassis came from an uploaded PDF, each row can be opened to show
    * that box on a crop of the sheet — see `SheetBoxCrop`. Every other chassis gets no opener at
@@ -103,7 +115,16 @@ export function SetupChangedSincePreviousList({
                   {row.label}
                 </div>
                 <div className="min-w-0 break-words px-2 py-[7px] text-right text-[13px] tabular-nums leading-tight text-foreground">
-                  {row.value}
+                  {onEditValue && setupKeyIsInlineEditable(row.key) ? (
+                    <InlineValueEdit
+                      label={row.label}
+                      value={row.value === "—" ? "" : row.value}
+                      numeric
+                      onSave={(next) => onEditValue(row.key, next)}
+                    />
+                  ) : (
+                    row.value
+                  )}
                 </div>
                 <div className="min-w-0 break-words pl-2 pr-3.5 py-[7px] text-right text-[12px] tabular-nums leading-tight text-faint line-through">
                   {row.previousValue}

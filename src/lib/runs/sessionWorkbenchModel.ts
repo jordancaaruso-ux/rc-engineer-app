@@ -61,7 +61,14 @@ export type WorkbenchRunSource = {
  */
 export type WorkbenchGroupSource = {
   title: string;
-  type: "Testing" | "Race Meeting";
+  type: "Testing" | "Event";
+  /**
+   * Venue and day for the chart's scope line — a test day's title is just "Test day", so without
+   * these the caption on the picture says nothing. Optional, and `"—"` counts as absent (the
+   * history page uses that dash as its own empty marker in the rail).
+   */
+  trackName?: string | null;
+  dateLabel?: string | null;
   /** Newest-first — tire and setup indicators are both "vs the previous run". */
   runs: WorkbenchRunSource[];
 };
@@ -144,8 +151,17 @@ export function buildGroupTrendModel(
   }
 
   return {
-    scopeKind: group.type === "Race Meeting" ? "event" : "day",
-    scopeLabel: group.title,
+    scopeKind: group.type === "Event" ? "event" : "day",
+    // Drawn under the card's title since 2026-08-20, so it has to say where and when rather than
+    // just "Test day". Same rule as `/analysis` (`trendScopeLabel`): a meeting names itself,
+    // anything else is the venue and the date. The pane's own headline sits above and can scroll
+    // off — the caption on the picture should not depend on what is still on screen beside it.
+    scopeLabel:
+      group.type === "Event"
+        ? group.title
+        : [group.trackName === "—" ? null : group.trackName, group.dateLabel]
+            .filter(Boolean)
+            .join(" · ") || group.title,
     runs: trendRuns,
     carOptions,
     defaultCarId: carOptions[0]?.carId ?? null,
@@ -267,7 +283,7 @@ export type WorkbenchGroupHeadline = {
 export type WorkbenchGroup = {
   id: string;
   title: string;
-  type: "Testing" | "Race Meeting";
+  type: "Testing" | "Event";
   trackName: string | null;
   dateLabel: string;
   runs: WorkbenchRunRow[];

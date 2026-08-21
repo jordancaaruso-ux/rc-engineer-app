@@ -9,6 +9,7 @@ import { SetupSheetModal, type SetupSheetModalRun } from "@/components/runs/RunH
 import { RunLapAnalysisModal } from "@/components/runs/RunHistoryModalsLazy";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
+import type { SetupEditorSavedResult } from "@/components/setup/useSetupEditorSave";
 
 /**
  * Client shell for `/runs/[id]` — the same `RunDetailPanel` Sessions rendered, topped by the
@@ -80,6 +81,33 @@ export function RunPageClient({
   const [lapsOpen, setLapsOpen] = useState(false);
   const inHeader = placement === "header";
 
+  /**
+   * ============================== THE SETUP CORRECTION ROUND TRIP ==============================
+   *
+   * Correcting a run's setup happens INSIDE the setup pop-up (2026-08-21) rather than on a page
+   * of its own, so this shell is what joins the two halves that used to be joined by a
+   * navigation and a `sessionStorage` hop:
+   *
+   *  - `setupEditing` opens the pop-up already armed, for the panel's "Edit setup on the sheet".
+   *  - `pendingCascade` carries the "did your other runs have this wrong too?" questions back
+   *    DOWN to `RunDetailPanel`, which owns the sheet that asks them.
+   *
+   * The `nonce` is what makes the hand-off repeatable. The payload for a second correction of
+   * the same field with the same neighbours is deep-equal to the first, so a panel watching the
+   * value alone would ignore it — and the second correction is exactly the one a driver makes
+   * after answering "just this run" the first time.
+   */
+  const [setupEditing, setSetupEditing] = useState(false);
+  const [pendingCascade, setPendingCascade] = useState<{
+    nonce: number;
+    result: SetupEditorSavedResult;
+  } | null>(null);
+
+  const openSetupEditor = () => {
+    setSetupEditing(true);
+    setSetupOpen(true);
+  };
+
   // Own runs arrive already filtered to this car by the server query, so this is belt-and-braces.
   // A teammate's arrive scoped to the run's *discipline* instead — re-cutting those to the exact
   // car would throw away everything the page just went and fetched.
@@ -92,11 +120,33 @@ export function RunPageClient({
     <>
       <SetupSheetModal
         open={setupOpen}
-        onClose={() => setSetupOpen(false)}
+        onClose={() => {
+          setSetupOpen(false);
+          setSetupEditing(false);
+        }}
         run={setupOpen ? (run as unknown as SetupSheetModalRun) : null}
         pickerRuns={pickerRuns as SetupSheetModalRun[]}
         runListSource={runListSource}
         viewerUserId={null}
+        startEditing={setupEditing}
+        /*
+         * Only passed when the viewer may actually correct this run. The modal treats the
+         * absence of this callback as "read-only host" — see its prop docs — so a teammate's
+         * shared session never grows an Edit toggle, on top of the server's own owner test.
+         */
+        onRunSetupCorrected={
+          allowRunMutations
+            ? (result) => {
+                setPendingCascade((prev) => ({ nonce: (prev?.nonce ?? 0) + 1, result }));
+                /*
+                 * The run this page was rendered with still points at the OLD snapshot, and
+                 * the correction minted a new one. Without this the pop-up would drop back to
+                 * reading and redraw the numbers it just replaced.
+                 */
+                router.refresh();
+              }
+            : undefined
+        }
       />
       {lapsOpen ? (
         <RunLapAnalysisModal
@@ -172,6 +222,8 @@ export function RunPageClient({
         displayTimeZone={displayTimeZone}
         allowRunMutations={allowRunMutations}
         onDeleted={() => router.push("/runs/history")}
+        onEditSetup={openSetupEditor}
+        cascadeFromSetupEditor={pendingCascade}
         headerLead={backControl}
         headerActions={compactActions}
         layout={layout}
@@ -244,6 +296,8 @@ export function RunPageClient({
           displayTimeZone={displayTimeZone}
           allowRunMutations={allowRunMutations}
           onDeleted={() => router.push("/runs/history")}
+          onEditSetup={openSetupEditor}
+          cascadeFromSetupEditor={pendingCascade}
         />
       </div>
 
