@@ -83,7 +83,7 @@ export function DashboardNextOutingCard({
 
   // Same destination rule as the phone card (founder call 2026-07-29): once you have run
   // at a meeting the useful place is those runs — run history already groups an event's
-  // runs as one "Race Meeting". Before the first run there is nothing there, so the event
+  // runs as one "Event". Before the first run there is nothing there, so the event
   // page stays the target.
   const hasRuns = event.runCount > 0;
   const heroHref = hasRuns

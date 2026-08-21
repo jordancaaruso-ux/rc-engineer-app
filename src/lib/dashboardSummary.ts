@@ -60,6 +60,26 @@ export type DashboardSummary = {
   windowDays: number;
   /** False when there are no completed runs in the current window (empty state). */
   hasData: boolean;
+  /**
+   * True when the driver has EVER completed a run, regardless of the window.
+   *
+   * `hasData` alone was being read as "this driver is new", which it never meant: it is scoped to
+   * the rolling window, so a month away from the track made it false for someone with years of
+   * history. Measured 2026-08-21 on the production demo account — 178 runs, newest 33 days old —
+   * which was being told to "log your first run". The card needs both facts to tell a first-timer
+   * apart from a driver having a quiet spell.
+   */
+  hasEverLogged: boolean;
+  /**
+   * When the driver was last on track, all-time, ALREADY FORMATTED ("19 Jul"). Null only for a
+   * genuine first-timer.
+   *
+   * A string rather than a `Date` on purpose: this summary travels through a cached read, and a
+   * Date that survives a JSON round trip comes back as a string — so a `Date` here would work on a
+   * cache miss and throw on a hit. Formatting at the source also keeps the driver's own time zone,
+   * which the renderer does not have.
+   */
+  lastRunLabel: string | null;
   runs: SummaryDelta;
   laps: SummaryDelta;
   drivingSeconds: SummaryDelta;
@@ -98,6 +118,16 @@ function localDayKey(d: Date, timeZone: string): string {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** "19 Jul" in the driver's own time zone, for the quiet-spell line. */
+function formatLastOut(d: Date | null, timeZone: string): string | null {
+  if (!d) return null;
+  try {
+    return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone }).format(d);
+  } catch {
+    return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(d);
+  }
+}
 
 /**
  * Bucket completed runs into the current window `[now - windowDays, now]` and the
@@ -168,6 +198,16 @@ export function computeDashboardSummary(
   return {
     windowDays,
     hasData: runs.current > 0,
+    // Computed from the same `rows` the windows are cut from — that argument is the full completed
+    // run history, not a pre-filtered slice, so this needs no extra query.
+    hasEverLogged: rows.length > 0,
+    lastRunLabel: formatLastOut(
+      rows.reduce<Date | null>(
+        (newest, r) => (newest === null || r.effectiveAt > newest ? r.effectiveAt : newest),
+        null,
+      ),
+      timeZone,
+    ),
     runs,
     laps,
     drivingSeconds,

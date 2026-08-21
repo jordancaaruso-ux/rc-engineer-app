@@ -46,7 +46,7 @@ export function DashboardNextOutingCard({
 
   // Once you've run at a meeting, the useful destination is the runs — not the
   // event's dates and spec tire (founder call 2026-07-29). Run history already
-  // groups an event's runs as one "Race Meeting", so the filtered Sessions list
+  // groups an event's runs as one "Event", so the filtered Sessions list
   // is the meeting view. Before the first run there's nothing to see, so the
   // event page stays the target.
   const hasRuns = (event?.runCount ?? 0) > 0;

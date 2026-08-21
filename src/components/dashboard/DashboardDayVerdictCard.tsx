@@ -7,6 +7,7 @@ import { carRatingBandCaption } from "@/lib/runHandlingAssessment";
 import { cn } from "@/lib/utils";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { RatingDial } from "@/components/ui/RatingDial";
+import { PaceSparkline } from "@/components/dashboard/PaceSparkline";
 
 const GAIN = "text-gain";
 const LOSS = "text-destructive";
@@ -69,27 +70,6 @@ function handlingHeadline(handling: NonNullable<TodayVerdict["handling"]>, runCo
   }
 }
 
-/** Per-run pace sparkline — faster laps plot lower, so an improving day slopes down. */
-function Sparkline({ values, direction }: { values: number[]; direction: "faster" | "slower" | "steady" }) {
-  const W = 72;
-  const H = 26;
-  const PAD = 4;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min;
-  const x = (i: number) => (values.length === 1 ? W / 2 : PAD + (i * (W - 2 * PAD)) / (values.length - 1));
-  const y = (v: number) => (range === 0 ? H / 2 : PAD + ((max - v) * (H - 2 * PAD)) / range);
-  const points = values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-  const last = values[values.length - 1];
-  const endColor = direction === "faster" ? "rgb(var(--color-gain))" : direction === "slower" ? "rgb(var(--color-destructive))" : "rgb(var(--color-faint))";
-  return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden className="shrink-0">
-      <polyline points={points} fill="none" stroke="rgb(var(--color-faint))" strokeWidth="1.5" />
-      <circle cx={x(values.length - 1)} cy={y(last)} r="2.6" fill={endColor} />
-    </svg>
-  );
-}
-
 function InstrumentRow({
   label,
   main,
@@ -122,19 +102,18 @@ function InstrumentRow({
   );
 }
 
-// No mode param (one-mode decision 2026-07-29): the Engineer answers the same way
-// everywhere — the prompt text itself says what this tap wants.
-const ENGINEER_TODAY_HREF = `/engineer?prompt=${encodeURIComponent(
-  "Give me your read on today so far."
-)}`;
-
 /**
  * Track-day day-verdict card — the computed read of the day ("three
  * instruments", docs/DASHBOARD_NORTH_STAR.md v2, founder-locked 2026-07-19 via
  * artifact board): pace trend, whether the last setup change helped, and lap
  * consistency. Pure math, no AI — the run list itself lives in Sessions
- * (tapping the card lands there), and the Engineer is on-demand via the footer
- * (quick mode, anchored to today). Replaces the Today-so-far run strip.
+ * (tapping the card lands there). Replaces the Today-so-far run strip.
+ *
+ * **No Engineer footer since 2026-08-20** (founder call). It read "Ask the Engineer about
+ * today" and queued "give me your read on today so far" — a request to recite the figures
+ * printed directly above it. `DashboardAskEngineerCard` takes the slot under this card
+ * instead, and offers questions the card cannot answer: worth changing at all, why it is
+ * loose on entry, which tyre.
  */
 export function DashboardDayVerdictCard({
   verdict,
@@ -210,7 +189,7 @@ export function DashboardDayVerdictCard({
               )
             }
             right={trend && trend.spark.length >= 2 ? (
-              <Sparkline values={trend.spark} direction={trend.direction} />
+              <PaceSparkline values={trend.spark} direction={trend.direction} />
             ) : undefined}
             last={!lastChange && !handling}
           />
@@ -251,18 +230,6 @@ export function DashboardDayVerdictCard({
         ) : null}
       </div>
 
-      {/* On-demand Engineer read — the only AI on this card, and you ask for it. */}
-      <div className="relative z-10 mt-3 border-t border-border/70 pt-2.5">
-        <Link
-          href={ENGINEER_TODAY_HREF}
-          prefetch
-          className="tap-active flex items-center gap-2 text-[13px] font-semibold text-muted-foreground transition hover:text-foreground"
-        >
-          <span aria-hidden className="text-primary-ink">✦</span>
-          Ask the Engineer about today
-          <ArrowUpRight aria-hidden className="ml-auto size-[15px] text-faint" strokeWidth={2.2} />
-        </Link>
-      </div>
     </SurfaceCard>
   );
 }

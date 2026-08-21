@@ -48,7 +48,7 @@ function trendRun(index: number): AnalysisTrendRun {
 }
 
 const TREND: AnalysisTrendModel = {
-  scopeLabel: "19 Jul 2026 · TFTR",
+  scopeLabel: "TFTR · 19 Jul 2026",
   scopeKind: "day",
   runs: BESTS.map((_, index) => trendRun(index)),
   carOptions: [{ carId: "car_1", carName: "A800 RR" }],

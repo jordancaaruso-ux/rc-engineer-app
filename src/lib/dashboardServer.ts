@@ -54,6 +54,21 @@ import { perfSpan } from "@/lib/perfLog";
 export type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
 export type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
 
+/**
+ * The rolling summary window, 30 days in production and NOT configurable there — the card's own
+ * copy says "vs the previous 30 days", so a different length would make it lie.
+ *
+ * The escape hatch exists for one reason: `.env.local` points at the scratch-dev clone, whose newest
+ * runs are already older than 30 days, so the whole card renders empty and there is nothing to look
+ * at while testing. Widening it locally (`DASHBOARD_WINDOW_DAYS=45`) puts real numbers back on the
+ * screen. Production ignores the variable entirely, so this cannot escape into a shipped build.
+ */
+function dashboardWindowDays(): number {
+  if (process.env.NODE_ENV === "production") return 30;
+  const raw = Number(process.env.DASHBOARD_WINDOW_DAYS);
+  return Number.isFinite(raw) && raw >= 1 && raw <= 3650 ? Math.floor(raw) : 30;
+}
+
 /** @deprecated import from `@/lib/eventActive` */
 export { eventIsActiveOnLocalToday, eventIsActiveOnCalendarDay } from "@/lib/eventActive";
 
@@ -761,7 +776,7 @@ export async function loadDashboardHomeModel(
       className: r.raceClass,
     };
   });
-  const summary = computeDashboardSummary(summaryInputs, new Date(), timeZone);
+  const summary = computeDashboardSummary(summaryInputs, new Date(), timeZone, dashboardWindowDays());
 
   // All-time records board (best lap / avg-top-5 / race pace per track+class) +
   // the fresh-PB flag when the most recent completed run just broke a record.

@@ -679,19 +679,34 @@ export function SessionTrendCard({
           `.eyebrow-root` is unlayered CSS while Tailwind 4 utilities live in
           `@layer utilities`, so passing `border-b-0` to <Eyebrow> is silently a
           no-op and the card ends up with two rules of two different lengths. */}
-      <div className="eyebrow-root flex items-center gap-3">
-        <span className="eyebrow-label min-w-0 flex-1">Session trend</span>
-        <PillToggle
-          className="w-auto shrink-0 whitespace-nowrap"
-          options={[
-            { value: "line", label: "Line" },
-            { value: "spread", label: "Spread" },
-          ]}
-          value={view}
-          onChange={chooseView}
-          role="tablist"
-          ariaLabel="Pace chart view"
-        />
+      <div className="eyebrow-root flex flex-col gap-1">
+        <div className="flex items-center gap-3">
+          <span className="eyebrow-label min-w-0 flex-1">Session trend</span>
+          <PillToggle
+            className="w-auto shrink-0 whitespace-nowrap"
+            options={[
+              { value: "line", label: "Line" },
+              { value: "spread", label: "Spread" },
+            ]}
+            value={view}
+            onChange={chooseView}
+            role="tablist"
+            ariaLabel="Pace chart view"
+          />
+        </div>
+        {/* What this chart is actually charting (2026-08-20). It said nothing before — which day,
+            which venue, which meeting were all left implied by "your most recent runs", so the
+            picture only made sense to someone who already knew the answer.
+
+            Its own line under the title, not beside it: the toggle already owns the right of that
+            row, and `TeammatesCard` directly below tried the side-by-side version at 390px and
+            lost both halves — a wrapped eyebrow AND a scope truncated mid-date.
+
+            Flush left, NOT indented under the eyebrow's words. It was indented past the ink notch
+            for one build and pulled: `TeammatesCard` prints this same line, in this same type, one
+            card down the same page, and it sits flush — two identical lines at two indents on one
+            screen reads as a mistake rather than as a refinement. */}
+        <span className="type-timestamp block truncate">{trend.scopeLabel}</span>
       </div>
 
       {trend.carOptions.length > 1 ? (

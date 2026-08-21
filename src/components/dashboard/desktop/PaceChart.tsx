@@ -24,6 +24,15 @@ const PAD = 12;
  * column gives it while the stroke stays visually even, because the vertical scale is
  * fixed at 168px.
  *
+ * **The dots are HTML, not SVG, and that is the point.** Stretching the viewBox means the
+ * horizontal and vertical scales differ by a factor that changes with the window width, so
+ * an SVG `<circle>` in here draws as an ellipse — fat on a wide window, tall on a narrow
+ * one, most obvious on the r=6 marker. The line does not care (`non-scaling-stroke`), so
+ * only the markers move out: absolutely positioned over the same box at `left: x / W` as a
+ * percentage and `top: y` in pixels, which is exactly where the stretch would have put them
+ * because the vertical scale is 1 unit = 1px. A CSS circle stays round at every width.
+ * Do not put them back inside the `<svg>`.
+ *
  * The draw-on entrance uses the app's existing `.rc-draw` class (`pathLength="1"` +
  * dashoffset), which is already gated on `prefers-reduced-motion` in globals.css — so
  * reduced motion gets the line already drawn rather than a special case here.
@@ -84,40 +93,52 @@ export function PaceChart({
 
   return (
     <div className="min-w-0">
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        preserveAspectRatio="none"
-        className="block h-[168px] w-full overflow-visible"
-        role="img"
-        aria-label={
-          isLaps
-            ? `Lap times across ${series.length} laps of your last run, quickest ${formatLap(min)}. Lower is faster.`
-            : `Pace across ${series.length} runs, from ${formatLap(first.best)} to ${formatLap(last.best)}. Lower is faster.`
-        }
-      >
-        <line x1="0" y1="12" x2={W} y2="12" stroke="rgb(var(--color-border))" strokeWidth="1" strokeDasharray="2 5" />
-        <line x1="0" y1="84" x2={W} y2="84" stroke="rgb(var(--color-border))" strokeWidth="1" strokeDasharray="2 5" />
-        <line x1="0" y1="156" x2={W} y2="156" stroke="rgb(var(--color-border))" strokeWidth="1" />
+      <div className="relative h-[168px] w-full">
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio="none"
+          className="block h-[168px] w-full overflow-visible"
+          role="img"
+          aria-label={
+            isLaps
+              ? `Lap times across ${series.length} laps of your last run, quickest ${formatLap(min)}. Lower is faster.`
+              : `Pace across ${series.length} runs, from ${formatLap(first.best)} to ${formatLap(last.best)}. Lower is faster.`
+          }
+        >
+          <line x1="0" y1="12" x2={W} y2="12" stroke="rgb(var(--color-border))" strokeWidth="1" strokeDasharray="2 5" />
+          <line x1="0" y1="84" x2={W} y2="84" stroke="rgb(var(--color-border))" strokeWidth="1" strokeDasharray="2 5" />
+          <line x1="0" y1="156" x2={W} y2="156" stroke="rgb(var(--color-border))" strokeWidth="1" />
 
-        <polyline
-          className="rc-draw"
-          pathLength="1"
-          points={points}
-          fill="none"
-          stroke="rgb(var(--color-faint))"
-          strokeWidth="2.5"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          vectorEffect="non-scaling-stroke"
-        />
+          <polyline
+            className="rc-draw"
+            pathLength="1"
+            points={points}
+            fill="none"
+            stroke="rgb(var(--color-faint))"
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+
+        </svg>
 
         {series.map((p, i) =>
           i === markIndex ? null : (
-            <circle key={p.runId} cx={x(i)} cy={y(p.best)} r="3" fill="rgb(var(--color-faint))" />
+            <span
+              key={p.runId}
+              aria-hidden
+              className="pointer-events-none absolute block size-[6px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-faint"
+              style={{ left: `${(x(i) / W) * 100}%`, top: `${y(p.best)}px` }}
+            />
           )
         )}
-        <circle cx={markX} cy={markY} r="6" fill={markColor} />
-      </svg>
+        <span
+          aria-hidden
+          className="pointer-events-none absolute block size-[12px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{ left: `${(markX / W) * 100}%`, top: `${markY}px`, backgroundColor: markColor }}
+        />
+      </div>
 
       <div className="mt-1 flex items-baseline justify-between gap-3 tabular-nums text-[10px] text-faint">
         <span className="truncate">

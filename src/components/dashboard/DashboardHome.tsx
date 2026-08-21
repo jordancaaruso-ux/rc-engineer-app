@@ -1,5 +1,7 @@
 import type { DashboardHomeModel } from "@/lib/dashboardServer";
 import { ActionItemListPanel } from "@/components/dashboard/ActionItemListPanel";
+import { DashboardListFold } from "@/components/dashboard/DashboardListFold";
+import { DashboardAskEngineerCard } from "@/components/dashboard/DashboardAskEngineerCard";
 import { DashboardDayVerdictCard } from "@/components/dashboard/DashboardDayVerdictCard";
 import { DashboardNextOutingCard } from "@/components/dashboard/DashboardNextOutingCard";
 import { DashboardStartRunCta } from "@/components/dashboard/DashboardStartRunCta";
@@ -11,9 +13,9 @@ import { PendingTeamInvitesCard } from "@/components/teams/PendingTeamInvitesCar
 import type { OnboardingView } from "@/lib/onboarding/server";
 import { showGetSetUpCard } from "@/lib/onboarding/visibility";
 import type { DashboardSetups } from "@/lib/setup/getDashboardSetups";
-import { CardPanel } from "@/components/ui/CardPanel";
 import { Reveal } from "@/components/ui/Reveal";
 import { DashboardDesktop } from "@/components/dashboard/desktop/DashboardDesktop";
+import { selectDashboardStarterQuestions } from "@/lib/engineerStarterQuestions";
 
 /**
  * Adaptive dashboard — two modes, auto-switched (docs/DASHBOARD_NORTH_STAR.md;
@@ -21,11 +23,27 @@ import { DashboardDesktop } from "@/components/dashboard/desktop/DashboardDeskto
  * the next action, verdicts not evidence; depth lives in Analysis / Sessions.
  *
  *   Track day (run/draft today, or an active event):
- *     CTA → Day verdict (computed instruments; Engineer on demand in the
- *     footer) → Ideas → 30-day summary
+ *     CTA → Day verdict (computed instruments) → [meeting countdown] →
+ *     Ask the Engineer → Ideas (open) → Things to do (folded)
  *   Off day:
  *     CTA → Next outing (event countdown; a book-a-track-day nudge when nothing
- *     is booked) → Ideas → Things to do → 30-day summary
+ *     is booked) → How you're going (per-track trends) → Ask the Engineer →
+ *     Ideas (folded) → Things to do (folded)
+ *
+ * ── The 2026-08-20 pass (founder call) ───────────────────────────────────────
+ * Both lists fold to a single labelled row (`DashboardListFold`) and moved to the
+ * BACK of both stacks: the yellow edge tab opens the same two lists from anywhere
+ * in the app, so the dashboard copy is a convenience, not the way in. Ideas still
+ * opens itself on a track day, where the list is live during the session.
+ *
+ * That freed the middle, which now carries a read and a question. **How you're
+ * going** is the old 30-day summary card promoted off the bottom, opening on a
+ * session trend per track. **Ask the Engineer** is one written starter question,
+ * cycling — and on a track day it takes the slot the trends have on an off day,
+ * because at the track the next change is the question, not last month.
+ *
+ * The 30-day card does NOT appear on a track day, which means a new record breaking
+ * mid-meeting has no celebration until the drive home. Known, and the founder's call.
  *
  * The outing card and the Ideas list were ONE tall card until 2026-08-18, when a
  * founder call split them. The list is now the same card on every kind of day
@@ -33,7 +51,8 @@ import { DashboardDesktop } from "@/components/dashboard/desktop/DashboardDeskto
  *
  * Retired in v2 (2026-07-19): the Today-so-far run strip (the run list lives in
  * Sessions), the last-session digest card, the next-event-prep card, and the auto
- * Engineer read (on-demand only, via the verdict-card footer).
+ * Engineer read — the Engineer is still only ever asked on purpose, now from its
+ * own card rather than the verdict card's footer.
  *
  * ── Desktop, 2026-08-08 ──────────────────────────────────────────────────────
  * The stacks above ARE the phone and are unchanged. At xl+ they are replaced
@@ -54,8 +73,9 @@ import { DashboardDesktop } from "@/components/dashboard/desktop/DashboardDeskto
  *     seed from the same server rows, and they can diverge only if the window is
  *     resized across 1280px mid-edit. Accepted.
  *
- * Mobile is the locked reference: everything below the desktop tree is `xl:hidden`
- * and byte-identical to before. Prove it with `npm run layout:probe --width=390`,
+ * Mobile is the locked reference: everything below the desktop tree is `xl:hidden`,
+ * and no desktop pass may move it. It changes only on its own founder call — the
+ * 2026-08-20 list fold is one. Prove a change with `npm run layout:probe --width=390`,
  * never screenshots.
  */
 export function DashboardHome({
@@ -138,8 +158,18 @@ export function DashboardHome({
   // Called "Ideas" wherever it appears now. It used to answer to "Test plan" whenever an
   // event was booked and "Things to try" otherwise, so booking a race quietly renamed the
   // driver's own list.
+  //
+  // Folded on the phone since 2026-08-20 (`DashboardListFold`): the list opens itself on a
+  // track day, where it is live during the session, and starts closed on an off day, where
+  // two open lists WERE the whole page. The desktop column is untouched — it has its own
+  // card and its own 6-row cap.
   const ideasCard = (
-    <CardPanel dataTour="things-to-try">
+    <DashboardListFold
+      label="Ideas"
+      count={thingsToTry.length}
+      defaultOpen={isTrackDay}
+      dataTour="things-to-try"
+    >
       <ActionItemListPanel
         list="try"
         title="Ideas"
@@ -147,9 +177,38 @@ export function DashboardHome({
         addLabel="Add an idea"
         initialItems={thingsToTry}
         embedded
+        titleHidden
       />
-    </CardPanel>
+    </DashboardListFold>
   );
+
+  // Reminders, folded, and now on a track day too — both lists ride at the back of every
+  // stack rather than one of them existing only on an off day.
+  const thingsToDoCard = (
+    <DashboardListFold label="Things to do" count={thingsToDo.length}>
+      <ActionItemListPanel
+        list="do"
+        title="Things to do"
+        addPlaceholder="Add a reminder…"
+        initialItems={thingsToDo}
+        embedded
+        titleHidden
+      />
+    </DashboardListFold>
+  );
+
+  /*
+   * The questions the Ask-the-Engineer card offers. Server-picked so the first one is in the
+   * HTML — the card cycles from there.
+   *
+   * `recentRun` is the "has anything been logged" test: it is the Engineer's Auto subject, so
+   * when it exists the read-this-run questions have something to read. With nothing logged the
+   * selector drops them and the card still has plenty to ask.
+   */
+  const askQuestions = selectDashboardStarterQuestions({
+    hasRuns: Boolean(recentRun),
+    isTrackDay,
+  });
 
 
   return (
@@ -214,10 +273,10 @@ export function DashboardHome({
         ) : null}
 
         {/* ── Phone (below xl) ──────────────────────────────────────────────────
-            Verdict or next-outing, then the driver's Ideas list, then ambient momentum
-            last. The outing card and the list separated on 2026-08-18; everything else
-            is the stack the desktop passes were built against, and
-            `npm run layout:probe --width=390` is still the gate. */}
+            Rebuilt 2026-08-20 (founder call). Today or the next outing, then how you're
+            going, then one question worth asking — and the two lists LAST, folded, because
+            the edge tab reaches the same two lists from anywhere in the app and is the door
+            that actually gets used. `npm run layout:probe --width=390` is still the gate. */}
         <div className="flex flex-col gap-3 xl:hidden">
           {isTrackDay ? (
             <>
@@ -233,7 +292,16 @@ export function DashboardHome({
                 </Reveal>
               ) : null}
 
-              <Reveal index={3}>{ideasCard}</Reveal>
+              {/* Where "How you're going" sits on an off day. At the track the last thirty
+                  days are not the question — the next change is — so the Engineer takes the
+                  slot and the trends wait for the drive home. */}
+              <Reveal index={3}>
+                <DashboardAskEngineerCard questions={askQuestions} />
+              </Reveal>
+
+              <Reveal index={4}>{ideasCard}</Reveal>
+
+              <Reveal index={5}>{thingsToDoCard}</Reveal>
             </>
           ) : (
             <>
@@ -241,26 +309,22 @@ export function DashboardHome({
                 <DashboardNextOutingCard event={nextEvent} />
               </Reveal>
 
-              <Reveal index={2}>{ideasCard}</Reveal>
+              {/* Ambient momentum was demoted to last on 2026-07-16 and came back up on
+                  2026-08-20 as "How you're going" — a session trend per track from the last
+                  30 days, which is a read on the driver rather than a scoreboard. */}
+              <Reveal index={2}>
+                <DashboardSummaryCard summary={summary} records={records} newPb={newPb} />
+              </Reveal>
 
               <Reveal index={3}>
-                <CardPanel>
-                  <ActionItemListPanel
-                    list="do"
-                    title="Things to do"
-                    addPlaceholder="Add a reminder…"
-                    initialItems={thingsToDo}
-                    embedded
-                  />
-                </CardPanel>
+                <DashboardAskEngineerCard questions={askQuestions} />
               </Reveal>
+
+              <Reveal index={4}>{ideasCard}</Reveal>
+
+              <Reveal index={5}>{thingsToDoCard}</Reveal>
             </>
           )}
-
-          {/* Demoted 2026-07-16: ambient momentum rides last, never the lead. */}
-          <Reveal index={4}>
-            <DashboardSummaryCard summary={summary} records={records} newPb={newPb} />
-          </Reveal>
         </div>
       </section>
     </>

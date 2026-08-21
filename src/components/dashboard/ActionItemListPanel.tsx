@@ -20,6 +20,7 @@ export function ActionItemListPanel({
   initialItems,
   embedded = false,
   variant = "pill",
+  titleHidden = false,
   onItemsChange,
   maxVisible,
 }: {
@@ -53,6 +54,12 @@ export function ActionItemListPanel({
    * drag affordance (it swaps to the grip on hover).
    */
   variant?: "pill" | "ledger";
+  /**
+   * Drop the panel's own heading to screen readers only, for an owner that already prints it —
+   * the phone dashboard's fold row (`DashboardListFold`, 2026-08-20), the same arrangement the
+   * ledger variant has always had with the desktop card frame.
+   */
+  titleHidden?: boolean;
   /**
    * Show only this many rows, with the rest behind a "+N more" line that expands in place.
    *
@@ -241,9 +248,10 @@ export function ActionItemListPanel({
       ? "rounded-md border-0 bg-transparent p-0 shadow-none"
       : "rounded-xl border border-border p-4 shadow-[0_18px_50px_-28px_rgba(0,0,0,0.75)]";
 
-  // In the ledger variant the card shell above supplies the title (and the count), so the
-  // panel's own heading would be a second copy. Kept in the DOM for screen readers.
-  const titleEl = isLedger ? (
+  // In the ledger variant — and under the phone dashboard's fold row — the card shell above
+  // supplies the title (and the count), so the panel's own heading would be a second copy.
+  // Kept in the DOM for screen readers.
+  const titleEl = isLedger || titleHidden ? (
     <h3 className="sr-only">{title}</h3>
   ) : (
     <Eyebrow dot="muted">{title}</Eyebrow>

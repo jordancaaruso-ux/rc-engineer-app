@@ -4,6 +4,7 @@ import type { DashboardHomeModel } from "@/lib/dashboardServer";
 import { carRatingBandCaption } from "@/lib/runHandlingAssessment";
 import { cn } from "@/lib/utils";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { lapImportHref } from "@/lib/runs/lapImportHref";
 
 /**
  * The desktop hero's stand-in on a track day with no lap times (founder call 2026-08-11).
@@ -156,9 +157,10 @@ export function DashboardTodayNoLapsCard({
         </div>
       </div>
 
-      {/* The one thing missing, and the door straight to it. */}
+      {/* The one thing missing, and the door straight to it — landing on the run once the
+          laps are in, not back on this card with nothing left to say. */}
       <Link
-        href={`/runs/${latest.runId}/edit?step=laps`}
+        href={lapImportHref(latest.runId)}
         prefetch={false}
         className="tap-active flex items-center gap-2 border-t border-border px-6 py-3 text-[12.5px] font-semibold text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
       >
