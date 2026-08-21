@@ -26,7 +26,16 @@ const nextConfig = {
   // LAN dev origin (phone testing + headless verification drive the app via this
   // IP). Next 16 blocks cross-origin /_next/* dev requests from unlisted origins,
   // which silently kills hydration — pages render but nothing is clickable.
-  allowedDevOrigins: ["192.168.1.112", "192.168.50.248", "192.168.50.91"],
+  // `*.trycloudflare.com` is the quick tunnel (`npx cloudflared tunnel --url http://localhost:3000`),
+  // which is how the dev server gets onto a phone that is NOT on the home LAN. The hostname is
+  // random per tunnel, so it has to be a wildcard; Next matches one label per `*`, which is exactly
+  // the shape Cloudflare hands out. Dev-only config — it does not exist in a production build.
+  allowedDevOrigins: [
+    "192.168.1.112",
+    "192.168.50.248",
+    "192.168.50.91",
+    "*.trycloudflare.com",
+  ],
   // onnxruntime-node ships a native .node binary; keep it external so webpack doesn't try to
   // bundle it (local PP-OCR text reader, src/lib/setupCalibrations/localOcr.ts).
   // @napi-rs/canvas (pdfjs-dist's Node canvas) + pdf-to-img rasterize flattened-PDF setup sheets

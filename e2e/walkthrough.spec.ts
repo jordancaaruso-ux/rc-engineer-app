@@ -132,7 +132,7 @@ test("log a complete run from scratch, capturing every step", async ({ page }) =
 
   await page.getByRole("combobox", { name: "Car" }).selectOption({ label: "A800RR" });
   await beat(700);
-  await page.getByRole("radio", { name: "Race meeting" }).click();
+  await page.getByRole("radio", { name: "Event" }).click();
   await beat(800);
 
   // Pick today's meeting. Native <select>, so selectOption — clicking one opens an OS-level
@@ -306,7 +306,7 @@ test("log a complete run from scratch, capturing every step", async ({ page }) =
       "| | |",
       "|---|---|",
       "| Car | A800RR (chosen from two) |",
-      "| Day | Race meeting — TFTR Club Round 5, today · Qualifying |",
+      "| Day | Event — TFTR Club Round 5, today · Qualifying |",
       "| Tires | Matrix EP Touring D36, new set |",
       "| Prep | Mighty Gripper Yellow applied · 20 min in warmers |",
       "| Setup | Saved setup \"TFTR — medium grip\" — ~70 parameters in one tap |",

@@ -52,6 +52,7 @@ Each platform pack carries a grade, shown as a small tag wherever absolutes rend
 | `measured` | Hand-measured hardpoints (calipers, stripped car) |
 | `cross-checked` | Engine output matches an established external calculator (VSUSP) on this pack |
 | `cad-verified` | Hardpoints confirmed against CAD / manufacturer drawings |
+| `teaching-model` | **Not a car.** The invented fallback below — it renders as a `sandbox` tag, not a grade, because there is nothing here to grade |
 
 A800R launches at `cross-checked`.
 
@@ -62,6 +63,68 @@ A800R launches at `cross-checked`.
 ### Platform pack
 
 A pack is per car model: every car using that sheet model inherits it, and the field→geometry mapping lives next to the fields it maps. **Authoring path: VSUSP share-link import** fills base hardpoints; an admin page manages the mapping. No code change per new car. The pack's shape and the field mapping live in `src/lib/rollCenter/packs.ts` and `computeFromSnapshot.ts` — the code is the contract, not a copy in this doc.
+
+### When we have no measurements: the teaching model (founder, 2026-08-19)
+
+A pack belongs to a car. Until 2026-08-19 the Lab had no answer for the case where we don't have
+one — so it sniffed part names, found none, and handed back the **A800's hardpoints anyway**. Every
+driver who wasn't on an Awesomatix opened the Geometry Lab onto someone else's car, and the setup
+picker silently dropped every row it couldn't fingerprint, so their own runs weren't even listed.
+
+The answer is a **teaching model**: a 1/10 touring car nobody races, which the Lab falls back to and
+which says so on screen. The ruling that makes it honest is the trust doctrine one step further:
+
+> **Direction and rough magnitude generalise; the absolute does not.** Which way a shim moves the
+> roll centre, and roughly how far, is true of any double-wishbone touring car. The exact millimetre
+> belongs to the car it was measured on. The teaching model therefore teaches the mechanism and
+> claims no number.
+
+- **Every value is a whole or half millimetre, deliberately.** Roundness is the tell — nobody
+  mistakes 60.0mm for a measurement. Locked by a test, so it can't drift into looking measured.
+- **What's pinned comes from the class, not a brand:** 190mm maximum width, 64mm tyres, 5mm ride
+  height, the wheel offset every 1/10 TC shares. Only the mount heights and arm lengths were chosen,
+  and they were chosen so the **ratios** land mid-field — 1.20mm of RC per mm of ride height, which
+  is the figure this doc already quotes.
+- **Front and rear identical**, so the roll axis starts level and the driver makes rake themselves.
+- **Sealed off.** No save, no run prefill, no Engineer context, no stored RC, nothing into a
+  cross-car aggregate. The knobs take action names ("raise lower arm inner") rather than one brand's
+  part names, because the model has no parts.
+- **The picker marks, it never hides.** A row we can't compute geometry for still loads — into the
+  teaching model, labelled. An empty list told the driver nothing; "no measurements" tells them
+  exactly what's missing, and is where the ask for driver-supplied measurements belongs.
+- **Sheet surfaces are unaffected.** The setup-sheet strip and block resolve by template key and
+  still show nothing when there's no pack — a sheet must never render teaching numbers as that
+  car's geometry. The fallback is the Lab's alone.
+- **Honest limit, accepted:** the fingerprint reads shim keys, so a genuine A800 sheet with all four
+  shim boxes empty now falls to the teaching model too. That is the safe direction, and it resolves
+  when packs key off the chassis rather than field names.
+- **Touring car only.** The model is a TC and names itself one. Other classes get their own teaching
+  model when the class arrives; the sandbox is a fallback for cars we haven't measured, never a
+  licence to always show something.
+
+### The chassis plate (founder, 2026-08-19)
+
+Packs carry `chassisHalfWidthMm` — half the plate's width at the axle line — and the schematic draws
+the plate and a **ride-height dimension from the ground to its underside**. Before this the "chassis"
+was a line between the two lower-inner mounts: 21mm wide on an A800 against a 44mm plate, with no
+thickness at all, so ride height had nothing to look at and the steel/carbon/alu choice was invisible
+despite doing real work in the calc.
+
+Two properties keep it cheap and safe: it is **drawn and never solved**, so a missing or approximate
+width cannot move a single number — which also makes it the one pack figure a driver can take with a
+ruler on a built car — and a pack with no width measured draws **dashed and faint** rather than
+pretending.
+
+A measured plate draws as a **thin, fully opaque outline with no fill** — the same hairline weight as
+the arms (founder, 2026-08-19/20). Washed-out and semi-transparent read as a guess; filled solid read
+as the subject, and the subject is the suspension. The plate is the biggest shape in the drawing, so
+it carries the thinnest line. The A800 was the dashed case until the founder put a ruler across it:
+**44mm at the axle line**, so it draws as a real outline now. Only a fallback width stays faint and
+dashed.
+
+It also makes the datum ruling below visible for the first time: the plate's **bottom** is ride
+height, the mounts bolt to its **top**, so a thicker chassis draws as a thicker plate rather than a
+raised car.
 
 ### What drives the calculation (all from the sheet)
 

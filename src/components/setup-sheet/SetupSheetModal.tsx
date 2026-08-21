@@ -19,6 +19,9 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { SegmentedControl, type SegmentedOption } from "@/components/ui/SegmentedControl";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { ReadOnlySheetSurface } from "@/components/setup/ReadOnlySheetSurface";
+import { SheetSetupEditorClient } from "@/components/setup/SheetSetupEditorClient";
+import { LibrarySetupEditorClient } from "@/components/setup/LibrarySetupEditorClient";
+import type { SetupEditorSavedResult } from "@/components/setup/useSetupEditorSave";
 import { SheetCompareSurface } from "@/components/setup/SheetCompareSurface";
 import { Eyebrow } from "@/components/ui/panel";
 import { SessionSetupSaveButton } from "@/components/setup/SessionSetupSaveButton";
@@ -102,6 +105,8 @@ export function SetupSheetModal({
   runListSource = "my_runs",
   viewerUserId = null,
   memberDisplayByUserId,
+  startEditing = false,
+  onRunSetupCorrected,
 }: {
   open: boolean;
   onClose: () => void;
@@ -111,6 +116,26 @@ export function SetupSheetModal({
   runListSource?: RunCompareListSource;
   viewerUserId?: string | null;
   memberDisplayByUserId?: Record<string, string>;
+  /**
+   * Open straight into edit mode — the run page's "Edit setup on the sheet" door, which is a
+   * request to correct rather than to read.
+   */
+  startEditing?: boolean;
+  /**
+   * ============================== WHAT MAKES THIS MODAL EDITABLE ==============================
+   *
+   * Present only when the host is the RUN PAGE. Correcting a setup here writes through
+   * `PATCH /api/runs/[id]/setup-snapshot`, which mints a new snapshot and repoints that one
+   * run — and it answers with the "did your other runs have this wrong too?" questions, which
+   * have to land somewhere that can ask them.
+   *
+   * The other three hosts (`RunHistoryTable`, `SessionTrendCard`, `LapComparisonColumnGrid`)
+   * mount this modal over a list with no run page underneath, so there is nowhere for those
+   * questions to go. They pass nothing, the Edit toggle never appears, and the setup stays
+   * readable exactly as before — a door that silently dropped the cascade would be worse than
+   * no door.
+   */
+  onRunSetupCorrected?: (result: SetupEditorSavedResult) => void;
 }) {
   const [compareOpen, setCompareOpen] = useState(false);
   const [compareSource, setCompareSource] = useState<CompareSource>("mine");
@@ -133,6 +158,21 @@ export function SetupSheetModal({
   const [sheetModelId, setSheetModelId] = useState<string | null>(null);
   /** The EDITION this run's setup keys draw on, when not the primary blank. Rides with the model. */
   const [sheetEditionBlankId, setSheetEditionBlankId] = useState<string | null>(null);
+  /**
+   * Reading or correcting. Read is the resting state — nothing on a session is touchable until
+   * the driver says so, the same rule the run panel's own pencil follows.
+   *
+   * Reset whenever the modal closes or moves to another run: this component is never unmounted
+   * between opens (see the `loadedSetupData` effect below for the other half of that), so
+   * without it a driver who edited run A and closed would find run B's sheet already armed.
+   */
+  const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    if (!open) setEditing(false);
+  }, [open]);
+  useEffect(() => {
+    setEditing(open && startEditing);
+  }, [open, run?.id, startEditing]);
 
   useEffect(() => {
     setPortalReady(true);
@@ -521,6 +561,44 @@ export function SetupSheetModal({
     return getGenericSetupSheetTemplate();
   }, [modelTemplate, run?.car?.setupSheetTemplate]);
 
+  /**
+   * May this viewer correct this run's setup from in here?
+   *
+   * Three conditions, and each rules out a real case:
+   *  - `saveContext?.action === "mark"` — the server's owner test. A teammate reads and copies.
+   *  - `onRunSetupCorrected` — the host can receive the cascade questions. See the prop.
+   *  - a snapshot and a car to write against.
+   *
+   * `setupValuesPending` is deliberately NOT one of them: it gates the SURFACE below, and a
+   * toggle that appears late reads as the app changing its mind.
+   */
+  const canCorrect = Boolean(
+    run?.setupSnapshot?.id && carId && saveContext?.action === "mark" && onRunSetupCorrected
+  );
+
+  /*
+   * Correcting and comparing are mutually exclusive: the compare surface paints a SECOND
+   * setup into the same boxes, so a fillable box would be showing one value and writing to
+   * another. Picking a baseline therefore drops out of edit mode rather than fighting it.
+   */
+  const editingNow = canCorrect && editing && !compareActive;
+
+  /**
+   * A correction landed. Drop back to reading, and hand the cascade questions up.
+   *
+   * Back to READING and not straight out of the pop-up: the driver came here to look at the
+   * sheet, and closing it on save would answer a question they did not ask. The run's own
+   * "Setup vs previous run" list re-reads behind the scrim, and the questions open on top.
+   *
+   * The stale-values problem is the host's: the run this modal was handed still carries the
+   * OLD snapshot id, so `onRunSetupCorrected` is also what triggers the page refresh that
+   * brings the new one back.
+   */
+  function handleCorrected(result: SetupEditorSavedResult) {
+    setEditing(false);
+    onRunSetupCorrected?.(result);
+  }
+
   if (!open || !portalReady) return null;
 
   return createPortal(
@@ -554,22 +632,39 @@ export function SetupSheetModal({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {/*
-              The door into the editor from the run's own side — the only one there has ever been,
-              and until 2026-08-16 there was none at all: a driver who wanted to fix what they had
-              logged had to walk out to the garage, where editing that setup now deliberately does
-              NOT touch the run. `?run=` is what tells the editor which side of that line it is on
-              (see `setupSaveMode.ts`), so it is the whole point of this link.
+              ============================== CORRECTING HAPPENS HERE ==============================
 
-              Owner only: `action === "mark"` is the server's answer to "is this viewer the one who
-              logged it" — a teammate may read the setup and copy it, never correct it.
+              This was a Link out to `/cars/[carId]/setups/[setupId]/edit` until 2026-08-21 —
+              a whole page away to change one number, which the founder called clunky and was
+              right to: the pop-up was ALREADY drawing the editor. `ReadOnlySheetSurface` is
+              `SheetFillSurface` with `readOnly` on, and the editor page is the same component
+              with it off. One boolean, one page trip.
+
+              So it is a toggle now, and the page survives only for the garage, where there is
+              no run to correct. What a save MEANS still comes from `saveMode` — `correctRun`,
+              which is the ONLY safe write for a run: `Run.setupSnapshotId` has no unique
+              constraint and "mark, not copy" can leave a named library setup on the same row,
+              so `PATCH /api/setup-snapshots/[id]` hard-refuses a snapshot with runs on it.
+
+              Owner only: `action === "mark"` is the server's answer to "is this viewer the one
+              who logged it" — a teammate may read the setup and copy it, never correct it.
+              `onRunSetupCorrected` adds the second condition: a host that can receive the
+              cascade questions.
             */}
-            {run?.setupSnapshot?.id && carId && saveContext?.action === "mark" ? (
-              <Link
-                href={`/cars/${carId}/setups/${run.setupSnapshot.id}/edit?run=${encodeURIComponent(run.id)}`}
-                className="shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-medium no-underline transition hover:bg-muted/90"
+            {canCorrect ? (
+              <button
+                type="button"
+                onClick={() => setEditing((v) => !v)}
+                aria-pressed={editing}
+                className={cn(
+                  "shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition",
+                  editing
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border hover:bg-muted/90"
+                )}
               >
-                Edit setup
-              </Link>
+                {editing ? "Done" : "Edit setup"}
+              </button>
             ) : null}
             {/*
               Keyed by snapshot: opening a second session reuses this component (the modal is never
@@ -732,6 +827,47 @@ export function SetupSheetModal({
                     This car has no setup sheet yet, so there is no sheet to compare on. Add its
                     sheet from the car page and this comparison works.
                   </p>
+                )
+              ) : editingNow && run.setupSnapshot?.id && carId ? (
+                /*
+                 * The same paper, fillable — `SheetSetupEditorClient` and `ReadOnlySheetSurface`
+                 * are both thin wrappers over one `SheetFillSurface`, so a box does not move a
+                 * pixel between reading and correcting.
+                 *
+                 * Keyed by snapshot: this modal is never unmounted, and the editor seeds its
+                 * working values ONCE from `initialValues`. Without a fresh key, opening a
+                 * second session would edit run B's setup starting from run A's numbers.
+                 *
+                 * `setupValuesPending` holds it back until the real values land, for the same
+                 * reason — an editor seeded from `{}` would read as a blank sheet, and saving it
+                 * would write one.
+                 */
+                setupValuesPending ? (
+                  <p className="text-[11px] text-muted-foreground">Loading this run’s setup…</p>
+                ) : sheetModelId ? (
+                  <SheetSetupEditorClient
+                    key={`edit:${run.setupSnapshot.id}`}
+                    carId={carId}
+                    setupId={run.setupSnapshot.id}
+                    saveMode={{ kind: "correctRun", runId: run.id }}
+                    setupSheetModelId={sheetModelId}
+                    editionBlankId={sheetEditionBlankId}
+                    initialValues={runSetup}
+                    templateKey={template.templateKey}
+                    hosted
+                    onSaved={handleCorrected}
+                  />
+                ) : (
+                  <LibrarySetupEditorClient
+                    key={`edit:${run.setupSnapshot.id}`}
+                    carId={carId}
+                    setupId={run.setupSnapshot.id}
+                    saveMode={{ kind: "correctRun", runId: run.id }}
+                    initialValues={runSetup}
+                    template={template}
+                    hosted
+                    onSaved={handleCorrected}
+                  />
                 )
               ) : sheetModelId ? (
                 <div className="space-y-1">

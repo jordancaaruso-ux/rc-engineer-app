@@ -35,8 +35,25 @@ const config: CapacitorConfig = {
     backgroundColor: "#EAE7E0",
   },
   plugins: {
+    /**
+     * The native splash HOLDS until the web app says it is ready (2026-08-19).
+     *
+     * It was `launchShowDuration: 0` — hide immediately — which uncovered the web
+     * view while it was still fetching the hosted app, so the launch read as JRC →
+     * a flash of a half-built app → the web TRACKSIDE splash → the app. `PwaSplashDismiss`
+     * now calls `SplashScreen.hide()` on the same readiness signal (window load +
+     * fonts), and the web splash is suppressed in the shell entirely, so there is one
+     * splash from the icon tap to the dashboard.
+     *
+     * `launchAutoHide` stays TRUE deliberately: it is the backstop. If the app never
+     * loads — no signal, dead network, JS that never runs — the duration below still
+     * ends it. A splash with no way out is worse than a blank screen.
+     */
     SplashScreen: {
-      launchShowDuration: 0,
+      launchAutoHide: true,
+      launchShowDuration: 4000,
+      launchFadeOutDuration: 220,
+      backgroundColor: "#EAE7E0",
     },
   },
 };

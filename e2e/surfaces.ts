@@ -13,6 +13,8 @@ export const STATIC_SURFACES: Surface[] = [
   { slug: "sessions", path: "/runs/history" },
   { slug: "log-run", path: "/runs/new" },
   { slug: "engineer", path: "/engineer" },
+  // A dock cell since the 2026-08-18 restructure, so it belongs in both whole-app audits.
+  { slug: "paddock", path: "/paddock" },
   { slug: "events", path: "/events" },
   { slug: "garage", path: "/cars" },
   { slug: "setup-hub", path: "/setup" },

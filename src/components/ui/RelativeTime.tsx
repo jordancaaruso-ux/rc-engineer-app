@@ -9,6 +9,7 @@ import {
   formatRunCreatedAtDateTime,
   formatRunDateOnly,
 } from "@/lib/formatDate";
+import { formatRelativeFromNow } from "@/lib/formatRelative";
 
 function formatLocalExact(d: Date): string {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -16,37 +17,6 @@ function formatLocalExact(d: Date): string {
     ...RUN_DISPLAY_DATETIME_OPTIONS,
     timeZone,
   }).format(d);
-}
-
-function formatRelative(then: Date, now: Date): string {
-  const diffMs = then.getTime() - now.getTime();
-  const absSec = Math.abs(diffMs) / 1000;
-
-  const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-
-  if (absSec < 45) return diffMs >= 0 ? "in a moment" : "just now";
-  if (absSec < 60 * 60) {
-    const mins = Math.round(diffMs / 60_000);
-    return rtf.format(mins, "minute");
-  }
-  if (absSec < 60 * 60 * 24) {
-    const hrs = Math.round(diffMs / 3_600_000);
-    return rtf.format(hrs, "hour");
-  }
-  if (absSec < 60 * 60 * 24 * 7) {
-    const days = Math.round(diffMs / 86_400_000);
-    return rtf.format(days, "day");
-  }
-  if (absSec < 60 * 60 * 24 * 30) {
-    const weeks = Math.round(diffMs / (86_400_000 * 7));
-    return rtf.format(weeks, "week");
-  }
-  if (absSec < 60 * 60 * 24 * 365) {
-    const months = Math.round(diffMs / (86_400_000 * 30));
-    return rtf.format(months, "month");
-  }
-  const years = Math.round(diffMs / (86_400_000 * 365));
-  return rtf.format(years, "year");
 }
 
 function capitalizeFirst(s: string): string {
@@ -108,7 +78,7 @@ export function RelativeTime({
   }
 
   const exact = formatLocalExact(dt);
-  const relative = formatRelative(dt, now);
+  const relative = formatRelativeFromNow(dt, now);
 
   if (display === "exact") {
     return (

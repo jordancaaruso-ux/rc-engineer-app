@@ -8,6 +8,13 @@ export const APP_SETTING_KEYS = {
   liveRcDriverId: "liveRcDriverId",
   /** Display name on Speedhive results (optional; falls back to liveRcDriverName). */
   speedhiveDriverName: "speedhiveDriverName",
+  /**
+   * Display name on MyRCM results (optional; falls back to speedhiveDriverName then
+   * liveRcDriverName). MyRCM publishes no driver id or transponder, so the name is the only handle
+   * on which row of the field is yours — and without a match the import refuses to guess rather
+   * than handing back the winner's laps.
+   */
+  myRcmDriverName: "myRcmDriverName",
   /** Comma-separated or JSON array of MYLAPS transponder numbers for Speedhive discovery. */
   speedhiveTransponderNumbersJson: "speedhiveTransponderNumbersJson",
   /**
@@ -123,10 +130,25 @@ export async function getMyNameSetting(userId: string): Promise<string | null> {
 export async function getMyNameSettingsForUsers(
   userIds: string[]
 ): Promise<Record<string, string>> {
+  return getSettingForUsers(userIds, APP_SETTING_KEYS.myName);
+}
+
+/**
+ * One setting for a set of users, as a `userId → value` map holding only the users who have a
+ * non-empty value.
+ *
+ * Generalised out of `getMyNameSettingsForUsers` when the Analysis "Out with you" card needed the
+ * same batch shape for `liveRcDriverName` — it resolves a driver's display name through both keys
+ * in turn, and two near-identical readers is how the two fall out of step.
+ */
+export async function getSettingForUsers(
+  userIds: string[],
+  key: string
+): Promise<Record<string, string>> {
   if (userIds.length === 0) return {};
   try {
     const rows = await prisma.appSetting.findMany({
-      where: { userId: { in: userIds }, key: APP_SETTING_KEYS.myName },
+      where: { userId: { in: userIds }, key },
       select: { userId: true, value: true },
     });
     const out: Record<string, string> = {};
@@ -137,7 +159,7 @@ export async function getMyNameSettingsForUsers(
     return out;
   } catch (err) {
     if (isMissingAppSettingTableError(err)) {
-      console.warn("[appSettings] AppSetting table missing; returning empty name map");
+      console.warn(`[appSettings] AppSetting table missing; returning empty map for ${key}`);
       return {};
     }
     throw err;
@@ -203,6 +225,34 @@ export async function getSpeedhiveDriverNameForUser(userId: string): Promise<str
   const sh = (await getSpeedhiveDriverNameSetting(userId))?.trim();
   if (sh) return sh;
   return (await getLiveRcDriverNameSetting(userId))?.trim() || null;
+}
+
+export async function getMyRcmDriverNameSetting(userId: string): Promise<string | null> {
+  return getUserSetting(userId, APP_SETTING_KEYS.myRcmDriverName);
+}
+
+export async function setMyRcmDriverNameSetting(userId: string, value: string | null): Promise<void> {
+  await setUserSetting(userId, APP_SETTING_KEYS.myRcmDriverName, value);
+}
+
+/**
+ * Every name to try against a MyRCM field, most specific first. The explicit MyRCM name wins, then
+ * the other timing identities the driver has already given us — a driver whose name is spelled the
+ * same everywhere never has to fill this in.
+ */
+export async function getMyRcmDriverNamesForUser(userId: string): Promise<string[]> {
+  const [myRcm, speedhive, liveRc, myName] = await Promise.all([
+    getMyRcmDriverNameSetting(userId),
+    getSpeedhiveDriverNameSetting(userId),
+    getLiveRcDriverNameSetting(userId),
+    getMyNameSetting(userId),
+  ]);
+  const out: string[] = [];
+  for (const n of [myRcm, speedhive, liveRc, myName]) {
+    const t = n?.trim();
+    if (t && !out.some((existing) => existing.toLowerCase() === t.toLowerCase())) out.push(t);
+  }
+  return out;
 }
 
 export async function getCurrentPracticeDayUrlSetting(userId: string): Promise<string | null> {

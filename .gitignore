@@ -70,6 +70,9 @@ onboarding-friction/
 # Light/dark parity captures (regenerate with e2e/light-mode-audit.spec.ts)
 light-mode-audit/
 
+# Markup-note verification captures (regenerate with scripts/dev-notes-shots.ts)
+notes-shots/
+
 # Type audit report (regenerate with e2e/typography-audit.spec.ts)
 typography-audit/
 
@@ -81,3 +84,22 @@ share-shots/
 
 # Engineer starter-question captures (regenerate with e2e/engineer-starter-questions.spec.ts)
 e2e/.shots/
+
+# On-app markup notes (dev-only layer, components/devtools/DevMarkupLayer.tsx)
+.markup/
+
+# Paddock row-chevron verification captures (regenerate with scripts/dev-chevron-shots.ts)
+chevron-shots/
+
+# Paddock cars-band verification captures (regenerate with scripts/dev-paddock-cars-shot.ts)
+paddock-cars-shots/
+
+# Analysis scope-line captures (regenerate with scripts/dev-analysis-scope-shot.ts)
+analysis-scope-shots/
+
+# Regression-drive captures (regenerate with the drive scripts in scripts/)
+drive-shots/
+compare-shots/
+
+# Root-level scratch captures from ad-hoc debugging
+/tmp-*.png

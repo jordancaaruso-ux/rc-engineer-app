@@ -116,6 +116,24 @@ function dashboardAddInput(page: Page) {
     .first();
 }
 
+/**
+ * Unfold the dashboard's own Ideas card (`DashboardListFold`, 2026-08-20).
+ *
+ * Both phone lists collapse to a labelled row on an off day, so there is no add row on screen
+ * until one is opened — which is the point of the fold, and it is exactly the state a driver is
+ * in when they use the dashboard's list rather than the drawer. On a track day Ideas opens
+ * itself, so this is a no-op then.
+ */
+async function openDashboardIdeas(page: Page) {
+  const fold = page.locator("main").getByRole("button", { name: /^Ideas\b/ }).first();
+  await expect(fold).toBeVisible({ timeout: 20_000 });
+  if ((await fold.getAttribute("aria-expanded")) === "false") {
+    await fold.click();
+    await expect(fold).toHaveAttribute("aria-expanded", "true", { timeout: 5_000 });
+    await page.waitForTimeout(400);
+  }
+}
+
 test.describe("ideas tab nudge", () => {
   test.beforeEach(async ({ page }) => {
     // Every rule below is defined relative to "has never opened the panel", and that flag is
@@ -214,6 +232,7 @@ test.describe("ideas tab nudge", () => {
 
     // Now the real case: add from the dashboard's own list with the drawer shut, long after
     // the panel has been opened — the one nudge that deliberately outlives the ceiling.
+    await openDashboardIdeas(page);
     const dashInput = dashboardAddInput(page);
     await expect(dashInput).toBeVisible({ timeout: 20_000 });
 

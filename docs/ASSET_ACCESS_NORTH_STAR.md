@@ -84,7 +84,41 @@ Verification handles *wrongness*; dedupe handles *duplication*. Both are needed 
 
 ## AI catalog pre-seeding (approved 2026-07-13)
 
-Agents sweep manufacturer sites, retailers (RCMart, EuroRC, AMain), and PetitRC to enumerate **tire types (TC first), additive types, and chassis types** into candidate rows. **Nothing lands without founder review** — each sweep produces a review artifact where Jordan approves / edits / rejects every row; approved rows land as **verified**. Goal: verified coverage ~complete before wider beta, so user creation becomes the rare exception. Tracks are not pre-seedable (long tail of local clubs) — open creation carries them.
+Agents sweep manufacturer sites, retailers (RCMart, EuroRC, AMain), and PetitRC to enumerate **tire types (TC first), additive types, and chassis types** into candidate rows. **Nothing lands without founder review** — each sweep produces a review artifact where Jordan approves / edits / rejects every row; approved rows land as **verified**. Goal: verified coverage ~complete before wider beta, so user creation becomes the rare exception.
+
+### Tracks ARE pre-seedable (reversed 2026-08-19)
+
+This section used to end "Tracks are not pre-seedable (long tail of local clubs) — open creation
+carries them." That was wrong about the supply. Two open sources cover the head of the distribution
+almost completely, and they cover each other's blind spots:
+
+- **LiveRC subdomain sweep** — 1,126 hosts, 1,075 active in the last 12 months. Each track's own
+  home page publishes its name, street, town, state and country, and the subdomain *is* the durable
+  timing link. Strong in the US (765), AU (57), CA (56), UK (34), NZ (31); nearly absent in the EU.
+- **OpenStreetMap `sport=rc_car`** — 544 named tracks with traced coordinates, **448 of them in
+  Europe** (Germany, Italy, France, Sweden, Netherlands, Austria). Exactly the gap LiveRC leaves,
+  and the pins are better than any geocode. ODbL: **attribution is required**, not optional.
+
+Activity is filtered on **recency, never event count**. Measured 2026-08-19: a "50+ events" floor
+would have dropped 513 still-active tracks, 507 of which had raced within three months. Event count
+measures whether a club posts its club nights to LiveRC — a habit, not a pulse.
+
+**MYLAPS/Speedhive data is not used and must not be added.** Their Conditions of Use Art. 5.3
+forbids copying their data for commercial purposes (Dutch law, Haarlem courts, Art. 10.2). A 994-row
+RC location dump exists and was deliberately discarded. The risk that matters is not a lawsuit but
+an IP block, which would break Speedhive lap import for paying EU users — a self-inflicted outage on
+a shipped feature. The EU gap closes instead through **"find your timing link"** on any track with
+no timing source: the first driver who races there pastes their own club's link once, and every
+driver at that track gets lap import from then on. Setting timing URLs is already open to any
+signed-in driver, so this needs no new permission.
+
+Seeded rows are owned by a system account (`catalog@jrcdynamics.com` — deliberately not matching the
+demo or `+ob…` throwaway patterns, or `trackCatalogScopeWhere()` would hide the whole catalog) and
+land **verified**. `gripTags`/`layoutTags` are left empty: grip is logged per session, not declared
+per track (see "Grip is not a track property" above). Idempotency comes from a unique
+`(catalogSource, catalogSourceRef)`, so re-running the import updates rather than duplicates.
+
+Pipeline, review tool and the rights reasoning: `seeds/track-catalog/README.md`.
 
 ---
 

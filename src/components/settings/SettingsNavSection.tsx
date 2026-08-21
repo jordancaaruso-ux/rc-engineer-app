@@ -76,7 +76,11 @@ export function SettingsNavSection({ isAdmin = false }: { isAdmin?: boolean }) {
           href="/teams"
           icon={Users}
           title="Teams"
-          description="Shared setups and team garage."
+          /* Was "Shared setups and team garage", which described neither the feature nor
+             anything that exists: teams share runs, not setups, and there is no team garage.
+             A team is who can see your sessions — which is a setting, and why this row is now
+             the only door to it (nav restructure 2026-08-18). */
+          description="Who you share sessions with, and who shares theirs with you."
         />
         {catalogs.map((link) => {
           const Icon = CATALOG_ICONS[link.icon] ?? Layers;

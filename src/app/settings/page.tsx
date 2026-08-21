@@ -4,6 +4,7 @@ import {
   getLiveRcDriverNameSetting,
   getMyNameSetting,
   getSpeedhiveDriverNameSetting,
+  getMyRcmDriverNameSetting,
   getSpeedhiveTransponderNumbersSetting,
 } from "@/lib/appSettings";
 import {
@@ -67,12 +68,14 @@ export default async function SettingsPage() {
     liveRcDriverId,
     speedhiveDriverName,
     speedhiveTransponderRaw,
+    myRcmDriverName,
   ] = await Promise.all([
     getMyNameSetting(user.id),
     getLiveRcDriverNameSetting(user.id),
     getLiveRcDriverIdSetting(user.id),
     getSpeedhiveDriverNameSetting(user.id),
     getSpeedhiveTransponderNumbersSetting(user.id),
+    getMyRcmDriverNameSetting(user.id),
   ]);
   const speedhiveTransponderNumbersText = formatSpeedhiveTransponderNumbersForSetting(
     parseSpeedhiveTransponderNumbersSetting(speedhiveTransponderRaw)
@@ -100,6 +103,7 @@ export default async function SettingsPage() {
               liveRcDriverId: liveRcDriverId ?? "",
               speedhiveDriverName: speedhiveDriverName ?? "",
               speedhiveTransponderNumbers: speedhiveTransponderNumbersText,
+              myRcmDriverName: myRcmDriverName ?? "",
             }}
           />
 

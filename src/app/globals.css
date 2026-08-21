@@ -214,8 +214,9 @@
  * glass and border tokens are unchanged, so cards read as quiet panels set into
  * the page rather than lifted off a dark hole.
  *
- * Kept as an RGB triplet so scrims that fade to the page (the title condenser)
- * can take an alpha.
+ * Kept as an RGB triplet so anything that fades to the page can take an alpha
+ * (the tour cutout's dim). The title condenser used to be the main caller; it
+ * paints nothing at all since 2026-08-19.
  *
  * NOTE: this bare `:root` block is the DARK ground, and since 2026-08-18 nothing
  * ships on it — the app always stamps `data-theme="light"`, so the paper values
@@ -598,6 +599,21 @@ html.pwa-ready[data-standalone="true"] #pwa-splash {
   transition: opacity 420ms ease;
 }
 html.pwa-splash-done[data-standalone="true"] #pwa-splash {
+  display: none;
+}
+/*
+ * NOT in the iOS shell (2026-08-19). There the launch is already covered by the
+ * native splash in `Splash.imageset`, which paints the moment the icon is tapped;
+ * this one then arrived on top of it a beat later with different artwork and a
+ * longer hold, so the sequence read JRC → a flash of the app → JRC TRACKSIDE →
+ * the app. One splash, and it is the one that starts first: `capacitor.config.ts`
+ * now holds the native splash open and `PwaSplashDismiss` hides it on the same
+ * readiness signal this element used to fade on.
+ *
+ * Equal specificity to the `[data-standalone]` rules above and placed after them,
+ * so source order wins and no `!important` is needed.
+ */
+html[data-native="true"] #pwa-splash {
   display: none;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1130,7 +1146,13 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
  * toolbar, so all three agree there — the difference only ever shows in a browser.
  */
 :root {
-  --ideas-tab-y: 42svh;
+  /*
+   * Moved up by exactly one tab height (founder, 2026-08-19): the top of the tab
+   * now sits where its bottom used to. Written as the subtraction rather than as
+   * a new percentage so the 42% reasoning above stays readable and the offset is
+   * visibly tied to `height: 56px` below — change one and you must change both.
+   */
+  --ideas-tab-y: calc(42svh - 56px);
 }
 
 .ideas-edge-tab {
@@ -1579,25 +1601,23 @@ html[data-nav-pending] .page {
   opacity: 1;
 }
 
-/* Scrim grounding the top band on scroll so the label reads over content. Fades
-   with the parent (opacity groups the subtree); full-width to the viewport.
-   Tight + lighter-topped (founder tuner 2026-07-15): starts fading almost
-   immediately so there's no hard grey slab, and the top is semi-transparent so
-   content still shows through behind the pills. */
-.title-condenser::before {
-  content: "";
-  position: fixed;
-  inset-inline: 0;
-  top: 0;
-  height: calc(var(--top-chrome-y) + 58px);
-  z-index: -1;
-  background: linear-gradient(
-    rgb(var(--page-bg-rgb) / 0.7) 0%,
-    rgb(var(--page-bg-rgb) / 0.7) 12%,
-    rgb(var(--page-bg-rgb) / 0) 100%
-  );
-  pointer-events: none;
-}
+/* NO SCRIM (2026-08-19). The condensed label now sits straight over the page
+   with nothing painted behind it.
+
+   The history, because this has been retuned twice and the pull is to add it
+   back: it began as a 70%-max wash the whole way, tuned 2026-07-15 against the
+   charcoal page, where 70% charcoal over yellow lands on a dark olive a shade
+   off the background and anything sliding under the chrome genuinely read as
+   receding. On ash paper the same 70% over the Start-run bar's #FFD60A lands on
+   a pale yellow that is still plainly a yellow card, so the wash stopped reading
+   as depth and started reading as a gradient painted onto the card. Same day it
+   became opaque down to the pills with a 58px fade below — the iOS large-title
+   idiom. On a real device that fade still read as a gradient ending in a hard
+   line where it hits zero: mobile Safari renders an 8-bit gradient without
+   dithering, and against flat paper the last band has an edge. No fade length
+   fixes that; the fix is not to paint one. Founder call: try it with nothing.
+   If the label turns out unreadable over busy content, the answer is a backing
+   on the LABEL, not a full-width wash. */
 
 .title-condenser .title-condenser-mark {
   flex: none;

@@ -1,31 +1,17 @@
-import type { Metadata } from "next";
-import type { ReactNode } from "react";
-import { NavHubPage } from "@/components/layout/NavHubPage";
-import { MORE_HUB_LINKS } from "@/components/layout/navConfig";
+import { redirect } from "next/navigation";
 
 /**
- * The phone's overflow door (nav restructure 2026-08-12).
+ * `/more` is gone (nav restructure 2026-08-18).
  *
- * A page, not a bottom sheet. A sheet would make these three sections feel like a
- * menu you dismiss, and they are destinations you go to — Events and Garage each
- * had their own dock cell until this change. A route also means Back works, the
- * dock keeps a lit cell while you are inside one of them
- * (`resolveActiveMobileNavId`), and the three doors are linkable.
+ * It was the phone's overflow drawer: a menu word holding a dock cell, listing Events,
+ * Garage and Tools as three doors that each needed a sentence to explain themselves. Events
+ * and Garage are Paddock now, Tools stayed as doors on `/analysis`, and the cell went with
+ * them.
  *
- * Desktop never routes here — the top rail shows all seven destinations at once —
- * but the page is not blocked at md+ either: landing on it from a shared link
- * should show the doors, not a dead end.
+ * The route stays as a redirect rather than a 404 because it was linkable for six days and
+ * the dock cell was the only way most people reached anything behind it — a bookmark or a
+ * back-button landing here should arrive somewhere real.
  */
-export const metadata: Metadata = {
-  title: "More",
-};
-
-export default function MoreHubPage(): ReactNode {
-  return (
-    <NavHubPage
-      title="More"
-      subtitle="Events, your garage, and the workbenches."
-      links={MORE_HUB_LINKS}
-    />
-  );
+export default function MoreHubPage(): never {
+  redirect("/paddock");
 }

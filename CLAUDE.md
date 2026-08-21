@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-Counts and paths below were verified against the tree on 2026-08-17; if one disagrees with the code,
+Counts and paths below were verified against the tree on 2026-08-18; if one disagrees with the code,
 the code is right — fix the line.
 
 RC car race-engineering app for competitive 1/10-scale radio-control racing: log every on-track run,
@@ -22,7 +22,7 @@ npx next build            # LOCAL production build
 - **`npm run build` is the Vercel pipeline**, not a local build: it runs `scripts/vercel-build.cjs`,
   which does `prisma migrate deploy` first. Denied at the harness level. Use `npx next build`.
 - **No test runner.** No Jest, no Vitest. Tests are plain `node:test` or bare `tsx` scripts, one npm
-  script per area — 104 of them (`npm run test:nav`, `test:blank-upload`, `test:engineer-chat`, …).
+  script per area — 114 of them (`npm run test:nav`, `test:blank-upload`, `test:engineer-chat`, …).
   Run the one matching what you changed; `grep test: package.json` to find it.
 - **One test file directly:** `npx tsx --test path/to/x.test.ts`. Anything importing a `server-only`
   module needs `node --conditions=react-server --import tsx path/to/x.test.ts` — that's why the
@@ -74,7 +74,7 @@ holds the real NextAuth v5 config: magic-link email + optional Google, with a si
 `getAuthenticatedApiUser()` (`src/lib/currentUser.ts`). Entitlement is always derived server-side in
 `src/lib/entitlement.ts` from the Stripe webhook's `Subscription` row — never trusted from a client.
 
-**`src/lib` is where the logic lives** (57 domain folders); `src/components` and `src/app` are
+**`src/lib` is where the logic lives** (59 domain folders); `src/components` and `src/app` are
 thin over it. Four subsystems carry most of the weight:
 
 1. **Runs** — a `Run` is one 5–8 minute on-track session and the atomic unit of the whole product.
@@ -106,9 +106,13 @@ on Vercel, check the trace before anything else.
 
 ## Read the north star before you build
 
-`docs/` holds 32 spec documents that are the product source of truth. Find the one that matches and
+`docs/` holds 33 spec documents that are the product source of truth. Find the one that matches and
 read it first; if nothing matches, you don't need one. A spec is intent, not shipped code —
 `docs/NOT_YET_BUILT.md` says what isn't real yet, and no feature is real because a doc describes it.
+
+**Lost, or new to the codebase?** `docs/APP_CONTEXT.md` is the full map — every surface, route,
+model and subsystem in one file, with the reasoning behind each. It is orientation, not a spec:
+read it to find the right north star, then read that.
 
 | Task touches | Read |
 |---|---|

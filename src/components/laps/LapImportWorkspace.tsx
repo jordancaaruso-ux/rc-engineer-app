@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import { isMyRcmDiscoveryUrl } from "@/lib/lapUrlParsers/myRcmUrl";
 import {
   formatDriverSessionLabel,
   resolveImportedSessionDisplayTimeIso,
@@ -35,13 +36,12 @@ type ImportResultRow =
 
 type DiscoveredSession = { url: string; label: string; group: string };
 
-/** A MyRCM class (report) URL without a `reportKey` — pasting it lists sessions to pick from. */
-function isMyRcmCategoryLine(line: string): boolean {
-  return (
-    /^https?:\/\/(www\.)?myrcm\.ch\/myrcm\/report\/[a-z]{2}\/\d+\/\d+(?:[/?#]|$)/i.test(line) &&
-    !/[?&]reportKey=\d+/i.test(line)
-  );
-}
+/**
+ * A MyRCM event or class URL — no `reportKey`, so pasting it lists the runs to pick from.
+ * The shapes live in one place (`myRcmUrl.ts`), which is why this no longer hand-rolls a regex:
+ * the copy that used to live here only knew the pre-v9 address and silently stopped matching.
+ */
+const isMyRcmCategoryLine = isMyRcmDiscoveryUrl;
 
 export function LapImportWorkspace() {
   const searchParams = useSearchParams();
@@ -248,7 +248,7 @@ export function LapImportWorkspace() {
         <Eyebrow>Import from URLs</Eyebrow>
         <p className="text-[11px] text-muted-foreground leading-snug">
           Paste LiveRC, Speedhive, or MyRCM timing links — one per line. LiveRC event hub URLs expand to each race result;
-          a MyRCM class URL (<code className="text-[10px]">myrcm.ch/myrcm/report/…</code>) lists its sessions to pick from.
+          a MyRCM event or class URL (<code className="text-[10px]">myrcm.ch/en/report/…</code>) lists its runs to pick from.
           Use <code className="text-[10px]">?eventId=…</code> on this page to filter by that event&apos;s race classes. Failed lines do not cancel the rest.
         </p>
         <textarea

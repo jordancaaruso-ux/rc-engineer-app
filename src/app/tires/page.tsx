@@ -7,16 +7,26 @@ import { ensureSeedTireTypes } from "@/lib/tires/ensureSeedTireTypes";
 import { TireGaragePanel } from "@/components/tires/TireGaragePanel";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
+import { CATALOG_BACK_PARAM, safeCatalogBackHref } from "@/lib/catalogReturn";
 
 export const revalidate = 30;
 
-export default async function TiresPage(): Promise<ReactNode> {
+export default async function TiresPage(props: {
+  /**
+   * `back=/paddock` is stamped on by the Paddock tyres band. Anything else — the Settings row,
+   * a shared link, a cold launch — falls back to Settings, which is where this page is filed.
+   */
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<ReactNode> {
+  const resolvedSearch = (await props.searchParams) ?? {};
+  const backHref = safeCatalogBackHref(resolvedSearch[CATALOG_BACK_PARAM]);
+
   if (!hasDatabaseUrl()) {
     return (
       <>
         <header className="page-header">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <PageBackLink href="/settings" />
+            <PageBackLink href={backHref} />
             <div>
               <h1 className="page-title">Tires</h1>
               <p className="page-subtitle">Database not configured.</p>
@@ -51,7 +61,7 @@ export default async function TiresPage(): Promise<ReactNode> {
     <>
       <header className="page-header">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <PageBackLink href="/settings" />
+          <PageBackLink href={backHref} />
           <div>
             <h1 className="page-title">Tires</h1>
             <p className="page-subtitle">Tire type catalog.</p>

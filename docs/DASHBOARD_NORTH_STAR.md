@@ -1,7 +1,9 @@
 # Dashboard North Star — the adaptive home
 
 **Status:** Locked (founder interviews 2026-07-16 + v2 2026-07-19; Setups card added and retired
-2026-07-29; desktop pass 2026-08-07, **superseded by the "timing tower" redesign 2026-08-08**).
+2026-07-29; desktop pass 2026-08-07, **superseded by the "timing tower" redesign 2026-08-08**;
+**phone stacks rebuilt 2026-08-20** — lists folded to the back, per-track trends promoted, one
+cycling Engineer question, and the verdict card's Engineer footer removed).
 **Owner:** Jordan.
 
 This doc governs what the dashboard (`/`) shows and in what order. `PRODUCT_NORTH_STAR.md`
@@ -85,12 +87,21 @@ Auto only — no manual toggle. (Revisit if the "reviewing at the track café" c
      Consistency is untouched on **desktop** — the hero's second dial still reads
      `consistencyWord` / `consistencyPercent`, and the honest all-laps version (100 − CV)
      still lives in Analysis, which is what the Engineer reads.
-   - Footer: **"✦ Ask the Engineer about today"** → chat in **quick mode** with a queued
-     read-my-day prompt. This is the only Engineer entry on the card — always on demand.
-   - Tapping the card anywhere else → Sessions with today expanded (the evidence).
-4. **Ideas** — the driver's experiment list, live on the page during a session. Its own card,
-   below the outing card when a meeting is running (split 2026-08-18).
-5. **Last 30 days card** — always last.
+   - **No footer since 2026-08-20.** It read "✦ Ask the Engineer about today" and queued
+     "give me your read on today so far" — a request to recite the figures printed directly
+     above it. The Engineer moved to card 4 with better questions (founder call).
+   - Tapping the card → Sessions with today expanded (the evidence).
+4. **Ask the Engineer** (`DashboardAskEngineerCard`, 2026-08-20) — one written starter
+   question, cycling. Takes the slot "How you're going" holds on an off day, because at the
+   track the next change is the question and last month is not. See the section below.
+5. **Ideas** — the driver's experiment list, live on the page during a session, and the one
+   fold that **opens itself** on a track day.
+6. **Things to do** — reminders, folded. New to the track-day stack on 2026-08-20; both lists
+   now ride at the back of both stacks.
+
+**No "How you're going" on a track day** (founder call 2026-08-20). One consequence, accepted:
+the new-record celebration lives on that card, so a PB broken mid-meeting has no banner until
+the drive home.
 
 ## The "add a setup sheet" card (both modes, position 2)
 
@@ -119,11 +130,72 @@ The onboarding ask, and only the ask (`DashboardAddSetupCard`; rules in `ONBOARD
    open" chip as well, which made it a phone-screen-tall stack of two unrelated jobs. The
    chip is gone for good — it counted the Things-to-do list, which has its own card two
    rows down and printed the same number twice. The list moved out to card 4.
-4. **Ideas card** — the try list, in its own `CardPanel`, on every kind of day. Before the
-   split it lived inside the outing card whenever a meeting was running and stood alone
-   otherwise, so it moved on the driver depending on the data.
-5. **Things to do** — reminders list.
-6. **Last 30 days card** — always last.
+4. **How you're going** (`DashboardSummaryCard`) — the old Last-30-days card, promoted off the
+   bottom on 2026-08-20 and opening on a new **Tracks** face: one little session trend per
+   track visited in the window. See the section below.
+5. **Ask the Engineer** — the same cycling question card as the track-day stack.
+6. **Ideas card** — the try list, in its own `CardPanel`, on every kind of day, folded. Before
+   the 2026-08-18 split it lived inside the outing card whenever a meeting was running and
+   stood alone otherwise, so it moved on the driver depending on the data.
+7. **Things to do** — reminders list, folded.
+
+## The lists fold, and they ride last (2026-08-20)
+
+Both lists collapse to one labelled row with their count (`DashboardListFold`), and both moved
+to the **back** of both stacks. Measured before the change on a real account at 390px: the two
+open lists filled roughly 500px of an 844px screen, so the phone dashboard was a to-do app with
+a run button on top.
+
+They are not the way into the lists and never were — the yellow edge tab (`IdeasEdgeTab`) opens
+both from anywhere in the app. The dashboard copy is a convenience, so it sits where a
+convenience sits.
+
+**Ideas opens itself on a track day**, where the list is live and the driver is working through
+it mid-session. Everything else starts closed. No persistence: a remembered fold has to be read
+after hydration, so the card would jump open a beat after every paint for a state one tap
+restores.
+
+## How you're going — a trend per track (2026-08-20)
+
+Face 1 of the card is one row per track visited in the window, most-active first: the track (and
+class), the shape of its sessions oldest → newest, how many, and the best lap there. Three rows,
+then a "+N more" line. The window's totals — runs, laps, wheel time — print as a line under the
+title; the Overview face still carries them with their deltas, and Records is untouched.
+
+It runs on `summary.paceByTrack`, which has been computed on every dashboard load and rendered
+by nothing since 2026-07-10. **Per-track is the only honest scope** — one axis carrying a
+12-second club track and an 18-second big track measures the drive to the venue, the same rule
+that governs the desktop pace chart.
+
+**It reports; it does not grade.** A per-track trend card was REMOVED on 2026-07-10 because a
+trend drops on one slow session — a green track, traffic, a tyre gamble — and tells a driver
+they are getting slower when they are not. Records replaced it for exactly that reason. So this
+version keeps the shape and the figures and drops the verdict: only a faster window earns green,
+a slower one prints in plain ink, and nothing on the card is red. Worth watching for a fortnight
+after it ships — if it starts reading as a scoreboard again, that is the failure to catch.
+
+`storageKey` moved with the new face (`dashboard-summary` → `dashboard-how-youre-going`).
+PagedCard remembers the last face per device, so keeping the old key would have landed every
+existing driver on Overview and hidden the new face behind a swipe they had no reason to make.
+
+## Ask the Engineer — one question, cycling (2026-08-20)
+
+`DashboardAskEngineerCard` shows one written starter question from
+`selectDashboardStarterQuestions`, and turns to the next every 7 seconds. Tapping opens
+`/engineer?prompt=…` with the full question in the composer — **it does not send**, which
+matters more here than on the Engineer page: a mis-tap from the dashboard would otherwise spend
+a request from the monthly cap on a question nobody asked.
+
+- **The family filter is the whole rule.** A track day offers run / feel / plan questions; an
+  off day trades feel for learn, because "loose on entry" is a question about a car that isn't
+  in front of you. Eligibility (what needs a run in focus) is still the Engineer page's rule,
+  reused — never re-implemented.
+- **It cycles and the Engineer page's rail deliberately does not.** The rail is a tool you
+  return to hunting for the chip you used last round, so it is fixed. This card is an
+  invitation, and it rotates so it is not the same sentence at 9am and 4pm.
+- **It stops for good on touch** (the same rule the phone rail uses for its auto-scroll), and
+  reduced motion never rotates at all — a question that changes as you reach for it is a
+  question you did not choose.
 
 ## One name for the try list: **Ideas** (2026-08-18)
 

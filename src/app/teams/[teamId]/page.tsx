@@ -13,7 +13,7 @@ import { TeamRosterStrip } from "@/components/teams/TeamRosterStrip";
 
 /**
  * `force-dynamic` with no `revalidate`: a comment must appear the moment it is posted, and
- * a cached team feed during a race meeting is worse than no feed at all.
+ * a cached team feed during an event is worse than no feed at all.
  */
 export const dynamic = "force-dynamic";
 

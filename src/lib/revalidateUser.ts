@@ -8,6 +8,10 @@ export function revalidateAfterRunMutation(userId: string): void {
   revalidatePath("/");
   revalidatePath("/engineer");
   revalidatePath("/laps/import");
+  // A new run moves three of the four Tools bands at once: it is the geometry band's source,
+  // half the compare pair, and — when the run was logged from an import — the reason a session
+  // leaves the lap-import band. `runsTag` below busts the cached model; this busts the route.
+  revalidatePath("/tools");
   revalidateTag(dashboardTag(userId), IMMEDIATE);
   revalidateTag(runsTag(userId), IMMEDIATE);
 }
@@ -23,6 +27,22 @@ export function revalidateAfterCarMutation(userId: string): void {
   revalidatePath("/cars");
   revalidatePath("/runs/new");
   revalidateTag(carsTag(userId), IMMEDIATE);
+  revalidateTag(dashboardTag(userId), IMMEDIATE);
+}
+
+/**
+ * Booking, editing or joining a meeting.
+ *
+ * Event mutations used to revalidate nothing, and that was correct: `/events` is
+ * `force-dynamic` and the dashboard's next-outing card rides the dashboard tag. Paddock
+ * changed it — its hero IS the next meeting and the model is cached for 30s, so without
+ * this a driver books a meeting and the tab still says "No meeting planned" for half a
+ * minute (measured 2026-08-18).
+ */
+export function revalidateAfterEventMutation(userId: string): void {
+  revalidatePath("/events");
+  revalidatePath("/paddock");
+  revalidatePath("/");
   revalidateTag(dashboardTag(userId), IMMEDIATE);
 }
 
