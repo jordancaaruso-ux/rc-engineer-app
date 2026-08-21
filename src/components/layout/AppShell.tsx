@@ -33,8 +33,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   // its tick resolved to `left: 100%` — past the right end of the title, where it
   // dangled on `/teams` and was clipped away entirely on `/teams/[teamId]`. Deriving
   // the slot width from the nav means a seventh destination cannot repeat it.
-  // The DOCK cell, not the section — Events, Garage and Tools all sit behind More
-  // now, and the timing line has to agree with the dock underneath it.
+  // The DOCK cell, not the section — the phone reaches Tools from Analysis rather than
+  // through a cell of its own, and the timing line has to agree with the dock underneath
+  // it. The count is four since the 2026-08-18 restructure, which is exactly the change
+  // the hardcoded `width: 20%` above would have broken a second time.
   const activeNavId = pathname ? resolveActiveMobileNavId(pathname) : null;
   const navSector = activeNavId ? MOBILE_NAV.findIndex((item) => item.id === activeNavId) : -1;
 

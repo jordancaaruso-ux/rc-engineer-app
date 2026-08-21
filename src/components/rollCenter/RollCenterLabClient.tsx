@@ -27,9 +27,11 @@ import { Button } from "@/components/ui/Button";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { Eyebrow } from "@/components/ui/panel";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { AxleSchematic } from "@/components/rollCenter/AxleSchematic";
+import { AxleSchematic, type ChassisPlate } from "@/components/rollCenter/AxleSchematic";
 import { LabSheetPane } from "@/components/rollCenter/LabSheetPane";
 import {
+  chassisBottomAt,
+  chassisPlateCorners,
   computeAxleMetrics,
   solveAxle,
   type AxleAdjustments,
@@ -40,7 +42,11 @@ import {
   computeRollCenterFromSnapshot,
   deriveRollCenterInputs,
 } from "@/lib/rollCenter/computeFromSnapshot";
-import { resolvePackForSnapshot } from "@/lib/rollCenter/packs";
+import {
+  DEFAULT_CHASSIS_HALF_WIDTH_MM,
+  resolveLabPack,
+  resolvePackForSnapshot,
+} from "@/lib/rollCenter/packs";
 import {
   GEOMETRY_SHEET_KEYS,
   LAB_DEFAULT_FIELDS,
@@ -92,6 +98,15 @@ type SetupPickerEntry = {
    */
   setupSheetModelId: string | null;
   fullData: Record<string, unknown> | null;
+  /**
+   * Whether this row's car has measured hardpoints behind it.
+   *
+   * The picker used to DROP every row that answered false, which is why a driver on anything but
+   * an Awesomatix opened the Lab to an empty list — the app knew about their setups and simply
+   * declined to mention them. Rows are marked now, never hidden: "no measurements" tells you what
+   * is missing, an empty list tells you nothing.
+   */
+  hasGeometry: boolean;
   /** Where a save may land. Resolved from what this row IS, not from anything the driver picks. */
   write: LabWriteTarget | null;
   labSource: LabSource | null;
@@ -137,30 +152,37 @@ function parseNum(v: string | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Per-axle control rows: which sheet keys each knob writes (all legs equalized on edit). */
+/**
+ * Per-axle control rows: which sheet keys each knob writes (all legs equalized on edit).
+ *
+ * `teaching` is the name the same knob wears on the teaching model, which has no parts to name —
+ * so it says what the adjustment DOES instead. "Under lower arm" is a shim stack, and plenty of
+ * chassis move that mount with an eccentric insert and no shim in sight; "raise lower arm inner"
+ * is true of all of them.
+ */
 const AXLE_KNOBS: Record<
   "front" | "rear",
-  { label: string; keys: GeometrySheetKey[]; max: number }[]
+  { label: string; teaching: string; keys: GeometrySheetKey[]; max: number }[]
 > = {
   front: [
-    { label: "Under lower arm", keys: ["under_lower_arm_shims_ff", "under_lower_arm_shims_fr"], max: 5 },
-    { label: "Under hub", keys: ["under_hub_shims_front"], max: 3 },
-    { label: "Upper inner", keys: ["upper_inner_shims_ff", "upper_inner_shims_fr"], max: 5 },
-    { label: "Upper outer", keys: ["upper_outer_shims_front"], max: 3 },
+    { label: "Under lower arm", teaching: "Raise lower arm inner", keys: ["under_lower_arm_shims_ff", "under_lower_arm_shims_fr"], max: 5 },
+    { label: "Under hub", teaching: "Raise hub off lower ball", keys: ["under_hub_shims_front"], max: 3 },
+    { label: "Upper inner", teaching: "Raise upper link inner", keys: ["upper_inner_shims_ff", "upper_inner_shims_fr"], max: 5 },
+    { label: "Upper outer", teaching: "Raise upper link outer", keys: ["upper_outer_shims_front"], max: 3 },
   ],
   rear: [
-    { label: "Under lower arm", keys: ["under_lower_arm_shims_rf", "under_lower_arm_shims_rr"], max: 5 },
-    { label: "Under hub", keys: ["under_hub_shims_rear"], max: 3 },
-    { label: "Upper inner", keys: ["upper_inner_shims_rf", "upper_inner_shims_rr"], max: 5 },
-    { label: "Upper outer", keys: ["upper_outer_shims_rear"], max: 3 },
+    { label: "Under lower arm", teaching: "Raise lower arm inner", keys: ["under_lower_arm_shims_rf", "under_lower_arm_shims_rr"], max: 5 },
+    { label: "Under hub", teaching: "Raise hub off lower ball", keys: ["under_hub_shims_rear"], max: 3 },
+    { label: "Upper inner", teaching: "Raise upper link inner", keys: ["upper_inner_shims_rf", "upper_inner_shims_rr"], max: 5 },
+    { label: "Upper outer", teaching: "Raise upper link outer", keys: ["upper_outer_shims_rear"], max: 3 },
   ],
 };
 
-const SENSITIVITY_KNOBS: { label: string; adjKey: keyof AxleAdjustments }[] = [
-  { label: "Under lower arm", adjKey: "underLowerArmMm" },
-  { label: "Under hub", adjKey: "underHubMm" },
-  { label: "Upper inner", adjKey: "upperInnerMm" },
-  { label: "Upper outer", adjKey: "upperOuterMm" },
+const SENSITIVITY_KNOBS: { label: string; teaching: string; adjKey: keyof AxleAdjustments }[] = [
+  { label: "Under lower arm", teaching: "Lower arm inner", adjKey: "underLowerArmMm" },
+  { label: "Under hub", teaching: "Hub off lower ball", adjKey: "underHubMm" },
+  { label: "Upper inner", teaching: "Upper link inner", adjKey: "upperInnerMm" },
+  { label: "Upper outer", teaching: "Upper link outer", adjKey: "upperOuterMm" },
 ];
 
 /** One knob row: label + 0.25-detent slider + free-typed mm box (founder rulings). */
@@ -622,6 +644,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
         when,
         fields: extractGeometryFields(data),
         setupSheetModelId: origin?.setupSheetModelId ?? null,
+        hasGeometry: resolvePackForSnapshot(data) != null,
         // The row already holds the whole snapshot; keeping it is free and is what sheet mode needs.
         fullData: data,
         labSource: origin?.labSource ?? null,
@@ -630,7 +653,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     };
     for (const run of runsRes?.runs ?? []) {
       const data = run.setupSnapshot?.data;
-      if (!isJsonObject(data) || !resolvePackForSnapshot(data)) continue;
+      if (!isJsonObject(data)) continue;
       const parts = formatRunPickerParts(run);
       push(`run-${run.id}`, "run", "mine", parts.title, parts.detail, parts.when, data, {
         setupSheetModelId: run.car?.setupSheetModelId ?? null,
@@ -641,7 +664,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     }
     for (const run of teamRes?.runs ?? []) {
       const data = run.setupSnapshot?.data;
-      if (!isJsonObject(data) || !resolvePackForSnapshot(data)) continue;
+      if (!isJsonObject(data)) continue;
       const parts = formatRunPickerParts(run, teamRes?.memberDisplayByUserId);
       push(`team-${run.id}`, "team", "teammates", parts.title, parts.detail, parts.when, data, {
         setupSheetModelId: run.car?.setupSheetModelId ?? null,
@@ -653,7 +676,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     const savedIds = new Set<string>();
     for (const saved of libRes?.setups ?? []) {
       const data = saved.setupData;
-      if (!isJsonObject(data) || !resolvePackForSnapshot(data)) continue;
+      if (!isJsonObject(data)) continue;
       savedIds.add(saved.id);
       push(
         `saved-${saved.id}`,
@@ -682,7 +705,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     }
     for (const sheet of docsRes?.downloadedSetups ?? []) {
       const data = sheet.setupData;
-      if (!isJsonObject(data) || !resolvePackForSnapshot(data)) continue;
+      if (!isJsonObject(data)) continue;
       // An imported sheet whose snapshot was later saved is the SAME setup — it was
       // listing twice, once under each name. The saved row wins: it carries the name
       // the driver chose.
@@ -841,20 +864,54 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     setSlot("b", null);
   };
 
+  /**
+   * Back to the blank car (founder pin on `/tools`, 2026-08-19).
+   *
+   * B could always be cleared and A never could, so a driver who arrived with a setup seeded —
+   * which is every door into the Lab except the two empty-state links — had no way to reach the
+   * no-shim car the Lab starts from. The calculator existed and was unreachable.
+   *
+   * Not `setSlot("a", …)`: that guard turns a null into "keep what's there" (right, A must always
+   * hold a car) and would otherwise write the blank car's own fields back into `s`. Blank is the
+   * absence of a seed, so the params come off instead and a refresh lands blank too.
+   */
+  const clearSlotA = () => {
+    setSlots((s) => ({ ...s, a: blankSlot() }));
+    syncUrl("a", null);
+  };
+
   const fields = active.fields;
-  const inputs = useMemo(() => deriveRollCenterInputs(fields as Record<string, unknown>), [fields]);
+  /*
+   * Which car this is, and — when the answer is "we don't know" — the teaching model instead of
+   * somebody else's hardpoints. `resolveLabPack` never returns null, so the Lab always draws.
+   */
+  const pack = useMemo(() => resolveLabPack(fields as Record<string, unknown>), [fields]);
+  /** No measurements behind the drawing: everything that leaves the Lab is sealed off below. */
+  const sandbox = pack.isTeachingModel === true;
+  const inputs = useMemo(
+    () => deriveRollCenterInputs(fields as Record<string, unknown>, pack),
+    [fields, pack]
+  );
   const computed = useMemo(
-    () => computeRollCenterFromSnapshot(fields as Record<string, unknown>),
-    [fields]
+    () => computeRollCenterFromSnapshot(fields as Record<string, unknown>, pack),
+    [fields, pack]
   );
   const otherFields = other?.fields ?? null;
-  const otherInputs = useMemo(
-    () => (otherFields ? deriveRollCenterInputs(otherFields as Record<string, unknown>) : null),
+  const otherPack = useMemo(
+    () => (otherFields ? resolveLabPack(otherFields as Record<string, unknown>) : null),
     [otherFields]
   );
+  const otherInputs = useMemo(
+    () =>
+      otherFields ? deriveRollCenterInputs(otherFields as Record<string, unknown>, otherPack) : null,
+    [otherFields, otherPack]
+  );
   const otherComputed = useMemo(
-    () => (otherFields ? computeRollCenterFromSnapshot(otherFields as Record<string, unknown>) : null),
-    [otherFields]
+    () =>
+      otherFields
+        ? computeRollCenterFromSnapshot(otherFields as Record<string, unknown>, otherPack)
+        : null,
+    [otherFields, otherPack]
   );
   // Delta chips only exist against the other slot — never vs the blank car.
   const compareComputed = comparing ? otherComputed : null;
@@ -939,11 +996,35 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     if (!geo || !adj) return null;
     const base = computeAxleMetrics(geo, adj);
     if (!base) return null;
-    return SENSITIVITY_KNOBS.map(({ label, adjKey }) => {
+    return SENSITIVITY_KNOBS.map(({ label, teaching, adjKey }) => {
       const m = computeAxleMetrics(geo, { ...adj, [adjKey]: adj[adjKey] + 1 });
-      return { label, perMm: m ? m.rcHeightMm - base.rcHeightMm : null };
+      return { label: sandbox ? teaching : label, perMm: m ? m.rcHeightMm - base.rcHeightMm : null };
     });
-  }, [geo, adj]);
+  }, [geo, adj, sandbox]);
+
+  /**
+   * The chassis plate under the drawing, and the ride height it finally makes visible.
+   *
+   * Width is drawn and never solved, so a pack that has never had one measured costs a dashed
+   * outline and not one changed number. Thickness is the pack's BASE plate — `chassisPlateCorners`
+   * adds the datum shift itself, which is how a thicker chassis reads as a thicker plate rather
+   * than as a raised car.
+   */
+  const chassisPlate = useMemo<ChassisPlate | null>(() => {
+    if (!geo || !adj) return null;
+    const halfWidth = pack.chassisHalfWidthMm ?? DEFAULT_CHASSIS_HALF_WIDTH_MM;
+    const baseThickness = pack.chassisOptions[pack.baseChassisCode]?.thicknessMm ?? 2;
+    // Inboard of the plate edge, clear of the arms above and the roll-centre marker below.
+    const rideAtX = -(halfWidth - 15);
+    const rideTop = chassisBottomAt(geo, adj, rideAtX, rollDeg, bumpMm);
+    return {
+      corners: chassisPlateCorners(geo, adj, halfWidth, baseThickness, rollDeg, bumpMm),
+      rideTop,
+      rideAtX,
+      rideHeightMm: rideTop.z,
+      measured: pack.chassisHalfWidthMm != null,
+    };
+  }, [geo, adj, pack, rollDeg, bumpMm]);
 
   const updateActiveSlot = (update: (slot: Slot) => Slot) => {
     setSlots((s) =>
@@ -1060,7 +1141,15 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     <CardPanel className="lab-setups" contentClassName="space-y-2">
       <Eyebrow>Setups</Eyebrow>
       <div className="flex items-center gap-2">
-        <SlotChip id="a" slot={slots.a} selected={activeId === "a"} onSelect={() => setSel("a")} />
+        <SlotChip
+          id="a"
+          slot={slots.a}
+          selected={activeId === "a"}
+          onSelect={() => setSel("a")}
+          /* Only once there's a setup in it — the blank car has nothing to clear, and an ✕
+             that does nothing reads as broken. `loaded` is the tell: it's null on blank. */
+          onClear={slots.a.loaded ? clearSlotA : undefined}
+        />
         {slots.b ? (
           <SlotChip
             id="b"
@@ -1166,8 +1255,15 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
                       </span>
                     )}
                   </span>
-                  <span className="whitespace-nowrap pt-0.5 text-[10px] tabular-nums text-faint">
+                  <span className="whitespace-nowrap pt-0.5 text-right text-[10px] tabular-nums text-faint">
                     {entry.when}
+                    {/* Marked, not hidden. A row with no measurements still loads — it just opens
+                        the teaching model rather than pretending to be this car. */}
+                    {!entry.hasGeometry && (
+                      <span className="block normal-nums text-[9px] leading-tight">
+                        no measurements
+                      </span>
+                    )}
                   </span>
                 </button>
                 <button
@@ -1283,12 +1379,44 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
             onChange={setAxle}
           />
           <span
-            className="ml-auto micro-caps text-faint border border-border rounded px-1.5 py-0.5"
-            title="Trust grade for absolute values; deltas are exact regardless"
+            className={cn(
+              "ml-auto micro-caps rounded border px-1.5 py-0.5",
+              sandbox
+                ? "border-foreground/40 text-foreground"
+                : "border-border text-faint"
+            )}
+            title={
+              sandbox
+                ? "Not a real car — invented numbers you can learn the directions on"
+                : "Trust grade for absolute values; deltas are exact regardless"
+            }
           >
-            {computed.verificationGrade}
+            {sandbox ? "sandbox" : computed.verificationGrade}
           </span>
         </div>
+
+        {/*
+         * The honest gap, said out loud on the one surface where a driver would otherwise assume
+         * the numbers are theirs. Two wordings, because "we don't have YOUR car" and "you opened
+         * a toy with no car at all" are different facts and only one of them is a gap to fill.
+         */}
+        {sandbox && (
+          <p className="rounded-lg border border-border bg-secondary px-3 py-2 text-[11px] leading-relaxed text-faint">
+            {active.source || active.setupSheetModelId ? (
+              <>
+                We don&rsquo;t have measured hardpoints for this car yet, so this is the{" "}
+                <span className="text-foreground">teaching model</span> — not your chassis.{" "}
+              </>
+            ) : (
+              <>
+                A <span className="text-foreground">teaching model</span>, not a car anyone races —
+                built to what every 1/10 touring car shares, with the mount heights chosen round.{" "}
+              </>
+            )}
+            Which way each shim moves the roll centre, and roughly how far, holds for any
+            double-wishbone touring car. The exact millimetre isn&rsquo;t yours.
+          </p>
+        )}
 
         {/*
          * Phone: a 12:5 letterbox, so the drawing is a fixed slice of a 390px column.
@@ -1304,6 +1432,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
             <AxleSchematic
               solved={solved}
               ghost={ghostSolved}
+              chassis={chassisPlate}
               extraPoints={schematicExtraPoints}
               fitBox
               axleLabel={axle}
@@ -1460,11 +1589,13 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
         {!sheetMode &&
           AXLE_KNOBS[axle].flatMap((knob) => {
             const { value, legsDiffer } = knobValue(knob.keys);
+            // The teaching model has no parts to name, so its knobs are named for what they do.
+            const knobLabel = sandbox ? knob.teaching : knob.label;
             if (!legsDiffer) {
               return [
                 <KnobRow
                   key={knob.label}
-                  label={knob.label}
+                  label={knobLabel}
                   value={value}
                   max={knob.max}
                   onChange={(v) => setKnob(knob.keys, v)}
@@ -1474,7 +1605,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
             return knob.keys.map((key) => (
               <KnobRow
                 key={key}
-                label={knob.label}
+                label={knobLabel}
                 sublabel={legLabel(key)}
                 value={parseNum(fields[key]) ?? 0}
                 max={knob.max}
@@ -1620,7 +1751,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
            * which needs no stored row at all and so is always offered.
            */}
           <div className="flex flex-wrap items-center gap-2">
-            {active.write && mergedSaveData ? (
+            {!sandbox && active.write && mergedSaveData ? (
               <Button
                 className="px-3 py-1 text-xs"
                 onClick={runSave}
@@ -1633,9 +1764,11 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
                     : "Save to this setup"}
               </Button>
             ) : null}
-            <ButtonLink href={nextRunHref} variant="outline" className="px-3 py-1 text-xs">
-              Use for next run
-            </ButtonLink>
+            {!sandbox && (
+              <ButtonLink href={nextRunHref} variant="outline" className="px-3 py-1 text-xs">
+                Use for next run
+              </ButtonLink>
+            )}
             <Button
               variant="outline"
               className="px-3 py-1 text-xs"
@@ -1645,6 +1778,18 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
               {copied ? "Copied" : comparing ? "Copy differences" : "Copy change list"}
             </Button>
           </div>
+
+          {/*
+           * Sealed off. Nothing worked out on a car we never measured may become a stored setup, a
+           * run prefill, or Engineer context — the directions it teaches are true, the millimetres
+           * are not, and only the millimetres would survive the trip out.
+           */}
+          {sandbox && (
+            <p className="ui-caption text-faint">
+              Nothing here saves or exports — it isn&rsquo;t your car. Load a setup we have
+              measurements for to use these numbers on.
+            </p>
+          )}
 
           {saveMsg ? <p className="ui-caption">{saveMsg}</p> : null}
 

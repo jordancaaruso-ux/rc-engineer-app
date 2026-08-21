@@ -77,6 +77,12 @@ const LIVE_STROKE = {
   knuckle: 0.7,
   lower: 0.6,
   upper: 0.5,
+  /**
+   * The chassis plate outline. The plate is the largest shape in the drawing, so it carries the
+   * THINNEST line (founder, 2026-08-20): weight here reads as importance, and the subject is the
+   * suspension. Same hairline as the arms, fully opaque, no fill.
+   */
+  plate: 0.5,
 } as const;
 
 /**
@@ -88,16 +94,36 @@ const GHOST_STROKE = 0.9;
 const GHOST_OPACITY = 0.65;
 const GHOST_DASH = "1 3";
 
+/**
+ * The chassis plate: its four corners, and where the ride-height dimension measures to.
+ *
+ * The drawing takes this ready-made rather than a pack, because the plate is the one part of the
+ * picture that is drawn and never solved — keeping it as plain points means the schematic can't
+ * accidentally start treating a plate width as geometry.
+ */
+export type ChassisPlate = {
+  corners: Vec2[];
+  /** Underside of the plate at {@link rideAtX} — the top end of the dimension. */
+  rideTop: Vec2;
+  rideAtX: number;
+  rideHeightMm: number;
+  /** False when the width is a fallback rather than a measurement — the plate draws dashed. */
+  measured: boolean;
+};
+
 /** Linkage lines for one axle: chassis bar, bulkheads, knuckles, arms. */
 function LinkageLines({
   solved,
   X,
   Y,
   ghost,
+  hideChassisBar,
 }: {
   solved: SolvedAxle;
   X: (x: number) => number;
   Y: (z: number) => number;
+  /** The real plate is being drawn instead, so the mount-to-mount stub would only double it. */
+  hideChassisBar?: boolean;
   ghost?: boolean;
 }) {
   const line = (a: Vec2, b: Vec2, width: number, key: string) => (
@@ -116,8 +142,11 @@ function LinkageLines({
   );
   return (
     <g>
-      {/* Chassis plate between the lower-inner mounts + bulkhead posts */}
-      {line(solved.left.innerLower, solved.right.innerLower, LIVE_STROKE.chassis, "chassis")}
+      {/* Mount-to-mount stub, only when no real plate is drawn (a pack with no width, and every
+          caller that predates the plate). It spans mount to mount — 21mm on an A800 against a
+          44mm plate — a placeholder for the plate, never a picture of it. */}
+      {!hideChassisBar &&
+        line(solved.left.innerLower, solved.right.innerLower, LIVE_STROKE.chassis, "chassis")}
       {[solved.left, solved.right].map((s, i) => (
         <g key={`legs-${i}`}>
           {line(s.innerLower, s.innerUpper, LIVE_STROKE.post, "post")}
@@ -130,10 +159,15 @@ function LinkageLines({
   );
 }
 
-export function AxleSchematic({ solved, ghost, extraPoints, fitBox, axleLabel, showCamber, className }: {
+export function AxleSchematic({ solved, ghost, chassis, extraPoints, fitBox, axleLabel, showCamber, className }: {
   solved: SolvedAxle;
   /** Optional second solve drawn dashed underneath (two-setup ghost compare). */
   ghost?: SolvedAxle | null;
+  /**
+   * The chassis plate and its ride-height dimension. Omit and the drawing falls back to the
+   * mount-to-mount stub, which is what every surface showed before the plate existed.
+   */
+  chassis?: ChassisPlate | null;
   /**
    * Extra points folded into the VERTICAL view extents but not drawn — the Lab passes the
    * roll-sweep RC path and both ends of the bump travel, so the viewBox stays put while the
@@ -266,6 +300,57 @@ export function AxleSchematic({ solved, ghost, extraPoints, fitBox, axleLabel, s
         strokeDasharray="3 4"
       />
 
+      {/* Chassis plate + the ride height it finally makes visible. Behind everything, because the
+          car is the subject and the plate is what the car hangs off. A measured plate draws as a
+          thin fully-opaque OUTLINE, no fill (founder, 2026-08-20): a washed-out line read as a
+          guess, and a filled bar read as the subject — an empty hairline the same weight as the
+          arms is neither. Only an unmeasured width stays faint and dashed, so a fallback can never
+          pass itself off as a measurement. */}
+      {chassis && (
+        <g>
+          <polygon
+            points={chassis.corners.map(d.P).join(" ")}
+            fill="currentColor"
+            fillOpacity={chassis.measured ? 0 : 0.04}
+            stroke="currentColor"
+            strokeOpacity={chassis.measured ? 1 : 0.32}
+            strokeWidth={LIVE_STROKE.plate}
+            strokeDasharray={chassis.measured ? undefined : "3 2.5"}
+            strokeLinejoin="round"
+          />
+          <g strokeOpacity={0.34} strokeWidth={0.8} stroke="currentColor">
+            <line
+              x1={d.X(chassis.rideTop.x)}
+              y1={d.Y(0)}
+              x2={d.X(chassis.rideTop.x)}
+              y2={d.Y(chassis.rideTop.z)}
+            />
+            <line
+              x1={d.X(chassis.rideTop.x - 2.5)}
+              y1={d.Y(0)}
+              x2={d.X(chassis.rideTop.x + 2.5)}
+              y2={d.Y(0)}
+            />
+            <line
+              x1={d.X(chassis.rideTop.x - 2.5)}
+              y1={d.Y(chassis.rideTop.z)}
+              x2={d.X(chassis.rideTop.x + 2.5)}
+              y2={d.Y(chassis.rideTop.z)}
+            />
+          </g>
+          <text
+            x={d.X(chassis.rideTop.x) - 5}
+            y={(d.Y(0) + d.Y(chassis.rideTop.z)) / 2 + 3}
+            textAnchor="end"
+            fontSize={8.5}
+            fill="currentColor"
+            fillOpacity={0.65}
+          >
+            ride {chassis.rideHeightMm.toFixed(1)}mm
+          </text>
+        </g>
+      )}
+
       {/* Ghost setup (dashed, faint) under the live one */}
       {ghost && d.gh && (
         <g aria-hidden="true">
@@ -311,7 +396,7 @@ export function AxleSchematic({ solved, ghost, extraPoints, fitBox, axleLabel, s
         />
       ))}
 
-      <LinkageLines solved={solved} X={d.X} Y={d.Y} />
+      <LinkageLines solved={solved} X={d.X} Y={d.Y} hideChassisBar={Boolean(chassis)} />
 
       {/* Pivots + balls */}
       {joints.map((p, i) => (

@@ -17,7 +17,6 @@ import {
 import { openIdeasPanel } from "@/components/layout/IdeasEdgeTab";
 import { PrimaryNavLink } from "@/components/layout/PrimaryNavLink";
 import { usePrimaryNav } from "@/components/layout/PrimaryNavProvider";
-import { ToolsNavMenu } from "@/components/layout/ToolsNavMenu";
 import { useTodayDraftRun } from "@/components/layout/TodayDraftRunProvider";
 import { haptic } from "@/lib/haptics";
 import { warmNewRunForm } from "@/lib/runs/warmNewRunForm";
@@ -34,10 +33,11 @@ const TICK_HALF = 14;
  * stacks that fit inside 64px of HEIGHT laid out horizontally. The container goes
  * 1684 → 1760px and the page title sits where the eye already starts.
  *
- * Seven destinations, not nine: `Add run` and `Settings` moved to the right-hand
- * utility cluster (see `DESKTOP_NAV`). A verb and a preference were sharing a list
- * with seven places, which a vertical rail could absorb and a horizontal one
- * cannot — every item now costs width that the content wants.
+ * Five destinations, not nine: `Add run` and `Settings` moved to the right-hand
+ * utility cluster (see `DESKTOP_NAV`), and the 2026-08-18/19 restructure folded the
+ * rest into Paddock and Tools. A verb and a preference were sharing a list with
+ * seven places, which a vertical rail could absorb and a horizontal one cannot —
+ * every item now costs width that the content wants.
  *
  * The active tick is the phone's, moved to the bottom edge of the rail: one
  * vocabulary across both platforms, replacing desktop's instant `elevate/0.05`
@@ -121,15 +121,12 @@ export const TopRail = memo(function TopRail() {
             const Icon = item.icon;
 
             /*
-             * Tools is the one tab that opens rather than goes (2026-08-13): its
-             * destination was a page holding nothing but three links, which the
-             * rail has the width to show itself. `/tools` still exists for the
-             * phone, which reaches it through `More`.
+             * Every tab goes somewhere (2026-08-19). Tools used to open a dropdown here
+             * (`ToolsNavMenu`, deleted) because its destination was a page holding nothing but
+             * three links — the rail had the width to show those itself, so it did. `/tools` is
+             * a real page now, and a menu in front of a place you would rather be is one tap of
+             * pure ceremony.
              */
-            if (item.id === "tools") {
-              return <ToolsNavMenu key={item.id} active={active} />;
-            }
-
             return (
               <PrimaryNavLink
                 key={item.id}

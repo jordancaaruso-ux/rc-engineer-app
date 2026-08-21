@@ -3,25 +3,28 @@ import {
   IconAnalysis,
   IconDashboard,
   IconEngineer,
-  IconEvents,
   IconGarage,
-  IconMore,
   IconSettings,
-  IconTeams,
   IconTools,
   type JrcIcon,
 } from "@/components/icons/JRCIcons";
 
+/**
+ * `paddock` replaced `assets`, `events` and `more` in the 2026-08-18 restructure.
+ *
+ * Those were three ids for one idea — the things a run points at — split across a dock cell,
+ * a desktop tab and an overflow menu. `teams` survives as an id without a tab: the route is
+ * still real, it is reached from Settings, and it lights no cell for the same reason
+ * `/settings` lights none.
+ */
 export type PrimaryNavId =
   | "dashboard"
   | "add-run"
   | "analysis"
-  | "events"
-  | "assets"
+  | "paddock"
   | "engineer"
   | "teams"
   | "tools"
-  | "more"
   | "settings";
 
 export type PrimaryNavItem = {
@@ -70,7 +73,6 @@ export function shouldShowLogRunFab(pathname: string | null | undefined): boolea
 }
 
 const ANALYSIS_PREFIXES = [
-  "/videos/analysis",
   "/runs/history",
   // Run view (`/runs/<id>`) lights Analysis. Longest-prefix scoring keeps `/runs/new` and
   // `/runs/<id>/edit` on the Add-run tab (addRunMatchScore returns the full path length).
@@ -79,13 +81,42 @@ const ANALYSIS_PREFIXES = [
 ] as const;
 
 /**
- * Tools own the workbenches you go to deliberately. `/analysis/roll-center` sits
- * under `/analysis` but scores longer here, and longest-prefix wins — so the lab
- * lights Tools without needing to move route.
+ * Tools own the workbenches you go to deliberately. `/analysis/roll-center` sits under
+ * `/analysis` but scores longer here, and longest-prefix wins — so the lab lights Tools
+ * without needing to move route.
+ *
+ * `/videos` and `/laps` joined the list when Tools became a page rather than a menu
+ * (2026-08-19), and both were homeless before it. The line between the two sections is where
+ * the WORK happens, not what the work is about: a video's results read on the run, which is
+ * Analysis, but the workshop you upload and sync in is a bench. `/videos/analysis` left
+ * `ANALYSIS_PREFIXES` for the same reason — it out-scored `/videos` and split one section
+ * across two cells, so opening a job darkened the cell you had just tapped.
+ *
+ * `/laps/import` had no section at all. Its only door in the whole app was a link inside one
+ * dashboard card.
  */
-const TOOLS_PREFIXES = ["/setup/comparison", "/analysis/roll-center", "/tools"] as const;
+const TOOLS_PREFIXES = [
+  "/setup/comparison",
+  "/analysis/roll-center",
+  "/videos",
+  "/laps",
+  "/tools",
+] as const;
 
-const ASSETS_PREFIXES = [
+/**
+ * Everything a run points at: the car, its setups, the track, the meeting.
+ *
+ * `/events` and `/tracks` joined this list in the 2026-08-18 restructure — Events had its own
+ * tab and Tracks was a row in Settings, filed there because that is where the shared catalogs
+ * were swept rather than because a track is a preference. Both are reached through Paddock
+ * now, so both light it.
+ *
+ * `/setup/comparison` is in `TOOLS_PREFIXES` and scores longer than `/setup`, so the bench
+ * still lights Tools. Longest prefix wins.
+ */
+const PADDOCK_PREFIXES = [
+  "/paddock",
+  "/events",
   "/setup-sheet-models",
   "/setup-documents",
   "/setup-calibrations",
@@ -126,11 +157,9 @@ export function resolveActiveNavId(pathname: string): PrimaryNavId | null {
     { id: "add-run", score: addRunMatchScore(pathname) },
     { id: "analysis", score: sectionMatchScore(pathname, ANALYSIS_PREFIXES) },
     { id: "tools", score: sectionMatchScore(pathname, TOOLS_PREFIXES) },
-    { id: "events", score: matchPrefixScore(pathname, "/events") },
-    { id: "assets", score: sectionMatchScore(pathname, ASSETS_PREFIXES) },
+    { id: "paddock", score: sectionMatchScore(pathname, PADDOCK_PREFIXES) },
     { id: "engineer", score: matchPrefixScore(pathname, "/engineer") },
     { id: "teams", score: matchPrefixScore(pathname, "/teams") },
-    { id: "more", score: matchPrefixScore(pathname, "/more") },
     { id: "settings", score: matchPrefixScore(pathname, "/settings") },
   ];
 
@@ -144,38 +173,36 @@ export function resolveActiveNavId(pathname: string): PrimaryNavId | null {
 }
 
 /**
- * The sections the phone reaches through `More` rather than through a cell of
- * its own. They keep their real nav id everywhere else — this is only about
- * which of the five dock cells lights up.
- */
-const BEHIND_MORE: readonly PrimaryNavId[] = ["events", "assets", "tools"];
-
-/**
- * Which of the five DOCK cells is active — not which section you are in.
+ * Which of the five DOCK cells is active — which, since 2026-08-19, is the same question as
+ * which section you are in.
  *
- * `resolveActiveNavId` answers the second question and is shared with desktop,
- * where Events, Garage and Tools each own a tab. On the phone they sit behind
- * `More`, and without this fold a driver on `/events` would watch every cell go
- * dark and the indicator fade out: technically "no cell matches", but it reads as
- * having navigated out of the app rather than one level into it.
+ * **There is no fold left.** Every section the dock can reach owns a cell on both platforms.
+ * The last exception was Tools: it had a desktop tab and no phone cell, so the Geometry Lab
+ * and the compare bench lit `Analysis` — the cell whose page happened to carry their doors.
+ * That was a lie the code told to stop the bar going dark on you, and giving Tools the cell
+ * the Paddock restructure freed removes the reason for it.
  *
- * Returns the section id untouched for everything the dock shows directly, so the
- * two functions agree on all five cells and differ only on the overflow.
+ * The pair is kept rather than collapsed into `resolveActiveNavId`. Two call sites still ask
+ * the mobile question by name, and the next section that outgrows five cells will want a fold
+ * again — deleting the seam would mean rediscovering where it went.
  */
 export function resolveActiveMobileNavId(pathname: string): PrimaryNavId | null {
   return foldMobileNavId(resolveActiveNavId(pathname));
 }
 
 /**
- * The same fold applied to an id you already have.
+ * The same fold applied to an id you already have — currently the identity.
  *
- * `PrimaryNavProvider` needs this rather than the path-based version above: the
- * dock's active cell is `pendingNavId ?? pathnameId`, and the optimistic half is
- * an id with no path to resolve. Folding only the resolved half would make a tap
- * on More flicker through "no cell active" before landing.
+ * `PrimaryNavProvider` needs this rather than the path-based version above: the dock's active
+ * cell is `pendingNavId ?? pathnameId`, and the optimistic half is an id with no path to
+ * resolve. Folding only the resolved half would make a tap flicker through "no cell active"
+ * before landing.
+ *
+ * Ids with no cell (`settings`, `teams`, `add-run`) are returned untouched and NOT mapped onto
+ * a cell. They are reached from the avatar, from Settings and from the log-run circle — none
+ * of which is a dock cell — so lighting one would point at the wrong control.
  */
 export function foldMobileNavId(id: PrimaryNavId | null): PrimaryNavId | null {
-  if (id && BEHIND_MORE.includes(id)) return "more";
   return id;
 }
 
@@ -202,29 +229,34 @@ const ANALYSIS: PrimaryNavItem = { id: "analysis", href: "/analysis", label: "An
  * different destination for the same section, not a different section.
  */
 const ANALYSIS_DESKTOP: PrimaryNavItem = { ...ANALYSIS, href: "/runs/history" };
-/** Desktop-only: on the phone these stay as doors on `/analysis`. */
+/**
+ * Tools — the benches: geometry, setup comparison, video, lap import (founder call 2026-08-19).
+ *
+ * It has been a tab with no page behind it worth landing on. `/tools` listed three doors with a
+ * sentence under each, which is the shape `/more` had, so the rail opened a dropdown instead
+ * (`ToolsNavMenu`) and the phone got no cell at all — the benches sat as two links at the foot of
+ * `/analysis`, with `foldMobileNavId` lighting the Analysis cell while you stood inside the Lab.
+ *
+ * The Paddock restructure freed a dock cell and it went into padding. This spends it: `/tools` is
+ * a real page now, seeded from the driver's own rows, and the fold, the dropdown and the doors on
+ * `/analysis` all went with it.
+ */
 const TOOLS: PrimaryNavItem = { id: "tools", href: "/tools", label: "Tools", icon: IconTools };
 /**
- * Events got their own tab (founder call 2026-07-29). They had one door left after the Garage hub
- * was deleted — the dashboard Next-outing card — and a meeting is neither an asset nor team data,
- * so no existing tab fitted. Sits next to Analysis; `/events` no longer lights Garage.
+ * Paddock — cars, setups, tracks and meetings (founder call 2026-08-18).
+ *
+ * It replaced three things at once: the `Garage` cell, the `Events` tab, and the `More`
+ * drawer that had swallowed both. Those were three names for one idea — everything a run
+ * points at — and `More` in particular was a menu word occupying a cell, listing doors that
+ * each needed a sentence to explain themselves.
+ *
+ * Named Paddock rather than Garage because it is no longer only your cars: a track is where
+ * you race and a meeting is when, and neither is equipment. `/paddock` is a summary; `/cars`,
+ * `/tracks` and `/events` are unchanged behind it and still hold the lists and the editors.
  */
-const EVENTS: PrimaryNavItem = { id: "events", href: "/events", label: "Events", icon: IconEvents };
-/**
- * Garage is the cars & setups list itself — there is no hub in between (founder call 2026-07-29).
- * The old `/assets` hub duplicated `/cars` and listed a "My tires" row that pointed at the shared
- * catalog; the catalogs now live under Settings and `/assets` + `/garage` redirect here.
- */
-const ASSETS: PrimaryNavItem = { id: "assets", href: "/cars", label: "Garage", icon: IconGarage };
+const PADDOCK: PrimaryNavItem = { id: "paddock", href: "/paddock", label: "Paddock", icon: IconGarage };
 const ENGINEER: PrimaryNavItem = { id: "engineer", href: "/engineer", label: "Engineer", icon: IconEngineer };
-const TEAMS: PrimaryNavItem = { id: "teams", href: "/teams", label: "Teams", icon: IconTeams };
 const SETTINGS: PrimaryNavItem = { id: "settings", href: "/settings", label: "Settings", icon: IconSettings };
-/**
- * The phone's overflow door (nav restructure 2026-08-12). Not a section — a page
- * listing the three sections the dock has no room for. Desktop never shows it:
- * the top rail carries all seven destinations on one line.
- */
-const MORE: PrimaryNavItem = { id: "more", href: "/more", label: "More", icon: IconMore };
 
 /**
  * The two items that left the destination lists for the desktop rail's utility
@@ -245,71 +277,51 @@ export const NAV_SETTINGS = SETTINGS;
  * Putting a verb and a preference in the same list as seven places was the thing
  * the rail could not justify once it went horizontal and every item cost width.
  *
- * Analysis points at the workbench here (see `ANALYSIS_DESKTOP`). Tools is on this
- * list and not in the dock; the phone reaches it through `More`.
+ * Analysis points at the workbench here (see `ANALYSIS_DESKTOP`).
  *
- * Ordered daily-loop first, then the places you visit around it (founder call
- * 2026-08-13): Dashboard → Analysis → Engineer → Teams are the four the dock also
- * carries, in the dock's own order, so the two platforms read the same left to
- * right; Events, Garage and Tools follow in the order `/more` lists them. Tools
- * sits last because it is the only tab that opens a menu rather than going
- * somewhere (`ToolsNavMenu`) — its panel hangs off the end of the row, clear of
- * the tabs beside it.
+ * Five now, not seven (2026-08-18). Teams left for Settings, and Events and Garage
+ * became Paddock. Ordered daily-loop first, then the things the loop refers to:
+ * Dashboard → Analysis → Engineer → Paddock → Tools.
+ *
+ * **This list and `MOBILE_NAV` are now the same five ids in the same order** (2026-08-19),
+ * which they have never been before. Tools was the last id that existed on one platform and
+ * not the other. Keep them in step: a destination on one and not the other is what produced
+ * both the `More` drawer and the Analysis-lights-for-Tools fold, and each cost more to
+ * explain than the tab it saved.
  */
 export const DESKTOP_NAV: PrimaryNavItem[] = [
   DASHBOARD,
   ANALYSIS_DESKTOP,
   ENGINEER,
-  TEAMS,
-  EVENTS,
-  ASSETS,
+  PADDOCK,
   TOOLS,
 ];
 
 /**
- * Mobile bottom dock: five destinations, the last of which is a door to the rest.
+ * Mobile bottom dock: five destinations, every one of them a place.
  *
- * Was six pure destinations squeezed to ~42.7px each — under the 44px tap
- * guideline, and that was BEFORE the row had to hold anything else. Five cells in
- * the full-bleed slab land at 60px at 390px:
+ * The cell count is a budget, and it has now moved three times. Six cells were ~42.7px each —
+ * under the 44px tap guideline. Five land at 60px, which is what bought the labels back. Four
+ * landed at 75px, and that was the 2026-08-18 restructure spending a freed cell on padding:
  *
  *     (390 − 28 padding − 52 log-run circle − 10 gap) ÷ 5 = 60px
  *
- * which is what buys the labels back. `Add run` is still the circle beside the
- * cells (`LogRunFab`, see `shouldShowLogRunFab`) and Settings still lives behind
- * the account avatar (`AccountMenu`), so neither takes a cell. Events, Garage and
- * Tools moved behind `More` — see `resolveActiveMobileNavId`, which keeps the More
- * cell lit while you are inside any of them.
+ * 60px is not a gamble — it is the width the dock ran at before `More` was deleted, with the
+ * labels on and nothing truncated. Tools takes the cell back (founder call 2026-08-19), which
+ * was the point of collapsing Garage, Events and `More` into Paddock in the first place.
  *
- * Adding a sixth destination here costs ~10px off every cell and puts "Dashboard"
- * back into truncation at 9.5px. Add it to `/more` instead.
+ * `Add run` is still the circle beside the cells (`LogRunFab`, see `shouldShowLogRunFab`) and
+ * Settings still lives behind the account avatar (`AccountMenu`), so neither takes a cell.
+ *
+ * The dock now maps onto the loop and the two places it refers to — arrive, review, ask, the
+ * cars/tracks/meetings behind all three, and the benches you take them to. No menu words, and
+ * no id that exists on desktop but not here: `DESKTOP_NAV` carries the same five in the same
+ * order, and the mobile fold is the identity.
+ *
+ * A SIXTH destination costs ~10px off every cell and puts "Dashboard" back into truncation at
+ * 9.5px. Put it inside one of these five instead.
  */
-export const MOBILE_NAV: PrimaryNavItem[] = [DASHBOARD, ANALYSIS, ENGINEER, TEAMS, MORE];
-
-/**
- * What `/more` lists. The three sections the dock gave up, in the order the rail
- * shows them, each landing exactly where its desktop tab lands.
- */
-export const MORE_HUB_LINKS: NavHubLink[] = [
-  {
-    href: "/events",
-    label: "Events",
-    description: "Race meetings and club days — planned and reviewed.",
-    icon: "calendar",
-  },
-  {
-    href: "/cars",
-    label: "Garage",
-    description: "Your cars and their setups.",
-    icon: "car",
-  },
-  {
-    href: "/tools",
-    label: "Tools",
-    description: "Compare setups, model geometry, and review video.",
-    icon: "wrench",
-  },
-];
+export const MOBILE_NAV: PrimaryNavItem[] = [DASHBOARD, ANALYSIS, ENGINEER, PADDOCK, TOOLS];
 
 export type NavHubIconKey =
   | "car"
@@ -331,58 +343,20 @@ export type NavHubLink = {
   icon: NavHubIconKey;
 };
 
-export const ANALYSIS_HUB_LINKS: NavHubLink[] = [
-  {
-    href: "/runs/history",
-    label: "Sessions",
-    description: "Browse and compare logged runs.",
-    icon: "history",
-  },
-  {
-    href: "/videos",
-    label: "Video",
-    description: "Analysis sessions, saved videos, and tools.",
-    icon: "video",
-  },
-  {
-    href: "/setup/comparison",
-    label: "Setup comparison",
-    description: "Put two setups on one sheet and swap between them.",
-    icon: "git-compare",
-  },
-  {
-    href: "/analysis/roll-center",
-    label: "Geometry Lab",
-    description: "What-if suspension geometry — shims, roll, RC migration.",
-    icon: "flask",
-  },
-];
-
-/**
- * Tools hub (`/tools`) — the workbenches you open on purpose, rather than glance
- * at. Same links the phone still shows as doors on `/analysis`; this is where
- * desktop reaches them now that Analysis lands on the Sessions workbench.
+/*
+ * `ANALYSIS_HUB_LINKS` and `TOOLS_HUB_LINKS` are both gone (2026-08-19), and they went for the
+ * same reason.
+ *
+ * Each was a list of doors carrying a `description` — a sentence explaining what was behind the
+ * door — and that sentence is the tell: it rendered identically for every driver on every day of
+ * the year, which is what makes a page read as scaffolding rather than as a place. `/tools` was
+ * built out of `TOOLS_HUB_LINKS` and is now built out of the driver's own rows; `/analysis` kept
+ * two of `ANALYSIS_HUB_LINKS` as doors at its foot purely because the phone had nowhere else to
+ * reach the benches, and it has somewhere now.
+ *
+ * `NavHubLink` itself stays — `CATALOG_LINKS` under Settings is still genuinely a list of doors,
+ * because reference catalogs are things you visit to tidy up rather than places you live.
  */
-export const TOOLS_HUB_LINKS: NavHubLink[] = [
-  {
-    href: "/setup/comparison",
-    label: "Setup comparison",
-    description: "Put two setups on one sheet and swap between them.",
-    icon: "git-compare",
-  },
-  {
-    href: "/analysis/roll-center",
-    label: "Geometry Lab",
-    description: "What-if suspension geometry — shims, roll, RC migration.",
-    icon: "flask",
-  },
-  {
-    href: "/videos",
-    label: "Video",
-    description: "Analysis sessions, saved videos, and tools.",
-    icon: "video",
-  },
-];
 
 export type NavHubSection = {
   eyebrow: string;
@@ -407,12 +381,14 @@ export const CATALOG_LINKS: CatalogLink[] = [
     // inside the car wizard.
     adminOnly: true,
   },
-  {
-    href: "/tracks",
-    label: "Tracks",
-    description: "Tracks, layouts, and grip tags.",
-    icon: "map-pin",
-  },
+  /*
+   * Tracks is NOT in this list any more (2026-08-18). It sat here because this is where the
+   * shared catalogs were swept when the Garage hub was deleted — filed by plumbing rather
+   * than by meaning. A track is not a preference: it carries layouts, grip tags and timing
+   * links, and you pick one every time you log a run or book a meeting. It lives on Paddock
+   * now. Tyres and additives stay, because you meet those inside the run form and come here
+   * only to tidy them up.
+   */
   {
     href: "/tires",
     label: "Tire catalog",

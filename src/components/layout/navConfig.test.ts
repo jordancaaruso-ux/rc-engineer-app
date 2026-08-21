@@ -4,75 +4,108 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  ANALYSIS_HUB_LINKS,
   CATALOG_LINKS,
   DESKTOP_NAV,
   MOBILE_NAV,
-  MORE_HUB_LINKS,
   NAV_ADD_RUN,
   NAV_SETTINGS,
-  TOOLS_HUB_LINKS,
   catalogLinksForUser,
+  foldMobileNavId,
   resolveActiveMobileNavId,
   resolveActiveNavId,
   shouldShowLogRunFab,
 } from "@/components/layout/navConfig";
 
-test("mobile dock is five cells ending in More, without add-run or settings", () => {
+test("mobile dock is five cells, every one a place", () => {
   assert.deepEqual(
     MOBILE_NAV.map((item) => item.id),
-    ["dashboard", "analysis", "engineer", "teams", "more"]
+    ["dashboard", "analysis", "engineer", "paddock", "tools"]
+  );
+  // Five is the budget's ceiling: 60px a cell at 390px, which is where the labels still fit.
+  // A sixth costs ~10px off every one and truncates "Dashboard".
+  assert.equal(MOBILE_NAV.length, 5);
+  // No menu word in the dock. `More` held a cell while being a list of doors rather than a
+  // destination — the whole point of the 2026-08-18 restructure was to spend that cell on a
+  // place instead.
+  assert.equal(
+    MOBILE_NAV.some((item) => item.href === "/more"),
+    false
   );
   // The two that live outside the dock entirely: the log-run circle and the avatar.
-  assert.equal(MOBILE_NAV.some((item) => item.id === "add-run"), false);
-  assert.equal(MOBILE_NAV.some((item) => item.id === "settings"), false);
+  assert.equal(
+    MOBILE_NAV.some((item) => item.id === "add-run"),
+    false
+  );
+  assert.equal(
+    MOBILE_NAV.some((item) => item.id === "settings"),
+    false
+  );
 });
 
-test("the desktop rail is seven destinations; add-run and settings are utilities", () => {
+test("the desktop rail is five destinations; add-run and settings are utilities", () => {
   assert.deepEqual(
     DESKTOP_NAV.map((item) => item.id),
-    ["dashboard", "analysis", "engineer", "teams", "events", "assets", "tools"]
+    ["dashboard", "analysis", "engineer", "paddock", "tools"]
   );
-  // The dock's four destinations lead, in the dock's order, so the rail and the
-  // dock read the same left to right (founder call 2026-08-13).
+  /*
+   * The two platforms carry the SAME five ids in the SAME order (2026-08-19) — a first for
+   * this app. Tools was the last id that lived on one and not the other, and both of the
+   * workarounds that gap produced (the `More` drawer, then Analysis lighting up for Tools)
+   * cost more to explain than the tab they saved. Keep them identical.
+   */
   assert.deepEqual(
-    DESKTOP_NAV.slice(0, 4).map((item) => item.id),
-    MOBILE_NAV.filter((item) => item.id !== "more").map((item) => item.id)
+    DESKTOP_NAV.map((item) => item.id),
+    MOBILE_NAV.map((item) => item.id)
   );
   // Both left the destination list for the rail's right-hand cluster — but they are
   // still defined here, so the cluster cannot drift from the nav.
-  assert.equal(DESKTOP_NAV.some((item) => item.id === "add-run"), false);
-  assert.equal(DESKTOP_NAV.some((item) => item.id === "settings"), false);
+  assert.equal(
+    DESKTOP_NAV.some((item) => item.id === "add-run"),
+    false
+  );
+  assert.equal(
+    DESKTOP_NAV.some((item) => item.id === "settings"),
+    false
+  );
   assert.equal(NAV_ADD_RUN.href, "/runs/new");
   assert.equal(NAV_ADD_RUN.smartDraft, true);
   assert.equal(NAV_SETTINGS.href, "/settings");
 });
 
-test("everything the dock dropped is still reachable from /more", () => {
-  const moreHrefs = MORE_HUB_LINKS.map((l) => l.href);
-  assert.deepEqual(moreHrefs, ["/events", "/cars", "/tools"]);
-  // Each door must land where its own desktop tab lands, or the two platforms
-  // disagree about what "Garage" means.
-  for (const id of ["events", "assets", "tools"] as const) {
-    const tab = DESKTOP_NAV.find((item) => item.id === id);
-    assert.ok(tab, `${id} missing from the rail`);
-    assert.ok(moreHrefs.includes(tab.href), `${tab.href} is unreachable on mobile`);
+test("everything the dropped cells held now lights Paddock", () => {
+  // Garage, Events and the track catalog were a dock cell, a rail tab and a Settings row.
+  // They are one section now, so every one of these paths must light the same cell — if any
+  // of them scored elsewhere, a driver deep in Paddock would watch the dock go dark.
+  for (const path of ["/paddock", "/cars", "/events", "/events/abc", "/tracks", "/setup-documents"]) {
+    assert.equal(resolveActiveNavId(path), "paddock", `${path} should light Paddock`);
   }
+  // Legacy hub routes still light it — both redirect to /cars.
+  assert.equal(resolveActiveNavId("/assets"), "paddock");
+  assert.equal(resolveActiveNavId("/garage"), "paddock");
 });
 
-test("More stays lit while you are inside a section it owns", () => {
-  // The fold: section id everywhere, dock cell in the dock.
-  for (const path of ["/events", "/events/abc", "/cars", "/tools", "/setup/comparison"]) {
-    assert.equal(resolveActiveMobileNavId(path), "more", `${path} should light More`);
+test("there is no mobile fold left — every section lights its own cell on both platforms", () => {
+  /*
+   * Tools was the last id that differed between the platforms: it had a desktop tab and no
+   * phone cell, so `/analysis/roll-center` lit `Analysis` — the cell whose page happened to
+   * carry the door. Giving Tools the cell Paddock freed removes the reason for the lie.
+   */
+  for (const path of ["/tools", "/setup/comparison", "/analysis/roll-center", "/videos", "/laps/import"]) {
+    assert.equal(resolveActiveMobileNavId(path), "tools", `${path} should light Tools`);
+    assert.equal(resolveActiveNavId(path), "tools", `${path} is the Tools section`);
   }
-  assert.equal(resolveActiveMobileNavId("/more"), "more");
-  // …and the five real cells are untouched by the fold.
-  for (const path of ["/", "/analysis", "/runs/history", "/engineer", "/teams"]) {
-    assert.equal(resolveActiveMobileNavId(path), resolveActiveNavId(path), `${path} folded wrongly`);
+  // The fold is the identity now. Asserted on the function itself, not just through paths:
+  // re-introducing a special case has to break a test that says so out loud.
+  for (const path of ["/", "/analysis", "/runs/history", "/engineer", "/cars", "/events", "/tools"]) {
+    assert.equal(resolveActiveMobileNavId(path), resolveActiveNavId(path), `${path} folded`);
   }
-  // Settings is not in the dock at all — it must not light More either.
+  for (const id of ["dashboard", "analysis", "engineer", "paddock", "tools", "settings", "teams", "add-run"] as const) {
+    assert.equal(foldMobileNavId(id), id, `${id} should not fold`);
+  }
+  assert.equal(foldMobileNavId(null), null);
+  // Settings and Teams are not in the dock at all — they must not borrow a cell either.
   assert.equal(resolveActiveMobileNavId("/settings"), "settings");
-  assert.equal(resolveActiveNavId("/more"), "more");
+  assert.equal(resolveActiveMobileNavId("/teams"), "teams");
 });
 
 test("Analysis lands on the workbench at desktop and the card hub on the phone", () => {
@@ -87,16 +120,14 @@ test("Analysis lands on the workbench at desktop and the card hub on the phone",
   assert.equal(resolveActiveNavId("/analysis"), "analysis");
 });
 
-test("Tools has no dock cell; the phone reaches every tool two ways", () => {
-  assert.ok(DESKTOP_NAV.some((item) => item.id === "tools"));
-  assert.ok(!MOBILE_NAV.some((item) => item.id === "tools"));
-  // Still doors on the phone's Analysis hub — the /more route added a second way in,
-  // it did not take this one away.
-  const analysisHrefs = new Set(ANALYSIS_HUB_LINKS.map((l) => l.href));
-  for (const link of TOOLS_HUB_LINKS) {
-    assert.ok(analysisHrefs.has(link.href), `${link.href} is unreachable on mobile`);
-  }
-  assert.ok(MORE_HUB_LINKS.some((l) => l.href === "/tools"));
+test("Tools owns a cell on both platforms", () => {
+  const desktop = DESKTOP_NAV.find((item) => item.id === "tools");
+  const mobile = MOBILE_NAV.find((item) => item.id === "tools");
+  // Same destination either way — unlike Analysis, Tools has one page and no workbench split.
+  assert.equal(desktop?.href, "/tools");
+  assert.equal(mobile?.href, "/tools");
+  assert.equal(desktop?.label, "Tools");
+  assert.equal(mobile?.label, "Tools");
 });
 
 test("tool routes light Tools, not Analysis — longest prefix wins", () => {
@@ -106,37 +137,49 @@ test("tool routes light Tools, not Analysis — longest prefix wins", () => {
   assert.equal(resolveActiveNavId("/analysis/roll-center"), "tools");
   // …and the hub itself must not get dragged along with it.
   assert.equal(resolveActiveNavId("/analysis"), "analysis");
+  // `/setup/comparison` scores longer than the Paddock list's `/setup` — the bench is a tool,
+  // the sheet is a setup, and they share a prefix.
+  assert.equal(resolveActiveNavId("/setup/abc"), "paddock");
 });
 
-test("events own their tab — /events no longer lights Garage (2026-07-29)", () => {
-  assert.equal(resolveActiveNavId("/events"), "events");
-  assert.equal(resolveActiveNavId("/events/abc123"), "events");
-  // The Garage prefix list used to swallow /events; keep it out for good.
-  assert.notEqual(resolveActiveNavId("/events"), "assets");
-  // Its tab is the rail's now — the phone reaches it through More (2026-08-12).
-  const events = DESKTOP_NAV.find((item) => item.id === "events");
-  assert.equal(events?.href, "/events");
-  assert.equal(events?.label, "Events");
+test("the two benches that had no section now have one", () => {
+  /*
+   * `/videos/analysis` used to sit in ANALYSIS_PREFIXES and out-score `/videos`, which split
+   * one workshop across two cells: the library lit nothing and opening a job lit Analysis.
+   * The whole of `/videos` is Tools now — the results still read on the run, which is Analysis.
+   */
+  assert.equal(resolveActiveNavId("/videos"), "tools");
+  assert.equal(resolveActiveNavId("/videos/analysis"), "tools");
+  assert.equal(resolveActiveNavId("/videos/analysis/jobs/abc"), "tools");
+  assert.equal(resolveActiveNavId("/videos/overlay"), "tools");
+  // A run is still Analysis, wherever its video was made.
+  assert.equal(resolveActiveNavId("/runs/abc"), "analysis");
+  // `/laps/import` had no section at all — its only door in the app was one dashboard link.
+  assert.equal(resolveActiveNavId("/laps/import"), "tools");
 });
 
-test("the Garage tab lands on the cars list, not a hub (2026-07-29)", () => {
-  const garage = DESKTOP_NAV.find((item) => item.id === "assets");
-  assert.equal(garage?.href, "/cars");
-  assert.equal(garage?.label, "Garage");
-  // Legacy hub routes still light the tab — both redirect to /cars.
-  assert.equal(resolveActiveNavId("/assets"), "assets");
-  assert.equal(resolveActiveNavId("/garage"), "assets");
+test("the Paddock tab lands on its own page, not on the cars list", () => {
+  const paddock = DESKTOP_NAV.find((item) => item.id === "paddock");
+  assert.equal(paddock?.href, "/paddock");
+  assert.equal(paddock?.label, "Paddock");
+  // Named Paddock, not Garage: it holds tracks and meetings, and neither is equipment.
+  assert.equal(
+    DESKTOP_NAV.some((item) => item.label === "Garage"),
+    false
+  );
 });
 
-test("catalogs are Settings-only reference data, calibrations admin-gated", () => {
+test("catalogs are Settings-only reference data; tracks are not a catalog", () => {
   const hrefs = CATALOG_LINKS.map((l) => l.href);
   assert.deepEqual(hrefs, [
     "/setup-sheet-models",
-    "/tracks",
     "/tires",
     "/additives",
     "/setup-calibrations",
   ]);
+  // Tracks left this list on 2026-08-18. You pick one every time you log a run or book a
+  // meeting; it belongs with the things a run points at, not with the tidy-up catalogs.
+  assert.equal(hrefs.includes("/tracks"), false);
   // Tires are picker-only in the daily loop — one catalog entry, never a "my tires" asset.
   assert.equal(hrefs.filter((h) => h === "/tires").length, 1);
   assert.equal(hrefs.includes("/cars"), false);
@@ -151,13 +194,19 @@ test("catalogs are Settings-only reference data, calibrations admin-gated", () =
   );
 });
 
-test("resolveActiveNavId splits /teams from /settings (Teams is its own tab now)", () => {
+test("Teams keeps its routes without keeping a tab", () => {
+  // The section id survives so the route resolves; no nav list carries it any more, because
+  // creating and joining a team is configuration and lives in Settings (2026-08-18).
   assert.equal(resolveActiveNavId("/teams"), "teams");
   assert.equal(resolveActiveNavId("/teams/abc"), "teams");
   // Team admin lives at /teams/<id>/settings — it must not light up the Settings tab.
   assert.equal(resolveActiveNavId("/teams/abc/settings"), "teams");
   assert.equal(resolveActiveNavId("/settings"), "settings");
   assert.equal(resolveActiveNavId("/settings/danger"), "settings");
+  assert.equal(
+    [...MOBILE_NAV, ...DESKTOP_NAV].some((item) => item.id === "teams"),
+    false
+  );
 });
 
 test("resolveActiveNavId still maps the core routes", () => {
@@ -169,7 +218,7 @@ test("resolveActiveNavId still maps the core routes", () => {
   // The run view (`/runs/<id>`) is a viewing surface — Analysis, not Add-run.
   assert.equal(resolveActiveNavId("/runs/abc"), "analysis");
   assert.equal(resolveActiveNavId("/engineer"), "engineer");
-  assert.equal(resolveActiveNavId("/cars"), "assets");
+  assert.equal(resolveActiveNavId("/cars"), "paddock");
 });
 
 test("shouldShowLogRunFab is visible on destinations, hidden inside create/edit flows", () => {
@@ -180,6 +229,7 @@ test("shouldShowLogRunFab is visible on destinations, hidden inside create/edit 
     "/runs/history",
     "/engineer",
     "/teams",
+    "/paddock",
     "/assets",
     "/cars",
     "/setup-documents", // the list stays; only the editor detail hides
@@ -189,11 +239,7 @@ test("shouldShowLogRunFab is visible on destinations, hidden inside create/edit 
   }
 
   // Hidden: you're already logging, or in an editor with its own Save.
-  for (const path of [
-    "/runs/new",
-    "/runs/abc/edit",
-    "/setup-documents/xyz",
-  ]) {
+  for (const path of ["/runs/new", "/runs/abc/edit", "/setup-documents/xyz"]) {
     assert.equal(shouldShowLogRunFab(path), false, `expected no FAB on ${path}`);
   }
 

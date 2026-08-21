@@ -16,6 +16,7 @@
 
 import { useId, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Eyebrow } from "@/components/ui/panel";
 import {
@@ -124,6 +125,9 @@ export function RollCenterCompareStrip({ a, b, rightLabel, templateKey, classNam
   const pack = useMemo(() => resolvePackForTemplateKey(templateKey), [templateKey]);
   const ca = useMemo(() => (pack ? computeRollCenterFromSnapshot(a, pack) : null), [pack, a]);
   const cb = useMemo(() => (pack ? computeRollCenterFromSnapshot(b, pack) : null), [pack, b]);
+  // Above the early return — a hook cannot sit behind a condition. It only feeds the Lab link's
+  // back arrow, so the compare surface returns to itself instead of to Tools.
+  const pathname = usePathname();
   if (!ca || !cb || ca.packId !== cb.packId) return null;
 
   const row = (label: string, va: number, vb: number) => {
@@ -150,7 +154,7 @@ export function RollCenterCompareStrip({ a, b, rightLabel, templateKey, classNam
       {row("Roll axis rake", ca.rakeMm, cb.rakeMm)}
       <div className="pt-1">
         <Link
-          href={labHref(a, b, { s: "This run", g: rightLabel })}
+          href={labHref(a, b, { s: "This run", g: rightLabel }, undefined, pathname)}
           className="text-xs font-medium text-muted-foreground hover:text-foreground transition"
         >
           Compare in Lab →

@@ -325,6 +325,45 @@ export function solveAxle(
   return { left, right, rollCentre };
 }
 
+/**
+ * The chassis plate in world space for a pose, corners anticlockwise from bottom-left.
+ *
+ * **Drawn, never solved** — nothing here feeds a metric, which is why the plate's width may be a
+ * default without any number moving. The plate BOTTOM sits at the pack's frame bottom, because
+ * that IS ride height: ground to the underside of the car. The mounts bolt to the TOP. That is
+ * why `mountZShiftMm` thickens the plate here rather than lifting it — a thicker chassis raises
+ * everything bolted to it while the ride height you measure underneath stays where it was.
+ */
+export function chassisPlateCorners(
+  geo: AxleGeometry,
+  adj: AxleAdjustments,
+  halfWidthMm: number,
+  baseThicknessMm: number,
+  rollDeg = 0,
+  bumpMm = 0
+): Vec2[] {
+  const toWorld = chassisTransform(adj.rideDeltaMm + bumpMm, rollDeg);
+  const bottom = geo.frameBottom;
+  const top = bottom + baseThicknessMm + adj.mountZShiftMm;
+  return [
+    { x: -halfWidthMm, z: bottom },
+    { x: halfWidthMm, z: bottom },
+    { x: halfWidthMm, z: top },
+    { x: -halfWidthMm, z: top },
+  ].map(toWorld);
+}
+
+/** The plate's underside at one lateral position — the top end of a ride-height dimension. */
+export function chassisBottomAt(
+  geo: AxleGeometry,
+  adj: AxleAdjustments,
+  xMm: number,
+  rollDeg = 0,
+  bumpMm = 0
+): Vec2 {
+  return chassisTransform(adj.rideDeltaMm + bumpMm, rollDeg)({ x: xMm, z: geo.frameBottom });
+}
+
 const armAngleDeg = (inner: Vec2, outer: Vec2): number =>
   (Math.atan2(outer.z - inner.z, outer.x - inner.x) * 180) / Math.PI;
 

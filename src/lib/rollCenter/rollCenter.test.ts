@@ -9,9 +9,22 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { computeAxleMetrics, solveAxle, solveCamberTrim, ZERO_ADJUSTMENTS } from "./engine";
+import {
+  chassisBottomAt,
+  chassisPlateCorners,
+  computeAxleMetrics,
+  solveAxle,
+  solveCamberTrim,
+  ZERO_ADJUSTMENTS,
+} from "./engine";
 import { parseVsuspUrl } from "./vsusp";
-import { AWESOMATIX_A800_PACK, chassisMountShiftMm, resolvePackForSnapshot } from "./packs";
+import {
+  AWESOMATIX_A800_PACK,
+  TEACHING_TC_PACK,
+  chassisMountShiftMm,
+  resolveLabPack,
+  resolvePackForSnapshot,
+} from "./packs";
 import {
   computeRollCenterFromSnapshot,
   deriveRollCenterInputs,
@@ -260,16 +273,120 @@ test("per-leg shims survive a Lab edit: only the touched leg moves", () => {
   );
 });
 
-test("lab defaults solve to the VSUSP baseline; derive inputs exposed", () => {
-  const inputs = deriveRollCenterInputs(LAB_DEFAULT_FIELDS as Record<string, unknown>);
-  assert.ok(inputs, "lab defaults must fingerprint the A800 pack");
-  const computed = computeRollCenterFromSnapshot(LAB_DEFAULT_FIELDS as Record<string, unknown>);
+test("the blank Lab is the teaching model, not somebody's Awesomatix", () => {
+  // The defaults used to carry twelve shim keys set to "0" — the very keys the fingerprint reads —
+  // so the blank car WAS an A800 for every driver alive. It must not be one now.
+  assert.equal(
+    resolvePackForSnapshot(LAB_DEFAULT_FIELDS as Record<string, unknown>),
+    null,
+    "blank Lab defaults must not fingerprint any real car"
+  );
+  const pack = resolveLabPack(LAB_DEFAULT_FIELDS as Record<string, unknown>);
+  assert.equal(pack.id, TEACHING_TC_PACK.id);
+  assert.equal(pack.verificationGrade, "teaching-model");
+  assert.equal(pack.isTeachingModel, true);
+  // Belongs to no car, so no template key can ever reach it.
+  assert.deepEqual([...pack.appliesToTemplateKeys], []);
+
+  const computed = computeRollCenterFromSnapshot(LAB_DEFAULT_FIELDS as Record<string, unknown>, pack);
   assert.ok(computed);
-  // No shims + pack ride heights = the no-shim VSUSP anchor (camber unset → link default).
+  assert.equal(computed.verificationGrade, "teaching-model");
+  // Front and rear are identical by design (founder 2026-08-19): the roll axis starts level and
+  // the driver makes rake themselves.
+  assert.ok(
+    Math.abs(computed.rakeMm) < 1e-9,
+    `teaching model must start with a level roll axis, got ${computed.rakeMm}`
+  );
+
+  const changes = labChangeList(
+    { ...LAB_DEFAULT_FIELDS, under_hub_shims_front: "0.5" },
+    LAB_DEFAULT_FIELDS
+  );
+  assert.deepEqual(changes, ["under hub shims front: — → 0.5"]);
+});
+
+test("teaching model: round numbers, class-legal width, mid-range ratios", () => {
+  const geo = TEACHING_TC_PACK.front;
+  // Roundness is the tell — nobody mistakes 60.0 for a measurement. Every hardpoint must stay on
+  // a half-millimetre grid; the day one drifts to 60.37 it has started pretending to be measured.
+  for (const [k, v] of Object.entries(geo)) {
+    assert.ok(Math.abs(v * 2 - Math.round(v * 2)) < 1e-9, `${k} = ${v} is not a whole or half mm`);
+  }
+
+  const m = computeAxleMetrics(geo, ZERO_ADJUSTMENTS);
+  assert.ok(m);
+  // 190mm is the 1/10 touring car class limit. The engine measures contact patch to contact patch
+  // and the contact sits mid-tyre, so a 26mm tyre puts the target at 190 − 26.
+  assert.ok(Math.abs(m.trackMm - 164) < 0.5, `track ${m.trackMm} (190mm overall is the target)`);
+  assert.ok(Math.abs(m.rcHeightMm - -9.15) < 0.05, `RC ${m.rcHeightMm}`);
+  // A realistic static camber falls out with no trim at all — worth locking, it was not forced.
+  assert.ok(Math.abs(m.camberDeg - -1.94) < 0.05, `camber ${m.camberDeg}`);
+  assert.ok(Math.abs(m.lowerArmAngleDeg - 6.81) < 0.05, `lower arm ${m.lowerArmAngleDeg}`);
+
+  /*
+   * The ratios are the entire point of this pack: the absolute belongs to nobody, but "1mm of
+   * ride height is worth ~1.2mm of roll centre" is the figure the north star quotes and the thing
+   * a driver actually carries away. Signs must never flip.
+   */
+  const ride = computeAxleMetrics(geo, { ...ZERO_ADJUSTMENTS, rideDeltaMm: 1 });
+  assert.ok(ride);
+  assert.ok(Math.abs(ride.rcHeightMm - m.rcHeightMm - 1.2) < 0.05, "ride height ≈ 1.2mm RC per mm");
+  const perMm = (key: "underLowerArmMm" | "upperInnerMm" | "underHubMm" | "upperOuterMm") => {
+    const r = computeAxleMetrics(geo, { ...ZERO_ADJUSTMENTS, [key]: 1 });
+    assert.ok(r);
+    return r.rcHeightMm - m.rcHeightMm;
+  };
+  assert.ok(perMm("underLowerArmMm") > 1.5, "raising the lower arm inner must raise RC");
+  assert.ok(perMm("underHubMm") > 1.5, "raising the hub off the lower ball must raise RC");
+  assert.ok(perMm("upperOuterMm") > 0.5, "raising the upper link outer must raise RC");
+  assert.ok(perMm("upperInnerMm") < -0.5, "raising the upper link inner must LOWER RC");
+});
+
+test("a real A800 snapshot still resolves to the A800 and still hits the VSUSP anchor", () => {
+  // The fingerprint now only ever UPGRADES the answer, so the car it was built for must still win.
+  const a800 = {
+    under_hub_shims_front: "0",
+    under_lower_arm_shims_ff: "0",
+    upper_inner_shims_ff: "0",
+    upper_outer_shims_front: "0",
+    ride_height_front: "5.0",
+    ride_height_rear: "5.2",
+    chassis: "C01RS",
+  };
+  assert.equal(resolveLabPack(a800).id, AWESOMATIX_A800_PACK.id);
+  const inputs = deriveRollCenterInputs(a800, resolveLabPack(a800));
+  assert.ok(inputs, "derive inputs stays exposed for the Lab");
+  const computed = computeRollCenterFromSnapshot(a800, resolveLabPack(a800));
+  assert.ok(computed);
   assert.ok(Math.abs(computed.front.rcHeightMm - -9.09) < 0.02, `front ${computed.front.rcHeightMm}`);
   assert.ok(Math.abs(computed.rear.rcHeightMm - -8.5) < 0.02, `rear ${computed.rear.rcHeightMm}`);
-  const changes = labChangeList({ ...LAB_DEFAULT_FIELDS, under_hub_shims_front: "0.5" }, LAB_DEFAULT_FIELDS);
-  assert.deepEqual(changes, ["under hub shims front: 0 → 0.5"]);
+});
+
+test("the chassis plate is drawn, never solved", () => {
+  const geo = TEACHING_TC_PACK.front;
+  const base = computeAxleMetrics(geo, ZERO_ADJUSTMENTS);
+  assert.ok(base);
+
+  // Plate bottom IS ride height: ground to the underside. Mounts bolt to the TOP, which is why a
+  // thicker chassis thickens the plate here rather than lifting the car.
+  const corners = chassisPlateCorners(geo, ZERO_ADJUSTMENTS, 45, 2);
+  assert.equal(corners.length, 4);
+  assert.ok(Math.abs(corners[0].z - geo.frameBottom) < 1e-9, "plate bottom sits at the frame bottom");
+  assert.ok(Math.abs(corners[2].z - (geo.frameBottom + 2)) < 1e-9, "plate top is bottom + thickness");
+  assert.ok(Math.abs(corners[1].x - 45) < 1e-9, "plate reaches its half-width");
+
+  const shifted = chassisPlateCorners(geo, { ...ZERO_ADJUSTMENTS, mountZShiftMm: 1 }, 45, 2);
+  assert.ok(Math.abs(shifted[0].z - geo.frameBottom) < 1e-9, "a thicker plate must not move ride height");
+  assert.ok(Math.abs(shifted[2].z - (geo.frameBottom + 3)) < 1e-9, "a thicker plate gets thicker");
+
+  assert.ok(
+    Math.abs(chassisBottomAt(geo, ZERO_ADJUSTMENTS, -30).z - geo.frameBottom) < 1e-9,
+    "the ride-height dimension measures to the plate underside"
+  );
+
+  // The width is drawn and nothing else — a different one must not move a single number.
+  const wide = computeAxleMetrics(geo, ZERO_ADJUSTMENTS);
+  assert.ok(wide && Math.abs(wide.rcHeightMm - base.rcHeightMm) < 1e-12);
 });
 
 test("deltas are datum-robust: shim delta survives a base-geometry error", () => {

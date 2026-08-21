@@ -209,9 +209,10 @@ export type SnapshotGeometryInputs = {
  * solves and sensitivity sweeps beyond the static metrics.
  */
 export function deriveRollCenterInputs(
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
+  packForCar?: RollCenterPack | null
 ): SnapshotGeometryInputs | null {
-  return deriveSnapshotInputs(data);
+  return deriveSnapshotInputs(data, packForCar);
 }
 
 function deriveSnapshotInputs(
@@ -227,16 +228,30 @@ function deriveSnapshotInputs(
 
   const chassisCode = detectChassisCode(pack, data["chassis"]);
   const mountShift = chassisCode != null ? chassisMountShiftMm(pack, chassisCode) : null;
-  if (mountShift == null) {
+  /*
+   * The teaching model has one plate and no chassis choice to read, so "assumed steel" would be
+   * noise on top of a car that is already announced as invented. Its assumption is the whole model.
+   */
+  if (pack.isTeachingModel) {
+    assumptions.push("teaching model — these numbers belong to no real car");
+  } else if (mountShift == null) {
     assumptions.push(`chassis assumed ${pack.chassisOptions[pack.baseChassisCode].label.toLowerCase()}`);
   }
   const mountZShiftMm = mountShift ?? 0;
 
   // Tire: no canonical tire-diameter key exists yet — nominal OD is always assumed.
-  assumptions.push(`tire Ø ${AWESOMATIX_NOMINAL_TIRE_NOTE}`);
+  if (!pack.isTeachingModel) assumptions.push(`tire Ø ${AWESOMATIX_NOMINAL_TIRE_NOTE}`);
 
-  const frontAdj = axleAdjustments(data, pack.front, FRONT_KEYS, mountZShiftMm, assumptions);
-  const rearAdj = axleAdjustments(data, pack.rear, REAR_KEYS, mountZShiftMm, assumptions);
+  /*
+   * Per-box notes are worth reading on a real sheet — "you left the front under-hub shims blank"
+   * is a gap the driver can close. On the teaching model there is no sheet to have left blank, so
+   * the same code produced ten lines of "no shims recorded, assumed 0" under a car that was
+   * already announced as invented. The notes go to a sink there instead: the model IS the
+   * assumption, and it is stated once above.
+   */
+  const noteSink = pack.isTeachingModel ? [] : assumptions;
+  const frontAdj = axleAdjustments(data, pack.front, FRONT_KEYS, mountZShiftMm, noteSink);
+  const rearAdj = axleAdjustments(data, pack.rear, REAR_KEYS, mountZShiftMm, noteSink);
 
   return { pack, frontAdj, rearAdj, assumptions };
 }

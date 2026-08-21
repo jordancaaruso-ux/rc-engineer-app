@@ -14,6 +14,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { AxleSchematic } from "@/components/rollCenter/AxleSchematic";
@@ -22,6 +23,7 @@ import type {
   solveRollCenterDiagram,
 } from "@/lib/rollCenter/computeFromSnapshot";
 import { encodeLabSlot, extractGeometryFields, type LabSource } from "@/lib/rollCenter/labState";
+import { labBackQuery } from "@/lib/rollCenter/labReturn";
 
 export type RollCenterSolves = ReturnType<typeof solveRollCenterDiagram>;
 
@@ -32,12 +34,22 @@ export type RollCenterSolves = ReturnType<typeof solveRollCenterDiagram>;
  * as before. When a surface knows which chassis it is drawing and which row it is showing, passing
  * that along is what lets the Lab draw the actual sheet and offer a way back to the setup — see
  * `labState.ts`. A surface that doesn't know simply doesn't say.
+ *
+ * `back` is the same bargain for the Lab's back arrow (2026-08-19, `labReturn.ts`). The Lab is
+ * entered from Tools and from any sheet, so it cannot guess; the caller passes its own path and
+ * the arrow returns the driver to the sheet they were reading. Callers that pass nothing land on
+ * Tools, which is the Lab's dock cell and the right answer for an unattributed arrival.
+ *
+ * The PATH only, never the query — `usePathname` needs no Suspense boundary where
+ * `useSearchParams` forces one on every page that draws geometry, and the page is the destination
+ * either way.
  */
 export function labHref(
   value: Record<string, unknown>,
   ghostValue?: Record<string, unknown> | null,
   labels?: { s?: string; g?: string },
-  origin?: { setupSheetModelId?: string | null; source?: LabSource | null }
+  origin?: { setupSheetModelId?: string | null; source?: LabSource | null },
+  back?: string | null
 ): string {
   const s = encodeLabSlot({
     fields: extractGeometryFields(value),
@@ -54,7 +66,7 @@ export function labHref(
     : null;
   const sl = labels?.s ? `&sl=${encodeURIComponent(labels.s.slice(0, 60))}` : "";
   const gl = g && labels?.g ? `&gl=${encodeURIComponent(labels.g.slice(0, 60))}` : "";
-  return `/analysis/roll-center?s=${s}${sl}${g ? `&g=${g}` : ""}${gl}`;
+  return `/analysis/roll-center?s=${s}${sl}${g ? `&g=${g}` : ""}${gl}${labBackQuery(back)}`;
 }
 
 export function fmtMm(v: number): string {
@@ -156,6 +168,8 @@ export function RollCenterDetail({
   className?: string;
 }) {
   const [axle, setAxle] = useState<"front" | "rear">("front");
+  // Where the Lab's back arrow should return to — this sheet, wherever it is being drawn.
+  const pathname = usePathname();
 
   return (
     <div className={className}>
@@ -221,7 +235,7 @@ export function RollCenterDetail({
 
       <div className="flex flex-wrap items-center gap-2 border-t border-border/80 px-2 py-2">
         <Link
-          href={labHref(value, baselineValue, labLabels, labOrigin)}
+          href={labHref(value, baselineValue, labLabels, labOrigin, pathname)}
           /* `primary-ink`, not `accent`: yellow doing a foreground job has to darken on paper,
              which is the whole reason that token exists (light mode, main @ 4275087). */
           className="tap-active inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:border-primary-ink/40 hover:bg-muted/60"

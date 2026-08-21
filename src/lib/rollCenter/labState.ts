@@ -39,23 +39,28 @@ export type LabFields = Partial<Record<GeometrySheetKey, string>>;
 /** Field-length cap shared by extract + decode (chassis choice objects can be long-ish). */
 const MAX_FIELD_CHARS = 120;
 
-/** A800 no-shim baseline — the Lab's blank-slate state (fingerprints the pack). */
+/**
+ * The Lab's blank slate: no shims, 5mm ride height at both ends, no chassis choice.
+ *
+ * This used to be the A800's own no-shim state — twelve shim keys set to "0" and
+ * `chassis: "C01RS"`. Those zeros were not neutral: they are the very keys `resolvePackForSnapshot`
+ * fingerprints, so the blank Lab announced itself as an Awesomatix and every driver alive opened
+ * onto someone else's car.
+ *
+ * The shim keys are gone entirely, which is also the more honest reading of them — a box nobody
+ * filled in is "not recorded", not "zero", and `legMean` already assumes zero WITH an assumption
+ * note. What is left is car-agnostic: 5mm at both ends, the ride height every touring car starts
+ * at. A snapshot carrying no shim keys of its own now resolves to the teaching model instead
+ * (`resolveLabPack`).
+ *
+ * Live consequence, accepted: a real A800 sheet whose four shim boxes are ALL empty no longer
+ * fingerprints as an A800 and opens the teaching model too. That is the safe direction — never
+ * claim a car we cannot confirm — and it resolves properly the day packs key off the chassis
+ * itself rather than off field names.
+ */
 export const LAB_DEFAULT_FIELDS: LabFields = {
-  under_lower_arm_shims_ff: "0",
-  under_lower_arm_shims_fr: "0",
-  under_lower_arm_shims_rf: "0",
-  under_lower_arm_shims_rr: "0",
-  upper_inner_shims_ff: "0",
-  upper_inner_shims_fr: "0",
-  upper_inner_shims_rf: "0",
-  upper_inner_shims_rr: "0",
-  under_hub_shims_front: "0",
-  under_hub_shims_rear: "0",
-  upper_outer_shims_front: "0",
-  upper_outer_shims_rear: "0",
   ride_height_front: "5.0",
-  ride_height_rear: "5.2",
-  chassis: "C01RS",
+  ride_height_rear: "5.0",
 };
 
 /** Pick the geometry slice out of a full setup snapshot, as display strings.
