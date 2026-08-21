@@ -12,6 +12,7 @@ import {
 } from "@/lib/events/eventParticipation";
 import { findEventByTrackAndResultsUrl } from "@/lib/events/findEventForLiveRc";
 import { eventTrackFieldsForLink } from "@/lib/tracks/legacyTrackSnapshot";
+import { revalidateAfterEventMutation } from "@/lib/revalidateUser";
 
 export const dynamic = "force-dynamic";
 
@@ -176,6 +177,9 @@ export async function POST(request: Request) {
           where: { id: existing.id },
           include: EVENT_LIST_INCLUDE,
         });
+        // A 409 here still JOINED them to a meeting, so what Paddock shows as next has
+        // changed even though the request "failed".
+        revalidateAfterEventMutation(userId);
         return NextResponse.json(
           {
             error: "An event with this LiveRC results URL already exists — joined your participation.",
@@ -218,6 +222,10 @@ export async function POST(request: Request) {
       where: { id: event.id },
       include: EVENT_LIST_INCLUDE,
     });
+
+    // Paddock's hero is the next booked meeting and its model is cached — without this the
+    // tab still reads "No meeting planned" for up to 30s after you book one.
+    revalidateAfterEventMutation(userId);
 
     return NextResponse.json(
       { event: withParts ? mapEventForUser(withParts, userId) : mapEventForUser(event, userId) },

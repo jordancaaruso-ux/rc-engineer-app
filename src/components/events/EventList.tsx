@@ -232,7 +232,7 @@ export function EventList({
           title="Upcoming events"
           subtitle="End date is today or later."
           events={upcoming}
-          emptyMessage="No upcoming events. Create one above or log a race meeting from Log your run."
+          emptyMessage="No upcoming events. Create one above, or log one from Log your run."
           stats={stats}
         />
 

@@ -37,7 +37,7 @@ export default async function EventsPage({
       <>
         <header className="page-header is-echo">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <PageBackLink href="/" />
+            <PageBackLink href="/paddock" />
             <div>
               <h1 className="page-title">Events</h1>
               <p className="page-subtitle">Database not configured.</p>

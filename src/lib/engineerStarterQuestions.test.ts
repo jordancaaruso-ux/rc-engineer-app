@@ -9,8 +9,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  DASHBOARD_STARTER_COUNT,
   ENGINEER_STARTER_BOARD_COUNT,
   ENGINEER_STARTER_QUESTIONS,
+  selectDashboardStarterQuestions,
   selectEngineerStarterQuestions,
 } from "@/lib/engineerStarterQuestions";
 
@@ -91,4 +93,45 @@ test("limit trims without reordering", () => {
     (q) => q.id,
   );
   assert.deepEqual(board, full.slice(0, ENGINEER_STARTER_BOARD_COUNT));
+});
+
+/* ── The phone dashboard's card (2026-08-20) ───────────────────────────────── */
+
+test("the dashboard card asks about the car at the track, and about the craft away from it", () => {
+  const atTrack = selectDashboardStarterQuestions({ hasRuns: true, isTrackDay: true });
+  const offDay = selectDashboardStarterQuestions({ hasRuns: true, isTrackDay: false });
+
+  assert.ok(atTrack.length > 0 && offDay.length > 0);
+  assert.ok(
+    atTrack.some((q) => q.family === "feel"),
+    "a track day should offer the how-does-it-feel questions",
+  );
+  assert.ok(
+    !offDay.some((q) => q.family === "feel"),
+    "an off day should not ask about a car that isn't in front of the driver",
+  );
+  assert.ok(
+    offDay.some((q) => q.family === "learn"),
+    "an off day is when the learn questions are worth the slot",
+  );
+});
+
+test("a driver with nothing logged is never offered a question about a run", () => {
+  for (const isTrackDay of [true, false]) {
+    const picked = selectDashboardStarterQuestions({ hasRuns: false, isTrackDay });
+    assert.ok(picked.length > 0, "there must always be something to ask");
+    assert.equal(
+      picked.filter((q) => q.family === "run").length,
+      0,
+      "no run in focus means no read-this-run question",
+    );
+  }
+});
+
+test("the card never offers more than it can cycle through, and never repeats one", () => {
+  for (const isTrackDay of [true, false]) {
+    const picked = selectDashboardStarterQuestions({ hasRuns: true, isTrackDay });
+    assert.ok(picked.length <= DASHBOARD_STARTER_COUNT);
+    assert.equal(new Set(picked.map((q) => q.id)).size, picked.length);
+  }
 });

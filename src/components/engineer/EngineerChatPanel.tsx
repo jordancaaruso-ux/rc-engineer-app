@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ArrowUp, MessageSquarePlus } from "lucide-react";
+import { ArrowUp, ChevronDown, MessageSquarePlus } from "lucide-react";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
@@ -56,6 +56,8 @@ import { EngineerMarkdown } from "@/components/ui/EngineerMarkdown";
 
 import { Eyebrow } from "@/components/ui/panel";
 
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
+
 
 import { RelativeTime } from "@/components/ui/RelativeTime";
 
@@ -95,6 +97,10 @@ type ThreadSummary = {
 
   preview: string | null;
 
+  /** A plain-text taste of the ENGINEER’s last answer. Only the first few threads carry one. */
+
+  answerPreview?: string | null;
+
   updatedAt: string;
 
 };
@@ -120,6 +126,12 @@ export type EngineerQueuedChatPrompt = { id: number; text: string };
 // History starts collapsed to the most recent few conversations; the rest live
 // behind a "Show all" toggle so the panel doesn't scroll into a wall of threads.
 const HISTORY_COLLAPSED_COUNT = 4;
+
+// How many of those rows show a line of the answer under the title (founder call 2026-08-20).
+// A list of titles is a filing cabinet; three previews make it a page you can read. The rest
+// stay one-liners — previewing everything is the wall of text the collapse exists to avoid.
+// Kept in step with PREVIEW_THREAD_COUNT in /api/engineer/threads, which only fetches this many.
+const HISTORY_PREVIEW_COUNT = 3;
 
 
 
@@ -384,6 +396,12 @@ export function EngineerChatPanel({
 
   const [historyExpanded, setHistoryExpanded] = useState(false);
 
+  // Phone-only disclosure for the whole history card (lg keeps the rail open).
+  // `null` = untouched, in which case it follows the thread: open while there is no
+  // conversation on screen (otherwise the phone page is two short cards and a lot of
+  // nothing), shut once there is one.
+  const [historyOpen, setHistoryOpen] = useState<boolean | null>(null);
+
   const [candidates, setCandidates] = useState<AnchorCandidate[]>([]);
 
   const [candidatesLoading, setCandidatesLoading] = useState(true);
@@ -616,6 +634,10 @@ export function EngineerChatPanel({
     async (id: string) => {
 
       initialUrlThreadLoaded.current = id;
+
+      // Picking a chat on a phone shuts the history card behind it — otherwise you pick a
+      // conversation and stay looking at the list you picked it from.
+      setHistoryOpen(false);
 
       setLoadingThread(true);
 
@@ -1311,6 +1333,8 @@ export function EngineerChatPanel({
   };
   // ─────────────────────────────────────────────────────────────────────────────
 
+  const historyShown = historyOpen ?? messages.length === 0;
+
   const canCollapseHistory = threads.length > HISTORY_COLLAPSED_COUNT;
 
   // Collapsed view shows the most recent few, but always keeps the active
@@ -1332,23 +1356,35 @@ export function EngineerChatPanel({
   return (
 
     /*
-     * Phone: one column — transcript, composer, then past conversations. Unchanged.
+     * TWO CARDS since 2026-08-18, where there used to be one panel with an internal divider:
+     * the conversation is one card, past conversations are their own. Same geometry at lg —
+     * history still sits in a 19rem left column, it just has its own border and stops at its
+     * own content instead of stretching the chat's full height.
      *
-     * lg+: the same three blocks become a real chat window. History moves to a left rail, the
-     * transcript takes the full height and the composer anchors to the bottom. DOM order stays
-     * transcript → composer → history so the phone is untouched; the grid does the placing.
+     * Phone: chat card, then a history card that starts SHUT (a count row you tap). The old
+     * single card ran the thread list underneath the composer, so the page never ended on the
+     * thing you came for.
      *
-     * Row 1 is `1fr` so that before the first question the empty track still absorbs the slack
-     * and the composer sits at the bottom — the way every chat app resolves an empty thread.
+     * DOM order is chat → history; the lg grid puts history back on the left.
      */
-    <div className="flex flex-col lg:grid lg:h-[min(76dvh,48rem)] lg:grid-cols-[19rem_1fr] lg:grid-rows-[1fr_auto]">
+    <div className="flex flex-col gap-3 lg:grid lg:h-[min(76dvh,48rem)] lg:grid-cols-[19rem_1fr] lg:gap-3">
+
+      <SurfaceCard
+        variant="panel"
+        overflowHidden={false}
+        className="lg:col-start-2 lg:row-start-1 lg:min-h-0"
+        /* Row 1 is `1fr` so that before the first question the empty track still absorbs the
+           slack and the composer sits at the bottom — the way every chat app resolves an empty
+           thread. `h-full` re-pins the height the outer grid used to own directly. */
+        contentClassName="p-0 flex flex-col lg:grid lg:h-full lg:min-h-0 lg:grid-rows-[1fr_auto]"
+      >
 
       {messages.length > 0 ? (
 
         /* `lg:max-h-none` is the point of this whole pass: a hard 340px scroll-well is right on a
            phone and absurd on a 1440px monitor, where it left the bottom 45% of the screen empty.
            At lg the grid row owns the height instead. */
-        <div className="max-h-[min(42vh,340px)] overflow-y-auto border-b border-border/80 px-3 py-2.5 space-y-2 lg:col-start-2 lg:row-start-1 lg:max-h-none lg:min-h-0 lg:border-b-0 lg:px-5 lg:py-4">
+        <div className="max-h-[min(42vh,340px)] overflow-y-auto border-b border-border/80 px-3 py-2.5 space-y-2 lg:row-start-1 lg:max-h-none lg:min-h-0 lg:border-b-0 lg:px-5 lg:py-4">
 
           {messages.map((m, idx) => {
 
@@ -1489,7 +1525,7 @@ export function EngineerChatPanel({
         * so it says what belongs there. `hidden lg:flex` is what keeps this off the phone.
         */}
       {messages.length === 0 ? (
-        <div className="hidden lg:col-start-2 lg:row-start-1 lg:flex lg:min-h-0 lg:flex-col lg:items-center lg:justify-center lg:gap-2 lg:px-8 lg:text-center">
+        <div className="hidden lg:row-start-1 lg:flex lg:min-h-0 lg:flex-col lg:items-center lg:justify-center lg:gap-2 lg:px-8 lg:text-center">
           <p className="text-sm font-medium text-foreground">Ask the Engineer about your car.</p>
           <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
             It reads the runs, setups and conditions you&rsquo;ve logged. Start with one of these,
@@ -1507,7 +1543,7 @@ export function EngineerChatPanel({
         </div>
       ) : null}
 
-      <div className="p-3 space-y-2 lg:col-start-2 lg:row-start-2 lg:border-t lg:border-border/80 lg:px-5 lg:py-4">
+      <div className="p-3 space-y-2 lg:row-start-2 lg:border-t lg:border-border/80 lg:px-5 lg:py-4">
 
         <EngineerSubjectBar
           mode={generalMode ? "general" : "data"}
@@ -1644,9 +1680,41 @@ export function EngineerChatPanel({
 
 
 
-      <div className="border-t border-border/80 px-3 py-3 md:px-4 lg:col-start-1 lg:row-start-1 lg:row-span-2 lg:min-h-0 lg:overflow-y-auto lg:border-t-0 lg:border-r lg:px-4">
+      </SurfaceCard>
 
-        <Eyebrow className="mb-2">History</Eyebrow>
+      {/* The history card. At lg it is the left column and always open; on a phone it is a
+          closed row you tap, so the chat card is the last thing before the dock. `self-start`
+          keeps it at its own height instead of stretching to the chat's 76dvh. */}
+      <SurfaceCard
+        variant="panel"
+        overflowHidden={false}
+        className="lg:col-start-1 lg:row-start-1 lg:max-h-full lg:self-start lg:overflow-y-auto"
+        contentClassName="p-0 px-3 py-3 md:px-4 lg:px-4"
+      >
+
+        <button
+          type="button"
+          onClick={() => setHistoryOpen(!historyShown)}
+          aria-expanded={historyShown}
+          aria-controls="engineer-history-list"
+          /* Inert at lg — the list is always on screen there, so the row is just a heading. */
+          className="tap-active -mx-1 flex w-full items-center justify-between gap-2 rounded-lg px-1 py-0.5 text-left lg:pointer-events-none"
+        >
+          <Eyebrow>{threads.length > 0 ? `History · ${threads.length}` : "History"}</Eyebrow>
+          <ChevronDown
+            className={cn(
+              "size-4 shrink-0 text-muted-foreground transition-transform lg:hidden",
+              historyShown && "rotate-180"
+            )}
+            strokeWidth={2}
+            aria-hidden
+          />
+        </button>
+
+        <div
+          id="engineer-history-list"
+          className={cn("mt-2", historyShown ? "block" : "hidden lg:block")}
+        >
 
         {threadsLoading ? (
 
@@ -1666,9 +1734,13 @@ export function EngineerChatPanel({
 
           <ul className="space-y-1">
 
-            {visibleThreads.map((t) => {
+            {visibleThreads.map((t, threadIndex) => {
 
               const active = t.id === threadId;
+
+              // The top few read as previews; the tail stays a one-line list. Indexed off the
+              // rendered order, so "Show all" never turns a preview into a plain row.
+              const showPreview = threadIndex < HISTORY_PREVIEW_COUNT && Boolean(t.answerPreview);
 
               return (
 
@@ -1708,7 +1780,23 @@ export function EngineerChatPanel({
 
                     >
 
-                      <div className="truncate text-sm text-foreground">{t.title}</div>
+                      <div
+                        className={cn(
+                          "text-sm text-foreground",
+                          /* The question wraps to two lines on a preview row — it IS the
+                             headline there — and stays clipped to one in the compact list. */
+                          showPreview ? "line-clamp-2 font-medium leading-snug" : "truncate"
+                        )}
+                      >
+                        {t.title}
+                      </div>
+
+                      {showPreview ? (
+                        <p className="mt-1 line-clamp-2 text-[12px] leading-[1.45] text-muted-foreground">
+                          <span aria-hidden className="mr-1 text-primary-ink">✦</span>
+                          {t.answerPreview}
+                        </p>
+                      ) : null}
 
                       <div className="mt-0.5">
                         <RelativeTime iso={t.updatedAt} fallback="…" display="relative" />
@@ -1728,7 +1816,10 @@ export function EngineerChatPanel({
 
                       className={cn(
 
-                        "tap-active shrink-0 rounded-lg px-2.5 text-[11px] text-muted-foreground transition hover:text-destructive hover:bg-destructive/10",
+                        /* Full-height target, label at the TOP: on a preview row the button is
+                           three lines tall, and a centred "Delete" floated alongside the
+                           answer as if it belonged to it. */
+                        "tap-active flex shrink-0 items-start rounded-lg px-2.5 pt-2.5 text-[11px] text-muted-foreground transition hover:text-destructive hover:bg-destructive/10",
 
                         (panelBusy || deletingThreadId === t.id) && "opacity-60 pointer-events-none"
 
@@ -1776,7 +1867,9 @@ export function EngineerChatPanel({
 
         )}
 
-      </div>
+        </div>
+
+      </SurfaceCard>
 
     </div>
 

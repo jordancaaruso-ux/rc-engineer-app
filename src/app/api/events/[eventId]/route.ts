@@ -14,6 +14,7 @@ import {
 import { canEditSharedEventFields } from "@/lib/events/eventAccess";
 import { mergeEventIntoExistingByResultsUrl } from "@/lib/events/mergeEvents";
 import { eventTrackFieldsForLink } from "@/lib/tracks/legacyTrackSnapshot";
+import { revalidateAfterEventMutation } from "@/lib/revalidateUser";
 
 function optString(v: unknown): string | null | undefined {
   if (v === undefined) return undefined;
@@ -294,6 +295,9 @@ export async function PATCH(
   if (!event) {
     return NextResponse.json({ error: "Event not found" }, { status: 404 });
   }
+
+  // Dates and tracks are editable here, and both change what Paddock's hero says.
+  revalidateAfterEventMutation(user.id);
 
   return NextResponse.json({
     ok: true,

@@ -233,3 +233,45 @@ export function selectEngineerStarterQuestions(
 
 /** How many the desktop empty-state board lays out. The rail scrolls the rest. */
 export const ENGINEER_STARTER_BOARD_COUNT = 6;
+
+/**
+ * Families the phone dashboard's Ask-the-Engineer card offers, by mode.
+ *
+ * At the track you want the next change, so the card asks about the run you just did, the way
+ * the car feels, and what to do about the conditions. On an off day "loose on entry" is a
+ * question about a car that isn't in front of you, so the card trades the feel questions for
+ * the ones worth thinking about between meetings.
+ */
+const DASHBOARD_FAMILIES: Record<"trackDay" | "offDay", readonly EngineerStarterFamily[]> = {
+  trackDay: ["run", "feel", "plan"],
+  offDay: ["run", "plan", "learn"],
+};
+
+/** How many the dashboard card cycles through. Four is one from each family it asks for. */
+export const DASHBOARD_STARTER_COUNT = 4;
+
+/**
+ * The questions the dashboard card offers (2026-08-20).
+ *
+ * Built on {@link selectEngineerStarterQuestions} so the eligibility rules can only ever be
+ * written once — a question that needs a run in focus must not appear here either. The only
+ * thing added is the family filter above, because the dashboard has room for one question at a
+ * time and the day decides which kind is worth the slot.
+ *
+ * The order stays deterministic, exactly as it is on the Engineer page. The card CYCLES
+ * through them on the dashboard, which is a different job: this card is an invitation to ask
+ * something, not a rail you come back to hunting for the chip you used last round.
+ */
+export function selectDashboardStarterQuestions(state: {
+  /** The driver has at least one logged run — the Engineer's Auto subject will find it. */
+  hasRuns: boolean;
+  isTrackDay: boolean;
+}): EngineerStarterQuestion[] {
+  const families = DASHBOARD_FAMILIES[state.isTrackDay ? "trackDay" : "offDay"];
+  return selectEngineerStarterQuestions({
+    runInFocus: state.hasRuns,
+    hasHistory: state.hasRuns,
+  })
+    .filter((q) => families.includes(q.family))
+    .slice(0, DASHBOARD_STARTER_COUNT);
+}

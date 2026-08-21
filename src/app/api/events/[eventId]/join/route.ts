@@ -8,6 +8,7 @@ import {
   mapEventForUser,
   userMayJoinEvent,
 } from "@/lib/events/eventParticipation";
+import { revalidateAfterEventMutation } from "@/lib/revalidateUser";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,8 @@ export async function POST(
   if (!event) {
     return NextResponse.json({ error: "Event not found" }, { status: 404 });
   }
+
+  revalidateAfterEventMutation(userId);
 
   return NextResponse.json({ event: mapEventForUser(event, userId) });
 }

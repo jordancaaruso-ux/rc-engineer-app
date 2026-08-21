@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import type { EventsSeasonModel } from "@/lib/events/seasonTypes";
 import { Collapse } from "@/components/ui/Collapse";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 import { EventAddForm, type TrackOption } from "@/components/events/EventAddForm";
 import {
   EventList,
@@ -69,8 +70,22 @@ export function EventsView({
   return (
     <>
       <header className="page-header events-header is-echo">
-        <div className="min-w-0">
-          <h1 className="page-title">Events</h1>
+        {/*
+          The back arrow wraps the title block rather than sitting beside it, matching
+          `/tracks` and `/runs/history`: `.page-header a[aria-label="Back"]` pins the arrow
+          absolutely to the gutter, and `.page-header.is-echo div:has(> .page-title)` hides
+          only the title's OWN parent from md up. Put the arrow in that same div and the
+          desktop rail would take the arrow away with the title.
+
+          No `flex-1` here, unlike `/runs/history`: at xl this header also carries the season
+          meta line and the YearToggle / Add-event group, and a growing first child would push
+          them off their axis.
+        */}
+        <div className="flex min-w-0 items-center gap-3">
+          <PageBackLink href="/paddock" />
+          <div className="min-w-0">
+            <h1 className="page-title">Events</h1>
+          </div>
         </div>
         <span className="hidden shrink-0 micro-caps text-muted-foreground xl:inline">
           {metaLine}
