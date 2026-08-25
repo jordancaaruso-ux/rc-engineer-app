@@ -5,7 +5,7 @@ discipline: touring
 change:
   parameter: droop_rear
   direction: increase
-  typical_step: "0.5 mm of travel; read the sheet's column direction before comparing"
+  typical_step: "one small step; read the sheet's column direction before comparing"
 effects:
   - phase: entry
     power: off-power

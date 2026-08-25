@@ -5,7 +5,7 @@ discipline: touring
 change:
   parameter: droop_front
   direction: increase
-  typical_step: "0.5 mm of travel; sheets disagree on whether a bigger number means more or less — read the column"
+  typical_step: "one small step; sheets disagree on whether a bigger number means more or less — read the column"
 effects:
   - phase: entry
     power: off-power

@@ -5,7 +5,7 @@ discipline: touring
 change:
   parameter: damper_oil_rear
   direction: increase
-  typical_step: "50 cSt; stagger front-vs-rear moves balance"
+  typical_step: "one step in your oil range; stagger front-vs-rear moves balance"
 effects:
   - phase: exit
     power: on-power

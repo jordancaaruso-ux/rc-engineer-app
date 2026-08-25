@@ -5,7 +5,7 @@ discipline: touring
 change:
   parameter: diff_oil
   direction: increase
-  typical_step: "one grade (e.g. 3000 → 5000 cSt); the step sizes are coarse, so expect a real change"
+  typical_step: "one grade; the steps are coarse, so expect a real change"
 effects:
   - phase: entry
     power: off-power

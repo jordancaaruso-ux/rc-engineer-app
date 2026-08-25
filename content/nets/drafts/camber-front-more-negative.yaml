@@ -4,7 +4,7 @@ discipline: touring
 change:
   parameter: camber_front
   direction: increase
-  typical_step: "0.5° of negative camber (touring fronts typically run −0.5° to −2°); never positive"
+  typical_step: "0.5°; published touring guides put most setups near −1° to −2°, and never positive"
 effects:
   - phase: mid
     power: any

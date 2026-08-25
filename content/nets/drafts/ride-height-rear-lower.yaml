@@ -5,7 +5,7 @@ discipline: touring
 change:
   parameter: ride_height_rear
   direction: decrease
-  typical_step: "0.5 mm (touring runs ~4.5–6 mm)"
+  typical_step: "0.5 mm at a time; guides start around 5–5.5 mm and go higher on a bumpy track"
 effects:
   - phase: all
     power: any

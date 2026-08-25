@@ -5,7 +5,7 @@ discipline: touring
 change:
   parameter: toe_rear
   direction: increase
-  typical_step: "0.5° per side (typical range 2–3°)"
+  typical_step: "0.5° per side; guides differ on the usual window — one caps on-road at 3°, another runs to 3.5°"
 effects:
   - phase: all
     power: any

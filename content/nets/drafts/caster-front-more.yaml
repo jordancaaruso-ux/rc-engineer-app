@@ -6,7 +6,7 @@ discipline: touring
 change:
   parameter: caster_front
   direction: increase
-  typical_step: "2° (touring runs roughly 0–8°; often a hub or insert swap, not a dial)"
+  typical_step: "one step — often a hub or insert swap, not a dial; touring runs between 0 and 8°"
 effects:
   - phase: entry
     power: off-power
