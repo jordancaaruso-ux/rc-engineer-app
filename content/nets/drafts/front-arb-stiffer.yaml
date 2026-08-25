@@ -1,47 +1,59 @@
-# AI DRAFT — not founder-reviewed. Drafted from petitrc RC CheatSheets + Tekno setup guide
-# + XRAY setup book; contested claims discovered via RCTech threads (never sourced from them).
+# AI DRAFT — not founder-reviewed. REWRITTEN 2026-08-14 from Invisible Speed transcripts,
+# replacing the earlier draft that was assembled from chart-style guides. The old draft carried an
+# invented `contested` split (soft vs stiff front bar on low grip); no source supports it and the
+# physics KB settles it, so it is gone.
 id: front_arb_stiffer
 discipline: touring
 change:
   parameter: arb_front
   direction: increase
-  typical_step: "one wire size (~0.1 mm)"
+  typical_step: "one wire size (~0.1 mm); 0.2 mm is the most to move in one go"
 effects:
   - phase: entry
     power: off-power
     end: front
-    feel: "sharper initial steering response — the car takes a set faster and stays flatter"
+    feel: "less front grip going in — off-power steering into the corner drops"
+    confidence: consensus
+  - phase: entry
+    power: any
+    end: car
+    feel: "the car changes direction sooner after the steering input, and rolls less doing it"
     confidence: consensus
   - phase: mid
     power: any
     end: front
-    feel: "less front side grip once loaded — the front washes wide through the middle of the corner"
-    confidence: contested
-  - phase: exit
-    power: on-power
-    end: car
-    feel: "more stable putting power down, at the cost of steering out of the corner"
+    feel: "less front grip through the middle — the front runs wide, worst in tight corners"
+    confidence: consensus
+  - phase: all
+    power: any
+    end: rear
+    feel: "the rear gains grip relative to the front, so the car is steadier behind"
     confidence: majority
 secondary_effects:
-  - "rear gains relative side grip — front/rear bar stiffness is a coupled axis; stiffening one end frees the other"
-  - "faster side-to-side transitions in chicanes"
-dose_response: monotonic
+  - "front and rear bars are one coupled axis — stiffening the front also holds the rear flatter, so the rear gains a little grip as the front loses it"
+  - "moving both bars one step the same way changes overall grip without moving balance; moving one end moves balance"
+  - "a bar too stiff for the grip level makes the car twitchy around straight-ahead"
+  - "the common lore that a stiffer bar 'adds grip because the car stays flat' is the wrong way round at the end you stiffen"
+dose_response: to_a_point
 modifiers:
-  - context: "very high grip (carpet, additive asphalt)"
-    action: attenuates
-    note: "high bite tolerates the bar; controlling roll and stopping traction-roll is its main use case there"
-  - context: "very low grip"
+  - context: "tight, low-speed corners"
     action: amplifies
-    note: "low grip can't afford the front side-grip loss — but see contested"
-contested:
-  claim_a: "majority: run softer or no front bar on low grip — the car needs roll to lean load into the tyre"
-  claim_b: "minority (some top drivers): run stiffer on low grip to keep the platform calm and the tyre flat"
-  discriminator: "if the car rolls to the outer edge and then snaps sideways, try claim B; if it slides progressively and gradually, stay with claim A"
+    note: "the front-grip loss costs most exactly where steering is scarcest — a bar that suits the fast section can make a hairpin push"
+  - context: "extremely high grip, where the car has stopped sliding at all"
+    action: reverses
+    note: "past that point a THINNER front bar is preferred, with much thicker damping doing the roll control instead: a stiff bar leaves no time to absorb a kerb or a caught edge, so the car flips rather than rolls. Grip level to bar thickness is not a monotonic relationship"
+  - context: "bumpy track"
+    action: attenuates
+    note: "thinner bars ride bumps better; the response gained is spent fighting the surface"
+  - context: "low grip, and the driver wants security rather than the last tenth"
+    action: attenuates
+    note: "fast drivers go thinner at the front only and keep the rear bar for support on power; a driver who wants an easy car should go thinner at BOTH ends, which adds overall grip instead of moving balance"
 physics_link:
   - arb.md
   - concepts/roll-stiffness.md
-  - concepts/load-transfer.md
+  - concepts/tyre-load-sensitivity.md
+  - concepts/corner-regime.md
+  - concepts/bite-hold.md
 sources:
-  - "petitrc RC CheatSheets"
-  - "Tekno Set Up Guide"
-  - "XRAY T1R Setup Book"
+  - "Invisible Speed (Joseph Quagraine) — anti-roll bar video + course meeting transcripts"
+  - "On Road Setup Guide (Anthony Atack, XRAY T3) — front sway bar table; agrees"
