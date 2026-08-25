@@ -1,5 +1,5 @@
-# AI DRAFT — not founder-reviewed. Drafted 2026-08-25 from Invisible Speed transcripts
-# (anti-roll bar video + TITC/course meetings), cross-checked against arb.md.
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass on the first draft). Drafted from Invisible
+# Speed transcripts, cross-checked against arb.md.
 id: rear_arb_stiffer
 discipline: touring
 change:
@@ -19,13 +19,18 @@ effects:
     confidence: consensus
   - phase: exit
     power: on-power
+    end: rear
+    feel: "more rear support on exit — the car drives straighter off the corner instead of wandering about, so it exits better"
+    confidence: consensus
+  - phase: exit
+    power: on-power
     end: car
     feel: "more on-power steering out of the corner, and the car stays flatter instead of rolling onto the outside rear"
     confidence: consensus
   - phase: all
     power: any
     end: car
-    feel: "quicker side-to-side in chicanes; the whole car responds faster"
+    feel: "you get more reaction in chicanes — the car changes direction quicker"
     confidence: consensus
 secondary_effects:
   - "front and rear bars are one coupled axis — stiffening the rear also frees the front a little"
@@ -35,7 +40,7 @@ dose_response: to_a_point
 modifiers:
   - context: "tight, low-speed corners"
     action: reverses
-    note: "in a hairpin the car needs the rear to roll to rotate — too stiff a rear bar and it lifts the inside rear and feels stuck instead of turning; in fast corners the same bar GIVES steering. Watch for the inside rear lifting on entry: that is the bar too thick"
+    note: "in a hairpin the car needs the rear to roll to rotate; in fast corners the same bar gives steering"
   - context: "bumpy track"
     action: attenuates
     note: "a stiff rear bar ties the rear wheels together over one-wheel bumps; thinner rides them better"

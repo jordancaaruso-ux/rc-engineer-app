@@ -42,7 +42,7 @@ modifiers:
     note: "a chicane or a flick is over before roll finishes — it is all entry, so a stiffer front bar is close to pure gain there. A hairpin has a short but real settled middle, which is exactly where the front-grip loss shows up. Same bar, same lap, two different answers"
   - context: "extremely high grip, where the car has stopped sliding at all"
     action: reverses
-    note: "past that point a THINNER front bar is preferred, with much thicker damping doing the roll control instead: a stiff bar leaves no time to absorb a kerb or a caught edge, so the car flips rather than rolls. Grip level to bar thickness is not a monotonic relationship"
+    note: "a thinner front bar gives you time to react, which makes the car easier to drive. A stiff bar leaves no time to react. Grip level to bar thickness is not a monotonic relationship"
   - context: "bumpy track"
     action: attenuates
     note: "thinner bars ride bumps better; the response gained is spent fighting the surface"

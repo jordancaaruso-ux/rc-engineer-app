@@ -5,7 +5,7 @@ discipline: touring
 change:
   parameter: ride_height_rear
   direction: decrease
-  typical_step: "0.5 mm (touring runs ~4.5–6 mm; rear commonly ~0.5 mm above front)"
+  typical_step: "0.5 mm (touring runs ~4.5–6 mm)"
 effects:
   - phase: all
     power: any
@@ -15,7 +15,7 @@ effects:
   - phase: entry
     power: off-power
     end: car
-    feel: "lowering only the rear takes out the usual rear-high stagger — less steering into the corner and less hold once in it"
+    feel: "lowering only the rear adds rake toward the front — less steering into the corner and less hold once in it"
     confidence: majority
   - phase: exit
     power: on-power
@@ -23,6 +23,8 @@ effects:
     feel: "the rear sits deeper and has less far to squat on power — steadier accelerating"
     confidence: majority
 secondary_effects:
+  - "it is not only a centre-of-gravity change — moving ride height moves the suspension geometry too, and that second effect can be the one you actually feel"
+  - "as a rule: as low as it will go without bottoming is better"
   - "a one-end change is a rake change — the balance moves with it"
   - "too low and the chassis touches under squat: sudden looseness on power with no warning"
 dose_response: to_a_point

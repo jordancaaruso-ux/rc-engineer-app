@@ -1,6 +1,6 @@
-# AI DRAFT — not founder-reviewed. Drafted 2026-08-25. The two period guides give OPPOSITE
-# corner-entry directions, so this entry is contested by construction. Cross-checked against
-# caster.md (mechanism: camber-with-steering + self-centring; touring runs 0–8°).
+# AI DRAFT — founder-corrected 2026-08-25. The first draft had this contested (two period guides
+# disagree on turn-in); the founder settled the direction, so the contested block is gone and his
+# reading stands. Cross-checked against caster.md.
 id: caster_front_more
 discipline: touring
 change:
@@ -8,33 +8,29 @@ change:
   direction: increase
   typical_step: "2° (touring runs roughly 0–8°; often a hub or insert swap, not a dial)"
 effects:
-  - phase: all
-    power: any
-    end: car
-    feel: "stronger self-centring — the car tracks straighter and steering loads up more predictably at speed"
+  - phase: entry
+    power: off-power
+    end: front
+    feel: "generally less initial steering — the nose waits a beat longer before it bites"
     confidence: majority
   - phase: mid
     power: any
     end: front
-    feel: "with lock applied the outside front leans further into the corner — more front grip once you are steering, which most of a corner is"
+    feel: "more steering through the middle of the corner"
     confidence: majority
-  - phase: entry
-    power: off-power
+  - phase: exit
+    power: on-power
     end: front
-    feel: "what it does to initial turn-in is disputed — see the two claims below"
-    confidence: contested
+    feel: "more steering on the way out"
+    confidence: majority
 secondary_effects:
   - "most of caster's effect arrives WITH steering, not around centre — judge it in corners, not on the straight"
   - "a caster change moves the camber the tyre sees under lock — re-check static camber against wear after changing it"
 dose_response: monotonic
-contested:
-  claim_a: "majority (Guyatt handbook): more caster gives LESS initial turn-in, with more on-power steering and better straight-line stability as the payback"
-  claim_b: "minority (Associated CheatSheets): more caster gives MORE steering entering the corner and less coming out"
-  discriminator: "make the change alone and drive the same tight corner: if the nose now waits an extra beat before biting but carries more front grip once loaded and on power, claim A is what your car does; if turn-in itself sharpened, claim B"
 physics_link:
   - caster.md
   - concepts/camber-grip.md
   - concepts/bite-hold.md
 sources:
-  - "Scott Guyatt R/C Handbook — caster section"
-  - "Associated RC CheatSheets — front caster page"
+  - "Founder (JC), 2026-08-25 — direction settled against two disagreeing period guides"
+  - "Scott Guyatt R/C Handbook — caster section (agrees on less initial turn-in)"

@@ -18,9 +18,10 @@ effects:
     feel: "lowering only the front takes rake out — turn-in sharpens slightly, and the car holds into the corner a touch less"
     confidence: majority
 secondary_effects:
+  - "it is not only a centre-of-gravity change — moving ride height moves the suspension geometry too (where the arms sit in their travel, so roll centres and static camber shift with it), and that second effect can be the one you actually feel"
+  - "as a rule: as low as it will go without bottoming is better"
   - "a one-end change is a rake change — lowering both ends together changes the car without moving balance"
   - "too low and the chassis touches: the platform goes solid mid-corner and the car goes loose without warning"
-  - "the common stagger is rear ~0.5 mm higher than front — more steering into the corner and the car holds in better"
   - "re-check ride height after tyre wear or any spring change"
 dose_response: to_a_point
 modifiers:

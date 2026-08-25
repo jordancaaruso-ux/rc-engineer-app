@@ -24,7 +24,7 @@ effects:
     feel: "the whole car feels smoother and more planted; helps against traction-rolling when grip is high"
     confidence: consensus
 secondary_effects:
-  - "damping sets WHEN load arrives, not how much grip an end makes — a thicker end takes its load sooner but that is timing, not bite"
+  - "thicker oil generally slows the car's movements down and makes it easier to drive — but go too far and it starts to feel imprecise, which is its own kind of hard to drive"
   - "oil thins as temperature rises — the same oil is a different setting on a hot afternoon; note temperature with every oil choice"
   - "more steering can be had from stagger: thicker front with thinner rear shifts balance toward the rear gripping"
   - "spring and oil are a pair — a big spring change usually wants the oil moved with it"

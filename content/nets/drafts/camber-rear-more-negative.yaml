@@ -18,9 +18,9 @@ effects:
     feel: "a shade less forward drive — the patch is fullest at zero camber, and every degree leans some of it away"
     confidence: consensus
 secondary_effects:
+  - "how much of any of this you get depends heavily on the tyre"
   - "reducing rear camber a touch is a quiet way to add forward drive when corner security is already good"
   - "the optimum is tyre- and temperature-specific — wear pattern across the tyre face is the evidence"
-  - "combining a front increase with a rear decrease moves the balance twice for one small change each"
 dose_response: to_a_point
 modifiers:
   - context: "a different tyre or a big track-temperature swing"

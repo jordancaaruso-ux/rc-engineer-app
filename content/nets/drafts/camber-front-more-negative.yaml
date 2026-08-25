@@ -1,6 +1,4 @@
-# AI DRAFT — not founder-reviewed. Drafted 2026-08-25 from Invisible Speed transcripts
-# (camber is his money-back-guarantee change) + On Road Setup Guide + Scott Guyatt R/C Handbook,
-# cross-checked against camber.md / camber-grip.md.
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass). Cross-checked against camber.md / camber-grip.md.
 id: camber_front_more_negative
 discipline: touring
 change:
@@ -11,17 +9,21 @@ effects:
   - phase: mid
     power: any
     end: front
-    feel: "more front side grip once the car has rolled — the loaded tyre sits nearer its best angle, so the front carries more speed through the corner"
+    feel: "normally more steering, and most of it in the middle of the corner"
     confidence: consensus
+  - phase: mid
+    power: any
+    end: front
+    feel: "going over the edge becomes more abrupt — when the front does let go, it lets go with less warning"
+    confidence: majority
   - phase: all
     power: braking
     end: front
-    feel: "a shade less contact patch upright — braking and straight-line bite give a little back"
+    feel: "braking and straight-line grip can suffer — the patch is fullest with the tyre upright"
     confidence: majority
 secondary_effects:
-  - "small changes matter more than they look — half a degree can move lap time even when the car feels no different"
-  - "the optimum is a property of the tyre and moves with track temperature — it is found by testing and wear pattern, not a fixed number"
-  - "past the optimum grip falls off quickly, often sharply — this is a to-a-point lever with a near cliff"
+  - "how much of any of this you get depends heavily on the tyre"
+  - "the optimum moves with the tyre and with track temperature — it is found by testing and wear pattern, not a fixed number"
   - "the tyre runs its static camber PLUS what roll adds — a roll-centre or spring change moves effective camber without touching this setting"
 dose_response: to_a_point
 modifiers:
@@ -38,4 +40,3 @@ physics_link:
 sources:
   - "Invisible Speed (Joseph Quagraine) — camber transcripts"
   - "On Road Setup Guide (Anthony Atack, XRAY T3) — front camber table"
-  - "Scott Guyatt R/C Handbook — camber section (~2° touring optimum, never positive)"

@@ -23,7 +23,7 @@ effects:
     feel: "slower side-to-side and a calmer mid-corner; on very high grip it guards against traction-roll"
     confidence: consensus
 secondary_effects:
-  - "damping sets WHEN load arrives, not how much grip an end makes"
+  - "thicker oil generally slows the car's movements down and makes it easier to drive — but go too far and it starts to feel imprecise, which is its own kind of hard to drive"
   - "oil thins with temperature — the same oil is a different setting hot vs cold"
   - "thinner rear with thicker front adds steering; the reverse calms it"
 dose_response: to_a_point

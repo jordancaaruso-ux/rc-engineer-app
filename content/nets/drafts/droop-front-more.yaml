@@ -1,6 +1,5 @@
-# AI DRAFT — not founder-reviewed. Drafted 2026-08-25 from Invisible Speed transcripts
-# (droop = the working range) + HUDY On Road Setup Guide + Scott Guyatt R/C Handbook,
-# cross-checked against droop-downstop.md.
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass). Drafted from Invisible Speed transcripts
+# (droop = the working range) + HUDY On Road Setup Guide, cross-checked against droop-downstop.md.
 id: droop_front_more
 discipline: touring
 change:
@@ -11,30 +10,38 @@ effects:
   - phase: entry
     power: off-power
     end: front
-    feel: "smoother, less immediate steering reaction into the corner — the front can extend and roll further before anything runs out"
+    feel: "smoother initially — the steering comes in gently rather than all at once"
+    confidence: consensus
+  - phase: mid
+    power: any
+    end: front
+    feel: "the front keeps gaining grip through the corner for longer, so there is more steering in the middle"
     confidence: consensus
   - phase: exit
     power: on-power
-    end: car
-    feel: "more load reaches the rear on power — steadier drive out, and the steering stays with you longer coming out of the corner"
-    confidence: majority
+    end: front
+    feel: "the steering is still with you coming out — more exit steering"
+    confidence: consensus
   - phase: all
     power: any
     end: car
     feel: "a wider working window — the car can pitch and roll further before a wheel tops out and the load transfers all at once"
     confidence: consensus
 secondary_effects:
-  - "less front droop is the fast direction on a smooth track: the car sets into corners, changes direction quicker, holds its speed through fast sweepers"
+  - "less front droop makes the front react faster — quicker to take a direction change, but it can be harder to drive"
   - "measuring shock length is not measuring droop — the wheel travel is the setting; measure it the same way every time"
   - "re-check droop after any ride height or shock change"
 dose_response: to_a_point
 modifiers:
+  - context: "high grip"
+    action: amplifies
+    note: "less droop turns too reactive when the grip is up — more droop is the calmer, more drivable car there"
+  - context: "low grip"
+    action: reverses
+    note: "less front droop can be the MORE forgiving car on a loose track — the front does not want to over-rotate the car, especially on exit"
   - context: "bumpy track"
     action: amplifies
-    note: "the extending wheel keeps the tyre on the ground over bumps — more droop is the usual bumpy-track direction"
-  - context: "smooth, high-grip track"
-    action: reverses
-    note: "the gains flip: less droop sharpens direction change and high-speed steering; run as little as still keeps the inside wheels planted"
+    note: "the extending wheel keeps the tyre on the ground over bumps"
 physics_link:
   - droop-downstop.md
   - concepts/bump-compliance.md
@@ -43,4 +50,3 @@ physics_link:
 sources:
   - "Invisible Speed (Joseph Quagraine) — droop / working range transcripts"
   - "HUDY / Anthony Atack On Road Setup Guide — front droop table"
-  - "Scott Guyatt R/C Handbook — on-road droop section"
