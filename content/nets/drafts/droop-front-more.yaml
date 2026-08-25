@@ -1,47 +1,46 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass). Drafted from Invisible Speed transcripts
-# (droop = the working range) + HUDY On Road Setup Guide, cross-checked against droop-downstop.md.
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass), transposed to the v2 fixed grid the same day.
+# NO measured step: droop deltas in real data run 0.2 mm at the median and 16.6 mm at the 75th
+# percentile, which is two sheet conventions in one column rather than a big move. Qualitative only.
 id: droop_front_more
 discipline: touring
 change:
   parameter: droop_front
   direction: increase
-  typical_step: "one small step; sheets disagree on whether a bigger number means more or less — read the column"
+  typical_step: "one small step — sheets disagree on whether a bigger number means more or less, so read the column"
 effects:
   - phase: entry
-    power: off-power
     end: front
+    tag: response_less
     feel: "smoother initially — the steering comes in gently rather than all at once"
     confidence: consensus
+  - phase: entry
+    end: rear
+    tag: none
   - phase: mid
-    power: any
     end: front
+    tag: grip_more
     feel: "the front keeps gaining grip through the corner for longer, so there is more steering in the middle"
     confidence: consensus
+  - phase: mid
+    end: rear
+    tag: none
   - phase: exit
-    power: on-power
     end: front
+    tag: grip_more
     feel: "the steering is still with you coming out — more exit steering"
     confidence: consensus
-  - phase: all
-    power: any
-    end: car
-    feel: "a wider working window — the car can pitch and roll further before a wheel tops out and the load transfers all at once"
-    confidence: consensus
-secondary_effects:
-  - "less front droop makes the front react faster — quicker to take a direction change, but it can be harder to drive"
-  - "measuring shock length is not measuring droop — the wheel travel is the setting; measure it the same way every time"
-  - "re-check droop after any ride height or shock change"
+  - phase: exit
+    end: rear
+    tag: none
+overall: "a wider working window — the car can pitch and roll further before a wheel tops out and the load transfers all at once"
 dose_response: to_a_point
 modifiers:
   - context: "high grip"
     action: amplifies
-    note: "less droop turns too reactive when the grip is up — more droop is the calmer, more drivable car there"
+    note: "less droop turns too reactive when the grip is up; more droop is the calmer, more drivable car there"
   - context: "low grip"
     action: reverses
     note: "less front droop can be the MORE forgiving car on a loose track — the front does not want to over-rotate the car, especially on exit"
-  - context: "bumpy track"
-    action: amplifies
-    note: "the extending wheel keeps the tyre on the ground over bumps"
 physics_link:
   - droop-downstop.md
   - concepts/bump-compliance.md

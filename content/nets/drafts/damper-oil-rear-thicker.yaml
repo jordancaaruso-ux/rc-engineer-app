@@ -1,39 +1,45 @@
-# AI DRAFT — not founder-reviewed. Drafted 2026-08-25 from Invisible Speed transcripts +
-# On Road Setup Guide (Atack), conforming to damper-oil.md (timing, not grip).
+# AI DRAFT — not founder-reviewed. Drafted 2026-08-25, transposed to the v2 fixed grid the same day.
+# Step size measured from 24 real consecutive-run oil changes across 4 drivers.
+# Cell filled from the physics KB rather than a source during the transpose: entry/rear.
+# The mid-corner cells are deliberately "nothing reliable" — see the front entry.
 id: damper_oil_rear_thicker
 discipline: touring
 change:
   parameter: damper_oil_rear
   direction: increase
-  typical_step: "one step in your oil range; stagger front-vs-rear moves balance"
+  typical_step: "about 75 cSt is the usual move; 25 cSt is the smallest that registers"
 effects:
-  - phase: exit
-    power: on-power
+  - phase: entry
+    end: front
+    tag: none
+  - phase: entry
     end: rear
-    feel: "the rear squats slower on power and settles sooner — steadier putting power down, without more actual grip to lean on"
-    confidence: consensus
-  - phase: all
-    power: any
-    end: rear
-    feel: "harsher over bumps and kerbs at the rear — fast hits pass through instead of being absorbed"
-    confidence: consensus
+    tag: response_less
+    feel: "the rear settles slower into the corner — calmer and more consistent, without more grip to lean on"
+    confidence: majority
   - phase: mid
-    power: any
-    end: car
-    feel: "slower side-to-side and a calmer mid-corner; on very high grip it guards against traction-roll"
+    end: front
+    tag: none
+  - phase: mid
+    end: rear
+    tag: none
+  - phase: exit
+    end: front
+    tag: none
+  - phase: exit
+    end: rear
+    tag: response_less
+    feel: "the rear squats slower on power and settles sooner — steadier putting power down, without more actual grip"
     confidence: consensus
-secondary_effects:
-  - "thicker oil generally slows the car's movements down and makes it easier to drive — but go too far and it starts to feel imprecise, which is its own kind of hard to drive"
-  - "oil thins with temperature — the same oil is a different setting hot vs cold"
-  - "thinner rear with thicker front adds steering; the reverse calms it"
+overall: "thicker oil slows the car's movements down and makes it easier to drive; too far and it starts to feel imprecise, which is its own kind of hard to drive"
 dose_response: to_a_point
 modifiers:
   - context: "bumpy track"
     action: amplifies
-    note: "the harshness cost lands hardest at the driven end — thinner rear oil keeps the rear tyres following the surface and the load steady"
+    note: "the harshness lands hardest at the driven end — thinner rear oil keeps the rear tyres following the surface and the load steady"
   - context: "very high grip"
     action: amplifies
-    note: "the traction-roll guard is the main reason to go thicker; pairs with a thinner bar doing less of the roll control"
+    note: "guarding against traction-rolling is the main reason to go thicker there; it pairs with a thinner bar doing less of the roll control"
 physics_link:
   - damper-oil.md
   - concepts/damping.md

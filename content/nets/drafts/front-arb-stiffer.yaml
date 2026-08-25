@@ -1,54 +1,45 @@
-# AI DRAFT — not founder-reviewed. REWRITTEN 2026-08-14 from Invisible Speed transcripts,
-# replacing the earlier draft that was assembled from chart-style guides. The old draft carried an
-# invented `contested` split (soft vs stiff front bar on low grip); no source supports it and the
-# physics KB settles it, so it is gone.
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass), transposed to the v2 fixed grid the same day.
+# Step size measured from 39 real consecutive-run bar changes across 5 drivers.
 id: front_arb_stiffer
 discipline: touring
 change:
   parameter: arb_front
   direction: increase
-  typical_step: "the smallest step your bar set offers — touring bars run about 1.1–1.3 mm, so a step is a bigger share of the bar than it looks"
+  typical_step: "0.1 mm is both the smallest move that registers and the usual one; 0.2 mm is a big step"
 effects:
   - phase: entry
-    power: off-power
     end: front
-    feel: "the front takes its load sooner, so its grip arrives earlier — turn-in is sharper and the car sets into the corner quicker"
+    tag: grip_earlier
+    feel: "the front takes its load sooner, so its grip arrives earlier — sharper turn-in, and the car sets into the corner quicker"
     confidence: consensus
   - phase: entry
-    power: any
-    end: car
-    feel: "the car changes direction sooner after the steering input, and rolls less doing it"
+    end: rear
+    tag: none
+  - phase: mid
+    end: front
+    tag: grip_less
+    feel: "once roll has settled the front carries the bigger share of the transfer and gives up side grip — the car pushes"
     confidence: consensus
   - phase: mid
-    power: any
-    end: front
-    feel: "once the car has rolled and settled, the front carries the bigger share of the transfer and gives up side grip — the car pushes through the middle"
-    confidence: consensus
-  - phase: all
-    power: any
     end: rear
+    tag: stability_more
     feel: "the rear gains grip relative to the front, so the car is steadier behind"
     confidence: majority
-secondary_effects:
-  - "the same change answers opposite ways in the two phases — front grip arrives EARLIER on the way in, and there is LESS of it once roll has settled. Which one the driver notices depends on how much settled middle the corner has"
-  - "front and rear bars are one coupled axis — stiffening the front also holds the rear flatter, so the rear gains a little grip as the front loses it"
-  - "moving both bars one step the same way changes overall grip without moving balance; moving one end moves balance"
-  - "a bar too stiff for the grip level makes the car twitchy around straight-ahead"
-  - "the common lore that a stiffer bar 'adds grip because the car stays flat' is the wrong way round at the end you stiffen"
+  - phase: exit
+    end: front
+    tag: none
+  - phase: exit
+    end: rear
+    tag: none
+overall: "the car changes direction sooner after the steering input and rolls less doing it; too stiff for the grip level makes it twitchy around straight-ahead"
 dose_response: to_a_point
 modifiers:
+  - context: "extremely high grip, where the car has stopped sliding"
+    action: reverses
+    note: "a thinner front bar gives you time to react, which makes the car easier to drive; a stiff bar leaves none. Grip level to bar thickness is not a straight line"
   - context: "tight, low-speed corners"
     action: amplifies
-    note: "a chicane or a flick is over before roll finishes — it is all entry, so a stiffer front bar is close to pure gain there. A hairpin has a short but real settled middle, which is exactly where the front-grip loss shows up. Same bar, same lap, two different answers"
-  - context: "extremely high grip, where the car has stopped sliding at all"
-    action: reverses
-    note: "a thinner front bar gives you time to react, which makes the car easier to drive. A stiff bar leaves no time to react. Grip level to bar thickness is not a monotonic relationship"
-  - context: "bumpy track"
-    action: attenuates
-    note: "thinner bars ride bumps better; the response gained is spent fighting the surface"
-  - context: "low grip, and the driver wants security rather than the last tenth"
-    action: attenuates
-    note: "fast drivers go thinner at the front only and keep the rear bar for support on power; a driver who wants an easy car should go thinner at BOTH ends, which adds overall grip instead of moving balance"
+    note: "a chicane or a flick is over before roll finishes, so it is all entry and a stiffer front bar is close to pure gain; a hairpin has a short settled middle where the loss shows"
 physics_link:
   - arb.md
   - concepts/roll-stiffness.md

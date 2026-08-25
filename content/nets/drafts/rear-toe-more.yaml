@@ -1,40 +1,43 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass, replacing the original AI draft).
-# Cross-checked against toe.md / toe-and-scrub.md.
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass), transposed to the v2 fixed grid the same day.
+# Step size measured from 70 real consecutive-run rear-toe changes across 5 drivers — the best-
+# evidenced step in the set, and it reproduces the founder's own instinct (0.2 is small, 0.5 is normal).
 id: rear_toe_more
 discipline: touring
 change:
   parameter: toe_rear
   direction: increase
-  typical_step: "0.5° per side; guides differ on the usual window — one caps on-road at 3°, another runs to 3.5°"
+  typical_step: "0.5° is the usual move; 0.2° is a small one, and it is not nothing"
 effects:
-  - phase: all
-    power: any
+  - phase: entry
+    end: front
+    tag: none
+  - phase: entry
     end: rear
-    feel: "more rear grip and more security, everywhere in the corner"
+    tag: grip_more
+    feel: "more rear grip and more security on the way in"
     confidence: consensus
   - phase: mid
-    power: any
-    end: car
-    feel: "less rotation"
+    end: front
+    tag: none
+  - phase: mid
+    end: rear
+    tag: stability_more
+    feel: "more security and less rotation through the middle"
     confidence: consensus
   - phase: exit
-    power: on-power
+    end: front
+    tag: none
+  - phase: exit
     end: rear
-    feel: "more forward traction"
+    tag: grip_more
+    feel: "more forward traction off the corner"
     confidence: consensus
-  - phase: all
-    power: any
-    end: car
-    feel: "it can cost straight-line speed — toed tyres scrub"
-    confidence: consensus
-secondary_effects:
-  - "generally a car has more corner speed with LESS rear toe — the security is bought with pace"
-  - "more rear tyre wear"
+overall: "it costs straight-line speed — toed tyres scrub — and a car generally carries more corner speed with LESS rear toe: the security is bought with pace"
 dose_response: to_a_point
 modifiers:
   - context: "high-speed flowing track"
     action: amplifies
-    note: "the stability gain matters most where commitment is highest; the scrub cost also grows with speed"
+    note: "the stability gain matters most where commitment is highest, and the scrub cost grows with speed too"
   - context: "tight technical track"
     action: attenuates
     note: "rotation matters more than stability there"

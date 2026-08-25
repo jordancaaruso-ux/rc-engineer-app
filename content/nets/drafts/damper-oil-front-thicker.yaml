@@ -1,44 +1,43 @@
-# AI DRAFT — not founder-reviewed. Drafted 2026-08-25 from Invisible Speed transcripts +
-# On Road Setup Guide (Atack), written to conform to damper-oil.md's founder-confirmed line:
-# damping moves WHEN load arrives, it does not buy grip.
+# AI DRAFT — not founder-reviewed. Drafted 2026-08-25, transposed to the v2 fixed grid the same day.
+# Step size measured from 25 real consecutive-run oil changes across 4 drivers.
+# The mid-corner cells are deliberately "nothing reliable": damping acts on movement, and once
+# roll has settled there is no movement left for it to act on. damper-oil.md carries the mechanism.
 id: damper_oil_front_thicker
 discipline: touring
 change:
   parameter: damper_oil_front
   direction: increase
-  typical_step: "one step in your oil range; stagger front-vs-rear moves balance"
+  typical_step: "about 100 cSt is the usual move; 25 cSt is the smallest that registers"
 effects:
   - phase: entry
-    power: off-power
     end: front
+    tag: response_less
     feel: "the front rolls in slower and settles sooner — steering response is calmer and more consistent, not sharper"
     confidence: consensus
-  - phase: all
-    power: any
+  - phase: entry
+    end: rear
+    tag: none
+  - phase: mid
     end: front
-    feel: "harsher over bumps and kerbs — a fast hit passes into the chassis instead of the wheel taking it"
-    confidence: consensus
-  - phase: all
-    power: any
-    end: car
-    feel: "the whole car feels smoother and more planted; helps against traction-rolling when grip is high"
-    confidence: consensus
-secondary_effects:
-  - "thicker oil generally slows the car's movements down and makes it easier to drive — but go too far and it starts to feel imprecise, which is its own kind of hard to drive"
-  - "oil thins as temperature rises — the same oil is a different setting on a hot afternoon; note temperature with every oil choice"
-  - "more steering can be had from stagger: thicker front with thinner rear shifts balance toward the rear gripping"
-  - "spring and oil are a pair — a big spring change usually wants the oil moved with it"
+    tag: none
+  - phase: mid
+    end: rear
+    tag: none
+  - phase: exit
+    end: front
+    tag: none
+  - phase: exit
+    end: rear
+    tag: none
+overall: "thicker oil slows the car's movements down and makes it easier to drive; too far and it starts to feel imprecise, which is its own kind of hard to drive"
 dose_response: to_a_point
 modifiers:
-  - context: "hot day"
-    action: attenuates
-    note: "heat thins the oil back toward where you started; thicker is the usual hot-weather direction for that reason, not for handling"
   - context: "bumpy track"
     action: amplifies
-    note: "the harshness cost grows with every fast input; thinner oil lets the wheel take the bump and the tyre stay loaded"
-  - context: "cold day"
+    note: "the harshness cost grows with every fast input — thinner oil lets the wheel take the bump and the tyre stay loaded"
+  - context: "very high grip"
     action: amplifies
-    note: "cold thickens oil — the same bottle is a stiffer setting than the sheet says"
+    note: "guarding against traction-rolling is the main reason to go thicker there, not chasing grip"
 physics_link:
   - damper-oil.md
   - concepts/damping.md

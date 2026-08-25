@@ -1,52 +1,47 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass on the first draft). Drafted from Invisible
-# Speed transcripts, cross-checked against arb.md.
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass), transposed to the v2 fixed grid the same day.
+# Step size measured from 14 real consecutive-run bar changes across 4 drivers.
 id: rear_arb_stiffer
 discipline: touring
 change:
   parameter: arb_rear
   direction: increase
-  typical_step: "the smallest step your bar set offers — touring bars run about 1.1–1.3 mm, so a step is a bigger share of the bar than it looks"
+  typical_step: "0.1 mm is both the smallest move that registers and the usual one; 0.2 mm is a big step"
 effects:
   - phase: entry
-    power: off-power
+    end: front
+    tag: none
+  - phase: entry
     end: rear
+    tag: grip_earlier
     feel: "the rear takes its load sooner, so its grip is there earlier — the rear feels secure from the first steering input"
     confidence: consensus
   - phase: mid
-    power: any
+    end: front
+    tag: none
+  - phase: mid
     end: rear
-    feel: "once roll has settled the rear carries the bigger share of the transfer and gives up side grip — the car rotates more, and past a point the rear slides"
+    tag: grip_less
+    feel: "once roll has settled the rear carries the bigger share and gives up side grip — the car rotates more, and past a point the rear slides"
     confidence: consensus
   - phase: exit
-    power: on-power
-    end: rear
-    feel: "more rear support on exit — the car drives straighter off the corner instead of wandering about, so it exits better"
+    end: front
+    tag: grip_more
+    feel: "more on-power steering out of the corner"
     confidence: consensus
   - phase: exit
-    power: on-power
-    end: car
-    feel: "more on-power steering out of the corner, and the car stays flatter instead of rolling onto the outside rear"
+    end: rear
+    tag: stability_more
+    feel: "more rear support on exit — the car drives straighter off the corner instead of wandering about"
     confidence: consensus
-  - phase: all
-    power: any
-    end: car
-    feel: "you get more reaction in chicanes — the car changes direction quicker"
-    confidence: consensus
-secondary_effects:
-  - "front and rear bars are one coupled axis — stiffening the rear also frees the front a little"
-  - "the same change answers opposite ways in the two phases: rear grip arrives earlier on the way in, and there is less of it once roll has settled"
-  - "moving both bars one step the same way changes overall grip without moving balance; moving one end moves balance"
+overall: "more reaction in chicanes — the car changes direction quicker, and stays flatter instead of rolling onto the outside rear"
 dose_response: to_a_point
 modifiers:
   - context: "tight, low-speed corners"
     action: reverses
-    note: "in a hairpin the car needs the rear to roll to rotate; in fast corners the same bar gives steering"
-  - context: "bumpy track"
-    action: attenuates
-    note: "a stiff rear bar ties the rear wheels together over one-wheel bumps; thinner rides them better"
+    note: "in a hairpin the car needs the rear to roll in order to rotate; in fast corners the same bar is what gives you steering"
   - context: "low grip"
     action: attenuates
-    note: "a thinner rear bar adds rear grip and comfort on a loose track; the fast-driver habit of keeping the rear bar for on-power support costs security most drivers want"
+    note: "a thinner rear bar adds rear grip and comfort on a loose track; keeping the rear bar for on-power support is a fast-driver habit that costs the security most drivers want"
 physics_link:
   - arb.md
   - concepts/roll-stiffness.md

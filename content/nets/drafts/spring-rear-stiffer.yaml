@@ -1,41 +1,45 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass). Drafted from the On Road Setup Guide (Atack)
-# + Invisible Speed transcripts, cross-checked against spring-rate.md.
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass), transposed to the v2 fixed grid the same day.
+# Step size measured from 36 real consecutive-run spring changes across 4 drivers.
+# Cell filled from the physics KB rather than a source during the transpose: entry/rear.
 id: spring_rear_stiffer
 discipline: touring
 change:
   parameter: spring_rear
   direction: increase
-  typical_step: "one rate step in the maker's range"
+  typical_step: "about 5 gf/mm is the usual move — roughly one rate step in most ranges; 2.5 gf/mm is the smallest that registers"
 effects:
+  - phase: entry
+    end: front
+    tag: none
+  - phase: entry
+    end: rear
+    tag: grip_earlier
+    feel: "the rear takes its load sooner, so its grip is there earlier from the first steering input"
+    confidence: majority
   - phase: mid
-    power: any
+    end: front
+    tag: none
+  - phase: mid
     end: rear
-    feel: "once roll has settled the rear carries the bigger share and gives up side grip — the car rotates more; too far and the rear slides mid-corner"
+    tag: grip_less
+    feel: "once roll has settled the rear carries the bigger share and gives up side grip — the car rotates more; too far and the rear slides"
     confidence: consensus
   - phase: exit
-    power: on-power
-    end: rear
-    feel: "more rear support on exit — the car drives straighter off the corner instead of wandering about, so it exits better"
-    confidence: consensus
-  - phase: exit
-    power: on-power
-    end: car
+    end: front
+    tag: grip_more
     feel: "more steering on power, and the rear stays flatter instead of squatting onto the outside tyre"
     confidence: consensus
-  - phase: all
-    power: any
+  - phase: exit
     end: rear
-    feel: "more rear grip in quick direction changes"
+    tag: stability_more
+    feel: "more rear support on exit — the car drives straighter off the corner instead of wandering about"
     confidence: consensus
-secondary_effects:
-  - "the same change answers opposite ways in the two phases: rear grip arrives earlier on the way in, and there is less of it once roll has settled"
-  - "softer rear is the classic add-rear-grip move — it gains hold through the corner at the cost of response"
-  - "re-set ride height after any spring change"
+overall: "more rear grip in quick direction changes"
 dose_response: to_a_point
 modifiers:
   - context: "high grip, hard on-power cornering"
     action: amplifies
-    note: "the support matters most where the forces are biggest — a rear that collapses onto the outside tyre on power needs the stiffness"
+    note: "the support matters most where the forces are biggest — a rear that collapses onto the outside tyre on power is what needs the stiffness"
   - context: "bumpy track"
     action: attenuates
     note: "stiffer passes bumps into the chassis; the rear skips instead of gripping"

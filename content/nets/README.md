@@ -41,7 +41,13 @@ content/nets/
   drafts/<slug>.yaml   AI-drafted entries awaiting bulk review                [open]
 ```
 
-## Schema
+## Schema (v2 — the fixed grid)
+
+**Why it is fixed.** v1 let an entry be any shape, and entries ranged 1,382 to 3,551 bytes.
+The model reads the whole block at once and favours the fattest entry in it, regardless of
+whether that lever is the right answer — length was carrying weight it had not earned, which
+is failure mode #2 (generic advice) arriving through the back door. v2 makes every entry the
+same shape by construction. Founder interview, 2026-08-25.
 
 ```yaml
 id: front_arb_stiffer            # stable key: <parameter>_<direction-word>
@@ -49,33 +55,106 @@ discipline: touring              # touring | offroad-1-8 | ...
 change:
   parameter: arb_front           # canonical setup key — must match the KB **Keys:** vocabulary
   direction: increase            # increase | decrease
-  typical_step: "one wire size (~0.1–0.2 mm)"   # optional
-effects:                         # phase × power × end, driver language
-  - phase: entry                 # entry | mid | exit | all
-    power: off-power             # on-power | off-power | braking | any
-    end: front                   # front | rear | car
-    feel: "sharper initial steering, car stays flatter"
+  typical_step: "0.1 mm is both the smallest move that registers and the usual one"
+effects:                         # EXACTLY the six cells below, always, in any file order
+  - phase: entry                 # entry | mid | exit
+    end: front                   # front | rear
+    tag: grip_earlier            # machine-readable; NOT rendered to the model
+    feel: "the front takes its load sooner, so its grip arrives earlier"
     confidence: consensus        # consensus | majority | contested
-secondary_effects:               # optional, plain strings
-  - "rear gains relative side grip — front/rear bar stiffness is a coupled axis"
-dose_response: monotonic         # monotonic | to_a_point | threshold
-modifiers:                       # optional; the reason nets exist
-  - context: "very high grip (carpet, additive asphalt)"
-    action: attenuates           # amplifies | attenuates | reverses
-    note: "high bite tolerates the bar — controlling roll is its main use case there"
+  - phase: entry
+    end: rear
+    tag: none                    # "nothing reliable happens here" — a claim, not an omission
+overall: "the car changes direction sooner and rolls less doing it"   # optional, max ONE
+dose_response: to_a_point        # monotonic | to_a_point | threshold
+modifiers:                       # optional, max TWO — the reason nets exist
+  - context: "extremely high grip, where the car has stopped sliding"
+    action: reverses             # amplifies | attenuates | reverses
+    note: "a thinner front bar gives you time to react; a stiff bar leaves none"
 contested:                       # REQUIRED iff any effect confidence == contested
-  claim_a: "majority: softer/no front bar on low grip — the car needs roll to work the tyre"
-  claim_b: "minority: stiffer on low grip keeps the platform calm and the tyre flat"
-  discriminator: "if the car rolls to the outer edge and snaps sideways, run claim B; if it slides progressively, claim A"
+  claim_a: "..."
+  claim_b: "..."
+  discriminator: "the on-track observable that tells this driver which claim applies today"
 physics_link:                    # every entry resolves to a file in content/vehicle-dynamics/
   - arb.md
-  - concepts/roll-stiffness.md
-sources:
-  - "petitrc RC CheatSheets"
+  - concepts/corner-regime.md
+sources:                         # authoring record only — never rendered, never named to a driver
+  - "Invisible Speed (Joseph Quagraine) — anti-roll bar transcripts"
 ```
 
-Validation: `npm run nets:check` (schema completeness, contested ⇒ both claims + discriminator,
-every `physics_link` resolves, no duplicate (parameter, direction) per discipline).
+### The six cells
+
+`entry | mid | exit` × `front | rear`. All six present in every entry. A cell where the change
+does nothing dependable is `tag: none` and renders as **"nothing reliable"** — *"a stiffer front
+bar does nothing reliable on exit"* is a real claim, it stops the model inventing one, and it is
+why damper oil's mid-corner cells are empty on purpose (damping acts on movement; once roll has
+settled there is no movement left for it to act on).
+
+**The on-power / off-power axis is folded into the phase.** In touring, entry is off-power or
+braking and exit is on-power. Carrying both axes tripled the rows for no extra information and
+was a main source of the length spread.
+
+**Never collapse a lever to one direction.** `concepts/corner-regime.md` states once that how
+much of a corner is entry-versus-settled moves with speed, grip and corner shape — so a faster
+car spends more of the corner in transition, and the ENTRY row is the one that dominates for it.
+Because every net answers entry and mid *separately*, that single law composes across all of
+them for free. Restating it inside entries is exactly the duplication v2 exists to remove.
+
+### The duplication rule
+
+**A net may not restate anything the physics KB already says.** It links (`physics_link`); it
+never repeats. v1's `secondary_effects` was where entries got fat, and most of what it held was
+`arb.md` and `spring-rate.md` paraphrased — the same claim in two places reads to the model as
+two independent sources agreeing, which manufactures confidence out of nothing. The field is
+removed and the validator rejects it. An end-scoped claim goes in its grid cell, a car-level one
+in `overall`, a context flip in `modifiers`, and mechanism goes in the KB or nowhere.
+
+### `tag`
+
+Coded effect direction, scoped to the cell's `end` — `grip_more` at the front reads as steering,
+at the rear as security. `grip_earlier` / `grip_later` are *timing* rather than amount: the
+corner-regime hook, and the reason one lever can honestly say "more grip" on entry and "less
+grip" mid-corner in the same entry.
+
+It is deliberately **not rendered to the model**. It exists so code can later compute *"which
+levers touch mid-corner front grip"* deterministically instead of the model choosing by feel.
+Rendering it would only invite the model to parrot the vocabulary, and cost tokens for nothing.
+
+### `typical_step` — scale sense, not a prescription
+
+What size of move actually registers, and what size the driver's peers typically make. **Measured
+from real consecutive-run setup deltas** (452 pairs, 4–6 distinct drivers per lever, 2026-08-25),
+never paraphrased from a guide — an earlier pass invented or misapplied numbers in ten of sixteen
+entries, and `typical_step` was the field every one of them landed in.
+
+Two levers carry no number and say so:
+
+- **Droop** — median delta 0.2 mm but 75th percentile 16.6 mm. That is not a big move, it is two
+  sheet conventions (gap in mm vs block height) sitting in one column.
+- **Diff oil** — 6 changes across 2 drivers. Too thin to quote.
+
+The data measures **what drivers do, not what is correct**, and it is a handful of drivers. It is
+calibration, not authority — write it that way.
+
+### Caps, and why they are enforced
+
+`npm run nets:check` rejects an entry that breaks any of them, so a fat entry cannot be committed:
+
+| Field | Cap |
+|---|---|
+| `feel` | 150 chars |
+| `overall` | 170 chars, max one |
+| `typical_step` | 150 chars |
+| `modifiers` | max 2 · context 80 · note 200 |
+| `contested` fields | 200 chars each |
+| **whole rendered entry** | **1,500 chars** |
+
+The rendered ceiling is the one that matters: per-field caps bound each line, but only a whole-
+entry ceiling stops an entry growing back into the one the model favours by bulk. v2 currently
+renders 563–1,374 chars against v1's 1,382–3,551 bytes of source.
+
+Validation also checks: contested ⇒ both claims + discriminator, every `physics_link` resolves,
+no duplicate (parameter, direction) per discipline.
 
 ## How the Engineer renders confidence
 

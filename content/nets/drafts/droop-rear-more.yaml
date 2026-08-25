@@ -1,33 +1,38 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass). Drafted from Invisible Speed transcripts +
-# HUDY On Road Setup Guide, cross-checked against droop-downstop.md.
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass), transposed to the v2 fixed grid the same day.
+# NO measured step — see the front droop entry for why the real-data deltas are unusable.
 id: droop_rear_more
 discipline: touring
 change:
   parameter: droop_rear
   direction: increase
-  typical_step: "one small step; read the sheet's column direction before comparing"
+  typical_step: "one small step — read the sheet's column direction before comparing two setups"
 effects:
   - phase: entry
-    power: off-power
-    end: car
-    feel: "often more rotation on entry — the car turns in more freely"
-    confidence: consensus
+    end: front
+    tag: none
   - phase: entry
-    power: braking
     end: rear
+    tag: grip_more
     feel: "the rear extends further before topping out, so the rear tyres stay loaded into the corner instead of going light"
     confidence: consensus
-  - phase: all
-    power: any
-    end: car
-    feel: "a wider working window before a wheel tops out and the load transfers all at once"
-    confidence: consensus
-secondary_effects:
-  - "when rear droop is too limited the rear can lose grip suddenly — that abruptness is the sign you have run out of it"
-  - "less rear droop makes the car quicker to square up and go"
-  - "re-check droop after any ride height or shock change"
+  - phase: mid
+    end: front
+    tag: none
+  - phase: mid
+    end: rear
+    tag: none
+  - phase: exit
+    end: front
+    tag: none
+  - phase: exit
+    end: rear
+    tag: none
+overall: "often more rotation on entry — the car turns in more freely — and a wider working window before a wheel tops out"
 dose_response: to_a_point
 modifiers:
+  - context: "when rear droop is already very limited"
+    action: reverses
+    note: "the rear can lose grip suddenly there; that abruptness is the sign you have run out of it, and giving droop back is the fix"
   - context: "bumpy track"
     action: amplifies
     note: "braking over bumps is where the extending rear earns its keep — the tyre follows the surface instead of skipping"

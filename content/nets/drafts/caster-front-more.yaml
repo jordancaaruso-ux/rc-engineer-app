@@ -1,31 +1,37 @@
-# AI DRAFT — founder-corrected 2026-08-25. The first draft had this contested (two period guides
-# disagree on turn-in); the founder settled the direction, so the contested block is gone and his
-# reading stands. Cross-checked against caster.md.
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass), transposed to the v2 fixed grid the same day.
+# The founder settled the direction against two disagreeing period guides, so his reading stands
+# and there is no contested block. Step size measured from 19 real changes across 5 drivers.
 id: caster_front_more
 discipline: touring
 change:
   parameter: caster_front
   direction: increase
-  typical_step: "one step — often a hub or insert swap, not a dial; touring runs between 0 and 8°"
+  typical_step: "1° is the usual move and 0.5° the smallest that registers — often a hub or insert swap, not a dial"
 effects:
   - phase: entry
-    power: off-power
     end: front
+    tag: grip_less
     feel: "generally less initial steering — the nose waits a beat longer before it bites"
     confidence: majority
+  - phase: entry
+    end: rear
+    tag: none
   - phase: mid
-    power: any
     end: front
+    tag: grip_more
     feel: "more steering through the middle of the corner"
     confidence: majority
+  - phase: mid
+    end: rear
+    tag: none
   - phase: exit
-    power: on-power
     end: front
+    tag: grip_more
     feel: "more steering on the way out"
     confidence: majority
-secondary_effects:
-  - "most of caster's effect arrives WITH steering, not around centre — judge it in corners, not on the straight"
-  - "a caster change moves the camber the tyre sees under lock — re-check static camber against wear after changing it"
+  - phase: exit
+    end: rear
+    tag: none
 dose_response: monotonic
 physics_link:
   - caster.md

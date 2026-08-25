@@ -1,25 +1,36 @@
-# AI DRAFT — founder-corrected 2026-08-25. The first draft carried a contested block on the
-# straight-line effect; the founder cut it. Cross-checked against toe.md / toe-and-scrub.md.
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass), transposed to the v2 fixed grid the same day.
+# Step size measured from 23 real consecutive-run front-toe changes across 5 drivers.
+# Cell filled from the physics KB rather than a source during the transpose: mid/front.
 id: front_toe_out_more
 discipline: touring
 change:
   parameter: toe_front
   direction: increase
-  typical_step: "0.1–0.5° per side toward toe-out (touring fronts run between −1° in and +1° out); increase here means MORE TOE-OUT, the touring front convention. Sheet signs differ — confirm which way yours counts"
+  typical_step: "0.2° per side is the usual move, 0.1° the smallest that registers; increase = more toe-OUT, but sheet signs differ — check yours"
 effects:
   - phase: entry
-    power: off-power
     end: front
+    tag: grip_more
     feel: "more overall steering, and a gentler response right around centre — easier to be smooth with"
     confidence: majority
-  - phase: all
-    power: any
-    end: car
-    feel: "toed tyres scrub — a touch of straight-line speed and tyre life goes with every degree"
-    confidence: consensus
-secondary_effects:
-  - "one of the smallest worthwhile changes on the car — top drivers move it by 0.1° to trim steering feel between runs"
-  - "the tyre runs static toe PLUS bump steer through travel — check the pair together"
+  - phase: entry
+    end: rear
+    tag: none
+  - phase: mid
+    end: front
+    tag: grip_more
+    feel: "more steering through the middle too, though the gain is clearest on the way in"
+    confidence: majority
+  - phase: mid
+    end: rear
+    tag: none
+  - phase: exit
+    end: front
+    tag: none
+  - phase: exit
+    end: rear
+    tag: none
+overall: "toed tyres scrub — a touch of straight-line speed and tyre life goes with every degree"
 dose_response: to_a_point
 physics_link:
   - toe.md
