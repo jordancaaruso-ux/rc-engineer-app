@@ -1,6 +1,7 @@
 import "server-only";
 
 import { loadFullVehicleDynamicsKb } from "@/lib/engineer/kb";
+import { ENGINEER_NETS_HEADER, loadNets } from "@/lib/engineer/nets";
 import { engineerOpenAiUserMessage } from "@/lib/openAiRetry";
 import {
   buildEngineerMessages,
@@ -49,9 +50,15 @@ export async function generateEngineerChatReply(params: {
   onToken?: (delta: string) => void;
   /**
    * Payload override for the eval harness — an "arm" supplies its own ordered blocks.
-   * Omitted (the shipped path) means the standard KB + prompt payload.
+   * Omitted (the shipped path) means KB + nets + prompt (the v1-nets composition,
+   * shipped by founder call 2026-08-25 — see the north star changelog).
    */
   blocks?: EngineerPayloadBlock[];
+  /**
+   * Per-turn driver-data blocks (driverData.ts). Appended after every stable block so
+   * the cached prefix never varies; [] (the default) is the data-less request.
+   */
+  driverBlocks?: EngineerPayloadBlock[];
 }): Promise<{ reply: string; usage: EngineerChatUsage | null; model: string }> {
   const apiKey = mustGetOpenAiKey();
   const kb = await loadFullVehicleDynamicsKb();
@@ -59,7 +66,24 @@ export async function generateEngineerChatReply(params: {
     throw new Error("The vehicle-dynamics knowledge base is empty — the Engineer has nothing to reason from.");
   }
 
-  const blocks = params.blocks ?? standardEngineerBlocks(kb.markdown);
+  let blocks: EngineerPayloadBlock[];
+  if (params.blocks) {
+    blocks = params.blocks;
+  } else {
+    // The shipped payload: KB, nets, prompt — cache-stable in that order (north star §3).
+    // Composition matches the harness's v1-nets arm byte for byte, so eval results on
+    // that arm keep describing the shipped Engineer.
+    const nets = await loadNets({ discipline: "touring" });
+    const [kbBlock, promptBlock] = standardEngineerBlocks(kb.markdown);
+    blocks = [kbBlock];
+    if (nets.text.trim().length > 0) {
+      blocks.push({ id: "nets", cacheStable: true, content: ENGINEER_NETS_HEADER + nets.text });
+    }
+    blocks.push(promptBlock);
+  }
+  if (params.driverBlocks && params.driverBlocks.length > 0) {
+    blocks = [...blocks, ...params.driverBlocks];
+  }
   const { model, temperature } = engineerChatModel();
   let messages = buildEngineerMessages(blocks, params.messages);
 

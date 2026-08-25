@@ -14,8 +14,9 @@ import {
  * content/nets/README.md). Mirrors the KB loader's conventions: sorted filenames for a
  * byte-stable render, reviewed tier before a hedged drafts divider, per-process cache.
  *
- * NOT wired into the shipped payload yet — the "+nets" eval arm feeds it to the harness,
- * and it ships only on a harness win (docs/ENGINEER_NORTH_STAR.md §4).
+ * Wired into the shipped payload since 2026-08-25 (founder call — ship first, iterate
+ * through the harness; north star changelog). The "+nets" eval arm composes the same
+ * blocks, so harness results on that arm describe the shipped Engineer.
  */
 
 const NETS_DIR = path.join(process.cwd(), "content", "nets");

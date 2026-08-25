@@ -75,11 +75,15 @@ test("per-turn blocks are allowed after the stable prefix — the driver-data sl
   assert.equal(msgs[2].content, "today's grip is low");
 });
 
-test("no per-car data can reach the model — the prompt says so out loud", () => {
+test("the prompt draws the data line exactly where the payload does", () => {
   const all = ENGINEER_KB_HEADER + ENGINEER_CHAT_SYSTEM_PROMPT;
   assert.ok(
-    /cannot see this driver's logged data/i.test(ENGINEER_CHAT_SYSTEM_PROMPT),
-    "the shipped payload has no setup or run data; the model must be told, or it invents values"
+    /DRIVER DATA block/.test(ENGINEER_CHAT_SYSTEM_PROMPT),
+    "driver data ships as a named block; the prompt must name it or the model invents values around it"
+  );
+  assert.ok(
+    /can't see|cannot see/i.test(ENGINEER_CHAT_SYSTEM_PROMPT),
+    "the prompt must still tell the model to say when data is beyond what is attached"
   );
   assert.ok(!/context json/i.test(all), "there is no context JSON to point the model at");
   assert.ok(!/tool/i.test(all), "the Engineer sends no tools; instructions about them would be a lie");

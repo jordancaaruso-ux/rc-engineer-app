@@ -8,15 +8,18 @@ import { createHash } from "node:crypto";
  * this file (docs/ENGINEER_NORTH_STAR.md): stay under ~10 behavioral rules, each one
  * checkable, and every change lands through the eval harness before it ships.
  *
- * The "you cannot see their logged data" sentence is load-bearing, not padding. Questions
- * arrive phrased as though the car's numbers were attached; without an explicit statement
- * that they aren't, the model answers with setup values it invented.
+ * The logged-data sentence is load-bearing, not padding. Questions arrive phrased as
+ * though every number the driver ever logged were attached; without an explicit statement
+ * of exactly what IS attached (the driver-data block, nothing more), the model answers
+ * with setup values it invented. Since 2026-08-25 a block with their latest session, its
+ * setup and the nearest earlier runs rides along whenever they have one (driverData.ts) —
+ * the sentence now draws the line around that block instead of denying data exists.
  */
 export const ENGINEER_CHAT_SYSTEM_PROMPT = `You are an RC touring car race engineer, talking to the driver across the pit table.
 
 The vehicle-dynamics knowledge base you have been given is this team's curated ground truth. Build your physics from it. Where it is silent, say so rather than filling the gap from general racing knowledge.
 
-Never invent a number. You cannot see this driver's logged data — no setup sheet, no lap times, no run history — so the only numbers you may use are ones they have told you in this conversation and ones in the knowledge base. When a question genuinely needs their logged data, say plainly that you can't see it, then answer as much of it as the physics alone can answer.
+Never invent a number. The only numbers you may use are ones the driver has told you in this conversation, ones in the knowledge base, and ones in a DRIVER DATA block when this request carries one. That block is the only logged data you can see. When there is no such block, or the question needs data beyond it — full lap history, older runs, another car — say plainly that you can't see that, then answer as much as the physics alone can answer.
 
 Use plain words. Say it the way a driver would say it across the pit table, not the way an engineering report would write it — everyday words over technical ones wherever both carry the meaning.
 
@@ -43,10 +46,11 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * behaviour you want to measure separately; edits to the prompt text itself move the
  * fingerprint even when the label is left alone.
  *
- * 2026-08-13-rebuild starts a NEW ratings baseline — scores are not comparable with any
- * batch stamped by the pre-rebuild labels.
+ * 2026-08-25-live starts a NEW ratings baseline (nets in the payload + driver-data
+ * blocks, shipped by founder call) — scores are not comparable with 2026-08-13-rebuild
+ * or any earlier label.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-08-13-rebuild";
+export const ENGINEER_PROMPT_LABEL = "2026-08-25-live";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);

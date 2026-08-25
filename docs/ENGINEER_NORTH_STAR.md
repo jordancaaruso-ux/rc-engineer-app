@@ -60,7 +60,7 @@ Three artifacts, strictly tiered:
 |---|---|---|---|
 | **Physics KB** | Mechanisms — what a change does physically, never composed outcomes | Founder's "cannot be argued" test | `content/vehicle-dynamics/` |
 | **Nets** | Empirical priors — "this change most likely feels like Y, and here's what flips/mutes it" | Probabilistic by design; AI-drafted from trusted sources, cross-checked against the KB, founder bulk-reviewed | `content/nets/` |
-| **Driver data** | The driver's runs, setup, track, tyres | *Reserved — Phase 4.* The payload builder has the slot; nothing fills it yet | — |
+| **Driver data** | The driver's runs, setup, track, tyres | Facts, not instructions — plain statements only, v0-lab lineage; shipped 2026-08-25 ahead of harness calibration (changelog) | `src/lib/engineer/driverData.ts` |
 
 Nets are **change-first** (the transpose of every symptom→fix guide), in RC-canonical
 coordinates: corner phase × on/off power × end of car. Modifiers are first-class and may
@@ -129,9 +129,11 @@ Each of these was deleted or declined for a reason. They return only through the
   shape serves everyone without asking.
 - **No retrieval machinery.** The KB is ~14K tokens and rides whole in every request. Retrieval
   returns only if the corpus outgrows the context budget, measured, not assumed.
-- **No driver data yet — but designed for it.** The block payload, nets schema, and harness all
-  accept driver-data blocks; Phase 4 wires them in. Until then the prompt says "you cannot see
-  this driver's logged data" and that sentence is load-bearing.
+- **Driver data ships as facts, never instructions.** Since 2026-08-25 every turn carries the
+  driver's latest session, its setup, and the nearest earlier runs as per-turn blocks
+  (`driverData.ts`) — plain statements of what is true, nothing about how to think. The
+  prompt sentence that once denied data exists now draws the line around exactly what is
+  attached, and it is still load-bearing.
 - **No tools, no modes, no choice chips, no status theatre.** The old pipeline grew to ~99K
   chars a turn one reasonable addition at a time; the payload-contract test exists so additions
   fail loudly instead of accreting.
@@ -140,6 +142,17 @@ Each of these was deleted or declined for a reason. They return only through the
   blind audit for anything user-visible.
 
 ## Changelog
+
+- **2026-08-25** — Founder call: ship the rebuilt Engineer to production ahead of harness
+  calibration, then iterate. Three changes land together: (1) the nets enter the shipped
+  payload (16 AI-drafted touring entries in the drafts tier, rendered behind the hedge
+  divider until founder review promotes them; Invisible Speed transcripts become the primary
+  drafting source, README amended); (2) driver-data blocks ship for every user — latest
+  session + setup + comparable runs, the v0 lab's fact blocks promoted from admin-gated to
+  always-on; (3) prompt label bumps to `2026-08-25-live`, a new ratings baseline. §4 is
+  deferred for this ship, not repealed: the calibration session, judge exam and ship bar
+  still govern every change from here, and the first calibration run doubles as this ship's
+  retrospective measurement.
 
 - **2026-08-13** — Document written fresh; everything prior deleted. Ground-up rebuild: new core
   at `src/lib/engineer/` (block payload, enforced cache order), satellites and old docs/bench

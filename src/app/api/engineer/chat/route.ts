@@ -3,6 +3,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasOpenAiApiKey } from "@/lib/openaiServerEnv";
 import { generateEngineerChatReply } from "@/lib/engineer/chat";
+import { buildDriverDataBlocks } from "@/lib/engineer/driverData";
 import type { EngineerChatMessage } from "@/lib/engineer/payload";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
 import { checkAiBudget, engineerQuotaSnapshot, recordAiUsage } from "@/lib/aiUsage/ledger";
@@ -215,6 +216,14 @@ export async function POST(request: Request) {
       return refuseAllowance(budget.message, 429);
     }
 
+    // The driver's own data rides along on every turn: an explicit runId from the client
+    // wins (old-era clients still send one), otherwise their latest run. A driver with no
+    // runs gets [] and the request is byte-identical to the data-less one.
+    const driverBlocks = await buildDriverDataBlocks({
+      userId: user.id,
+      runId: runId || null,
+    }).catch(() => []);
+
     if (useStream) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
@@ -234,6 +243,7 @@ export async function POST(request: Request) {
             send("status", { phase: "thinking" });
             const out = await generateEngineerChatReply({
               messages,
+              driverBlocks,
               onToken: (t) => send("token", { t }),
             });
             await recordAiUsage({
@@ -281,7 +291,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const out = await generateEngineerChatReply({ messages });
+    const out = await generateEngineerChatReply({ messages, driverBlocks });
 
     await recordAiUsage({
       userId: user.id,
