@@ -22,10 +22,15 @@ founder-reviewed, and rendered to the Engineer with a hedge divider (same conven
 Founder bulk-review promotes a file up into its discipline folder (`touring/…`), which is locked
 by kb-guard like KB prose.
 
-**Trusted draft sources** (mutually agreeing ~90% of the time): the XRAY/Hudy setup books, the
-Tekno setup guide, the Team Associated handbook, petitrc's distilled setting guides
-(TouringCarSetting_V1, RC CheatSheets). Forums (RCTech, oOple) are used only to *discover*
-contested topics — never as the source of a claim.
+**Trusted draft sources**, in order: Invisible Speed (Joseph Quagraine) — the founder's most
+trusted source; video/course transcripts are the primary basis for drafts, and his framework
+(initial vs overall grip, delayed load transfer, the working range) is the same one the physics
+KB derives independently. Then the chart-style guides as cross-checks and disagreement partners:
+the HUDY/Atack On Road Setup Guide, the Scott Guyatt R/C Handbook, petitrc's RC CheatSheets, and
+the XRAY/Hudy setup books. Where a chart contradicts Invisible Speed AND the KB settles it, the
+chart is simply wrong (the "stiffer bar = more grip" lore); where trusted sources genuinely
+split, the entry is `contested`. Forums (RCTech, oOple) are used only to *discover* contested
+topics — never as the source of a claim.
 
 ## Layout
 

@@ -1,0 +1,43 @@
+# AI DRAFT — not founder-reviewed. Drafted 2026-08-25 from Invisible Speed transcripts +
+# HUDY On Road Setup Guide, cross-checked against ride-height-and-rake.md.
+id: ride_height_rear_lower
+discipline: touring
+change:
+  parameter: ride_height_rear
+  direction: decrease
+  typical_step: "0.5 mm (touring runs ~4.5–6 mm; rear commonly ~0.5 mm above front)"
+effects:
+  - phase: all
+    power: any
+    end: car
+    feel: "lower CoG, less total transfer — a faster-reacting car with more overall grip on a smooth surface"
+    confidence: consensus
+  - phase: entry
+    power: off-power
+    end: car
+    feel: "lowering only the rear takes out the usual rear-high stagger — less steering into the corner and less hold once in it"
+    confidence: majority
+  - phase: exit
+    power: on-power
+    end: rear
+    feel: "the rear sits deeper and has less far to squat on power — steadier accelerating"
+    confidence: majority
+secondary_effects:
+  - "a one-end change is a rake change — the balance moves with it"
+  - "too low and the chassis touches under squat: sudden looseness on power with no warning"
+dose_response: to_a_point
+modifiers:
+  - context: "bumpy track"
+    action: reverses
+    note: "raise it — bottoming under power on bumps costs more than the CoG gain pays"
+  - context: "smooth, high-grip track"
+    action: amplifies
+    note: "as low as the surface allows"
+physics_link:
+  - ride-height-and-rake.md
+  - concepts/load-transfer.md
+  - concepts/roll-center.md
+  - concepts/bump-compliance.md
+sources:
+  - "HUDY / Anthony Atack On Road Setup Guide — ride height + stagger table"
+  - "Invisible Speed (Joseph Quagraine) — ride height transcripts"

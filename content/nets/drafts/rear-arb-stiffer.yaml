@@ -1,0 +1,53 @@
+# AI DRAFT — not founder-reviewed. Drafted 2026-08-25 from Invisible Speed transcripts
+# (anti-roll bar video + TITC/course meetings), cross-checked against arb.md.
+id: rear_arb_stiffer
+discipline: touring
+change:
+  parameter: arb_rear
+  direction: increase
+  typical_step: "0.1 mm (touring bars run ~1.0–1.4 mm); 0.2 mm is the most to move in one go"
+effects:
+  - phase: entry
+    power: off-power
+    end: rear
+    feel: "the rear takes its load sooner, so its grip is there earlier — the rear feels secure from the first steering input"
+    confidence: consensus
+  - phase: mid
+    power: any
+    end: rear
+    feel: "once roll has settled the rear carries the bigger share of the transfer and gives up side grip — the car rotates more, and past a point the rear slides"
+    confidence: consensus
+  - phase: exit
+    power: on-power
+    end: car
+    feel: "more on-power steering out of the corner, and the car stays flatter instead of rolling onto the outside rear"
+    confidence: consensus
+  - phase: all
+    power: any
+    end: car
+    feel: "quicker side-to-side in chicanes; the whole car responds faster"
+    confidence: consensus
+secondary_effects:
+  - "front and rear bars are one coupled axis — stiffening the rear also frees the front a little"
+  - "the same change answers opposite ways in the two phases: rear grip arrives earlier on the way in, and there is less of it once roll has settled"
+  - "moving both bars one step the same way changes overall grip without moving balance; moving one end moves balance"
+dose_response: to_a_point
+modifiers:
+  - context: "tight, low-speed corners"
+    action: reverses
+    note: "in a hairpin the car needs the rear to roll to rotate — too stiff a rear bar and it lifts the inside rear and feels stuck instead of turning; in fast corners the same bar GIVES steering. Watch for the inside rear lifting on entry: that is the bar too thick"
+  - context: "bumpy track"
+    action: attenuates
+    note: "a stiff rear bar ties the rear wheels together over one-wheel bumps; thinner rides them better"
+  - context: "low grip"
+    action: attenuates
+    note: "a thinner rear bar adds rear grip and comfort on a loose track; the fast-driver habit of keeping the rear bar for on-power support costs security most drivers want"
+physics_link:
+  - arb.md
+  - concepts/roll-stiffness.md
+  - concepts/tyre-load-sensitivity.md
+  - concepts/corner-regime.md
+  - concepts/bite-hold.md
+sources:
+  - "Invisible Speed (Joseph Quagraine) — anti-roll bar video + course meeting transcripts"
+  - "On Road Setup Guide (Anthony Atack, XRAY T3) — rear sway bar table; agrees"

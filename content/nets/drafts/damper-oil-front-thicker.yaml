@@ -1,0 +1,49 @@
+# AI DRAFT — not founder-reviewed. Drafted 2026-08-25 from Invisible Speed transcripts +
+# On Road Setup Guide (Atack), written to conform to damper-oil.md's founder-confirmed line:
+# damping moves WHEN load arrives, it does not buy grip.
+id: damper_oil_front_thicker
+discipline: touring
+change:
+  parameter: damper_oil_front
+  direction: increase
+  typical_step: "50 cSt; stagger front-vs-rear moves balance"
+effects:
+  - phase: entry
+    power: off-power
+    end: front
+    feel: "the front rolls in slower and settles sooner — steering response is calmer and more consistent, not sharper"
+    confidence: consensus
+  - phase: all
+    power: any
+    end: front
+    feel: "harsher over bumps and kerbs — a fast hit passes into the chassis instead of the wheel taking it"
+    confidence: consensus
+  - phase: all
+    power: any
+    end: car
+    feel: "the whole car feels smoother and more planted; helps against traction-rolling when grip is high"
+    confidence: consensus
+secondary_effects:
+  - "damping sets WHEN load arrives, not how much grip an end makes — a thicker end takes its load sooner but that is timing, not bite"
+  - "oil thins as temperature rises — the same oil is a different setting on a hot afternoon; note temperature with every oil choice"
+  - "more steering can be had from stagger: thicker front with thinner rear shifts balance toward the rear gripping"
+  - "spring and oil are a pair — a big spring change usually wants the oil moved with it"
+dose_response: to_a_point
+modifiers:
+  - context: "hot day"
+    action: attenuates
+    note: "heat thins the oil back toward where you started; thicker is the usual hot-weather direction for that reason, not for handling"
+  - context: "bumpy track"
+    action: amplifies
+    note: "the harshness cost grows with every fast input; thinner oil lets the wheel take the bump and the tyre stay loaded"
+  - context: "cold day"
+    action: amplifies
+    note: "cold thickens oil — the same bottle is a stiffer setting than the sheet says"
+physics_link:
+  - damper-oil.md
+  - concepts/damping.md
+  - concepts/bump-compliance.md
+  - concepts/load-transfer.md
+sources:
+  - "Invisible Speed (Joseph Quagraine) — shock oil / temperature / piston transcripts"
+  - "On Road Setup Guide (Anthony Atack, XRAY T3) — shock oil table"

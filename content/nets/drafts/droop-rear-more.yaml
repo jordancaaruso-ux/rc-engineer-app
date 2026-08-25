@@ -1,0 +1,44 @@
+# AI DRAFT — not founder-reviewed. Drafted 2026-08-25 from Invisible Speed transcripts +
+# HUDY On Road Setup Guide + Scott Guyatt R/C Handbook, cross-checked against droop-downstop.md.
+id: droop_rear_more
+discipline: touring
+change:
+  parameter: droop_rear
+  direction: increase
+  typical_step: "0.5 mm of travel; read the sheet's column direction before comparing"
+effects:
+  - phase: entry
+    power: braking
+    end: front
+    feel: "more load reaches the front under braking — more steering into tight corners"
+    confidence: consensus
+  - phase: entry
+    power: braking
+    end: rear
+    feel: "the rear extends further before topping out, so the rear tyres stay loaded and planted into the corner instead of going light"
+    confidence: consensus
+  - phase: exit
+    power: on-power
+    end: car
+    feel: "the car is slower to square up and go — less droop snaps it straight quicker"
+    confidence: majority
+secondary_effects:
+  - "less rear droop is the smooth-track direction: quicker reactions, more stable under braking"
+  - "re-check droop after any ride height or shock change"
+dose_response: to_a_point
+modifiers:
+  - context: "bumpy track"
+    action: amplifies
+    note: "braking over bumps is where the extending rear earns its keep — the tyre follows the surface instead of skipping"
+  - context: "smooth, high-grip track"
+    action: reverses
+    note: "run less — the car reacts quicker and brakes straighter, and the planted-rear gain has nothing to work on"
+physics_link:
+  - droop-downstop.md
+  - concepts/bump-compliance.md
+  - concepts/load-transfer.md
+  - concepts/corner-regime.md
+sources:
+  - "Invisible Speed (Joseph Quagraine) — droop / working range transcripts"
+  - "HUDY / Anthony Atack On Road Setup Guide — rear droop table"
+  - "Scott Guyatt R/C Handbook — on-road droop section"

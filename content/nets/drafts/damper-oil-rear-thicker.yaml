@@ -1,0 +1,44 @@
+# AI DRAFT — not founder-reviewed. Drafted 2026-08-25 from Invisible Speed transcripts +
+# On Road Setup Guide (Atack), conforming to damper-oil.md (timing, not grip).
+id: damper_oil_rear_thicker
+discipline: touring
+change:
+  parameter: damper_oil_rear
+  direction: increase
+  typical_step: "50 cSt; stagger front-vs-rear moves balance"
+effects:
+  - phase: exit
+    power: on-power
+    end: rear
+    feel: "the rear squats slower on power and settles sooner — steadier putting power down, without more actual grip to lean on"
+    confidence: consensus
+  - phase: all
+    power: any
+    end: rear
+    feel: "harsher over bumps and kerbs at the rear — fast hits pass through instead of being absorbed"
+    confidence: consensus
+  - phase: mid
+    power: any
+    end: car
+    feel: "slower side-to-side and a calmer mid-corner; on very high grip it guards against traction-roll"
+    confidence: consensus
+secondary_effects:
+  - "damping sets WHEN load arrives, not how much grip an end makes"
+  - "oil thins with temperature — the same oil is a different setting hot vs cold"
+  - "thinner rear with thicker front adds steering; the reverse calms it"
+dose_response: to_a_point
+modifiers:
+  - context: "bumpy track"
+    action: amplifies
+    note: "the harshness cost lands hardest at the driven end — thinner rear oil keeps the rear tyres following the surface and the load steady"
+  - context: "very high grip"
+    action: amplifies
+    note: "the traction-roll guard is the main reason to go thicker; pairs with a thinner bar doing less of the roll control"
+physics_link:
+  - damper-oil.md
+  - concepts/damping.md
+  - concepts/bump-compliance.md
+  - concepts/load-transfer.md
+sources:
+  - "Invisible Speed (Joseph Quagraine) — shock oil / temperature transcripts"
+  - "On Road Setup Guide (Anthony Atack, XRAY T3) — shock oil table"

@@ -1,0 +1,48 @@
+# AI DRAFT — not founder-reviewed. Drafted 2026-08-25 from the On Road Setup Guide (Atack)
+# + Invisible Speed TITC transcripts, cross-checked against spring-rate.md.
+id: spring_front_stiffer
+discipline: touring
+change:
+  parameter: spring_front
+  direction: increase
+  typical_step: "one rate step in the maker's range"
+effects:
+  - phase: entry
+    power: off-power
+    end: front
+    feel: "the front takes its load sooner — sharper initial steering into the corner"
+    confidence: consensus
+  - phase: mid
+    power: any
+    end: front
+    feel: "once roll has settled the front carries the bigger share of the transfer and gives up side grip — less steering through the middle and out"
+    confidence: consensus
+  - phase: all
+    power: any
+    end: car
+    feel: "more responsive overall; can turn nervous around straight-ahead"
+    confidence: majority
+secondary_effects:
+  - "the same change answers opposite ways in the two phases: front grip arrives earlier on the way in, and there is less of it once roll has settled"
+  - "unlike a bar, a spring also changes how the front rides bumps and how deep it sits in its travel"
+  - "re-set ride height after any spring change — the collars only set height, not stiffness"
+dose_response: to_a_point
+modifiers:
+  - context: "corners with no settled middle — chicanes, flicks"
+    action: amplifies
+    note: "the direction change is over before roll finishes, so a stiffer front is close to pure entry gain there"
+  - context: "long or fast corners with a real settled middle"
+    action: reverses
+    note: "the settled-phase grip loss dominates — the car turns in well then washes mid-corner; a softer front gives more steering through and out"
+  - context: "bumpy track"
+    action: attenuates
+    note: "a stiffer front passes more of each bump into the chassis; softer keeps the tyre loaded"
+physics_link:
+  - spring-rate.md
+  - concepts/roll-stiffness.md
+  - concepts/corner-regime.md
+  - concepts/bite-hold.md
+  - concepts/bump-compliance.md
+sources:
+  - "On Road Setup Guide (Anthony Atack, XRAY T3) — front springs table"
+  - "Invisible Speed (Joseph Quagraine) — TITC transcripts (ran softer front than rear at high grip; spring/oil relationship)"

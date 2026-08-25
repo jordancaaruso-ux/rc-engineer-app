@@ -1,0 +1,41 @@
+# AI DRAFT — not founder-reviewed. Drafted 2026-08-25 from Invisible Speed transcripts
+# (camber is his money-back-guarantee change) + On Road Setup Guide + Scott Guyatt R/C Handbook,
+# cross-checked against camber.md / camber-grip.md.
+id: camber_front_more_negative
+discipline: touring
+change:
+  parameter: camber_front
+  direction: increase
+  typical_step: "0.5° of negative camber (touring fronts typically run −0.5° to −2°); never positive"
+effects:
+  - phase: mid
+    power: any
+    end: front
+    feel: "more front side grip once the car has rolled — the loaded tyre sits nearer its best angle, so the front carries more speed through the corner"
+    confidence: consensus
+  - phase: all
+    power: braking
+    end: front
+    feel: "a shade less contact patch upright — braking and straight-line bite give a little back"
+    confidence: majority
+secondary_effects:
+  - "small changes matter more than they look — half a degree can move lap time even when the car feels no different"
+  - "the optimum is a property of the tyre and moves with track temperature — it is found by testing and wear pattern, not a fixed number"
+  - "past the optimum grip falls off quickly, often sharply — this is a to-a-point lever with a near cliff"
+  - "the tyre runs its static camber PLUS what roll adds — a roll-centre or spring change moves effective camber without touching this setting"
+dose_response: to_a_point
+modifiers:
+  - context: "a different tyre or a big track-temperature swing"
+    action: attenuates
+    note: "the optimum moved — re-find it rather than trusting the old number"
+  - context: "high-grip surface where the car rolls hard"
+    action: amplifies
+    note: "more roll means the loaded tyre leans further from vertical, so the static camber has more correcting to do"
+physics_link:
+  - camber.md
+  - concepts/camber-grip.md
+  - concepts/camber-gain.md
+sources:
+  - "Invisible Speed (Joseph Quagraine) — camber transcripts"
+  - "On Road Setup Guide (Anthony Atack, XRAY T3) — front camber table"
+  - "Scott Guyatt R/C Handbook — camber section (~2° touring optimum, never positive)"

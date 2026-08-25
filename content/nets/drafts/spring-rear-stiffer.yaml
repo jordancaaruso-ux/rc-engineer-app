@@ -1,0 +1,48 @@
+# AI DRAFT — not founder-reviewed. Drafted 2026-08-25 from the On Road Setup Guide (Atack)
+# + Invisible Speed transcripts, cross-checked against spring-rate.md.
+id: spring_rear_stiffer
+discipline: touring
+change:
+  parameter: spring_rear
+  direction: increase
+  typical_step: "one rate step in the maker's range"
+effects:
+  - phase: entry
+    power: off-power
+    end: rear
+    feel: "the rear takes its load sooner — more secure on the brakes and on turn-in"
+    confidence: consensus
+  - phase: mid
+    power: any
+    end: rear
+    feel: "once roll has settled the rear carries the bigger share and gives up side grip — the car rotates more; too far and the rear slides mid-corner"
+    confidence: consensus
+  - phase: exit
+    power: on-power
+    end: car
+    feel: "more steering on power, and the rear stays flatter instead of squatting onto the outside tyre"
+    confidence: consensus
+secondary_effects:
+  - "the same change answers opposite ways in the two phases: rear grip arrives earlier on the way in, and there is less of it once roll has settled"
+  - "softer rear is the classic add-rear-grip move — it gains hold through every phase of the corner at the cost of response"
+  - "re-set ride height after any spring change"
+dose_response: to_a_point
+modifiers:
+  - context: "high grip, hard on-power cornering"
+    action: amplifies
+    note: "the support matters most where the forces are biggest — a rear that collapses onto the outside tyre on power needs the stiffness"
+  - context: "low grip"
+    action: amplifies
+    note: "low grip cannot afford the settled-phase rear grip loss; softer rear springs are the usual direction there"
+  - context: "bumpy track"
+    action: attenuates
+    note: "stiffer passes bumps into the chassis; the rear skips instead of gripping"
+physics_link:
+  - spring-rate.md
+  - concepts/roll-stiffness.md
+  - concepts/corner-regime.md
+  - concepts/bite-hold.md
+  - concepts/bump-compliance.md
+sources:
+  - "On Road Setup Guide (Anthony Atack, XRAY T3) — rear springs table"
+  - "Invisible Speed (Joseph Quagraine) — TITC + rear-support transcripts"

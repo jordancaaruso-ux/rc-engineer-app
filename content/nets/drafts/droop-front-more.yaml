@@ -1,0 +1,46 @@
+# AI DRAFT — not founder-reviewed. Drafted 2026-08-25 from Invisible Speed transcripts
+# (droop = the working range) + HUDY On Road Setup Guide + Scott Guyatt R/C Handbook,
+# cross-checked against droop-downstop.md.
+id: droop_front_more
+discipline: touring
+change:
+  parameter: droop_front
+  direction: increase
+  typical_step: "0.5 mm of travel; sheets disagree on whether a bigger number means more or less — read the column"
+effects:
+  - phase: entry
+    power: off-power
+    end: front
+    feel: "smoother, less immediate steering reaction into the corner — the front can extend and roll further before anything runs out"
+    confidence: consensus
+  - phase: exit
+    power: on-power
+    end: car
+    feel: "more load reaches the rear on power — steadier drive out, and the steering stays with you longer coming out of the corner"
+    confidence: majority
+  - phase: all
+    power: any
+    end: car
+    feel: "a wider working window — the car can pitch and roll further before a wheel tops out and the load transfers all at once"
+    confidence: consensus
+secondary_effects:
+  - "less front droop is the fast direction on a smooth track: the car sets into corners, changes direction quicker, holds its speed through fast sweepers"
+  - "measuring shock length is not measuring droop — the wheel travel is the setting; measure it the same way every time"
+  - "re-check droop after any ride height or shock change"
+dose_response: to_a_point
+modifiers:
+  - context: "bumpy track"
+    action: amplifies
+    note: "the extending wheel keeps the tyre on the ground over bumps — more droop is the usual bumpy-track direction"
+  - context: "smooth, high-grip track"
+    action: reverses
+    note: "the gains flip: less droop sharpens direction change and high-speed steering; run as little as still keeps the inside wheels planted"
+physics_link:
+  - droop-downstop.md
+  - concepts/bump-compliance.md
+  - concepts/load-transfer.md
+  - concepts/corner-regime.md
+sources:
+  - "Invisible Speed (Joseph Quagraine) — droop / working range transcripts"
+  - "HUDY / Anthony Atack On Road Setup Guide — front droop table"
+  - "Scott Guyatt R/C Handbook — on-road droop section"

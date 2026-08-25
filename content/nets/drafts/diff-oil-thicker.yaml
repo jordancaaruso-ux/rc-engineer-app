@@ -1,0 +1,46 @@
+# AI DRAFT — not founder-reviewed. Drafted 2026-08-25 from Invisible Speed transcripts +
+# On Road Setup Guide (Atack). Directions match the founder-confirmed signs in
+# diff-and-driveline.md (touring: rear gear diff; the front is a spool).
+id: diff_oil_thicker
+discipline: touring
+change:
+  parameter: diff_oil
+  direction: increase
+  typical_step: "one grade (e.g. 3000 → 5000 cSt); the step sizes are coarse, so expect a real change"
+effects:
+  - phase: entry
+    power: off-power
+    end: car
+    feel: "less rotation off throttle — the diff resists the speed difference the arc asks for, so the car turns in steadier but lazier"
+    confidence: consensus
+  - phase: mid
+    power: off-power
+    end: car
+    feel: "smoother and more consistent through the middle of the corner"
+    confidence: majority
+  - phase: exit
+    power: on-power
+    end: car
+    feel: "more rotation on power and a stronger, more connected drive out — both rears carry the torque instead of the inside one giving it up"
+    confidence: consensus
+secondary_effects:
+  - "the change is biggest in tight corners — that is where the rear wheels most need to differ in speed, so there is more coupling to feel"
+  - "on-power steering and off-power steering move in OPPOSITE directions with this lever — name which one you are missing before touching it"
+dose_response: to_a_point
+modifiers:
+  - context: "smooth, high-grip track"
+    action: amplifies
+    note: "the standard high-grip direction — the grip budget can afford the coupling, and the connected drive is worth lap time"
+  - context: "low grip"
+    action: reverses
+    note: "a tight diff eats the small grip budget on power and the car becomes hard to drive — thinner frees the inside wheel and leaves grip for cornering"
+  - context: "fast, flowing corners"
+    action: attenuates
+    note: "little speed difference between the rears at big radius — the lever has less to act on"
+physics_link:
+  - diff-and-driveline.md
+  - concepts/differential-coupling.md
+  - concepts/friction-circle.md
+sources:
+  - "Invisible Speed (Joseph Quagraine) — diff transcripts (thicker on smooth high grip; gear diffs difficult on low grip)"
+  - "On Road Setup Guide (Anthony Atack, XRAY T3) — rear differential section"
