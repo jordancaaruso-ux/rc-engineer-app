@@ -1,48 +1,25 @@
-# AI DRAFT — not founder-reviewed. Drafted 2026-08-25, transposed to the v2 fixed grid the same day.
-# Step size measured from 25 real consecutive-run oil changes across 4 drivers.
-# The mid-corner cells are deliberately "nothing reliable": damping acts on movement, and once
-# roll has settled there is no movement left for it to act on. damper-oil.md carries the mechanism.
+# AI DRAFT — not founder-reviewed. Drafted 2026-08-25, rebuilt to the v3 slider shape 2026-08-26.
+# NOTE: no bite-hold move, deliberately. bite-hold.md is explicit and founder-confirmed:
+# damping changes WHEN the load gets there without changing the roll angle the car ends up at,
+# so slowing the movement does not buy bite. Damper oil moves the damping slider and nothing else.
 id: damper_oil_front_thicker
 discipline: touring
 change:
   parameter: damper_oil_front
   direction: increase
-  typical_step: "about 100 cSt is the usual move; 25 cSt is the smallest that registers"
-effects:
-  - phase: entry
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+moves:
+  - slider: damping
     end: front
-    tag: response_less
-    feel: "the front rolls in slower and settles sooner — steering response is calmer and more consistent, not sharper"
+    toward: slower
     confidence: consensus
-  - phase: entry
-    end: rear
-    tag: none
-  - phase: mid
+  - slider: bump-compliance
     end: front
-    tag: none
-  - phase: mid
-    end: rear
-    tag: none
-  - phase: exit
-    end: front
-    tag: none
-  - phase: exit
-    end: rear
-    tag: none
-overall: "thicker oil slows the car's movements down and makes it easier to drive; too far and it starts to feel imprecise, which is its own kind of hard to drive"
-dose_response: to_a_point
-modifiers:
-  - context: "bumpy track"
-    action: amplifies
-    note: "the harshness cost grows with every fast input — thinner oil lets the wheel take the bump and the tyre stay loaded"
-  - context: "very high grip"
-    action: amplifies
-    note: "guarding against traction-rolling is the main reason to go thicker there, not chasing grip"
-physics_link:
+    toward: worse
+    confidence: consensus
+feel: "the front moves slower and feels more forgiving; too far and it goes imprecise"
+physics:
   - damper-oil.md
-  - concepts/damping.md
-  - concepts/bump-compliance.md
-  - concepts/load-transfer.md
 sources:
   - "Invisible Speed (Joseph Quagraine) — shock oil / temperature / piston transcripts"
   - "On Road Setup Guide (Anthony Atack, XRAY T3) — shock oil table"

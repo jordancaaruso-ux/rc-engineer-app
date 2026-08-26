@@ -1,51 +1,30 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass), transposed to the v2 fixed grid the same day.
-# Step size measured from 39 real consecutive-run bar changes across 5 drivers.
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass), rebuilt to the v3 slider shape 2026-08-26.
+# The old entry carried its own high-grip reversal. That is not a reversal: high grip slides the
+# bite/hold good spot toward hold, so a car already at the bite end is now past it. The rule lives
+# in bite-hold.md now, once, instead of here and in fifteen other files.
 id: front_arb_stiffer
 discipline: touring
 change:
   parameter: arb_front
   direction: increase
-  typical_step: "0.1 mm is both the smallest move that registers and the usual one; 0.2 mm is a big step"
-effects:
-  - phase: entry
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+moves:
+  - slider: bite-hold
     end: front
-    tag: grip_earlier
-    feel: "the front takes its load sooner, so its grip arrives earlier — sharper turn-in, and the car sets into the corner quicker"
+    toward: bite
     confidence: consensus
-  - phase: entry
+  - slider: bite-hold
     end: rear
-    tag: none
-  - phase: mid
-    end: front
-    tag: grip_less
-    feel: "once roll has settled the front carries the bigger share of the transfer and gives up side grip — the car pushes"
-    confidence: consensus
-  - phase: mid
-    end: rear
-    tag: stability_more
-    feel: "the rear gains grip relative to the front, so the car is steadier behind"
+    toward: hold
     confidence: majority
-  - phase: exit
+    relative: true
+  - slider: roll-stiffness
     end: front
-    tag: none
-  - phase: exit
-    end: rear
-    tag: none
-overall: "the car changes direction sooner after the steering input and rolls less doing it; too stiff for the grip level makes it twitchy around straight-ahead"
-dose_response: to_a_point
-modifiers:
-  - context: "extremely high grip, where the car has stopped sliding"
-    action: reverses
-    note: "a thinner front bar gives you time to react, which makes the car easier to drive; a stiff bar leaves none. Grip level to bar thickness is not a straight line"
-  - context: "tight, low-speed corners"
-    action: amplifies
-    note: "a chicane or a flick is over before roll finishes, so it is all entry and a stiffer front bar is close to pure gain; a hairpin has a short settled middle where the loss shows"
-physics_link:
+    toward: stiffer
+    confidence: consensus
+feel: "the front gets more pointy and precise; the rear feels more planted behind it"
+physics:
   - arb.md
-  - concepts/roll-stiffness.md
-  - concepts/tyre-load-sensitivity.md
-  - concepts/corner-regime.md
-  - concepts/bite-hold.md
 sources:
   - "Invisible Speed (Joseph Quagraine) — anti-roll bar video + course meeting transcripts"
   - "On Road Setup Guide (Anthony Atack, XRAY T3) — front sway bar table; agrees"

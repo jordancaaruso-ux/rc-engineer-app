@@ -1,41 +1,23 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass), transposed to the v2 fixed grid the same day.
-# Step size measured from 23 real consecutive-run front-toe changes across 5 drivers.
-# Cell filled from the physics KB rather than a source during the transpose: mid/front.
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass), rebuilt to the v3 slider shape 2026-08-26.
+# `increase` means MORE TOE-OUT, the touring front convention. Sheet signs differ.
 id: front_toe_out_more
 discipline: touring
 change:
   parameter: toe_front
   direction: increase
-  typical_step: "0.2° per side is the usual move, 0.1° the smallest that registers; increase = more toe-OUT, but sheet signs differ — check yours"
-effects:
-  - phase: entry
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+moves:
+  - slider: toe-and-scrub
     end: front
-    tag: grip_more
-    feel: "more overall steering, and a gentler response right around centre — easier to be smooth with"
+    toward: toed
+    confidence: consensus
+  - slider: bite-hold
+    end: front
+    toward: bite
     confidence: majority
-  - phase: entry
-    end: rear
-    tag: none
-  - phase: mid
-    end: front
-    tag: grip_more
-    feel: "more steering through the middle too, though the gain is clearest on the way in"
-    confidence: majority
-  - phase: mid
-    end: rear
-    tag: none
-  - phase: exit
-    end: front
-    tag: none
-  - phase: exit
-    end: rear
-    tag: none
-overall: "toed tyres scrub — a touch of straight-line speed and tyre life goes with every degree"
-dose_response: to_a_point
-physics_link:
+feel: "more front bite, and a smoother response right around centre"
+physics:
   - toe.md
-  - concepts/toe-and-scrub.md
-  - concepts/loaded-wheel.md
 sources:
   - "HUDY / Anthony Atack On Road Setup Guide — front toe table"
   - "Invisible Speed (Joseph Quagraine) — TITC transcripts (0.1° trims between rounds)"

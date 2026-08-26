@@ -1,50 +1,22 @@
-# AI DRAFT — not founder-reviewed. Drafted 2026-08-25, transposed to the v2 fixed grid the same day.
-# Step size measured from 27 real consecutive-run ride-height changes across 5 drivers.
+# AI DRAFT — not founder-reviewed. Drafted 2026-08-25, rebuilt to the v3 slider shape 2026-08-26.
 id: ride_height_rear_lower
 discipline: touring
 change:
   parameter: ride_height_rear
   direction: decrease
-  typical_step: "0.2 mm is the usual move and about the smallest that registers; 0.4 mm is a big step"
-effects:
-  - phase: entry
-    end: front
-    tag: grip_less
-    feel: "dropping only the rear takes rake out of the car — less steering into the corner"
-    confidence: majority
-  - phase: entry
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+moves:
+  - slider: load-transfer
+    end: car
+    toward: less
+    confidence: consensus
+  - slider: bump-compliance
     end: rear
-    tag: none
-  - phase: mid
-    end: front
-    tag: grip_less
-    feel: "and less hold once you are in it"
+    toward: worse
     confidence: majority
-  - phase: mid
-    end: rear
-    tag: none
-  - phase: exit
-    end: front
-    tag: none
-  - phase: exit
-    end: rear
-    tag: stability_more
-    feel: "the rear sits deeper and has less far to squat on power — steadier accelerating"
-    confidence: majority
-overall: "lower means less total load transfer — faster reactions and more overall grip on a smooth track; it also moves the geometry, which can be what you actually feel"
-dose_response: to_a_point
-modifiers:
-  - context: "bumpy track"
-    action: reverses
-    note: "raise it — bottoming under power on bumps costs more than the lower centre of gravity pays"
-  - context: "smooth, high-grip track"
-    action: amplifies
-    note: "as low as it will go without bottoming is better here; too low and it touches under squat, giving sudden looseness on power with no warning"
-physics_link:
+feel: "more overall grip on a smooth surface; too low and it goes unpredictable when the chassis touches"
+physics:
   - ride-height-and-rake.md
-  - concepts/load-transfer.md
-  - concepts/roll-center.md
-  - concepts/bump-compliance.md
 sources:
   - "HUDY / Anthony Atack On Road Setup Guide — ride height table"
   - "Invisible Speed (Joseph Quagraine) — ride height transcripts"

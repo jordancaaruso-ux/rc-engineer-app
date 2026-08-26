@@ -3,8 +3,12 @@
  *
  * Checks every entry under content/nets/ (reviewed tiers + drafts/):
  *   - schema completeness (shared with the runtime loader: src/lib/engineer/netsSchema.ts)
+ *   - every slider in `moves` resolves to a real concepts/<slider>.md, and `toward` is one of the
+ *     two words SLIDER_VOCAB declares for it
+ *   - `feel` carries no banned coinage (bite-hold.md's closed-vocabulary rule)
  *   - contested ⇒ both claims + discriminator present (schema-level)
- *   - every physics_link resolves to a real file in content/vehicle-dynamics/
+ *   - every `physics` file resolves in content/vehicle-dynamics/
+ *   - the rendered entry stays under the size ceiling
  *   - no duplicate (parameter, direction) per discipline
  *
  * Read-only. Exits 1 on any failure so it can gate a commit or a harness run.
@@ -62,8 +66,18 @@ for (const { rel, abs } of files) {
   }
 
   if (entry) {
-    for (const link of entry.physics_link) {
-      if (!kbFileExists(link)) problems.push(`physics_link "${link}" does not resolve in content/vehicle-dynamics/`);
+    for (const link of entry.physics) {
+      if (!kbFileExists(link)) {
+        problems.push(`physics "${link}" does not resolve in content/vehicle-dynamics/`);
+      }
+    }
+    for (const move of entry.moves) {
+      const sliderFile = `concepts/${move.slider}.md`;
+      if (!kbFileExists(sliderFile)) {
+        problems.push(
+          `moves: slider "${move.slider}" has no file at content/vehicle-dynamics/${sliderFile} — a slider that does not exist cannot carry the conditions`
+        );
+      }
     }
     const dupKey = `${entry.discipline}:${entry.change.parameter}:${entry.change.direction}`;
     const prev = seen.get(dupKey);

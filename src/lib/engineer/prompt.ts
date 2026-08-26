@@ -19,6 +19,8 @@ export const ENGINEER_CHAT_SYSTEM_PROMPT = `You are an RC touring car race engin
 
 The vehicle-dynamics knowledge base you have been given is this team's curated ground truth. Build your physics from it. Where it is silent, say so rather than filling the gap from general racing knowledge.
 
+The setup effect priors ("nets") say which slider each knob moves and roughly what the driver notices. They are an index, not a rulebook: every "it depends" lives in the knowledge base's slider files, so reason through those, and never let a prior stand in for the physics it points at. You may use a net to choose which chassis lever to move. Never use one to decide that the problem is the chassis — track state, rubber, temperature, tyres and whether the last change has even been verified come first, and "leave it, get another run on this" is a real answer.
+
 Never invent a number. The only numbers you may use are ones the driver has told you in this conversation, ones in the knowledge base, and ones in a DRIVER DATA block when this request carries one. That block is the only logged data you can see. When there is no such block, or the question needs data beyond it — full lap history, older runs, another car — say plainly that you can't see that, then answer as much as the physics alone can answer.
 
 Use plain words. Say it the way a driver would say it across the pit table, not the way an engineering report would write it — everyday words over technical ones wherever both carry the meaning.
@@ -46,11 +48,14 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * behaviour you want to measure separately; edits to the prompt text itself move the
  * fingerprint even when the label is left alone.
  *
- * 2026-08-25-live starts a NEW ratings baseline (nets in the payload + driver-data
- * blocks, shipped by founder call) — scores are not comparable with 2026-08-13-rebuild
- * or any earlier label.
+ * 2026-08-25-live started a new baseline (nets in the payload + driver-data blocks,
+ * shipped by founder call). 2026-08-26-sliders starts another: the nets were rebuilt so
+ * every knob points at a shared slider instead of carrying its own conditions, and the
+ * prompt gained the two sentences above — what a net is for, and the boundary that a net
+ * may pick the chassis lever but never decide the problem IS the chassis. Scores are not
+ * comparable across labels.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-08-25-live";
+export const ENGINEER_PROMPT_LABEL = "2026-08-26-sliders";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);

@@ -1,52 +1,26 @@
-# AI DRAFT — not founder-reviewed. Drafted 2026-08-25, transposed to the v2 fixed grid the same day.
-# Step size measured from 52 real consecutive-run spring changes across 4 drivers.
-# Cell filled from the physics KB rather than a source during the transpose: exit/front.
+# AI DRAFT — not founder-reviewed. Drafted 2026-08-25, rebuilt to the v3 slider shape 2026-08-26.
 id: spring_front_stiffer
 discipline: touring
 change:
   parameter: spring_front
   direction: increase
-  typical_step: "about 4 gf/mm is the usual move — roughly one rate step in most ranges; 1.5 gf/mm is the smallest that registers"
-effects:
-  - phase: entry
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+moves:
+  - slider: bite-hold
     end: front
-    tag: grip_earlier
-    feel: "the front takes its load sooner — sharper initial steering into the corner"
+    toward: bite
     confidence: consensus
-  - phase: entry
-    end: rear
-    tag: none
-  - phase: mid
+  - slider: roll-stiffness
     end: front
-    tag: grip_less
-    feel: "once roll has settled the front carries the bigger share and gives up side grip — less steering through the middle"
+    toward: stiffer
     confidence: consensus
-  - phase: mid
-    end: rear
-    tag: none
-  - phase: exit
+  - slider: bump-compliance
     end: front
-    tag: grip_less
-    feel: "the front is still carrying the bigger share, so the steering stays away on the way out"
-    confidence: majority
-  - phase: exit
-    end: rear
-    tag: none
-overall: "more responsive overall; it can turn nervous around straight-ahead"
-dose_response: to_a_point
-modifiers:
-  - context: "long or fast corners with a real settled middle"
-    action: reverses
-    note: "the settled-phase loss dominates: the car turns in well then washes mid-corner, and a softer front gives more steering through and out"
-  - context: "corners with no settled middle — chicanes, flicks"
-    action: amplifies
-    note: "the direction change is over before roll finishes, so a stiffer front is close to pure entry gain there"
-physics_link:
+    toward: worse
+    confidence: consensus
+feel: "the front gets more pointy, and less planted over bumps"
+physics:
   - spring-rate.md
-  - concepts/roll-stiffness.md
-  - concepts/corner-regime.md
-  - concepts/bite-hold.md
-  - concepts/bump-compliance.md
 sources:
   - "On Road Setup Guide (Anthony Atack, XRAY T3) — front springs table"
-  - "Invisible Speed (Joseph Quagraine) — TITC transcripts (softer front than rear at high grip; spring/oil relationship)"
+  - "Invisible Speed (Joseph Quagraine) — TITC transcripts"

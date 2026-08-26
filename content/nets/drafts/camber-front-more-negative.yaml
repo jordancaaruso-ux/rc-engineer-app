@@ -1,47 +1,18 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass), transposed to the v2 fixed grid the same day.
-# Step size measured from 50 real consecutive-run camber changes across 6 drivers.
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass), rebuilt to the v3 slider shape 2026-08-26.
 id: camber_front_more_negative
 discipline: touring
 change:
   parameter: camber_front
   direction: increase
-  typical_step: "0.5° is the usual move; 0.2° is about the smallest that registers"
-effects:
-  - phase: entry
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+moves:
+  - slider: camber-grip
     end: front
-    tag: grip_less
-    feel: "braking and straight-line grip can suffer — the contact patch is fullest with the tyre upright"
-    confidence: majority
-  - phase: entry
-    end: rear
-    tag: none
-  - phase: mid
-    end: front
-    tag: grip_more
-    feel: "normally more steering, and most of it in the middle of the corner"
+    toward: leaned
     confidence: consensus
-  - phase: mid
-    end: rear
-    tag: none
-  - phase: exit
-    end: front
-    tag: none
-  - phase: exit
-    end: rear
-    tag: none
-overall: "when the front does let go it lets go more abruptly, with less warning — and how much of any of this you get depends heavily on the tyre"
-dose_response: to_a_point
-modifiers:
-  - context: "a different tyre or a big track-temperature swing"
-    action: attenuates
-    note: "the optimum moved — re-find it from the wear pattern across the tyre face rather than trusting the old number"
-  - context: "high-grip surface where the car rolls hard"
-    action: amplifies
-    note: "more roll means the loaded tyre leans further from vertical, so the static camber has more correcting to do"
-physics_link:
+feel: "more front overall grip mid-corner; less warning when it lets go"
+physics:
   - camber.md
-  - concepts/camber-grip.md
-  - concepts/camber-gain.md
 sources:
   - "Invisible Speed (Joseph Quagraine) — camber transcripts"
   - "On Road Setup Guide (Anthony Atack, XRAY T3) — front camber table"

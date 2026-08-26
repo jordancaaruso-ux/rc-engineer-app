@@ -1,47 +1,20 @@
-# AI DRAFT — not founder-reviewed. Drafted 2026-08-25, transposed to the v2 fixed grid the same day.
-# Step size measured from 31 real consecutive-run camber changes across 6 drivers.
+# AI DRAFT — not founder-reviewed. Drafted 2026-08-25, rebuilt to the v3 slider shape 2026-08-26.
+# WORD GAP: "forward drive" is not on bite-hold.md's closed feel list. Awaiting the founder's
+# dictated additions; until then this line uses it because no allowed word carries the meaning.
 id: camber_rear_more_negative
 discipline: touring
 change:
   parameter: camber_rear
   direction: increase
-  typical_step: "0.5° is the usual move; 0.25° is about the smallest that registers"
-effects:
-  - phase: entry
-    end: front
-    tag: none
-  - phase: entry
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+moves:
+  - slider: camber-grip
     end: rear
-    tag: none
-  - phase: mid
-    end: front
-    tag: none
-  - phase: mid
-    end: rear
-    tag: grip_more
-    feel: "more rear side grip and security once the car has rolled — the rear holds on through the corner"
+    toward: leaned
     confidence: consensus
-  - phase: exit
-    end: front
-    tag: none
-  - phase: exit
-    end: rear
-    tag: grip_less
-    feel: "a shade less forward drive — the patch is fullest with the tyre upright, and every degree leans some of it away"
-    confidence: consensus
-overall: "how much of any of this you get depends heavily on the tyre; the wear pattern across the face is the evidence, not a number"
-dose_response: to_a_point
-modifiers:
-  - context: "a different tyre or a big track-temperature swing"
-    action: attenuates
-    note: "re-find the optimum; the old number belonged to the old rubber"
-  - context: "long fast corners"
-    action: amplifies
-    note: "the rear spends longer leaned over, so the mid-corner gain is worth more of the lap"
-physics_link:
+feel: "the rear holds on better mid-corner, with a little less forward drive on power"
+physics:
   - camber.md
-  - concepts/camber-grip.md
-  - concepts/camber-gain.md
 sources:
   - "Invisible Speed (Joseph Quagraine) — camber transcripts"
   - "On Road Setup Guide (Anthony Atack, XRAY T3) — rear camber table"

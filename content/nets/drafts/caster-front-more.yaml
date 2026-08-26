@@ -1,42 +1,21 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass), transposed to the v2 fixed grid the same day.
-# The founder settled the direction against two disagreeing period guides, so his reading stands
-# and there is no contested block. Step size measured from 19 real changes across 5 drivers.
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass), rebuilt to the v3 slider shape 2026-08-26.
+# Collapses to a single slider move: less grip on the way in, more later, is exactly the
+# bite end giving way to the hold end. The founder settled the direction against two
+# disagreeing period guides, so there is no contested block.
 id: caster_front_more
 discipline: touring
 change:
   parameter: caster_front
   direction: increase
-  typical_step: "1° is the usual move and 0.5° the smallest that registers — often a hub or insert swap, not a dial"
-effects:
-  - phase: entry
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+moves:
+  - slider: bite-hold
     end: front
-    tag: grip_less
-    feel: "generally less initial steering — the nose waits a beat longer before it bites"
+    toward: hold
     confidence: majority
-  - phase: entry
-    end: rear
-    tag: none
-  - phase: mid
-    end: front
-    tag: grip_more
-    feel: "more steering through the middle of the corner"
-    confidence: majority
-  - phase: mid
-    end: rear
-    tag: none
-  - phase: exit
-    end: front
-    tag: grip_more
-    feel: "more steering on the way out"
-    confidence: majority
-  - phase: exit
-    end: rear
-    tag: none
-dose_response: monotonic
-physics_link:
+feel: "less front bite on entry, more front grip mid-corner and on power"
+physics:
   - caster.md
-  - concepts/camber-grip.md
-  - concepts/bite-hold.md
 sources:
   - "Founder (JC), 2026-08-25 — direction settled against two disagreeing period guides"
   - "Scott Guyatt R/C Handbook — caster section (agrees on less initial turn-in)"

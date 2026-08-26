@@ -1,50 +1,21 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass), transposed to the v2 fixed grid the same day.
-# NO measured step: only 6 real diff-oil changes across 2 drivers — far too thin to quote.
-# Directions match the founder-confirmed signs in diff-and-driveline.md (touring: rear gear diff).
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass), rebuilt to the v3 slider shape 2026-08-26.
+# Touring: rear gear diff, front spool. On-power and off-power rotation move in OPPOSITE
+# directions with this knob, which is why it is one slider and not a bite/hold move.
+# WORD GAP: "rotation" is not on the closed feel list — awaiting the founder's additions.
 id: diff_oil_thicker
 discipline: touring
 change:
   parameter: diff_oil
   direction: increase
-  typical_step: "one grade — the steps are coarse, so expect a real change"
-effects:
-  - phase: entry
-    end: front
-    tag: none
-  - phase: entry
-    end: rear
-    tag: stability_more
-    feel: "less rotation off throttle — the car turns in steadier but lazier"
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+moves:
+  - slider: differential-coupling
+    end: car
+    toward: coupled
     confidence: consensus
-  - phase: mid
-    end: front
-    tag: none
-  - phase: mid
-    end: rear
-    tag: stability_more
-    feel: "smoother and more consistent through the middle of the corner"
-    confidence: majority
-  - phase: exit
-    end: front
-    tag: none
-  - phase: exit
-    end: rear
-    tag: grip_less
-    feel: "more rotation on throttle"
-    confidence: consensus
-overall: "on-power and off-power rotation move in OPPOSITE directions with this lever — name which one you are missing before touching it"
-dose_response: to_a_point
-modifiers:
-  - context: "tight corners"
-    action: amplifies
-    note: "that is where the rear wheels most need to differ in speed, so there is more coupling to feel"
-  - context: "fast, flowing corners"
-    action: attenuates
-    note: "little speed difference between the rears at big radius, so the lever has less to act on"
-physics_link:
+feel: "more planted off throttle through mid-corner; more rotation on power"
+physics:
   - diff-and-driveline.md
-  - concepts/differential-coupling.md
-  - concepts/friction-circle.md
 sources:
   - "Invisible Speed (Joseph Quagraine) — diff transcripts"
   - "On Road Setup Guide (Anthony Atack, XRAY T3) — rear differential section"

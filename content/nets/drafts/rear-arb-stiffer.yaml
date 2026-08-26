@@ -1,53 +1,27 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass), transposed to the v2 fixed grid the same day.
-# Step size measured from 14 real consecutive-run bar changes across 4 drivers.
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass), rebuilt to the v3 slider shape 2026-08-26.
 id: rear_arb_stiffer
 discipline: touring
 change:
   parameter: arb_rear
   direction: increase
-  typical_step: "0.1 mm is both the smallest move that registers and the usual one; 0.2 mm is a big step"
-effects:
-  - phase: entry
-    end: front
-    tag: none
-  - phase: entry
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+moves:
+  - slider: bite-hold
     end: rear
-    tag: grip_earlier
-    feel: "the rear takes its load sooner, so its grip is there earlier — the rear feels secure from the first steering input"
+    toward: bite
     confidence: consensus
-  - phase: mid
+  - slider: bite-hold
     end: front
-    tag: none
-  - phase: mid
+    toward: hold
+    confidence: majority
+    relative: true
+  - slider: roll-stiffness
     end: rear
-    tag: grip_less
-    feel: "once roll has settled the rear carries the bigger share and gives up side grip — the car rotates more, and past a point the rear slides"
+    toward: stiffer
     confidence: consensus
-  - phase: exit
-    end: front
-    tag: grip_more
-    feel: "more on-power steering out of the corner"
-    confidence: consensus
-  - phase: exit
-    end: rear
-    tag: stability_more
-    feel: "more rear support on exit — the car drives straighter off the corner instead of wandering about"
-    confidence: consensus
-overall: "more reaction in chicanes — the car changes direction quicker, and stays flatter instead of rolling onto the outside rear"
-dose_response: to_a_point
-modifiers:
-  - context: "tight, low-speed corners"
-    action: reverses
-    note: "in a hairpin the car needs the rear to roll in order to rotate; in fast corners the same bar is what gives you steering"
-  - context: "low grip"
-    action: attenuates
-    note: "a thinner rear bar adds rear grip and comfort on a loose track; keeping the rear bar for on-power support is a fast-driver habit that costs the security most drivers want"
-physics_link:
+feel: "the rear gets more pointy; past the good spot it goes unpredictable"
+physics:
   - arb.md
-  - concepts/roll-stiffness.md
-  - concepts/tyre-load-sensitivity.md
-  - concepts/corner-regime.md
-  - concepts/bite-hold.md
 sources:
   - "Invisible Speed (Joseph Quagraine) — anti-roll bar video + course meeting transcripts"
   - "On Road Setup Guide (Anthony Atack, XRAY T3) — rear sway bar table; agrees"

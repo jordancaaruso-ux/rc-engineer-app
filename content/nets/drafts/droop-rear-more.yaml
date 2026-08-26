@@ -1,46 +1,23 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass), transposed to the v2 fixed grid the same day.
-# NO measured step — see the front droop entry for why the real-data deltas are unusable.
+# AI DRAFT — founder-corrected 2026-08-25 (JC pass), rebuilt to the v3 slider shape 2026-08-26.
+# GAP: the working-range slider does not exist yet — see the front droop entry.
 id: droop_rear_more
 discipline: touring
 change:
   parameter: droop_rear
   direction: increase
-  typical_step: "one small step — read the sheet's column direction before comparing two setups"
-effects:
-  - phase: entry
-    end: front
-    tag: none
-  - phase: entry
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+moves:
+  - slider: bump-compliance
     end: rear
-    tag: grip_more
-    feel: "the rear extends further before topping out, so the rear tyres stay loaded into the corner instead of going light"
+    toward: better
     confidence: consensus
-  - phase: mid
-    end: front
-    tag: none
-  - phase: mid
+  - slider: bite-hold
     end: rear
-    tag: none
-  - phase: exit
-    end: front
-    tag: none
-  - phase: exit
-    end: rear
-    tag: none
-overall: "often more rotation on entry — the car turns in more freely — and a wider working window before a wheel tops out"
-dose_response: to_a_point
-modifiers:
-  - context: "when rear droop is already very limited"
-    action: reverses
-    note: "the rear can lose grip suddenly there; that abruptness is the sign you have run out of it, and giving droop back is the fix"
-  - context: "bumpy track"
-    action: amplifies
-    note: "braking over bumps is where the extending rear earns its keep — the tyre follows the surface instead of skipping"
-physics_link:
+    toward: hold
+    confidence: majority
+feel: "the rear comes in smoother and stays planted for longer"
+physics:
   - droop-downstop.md
-  - concepts/bump-compliance.md
-  - concepts/load-transfer.md
-  - concepts/corner-regime.md
 sources:
   - "Invisible Speed (Joseph Quagraine) — droop / working range transcripts"
   - "HUDY / Anthony Atack On Road Setup Guide — rear droop table"

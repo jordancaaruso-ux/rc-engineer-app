@@ -26,10 +26,11 @@ const NETS_DRAFTS_DIR = path.join(NETS_DIR, "drafts");
  * Header on the nets block. States the confidence semantics — the rendering rule per
  * confidence level is the model's instruction, so it lives with the data it governs.
  */
-export const ENGINEER_NETS_HEADER = `SETUP EFFECT PRIORS ("nets") — empirical, curated, probabilistic.
-Each entry says what a change MOST LIKELY feels like on track, and what context flips or mutes it. Every entry has the same six cells — ENTRY, MID and EXIT at each end of the car — so entries are the same size on purpose: a longer entry is not a better lever. "nothing reliable" is a real finding, not a gap: it means that change does not dependably do anything there, so do not invent an effect for it.
-These are priors, not laws: "consensus" — state it plainly; "majority" — state it, naming the minority view when the driver's context matches it; "contested" — present both claims and the on-track discriminator, never pick silently. A REVERSES IF line means the effect genuinely inverts in that context, not that it weakens. A "step" is the size of move that registers and what most drivers actually do — it is calibration, not a recommendation of how far to go.
-How much of a corner is ENTRY versus MID is not fixed: it moves with speed, grip and corner shape, so a faster car spends more of the corner still rolling and the ENTRY row weighs more for it. That is why each entry answers the phases separately — apply the rule from the knowledge base above rather than expecting it repeated here. The physics behind every entry lives in that knowledge base — reason from both together, and never present a prior as a guarantee.
+export const ENGINEER_NETS_HEADER = `SETUP EFFECT PRIORS ("nets") — an INDEX, not a rulebook.
+Every knob on the car is a slider: too far one way is bad, too far the other way is bad, and the good spot MOVES with grip, corner speed and how rough the surface is. Each entry below says only which slider that knob moves, which way, at which end — plus one line of what the driver notices. Entries are short and all the same size on purpose: a longer entry is not a better lever.
+Every "it depends" lives in the slider's own file in the knowledge base above, written once. So do not expect conditions here, and do not treat a SLIDES line as an outcome on its own — read the slider, work out where this car already sits on it and which way today's conditions have moved the good spot, and answer from that. A knob that moves a slider toward the bite end is an entry-phase answer without this file saying so.
+Confidence: "consensus" — state it plainly; "majority" — state it, naming the minority view when the driver's context matches it; "contested" — present both claims and the on-track discriminator, never pick silently. "knock-on" means the effect is a consequence of moving the other end, not a direct action. A "step" is what a normal-sized move looks like — calibration, never a recommendation of how far to go.
+Never present a prior as a guarantee, and never let one stand in for the physics it points at.
 
 `;
 
