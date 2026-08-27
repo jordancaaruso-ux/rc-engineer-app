@@ -15,7 +15,15 @@ gets depends on whether the chassis has finished rolling at the moment they are 
 
 So the **phase** decides which mechanism is running, and **how long the car is in the corner**
 decides how much middle there is. That is a question of time, not shape: a long, slow hairpin can
-have the longest middle on the track, and a fast bend taken flat can have almost none.
+have the longest middle on the track, and a fast bend taken flat a short one.
+
+**Where the landmarks fall.** The initial is the turn-in — from the first steering input until roll
+has finished. The apex of a corner the car turns through comes after that, quick or slow, mod or
+stock: roll takes a fixed, short time, and even a quick corner lasts several times longer. So a driver
+describing the apex is describing the settled car. What the corner's clock changes is how much of the
+corner comes before that point, not whether the apex is settled — in a faster car the initial is a
+bigger slice of the corner, so its answer is felt for more of the lap, but a settled-phase change
+still lands at the apex. A direction change is the exception: it has no apex to settle into.
 
 **Speed decides how much middle there is, as much as the corner does.** Chassis roll time is fixed;
 corner time is length divided by speed. So the same corner has more middle for a slower car and less
