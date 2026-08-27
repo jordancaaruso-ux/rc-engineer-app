@@ -1,13 +1,15 @@
 # FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Founder-corrected content from the 2026-08-25 pass carried
 # over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
+# Split into two lines 2026-08-27 (founder: rear camber is the same as front). The BEFORE line is inferred from "most of it mid-corner", as on the front.
 id: camber_rear_more_negative
 discipline: touring
 change:
   parameter: camber_rear
   direction: increase
   step: "0.5° is standard; 0.25° for a tweak"   # founder-dictated 2026-08-27
-roll_lever: false
-effect: "more rear hold mid-corner and a shade less forward traction on power; how much you get depends heavily on the tyre"
+roll_lever: true
+before_settled: "little change at the first steering input"
+once_settled: "more rear hold mid-corner and a shade less forward traction on power; how much you get depends heavily on the tyre"
 confidence: consensus
 physics:
   - camber.md

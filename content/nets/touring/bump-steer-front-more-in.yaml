@@ -2,14 +2,16 @@
 # direction per key is solver-checked (upper-link-geometry.md); the feel lines are the founder's.
 # `increase` = MORE shims = more bump-IN on this sheet (Awesomatix). Other cars can run the opposite
 # sign — never carry this direction to a different chassis.
+# Split into two lines 2026-08-27 (founder: the corner clock applies to anything that behaves differently initially and mid-corner). Same words as before.
 id: bump_steer_front_more_in
 discipline: touring
 change:
   parameter: bump_steer_shims_front
   direction: increase
   step: null            # a normal-sized move, founder-dictated; null = not set yet
-roll_lever: false
-effect: "more aggressive initially — more initial steering, and generally more mid-corner too; in on compression is out on extension, so it can help the car drive straight on exit"
+roll_lever: true
+before_settled: "more aggressive initially — more initial steering"
+once_settled: "generally more steering mid-corner too; in on compression is out on extension, so it can help the car drive straight on exit"
 confidence: majority
 physics:
   - bump-steer-toe-gain.md

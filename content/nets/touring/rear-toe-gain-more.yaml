@@ -3,14 +3,16 @@
 # for this set. Hedge accordingly until the founder has passed it.
 # `decrease` = FEWER shims = MORE toe gain on this sheet (Awesomatix). Other cars can run the
 # opposite sign — never carry this direction to a different chassis.
+# Split into two lines 2026-08-27 (founder: the corner clock applies to anything that behaves differently initially and mid-corner). Same words as before.
 id: rear_toe_gain_more
 discipline: touring
 change:
   parameter: toe_gain_shims_rear
   direction: decrease
   step: "half a shim, depending on how sensitive the car is — about 0.2° more gain from static ride height to compressed onto the board"   # founder-dictated 2026-08-27
-roll_lever: false
-effect: "as more rear toe — more rear grip, less rotation, more forward traction — but arriving as it rolls and squats; it extends on the way in, so less toe and security there"
+roll_lever: true
+before_settled: "it extends on the way in, so less rear toe there — less security on the first input"
+once_settled: "as more rear toe — more rear grip, less rotation, more forward traction — arriving as the car rolls and squats"
 confidence: majority
 physics:
   - bump-steer-toe-gain.md
