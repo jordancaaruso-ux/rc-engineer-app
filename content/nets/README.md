@@ -22,21 +22,19 @@ moves. Do not rebuild any of them. Founder interview, 2026-08-26/27.
 
 ## Two shapes, decided by physics
 
-A knob that changes **how much or how fast the car rolls and transfers load** — bars, springs,
-damper oil, ride height, droop — genuinely has two answers: one before the car has settled into the
-corner, one once it has. `concepts/corner-regime.md` and `concepts/bite-hold.md` carry the rule.
+A knob that **does one thing before the car has settled into the corner and another once it has**
+genuinely has two answers. `concepts/corner-regime.md` and `concepts/bite-hold.md` carry the rule.
 Which answer matters today depends on how long the corner lasts against how long this car takes to
 settle, and the Engineer works that out from the rule plus the facts the request carries. Those
-knobs carry **both lines**.
+knobs carry **both lines**. The roll levers — bars, springs, damper oil, ride height, droop,
+roll-centre, flex — are the obvious members, but the test is the two answers, not the mechanism:
+front toe-out smooths the initial and can give steering in the middle, so it is one of them
+(founder, 2026-08-27 — "it's anything that behaves differently initially and mid-corner").
 
-A knob that acts through another mechanism — camber, rear toe, diff, caster — does one thing whatever
-the corner's clock says, and carries **one line**.
+A knob that does the same thing throughout the corner carries **one line**.
 
-One exception outside the roll levers: **front toe**. It is not a roll lever, but its two ends land
-on different parts of the corner — it smooths the initial (often read as less steering) and can give
-more steering right in the middle — so a fast car feels one and a slow car the other. It carries
-both lines (founder, 2026-08-27). `roll_lever: true` on that entry means "takes the two-line shape",
-not "changes roll".
+`roll_lever: true` is the flag for the two-line shape. The name is historical — read it as "has two
+answers", not "changes roll".
 
 ```
 CHANGE: arb_front increase [consensus]
