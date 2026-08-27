@@ -1,0 +1,20 @@
+# AI DRAFT — awaiting founder review. Third sweep, 2026-08-27. Drafted from the physics KB's own
+# effects notes (roll-centre files are solver-checked and founder-verified for DIRECTION; the outcome
+# lines here are the nets' addition). Invisible Speed transcripts NOT consulted for this set.
+# Awesomatix only. The same lever as thicker front oil, plus pack — fewer holes, so damping rises faster with shaft speed.
+id: damper_percent_front_higher
+discipline: touring
+change:
+  parameter: damper_percent_front
+  direction: increase
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+roll_lever: true
+before_settled: "the front rolls in slower — calmer, more forgiving initial steering, not more of it; higher percent also adds pack, so fast hits over bumps come through harder"
+once_settled: "no change — damping only acts while the car is moving, and a settled car has stopped"
+confidence: consensus
+physics:
+  - awesomatix-spring-gap-damper.md
+  - damper-oil.md
+sources:
+  - "awesomatix-spring-gap-damper.md (higher percent = more damping AND more pack, founder-confirmed)"
+  - "damper-oil-front-thicker net"

@@ -1,0 +1,19 @@
+# AI DRAFT — awaiting founder review. Third sweep, 2026-08-27. Drafted from the physics KB's own
+# effects notes (roll-centre files are solver-checked and founder-verified for DIRECTION; the outcome
+# lines here are the nets' addition). Invisible Speed transcripts NOT consulted for this set.
+# This entry is for the body moved FORWARD. Whether that is a smaller or larger number on the sheet
+# depends on how the sheet measures it — read the column. Written as `decrease` = nearer the windshield.
+id: body_forward
+discipline: touring
+change:
+  parameter: body_position_from_windshield
+  direction: decrease
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+roll_lever: false
+effect: "more front aero load the faster you go — more steering in fast corners and a touch less rear security there; little change in slow corners"
+confidence: majority
+physics:
+  - bodyshell-aero.md
+sources:
+  - "bodyshell-aero.md + concepts/aero-load.md (aero load scales with speed²)"
+  - "HUDY / Anthony Atack On Road Setup Guide — body position table"

@@ -1,0 +1,20 @@
+# AI DRAFT — awaiting founder review. Third sweep, 2026-08-27. Drafted from the physics KB's own
+# effects notes (roll-centre files are solver-checked and founder-verified for DIRECTION; the outcome
+# lines here are the nets' addition). Invisible Speed transcripts NOT consulted for this set.
+# Awesomatix only. Bigger gap = stiffer = the same lever as a stiffer rear spring; lines match that entry.
+id: spring_gap_rear_bigger
+discipline: touring
+change:
+  parameter: spring_gap_rear
+  direction: increase
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+roll_lever: true
+before_settled: "the rear bites sooner, and holds on better through quick direction changes"
+once_settled: "tends toward more oversteer mid-corner, though it can go the other way; more rear support on power, so it can drive straighter off; less planted over bumps"
+confidence: consensus
+physics:
+  - awesomatix-spring-gap-damper.md
+  - spring-rate.md
+sources:
+  - "awesomatix-spring-gap-damper.md"
+  - "spring-rear-stiffer net"
