@@ -1,10 +1,10 @@
-# AI DRAFT — awaiting founder review. Third sweep, founder-corrected 2026-08-27. Roll-centre direction
-# per key is solver-checked (upper-link-geometry.md); the outcome lines are the nets' addition.
-# Every roll-centre key gets its own entry (founder: they all move roll centre but they do not all feel
-# the same). HOW THIS KEY FEELS DIFFERENT FROM THE OTHERS: NOT YET DICTATED — until it is, the lines
-# below are the roll-centre direction only. The header states this key's strength and what else it moves.
-# THE ODD ONE OUT: adding upper-inner shims LOWERS RC (~0.5 mm per 0.5 mm shim) and REDUCES camber gain.
-# `upper_inner_shims_rear` = rf and rr together. Lines below are the LOWER-roll-centre feel.
+# AI DRAFT — awaiting founder review. Third sweep, founder-corrected 2026-08-27 (two passes). Roll-centre
+# direction per key is solver-checked (upper-link-geometry.md); the feel lines are the founder's.
+# Founder: the upper links are about BITE — a big change in the amount of bite the car has — and the overall
+# grip feel moves with them more than with the other keys. Outer and inner are the same lever from either
+# end: what matters is the upper arm's angle. ~0.5 mm of RC per 0.5 mm shim, camber gain moves with it.
+# Adding upper-INNER shims LOWERS RC and reduces camber gain — the lines below are the lower-RC feel.
+# `upper_inner_shims_rear` = rf and rr together.
 id: upper_inner_rear_more
 discipline: touring
 change:
@@ -12,11 +12,11 @@ change:
   direction: increase
   step: null            # a normal-sized move, founder-dictated; null = not set yet
 roll_lever: true
-before_settled: "the rear bites later — less secure from the first input, and more in the track"
-once_settled: "tends toward more rear hold through the middle, though it can go the other way; on exit it can go either way, depending on the day"
+before_settled: "a big change in rear bite the other way — less secure from the first input, and more in the track"
+once_settled: "tends toward more rear hold through the middle, though it can go the other way; the overall rear grip feel moves with it; exit either way"
 confidence: majority
 physics:
   - upper-link-geometry.md
 sources:
   - "upper-link-geometry.md roll-centre table (solver-verified 2026-08-01)"
-  - "Founder (JC), 2026-08-27 — front: more understeer settled; rear: hedged like the rear bar and spring"
+  - "Founder (JC), 2026-08-27 — lower arm = support + initial grip; upper links = bite + overall-grip feel; rear settled hedged like bar and spring"
