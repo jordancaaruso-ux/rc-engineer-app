@@ -186,7 +186,7 @@ export function validateNetEntry(raw: unknown): string[] {
   }
 
   if (typeof e.roll_lever !== "boolean") {
-    errs.push("roll_lever: required boolean — true if the knob changes how much or how fast the car rolls / transfers load");
+    errs.push("roll_lever: required boolean — true if the knob changes how much or how fast the car rolls / transfers load (front toe is the one non-roll knob that takes the two-line shape; see README)");
   } else if (e.roll_lever) {
     checkLine(errs, "before_settled", e.before_settled, true);
     checkLine(errs, "once_settled", e.once_settled, true);

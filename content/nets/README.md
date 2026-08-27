@@ -29,8 +29,14 @@ Which answer matters today depends on how long the corner lasts against how long
 settle, and the Engineer works that out from the rule plus the facts the request carries. Those
 knobs carry **both lines**.
 
-A knob that acts through another mechanism — camber, toe, diff, caster — does one thing whatever
+A knob that acts through another mechanism — camber, rear toe, diff, caster — does one thing whatever
 the corner's clock says, and carries **one line**.
+
+One exception outside the roll levers: **front toe**. It is not a roll lever, but its two ends land
+on different parts of the corner — it smooths the initial (often read as less steering) and can give
+more steering right in the middle — so a fast car feels one and a slow car the other. It carries
+both lines (founder, 2026-08-27). `roll_lever: true` on that entry means "takes the two-line shape",
+not "changes roll".
 
 ```
 CHANGE: arb_front increase [consensus]
