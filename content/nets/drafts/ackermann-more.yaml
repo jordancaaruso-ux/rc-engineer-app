@@ -1,0 +1,18 @@
+# AI DRAFT — awaiting founder review. Second sweep, 2026-08-27. Drafted from the physics KB's own
+# handling notes and the HUDY/Atack On Road Setup Guide; Invisible Speed transcripts NOT consulted
+# for this set. Hedge accordingly until the founder has passed it.
+# `increase` = the inside wheel turns MORE than the outside = more ackermann.
+id: ackermann_more
+discipline: touring
+change:
+  parameter: inner_steering_angle
+  direction: increase
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+roll_lever: false
+effect: "less initial steering but smoother through tight corners; the tighter the corner the more it does, in fast ones almost nothing"
+confidence: majority
+physics:
+  - steering-geometry-ackermann.md
+sources:
+  - "steering-geometry-ackermann.md (1/radius² scaling)"
+  - "HUDY / Anthony Atack On Road Setup Guide — ackermann table"

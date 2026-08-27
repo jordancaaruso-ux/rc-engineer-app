@@ -1,0 +1,19 @@
+# AI DRAFT — awaiting founder review. Second sweep, 2026-08-27. Drafted from the physics KB's own
+# handling notes and the HUDY/Atack On Road Setup Guide; Invisible Speed transcripts NOT consulted
+# for this set. Hedge accordingly until the founder has passed it.
+# `decrease` = FEWER shims = MORE toe gain on this sheet (Awesomatix). Other cars can run the
+# opposite sign — never carry this direction to a different chassis.
+id: rear_toe_gain_more
+discipline: touring
+change:
+  parameter: toe_gain_shims_rear
+  direction: decrease
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+roll_lever: false
+effect: "more rear grip exactly when the outer rear is loaded — more secure in roll and on power — without the straight-line cost of static toe"
+confidence: majority
+physics:
+  - bump-steer-toe-gain.md
+  - toe.md
+sources:
+  - "bump-steer-toe-gain.md (founder-confirmed sign 2026-07-30)"

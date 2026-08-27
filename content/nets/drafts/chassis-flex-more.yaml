@@ -1,0 +1,20 @@
+# AI DRAFT — awaiting founder review. Second sweep, 2026-08-27. Drafted from the physics KB's own
+# handling notes and the HUDY/Atack On Road Setup Guide; Invisible Speed transcripts NOT consulted
+# for this set. Hedge accordingly until the founder has passed it.
+# `decrease` = fewer engaged screws = MORE flex. Softer decks and more cuts go the same way.
+# Front-half adjusters bias the front, rear-half the rear; this entry is the whole-car direction.
+id: chassis_flex_more
+discipline: touring
+change:
+  parameter: top_deck_screws
+  direction: decrease
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+roll_lever: true
+before_settled: "load moves into the tyres more slowly, so the car feels more forgiving and less pointy on turn-in"
+once_settled: "more overall grip on a low-grip or bumpy track, but less precise on high grip — the platform gives before the tyre does"
+confidence: majority
+physics:
+  - flex-chassis.md
+sources:
+  - "flex-chassis.md + concepts/chassis-flex.md"
+  - "HUDY / Anthony Atack On Road Setup Guide — chassis flex / top deck table"

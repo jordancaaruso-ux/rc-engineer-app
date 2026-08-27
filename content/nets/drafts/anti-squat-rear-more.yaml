@@ -1,0 +1,19 @@
+# AI DRAFT — awaiting founder review. Second sweep, 2026-08-27. Drafted from the physics KB's own
+# handling notes and the HUDY/Atack On Road Setup Guide; Invisible Speed transcripts NOT consulted
+# for this set. Hedge accordingly until the founder has passed it.
+# `increase` = raising the rear arm's FORWARD pickup = more anti-squat (sign per this sheet).
+# Fore-aft transfer, not roll: it does not swing with the corner's clock, so one line.
+id: anti_squat_rear_more
+discipline: touring
+change:
+  parameter: under_lower_arm_shims_rf
+  direction: increase
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+roll_lever: false
+effect: "the rear squats less on power and the drive arrives sooner — more forward traction and more on-power steering on a smooth track; less forgiving over bumps under power"
+confidence: majority
+physics:
+  - anti-dive-anti-squat.md
+sources:
+  - "anti-dive-anti-squat.md"
+  - "HUDY / Anthony Atack On Road Setup Guide — anti-squat table"
