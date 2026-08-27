@@ -14,16 +14,18 @@ words:
   less: "fewer"
 step: null   # a normal-sized move, founder-dictated; null = not set yet
 two_answers: true
+# Founder, 2026-08-27 (second pass): "support" is not something a driver feels — lead with what they do feel: more direct,
+# precise, stiff. And on this key the front RELATIVE to the rear is as important as the change itself, if not more.
 more:
   reviewed: true
   confidence: majority
-  before_settled: "more initial front grip — more initial steering, and the front feels more on the track"
-  once_settled: "more support — the front is held up more at the limit and rolls less; generally more understeer through the middle"
+  before_settled: "feels more direct and precise from the first input — stiffer, more on the track, a little more initial grip"
+  once_settled: "tends toward understeer mid-corner; and it is the front against the rear you feel — raise both together and much of it cancels"
 less:
   reviewed: false
   confidence: majority
-  before_settled: "less initial front grip — less initial steering, and the front feels more in the track"
-  once_settled: "less support — the front rolls more and is held up less at the limit; generally more front grip through the middle"
+  before_settled: "feels less direct from the first input — softer, more in the track, a little less initial grip"
+  once_settled: "tends toward more front grip mid-corner — less understeer; the front against the rear is what you feel"
 physics:
   - under-lower-arm.md
 sources:
