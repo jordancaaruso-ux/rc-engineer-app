@@ -1,21 +1,16 @@
-# AI DRAFT — not founder-reviewed. Drafted 2026-08-25, rebuilt to the v3 slider shape 2026-08-26.
-# No bite-hold move — see the front entry.
+# AI DRAFT — awaiting founder review. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
+# ONCE SETTLED says "no change" on purpose — see the front entry.
 id: damper_oil_rear_thicker
 discipline: touring
 change:
   parameter: damper_oil_rear
   direction: increase
   step: null            # a normal-sized move, founder-dictated; null = not set yet
-moves:
-  - slider: damping
-    end: rear
-    toward: slower
-    confidence: consensus
-  - slider: bump-compliance
-    end: rear
-    toward: worse
-    confidence: consensus
-feel: "the rear moves slower and feels more forgiving; too far and it goes imprecise"
+roll_lever: true
+before_settled: "the rear takes its set slower — more forgiving into the corner and settling onto the power; too far and it goes imprecise"
+once_settled: "no change — damping only acts while the car is moving, and a settled car has stopped"
+confidence: consensus
 physics:
   - damper-oil.md
 sources:

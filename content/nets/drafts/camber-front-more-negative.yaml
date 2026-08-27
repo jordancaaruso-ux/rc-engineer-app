@@ -1,16 +1,14 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass), rebuilt to the v3 slider shape 2026-08-26.
+# AI DRAFT — awaiting founder review. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
 id: camber_front_more_negative
 discipline: touring
 change:
   parameter: camber_front
   direction: increase
   step: null            # a normal-sized move, founder-dictated; null = not set yet
-moves:
-  - slider: camber-grip
-    end: front
-    toward: leaned
-    confidence: consensus
-feel: "more front overall grip mid-corner; less warning when it lets go"
+roll_lever: false
+effect: "more steering, most of it mid-corner; it lets go more abruptly, braking and straight-line grip can suffer, and how much you get depends heavily on the tyre"
+confidence: consensus
 physics:
   - camber.md
 sources:

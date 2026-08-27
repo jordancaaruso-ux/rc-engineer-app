@@ -1,25 +1,15 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass), rebuilt to the v3 slider shape 2026-08-26.
+# AI DRAFT — awaiting founder review. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
 id: rear_arb_stiffer
 discipline: touring
 change:
   parameter: arb_rear
   direction: increase
   step: null            # a normal-sized move, founder-dictated; null = not set yet
-moves:
-  - slider: bite-hold
-    end: rear
-    toward: bite
-    confidence: consensus
-  - slider: bite-hold
-    end: front
-    toward: hold
-    confidence: majority
-    relative: true
-  - slider: roll-stiffness
-    end: rear
-    toward: stiffer
-    confidence: consensus
-feel: "the rear gets more pointy; past the good spot it goes unpredictable"
+roll_lever: true
+before_settled: "the rear bites sooner — secure from the first steering input, and quicker through direction changes"
+once_settled: "more oversteer through the middle, but more rear support on power, so it drives straighter off the corner"
+confidence: consensus
 physics:
   - arb.md
 sources:

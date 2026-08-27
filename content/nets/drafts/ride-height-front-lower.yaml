@@ -1,20 +1,15 @@
-# AI DRAFT — not founder-reviewed. Drafted 2026-08-25, rebuilt to the v3 slider shape 2026-08-26.
+# AI DRAFT — awaiting founder review. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
 id: ride_height_front_lower
 discipline: touring
 change:
   parameter: ride_height_front
   direction: decrease
   step: null            # a normal-sized move, founder-dictated; null = not set yet
-moves:
-  - slider: load-transfer
-    end: car
-    toward: less
-    confidence: consensus
-  - slider: bump-compliance
-    end: front
-    toward: worse
-    confidence: majority
-feel: "more overall grip on a smooth surface; too low and it goes unpredictable when the chassis touches"
+roll_lever: true
+before_settled: "with the rake taken out it turns in a little quicker, and less load moves so there is more overall grip on a smooth surface"
+once_settled: "a little less front hold through the middle; too low and the chassis touches, which goes unpredictable with no warning"
+confidence: majority
 physics:
   - ride-height-and-rake.md
 sources:

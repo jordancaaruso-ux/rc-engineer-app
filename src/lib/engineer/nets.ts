@@ -26,11 +26,10 @@ const NETS_DRAFTS_DIR = path.join(NETS_DIR, "drafts");
  * Header on the nets block. States the confidence semantics — the rendering rule per
  * confidence level is the model's instruction, so it lives with the data it governs.
  */
-export const ENGINEER_NETS_HEADER = `SETUP EFFECT PRIORS ("nets") — an INDEX, not a rulebook.
-Every knob on the car is a slider: too far one way is bad, too far the other way is bad, and the good spot MOVES with grip, corner speed and how rough the surface is. Each entry below says only which slider that knob moves, which way, at which end — plus one line of what the driver notices. Entries are short and all the same size on purpose: a longer entry is not a better lever.
-Every "it depends" lives in the slider's own file in the knowledge base above, written once. So do not expect conditions here, and do not treat a SLIDES line as an outcome on its own — read the slider, work out where this car already sits on it and which way today's conditions have moved the good spot, and answer from that. A knob that moves a slider toward the bite end is an entry-phase answer without this file saying so.
-Confidence: "consensus" — state it plainly; "majority" — state it, naming the minority view when the driver's context matches it; "contested" — present both claims and the on-track discriminator, never pick silently. "knock-on" means the effect is a consequence of moving the other end, not a direct action. A "step" is what a normal-sized move looks like — calibration, never a recommendation of how far to go.
-Never present a prior as a guarantee, and never let one stand in for the physics it points at.
+export const ENGINEER_NETS_HEADER = `SETUP EFFECT PRIORS ("nets") — outcomes, in the driver's words. Probabilistic: "most likely", never "will".
+Each entry says what one knob most likely does. A knob that changes how much or how fast the car rolls and moves its load has TWO lines — BEFORE THE CAR SETTLES and ONCE SETTLED — because it genuinely has two answers, and which one matters today depends on how long the corner lasts against how long this car takes to settle. The knowledge base above carries that rule; work out from it and from what the driver has told you which line applies, and say so. A knob with one EFFECT line acts through another mechanism and does not swing with the corner. A longer entry is not a better lever.
+Nothing here says why, and nothing here says what makes an effect bigger, smaller or worth the opposite move — that all lives in the knowledge base, once. Never let a prior stand in for the mechanism it points at.
+Confidence: "consensus" — state it plainly; "majority" — state it, naming the minority view when the driver's context matches it; "contested" — present both claims and the on-track discriminator, never pick silently. A "normal move" is what a typical-sized change looks like — calibration, never a recommendation of how far to go.
 
 `;
 

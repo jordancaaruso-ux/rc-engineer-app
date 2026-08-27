@@ -1,24 +1,15 @@
-# AI DRAFT — not founder-reviewed. Drafted 2026-08-25, rebuilt to the v3 slider shape 2026-08-26.
+# AI DRAFT — awaiting founder review. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
 id: spring_front_stiffer
 discipline: touring
 change:
   parameter: spring_front
   direction: increase
   step: null            # a normal-sized move, founder-dictated; null = not set yet
-moves:
-  - slider: bite-hold
-    end: front
-    toward: bite
-    confidence: consensus
-  - slider: roll-stiffness
-    end: front
-    toward: stiffer
-    confidence: consensus
-  - slider: bump-compliance
-    end: front
-    toward: worse
-    confidence: consensus
-feel: "the front gets more pointy, and less planted over bumps"
+roll_lever: true
+before_settled: "more initial steering into the corner"
+once_settled: "more understeer through the middle and on the way out; less planted over bumps"
+confidence: consensus
 physics:
   - spring-rate.md
 sources:

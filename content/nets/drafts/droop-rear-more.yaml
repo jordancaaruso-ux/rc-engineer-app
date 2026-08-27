@@ -1,21 +1,15 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass), rebuilt to the v3 slider shape 2026-08-26.
-# GAP: the working-range slider does not exist yet — see the front droop entry.
+# AI DRAFT — awaiting founder review. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
 id: droop_rear_more
 discipline: touring
 change:
   parameter: droop_rear
   direction: increase
   step: null            # a normal-sized move, founder-dictated; null = not set yet
-moves:
-  - slider: bump-compliance
-    end: rear
-    toward: better
-    confidence: consensus
-  - slider: bite-hold
-    end: rear
-    toward: hold
-    confidence: majority
-feel: "the rear comes in smoother and stays planted for longer"
+roll_lever: true
+before_settled: "more rotation on entry — the car turns in more freely"
+once_settled: "the rear stays loaded for longer instead of going light; when droop is too limited the rear lets go suddenly"
+confidence: consensus
 physics:
   - droop-downstop.md
 sources:

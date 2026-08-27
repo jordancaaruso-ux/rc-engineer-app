@@ -1,19 +1,16 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass), rebuilt to the v3 slider shape 2026-08-26.
-# Touring: rear gear diff, front spool. On-power and off-power rotation move in OPPOSITE
-# directions with this knob, which is why it is one slider and not a bite/hold move.
-# WORD GAP: "rotation" is not on the closed feel list — awaiting the founder's additions.
+# AI DRAFT — awaiting founder review. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
+# Touring: rear gear diff, front spool. The on/off-throttle split is a THROTTLE split, not a
+# settled split, so this is one line and not a roll lever.
 id: diff_oil_thicker
 discipline: touring
 change:
   parameter: diff_oil
   direction: increase
   step: null            # a normal-sized move, founder-dictated; null = not set yet
-moves:
-  - slider: differential-coupling
-    end: car
-    toward: coupled
-    confidence: consensus
-feel: "more planted off throttle through mid-corner; more rotation on power"
+roll_lever: false
+effect: "less rotation off throttle and more rotation on throttle — the two move opposite ways, so name which one is missing before touching it; biggest in tight corners"
+confidence: consensus
 physics:
   - diff-and-driveline.md
 sources:

@@ -1,24 +1,15 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass), rebuilt to the v3 slider shape 2026-08-26.
+# AI DRAFT — awaiting founder review. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
 id: spring_rear_stiffer
 discipline: touring
 change:
   parameter: spring_rear
   direction: increase
   step: null            # a normal-sized move, founder-dictated; null = not set yet
-moves:
-  - slider: bite-hold
-    end: rear
-    toward: bite
-    confidence: consensus
-  - slider: roll-stiffness
-    end: rear
-    toward: stiffer
-    confidence: consensus
-  - slider: bump-compliance
-    end: rear
-    toward: worse
-    confidence: consensus
-feel: "the rear gets more pointy, and less planted over bumps"
+roll_lever: true
+before_settled: "the rear bites sooner, and holds on better through quick direction changes"
+once_settled: "more oversteer through the middle, but more rear support on power so it drives straighter off the corner; less planted over bumps"
+confidence: consensus
 physics:
   - spring-rate.md
 sources:

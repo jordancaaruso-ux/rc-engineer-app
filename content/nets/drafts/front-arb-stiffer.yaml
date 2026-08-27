@@ -1,28 +1,15 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass), rebuilt to the v3 slider shape 2026-08-26.
-# The old entry carried its own high-grip reversal. That is not a reversal: high grip slides the
-# bite/hold good spot toward hold, so a car already at the bite end is now past it. The rule lives
-# in bite-hold.md now, once, instead of here and in fifteen other files.
+# AI DRAFT — awaiting founder review. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
 id: front_arb_stiffer
 discipline: touring
 change:
   parameter: arb_front
   direction: increase
   step: null            # a normal-sized move, founder-dictated; null = not set yet
-moves:
-  - slider: bite-hold
-    end: front
-    toward: bite
-    confidence: consensus
-  - slider: bite-hold
-    end: rear
-    toward: hold
-    confidence: majority
-    relative: true
-  - slider: roll-stiffness
-    end: front
-    toward: stiffer
-    confidence: consensus
-feel: "the front gets more pointy and precise; the rear feels more planted behind it"
+roll_lever: true
+before_settled: "more initial steering — the front bites sooner and the car turns in quicker, with less roll"
+once_settled: "more understeer through the middle, and the rear feels more planted behind it"
+confidence: consensus
 physics:
   - arb.md
 sources:

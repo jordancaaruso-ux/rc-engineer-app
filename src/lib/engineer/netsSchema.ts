@@ -1,74 +1,46 @@
 /**
- * Nets schema v3 — pure (no fs / no server-only) so the runtime loader and the validator script
+ * Nets schema v4 — pure (no fs / no server-only) so the runtime loader and the validator script
  * share one definition. Authoring rules: content/nets/README.md.
  *
- * THE IDEA. Every knob on the car is a slider. Too far one way is bad, too far the other way is
- * bad, and the good spot moves with the day — grip, corner speed, how rough the surface is. v1 and
- * v2 both wrote that out separately for all sixteen knobs, and both broke the same way: entries
- * grew to fit their conditions, the model leaned on whichever was longest, and half the "feel"
- * lines were the physics KB restated somewhere shorter and more scannable — so a net could stand
- * in for the physics instead of pointing at it.
+ * WHAT A NET IS. One knob, and what it most likely does, in the driver's words — balance,
+ * understeer, oversteer, steering. Those words appear NOWHERE in the physics KB, on purpose (its
+ * header: "mechanisms, not outcomes"). Outcomes are the one thing a net carries that nothing
+ * else does, and they are the ONLY thing it carries. Everything else — why, what makes it bigger
+ * or smaller, when the opposite move is right — already lives in content/vehicle-dynamics/, and
+ * a net that restates it is a shorter, more scannable copy the model reaches for instead of the
+ * physics. Three earlier formats died of exactly that (founder interview 2026-08-26/27; do not
+ * rebuild the phase grid, the tags, the slider index, or per-knob flip conditions).
  *
- * v3 writes each slider down ONCE, in the concept files, and every knob just says which slider it
- * moves and which way. The "it depends" lives in one place instead of sixteen.
+ * TWO SHAPES, DECIDED BY PHYSICS. A knob that changes how much or how fast the car rolls and
+ * transfers load — bars, springs, damper oil, ride height, droop — genuinely has two answers:
+ * one before the car has settled into the corner, one once it has (concepts/corner-regime.md,
+ * concepts/bite-hold.md). Which answer matters today depends on how long the corner lasts against
+ * how long this car takes to settle, and the model works that out from the KB's rule plus the
+ * facts the request carries. Those knobs carry BOTH lines. A knob that acts through another
+ * mechanism — camber, toe, diff, caster — does one thing whatever the corner's clock says, and
+ * carries ONE line. The unevenness is the physics talking, which is the only kind allowed.
  *
- * NO SWITCHES. An earlier draft had per-knob flip conditions ("when grip is high, this reverses").
- * Grip does not flip anything — the good spot slid, so the car is now further along the slider than
- * it wants to be. A threshold in a knob is a bucket wearing a disguise, and it is why `flips`,
- * `modifiers` and the six-box grid are all rejected below.
- *
- * WHAT LIVES WHERE:
- *   content/vehicle-dynamics/*.md            why a change does what it does        (locked)
- *   content/vehicle-dynamics/concepts/*.md   the sliders: each end's feel, and     (locked)
- *                                            what moves the good spot
- *   content/nets/                            which slider, which way, one line     (drafts)
- *
- * Phase, grip level and corner speed are never stored per knob — they fall out of the sliders.
- * `bite-hold.md` already states that phase is which part of the grip build the driver samples.
+ * The driver's own words. `bite-hold.md` carries a closed feel vocabulary and names the coinages
+ * that are not on it; the founder is extending it with the balance words (steering, rotation,
+ * forward traction). The validator enforces the ban list, not an allow list — an allow list is
+ * unenforceable on free text.
  */
 
-export const NET_ENDS = ["front", "rear", "car"] as const;
 export const NET_CONFIDENCES = ["consensus", "majority", "contested"] as const;
 export const NET_DIRECTIONS = ["increase", "decrease"] as const;
 
 /**
- * Which way a knob can push each slider.
- *
- * This table lives in CODE, not in the concept files, on purpose: the concept files are plain
- * prose with no header block and they are locked by kb-guard, so declaring a vocabulary inside
- * each would be twenty founder-gated diffs for what is plumbing. The key is the concept's
- * filename without `.md` — `bite-hold` resolves to `concepts/bite-hold.md`, and the validator
- * checks that it does.
- */
-export const SLIDER_VOCAB: Readonly<Record<string, readonly [string, string]>> = {
-  "bite-hold": ["bite", "hold"],
-  damping: ["slower", "faster"],
-  "bump-compliance": ["better", "worse"],
-  "camber-grip": ["leaned", "upright"],
-  "toe-and-scrub": ["toed", "straight"],
-  "differential-coupling": ["coupled", "free"],
-  "roll-stiffness": ["stiffer", "softer"],
-  "load-transfer": ["more", "less"],
-  "roll-center": ["higher", "lower"],
-};
-
-/**
  * Words that are not feel words, however natural they sound.
  *
- * `concepts/bite-hold.md` carries the closed list of words that ARE allowed and names some of
- * these itself: *"`punchy`, `crisper`, `takes a set`, `lined up`, `skatey`, `on top of it`,
- * `nervous-feeling`, `too immediate` are examples, not the boundary."* The rest are coinages v1
- * and v2 introduced and shipped.
- *
- * This is a BANNED list rather than an allowed list because an allowed list cannot be enforced on
- * free text — a legitimate sentence contains "the", "on", "track". The founder's rule for what to
- * do when a coinage is the only word that fits is the important half, and it is not a style note:
- * *"it is a sign the change has not been understood well enough to predict its feel — in which
- * case say what the change does mechanically, or name where in the corner and what the car does
- * there, and stop."*
+ * `concepts/bite-hold.md` names the first group itself: *"`punchy`, `crisper`, `takes a set`,
+ * `lined up`, `skatey`, `on top of it`, `nervous-feeling`, `too immediate` are examples, not the
+ * boundary."* The second group are coinages earlier drafts introduced and shipped. The founder's
+ * rule for what to do when a coinage is the only word that fits is the important half: *"it is a
+ * sign the change has not been understood well enough to predict its feel — in which case say
+ * what the change does mechanically, or name where in the corner and what the car does there,
+ * and stop."*
  */
 export const BANNED_FEEL_COINAGES: readonly string[] = [
-  // named in bite-hold.md
   "punchy",
   "crisper",
   "takes a set",
@@ -77,7 +49,6 @@ export const BANNED_FEEL_COINAGES: readonly string[] = [
   "on top of it",
   "nervous-feeling",
   "too immediate",
-  // introduced by the v1 / v2 drafts and shipped
   "pushes",
   "pushing",
   "wandering",
@@ -91,46 +62,34 @@ export const BANNED_FEEL_COINAGES: readonly string[] = [
   "sharper",
   "sharpens",
   "washes",
-  "loose",
   "planted-feeling",
 ];
 
-export const NET_FEEL_MAX = 130;
+export const NET_LINE_MAX = 170;
 export const NET_STEP_MAX = 140;
 export const NET_CONTESTED_FIELD_MAX = 200;
-export const NET_MAX_MOVES = 4;
 
 /**
- * Hard ceiling on the RENDERED entry. The field caps bound each line; only a whole-entry ceiling
- * stops an entry growing back into the one the model favours by bulk. v1 rendered up to ~3.5K
- * characters of source per entry and v2 up to 1,374; v3 entries are four or five lines.
+ * Hard ceiling on the RENDERED entry. Line caps bound each line; only a whole-entry ceiling stops
+ * an entry growing back into the one the model favours by bulk.
  */
-export const NET_RENDER_MAX = 700;
+export const NET_RENDER_MAX = 600;
 
-/** Fields from v1/v2 that must not come back, each with a pointer to its replacement. */
+/** Fields from earlier formats that must not come back, each with a pointer to its replacement. */
 const RETIRED_FIELDS: Readonly<Record<string, string>> = {
-  effects: "the six-box grid is gone — say which slider you move in `moves`, and the phases fall out of the slider",
-  secondary_effects: "removed in v2 — mechanism belongs in the physics KB, not restated here",
-  power: "the on/off-power axis is not stored — it falls out of the slider",
-  overall: "use a `moves` entry with `end: car`, or the single `feel` line",
-  modifiers: "conditions live in the slider's concept file now, written once instead of per knob",
+  effects: "the phase grid is gone — a roll lever carries `before_settled` + `once_settled`, anything else carries `effect`",
+  secondary_effects: "mechanism belongs in the physics KB, not restated here",
+  power: "not stored — a throttle split, where a knob has one, goes in the line itself",
+  overall: "there is no car-level line — put it in the entry's line",
+  modifiers: "conditions live in the KB concept files, written once instead of per knob",
   flips: "a flip is a threshold, and conditions are continuous — the good spot slides, it does not switch",
-  tag: "replaced by `moves[].slider` + `toward`, which resolve to real files",
-  typical_step: "renamed to `step`, and it is founder-dictated or null",
+  tag: "no machine vocabulary — the driver's words ARE the index",
+  moves: "the slider index restated the physics KB; the KB already says which lever a knob moves",
+  feel: "split into `before_settled` + `once_settled` for roll levers, `effect` for the rest",
+  typical_step: "renamed to `step`, founder-dictated or null",
   varies_by_car: "dropped — nothing in the app reads a step off a driver's sheet",
-  dose_response: "the slider says where the good spot is; a per-knob dose curve says it twice",
-  physics_link: "renamed to `physics`, to keep it distinct from the sliders in `moves`",
-};
-
-export type NetMove = {
-  /** Concept filename without `.md`; must be a key of SLIDER_VOCAB and resolve on disk. */
-  slider: string;
-  end: (typeof NET_ENDS)[number];
-  /** One of the two words SLIDER_VOCAB declares for this slider. */
-  toward: string;
-  confidence: (typeof NET_CONFIDENCES)[number];
-  /** True when this is a knock-on from moving the other end, not a direct action. */
-  relative?: boolean;
+  dose_response: "the KB's window says where the good spot is; a per-knob dose curve says it twice",
+  physics_link: "renamed to `physics`",
 };
 
 export type NetEntry = {
@@ -142,15 +101,21 @@ export type NetEntry = {
     /** A normal-sized move, in the founder's words. `null` until he has dictated it. */
     step: string | null;
   };
-  moves: NetMove[];
-  /** One line, closed vocabulary. What the driver notices. */
-  feel: string;
+  /**
+   * True when the knob changes how much or how fast the car rolls / transfers load. Decides the
+   * shape: roll levers carry `before_settled` + `once_settled`; others carry `effect`.
+   */
+  roll_lever: boolean;
+  before_settled?: string;
+  once_settled?: string;
+  effect?: string;
+  confidence: (typeof NET_CONFIDENCES)[number];
   contested?: {
     claim_a: string;
     claim_b: string;
     discriminator: string;
   };
-  /** Parameter-level physics files (not sliders) — the anti-substitution hook. */
+  /** Files in content/vehicle-dynamics/ — the anti-substitution hook. */
   physics: string[];
   sources?: string[];
 };
@@ -167,13 +132,30 @@ function capped(v: unknown, max: number): boolean {
   return typeof v === "string" && v.trim().length > 0 && v.trim().length <= max;
 }
 
-/** Coinages found in a feel line. Word-boundary matched so "loose" does not fire on "loosely". */
+/** Coinages found in a line. Word-boundary matched so "lazy" does not fire on "lazily". */
 export function findBannedCoinages(text: string): string[] {
   const hay = text.toLowerCase();
   return BANNED_FEEL_COINAGES.filter((word) => {
     const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     return new RegExp(`(^|[^a-z])${escaped}([^a-z]|$)`, "i").test(hay);
   });
+}
+
+function checkLine(errs: string[], field: string, v: unknown, required: boolean): void {
+  if (v == null) {
+    if (required) errs.push(`${field}: required — one line, in the driver's words`);
+    return;
+  }
+  if (!capped(v, NET_LINE_MAX)) {
+    errs.push(`${field}: must be a non-empty string of at most ${NET_LINE_MAX} chars`);
+    return;
+  }
+  const banned = findBannedCoinages(v as string);
+  if (banned.length > 0) {
+    errs.push(
+      `${field}: "${banned.join('", "')}" ${banned.length === 1 ? "is a coinage" : "are coinages"} — per bite-hold.md, that means the change is not understood well enough to predict its feel. Say what it does mechanically, or name where in the corner and what the car does there, and stop`
+    );
+  }
 }
 
 /** Validate one parsed YAML document. Returns error strings; empty = valid. */
@@ -203,59 +185,25 @@ export function validateNetEntry(raw: unknown): string[] {
     }
   }
 
-  let hasContestedMove = false;
-  if (!Array.isArray(e.moves) || e.moves.length === 0) {
-    errs.push("moves: required non-empty array — which slider this knob moves, and which way");
+  if (typeof e.roll_lever !== "boolean") {
+    errs.push("roll_lever: required boolean — true if the knob changes how much or how fast the car rolls / transfers load");
+  } else if (e.roll_lever) {
+    checkLine(errs, "before_settled", e.before_settled, true);
+    checkLine(errs, "once_settled", e.once_settled, true);
+    if (e.effect != null) errs.push("effect: a roll lever carries before_settled + once_settled, not effect");
   } else {
-    if (e.moves.length > NET_MAX_MOVES)
-      errs.push(`moves: at most ${NET_MAX_MOVES} — a knob that moves more sliders than that is really several knobs`);
-    const seen = new Set<string>();
-    e.moves.forEach((m, i) => {
-      if (!m || typeof m !== "object") {
-        errs.push(`moves[${i}]: not an object`);
-        return;
-      }
-      const mm = m as Record<string, unknown>;
-      const slider = mm.slider;
-      const vocab = typeof slider === "string" ? SLIDER_VOCAB[slider] : undefined;
-      if (!isNonEmptyString(slider)) {
-        errs.push(`moves[${i}].slider: required — a concept filename without .md`);
-      } else if (!vocab) {
-        errs.push(
-          `moves[${i}].slider: "${slider}" has no direction vocabulary — add it to SLIDER_VOCAB, or the slider does not exist yet`
-        );
-      }
-      if (!oneOf(mm.end, NET_ENDS)) errs.push(`moves[${i}].end: must be one of ${NET_ENDS.join("|")}`);
-      if (vocab && !vocab.includes(mm.toward as string))
-        errs.push(`moves[${i}].toward: must be one of ${vocab.join("|")} for slider "${String(slider)}"`);
-      if (!oneOf(mm.confidence, NET_CONFIDENCES))
-        errs.push(`moves[${i}].confidence: must be one of ${NET_CONFIDENCES.join("|")}`);
-      if (mm.relative != null && typeof mm.relative !== "boolean")
-        errs.push(`moves[${i}].relative: must be a boolean when present`);
-      if (mm.confidence === "contested") hasContestedMove = true;
-      if (isNonEmptyString(slider) && oneOf(mm.end, NET_ENDS)) {
-        const key = `${slider}/${mm.end}`;
-        if (seen.has(key)) errs.push(`moves: two entries for ${key} — one knob moves one slider one way at one end`);
-        seen.add(key);
-      }
-    });
+    checkLine(errs, "effect", e.effect, true);
+    if (e.before_settled != null || e.once_settled != null)
+      errs.push("before_settled/once_settled: only a roll lever splits by settle — this knob carries one `effect` line");
   }
 
-  if (!capped(e.feel, NET_FEEL_MAX)) {
-    errs.push(`feel: required, max ${NET_FEEL_MAX} chars — one line of what the driver notices`);
-  } else {
-    const banned = findBannedCoinages(e.feel as string);
-    if (banned.length > 0) {
-      errs.push(
-        `feel: "${banned.join('", "')}" ${banned.length === 1 ? "is a coinage" : "are coinages"} — per bite-hold.md, that means the change is not understood well enough to predict its feel. Say what it does mechanically, or name where in the corner and what the car does there, and stop`
-      );
-    }
-  }
+  if (!oneOf(e.confidence, NET_CONFIDENCES))
+    errs.push(`confidence: must be one of ${NET_CONFIDENCES.join("|")}`);
 
   const contested = e.contested as Record<string, unknown> | undefined;
-  if (hasContestedMove) {
+  if (e.confidence === "contested") {
     if (!contested || typeof contested !== "object") {
-      errs.push("contested: required when any move has confidence: contested");
+      errs.push("contested: required when confidence is contested");
     } else {
       for (const k of ["claim_a", "claim_b", "discriminator"] as const) {
         if (!capped(contested[k], NET_CONTESTED_FIELD_MAX))
@@ -263,7 +211,7 @@ export function validateNetEntry(raw: unknown): string[] {
       }
     }
   } else if (contested != null) {
-    errs.push("contested: present but no move has confidence: contested — mark the move or drop the block");
+    errs.push("contested: present but confidence is not contested — mark it or drop the block");
   }
 
   if (!Array.isArray(e.physics) || e.physics.length === 0 || e.physics.some((p) => !isNonEmptyString(p))) {
@@ -278,9 +226,7 @@ export function validateNetEntry(raw: unknown): string[] {
   if (errs.length === 0) {
     const rendered = renderNetEntry(raw as NetEntry).length;
     if (rendered > NET_RENDER_MAX) {
-      errs.push(
-        `entry renders to ${rendered} chars, over the ${NET_RENDER_MAX} ceiling — length is attention the knob has not earned`
-      );
+      errs.push(`entry renders to ${rendered} chars, over the ${NET_RENDER_MAX} ceiling — length is attention the knob has not earned`);
     }
   }
 
@@ -295,20 +241,20 @@ export function renderNetEntry(entry: NetEntry): string {
   const lines: string[] = [];
   const dirWord = entry.change.direction === "increase" ? "more/stiffer" : "less/softer";
   lines.push(
-    `CHANGE: ${entry.change.parameter} ${entry.change.direction} (${dirWord})` +
+    `CHANGE: ${entry.change.parameter} ${entry.change.direction} (${dirWord}) [${entry.confidence}]` +
       (entry.change.step ? ` | a normal move: ${entry.change.step}` : "")
   );
-  for (const m of entry.moves) {
-    lines.push(
-      `  SLIDES: ${m.end} toward ${m.toward} on the ${m.slider} slider (${m.confidence}${m.relative ? ", knock-on" : ""})`
-    );
+  if (entry.roll_lever) {
+    lines.push(`  BEFORE THE CAR SETTLES: ${entry.before_settled}`);
+    lines.push(`  ONCE SETTLED: ${entry.once_settled}`);
+  } else {
+    lines.push(`  EFFECT: ${entry.effect}`);
   }
-  lines.push(`  FEEL: ${entry.feel}`);
   if (entry.contested) {
     lines.push(`  CONTESTED — claim A: ${entry.contested.claim_a}`);
     lines.push(`            claim B: ${entry.contested.claim_b}`);
     lines.push(`            what decides it on track: ${entry.contested.discriminator}`);
   }
-  lines.push(`  MECHANISM: ${entry.physics.join(", ")}`);
+  lines.push(`  WHY: ${entry.physics.join(", ")}`);
   return lines.join("\n");
 }

@@ -1,4 +1,5 @@
-# AI DRAFT — founder-corrected 2026-08-25 (JC pass), rebuilt to the v3 slider shape 2026-08-26.
+# AI DRAFT — awaiting founder review. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
 # `increase` means MORE TOE-OUT, the touring front convention. Sheet signs differ.
 id: front_toe_out_more
 discipline: touring
@@ -6,16 +7,9 @@ change:
   parameter: toe_front
   direction: increase
   step: null            # a normal-sized move, founder-dictated; null = not set yet
-moves:
-  - slider: toe-and-scrub
-    end: front
-    toward: toed
-    confidence: consensus
-  - slider: bite-hold
-    end: front
-    toward: bite
-    confidence: majority
-feel: "more front bite, and a smoother response right around centre"
+roll_lever: false
+effect: "more steering overall and a gentler response right around centre; a touch of straight-line speed and tyre life goes with every degree"
+confidence: majority
 physics:
   - toe.md
 sources:
