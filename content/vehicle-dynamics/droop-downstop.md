@@ -13,3 +13,10 @@ the limit that corner takes load slowly through its springs; past it the path is
 arrives at once. More extension delays the switch, so load builds later there — the
 [[corner-regime]] timing mechanism. Past the limit the end is stiffer in roll too, so its
 steady-state share moves.
+
+**The window (founder, 2026-08-27).** Droop is a working range, and both ends of it are wrong in
+different ways. **Too much front droop:** slow to react — harder to drive on the lack-of-precision
+side, and harder to drive on throttle. **Too little front droop:** the front reacts faster and takes a
+direction change quicker, but it can be harder to drive for it — too reactive when grip is up. **Too
+little rear droop:** the rear runs out of extension and lets go suddenly; that abruptness is the sign.
+A move toward one end says nothing about the failure waiting at the other.

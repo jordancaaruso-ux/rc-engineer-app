@@ -9,7 +9,7 @@ change:
   direction: increase
   step: "50 cSt; 25 is a small one"   # founder-dictated 2026-08-27
 roll_lever: true
-before_settled: "the front rolls in slower, so the initial steering arrives calmer and more forgiving — not more of it; too far and it goes imprecise"
+before_settled: "the front rolls in slower, so the initial steering arrives calmer and more forgiving — not more of it; too far and it reacts too slowly, and is just slower"
 once_settled: "no change — damping only acts while the car is moving, and a settled car has stopped"
 confidence: consensus
 physics:

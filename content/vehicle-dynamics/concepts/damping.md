@@ -16,6 +16,12 @@ sits between them is not derivable from the change alone.
 Over a *run* of inputs the wheel must also extend before the next arrives; if it can't, travel is
 used up and the car rides down.
 
+**The window (founder, 2026-08-27).** Both ends are wrong in different ways, and a move in one
+direction says nothing about the failure waiting at the other. **Too much damping:** the car reacts
+too slowly — it does not answer inputs as fast, and it is simply slower for it; it also reads as
+imprecise. **Too little:** the car moves too quickly — too reactive, harder to drive. Where the good
+spot sits is not derivable from the change alone; a rougher surface pulls it toward less.
+
 **Moved by:** damper oil [[damper-oil]] (thicker → more damping), plus pistons and holes.
 **Affects:** [[load-transfer]] (rate of the slow/elastic path); what that timing does to grip
 character lives in [[bite-hold]].
