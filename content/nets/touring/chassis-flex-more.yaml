@@ -8,7 +8,7 @@ discipline: touring
 change:
   parameter: top_deck_screws
   direction: decrease
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "softer top decks, more cuts or a softer material, fewer screws in the top decks or motor mount"   # founder-dictated 2026-08-27
 roll_lever: true
 before_settled: "load moves into the tyres more slowly, so the car feels more forgiving and less pointy on turn-in"
 once_settled: "more overall grip on a low-grip or bumpy track, but less precise on high grip — the platform gives before the tyre does"

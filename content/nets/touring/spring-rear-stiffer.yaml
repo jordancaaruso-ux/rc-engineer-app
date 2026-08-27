@@ -5,7 +5,7 @@ discipline: touring
 change:
   parameter: spring_rear
   direction: increase
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "one step in the range, often 0.1"   # founder-dictated 2026-08-27
 roll_lever: true
 before_settled: "the rear bites sooner, and holds on better through quick direction changes"
 once_settled: "tends toward more oversteer mid-corner, though it can go the other way; more rear support on power, so it can drive straighter off; less planted over bumps"

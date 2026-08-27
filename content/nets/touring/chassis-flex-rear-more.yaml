@@ -7,7 +7,7 @@ discipline: touring
 change:
   parameter: top_deck_rear
   direction: decrease
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "one screw behind the spur gear on the motor mount or top deck, or one less cut in the rear top deck — flex screws move toward the rear"   # founder-dictated 2026-08-27
 roll_lever: true
 before_settled: "the rear bites later — a little less secure from the first steering input, but more progressive"
 once_settled: "tends toward more rear grip through the middle, though it can go the other way — often it is LESS rear flex that gives more rear grip and less rotation"

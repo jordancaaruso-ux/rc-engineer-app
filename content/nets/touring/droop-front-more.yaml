@@ -5,7 +5,7 @@ discipline: touring
 change:
   parameter: droop_front
   direction: increase
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "0.2 mm"   # founder-dictated 2026-08-27
 roll_lever: true
 before_settled: "smoother initially — the steering comes in gently rather than all at once"
 once_settled: "the front keeps gaining grip for longer, so more steering through the middle and on the way out"

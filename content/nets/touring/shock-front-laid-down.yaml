@@ -8,7 +8,7 @@ discipline: touring
 change:
   parameter: shock_angle_front
   direction: decrease
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "one hole, about 0.5 mm"   # founder-dictated 2026-08-27
 roll_lever: true
 before_settled: "less initial steering — the front takes longer to bite, but it comes in more progressively"
 once_settled: "more front grip through the middle and more forgiving over bumps; the rate rises the harder it is pushed, so it firms up under big loads"

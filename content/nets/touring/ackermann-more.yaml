@@ -7,7 +7,7 @@ discipline: touring
 change:
   parameter: inner_steering_angle
   direction: increase
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "0.5 mm"   # founder-dictated 2026-08-27
 roll_lever: false
 effect: "less initial steering but smoother through tight corners; and it does more the tighter the corner is"
 confidence: majority

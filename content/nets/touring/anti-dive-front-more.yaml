@@ -7,7 +7,7 @@ discipline: touring
 change:
   parameter: under_lower_arm_shims_fr
   direction: increase
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "a 0.25 shim"   # founder-dictated 2026-08-27
 roll_lever: false
 effect: "the nose dives less on the brakes, so the front bites sooner into a braking corner; less forgiving over bumps under brakes"
 confidence: majority

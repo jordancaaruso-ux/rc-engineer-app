@@ -5,7 +5,7 @@ discipline: touring
 change:
   parameter: camber_rear
   direction: increase
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "0.5° is standard; 0.25° for a tweak"   # founder-dictated 2026-08-27
 roll_lever: false
 effect: "more rear hold mid-corner and a shade less forward traction on power; how much you get depends heavily on the tyre"
 confidence: consensus

@@ -7,7 +7,7 @@ discipline: touring
 change:
   parameter: top_deck_front
   direction: decrease
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "one screw ahead of the spur gear on the motor mount or top deck, or one less cut in the front top deck — flex screws move toward the front"   # founder-dictated 2026-08-27
 roll_lever: true
 before_settled: "the front bites later, so a little less initial steering, and it comes in more gently"
 once_settled: "more front grip through the middle — the front gives before the tyre does — and more forgiving over bumps at that end"

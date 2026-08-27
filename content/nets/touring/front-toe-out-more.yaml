@@ -6,7 +6,7 @@ discipline: touring
 change:
   parameter: toe_front
   direction: increase
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "0.2° per side; even 0.1° is noticeable"   # founder-dictated 2026-08-27
 roll_lever: false
 effect: "more steering overall and a gentler response right around centre; a touch of straight-line speed and tyre life goes with every degree"
 confidence: majority

@@ -7,7 +7,7 @@ discipline: touring
 change:
   parameter: shock_angle_rear
   direction: decrease
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "one hole, about 0.5 mm"   # founder-dictated 2026-08-27
 roll_lever: true
 before_settled: "the rear takes longer to bite — a little less secure on turn-in, but more progressive"
 once_settled: "more rear grip through the middle and more forgiving over bumps; firms up under big loads"

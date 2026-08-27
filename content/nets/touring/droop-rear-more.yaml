@@ -5,7 +5,7 @@ discipline: touring
 change:
   parameter: droop_rear
   direction: increase
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "0.2 mm"   # founder-dictated 2026-08-27
 roll_lever: true
 before_settled: "more rotation on entry — the car turns in more freely"
 once_settled: "the rear stays loaded for longer instead of going light; when droop is too limited the rear lets go suddenly"

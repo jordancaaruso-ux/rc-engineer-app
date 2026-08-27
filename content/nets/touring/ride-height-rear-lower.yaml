@@ -6,7 +6,7 @@ discipline: touring
 change:
   parameter: ride_height_rear
   direction: decrease
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "0.2 mm"   # founder-dictated 2026-08-27
 roll_lever: true
 before_settled: "with the tail lower than the nose, more likely a little less initial steering"
 once_settled: "more likely a touch more rear grip through the middle and more planted on power — but hard to call, the geometry moves with it; too low and it touches under power"

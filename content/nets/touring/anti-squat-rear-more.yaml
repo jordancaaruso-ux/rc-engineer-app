@@ -8,7 +8,7 @@ discipline: touring
 change:
   parameter: under_lower_arm_shims_rf
   direction: increase
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "a 0.25 shim"   # founder-dictated 2026-08-27
 roll_lever: false
 effect: "the rear squats less on power and the drive arrives sooner — more forward traction and more on-power steering on a smooth track; less forgiving over bumps under power"
 confidence: majority

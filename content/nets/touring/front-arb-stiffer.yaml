@@ -5,7 +5,7 @@ discipline: touring
 change:
   parameter: arb_front
   direction: increase
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "0.1 mm"   # founder-dictated 2026-08-27
 roll_lever: true
 before_settled: "more initial steering — the front bites sooner and the car turns in quicker, with less roll"
 once_settled: "more understeer through the middle, and the rear feels more planted behind it"

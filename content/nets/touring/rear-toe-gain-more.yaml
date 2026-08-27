@@ -8,7 +8,7 @@ discipline: touring
 change:
   parameter: toe_gain_shims_rear
   direction: decrease
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "half a shim, depending on how sensitive the car is — about 0.2° more gain from static ride height to compressed onto the board"   # founder-dictated 2026-08-27
 roll_lever: false
 effect: "as more rear toe — more rear grip, less rotation, more forward traction — but arriving as it rolls and squats; it extends on the way in, so less toe and security there"
 confidence: majority

@@ -7,7 +7,7 @@ discipline: touring
 change:
   parameter: caster_front
   direction: increase
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "0.5°"   # founder-dictated 2026-08-27
 roll_lever: false
 effect: "less initial steering, more steering through the middle and on the way out"
 confidence: majority

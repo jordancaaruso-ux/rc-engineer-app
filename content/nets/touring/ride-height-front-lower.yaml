@@ -7,7 +7,7 @@ discipline: touring
 change:
   parameter: ride_height_front
   direction: decrease
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "0.2 mm"   # founder-dictated 2026-08-27
 roll_lever: true
 before_settled: "with the nose lower than the tail, more likely a little more initial steering"
 once_settled: "more likely a touch more front grip through the middle, but hard to call — the geometry moves with it; too low and it touches, unpredictable with no warning"

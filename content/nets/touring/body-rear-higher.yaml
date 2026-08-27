@@ -6,7 +6,7 @@ discipline: touring
 change:
   parameter: rear_hrb_setting
   direction: increase
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "1 mm"   # founder-dictated 2026-08-27
 roll_lever: false
 effect: "more rear grip the faster you go — more secure in fast corners, little change in slow ones; a touch of straight-line speed goes with it"
 confidence: majority

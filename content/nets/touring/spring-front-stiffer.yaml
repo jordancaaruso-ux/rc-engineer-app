@@ -5,7 +5,7 @@ discipline: touring
 change:
   parameter: spring_front
   direction: increase
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "one step in the range, often 0.1"   # founder-dictated 2026-08-27
 roll_lever: true
 before_settled: "more initial steering into the corner"
 once_settled: "more understeer through the middle and on the way out; less planted over bumps"

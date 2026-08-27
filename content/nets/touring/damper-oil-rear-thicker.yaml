@@ -6,7 +6,7 @@ discipline: touring
 change:
   parameter: damper_oil_rear
   direction: increase
-  step: null            # a normal-sized move, founder-dictated; null = not set yet
+  step: "50 cSt; 25 is a small one"   # founder-dictated 2026-08-27
 roll_lever: true
 before_settled: "the rear takes its set slower — more forgiving into the corner and settling onto the power; too far and it goes imprecise"
 once_settled: "no change — damping only acts while the car is moving, and a settled car has stopped"
