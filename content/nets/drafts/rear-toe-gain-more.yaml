@@ -10,7 +10,7 @@ change:
   direction: decrease
   step: null            # a normal-sized move, founder-dictated; null = not set yet
 roll_lever: false
-effect: "more rear grip exactly when the outer rear is loaded — more secure in roll and on power — without the straight-line cost of static toe"
+effect: "as more rear toe — more rear grip, less rotation, more forward traction — but arriving as it rolls and squats; it extends on the way in, so less toe and less security there"
 confidence: majority
 physics:
   - bump-steer-toe-gain.md
