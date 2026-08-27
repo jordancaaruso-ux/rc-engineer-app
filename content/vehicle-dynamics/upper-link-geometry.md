@@ -29,8 +29,16 @@ a camber change and the static angle has to be re-checked against it. Ride heigh
 it moves RC without taking camber gain with it.
 
 **Removing** shims reverses each. The two upper-link ends run **opposite senses** and are **equal in
-strength** (~0.5 mm of RC each); the **under-lower-arm and under-hub shims are about twice as
-strong** as either upper-link end.
+strength** (~0.5 mm of RC each); the **under-lower-arm and under-hub shims move the roll centre
+about twice as far** as either upper-link end.
+
+**What each key leans toward, relative to the others.** All four move camber gain by a similar
+amount — −0.015 to −0.019° per mm of bump for a 0.5 mm shim (solver-verified 2026-08-27) — while
+the roll-centre change differs by two to one. So measured against its own roll-centre change, an
+upper-link shim carries relatively more camber-gain change than a lower-arm or hub shim does; and
+measured against each other, the under-lower-arm and under-hub shims lean toward a roll-centre
+change, the upper-link ends toward a camber-gain change. Every key moves both; the lean is relative,
+not a split.
 
 Directions hold for normal double-wishbone geometry; the magnitudes are this chassis
 (solver-verified 2026-08-01, 0.5 mm perturbations from the pack baseline).
