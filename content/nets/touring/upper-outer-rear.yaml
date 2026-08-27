@@ -6,6 +6,7 @@
 # Adding upper-OUTER shims raises RC.
 # v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
 # carried over from upper-outer-rear-more.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+# Founder, 2026-08-27: on the roll-centre keys the rear RELATIVE to the other end is as important as the change itself, if not more — said on every side.
 id: upper_outer_shims_rear
 discipline: touring
 parameter: upper_outer_shims_rear
@@ -19,11 +20,11 @@ more:
   reviewed: true
   confidence: majority
   before_settled: "a big change in rear bite — noticeably more secure from the first input, and more on the track"
-  once_settled: "tends toward oversteer through the middle, though it can go the other way; the overall rear grip feel moves with it; exit either way"
+  once_settled: "tends toward oversteer through the middle, though it can go the other way; the overall rear grip feel moves with it; exit either way; rear against front is what you feel"
 less:
   reviewed: false
   confidence: majority
-  before_settled: "a big change in rear bite the other way — less secure from the first input, and more in the track"
+  before_settled: "a big change in rear bite the other way — less secure from the first input, and more in the track; rear against front is what you feel"
   once_settled: "tends toward more rear hold through the middle, though it can go the other way; the overall rear grip feel moves with it; exit either way"
 physics:
   - upper-link-geometry.md

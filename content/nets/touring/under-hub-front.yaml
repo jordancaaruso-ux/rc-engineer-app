@@ -4,6 +4,7 @@
 # roll-centre direction only. Raises RC ~1.05 mm per 0.5 mm shim (about as strong as the lower arm); adds camber gain.
 # v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
 # carried over from under-hub-front-more.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+# Founder, 2026-08-27: on the roll-centre keys the front RELATIVE to the other end is as important as the change itself, if not more — said on every side.
 id: under_hub_shims_front
 discipline: touring
 parameter: under_hub_shims_front
@@ -17,12 +18,12 @@ more:
   reviewed: true
   confidence: majority
   before_settled: "more front bite — more initial steering, and the front feels more on the track"
-  once_settled: "generally more understeer through the middle with a higher front roll centre"
+  once_settled: "generally more understeer through the middle with a higher front roll centre; front against rear is what you feel"
 less:
   reviewed: false
   confidence: majority
   before_settled: "less front bite — less initial steering, and the front feels more in the track"
-  once_settled: "generally more front grip through the middle with a lower front roll centre"
+  once_settled: "generally more front grip through the middle with a lower front roll centre; front against rear is what you feel"
 physics:
   - under-hub.md
 sources:

@@ -19,12 +19,12 @@ two_answers: true
 more:
   reviewed: true
   confidence: majority
-  before_settled: "feels more direct and precise from the first input — stiffer, more on the track, a little more initial grip"
+  before_settled: "feels more direct and precise from the first input — stiffer, more on the track, more initial grip"
   once_settled: "tends toward understeer mid-corner; and it is the front against the rear you feel — raise both together and much of it cancels"
 less:
   reviewed: false
   confidence: majority
-  before_settled: "feels less direct from the first input — softer, more in the track, a little less initial grip"
+  before_settled: "feels less direct from the first input — softer, more in the track, less initial grip"
   once_settled: "tends toward more front grip mid-corner — less understeer; the front against the rear is what you feel"
 physics:
   - under-lower-arm.md
