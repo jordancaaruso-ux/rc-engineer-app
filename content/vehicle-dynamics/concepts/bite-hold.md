@@ -17,6 +17,11 @@ Neither end is "better" — there's a window that depends on the driver and the 
 toward ultimate pace that's hard to hit consistently; more hold toward easy and repeatable with a
 lower ceiling — but both extremes hurt.
 
+**The window moves with grip.** As grip rises, the bite end gets harder to drive — the car answers
+every input and leaves no time to react. As grip falls, the hold end gets harder — too little bite
+reads numb and unpredictable. The same setting can be right at one grip level and wrong at another
+with nothing on the car changed.
+
 **Per axle.** Front and rear each have their own bite/hold.
 
 ## Feel vocabulary (the closed list)
@@ -33,6 +38,10 @@ stop.
 - **Too little bite:** `numb`, `unpredictable`, `imprecise`
 - **Roll-centre / link language:** `smoother`, `more rolled-in`, `on the track`, `in the track`
 - **Phase:** `entry`, `mid-corner`, `on power`
+- **Balance** (founder, 2026-08-27): `understeer`, `oversteer` — the overall balance · `steering` —
+  balance owed to the front · `rotation` — balance owed to the rear · `forward traction` / `drive` —
+  the rear putting power down · `push` — understeer caused by a lack of rotation from the rear, not a
+  front problem · `snap` — a quick oversteer
 - `responsive` — reserved: only for **on the track** / **initial bite** / **initial grip**. Never for
   a lower roll centre or a flatter upper link.
 

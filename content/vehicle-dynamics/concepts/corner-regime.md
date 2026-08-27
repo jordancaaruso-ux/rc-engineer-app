@@ -11,7 +11,7 @@ gets depends on whether the chassis has finished rolling at the moment they are 
 - **The middle — once roll has finished and speed and radius hold.** Only then is the settled
   mechanism running. Any corner the car is in for longer than it takes to finish rolling has one.
 - **A corner with no middle:** a chicane, an ess, a flick. The direction change is over before roll
-  finishes, so it is all entry.
+  finishes, so it leans toward entry the hardest of anything on the track.
 
 So the **phase** decides which mechanism is running, and **how long the car is in the corner**
 decides how much middle there is. That is a question of time, not shape: a long, slow hairpin can
@@ -24,6 +24,16 @@ still rolling. The same change therefore lands differently on the two: more of a
 change on the slower car, more of a timing one on the faster, so a setting proven in one class can
 answer the other way in the other at the same track. Anything that changes corner speed moves it the
 same way — grip coming up through the day, a tyre change, a layout rework.
+
+Of the two, **speed is the bigger factor.** A faster car spends more of every corner still rolling,
+so more of its lap is decided by when grip arrives and less by how much settles — it lives nearer the
+initial-grip end. A **direction change** leans that way the hardest: the car is already rolled the
+wrong way when the next input arrives.
+
+**Scope.** This applies to changes that move how much or how fast the car rolls and transfers load —
+springs, bars, damping, ride height, droop, roll-centre, and chassis flex, which sets how fast the
+platform takes up the load. Camber, toe, Ackermann and the diff act through other mechanisms and do
+not swing with the corner's clock.
 
 ## Corner regime — how far a stiffness change carries
 
@@ -53,3 +63,8 @@ takes its load **sooner** on the way in, so its grip is there **earlier**. Softe
 **Front/rear symmetry.** All of this applies at either axle. A stiffer front loads sooner while
 roll develops and carries a bigger share once roll is constant; a softer front is the mirror of
 both. Which part of the corner decides the sign.
+
+**The settled answer at the rear is the least trustworthy claim on this page** (founder, 2026-08-27).
+Stiffer at the rear — bar, spring, or less rear flex — is expected to give up rear grip once the car
+has settled, and on track it often does the opposite: more rear grip and less rotation. The mechanism
+for that is not yet understood. Hold the settled-rear answer more loosely than the rest, and say so.
