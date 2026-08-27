@@ -50,6 +50,35 @@ Everything else is a coinage, however natural it sounds. `punchy`, `crisper`, `t
 boundary — the boundary is this list. A coinage carries no mechanism, cannot be checked on track,
 and leaves the driver asking what was meant.
 
+## What drivers say (translation, not diagnosis)
+
+Drivers do not speak the list above. They say "no grip", "won't turn in", "loose", "twitchy". Each
+of those phrases can mean more than one thing on this page, and which one it is decides which
+mechanism is running — so a phrase is a starting point that carries every candidate that fits, and
+the question beside it is what separates them. It is asked only when the answer would change the
+advice; when the driver has already said enough, the candidates that no longer fit simply drop.
+The same phrase leans one way on a low-grip day and the other on a high-grip day (the window
+paragraph above), and any of them can be the tyre, the track, or the driver before it is the car.
+
+| The driver says | Can mean | What separates them |
+|---|---|---|
+| "no grip", "like ice", "nothing there" | short of **bite** — the grip is there once the car has settled but arrives so late it is never trusted, common on a low-grip day · both ends short of **hold** · the tyre or the track itself | Is the grip there once the car has settled, just late? Did other cars on the same tyre have it? |
+| "won't turn in", "no steering on entry", "doesn't want to turn" | front short of **bite** · rear with too much **bite** — it takes its load first and holds the car straight | Does the front come in late, or never? Is the rear holding it straight while the front waits? |
+| "understeers", "pushes mid-corner", "won't hold the line" | front short of **hold** · **push** — the rear has too much hold and the car will not rotate | Is the front sliding, or is the whole car just not rotating? |
+| "loose", "the rear steps out", "oversteer" | rear short of **bite** (turn-in, direction changes) · rear short of **hold** (mid-corner) · short of **forward traction** (on power) | Which part of the corner, and on or off the throttle? |
+| "too pointy", "edgy", "can't drive it", "twitchy", "darty" | too much **bite** — past the bite end of the window, common when grip comes up · the car moving too quickly — too little damping, too little droop ([[damping]], [[droop-downstop]]) | Does it answer too hard and stay there, or move too fast and then settle? Has grip come up today? |
+| "numb", "vague", "no feel", "doesn't do what I ask" | short of **bite** · the car reacting too slowly — too much damping, too much droop | Slow to answer at all, or the answer arrives late but then it is all there? |
+| "lazy", "slow to react", "won't change direction" | too much damping · too much droop · a fast car short of **initial** grip in direction changes ([[corner-regime]]) | Slow into everything, or only in the quick direction changes? |
+| "unpredictable", "inconsistent", "can't trust it" | too much **bite** — lets go without warning · too little bite on a low-grip day — never quite arrives · the chassis touching down ([[ride-height-and-rake]]) · the rear running out of droop and letting go suddenly | Does it let go without warning at the limit, or never quite arrive? Low grip or high? |
+| "bouncy", "unsettled over bumps", "skips" | too much damping — it cannot get out of the way of a fast input · too little damping — it keeps moving after the hit ([[bump-compliance]]) · the platform too stiff ([[flex-chassis]]) | On the bump itself, or after it? |
+| "no drive", "no forward traction", "spins up" | rear short of **hold** on power · the diff too free — it lacks drive ([[differential-coupling]]) · anti-squat ([[anti-dive-anti-squat]]) | Is it wheelspin, or the rear sliding sideways on power? |
+| "snaps", "lets go all at once" | a quick oversteer: on power (a diff too tight) · off power (a diff too free) · the rear out of droop · past the bite end of the window | On or off the throttle? Sudden every time, or only at the limit? |
+| "good on entry but not mid" / "good mid but not entry" | the driver has placed it on the clock already — entry is the bite end, mid the hold end; no question needed | — |
+
+Two phrases the table deliberately does not translate: "more steering" and "more grip" on their own
+say nothing about **where** — they are answered by asking which part of the corner, or by reading
+the run.
+
 **Caused by:** the speed of load transfer ([[load-transfer]]) — fast transfer → bite, slow → hold —
 but only through the knobs that change **how much roll is taken** by the time load arrives.
 **Damping is the exception** (founder-confirmed 2026-08-07): it changes *when* the load gets there
