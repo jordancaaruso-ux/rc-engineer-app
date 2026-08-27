@@ -5,7 +5,7 @@ discipline: touring
 change:
   parameter: toe_rear
   direction: increase
-  step: "0.2° per side; 0.1° is noticeable, up to 0.5° for a big change"   # founder-dictated 2026-08-27
+  step: "0.25° per side; 0.1° is a very small change, 0.5° a pretty big one"   # founder-dictated 2026-08-27, corrected same day
 roll_lever: false
 effect: "more rear grip and security everywhere, less rotation, more forward traction; it costs straight-line speed, and less rear toe generally means more corner speed"
 confidence: consensus
