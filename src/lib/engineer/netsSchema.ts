@@ -239,7 +239,8 @@ export function validateNetEntry(raw: unknown): string[] {
  */
 export function renderNetEntry(entry: NetEntry): string {
   const lines: string[] = [];
-  const dirWord = entry.change.direction === "increase" ? "more/stiffer" : "less/softer";
+  // Plain "more"/"less": "stiffer" read right on a bar and wrong on caster or camber (founder drive, 2026-08-27).
+  const dirWord = entry.change.direction === "increase" ? "more" : "less";
   lines.push(
     `CHANGE: ${entry.change.parameter} ${entry.change.direction} (${dirWord}) [${entry.confidence}]` +
       (entry.change.step ? ` | a normal move: ${entry.change.step}` : "")
