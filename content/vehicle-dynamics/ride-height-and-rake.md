@@ -3,9 +3,10 @@
 **Concepts:** [[load-transfer]], [[roll-center]], [[bump-compliance]]
 
 **Physics.** Ride height sets **CoG height**, scaling the **total** load transfer ([[load-transfer]]). It
-also moves the **suspension geometry** — where the arms sit in travel, so the roll centres and static
-camber shift ([[roll-center]]). Too low and the chassis **bottoms**: the platform goes solid and the tyre
-unloads ([[bump-compliance]]). A one-end change is also a rake change.
+also moves the **suspension geometry** — lowering the chassis lowers the inner mounting points of every
+arm and link with it, so where the arms sit in travel and the roll centres shift ([[roll-center]]). Too
+low and the chassis **bottoms**: the platform goes solid and the tyre unloads ([[bump-compliance]]). A
+one-end change is also a rake change.
 
 ## Rake (front vs rear ride height)
 **Keys:** `ride_height_front`, `ride_height_rear`
