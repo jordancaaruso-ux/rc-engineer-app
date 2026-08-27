@@ -10,10 +10,10 @@ change:
   step: null            # a normal-sized move, founder-dictated; null = not set yet
 roll_lever: true
 before_settled: "the rear bites later — a little less secure from the first steering input, but more progressive"
-once_settled: "more rear grip through the middle and more forgiving over bumps at that end; less precise on high grip"
+once_settled: "tends toward more rear grip through the middle, though it can go the other way — often it is LESS rear flex that gives more rear grip and less rotation"
 confidence: majority
 physics:
   - flex-chassis.md
 sources:
   - "flex-chassis.md + concepts/chassis-flex.md (rear-half adjusters bias rear flex)"
-  - "Founder (JC), 2026-08-27 — flex relativity"
+  - "Founder (JC), 2026-08-27 — flex relativity; often less rear flex = more rear grip, physics not yet understood"

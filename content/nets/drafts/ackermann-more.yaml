@@ -9,7 +9,7 @@ change:
   direction: increase
   step: null            # a normal-sized move, founder-dictated; null = not set yet
 roll_lever: false
-effect: "less initial steering but smoother through tight corners; the tighter the corner the more it does, in less tight ones almost nothing"
+effect: "less initial steering but smoother through tight corners; and it does more the tighter the corner is"
 confidence: majority
 physics:
   - steering-geometry-ackermann.md
