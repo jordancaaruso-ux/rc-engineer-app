@@ -30,10 +30,11 @@ so more of its lap is decided by when grip arrives and less by how much settles 
 initial-grip end. A **direction change** leans that way the hardest: the car is already rolled the
 wrong way when the next input arrives.
 
-**Scope.** This applies to changes that move how much or how fast the car rolls and transfers load —
-springs, bars, damping, ride height, droop, roll-centre, and chassis flex, which sets how fast the
-platform takes up the load. Camber, toe, Ackermann and the diff act through other mechanisms and do
-not swing with the corner's clock.
+**Scope.** What decides whether a change swings with the corner's clock is whether it does one
+thing before the car has settled and another once it has — not what it acts through. The changes
+that move how much or how fast the car rolls and transfers load — springs, bars, damping, ride
+height, droop, roll-centre, and chassis flex, which sets how fast the platform takes up the load —
+all do. The diff, anti-squat and anti-dive split on the throttle instead, not on time in the corner.
 
 ## Corner regime — how far a stiffness change carries
 
