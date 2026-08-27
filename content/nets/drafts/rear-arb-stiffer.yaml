@@ -8,7 +8,7 @@ change:
   step: null            # a normal-sized move, founder-dictated; null = not set yet
 roll_lever: true
 before_settled: "the rear bites sooner — secure from the first steering input, and quicker through direction changes"
-once_settled: "more oversteer through the middle, but more rear support on power, so it drives straighter off the corner"
+once_settled: "tends toward more oversteer through the middle, though this one can go the other way; more rear support on power, so it can drive straighter off the corner"
 confidence: consensus
 physics:
   - arb.md

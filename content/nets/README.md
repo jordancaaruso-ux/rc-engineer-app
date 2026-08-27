@@ -96,9 +96,23 @@ unenforceable on free text. It is seeded with the coinages `bite-hold.md` names 
 takes a set, skatey, on top of it, nervous-feeling) plus every one earlier drafts shipped (pushes,
 wandering, steadier, lazier, twitchy, darty, sharper).
 
-**The balance words** — understeer, oversteer, steering, rotation, forward traction — are what the
-run log records and what these entries are for. They are not on the closed list yet; the founder is
-dictating the additions, each mapped to what it points at.
+**The balance words** — founder-dictated 2026-08-27, proposed for `bite-hold.md`'s closed list:
+
+| Word | Means |
+|---|---|
+| **understeer / oversteer** | the overall balance |
+| **steering** | balance owed to the front |
+| **rotation** | balance owed to the rear |
+| **forward traction / drive** | the rear putting power down |
+| **push** | understeer caused by a lack of rotation from the rear — not a front problem |
+| **snap** | a quick oversteer |
+
+These are what the run log records and what these entries are for. Note `push` is a balance word
+with a specific meaning and is *not* a coinage — an earlier ban list had it wrong.
+
+**One direction per knob.** Each entry is written for one direction; the opposite move most likely
+does the opposite, and the block header says so. Write a second file for the other direction only
+when it is genuinely not the mirror.
 
 ### `step`
 

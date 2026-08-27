@@ -49,8 +49,8 @@ export const BANNED_FEEL_COINAGES: readonly string[] = [
   "on top of it",
   "nervous-feeling",
   "too immediate",
-  "pushes",
-  "pushing",
+  // "push" is NOT here: founder 2026-08-27 — push is a real balance word (understeer caused by
+  // a lack of rotation from the rear), and it joins the closed list with the other balance words.
   "wandering",
   "wanders",
   "steadier",

@@ -1,5 +1,6 @@
 # AI DRAFT — awaiting founder review. Founder-corrected content from the 2026-08-25 pass carried
 # over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
+# Founder 2026-08-27: relative (tail vs nose), hedged harder than the rest - see the front entry.
 id: ride_height_rear_lower
 discipline: touring
 change:
@@ -7,8 +8,8 @@ change:
   direction: decrease
   step: null            # a normal-sized move, founder-dictated; null = not set yet
 roll_lever: true
-before_settled: "less steering into the corner as the rake comes out; less load moves, so more overall grip on a smooth surface"
-once_settled: "less hold through the middle, but the rear has less far to squat so it is more planted on power; too low and it touches under power, sudden and unpredictable"
+before_settled: "with the tail lower than the nose, more likely a little less initial steering"
+once_settled: "more likely a touch more rear grip through the middle and more planted on power — but hard to call, the geometry moves with it; too low and it touches under power"
 confidence: majority
 physics:
   - ride-height-and-rake.md

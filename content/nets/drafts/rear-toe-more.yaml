@@ -7,7 +7,7 @@ change:
   direction: increase
   step: null            # a normal-sized move, founder-dictated; null = not set yet
 roll_lever: false
-effect: "more rear grip and security everywhere, less rotation, more forward traction; it costs straight-line speed, and less rear toe generally means more corner speed"
+effect: "more rear grip and security everywhere, less rotation, more forward traction; it costs straight-line speed, and a car generally carries more corner speed with less rear toe"
 confidence: consensus
 physics:
   - toe.md
