@@ -9,12 +9,13 @@ gets depends on whether the chassis has finished rolling at the moment they are 
 - **On the way in — the first part of every corner, whatever kind it is.** The car has not rolled
   yet, so only the timing mechanism is running.
 - **The middle — once roll has finished and speed and radius hold.** Only then is the settled
-  mechanism running. A hairpin's middle is settled the same as a sweeper's; it is just shorter.
+  mechanism running. Any corner the car is in for longer than it takes to finish rolling has one.
 - **A corner with no middle:** a chicane, an ess, a flick. The direction change is over before roll
   finishes, so it is all entry.
 
-So the **phase** decides which mechanism is running, and the **corner** decides how much middle
-there is: a sweeper gives a long middle, a hairpin a short one, a flick none.
+So the **phase** decides which mechanism is running, and **how long the car is in the corner**
+decides how much middle there is. That is a question of time, not shape: a long, slow hairpin can
+have the longest middle on the track, and a fast bend taken flat can have almost none.
 
 **Speed decides how much middle there is, as much as the corner does.** Chassis roll time is fixed;
 corner time is length divided by speed. So the same corner has more middle for a slower car and less
@@ -52,7 +53,3 @@ takes its load **sooner** on the way in, so its grip is there **earlier**. Softe
 **Front/rear symmetry.** All of this applies at either axle. A stiffer front loads sooner while
 roll develops and carries a bigger share once roll is constant; a softer front is the mirror of
 both. Which part of the corner decides the sign.
-
-**Low grip (tendency, not a law).** Low grip cuts cornering force, so there is less load transfer
-for the settled mechanism to redistribute — its effect shrinks with grip. Low grip also slows
-corners, giving the chassis more time to settle.
