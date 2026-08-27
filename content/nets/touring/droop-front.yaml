@@ -1,0 +1,29 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
+# v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
+# carried over from droop-front-more.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: droop_front
+discipline: touring
+parameter: droop_front
+label: "Front droop"
+words:
+  more: "more"
+  less: "less"
+step: "0.2 mm"   # founder-dictated 2026-08-27
+two_answers: true
+more:
+  reviewed: true
+  confidence: consensus
+  before_settled: "smoother initially — the steering comes in gently rather than all at once"
+  once_settled: "the front keeps gaining grip for longer, so more steering through the middle and on the way out"
+less:
+  reviewed: false
+  confidence: consensus
+  before_settled: "more immediate initially — the steering comes in quicker, all at once; too far and it can be too reactive when grip is up"
+  once_settled: "the front stops gaining grip sooner, so less steering through the middle and on the way out"
+physics:
+  - droop-downstop.md
+sources:
+  - "Invisible Speed (Joseph Quagraine) — droop / working range transcripts"
+  - "HUDY / Anthony Atack On Road Setup Guide — front droop table"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

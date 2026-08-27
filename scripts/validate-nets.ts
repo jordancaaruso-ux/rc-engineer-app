@@ -3,20 +3,20 @@
  *
  * Checks every entry under content/nets/ (reviewed tiers + drafts/):
  *   - schema completeness (shared with the runtime loader: src/lib/engineer/netsSchema.ts)
- *   - the shape matches the physics: a roll lever carries before_settled + once_settled, anything
- *     else carries one `effect` line
+ *   - one entry per knob, both directions inside; the shape matches `two_answers` on each side
  *   - no line carries a banned coinage (bite-hold.md's closed-vocabulary rule)
- *   - contested ⇒ both claims + discriminator present (schema-level)
+ *   - contested ⇒ both claims + discriminator present, per side (schema-level)
  *   - every `physics` file resolves in content/vehicle-dynamics/
  *   - the rendered entry stays under the size ceiling
- *   - no duplicate (parameter, direction) per discipline
+ *   - no duplicate parameter per discipline
+ *   - reports every side still marked `reviewed: false` (AI-drafted, owed a founder pass)
  *
  * Read-only. Exits 1 on any failure so it can gate a commit or a harness run.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
-import { validateNetEntry, type NetEntry } from "@/lib/engineer/netsSchema";
+import { unreviewedSides, validateNetEntry, type NetEntry } from "@/lib/engineer/netsSchema";
 
 const repoRoot = process.cwd();
 const NETS_DIR = path.join(repoRoot, "content", "nets");
@@ -51,7 +51,9 @@ try {
 }
 
 let failures = 0;
-const seen = new Map<string, string>(); // `${discipline}:${parameter}:${direction}` -> file
+const seen = new Map<string, string>(); // `${discipline}:${parameter}` -> file
+const unreviewed: string[] = [];
+let sidesWritten = 0;
 
 for (const { rel, abs } of files) {
   const problems: string[] = [];
@@ -71,10 +73,13 @@ for (const { rel, abs } of files) {
         problems.push(`physics "${link}" does not resolve in content/vehicle-dynamics/`);
       }
     }
-    const dupKey = `${entry.discipline}:${entry.change.parameter}:${entry.change.direction}`;
+    const dupKey = `${entry.discipline}:${entry.parameter}`;
     const prev = seen.get(dupKey);
-    if (prev) problems.push(`duplicate (parameter, direction) for ${entry.discipline} — already defined in ${prev}`);
+    if (prev) problems.push(`duplicate parameter for ${entry.discipline} — already defined in ${prev}`);
     else seen.set(dupKey, rel);
+    if (entry.more) sidesWritten++;
+    if (entry.less) sidesWritten++;
+    unreviewed.push(...unreviewedSides(entry));
   }
 
   if (problems.length > 0) {
@@ -86,5 +91,9 @@ for (const { rel, abs } of files) {
   }
 }
 
+if (unreviewed.length > 0) {
+  console.log(`\n${unreviewed.length} of ${sidesWritten} sides AI-drafted, not yet founder-reviewed:`);
+  for (const s of unreviewed) console.log(`  - ${s}`);
+}
 console.log(`\n${files.length - failures}/${files.length} entries valid`);
 process.exit(failures > 0 ? 1 : 0);

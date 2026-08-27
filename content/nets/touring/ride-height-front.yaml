@@ -1,0 +1,31 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
+# Founder 2026-08-27: the outcome of a ride-height change on its own is hard to determine; what is
+# sayable is the RELATIVE change - nose vs tail. Written that way, and hedged harder than the rest.
+# v5 (2026-08-27): one entry per knob, both directions inside. The LESS side is the founder-reviewed text
+# carried over from ride-height-front-lower.yaml; the MORE side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: ride_height_front
+discipline: touring
+parameter: ride_height_front
+label: "Front ride height"
+words:
+  more: "higher"
+  less: "lower"
+step: "0.2 mm"   # founder-dictated 2026-08-27
+two_answers: true
+more:
+  reviewed: false
+  confidence: majority
+  before_settled: "with the nose higher than the tail, more likely a little less initial steering"
+  once_settled: "more likely a touch less front grip through the middle, but hard to call — the geometry moves with it"
+less:
+  reviewed: true
+  confidence: majority
+  before_settled: "with the nose lower than the tail, more likely a little more initial steering"
+  once_settled: "more likely a touch more front grip through the middle, but hard to call — the geometry moves with it; too low and it touches, unpredictable with no warning"
+physics:
+  - ride-height-and-rake.md
+sources:
+  - "HUDY / Anthony Atack On Road Setup Guide — ride height table"
+  - "Invisible Speed (Joseph Quagraine) — ride height transcripts"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

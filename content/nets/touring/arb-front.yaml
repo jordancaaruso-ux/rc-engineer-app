@@ -1,0 +1,29 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
+# v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
+# carried over from front-arb-stiffer.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: arb_front
+discipline: touring
+parameter: arb_front
+label: "Front anti-roll bar"
+words:
+  more: "stiffer"
+  less: "softer"
+step: "0.1 mm"   # founder-dictated 2026-08-27
+two_answers: true
+more:
+  reviewed: true
+  confidence: consensus
+  before_settled: "more initial steering — the front bites sooner and the car turns in quicker, with less roll"
+  once_settled: "more understeer through the middle, and the rear feels more planted behind it"
+less:
+  reviewed: false
+  confidence: consensus
+  before_settled: "less initial steering — the front bites later and turn-in is smoother, with more roll"
+  once_settled: "more steering through the middle — less understeer — and the rear feels a little less planted behind it"
+physics:
+  - arb.md
+sources:
+  - "Invisible Speed (Joseph Quagraine) — anti-roll bar video + course meeting transcripts"
+  - "On Road Setup Guide (Anthony Atack, XRAY T3) — front sway bar table; agrees"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

@@ -1,0 +1,32 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Second sweep, 2026-08-27. Drafted from the physics KB's own
+# handling notes and the HUDY/Atack On Road Setup Guide; Invisible Speed transcripts NOT consulted
+# for this set. Hedge accordingly until the founder has passed it.
+# `decrease` = fewer engaged screws = MORE flex. Softer decks and more cuts go the same way.
+# Front-half adjusters bias the front, rear-half the rear; this entry is the whole-car direction.
+# v5 (2026-08-27): one entry per knob, both directions inside. The LESS side is the founder-reviewed text
+# carried over from chassis-flex-more.yaml; the MORE side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: top_deck_screws
+discipline: touring
+parameter: top_deck_screws
+label: "Chassis flex (whole car)"
+words:
+  more: "stiffer — more screws, fewer cuts"
+  less: "more flex — fewer screws, more cuts"
+step: "softer top decks, more cuts or a softer material, fewer screws in the top decks or motor mount"   # founder-dictated 2026-08-27
+two_answers: true
+more:
+  reviewed: false
+  confidence: majority
+  before_settled: "load moves into the tyres faster, so the car feels more pointy and less forgiving on turn-in"
+  once_settled: "more precise on high grip, but less overall grip on a low-grip or bumpy track — the tyre gives before the platform does"
+less:
+  reviewed: true
+  confidence: majority
+  before_settled: "load moves into the tyres more slowly, so the car feels more forgiving and less pointy on turn-in"
+  once_settled: "more overall grip on a low-grip or bumpy track, but less precise on high grip — the platform gives before the tyre does"
+physics:
+  - flex-chassis.md
+sources:
+  - "flex-chassis.md + concepts/chassis-flex.md"
+  - "HUDY / Anthony Atack On Road Setup Guide — chassis flex / top deck table"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

@@ -1,0 +1,28 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Second sweep, 2026-08-27. Drafted from the physics KB's own
+# handling notes and the HUDY/Atack On Road Setup Guide; Invisible Speed transcripts NOT consulted
+# for this set. Hedge accordingly until the founder has passed it.
+# v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
+# carried over from body-rear-higher.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: rear_hrb_setting
+discipline: touring
+parameter: rear_hrb_setting
+label: "Body rear height"
+words:
+  more: "higher"
+  less: "lower"
+step: "1 mm"   # founder-dictated 2026-08-27
+two_answers: false
+more:
+  reviewed: true
+  confidence: majority
+  effect: "more rear grip the faster you go — more secure in fast corners, little change in slow ones; a touch of straight-line speed goes with it"
+less:
+  reviewed: false
+  confidence: majority
+  effect: "less rear grip the faster you go — less secure in fast corners, little change in slow ones; a touch of straight-line speed comes back"
+physics:
+  - bodyshell-aero.md
+sources:
+  - "bodyshell-aero.md + concepts/aero-load.md (aero load scales with speed²)"
+  - "HUDY / Anthony Atack On Road Setup Guide — body / wing table"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

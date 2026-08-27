@@ -1,0 +1,29 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
+# v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
+# carried over from rear-arb-stiffer.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: arb_rear
+discipline: touring
+parameter: arb_rear
+label: "Rear anti-roll bar"
+words:
+  more: "stiffer"
+  less: "softer"
+step: "0.1 mm"   # founder-dictated 2026-08-27
+two_answers: true
+more:
+  reviewed: true
+  confidence: consensus
+  before_settled: "the rear bites sooner — secure from the first steering input, and quicker through direction changes"
+  once_settled: "tends toward more oversteer through the middle, though this one can go the other way; more rear support on power, so it can drive straighter off the corner"
+less:
+  reviewed: false
+  confidence: consensus
+  before_settled: "the rear bites later — a little less secure from the first steering input, and slower through direction changes"
+  once_settled: "tends toward more rear grip through the middle — less oversteer — though this one can go the other way; less rear support on power"
+physics:
+  - arb.md
+sources:
+  - "Invisible Speed (Joseph Quagraine) — anti-roll bar video + course meeting transcripts"
+  - "On Road Setup Guide (Anthony Atack, XRAY T3) — rear sway bar table; agrees"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

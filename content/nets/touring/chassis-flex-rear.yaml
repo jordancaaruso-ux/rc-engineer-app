@@ -1,0 +1,31 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Second sweep, 2026-08-27. Drafted from the physics KB's own
+# handling notes and the HUDY/Atack On Road Setup Guide; Invisible Speed transcripts NOT consulted
+# for this set. Hedge accordingly until the founder has passed it.
+# `decrease` = softer / fewer rear-half fasteners = MORE REAR flex, relative to the front.
+# v5 (2026-08-27): one entry per knob, both directions inside. The LESS side is the founder-reviewed text
+# carried over from chassis-flex-rear-more.yaml; the MORE side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: top_deck_rear
+discipline: touring
+parameter: top_deck_rear
+label: "Rear chassis flex"
+words:
+  more: "stiffer at the rear"
+  less: "more rear flex"
+step: "one screw behind the spur gear on the motor mount or top deck, or one less cut in the rear top deck — flex screws move toward the rear"   # founder-dictated 2026-08-27
+two_answers: true
+more:
+  reviewed: false
+  confidence: majority
+  before_settled: "the rear bites sooner — more secure from the first steering input, but less progressive"
+  once_settled: "tends toward less rear grip through the middle, though it often goes the other way — a stiffer rear giving more rear grip and less rotation"
+less:
+  reviewed: true
+  confidence: majority
+  before_settled: "the rear bites later — a little less secure from the first steering input, but more progressive"
+  once_settled: "tends toward more rear grip through the middle, though it can go the other way — often it is LESS rear flex that gives more rear grip and less rotation"
+physics:
+  - flex-chassis.md
+sources:
+  - "flex-chassis.md + concepts/chassis-flex.md (rear-half adjusters bias rear flex)"
+  - "Founder (JC), 2026-08-27 — flex relativity; often less rear flex = more rear grip, physics not yet understood"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

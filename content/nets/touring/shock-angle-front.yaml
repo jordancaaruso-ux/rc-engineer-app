@@ -1,0 +1,33 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Second sweep, 2026-08-27. Drafted from the physics KB's own
+# handling notes and the HUDY/Atack On Road Setup Guide; Invisible Speed transcripts NOT consulted
+# for this set. Hedge accordingly until the founder has passed it.
+# `decrease` = more LAID DOWN / further inboard = lower motion ratio = softer and progressive.
+# Sheets count tower and arm holes differently — read the column before mapping.
+# v5 (2026-08-27): one entry per knob, both directions inside. The LESS side is the founder-reviewed text
+# carried over from shock-front-laid-down.yaml; the MORE side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: shock_angle_front
+discipline: touring
+parameter: shock_angle_front
+label: "Front shock position"
+words:
+  more: "more upright"
+  less: "more laid down"
+step: "one hole, about 0.5 mm"   # founder-dictated 2026-08-27
+two_answers: true
+more:
+  reviewed: false
+  confidence: majority
+  before_settled: "more initial steering — the front bites sooner, and comes in less progressively"
+  once_settled: "less front grip through the middle and less forgiving over bumps; the rate stays more even through the travel"
+less:
+  reviewed: true
+  confidence: majority
+  before_settled: "less initial steering — the front takes longer to bite, but it comes in more progressively"
+  once_settled: "more front grip through the middle and more forgiving over bumps; the rate rises the harder it is pushed, so it firms up under big loads"
+physics:
+  - shock-geometry.md
+  - spring-rate.md
+sources:
+  - "shock-geometry.md handling section (founder-confirmed direction: laid down = softer + progressive)"
+  - "HUDY / Anthony Atack On Road Setup Guide — shock position table"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

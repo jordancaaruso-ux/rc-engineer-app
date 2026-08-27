@@ -1,0 +1,31 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Third sweep, founder-corrected 2026-08-27 (two passes). Roll-centre
+# direction per key is solver-checked (upper-link-geometry.md); the feel lines are the founder's.
+# HOW THE HUB FEELS DIFFERENT FROM THE OTHER ROLL-CENTRE KEYS: NOT YET DICTATED — these lines are the
+# roll-centre direction only. Raises RC ~1.05 mm per 0.5 mm shim (about as strong as the lower arm); adds camber gain.
+# v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
+# carried over from under-hub-front-more.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: under_hub_shims_front
+discipline: touring
+parameter: under_hub_shims_front
+label: "Front under-hub shims"
+words:
+  more: "more"
+  less: "fewer"
+step: null   # a normal-sized move, founder-dictated; null = not set yet
+two_answers: true
+more:
+  reviewed: true
+  confidence: majority
+  before_settled: "more front bite — more initial steering, and the front feels more on the track"
+  once_settled: "generally more understeer through the middle with a higher front roll centre"
+less:
+  reviewed: false
+  confidence: majority
+  before_settled: "less front bite — less initial steering, and the front feels more in the track"
+  once_settled: "generally more front grip through the middle with a lower front roll centre"
+physics:
+  - under-hub.md
+sources:
+  - "upper-link-geometry.md roll-centre table (solver-verified 2026-08-01)"
+  - "Founder (JC), 2026-08-27 — lower arm = support + initial grip; upper links = bite + overall-grip feel; rear settled hedged like bar and spring"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

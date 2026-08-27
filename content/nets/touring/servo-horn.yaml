@@ -1,0 +1,27 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Third sweep, founder-corrected 2026-08-27 (two passes). Roll-centre
+# direction per key is solver-checked (upper-link-geometry.md); the feel lines are the founder's.
+# A driver-interface lever, not suspension: it changes how the hand reaches the tyres, not what the geometry does.
+# v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
+# carried over from servo-horn-taller.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: servo_horn_height
+discipline: touring
+parameter: servo_horn_height
+label: "Servo horn"
+words:
+  more: "taller"
+  less: "shorter"
+step: null   # a normal-sized move, founder-dictated; null = not set yet
+two_answers: false
+more:
+  reviewed: true
+  confidence: consensus
+  effect: "faster, more aggressive steering response to the same hand movement; a shorter horn is smoother and finer-grained"
+less:
+  reviewed: false
+  confidence: consensus
+  effect: "slower, smoother steering response to the same hand movement — finer-grained"
+physics:
+  - servo-horn-steering-response.md
+sources:
+  - "servo-horn-steering-response.md (shorter = smoother, founder-confirmed)"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

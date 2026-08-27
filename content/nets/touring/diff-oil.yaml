@@ -1,0 +1,29 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
+# Touring: rear gear diff, front spool. The on/off-throttle split is a THROTTLE split, not a
+# settled split, so this is one line and not a roll lever.
+# v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
+# carried over from diff-oil-thicker.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: diff_oil
+discipline: touring
+parameter: diff_oil
+label: "Diff oil"
+words:
+  more: "thicker"
+  less: "thinner"
+step: "1,000 cSt"   # founder-dictated 2026-08-27
+two_answers: false
+more:
+  reviewed: true
+  confidence: consensus
+  effect: "less rotation off throttle and more rotation on throttle — the two move opposite ways, so name which one is missing before touching it; biggest in tight corners"
+less:
+  reviewed: false
+  confidence: consensus
+  effect: "more rotation off throttle and less on throttle — the two move opposite ways, so name which is missing before touching it; too thin lacks drive; biggest in tight corners"
+physics:
+  - diff-and-driveline.md
+sources:
+  - "Invisible Speed (Joseph Quagraine) — diff transcripts"
+  - "On Road Setup Guide (Anthony Atack, XRAY T3) — rear differential section"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

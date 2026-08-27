@@ -1,0 +1,30 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
+# Split into two lines 2026-08-27. The BEFORE line is inferred from the founder's own "most of it mid-corner" — the one line here he has not said in those words.
+# v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
+# carried over from camber-front-more-negative.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: camber_front
+discipline: touring
+parameter: camber_front
+label: "Front camber"
+words:
+  more: "more negative"
+  less: "less negative"
+step: "0.5° is standard; 0.25° for a tweak"   # founder-dictated 2026-08-27
+two_answers: true
+more:
+  reviewed: true
+  confidence: consensus
+  before_settled: "little change at the first steering input"
+  once_settled: "more steering through the middle; it lets go more abruptly, braking and straight-line grip can suffer, and how much you get depends heavily on the tyre"
+less:
+  reviewed: false
+  confidence: consensus
+  before_settled: "little change at the first steering input"
+  once_settled: "less steering through the middle; it lets go more progressively, braking and straight-line grip can improve, and how much depends heavily on the tyre"
+physics:
+  - camber.md
+sources:
+  - "Invisible Speed (Joseph Quagraine) — camber transcripts"
+  - "On Road Setup Guide (Anthony Atack, XRAY T3) — front camber table"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

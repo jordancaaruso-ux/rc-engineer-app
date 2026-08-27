@@ -1,0 +1,30 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Second sweep, 2026-08-27. Drafted from the physics KB's own
+# handling notes and the HUDY/Atack On Road Setup Guide; Invisible Speed transcripts NOT consulted
+# for this set. Hedge accordingly until the founder has passed it.
+# `increase` = raising the rear arm's FORWARD pickup = more anti-squat (sign per this sheet).
+# Fore-aft transfer, not roll: it does not swing with the corner's clock, so one line.
+# v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
+# carried over from anti-squat-rear-more.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: under_lower_arm_shims_rf
+discipline: touring
+parameter: under_lower_arm_shims_rf
+label: "Rear anti-squat"
+words:
+  more: "more"
+  less: "less"
+step: "a 0.25 shim"   # founder-dictated 2026-08-27
+two_answers: false
+more:
+  reviewed: true
+  confidence: majority
+  effect: "the rear squats less on power and the drive arrives sooner — more forward traction and more on-power steering on a smooth track; less forgiving over bumps under power"
+less:
+  reviewed: false
+  confidence: majority
+  effect: "the rear squats more on power and the drive arrives later — less forward traction and less on-power steering on a smooth track; more forgiving over bumps under power"
+physics:
+  - anti-dive-anti-squat.md
+sources:
+  - "anti-dive-anti-squat.md"
+  - "HUDY / Anthony Atack On Road Setup Guide — anti-squat table"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

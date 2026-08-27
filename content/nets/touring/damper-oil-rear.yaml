@@ -1,0 +1,30 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
+# ONCE SETTLED says "no change" on purpose — see the front entry.
+# v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
+# carried over from damper-oil-rear-thicker.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: damper_oil_rear
+discipline: touring
+parameter: damper_oil_rear
+label: "Rear damper oil"
+words:
+  more: "thicker"
+  less: "thinner"
+step: "50 cSt; 25 is a small one"   # founder-dictated 2026-08-27
+two_answers: true
+more:
+  reviewed: true
+  confidence: consensus
+  before_settled: "the rear takes its set slower — more forgiving into the corner and settling onto the power; too far and it reacts too slowly, and is just slower"
+  once_settled: "no change — damping only acts while the car is moving, and a settled car has stopped"
+less:
+  reviewed: false
+  confidence: consensus
+  before_settled: "the rear takes its set faster — quicker to rotate into the corner and less settled onto the power; too far and it moves too quickly, harder to drive"
+  once_settled: "no change — damping only acts while the car is moving, and a settled car has stopped"
+physics:
+  - damper-oil.md
+sources:
+  - "Invisible Speed (Joseph Quagraine) — shock oil / temperature transcripts"
+  - "On Road Setup Guide (Anthony Atack, XRAY T3) — shock oil table"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

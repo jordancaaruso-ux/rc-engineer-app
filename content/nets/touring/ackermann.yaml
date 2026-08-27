@@ -1,0 +1,32 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Second sweep, 2026-08-27. Drafted from the physics KB's own
+# handling notes and the HUDY/Atack On Road Setup Guide; Invisible Speed transcripts NOT consulted
+# for this set. Hedge accordingly until the founder has passed it.
+# `increase` = the inside wheel turns MORE than the outside = more ackermann.
+# Split into two lines 2026-08-27 (founder: the corner clock applies to anything that behaves differently initially and mid-corner). Same words as before.
+# v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
+# carried over from ackermann-more.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: inner_steering_angle
+discipline: touring
+parameter: inner_steering_angle
+label: "Ackermann"
+words:
+  more: "more — inside wheel turns more"
+  less: "less"
+step: "0.5 mm"   # founder-dictated 2026-08-27
+two_answers: true
+more:
+  reviewed: true
+  confidence: majority
+  before_settled: "less initial steering"
+  once_settled: "smoother through tight corners; and it does more the tighter the corner is"
+less:
+  reviewed: false
+  confidence: majority
+  before_settled: "more initial steering — more aggressive on the first input"
+  once_settled: "less smooth through tight corners — the front can scrub; and it does more the tighter the corner is"
+physics:
+  - steering-geometry-ackermann.md
+sources:
+  - "steering-geometry-ackermann.md (1/radius² scaling)"
+  - "HUDY / Anthony Atack On Road Setup Guide — ackermann table"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

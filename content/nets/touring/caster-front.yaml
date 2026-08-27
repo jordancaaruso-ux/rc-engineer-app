@@ -1,0 +1,32 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
+# Not a roll lever: caster changes the camber the tyre sees under steering lock, and the
+# entry/mid split here is a steering-angle effect, not the corner settling.
+# Split into two lines 2026-08-27 (founder: the corner clock applies to anything that behaves differently initially and mid-corner). Same words as before.
+# v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
+# carried over from caster-front-more.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: caster_front
+discipline: touring
+parameter: caster_front
+label: "Front caster"
+words:
+  more: "more"
+  less: "less"
+step: "0.5°"   # founder-dictated 2026-08-27
+two_answers: true
+more:
+  reviewed: true
+  confidence: majority
+  before_settled: "less initial steering"
+  once_settled: "more steering through the middle and on the way out"
+less:
+  reviewed: false
+  confidence: majority
+  before_settled: "more initial steering"
+  once_settled: "less steering through the middle and on the way out"
+physics:
+  - caster.md
+sources:
+  - "Founder (JC), 2026-08-25 — direction settled against two disagreeing period guides"
+  - "Scott Guyatt R/C Handbook — caster section (agrees on less initial turn-in)"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

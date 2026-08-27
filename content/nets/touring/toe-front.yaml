@@ -1,0 +1,34 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
+# `increase` means MORE TOE-OUT, the touring front convention. Sheet signs differ.
+# Founder, 2026-08-27 (after the first drive): it smooths the initial, which often reads as LESS steering, and can give
+# more right in the middle. A fast car feels the first, a slow car the second — two answers, so two lines. Never a lever
+# for "more steering overall" — the old single line said exactly that, and the Engineer reached for it on that word.
+# v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
+# carried over from front-toe-out-more.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: toe_front
+discipline: touring
+parameter: toe_front
+label: "Front toe"
+words:
+  more: "more toe-out"
+  less: "less toe-out (toward toe-in)"
+step: "0.2° per side; even 0.1° is noticeable"   # founder-dictated 2026-08-27
+two_answers: true
+more:
+  reviewed: true
+  confidence: majority
+  before_settled: "smoother and less immediate on turn-in, so it often feels like less steering at first"
+  once_settled: "can give more steering right in the middle — not a lever for more steering overall; a touch of straight-line speed and tyre life goes with every degree"
+less:
+  reviewed: false
+  confidence: majority
+  before_settled: "more immediate on turn-in — more initial steering, and more reactive right around centre"
+  once_settled: "a little less steering right in the middle; a touch more straight-line speed and tyre life"
+physics:
+  - toe.md
+sources:
+  - "Founder (JC), 2026-08-27 — smooths the initial, more steering mid; never for overall steering"
+  - "HUDY / Anthony Atack On Road Setup Guide — front toe table"
+  - "Invisible Speed (Joseph Quagraine) — TITC transcripts (0.1° trims between rounds)"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

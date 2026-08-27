@@ -1,0 +1,32 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Third sweep, founder-corrected 2026-08-27 (two passes). Roll-centre
+# direction per key is solver-checked (upper-link-geometry.md); the feel lines are the founder's.
+# Founder: the lower-arm stack is mostly about SUPPORT, and initial grip — not only support. The strongest
+# roll-centre lever (~1.1 mm per 0.5 mm shim); adds camber gain with it.
+# `under_lower_arm_shims_front` = the FRONT stack, ff and fr raised together. The ff/fr SPLIT is anti-dive, a separate entry.
+# v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
+# carried over from under-lower-arm-front-more.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: under_lower_arm_shims_front
+discipline: touring
+parameter: under_lower_arm_shims_front
+label: "Front under-lower-arm shims"
+words:
+  more: "more"
+  less: "fewer"
+step: null   # a normal-sized move, founder-dictated; null = not set yet
+two_answers: true
+more:
+  reviewed: true
+  confidence: majority
+  before_settled: "more initial front grip — more initial steering, and the front feels more on the track"
+  once_settled: "more support — the front is held up more at the limit and rolls less; generally more understeer through the middle"
+less:
+  reviewed: false
+  confidence: majority
+  before_settled: "less initial front grip — less initial steering, and the front feels more in the track"
+  once_settled: "less support — the front rolls more and is held up less at the limit; generally more front grip through the middle"
+physics:
+  - under-lower-arm.md
+sources:
+  - "upper-link-geometry.md roll-centre table (solver-verified 2026-08-01)"
+  - "Founder (JC), 2026-08-27 — lower arm = support + initial grip; upper links = bite + overall-grip feel; rear settled hedged like bar and spring"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

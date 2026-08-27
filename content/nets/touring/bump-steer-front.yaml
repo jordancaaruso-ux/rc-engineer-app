@@ -1,0 +1,33 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Third sweep, founder-corrected 2026-08-27 (two passes). Roll-centre
+# direction per key is solver-checked (upper-link-geometry.md); the feel lines are the founder's.
+# `increase` = MORE shims = more bump-IN on this sheet (Awesomatix). Other cars can run the opposite
+# sign — never carry this direction to a different chassis.
+# Split into two lines 2026-08-27 (founder: the corner clock applies to anything that behaves differently initially and mid-corner). Same words as before.
+# v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
+# carried over from bump-steer-front-more-in.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: bump_steer_shims_front
+discipline: touring
+parameter: bump_steer_shims_front
+label: "Front bump steer (shims)"
+words:
+  more: "more — more bump-in"
+  less: "fewer — less bump-in"
+step: null   # a normal-sized move, founder-dictated; null = not set yet
+two_answers: true
+more:
+  reviewed: true
+  confidence: majority
+  before_settled: "more aggressive initially — more initial steering"
+  once_settled: "generally more steering mid-corner too; in on compression is out on extension, so it can help the car drive straight on exit"
+less:
+  reviewed: false
+  confidence: majority
+  before_settled: "calmer initially — less initial steering"
+  once_settled: "generally less steering mid-corner too; less toe-in on compression means less toe-out on extension, so it can feel less straight on exit"
+physics:
+  - bump-steer-toe-gain.md
+  - toe.md
+sources:
+  - "Founder (JC), 2026-08-27"
+  - "bump-steer-toe-gain.md (founder-confirmed sign 2026-07-30)"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

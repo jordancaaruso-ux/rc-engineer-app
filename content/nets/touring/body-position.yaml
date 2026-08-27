@@ -1,0 +1,29 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Third sweep, founder-corrected 2026-08-27 (two passes). Roll-centre
+# direction per key is solver-checked (upper-link-geometry.md); the feel lines are the founder's.
+# This entry is for the body moved FORWARD. Whether that is a smaller or larger number on the sheet
+# depends on how the sheet measures it — read the column. Written as `decrease` = nearer the windshield.
+# v5 (2026-08-27): one entry per knob, both directions inside. The LESS side is the founder-reviewed text
+# carried over from body-forward.yaml; the MORE side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: body_position_from_windshield
+discipline: touring
+parameter: body_position_from_windshield
+label: "Body position"
+words:
+  more: "further back"
+  less: "further forward"
+step: null   # a normal-sized move, founder-dictated; null = not set yet
+two_answers: false
+more:
+  reviewed: false
+  confidence: majority
+  effect: "less front aero load the faster you go — less steering in fast corners and a touch more rear security there; little change in slow corners"
+less:
+  reviewed: true
+  confidence: majority
+  effect: "more front aero load the faster you go — more steering in fast corners and a touch less rear security there; little change in slow corners"
+physics:
+  - bodyshell-aero.md
+sources:
+  - "bodyshell-aero.md + concepts/aero-load.md (aero load scales with speed²)"
+  - "HUDY / Anthony Atack On Road Setup Guide — body position table"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

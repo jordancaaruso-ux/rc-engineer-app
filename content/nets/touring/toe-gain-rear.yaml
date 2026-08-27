@@ -1,0 +1,33 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Second sweep, 2026-08-27. Drafted from the physics KB's own
+# handling notes and the HUDY/Atack On Road Setup Guide; Invisible Speed transcripts NOT consulted
+# for this set. Hedge accordingly until the founder has passed it.
+# `decrease` = FEWER shims = MORE toe gain on this sheet (Awesomatix). Other cars can run the
+# opposite sign — never carry this direction to a different chassis.
+# Split into two lines 2026-08-27 (founder: the corner clock applies to anything that behaves differently initially and mid-corner). Same words as before.
+# v5 (2026-08-27): one entry per knob, both directions inside. The LESS side is the founder-reviewed text
+# carried over from rear-toe-gain-more.yaml; the MORE side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: toe_gain_shims_rear
+discipline: touring
+parameter: toe_gain_shims_rear
+label: "Rear toe gain (shims)"
+words:
+  more: "more shims — less toe gain"
+  less: "fewer shims — more toe gain"
+step: "half a shim, depending on how sensitive the car is — about 0.2° more gain from static ride height to compressed onto the board"   # founder-dictated 2026-08-27
+two_answers: true
+more:
+  reviewed: false
+  confidence: majority
+  before_settled: "less change on the way in — the rear keeps more of its static toe, so more security on the first input"
+  once_settled: "as less rear toe — a little less rear grip, more rotation, less forward traction — the toe stays nearer static as the car rolls and squats"
+less:
+  reviewed: true
+  confidence: majority
+  before_settled: "it extends on the way in, so less rear toe there — less security on the first input"
+  once_settled: "as more rear toe — more rear grip, less rotation, more forward traction — arriving as the car rolls and squats"
+physics:
+  - bump-steer-toe-gain.md
+  - toe.md
+sources:
+  - "bump-steer-toe-gain.md (founder-confirmed sign 2026-07-30)"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

@@ -1,0 +1,29 @@
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Founder-corrected content from the 2026-08-25 pass carried
+# over; shape rebuilt 2026-08-27 (interview): outcomes only, in the driver's words.
+# v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
+# carried over from spring-rear-stiffer.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+id: spring_rear
+discipline: touring
+parameter: spring_rear
+label: "Rear spring"
+words:
+  more: "stiffer"
+  less: "softer"
+step: "one step in the range, often 0.1"   # founder-dictated 2026-08-27
+two_answers: true
+more:
+  reviewed: true
+  confidence: consensus
+  before_settled: "the rear bites sooner, and holds on better through quick direction changes"
+  once_settled: "tends toward more oversteer mid-corner, though it can go the other way; more rear support on power, so it can drive straighter off; less planted over bumps"
+less:
+  reviewed: false
+  confidence: consensus
+  before_settled: "the rear bites later, and holds on less well through quick direction changes"
+  once_settled: "tends toward more rear grip mid-corner — less oversteer — though it can go the other way; less rear support on power; more planted over bumps"
+physics:
+  - spring-rate.md
+sources:
+  - "On Road Setup Guide (Anthony Atack, XRAY T3) — rear springs table"
+  - "Invisible Speed (Joseph Quagraine) — TITC + rear-support transcripts"
+  - "Opposite side: AI-drafted by inversion of the founder-reviewed side, 2026-08-27"

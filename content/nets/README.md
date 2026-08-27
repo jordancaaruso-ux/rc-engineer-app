@@ -1,8 +1,8 @@
 # Nets — what a knob most likely does, in the driver's words
 
-**What a net is.** One entry per (parameter, direction), saying what that change most likely does
-on track — balance, understeer, oversteer, steering, rotation. Probabilistic by design: "most
-likely", never "will".
+**What a net is.** One entry per knob, saying what each direction most likely does on track —
+balance, understeer, oversteer, steering, rotation. Probabilistic by design: "most likely", never
+"will".
 
 **What a net is not.** Physics, conditions, or mechanism. *Why* a change does what it does lives in
 `content/vehicle-dynamics/`. *What makes it bigger, smaller, or worth the opposite move today* lives
@@ -20,37 +20,62 @@ moves. Do not rebuild any of them. Founder interview, 2026-08-26/27.
 
 ---
 
-## Two shapes, decided by physics
+## One entry per knob, both directions inside (v5)
+
+v4 wrote each knob in one direction and left the Engineer to invert the sentence. Driven on the
+founder's own account (2026-08-27) it never once reached for "softer front bar" for more mid-corner
+steering: the roll-centre net literally said *"more front grip through the middle"* and the bar net
+said the opposite words in the opposite direction. At decision time a literal line beats a derived
+one every time, so the unwritten direction — softening, the everyday move — was never in the
+running. Founder call: *"one entry for each parameter, then the net for each direction within it."*
+
+So each file is one knob. Both directions sit inside it, each with its own confidence and its own
+`reviewed` flag, and the knob names its own pair of direction words — stiffer/softer,
+thicker/thinner, more negative/less negative, higher/lower — so the sheet-sign convention is said
+once, in a driver's word, instead of a generic "more/less" gloss.
+
+A side that is not yet written is left out and renders nothing; the block header says the
+opposite most likely does the opposite. An AI-drafted side is written with `reviewed: false` —
+`npm run nets:check` lists every such side, and that list is what the founder still owes a pass on.
+It renders exactly like a reviewed side, on purpose: a draft marker would make the local test read
+differently from what ships.
+
+## Two answers or one, decided by behaviour
 
 A knob that **does one thing before the car has settled into the corner and another once it has**
 genuinely has two answers. `concepts/corner-regime.md` and `concepts/bite-hold.md` carry the rule.
 Which answer matters today depends on how long the corner lasts against how long this car takes to
 settle, and the Engineer works that out from the rule plus the facts the request carries. Those
-knobs carry **both lines**. The roll levers — bars, springs, damper oil, ride height, droop,
-roll-centre, flex — are the obvious members, but the test is the two answers, not the mechanism:
-front toe-out smooths the initial and can give steering in the middle, so it is one of them
-(founder, 2026-08-27 — "it's anything that behaves differently initially and mid-corner").
+knobs carry **both lines on each side** (`two_answers: true`). The test is the two answers, not the
+mechanism (founder, 2026-08-27 — *"it's anything that behaves differently initially and
+mid-corner"*): the roll levers are the obvious members, and front toe, caster, Ackermann, rear toe
+gain, bump steer and camber split the same way.
 
-A knob that does the same thing throughout the corner carries **one line**.
-
-`roll_lever: true` is the flag for the two-line shape. The name is historical — read it as "has two
-answers", not "changes roll".
+A knob that does the same thing throughout the corner carries **one line per side**
+(`two_answers: false`): rear toe, the diff, anti-squat, anti-dive, body, weight, servo horn. The
+diff and anti-squat split on the throttle, not on time in the corner — that split goes in the line.
 
 ```
-CHANGE: arb_front increase [consensus]
-  BEFORE THE CAR SETTLES: more initial steering — the front bites sooner and the car turns in quicker
-  ONCE SETTLED: more understeer through the middle, and the rear feels more planted behind it
+FRONT ANTI-ROLL BAR (arb_front) | a normal move: 0.1 mm
+  STIFFER [consensus]
+    BEFORE THE CAR SETTLES: more initial steering — the front bites sooner and the car turns in quicker, with less roll
+    ONCE SETTLED: more understeer through the middle, and the rear feels more planted behind it
+  SOFTER [consensus]
+    BEFORE THE CAR SETTLES: less initial steering — the front bites later and turn-in is smoother, with more roll
+    ONCE SETTLED: more steering through the middle — less understeer — and the rear feels a little less planted behind it
   WHY: arb.md
 
-CHANGE: camber_front increase [consensus]
-  EFFECT: more steering, most of it mid-corner; it lets go more abruptly, and how much you get depends on the tyre
-  WHY: camber.md
+DIFF OIL (diff_oil) | a normal move: 1,000 cSt
+  THICKER [consensus]
+    EFFECT: less rotation off throttle and more rotation on throttle — …
+  THINNER [consensus]
+    EFFECT: more rotation off throttle and less on throttle — …
+  WHY: diff-and-driveline.md
 ```
 
-The unevenness is the physics talking, which is the only kind allowed. Damper oil is the proof the
-shape is right: its ONCE SETTLED line says *"no change"* — `bite-hold.md` is explicit that damping
-moves *when* load arrives without changing the roll angle the car ends up at — and that is a real
-claim a six-box grid could only express as five empty boxes.
+Damper oil is the proof the shape is right: its ONCE SETTLED line says *"no change"* on both sides
+— `bite-hold.md` is explicit that damping moves *when* load arrives without changing the roll angle
+the car ends up at.
 
 **Corner types are never named.** A hairpin is slow, so it lasts a long time and *is* settled; a
 180° hairpin and a 90° sweeper of four times the radius take the same time. What matters is
@@ -63,20 +88,29 @@ answer.
 ## Schema
 
 ```yaml
-id: front_arb_stiffer            # stable key: <parameter>_<direction-word>
+id: arb_front                    # = parameter — one entry per knob
 discipline: touring
-change:
-  parameter: arb_front           # canonical setup key — matches the KB **Keys:** vocabulary
-  direction: increase            # increase | decrease
-  step: null                     # a normal-sized move, founder's words; null until dictated
-roll_lever: true                 # true => before_settled + once_settled; false => effect
-before_settled: "..."            # max 170 chars each, driver's words, no banned coinage
-once_settled: "..."
-confidence: consensus            # consensus | majority | contested
-contested:                       # REQUIRED iff confidence is contested
-  claim_a: "..."
-  claim_b: "..."
-  discriminator: "what you'd see on track that decides it today"
+parameter: arb_front             # canonical setup key — matches the KB **Keys:** vocabulary
+label: "Front anti-roll bar"     # what a driver calls it; rendered as the heading
+words:
+  more: "stiffer"                # what an increase means on this knob, in a driver's word
+  less: "softer"                 # …and a decrease. Sheet-sign conventions get said here, once
+step: "0.1 mm"                   # a normal-sized move, founder's words, shared by both directions; null until dictated
+two_answers: true                # true => before_settled + once_settled per side; false => effect per side
+more:
+  reviewed: true                 # founder has passed this side; false = AI-drafted
+  confidence: consensus          # consensus | majority | contested — per side
+  before_settled: "..."          # max 170 chars each, driver's words, no banned coinage
+  once_settled: "..."
+less:
+  reviewed: false
+  confidence: consensus
+  before_settled: "..."
+  once_settled: "..."
+  contested:                     # REQUIRED iff that side's confidence is contested
+    claim_a: "..."
+    claim_b: "..."
+    discriminator: "what you'd see on track that decides it today"
 physics:                         # files in content/vehicle-dynamics/ — the anti-substitution hook
   - arb.md
 sources:                         # authoring record only — never rendered, never named to a driver
@@ -100,7 +134,7 @@ unenforceable on free text. It is seeded with the coinages `bite-hold.md` names 
 takes a set, skatey, on top of it, nervous-feeling) plus every one earlier drafts shipped (pushes,
 wandering, steadier, lazier, twitchy, darty, sharper).
 
-**The balance words** — founder-dictated 2026-08-27, proposed for `bite-hold.md`'s closed list:
+**The balance words** — founder-dictated 2026-08-27, on `bite-hold.md`'s closed list:
 
 | Word | Means |
 |---|---|
@@ -114,16 +148,13 @@ wandering, steadier, lazier, twitchy, darty, sharper).
 These are what the run log records and what these entries are for. Note `push` is a balance word
 with a specific meaning and is *not* a coinage — an earlier ban list had it wrong.
 
-**One direction per knob.** Each entry is written for one direction; the opposite move most likely
-does the opposite, and the block header says so. Write a second file for the other direction only
-when it is genuinely not the mirror.
-
 ### `step`
 
-A **normal-sized move**, in the founder's words — not a floor, not a prescription. `null` until he
-has dictated it, and the renderer omits it. Nothing else may put a number here: an earlier pass
-invented, widened or misapplied a figure in ten of sixteen entries, and this was the field every one
-of them landed in. Measured from users' setup data is also out (founder, 2026-08-26: "not yet").
+A **normal-sized move**, in the founder's words — not a floor, not a prescription. Shared by both
+directions. `null` until he has dictated it, and the renderer omits it. Nothing else may put a
+number here: an earlier pass invented, widened or misapplied a figure in ten of sixteen entries, and
+this was the field every one of them landed in. Measured from users' setup data is also out
+(founder, 2026-08-26: "not yet").
 
 ---
 
@@ -133,17 +164,18 @@ of them landed in. Measured from users' setup data is also out (founder, 2026-08
 |---|---|
 | each line | 170 chars, no banned coinage |
 | `step` | 140 chars, or null |
+| `label` / each `words` entry | 40 chars |
 | `contested` fields | 200 chars each |
-| **whole rendered entry** | **600 chars** |
+| **whole rendered entry (both sides)** | **1,100 chars** |
 
 The rendered ceiling is the one that matters — line caps bound each line, but only a whole-entry
 ceiling stops an entry growing back into the one the model favours by bulk.
 
 ## Validation
 
-`npm run nets:check` — schema, the shape matches `roll_lever`, no banned coinage on any line,
-contested ⇒ both claims + discriminator, `physics` files resolve, render ceiling, no duplicate
-(parameter, direction) per discipline.
+`npm run nets:check` — schema, `id` = `parameter`, the shape on each side matches `two_answers`, no
+banned coinage on any line, contested ⇒ both claims + discriminator, `physics` files resolve, render
+ceiling, no duplicate parameter per discipline, and a list of every side still `reviewed: false`.
 
 ---
 
@@ -151,19 +183,20 @@ contested ⇒ both claims + discriminator, `physics` files resolve, render ceili
 
 `drafts/` is the open tier — AI-drafted, not yet founder-reviewed, rendered to the Engineer behind a
 hedge divider. Founder review promotes a file into its discipline folder (`touring/`), locked by
-`kb-guard` like KB prose.
+`kb-guard` like KB prose. Inside a locked file, a side marked `reviewed: false` is the finer-grained
+version of the same thing.
 
 **Trusted draft sources**, in order: Invisible Speed (Joseph Quagraine) — the founder's most trusted
 source; his framework (initial vs overall grip, delayed load transfer, the working range) is the
 same one the physics KB derives independently. Then the chart-style guides as cross-checks and
 disagreement partners: the HUDY/Atack On Road Setup Guide, the Scott Guyatt R/C Handbook, petitrc's
 RC CheatSheets, and the XRAY/Hudy setup books. Where a chart contradicts Invisible Speed AND the KB
-settles it, the chart is simply wrong. Where trusted sources genuinely split, the entry is
+settles it, the chart is simply wrong. Where trusted sources genuinely split, the side is
 `contested` and carries both claims plus a discriminator. Forums are used only to *discover*
 contested topics, never as the source of a claim.
 
 ## Coverage
 
-Sixteen entries today, all touring. Next worth writing: shock position, track width, chassis flex,
-wing, anti-squat, tyres and inserts. Roll-centre knobs are deliberately absent — the KB already
-carries them founder-verified and solver-checked. Off-road is a separate discipline tree, later.
+Thirty-eight knobs, all touring, one founder-reviewed side each and the opposite side AI-drafted
+(2026-08-27). Not yet written: tyres and inserts, track width, wing. Off-road is a separate
+discipline tree, later.
