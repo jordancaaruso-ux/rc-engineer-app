@@ -1,6 +1,5 @@
-# AI DRAFT — awaiting founder review. Third sweep, 2026-08-27. Drafted from the physics KB's own
-# effects notes (roll-centre files are solver-checked and founder-verified for DIRECTION; the outcome
-# lines here are the nets' addition). Invisible Speed transcripts NOT consulted for this set.
+# AI DRAFT — awaiting founder review. Third sweep, founder-corrected 2026-08-27. Roll-centre direction
+# per key is solver-checked (upper-link-geometry.md); the outcome lines are the nets' addition.
 # `increase` = MORE shims = more bump-IN on this sheet (Awesomatix). Other cars can run the opposite
 # sign — never carry this direction to a different chassis.
 id: bump_steer_front_more_in
@@ -10,10 +9,11 @@ change:
   direction: increase
   step: null            # a normal-sized move, founder-dictated; null = not set yet
 roll_lever: false
-effect: "the loaded front toes in as the car rolls — more secure mid-corner but less steering as it loads up; bump-out is the mirror, steering building as it rolls"
+effect: "more aggressive initially — more initial steering, and generally more mid-corner too; in on compression is out on extension, so it can help the car drive straight on exit"
 confidence: majority
 physics:
   - bump-steer-toe-gain.md
   - toe.md
 sources:
+  - "Founder (JC), 2026-08-27"
   - "bump-steer-toe-gain.md (founder-confirmed sign 2026-07-30)"

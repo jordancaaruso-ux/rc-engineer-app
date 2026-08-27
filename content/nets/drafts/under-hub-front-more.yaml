@@ -1,0 +1,21 @@
+# AI DRAFT — awaiting founder review. Third sweep, founder-corrected 2026-08-27. Roll-centre direction
+# per key is solver-checked (upper-link-geometry.md); the outcome lines are the nets' addition.
+# Every roll-centre key gets its own entry (founder: they all move roll centre but they do not all feel
+# the same). HOW THIS KEY FEELS DIFFERENT FROM THE OTHERS: NOT YET DICTATED — until it is, the lines
+# below are the roll-centre direction only. The header states this key's strength and what else it moves.
+# Raises RC ~1.05 mm per 0.5 mm shim (about as strong as the lower arm) and adds camber gain with it.
+id: under_hub_front_more
+discipline: touring
+change:
+  parameter: under_hub_shims_front
+  direction: increase
+  step: null            # a normal-sized move, founder-dictated; null = not set yet
+roll_lever: true
+before_settled: "more front bite — more initial steering, and the front feels more on the track"
+once_settled: "generally more understeer through the middle with a higher front roll centre"
+confidence: majority
+physics:
+  - under-hub.md
+sources:
+  - "upper-link-geometry.md roll-centre table (solver-verified 2026-08-01)"
+  - "Founder (JC), 2026-08-27 — front: more understeer settled; rear: hedged like the rear bar and spring"
