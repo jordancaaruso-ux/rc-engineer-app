@@ -1,19 +1,18 @@
-# AI DRAFT — awaiting founder review. Third sweep, founder-corrected 2026-08-27 (two passes). Roll-centre
+# FOUNDER-REVIEWED 2026-08-27 (JC pass) — promoted to the locked tier. Third sweep, founder-corrected 2026-08-27 (two passes). Roll-centre
 # direction per key is solver-checked (upper-link-geometry.md); the feel lines are the founder's.
 # Founder: the upper links are about BITE — a big change in the amount of bite the car has — and the overall
 # grip feel moves with them more than with the other keys. Outer and inner are the same lever from either
 # end: what matters is the upper arm's angle. ~0.5 mm of RC per 0.5 mm shim, camber gain moves with it.
-# Adding upper-INNER shims LOWERS RC and reduces camber gain — the lines below are the lower-RC feel.
-# `upper_inner_shims_rear` = rf and rr together.
-id: upper_inner_rear_more
+# Adding upper-OUTER shims raises RC.
+id: upper_outer_front_more
 discipline: touring
 change:
-  parameter: upper_inner_shims_rear
+  parameter: upper_outer_shims_front
   direction: increase
   step: null            # a normal-sized move, founder-dictated; null = not set yet
 roll_lever: true
-before_settled: "a big change in rear bite the other way — less secure from the first input, and more in the track"
-once_settled: "tends toward more rear hold through the middle, though it can go the other way; the overall rear grip feel moves with it; exit either way"
+before_settled: "a big change in front bite — noticeably more initial steering, and more on the track"
+once_settled: "generally more understeer through the middle; the overall front grip feel moves with this more than with the other keys"
 confidence: majority
 physics:
   - upper-link-geometry.md
