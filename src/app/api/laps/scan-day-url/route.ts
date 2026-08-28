@@ -16,8 +16,6 @@ import {
 } from "@/lib/lapWatch/liveRcNameNormalize";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { discoverTrackTimingSessions } from "@/lib/lapWatch/discoverTrackTimingSessions";
-import { discoverMyRcmDaySessions } from "@/lib/lapWatch/discoverMyRcmDaySessions";
-import { isMyRcmDiscoveryUrl } from "@/lib/lapUrlParsers/myRcmReport";
 import { sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
 import { rawSessionDriversFromImportedPayload } from "@/lib/lapImport/importedIngestPlan";
 import { hasSpeedhiveIdentityForUser } from "@/lib/speedhive/speedhiveDriverSettings";
@@ -385,59 +383,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "dayUrl or trackId is required" }, { status: 400 });
   }
 
-  // MyRCM event / class URL: enumerate its result sessions for the picker (paste-per-event flow).
-  if (isMyRcmDiscoveryUrl(dayUrl)) {
-    let eventRaceClass: string | null = null;
-    if (eventId) {
-      const ev = await prisma.event.findFirst({
-        where: { id: eventId },
-        select: { raceClass: true },
-      });
-      eventRaceClass = ev?.raceClass?.trim() || null;
-    }
-    const discovered = await discoverMyRcmDaySessions({
-      userId: userId,
-      url: dayUrl,
-      eventRaceClass,
-    });
-    const candidates: ScanDayUrlCandidateRow[] = discovered.candidates.map((c) => ({
-      sessionId: c.sessionId,
-      sessionUrl: c.sessionUrl,
-      driverName: c.label,
-      sessionTime: null,
-      sessionCompletedAtIso: null,
-      matchesDriver: null,
-      alreadyImported: c.alreadyImported,
-      linkedRunId: c.linkedRunId,
-      timingSource: "myrcm",
-    }));
-    let scanMessage = discovered.scanMessage;
-    if (!scanMessage && candidates.length > 0) {
-      scanMessage = discovered.classFilterApplied
-        ? `MyRCM sessions for your class — pick the one you raced.`
-        : "MyRCM lists sessions by class and round — pick the one you raced.";
-    }
-    return NextResponse.json({
-      ok: true,
-      dayUrl,
-      indexKind: "results" as ScanDayUrlIndexKind,
-      liveRcDriverName: null,
-      candidates,
-      totalCandidates: discovered.totalSessions,
-      matchedCount: null,
-      hasDriverNameSetting: false,
-      driverFilterApplied: false,
-      scanMessage,
-    });
-  }
-
+  // MyRCM discovery was removed on 2026-08-26 — see `timingUrlSafetySync.ts`. A pasted MyRCM URL
+  // now falls through to the unsupported-URL answer below rather than being crawled.
   const isPractice = isLiveRcPracticeListUrl(dayUrl);
   const isResults = isLiveRcResultsDiscoveryUrl(dayUrl);
   if (!isPractice && !isResults) {
     return NextResponse.json(
       {
         error:
-          "Unsupported timing URL. Use a LiveRC practice list or results page, or a MyRCM event/results URL (myrcm.ch).",
+          "Unsupported timing URL. Use a LiveRC practice list or results page, or a Speedhive session URL.",
       },
       { status: 400 }
     );

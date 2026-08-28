@@ -100,6 +100,7 @@ export default async function EventDetailPage(props: {
             initialControlledAdditiveTypeId={event.controlledAdditiveTypeId}
             initialPracticeSourceUrl={event.practiceSourceUrl}
             initialResultsSourceUrl={event.resultsSourceUrl}
+            initialMyRcmUrl={event.myRcmUrl}
             initialRaceClass={event.raceClass}
             runCount={runCount}
           />

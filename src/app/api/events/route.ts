@@ -4,6 +4,8 @@ import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { parseEventDateYmd, eventDateToYmd } from "@/lib/eventDateParse";
 import { normalizeLiveRcEventHubUrl } from "@/lib/lapWatch/resolveEventFromLiveRcMeeting";
+import { classifyMyRcmEventLink } from "@/lib/lapUrlParsers/myRcmUrl";
+import { isMyRcmHostUrl } from "@/lib/lapUrlParsers/myRcmPdfSource";
 import {
   ensureEventParticipation,
   EVENT_LIST_INCLUDE,
@@ -83,6 +85,7 @@ export async function POST(request: Request) {
       notes?: string | null;
       practiceSourceUrl?: string | null;
       resultsSourceUrl?: string | null;
+      myRcmUrl?: string | null;
       controlledTireLabel?: string | null;
       controlledTireTypeId?: string | null;
       controlledAdditiveTypeId?: string | null;
@@ -134,9 +137,28 @@ export async function POST(request: Request) {
       typeof body.resultsSourceUrl === "string" && body.resultsSourceUrl.trim()
         ? body.resultsSourceUrl.trim()
         : null;
+
+    // A MyRCM link here would be stored and never used: this field means "an index we scan", and
+    // myrcm.ch is on the fetch denylist. Say where it goes instead of swallowing it.
+    if (isMyRcmHostUrl(resultsSourceUrlRaw)) {
+      return NextResponse.json(
+        { error: "That's a MyRCM link — put it in the event's MyRCM page field instead." },
+        { status: 400 }
+      );
+    }
     const resultsSourceUrl = resultsSourceUrlRaw
       ? normalizeLiveRcEventHubUrl(resultsSourceUrlRaw) ?? resultsSourceUrlRaw
       : null;
+    // Validated rather than stored as typed: a link that goes nowhere is only discovered at the
+    // track, mid-import, which is the worst possible moment to find out.
+    let myRcmUrl: string | null = null;
+    if (typeof body.myRcmUrl === "string" && body.myRcmUrl.trim()) {
+      const classified = classifyMyRcmEventLink(body.myRcmUrl);
+      if (!classified.ok) {
+        return NextResponse.json({ error: classified.error }, { status: 400 });
+      }
+      myRcmUrl = classified.url;
+    }
     const controlledTireLabel =
       typeof body.controlledTireLabel === "string" && body.controlledTireLabel.trim()
         ? body.controlledTireLabel.trim()
@@ -205,6 +227,7 @@ export async function POST(request: Request) {
         endDate,
         practiceSourceUrl,
         resultsSourceUrl,
+        myRcmUrl,
       },
       include: EVENT_LIST_INCLUDE,
     });

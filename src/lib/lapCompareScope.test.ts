@@ -1,10 +1,55 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  lapCompareFieldSeriesId,
+  lapCompareFieldSeriesRunId,
   lapCompareTrackKey,
   lapSeriesMatchesCompareScope,
   sameLocalCalendarDay,
 } from "@/lib/lapCompareScope";
+
+test("field series ids round-trip the run they hang off", () => {
+  const id = lapCompareFieldSeriesId("run_1", "set_9");
+  assert.equal(id, "field:run_1:set_9");
+  assert.equal(lapCompareFieldSeriesRunId(id), "run_1");
+  assert.equal(lapCompareFieldSeriesRunId("history:run_1"), null);
+  assert.equal(lapCompareFieldSeriesRunId("field:"), null);
+  assert.equal(lapCompareFieldSeriesRunId("field:noset"), null);
+});
+
+test("a rival off another run's timing sheet is scoped like that run", () => {
+  const rival = lapCompareFieldSeriesId("r-in", "s1");
+  const rivalOut = lapCompareFieldSeriesId("r-out", "s1");
+  // same_event: follows the owning run's event, not the anchor's own field bypass.
+  const ev = {
+    scope: "same_event" as const,
+    anchorInstantIso: AUG_2,
+    anchorEventId: "evt-1",
+    eventIdForHistoryRun: (id: string) => (id === "r-in" ? "evt-1" : "evt-2"),
+  };
+  assert.equal(lapSeriesMatchesCompareScope({ seriesId: rival, sortIso: APR_10, ...ev }), true);
+  assert.equal(lapSeriesMatchesCompareScope({ seriesId: rivalOut, sortIso: APR_10, ...ev }), false);
+  // same_track: whatever track the caller resolves for the owning run.
+  const tk = {
+    scope: "same_track" as const,
+    anchorInstantIso: AUG_2,
+    anchorTrackKey: lapCompareTrackKey("MR33 Arena"),
+    trackKeyForSeries: (id: string) =>
+      id === rivalOut ? lapCompareTrackKey("Geelong") : lapCompareTrackKey("mr33 arena"),
+  };
+  assert.equal(lapSeriesMatchesCompareScope({ seriesId: rival, sortIso: APR_10, ...tk }), true);
+  assert.equal(lapSeriesMatchesCompareScope({ seriesId: rivalOut, sortIso: APR_10, ...tk }), false);
+  // same_day: the owning run's day, so a heat from April is not "today" in August.
+  assert.equal(
+    lapSeriesMatchesCompareScope({ seriesId: rival, sortIso: APR_10, scope: "same_day", anchorInstantIso: AUG_2 }),
+    false
+  );
+  // Unlike the anchor's own `imported:` field, there is no scope bypass.
+  assert.equal(
+    lapSeriesMatchesCompareScope({ seriesId: "imported:s1", sortIso: APR_10, scope: "same_day", anchorInstantIso: AUG_2 }),
+    true
+  );
+});
 
 /** Local-midnight ISO so the same-day assertions don't straddle a UTC boundary. */
 function localIso(y: number, m: number, d: number, h = 12): string {

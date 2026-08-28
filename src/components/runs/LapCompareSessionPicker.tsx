@@ -16,7 +16,7 @@
 
 import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEnterExit } from "@/components/ui/Collapse";
 import { formatLap } from "@/lib/runLaps";
@@ -35,6 +35,15 @@ export type LapPickerGroup = {
   /** Heading above the rows — "This test day · MR33 Arena". */
   label: string;
   rows: LapPickerRow[];
+  /**
+   * Present on a group that folds: the heading becomes the toggle. Another
+   * race's field is one of these — a season of club nights at one track is
+   * fifty timing sheets, and a flat list of five hundred rivals is not a picker.
+   */
+  onToggle?: () => void;
+  collapsed?: boolean;
+  /** One line under the heading while its laps load, or when they failed to. */
+  status?: string | null;
 };
 
 /** Which slice of the comparable sessions is on screen. */
@@ -48,10 +57,13 @@ export function LapCompareSegmentBar({
   segments,
   active,
   onSelect,
+  ariaLabel = "Whose sessions to compare against",
 }: {
   segments: LapPickerSegment[];
   active: string;
   onSelect: (key: string) => void;
+  /** The picker draws this bar twice — once over the target, once over the tick-list. */
+  ariaLabel?: string;
 }) {
   // One segment is not a choice — drawing a control that can only be pressed
   // into its current state reads as broken. A solo run has only its driver.
@@ -60,7 +72,7 @@ export function LapCompareSegmentBar({
     <div
       className="flex gap-0.5 rounded-md border border-border bg-surface-runna-inset p-0.5"
       role="tablist"
-      aria-label="Whose sessions to compare against"
+      aria-label={ariaLabel}
     >
       {segments.map((s) => {
         const on = s.key === active;
@@ -132,43 +144,52 @@ function PickerRow({
   );
 }
 
+
+/**
+ * The session everything else is measured against, drawn as a row.
+ *
+ * It used to sit at the top of the list, one segment bar below the dropdown that picks it —
+ * so the same session appeared twice on one panel, under two different words: "Measure
+ * everything against" up top and "Target" down here, with a tab named after a driver in
+ * between (founder, 2026-08-27: "I'm a bit confused"). Directly beneath its dropdown it needs
+ * no label at all: it is visibly the answer to the question above it, and it carries the one
+ * thing the dropdown cannot — the lap time every delta on the sheet is counted from.
+ */
+export function LapCompareTargetRow({ target }: { target: LapPickerRow | null }) {
+  if (!target) return null;
+  return (
+    <div
+      data-testid="lap-compare-target-row"
+      className="flex items-center gap-2.5 rounded-md border border-primary-ink/60 bg-primary/10 px-2 py-1.5"
+    >
+      <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
+      <span className="min-w-0 flex-1 leading-tight">
+        <span className="block truncate text-[12px] text-foreground">{target.name}</span>
+        <span className="block truncate text-[10px] tabular-nums text-muted-foreground">
+          {target.when}
+        </span>
+      </span>
+      <span className="shrink-0 text-[11px] tabular-nums text-primary-ink">
+        {formatLap(target.bestLap)}
+      </span>
+    </div>
+  );
+}
+
 export function LapCompareSessionList({
   groups,
   selectedIds,
   onToggle,
-  target,
   className,
 }: {
   groups: LapPickerGroup[];
   selectedIds: string[];
   onToggle: (id: string) => void;
-  /** The row everything is measured against — pinned above the groups, never tickable. */
-  target: LapPickerRow | null;
   className?: string;
 }) {
   const total = groups.reduce((n, g) => n + g.rows.length, 0);
   return (
     <div className={cn("space-y-3", className)}>
-      {target ? (
-        <div className="flex items-center gap-2.5 rounded-md border border-primary-ink/60 bg-primary/10 px-2 py-1.5">
-          <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
-          <span className="min-w-0 flex-1 leading-tight">
-            <span className="flex items-center gap-1.5">
-              <span className="truncate text-[12px] text-foreground">{target.name}</span>
-              <span className="ui-label-caps shrink-0 rounded-full border border-primary-ink/50 px-1.5 text-[9px] uppercase text-primary-ink">
-                Target
-              </span>
-            </span>
-            <span className="block truncate text-[10px] tabular-nums text-muted-foreground">
-              {target.when}
-            </span>
-          </span>
-          <span className="shrink-0 text-[11px] tabular-nums text-primary-ink">
-            {formatLap(target.bestLap)}
-          </span>
-        </div>
-      ) : null}
-
       {total === 0 ? (
         <p className="px-0.5 py-3 text-[11px] text-muted-foreground">
           Nothing else to compare against here. Widen the scope to reach other tracks and
@@ -177,17 +198,45 @@ export function LapCompareSessionList({
       ) : (
         groups.map((g) => (
           <div key={g.key} className="space-y-1">
-            <p className="ui-label-caps text-[9px] uppercase tracking-wider">{g.label}</p>
-            <ul className="space-y-1">
-              {g.rows.map((row) => (
-                <PickerRow
-                  key={row.id}
-                  row={row}
-                  checked={selectedIds.includes(row.id)}
-                  onToggle={onToggle}
+            {g.onToggle ? (
+              <button
+                type="button"
+                className="tap-active flex w-full items-center gap-1.5 rounded-md px-0.5 py-1 text-left hover:bg-surface-runna-inset/60"
+                aria-expanded={!g.collapsed}
+                onClick={g.onToggle}
+              >
+                <ChevronRight
+                  className={cn(
+                    "size-3 shrink-0 text-muted-foreground transition-transform",
+                    !g.collapsed && "rotate-90"
+                  )}
+                  aria-hidden
                 />
-              ))}
-            </ul>
+                <span className="ui-label-caps min-w-0 flex-1 truncate text-[9px] uppercase tracking-wider">
+                  {g.label}
+                </span>
+                <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                  {g.rows.length}
+                </span>
+              </button>
+            ) : (
+              <p className="ui-label-caps text-[9px] uppercase tracking-wider">{g.label}</p>
+            )}
+            {g.status ? (
+              <p className="px-0.5 text-[10px] text-muted-foreground">{g.status}</p>
+            ) : null}
+            {g.collapsed ? null : (
+              <ul className="space-y-1">
+                {g.rows.map((row) => (
+                  <PickerRow
+                    key={row.id}
+                    row={row}
+                    checked={selectedIds.includes(row.id)}
+                    onToggle={onToggle}
+                  />
+                ))}
+              </ul>
+            )}
           </div>
         ))
       )}
@@ -256,7 +305,7 @@ export function LapCompareSheet({
         </div>
         <div className="flex items-center justify-between gap-2 px-4 pb-1 pt-2.5">
           <h2 className="min-w-0 truncate text-[15px] font-bold tracking-tight text-foreground">
-            Compare with
+            Choose sessions
           </h2>
           <button
             type="button"

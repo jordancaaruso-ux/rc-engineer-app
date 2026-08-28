@@ -32,7 +32,6 @@ export function NextUpCard({ nextUp }: { nextUp: NextUp }) {
   return (
     <SurfaceCard variant="hero" contentClassName="p-0" className="rounded-2xl">
       <div className="flex items-center gap-3 border-b border-border px-5 py-3.5">
-        <span className="h-3.5 w-[3px] shrink-0 skew-x-[-21deg] rounded-sm bg-primary" aria-hidden />
         <span className="micro-caps text-foreground">
           Next up
         </span>
@@ -166,7 +165,6 @@ export function NothingBookedCard({
   return (
     <SurfaceCard variant="hero" contentClassName="p-0" className="rounded-2xl">
       <div className="flex items-center gap-3 border-b border-border px-5 py-3.5">
-        <span className="h-3.5 w-[3px] shrink-0 skew-x-[-21deg] rounded-sm bg-primary" aria-hidden />
         <span className="micro-caps text-foreground">
           Nothing booked
         </span>
@@ -191,7 +189,7 @@ export function NothingBookedCard({
           <button
             type="button"
             onClick={() => onNewEvent(cadence.suggestedYmd)}
-            className="tap-active inline-flex min-h-[38px] items-center gap-2 rounded-lg primary-face bg-primary px-4 text-[13px] font-bold tracking-[-.01em] whitespace-nowrap text-primary-foreground transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="tap-active inline-flex min-h-[38px] items-center gap-2 rounded-lg primary-face bg-primary px-4 text-[13px] font-semibold tracking-[-.01em] whitespace-nowrap text-primary-foreground transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             <Plus className="size-4" strokeWidth={2.6} aria-hidden />
             {cadence.suggestedYmd ? `Book ${weekdayOf(cadence.suggestedYmd)}` : "New event"}

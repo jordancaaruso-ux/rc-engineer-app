@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   buildMyRcmSessionUrl,
+  classifyMyRcmEventLink,
   enumerateMyRcmSessions,
   isMyRcmCategoryUrl,
   isMyRcmDiscoveryUrl,
@@ -46,6 +47,50 @@ const EVENT_URL = "https://www.myrcm.ch/en/report/97370";
 const LEGACY_SESSION_URL = "https://www.myrcm.ch/myrcm/report/en/97370/388960?reportKey=4709";
 const LEGACY_EVENT_URL =
   "https://www.myrcm.ch/myrcm/main?dId[O]=51&pLa=en&dId[E]=97370&tId=E&hId[1]=org#";
+
+test("classifyMyRcmEventLink: a heat link is stored as its class page", () => {
+  // The whole point: a driver pastes the run they are looking at, and that run is over. Storing
+  // it would send them back to last round's result every meeting.
+  const heat = classifyMyRcmEventLink(SESSION_URL);
+  assert.equal(heat.ok, true);
+  assert.equal(heat.ok && heat.url, CLASS_URL);
+
+  const legacyHeat = classifyMyRcmEventLink(LEGACY_SESSION_URL);
+  assert.equal(legacyHeat.ok, true);
+  assert.equal(legacyHeat.ok && legacyHeat.url, "https://www.myrcm.ch/en/report/97370/388960");
+});
+
+test("classifyMyRcmEventLink: class and event pages are kept as they are", () => {
+  const cls = classifyMyRcmEventLink(CLASS_URL);
+  assert.equal(cls.ok && cls.url, CLASS_URL);
+
+  // An event link must NOT be promoted to a class: which class is theirs is unknowable without
+  // reading the page, and reading MyRCM is exactly what we may not do.
+  const ev = classifyMyRcmEventLink(EVENT_URL);
+  assert.equal(ev.ok && ev.url, EVENT_URL);
+
+  const legacyEvent = classifyMyRcmEventLink(LEGACY_EVENT_URL);
+  assert.equal(legacyEvent.ok && legacyEvent.url, "https://www.myrcm.ch/en/report/97370");
+});
+
+test("classifyMyRcmEventLink: bare hostname, other language, and rejections", () => {
+  const bare = classifyMyRcmEventLink("www.myrcm.ch/en/report/99719/395535");
+  assert.equal(bare.ok && bare.url, CLASS_URL);
+
+  // A German driver's link stays German.
+  const de = classifyMyRcmEventLink("https://www.myrcm.ch/de/report/99719/395535?reportKey=6058");
+  assert.equal(de.ok && de.url, "https://www.myrcm.ch/de/report/99719/395535");
+
+  const home = classifyMyRcmEventLink("https://www.myrcm.ch/");
+  assert.equal(home.ok, false);
+  assert.match(home.ok ? "" : home.error, /not a results page/i);
+
+  const liveRc = classifyMyRcmEventLink("https://tftr.liverc.com/results/");
+  assert.equal(liveRc.ok, false);
+  assert.match(liveRc.ok ? "" : liveRc.error, /isn't a MyRCM link/i);
+
+  assert.equal(classifyMyRcmEventLink("   ").ok, false);
+});
 
 test("URL classification (v9 shapes)", () => {
   assert.equal(isMyRcmSessionUrl(SESSION_URL), true);

@@ -10,9 +10,27 @@
  *   `imported:<id>`— the rest of the field from the timing sheet saved on that run
  *   `history:<id>` — another of the driver's runs
  *   `library:<id>` — a session from the viewer's imported lap-time library
+ *   `field:<runId>:<setId>` — a rival off the timing sheet of ANOTHER run in the
+ *                   picker, so a competitor's first heat can be measured against
+ *                   this one. Scoped exactly like the `history:` row of that run.
  */
 
 export type LapCompareScope = "all" | "same_day" | "same_event" | "same_track";
+
+const FIELD_PREFIX = "field:";
+
+export function lapCompareFieldSeriesId(runId: string, setId: string): string {
+  return `${FIELD_PREFIX}${runId}:${setId}`;
+}
+
+/** `field:<runId>:<setId>` → the run the timing sheet hangs off; null for any other id. */
+export function lapCompareFieldSeriesRunId(seriesId: string): string | null {
+  if (!seriesId.startsWith(FIELD_PREFIX)) return null;
+  const rest = seriesId.slice(FIELD_PREFIX.length);
+  const cut = rest.indexOf(":");
+  if (cut <= 0) return null;
+  return rest.slice(0, cut);
+}
 
 /**
  * Track identity for scoping, keyed on the resolved NAME rather than the id: imported
@@ -93,9 +111,12 @@ export function lapSeriesMatchesCompareScope(input: {
   if (!anchorEventId) return !seriesId.startsWith("library:");
 
   if (seriesId === "run:primary") return primaryRunEventId === anchorEventId;
-  if (seriesId.startsWith("history:")) {
-    const runId = seriesId.slice("history:".length);
-    return (eventIdForHistoryRun?.(runId) ?? null) === anchorEventId;
+  // A rival off another run's timing sheet was at that run's event, by construction.
+  const ownerRunId = seriesId.startsWith("history:")
+    ? seriesId.slice("history:".length)
+    : lapCompareFieldSeriesRunId(seriesId);
+  if (ownerRunId) {
+    return (eventIdForHistoryRun?.(ownerRunId) ?? null) === anchorEventId;
   }
   return false;
 }

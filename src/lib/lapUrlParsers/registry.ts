@@ -2,14 +2,18 @@ import type { LapUrlParseContext, LapUrlParser } from "./types";
 import { stubUrlParser } from "./stubParser";
 import { httpTimingParser } from "./httpTimingParser";
 import { liveRcParser } from "./liveRcParser";
-import { myRcmParser } from "./myRcmParser";
 import { speedhiveParser } from "./speedhiveParser";
 import { speedhivePracticeParser } from "./speedhivePracticeParser";
 
-/** Order: specific parsers first; stub last. */
+/**
+ * Order: specific parsers first; stub last.
+ *
+ * `myRcmParser` is deliberately absent (2026-08-26) — see `timingUrlSafetySync.ts`. Dropping it
+ * here is not enough on its own: `httpTimingParser` matches any http(s) URL, so the host
+ * allowlist, not this list, is what actually stops a MyRCM fetch.
+ */
 const parsers: LapUrlParser[] = [
   liveRcParser,
-  myRcmParser,
   speedhivePracticeParser,
   speedhiveParser,
   httpTimingParser,

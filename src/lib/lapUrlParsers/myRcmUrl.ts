@@ -143,3 +143,64 @@ export function buildMyRcmEventUrl(eventId: string, lang = "en"): string {
 export function isMyRcmDiscoveryUrl(urlStr: string): boolean {
   return isMyRcmCategoryUrl(urlStr) || isMyRcmEventUrl(urlStr);
 }
+
+export const MYRCM_EVENT_LINK_EXAMPLE = "e.g. myrcm.ch/en/report/94266/380206";
+
+/**
+ * One pasted MyRCM address → the link to store on an `Event` (`Event.myRcmUrl`).
+ *
+ * Kept as a *destination*: the app never fetches this, it hands it to the driver to tap on their
+ * way to download a run's PDF. So the only question is which page drops them closest to the
+ * download button, and the answer is their class page — every heat they will ever import is one
+ * tap from there.
+ *
+ * Which is why a **single-run link normalises up to its class page**. A driver naturally pastes
+ * the heat they are looking at, but that heat is over the moment it is saved; storing it would
+ * send them to last round's result every time. Same reasoning downward: nothing is invented, an
+ * event-only link stays an event link, because we cannot know which of its classes is theirs
+ * without reading the page — and reading the page is the thing we may not do.
+ *
+ * Accepts bare hostnames, the legacy `/myrcm/report/<lang>/…` shape, and the legacy
+ * `/myrcm/main?dId[E]=` landing page; always emits the v9 address, keeping the language they
+ * pasted so a German driver's link stays German.
+ */
+export function classifyMyRcmEventLink(
+  raw: string
+): { ok: true; url: string } | { ok: false; error: string } {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return { ok: false, error: `Paste your class page on MyRCM — ${MYRCM_EVENT_LINK_EXAMPLE}` };
+  }
+  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  const legacyEventId = legacyMyRcmEventIdFromUrl(candidate);
+  if (legacyEventId) return { ok: true, url: buildMyRcmEventUrl(legacyEventId) };
+
+  const ref = parseMyRcmReportUrl(candidate);
+  if (!ref) {
+    let host: string;
+    try {
+      host = new URL(candidate).hostname;
+    } catch {
+      return { ok: false, error: `That doesn't look like a link — ${MYRCM_EVENT_LINK_EXAMPLE}` };
+    }
+    if (isMyRcmHostname(host)) {
+      // Right site, wrong page — usually MyRCM's home or a timetable.
+      return {
+        ok: false,
+        error: `That's MyRCM, but not a results page. Open your class and copy that address — ${MYRCM_EVENT_LINK_EXAMPLE}`,
+      };
+    }
+    return {
+      ok: false,
+      error: `That isn't a MyRCM link. LiveRC and Speedhive pages go in the timing URL fields above.`,
+    };
+  }
+
+  return {
+    ok: true,
+    url: ref.categoryId
+      ? buildMyRcmCategoryUrl(ref.eventId, ref.categoryId, ref.lang)
+      : buildMyRcmEventUrl(ref.eventId, ref.lang),
+  };
+}

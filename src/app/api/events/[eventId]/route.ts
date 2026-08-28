@@ -5,6 +5,8 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { eventDateToYmd, parseEventDateYmd } from "@/lib/eventDateParse";
 import { normalizeLiveRcEventHubUrl } from "@/lib/lapWatch/resolveEventFromLiveRcMeeting";
+import { classifyMyRcmEventLink } from "@/lib/lapUrlParsers/myRcmUrl";
+import { isMyRcmHostUrl } from "@/lib/lapUrlParsers/myRcmPdfSource";
 import {
   ensureEventParticipation,
   EVENT_LIST_INCLUDE,
@@ -33,6 +35,7 @@ const SHARED_PATCH_KEYS = new Set([
   "endDate",
   "practiceSourceUrl",
   "resultsSourceUrl",
+  "myRcmUrl",
   "raceClass",
 ]);
 
@@ -176,7 +179,29 @@ export async function PATCH(
 
   const practiceSourceUrl = optString(body.practiceSourceUrl);
   const resultsSourceUrlRaw = optString(body.resultsSourceUrl);
+  const myRcmUrlRaw = optString(body.myRcmUrl);
   const raceClass = optString(body.raceClass);
+
+  // Same validation as create: refuse a link that would strand the driver mid-import. Clearing
+  // it (empty string → null) stays allowed.
+  if (myRcmUrlRaw !== undefined) {
+    if (myRcmUrlRaw === null) {
+      eventData.myRcmUrl = null;
+    } else {
+      const classified = classifyMyRcmEventLink(myRcmUrlRaw);
+      if (!classified.ok) {
+        return NextResponse.json({ error: classified.error }, { status: 400 });
+      }
+      eventData.myRcmUrl = classified.url;
+    }
+  }
+
+  if (isMyRcmHostUrl(resultsSourceUrlRaw)) {
+    return NextResponse.json(
+      { error: "That's a MyRCM link — put it in the event's MyRCM page field instead." },
+      { status: 400 }
+    );
+  }
 
   if (practiceSourceUrl !== undefined) eventData.practiceSourceUrl = practiceSourceUrl;
   if (resultsSourceUrlRaw !== undefined) {

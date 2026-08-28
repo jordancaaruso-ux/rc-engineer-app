@@ -70,6 +70,8 @@ export function EventAddForm({
   const [notes, setNotes] = useState("");
   const [practiceSourceUrl, setPracticeSourceUrl] = useState("");
   const [resultsSourceUrl, setResultsSourceUrl] = useState("");
+  /** Where this meeting lives on MyRCM. A destination for the driver, never a page we fetch. */
+  const [myRcmUrl, setMyRcmUrl] = useState("");
   const [tireControlled, setTireControlled] = useState(false);
   const [controlledTireTypeId, setControlledTireTypeId] = useState("");
   const [controlAdditiveEnabled, setControlAdditiveEnabled] = useState(false);
@@ -149,6 +151,9 @@ export function EventAddForm({
           notes: notes.trim() || null,
           practiceSourceUrl: showTimingUrlFields ? practiceSourceUrl.trim() || null : null,
           resultsSourceUrl: showTimingUrlFields ? resultsSourceUrl.trim() || null : null,
+          // NOT gated on `showTimingUrlFields`: that switch asks whether the track already has a
+          // page we can scan, and no amount of LiveRC makes a MyRCM meeting importable.
+          myRcmUrl: myRcmUrl.trim() || null,
           controlledTireTypeId: tireControlled ? controlledTireTypeId.trim() || null : null,
           controlledAdditiveTypeId: controlAdditiveEnabled
             ? controlledAdditiveTypeId.trim() || null
@@ -309,6 +314,19 @@ export function EventAddForm({
           needed.
         </p>
       ) : null}
+      <div>
+        <label className="block text-[11px] text-muted-foreground mb-1">
+          MyRCM page (optional)
+        </label>
+        <input
+          type="url"
+          className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+          value={myRcmUrl}
+          onChange={(e) => setMyRcmUrl(e.target.value)}
+          placeholder="Your class page on MyRCM"
+        />
+        <p className="mt-1 text-[11px] text-muted-foreground">Results come in as a file — this is where Import PDF sends you.</p>
+      </div>
       <div className="space-y-1.5">
         <label className="block text-[11px] text-muted-foreground">Tire</label>
         <SegmentedControl<"open" | "controlled">
