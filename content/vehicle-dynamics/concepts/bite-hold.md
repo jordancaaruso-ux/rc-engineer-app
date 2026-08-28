@@ -70,7 +70,13 @@ facts, never against the words.
    fore-aft geometry split on that, not on the clock ([[differential-coupling]],
    [[anti-dive-anti-squat]]).
 4. **How the grip behaves at that point** — this is the axis this page is about:
-   - it **arrives late** (there once settled, not on the first input) — short of bite;
+   - it **arrives late** (there once settled, not on the first input). Read this with fact 2: grip
+     that arrives for the last tenth of a corner is, to the driver, no grip in that corner — and in a
+     fast car or a quick corner most corners are like that, so "no grip anywhere" and "it arrives
+     late" are often the same complaint, not two;
+   - it **has no bite** — the grip that arrives is progressive and low rather than sharp and high.
+     This usually goes hand in hand with arriving late, because the same knobs move both, but it is
+     not the same fact: bite is the shape of the arrival, lateness its timing;
    - it **never arrives** — short of grip overall, or the tyre and track before the car;
    - it **arrives and then goes**, suddenly and without warning — past the bite end of the window,
      or something running out ([[droop-downstop]], [[ride-height-and-rake]]);
