@@ -1,4 +1,9 @@
-import { predictSfEndTime, predictSfStartTime, buildSfPredictions } from "./sync";
+import {
+  predictSfEndTime,
+  predictSfStartTime,
+  buildSfPredictions,
+  visibleCrossings,
+} from "./sync";
 import {
   defaultDriverKeys,
   applyTop3LapSelection,
@@ -9,7 +14,7 @@ import {
 import { emptyManualSession, newTimingSessionId } from "./types";
 import type { ManualDriver, ManualTimingSession } from "./types";
 import { getLapAlignmentPreview, getLapAlignSteps } from "./predictSectors";
-import { getCompareSfAlignment, videoTimeAtLapSf } from "./sessionModel";
+import { getCompareSfAlignment, hasMarkedLap, videoTimeAtLapSf } from "./sessionModel";
 import type { ManualVideoSessionV2 } from "./types";
 
 const me: ManualDriver = {
@@ -56,9 +61,13 @@ if (t3me == null || Math.abs(t3me - 112.4) > 0.01) {
   throw new Error(`expected lap 3 me at 112.4, got ${t3me}`);
 }
 
+// The rival is placed from the tone, not from the anchor lap: the anchor is the end of my lap 2
+// (100 = tone + 12.5 + 12.3), so the tone is 75.2 and the rival's lap 3 ends at
+// 75.2 + 12.2 + 12.1 + 12.0 = 111.5 — the same answer the off-video path gives further down.
+// The old shortcut said 112 ("everyone ends lap 2 together"), which is only true of lap 1's start.
 const t3comp = predictSfEndTime(comp, 3, timingSession);
-if (t3comp == null || Math.abs(t3comp - 112) > 0.01) {
-  throw new Error(`expected comp lap 3 at 112 (anchor + comp lap 3), got ${t3comp}`);
+if (t3comp == null || Math.abs(t3comp - 111.5) > 0.01) {
+  throw new Error(`expected comp lap 3 at 111.5 (tone + comp laps 1..3), got ${t3comp}`);
 }
 
 const preds = buildSfPredictions(timingSession, [
@@ -236,6 +245,96 @@ if (meStartOverride !== 118) {
 const compStartFromAnchor = predictSfStartTime(comp, 2, anchoredCompSession);
 if (compStartFromAnchor !== 100) {
   throw new Error(`anchor driver lap should stay at anchor video time, got ${compStartFromAnchor}`);
+}
+
+// A race: lap 1 is the tone-to-loop fragment, so the first time over the line ENDS lap 1 — and
+// anchoring on it as "sf_finish L1" puts lap 2's start on that exact frame. Anchoring it as
+// "L1 start" (what the old Sync step did) put every lap 1.386s late.
+{
+  const racer: ManualDriver = {
+    key: "r",
+    driverName: "Racer",
+    normalizedName: "racer",
+    role: "me",
+    laps: [
+      { lapNumber: 1, lapTimeSec: 1.386 },
+      { lapNumber: 2, lapTimeSec: 17.2 },
+      { lapNumber: 3, lapTimeSec: 17.1 },
+      { lapNumber: 4, lapTimeSec: 17.3 },
+    ],
+  };
+  const xs = visibleCrossings(racer);
+  if (xs.length !== 4 || xs[0]!.anchorKind !== "sf_finish" || xs[0]!.lapNumber !== 1) {
+    throw new Error(`race: first crossing should end L1, got ${JSON.stringify(xs[0])}`);
+  }
+  if (xs[0]!.startsLap !== 2 || xs[1]!.endsLap !== 2) {
+    throw new Error("race: crossing k ends lap k and starts lap k+1");
+  }
+  const raceSession: ManualTimingSession = {
+    sessionId: "race",
+    label: "Race",
+    isOnVideo: true,
+    drivers: [racer],
+    sync: {
+      anchor: { videoTimeSec: 79.099, lapNumber: 1, driverRole: "me", anchorKind: "sf_finish" },
+    },
+  };
+  const l2 = predictSfStartTime(racer, 2, raceSession);
+  if (l2 == null || Math.abs(l2 - 79.099) > 1e-9) {
+    throw new Error(`race: lap 2 should start on the first crossing, got ${l2}`);
+  }
+  const l3 = predictSfStartTime(racer, 3, raceSession);
+  if (l3 == null || Math.abs(l3 - (79.099 + 17.2)) > 1e-9) {
+    throw new Error(`race: lap 3 start should walk one lap on, got ${l3}`);
+  }
+
+  // Practice: lap 1 is timed loop to loop, so the first crossing STARTS the first lap.
+  const practiser: ManualDriver = { ...racer, laps: racer.laps.slice(1) };
+  const ps = visibleCrossings(practiser);
+  if (ps.length !== 4 || ps[0]!.anchorKind !== "sf_start" || ps[0]!.lapNumber !== 2) {
+    throw new Error(`practice: first crossing should start the first lap, got ${JSON.stringify(ps[0])}`);
+  }
+  if (ps[3]!.anchorKind !== "sf_finish" || ps[3]!.lapNumber !== 4 || ps[3]!.startsLap !== null) {
+    throw new Error("practice: the last crossing ends the last lap and starts nothing");
+  }
+}
+
+// A reopened session is "an analysis" once one selected lap of yours is marked over every
+// corner line on the on-video session — then the compare opens without the video.
+{
+  const base: ManualVideoSessionV2 = {
+    ...emptyManualSession(),
+    timingSessions: [
+      { sessionId: "q1", label: "Q1", isOnVideo: true, drivers: [me, comp], sync: {} },
+    ],
+    selectedLaps: { me: [2, 3], competitor: [3] },
+    marks: [],
+  };
+  const lines = ["sf", "s1", "s2"];
+  const mark = (lapNumber: number, lineKey: string, sessionId = "q1") => ({
+    sessionId,
+    driverRole: "me" as const,
+    lapNumber,
+    lineKey,
+    videoTimeSec: 1,
+  });
+  if (hasMarkedLap(base, lines)) throw new Error("no marks: nothing to show");
+  // Two laps each missing a corner: no lap is whole, so no sector compare yet.
+  const halves = { ...base, marks: [mark(2, "s1"), mark(3, "s2")] };
+  if (hasMarkedLap(halves, lines)) throw new Error("no whole lap: nothing to show");
+  // One whole lap is enough, even with the other lap short a crossing.
+  const oneLap = { ...base, marks: [mark(2, "s1"), mark(2, "s2"), mark(3, "s1")] };
+  if (!hasMarkedLap(oneLap, lines)) throw new Error("one whole lap: an analysis");
+  // SF is never a mark target (lap times give it), so it must not count as a missing line.
+  if (!hasMarkedLap(oneLap, ["sf", "s1", "s2"])) throw new Error("sf line must be ignored");
+  // Marks on another timing session do not count for this one.
+  const elsewhere = { ...base, marks: oneLap.marks.map((m) => ({ ...m, sessionId: "q2" })) };
+  if (hasMarkedLap(elsewhere, lines)) throw new Error("marks on q2 do not count for q1");
+  // A whole lap that is not a selected lap does not count either.
+  const unselected = { ...base, marks: [mark(1, "s1"), mark(1, "s2")] };
+  if (hasMarkedLap(unselected, lines)) throw new Error("lap 1 is not selected");
+  // A session with no corner lines has nothing to mark, so it is never an analysis.
+  if (hasMarkedLap(oneLap, ["sf"])) throw new Error("no corner lines: nothing to show");
 }
 
 console.log("manualVideoAnalysis sync.test.ts OK");

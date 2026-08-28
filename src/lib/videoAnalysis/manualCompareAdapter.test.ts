@@ -131,4 +131,24 @@ const rival = cars[1]!.laps[0]!;
 const cross = compareLaps(me.laps[0]!, rival, [{ id: "s1", label: "Esses" }]);
 assert(close(cross.totalDeltaSec, 0.3, 1e-6), `cross-car delta wrong: ${cross.totalDeltaSec}`);
 
+// --- a race's opening fragment is not a lap ---
+{
+  // The run from the grid to the line: 1.4s against 17s laps. It is timed as "lap 4" here only
+  // so the fixture stays intact; the rule is about length, not position.
+  const base = compareCarsFromManualSession(session, LINES).find((c) => c.carId === 1)!;
+  const withFragment: ManualVideoSessionV2 = {
+    ...session,
+    timingSessions: [{
+      ...session.timingSessions[0]!,
+      drivers: session.timingSessions[0]!.drivers.map((d) =>
+        d.role === "me" ? { ...d, laps: [...d.laps, { lapNumber: 4, lapTimeSec: 1.4 }] } : d
+      ),
+    }],
+    marks: [...session.marks, mark("me", 4, LAP_START_LINE_KEY, 152.7)],
+  };
+  const me = compareCarsFromManualSession(withFragment, LINES).find((c) => c.carId === 1)!;
+  assert(!me.laps.some((l) => l.lapIndex === 4), "the grid-to-line fragment must not be a compare lap");
+  assert(me.laps.length === base.laps.length, "the real laps are untouched");
+}
+
 console.log("videoAnalysis manualCompareAdapter.test.ts OK");

@@ -18,6 +18,7 @@ import {
   type SectorLineInfo,
 } from "@/lib/manualVideoAnalysis/sectors";
 import { primaryTimingSession } from "@/lib/manualVideoAnalysis/sessionModel";
+import { realLaps } from "./findCrossings/fromSession";
 import type { CompareCar, CompareLap } from "./lapCompare";
 
 const ROLE_CAR_IDS = { me: 1, competitor: 2 } as const;
@@ -42,7 +43,10 @@ export function compareCarsFromManualSession(
     const anchored = Boolean(primary.sync.anchor);
 
     const laps: CompareLap[] = [];
-    for (const lap of driver.laps) {
+    // A race's opening "lap" is the run from the grid to the line — 1.7s against a 17s median
+    // at Boronia — and with it in, the compare opened on "L1 BEST 1.663 vs L10". Same rule as
+    // the crossing scan: a lap under 60% of the driver's median is not a lap.
+    for (const lap of realLaps(driver.laps)) {
       if (lap.isIncluded === false) continue;
       if (!(lap.lapTimeSec > 0)) continue;
       const hasExplicitStart =

@@ -74,6 +74,7 @@ const RESULT = {
 const MANUAL_SESSION = {
   version: 2,
   timingSource: "run",
+  localVideoName: "IMG_4044.MOV",
   timingSessions: [
     {
       sessionId: "ts_prev",

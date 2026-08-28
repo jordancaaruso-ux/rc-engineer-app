@@ -1,6 +1,8 @@
 import type { LapUrlParseResult, LapUrlSessionDriver } from "@/lib/lapUrlParsers/types";
+import { realLaps } from "@/lib/videoAnalysis/findCrossings/fromSession";
 import type {
   DriverRole,
+  DriverSlot,
   ManualDriver,
   ManualDriverLap,
   ManualTimingSession,
@@ -34,7 +36,9 @@ export function driversFromParseResult(
   let foundMe = false;
   return sd.map((d, idx) => {
     const laps = lapsFromSessionDriver(d);
-    let role: DriverRole = "competitor";
+    // Everyone in the imported heat starts as nobody. Defaulting them to "competitor" here is what
+    // put fifteen drivers in a slot meant for one, and made the rival a matter of list order.
+    let role: DriverSlot = "other";
     if (normPrimary) {
       const isMe =
         d.normalizedName.toLowerCase() === normPrimary ||
@@ -101,6 +105,16 @@ export function sessionLabelFromUrl(url: string): string {
   }
 }
 
+/**
+ * Who this analysis is about, before the driver has said.
+ *
+ * "Me" is a real match — the driver's saved timing name against the field — but the rival never
+ * was. A heat import brings fifteen drivers and this used to hand back whichever one the timing
+ * site listed first, which then became the car every sector time was measured against without
+ * anybody choosing it. A rival is now only ever returned when it is genuinely known: either the
+ * driver has already picked one, or the session holds exactly two people and there is nothing
+ * to pick between.
+ */
 export function defaultDriverKeys(drivers: ManualDriver[]): {
   meKey: string;
   competitorKey: string;
@@ -108,12 +122,9 @@ export function defaultDriverKeys(drivers: ManualDriver[]): {
   if (drivers.length === 0) return { meKey: "", competitorKey: "" };
   const me = drivers.find((d) => d.role === "me");
   const competitor = drivers.find((d) => d.role === "competitor" && d.key !== me?.key);
-  if (me && competitor) return { meKey: me.key, competitorKey: competitor.key };
-  if (drivers.length >= 2) {
-    const meKey = drivers[0]!.key;
-    const competitorDriver = drivers.find((d) => d.key !== meKey);
-    return { meKey, competitorKey: competitorDriver?.key ?? drivers[1]!.key };
-  }
+  if (me) return { meKey: me.key, competitorKey: competitor?.key ?? "" };
+  // Two people and no name match: there is nothing to pick between, so position decides both.
+  if (drivers.length === 2) return { meKey: drivers[0]!.key, competitorKey: drivers[1]!.key };
   return { meKey: drivers[0]!.key, competitorKey: "" };
 }
 
@@ -213,6 +224,13 @@ export function applyDefaultIsOnVideo(sessions: ManualTimingSession[]): ManualTi
   });
 }
 
+/**
+ * Stamp the two chosen drivers and demote everybody else.
+ *
+ * Keeping an unlisted driver's previous role is what let a whole field read as the competitor:
+ * "competitor" was the default role on every imported row, so every one of them answered to a
+ * lookup for the rival and the first in the list won. Exactly one driver holds each slot now.
+ */
 export function setDriverRoles(
   drivers: ManualDriver[],
   meKey: string,
@@ -220,13 +238,14 @@ export function setDriverRoles(
 ): ManualDriver[] {
   return drivers.map((d) => ({
     ...d,
-    role: d.key === meKey ? "me" : d.key === competitorKey ? "competitor" : d.role,
+    role: d.key === meKey ? "me" : d.key && d.key === competitorKey ? "competitor" : "other",
   }));
 }
 
 export function pickBestNLapNumbers(laps: ManualDriverLap[], n = 3): number[] {
-  return [...laps]
-    .filter((l) => l.isIncluded !== false && l.lapTimeSec > 0)
+  // realLaps first: a race's opening lap is timed from the start line, so it is a fragment, and
+  // sorting by lap time would otherwise offer it as the driver's best lap.
+  return realLaps([...laps])
     .sort((a, b) => a.lapTimeSec - b.lapTimeSec)
     .slice(0, n)
     .map((l) => l.lapNumber);
@@ -239,10 +258,27 @@ export function allIncludedLapNumbers(laps: ManualDriverLap[]): number[] {
     .map((l) => l.lapNumber);
 }
 
+/**
+ * One driver per slot, whatever the stored session says.
+ *
+ * Sessions saved before "other" existed have the entire imported field sitting in the rival's
+ * slot, so a lookup for the competitor answers with whoever the timing site listed first. Read
+ * back through here they keep that same first driver — no silent change of who the analysis is
+ * about — and everyone else steps out of the way so the picker can show the truth.
+ */
+function oneDriverPerSlot(drivers: ManualDriver[]): ManualDriver[] {
+  const meKey = drivers.find((d) => d.role === "me")?.key;
+  const rivalKey = drivers.find((d) => d.role === "competitor" && d.key !== meKey)?.key;
+  return drivers.map((d) => ({
+    ...d,
+    role: d.key === meKey ? "me" : d.key === rivalKey ? "competitor" : "other",
+  }));
+}
+
 export function normalizeManualSession(session: ManualVideoSessionV2): ManualVideoSessionV2 {
   const timingSessions = session.timingSessions.map((ts) => ({
     ...ts,
-    drivers: ts.drivers.map((d) => ({
+    drivers: oneDriverPerSlot(ts.drivers).map((d) => ({
       ...d,
       laps: d.laps.map((l) => ({ ...l, isIncluded: l.isIncluded !== false })),
     })),

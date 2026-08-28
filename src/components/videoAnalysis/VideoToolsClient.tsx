@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Film, Play, Upload } from "lucide-react";
 import { Eyebrow } from "@/components/ui/panel";
+import { uploadVideoToLibrary } from "@/lib/videos/clientUpload";
 
 type JobRow = {
   id: string;
@@ -46,9 +47,11 @@ function formatBytes(bytes: number): string {
 export function VideoToolsClient() {
   const [jobs, setJobs] = useState<JobRow[] | null>(null);
   const [videos, setVideos] = useState<VideoRow[] | null>(null);
-  const [uploading, setUploading] = useState(false);
+  /** null = idle; a number = uploading, 0–100. */
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const uploading = uploadPct !== null;
 
   useEffect(() => {
     void fetch("/api/video-analysis/jobs")
@@ -62,17 +65,10 @@ export function VideoToolsClient() {
   }, []);
 
   async function handleUpload(file: File) {
-    setUploading(true);
+    setUploadPct(0);
     setUploadError(null);
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch("/api/videos", { method: "POST", body: form });
-      const payload = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        video?: VideoRow;
-      };
-      if (!res.ok) throw new Error(payload.error || `Upload failed (${res.status})`);
+      await uploadVideoToLibrary(file, { onProgress: setUploadPct });
       const listRes = await fetch("/api/videos");
       if (listRes.ok) {
         const d = (await listRes.json()) as { videos?: VideoRow[] };
@@ -81,7 +77,7 @@ export function VideoToolsClient() {
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Upload failed");
     } finally {
-      setUploading(false);
+      setUploadPct(null);
       if (fileRef.current) fileRef.current.value = "";
     }
   }
@@ -93,7 +89,7 @@ export function VideoToolsClient() {
           <Eyebrow>Recent analysis sessions</Eyebrow>
           <Link
             href="/videos/analysis/manual/new"
-            className="rounded-lg primary-face bg-primary px-3 py-1.5 text-[11.5px] font-bold text-primary-foreground no-underline transition-colors hover:bg-[#E6BE00]"
+            className="rounded-lg primary-face bg-primary px-3 py-1.5 text-[11.5px] font-semibold text-primary-foreground no-underline transition-colors hover:bg-[#E6BE00]"
           >
             New analysis
           </Link>
@@ -153,7 +149,7 @@ export function VideoToolsClient() {
             className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-1.5 text-[11.5px] font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-60"
           >
             <Upload className="h-3 w-3" aria-hidden />
-            {uploading ? "Uploading…" : "Upload video"}
+            {uploading ? `Uploading… ${uploadPct}%` : "Upload video"}
           </button>
           <input
             ref={fileRef}

@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
+import { head } from "@vercel/blob";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { requireApiFeature } from "@/lib/entitlementGuards";
 import { prisma } from "@/lib/prisma";
 import {
+  blobPathnameFromUrl,
+  isOwnVideoBlobUrl,
   storeVideoFile,
   VIDEO_ALLOWED_MIME,
   videoMaxUploadBytes,
@@ -43,6 +46,10 @@ export async function POST(request: Request) {
   const userId = gate.user.id;
 
   const ct = request.headers.get("content-type") ?? "";
+  // Register a client-direct blob upload (big files never pass through this server).
+  if (ct.includes("application/json")) {
+    return registerDirectUpload(request, userId);
+  }
   if (!ct.includes("multipart/form-data")) {
     return NextResponse.json({ error: "Expected multipart/form-data" }, { status: 400 });
   }
@@ -78,24 +85,8 @@ export async function POST(request: Request) {
   const runId = typeof runIdRaw === "string" && runIdRaw.trim() ? runIdRaw.trim() : null;
   const trackId = typeof trackIdRaw === "string" && trackIdRaw.trim() ? trackIdRaw.trim() : null;
 
-  if (runId) {
-    const ownedRun = await prisma.run.findFirst({
-      where: { id: runId, userId: userId },
-      select: { id: true },
-    });
-    if (!ownedRun) {
-      return NextResponse.json({ error: "Run not found" }, { status: 400 });
-    }
-  }
-  if (trackId) {
-    const ownedTrack = await prisma.track.findFirst({
-      where: { id: trackId },
-      select: { id: true },
-    });
-    if (!ownedTrack) {
-      return NextResponse.json({ error: "Track not found" }, { status: 400 });
-    }
-  }
+  const linkError = await validateLinks(userId, runId, trackId);
+  if (linkError) return linkError;
   const localPathRaw = form.get("localAnalysisPath");
   const localAnalysisPath =
     typeof localPathRaw === "string" && localPathRaw.trim()
@@ -115,6 +106,98 @@ export async function POST(request: Request) {
       runId,
       trackId,
       localAnalysisPath,
+    },
+    select: { id: true },
+  });
+
+  return NextResponse.json({ id: created.id }, { status: 201 });
+}
+
+async function validateLinks(
+  userId: string,
+  runId: string | null,
+  trackId: string | null
+): Promise<NextResponse | null> {
+  if (runId) {
+    const ownedRun = await prisma.run.findFirst({
+      where: { id: runId, userId: userId },
+      select: { id: true },
+    });
+    if (!ownedRun) {
+      return NextResponse.json({ error: "Run not found" }, { status: 400 });
+    }
+  }
+  if (trackId) {
+    const ownedTrack = await prisma.track.findFirst({
+      where: { id: trackId },
+      select: { id: true },
+    });
+    if (!ownedTrack) {
+      return NextResponse.json({ error: "Track not found" }, { status: 400 });
+    }
+  }
+  return null;
+}
+
+/**
+ * Turn a finished client-direct blob upload into a VideoAsset row. The URL is only
+ * trusted after two checks: it must live in OUR store (`isOwnVideoBlobUrl`), and
+ * `head()` must find it — size and content type come from `head`, never the client.
+ */
+async function registerDirectUpload(request: Request, userId: string): Promise<NextResponse> {
+  const body = (await request.json().catch(() => null)) as {
+    url?: string;
+    filename?: string;
+    label?: string;
+    runId?: string;
+    trackId?: string;
+  } | null;
+  const url = typeof body?.url === "string" ? body.url.trim() : "";
+  if (!url || !isOwnVideoBlobUrl(url)) {
+    return NextResponse.json({ error: "Unrecognized storage URL" }, { status: 400 });
+  }
+  const pathname = blobPathnameFromUrl(url);
+  if (!pathname.startsWith("videos/")) {
+    return NextResponse.json({ error: "Unrecognized storage URL" }, { status: 400 });
+  }
+
+  let meta: Awaited<ReturnType<typeof head>>;
+  try {
+    meta = await head(url, { token: process.env.BLOB_READ_WRITE_TOKEN });
+  } catch {
+    return NextResponse.json({ error: "Uploaded file not found in storage" }, { status: 400 });
+  }
+  const mimeType = (meta.contentType ?? "").split(";")[0]!.trim().toLowerCase();
+  if (!VIDEO_ALLOWED_MIME.has(mimeType)) {
+    return NextResponse.json(
+      { error: "Unsupported video type. Use MP4/WebM/MOV." },
+      { status: 400 }
+    );
+  }
+
+  const label =
+    typeof body?.label === "string" && body.label.trim() ? body.label.trim().slice(0, 120) : null;
+  const runId = typeof body?.runId === "string" && body.runId.trim() ? body.runId.trim() : null;
+  const trackId =
+    typeof body?.trackId === "string" && body.trackId.trim() ? body.trackId.trim() : null;
+  const linkError = await validateLinks(userId, runId, trackId);
+  if (linkError) return linkError;
+
+  const originalFilename =
+    typeof body?.filename === "string" && body.filename.trim()
+      ? body.filename.trim().slice(0, 200)
+      : pathname.split("/").pop() || "upload";
+
+  const created = await prisma.videoAsset.create({
+    data: {
+      userId,
+      storagePath: url,
+      originalFilename,
+      mimeType,
+      bytes: meta.size,
+      label,
+      runId,
+      trackId,
     },
     select: { id: true },
   });

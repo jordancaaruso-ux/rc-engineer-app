@@ -13,7 +13,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Play } from "lucide-react";
+import { Film, Play, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Eyebrow } from "@/components/ui/panel";
 import { Collapse } from "@/components/ui/Collapse";
@@ -33,6 +33,7 @@ import {
 } from "@/lib/videoAnalysis/lapCompare";
 import { compareCarsFromManualSession } from "@/lib/videoAnalysis/manualCompareAdapter";
 import { SectorClipPlayer } from "@/components/videoAnalysis/SectorClipPlayer";
+import { useLocalVideoSource } from "@/lib/videos/useLocalVideoSource";
 
 const GAIN_TEXT = "text-gain";
 const GAIN_BG = "bg-gain";
@@ -50,6 +51,8 @@ type PanelData = {
   cars: CompareCar[];
   lineDefs: Array<{ id: string; label: string }>;
   videoUrl: string | null;
+  /** File name the analysis was marked against (manual sessions) — the pick hint. */
+  expectedVideoName: string | null;
   source: "worker" | "manual";
   transponder: { comparedLaps: number; medianDeltaSec: number | null } | null;
 };
@@ -80,13 +83,32 @@ function deltaTextClass(deltaSec: number): string {
 
 export function LapComparePanel({
   runId,
+  jobId,
   trackId,
   allowMutations = true,
+  clipUrl: clipUrlOverride = null,
+  layout = "stack",
 }: {
-  runId: string;
+  /** The run whose analysis to show — the usual door, from the run's Video section. */
+  runId?: string;
+  /**
+   * One analysis directly, by id — the door from the analysis itself. A session that is not
+   * linked to a run (the video was analysed from Tools, or the run was never logged) has no
+   * other way to be looked at: the compare lived only inside a run, and the Done step told the
+   * driver to "link it to a run" with nothing to link it with.
+   */
+  jobId?: string;
   trackId?: string | null;
   /** False for a teammate's run — no analyze CTA, section hidden without data. */
   allowMutations?: boolean;
+  /** Footage already open on this device (an object URL) — clips play from it, no re-pick. */
+  clipUrl?: string | null;
+  /**
+   * "stack" (default): the clip opens inside the tapped sector card — right for a phone and
+   * for the run's Video section. "wide": the clip is the page — one big player that the
+   * cards drive, sticky beside them on a desktop; the Done step of an analysis uses it.
+   */
+  layout?: "stack" | "wide";
 }) {
   const [loaded, setLoaded] = useState(false);
   const [job, setJob] = useState<JobSummary | null>(null);
@@ -99,6 +121,10 @@ export function LapComparePanel({
   const [pickerSlot, setPickerSlot] = useState<"a" | "b">("b");
   const [pickerCarId, setPickerCarId] = useState<number | null>(null);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const localFileInputRef = useRef<HTMLInputElement | null>(null);
+  // Local-first clips: when no uploaded asset exists, the footage can still play
+  // straight off a file on this device (keyed by job so Reopen finds it next visit).
+  const local = useLocalVideoSource(job?.id ?? null);
 
   useEffect(() => {
     let alive = true;
@@ -109,37 +135,51 @@ export function LapComparePanel({
     setBRef(null);
     void (async () => {
       try {
-        const listRes = await fetch(
-          `/api/video-analysis/jobs?runId=${encodeURIComponent(runId)}`
-        );
-        if (!listRes.ok) return;
-        const list = (await listRes.json()) as {
-          jobs?: Array<{
-            id: string;
-            status: string;
-            hasResult: boolean;
-            hasManual?: boolean;
-            analysisMode?: string;
-            profile?: { name?: string };
-          }>;
-        };
-        const jobs = list.jobs ?? [];
-        const row =
-          jobs.find((j) => j.hasResult) ?? jobs.find((j) => j.hasManual) ?? jobs[0];
-        if (!alive) return;
-        if (!row) return;
-        setJob({
-          id: row.id,
-          status: row.status,
-          profileName: row.profile?.name ?? "Video analysis",
-          analysisMode: row.analysisMode ?? "worker",
-        });
-        if (!row.hasResult && !row.hasManual) return;
+        let rowId: string;
+        if (jobId) {
+          rowId = jobId;
+        } else {
+          if (!runId) return;
+          const listRes = await fetch(
+            `/api/video-analysis/jobs?runId=${encodeURIComponent(runId)}`
+          );
+          if (!listRes.ok) return;
+          const list = (await listRes.json()) as {
+            jobs?: Array<{
+              id: string;
+              status: string;
+              hasResult: boolean;
+              hasManual?: boolean;
+              analysisMode?: string;
+              profile?: { name?: string };
+            }>;
+          };
+          const jobs = list.jobs ?? [];
+          const row =
+            jobs.find((j) => j.hasResult) ?? jobs.find((j) => j.hasManual) ?? jobs[0];
+          if (!alive) return;
+          if (!row) return;
+          setJob({
+            id: row.id,
+            status: row.status,
+            profileName: row.profile?.name ?? "Video analysis",
+            analysisMode: row.analysisMode ?? "worker",
+          });
+          if (!row.hasResult && !row.hasManual) return;
+          rowId = row.id;
+        }
 
-        const detailRes = await fetch(`/api/video-analysis/jobs/${row.id}`);
+        const detailRes = await fetch(`/api/video-analysis/jobs/${rowId}`);
         if (!detailRes.ok) return;
         const detail = (await detailRes.json()) as {
-          job?: { videoAssetId?: string | null; idCorrectionsJson?: unknown };
+          job?: {
+            id?: string;
+            status?: string;
+            analysisMode?: string;
+            videoAssetId?: string | null;
+            idCorrectionsJson?: unknown;
+            profile?: { name?: string };
+          };
           result?: VideoAnalysisResultV1 | null;
           manual?: { session?: ManualVideoSessionV2 } | null;
           transponderCompare?: {
@@ -149,6 +189,14 @@ export function LapComparePanel({
           sectorLines?: Array<{ lineKey: string; label: string; sortOrder: number }>;
         };
         if (!alive) return;
+        if (jobId) {
+          setJob({
+            id: jobId,
+            status: detail.job?.status ?? "COMPLETED",
+            profileName: detail.job?.profile?.name ?? "Video analysis",
+            analysisMode: detail.job?.analysisMode ?? "manual",
+          });
+        }
 
         const profileLines = detail.sectorLines ?? [];
         let cars: CompareCar[] = [];
@@ -192,6 +240,7 @@ export function LapComparePanel({
           videoUrl: detail.job?.videoAssetId
             ? `/api/videos/${encodeURIComponent(detail.job.videoAssetId)}/file`
             : null,
+          expectedVideoName: detail.manual?.session?.localVideoName ?? null,
           transponder: detail.transponderCompare ?? null,
         });
         setARef({ carId: a.carId, lapIndex: a.lapIndex });
@@ -206,7 +255,7 @@ export function LapComparePanel({
     return () => {
       alive = false;
     };
-  }, [runId]);
+  }, [runId, jobId]);
 
   const lapA = data ? findLap(data.cars, aRef) : null;
   const lapB = data ? findLap(data.cars, bRef) : null;
@@ -225,9 +274,10 @@ export function LapComparePanel({
   // nothing rather than an analyze prompt for someone else's run.
   if (!hasCompare && !allowMutations) return null;
 
-  const analyzeHref = trackId
-    ? `/videos/analysis/manual/new?trackId=${encodeURIComponent(trackId)}&runId=${encodeURIComponent(runId)}`
-    : null;
+  const analyzeHref =
+    trackId && runId
+      ? `/videos/analysis/manual/new?trackId=${encodeURIComponent(trackId)}&runId=${encodeURIComponent(runId)}`
+      : null;
 
   const statusRow = (
     <div className="flex items-center gap-2.5 rounded-lg border border-border bg-secondary/50 px-3 py-2.5">
@@ -239,13 +289,16 @@ export function LapComparePanel({
           <span className="rounded-md border border-gain/25 bg-gain/10 px-1.5 py-0.5 micro-caps text-gain">
             Analyzed
           </span>
-          <Link
-            href={`/videos/analysis/jobs/${encodeURIComponent(job.id)}`}
-            className="ml-auto shrink-0 text-[11px] font-bold text-primary-ink no-underline hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
-            Open session
-          </Link>
+          {/* On the analysis itself the link would point at the page it is on. */}
+          {jobId ? null : (
+            <Link
+              href={`/videos/analysis/jobs/${encodeURIComponent(job.id)}`}
+              className="ml-auto shrink-0 text-[11px] font-bold text-primary-ink no-underline hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Open session
+            </Link>
+          )}
         </>
       ) : job ? (
         <>
@@ -273,7 +326,7 @@ export function LapComparePanel({
           {analyzeHref ? (
             <Link
               href={analyzeHref}
-              className="shrink-0 rounded-lg primary-face bg-primary px-3 py-1.5 text-[11.5px] font-bold text-primary-foreground no-underline transition-colors hover:bg-[#E6BE00]"
+              className="shrink-0 rounded-lg primary-face bg-primary px-3 py-1.5 text-[11.5px] font-semibold text-primary-foreground no-underline transition-colors hover:bg-[#E6BE00]"
               onClick={(e) => e.stopPropagation()}
             >
               Analyze video
@@ -298,6 +351,9 @@ export function LapComparePanel({
   const la = lapA!;
   const lb = lapB!;
 
+  // Uploaded asset wins; then footage the caller already has open; then a file attached here.
+  const clipUrl = d.videoUrl ?? clipUrlOverride ?? local.url;
+
   const crossCar = la.carId !== lb.carId;
   const sorted =
     sortMode === "rank"
@@ -305,9 +361,15 @@ export function LapComparePanel({
       : rep.segments;
   const totalASec = rep.segments.reduce((s, x) => s + x.aSec, 0);
   const pickerCar = d.cars.find((c) => c.carId === pickerCarId) ?? d.cars[0]!;
+  const wide = layout === "wide";
+  // The big player always shows something: the sector that decided the lap, until a card is
+  // tapped. A tapped sector that no longer exists (laps changed) falls back the same way.
+  const shownSeg = wide
+    ? (sorted.find((s) => s.key === openSeg) ?? sorted[0] ?? null)
+    : null;
 
   function jumpToSegment(seg: SectorSegment) {
-    setOpenSeg(d.videoUrl ? seg.key : null);
+    setOpenSeg(clipUrl ? seg.key : null);
     cardRefs.current[seg.key]?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
@@ -342,10 +404,112 @@ export function LapComparePanel({
     );
   };
 
+  const localClipRow = d.videoUrl || clipUrlOverride ? null : (
+    <div className="flex items-center gap-2 rounded-lg border border-dashed border-border bg-secondary/40 px-3 py-2">
+      <Film className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      {local.url ? (
+        <>
+          <span className="min-w-0 flex-1 truncate text-[11.5px] text-muted-foreground">
+            Clips playing from <span className="font-semibold text-foreground">{local.fileName}</span> on
+            this device
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setOpenSeg(null);
+              local.clear();
+            }}
+            aria-label="Detach video"
+            className="shrink-0 rounded-md border border-border p-1 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-3 w-3" aria-hidden />
+          </button>
+        </>
+      ) : (
+        <>
+          <span className="min-w-0 flex-1 text-[11.5px] leading-snug text-muted-foreground">
+            {local.error ??
+              `${d.expectedVideoName ?? "The video"} stays on this device — pick it to watch the clips. Nothing uploads.`}
+          </span>
+          {local.rememberedName && !local.error ? (
+            <button
+              type="button"
+              onClick={() => void local.reopenRemembered()}
+              className="shrink-0 rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-[11px] font-semibold hover:bg-muted"
+            >
+              Reopen {local.rememberedName.length > 18 ? "video" : local.rememberedName}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => {
+              if (local.canRemember) void local.pickWithPicker();
+              else localFileInputRef.current?.click();
+            }}
+            className="shrink-0 rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-[11px] font-semibold hover:bg-muted"
+          >
+            Pick video
+          </button>
+        </>
+      )}
+      <input
+        ref={localFileInputRef}
+        type="file"
+        accept="video/mp4,video/webm,video/quicktime,.mov,.mp4,.webm"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) local.attachFile(f);
+          e.target.value = "";
+        }}
+      />
+    </div>
+  );
+
+  // Wide: the player is the page. It sits first in the column on a phone and sticks beside
+  // the cards from lg up, at the video's own shape, as tall as the window allows.
+  const bigPlayer =
+    wide && shownSeg ? (
+      <div className="lg:sticky lg:top-4">
+        {clipUrl ? (
+          <SectorClipPlayer
+            key={shownSeg.key}
+            videoUrl={clipUrl}
+            aWindow={shownSeg.aWindow}
+            bWindow={shownSeg.bWindow}
+            aLabel={`${crossCar ? `${la.carLabel} ` : ""}L${la.lapIndex}`}
+            bLabel={`${crossCar ? `${lb.carLabel} ` : ""}L${lb.lapIndex}`}
+            fit="window"
+          />
+        ) : (
+          <div className="flex aspect-video items-center justify-center rounded-lg border border-border bg-secondary/60 text-[12px] text-muted-foreground">
+            Pick the video to watch each sector.
+          </div>
+        )}
+        <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+          <span className="font-semibold text-foreground">{shownSeg.name}</span> ·{" "}
+          {shownSeg.fromLabel} → {shownSeg.toLabel} ·{" "}
+          <span className={cn("tabular-nums", deltaTextClass(shownSeg.deltaSec))}>
+            {formatSignedDeltaSec(shownSeg.deltaSec)}s
+          </span>{" "}
+          — tap another sector to watch it.
+        </p>
+      </div>
+    ) : null;
+
   return (
-    <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-      <Eyebrow>Video</Eyebrow>
+    <div
+      className={cn(
+        "space-y-2",
+        wide && "lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-6 lg:space-y-0 xl:grid-cols-[minmax(0,1fr)_440px]"
+      )}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {bigPlayer}
+      <div className={cn("space-y-2", wide && "min-w-0")}>
+      {wide ? null : <Eyebrow>Video</Eyebrow>}
       {statusRow}
+      {localClipRow}
 
       {/* Hero: total delta + template read */}
       <div className="space-y-2.5 rounded-lg border border-border bg-secondary/60 p-3">
@@ -501,18 +665,23 @@ export function LapComparePanel({
               </div>
             );
           }
-          const open = openSeg === seg.key;
+          const open = wide ? shownSeg?.key === seg.key : openSeg === seg.key;
           return (
             <div
               key={seg.key}
               ref={(el) => {
                 cardRefs.current[seg.key] = el;
               }}
-              className="rounded-lg border border-border bg-secondary/50 transition-colors hover:border-foreground/20"
+              className={cn(
+                "rounded-lg border bg-secondary/50 transition-colors hover:border-foreground/20",
+                wide && open ? "border-primary-ink/60 bg-primary/5" : "border-border"
+              )}
             >
               <button
                 type="button"
-                onClick={() => setOpenSeg(open ? null : d.videoUrl ? seg.key : null)}
+                onClick={() =>
+                  wide ? setOpenSeg(seg.key) : setOpenSeg(open ? null : clipUrl ? seg.key : null)
+                }
                 className="block w-full p-3 text-left"
                 aria-expanded={open}
               >
@@ -543,10 +712,10 @@ export function LapComparePanel({
                   >
                     {gained ? "Gained" : "Lost"} {Math.abs(seg.deltaSec).toFixed(2)}s
                   </span>
-                  {d.videoUrl ? (
+                  {clipUrl ? (
                     <span className="ml-auto inline-flex items-center gap-1 text-[10.5px] font-bold text-primary-ink">
                       <Play className="h-2.5 w-2.5" aria-hidden />
-                      Watch both laps
+                      {wide ? (open ? "Playing" : "Watch") : "Watch both laps"}
                     </span>
                   ) : null}
                 </div>
@@ -557,12 +726,12 @@ export function LapComparePanel({
                   />
                 </div>
               </button>
-              {d.videoUrl ? (
+              {clipUrl && !wide ? (
                 <Collapse open={open}>
                   <div className="border-t border-border p-3">
                     {open ? (
                       <SectorClipPlayer
-                        videoUrl={d.videoUrl}
+                        videoUrl={clipUrl}
                         aWindow={seg.aWindow}
                         bWindow={seg.bWindow}
                         aLabel={`${crossCar ? `${la.carLabel} ` : ""}L${la.lapIndex}`}
@@ -586,6 +755,7 @@ export function LapComparePanel({
             ? `Sector timing from video · median Δ vs transponder ${d.transponder.medianDeltaSec.toFixed(2)}s over ${d.transponder.comparedLaps} laps`
             : "Sector timing from video crossings"}
       </p>
+      </div>
     </div>
   );
 }

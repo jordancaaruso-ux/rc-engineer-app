@@ -182,4 +182,20 @@ function lap(overrides: Partial<CompareLap>): CompareLap {
   assert(formatSignedDeltaSec(-0.2543, 2) === "−0.25", "decimals param");
 }
 
+// --- the default pair prefers laps that carry sector splits ---
+{
+  const lap = (lapIndex: number, lapTimeSec: number, splits: Record<string, number>): CompareLap => ({
+    carId: 1, carLabel: "You", lapIndex, lapTimeSec,
+    startSec: 100 + lapIndex * 20, endSec: 100 + lapIndex * 20 + lapTimeSec, splits,
+  });
+  // The quickest lap has nothing marked on it: it can only say "whole-lap delta only".
+  const car = { carId: 1, carLabel: "You", lapCount: 4, bestLapSec: 17.0,
+    laps: [lap(2, 17.0, {}), lap(3, 17.4, { s1: 4.1 }), lap(4, 17.2, { s1: 4.0 }), lap(5, 17.9, {})] };
+  const pair = defaultLapPair(car);
+  assert(pair && pair.a.lapIndex === 4 && pair.b.lapIndex === 3, "the two quickest laps WITH splits are the default pair");
+  const bare = { ...car, lapCount: 2, laps: [lap(2, 17.0, {}), lap(3, 17.4, {})] };
+  const p2 = defaultLapPair(bare);
+  assert(p2 && p2.a.lapIndex === 2 && p2.b.lapIndex === 3, "with no splits anywhere, time alone decides");
+}
+
 console.log("videoAnalysis lapCompare.test.ts OK");

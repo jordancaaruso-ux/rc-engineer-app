@@ -31,7 +31,7 @@ Grounding data: the validated two-driver session of 2026-07-21 (Jordan vs Cooper
 
 | Decision | Ruling |
 |---|---|
-| **Primary surfaces** | **Story cards + Sector matrix.** Track map and lap heat-grid are secondary tabs; all four share one basis toggle and one player. |
+| **Primary surfaces** | ~~Story cards + Sector matrix.~~ **Superseded 2026-08-28 evening: the Sector board** — the video, then ONE table in the lap sheet's grammar (you as the flat base, one driver as the coloured overlay, rows = laps), a Fastest chip per sector. Story cards, the matrix and the heat-grid tab are gone; the board IS the heat grid. Track map still secondary, not built. |
 | **Basis** | **Top-5 average LEADS; best lap is the toggle.** (Founder initially chose best-first, reversed after using the prototype — race pace is the honest headline.) Top-5 = mean of the 5 fastest *clean* times per segment per driver. |
 | **Sector click-through** | **"Right — build this."** Clicking any sector time opens the **time owner's** footage cropped to that sector. Beside the player: a **ranked rail of YOUR times for that segment** (each row shows its parent lap + lap time). Tapping a rail row **ghosts that lap over the playing clip** (identical clip padding ⇒ both start at sector entry, sync by construction). No intermediate page. |
 | **Line overlay** | **Core feature**, not a toy. Static driven-line comparison on the real camera frame, **path only** for v1 (no speed color, no scatter — those must earn their place later). Founder accepted minutes-per-lap desktop compute and an imperfect fisheye edge. |

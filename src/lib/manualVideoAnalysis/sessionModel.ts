@@ -8,6 +8,7 @@ import type {
   ManualVideoSessionV2,
 } from "./types";
 import {
+  anchorForRole,
   predictSfEndTime,
   predictSfStartTime,
   transponderSfSec,
@@ -31,11 +32,46 @@ export function primaryTimingSession(session: ManualVideoSessionV2): ManualTimin
   return session.timingSessions.find((s) => s.isOnVideo) ?? session.timingSessions[0];
 }
 
-/** First session marked on-video that has an SF anchor set. */
+/** Any anchor on this session — the shared one, or a driver's own. */
+export function anyAnchor(sync: ManualTimingSession["sync"]) {
+  return sync.anchor ?? sync.anchorByRole?.me ?? sync.anchorByRole?.competitor;
+}
+
+/** First session marked on-video that has an SF anchor set — of any kind. */
 export function referenceAnchoredSession(
   session: ManualVideoSessionV2
 ): ManualTimingSession | undefined {
-  return session.timingSessions.find((s) => s.isOnVideo && s.sync.anchor);
+  return session.timingSessions.find((s) => s.isOnVideo && anyAnchor(s.sync));
+}
+
+/**
+ * The analysis has produced something to look at: at least one of your selected laps is marked
+ * over every corner line on the session that is on the video, so a sector compare exists.
+ * This is what "the analysis is already done" means when a session is reopened — the numbers
+ * come from the marks, so they can be shown without the video (which usually lives on the
+ * phone and was never uploaded). Such a session must never land back on "Pick the video" and
+ * walk the driver through timing, lines and sync again for work it already holds.
+ *
+ * One complete lap, not every lap: the detector marks ten laps in a pass and leaves the odd
+ * crossing it could not see, and that session is still an analysis, not a half-done one.
+ */
+export function hasMarkedLap(session: ManualVideoSessionV2, lineKeys: string[]): boolean {
+  const primary = primaryTimingSession(session);
+  if (!primary) return false;
+  const corners = lineKeys.filter((k) => k !== "sf");
+  const laps = session.selectedLaps.me;
+  if (corners.length === 0 || laps.length === 0) return false;
+  return laps.some((lapNumber) =>
+    corners.every((lineKey) =>
+      session.marks.some(
+        (m) =>
+          m.sessionId === primary.sessionId &&
+          m.driverRole === "me" &&
+          m.lapNumber === lapNumber &&
+          m.lineKey === lineKey
+      )
+    )
+  );
 }
 
 export function legacyFlatDrivers(session: ManualVideoSessionV2): ManualDriver[] {
@@ -69,12 +105,14 @@ export function videoTimeAtLapSf(
   const kind = alignKind(alignAt);
   const predict = kind === "sf_finish" ? predictSfEndTime : predictSfStartTime;
 
-  if (ts.isOnVideo && ts.sync.anchor) {
+  // A driver placed by their OWN anchor is placed exactly; otherwise the session's shared
+  // anchor still walks them, which is right whenever the field started together.
+  if (ts.isOnVideo && (anchorForRole(ts.sync, role) ?? anyAnchor(ts.sync))) {
     return predict(driver, lapNumber, ts);
   }
 
   const ref = referenceAnchoredSession(session);
-  const anchor = ref?.sync.anchor;
+  const anchor = ref ? anyAnchor(ref.sync) : undefined;
   if (!ref || !anchor) return null;
 
   const refDriver = findDriverInSession(ref, anchor.driverRole);

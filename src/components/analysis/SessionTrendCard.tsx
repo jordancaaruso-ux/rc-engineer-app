@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import { Wrench } from "lucide-react";
 import type {
@@ -18,7 +26,10 @@ import {
   TIRE_MARK_STROKE,
 } from "@/components/runs/TireIndicatorIcon";
 import { formatTireIndicatorTitle, type RunTireIndicator } from "@/lib/runs/tireSetChange";
+import { carRatingBandCaption, carRatingBandColor } from "@/lib/runHandlingAssessment";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/runs/RunHistoryModalsLazy";
+import { SetupCascadeQuestions } from "@/components/runs/SetupCascadeQuestions";
+import type { SetupEditorSavedResult } from "@/components/setup/useSetupEditorSave";
 import { cn } from "@/lib/utils";
 
 /**
@@ -46,15 +57,30 @@ type TrendView = "line" | "spread";
 
 const PACE_VIEW_STORAGE_KEY = "analysisTrendPaceView";
 
-// Single warm-ink luminance ramp, not a rainbow: the series you came to read
-// (best lap) is the brightest + thickest line and everything else recedes with
-// falling luminance. Yellow stays action-only (VISUAL_NORTH_STAR), so the hero
-// line is bright ink, never the accent.
+/**
+ * One ink at four depths — warm grey, the app's own. Definitions and the reasoning
+ * live on `--color-pace-*` in globals.css; the short version is that these four are
+ * one measurement read at four resolutions, so they belong on an ordinal ramp, and
+ * a ramp of one measurement does not need a hue.
+ *
+ * They were violet for part of 2026-08-25 and came back to grey the same day
+ * (founder's call): four coloured lines over ash paper read as a picture about the
+ * colour, pulling harder than the run rows underneath, which are the subject.
+ *
+ * What was actually wrong with the greys they replaced was the STEPPING, not the
+ * grey: measured lightness ran [0.209, 0.515, 0.614, 0.468], so Median drew DARKER
+ * than Avg top 10 and sat 0.047 from Top 5 — two of the four were one colour, in
+ * the wrong order, at 1.75px on paper. The ramp in globals.css is monotone now,
+ * every adjacent gap ≥ 0.11, so re-greying does not bring that back.
+ *
+ * Best lap keeps the thickest stroke as well as the deepest step, so the line you
+ * came to read wins on both axes and survives being printed in one ink.
+ */
 const SERIES: Array<{ key: SeriesKey; name: string; color: string; width: number }> = [
-  { key: "best", name: "Best lap", color: "rgb(var(--color-foreground))", width: 2.5 },
-  { key: "avgTop5", name: "Avg top 5", color: "rgb(var(--color-muted-foreground))", width: 1.75 },
-  { key: "avgTop10", name: "Avg top 10", color: "#87847D", width: 1.75 },
-  { key: "median", name: "Median", color: "#5C5A55", width: 1.75 },
+  { key: "best", name: "Best lap", color: "rgb(var(--color-pace-1))", width: 2.5 },
+  { key: "avgTop5", name: "Avg top 5", color: "rgb(var(--color-pace-2))", width: 1.75 },
+  { key: "avgTop10", name: "Avg top 10", color: "rgb(var(--color-pace-3))", width: 1.75 },
+  { key: "median", name: "Median", color: "rgb(var(--color-pace-4))", width: 1.75 },
 ];
 
 /**
@@ -75,6 +101,22 @@ const BOX_WIDTH_MIN = 6;
 const BOX_WIDTH_MAX = 26;
 /** At or below the floor a box can't be read: fall back to a range line + median tick. */
 const BOX_DEGRADE_AT = 6.5;
+
+/**
+ * How long the plot rests on each run while it walks itself through the day.
+ *
+ * The chart reads its own figures out, oldest run first, until you take it over
+ * (2026-08-25). Before this it opened pointed at nothing: four lines, and a key row
+ * printing the LAST run's numbers with no mark on the plot saying which column
+ * those numbers came from. You had to know to drag a finger across it to discover
+ * that the picture was readable at all — on a phone there is no hover to hint it.
+ *
+ * 1.1s is long enough to read a five-digit lap time and short enough that a
+ * five-run day is over in under six seconds. It is a demonstration, not an
+ * animation: the moment a pointer touches the plot the walk stands aside, and once
+ * you actually pick a run it stops for good.
+ */
+const CYCLE_MS = 1100;
 
 /**
  * The card sizes itself to its *container*, not the viewport — it's 560px wide on
@@ -122,10 +164,31 @@ type ChartMetrics = {
   markMinSpacing: number;
   /** Roughly how many x-axis labels fit before they collide. */
   labelBudget: number;
+  /** False on the day screen: no wrench or tire row hangs under the plot. */
+  gutter: boolean;
 };
 
-function chartMetrics(chartWidth: number): ChartMetrics {
+function chartMetrics(chartWidth: number, compact = false): ChartMetrics {
   const spacious = chartWidth >= SPACIOUS_AT;
+  if (compact) {
+    // Nothing below the axis but the run labels, so the only bottom padding is
+    // the room those need: the 62-84px the glyph rows used is the whole saving.
+    const height = spacious ? 268 : 176;
+    const padBottom = 24;
+    const plotBottom = height - padBottom;
+    return {
+      height,
+      padBottom,
+      plotBottom,
+      markSize: spacious ? 20 : 16,
+      setupRowCenter: plotBottom,
+      tireRowCenter: plotBottom,
+      labelBaseline: plotBottom + 15,
+      markMinSpacing: spacious ? 28 : 22,
+      labelBudget: spacious ? 14 : 8,
+      gutter: false,
+    };
+  }
   const height = spacious ? 384 : 252;
   const padBottom = spacious ? 84 : 68;
   const plotBottom = height - padBottom;
@@ -139,6 +202,7 @@ function chartMetrics(chartWidth: number): ChartMetrics {
     labelBaseline: plotBottom + (spacious ? 73 : 62),
     markMinSpacing: spacious ? 28 : 22,
     labelBudget: spacious ? 14 : 8,
+    gutter: true,
   };
 }
 
@@ -550,13 +614,23 @@ function SetupChangeRow({
   );
 }
 
-/** Measured chart width via ResizeObserver; each face measures independently. */
+/**
+ * Measured chart width via ResizeObserver; each face measures independently.
+ *
+ * The first measurement is taken in a layout effect, BEFORE the browser paints.
+ * The SVG keeps its aspect ratio, so a viewBox still holding the 340 default in a
+ * pane twice that wide doesn't stretch — it draws the whole chart at half size,
+ * centred in blank card, for exactly one frame and then snaps. That frame is the
+ * one you get every time a chart mounts, and it reads as the chart resizing itself.
+ */
 function useChartWidth(dep: unknown): [React.RefObject<HTMLDivElement | null>, number] {
   const [chartWidth, setChartWidth] = useState(340);
   const chartRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = chartRef.current;
     if (!el) return;
+    const measured = el.getBoundingClientRect().width;
+    if (measured > 0) setChartWidth(measured);
     const observer = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width;
       if (width && width > 0) setChartWidth(width);
@@ -571,6 +645,10 @@ export function SessionTrendCard({
   trend,
   onSelectRun,
   onFocusRun,
+  markedRunId = null,
+  compact = false,
+  bare = false,
+  heading,
 }: {
   trend: AnalysisTrendModel | null;
   /**
@@ -594,6 +672,46 @@ export function SessionTrendCard({
    * last row permanently marked for a chart nobody is touching.
    */
   onFocusRun?: (runId: string | null) => void;
+  /**
+   * The run the LIST is holding open, drawn on the plot (2026-08-25) — the return
+   * leg of `onFocusRun`, which until now only ever travelled outward. Without it
+   * the chart could light a row and the row could not light the chart back, so
+   * unfolding Run 3 left the picture above it saying nothing about Run 3.
+   *
+   * Drawn as the accent rule the open row already wears down its left edge, plus a
+   * fattened point per series, and the key row reads this run when the pointer is
+   * away. A live pointer still outranks it: what your finger is on beats what you
+   * left open.
+   */
+  markedRunId?: string | null;
+  /**
+   * The day screen's chart (2026-08-24), where the runs below it are the subject
+   * and this is the picture above them.
+   *
+   * Everything the card spends height on to be self-sufficient comes off: the
+   * Line/Spread toggle (Line only), the scope line (the page header two inches
+   * up says the same day and venue), the hover readout (every figure in it is
+   * already printed on the run row underneath), and the wrench + tire gutter —
+   * whose one claim, "the setup moved on this run", the expanded row now writes
+   * out in words and numbers instead of a glyph to be matched to a column.
+   *
+   * The series keys move up beside the title, so the whole chrome is one line.
+   * Nothing here changes /analysis, where the card IS the surface.
+   */
+  compact?: boolean;
+  /**
+   * Compact only: draw the chart WITHOUT its card, for a host that already has one.
+   *
+   * `/analysis` puts the picture inside the outing it is a picture of (2026-08-25), under
+   * that outing's name — a card of its own there was a second box saying nothing, and the
+   * chart read as generic because nothing above it said which day it was drawing.
+   */
+  bare?: boolean;
+  /**
+   * Compact only: what this chart is a picture of, drawn above the series keys.
+   * `OutingHeading` on both surfaces that pass it.
+   */
+  heading?: ReactNode;
 }) {
   const [selectedCarId, setSelectedCarId] = useState<string | null>(trend?.defaultCarId ?? null);
   // Tapping a wrench opens the same setup sheet the "View setup" button opens in
@@ -605,6 +723,18 @@ export function SessionTrendCard({
   } | null>(null);
   const [setupLoadingRunId, setSetupLoadingRunId] = useState<string | null>(null);
   const [setupError, setSetupError] = useState<string | null>(null);
+  /*
+   * The "did your other runs have this wrong too?" questions the correction earned. Kept
+   * out of the modal's own branch, so closing the sheet doesn't take the question with it.
+   */
+  const [cascade, setCascade] = useState<{
+    runId: string;
+    nonce: number;
+    result: SetupEditorSavedResult;
+  } | null>(null);
+  // A correction mints a new snapshot, and the wrench row above is drawn from the
+  // old one — so the chart has to be re-read once the editor saves.
+  const setupRouter = useRouter();
 
   const openSetupForRun = async (runId: string) => {
     setSetupLoadingRunId(runId);
@@ -629,7 +759,6 @@ export function SessionTrendCard({
     () => (trend ? trend.runs.filter((run) => run.carId === selectedCarId) : []),
     [trend, selectedCarId]
   );
-
   // The Line/Spread view lives up here rather than inside the chart, because its
   // toggle sits in the card header beside the eyebrow — the same shape
   // TeamDayCard's "Best / Top 5" uses. A header control is always on screen and
@@ -637,15 +766,63 @@ export function SessionTrendCard({
   // thumb that just tapped it, and it costs no row of its own.
   const [view, setView] = useState<TrendView>("line");
 
+  /**
+   * Which series are switched off — state of the card, not of the plot, because
+   * in compact mode the buttons that toggle them sit in the card header while
+   * the lines they hide are drawn one level down.
+   */
+  const [hidden, setHidden] = useState<Set<SeriesKey>>(new Set());
+  /*
+   * Which run the key row is reading — the one the plot is pointed at.
+   *
+   * The plot already publishes this through `onFocusRun`; the card now listens in on
+   * the way past rather than asking the plot for a second channel. Null resting, so
+   * the row falls back to the latest run, which is the same fallback the full card's
+   * readout strip has always used.
+   */
+  const [readRunId, setReadRunId] = useState<string | null>(null);
+  /**
+   * The run the key row prints: the one the plot is reading, else the one the list
+   * below is holding open, else the latest.
+   *
+   * "Reading" is the plot's own word — a pointer on it, or the column its
+   * left-to-right walk is resting on (`CYCLE_MS`). It arrives on `onReadRun` rather
+   * than on `onFocusRun` because the two answer different questions: this card asks
+   * "which run are these four numbers", and the host list asks "is the user's finger
+   * on my row". The walk answers the first and must not answer the second.
+   *
+   * The marked run sits in the middle deliberately. What the plot is reading wins
+   * because it is live; but with the plot resting, the four figures should belong to
+   * the run you actually have open underneath, or the card prints Run 6's times
+   * above an unfolded Run 3.
+   */
+  const readoutRun = useMemo(
+    () =>
+      carRuns.find((run) => run.id === readRunId) ??
+      carRuns.find((run) => run.id === markedRunId) ??
+      carRuns[carRuns.length - 1] ??
+      null,
+    [carRuns, readRunId, markedRunId]
+  );
+  const toggleSeries = useCallback((key: SeriesKey) => {
+    setHidden((previous) => {
+      const next = new Set(previous);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
   // Read after mount so the server and first client render agree.
   useEffect(() => {
+    if (compact) return; // one view here, and it is never the stored one
     try {
       const saved = window.localStorage.getItem(PACE_VIEW_STORAGE_KEY);
       if (saved === "spread" || saved === "line") setView(saved);
     } catch {
       /* storage unavailable (private mode) — stay on the line view */
     }
-  }, []);
+  }, [compact]);
 
   const chooseView = useCallback((next: TrendView) => {
     setView(next);
@@ -667,6 +844,84 @@ export function SessionTrendCard({
         <ButtonLink href="/runs/new" className="self-start">
           Log a run
         </ButtonLink>
+      </SurfaceCard>
+    );
+  }
+
+  if (compact) {
+    /*
+     * The body once, then wrapped — NOT two little `Shell` components chosen by a
+     * ternary. A component declared during render is a new type on every render, so
+     * React unmounts and remounts its whole subtree: the chart would lose its
+     * measured width (and `useChartWidth` ignores 0, so it would silently fall back
+     * to the 340px default). eslint's `react-hooks/static-components` refuses it
+     * outright, and it is right to.
+     */
+    const body = (
+      <>
+        {/* The day this is a picture OF (2026-08-25). Without it the compact chart is
+            four grey lines with no subject — the founder's word was "generic". Same
+            component `/analysis` heads its outing with, so the two cannot drift. */}
+        {heading}
+
+        {trend.carOptions.length > 1 ? (
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Car">
+            {trend.carOptions.map((option) => {
+              const active = option.carId === selectedCarId;
+              return (
+                <button
+                  key={option.carId ?? "none"}
+                  type="button"
+                  onClick={() => setSelectedCarId(option.carId)}
+                  className={cn(
+                    "tap-active rounded-lg border px-2.5 py-1 text-[11.5px] font-semibold transition-colors",
+                    active
+                      ? "border-ring/45 bg-muted text-foreground"
+                      : "border-border bg-secondary text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {option.carName}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {/*
+          Caption above the picture, figures below it (founder call, 2026-08-26).
+
+          The two halves answer different questions and belong on different sides of
+          the plot. The caption says what the picture is DRAWING — which run the plot
+          is reading, on what rubber, at what time — and a picture's caption cannot sit
+          under the thing it introduces or you have read the chart before you know what
+          it is. The figures are READ OFF the plot, so they sit under it, where your eye
+          already is when you take your finger off.
+        */}
+        <RunCaptionLine run={readoutRun} />
+
+        <PaceTrendChart
+          carRuns={carRuns}
+          scopeLabel={trend.scopeLabel}
+          view="line"
+          compact
+          hidden={hidden}
+          onToggleSeries={toggleSeries}
+          onOpenSetup={openSetupForRun}
+          setupLoadingRunId={setupLoadingRunId}
+          onSelectRun={onSelectRun}
+          onFocusRun={onFocusRun}
+          onReadRun={setReadRunId}
+          markedRunId={markedRunId}
+        />
+
+        <SeriesFigureRow hidden={hidden} onToggle={toggleSeries} readoutRun={readoutRun} />
+      </>
+    );
+    return bare ? (
+      <div className="flex flex-col gap-2 px-2.5 pb-2.5 pt-2 sm:px-4">{body}</div>
+    ) : (
+      <SurfaceCard variant="hero" contentClassName="flex flex-col gap-2 p-2.5 sm:p-4">
+        {body}
       </SurfaceCard>
     );
   }
@@ -736,10 +991,13 @@ export function SessionTrendCard({
         carRuns={carRuns}
         scopeLabel={trend.scopeLabel}
         view={view}
+        hidden={hidden}
+        onToggleSeries={toggleSeries}
         onOpenSetup={openSetupForRun}
         setupLoadingRunId={setupLoadingRunId}
         onSelectRun={onSelectRun}
         onFocusRun={onFocusRun}
+        markedRunId={markedRunId}
       />
 
       {setupError ? <p className="text-[11px] text-destructive">{setupError}</p> : null}
@@ -750,6 +1008,27 @@ export function SessionTrendCard({
           onClose={() => setSetupModal(null)}
           run={setupModal.run}
           pickerRuns={setupModal.pickerRuns}
+          /*
+           * Same door as the run page's, so it edits like the run page's. This card
+           * carries no viewer id, so ownership is left to the server test the modal
+           * already waits on (`save.action === "mark"`) — the toggle stays hidden on
+           * a run that isn't yours whatever this host passes.
+           */
+          onRunSetupCorrected={(result) => {
+            // The questions travel too. A refresh on its own is what made the cascade
+            // look deleted on every door except `/runs/[id]` (2026-08-25).
+            const runId = setupModal.run.id;
+            setCascade((prev) => ({ runId, nonce: (prev?.nonce ?? 0) + 1, result }));
+            setupRouter.refresh();
+          }}
+        />
+      ) : null}
+      {cascade ? (
+        <SetupCascadeQuestions
+          key={cascade.runId}
+          runId={cascade.runId}
+          pending={cascade}
+          onChanged={() => setupRouter.refresh()}
         />
       ) : null}
     </SurfaceCard>
@@ -761,19 +1040,39 @@ function PaceTrendChart({
   carRuns,
   scopeLabel,
   view,
+  compact = false,
+  hidden,
+  onToggleSeries,
   onOpenSetup,
   setupLoadingRunId,
   onSelectRun,
   onFocusRun,
+  onReadRun,
+  markedRunId = null,
 }: {
   carRuns: AnalysisTrendRun[];
   scopeLabel: string;
   /** Owned by the card, because the toggle for it lives in the card header. */
   view: TrendView;
+  /** Day screen: plot only — no readout strip, no gutter, no key row. See `SessionTrendCard`. */
+  compact?: boolean;
+  /** Owned by the card too, for the same reason: compact draws the keys in the header. */
+  hidden: Set<SeriesKey>;
+  onToggleSeries: (key: SeriesKey) => void;
   onOpenSetup: (runId: string) => void;
   setupLoadingRunId: string | null;
   onSelectRun?: (runId: string) => void;
   onFocusRun?: (runId: string | null) => void;
+  /**
+   * The run this plot is currently READING — pointed at, or reached by the walk it
+   * does on its own (see `CYCLE_MS`). Separate from `onFocusRun` on purpose:
+   * `onFocusRun` is the user's finger, and a list beside the chart lights a row off
+   * it. The walk is not the user's finger, so it must never reach through and start
+   * flicking rows in someone else's list; it only moves the figures on this card.
+   */
+  onReadRun?: (runId: string | null) => void;
+  /** The run the host's list is holding open. See `SessionTrendCard`. */
+  markedRunId?: string | null;
 }) {
   const router = useRouter();
   const openRun = useCallback(
@@ -783,12 +1082,22 @@ function PaceTrendChart({
     },
     [onSelectRun, router]
   );
-  const [hidden, setHidden] = useState<Set<SeriesKey>>(new Set());
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  /**
+   * The column the self-walk is resting on, and whether the walk has been taken
+   * over. See `CYCLE_MS` for why the chart reads itself out at all.
+   *
+   * Two states rather than one nullable index, because "not walking" and "walking,
+   * currently on run 1" are different things and the second has to survive a hover:
+   * the pointer parks the walk on whatever column you leave it on, and the walk
+   * carries on from there when your finger goes.
+   */
+  const [cycleIndex, setCycleIndex] = useState(0);
+  const [walkTakenOver, setWalkTakenOver] = useState(false);
   const [chartRef, chartWidth] = useChartWidth(carRuns);
   const pointerDownRef = useRef<{ x: number; y: number; sameIndex: boolean } | null>(null);
 
-  const dims = useMemo(() => chartMetrics(chartWidth), [chartWidth]);
+  const dims = useMemo(() => chartMetrics(chartWidth, compact), [chartWidth, compact]);
 
   const geometry = useMemo(() => {
     if (carRuns.length === 0) return null;
@@ -844,6 +1153,46 @@ function PaceTrendChart({
     geometry?.spread != null && carRuns.some((run) => run.distribution != null);
   const ready = view === "spread" ? spreadReady : lineReady;
 
+  /*
+   * The walk (2026-08-25). Four gates, and each one is a case where the chart
+   * moving on its own would be wrong rather than merely unnecessary:
+   *
+   * - taken over — you have pressed the plot, so it is yours now;
+   * - a run is open below — the picture is answering that run, and walking off it
+   *   would leave the key row describing a column the open row does not match;
+   * - Spread view — its emphasis is a box growing, which at 1.1s a step is a
+   *   fidget, not a readout; the Line view's mark is a rule and four dots;
+   * - fewer than two runs, or nothing to draw — there is no left-to-right.
+   *
+   * Reduced motion switches it off outright rather than slowing it down: someone
+   * who has asked for stillness is not asking for a slower carousel. They lose
+   * nothing, because the resting state — latest run, no mark — is what this chart
+   * showed everyone before today.
+   */
+  const walking =
+    !walkTakenOver && markedRunId == null && view === "line" && ready && carRuns.length >= 2;
+
+  // Restart at the left whenever the set of runs changes under it — a car filter
+  // can leave `cycleIndex` past the end of the new list.
+  useEffect(() => {
+    setCycleIndex(0);
+  }, [carRuns]);
+
+  useEffect(() => {
+    // The timer STOPS under the pointer rather than ticking away behind it. Hover
+    // already outranks the walk on screen, so leaving the interval running looked
+    // right and wasn't: park on run 2, read it for three seconds, take your finger
+    // off, and the chart jumped to run 5 because that is where the clock had got to.
+    // Measured, not reasoned about — the on-screen readout went "Run 2 → Run 5 → Run 1".
+    if (!walking || hoverIndex != null) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = window.setInterval(
+      () => setCycleIndex((index) => (index + 1) % carRuns.length),
+      CYCLE_MS
+    );
+    return () => window.clearInterval(timer);
+  }, [walking, hoverIndex, carRuns.length]);
+
   // The collapsed state has to paint before it's released or the boxes appear
   // fully grown. Skip it on mount (restored view) — only a real switch animates.
   const [morphed, setMorphed] = useState(true);
@@ -863,15 +1212,6 @@ function PaceTrendChart({
     };
   }, [view]);
 
-  const toggleSeries = (key: SeriesKey) => {
-    setHidden((previous) => {
-      const next = new Set(previous);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
   const nearestRunIndex = (event: React.PointerEvent<SVGSVGElement>): number | null => {
     if (!geometry || carRuns.length === 0) return null;
     const rect = event.currentTarget.getBoundingClientRect();
@@ -890,12 +1230,24 @@ function PaceTrendChart({
 
   const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
     const index = nearestRunIndex(event);
-    if (index != null) setHoverIndex(index);
+    if (index == null) return;
+    setHoverIndex(index);
+    // Hovering only STANDS the walk aside — the pointer outranks it while it is on
+    // the plot. Handing the walk the column you left on means the chart carries on
+    // from where your eye was rather than snapping back to wherever the timer got
+    // to while you were reading.
+    setCycleIndex(index);
   };
 
   const handlePointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
     const index = nearestRunIndex(event);
     if (index == null) return;
+    // A press is the chart being taken over, and it does not hand back. Set here
+    // rather than in `handleClick`: on touch the first press only moves the
+    // pointer (`sameIndex` is false), and a walk that resumed under a thumb
+    // already resting on the plot would move the column out from under the
+    // second tap.
+    setWalkTakenOver(true);
     pointerDownRef.current = {
       x: event.clientX,
       y: event.clientY,
@@ -916,9 +1268,36 @@ function PaceTrendChart({
   };
 
   const hoverRun = hoverIndex != null ? carRuns[hoverIndex] : null;
-  // The readout strip always shows a run — the hovered one, else the latest —
-  // so it has a stable height and the plot itself is never covered by a tooltip.
-  const displayRun = hoverRun ?? carRuns[carRuns.length - 1] ?? null;
+  /*
+   * The column the plot is pointing at: your finger first, then the walk.
+   *
+   * Everything the chart draws as "here" — the dashed rule, the fattened points,
+   * the figures in the readout — reads this one index, so the walk is literally the
+   * hover state moving on a timer and there is no second set of marks to keep in
+   * step with the first.
+   *
+   * Clamped, because `cycleIndex` outlives one render of a car filter that shortens
+   * the list; the reset effect above lands a tick later.
+   */
+  const activeIndex = hoverIndex ?? (walking ? Math.min(cycleIndex, carRuns.length - 1) : null);
+  const activeRun = activeIndex != null ? (carRuns[activeIndex] ?? null) : null;
+  // The readout strip always shows a run — the one being pointed at, else the
+  // latest — so it has a stable height and the plot is never covered by a tooltip.
+  const displayRun = activeRun ?? carRuns[carRuns.length - 1] ?? null;
+
+  /*
+   * The run the host's list is holding open, as a column on this plot.
+   *
+   * Suppressed while that same column is under the pointer: hover already draws a
+   * rule and fat points there, and two marks stacked on one column read as a
+   * rendering fault rather than as two facts. A car filter that hides the marked
+   * run simply leaves nothing marked — `indexOf` returns -1 and we drop it.
+   */
+  const markedIndex = useMemo(() => {
+    if (!markedRunId) return null;
+    const index = carRuns.findIndex((run) => run.id === markedRunId);
+    return index < 0 || index === activeIndex ? null : index;
+  }, [carRuns, markedRunId, activeIndex]);
 
   /*
    * Publish the hovered run so a list beside the chart can light the same row.
@@ -943,9 +1322,25 @@ function PaceTrendChart({
   // Leaving the card must not leave a row lit — the pane swaps on selection.
   useEffect(() => () => onFocusRunRef.current?.(null), []);
 
+  /*
+   * And the same again for the run being READ, which the walk moves and the pointer
+   * does not own. Same ref dance, same reason — see `onReadRun` on the props.
+   */
+  const readRunId = activeRun?.id ?? null;
+  const onReadRunRef = useRef(onReadRun);
+  useEffect(() => {
+    onReadRunRef.current = onReadRun;
+  }, [onReadRun]);
+  useEffect(() => {
+    onReadRunRef.current?.(readRunId);
+  }, [readRunId]);
+  useEffect(() => () => onReadRunRef.current?.(null), []);
+
   return (
-    <div className="flex flex-col gap-3">
-      {ready && displayRun ? (
+    <div className={cn("flex flex-col", compact ? "gap-0" : "gap-3")}>
+      {/* Every figure in this strip is printed on the run's own row underneath on
+          the day screen, so compact draws no readout at all. */}
+      {ready && displayRun && !compact ? (
         <div className="rounded-lg border border-border/60 bg-secondary/40 px-2.5 py-1.5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
@@ -971,6 +1366,23 @@ function PaceTrendChart({
                 </span>
               ) : null}
             </div>
+            {/*
+              The clock, held right against the strip's own edge.
+
+              The strip already says which run you are on; a chart of a day says
+              nothing about where in that day each point sat, and the driver reading
+              it is looking for the run that fell in the heat. The row was built with
+              `justify-between` and one child, so the slot was there waiting — the
+              time costs no height and no second line at 390px.
+            */}
+            <span className="flex shrink-0 items-baseline gap-2">
+              <RunExtraFigures run={displayRun} />
+              {displayRun.timeLabel ? (
+                <span className="tabular-nums text-[10.5px] leading-tight text-muted-foreground">
+                  {displayRun.timeLabel}
+                </span>
+              ) : null}
+            </span>
           </div>
           {view === "spread" ? (
             <SpreadReadoutValues run={displayRun} />
@@ -1069,38 +1481,74 @@ function PaceTrendChart({
               const step = Math.max(1, Math.ceil(carRuns.length / dims.labelBudget));
               const isLast = index === carRuns.length - 1;
               const stepped = index % step === 0 && carRuns.length - 1 - index >= step;
-              if (!isLast && !stepped) return null;
+              // The open run always gets its name printed, even on a long day where
+              // the label budget would otherwise have stepped over it — a marked
+              // column with no label underneath is a mark you can't name.
+              const isMarked = index === markedIndex;
+              if (!isLast && !stepped && !isMarked) return null;
               return (
                 <text
                   key={run.id}
                   x={geometry.xAt(index)}
                   y={dims.labelBaseline}
                   textAnchor="middle"
-                  className={cn("tabular-nums text-[9px]", isLast ? "fill-muted-foreground" : "fill-faint")}
+                  className={cn(
+                    "tabular-nums text-[9px]",
+                    isMarked
+                      ? "fill-foreground font-semibold"
+                      : isLast
+                        ? "fill-muted-foreground"
+                        : "fill-faint"
+                  )}
                 >
                   {run.shortLabel}
                 </text>
               );
             })}
 
-            <TireSetRow carRuns={carRuns} xAt={geometry.xAt} dims={dims} />
+            {dims.gutter ? (
+              <>
+                <TireSetRow carRuns={carRuns} xAt={geometry.xAt} dims={dims} />
 
-            <SetupChangeRow
-              carRuns={carRuns}
-              xAt={geometry.xAt}
-              dims={dims}
-              onOpenSetup={onOpenSetup}
-              loadingRunId={setupLoadingRunId}
-            />
+                <SetupChangeRow
+                  carRuns={carRuns}
+                  xAt={geometry.xAt}
+                  dims={dims}
+                  onOpenSetup={onOpenSetup}
+                  loadingRunId={setupLoadingRunId}
+                />
+              </>
+            ) : null}
 
-            {hoverIndex != null ? (
+            {/*
+              The open run's column, in the accent the open row wears down its own
+              left edge — solid, where hover's is dashed, because one is a thing you
+              left open and the other is a thing you are touching. Yellow is legal
+              here for the same reason it is legal on active nav: it marks WHERE YOU
+              ARE, not how fast anything was (VISUAL_NORTH_STAR).
+
+              Drawn before the series so the lines and their points sit on top of it.
+            */}
+            {markedIndex != null ? (
               <line
-                x1={geometry.xAt(hoverIndex)}
-                x2={geometry.xAt(hoverIndex)}
+                x1={geometry.xAt(markedIndex)}
+                x2={geometry.xAt(markedIndex)}
+                y1={PAD_TOP - 2}
+                y2={dims.gutter ? dims.tireRowCenter + dims.markSize / 2 + 5 : dims.plotBottom}
+                className="stroke-primary-ink/45"
+                strokeWidth={1.5}
+              />
+            ) : null}
+
+            {activeIndex != null ? (
+              <line
+                x1={geometry.xAt(activeIndex)}
+                x2={geometry.xAt(activeIndex)}
                 y1={PAD_TOP - 2}
                 // Runs on through the gutter so the hovered run's wrench and tire
-                // are visibly the same column as the point you're reading.
-                y2={dims.tireRowCenter + dims.markSize / 2 + 5}
+                // are visibly the same column as the point you're reading. With no
+                // gutter it stops at the axis, which is all there is to point at.
+                y2={dims.gutter ? dims.tireRowCenter + dims.markSize / 2 + 5 : dims.plotBottom}
                 className="stroke-border"
                 strokeWidth={1}
                 strokeDasharray="3 3"
@@ -1151,10 +1599,22 @@ function PaceTrendChart({
                           />
                         ) : null
                       )}
-                      {hoverIndex != null && !isHidden && points[hoverIndex] ? (
+                      {activeIndex != null && !isHidden && points[activeIndex] ? (
                         <circle
-                          cx={points[hoverIndex].x}
-                          cy={points[hoverIndex].y}
+                          cx={points[activeIndex].x}
+                          cy={points[activeIndex].y}
+                          r={4}
+                          fill={series.color}
+                          className="stroke-card"
+                          strokeWidth={1.5}
+                        />
+                      ) : null}
+                      {/* Same fat point for the open run, so its four figures are
+                          findable on the plot and not just readable off the key. */}
+                      {markedIndex != null && !isHidden && points[markedIndex] ? (
+                        <circle
+                          cx={points[markedIndex].x}
+                          cy={points[markedIndex].y}
                           r={4}
                           fill={series.color}
                           className="stroke-card"
@@ -1183,7 +1643,7 @@ function PaceTrendChart({
                       boxWidth={clamp(geometry.spacing * 0.5, BOX_WIDTH_MIN, BOX_WIDTH_MAX)}
                       scale={geometry.spread!}
                       expanded={morphed}
-                      emphasized={hoverIndex === index}
+                      emphasized={activeIndex === index}
                     />
                   ) : null
                 )}
@@ -1203,42 +1663,374 @@ function PaceTrendChart({
 
       {/* Line-view only — these toggle series the spread view doesn't draw. The
           `hidden` set is React state, so what you switched off comes back with you.
-          One row, always: a lone "Median" spilling to a second line reads as a
-          separate group of controls when it is the same group, so the labels are
-          kept short enough to fit at 390px and the row must not wrap. */}
-      {view === "line" ? (
-        <div className="flex flex-nowrap items-center gap-1" role="group" aria-label="Metrics">
-          {SERIES.map((series) => {
-            const isHidden = hidden.has(series.key);
-            return (
-              <button
-                key={series.key}
-                type="button"
-                onClick={() => toggleSeries(series.key)}
-                aria-pressed={!isHidden}
-                className={cn(
-                  "tap-active flex shrink-0 items-center gap-1 rounded-md border border-border bg-secondary px-1.5 py-1 transition-opacity hover:border-ring/30",
-                  isHidden && "opacity-45"
-                )}
-              >
-                <span
-                  className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: series.color }}
-                  aria-hidden
-                />
-                <span
-                  className={cn(
-                    "whitespace-nowrap text-[10.5px] tracking-tight",
-                    isHidden ? "text-faint" : "text-muted-foreground"
-                  )}
-                >
-                  {series.name}
-                </span>
-              </button>
-            );
-          })}
+          Compact draws this same row in the card header instead, where it doubles
+          as the card's title line. */}
+      {view === "line" && !compact ? (
+        <SeriesKeyRow hidden={hidden} onToggle={onToggleSeries} />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * A sample of one series' actual line, for its cell — drawn at the same stroke
+ * width the plot uses, so "Best lap" is visibly the fattest key as well as the
+ * fattest line. A round dot said only "this colour"; a line sample says "this
+ * line", which is the thing you are trying to find in the picture above.
+ */
+function SeriesMark({ color, width }: { color: string; width: number }) {
+  return (
+    <svg width="11" height="6" viewBox="0 0 11 6" aria-hidden className="shrink-0 overflow-visible">
+      <line x1="0.5" y1="3" x2="10.5" y2="3" stroke={color} strokeWidth={width} strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * The four measures, under the chart: the key to the picture and its readout at
+ * once. Each cell names a line, draws a sample of it, and prints that line's figure
+ * for whichever run the plot is currently reading — point at run 4 and the four
+ * numbers become run 4's.
+ *
+ * ## Four cells, not four chips
+ *
+ * They wore `chipToggleClass` for a few hours on 2026-08-25 — bordered, filled,
+ * `flex-1` — on the reasoning that they have ALWAYS been buttons (tap one and its
+ * line drops off the plot) and nothing said so. What that actually produced was
+ * four heavy outlined boxes directly under a delicate four-line chart, all four
+ * "on" and therefore all four wearing the strongest border in the toggle family.
+ * Founder, same day: "too big and looks weird". He is right, and the diagnosis is
+ * that the borders were never carrying the affordance anyway — a chip that is on
+ * looks exactly like a chip that is furniture.
+ *
+ * So: no box. Hairline dividers make it one strip instead of four objects, the
+ * type comes down a step, and the row reads as an instrument under the plot rather
+ * than as a row of buttons competing with it. The off state is the whole cell going
+ * faint with its line sample drained — which is the one place `opacity` is the
+ * honest signal, because a series that is off is literally a line that has gone.
+ * The label and mark stay legible either way, so you can always find the switch you
+ * threw.
+ *
+ * ## One row, values stacked
+ *
+ * A lone "Median" spilling to a second line reads as a separate group of controls
+ * when it is the same group, so the row must not wrap and the labels are kept short
+ * enough that it doesn't. That is also why the figure sits ABOVE the mark and label
+ * rather than beside it: measured in Sora, the beside-it form wants ~103px a cell
+ * (mark 11 + "Avg top 10" ~50 + a 5-digit tabular figure ~40 + gaps) and a 390px
+ * phone has ~83px to spend. Stacked, a cell needs ~72px and all four fit with room
+ * over. Founder call, 2026-08-25: one row.
+ */
+/**
+ * The compact card's caption, ABOVE the plot: which run the picture is reading, what
+ * rubber was under it, and when it ran.
+ *
+ *     Practice   Vaulk 36SK · run 3        Rating 7  Air 24°C   3:09 PM
+ *
+ * The rating and the air joined it on 2026-08-26 — see `RunExtraFigures` for why they sit
+ * up here with the tyre rather than down in the figure strip.
+ *
+ * ## What is deliberately NOT on it (founder call, 2026-08-26)
+ *
+ * A wrench and a tyre disc rode here for one build. Both came off:
+ *
+ *   - the **tyre disc** decoded to "this set changed / this is its Nth run", and the
+ *     words next to it already say `Vaulk 36SK · run 3`. A glyph you have to learn,
+ *     beside the sentence it stands for, is a glyph that is not earning its ink;
+ *   - the **wrench** said "the setup moved on this run". It is the one fact that
+ *     leaves with it — you now find it by opening the run, where the change is
+ *     written out as fields and numbers rather than as a mark to be matched to a
+ *     column. That trade was made with eyes open; if it needs to come back it comes
+ *     back as the WORD, not as a glyph.
+ *
+ * The session's name is what the run WAS ("Practice", "Qualifying 2"), not where it
+ * fell in the day — the same reversal the rows below made on the same date.
+ */
+function RunCaptionLine({ run }: { run: AnalysisTrendRun | null }) {
+  if (!run) return null;
+  return (
+    <div className="flex min-w-0 items-baseline gap-2 px-0.5">
+      <span className="shrink-0 text-[11.5px] font-semibold tracking-tight text-foreground">
+        {run.sessionName}
+      </span>
+      {run.tireIndicator ? (
+        <span className="truncate text-[10.5px] text-muted-foreground">
+          {run.tireIndicator.tireLabel}
+          {run.tireIndicator.runNumber != null ? ` · run ${run.tireIndicator.runNumber}` : ""}
+        </span>
+      ) : null}
+      {/*
+        One right-hand group, not three things each reaching for `ml-auto` — with more
+        than one auto margin on a flex row the free space is SHARED between them and the
+        rating drifts into the middle of the line instead of sitting with the clock.
+      */}
+      <span className="ml-auto flex shrink-0 items-baseline gap-2">
+        <RunExtraFigures run={run} />
+        {run.timeLabel ? (
+          <span className="text-[10px] tabular-nums text-faint">{run.timeLabel}</span>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The four figures, UNDER the plot on the compact card — a swatch and a number each,
+ * for whichever run the plot is reading.
+ *
+ * Under, not over (founder call, 2026-08-26, reversing the morning's arrangement):
+ * these are read OFF the picture, so they belong on the side your eye is already on
+ * when you lift your finger. The caption, which says what the picture IS, stays above
+ * it — see `RunCaptionLine`.
+ *
+ * No names beside the swatches. The shade ramp is the label: dark to pale is best →
+ * median in a fixed order, directly under the four lines it names, and the full card
+ * still spells them out where there is width for it. Each is a toggle, as the named
+ * cells are — tap one and its line leaves the plot.
+ */
+function SeriesFigureRow({
+  hidden,
+  onToggle,
+  readoutRun,
+}: {
+  hidden: Set<SeriesKey>;
+  onToggle: (key: SeriesKey) => void;
+  readoutRun?: AnalysisTrendRun | null;
+}) {
+  const valueOf = (key: SeriesKey): number | null => {
+    if (!readoutRun) return null;
+    const m = readoutRun.metrics;
+    return key === "best"
+      ? m.best
+      : key === "avgTop5"
+        ? m.avgTop5
+        : key === "avgTop10"
+          ? m.avgTop10
+          : m.median;
+  };
+  return (
+    <div className="flex flex-nowrap items-center gap-x-4 px-0.5" role="group" aria-label="Metrics">
+      {SERIES.map((series) => {
+        const isHidden = hidden.has(series.key);
+        const value = valueOf(series.key);
+        return (
+          <button
+            key={series.key}
+            type="button"
+            onClick={() => onToggle(series.key)}
+            aria-pressed={!isHidden}
+            aria-label={series.name}
+            className={cn(
+              "tap-active flex min-w-0 items-center gap-1.5 rounded-[3px] py-0.5 transition-colors",
+              "hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40",
+              isHidden ? "text-faint" : "text-foreground"
+            )}
+          >
+            <span
+              className={cn("h-[9px] w-[9px] shrink-0 rounded-[2.5px]", isHidden && "opacity-30")}
+              style={{ backgroundColor: series.color }}
+              aria-hidden
+            />
+            {/* Semibold, never bold — the weight every figure in this app is set in.
+                Bold here made four numbers over a delicate four-line chart read as a
+                scoreboard (founder, 2026-08-26). */}
+            <span className="text-[13px] font-semibold tabular-nums leading-none tracking-tight">
+              {value != null ? seconds(value) : "—"}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The two figures that are NOT read off the lines: your 1–10 verdict on the car, and the
+ * air it ran in. Added 2026-08-26.
+ *
+ * ## Why they sit in the readout and not on the plot
+ *
+ * The version that drew them was built and looked at first: a rating line over the four
+ * pace lines, behind a pill row. It works — the shape of a bad slot is visible before any
+ * number is — and it was dropped anyway, on two counts. It puts a second scale in a frame
+ * that has one, where the overlay's HEIGHT means nothing in seconds and can therefore only
+ * ever be read for shape; and it costs a control row, ~32px on a 390px phone, which is the
+ * same toll that retired the three-face picker in August. The strip already walks itself
+ * run by run, so the figures ride that mechanism for free and no pixel of chart is spent.
+ *
+ * If the overlay ever comes back it comes back as the RATING only. Air temperature as a
+ * band was the weakest half of that build — decorative on a day the weather sat still, and
+ * already answered by the numeral here.
+ *
+ * ## Why the caption line and not the figure strip
+ *
+ * Under the plot was where they were built, and it does not fit: four lap times at 13px
+ * with their swatches already spend ~276 of the 328px a 390px phone gives that row, and
+ * "Rating 7 · Air 15°C" wants another ~110. Measured on the real card, `16.204` and the
+ * word "Rating" printed on top of each other. Shrinking the gaps and the words got within
+ * ~13px of fitting, which is not fitting.
+ *
+ * The card's own rule then settles it rather than the arithmetic: the caption says what
+ * the picture is DRAWING — which run, on what rubber, at what time — and the strip below
+ * carries what is READ OFF the lines. A rating and an air temperature are not read off the
+ * lines. They are two more facts about the run, and they belong in the sentence with the
+ * tyre and the clock, which is also the line with the space for them.
+ *
+ * ## One shape, both cards
+ *
+ * The compact card and the full one keep their readouts in different furniture — a caption
+ * line above the plot on the phone, a bordered strip above it on desktop — but both end
+ * that line with the same right-hand group, so this renders once and is dropped into both.
+ * It is NOT in the full card's bottom row: that row is the legend, handed no run to read,
+ * and a rating has nothing to be the legend of.
+ *
+ * A missing half draws nothing at all rather than a dash: an empty label is a worse answer
+ * than silence, and a run with neither figure gives the tyre and the clock their space back.
+ */
+function RunExtraFigures({ run }: { run: AnalysisTrendRun | null | undefined }) {
+  const rating = run?.carRating ?? null;
+  const air = run?.airTempC ?? null;
+  if (rating == null && air == null) return null;
+
+  /* The numeral wears its band's ink — the same ramp `RatingDial` fills its arc from, so a
+     5 is the same colour wherever you meet it. This is not the pace ramp and not the
+     accent: `--color-rating-*` is a verdict scale, which is exactly what this number is. */
+  const ratingColor = carRatingBandColor(rating);
+  // The band word is the tooltip's, not the line's — "Rating 7" is the whole line, and
+  // spelling out "good" beside it costs a phone's width to say what the ink already says.
+  const band = rating != null ? carRatingBandCaption(rating) : null;
+  const ratingTitle =
+    rating != null
+      ? `Car rating ${rating} out of 10${band ? ` — ${band.toLowerCase()}` : ""}`
+      : undefined;
+  const airLabel = air != null ? `${Math.round(air)}°C` : null;
+
+  /*
+   * Caption voice, not figure voice: 9.5px label against a 11px numeral, a step under
+   * the 13px the lap times are set in. They share a line with the tyre and the clock and
+   * must read as more of that sentence, not as two more figures that wandered up off the
+   * strip. The rating still gets its band ink, which is all the emphasis it needs.
+   */
+  return (
+    <span className="flex shrink-0 items-baseline gap-2">
+      {rating != null ? (
+        <span className="flex items-baseline gap-1" title={ratingTitle}>
+          <span className="text-[9.5px] leading-none text-muted-foreground">Rating</span>
+          <span
+            className="text-[11px] font-semibold tabular-nums leading-none tracking-tight"
+            style={{ color: ratingColor }}
+          >
+            {rating}
+          </span>
+        </span>
+      ) : null}
+      {airLabel ? (
+        <span className="flex items-baseline gap-1">
+          <span className="text-[9.5px] leading-none text-muted-foreground">Air</span>
+          <span className="text-[11px] font-semibold tabular-nums leading-none tracking-tight text-foreground">
+            {airLabel}
+          </span>
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function SeriesKeyRow({
+  hidden,
+  onToggle,
+  className,
+  readoutRun,
+}: {
+  hidden: Set<SeriesKey>;
+  onToggle: (key: SeriesKey) => void;
+  className?: string;
+  /** The run the figures belong to — hovered/tapped, else the latest. */
+  readoutRun?: AnalysisTrendRun | null;
+}) {
+  const valueOf = (key: SeriesKey): number | null => {
+    if (!readoutRun) return null;
+    const m = readoutRun.metrics;
+    return key === "best" ? m.best : key === "avgTop5" ? m.avgTop5 : key === "avgTop10" ? m.avgTop10 : m.median;
+  };
+  return (
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      {readoutRun ? (
+        <div className="flex min-w-0 items-baseline gap-1.5 px-0.5">
+          <span className="truncate text-[11.5px] font-semibold tracking-tight text-foreground">
+            {readoutRun.sessionName}
+          </span>
+          {readoutRun.timeLabel ? (
+            <span className="shrink-0 text-[10px] tabular-nums text-faint">
+              {readoutRun.timeLabel}
+            </span>
+          ) : null}
         </div>
       ) : null}
+      {/*
+        `flex-1` with a cap, not plain `flex-1`: on the phone four cells share ~335px
+        and land at ~83px each, under the cap, so nothing changes there. In the
+        Sessions pane the row is ~1330px wide and four stretched cells read as four
+        empty banners with a word in the middle of each.
+
+        The dividers are what make this a strip rather than four objects, so they are
+        drawn between the cells (`[&>*+*]`) and not around them.
+      */}
+      <div
+        className={cn(
+          "flex flex-nowrap items-stretch",
+          // Dividers only when the cells carry figures. With four bare labels they
+          // are a legend, and ruling a legend into columns implies a table.
+          readoutRun && "[&>*+*]:border-l [&>*+*]:border-border/70"
+        )}
+        role="group"
+        aria-label="Metrics"
+      >
+      {SERIES.map((series) => {
+        const isHidden = hidden.has(series.key);
+        const value = valueOf(series.key);
+        return (
+          <button
+            key={series.key}
+            type="button"
+            onClick={() => onToggle(series.key)}
+            aria-pressed={!isHidden}
+            className={cn(
+              "tap-active flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-[3px] py-1",
+              // With figures this is a strip and the cells share the width evenly.
+              // Without them it is a legend and must sit left, at its own size — the
+              // full card is ~1000px wide on desktop, and four stretched labels there
+              // read as four empty banners with a word in the middle of each.
+              readoutRun ? "max-w-[168px] flex-1 px-1" : "shrink-0 px-2.5",
+              "transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40",
+              isHidden ? "text-faint" : "text-foreground"
+            )}
+          >
+            {value != null ? (
+              <span className="text-[12.5px] font-semibold tabular-nums leading-none">
+                {seconds(value)}
+              </span>
+            ) : null}
+            <span className="flex min-w-0 items-center gap-1">
+              {/* Drained, not recoloured, when the series is off: a line that is not
+                  on the plot should not be advertising its ink at full strength, and
+                  keeping the mark's shape and hue at 30% still tells you which line
+                  you dropped when you go to put it back. */}
+              <span className={cn("flex", isHidden && "opacity-30")}>
+                <SeriesMark color={series.color} width={series.width} />
+              </span>
+              <span className="truncate text-[9.5px] leading-none tracking-tight">
+                {series.name}
+              </span>
+            </span>
+          </button>
+        );
+      })}
+      {/* Deliberately no rating or air temperature here. On the full card this row is
+          the LEGEND — it names the four lines and is handed no run to read — while the
+          figures live in the readout strip above the plot, which is where those two
+          joined them. A rating has nothing to be the legend of. */}
+      </div>
     </div>
   );
 }

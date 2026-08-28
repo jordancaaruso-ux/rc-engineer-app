@@ -15,6 +15,11 @@ const LOCAL_UPLOAD_ROOT = path.join(process.cwd(), ".local-uploads");
 export const VIDEO_MAX_BYTES_VERCEL = 4 * 1024 * 1024;
 /** Local dev / self-hosted: allow full 1080p60 heat uploads. */
 export const VIDEO_MAX_BYTES_LOCAL = 512 * 1024 * 1024;
+/**
+ * Client-direct blob uploads never pass through a serverless body, so the cap is our own.
+ * Just under 2GB — `VideoAsset.bytes` is a 4-byte Int, and 2GiB exactly would overflow it.
+ */
+export const VIDEO_MAX_BYTES_DIRECT = 2000 * 1024 * 1024;
 
 export function videoMaxUploadBytes(): number {
   if (process.env.VERCEL === "1") return VIDEO_MAX_BYTES_VERCEL;
@@ -73,5 +78,38 @@ export async function storeVideoFile(
 
 export async function readVideoBytesFromStorageRef(ref: string): Promise<Buffer> {
   return readBytesFromStorageRef(ref);
+}
+
+/** Store id embedded in the read-write token (`vercel_blob_rw_<ID>_…`); hostnames use it lowercased. */
+export function videoBlobStoreId(): string | null {
+  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+  if (!token) return null;
+  const m = /^vercel_blob_rw_([A-Za-z0-9]+)_/.exec(token);
+  return m ? m[1].toLowerCase() : null;
+}
+
+/**
+ * True only for URLs inside OUR blob store. The register endpoint trusts a client-supplied
+ * URL as far as calling `head()` on it — this check keeps that from becoming a way to attach
+ * someone else's (or some other store's) file to a VideoAsset row.
+ */
+export function isOwnVideoBlobUrl(raw: string): boolean {
+  const storeId = videoBlobStoreId();
+  if (!storeId) return false;
+  try {
+    const u = new URL(raw);
+    return (
+      u.protocol === "https:" &&
+      (u.hostname === `${storeId}.private.blob.vercel-storage.com` ||
+        u.hostname === `${storeId}.public.blob.vercel-storage.com`)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Decoded pathname inside the store for one of our blob URLs (e.g. `videos/<uuid>.mp4`). */
+export function blobPathnameFromUrl(raw: string): string {
+  return decodeURIComponent(new URL(raw).pathname.replace(/^\//, ""));
 }
 

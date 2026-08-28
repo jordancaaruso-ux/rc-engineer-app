@@ -1,0 +1,35 @@
+{
+  "_note": "Ground truth by eye from IMG_4480.MOV contact sheets, 2026-08-27. Each pick is the frame where the car's centre sits on the drawn line, ±1 frame (33ms) unless noted. 'due' is where the timing said the car would be (lap start + the corner's typical offset), which the sheets were centred on — never the detector's answer. Jordan = PINK car (his word). Sandy = RED car (identified at her lap 4 and lap 11 SF crossings under the corrected anchor).",
+  "anchor_finding": "The session anchor (79.0987, 'L1 start') is Jordan's FIRST LOOP CROSSING, i.e. the END of lap 1. The transponder's lap 1 starts at the tone, 1.386s (his L1 time) earlier. Every app lap start is therefore 1.386s late for every driver. With ANCHOR_SHIFT=-1.386 the walk places both cars at SF to within 5–11ms (see sf_checks). Corner offsets learnt by the detector are relative to the late start and so still line up in absolute time.",
+  "sf_checks_corrected": [
+    { "role": "me", "lap": 9, "walk": 212.461, "seen": 212.450, "car": "pink", "err_ms": -11 },
+    { "role": "competitor", "lap": 4, "walk": 113.037, "seen": 113.028, "car": "red", "err_ms": -9 },
+    { "role": "competitor", "lap": 11, "walk": 234.416, "seen": 234.410, "car": "red", "err_ms": -6 }
+  ],
+  "start_sheet": "79.41–80.98: white car crosses SF ≈79.94 (Justin under corrected walk 79.974), green ≈80.33 (Paul, 80.302); pink already past the line at 79.41 (Jordan's first crossing = the anchor, 79.099).",
+  "picks": [
+    { "role": "me", "lap": 9, "line": "s1", "t": 214.535, "due": 214.547, "confidence": "±1 frame" },
+    { "role": "me", "lap": 9, "line": "s2", "t": 216.100, "due": 216.147, "confidence": "±1 frame" },
+    { "role": "me", "lap": 9, "line": "s3", "t": 220.187, "due": 220.407, "confidence": "±1 frame" },
+    { "role": "me", "lap": 9, "line": "s4", "t": 224.057, "due": 224.087, "confidence": "exact frame" },
+    { "role": "me", "lap": 9, "line": "s5", "t": 227.510, "due": 227.557, "confidence": "±1.5 frames, faint" },
+
+    { "role": "me", "lap": 12, "line": "s1", "t": null, "due": 267.071, "confidence": "NO CROSSING — the pink car ran a wider line and passed above the drawn segment (50px long) between 267.11 and 267.75" },
+    { "role": "me", "lap": 12, "line": "s2", "t": 268.700, "due": 268.671, "confidence": "±1 frame" },
+    { "role": "me", "lap": 12, "line": "s3", "t": 273.100, "due": 272.931, "confidence": "±1 frame" },
+    { "role": "me", "lap": 12, "line": "s4", "t": 277.085, "due": 276.611, "confidence": "exact frame" },
+    { "role": "me", "lap": 12, "line": "s5", "t": 280.590, "due": 280.081, "confidence": "±1.5 frames, faint" },
+
+    { "role": "competitor", "lap": 4, "line": "s1", "t": 115.063, "due": 115.063, "confidence": "±1 frame" },
+    { "role": "competitor", "lap": 4, "line": "s2", "t": 116.600, "due": 116.713, "confidence": "±1 frame" },
+    { "role": "competitor", "lap": 4, "line": "s3", "t": 120.733, "due": 120.743, "confidence": "±1 frame" },
+    { "role": "competitor", "lap": 4, "line": "s4", "t": 124.485, "due": 124.683, "confidence": "±1 frame; clips the far end of the line" },
+    { "role": "competitor", "lap": 4, "line": "s5", "t": 127.870, "due": 128.173, "confidence": "±1.5 frames, faint" },
+
+    { "role": "competitor", "lap": 11, "line": "s1", "t": 236.380, "due": 236.442, "confidence": "±1 frame" },
+    { "role": "competitor", "lap": 11, "line": "s2", "t": 238.030, "due": 238.092, "confidence": "±1 frame" },
+    { "role": "competitor", "lap": 11, "line": "s3", "t": 242.100, "due": 242.122, "confidence": "±1 frame" },
+    { "role": "competitor", "lap": 11, "line": "s4", "t": 246.068, "due": 246.062, "confidence": "exact frame" },
+    { "role": "competitor", "lap": 11, "line": "s5", "t": 249.520, "due": 249.552, "confidence": "±1.5 frames, faint" }
+  ]
+}
