@@ -81,8 +81,9 @@ facts, never against the words.
    - it **has no bite** — the grip that arrives is progressive and low rather than sharp and high.
      This usually goes hand in hand with arriving late, because the same knobs move both, but it is
      not the same fact: bite is the shape of the arrival, lateness its timing. A driver who says
-     "bite" has used this page's word and named this fact — it is not the never-arrives case below,
-     and the two do not need separating with a question;
+     "bite", "numb", "imprecise" or "unpredictable" has used this page's words and named this fact
+     — the initial grip — it is not the never-arrives case below, and the two do not need separating
+     with a question;
    - it **never arrives** — short of grip overall, or the tyre and track before the car;
    - it **arrives and then goes**, suddenly and without warning — past the bite end of the window,
      or something running out ([[droop-downstop]], [[ride-height-and-rake]]);
@@ -98,7 +99,8 @@ facts, never against the words.
 Most complaints supply two or three of these and leave the rest open. The open ones are the
 candidates: carry every reading that still fits, and ask for the fact that separates them **only
 when the answer would change the advice**. "Like ice" on a low-grip day leaves fact 4 open between
-*late* and *never* — one question ("is it there once the car has settled, just late?") decides it,
+*late* and *never* — one question ("does it grip up once you're into the corner, or is it never
+there?") decides it,
 and the two answers lead to different mechanisms. "Good on entry but not mid" has already answered
 facts 1, 2 and 4 and needs no question. "More steering" and "more grip" on their own have answered
 almost nothing.
