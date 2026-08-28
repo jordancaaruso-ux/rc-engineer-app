@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Check, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptics";
+import { CHASSIS_PLATFORMS } from "@/lib/cars/carClasses";
 import {
   uploadBlankSheetForChassis,
   type BlankUploadModel,
@@ -24,25 +25,36 @@ import {
  * and the requirement drowned in it. The field label below no longer repeats it either.
  *
  * The card has exactly one yellow thing at a time, and it is always the next move: "Choose file"
- * full-width until a file exists, then "Create chassis" in its place. Both wear
- * `.primary-face-static` rather than `.primary-face` — a specular band crossing a button this
- * wide reads as a screen wipe, the same call `RecentRunsCard` made.
+ * full-width until a file exists, then "Create chassis" in its place. Neither wears
+ * `.primary-face`: that class's lift is drawn for a button raised off the page, and across the
+ * full width of a card the same shadow reads as a rule under the control rather than depth.
  *
  * NO NAME GATE (2026-08-18). The picker used to stay disabled until the chassis had a name, which
  * left the card opening on a greyed-out control with nothing to press — and a yellow button you
  * cannot press is worse than a grey one. The gate bought nothing: the confirm step below already
  * handles a file with no name ("Name your chassis to create it"), and `submit()` still refuses.
  * Both inputs stay on screen in every state so a typo in the name never costs the chosen file.
+ *
+ * DISCIPLINE IS ASKED FOR AND REQUIRED (founder call, 2026-08-26). Nothing used to ask, so a
+ * chassis added here never said what it raced: discipline was read off `CHASSIS_PLATFORM_BY_SLUG`,
+ * a list of twelve curated slugs, and a chassis derived from a driver's own PDF is not on it. The
+ * answer stayed "unknown" for the life of the row unless the driver later found the override
+ * dropdown on the car page — which is the same control, three screens away, after the fact.
+ *
+ * It follows the name gate's rule rather than the file picker's: the select is on screen from the
+ * first render and never disabled, and the confirm step names whichever answer is still missing.
+ * The chassis row is global, so this answer is the one every driver who later merges onto the same
+ * sheet inherits — which is the argument for asking once, here, rather than per car.
  */
 
 /**
  * The card's single yellow action, whichever one it currently is. Deliberately NOT
- * `primaryButtonClassName()`: that is the toolbar chip — 30px tall, `text-xs`, and wearing
- * `.primary-face`, whose band sweeps across it every 2.6s. Across the full width of a card the
- * same band reads as a screen wipe, so this takes the material and holds it still.
+ * `primaryButtonClassName()`: that is the toolbar chip — 30px tall, `text-xs`, and lifted off
+ * the page by `.primary-face`. This one is flush across the card, so it takes the fill and no
+ * shadow at all; the yellow is its own edge on paper.
  */
 const wideYellowClassName =
-  "tap-active primary-face-static flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2.5 text-[13px] font-bold tracking-tight text-primary-foreground transition hover:brightness-105 active:brightness-95 disabled:opacity-60";
+  "tap-active flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2.5 text-[13px] font-semibold tracking-tight text-primary-foreground transition hover:brightness-105 active:brightness-95 disabled:opacity-60";
 
 function formatFileSize(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -69,6 +81,7 @@ export function AddCarBlankUpload({
   onAddWithoutSheet: () => void;
 }) {
   const [chassisName, setChassisName] = useState("");
+  const [discipline, setDiscipline] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,16 +89,17 @@ export function AddCarBlankUpload({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const named = chassisName.trim().length > 0;
-  const canCreate = named && file !== null && !busy;
+  const placed = discipline.length > 0;
+  const canCreate = named && placed && file !== null && !busy;
 
   async function submit() {
-    if (!file || !named || busy) return;
+    if (!file || !named || !placed || busy) return;
     haptic("light");
     setBusy(true);
     setError(null);
     setOfferNoSheet(false);
     try {
-      const result = await uploadBlankSheetForChassis(file, chassisName);
+      const result = await uploadBlankSheetForChassis(file, chassisName, discipline);
       if (!result.ok) {
         setError(result.error);
         setOfferNoSheet(result.offerCarWithoutSheet);
@@ -121,6 +135,30 @@ export function AddCarBlankUpload({
           onChange={(e) => setChassisName(e.target.value)}
           aria-label="Chassis name"
         />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-[11px] text-muted-foreground">What it races</label>
+        {/*
+          A native select, deliberately — the same control the car page uses for this exact
+          question (`CarDetailsCard`'s SelectRow), and thirteen fixed options is not a list that
+          earns a searchable PickerSheet. Full width here rather than the settings row's 190px
+          because this card is a form, not a list of answers.
+        */}
+        <select
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+          value={discipline}
+          onChange={(e) => setDiscipline(e.target.value)}
+          disabled={busy}
+          aria-label="What it races"
+        >
+          <option value="">Choose…</option>
+          {CHASSIS_PLATFORMS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div>
@@ -176,11 +214,18 @@ export function AddCarBlankUpload({
 
       {file ? (
         <div className="rounded-md border border-border bg-background p-2.5">
+          {/*
+            One line, naming the ONE thing still missing — never a list of what's wrong. Name
+            before discipline because that is the reading order of the fields above, so the
+            prompt always points at the first empty box rather than making them hunt.
+          */}
           <p className="text-xs font-medium text-foreground">
-            {named ? (
-              <>Create &ldquo;{chassisName.trim()}&rdquo;?</>
-            ) : (
+            {!named ? (
               <>Name your chassis to create it.</>
+            ) : !placed ? (
+              <>Say what &ldquo;{chassisName.trim()}&rdquo; races to create it.</>
+            ) : (
+              <>Create &ldquo;{chassisName.trim()}&rdquo;?</>
             )}
           </p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">

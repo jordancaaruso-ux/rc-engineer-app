@@ -73,7 +73,14 @@ export default async function CarDetailPage(props: {
         setupSheetModelId: true,
         createdAt: true,
         setupSheetModel: {
-          select: { id: true, name: true, slug: true, userId: true, isAuthorized: true },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            discipline: true,
+            userId: true,
+            isAuthorized: true,
+          },
         },
       },
     }),

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
-import { CHASSIS_PLATFORMS } from "@/lib/cars/carClasses";
+import { isChassisPlatformId } from "@/lib/cars/carClasses";
 import { templateKeyFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
 import { revalidateAfterCarMutation } from "@/lib/revalidateUser";
 import { carNameTakenMessage, findCarNameClash } from "@/lib/cars/carName";
@@ -134,7 +134,7 @@ export async function PATCH(
    */
   if (body.carClass !== undefined) {
     const raw = body.carClass?.trim() || null;
-    if (raw && !CHASSIS_PLATFORMS.some((p) => p.id === raw)) {
+    if (raw && !isChassisPlatformId(raw)) {
       return NextResponse.json({ error: "Unknown discipline" }, { status: 400 });
     }
     data.carClass = raw;

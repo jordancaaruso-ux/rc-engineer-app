@@ -50,26 +50,35 @@ export function platformForChassisSlug(
 export type CarDisciplineInput = {
   carClass?: string | null;
   setupSheetTemplate?: string | null;
-  setupSheetModel?: { slug: string | null } | null;
+  setupSheetModel?: { slug: string | null; discipline?: string | null } | null;
 };
 
 /**
  * A car's discipline (== chassis platform), or null when nothing says.
  *
- * Inference from the chassis first, then the dormant `Car.carClass` column as an override for
- * cars the catalog can't place. Lifted from `loadGeneralCarIdentity`, which had this exact
- * expression inline and was the only thing reading `carClass` for identity.
+ * THREE SOURCES, IN THIS ORDER, and the order is the whole design:
  *
- * Be aware what this can return **today**: every slug in `CHASSIS_PLATFORM_BY_SLUG` is
- * `touring`, and nothing writes `carClass` since the picker was dropped 2026-07-22. So on
- * current data this is `"touring"` or `null` and nothing else — any filter built on it is
- * inert until non-touring chassis are catalogued or a way to set `carClass` comes back.
+ *  1. `CHASSIS_PLATFORM_BY_SLUG` — the curated catalog. First because it is the founder's own
+ *     answer for a chassis he reviewed, and it must outrank whatever a driver typed.
+ *  2. `SetupSheetModel.discipline` — what the driver chose when they created the chassis from
+ *     their PDF (2026-08-26). The chassis is global, so this answers for everyone who later
+ *     joins that row, not just the person who uploaded.
+ *  3. `Car.carClass` — the per-car override, for a car the first two can't place.
+ *
+ * Before (2), a chassis a driver derived was discipline-less forever: the slug map only holds
+ * twelve curated slugs, a derived row's slug is a fingerprint (`sheet_…`), and nothing wrote
+ * `carClass` unless the driver found the picker on the car page. Every self-added chassis in the
+ * app read as "unknown".
+ *
+ * Be aware what this can still return on OLD data: every slug in `CHASSIS_PLATFORM_BY_SLUG` is
+ * `touring`, and rows created before the discipline column exists have none — so a chassis
+ * derived before 2026-08-26 stays null until someone sets it.
  */
 export function disciplineForCar(car: CarDisciplineInput | null | undefined): string | null {
   if (!car) return null;
   const slug = car.setupSheetModel?.slug ?? canonicalSetupSheetTemplateId(car.setupSheetTemplate);
   const inferred = platformForChassisSlug(slug);
   if (inferred) return inferred;
-  // `|| null`, not `?? null`: a whitespace-only carClass trims to "" and must read as unset.
-  return car.carClass?.trim() || null;
+  // `|| null` throughout, not `?? null`: a whitespace-only value trims to "" and must read unset.
+  return car.setupSheetModel?.discipline?.trim() || car.carClass?.trim() || null;
 }

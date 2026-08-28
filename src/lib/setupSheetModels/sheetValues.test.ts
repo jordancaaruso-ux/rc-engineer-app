@@ -47,11 +47,28 @@ import {
   });
 }
 
-// --- Clearing a box removes the key, rather than storing a blank over it ---------------------
+// --- Clearing a box keeps the key holding "", the marker that says "made blank on purpose" ---
+//
+// It used to delete the key. That reads as "the driver said nothing about this box" to the
+// log-run save, which merges onto a baseline snapshot — so the old value was written straight
+// back into the new run and reappeared next time out (reported and filmed 2026-08-25).
 {
   const merged = mergeSheetValuesIntoSnapshot({ text2: "4.5", text3: "1" }, { text2: "", text3: "1" });
-  assert.deepEqual(merged, { text3: "1" });
-  assert.equal("text2" in merged, false, "a cleared box must not keep its old value");
+  assert.deepEqual(merged, { text2: "", text3: "1" });
+  assert.equal("text2" in merged, true, "a cleared box must SAY it was cleared, not go quiet");
+  assert.equal(merged.text2, "", "and it says so by holding the empty-string marker");
+}
+
+// --- A box cleared to whitespace is cleared, not set to spaces -------------------------------
+{
+  const merged = mergeSheetValuesIntoSnapshot({ text2: "4.5" }, { text2: "   " });
+  assert.equal(merged.text2, "");
+}
+
+// --- Clearing a box the setup never had is still a marker, and harmless ----------------------
+{
+  const merged = mergeSheetValuesIntoSnapshot({ text3: "1" }, { text2: "" });
+  assert.deepEqual(merged, { text3: "1", text2: "" });
 }
 
 // --- The previous snapshot is never mutated --------------------------------------------------

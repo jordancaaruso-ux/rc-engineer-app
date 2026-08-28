@@ -9,6 +9,10 @@ import {
   optionSelectedInSurfaceValue,
   toggleOptionInSurfaceValue,
 } from "@/lib/setupSheetModels/sheetSurfaceValues";
+import {
+  applyDerivedSheetBoxes,
+  derivedBoxKeysOnSheet,
+} from "@/lib/setupSheetModels/sheetDerivedBoxes";
 import { ZAPF_MARKS, type ZapfMarkPlacement } from "@/lib/setupDocuments/zapfDingbatMarks";
 
 /**
@@ -522,6 +526,23 @@ export function SheetFillSurface({
   const order = useMemo(() => fields.filter((f) => boxByKey.has(f.key)), [fields, boxByKey]);
   const fieldByKey = useMemo(() => new Map(fields.map((f) => [f.key, f])), [fields]);
 
+  /**
+   * ============================== BOXES THE SHEET WORKS OUT ==============================
+   *
+   * A few boxes on the paper are the answer to the boxes beside them — spring rate from the gap,
+   * final drive from spur and pinion. They are not typed into: they follow. See
+   * `sheetDerivedBoxes` for the formulas, and for why the sheet's own field list is the gate.
+   *
+   * Empty until the plan lands, which is deliberate. Nothing is re-derived on arrival, only on an
+   * edit: a driver who opens a sheet and closes it again must not be told they have unsaved work
+   * because a stored value disagreed with its inputs.
+   */
+  const derivedKeys = useMemo(() => derivedBoxKeysOnSheet(fields.map((f) => f.key)), [fields]);
+  const withDerived = useCallback(
+    (v: Record<string, string>) => applyDerivedSheetBoxes(v, derivedKeys),
+    [derivedKeys]
+  );
+
   const focused = focusIndex === null ? null : order[focusIndex] ?? null;
   const focusedBox = focused ? boxByKey.get(focused.key) ?? null : null;
   const isFocusMode = focusIndex !== null;
@@ -1030,27 +1051,45 @@ export function SheetFillSurface({
     [order, values]
   );
 
-  const setValue = useCallback((key: string, value: string) => {
-    setValues((prev) => ({ ...prev, [key]: value }));
-  }, []);
+  /**
+   * Every edit goes through here, and every edit re-answers the boxes the sheet works out for
+   * itself. Typing a spring gap has to move the spring rate printed two rows away in the same
+   * keystroke, or the sheet is showing the driver a number it knows to be wrong.
+   */
+  const editValues = useCallback(
+    (change: (prev: Record<string, string>) => Record<string, string>) => {
+      setValues((prev) => withDerived(change(prev)));
+    },
+    [withDerived]
+  );
+
+  const setValue = useCallback(
+    (key: string, value: string) => {
+      editValues((prev) => ({ ...prev, [key]: value }));
+    },
+    [editValues]
+  );
 
   /**
    * Answering a box that is not typed into: a tick goes on and off, a row of choices steps along and
    * then back to none. Shared, because the mouse and the space bar must do the same thing.
    */
-  const answerWithoutTyping = useCallback((field: SheetFillField) => {
-    setValues((prev) => {
-      const current = prev[field.key] ?? "";
-      if (field.options?.length) {
-        // Stored values when the plan declares them, labels otherwise (a derived sheet's labels
-        // ARE its values). Stepping compares case-insensitively so a saved "c127s" still steps.
-        const opts = field.optionValues?.length ? field.optionValues : field.options;
-        const i = opts.findIndex((o) => o.trim().toLowerCase() === current.trim().toLowerCase());
-        return { ...prev, [field.key]: opts[i + 1] ?? "" };
-      }
-      return { ...prev, [field.key]: current ? "" : "1" };
-    });
-  }, []);
+  const answerWithoutTyping = useCallback(
+    (field: SheetFillField) => {
+      editValues((prev) => {
+        const current = prev[field.key] ?? "";
+        if (field.options?.length) {
+          // Stored values when the plan declares them, labels otherwise (a derived sheet's labels
+          // ARE its values). Stepping compares case-insensitively so a saved "c127s" still steps.
+          const opts = field.optionValues?.length ? field.optionValues : field.options;
+          const i = opts.findIndex((o) => o.trim().toLowerCase() === current.trim().toLowerCase());
+          return { ...prev, [field.key]: opts[i + 1] ?? "" };
+        }
+        return { ...prev, [field.key]: current ? "" : "1" };
+      });
+    },
+    [editValues]
+  );
 
   /**
    * Tell the caller after the state has settled, not from inside the updater.
@@ -1075,6 +1114,15 @@ export function SheetFillSurface({
   const focusBox = useCallback(
     (key: string, optionValue?: string) => {
       if (readOnly) return;
+      /*
+       * A box the sheet works out for itself refuses the tap.
+       *
+       * Letting it focus would put a caret in a box whose next keystroke gets overwritten by the
+       * formula — which reads as the app fighting you, and is worse than the stale number this
+       * change removes. The ordinary field list has always refused these for the same reason
+       * (`isDerivedSetupKey` in `SetupSheetStructured`); the sheet just never knew about them.
+       */
+      if (derivedKeys.has(key)) return;
       // A drag that ended on a box is a pan, not a tap.
       if ((gesture.current?.moved ?? 0) >= TAP_SLOP_PX) return;
       const i = order.findIndex((f) => f.key === key);
@@ -1094,7 +1142,9 @@ export function SheetFillSurface({
        * keyboard" bug on the Mi10 sheet (founder, 2026-08-15).
        */
       if (optionValue !== undefined) {
-        setValues((prev) => ({
+        // Through `editValues`: the spring and the SRS arrangement are printed choice boxes, and
+        // they are two of the three inputs the spring rate is worked out from.
+        editValues((prev) => ({
           ...prev,
           [key]: toggleOptionInSurfaceValue(prev[key] ?? "", optionValue, Boolean(field.multi)),
         }));
@@ -1136,20 +1186,28 @@ export function SheetFillSurface({
       }
       setFocusIndex(i);
     },
-    [order, finePointer, answerWithoutTyping, readOnly]
+    [order, finePointer, answerWithoutTyping, readOnly, derivedKeys, editValues]
   );
 
   const step = useCallback(
     (delta: number) => {
       setFocusIndex((i) => {
         if (i === null) return null;
-        const next = i + delta;
+        /*
+         * Walk PAST the boxes the sheet works out for itself. Next and back exist to put the
+         * keyboard on the following box; stopping on one that refuses typing would strand the
+         * driver a tap from nowhere, mid-sheet.
+         */
+        let next = i + delta;
+        while (next >= 0 && next < order.length && derivedKeys.has(order[next]!.key)) {
+          next += delta;
+        }
         if (next < 0 || next >= order.length) return i;
         haptic("light");
         return next;
       });
     },
-    [order.length]
+    [order, derivedKeys]
   );
 
   /**
@@ -1194,8 +1252,10 @@ export function SheetFillSurface({
     const left = view.x + (b.x + b.width / 2) * fitted.width * view.zoom;
     const top = view.y + b.y * fitted.height * view.zoom - 6;
     if (left < 0 || left > stage.width || top < 0 || top > stage.height) return null;
-    return { label: f.label, left, top };
-  }, [finePointer, hoverKey, fitted, view, boxByKey, fieldByKey, page, stage, isFocusMode]);
+    // Say so before the pointer discovers it: a box that refuses the click has to explain itself.
+    const label = derivedKeys.has(hoverKey) ? `${f.label} — worked out from the sheet` : f.label;
+    return { label, left, top };
+  }, [finePointer, hoverKey, fitted, view, boxByKey, fieldByKey, page, stage, isFocusMode, derivedKeys]);
 
   // Turning to page 2 asks the server for a picture it has probably never drawn, so the wait — and
   // any refusal — belongs to that page, not to the one that already loaded.
@@ -1318,6 +1378,12 @@ export function SheetFillSurface({
                     pageHeight: fitted.height,
                   });
               const editingHere = desktopEditing && isFocused;
+              /**
+               * A box the sheet works out for itself. It draws its value like any other, but it
+               * extends no invitation to fill: the pale-blue tint every PDF reader paints on a
+               * fillable field would be a promise this box cannot keep.
+               */
+              const isDerived = derivedKeys.has(b.key);
               return (
                 <button
                   // Option boxes share their parameter's key, so the key alone can't be React's.
@@ -1325,12 +1391,16 @@ export function SheetFillSurface({
                   type="button"
                   data-sheet-box=""
                   aria-label={
-                    isOptionBox ? `${f?.label ?? b.key} — ${optionLabel}` : (f?.label ?? b.key)
+                    isOptionBox
+                      ? `${f?.label ?? b.key} — ${optionLabel}`
+                      : isDerived
+                        ? `${f?.label ?? b.key} — worked out from the sheet`
+                        : (f?.label ?? b.key)
                   }
                   aria-pressed={isOptionBox ? filled : undefined}
                   // Not `disabled` — the hover name should still say what a box is on a sheet
                   // that is only being read. focusBox itself refuses edits when read-only.
-                  aria-disabled={readOnly || undefined}
+                  aria-disabled={readOnly || isDerived || undefined}
                   onClick={readOnly ? undefined : () => focusBox(b.key, b.optionValue)}
                   // Only the phone has a keyboard to protect; on a desktop the stage wants the
                   // mousedown so a drag from anywhere on the sheet pans it.
@@ -1339,8 +1409,9 @@ export function SheetFillSurface({
                   onMouseLeave={finePointer ? () => setHoverKey((k) => (k === b.key ? null : k)) : undefined}
                   className={cn(
                     "absolute box-border flex items-center overflow-hidden rounded-[1px]",
-                    !readOnly && "border",
-                    isFocused && !readOnly ? "z-20 border-primary-ink" : "z-0"
+                    !readOnly && !isDerived && "border",
+                    isFocused && !readOnly ? "z-20 border-primary-ink" : "z-0",
+                    isDerived && "cursor-default"
                   )}
                   style={{
                     left: b.x * fitted.width,
@@ -1351,8 +1422,12 @@ export function SheetFillSurface({
                      * Pale blue is the field highlight every PDF reader draws — an invitation to
                      * fill. A read-only sheet extends no invitation: the paper shows through bare
                      * and only the values sit on it, the way a printed, filled-in sheet looks.
+                     *
+                     * Nor does a box the sheet works out for itself, on any sheet: the number in it
+                     * is real and belongs on the paper, but no one is being asked to type it.
                      */
-                    background: readOnly ? "transparent" : isFocused ? FOCUS_TINT : FIELD_TINT,
+                    background:
+                      readOnly || isDerived ? "transparent" : isFocused ? FOCUS_TINT : FIELD_TINT,
                     borderColor: isFocused && !readOnly ? undefined : FIELD_TINT_BORDER,
                     boxShadow: isFocused && !readOnly ? FOCUS_HALO : undefined,
                     justifyContent:

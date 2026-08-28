@@ -63,10 +63,20 @@ type BlankUploadResponse = {
 export async function uploadBlankSheetForChassis(
   file: File,
   chassisName: string,
+  /**
+   * A `ChassisPlatformId`. Required, and positional rather than an option, so a caller cannot
+   * forget it and get a chassis that never says what it races — the route refuses the derive
+   * door without one anyway, and a 400 after the upload is a worse way to find out.
+   */
+  discipline: string,
   opts?: { signal?: AbortSignal; timeoutMs?: number }
 ): Promise<BlankUploadResult> {
   const name = chassisName.trim();
   if (!name) return { ok: false, error: "Give the chassis a name first.", offerCarWithoutSheet: false };
+  const platform = discipline.trim();
+  if (!platform) {
+    return { ok: false, error: "Pick what this chassis races first.", offerCarWithoutSheet: false };
+  }
 
   // Deriving a 289-box sheet takes noticeably longer than storing a file, and a phone on track
   // wifi is the normal case, so this is more generous than the plain document upload's 60s.
@@ -88,6 +98,7 @@ export async function uploadBlankSheetForChassis(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
+          discipline: platform,
           derive: true,
           storagePath,
           originalFilename: file.name,
@@ -99,6 +110,7 @@ export async function uploadBlankSheetForChassis(
     } else {
       const fd = new FormData();
       fd.set("name", name);
+      fd.set("discipline", platform);
       fd.set("derive", "1");
       fd.set("pdf", file);
       res = await fetch("/api/setup-sheet-models/blank", {

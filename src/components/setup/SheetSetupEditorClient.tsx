@@ -6,6 +6,8 @@ import { SheetGeometryStrip } from "@/components/rollCenter/SheetGeometryStrip";
 import { SetupEditorSaveBar } from "@/components/setup/SetupEditorSaveBar";
 import {
   useSetupEditorSave,
+  useReportHostedSave,
+  type HostedSetupSave,
   type SetupEditorSavedResult,
 } from "@/components/setup/useSetupEditorSave";
 import { useReportSetupEditorState } from "@/components/setup/setupEditorShare";
@@ -37,6 +39,7 @@ export function SheetSetupEditorClient({
   templateKey,
   returnHref,
   onSaved,
+  onSaveStateChange,
   hosted = false,
 }: {
   carId: string;
@@ -54,6 +57,8 @@ export function SheetSetupEditorClient({
   returnHref?: string | null;
   /** Hosted in the run's setup pop-up: take the result in memory instead of navigating. */
   onSaved?: (result: SetupEditorSavedResult) => void;
+  /** Publishes unsaved work to a host that has exits of its own. See `useReportHostedSave`. */
+  onSaveStateChange?: (state: HostedSetupSave | null) => void;
   /** Lay the save bar out in the flow of a scrolling host rather than fixed to the viewport. */
   hosted?: boolean;
 }) {
@@ -92,6 +97,8 @@ export function SheetSetupEditorClient({
   });
   // Tells the Share button above the editor where the setup stands. See `setupEditorShare`.
   useReportSetupEditorState(save.dirty, save.savedCount);
+  // Tells a HOST with its own exits the same thing, plus a way to save from one of them.
+  useReportHostedSave(save, onSaveStateChange);
 
   return (
     <div className="space-y-3">
