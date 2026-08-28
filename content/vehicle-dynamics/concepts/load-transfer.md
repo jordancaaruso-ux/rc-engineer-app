@@ -14,6 +14,12 @@ Two facets the setup shapes:
 - **Front/rear split** — the lateral total can transfer more at the front or the rear, set by the
   front/rear roll-stiffness balance.
 
+**The total moves with grip** (founder, 2026-08-28). The g a car pulls is set by what the tyre can
+hold, so more grip means more load transferring through the same corner — more roll, and under
+brakes and power more pitch. A car is set up to work within a certain amount of that movement. As
+grip goes up the car moves further, as it goes down less far, and the setup is being asked to work
+outside the movement it was set for.
+
 **When each facet governs.** At turn-in the springs haven't deflected, so they've moved **no load
 yet** — the split at that moment is set by the **roll-centre heights alone**, and spring/ARB rates
 contribute nothing until the car has actually rolled. The elastic share ramps in as roll develops and
