@@ -22,8 +22,7 @@ past that, as it goes down it rolls short of it.
 **Traction rolling** (founder, 2026-08-28). When the transfer reaches the whole of the inside
 tyres' load they lift, and the car tips onto its outside tyres. It comes sooner the higher the CoG,
 the narrower the track, and the more grip there is; and jacking ([[roll-center]]) lifts the chassis
-in the corner, so a car that jacks more tips sooner. Stiffness moves how fast the transfer arrives
-and which end takes it, not the total.
+in the corner, so a car that jacks more tips sooner.
 
 **When each facet governs.** At turn-in the springs haven't deflected, so they've moved **no load
 yet** — the split at that moment is set by the **roll-centre heights alone**, and spring/ARB rates
