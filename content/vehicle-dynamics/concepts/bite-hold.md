@@ -76,7 +76,9 @@ facts, never against the words.
      late" are often the same complaint, not two;
    - it **has no bite** — the grip that arrives is progressive and low rather than sharp and high.
      This usually goes hand in hand with arriving late, because the same knobs move both, but it is
-     not the same fact: bite is the shape of the arrival, lateness its timing;
+     not the same fact: bite is the shape of the arrival, lateness its timing. A driver who says
+     "bite" has used this page's word and named this fact — it is not the never-arrives case below,
+     and the two do not need separating with a question;
    - it **never arrives** — short of grip overall, or the tyre and track before the car;
    - it **arrives and then goes**, suddenly and without warning — past the bite end of the window,
      or something running out ([[droop-downstop]], [[ride-height-and-rake]]);
