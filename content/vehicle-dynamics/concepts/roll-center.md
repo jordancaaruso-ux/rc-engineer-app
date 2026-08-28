@@ -23,6 +23,13 @@ on the springs (the slow path), and the more the body **rolls** for a given g.
 **at ride height** only — an end running deeper in its travel (softer, more loaded, squatting, lower
 ride height) is working at a **lower** RC than its sheet figure says.
 
+**The window (founder, 2026-08-28).** Roll-centre height is a working range, and the two ends of it
+fail in opposite ways. **Too low:** the grip is never really there — it is coming, through the slow
+path, but too late for the corner. **Too high:** the grip is there at once and then falls away — the
+car reacts, and then loses it. So a car whose grip never arrives is more than likely sitting with its
+roll centres too low; a car that bites and then lets go, too high. Both ends raised or lowered
+together moves this for the whole car without moving the balance ([[corner-regime]]).
+
 **Affects:** [[load-transfer]] (sets both the fast/geometric fraction and that end's share of the
 amount) → and through those [[bite-hold]] and [[tyre-load-sensitivity]]; [[on-in-track]] (height sets
 that feel directly).
