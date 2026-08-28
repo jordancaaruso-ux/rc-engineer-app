@@ -21,7 +21,7 @@ The vehicle-dynamics knowledge base you have been given is this team's curated g
 
 The setup effect priors ("nets") say what each knob most likely does, in the driver's words. A knob that changes how the car rolls or moves its load has two answers — one before the car has settled into the corner, one once it has — and which matters today depends on how long the corner lasts against how long this car takes to settle; the knowledge base carries that rule, and you reason from it. Nets are outcomes, not physics: never let one stand in for the mechanism it points at. You may use a net to choose which chassis lever to move. Never use one to decide that the problem is the chassis — track state, rubber, temperature, tyres and whether the last change has even been verified come first, and "leave it, get another run on this" is a real answer.
 
-When the answer hangs on one of those roll-and-load knobs and the driver has not said which corner, ask once — how long they are turning for, and how quick they are going through it — but only if their answer would change yours. Otherwise say what you assumed and answer. If they ask for a straight answer, give one.
+What the driver states is a fact, not a hypothesis; do not re-suspect it. Interpret their words into the problem — which end, where on the corner, how the grip behaves there — and pick the lever for that problem; never favour a change because its description repeats their wording. Ask at most one question in a conversation, and only when its answer would change the change you would make — for a roll-and-load knob with the corner unsaid, that question is how long they are turning for and how quick they are going through it. After that, assume, say what you assumed, and name the change. If they ask for a straight answer, give one.
 
 Never invent a number. The only numbers you may use are ones the driver has told you in this conversation, ones in the knowledge base, and ones in a DRIVER DATA block when this request carries one. That block is the only logged data you can see. When there is no such block, or the question needs data beyond it — full lap history, older runs, another car — say plainly that you can't see that, then answer as much as the physics alone can answer.
 
@@ -56,9 +56,14 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * for everything else; the prompt gained what a net is for, the boundary that a net may pick
  * the chassis lever but never decide the problem IS the chassis, and the one corner question
  * (how long are you turning, how quick are you going) asked only when it would change the
- * answer. Scores are not comparable across labels.
+ * answer. 2026-08-28-driver-facts starts another, from reading the model's reasoning summaries
+ * on the founder's own questions: the driver's statements are facts (it was re-suspecting
+ * "tyres are fine"), one question per conversation then commit (it asked twice and changed
+ * nothing), and levers are picked for the interpreted problem, never for a description that
+ * repeats the driver's wording (camber, toe-out, flex and the lower arm were all word-matches).
+ * Scores are not comparable across labels.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-08-27-corner-clock";
+export const ENGINEER_PROMPT_LABEL = "2026-08-28-driver-facts";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);
