@@ -1,4 +1,5 @@
 import type { SetupSnapshotData, SetupSnapshotValue } from "@/lib/runSetup";
+import { PRESET_WITH_OTHER_BASE_KEYS, scalarSetupTextFromUnknown } from "@/lib/setup/presetWithOther";
 import { storedValuesToSurface } from "@/lib/setupSheetModels/sheetSurfaceValues";
 
 /**
@@ -80,6 +81,25 @@ export function mergeSheetValuesIntoSnapshot(
   for (const [k, v] of Object.entries(sheetValues)) {
     if (typeof v === "string") {
       next[k] = v.trim() === "" ? "" : v;
+      // A marker on a `_other` companion whose base is NOT in this save: the previous snapshot
+      // keeps that text inside the base's object (`front_bumper: { otherText: "Plastic" }`), so
+      // blank it there as well — otherwise the marker lands on a key the snapshot never used and
+      // the text comes back (2026-08-29). The sheet now sends the marker on the base too; this
+      // covers a phone still running the old bundle.
+      if (next[k] === "" && k.endsWith("_other") && !(k.slice(0, -6) in sheetValues)) {
+        const base = k.slice(0, -6);
+        const prev = previous[base];
+        if (
+          (PRESET_WITH_OTHER_BASE_KEYS as readonly string[]).includes(base) &&
+          prev != null &&
+          typeof prev === "object" &&
+          !Array.isArray(prev) &&
+          "otherText" in prev
+        ) {
+          const preset = scalarSetupTextFromUnknown((prev as { selectedPreset?: unknown }).selectedPreset).trim();
+          next[base] = preset ? { selectedPreset: preset, otherText: "" } : "";
+        }
+      }
       continue;
     }
     // Stored shapes from a calibrated sheet: a ticked-options array, a preset-with-other object,

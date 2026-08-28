@@ -79,3 +79,29 @@ import {
 }
 
 console.log("sheetValues.test.ts ok");
+
+// --- A marker on a `_other` companion alone still blanks the text inside its base ------------
+//
+// The sheet now sends the marker on the base key too; a phone still on yesterday's bundle sends
+// only the companion's. Either way "Plastic" must not survive the save.
+{
+  const previous: SetupSnapshotData = {
+    front_bumper: { selectedPreset: "", otherText: "Plastic" },
+    top_deck_front: { selectedPreset: "C127S", otherText: "G" },
+    text2: "4.5",
+  };
+  const merged = mergeSheetValuesIntoSnapshot(previous, { front_bumper_other: "", top_deck_front_other: "" });
+  assert.equal(merged.front_bumper, "", "no preset, no text: the pair is cleared");
+  assert.deepEqual(
+    merged.top_deck_front,
+    { selectedPreset: "C127S", otherText: "" },
+    "a chosen preset stays, only its custom text goes"
+  );
+  assert.equal(merged.text2, "4.5");
+  // The base named in the same save wins outright; the companion marker changes nothing.
+  const explicit = mergeSheetValuesIntoSnapshot(previous, {
+    front_bumper: { selectedPreset: "Foam", otherText: "" },
+    front_bumper_other: "",
+  });
+  assert.deepEqual(explicit.front_bumper, { selectedPreset: "Foam", otherText: "" });
+}

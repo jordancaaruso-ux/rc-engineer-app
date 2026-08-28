@@ -161,6 +161,18 @@ export function surfaceValuesToStoredMerge(
     // either way this KEY holds nothing any more, and the merge must be told so.
     out[key] = "";
   }
+  // A preset-with-other pair is STORED under its base key, so the marker has to sit there too.
+  // The paper's "custom text" box has its own key (`front_bumper_other`); emptying it put the
+  // marker on that key alone, and the merge wrote "" over a key the snapshot never used while
+  // `front_bumper: { otherText: "Plastic" }` stood untouched — "removing 'plastic' didn't work,
+  // others did" (2026-08-29). The pair is one value: when both halves are blank, say so where
+  // the value lives.
+  for (const field of fields) {
+    if (!fieldUsesPresetWithOther(field.key, field.options ?? null)) continue;
+    if (field.key in stored) continue;
+    const companion = legacyOtherKeyForPresetField(field.key);
+    if (field.key in surface || companion in surface) out[field.key] = "";
+  }
   return out;
 }
 

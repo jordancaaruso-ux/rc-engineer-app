@@ -4,6 +4,7 @@ import {
   splitMultiSurfaceValue,
   storedValuesToSurface,
   surfaceValuesToStored,
+  surfaceValuesToStoredMerge,
   toggleOptionInSurfaceValue,
 } from "@/lib/setupSheetModels/sheetSurfaceValues";
 import type { SheetPlanField } from "@/lib/setupSheetModels/sheetPlan";
@@ -146,3 +147,35 @@ function planField(p: Partial<SheetPlanField> & { key: string }): SheetPlanField
 }
 
 console.log("sheetSurfaceValues.test.ts ok");
+
+// ---- Emptying the "custom text" box of a preset pair clears the STORED key (2026-08-29) ----
+//
+// "Plastic" lived in `front_bumper: { selectedPreset: "", otherText: "Plastic" }` and was drawn in
+// the paper's `front_bumper_other` box. Clearing that box put the deletion marker on
+// `front_bumper_other` — a key the snapshot never used — and the merge left the base object
+// standing, so the text came back on the next run while every plain box he cleared stayed cleared.
+{
+  const fields: SheetPlanField[] = [
+    planField({ key: "front_bumper", options: ["Foam", "Other"], optionValues: ["Foam", "Other"] }),
+    planField({ key: "front_bumper_other" }),
+    planField({ key: "ride_height_front" }),
+  ];
+  const surface = storedValuesToSurface({
+    front_bumper: { selectedPreset: "", otherText: "Plastic" },
+    ride_height_front: "5.1",
+  });
+  assert.equal(surface.front_bumper_other, "Plastic", "the text is drawn in the companion box");
+  surface.front_bumper_other = "";
+  const merge = surfaceValuesToStoredMerge(surface, fields);
+  assert.equal(merge.front_bumper, "", "the marker sits on the key the snapshot stores the pair under");
+  assert.equal(merge.front_bumper_other, "", "and on the box's own key, as before");
+  assert.equal(merge.ride_height_front, "5.1");
+  // Clearing the text while a preset is chosen keeps the preset: that is a value, not a blank.
+  const kept = surfaceValuesToStoredMerge({ front_bumper: "Foam", front_bumper_other: "" }, fields);
+  assert.deepEqual(kept.front_bumper, { selectedPreset: "Foam", otherText: "" });
+  // A pair the surface never mentions is not touched — no marker out of nowhere.
+  const untouched = surfaceValuesToStoredMerge({ ride_height_front: "5.2" }, fields);
+  assert.equal("front_bumper" in untouched, false);
+}
+
+console.log("sheetSurfaceValues.test.ts OK");
