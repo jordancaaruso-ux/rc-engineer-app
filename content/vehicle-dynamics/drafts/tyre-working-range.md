@@ -33,11 +33,20 @@ finds grip. The same stiffness change can therefore add grip on one day and take
 another with nothing on the car different; which side of the range the tyre is on is not derivable
 from the change alone.
 
-**Two things that look alike.** A car that is short of bite and a car whose tyres are below their
-range both read as "no grip" — the difference is that the under-worked tyre **improves through the
-run** as it warms, and improves faster the harder it is driven, while a bite shortage is the same
-on lap one and lap ten. Whether it comes in through the run is the fact that separates them, and
-they can also both be true at once: a soft platform that arrives late *and* never warms the tyre.
+**Where the tyre starts the run decides which way it moves.** A tyre's temperature through a run is
+the balance between the heat the work puts in and the heat the surface and the air take out. In
+touring car, tyres go on **from warmers** — at or near the range before the first lap — so an
+under-worked tyre does not come in through the run, it **falls away**: the work is not enough to
+hold it against a cool track, and the car gets worse as the run goes on (founder, 2026-08-28).
+A class that starts cold, with no warmers, moves the other way — an under-worked tyre comes in
+late or never, and improves the harder it is driven. The direction is a fact of the discipline, not
+of the setting.
+
+**Two things that look alike.** A car that is short of bite and a car whose tyres are outside their
+range both read as "no grip". A bite shortage is the same on lap one and lap ten; a tyre losing or
+gaining its range moves through the run, in the direction the paragraph above gives for the class.
+They can also both be true at once: a soft platform that arrives late *and* never works the tyre
+enough to hold its temperature.
 
 **Where this sits against the other low-grip lever.** [[chassis-flex]] gives grip on a low-grip
 surface by letting the platform give before the tyre does — compliance. Working the tyre harder
