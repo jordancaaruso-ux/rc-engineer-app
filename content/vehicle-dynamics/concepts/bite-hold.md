@@ -82,8 +82,8 @@ facts, never against the words.
      This usually goes hand in hand with arriving late, because the same knobs move both, but it is
      not the same fact: bite is the shape of the arrival, lateness its timing. A driver who says
      "bite", "numb", "imprecise" or "unpredictable" has used this page's words and named this fact
-     — the initial grip — it is not the never-arrives case below, and the two do not need separating
-     with a question;
+     — the initial grip, which is going in, so fact 2 is answered too. It is not the never-arrives
+     case below, and neither needs separating with a question;
    - it **never arrives** — short of grip overall, or the tyre and track before the car;
    - it **arrives and then goes**, suddenly and without warning — past the bite end of the window,
      or something running out ([[droop-downstop]], [[ride-height-and-rake]]);
