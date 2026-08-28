@@ -113,7 +113,13 @@ export async function POST(request: Request) {
     },
     laps: result.laps,
     driverNotFound: result.driverNotFound,
-    warnings: result.warnings,
+    // The card prints `message`; the parser's issues carry `detail` and a name. Handed over raw,
+    // every warning drew as an empty line under "Things to know" (2026-08-29).
+    warnings: result.warnings.map((issue) => ({
+      kind: issue.kind,
+      severity: issue.severity,
+      message: `${issue.driverName}: ${issue.detail}`,
+    })),
     drivers: report.drivers.map((driver) => ({
       id: `myrcm-pdf-p${driver.position}`,
       position: driver.position,

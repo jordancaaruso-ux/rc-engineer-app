@@ -98,12 +98,18 @@ export type MyRcmPdfDriver = {
    * only for the reconcile.
    */
   startSegmentSeconds: number | null;
+  /**
+   * Whole seconds MyRCM added to `TOTAL` over and above the laps — a time penalty. Read off the
+   * arithmetic, not off the page: the file prints the penalised total and says nothing else. Null
+   * when the laps account for the total on their own.
+   */
+  penaltySeconds: number | null;
 };
 
 export type MyRcmPdfIssue = {
   position: number;
   driverName: string;
-  kind: "total_time" | "best_lap" | "no_laps" | "lap_count";
+  kind: "total_time" | "best_lap" | "no_laps" | "lap_count" | "penalty";
   /**
    * `error` blocks the import; `warning` does not.
    *
@@ -406,6 +412,7 @@ function parseClassification(bands: MyRcmPdfBand[]): ParsedClassification {
       statedTotalSeconds: totalText ? parseMyRcmPdfTime(totalText) : null,
       statedBestLapSeconds: bestText ? parseMyRcmPdfTime(bestText) : null,
       note: noteText && noteText !== "-" ? noteText : null,
+      penaltySeconds: null,
     });
   }
 
@@ -687,13 +694,25 @@ export function parseMyRcmPdfReport(cells: Array<MyRcmPdfCell & { page: number }
         driver.laps.reduce((total, lap) => total + lap, 0) + (driver.startSegmentSeconds ?? 0);
       // Every lap is printed to a millisecond, so the slack only has to cover float addition.
       if (Math.abs(sum - driver.statedTotalSeconds) > 0.005) {
-        issues.push({
-          position: driver.position,
-          driverName: driver.driverName,
-          kind: "total_time",
-          severity: "error",
-          detail: `laps sum to ${sum.toFixed(3)}s, file states ${driver.statedTotalSeconds.toFixed(3)}s`,
-        });
+        const penalty = penaltySecondsFromTotals(sum, driver.statedTotalSeconds);
+        if (penalty !== null) {
+          driver.penaltySeconds = penalty;
+          issues.push({
+            position: driver.position,
+            driverName: driver.driverName,
+            kind: "penalty",
+            severity: "warning",
+            detail: `${penalty}s penalty — the file's total is ${penalty}s more than the laps; the laps are kept as driven`,
+          });
+        } else {
+          issues.push({
+            position: driver.position,
+            driverName: driver.driverName,
+            kind: "total_time",
+            severity: "error",
+            detail: `laps sum to ${sum.toFixed(3)}s, file states ${driver.statedTotalSeconds.toFixed(3)}s`,
+          });
+        }
       }
     }
 
@@ -743,6 +762,28 @@ export function parseMyRcmPdfReport(cells: Array<MyRcmPdfCell & { page: number }
     reconciled: !issues.some((issue) => issue.severity === "error"),
     issues,
   };
+}
+
+/**
+ * A time penalty, read off the arithmetic.
+ *
+ * The first refusal off a real race sheet (2026-08-29): "laps sum to 301.372s, file states
+ * 311.372s" — ten seconds, to the millisecond. That is not a lap in the wrong column: a swapped
+ * column moves a *lap time* between drivers and leaves a fractional gap, and the best-lap check
+ * fires beside it. A gap that is a whole number of seconds, in the total's favour, is what a race
+ * director's penalty looks like once MyRCM has added it to `TOTAL` and printed nothing else.
+ *
+ * Bounded at ten minutes: beyond that it is not a penalty, it is a broken read. Null for any gap
+ * that is fractional, negative, or zero.
+ */
+export const MAX_PENALTY_SEC = 600;
+
+export function penaltySecondsFromTotals(lapsSumSeconds: number, statedTotalSeconds: number): number | null {
+  const gap = statedTotalSeconds - lapsSumSeconds;
+  if (!(gap > 0.005) || gap > MAX_PENALTY_SEC) return null;
+  const whole = Math.round(gap);
+  if (whole < 1 || Math.abs(gap - whole) > 0.005) return null;
+  return whole;
 }
 
 /** Normalisation used to match a driver to their row. Mirrors the other timing sources. */

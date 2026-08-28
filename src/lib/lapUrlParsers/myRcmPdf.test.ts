@@ -44,8 +44,10 @@ import {
   toSessionDrivers,
   toLapUrlParseResult,
   selectMyRcmPdfDriver,
+  MAX_PENALTY_SEC,
   MYRCM_PDF_PARSER_ID,
   MyRcmPdfParseError,
+  penaltySecondsFromTotals,
   type MyRcmPdfReport,
 } from "@/lib/lapUrlParsers/myRcmPdf";
 import { extractMyRcmPdfCells, looksLikePdf, MyRcmPdfReadError } from "@/lib/lapUrlParsers/myRcmPdfText";
@@ -366,4 +368,19 @@ test("the field converts to the shape the import already speaks", async () => {
     lapCount: 78,
   });
   assert.equal(new Set(drivers.map((d) => d.id)).size, 8, "ids are unique across the field");
+});
+
+test("a whole-second gap between the laps and TOTAL is a penalty, not a misread", () => {
+  // The first real refusal (2026-08-29): 301.372 driven, 311.372 printed — a ten-second penalty.
+  assert.equal(penaltySecondsFromTotals(301.372, 311.372), 10);
+  assert.equal(penaltySecondsFromTotals(301.372, 306.372), 5);
+  assert.equal(penaltySecondsFromTotals(1801.004, 1861.004), 60, "a minute is still whole seconds");
+  // Float slack: sums of printed milliseconds wander by a few millionths.
+  assert.equal(penaltySecondsFromTotals(301.3720000001, 311.372), 10);
+  // Not penalties: a fractional gap (a lap in the wrong column), a total SHORT of the laps, no gap,
+  // or a gap too big to be a race director's doing.
+  assert.equal(penaltySecondsFromTotals(301.372, 311.400), null);
+  assert.equal(penaltySecondsFromTotals(311.372, 301.372), null);
+  assert.equal(penaltySecondsFromTotals(301.372, 301.372), null);
+  assert.equal(penaltySecondsFromTotals(301.372, 301.372 + MAX_PENALTY_SEC + 1), null);
 });
