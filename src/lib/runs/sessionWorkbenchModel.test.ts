@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildGroupRunRows, type WorkbenchGroupSource } from "@/lib/runs/sessionWorkbenchModel";
+import {
+  buildGroupRunRows,
+  buildGroupTrendModel,
+  type WorkbenchGroupSource,
+} from "@/lib/runs/sessionWorkbenchModel";
 
 /**
  * The Sessions run rows show best / top 5 / top 10 side by side, and the two
@@ -74,4 +78,118 @@ test("only the fastest run in the group is marked, and green rides on best", () 
   const marked = rows.filter((r) => r.isGroupBest);
   assert.equal(marked.length, 1);
   assert.equal(marked[0]!.id, "fast");
+});
+
+/**
+ * The row's second line leads with the time of day, and the clock it prints is the
+ * one that was at the track — not the reader's. A driver who flies interstate for a
+ * meeting and reviews it back home would otherwise see every run shifted by hours,
+ * on the one screen whose whole subject is how a day unfolded.
+ */
+test("time of day prints on the run's own clock, then the owner's, then the reader's", () => {
+  const at = new Date("2026-08-24T04:15:00.000Z"); // 2:15 PM in Sydney, 6:15 AM in Berlin
+
+  const [ownZone] = buildGroupRunRows(
+    group([{ ...run("r1", laps(6)), userId: "u1", localTimeZone: "Australia/Sydney", createdAt: at }]),
+    { viewerTimeZone: "Europe/Berlin" }
+  );
+  assert.equal(ownZone!.timeLabel, "2:15 PM", "the run's captured zone wins over the reader's");
+
+  // Logged before Run.localTimeZone existed — the owner's account zone stands in.
+  const [ownerZone] = buildGroupRunRows(
+    group([{ ...run("r2", laps(6)), userId: "u1", localTimeZone: null, createdAt: at }]),
+    { ownerTimeZoneByUserId: { u1: "Australia/Sydney" }, viewerTimeZone: "Europe/Berlin" }
+  );
+  assert.equal(ownerZone!.timeLabel, "2:15 PM");
+
+  // Nothing else known: the reader's zone is the last resort, not the first choice.
+  const [viewerZone] = buildGroupRunRows(
+    group([{ ...run("r3", laps(6)), userId: "u1", localTimeZone: null, createdAt: at }]),
+    { viewerTimeZone: "Europe/Berlin" }
+  );
+  assert.equal(viewerZone!.timeLabel, "6:15 AM");
+});
+
+/**
+ * The row's expansion prints "Setup vs Run N" from `setupDiff`, and the three
+ * modes are three different things to tell a driver. The one that matters is
+ * `no_setup`: a run can be completed with an empty sheet ("log it anyway"), and
+ * diffing empty against a real setup reads every field of the previous run as
+ * having just been changed — the opposite of what happened.
+ */
+test("setupDiff separates no-setup, no-baseline and a real diff", () => {
+  const newest = { ...run("r3", laps(6)), createdAt: new Date("2026-08-24T05:00:00Z") };
+  const middle = { ...run("r2", laps(6)), createdAt: new Date("2026-08-24T04:00:00Z") };
+  const oldest = { ...run("r1", laps(6)), createdAt: new Date("2026-08-24T03:00:00Z") };
+  const rows = buildGroupRunRows(group([newest, middle, oldest]), undefined, {
+    setupDataByRunId: new Map<string, unknown>([
+      ["r3", {}],
+      ["r2", { camber_front: "-1.5", ride_height_rear: "5.5" }],
+      ["r1", { camber_front: "-1.0", ride_height_rear: "5.5" }],
+    ]),
+  });
+
+  assert.equal(rows[0]!.setupDiff?.mode, "no_setup", "an empty sheet is not 'everything changed'");
+
+  const middleDiff = rows[1]!.setupDiff;
+  assert.equal(middleDiff?.mode, "diff");
+  assert.equal(middleDiff!.mode === "diff" && middleDiff.rows.length, 1);
+  assert.equal(middleDiff!.mode === "diff" && middleDiff.rows[0]!.value, "-1.5");
+  assert.equal(middleDiff!.mode === "diff" && middleDiff.rows[0]!.previousValue, "-1");
+  assert.equal(middleDiff!.mode === "diff" && middleDiff.previousLabel, "Run 1");
+
+  assert.equal(rows[2]!.setupDiff?.mode, "no_baseline", "the first run on a car has nothing to diff");
+});
+
+/** Without snapshots the field is null — the expansion then says so rather than "no changes". */
+test("setupDiff is null when the caller passed no setup data", () => {
+  const [row] = buildGroupRunRows(group([run("r1", laps(6))]));
+  assert.equal(row!.setupDiff, null);
+});
+
+/**
+ * The trend card's readout strip prints the driver's 1–10 verdict beside the lap
+ * times, and colours the numeral from `CAR_RATING_BANDS`. `Run.carRating` is a plain
+ * nullable Int with no check constraint behind it, so a value outside the picker's
+ * scale would land outside every band and fall through to the muted "unrated" ink —
+ * printed next to a number that plainly is not unrated. These pin the guard.
+ */
+test("the trend readout carries the rating and the air it ran in", () => {
+  const model = buildGroupTrendModel(
+    group([
+      {
+        ...run("r1", laps(12)),
+        carRating: 7,
+        conditionsAirTempC: 23.4,
+      },
+    ])
+  );
+  assert.equal(model!.runs[0]!.carRating, 7);
+  // The Celsius float is passed through whole — rounding happens where it is drawn.
+  assert.ok(Math.abs(model!.runs[0]!.airTempC! - 23.4) < 1e-9);
+});
+
+test("a rating outside 1–10 is dropped rather than printed in an unrated colour", () => {
+  const cases: Array<[number | null | undefined, number | null]> = [
+    [0, null],
+    [11, null],
+    [-3, null],
+    [Number.NaN, null],
+    [null, null],
+    [undefined, null],
+    [1, 1],
+    [10, 10],
+    // The column is an Int, but nothing stops a float arriving; the bands are whole numbers.
+    [7.4, 7],
+  ];
+  for (const [input, expected] of cases) {
+    const model = buildGroupTrendModel(group([{ ...run("r1", laps(12)), carRating: input }]));
+    assert.equal(model!.runs[0]!.carRating, expected, `carRating ${String(input)}`);
+  }
+});
+
+test("a run with no conditions logged reports no air temperature", () => {
+  const model = buildGroupTrendModel(group([run("r1", laps(12))]));
+  assert.equal(model!.runs[0]!.airTempC, null);
+  assert.equal(model!.runs[0]!.carRating, null);
 });

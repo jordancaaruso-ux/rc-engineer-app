@@ -1,5 +1,4 @@
 import "server-only";
-import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { demoCatalogUserId } from "@/lib/demo/demoAccess";
@@ -62,17 +61,46 @@ async function loadDemoSeasonFacts(): Promise<DemoSeasonFacts> {
       runCount: runs._count._all > 0 ? runs._count._all : null,
       trackCount: tracks.length > 0 ? tracks.length : null,
     };
-  } catch {
-    // The door is not worth failing over. Fewer rows, same screen.
+  } catch (error) {
+    /*
+     * The door is not worth failing over — fewer rows, same screen. But it IS worth saying so.
+     * This catch was silent until 2026-08-25, and the cost of that silence was measured on
+     * production: the live demo door was showing nothing but "Access · Read-only" — no driver,
+     * no run count, no venues — while the exact same queries, run by hand against the same
+     * shape of data, returned 178 runs across 6 tracks. A degraded first impression that
+     * reports itself nowhere is one nobody can fix.
+     */
+    console.error("[demoSeasonFacts] read failed for userId=%s:", userId, error);
     return EMPTY;
   }
 }
 
-/**
- * Cached for an hour. The demo account only changes when the founder re-runs `demo:seed`, and
- * this read sits on the critical path of a first impression — it must never cost a round trip
- * that the visitor waits on twice.
+/** True when a facts read produced nothing worth showing. */
+function isEmptyFacts(facts: DemoSeasonFacts): boolean {
+  return !facts.driverName && !facts.runCount && !facts.trackCount;
+}
+
+/*
+ * Memoised in-process for an hour, NOT in the Next data cache.
+ *
+ * `unstable_cache` was the wrong tool here and is the prime suspect for the production symptom
+ * above: it persists across deploys, so one bad read — a deploy that landed before the seed, a
+ * cold database, a connection blip — pins an empty answer onto the app's first impression and
+ * keeps serving it. A plain module memo cannot outlive the lambda, and the guard below means a
+ * failed or empty read is never remembered at all: the very next visitor retries.
+ *
+ * Ten minutes, not the hour this used to hold. Three indexed queries are not worth protecting
+ * harder than that, and the shorter window was earned during testing: a re-seed renamed the demo
+ * driver and the door kept introducing the previous one, which is a strange thing to be looking
+ * at while checking whether a re-seed worked. The seed runs in its own process and cannot reach
+ * this memo, so a short TTL is the only thing that makes a re-seed show up promptly.
  */
+let memo: { facts: DemoSeasonFacts; expiresAt: number } | null = null;
+const MEMO_TTL_MS = 10 * 60 * 1000;
+
 export async function getDemoSeasonFacts(): Promise<DemoSeasonFacts> {
-  return unstable_cache(loadDemoSeasonFacts, ["demo-season-facts-v1"], { revalidate: 3600 })();
+  if (memo && memo.expiresAt > Date.now()) return memo.facts;
+  const facts = await loadDemoSeasonFacts();
+  if (!isEmptyFacts(facts)) memo = { facts, expiresAt: Date.now() + MEMO_TTL_MS };
+  return facts;
 }

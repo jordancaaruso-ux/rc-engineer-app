@@ -19,6 +19,7 @@ import {
   parseWarmerTimingMinutes,
 } from "@/lib/runs/applyRunContextToSetupSnapshot";
 import { normalizeTirePrep, derivedWarmerTimingMinutes } from "@/lib/runs/tirePrep";
+import { draftCompletionDayStamp } from "@/lib/runs/draftCompletionDay";
 import { applyTireRunNumberCascade } from "@/lib/tires/applyTireRunNumberCascade";
 import { getSetupSheetFieldKeysForCarRow } from "@/lib/runs/setupSheetFieldKeysForCar";
 import { resolveSourcePdfLinksForNewRun } from "@/lib/setup/ensureRunSetupPdf";
@@ -197,6 +198,8 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     loggingComplete: boolean;
     loggingCompletedAt: Date | null;
     tireRunNumber: number;
+    sessionCompletedAt: Date | null;
+    conditionsSource: string | null;
     tireTypeId: string | null;
     tireStintId: string | null;
     sortAt: Date;
@@ -214,6 +217,9 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         loggingComplete: true,
         loggingCompletedAt: true,
         tireRunNumber: true,
+        // Both read only on the draft→complete transition below.
+        sessionCompletedAt: true,
+        conditionsSource: true,
         // The stored tire identity: what the correction below is measured against,
         // and what keeps an edit on the stint it already belongs to.
         tireTypeId: true,
@@ -500,15 +506,32 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   if (body.trackId && !track) {
     return NextResponse.json({ error: "Track not found" }, { status: 400 });
   }
-
-  // Effortless capture: when the client attached no reading (fast save, a
-  // transient weather-fetch failure, or the async client fetch not landing
-  // before submit) but the run's track has a saved pin, fetch conditions
-  // server-side so auto-capture is reliable every time. Create-only: never
-  // override an explicit clear on edit; the session instant drives the reading.
+  /**
+   * Effortless capture: when the client attached no reading (fast save, a transient weather-fetch
+   * failure, or the async client fetch not landing before submit) but the run's track has a saved
+   * pin, fetch conditions server-side so auto-capture is reliable every time.
+   *
+   * Fires when the run BECOMES COMPLETE, not when the row is created (2026-08-25). It was
+   * create-only, which silently corrupted every run drafted ahead of time: saving a draft the night
+   * before a meeting — with the track picked, which you would — stamped that evening's weather onto
+   * the run. Next day the wizard's own capture at Run complete looks for "does this run already
+   * have a reading?", finds one, and stands down, so the run kept Friday night's air temp and still
+   * air forever. Weather is a real Engineer input, so that is a wrong answer rather than a missing
+   * one. A draft now carries no reading at all until it is finished, which is the honest state and
+   * the one the wizard was always designed around (`WizardConditionsBand`: the band's reading is a
+   * preview and is deliberately never lifted into the form).
+   *
+   * The "never override an explicit clear on edit" guard survives as the transition test: editing
+   * an already-complete run never reaches here.
+   */
+  const isBecomingComplete =
+    loggingComplete && (params.mode === "create" || existingUpdate?.loggingComplete === false);
+  const willStoreConditionsSource = conditionsColumns
+    ? conditionsColumns.conditionsSource != null
+    : existingUpdate?.conditionsSource != null;
   if (
-    params.mode === "create" &&
-    normalizedConditions == null &&
+    isBecomingComplete &&
+    !willStoreConditionsSource &&
     track &&
     trackHasMarkedLocation(track)
   ) {
@@ -669,6 +692,29 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     };
     if (loggingComplete && existing.loggingComplete === false && existing.loggingCompletedAt == null) {
       updateData.loggingCompletedAt = new Date();
+    }
+    /**
+     * A draft finished on a different day than it was banked files onto the day it was DRIVEN.
+     *
+     * `sortAt` is otherwise stamped once and never moves — see `draftCompletionDay.ts` for why that
+     * contract is right everywhere except here, and why this only fires when the two days actually
+     * differ. Without it, prepping the night before a meeting (the case drafts exist for, and the
+     * one the wizard's own copy invites) filed the run under the previous day forever.
+     */
+    if (loggingComplete && existing.loggingComplete === false && deviceTimeZone) {
+      const dayStamp = draftCompletionDayStamp({
+        sortAt: existing.sortAt,
+        storedSessionCompletedAt: existing.sessionCompletedAt,
+        importedSessionCompletedAt: sessionCompletedAtResolved,
+        now: new Date(),
+        timeZone: deviceTimeZone,
+      });
+      if (dayStamp) {
+        updateData.sortAt = dayStamp.sortAt;
+        if (dayStamp.sessionCompletedAt) {
+          updateData.sessionCompletedAt = dayStamp.sessionCompletedAt;
+        }
+      }
     }
     if ("handlingAssessmentJson" in body) {
       updateData.handlingAssessmentJson = loggingComplete

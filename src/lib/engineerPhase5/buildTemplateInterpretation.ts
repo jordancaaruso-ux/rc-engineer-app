@@ -135,10 +135,10 @@ export function fieldPhrase(summary: EngineerRunSummaryV2): string {
               ? `${you.gapToSessionBestSeconds.toFixed(3)}s`
               : "—";
           const fade =
-            you.fadeSeconds != null && Number.isFinite(you.fadeSeconds)
-              ? `${you.fadeSeconds >= 0 ? "+" : ""}${you.fadeSeconds.toFixed(3)}s`
+            you.fadePerLapSeconds != null && Number.isFinite(you.fadePerLapSeconds)
+              ? `${you.fadePerLapSeconds >= 0 ? "+" : ""}${you.fadePerLapSeconds.toFixed(3)}s/lap`
               : "n/a";
-          return `Imported lap-set field (≥2 persisted drivers, best lap + stint fade): your row ranked ${you.rank} of ${f.ranked.length}; gap to session best lap ${gap}; stint fade ${fade} (second half vs first half of included laps, when computable).`;
+          return `Imported lap-set field (≥2 persisted drivers, best lap + stint fade): your row ranked ${you.rank} of ${f.ranked.length}; gap to session best lap ${gap}; stint fade ${fade} (median pairwise seconds-per-lap drift over clean laps after the out-lap, positive = slower late in the run, when computable).`;
         })()
       : "";
   const agg = importedSessionFieldPhrase(summary);

@@ -46,6 +46,29 @@ const FIELD = [
   run("d3", "usr_dayne", "18:30", 17.38, "A1"),
 ];
 
+/**
+ * The two days the y-axis used to draw unreadably, kept so the fix can be SEEN
+ * rather than reasoned about (see `yDomain` in `TeamDayCard`).
+ *
+ * `TIGHT` is a field inside a tenth of each other — the old "fit exactly what is
+ * on screen" scale magnified that tenth to the full height of the card and
+ * printed an axis reading 17.3, 17.3, 17.4, 17.4. `WRECKED` holds one session
+ * that wasn't racing (Glenn's Q3, a 22-second red flag), which used to own the
+ * axis and squash the other eleven runs into a flat line three pixels tall.
+ */
+const TIGHT = [
+  run("t1", "usr_glenn", "13:25", 17.31, "Q1"),
+  run("t2", "usr_glenn", "14:30", 17.33, "Q2"),
+  run("t3", "usr_glenn", "15:50", 17.36, "A1"),
+  run("t4", "usr_mara", "13:40", 17.29, "Q1"),
+  run("t5", "usr_mara", "14:50", 17.34, "Q2"),
+  run("t6", "usr_mara", "16:10", 17.3, "A1"),
+  run("t7", "usr_dayne", "13:50", 17.35, "Q1"),
+  run("t8", "usr_dayne", "15:05", 17.38, "Q2"),
+];
+
+const WRECKED = FIELD.map((r) => (r.id === "g3" ? { ...r, bestLapSeconds: 22.4 } : r));
+
 const OPTS = {
   memberDisplayByUserId: {
     usr_glenn: "Glenn Harding",
@@ -81,6 +104,26 @@ export default function TeamFocusPreviewPage() {
         <TeamDayCard
           day={field}
           title="26 Jul 2026 · TFTR"
+          viewerUserId="usr_mara"
+          onSelectDriver={() => {}}
+          onSelectRun={setOpened}
+        />
+      </section>
+      <h2 className="page-title">Tight day — a field inside one tenth</h2>
+      <section>
+        <TeamDayCard
+          day={buildTeamDayModel(TIGHT, OPTS)!}
+          title="27 Jul 2026 · TFTR"
+          viewerUserId="usr_mara"
+          onSelectDriver={() => {}}
+          onSelectRun={setOpened}
+        />
+      </section>
+      <h2 className="page-title">One session that wasn&apos;t racing</h2>
+      <section>
+        <TeamDayCard
+          day={buildTeamDayModel(WRECKED, OPTS)!}
+          title="28 Jul 2026 · TFTR"
           viewerUserId="usr_mara"
           onSelectDriver={() => {}}
           onSelectRun={setOpened}

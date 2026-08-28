@@ -94,6 +94,35 @@
   --color-best-lap: 167 139 250; /* #A78BFA */
 
   /*
+   * Pace-measure ramp — best lap / avg top 5 / avg top 10 / median on the session
+   * trend chart. An ORDINAL ramp, not the categorical `--color-series-*` set above:
+   * these four are one measurement read at four depths, so they separate by
+   * lightness alone, strongest first, and carry no hue of their own.
+   *
+   * Warm grey — the app's own ink family. It was violet for part of 2026-08-25, the
+   * argument being that purple already means "fastest lap" on the lap grid and the
+   * share card, so the line should wear the colour its numerals wear. On the chart
+   * it read as a picture ABOUT purple: four coloured lines pulling harder than the
+   * run rows beneath them, which are the subject. Founder's call, same day: back to
+   * grey. One measurement at four depths does not need a hue, and the two colours
+   * that mean something on this card — yellow for where you are, green for the
+   * outing's best lap — get the field to themselves again.
+   *
+   * The greys pulled that morning were NOT a ramp: measured OKLCH lightness ran
+   * [0.209, 0.515, 0.614, 0.468], so Median drew DARKER than Avg top 10 (the
+   * "fainter as it matters less" logic reversing at the last step) and sat 0.047
+   * from Top 5, which is one colour at 1.75px. That was the real fault, and it is
+   * fixed here rather than painted over.
+   *
+   * Validated against the surface it is drawn on — monotone lightness, every
+   * adjacent gap ≥ 0.11, pale end clear of the ground.
+   */
+  --color-pace-1: 236 233 228; /* #ECE9E4 — best lap, L 0.935, 14.8:1 */
+  --color-pace-2: 184 180 170; /* #B8B4AA — avg top 5, L 0.770 */
+  --color-pace-3: 138 133 122; /* #8A857A — avg top 10, L 0.618 */
+  --color-pace-4: 96 92 84; /* #605C54 — median, L 0.476, 2.69:1 on card */
+
+  /*
    * Categorical driver hues — the ONLY place in the app where colour means
    * "which person", not "how fast". Three slots, assigned in fixed order as you
    * tick drivers to compare on a team day, and never cycled: a fourth tick is
@@ -300,6 +329,14 @@
   --color-elevate: 25 24 21; /* tint with ink, not white */
   --color-warning: 140 84 0; /* #8C5400 — 5.6:1 (amber-600 is 2.6:1) */
   --color-best-lap: 109 40 217; /* #6D28D9 — 6.6:1 (#A78BFA is 2.5:1) */
+  /* Pace ramp, re-stepped for paper: the dark ramp runs bright→deep and inverts
+     here, so "best lap" stays the strongest mark on whichever ground it is drawn.
+     Same warm-grey family as the ink on this page. Monotone on #FCFBF8, adjacent
+     gaps 0.168 / 0.146 / 0.116; the pale end (median) reads 2.37:1. */
+  --color-pace-1: 46 44 40; /* #2E2C28 — best lap, L 0.294, 13.5:1 */
+  --color-pace-2: 92 88 79; /* #5C584F — avg top 5, L 0.461, 6.9:1 */
+  --color-pace-3: 135 130 118; /* #878276 — avg top 10, L 0.607, 3.7:1 */
+  --color-pace-4: 171 165 153; /* #ABA599 — median, L 0.724, 2.37:1 */
   /* Driver hues, re-stepped for paper: the dark trio sits at 2.4–2.7:1 on #FCFBF8.
      Same three families, same fixed order — validated on this surface, all PASS. */
   --color-series-1: 42 120 214; /* #2A78D6 */
@@ -1691,38 +1728,21 @@ html[data-nav-pending] .page {
   @apply font-sans text-[12px] font-semibold tracking-normal text-muted-foreground;
 }
 
-/* Section signpost (redesigned 2026-07-16): Sora bold uppercase ink with a leading tick.
+/* Section signpost (redesigned 2026-07-16): Sora bold uppercase ink. The words alone — the
+   hairline under them (`.eyebrow-root`) is what separates one section from the next, not a glyph.
    Was 10px mono 0.28em yellow — bumped to a readable heading so sections stop being glanced over.
    Stat/table micro-labels stay small + faint via .type-data-label (unchanged).
 
-   TICK RETHOUGHT 2026-08-18 (founder pick "B" off the four-option artifact): the straight
-   3px `primary-ink` bar became the Start-run CTA's −21° notch, in `foreground`.
-
-   Two reasons, and neither is taste. (1) Yellow in this app means "do this" or "you are
-   here" — the log-run circle, `.page-title::before`, `.rc-tour-rail`. A yellow bar in front
-   of the words "Recent runs" points at neither, so it was the one purely decorative yellow
-   in the palette, diluting the yellow doing real work further down the same page. (2) The
-   21° lean already runs through the JRC glyph, the CTA notch, the page-title sector and the
-   `.primary-face` sheen; wearing it here costs nothing and makes one more thing agree.
-
-   NOT literally black, which was the obvious reading of "like the button". The CTA notch is
-   `rgba(18,17,16,.88)` because its ground is #FFD60A — on a #181716 card that is invisible.
-   The shape's colour is really "the ink of whatever it sits on", which is `foreground`, and
-   that inverts correctly on paper for free.
-
-   Geometry copied from `DashboardStartRunCta`: 0.76em is Sora 700's cap height, so with
-   `items-baseline` the tick's bottom edge lands on the text baseline and its top meets the
-   cap — an empty flex item has no baseline of its own, so flexbox synthesises one from its
-   bottom border edge, which is exactly the alignment wanted. Width steps 6.5px → 6px for the
-   17px label (the CTA's is set at 20px). The skew leaves the bottom-left corner ~2.5px
-   outside the box, as it does on the CTA; that overhang is the mark, not a bug. */
+   NO LEADING MARK (founder call 2026-08-25). The label wore a −21° tick until this date: a 3px
+   yellow bar, recoloured 2026-08-18 into the Start-run CTA’s notch in `foreground`. Both went for
+   the same reason the yellow one was recoloured — a mark in front of every heading in the app is
+   decoration repeated ~90 times, and repeated decoration reads as clutter rather than as system.
+   The −21° cut still runs through the JRC glyph, the page-title sector, `.rc-tour-rail`, the
+   `.primary-face` sheen and `DashboardStartRunCta`’s own notch — the ONE place it still leads a
+   label, where it marks the single action the page wants, so it points at something. Do not
+   re-add it here; the mark in front of a heading has now been argued twice and lost twice. */
 .eyebrow-label {
   @apply inline-flex items-baseline gap-2 font-sans text-[17px] font-bold uppercase leading-tight tracking-normal text-foreground;
-}
-.eyebrow-label::before {
-  content: "";
-  @apply h-[0.76em] w-[6px] flex-none rounded-[1px] bg-foreground;
-  transform: skewX(-21deg);
 }
 /* Hairline rule under the label block — applied by the Eyebrow component wrapper. */
 .eyebrow-root {
@@ -1970,7 +1990,9 @@ html[data-nav-pending] .page {
   .page-header:has(+ .page-body.max-w-6xl) { max-width: 72rem; }
   .page-header:has(+ .page-body.dash-wide),
   .page-header:has(+ .page-body.events-wide),
-  .page-header:has(+ .page-body.lab-wide) { max-width: 110rem; }
+  .page-header:has(+ .page-body.lab-wide),
+  .page-header:has(+ .page-body.laps-wide),
+  .page-header:has(+ .page-body.tools-wide) { max-width: 110rem; }
   /* Engineer's clamp is `lg:`-prefixed; the escaped class name is not something to
      put in a selector, so the page carries a plain marker for the mirror. */
   .page-header:has(+ .page-body.engineer-wide) { max-width: 72rem; }
@@ -2151,6 +2173,39 @@ html[data-nav-pending] .page {
    in the `.page-header:has(+ .page-body.lab-wide)` mirror above so the title
    stays on the cards' axis.
 --------------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------------
+   Lap sheet desktop width (2026-08-27). Fourth page on the 1760px axis.
+
+   The full-page lap sheet was clamped to 72rem, so on a 1440 monitor the picker
+   rail and three lap columns sat in the middle third with paper either side —
+   "hardly any of the screen is used" (founder call). The columns keep their
+   width; the cap is what limits how many of them fit before the sideways scroll,
+   and on a race sheet that opens on its whole field the count is the point.
+   Same `@layer` trap as the three above: plain CSS, not an `xl:max-w-*`.
+--------------------------------------------------------------------------- */
+@media (min-width: 1280px) {
+  .laps-wide {
+    max-width: 110rem; /* 1760px */
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Tools desktop width (2026-08-27). Fifth page on the 1760px axis.
+
+   Tools was an 896px column at every width, three cards stacked, so on a 1440
+   monitor you scrolled to reach Laptime Analysis on the page whose point is
+   that nothing needs opening. From xl it shares the dashboard's and the lap
+   sheet's cap and lays its three benches side by side (the grid is a Tailwind
+   `xl:grid-cols-3` on the page). Same `@layer` trap as the four above: the cap
+   is plain CSS, and it is registered in the `.page-header:has(+ .page-body
+   .tools-wide)` mirror so the title stays on the cards' axis.
+--------------------------------------------------------------------------- */
+@media (min-width: 1280px) {
+  .tools-wide {
+    max-width: 110rem; /* 1760px */
+  }
+}
+
 @media (min-width: 1280px) {
   .lab-wide {
     max-width: 110rem; /* 1760px */
@@ -2538,6 +2593,14 @@ html[data-nav-pending] .page {
 --------------------------------------------------------------------------- */
 .door-dark {
   color-scheme: dark;
+  /* Load-bearing, and NOT redundant with --color-foreground below: `body` applies
+     `text-foreground` at the top of the tree, so the colour resolves THERE, against
+     paper's ink (#191815), and every child carrying no explicit text-* class simply
+     inherits that computed near-black — the headline, the prices, the card titles.
+     Since the theme went paper-only (2026-08-18) that painted this scene's uncoloured
+     text black on black. Re-declaring the tokens is not enough; the colour has to be
+     re-resolved on this wrapper. */
+  color: rgb(var(--color-foreground));
   --color-background: 18 17 16;
   --color-foreground: 236 233 228;
   --color-card: 24 23 22;
@@ -2554,7 +2617,10 @@ html[data-nav-pending] .page {
   --color-border: 56 55 52;
   --color-input: 21 20 19;
   --color-ring: 255 214 10;
-  --color-faint: 100 98 94;
+  /* Lifted off the dark theme's 2.9:1 #64625E (2026-08-25). Inside the app faint is
+     decorative only; here it carries real copy — the step rail, the tier labels, the
+     refund terms — at 12px over a photo, where it read as grey-on-black. ~4.4:1 now. */
+  --color-faint: 140 136 127;
   --color-primary-ink: 255 214 10;
   --color-gain: 79 208 137;
   --color-elevate: 255 255 255;
@@ -2782,33 +2848,73 @@ html[data-nav-pending] .page {
 }
 
 /*
- * The primary face — the lit rim, and ONLY the lit rim. Cream inset along the top,
- * bronze inset along the bottom, soft drop shadow under the whole thing. It is what
- * stops a yellow button reading as a flat sticker, and it costs the driver nothing
- * because it never moves.
+ * The primary face — what a yellow button is made of. Two soft warm shadows under it,
+ * and nothing drawn on it. The button IS the yellow; the shadow is the only thing saying
+ * it sits above the paper.
  *
- * NO SHEEN (founder call 2026-08-18, narrowing the call made earlier the same day).
- * For about a day this class also carried the Log-run circle's crossing specular, so
- * all ~79 yellow buttons in the app shone on the same 2.6s clock. That is self-
- * cancelling: the video-analysis flow alone puts ten of them on one screen, and when
- * everything shines, shine stops meaning anything and just spends attention. It also
- * quietly broke the rule the aura already follows — mark the ONE action, not every
- * action.
+ * NO RIM (founder call 2026-08-25, hours after the rebuild below, off a five-way A/B on
+ * the real page). The rebuild had replaced the old two-line bevel with a single 1px inset
+ * of warm ink at 12% — one line, one width, every button size. It scaled, and it was still
+ * wrong, for a reason that only shows at 4x: a uniform dark line all the way round a
+ * SATURATED fill does not read as an edge, it reads as a STROKE. Buttons wearing it looked
+ * like stickers — worst on the 26px chip and the 52px circle, where 1px is a big fraction
+ * of the shape and the ring closes into a visible outline.
  *
- * The band now lives on exactly two surfaces, both of them the same #1 action: the
- * dashboard's Start-a-new-run bar and the dock's Log-run circle. Both wear it through
- * `.logrun-fx`, an element rather than this class, which is why that sweep did not
- * have to touch either of them.
+ * Directional rims were tried in the same pass (lit top + shaded foot, scaled in `em` so
+ * they survive every size) and lost harder: a highlight band along the top of a small chip
+ * is the gel-button look. An amber ring instead of ink lost too — warmer, still a stroke.
  *
- * NO outward aura here either (`.logrun-glow`): that pulse is how the dock circle
- * says "this is the one action" — repeat it on every yellow button and it says
- * nothing. Same argument, made about the band one day later.
+ * So the depth is not drawn at all now. #FFD60A against ash paper or a cream card is a
+ * 3:1-plus jump on its own; it has never needed a line around it to be found. Ink and never
+ * black in the shadows: every other shadow on paper is warm, and a neutral one reads as a
+ * hole punched in the page.
+ *
+ * DO NOT re-add a rim of any kind here. It has now been drawn three ways — 1.5px cream/bronze
+ * bevel, 1px ink ring, em-scaled directional — and removed each time, always for the same
+ * fault: a line around 79 yellow buttons is a line the driver has to look past 79 times.
+ *
+ * The two Log-run surfaces are untouched by this and always were: both the dashboard bar and
+ * the dock circle carry their own inline shadow plus `.logrun-fx`, so the 1.5px cream/bronze
+ * bevel still lives exactly where it was designed to — on the ONE action, at a size that can
+ * carry it.
+ *
+ * NO SHEEN (founder call 2026-08-18, narrowing the call made earlier the same day). For about
+ * a day this class also carried the Log-run circle’s crossing specular, so all ~79 yellow
+ * buttons in the app shone on the same 2.6s clock. That is self-cancelling: the video-analysis
+ * flow alone puts ten of them on one screen, and when everything shines, shine stops meaning
+ * anything and just spends attention. The band now lives on exactly two surfaces, both the
+ * same #1 action, and both wear it through `.logrun-fx` — an element rather than this class.
+ *
+ * NO outward aura here either (`.logrun-glow`): that pulse is how the dock circle says "this
+ * is the one action" — repeat it on every yellow button and it says nothing.
  */
 .primary-face {
   box-shadow:
-    0 10px 22px -8px rgba(0, 0, 0, 0.65),
-    inset 0 1.5px 0 rgba(255, 252, 230, 0.62),
-    inset 0 -1.5px 0 rgba(122, 90, 0, 0.3);
+    0 1px 1px rgba(25, 24, 21, 0.09),
+    0 3px 6px -3px rgba(25, 24, 21, 0.16);
+}
+
+/*
+ * Press states. The old face changed nothing on hover — call sites each bolted on
+ * their own `hover:brightness-*`, which is why they still disagree with each other
+ * (105 in some places, 95 in others). Those stay; this adds only the shadow, so the
+ * button lifts on hover and sits back down on press. Scoped to real controls because
+ * `.primary-face` is also worn by inert bands, and behind `hover: hover` so a phone
+ * does not leave the lifted state stuck under a finger after a tap.
+ */
+@media (hover: hover) {
+  button.primary-face:not(:disabled):hover,
+  a.primary-face:hover,
+  label.primary-face:hover {
+    box-shadow:
+      0 1px 1px rgba(25, 24, 21, 0.1),
+      0 5px 10px -4px rgba(25, 24, 21, 0.2);
+  }
+}
+
+button.primary-face:not(:disabled):active,
+a.primary-face:active {
+  box-shadow: 0 1px 1px rgba(25, 24, 21, 0.08);
 }
 
 /*
@@ -2818,22 +2924,13 @@ html[data-nav-pending] .page {
  */
 
 /*
- * The same face, minus the drop shadow — for a full-bleed band at the foot of a card
- * (the Sessions door), where the surface is flush with the card rather than raised
- * off it and an outer shadow would draw a dark line across the middle of the panel.
- *
- * NOTE the name is now half-historical. When it was written, `-static` meant "the
- * primary face with its sweeping band removed", because `.primary-face` still had
- * one. Since the band was pulled off that class entirely, both are static and the
- * only thing separating them is the drop shadow above. Kept as-is rather than
- * renamed because the distinction is still real and the rename is churn — but do
- * not read `-static` as implying its sibling moves.
+ * `.primary-face-static` was here — the same face minus the drop shadow, for a full-bleed
+ * band flush with a card (the Sessions door, the Paddock band feet), where an outer shadow
+ * would draw a dark line across the middle of the panel. Deleted 2026-08-25 with the rim:
+ * once the ring came off `.primary-face`, face-minus-shadow was face-minus-everything, and
+ * an empty class is worse than none. Those surfaces now wear plain `bg-primary` and are
+ * correct — a yellow band flush on a pale card is already its own edge.
  */
-.primary-face-static {
-  box-shadow:
-    inset 0 1.5px 0 rgba(255, 252, 230, 0.62),
-    inset 0 -1.5px 0 rgba(122, 90, 0, 0.3);
-}
 
 /* Instant tap feedback on mobile nav, hub rows, and buttons */
 .tap-active {
@@ -3266,5 +3363,83 @@ html.video-overlay-fullscreen-active body {
   }
   .engineer-starter-board > *:hover {
     transform: none;
+  }
+}
+
+
+/* ---------------------------------------------------------------------------
+   The first-run hand-off bar — "Continue setting up" on the Garage after the
+   first car, "Back to setting up" on Settings mid-walk (founder 2026-08-26).
+   Mounted by `SetUpHandoffBar`, which portals to `document.body`; see the note in
+   that file for why neither `position: sticky` nor a plain `position: fixed`
+   inside `.app-shell` can do this.
+
+   Only the VERTICAL geometry is written here, because only it is knowable: the bar
+   has to clear chrome that is already fixed, and those numbers are declared above —
+   34px corner pills riding `--top-chrome-y` on the phone, and the 64px `.top-rail`
+   from md up. `MobileTitleCondenser` fades the compact page title into that same
+   phone band, so the bar sits BELOW the band rather than in it, or the two overlap
+   the moment the title scrolls off.
+
+   Everything horizontal, and the room reserved at the top of the page, come from
+   `SetUpHandoffBar` measuring the live `.page-body` — see the note in that file.
+   Media queries cannot do it: Settings is a centred `max-w-2xl` column, the Garage
+   is a left-aligned one with no max-width and no page header at all on desktop, and
+   a rule clamped to either one is wrong on the other. The fallbacks below are the
+   phone's gutters, for the frame before the measurement lands.
+--------------------------------------------------------------------------- */
+.setup-handoff-bar {
+  position: fixed;
+  top: calc(var(--top-chrome-y) + 44px);
+  left: var(--setup-handoff-left, max(1.25rem, env(safe-area-inset-left)));
+  right: var(--setup-handoff-right, max(1.25rem, env(safe-area-inset-right)));
+  /* Above page content, below the corner pills (z-40) and compact title (z-30). */
+  z-index: 29;
+}
+
+@media (min-width: 768px) {
+  .setup-handoff-bar {
+    top: calc(var(--demo-banner-h, 0px) + 64px + 16px);
+  }
+}
+
+/* How far the bar reaches past the top of `.page-body`, plus a card gap — measured,
+   never the bar's own height. The fallback covers a one-line bar on a phone. */
+body.has-setup-handoff .page-body {
+  padding-top: var(--setup-handoff-pad, 62px);
+}
+
+/* ---------------------------------------------------------------------------
+   `back-in-column` — the back arrow lines up with the cards, not the screen edge
+
+   The app-wide rule hangs the arrow in the gutter, absolutely positioned one
+   gutter left of the column, so the TITLE stays flush with the first card. That
+   is right for a page whose title is the subject ("Settings"), and wrong on the
+   lap-analysis pages, where the title is a session name that changes length on
+   every row you open: the arrow read as floating off on its own at the far left
+   of a wide monitor, unattached to anything (founder call, 2026-08-27).
+
+   Here the arrow rejoins the flow as the first thing in the column, so its left
+   edge is the cards' left edge and the title follows it on the same line.
+   Scoped to pages that opt in — every other back-arrow page keeps the gutter.
+--------------------------------------------------------------------------- */
+.page-header.back-in-column {
+  justify-content: flex-start;
+  gap: 0.625rem;
+}
+
+.page-header.back-in-column a[aria-label="Back"] {
+  position: static;
+  transform: none;
+}
+
+/* The gutter widening exists to make room for an arrow that hangs outside the
+   column. Nothing hangs outside here, so the page keeps the ordinary gutter and
+   the column does not shift out from under the rest of the app. */
+@media (min-width: 1280px) {
+  .page:has(.page-header.back-in-column) .page-header,
+  .page:has(.page-header.back-in-column) .page-body {
+    padding-left: max(2rem, env(safe-area-inset-left));
+    padding-right: max(2rem, env(safe-area-inset-right));
   }
 }

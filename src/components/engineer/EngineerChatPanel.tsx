@@ -57,6 +57,11 @@ import { EngineerMarkdown } from "@/components/ui/EngineerMarkdown";
 import { Eyebrow } from "@/components/ui/panel";
 
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { useSession } from "next-auth/react";
+import {
+  DemoEngineerEmptyState,
+  DemoEngineerReadingNote,
+} from "@/components/demo/DemoEngineerReadingNote";
 
 
 import { RelativeTime } from "@/components/ui/RelativeTime";
@@ -325,6 +330,14 @@ export function EngineerChatPanel({
   ratingsEnabled?: boolean;
 
 } = {}) {
+
+  /*
+   * A demo session reads answered conversations and asks nothing (founder call 2026-08-25).
+   * Read here rather than passed as a prop: this panel is reached from the Engineer page AND
+   * lazily from elsewhere, and threading a flag through every caller to say something the
+   * session already knows is how one of those callers ends up forgetting.
+   */
+  const isDemoSession = useSession().data?.user?.isDemo === true;
 
   const router = useRouter();
 
@@ -1372,7 +1385,14 @@ export function EngineerChatPanel({
       <SurfaceCard
         variant="panel"
         overflowHidden={false}
-        className="lg:col-start-2 lg:row-start-1 lg:min-h-0"
+        className={cn(
+          "lg:col-start-2 lg:row-start-1 lg:min-h-0",
+          /* A demo visitor with nothing open has an empty card here: no transcript, and no
+             composer, because neither belongs in a demo. On a phone that rendered as a blank
+             rounded pill floating above the history — a card with no contents at all. At lg it
+             still holds the empty state, so it only hides below that. */
+          isDemoSession && messages.length === 0 && "hidden lg:block",
+        )}
         /* Row 1 is `1fr` so that before the first question the empty track still absorbs the
            slack and the composer sits at the bottom — the way every chat app resolves an empty
            thread. `h-full` re-pins the height the outer grid used to own directly. */
@@ -1525,26 +1545,52 @@ export function EngineerChatPanel({
         * so it says what belongs there. `hidden lg:flex` is what keeps this off the phone.
         */}
       {messages.length === 0 ? (
-        <div className="hidden lg:row-start-1 lg:flex lg:min-h-0 lg:flex-col lg:items-center lg:justify-center lg:gap-2 lg:px-8 lg:text-center">
-          <p className="text-sm font-medium text-foreground">Ask the Engineer about your car.</p>
-          <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
-            It reads the runs, setups and conditions you&rsquo;ve logged. Start with one of these,
-            or type your own.
-          </p>
-          {/* The board owns this row at lg; the rail below is `lg:hidden`, so the
-              same list is never on screen twice. */}
-          <EngineerStarterQuestions
-            variant="board"
-            questions={starterQuestions.slice(0, ENGINEER_STARTER_BOARD_COUNT)}
-            disabled={panelBusy}
-            onPick={fillFromStarter}
-            className="mt-2"
-          />
-        </div>
+        isDemoSession ? (
+          <DemoEngineerEmptyState />
+        ) : (
+          <div className="hidden lg:row-start-1 lg:flex lg:min-h-0 lg:flex-col lg:items-center lg:justify-center lg:gap-2 lg:px-8 lg:text-center">
+            <p className="text-sm font-medium text-foreground">Ask the Engineer about your car.</p>
+            <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
+              It reads the runs, setups and conditions you&rsquo;ve logged. Start with one of these,
+              or type your own.
+            </p>
+            {/* The board owns this row at lg; the rail below is `lg:hidden`, so the
+                same list is never on screen twice. */}
+            <EngineerStarterQuestions
+              variant="board"
+              questions={starterQuestions.slice(0, ENGINEER_STARTER_BOARD_COUNT)}
+              disabled={panelBusy}
+              onPick={fillFromStarter}
+              className="mt-2"
+            />
+          </div>
+        )
       ) : null}
 
-      <div className="p-3 space-y-2 lg:row-start-2 lg:border-t lg:border-border/80 lg:px-5 lg:py-4">
+      <div
+        className={cn(
+          "p-3 space-y-2 lg:row-start-2 lg:border-t lg:border-border/80 lg:px-5 lg:py-4",
+          /* With nothing open, a demo has neither a composer nor a reading note to put here, and
+             the bare row still drew its padding and its top border — an empty grey band ruled off
+             under the empty state. */
+          isDemoSession && messages.length === 0 && "hidden",
+        )}
+      >
 
+        {/*
+          Everything below is the ASKING half of this panel — what the chat is about, what to ask,
+          and the box to ask it in. A demo session cannot ask (founder call 2026-08-25: the demo
+          shows answered questions and nothing else), so none of it is rendered rather than being
+          rendered disabled. The subject bar and anchor picker go with the composer deliberately:
+          both are controls for steering a conversation that is never going to happen, and a
+          picker that changes the focus of a chat you cannot send is worse than no picker.
+        */}
+        {isDemoSession ? (
+          // Only under a conversation the visitor has actually read — the empty state carries its
+          // own copy and its own door, and both at once reads as the same sentence twice.
+          messages.length > 0 ? <DemoEngineerReadingNote /> : null
+        ) : (
+        <>
         <EngineerSubjectBar
           mode={generalMode ? "general" : "data"}
           pinned={pinnedChip}
@@ -1675,6 +1721,8 @@ export function EngineerChatPanel({
           </Button>
 
         </div>
+        </>
+        )}
 
       </div>
 
@@ -1804,6 +1852,10 @@ export function EngineerChatPanel({
 
                     </button>
 
+                    {/* Not for a demo visitor. Middleware refuses the DELETE anyway, but offering
+                        it at all puts a destructive control against every row of someone else's
+                        season — on the one page whose banner says the demo is read-only. */}
+                    {isDemoSession ? null : (
                     <button
 
                       type="button"
@@ -1830,6 +1882,7 @@ export function EngineerChatPanel({
                       {deletingThreadId === t.id ? "…" : "Delete"}
 
                     </button>
+                    )}
 
                   </div>
 

@@ -221,7 +221,7 @@ export default async function WelcomePage(): Promise<ReactNode> {
             <li>· Pace, consistency, and mistakes — three lenses on every session</li>
             <li>· Setup changes and tire sets marked run by run</li>
             <li>· Track progress across events, cars, and seasons</li>
-            <li>· Lap times attach themselves from LiveRC, Speedhive and MyRCM</li>
+            <li>· Lap times attach themselves from LiveRC and Speedhive</li>
           </ul>
         </section>
 

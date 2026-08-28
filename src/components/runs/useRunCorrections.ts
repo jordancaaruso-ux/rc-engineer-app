@@ -216,15 +216,26 @@ export function useRunCorrections({
         { key: current.field.key, value: current.nextDisplay, runIds }
       );
       const updated = (payload.updatedRunIds as string[] | undefined) ?? [];
+      /*
+       * Ticked runs the server could not reach at all — deleted since the sheet was drawn,
+       * or on another car. Reported separately from "already said that", which is what this
+       * used to say about BOTH cases: a cascade that silently applied to none of the runs
+       * the driver ticked read as a reassurance that nothing needed doing.
+       */
+      const dropped = (payload.droppedRunIds as string[] | undefined) ?? [];
       shiftQueue();
       onChanged();
 
       // "other", not "later" — the ticked runs can now sit either side of the correction.
+      const fixedLine =
+        updated.length === 0
+          ? "Those runs already said that — nothing to change."
+          : `${current.field.label} fixed on ${updated.length} other ${updated.length === 1 ? "run" : "runs"}.`;
       setToast({
         message:
-          updated.length === 0
-            ? "Those runs already said that — nothing to change."
-            : `${current.field.label} fixed on ${updated.length} other ${updated.length === 1 ? "run" : "runs"}.`,
+          dropped.length > 0
+            ? `${fixedLine} ${dropped.length} ${dropped.length === 1 ? "run" : "runs"} couldn’t be reached.`
+            : fixedLine,
         undo:
           updated.length === 0
             ? undefined

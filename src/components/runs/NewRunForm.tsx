@@ -13,7 +13,13 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow, PanelSubtitle } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { ActionToast } from "@/components/ui/ActionToast";
-import { coerceSetupValue, normalizeSetupData, parseLapTimes, type SetupSnapshotData } from "@/lib/runSetup";
+import {
+  coerceSetupValue,
+  filledSetupValueCount,
+  normalizeSetupData,
+  parseLapTimes,
+  type SetupSnapshotData,
+} from "@/lib/runSetup";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { isRunContextSetupKey } from "@/lib/setup/runContextSetupKeys";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
@@ -56,7 +62,7 @@ import type { RunPickerRun } from "@/lib/runPickerFormat";
 import { formatRunPickerLineRelativeWhen } from "@/lib/runPickerFormat";
 import { CopyLastRunCard } from "@/components/runs/CopyLastRunCard";
 import { useCopyLastRunFormOptional } from "@/components/runs/CopyLastRunFormContext";
-import { useTodayDraftRunOptional } from "@/components/layout/TodayDraftRunProvider";
+import { useDraftRunOptional } from "@/components/layout/DraftRunProvider";
 import type { CopyPreviewRunRecord } from "@/lib/runs/copyPreviewRunTypes";
 import { RunLogQuickSetupUpload } from "@/components/runs/RunLogQuickSetupUpload";
 import { RunPickerSelect } from "@/components/runs/RunPickerSelect";
@@ -179,7 +185,7 @@ function WizardSessionGroup({
  * so the persistent actions read as one system across the app.
  */
 const fabPillPrimaryClass =
-  "pointer-events-auto tap-active inline-flex h-12 items-center gap-1.5 rounded-full primary-face bg-primary px-4 font-sans text-sm font-bold text-primary-foreground shadow-[0_12px_26px_-6px_rgba(255,214,10,0.35),0_10px_22px_-8px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.4)] transition-transform duration-150 hover:bg-[#E6BE00] active:scale-95 touch-manipulation";
+  "pointer-events-auto tap-active inline-flex h-12 items-center gap-1.5 rounded-full primary-face bg-primary px-4 font-sans text-sm font-semibold text-primary-foreground shadow-[0_12px_26px_-6px_rgba(255,214,10,0.35),0_10px_22px_-8px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.4)] transition-transform duration-150 hover:bg-[#E6BE00] active:scale-95 touch-manipulation";
 const fabPillOutlineClass =
   "pointer-events-auto tap-active inline-flex h-12 items-center gap-1.5 rounded-full border border-white/10 bg-card px-4 font-sans text-sm font-bold text-foreground shadow-[0_10px_22px_-8px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.12)] transition-transform duration-150 hover:bg-muted active:scale-95 touch-manipulation";
 
@@ -230,6 +236,8 @@ type EventOption = {
   practiceSourceUrl?: string | null;
   /** LiveRC results / race timing page URL (optional). */
   resultsSourceUrl?: string | null;
+  /** This meeting's page on MyRCM — a link the driver taps, never one we fetch. */
+  myRcmUrl?: string | null;
   /** Optional spec compound (same style as TireSet.label), e.g. Sweep 32. */
   controlledTireLabel?: string | null;
   controlledTireTypeId?: string | null;
@@ -481,6 +489,13 @@ function cloneSetupSnapshot(d: SetupSnapshotData): SetupSnapshotData {
 }
 
 /** Which form areas were filled from copy-last-run (drives highlight until the driver touches the field). */
+/** The unfinished run a prefilled setup came off, when that isn't the run named on the card. */
+type UnfinishedSetupSource = {
+  id: string;
+  whenIso: string;
+  sessionLabel: string | null;
+};
+
 type LastRunPrefillHighlights = {
   session?: boolean;
   event?: boolean;
@@ -573,7 +588,7 @@ export function NewRunForm(props: {
   const router = useRouter();
   const returnHref = props.returnHref ?? null;
   const copyLastRunCtx = useCopyLastRunFormOptional();
-  const todayDraftCtx = useTodayDraftRunOptional();
+  const todayDraftCtx = useDraftRunOptional();
   const externalCopyLastRunCard = Boolean(copyLastRunCtx);
   const [carsList, setCarsList] = useState<CarOption[]>(props.cars);
   const tracks = props.tracks;
@@ -644,6 +659,7 @@ export function NewRunForm(props: {
   const [newEventEndDate, setNewEventEndDate] = useState("");
   const [newEventPracticeUrl, setNewEventPracticeUrl] = useState("");
   const [newEventResultsUrl, setNewEventResultsUrl] = useState("");
+  const [newEventMyRcmUrl, setNewEventMyRcmUrl] = useState("");
   const [newEventTireControlled, setNewEventTireControlled] = useState(false);
   const [newEventControlledTireTypeId, setNewEventControlledTireTypeId] = useState("");
   const [newEventControlAdditiveEnabled, setNewEventControlAdditiveEnabled] = useState(false);
@@ -651,6 +667,8 @@ export function NewRunForm(props: {
   /** When logging an event day, timing URLs (stored on the Event; edited here, PATCH on save). */
   const [eventPracticeTimingUrl, setEventPracticeTimingUrl] = useState("");
   const [eventRaceTimingUrl, setEventRaceTimingUrl] = useState("");
+  /** This meeting's MyRCM page. Only ever handed to the driver as a link to tap. */
+  const [eventMyRcmUrl, setEventMyRcmUrl] = useState("");
   const [eventControlledTireTypeId, setEventControlledTireTypeId] = useState("");
   const [eventControlAdditiveEnabled, setEventControlAdditiveEnabled] = useState(false);
   const [eventControlledAdditiveTypeId, setEventControlledAdditiveTypeId] = useState("");
@@ -667,6 +685,13 @@ export function NewRunForm(props: {
   // tires/setup exactly as the copy card would.
   const [replicateLast, setReplicateLast] = useState(wizard?.continuing ?? false);
   const [lastRun, setLastRun] = useState<LastRun | null>(null);
+  /**
+   * Set when the setup being offered comes off a run the driver never finished — the day
+   * context still comes from the last COMPLETED run, so the card must say the two disagree
+   * rather than let "from your last run" cover both. See `lib/runs/prefillSetupSource`.
+   */
+  const [setupFromUnfinishedRun, setSetupFromUnfinishedRun] =
+    useState<UnfinishedSetupSource | null>(null);
   const [replicateLoaded, setReplicateLoaded] = useState(false);
 
   const [copyPreviewRun, setCopyPreviewRun] = useState<LastRun | null>(() =>
@@ -1821,7 +1846,7 @@ export function NewRunForm(props: {
     setCompleteValidation((prev) => {
       if (!prev.show) return prev;
       const carOk = carRating != null && carRating >= 1 && carRating <= 10;
-      const setupOk = Object.keys(setupData).length > 0;
+      const setupOk = filledSetupValueCount(setupData) > 0;
       if (carOk && setupOk) {
         return { show: false, carRating: false, additive: false, setup: false };
       }
@@ -2110,6 +2135,7 @@ export function NewRunForm(props: {
     }
     setEventPracticeTimingUrl(ev.practiceSourceUrl?.trim() ?? "");
     setEventRaceTimingUrl(ev.resultsSourceUrl?.trim() ?? "");
+    setEventMyRcmUrl(ev.myRcmUrl?.trim() ?? "");
     setEventControlledTireTypeId(ev.controlledTireTypeId?.trim() ?? ev.controlledTireType?.id ?? "");
     const nextControlledAdditiveId =
       ev.controlledAdditiveTypeId?.trim() ?? ev.controlledAdditiveType?.id ?? "";
@@ -2159,6 +2185,7 @@ export function NewRunForm(props: {
       notes: (raw.notes as string | null) ?? null,
       practiceSourceUrl: (raw.practiceSourceUrl as string | null) ?? null,
       resultsSourceUrl: (raw.resultsSourceUrl as string | null) ?? null,
+      myRcmUrl: (raw.myRcmUrl as string | null) ?? null,
       controlledTireLabel: (raw.controlledTireLabel as string | null) ?? null,
       controlledTireTypeId: (raw.controlledTireTypeId as string | null) ?? null,
       controlledTireType: (raw.controlledTireType as EventOption["controlledTireType"]) ?? null,
@@ -2560,7 +2587,7 @@ export function NewRunForm(props: {
       isEditing,
       driverChoseForThisCar: setupSourceChosenForRef.current === carId,
       alreadyDefaultedForThisCar: setupSourceDefaultedForRef.current === carId,
-      sheetHasContent: setupBaselineData != null || Object.keys(setupData).length > 0,
+      sheetHasContent: setupBaselineData != null || filledSetupValueCount(setupData) > 0,
     });
     if (!next) return;
     setupSourceDefaultedForRef.current = carId;
@@ -2823,11 +2850,13 @@ export function NewRunForm(props: {
 
     (async () => {
       try {
-        const { lastRun } = await jsonFetch<{ lastRun: LastRun | null }>(
-          `/api/runs/last?carId=${carId}`
-        );
+        const { lastRun, setupFromUnfinishedRun } = await jsonFetch<{
+          lastRun: LastRun | null;
+          setupFromUnfinishedRun?: UnfinishedSetupSource | null;
+        }>(`/api/runs/last?carId=${carId}`);
         if (!alive) return;
         setLastRun(lastRun);
+        setSetupFromUnfinishedRun(setupFromUnfinishedRun ?? null);
 
         if (pendingSwap) {
           // Mid-context car swap: the day context stays put — only the
@@ -3161,6 +3190,7 @@ export function NewRunForm(props: {
     if (!ev) return;
     setEventPracticeTimingUrl(ev.practiceSourceUrl?.trim() ?? "");
     setEventRaceTimingUrl(ev.resultsSourceUrl?.trim() ?? "");
+    setEventMyRcmUrl(ev.myRcmUrl?.trim() ?? "");
     const nextControlledTireId = ev.controlledTireTypeId?.trim() ?? ev.controlledTireType?.id ?? "";
     setEventControlledTireTypeId(nextControlledTireId);
     // Steer the tire picker to the spec compound and power the Spec/Open pill.
@@ -3345,6 +3375,7 @@ export function NewRunForm(props: {
           endDate: end,
           practiceSourceUrl: newEventPracticeUrl.trim() || null,
           resultsSourceUrl: newEventResultsUrl.trim() || null,
+          myRcmUrl: newEventMyRcmUrl.trim() || null,
           controlledTireTypeId: newEventControlledTireTypeId.trim() || null,
           controlledAdditiveTypeId: newEventControlAdditiveEnabled
             ? newEventControlledAdditiveTypeId.trim() || null
@@ -3585,7 +3616,7 @@ export function NewRunForm(props: {
       const missingCarRating = carRating == null || carRating < 1 || carRating > 10;
       // A controlled additive is auto-filled (running none is allowed), so it is
       // never a save blocker.
-      const missingSetup = !opts?.waiveSetup && Object.keys(setupData).length === 0;
+      const missingSetup = !opts?.waiveSetup && filledSetupValueCount(setupData) === 0;
       if (missingCarRating || missingSetup) {
         const parts: string[] = [];
         if (missingCarRating) parts.push("rate the car 1–10");
@@ -3873,6 +3904,7 @@ export function NewRunForm(props: {
       if (sessionType === "RACE_MEETING" && needsEvent && eventId) {
         const p = eventPracticeTimingUrl.trim() || null;
         const r = eventRaceTimingUrl.trim() || null;
+        const m = eventMyRcmUrl.trim() || null;
         const c = eventControlledTireTypeId.trim() || null;
         const a = eventControlAdditiveEnabled ? eventControlledAdditiveTypeId.trim() || null : null;
         void fetch(`/api/events/${encodeURIComponent(eventId)}`, {
@@ -3881,6 +3913,7 @@ export function NewRunForm(props: {
           body: JSON.stringify({
             practiceSourceUrl: p,
             resultsSourceUrl: r,
+            myRcmUrl: m,
             controlledTireTypeId: c,
             controlledAdditiveTypeId: a,
           }),
@@ -3894,6 +3927,7 @@ export function NewRunForm(props: {
                       ...e,
                       practiceSourceUrl: p,
                       resultsSourceUrl: r,
+                      myRcmUrl: m,
                       controlledTireTypeId: c,
                       controlledAdditiveTypeId: a,
                     }
@@ -4070,7 +4104,7 @@ export function NewRunForm(props: {
     equipment: { done: Boolean(tireTypeId) },
     prep: { done: wizardPrepIn },
     setup: {
-      done: setupBaselineData != null || Object.keys(setupData).length > 0,
+      done: setupBaselineData != null || filledSetupValueCount(setupData) > 0,
       attention: completeValidation.setup,
     },
     laps: { done: wizardLapsIn },
@@ -4088,7 +4122,7 @@ export function NewRunForm(props: {
         tireTypeId ||
         tirePrep.length > 0 ||
         additiveTypeId ||
-        Object.keys(setupData).length > 0 ||
+        filledSetupValueCount(setupData) > 0 ||
         wizardLapsIn ||
         carRating != null ||
         notes.trim()
@@ -4292,7 +4326,7 @@ export function NewRunForm(props: {
         setupBaselineSnapshotId != null &&
         setupBaselineSnapshotId === (lastRun?.setupSnapshot?.id ?? null) &&
         setupChangeCountSinceBaseline === 0 &&
-        Object.keys(setupData).length > 0,
+        filledSetupValueCount(setupData) > 0,
     };
   })();
   /** Session identity pieces — shared by the map-sheet Session row and the
@@ -4348,13 +4382,13 @@ export function NewRunForm(props: {
           value:
             setupChangeCountSinceBaseline > 0
               ? `${setupChangeCountSinceBaseline} change${setupChangeCountSinceBaseline === 1 ? "" : "s"} from loaded`
-              : Object.keys(setupData).length > 0
+              : filledSetupValueCount(setupData) > 0
                 ? "as loaded"
                 : "not attached",
           state:
             setupChangeCountSinceBaseline > 0
               ? "chg"
-              : Object.keys(setupData).length > 0
+              : filledSetupValueCount(setupData) > 0
                 ? "ok"
                 : "miss",
           prefilled: wizardPrefilled.setup,
@@ -4435,8 +4469,8 @@ export function NewRunForm(props: {
             key: "setup",
             label: "Setup",
             value:
-              Object.keys(setupData).length > 0
-                ? `${Object.keys(setupData).length} values · ${
+              filledSetupValueCount(setupData) > 0
+                ? `${filledSetupValueCount(setupData)} values · ${
                     setupChangeCountSinceBaseline > 0
                       ? `${setupChangeCountSinceBaseline} changed`
                       : "as last run"
@@ -4822,6 +4856,11 @@ export function NewRunForm(props: {
               kindLabel={wizardPrefillKindLabel}
               whenIso={wizardPrefillWhenIso}
               rows={wizardPrefillRows}
+              setupNote={
+                setupFromUnfinishedRun
+                  ? "Setup carried from a run you haven't finished yet."
+                  : null
+              }
               note={wizardVenueSwapNote}
               subNote={wizardCarSwapNote}
               onPrefill={applyWizardPrefill}
@@ -4918,6 +4957,11 @@ export function NewRunForm(props: {
                 {eventRaceTimingUrl.trim() ? (
                   <span className="min-w-0 truncate text-[11px] text-muted-foreground">
                     Race timing URL set
+                  </span>
+                ) : null}
+                {eventMyRcmUrl.trim() ? (
+                  <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+                    MyRCM page set
                   </span>
                 ) : null}
                 {eventControlledTireTypeId.trim() ? (
@@ -5106,6 +5150,25 @@ export function NewRunForm(props: {
                   </div>
                 </>
               )}
+              {/* Outside the LiveRC block on purpose: a track with a LiveRC page can still hold
+                  a MyRCM meeting, and nothing about MyRCM is auto-pulled either way. */}
+              <div className="space-y-1">
+                <label
+                  htmlFor="event-myrcm-url"
+                  className="block text-xs font-medium text-muted-foreground"
+                >
+                  MyRCM page (optional)
+                </label>
+                <input
+                  id="event-myrcm-url"
+                  type="url"
+                  value={eventMyRcmUrl}
+                  onChange={(e) => setEventMyRcmUrl(e.target.value)}
+                  placeholder="Your class page on MyRCM"
+                  className="form-control w-full px-3 py-2 text-xs"
+                />
+                <p className="ui-label-meta">Results come in as a file — this is where Import PDF sends you.</p>
+              </div>
               {/* Open vs Controlled is event config — set when the event is created
                   (New event panel or the Events page). Read-only here; a controlled
                   event locks the run's Tires step to it. */}
@@ -5238,6 +5301,16 @@ export function NewRunForm(props: {
                   </div>
                 </>
               )}
+              <div className="space-y-1">
+                <label className="block ui-label-meta">MyRCM page (optional)</label>
+                <input
+                  type="url"
+                  className="form-control w-full px-3 py-2 text-xs"
+                  value={newEventMyRcmUrl}
+                  onChange={(e) => setNewEventMyRcmUrl(e.target.value)}
+                  placeholder="Your class page on MyRCM"
+                />
+              </div>
               <div className="space-y-1.5">
                 <label className="block ui-label-meta">Tire</label>
                 <SegmentedControl<"open" | "controlled">
@@ -5922,7 +5995,7 @@ export function NewRunForm(props: {
             <button
               type="button"
               onClick={() => saveRun(undefined, "draft")}
-              className="rounded-md primary-face bg-primary px-3 py-1.5 text-[12px] font-bold text-primary-foreground transition hover:brightness-95"
+              className="rounded-md primary-face bg-primary px-3 py-1.5 text-[12px] font-semibold text-primary-foreground transition hover:brightness-95"
             >
               Save draft
             </button>
@@ -5934,6 +6007,9 @@ export function NewRunForm(props: {
         onChange={setLapIngest}
         practiceDayUrl={lapTimesLiveRcScanIndexUrl}
         lapImportEventId={sessionType === "RACE_MEETING" && eventId ? eventId : null}
+        eventMyRcmUrl={
+          sessionType === "RACE_MEETING" && eventId ? eventMyRcmUrl.trim() || null : null
+        }
         trackId={trackId.trim() || null}
         trackName={selectedRunTrack?.name ?? null}
         trackLiveRcUrl={selectedRunTrack?.liveRcUrl ?? null}

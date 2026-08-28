@@ -232,7 +232,7 @@ export function AiExtractionReviewPanel({
               <button
                 onClick={createSetup}
                 disabled={busy !== null}
-                className="rounded-lg primary-face bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-60"
+                className="rounded-lg primary-face bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60"
               >
                 {busy === "create" ? "Creating…" : dirty ? "Save & create setup" : "Create setup"}
               </button>

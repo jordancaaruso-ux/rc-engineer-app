@@ -4,6 +4,8 @@ import { useRef, useState } from "react";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { ChipListField } from "@/components/settings/ChipListField";
+import { KnownCompetitorsField } from "@/components/settings/KnownCompetitorsField";
+import type { KnownCompetitor } from "@/lib/speedhive/knownCompetitors";
 import { postSetting, SaveNote, type SaveState } from "@/components/settings/saveState";
 import {
   formatSpeedhiveTransponderNumbersForSetting,
@@ -39,8 +41,8 @@ type InitialTiming = {
   speedhiveTransponderNumbers: string;
   /** Speedhive display names; empty uses the LiveRC driver name when set. */
   speedhiveDriverName: string;
-  /** MyRCM display name; empty falls back to the MYLAPS then LiveRC names. */
-  myRcmDriverName: string;
+  /** Other drivers' chips this account has saved — see `KnownCompetitorsField`. */
+  knownCompetitors: KnownCompetitor[];
 };
 
 export function TimingIdentitySection({ initial }: { initial: InitialTiming }) {
@@ -50,9 +52,7 @@ export function TimingIdentitySection({ initial }: { initial: InitialTiming }) {
   const [speedhiveTransponderNumbers, setSpeedhiveTransponderNumbers] = useState(
     initial.speedhiveTransponderNumbers
   );
-  const [myRcmDriverName, setMyRcmDriverName] = useState(initial.myRcmDriverName);
   const [savingDriver, setSavingDriver] = useState<SaveState>({ kind: "idle" });
-  const [savingMyRcmDriver, setSavingMyRcmDriver] = useState<SaveState>({ kind: "idle" });
   const [savingDriverId, setSavingDriverId] = useState<SaveState>({ kind: "idle" });
   const [savingSpeedhiveDriver, setSavingSpeedhiveDriver] = useState<SaveState>({ kind: "idle" });
   const [savingSpeedhiveTransponder, setSavingSpeedhiveTransponder] = useState<SaveState>({
@@ -62,7 +62,6 @@ export function TimingIdentitySection({ initial }: { initial: InitialTiming }) {
   // Last value committed to the server. Blur only writes when the trimmed value
   // differs, so tabbing through an untouched field costs nothing.
   const committedLiveRc = useRef(initial.liveRcDriverName);
-  const committedMyRcm = useRef(initial.myRcmDriverName);
 
   async function commitLiveRcName() {
     if (liveRcDriverName.trim() === committedLiveRc.current.trim()) return;
@@ -72,16 +71,6 @@ export function TimingIdentitySection({ initial }: { initial: InitialTiming }) {
       setSavingDriver
     );
     if (ok) committedLiveRc.current = liveRcDriverName;
-  }
-
-  async function commitMyRcmName() {
-    if (myRcmDriverName.trim() === committedMyRcm.current.trim()) return;
-    const ok = await postSetting(
-      "/api/settings/myrcm-driver",
-      { myRcmDriverName: myRcmDriverName.trim() || null },
-      setSavingMyRcmDriver
-    );
-    if (ok) committedMyRcm.current = myRcmDriverName;
   }
 
   return (
@@ -200,34 +189,20 @@ export function TimingIdentitySection({ initial }: { initial: InitialTiming }) {
         />
       </div>
 
-      {/* MyRCM publishes no driver id and no transponder on its results — the printed name is the
-          only handle there is. Optional, because the import tries the MYLAPS and LiveRC names
-          first; fill it in only when MyRCM spells you differently. Leaving it blank never costs
-          you the field: an unmatched import still brings in every driver and asks which row is
-          yours, rather than quietly handing back the winner's laps. */}
-      <div className="space-y-1.5 border-t border-border px-4 py-3.5 text-sm">
-        <label htmlFor="myrcm-driver-name" className="block text-sm font-medium text-foreground">
-          Name on MyRCM
-        </label>
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            id="myrcm-driver-name"
-            type="text"
-            value={myRcmDriverName}
-            onChange={(e) => setMyRcmDriverName(e.target.value)}
-            onBlur={() => void commitMyRcmName()}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-            }}
-            placeholder="e.g. Jordan Smith"
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-primary-ink/50"
-          />
-          <SaveNote state={savingMyRcmDriver} />
-        </div>
-        <p className="ui-caption text-muted-foreground">
-          Only if MyRCM spells you differently.
-        </p>
+      {/*
+       * Other people's numbers, under the same heading as your own — because it is the same
+       * fact about the same timing system, just pointed at someone else. MYLAPS serves any
+       * chip's practice to anyone who asks, so knowing a rival's number is the whole of what
+       * it takes to compare your run against theirs.
+       */}
+      <div className="space-y-1.5 border-t border-border px-4 py-3.5">
+        <KnownCompetitorsField initial={initial.knownCompetitors} />
       </div>
+
+      {/* The "Name on MyRCM" field was removed on 2026-08-26 with MyRCM import itself (see
+          `timingUrlSafetySync.ts`). LiveRC and Speedhive are the two sources left, and each has
+          its own identity above; a third name that nothing reads would only be a question the
+          driver cannot answer usefully. Saved values stay in `AppSetting` untouched. */}
     </CardPanel>
   );
 }

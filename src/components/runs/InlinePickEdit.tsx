@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { PickerSheet } from "@/components/ui/PickerSheet";
+import type { OptionSection } from "@/lib/search/optionSearch";
 
 /**
  * A value on a logged run that is a CHOICE, changed in place.
@@ -18,21 +20,56 @@ import { cn } from "@/lib/utils";
  * driver's side — tap the value, change it — and no way to name something that does
  * not exist.
  *
- * ============================== WHY A NATIVE SELECT ==============================
+ * ============================== WHY THE PICKER SHEET, NOT A NATIVE SELECT ==============================
  *
- * Same call `InlineAdditiveEdit` made and for the same reason: a modal that takes over
- * the screen to offer a handful of rows is the worse control (see `SearchableSelect`).
- * The native picker is also the one control that is already correct on a phone, in a
- * webview, and for a screen reader, without this file owning any of that.
+ * This was a bare `<select>` until 2026-08-24, on the app's "short list, native menu"
+ * rule. That rule was wrong here for one measured reason: the tire list this thing is
+ * handed is the whole catalog — `correction-options` serves up to 200 compounds. On an
+ * iPhone a native `<select>` is a five-row wheel with no way to type, so correcting a
+ * tire set meant spinning blind past your own rubber. That is precisely the complaint
+ * `PickerSheet` exists to answer, and it answers it here identically: search, big rows,
+ * a tick on what's already set, opened onto the current choice.
  *
- * ============================== WHY IT IS INERT UNTIL EDIT MODE ==============================
+ * The car and additive lists are short and would have been fine either way. They use
+ * the sheet anyway, by founder call (2026-08-24) — pickers sitting side by side in one
+ * grid that behave differently is the worse outcome. It costs them nothing: the sheet's
+ * own threshold suppresses the search field under ten rows, so a short list gets a short
+ * sheet that hugs its rows rather than 85% of the screen. The additive had its own
+ * near-duplicate of this file (`InlineAdditiveEdit`); it is deleted, not wrapped.
  *
- * `disabled` renders plain text with no underline and no hit target at all — not a
- * greyed-out control. A session view is a record you read; until the driver presses
- * Edit, nothing on it should look like it wants pressing (founder call, 2026-08-20).
+ * ============================== WHY THE CLOSED STATE DID NOT CHANGE ==============================
+ *
+ * `PickerTrigger` — the boxed control with a chevron the wizard uses — is deliberately
+ * NOT used. A session view is a record you read, and a boxed control always looks
+ * pressable. What opens on tap changed; what a run looks like did not.
+ *
+ * `disabled` still renders plain text with no underline and no hit target at all —
+ * not a greyed-out control (founder call, 2026-08-20).
  */
 
-export type InlinePickOption = { id: string; label: string };
+export type InlinePickOption = {
+  id: string;
+  label: string;
+  /** Heading to sit under. Options with no group land in one unlabelled list. */
+  group?: string;
+};
+
+/** Groups in the order the server gave them; ungrouped options stay one flat section. */
+function toSections(options: InlinePickOption[]): OptionSection[] {
+  const sections: OptionSection[] = [];
+  const byKey = new Map<string, OptionSection>();
+  for (const o of options) {
+    const key = o.group ?? "";
+    let section = byKey.get(key);
+    if (!section) {
+      section = { key: key || "all", label: o.group ?? null, options: [] };
+      byKey.set(key, section);
+      sections.push(section);
+    }
+    section.options.push({ value: o.id, label: o.label });
+  }
+  return sections;
+}
 
 export function InlinePickEdit({
   value,
@@ -72,7 +109,6 @@ export function InlinePickEdit({
   const [loaded, setLoaded] = useState<InlinePickOption[] | null>(options ?? null);
   const [shown, setShown] = useState(value);
   const [error, setError] = useState<string | null>(null);
-  const selectRef = useRef<HTMLSelectElement | null>(null);
 
   // The parent re-renders with the server's answer after a save, and with the original
   // value after a rollback. Either way the display follows it.
@@ -81,8 +117,7 @@ export function InlinePickEdit({
     if (options) setLoaded(options);
   }, [options]);
 
-  // Leaving edit mode with the picker open would strand an open select over a
-  // read-only record.
+  // Leaving edit mode with the sheet open would strand a picker over a read-only record.
   useEffect(() => {
     if (disabled) setOpen(false);
   }, [disabled]);
@@ -95,25 +130,24 @@ export function InlinePickEdit({
         if (alive) setLoaded(next);
       })
       .catch(() => {
-        if (alive) setError("Couldn’t load the list");
+        if (!alive) return;
+        // The list is the whole sheet. With nothing to show, close it and say so
+        // where the driver was looking rather than parking an empty overlay.
+        setOpen(false);
+        setError("Couldn’t load the list");
       });
     return () => {
       alive = false;
     };
   }, [open, loaded, loadOptions]);
 
-  useEffect(() => {
-    if (open && loaded) selectRef.current?.focus();
-  }, [open, loaded]);
+  const sections = useMemo(() => toSections(loaded ?? []), [loaded]);
 
   async function choose(rawNext: string) {
     const nextId = rawNext === "" ? null : rawNext;
-    if (nextId === valueId) {
-      setOpen(false);
-      return;
-    }
-    const option = loaded?.find((o) => o.id === nextId) ?? null;
     setOpen(false);
+    if (nextId === valueId) return;
+    const option = loaded?.find((o) => o.id === nextId) ?? null;
     if (confirm && !(await confirm(option))) return;
 
     const previous = shown;
@@ -135,28 +169,6 @@ export function InlinePickEdit({
     );
   }
 
-  if (open) {
-    return loaded ? (
-      <select
-        ref={selectRef}
-        defaultValue={valueId ?? ""}
-        onChange={(e) => void choose(e.target.value)}
-        onBlur={() => setOpen(false)}
-        aria-label={ariaLabel}
-        className="max-w-[12rem] rounded-md border border-ring/60 bg-background px-1.5 py-0.5 text-[13px] text-foreground outline-none"
-      >
-        {allowEmpty ? <option value="">{emptyLabel}</option> : null}
-        {loaded.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    ) : (
-      <span className="text-[13px] text-muted-foreground">Loading…</span>
-    );
-  }
-
   const empty = shown.trim() === "" || shown === emptyLabel;
 
   return (
@@ -165,8 +177,11 @@ export function InlinePickEdit({
         type="button"
         onClick={(e) => {
           e.stopPropagation();
+          setError(null);
           setOpen(true);
         }}
+        aria-haspopup="dialog"
+        aria-expanded={open}
         aria-label={`${ariaLabel}: ${empty ? "not set" : shown}. Tap to change.`}
         className={cn(
           "tap-active -mx-1 rounded-md px-1 text-[13px] transition-colors",
@@ -185,6 +200,25 @@ export function InlinePickEdit({
           {error}
         </span>
       ) : null}
+      {/* First tap on a cold list waits on a request. Without this the tap reads as dead. */}
+      {open && loaded == null ? (
+        <span className="text-[11px] leading-tight text-muted-foreground">Loading…</span>
+      ) : null}
+      {/*
+        Held back until the list is in hand. The sheet's own opening behaviour — scroll
+        the current choice to the middle — is measured on first paint, so mounting it
+        empty and filling it a moment later would open every picker at row one.
+      */}
+      <PickerSheet
+        open={open && loaded != null}
+        onClose={() => setOpen(false)}
+        title={ariaLabel}
+        value={valueId ?? ""}
+        onSelect={(next) => void choose(next)}
+        sections={sections}
+        searchPlaceholder={`Search ${ariaLabel.toLowerCase()}…`}
+        clearRow={allowEmpty ? { label: emptyLabel === "—" ? "None" : emptyLabel } : null}
+      />
     </span>
   );
 }

@@ -135,7 +135,7 @@ async function loadPeerRunsInSameDiscipline(ownerUserId: string, anchorCarId: st
         id: true,
         carClass: true,
         setupSheetTemplate: true,
-        setupSheetModel: { select: { slug: true } },
+        setupSheetModel: { select: { slug: true, discipline: true } },
       },
     }),
     prisma.run.findMany({

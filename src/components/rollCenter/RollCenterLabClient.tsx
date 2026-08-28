@@ -237,101 +237,6 @@ function KnobRow({
   );
 }
 
-/** RC migration path in the front-view plane (same-unit axes: lateral vs height, mm). */
-function MigrationPathChart({
-  sweep,
-  ghostSweep,
-  ghostName,
-  current,
-}: {
-  sweep: { roll: number; x: number; z: number }[];
-  ghostSweep: { roll: number; x: number; z: number }[] | null;
-  ghostName: string | null;
-  current: { x: number; z: number } | null;
-}) {
-  const W = 320;
-  const H = 132;
-  const PAD = { l: 34, r: 12, t: 10, b: 20 };
-  const all = [...sweep, ...(ghostSweep ?? [])];
-  if (all.length < 2) return null;
-  const xMin = Math.min(...all.map((p) => p.x)) - 2;
-  const xMax = Math.max(...all.map((p) => p.x)) + 2;
-  const zMin = Math.min(...all.map((p) => p.z)) - 1;
-  const zMax = Math.max(...all.map((p) => p.z)) + 1;
-  // Quantized coordinates — server/client libm can differ by 1 ulp (hydration).
-  const q = (n: number) => Math.round(n * 100) / 100;
-  const X = (x: number) => q(PAD.l + ((x - xMin) / (xMax - xMin || 1)) * (W - PAD.l - PAD.r));
-  const Y = (z: number) => q(PAD.t + ((zMax - z) / (zMax - zMin || 1)) * (H - PAD.t - PAD.b));
-  const path = (pts: { x: number; z: number }[]) =>
-    pts.map((p, i) => `${i === 0 ? "M" : "L"}${X(p.x).toFixed(1)} ${Y(p.z).toFixed(1)}`).join(" ");
-  const ticksX = [xMin + 2, (xMin + xMax) / 2, xMax - 2];
-  const ticksZ = [zMin + 1, zMax - 1];
-  const last = sweep[sweep.length - 1];
-
-  return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      className="w-full tabular-nums"
-      role="img"
-      aria-label="Roll center migration path under chassis roll"
-    >
-      {ticksX.map((t, i) => (
-        <g key={`tx-${i}`}>
-          <line x1={X(t)} y1={PAD.t} x2={X(t)} y2={H - PAD.b} stroke="currentColor" strokeOpacity={0.08} />
-          <text x={X(t)} y={H - 8} textAnchor="middle" fontSize={7.5} fill="currentColor" fillOpacity={0.45}>
-            {t.toFixed(0)}
-          </text>
-        </g>
-      ))}
-      {ticksZ.map((t, i) => (
-        <g key={`tz-${i}`}>
-          <line x1={PAD.l} y1={Y(t)} x2={W - PAD.r} y2={Y(t)} stroke="currentColor" strokeOpacity={0.08} />
-          <text x={PAD.l - 4} y={Y(t) + 2.5} textAnchor="end" fontSize={7.5} fill="currentColor" fillOpacity={0.45}>
-            {t.toFixed(0)}
-          </text>
-        </g>
-      ))}
-      <text x={W - PAD.r} y={H - 8} textAnchor="end" fontSize={7.5} fill="currentColor" fillOpacity={0.55}>
-        lateral mm
-      </text>
-      <text x={PAD.l - 4} y={PAD.t + 2} textAnchor="end" fontSize={7.5} fill="currentColor" fillOpacity={0.55}>
-        mm
-      </text>
-
-      {ghostSweep && ghostSweep.length > 1 && (
-        <path d={path(ghostSweep)} fill="none" stroke="currentColor" strokeOpacity={0.3} strokeWidth={1.5} strokeDasharray="4 3" />
-      )}
-      <path d={path(sweep)} fill="none" stroke="currentColor" strokeOpacity={0.75} strokeWidth={2} strokeLinecap="round" />
-
-      {/* Whole-degree waypoints + start/end labels */}
-      {sweep
-        .filter((p) => Math.abs(p.roll - Math.round(p.roll)) < 1e-6)
-        .map((p) => (
-          <circle key={`wp-${p.roll}`} cx={X(p.x)} cy={Y(p.z)} r={2} fill="currentColor" fillOpacity={0.5} />
-        ))}
-      <text x={X(sweep[0].x) + 4} y={Y(sweep[0].z) - 4} fontSize={7.5} fill="currentColor" fillOpacity={0.6}>
-        0°
-      </text>
-      <text x={X(last.x) - 4} y={Y(last.z) - 4} textAnchor="end" fontSize={7.5} fill="currentColor" fillOpacity={0.6}>
-        {ROLL_MAX_DEG}°
-      </text>
-
-      {/* Current-roll RC — the one yellow mark */}
-      {current && (
-        <g className="text-primary-ink">
-          <circle cx={X(current.x)} cy={Y(current.z)} r={4.5} fill="currentColor" />
-        </g>
-      )}
-
-      {ghostSweep && (
-        <text x={W - PAD.r} y={PAD.t + 8} textAnchor="end" fontSize={7.5} fill="currentColor" fillOpacity={0.5}>
-          dashed = {ghostName ?? "ghost"}
-        </text>
-      )}
-    </svg>
-  );
-}
-
 /* ── Setup slots ──────────────────────────────────────────────────────────── */
 
 type SlotId = "a" | "b";
@@ -942,24 +847,47 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     [ghostGeo, ghostAdj, rollDeg, bumpMm]
   );
 
-  const sweep = useMemo(() => {
+  /**
+   * Camber gain at the pose the sliders are actually holding, read off the OUTSIDE wheel and
+   * measured AGAINST THE CHASSIS.
+   *
+   * The roll slider only travels positive, and positive roll drops the left mounts (measured on
+   * the A800 pack: left inner-lower 9.45mm at rest → 8.92mm at 3°), so the left side is the
+   * loaded one and `left` is the outside wheel for every value the slider can hold. At exactly
+   * 0° the car is symmetric and the choice costs nothing.
+   *
+   * The engine solves camber against the GROUND, which on a touring car is nearly all body lean:
+   * roll 3° and the outside front swings from −1.78° to +1.07° against the road, a +0.96°/°
+   * reading that says little beyond "the car leaned over". Founder's call, made twice — once in
+   * the interview and again after seeing both numbers on screen: what earns the row is what the
+   * GEOMETRY generates, so the lean comes back out. On the LEFT wheel the chassis frame is the
+   * world frame turned by +roll, so subtracting the roll angle is the entire conversion (it would
+   * be +roll on the right). What survives is about −0.04°/° — small, because long arms move the
+   * wheel very little over the travel roll produces — and negative in the same direction as the
+   * bump row, so the two rows finally read the same way round.
+   *
+   * Both numbers are slopes, not totals — a central difference either side of where the sliders
+   * sit, which is why they keep moving as you drag: camber gain is not a constant, it falls away
+   * as the arms go over centre. Bump is per mm of COMPRESSION, the sign convention
+   * `computeAxleMetrics` already publishes on the run-page geometry strip; the roll subtraction is
+   * a constant at any fixed roll, so it cancels out of the bump slope entirely.
+   */
+  const camberGain = useMemo(() => {
     if (!geo || !adj) return null;
-    const pts: { roll: number; x: number; z: number }[] = [];
-    for (let r = 0; r <= ROLL_MAX_DEG + 1e-6; r += 0.25) {
-      const s = solveAxle(geo, adj, r, bumpMm);
-      if (s?.rollCentre) pts.push({ roll: r, x: s.rollCentre.x, z: s.rollCentre.z });
-    }
-    return pts.length > 1 ? pts : null;
-  }, [geo, adj, bumpMm]);
-  const ghostSweep = useMemo(() => {
-    if (!ghostGeo || !ghostAdj) return null;
-    const pts: { roll: number; x: number; z: number }[] = [];
-    for (let r = 0; r <= ROLL_MAX_DEG + 1e-6; r += 0.25) {
-      const s = solveAxle(ghostGeo, ghostAdj, r, bumpMm);
-      if (s?.rollCentre) pts.push({ roll: r, x: s.rollCentre.x, z: s.rollCentre.z });
-    }
-    return pts.length > 1 ? pts : null;
-  }, [ghostGeo, ghostAdj, bumpMm]);
+    const camberVsChassis = (roll: number, bump: number) => {
+      const vsRoad = solveAxle(geo, adj, roll, bump)?.left.camberDeg;
+      return vsRoad == null ? null : vsRoad - roll;
+    };
+    const H = 0.5;
+    const rollUp = camberVsChassis(rollDeg + H, bumpMm);
+    const rollDown = camberVsChassis(rollDeg - H, bumpMm);
+    const bumpIn = camberVsChassis(rollDeg, bumpMm - H);
+    const bumpOut = camberVsChassis(rollDeg, bumpMm + H);
+    return {
+      perRollDeg: rollUp != null && rollDown != null ? (rollUp - rollDown) / (2 * H) : null,
+      perBumpMm: bumpIn != null && bumpOut != null ? (bumpIn - bumpOut) / (2 * H) : null,
+    };
+  }, [geo, adj, rollDeg, bumpMm]);
 
   /**
    * Both ends of the bump travel, folded into the extents but never drawn. Without this the
@@ -985,10 +913,10 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
   }, [geo, adj, ghostGeo, ghostAdj, staticRh]);
 
   /**
-   * Bump extremes only, so the bump slider never rescales the view. The RC sweep paths used to
+   * Bump extremes only, so the bump slider never rescales the view. A roll-centre sweep used to
    * be folded in here too — an attempt to hold the frame still against a roll centre that was
    * allowed to set the frame's floor. The schematic no longer lets RC touch the extents at all
-   * (fixed window, marker pinned), so feeding the sweep in would only re-introduce the drift.
+   * (fixed window, marker pinned), so feeding a sweep back in would only re-introduce the drift.
    */
   const schematicExtraPoints = useMemo(() => bumpExtent, [bumpExtent]);
 
@@ -1014,8 +942,16 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     if (!geo || !adj) return null;
     const halfWidth = pack.chassisHalfWidthMm ?? DEFAULT_CHASSIS_HALF_WIDTH_MM;
     const baseThickness = pack.chassisOptions[pack.baseChassisCode]?.thicknessMm ?? 2;
-    // Inboard of the plate edge, clear of the arms above and the roll-centre marker below.
-    const rideAtX = -(halfWidth - 15);
+    /*
+     * Inboard of the plate edge, clear of the arms above and the roll-centre marker below.
+     *
+     * The inset is a SHARE of the plate, not a flat 15mm. A flat 15mm was written for a wide
+     * plate and quietly broke on a narrow one: the A800 declares a 22mm half-width, which put the
+     * dimension 7mm from the centreline — on top of the dashed centreline and running its label
+     * under the RC readout. Capping at 15mm means a wide plate (the 45mm teaching car) lands
+     * exactly where it always did.
+     */
+    const rideAtX = -(halfWidth - Math.min(15, halfWidth * 0.35));
     const rideTop = chassisBottomAt(geo, adj, rideAtX, rollDeg, bumpMm);
     return {
       corners: chassisPlateCorners(geo, adj, halfWidth, baseThickness, rollDeg, bumpMm),
@@ -1343,7 +1279,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
   /*
    * Phone: one column, in this source order. Desktop (xl+): the same DOM re-flowed
    * into an instrument — controls on the left, the drawing and its readout in the
-   * middle, the slower reading (migration, sensitivities, change list) beneath at
+   * middle, the slower reading (camber gain, sensitivities, change list) beneath at
    * xl and beside at 2xl. The columns are placed EXPLICITLY (`col-start`/`row-start`)
    * rather than by source order, because the desktop order is not the phone order:
    * on a phone you meet the drawing before the knobs, on a desktop the knobs are the
@@ -1692,17 +1628,28 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
        * are three.
        */}
       <div className="lab-aside contents">
-        {/* ── Migration + sensitivities ──────────────────────────────── */}
+        {/* ── Camber gain + sensitivities ──────────────────────────────── */}
         <CardPanel contentClassName="space-y-3">
-          <Eyebrow>RC migration in roll · {axle}</Eyebrow>
-          {sweep && (
-            <MigrationPathChart
-              sweep={sweep}
-              ghostSweep={ghostSweep}
-              ghostName={comparing ? otherId.toUpperCase() : null}
-              current={rcAtRoll}
-            />
-          )}
+          <Eyebrow>Camber gain · {axle}</Eyebrow>
+          <div className="space-y-1">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="type-data-label">In roll (outside)</span>
+              <span className="text-[11px] tabular-nums">
+                {camberGain?.perRollDeg != null ? `${fmtMm(camberGain.perRollDeg, 3)}° / ° roll` : "—"}
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="type-data-label">In bump (outside)</span>
+              <span className="text-[11px] tabular-nums">
+                {camberGain?.perBumpMm != null ? `${fmtMm(camberGain.perBumpMm, 3)}° / mm` : "—"}
+              </span>
+            </div>
+          </div>
+          <p className="text-[10px] leading-relaxed text-faint">
+            Outside wheel measured against the chassis, at the pose the sliders are holding — the
+            camber your geometry makes, with the body lean taken out. Negative = the wheel is
+            leaning further in.
+          </p>
           <Eyebrow>Shim sensitivity · {axle}</Eyebrow>
           <div className="space-y-1">
             {sensitivities?.map((s) => (

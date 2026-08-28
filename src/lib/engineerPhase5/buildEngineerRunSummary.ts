@@ -121,7 +121,7 @@ export async function buildEngineerRunSummary(params: {
             rank: r.rank,
             bestLapSeconds: r.bestLapSeconds,
             gapToSessionBestSeconds: r.gapToSessionBestSeconds,
-            fadeSeconds: r.fadeSeconds,
+            fadePerLapSeconds: r.fadePerLapSeconds,
           })),
         }
       : null,

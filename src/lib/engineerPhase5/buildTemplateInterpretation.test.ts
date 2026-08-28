@@ -56,7 +56,7 @@ test("when field phrase is non-empty, it appears before setup phrase", () => {
           rank: 1,
           bestLapSeconds: 12.0,
           gapToSessionBestSeconds: 0,
-          fadeSeconds: null,
+          fadePerLapSeconds: null,
         },
         {
           label: "You",
@@ -64,7 +64,7 @@ test("when field phrase is non-empty, it appears before setup phrase", () => {
           rank: 2,
           bestLapSeconds: 12.5,
           gapToSessionBestSeconds: 0.5,
-          fadeSeconds: 0.02,
+          fadePerLapSeconds: 0.02,
         },
       ],
     },

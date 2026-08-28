@@ -20,14 +20,20 @@ const buttonBase =
   "tap-active inline-flex min-h-[30px] items-center justify-center rounded-lg border px-2.5 py-1.5 text-xs transition";
 
 /**
- * `.primary-face` carries the lit rim and the crossing specular (globals.css),
- * replacing the flat `shadow-glow-sm` lift — yellow buttons are now the same
- * material as the Log-run circle, minus its outward aura, which stays reserved
- * for the single #1 action.
+ * `.primary-face` carries the whole yellow material (globals.css): a 1px ink
+ * hairline plus a paper-weight lift, with the hover and press shadows living on
+ * the class rather than here. The 1.5px cream/bronze bevel it used to draw stayed
+ * behind on the Log-run circle and the dashboard bar, which is the point — that
+ * face marks the single #1 action, and it stops meaning anything if 87 buttons
+ * wear it (see the note over `.primary-face`, rebuilt 2026-08-25).
+ *
+ * Weight is `font-semibold`, not `font-bold`, from the same change. Bold + 12px +
+ * yellow at once is three kinds of emphasis stacked on a word like "Edit"; 600 is
+ * the register the rest of the paper theme is set in.
  */
 const primaryClass = cn(
   buttonBase,
-  "primary-action-chip primary-face border-transparent bg-primary font-bold text-primary-foreground hover:brightness-105 active:brightness-95"
+  "primary-action-chip primary-face border-transparent bg-primary font-semibold text-primary-foreground hover:brightness-105 active:brightness-95"
 );
 
 const outlineClass = cn(

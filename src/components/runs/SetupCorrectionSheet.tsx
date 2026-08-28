@@ -89,14 +89,24 @@ export function SetupCorrectionSheet({
   const listRef = useRef<HTMLDivElement | null>(null);
   const firstPickedRef = useRef<HTMLButtonElement | null>(null);
 
-  // Each new correction starts from the rule's answer, not from whatever was
-  // ticked the last time the sheet was open.
+  /*
+   * Each new correction starts from the rule's answer, not from whatever was ticked
+   * the last time the sheet was open — and NOT still mid-save.
+   *
+   * `applying` is reset here as well as in `apply`'s `finally`, and both are load-bearing.
+   * This component is rendered by the run panel unconditionally and draws nothing when
+   * there is no question, so a closed sheet is not an UNMOUNTED sheet: its state outlives
+   * every question. Left set, one successful apply locked the button on "Fixing…" for the
+   * whole life of the run row — the next question in the same save opened already greyed
+   * out, which is what a driver correcting two boxes at once actually met (2026-08-24).
+   */
   useEffect(() => {
     if (!correction) return;
     const next: Record<string, boolean> = {};
     for (const c of correction.candidates) next[c.runId] = c.defaultPicked;
     setPicked(next);
     setError(null);
+    setApplying(false);
   }, [correction]);
 
   /*
@@ -188,6 +198,12 @@ export function SetupCorrectionSheet({
       await onApply(chosen);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update those runs");
+    } finally {
+      /*
+       * Cleared whichever way it went. It used to clear only on the failure path, on the
+       * assumption that a landed apply took the sheet away with it — but the sheet is
+       * never unmounted (see the reset effect above), so success left the button dead.
+       */
       setApplying(false);
     }
   }

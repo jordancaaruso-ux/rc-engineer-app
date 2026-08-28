@@ -8,13 +8,6 @@ export const APP_SETTING_KEYS = {
   liveRcDriverId: "liveRcDriverId",
   /** Display name on Speedhive results (optional; falls back to liveRcDriverName). */
   speedhiveDriverName: "speedhiveDriverName",
-  /**
-   * Display name on MyRCM results (optional; falls back to speedhiveDriverName then
-   * liveRcDriverName). MyRCM publishes no driver id or transponder, so the name is the only handle
-   * on which row of the field is yours — and without a match the import refuses to guess rather
-   * than handing back the winner's laps.
-   */
-  myRcmDriverName: "myRcmDriverName",
   /** Comma-separated or JSON array of MYLAPS transponder numbers for Speedhive discovery. */
   speedhiveTransponderNumbersJson: "speedhiveTransponderNumbersJson",
   /**
@@ -23,6 +16,12 @@ export const APP_SETTING_KEYS = {
    * matching carries them instead. Cleared the moment a real number is saved.
    */
   speedhiveTransponderLoanerAt: "speedhiveTransponderLoanerAt",
+  /**
+   * Other people's transponders you know — teammates, rivals. JSON array of
+   * `{ name, transponder }`; see `lib/speedhive/knownCompetitors.ts`. Pulled only when
+   * asked, never on a schedule.
+   */
+  knownCompetitorsJson: "knownCompetitorsJson",
   /** MYLAPS / Speedhive account id (from linked login). */
   mylapsAccountId: "mylapsAccountId",
   /** Bearer access token for usersandproducts-api (server only). */
@@ -205,6 +204,17 @@ export async function setSpeedhiveTransponderNumbersSetting(
   await setUserSetting(userId, APP_SETTING_KEYS.speedhiveTransponderNumbersJson, value);
 }
 
+export async function getKnownCompetitorsSetting(userId: string): Promise<string | null> {
+  return getUserSetting(userId, APP_SETTING_KEYS.knownCompetitorsJson);
+}
+
+export async function setKnownCompetitorsSetting(
+  userId: string,
+  value: string | null
+): Promise<void> {
+  await setUserSetting(userId, APP_SETTING_KEYS.knownCompetitorsJson, value);
+}
+
 export async function getSpeedhiveTransponderLoanerSetting(userId: string): Promise<boolean> {
   return Boolean(await getUserSetting(userId, APP_SETTING_KEYS.speedhiveTransponderLoanerAt));
 }
@@ -227,32 +237,33 @@ export async function getSpeedhiveDriverNameForUser(userId: string): Promise<str
   return (await getLiveRcDriverNameSetting(userId))?.trim() || null;
 }
 
-export async function getMyRcmDriverNameSetting(userId: string): Promise<string | null> {
-  return getUserSetting(userId, APP_SETTING_KEYS.myRcmDriverName);
-}
-
-export async function setMyRcmDriverNameSetting(userId: string, value: string | null): Promise<void> {
-  await setUserSetting(userId, APP_SETTING_KEYS.myRcmDriverName, value);
-}
-
-/**
- * Every name to try against a MyRCM field, most specific first. The explicit MyRCM name wins, then
- * the other timing identities the driver has already given us — a driver whose name is spelled the
- * same everywhere never has to fill this in.
+/*
+ * The MyRCM identity *setters* were removed on 2026-08-26 along with MyRCM page scraping (see
+ * `timingUrlSafetySync.ts`). MyRCM import came back on 2026-08-27 as a PDF the driver uploads, and
+ * matching them to a row in it still needs a name — MyRCM publishes no driver id and no transponder
+ * in its results, so the name is the only handle it has ever had.
+ *
+ * Read-only, and deliberately by literal key: the row is legacy, `APP_SETTING_KEYS` no longer
+ * carries it, and nothing writes one any more. Drivers who saved a name before get their row
+ * pre-selected; everyone else picks from the field, which the upload flow shows either way.
  */
 export async function getMyRcmDriverNamesForUser(userId: string): Promise<string[]> {
-  const [myRcm, speedhive, liveRc, myName] = await Promise.all([
-    getMyRcmDriverNameSetting(userId),
+  const [legacyRow, speedhive, liveRc] = await Promise.all([
+    // Not via `getUserSetting`: `AppSettingKey` no longer lists this key, by design.
+    prisma.appSetting
+      .findUnique({ where: { userId_key: { userId, key: "myRcmDriverName" } }, select: { value: true } })
+      .catch(() => null),
     getSpeedhiveDriverNameSetting(userId),
     getLiveRcDriverNameSetting(userId),
-    getMyNameSetting(userId),
   ]);
-  const out: string[] = [];
-  for (const n of [myRcm, speedhive, liveRc, myName]) {
-    const t = n?.trim();
-    if (t && !out.some((existing) => existing.toLowerCase() === t.toLowerCase())) out.push(t);
+  const legacyMyRcm = legacyRow?.value ?? null;
+
+  const names: string[] = [];
+  for (const name of [legacyMyRcm, speedhive, liveRc]) {
+    const trimmed = name?.trim();
+    if (trimmed && !names.includes(trimmed)) names.push(trimmed);
   }
-  return out;
+  return names;
 }
 
 export async function getCurrentPracticeDayUrlSetting(userId: string): Promise<string | null> {

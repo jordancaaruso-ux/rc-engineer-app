@@ -189,7 +189,7 @@ export async function loadToolsModel(input: {
         ]
           .filter(Boolean)
           .join(" · "),
-        href: `/laps/import?sessionId=${encodeURIComponent(row.id)}`,
+        href: `/laps/analysis?session=${encodeURIComponent(row.id)}`,
       })
     ),
     unlinkedLapTotal,

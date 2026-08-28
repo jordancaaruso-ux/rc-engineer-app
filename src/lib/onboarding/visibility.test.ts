@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   isReadyToRun,
+  isSetUpComplete,
   showGetSetUpCard,
   showWelcomeScreen,
   type OnboardingFacts,
@@ -92,12 +93,37 @@ test("readiness needs both the car and the timing identity", () => {
   );
 });
 
-test("the ready card stays up until the run is logged", () => {
-  const ready = facts({ seen: true, hasCar: true, hasTimingIdentity: true, hasSetup: true });
+/*
+ * Amended again 2026-08-26. The sheet became step three of the walk, the card's
+ * "You're ready — log your first run" button came off (it stacked a second yellow
+ * button under the dashboard's Start-a-run bar), and so the card retires on a
+ * finished walk as well — with nothing left to ask, three ticks is furniture.
+ */
+test("the card retires once all three steps are done, run or no run", () => {
+  const done = facts({ seen: true, hasCar: true, hasTimingIdentity: true, hasSetup: true });
+  assert.equal(isSetUpComplete(done), true);
   assert.equal(
-    showGetSetUpCard(ready),
-    true,
-    "its last state is 'You're ready — log your first run'; retiring here hides the payoff"
+    showGetSetUpCard(done),
+    false,
+    "the payoff button is gone, so a complete card asks for nothing"
   );
-  assert.equal(showGetSetUpCard({ ...ready, hasAnyRun: true }), false);
+  assert.equal(showGetSetUpCard({ ...done, hasAnyRun: true }), false);
+});
+
+test("the sheet alone keeps the card up — it is a step, not a footnote", () => {
+  const sheetOutstanding = facts({ hasCar: true, hasTimingIdentity: true });
+  assert.equal(isSetUpComplete(sheetOutstanding), false);
+  assert.equal(
+    showGetSetUpCard(sheetOutstanding),
+    true,
+    "car + timing is ready to RUN, but the sheet ask is the card's last state"
+  );
+});
+
+test("completeness needs all three — readiness needs two", () => {
+  assert.equal(isSetUpComplete(facts({ hasCar: true, hasSetup: true })), false);
+  assert.equal(isSetUpComplete(facts({ hasTimingIdentity: true, hasSetup: true })), false);
+  const ready = facts({ hasCar: true, hasTimingIdentity: true });
+  assert.equal(isReadyToRun(ready), true);
+  assert.equal(isSetUpComplete(ready), false, "the sheet is asked for but never gates the run");
 });

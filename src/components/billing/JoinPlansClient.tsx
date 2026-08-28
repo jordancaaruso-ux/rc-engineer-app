@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { primaryButtonClassName } from "@/components/ui/ButtonLink";
+import { outlineButtonClassName, primaryButtonClassName } from "@/components/ui/ButtonLink";
 import { TIER_LABELS } from "@/lib/brand/brandNames";
 import { cn } from "@/lib/utils";
 import {
@@ -28,7 +28,7 @@ export type JoinPlan = {
  * two widths sell different products.
  */
 const COMPARE_ROWS: Array<{ label: string; standard: string; pro: string }> = [
-  { label: "Run logging (LiveRC · Speedhive · MyRCM)", standard: "✓", pro: "✓" },
+  { label: "Run logging (LiveRC · Speedhive)", standard: "✓", pro: "✓" },
   { label: "Session review & lap analysis", standard: "✓", pro: "✓" },
   { label: "Compare runs & setups", standard: "✓", pro: "✓" },
   {
@@ -41,11 +41,21 @@ const COMPARE_ROWS: Array<{ label: string; standard: string; pro: string }> = [
   { label: "Roll-centre tools", standard: "—", pro: "✓" },
 ];
 
+/**
+ * Both plan buttons are the same box and the same voice — only the fill does the
+ * recommending (founder 2026-08-25: side by side they read as two different components).
+ * The Race Engineer button used to carry `.primary-action-chip-prominent`, which brought
+ * uppercase, wider tracking, its own padding and `line-height: 1` with it; the explicit
+ * min-height keeps the two boxes equal whichever line-height wins the cascade.
+ */
+const PLAN_BUTTON_BOX =
+  "mt-auto min-h-[46px] w-full px-4 py-3 text-sm font-semibold normal-case tracking-normal disabled:cursor-not-allowed disabled:opacity-60";
+
 const STANDARD_BULLETS: Array<{ text: string; off?: boolean }> = [
   { text: "Unlimited run logging" },
   { text: "Session review: pace, consistency, mistakes" },
   { text: "Compare runs and setups" },
-  { text: "Laps from LiveRC, Speedhive and MyRCM" },
+  { text: "Laps from LiveRC and Speedhive" },
   { text: "Video and sector analysis", off: true },
   { text: "Roll-centre and geometry", off: true },
 ];
@@ -192,7 +202,7 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
                   b.off ? "text-faint" : "text-muted-foreground"
                 )}
               >
-                <span aria-hidden="true" className={b.off ? "text-border" : "text-primary-ink"}>
+                <span aria-hidden="true" className={b.off ? "text-faint" : "text-primary-ink"}>
                   {b.off ? "×" : "—"}
                 </span>
                 {b.text}
@@ -203,7 +213,9 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
             type="button"
             disabled={busy !== null || !standard}
             onClick={() => standard && startCheckout(standard.priceId)}
-            className="tap-active mt-auto w-full rounded-lg border border-border bg-transparent px-4 py-3 text-sm font-semibold text-foreground transition hover:border-faint hover:bg-elevate/5 disabled:cursor-not-allowed disabled:opacity-60"
+            className={outlineButtonClassName(
+              cn(PLAN_BUTTON_BOX, "bg-transparent hover:border-faint hover:bg-elevate/5")
+            )}
           >
             {busy === standard?.priceId ? "Redirecting…" : "Get started"}
           </button>
@@ -247,9 +259,7 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
             type="button"
             disabled={busy !== null || !pro}
             onClick={() => pro && startCheckout(pro.priceId)}
-            className={primaryButtonClassName(
-              "primary-action-chip-prominent mt-auto w-full px-4 py-3 text-[13px] uppercase tracking-[0.14em] disabled:cursor-not-allowed disabled:opacity-60"
-            )}
+            className={primaryButtonClassName(PLAN_BUTTON_BOX)}
           >
             {busy === pro?.priceId ? "Redirecting…" : "Get started"}
           </button>

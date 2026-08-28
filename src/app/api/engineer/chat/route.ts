@@ -135,11 +135,28 @@ export async function POST(request: Request) {
     const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    // Demo mode (MONETISATION_NORTH_STAR.md Phase 3): the one write a demo session may make.
-    // Per-IP cap below; the shared demo userId also flows through checkAiBudget, whose
-    // AiUsageDaily row doubles as a DB-backed GLOBAL demo ceiling. Persistence is skipped so
-    // live questions never pollute the curated thread history.
+    /*
+     * The demo never asks (MONETISATION_NORTH_STAR.md, "The demo's clock"). Founder call
+     * 2026-08-25 replaced two live questions a visitor with a curated history of answers already
+     * given, so `/api/engineer/chat` came off the demo write allowlist and middleware refuses
+     * this request before it arrives.
+     *
+     * This is the second lock on the same door, and it is FIRST in the handler on purpose. The
+     * middleware's lock is a path string in a Set — rename this route, add an alias, mount it
+     * under a rewrite, and the match quietly stops matching while the handler carries on
+     * answering. Identity cannot drift that way. Ahead of the deterministic lap-history path
+     * too, which is free but is still an answer, and the demo gives none.
+     */
     const isDemo = isDemoIdentity({ id: user.id, email: user.email });
+    if (isDemo) {
+      return NextResponse.json(
+        {
+          error:
+            "The demo shows answers the Engineer has already given. Get your own garage to ask about your own car.",
+        },
+        { status: 403 },
+      );
+    }
 
     const rl = checkApiRateLimit({
       key: `engineer-chat:${user.id}`,
@@ -179,20 +196,18 @@ export async function POST(request: Request) {
           timeZone,
         });
     if (lapHistoryAnswer) {
-      const feedback = isDemo
-        ? null
-        : await maybePersistEngineerReply({
-            userId: user.id,
-            body,
-            messages,
-            reply: lapHistoryAnswer.reply,
-            contextJson: null,
-            resolvedFocus: null,
-            runId,
-            compareRunId,
-            source: "lap_history",
-            anchor,
-          });
+      const feedback = await maybePersistEngineerReply({
+        userId: user.id,
+        body,
+        messages,
+        reply: lapHistoryAnswer.reply,
+        contextJson: null,
+        resolvedFocus: null,
+        runId,
+        compareRunId,
+        source: "lap_history",
+        anchor,
+      });
       if (useStream) {
         const encoder = new TextEncoder();
         const stream = new ReadableStream({
@@ -268,32 +283,6 @@ export async function POST(request: Request) {
       }
       return NextResponse.json({ error: message }, { status });
     };
-
-    // Demo visitors: 2 live questions a day per IP, plus a DURABLE global ceiling on the shared
-    // demo account (15/day · 100/month — founder wants this very limited, 2026-08-02). The
-    // per-IP brake is in-memory best-effort on serverless; the snapshot query is the one that
-    // actually bounds spend. Placed AFTER the free deterministic lap-history path so a database
-    // answer never burns a question, and BEFORE the budget block so refusals stay friendly.
-    if (isDemo) {
-      const demoRl = checkApiRateLimit({
-        key: `engineer-chat-demo:${clientIpKey(request)}`,
-        limit: 2,
-        windowMs: 24 * 60 * 60 * 1000,
-      });
-      if (!demoRl.ok) {
-        return refuseAllowance(
-          "That's both demo questions for today. In the full app, the Engineer answers all day — about your own car, not the demo driver's. Get your own garage at jrcdynamics.com/join.",
-          429,
-        );
-      }
-      const demoUsage = await engineerQuotaSnapshot(user.id);
-      if (demoUsage.today >= 15 || demoUsage.month >= 100) {
-        return refuseAllowance(
-          "The demo Engineer has answered a lot today — come back tomorrow, or get your own garage and ask about your own car.",
-          429,
-        );
-      }
-    }
 
     const entitlement = await getEntitlement(user);
     if (isBillingEnforced() && !entitlement.entitled) {
@@ -371,21 +360,19 @@ export async function POST(request: Request) {
               completionTokens: out.usage?.completionTokens ?? 0,
               cachedPromptTokens: out.usage?.cachedPromptTokens ?? 0,
             });
-            const feedback = isDemo
-              ? null
-              : await maybePersistEngineerReply({
-                  userId: user.id,
-                  body,
-                  messages,
-                  reply: out.reply,
-                  contextJson: null,
-                  resolvedFocus: null,
-                  runId,
-                  compareRunId,
-                  source: "llm",
-                  anchor,
-                  promptVersion,
-                });
+            const feedback = await maybePersistEngineerReply({
+              userId: user.id,
+              body,
+              messages,
+              reply: out.reply,
+              contextJson: null,
+              resolvedFocus: null,
+              runId,
+              compareRunId,
+              source: "llm",
+              anchor,
+              promptVersion,
+            });
             send("done", {
               reply: out.reply,
               resolvedFocus: null,
@@ -423,21 +410,19 @@ export async function POST(request: Request) {
       cachedPromptTokens: out.usage?.cachedPromptTokens ?? 0,
     });
 
-    const feedback = isDemo
-      ? null
-      : await maybePersistEngineerReply({
-          userId: user.id,
-          body,
-          messages,
-          reply: out.reply,
-          contextJson: null,
-          resolvedFocus: null,
-          runId,
-          compareRunId,
-          source: "llm",
-          anchor,
-          promptVersion,
-        });
+    const feedback = await maybePersistEngineerReply({
+      userId: user.id,
+      body,
+      messages,
+      reply: out.reply,
+      contextJson: null,
+      resolvedFocus: null,
+      runId,
+      compareRunId,
+      source: "llm",
+      anchor,
+      promptVersion,
+    });
 
     return NextResponse.json({
       contextJson: null,

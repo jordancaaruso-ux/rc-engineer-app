@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Flag } from "@phosphor-icons/react";
 import { IconAddRun } from "@/components/icons/JRCIcons";
 import { shouldShowLogRunFab } from "@/components/layout/navConfig";
-import { useTodayDraftRun } from "@/components/layout/TodayDraftRunProvider";
+import { useDraftRun } from "@/components/layout/DraftRunProvider";
 import { haptic } from "@/lib/haptics";
 import { warmNewRunForm } from "@/lib/runs/warmNewRunForm";
 
@@ -43,7 +43,7 @@ import { warmNewRunForm } from "@/lib/runs/warmNewRunForm";
 export const LogRunFab = memo(function LogRunFab() {
   const pathname = usePathname();
   const router = useRouter();
-  const { addRunHref, draftRunId } = useTodayDraftRun();
+  const { addRunHref, activeDraftRunId } = useDraftRun();
 
   if (!shouldShowLogRunFab(pathname)) return null;
 
@@ -74,7 +74,7 @@ export const LogRunFab = memo(function LogRunFab() {
   const href = addRunHref("/runs/new");
   // Draft-aware, matching the dashboard Start-run CTA: resume an unfinished run
   // vs start fresh.
-  const label = draftRunId ? "Finish run" : "Log run";
+  const label = activeDraftRunId ? "Finish run" : "Log run";
   const warm = () => {
     router.prefetch(href);
     warmNewRunForm();
@@ -92,12 +92,12 @@ export const LogRunFab = memo(function LogRunFab() {
     >
       {/* Sheen face layer — matched to the dashboard bar. */}
       <span className="logrun-fx" aria-hidden />
-      {draftRunId ? (
+      {activeDraftRunId ? (
         <Flag size={25} weight="bold" aria-hidden className="relative z-[2]" />
       ) : (
         <IconAddRun size={26} aria-hidden className="relative z-[2]" />
       )}
-      {draftRunId ? (
+      {activeDraftRunId ? (
         <span
           className="absolute right-0.5 top-0.5 z-[2] h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-background"
           aria-hidden

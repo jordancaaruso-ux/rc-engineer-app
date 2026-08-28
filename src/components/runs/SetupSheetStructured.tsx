@@ -59,6 +59,7 @@ import {
   DERIVED_REAR_SPRING_RATE_KEY,
   isDerivedSetupKey,
 } from "@/lib/setupCalculations/a800rrDerived";
+import { SPRING_RATE_DECIMALS } from "@/lib/setupCalculations/springRateFormula";
 import {
   computeSpringRateLookupForSide,
   hintForSpringLookup,
@@ -266,7 +267,8 @@ function SetupFieldJumpSearch({
 }
 
 function formatDerivedSpringRateNumber(n: number): string {
-  return n.toFixed(3);
+  // The sheet's own format action on both rate fields — see SPRING_RATE_DECIMALS.
+  return n.toFixed(SPRING_RATE_DECIMALS);
 }
 
 function shortSpringRateMissingReason(code: SpringLookupResolutionCode): string {
@@ -275,10 +277,10 @@ function shortSpringRateMissingReason(code: SpringLookupResolutionCode): string 
       return "Missing inputs";
     case "missing_input_mapping":
       return "Cannot map spring/SRS";
+    // Since the table was replaced by the sheet's own formula there is no range and no missing
+    // entry to report — the only unanswerable case left is an extension that cancels the lever.
     case "unsupported_lookup_value":
-      return "Gap out of range";
-    case "lookup_missing":
-      return "No table entry";
+      return "Extension cancels the lever";
     default:
       return "—";
   }

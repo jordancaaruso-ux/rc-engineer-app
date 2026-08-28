@@ -18,9 +18,28 @@ import { formatRunTiresDetailLine } from "@/lib/runs/runTireContextDisplay";
 import { RollCenterCompareStrip } from "@/components/rollCenter/RollCenterGeometryBlock";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 
+/**
+ * One driver's row off a timing sheet attached to a run. The list queries load
+ * these without `laps` (who was in the heat, not what they did); the lap sheet
+ * fetches the laps for a race only when you open its group in the Field tab.
+ */
+export type CompareRunImportedLapSet = {
+  id: string;
+  createdAt?: Date | string | null;
+  sessionCompletedAt?: Date | string | null;
+  sourceUrl?: string | null;
+  driverName: string;
+  displayName?: string | null;
+  normalizedName?: string | null;
+  isPrimaryUser?: boolean | null;
+  laps?: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded?: boolean }>;
+};
+
 export type CompareRunShape = {
   id: string;
   createdAt: Date | string;
+  /** Rivals on this run's timing sheet, so another race's field can be compared against. */
+  importedLapSets?: CompareRunImportedLapSet[];
   sessionType: string;
   meetingSessionType?: string | null;
   meetingSessionCode?: string | null;

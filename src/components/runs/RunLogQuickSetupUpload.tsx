@@ -131,7 +131,7 @@ export function RunLogQuickSetupUpload(props: {
         type="button"
         disabled={busy}
         onClick={() => fileInputRef.current?.click()}
-        className="rounded-md border border-primary-ink/60 primary-face bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition hover:bg-primary disabled:opacity-60 disabled:cursor-default"
+        className="rounded-md primary-face bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition hover:bg-primary disabled:opacity-60 disabled:cursor-default"
       >
         {stageLabel(stage)}
       </button>

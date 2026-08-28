@@ -31,7 +31,17 @@ export async function getCachedDashboardHomeModel(userId: string, timeZone: stri
       // card tells a first-timer apart from a driver having a quiet month. A v4 entry has
       // neither, so `hasEverLogged` reads undefined and a warm user with years of history would
       // still be told to "log your first run" — exactly the bug this shipped to fix.
-      [`dashboard-home-v5-${userId}-${timeZone}`],
+      // v6 (2026-08-25): the verdict's rows gained `runPosition`, and every run LABEL in the
+      // model changed with it — a day that names two runs the same now names them by position
+      // (`resolveDayRunNames`). A v5 entry carries the old labels, so a warm user on a practice
+      // day would keep reading "Best run was Practice" for the length of the window.
+      // v7 (2026-08-25): `todayDraftRunId` / `todayDraftSavedAt` became the draft block —
+      // `draftRunId`, `draftSavedAt`, `draftEventName`, `draftIsForToday`, `drafts`, `draftCount`.
+      // A v6 entry has none of them, and the failure is loud in one place and silent in another:
+      // the drafts card renders "NaN waiting" off an undefined count, and it lists the OLD
+      // unwindowed array, so months-old drafts reappear under a card that says "from the last
+      // three days". Measured on a warm dev page before this line existed.
+      [`dashboard-home-v7-${userId}-${timeZone}`],
       { tags: [dashboardTag(userId)], revalidate: 30 }
     )()
   );
@@ -72,7 +82,18 @@ export async function getCachedAnalysisHomeModel(userId: string, timeZone: strin
       // v8: `outWithYou` became `teammates` — `{ meeting, lastOut }` — when the card grew its
       // Last-out band (2026-08-20). A v7 entry has no `teammates` key at all, so the page would
       // drop the whole card, including the half that was working before.
-      [`analysis-home-v8-${userId}-${timeZone}`],
+      //
+      // v9: run NAMES changed (2026-08-25) — a day that gave two runs the same name now names
+      // them by position, and the chart's tick and its readout are numbered off one count
+      // instead of two. Same shape, same reasoning as v6: a v8 entry renders the old strings,
+      // which on a practice day are the exact strings this shipped to stop showing.
+      // v10: the model SHRANK (2026-08-25) — `trend` and `recentRuns` left it when the page
+      // became one outing, built uncached by `loadAnalysisOuting` because it carries whole run
+      // records. A v9 entry still renders correctly (every field the page now reads is present
+      // in it, and the two it no longer reads are simply ignored), so this bump buys nothing
+      // but a clean line between the two shapes — which is worth more than the 30 seconds it
+      // costs, given how often a stale entry has made working code look broken here.
+      [`analysis-home-v10-${userId}-${timeZone}`],
       { tags: [runsTag(userId), dashboardTag(userId)], revalidate: 30 }
     )()
   );

@@ -36,6 +36,13 @@ export type SegmentedOption<T extends string> = {
    * click; the parent decides what selecting it does.
    */
   muted?: boolean;
+  /**
+   * Inert: a segment that exists to report an answer rather than offer a choice —
+   * a timing source that was searched and came back with nothing. It stays on the
+   * rail carrying its `0`, because removing it would read as "we never looked".
+   * Skipped by arrow-key navigation so the keyboard can't land somewhere dead.
+   */
+  disabled?: boolean;
 };
 
 export function SegmentedControl<T extends string>({
@@ -65,9 +72,16 @@ export function SegmentedControl<T extends string>({
   const move = useCallback(
     (delta: number) => {
       if (count === 0) return;
-      const next = (activeIndex + delta + count) % count;
-      const opt = options[next];
-      if (opt) onChange(opt.value);
+      // Walk over inert segments rather than stopping on one — an arrow key that
+      // lands on a disabled option leaves the group with no usable selection.
+      for (let step = 1; step <= count; step += 1) {
+        const next = (((activeIndex + delta * step) % count) + count) % count;
+        const opt = options[next];
+        if (opt && !opt.disabled) {
+          onChange(opt.value);
+          return;
+        }
+      }
     },
     [activeIndex, count, options, onChange]
   );
@@ -107,6 +121,7 @@ export function SegmentedControl<T extends string>({
             role="radio"
             aria-checked={active}
             aria-label={opt.ariaLabel}
+            disabled={opt.disabled}
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(opt.value)}
             className={cn(

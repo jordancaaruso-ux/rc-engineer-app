@@ -1,21 +1,27 @@
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import { parseNumericFromSetupString } from "@/lib/setup/parseSetupNumeric";
 import {
-  SPRING_RATE_GAP_MAX_MM,
-  SPRING_RATE_GAP_MIN_MM,
-  SPRING_RATE_GAP_STEP_MM,
-  SPRING_RATE_TABLE_GF_MM,
-} from "@/lib/setupCalculations/springRateLookupTable";
+  computeSpringRateFromSheetFormula,
+  type SpringRateHardness,
+  type SpringRateSrs,
+} from "@/lib/setupCalculations/springRateFormula";
+
+/**
+ * Reading the three boxes the A800RR's spring rate is worked out from, and handing them to the
+ * sheet's own formula.
+ *
+ * This used to own a 0.2 mm snap and a 0–5 mm table lookup; both are gone with the table. See
+ * `springRateFormula.ts` for where the maths came from and what the table got wrong.
+ */
 
 export type SpringLookupResolutionCode =
   | "computed_ok"
   | "missing_input_value"
   | "missing_input_mapping"
-  | "unsupported_lookup_value"
-  | "lookup_missing";
+  | "unsupported_lookup_value";
 
-export type SpringHardness = "hard" | "soft";
-export type SrsKey = "I" | "II";
+export type SpringHardness = SpringRateHardness;
+export type SrsKey = SpringRateSrs;
 
 export type SpringLookupSideInput = {
   springRaw: string;
@@ -24,8 +30,16 @@ export type SpringLookupSideInput = {
   srs: SrsKey | null;
   springGap: number | null;
   lowerArmExtension: number;
-  effectiveSpringGap: number | null;
-  snappedGapKey: string | null;
+  /**
+   * The gap actually fed to the formula: the typed gap, less 4 mm on SRS II.
+   *
+   * NOT "gap − extension". The table's arithmetic put the extension here; the sheet's formula puts
+   * it in a lever ratio instead (see `leverRatio`), which is the substantive difference between
+   * the two and the reason this field was renamed rather than reused.
+   */
+  srsAdjustedGap: number | null;
+  /** `lever² / (lever + extension)²`. 1 whenever the extension is zero, which is nearly always. */
+  leverRatio: number | null;
 };
 
 /** Gap / extension are always mm — do not interpret "7.5K" as 7500. */
@@ -43,7 +57,7 @@ function readStringTrim(data: SetupSnapshotData, keys: string[]): string {
   return "";
 }
 
-/** std → hard, s → soft (table keys only; not persisted). No other tokens accepted. */
+/** std → hard, s → soft (formula branches only; not persisted). No other tokens accepted. */
 export function normalizeSpringHardnessForLookup(raw: string): SpringHardness | null {
   const t = raw.trim().toLowerCase();
   if (t === "std") return "hard";
@@ -60,28 +74,8 @@ export function normalizeSrsArrangementForLookup(raw: string): SrsKey | null {
 }
 
 /**
- * Snap effective gap to 0.2 mm steps; returns null if outside [SPRING_RATE_GAP_MIN_MM, SPRING_RATE_GAP_MAX_MM].
- */
-export function snapEffectiveSpringGapToTableKey(gapMm: number): { key: string; snapped: number } | null {
-  const snapped = Math.round(gapMm / SPRING_RATE_GAP_STEP_MM) * SPRING_RATE_GAP_STEP_MM;
-  const fixed = Number(snapped.toFixed(1));
-  if (fixed < SPRING_RATE_GAP_MIN_MM - 1e-6 || fixed > SPRING_RATE_GAP_MAX_MM + 1e-6) return null;
-  return { key: fixed.toFixed(1), snapped: fixed };
-}
-
-export function lookupSpringRateGfMmFromTable(args: {
-  side: "front" | "rear";
-  srs: SrsKey;
-  hardness: SpringHardness;
-  gapKey: string;
-}): number | null {
-  const block = SPRING_RATE_TABLE_GF_MM[args.srs][args.side][args.hardness];
-  const v = (block as Record<string, number | undefined>)[args.gapKey];
-  return typeof v === "number" && Number.isFinite(v) ? v : null;
-}
-
-/**
- * effectiveSpringGap = springGap - lowerArmExtension (extension defaults to 0 if unset).
+ * The extension defaults to 0 when unset, which is also the value 2,911 of 2,912 recorded sides
+ * actually hold — at 0 the lever ratio is exactly 1 and the extension drops out of the sum.
  */
 export function computeSpringRateLookupForSide(
   setup: SetupSnapshotData,
@@ -111,8 +105,8 @@ export function computeSpringRateLookupForSide(
     srs,
     springGap,
     lowerArmExtension: ext,
-    effectiveSpringGap: null,
-    snappedGapKey: null,
+    srsAdjustedGap: null,
+    leverRatio: null,
   };
 
   if (!springRaw.trim()) {
@@ -131,39 +125,25 @@ export function computeSpringRateLookupForSide(
     return { rate: null, resolution: "missing_input_value", input: baseInput };
   }
 
-  const effective = springGap - ext;
-  const snap = snapEffectiveSpringGapToTableKey(effective);
-  if (snap == null) {
-    return {
-      rate: null,
-      resolution: "unsupported_lookup_value",
-      input: { ...baseInput, effectiveSpringGap: effective, snappedGapKey: null },
-    };
-  }
-
-  const rate = lookupSpringRateGfMmFromTable({
+  const result = computeSpringRateFromSheetFormula({
     side,
     srs,
     hardness,
-    gapKey: snap.key,
+    gapMm: springGap,
+    lowerArmExtensionMm: ext,
   });
-  if (rate == null) {
-    return {
-      rate: null,
-      resolution: "lookup_missing",
-      input: { ...baseInput, effectiveSpringGap: effective, snappedGapKey: snap.key },
-    };
-  }
-
-  return {
-    rate,
-    resolution: "computed_ok",
-    input: {
-      ...baseInput,
-      effectiveSpringGap: effective,
-      snappedGapKey: snap.key,
-    },
+  const input: SpringLookupSideInput = {
+    ...baseInput,
+    srsAdjustedGap: result.srsAdjustedGapMm,
+    leverRatio: result.leverRatio,
   };
+
+  if (result.rateGfMm == null) {
+    // The only way here: an extension at or beyond minus the lever length, which divides by zero
+    // or flips the ratio's sign. Not a rate either way.
+    return { rate: null, resolution: "unsupported_lookup_value", input };
+  }
+  return { rate: result.rateGfMm, resolution: "computed_ok", input };
 }
 
 export function hintForSpringLookup(
@@ -182,11 +162,9 @@ export function hintForSpringLookup(
       if (input.srs == null && input.srsRaw.trim()) {
         return `${sideLabel}: SRS "${input.srsRaw}" is not I/II.`;
       }
-      return `${sideLabel}: could not map spring or SRS for lookup.`;
+      return `${sideLabel}: could not map spring or SRS for the rate formula.`;
     case "unsupported_lookup_value":
-      return `${sideLabel}: effective gap ${input.effectiveSpringGap != null ? input.effectiveSpringGap.toFixed(2) : "?"} mm (after spring gap − lower arm extension) is outside table range ${SPRING_RATE_GAP_MIN_MM}–${SPRING_RATE_GAP_MAX_MM} mm.`;
-    case "lookup_missing":
-      return `${sideLabel}: table has no entry for gap ${input.snappedGapKey ?? "?"}.`;
+      return `${sideLabel}: lower arm extension ${input.lowerArmExtension} mm cancels the lever length — no rate can be worked out.`;
     default:
       return "";
   }

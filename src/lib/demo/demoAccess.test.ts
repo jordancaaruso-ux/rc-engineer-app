@@ -32,13 +32,25 @@ test("writes are forbidden — API routes, thread deletes, and page-path server 
   );
 });
 
-test("the Engineer chat is the one allowed write — exact path only", () => {
-  assert.equal(decideDemoRequest({ method: "POST", pathname: "/api/engineer/chat" }), "allow");
+test("the Engineer chat is a write like any other — refused", () => {
+  /*
+   * This asserted "allow" until 2026-08-25. The demo used to answer two live questions a
+   * visitor; the founder replaced that with a curated history of answers already given, which
+   * makes the demo read-only with no exceptions at all. The flip is the point of the test: an
+   * allowed write here is an anonymous, unthrottled path to an LLM bill.
+   */
+  assert.equal(decideDemoRequest({ method: "POST", pathname: "/api/engineer/chat" }), "forbid");
   assert.equal(
     decideDemoRequest({ method: "POST", pathname: "/api/engineer/chat/extra" }),
     "forbid",
   );
   assert.equal(decideDemoRequest({ method: "POST", pathname: "/api/engineer/quick-fix" }), "forbid");
+});
+
+test("reading the Engineer's history is still allowed — that IS the demo now", () => {
+  assert.equal(decideDemoRequest({ method: "GET", pathname: "/api/engineer/threads" }), "allow");
+  assert.equal(decideDemoRequest({ method: "GET", pathname: "/api/engineer/threads/t1" }), "allow");
+  assert.equal(decideDemoRequest({ method: "GET", pathname: "/engineer" }), "allow");
 });
 
 test("isDemoIdentity matches by id, and by email case-insensitively", () => {

@@ -22,7 +22,7 @@ import { RunHistoryViewMore } from "@/components/runs/RunHistoryViewMore";
 import { OPEN_GROUP_PARAM } from "@/lib/runs/sessionsReturn";
 import { SessionsFilterBar } from "@/components/runs/SessionsFilterBar";
 import {
-  buildDayRunNumberMap,
+  buildDayRunNameMap,
   buildRunHistoryGroups,
   runSessionSortInstant,
   sessionGroupKey,
@@ -535,9 +535,10 @@ export default async function RunHistoryPage({
       for (const o of owners) ownerTimeZoneByUserId[o.id] = o.timeZone;
     }
   }
-  // Day-position names for unlabeled testing runs ("Run 2"). Computed from the
-  // full fetched set (pre-search-filter) so filtering never renumbers a day.
-  const dayRunNumberByRunId = buildDayRunNumberMap(runs, displayTimeZone, {
+  // Each run's name, resolved against its whole day — a name today REPEATS says
+  // nothing, so it becomes the run's position ("Run 2"). Computed from the full
+  // fetched set (pre-search-filter) so filtering never renumbers a day.
+  const dayRunNameByRunId = buildDayRunNameMap(runs, displayTimeZone, {
     ownerTimeZoneByUserId,
   });
   // Changed-keys diffing is O(runs × setup keys) — only pay for it when the
@@ -602,7 +603,7 @@ export default async function RunHistoryPage({
    */
   const priorRowsByGroupId = new Map<string, { dateLabel: string; rows: ReturnType<typeof buildGroupRunRows> }>();
   if (!teamMode) {
-    const rowsByGroupId = new Map(groups.map((g) => [g.id, buildGroupRunRows(g)]));
+    const rowsByGroupId = new Map(groups.map((g) => [g.id, buildGroupRunRows(g, groupZones)]));
     groups.forEach((group, index) => {
       for (let i = index + 1; i < groups.length; i++) {
         const older = groups[i]!;
@@ -617,7 +618,7 @@ export default async function RunHistoryPage({
   }
   const browserGroups: WorkbenchGroup[] = browserActive
     ? groups.map((group) => {
-        const rows = buildGroupRunRows(group);
+        const rows = buildGroupRunRows(group, groupZones, { setupDataByRunId });
         return {
           id: group.id,
           // A test day's date lives on the meta line, so "Test day – 19 Jul 2026"
@@ -627,12 +628,12 @@ export default async function RunHistoryPage({
           trackName: group.trackName && group.trackName !== "—" ? group.trackName : null,
           dateLabel: group.dateLabel,
           runs: rows,
-          trend: buildGroupTrendModel(group, { setupDataByRunId }),
+          trend: buildGroupTrendModel(group, { setupDataByRunId, zones: groupZones }),
           headline: teamMode
             ? null
             : buildGroupHeadline(rows, priorRowsByGroupId.get(group.id) ?? null),
           drivers: teamMode
-            ? buildGroupDrivers(group, { memberDisplayByUserId, setupDataByRunId })
+            ? buildGroupDrivers(group, { memberDisplayByUserId, setupDataByRunId, zones: groupZones })
             : null,
           teamDay: teamMode
             ? buildTeamDayModel(group.runs, { memberDisplayByUserId, zones: groupZones })
@@ -665,7 +666,7 @@ export default async function RunHistoryPage({
 
   function renderFlatRunList() {
     const showSessionColumn = runs.some(
-      (r) => formatRunSessionDisplay(r, { dayRunNumber: dayRunNumberByRunId[r.id] }) !== "—"
+      (r) => (dayRunNameByRunId[r.id] ?? formatRunSessionDisplay(r)) !== "—"
     );
     const columnLayout = {
       showReorderColumn: !teamMode,
@@ -738,7 +739,7 @@ export default async function RunHistoryPage({
                 memberDisplayByUserId={teamMode ? memberDisplayByUserId : undefined}
                 showMemberColumn={teamMode}
                 showSessionColumn={showSessionColumn}
-                dayRunNumberByRunId={dayRunNumberByRunId}
+                dayRunNameByRunId={dayRunNameByRunId}
                 matchReasonsById={matchReasonsById}
                 focusRunId={focusRunId}
               />

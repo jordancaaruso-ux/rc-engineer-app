@@ -38,6 +38,7 @@ export function WizardPrefillCard({
   kindLabel,
   whenIso,
   rows,
+  setupNote,
   note,
   subNote,
   onPrefill,
@@ -51,6 +52,12 @@ export function WizardPrefillCard({
   kindLabel: string;
   whenIso: string;
   rows: WizardPrefillRow[];
+  /**
+   * The setup on offer came off a run the driver never finished, while the rest of the card
+   * describes the last COMPLETED run. Said out loud because "from your last run" would
+   * otherwise cover two different runs at once (see `lib/runs/prefillSetupSource`).
+   */
+  setupNote?: string | null;
   /** GPS said we're somewhere else — the carried venue stayed put (note copy). */
   note?: string | null;
   /** Mid-context car change — what moved with the car (setup / tires+prep). */
@@ -104,6 +111,7 @@ export function WizardPrefillCard({
           </div>
         );
       })}
+      {setupNote ? <PrefillNote text={setupNote} /> : null}
       {note ? <PrefillNote text={note} /> : null}
       {subNote ? <PrefillNote text={subNote} /> : null}
       {applied ? (
@@ -123,7 +131,7 @@ export function WizardPrefillCard({
           onClick={onPrefill}
           disabled={loading}
           className={cn(
-            "tap-active mt-2.5 flex w-full items-center justify-center gap-2 rounded-lg primary-face bg-primary px-4 py-2.5 text-[13px] font-bold text-primary-foreground",
+            "tap-active mt-2.5 flex w-full items-center justify-center gap-2 rounded-lg primary-face bg-primary px-4 py-2.5 text-[13px] font-semibold text-primary-foreground",
             loading && "opacity-60"
           )}
         >

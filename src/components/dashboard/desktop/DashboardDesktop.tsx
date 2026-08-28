@@ -83,8 +83,10 @@ export function DashboardDesktop({
     todayStrip,
     thingsToTry,
     thingsToDo,
-    todayDraftRunId,
-    todayDraftSavedAt,
+    draftRunId,
+    draftSavedAt,
+    draftEventName,
+    draftIsForToday,
     featuredEvent,
   } = model;
 
@@ -103,7 +105,9 @@ export function DashboardDesktop({
   // footer stands down — the whole point of the card is that this line stops being the only
   // thing desktop knows about the day. A track day with no event booked (plain practice) has
   // no card to carry it, so there it stays.
-  const ctaFooter = todayDraftRunId
+  // Keyed on the draft being for TODAY, matching the CTA above it: a draft banked for Saturday
+  // is not "in progress", and saying so on a Tuesday describes a day that is not happening.
+  const ctaFooter = draftIsForToday
     ? "Draft in progress · laps and setup captured"
     : isTrackDay && !activeEvent
       ? `${todayRunCount} ${todayRunCount === 1 ? "run" : "runs"} logged today`
@@ -140,8 +144,10 @@ export function DashboardDesktop({
       {/* Row 1, right: act, then what you are acting towards. */}
       <div className="flex min-w-0 flex-col gap-5">
         <DashboardStartRunCta
-          serverDraftRunId={todayDraftRunId}
-          serverDraftSavedAt={todayDraftSavedAt}
+          serverDraftRunId={draftRunId}
+          serverDraftSavedAt={draftSavedAt}
+          serverDraftEventName={draftEventName}
+          serverDraftIsForToday={draftIsForToday}
           footer={ctaFooter}
         />
 

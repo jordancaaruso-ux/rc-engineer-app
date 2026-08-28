@@ -1,10 +1,15 @@
-import type { CompareRunShape } from "@/components/runs/RunComparePanel";
+import type {
+  CompareRunImportedLapSet,
+  CompareRunShape,
+} from "@/components/runs/RunComparePanel";
 
 /** Map a loaded run (analysis / history) into the compare / setup modal shape. */
 export function toCompareRunShape(run: {
   id: string;
   userId?: string | null;
   createdAt: Date | string;
+  /** Passed through as-is: the lap sheet reads who was in the heat off it. */
+  importedLapSets?: CompareRunImportedLapSet[] | null;
   sessionType: string;
   meetingSessionType?: string | null;
   meetingSessionCode?: string | null;
@@ -42,6 +47,7 @@ export function toCompareRunShape(run: {
     id: run.id,
     userId: run.userId ?? null,
     createdAt: run.createdAt,
+    importedLapSets: run.importedLapSets ?? undefined,
     sessionCompletedAt: run.sessionCompletedAt ?? null,
     loggingCompletedAt: run.loggingCompletedAt ?? null,
     sortAt: run.sortAt ?? null,

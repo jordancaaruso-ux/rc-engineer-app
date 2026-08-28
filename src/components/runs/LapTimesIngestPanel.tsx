@@ -13,7 +13,6 @@ import {
 import { parseManualLapText } from "@/lib/lapSession/parseManual";
 import type { LapSourceKind } from "@/lib/lapSession/types";
 import type { LapImportLapRow, LapUrlSessionDriver } from "@/lib/lapUrlParsers/types";
-import { isMyRcmDiscoveryUrl } from "@/lib/lapUrlParsers/myRcmUrl";
 import { formatLap } from "@/lib/runLaps";
 import type { LapRow } from "@/lib/lapAnalysis";
 import {
@@ -47,12 +46,23 @@ import {
   primaryRowsAcrossBlocks,
 } from "@/lib/lapImport/blockLapRows";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Eyebrow } from "@/components/ui/panel";
 import { PagedCard } from "@/components/ui/PagedCard";
 import {
   TrackTimingSourceNotice,
   type TrackTimingUrls,
 } from "@/components/runs/TrackTimingSourceNotice";
+import {
+  MyRcmPdfImportCard,
+  myRcmPdfSessionDrivers,
+  type MyRcmPdfImportResponse,
+} from "@/components/runs/MyRcmPdfImportCard";
+import {
+  MYRCM_PDF_PARSER_ID,
+  isMyRcmHostUrl,
+  myRcmPdfSourceFileName,
+} from "@/lib/lapUrlParsers/myRcmPdfSource";
 
 export type UrlImportBlock = {
   blockId: string;
@@ -168,6 +178,15 @@ function blockTimeFormatOpts(block: UrlImportBlock): ImportedSessionTimeFormatOp
   };
 }
 
+/**
+ * What to print where a block's source would otherwise be its URL. A PDF import has no URL —
+ * its `sourceUrl` is a synthetic `myrcm-pdf://…` fingerprint — so it shows the file's name.
+ */
+function describeBlockSource(block: UrlImportBlock): string {
+  const fileName = myRcmPdfSourceFileName(block.sourceUrl);
+  return fileName ? `MyRCM PDF · ${fileName}` : block.sourceUrl;
+}
+
 function sortSessionsNewestFirst<T>(items: T[], getIso: (item: T) => string | null): T[] {
   return [...items].sort((a, b) => {
     const ta = getIso(a) ? new Date(getIso(a)!).getTime() : 0;
@@ -237,15 +256,13 @@ type ImportedSessionRow = ScanDayCandidate & {
   linkedRunLabel: string | null;
 };
 
-/**
- * MyRCM event or class URL — scannable (lists its runs), not directly importable.
- * Shares `myRcmUrl.ts` with the server so a site rebuild only has to be answered once; the regex
- * that used to live here knew only the pre-v9 address and quietly stopped matching.
- */
-const isMyRcmDiscoveryPaste = isMyRcmDiscoveryUrl;
-
 const RECENT_RUNS_COLLAPSED = 3;
 const RECENT_RUNS_MAX = 10;
+/**
+ * Segment order on the source rail. Fixed rather than derived from the rows so the segments do not
+ * reshuffle underneath a driver between two scans of the same day.
+ */
+const SOURCE_FILTER_ORDER: readonly LapTimingSource[] = ["liverc", "speedhive", "myrcm"];
 /**
  * How much of the day's list to draw when nothing matched. Long enough to find yourself in a club
  * day's practice rounds, short enough that the card stays a card — the server caps it at 60.
@@ -587,7 +604,7 @@ function MoveLapsConfirm({
         <button
           type="button"
           disabled={busy}
-          className="inline-flex items-center rounded-md primary-face bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground transition hover:brightness-95 disabled:opacity-60"
+          className="inline-flex items-center rounded-md primary-face bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground transition hover:brightness-95 disabled:opacity-60"
           onClick={onConfirm}
         >
           {busy ? "Moving…" : "Move them here"}
@@ -636,7 +653,7 @@ function ScanStatusActionButton({
   const base =
     "inline-flex items-center rounded-md border border-border bg-surface-runna px-2.5 py-1 text-[11px] font-semibold transition hover:bg-surface-runna-inset";
   const primary =
-    "inline-flex items-center rounded-md primary-face bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground transition hover:brightness-95";
+    "inline-flex items-center rounded-md primary-face bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground transition hover:brightness-95";
 
   switch (action.kind) {
     case "settings":
@@ -693,6 +710,7 @@ export function LapTimesIngestPanel({
   trackSpeedhiveUrl,
   onTrackTimingUrlsSaved,
   editingRunId,
+  eventMyRcmUrl,
 }: {
   value: LapIngestFormValue;
   onChange: (next: LapIngestFormValue) => void;
@@ -713,6 +731,12 @@ export function LapTimesIngestPanel({
   onTrackTimingUrlsSaved?: (next: TrackTimingUrls) => void;
   /** When editing a run, linked timing imports stay visible in discovery even if already imported. */
   editingRunId?: string | null;
+  /**
+   * This meeting's page on MyRCM (`Event.myRcmUrl`), when the driver saved one. Read for exactly
+   * one thing: the PDF door's "Open MyRCM" opens it, so the trip to download a result starts on
+   * their own class rather than MyRCM's front page. Never fetched — see `myRcmPdfSource.ts`.
+   */
+  eventMyRcmUrl?: string | null;
 }) {
   const hasLiveRcTrack = Boolean(trackId?.trim() && trackLiveRcUrl?.trim());
   const hasSpeedhiveTrack = Boolean(trackId?.trim() && trackSpeedhiveUrl?.trim());
@@ -726,9 +750,11 @@ export function LapTimesIngestPanel({
   const [urlInput, setUrlInput] = useState("");
   /** "Add another timing session" sends the driver straight back to the paste box. */
   const urlInputRef = useRef<HTMLInputElement | null>(null);
-  /** Last manually scanned discovery URL (e.g. MyRCM event) — lets Refresh re-scan it. */
+  /** Last manually scanned discovery URL (a LiveRC day/event page) — lets Refresh re-scan it. */
   const manualScanUrlRef = useRef<string | null>(null);
   const [urlMessage, setUrlMessage] = useState<string | null>(null);
+  /** A MyRCM page pasted into the URL box — it opens the PDF door rather than going to the server. */
+  const [myRcmPastedUrl, setMyRcmPastedUrl] = useState<string | null>(null);
   const [dayScanBusy, setDayScanBusy] = useState(false);
   const [dayScanStatus, setDayScanStatus] = useState<ScanStatus | null>(null);
   const [dayScanCandidates, setDayScanCandidates] = useState<ScanDayCandidate[] | null>(null);
@@ -736,6 +762,16 @@ export function LapTimesIngestPanel({
   const [dayScanHasDriverName, setDayScanHasDriverName] = useState<boolean>(true);
   const [scanTotals, setScanTotals] = useState<{ total: number; unimported: number } | null>(null);
   const [showAllRecentRuns, setShowAllRecentRuns] = useState(false);
+  /**
+   * Which timing source the picker is narrowed to. A track carrying both a LiveRC page and a
+   * MYLAPS one returns one merged stream, and on a race day the three rows above the fold can
+   * easily all be from the site you weren't racing on.
+   *
+   * Reset to "all" by every scan (see `scanDayUrl`) rather than remembered: a refresh can bring
+   * back a source that was quiet a minute ago, and a session arriving into a bucket the driver
+   * isn't looking at reads exactly like a scan that found nothing.
+   */
+  const [sourceFilter, setSourceFilter] = useState<LapTimingSource | "all">("all");
   /** Unimported sessions completed before today (first-scan backlog) — collapsed by default. */
   const [dayScanOlderCandidates, setDayScanOlderCandidates] = useState<ScanDayCandidate[] | null>(null);
   const [dayScanOlderTotal, setDayScanOlderTotal] = useState(0);
@@ -937,7 +973,66 @@ export function LapTimesIngestPanel({
     }));
   }, [dayScanOlderCandidates, mergedImportCandidates, attachedUrls]);
 
-  const canExpandImportRows = mergedImportCandidates.length > RECENT_RUNS_COLLAPSED;
+  /**
+   * The segments the source rail offers, in one fixed order so they never reshuffle between scans.
+   *
+   * Built from the track's saved timing sites UNIONED with the sources actually present, not from
+   * the rows alone. A saved site that came back empty still has to appear carrying its `0`:
+   * dropping it reads as "we never looked there", when the truth is "we looked and it was quiet",
+   * and that is the answer the driver taps it for. The union half also keeps a source that was
+   * never a saved track site on the rail: MyRCM rows imported before 2026-08-26 stay findable even
+   * though nothing new can arrive from there any more.
+   */
+  const filterSourceCounts = useMemo(() => {
+    const counts = new Map<LapTimingSource, number>();
+    if (hasLiveRcTrack) counts.set("liverc", 0);
+    if (hasSpeedhiveTrack) counts.set("speedhive", 0);
+    for (const row of mergedImportCandidates) {
+      if (!row.timingSource) continue;
+      counts.set(row.timingSource, (counts.get(row.timingSource) ?? 0) + 1);
+    }
+    // Older rows earn a segment but not a count — the number on the rail has to agree with the
+    // number in the header, and the header counts what is in the list above the fold.
+    for (const row of olderPickerRows) {
+      if (row.timingSource && !counts.has(row.timingSource)) counts.set(row.timingSource, 0);
+    }
+    return SOURCE_FILTER_ORDER.filter((source) => counts.has(source)).map((source) => ({
+      source,
+      count: counts.get(source) ?? 0,
+    }));
+  }, [hasLiveRcTrack, hasSpeedhiveTrack, mergedImportCandidates, olderPickerRows]);
+
+  /** One source is not a choice — the rail only earns its line when there are two to pick between. */
+  const showSourceFilter = filterSourceCounts.length > 1;
+
+  const matchesSourceFilter = useCallback(
+    (source: LapTimingSource | null | undefined) => sourceFilter === "all" || source === sourceFilter,
+    [sourceFilter]
+  );
+
+  // Filtering happens here, BEFORE the collapse slice below. The other way round and
+  // "Show more sessions (4 more)" counts rows the filter has already taken out.
+  const visibleImportCandidates = useMemo(
+    () => mergedImportCandidates.filter((row) => matchesSourceFilter(row.timingSource)),
+    [mergedImportCandidates, matchesSourceFilter]
+  );
+
+  const visibleOlderPickerRows = useMemo(
+    () => olderPickerRows.filter((row) => matchesSourceFilter(row.timingSource)),
+    [olderPickerRows, matchesSourceFilter]
+  );
+
+  /**
+   * The filter emptied a list that has rows in it. Not reachable by tapping — a source with no
+   * rows is an inert segment — but importing the last session from the selected source gets you
+   * here, and the generic "check your driver name" copy would be a lie about what happened.
+   */
+  const sourceFilterHidEverything =
+    sourceFilter !== "all" &&
+    visibleImportCandidates.length === 0 &&
+    mergedImportCandidates.length > 0;
+
+  const canExpandImportRows = visibleImportCandidates.length > RECENT_RUNS_COLLAPSED;
 
   /**
    * Already-imported sessions, minus whatever this run is holding right now.
@@ -947,8 +1042,21 @@ export function LapTimesIngestPanel({
    * looking at. Same rule the main picker list follows, and the same bug it was written to end.
    */
   const importedPickerRows = useMemo(
-    () => importedCandidates.filter((row) => !attachedUrls.has(row.sessionUrl.trim())),
-    [importedCandidates, attachedUrls]
+    () =>
+      importedCandidates.filter(
+        (row) => !attachedUrls.has(row.sessionUrl.trim()) && matchesSourceFilter(row.timingSource)
+      ),
+    [importedCandidates, attachedUrls, matchesSourceFilter]
+  );
+
+  /**
+   * The day's list, whoever it belongs to. Filtered alongside everything else: it sits inside the
+   * same panel under the same header, so a rail saying "Speedhive" while this expander offers
+   * LiveRC rows would make the segment mean nothing.
+   */
+  const visibleSessionsToday = useMemo(
+    () => sessionsToday.filter((row) => matchesSourceFilter(row.source)),
+    [sessionsToday, matchesSourceFilter]
   );
 
   /**
@@ -964,10 +1072,12 @@ export function LapTimesIngestPanel({
   // Total for the status line — the track scan may report more unimported sessions
   // than it returns rows for. The scan counted anything attached since as still
   // unimported, so take those back off or the header reads one higher than the list.
-  const importPickerTotal = Math.max(
-    mergedImportCandidates.length,
-    (scanTotals?.unimported ?? 0) - attachedUrls.size
-  );
+  // With a source selected the list IS the total: `scanTotals` counts every source at once, so
+  // letting it win here would print a number the segment below could never account for.
+  const importPickerTotal =
+    sourceFilter === "all"
+      ? Math.max(mergedImportCandidates.length, (scanTotals?.unimported ?? 0) - attachedUrls.size)
+      : visibleImportCandidates.length;
 
   function selectTab(id: IngestTab) {
     setTab(id);
@@ -1043,6 +1153,9 @@ export function LapTimesIngestPanel({
     setDayScanIndexKind(null);
     setScanTotals(null);
     setShowAllRecentRuns(false);
+    // Back to "all" for the incoming list. A scan can return a source that was empty last time,
+    // and a new session landing behind an unselected segment looks like nothing was found.
+    setSourceFilter("all");
     setDayScanOlderCandidates(null);
     setDayScanOlderTotal(0);
     setShowOlderSessions(false);
@@ -1224,15 +1337,6 @@ export function LapTimesIngestPanel({
       setUrlMessage("Paste a timing/results URL first.");
       return;
     }
-    // MyRCM event / class URL: it lists many sessions, so scan it into the picker
-    // instead of importing (a direct MyRCM session URL with ?reportKey= imports normally).
-    if (isMyRcmDiscoveryPaste(url)) {
-      manualScanUrlRef.current = url;
-      setUrlMessage(null);
-      setTab("url-auto");
-      await scanDayUrl(url);
-      return;
-    }
     if (alreadyAttached(url)) {
       setUrlMessage("That session is already attached to this run.");
       return;
@@ -1241,6 +1345,15 @@ export function LapTimesIngestPanel({
   }
 
   async function runUrlImport(url: string) {
+    if (isMyRcmHostUrl(url)) {
+      // Never sent: myrcm.ch is on the fetch denylist, and the paste is the driver telling us
+      // where they raced. Answer with the file door below rather than "not supported".
+      setMyRcmPastedUrl(url);
+      setUrlMessage(null);
+      setUrlInput("");
+      haptic("light");
+      return;
+    }
     setUrlBusy(true);
     setUrlMessage(null);
     try {
@@ -1302,7 +1415,18 @@ export function LapTimesIngestPanel({
    * stored on this account being picked up again. Both hand over the same row shape, so the driver
    * picking, lap ticks and split-run ordering below can't drift between them.
    */
-  function attachImportRow(row: ImportResultRow, fallbackUrl: string) {
+  function attachImportRow(
+    row: ImportResultRow,
+    fallbackUrl: string,
+    opts?: {
+      /**
+       * The row that is theirs, decided by the server — or `null` for "nobody matched, make
+       * them pick". Passing the key at all switches off the P1 fallback: a MyRCM result has no
+       * driver id and no transponder, so guessing a row would file someone else's laps as theirs.
+       */
+      primaryDriverId: string | null;
+    }
+  ) {
     {
       const url = fallbackUrl;
       const parserId = row.parserId ?? "http_timing_v1";
@@ -1315,8 +1439,11 @@ export function LapTimesIngestPanel({
       const topLaps = row.laps ?? [];
       const lapRowsFromApi = row.lapRows;
 
-      const autoSelectIds =
-        sessionDrivers.length === 0
+      const autoSelectIds = opts
+        ? opts.primaryDriverId && sessionDrivers.some((d) => d.driverId === opts.primaryDriverId)
+          ? [opts.primaryDriverId]
+          : []
+        : sessionDrivers.length === 0
           ? []
           : sessionDrivers.length === 1 && sessionDrivers[0]?.driverId
             ? [sessionDrivers[0].driverId]
@@ -1397,6 +1524,35 @@ export function LapTimesIngestPanel({
       setUrlInput("");
       setUrlMessage(combinedMessage);
     }
+  }
+
+  /**
+   * A MyRCM result the driver uploaded as a PDF, accepted by the server. Same attach as every
+   * other import from here on — the response is reshaped into the row the URL door hands over.
+   */
+  function attachMyRcmPdf(res: MyRcmPdfImportResponse) {
+    attachImportRow(
+      {
+        success: true,
+        importedSessionId: res.importedSessionId,
+        recordedAt: res.recordedAt,
+        sessionCompletedAtIso: res.sessionCompletedAtIso,
+        sessionCompletedAtDbIso: res.sessionCompletedAtDbIso,
+        parserId: res.parserId,
+        laps: res.laps,
+        sessionDrivers: myRcmPdfSessionDrivers(res),
+        sessionHint: { name: res.session.name },
+        url: res.sourceUrl,
+      },
+      res.sourceUrl,
+      { primaryDriverId: res.matchedDriverId }
+    );
+    setMyRcmPastedUrl(null);
+  }
+
+  /** The attached block a PDF import landed as, by the session the server minted for it. */
+  function blockForImportedSession(importedSessionId: string): UrlImportBlock | null {
+    return value.urlImportBlocks.find((b) => b.importedSessionId === importedSessionId) ?? null;
   }
 
   /**
@@ -1509,8 +1665,8 @@ export function LapTimesIngestPanel({
   // run reaches here — the list is only what you have not taken yet.
   const importPickerRows = useMemo(
     () =>
-      mergedImportCandidates.slice(0, showAllRecentRuns ? RECENT_RUNS_MAX : RECENT_RUNS_COLLAPSED),
-    [mergedImportCandidates, showAllRecentRuns]
+      visibleImportCandidates.slice(0, showAllRecentRuns ? RECENT_RUNS_MAX : RECENT_RUNS_COLLAPSED),
+    [visibleImportCandidates, showAllRecentRuns]
   );
 
   function toggleLapInclusion(blockId: string, driverId: string, lapIndex: number) {
@@ -1562,8 +1718,9 @@ export function LapTimesIngestPanel({
               the strip is the run's laps, not a list UI. */}
           <div className="space-y-1.5">
             {attachedBlocks.map((block) => {
-              const primaryId =
-                block.selectedDriverIds?.[0] ?? block.sessionDrivers[0]?.driverId ?? null;
+              // No fallback to P1: a block with nothing picked (a MyRCM PDF whose names
+              // matched nobody) must not be drawn as if the winner's laps were theirs.
+              const primaryId = block.selectedDriverIds?.[0] ?? null;
               const driver = primaryId
                 ? block.sessionDrivers.find((d) => d.driverId === primaryId) ?? null
                 : null;
@@ -1573,7 +1730,13 @@ export function LapTimesIngestPanel({
                   key={block.blockId}
                   // Name only — the time is the meta line's job, and carrying it
                   // in both truncated each to uselessness at 390px.
-                  title={driver ? driver.driverName : block.sourceUrl}
+                  title={
+                    driver
+                      ? driver.driverName
+                      : block.sessionDrivers.length > 0
+                        ? "Pick your name"
+                        : describeBlockSource(block)
+                  }
                   when={formatImportedSessionTime(
                     blockLabelTimeIso(block),
                     blockTimeFormatOpts(block)
@@ -1654,6 +1817,56 @@ export function LapTimesIngestPanel({
                   {eventRaceBusy || dayScanBusy ? "Refreshing…" : "Refresh"}
                 </button>
               </div>
+              {/*
+                Which site's sessions to show. Only drawn when the track really has more than one
+                to choose between — most tracks carry a LiveRC page or a MYLAPS one, not both, and
+                there a rail would be a control with a single real option.
+
+                A source that was searched and came back with nothing keeps its segment and shows
+                `0`, greyed and untappable: that is the answer, and it is worth more here than an
+                empty list reached by a tap.
+              */}
+              {showSourceFilter ? (
+                <SegmentedControl<LapTimingSource | "all">
+                  size="sm"
+                  ariaLabel="Timing source"
+                  segmentClassName="px-2 py-1 text-[11px]"
+                  value={sourceFilter}
+                  onChange={(next) => {
+                    setSourceFilter(next);
+                    // A narrower list starts collapsed again, or "Show fewer sessions" sits under
+                    // three rows offering to hide nothing.
+                    setShowAllRecentRuns(false);
+                  }}
+                  options={[
+                    {
+                      value: "all",
+                      label: (
+                        <>
+                          All
+                          <span className="font-normal tabular-nums opacity-70">
+                            {mergedImportCandidates.length}
+                          </span>
+                        </>
+                      ),
+                      ariaLabel: `All sources, ${mergedImportCandidates.length} sessions`,
+                    },
+                    ...filterSourceCounts.map(({ source, count }) => ({
+                      value: source,
+                      label: (
+                        <>
+                          {timingSourceLabel(source)}
+                          <span className="font-normal tabular-nums opacity-70">{count}</span>
+                        </>
+                      ),
+                      ariaLabel: `${timingSourceLabel(source) ?? source}, ${count} session${
+                        count === 1 ? "" : "s"
+                      }`,
+                      disabled: count === 0,
+                    })),
+                  ]}
+                />
+              ) : null}
               {hasTrackDiscovery && !dayScanHasDriverName ? (
                 // Just-in-time timing gate (docs/ONBOARDING_NORTH_STAR.md, reversal
                 // 2026-07-23): timing isn't required up front, so this is where it
@@ -1671,7 +1884,7 @@ export function LapTimesIngestPanel({
                   </p>
                   <Link
                     href="/settings"
-                    className="mt-2 inline-flex items-center rounded-md primary-face bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground transition hover:brightness-95"
+                    className="mt-2 inline-flex items-center rounded-md primary-face bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground transition hover:brightness-95"
                   >
                     Add timing details
                   </Link>
@@ -1686,7 +1899,9 @@ export function LapTimesIngestPanel({
                           title={row.title}
                           when={row.when}
                           bestLapSeconds={row.bestLapSeconds}
-                          timingSource={row.timingSource}
+                          // Named on every row while the list is mixed; dropped once a source is
+                          // selected, where the rail above has already said it seven times.
+                          timingSource={sourceFilter === "all" ? row.timingSource : undefined}
                           actionLabel={row.alreadyImported ? "Import again" : "Import"}
                           disabled={urlBusy}
                           onClick={() => void importFromSessionUrl(row.sessionUrl)}
@@ -1702,7 +1917,12 @@ export function LapTimesIngestPanel({
                     >
                       {showAllRecentRuns
                         ? "Show fewer sessions"
-                        : `Show more sessions (${Math.min(RECENT_RUNS_MAX, mergedImportCandidates.length) - RECENT_RUNS_COLLAPSED} more)`}
+                        : // Counted off the FILTERED list, like the slice above it. Off the merged
+                          // one this offered "(4 more)" on a source that only had one left to show.
+                          `Show more sessions (${
+                            Math.min(RECENT_RUNS_MAX, visibleImportCandidates.length) -
+                            RECENT_RUNS_COLLAPSED
+                          } more)`}
                     </button>
                   ) : null}
                 </div>
@@ -1714,6 +1934,32 @@ export function LapTimesIngestPanel({
                     className="h-[22px] w-[22px] animate-spin rounded-full border-2 border-primary-ink/20 border-t-accent"
                   />
                   <p className="text-sm font-semibold text-foreground">Searching for new runs…</p>
+                </div>
+              ) : null}
+              {/*
+                Emptied by the filter, not by the scan — the last session from the selected source
+                has just been taken onto this run. Says so, and offers the way back, rather than
+                sending the driver to Settings to fix a driver name that was never wrong.
+              */}
+              {!eventRaceBusy && !dayScanBusy && sourceFilterHidEverything ? (
+                <div className="px-3 py-4 text-center">
+                  <p className="text-sm font-semibold text-foreground text-balance">
+                    Nothing left from {timingSourceLabel(sourceFilter as LapTimingSource)}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground text-pretty">
+                    There are still {mergedImportCandidates.length} session
+                    {mergedImportCandidates.length === 1 ? "" : "s"} from the other sources.
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-2.5 rounded-md border border-border bg-surface-runna px-3 py-1.5 text-[11px] font-medium transition hover:bg-surface-runna-inset"
+                    onClick={() => {
+                      setSourceFilter("all");
+                      setShowAllRecentRuns(false);
+                    }}
+                  >
+                    Show all sessions
+                  </button>
                 </div>
               ) : null}
               {!eventRaceBusy && !dayScanBusy && mergedImportCandidates.length === 0 ? (
@@ -1758,7 +2004,7 @@ export function LapTimesIngestPanel({
                   );
                 })()
               ) : null}
-              {!dayScanBusy && olderPickerRows.length > 0 ? (
+              {!dayScanBusy && visibleOlderPickerRows.length > 0 ? (
                 <div className="space-y-1">
                   <button
                     type="button"
@@ -1767,18 +2013,22 @@ export function LapTimesIngestPanel({
                   >
                     {showOlderSessions
                       ? "Hide older sessions"
-                      : `Show older sessions (${dayScanOlderTotal})`}
+                      : // `dayScanOlderTotal` is the server's count across every source at once, so
+                        // it can only be quoted while the list is unfiltered.
+                        `Show older sessions (${
+                          sourceFilter === "all" ? dayScanOlderTotal : visibleOlderPickerRows.length
+                        })`}
                   </button>
                   {showOlderSessions ? (
                     <>
                       <ul className="space-y-1">
-                        {olderPickerRows.map((row) => (
+                        {visibleOlderPickerRows.map((row) => (
                           <li key={row.key}>
                             <SessionImportListRow
                               title={row.title}
                               when={row.when}
                               bestLapSeconds={row.bestLapSeconds}
-                              timingSource={row.timingSource}
+                              timingSource={sourceFilter === "all" ? row.timingSource : undefined}
                               actionLabel="Import"
                               disabled={urlBusy}
                               onClick={() => void importFromSessionUrl(row.sessionUrl)}
@@ -1786,7 +2036,7 @@ export function LapTimesIngestPanel({
                           </li>
                         ))}
                       </ul>
-                      {dayScanOlderTotal > olderPickerRows.length ? (
+                      {sourceFilter === "all" && dayScanOlderTotal > olderPickerRows.length ? (
                         <p className="ui-label-meta">
                           Showing the {olderPickerRows.length} most recent of {dayScanOlderTotal} older sessions.
                         </p>
@@ -1801,7 +2051,7 @@ export function LapTimesIngestPanel({
                 own session, take it, then fix the name in Settings so the next one finds itself.
                 Behind a tap, never automatic — the old card printed five strangers' names at you.
               */}
-              {!dayScanBusy && sessionsToday.length > 0 ? (
+              {!dayScanBusy && visibleSessionsToday.length > 0 ? (
                 <div className="space-y-1">
                   <button
                     type="button"
@@ -1810,7 +2060,7 @@ export function LapTimesIngestPanel({
                   >
                     {showSessionsToday
                       ? `Hide the sessions from ${sessionsDayLabel}`
-                      : `See the sessions from ${sessionsDayLabel} (${sessionsToday.length})`}
+                      : `See the sessions from ${sessionsDayLabel} (${visibleSessionsToday.length})`}
                   </button>
                   {showSessionsToday ? (
                     <>
@@ -1819,7 +2069,7 @@ export function LapTimesIngestPanel({
                         take it — then fix your name in Settings so the next one finds itself.
                       </p>
                       <ul className="space-y-1">
-                        {sessionsToday.slice(0, SESSIONS_TODAY_SHOWN).map((row) => (
+                        {visibleSessionsToday.slice(0, SESSIONS_TODAY_SHOWN).map((row) => (
                           <li key={`today:${row.sessionId}`}>
                             <SessionImportListRow
                               title={row.label}
@@ -1830,7 +2080,7 @@ export function LapTimesIngestPanel({
                                 .filter(Boolean)
                                 .join(" · ")}
                               bestLapSeconds={null}
-                              timingSource={row.source}
+                              timingSource={sourceFilter === "all" ? row.source : undefined}
                               actionLabel="Import"
                               disabled={urlBusy}
                               onClick={() => void importFromSessionUrl(row.sessionUrl)}
@@ -1838,9 +2088,9 @@ export function LapTimesIngestPanel({
                           </li>
                         ))}
                       </ul>
-                      {sessionsToday.length > SESSIONS_TODAY_SHOWN ? (
+                      {visibleSessionsToday.length > SESSIONS_TODAY_SHOWN ? (
                         <p className="ui-label-meta">
-                          Showing {SESSIONS_TODAY_SHOWN} of {sessionsToday.length}.
+                          Showing {SESSIONS_TODAY_SHOWN} of {visibleSessionsToday.length}.
                         </p>
                       ) : null}
                     </>
@@ -1876,7 +2126,7 @@ export function LapTimesIngestPanel({
                             )}
                             note={row.linkedRunLabel ? `On ${row.linkedRunLabel}` : "Not on a run"}
                             bestLapSeconds={row.bestLapSeconds ?? null}
-                            timingSource={row.timingSource}
+                            timingSource={sourceFilter === "all" ? row.timingSource : undefined}
                             // Laps sitting loose are simply taken. Laps filed under another run get
                             // the confirm first, because taking them moves them off it.
                             actionLabel={row.linkedRunId ? "Use here" : "Use these laps"}
@@ -1913,7 +2163,7 @@ export function LapTimesIngestPanel({
             <div className="space-y-2 rounded-md border border-border bg-surface-runna p-2">
               <p className="ui-label-meta">
                 Or use <span className="text-foreground/90">URL Manual</span> to paste a session URL
-                or a MyRCM event URL.
+                straight in.
               </p>
             </div>
           ) : trackId?.trim() ? null : (
@@ -1930,8 +2180,8 @@ export function LapTimesIngestPanel({
             content: (
         <div className="space-y-2 text-sm">
           <p className="ui-label-meta">
-            Paste a LiveRC, Speedhive, MyRCM, or other timing/results page URL to import laps.
-            A MyRCM event or class URL lists its sessions to pick from.
+            Paste a LiveRC or Speedhive session URL to import laps. MyRCM results come in as a
+            file — see below.
           </p>
           <div className="flex flex-col sm:flex-row gap-2">
             <input
@@ -1973,7 +2223,9 @@ export function LapTimesIngestPanel({
                   <Eyebrow>
                     Imported · {formatImportedSessionTime(blockLabelTimeIso(activeImportBlock), blockTimeFormatOpts(activeImportBlock))}
                   </Eyebrow>
-                  <div className="text-[11px] text-muted-foreground break-all">{activeImportBlock.sourceUrl}</div>
+                  <div className="text-[11px] text-muted-foreground break-all">
+                    {describeBlockSource(activeImportBlock)}
+                  </div>
                 </div>
                 <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-primary-ink/40 bg-accent/10 px-2 py-1 text-[10px] font-medium text-foreground">
                   <span aria-hidden>✓</span>
@@ -2136,10 +2388,8 @@ export function LapTimesIngestPanel({
             content: (
         <div className="space-y-2 text-sm">
           <p className="ui-label-meta">
-            Upload a screenshot or photo of a lap list / timing app. The server uses{" "}
-            <span className="text-foreground/90">OpenAI vision</span> (JSON output) to fill laps below — always review
-            and edit before saving. Requires <code className="text-foreground/80">OPENAI_API_KEY</code> in{" "}
-            <code className="text-foreground/80">.env</code>.
+            Upload a screenshot or photo of a lap list or timing screen. We read the laps out of
+            it into the box below — always check them before saving.
           </p>
           <input
             type="file"
@@ -2160,6 +2410,26 @@ export function LapTimesIngestPanel({
           },
         ]}
       />
+
+      {/* The MyRCM door. Below the tabs, not among them: it only matters to drivers who race
+          on MyRCM, and it opens itself when one of them pastes a MyRCM link above. */}
+      {isUrlTab(tab) ? (
+        <MyRcmPdfImportCard
+          pastedUrl={myRcmPastedUrl}
+          openUrl={isMyRcmHostUrl(eventMyRcmUrl) ? eventMyRcmUrl!.trim() : null}
+          hasImported={attachedBlocks.some((b) => b.parserId === MYRCM_PDF_PARSER_ID)}
+          onImported={attachMyRcmPdf}
+          selectedDriverIdFor={(sid) => blockForImportedSession(sid)?.selectedDriverIds?.[0] ?? null}
+          onPickDriver={(sid, driverId) => {
+            const block = blockForImportedSession(sid);
+            if (!block) return;
+            selectPrimaryDriverForBlock(block.blockId, driverId, 0);
+            setFocusedBlockId(block.blockId);
+            setActivePreviewKey(`${block.blockId}:${driverId}`);
+            haptic("light");
+          }}
+        />
+      ) : null}
 
       {!isUrlTab(tab) ? (
         <div className="space-y-1">

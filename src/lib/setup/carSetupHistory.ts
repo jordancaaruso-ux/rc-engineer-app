@@ -1,4 +1,4 @@
-import { formatRunSessionDisplay } from "@/lib/runSession";
+import { formatRunSessionDisplay, resolveDayRunNames } from "@/lib/runSession";
 import { setupChangedRowsSincePrevious } from "@/lib/setupCompare/changedSincePrevious";
 import { isRunToRunSetupNoiseKey } from "@/lib/setupCompare/setupChangeNoise";
 import { savedRunSetupName } from "@/lib/setup/setupSaveName";
@@ -211,24 +211,29 @@ export function runToRunChangedKeys(current: unknown, previous: unknown): string
  * of that day is numbered 1 when it was really the 4th out. Only reachable on a car with more than
  * 60 runs, and only on the last row or two of the list.
  */
-function dayRunNumbers(
+function dayRunNames(
   runs: readonly SetupHistoryRunInput[],
   dayKey: (at: Date) => string
-): Map<string, number> {
-  const perDay = new Map<string, number>();
+): Map<string, string> {
+  const perDay = new Map<string, SetupHistoryRunInput[]>();
   for (const r of runs) {
     const key = dayKey(r.displayAt);
-    perDay.set(key, (perDay.get(key) ?? 0) + 1);
+    const list = perDay.get(key) ?? [];
+    list.push(r);
+    perDay.set(key, list);
   }
-  const numbers = new Map<string, number>();
-  const walked = new Map<string, number>();
-  for (const r of runs) {
-    const key = dayKey(r.displayAt);
-    const used = walked.get(key) ?? 0;
-    numbers.set(r.id, (perDay.get(key) ?? 0) - used);
-    walked.set(key, used + 1);
+  const names = new Map<string, string>();
+  for (const list of perDay.values()) {
+    // Newest first, so the day's count runs backwards off its length.
+    const resolved = resolveDayRunNames(
+      list.map((r, i) => {
+        const dayRunNumber = list.length - i;
+        return { name: formatRunSessionDisplay(r, { dayRunNumber }), dayRunNumber };
+      })
+    );
+    list.forEach((r, i) => names.set(r.id, resolved[i].label));
   }
-  return numbers;
+  return names;
 }
 
 export function buildCarSetupHistory(input: {
@@ -259,7 +264,7 @@ export function buildCarSetupHistory(input: {
   dayKey?: (at: Date) => string;
 }): CarSetupHistoryEntry[] {
   const entries: CarSetupHistoryEntry[] = [];
-  const runNumbers = input.dayKey ? dayRunNumbers(input.runs, input.dayKey) : null;
+  const runNames = input.dayKey ? dayRunNames(input.runs, input.dayKey) : null;
 
   for (let i = 0; i < input.runs.length; i += 1) {
     const run = input.runs[i];
@@ -284,17 +289,21 @@ export function buildCarSetupHistory(input: {
     /*
      * A run that named itself keeps its name — "Qualifying · Q2" says more than "Run 5" ever could,
      * and `formatRunSessionDisplay` only reaches for the number when there is nothing else to say.
-     * So the number appears exactly where the row used to read "Testing run".
+     * So the number appears exactly where the row used to read "Testing run" — and, since
+     * 2026-08-25, wherever the day gave two runs the SAME name (`resolveDayRunNames`): a day of
+     * practice sessions listed "Practice" against every setup on it.
      */
-    const session = formatRunSessionDisplay(
-      {
-        sessionType: run.sessionType,
-        meetingSessionType: run.meetingSessionType,
-        meetingSessionCode: run.meetingSessionCode,
-        sessionLabel: run.sessionLabel,
-      },
-      { dayRunNumber: runNumbers?.get(run.id) ?? null, fallback: "Testing run" }
-    );
+    const session =
+      runNames?.get(run.id) ??
+      formatRunSessionDisplay(
+        {
+          sessionType: run.sessionType,
+          meetingSessionType: run.meetingSessionType,
+          meetingSessionCode: run.meetingSessionCode,
+          sessionLabel: run.sessionLabel,
+        },
+        { fallback: "Testing run" }
+      );
     const saved = Boolean(snapshot?.isLibrary);
     entries.push({
       id: run.setupSnapshotId,

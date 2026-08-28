@@ -111,7 +111,7 @@ export default function TermsPage() {
 
       <Section title="Third-party sites">
         <p>
-          Lap import reads publicly available timing pages (LiveRC, MyRCM, Speedhive) from URLs you
+          Lap import reads publicly available timing pages (LiveRC, Speedhive) from URLs you
           provide. We are not affiliated with those services, do not control their data, and cannot
           guarantee an import is accurate or will keep working.
         </p>

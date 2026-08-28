@@ -17,7 +17,7 @@ import {
 import { openIdeasPanel } from "@/components/layout/IdeasEdgeTab";
 import { PrimaryNavLink } from "@/components/layout/PrimaryNavLink";
 import { usePrimaryNav } from "@/components/layout/PrimaryNavProvider";
-import { useTodayDraftRun } from "@/components/layout/TodayDraftRunProvider";
+import { useDraftRun } from "@/components/layout/DraftRunProvider";
 import { haptic } from "@/lib/haptics";
 import { warmNewRunForm } from "@/lib/runs/warmNewRunForm";
 import { cn } from "@/lib/utils";
@@ -45,7 +45,7 @@ const TICK_HALF = 14;
  */
 export const TopRail = memo(function TopRail() {
   const { activeId } = usePrimaryNav();
-  const { addRunHref, draftRunId } = useTodayDraftRun();
+  const { addRunHref, activeDraftRunId } = useDraftRun();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -102,7 +102,7 @@ export const TopRail = memo(function TopRail() {
    */
   const isDashboard = pathname === "/";
   const logRunHref = isDashboard ? "/runs/new" : addRunHref(NAV_ADD_RUN.href);
-  const logRunLabel = !isDashboard && draftRunId ? "Finish run" : "Log run";
+  const logRunLabel = !isDashboard && activeDraftRunId ? "Finish run" : "Log run";
   const warmLogRun = () => {
     router.prefetch(logRunHref);
     warmNewRunForm();

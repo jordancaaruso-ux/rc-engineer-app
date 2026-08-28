@@ -12,12 +12,31 @@ import { PaceSparkline } from "@/components/dashboard/PaceSparkline";
 const GAIN = "text-gain";
 const LOSS = "text-destructive";
 
-/** Signed lap delta, 3 decimals — negative (faster) reads green, positive red. */
-function DeltaChip({ delta, className }: { delta: number; className?: string }) {
+/**
+ * Signed lap delta, 3 decimals — negative (faster) reads green, positive red.
+ *
+ * `neutral` greys it instead, for a delta the card has already called noise. Without it a
+ * headline of "Holding steady" carried a red ▲ 0.020 beside it: two hundredths is inside
+ * the steady band by definition, and colouring it as lost time argued with the word. Same
+ * convention as `PaceSparkline`, whose end dot goes faint on a steady day.
+ */
+function DeltaChip({
+  delta,
+  neutral = false,
+  className,
+}: {
+  delta: number;
+  neutral?: boolean;
+  className?: string;
+}) {
   const faster = delta < 0;
   return (
     <span
-      className={cn("text-[12px] font-semibold tabular-nums", faster ? GAIN : LOSS, className)}
+      className={cn(
+        "text-[12px] font-semibold tabular-nums",
+        neutral ? "text-faint" : faster ? GAIN : LOSS,
+        className,
+      )}
     >
       {faster ? "▼" : "▲"} {Math.abs(delta).toFixed(3)}
     </span>
@@ -37,14 +56,25 @@ function changedLine(rows: NonNullable<TodayVerdict["lastChange"]>["rows"]): str
 }
 
 /**
- * Today's ratings as an arrow chain. Four values is what fits beside the dial on one
- * line at 390px — measured, not guessed — so a longer day collapses to both ENDS with
- * an ellipsis between. Both ends, because the direction word is computed from exactly
- * those two: trimming the first number would make the word look wrong.
+ * Today's ratings as figures plus the sentence they end. Four values is what fits beside
+ * the dial on one line at 390px — measured, not guessed.
+ *
+ * A longer day used to collapse to `6 → … → 6`, which hid the middle — and the middle is
+ * the whole point on the day most likely to have one (founder report 2026-08-25: a day
+ * that fluctuated read as "same all day" on BOTH lines). So past four runs the chain gives
+ * way to the day's low and high, which is the fact the ellipsis was eating. Nothing here
+ * prints where the day ENDED, because the dial to the right of this row is exactly that.
+ *
+ * The tail is " today", not " across today": measured at 390px, a four-value chain and the
+ * longer tail wrap onto a second line, because the dial takes the width its band word needs
+ * ("Workable" is the wide one).
  */
-function handlingArcLine(arc: number[]): string {
-  if (arc.length <= 4) return arc.join(" → ");
-  return `${arc[0]} → … → ${arc[arc.length - 1]}`;
+function handlingArcLine(arc: number[]): { figures: string; tail: string } {
+  if (arc.length <= 4) return { figures: arc.join(" → "), tail: " today" };
+  const low = Math.min(...arc);
+  const high = Math.max(...arc);
+  if (low === high) return { figures: String(low), tail: " every run today" };
+  return { figures: `low ${low}, high ${high}`, tail: " today" };
 }
 
 /**
@@ -56,17 +86,28 @@ function handlingArcLine(arc: number[]): string {
  * the car went, dial = where it ended up.
  */
 function handlingHeadline(handling: NonNullable<TodayVerdict["handling"]>, runCount: number): string {
+  // "Only Practice rated" on a day of five practice sessions named none of them, so a
+  // positional label speaks as a position — lower case, because it sits mid-sentence.
+  const rated = handling.runPosition != null ? `run ${handling.runPosition}` : handling.runLabel;
   switch (handling.direction) {
     case "improving":
       return "Coming to you";
     case "fading":
       return "Going away";
     case "flat":
+      // Every run today rated the same number — the only day that earns this sentence.
       return "Same all day";
+    case "holding":
+      return "Settled";
+    case "swinging":
+      return "Up and down";
     default:
-      // One rating so far. More runs than ratings means a draft is still open, so
-      // "first run of the day" would be a lie.
-      return runCount === 1 ? "First run of the day" : `Only ${handling.runLabel} rated`;
+      // No direction yet. Two ratings is not a trend — it is run 2 against run 1, the
+      // comparison this card stopped making — so the row states the count and lets the
+      // arc and the dial speak. One rating with more runs logged means a draft is still
+      // open, so "first run of the day" would be a lie.
+      if (handling.arc.length >= 2) return "Two runs rated";
+      return runCount === 1 ? "First run of the day" : `Only ${rated} rated`;
   }
 }
 
@@ -129,17 +170,44 @@ export function DashboardDayVerdictCard({
     context?.eventName ?? null,
   ].filter(Boolean);
 
+  /**
+   * The card's headline is the pace read, and since 2026-08-25 it is a claim about NOW
+   * rather than about the whole day: the latest run against the median of today's earlier
+   * ones. The wording carries that — "quicker than earlier" explains the delta beside it,
+   * where "trending faster" left the number to be guessed at.
+   *
+   * A two-run day gets no verdict at all. The only comparison it could make is against the
+   * first run of the morning, which is the anchor `medianOfEarlier` exists to retire.
+   */
   const headline = verdict.trend
     ? verdict.trend.direction === "faster"
-      ? "Trending faster"
+      ? "Quicker than earlier"
       : verdict.trend.direction === "slower"
-        ? "Trending slower"
-        : "Holding steady"
+        ? "Off your earlier pace"
+        : verdict.trend.direction === "steady"
+          ? "Holding steady"
+          : "Too early to call"
     : verdict.runCount === 1
       ? "One run logged"
       : "On the board";
 
   const { trend, bestRun, lastChange, handling } = verdict;
+  const arcLine = handling ? handlingArcLine(handling.arc) : null;
+
+  /**
+   * Which run was quickest.
+   *
+   * A run is named by its session TYPE, and nothing stores a session number, so a day of
+   * five practice sessions used to read "Best run was Practice" — true of all five of
+   * them, and therefore a pointer at nothing (founder report 2026-08-25). When the day's
+   * names repeat, `resolveDayRunNames` hands back the run's POSITION instead of inventing
+   * a "Practice 3" that could contradict the event's own timetable, and the sentence
+   * changes shape to suit it. A day with real names ("Qualifying", "A Main") is untouched.
+   */
+  const bestRunLine =
+    bestRun?.runPosition != null
+      ? `Best was run ${bestRun.runPosition} of ${verdict.runCount}`
+      : `Best run was ${bestRun?.runLabel ?? ""}`;
 
   const changeSub =
     lastChange?.verdict === "helped"
@@ -166,13 +234,15 @@ export function DashboardDayVerdictCard({
           <span className="text-[19px] font-bold leading-tight tracking-tight text-foreground">
             {headline}
           </span>
-          {trend ? <DeltaChip delta={trend.delta} /> : null}
+          {trend?.delta != null ? (
+            <DeltaChip delta={trend.delta} neutral={trend.direction === "steady"} />
+          ) : null}
         </div>
 
         {bestRun ? (
           <InstrumentRow
             label="Pace"
-            main={bestRun.bestLap != null ? `Best run was ${bestRun.runLabel}` : "No laps linked yet"}
+            main={bestRun.bestLap != null ? bestRunLine : "No laps linked yet"}
             sub={
               bestRun.bestLap != null ? (
                 <>
@@ -189,7 +259,7 @@ export function DashboardDayVerdictCard({
               )
             }
             right={trend && trend.spark.length >= 2 ? (
-              <PaceSparkline values={trend.spark} direction={trend.direction} />
+              <PaceSparkline values={trend.spark} direction={trend.direction ?? "steady"} />
             ) : undefined}
             last={!lastChange && !handling}
           />
@@ -200,7 +270,11 @@ export function DashboardDayVerdictCard({
             label="Last change"
             main={changedLine(lastChange.rows)}
             sub={changeSub}
-            right={lastChange.delta != null ? <DeltaChip delta={lastChange.delta} /> : undefined}
+            right={
+              lastChange.delta != null ? (
+                <DeltaChip delta={lastChange.delta} neutral={lastChange.verdict === "unclear"} />
+              ) : undefined
+            }
             last={!handling}
           />
         ) : null}
@@ -212,10 +286,8 @@ export function DashboardDayVerdictCard({
             sub={
               handling.arc.length >= 2 ? (
                 <>
-                  <span className="tabular-nums text-foreground/80">
-                    {handlingArcLine(handling.arc)}
-                  </span>{" "}
-                  across today
+                  <span className="tabular-nums text-foreground/80">{arcLine?.figures}</span>
+                  {arcLine?.tail}
                 </>
               ) : (
                 "the day's arc starts here"

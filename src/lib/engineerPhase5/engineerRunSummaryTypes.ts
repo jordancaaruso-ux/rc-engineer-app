@@ -103,7 +103,8 @@ export type EngineerRunSummaryV2 = {
       rank: number;
       bestLapSeconds: number | null;
       gapToSessionBestSeconds: number | null;
-      fadeSeconds: number | null;
+      /** Seconds per lap the stint drifted; positive = slower as it went on. */
+      fadePerLapSeconds: number | null;
     }>;
   };
   /**

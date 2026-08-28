@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowRight, Plus } from "lucide-react";
-import { useTodayDraftRun } from "@/components/layout/TodayDraftRunProvider";
+import { useDraftRun } from "@/components/layout/DraftRunProvider";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { formatAppTimestampUtc } from "@/lib/formatDate";
 import { warmNewRunForm } from "@/lib/runs/warmNewRunForm";
@@ -41,10 +41,20 @@ import { warmNewRunForm } from "@/lib/runs/warmNewRunForm";
 export function DashboardStartRunCta({
   serverDraftRunId,
   serverDraftSavedAt,
+  serverDraftEventName,
+  serverDraftIsForToday,
   footer,
 }: {
   serverDraftRunId: string | null;
   serverDraftSavedAt: string | null;
+  serverDraftEventName?: string | null;
+  /**
+   * Whether that draft is for TODAY. The bar only takes itself over for one that is — a draft
+   * banked for Saturday waits in Sessions until Saturday rather than replacing the app's primary
+   * action all week. This bar is the dashboard's ONLY draft surface (founder, 2026-08-25), so
+   * what it declines to offer is not shown on the dashboard at all. See `resumableDraftLogic`.
+   */
+  serverDraftIsForToday?: boolean;
   /**
    * Optional line inside the yellow card, under a hairline (design handoff 2026-08-08).
    * Used by the desktop column, where the CTA is a card with room for one more fact;
@@ -53,11 +63,15 @@ export function DashboardStartRunCta({
   footer?: string | null;
 }) {
   const router = useRouter();
-  const { draftRunId, draftSavedAt } = useTodayDraftRun();
+  const { draftRunId, draftSavedAt, draftEventName, draftIsForToday } = useDraftRun();
   const todayDraftRunId = draftRunId ?? serverDraftRunId;
   const todayDraftSavedAt = draftSavedAt ?? serverDraftSavedAt;
+  const todayDraftEventName = draftEventName ?? serverDraftEventName ?? null;
+  // The client provider is authoritative once it has answered; before that the server value
+  // carries the first paint. `draftRunId` is the tell for "the provider has run".
+  const isForToday = draftRunId ? draftIsForToday : Boolean(serverDraftIsForToday);
 
-  const hasDraft = Boolean(todayDraftRunId);
+  const hasDraft = Boolean(todayDraftRunId) && isForToday;
   const primaryHref = hasDraft
     ? `/runs/${encodeURIComponent(todayDraftRunId as string)}/edit`
     : "/runs/new";
@@ -105,6 +119,9 @@ export function DashboardStartRunCta({
           >
             {hasDraft && todayDraftSavedAt ? (
               <>
+                {/* Names the meeting when the draft was banked for one, so a bar reading
+                    "saved 4 days ago" is obviously deliberate rather than something forgotten. */}
+                {todayDraftEventName ? `${todayDraftEventName} · ` : null}
                 Saved{" "}
                 <RelativeTime
                   iso={todayDraftSavedAt}

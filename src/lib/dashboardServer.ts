@@ -22,7 +22,7 @@ import {
   type RecordRunInput,
 } from "@/lib/dashboardRecords";
 import { displayRunNotes } from "@/lib/runNotes";
-import { formatRunSessionDisplay } from "@/lib/runSession";
+import { formatRunSessionDisplay, resolveDayRunNames } from "@/lib/runSession";
 import {
   formatHandlingAssessmentDetailLines,
   formatPrimaryFocusLine,
@@ -34,6 +34,10 @@ import { calendarYmdInTimeZone, formatFeaturedEventDateLabel, RUN_DATETIME_LOCAL
 // NOTE: `syncRecentEventLapSources` is deliberately NOT imported at module scope —
 // see the dynamic import at its call site below.
 import { loadUserScopedEvents, userCanAccessEvent } from "@/lib/events/eventParticipation";
+import {
+  loadResumableDrafts,
+  type ResumableDraft,
+} from "@/lib/runs/loadResumableDrafts";
 import { resolveEventTrackLabel } from "@/lib/tracks/legacyTrackSnapshot";
 import { getLiveRcDriverIdSetting, getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
@@ -276,8 +280,6 @@ export type DashboardIncompleteRunRow = {
 };
 
 export type DashboardHomeModel = {
-  /** Saved runs where the user has not clicked "Run completed" yet. */
-  incompleteRuns: DashboardIncompleteRunRow[];
   thingsToTry: DashboardActionItemRow[];
   /** Pre–next-run checks / reminders (same rows as `ActionItem` `THINGS_TO_DO`). */
   thingsToDo: DashboardActionItemRow[];
@@ -318,14 +320,20 @@ export type DashboardHomeModel = {
   /** Number of runs logged today. */
   todayRunCount: number;
   /**
-   * Most recent _incomplete_ (draft) run logged today, if one exists. Drives
-   * the dashboard's contextual primary button ("Complete logging") so the
-   * driver jumps straight back into whichever draft needs finishing instead
-   * of being forced through the new-run flow first.
+   * The ONE unfinished run the dashboard may offer to finish. There is no list — the Start-run
+   * CTA is the dashboard's only draft surface (founder, 2026-08-25), and everything it does not
+   * offer lives in Sessions under the Drafts filter.
+   *
+   * Was `todayDraftRunId` / `todayDraftSavedAt`, read off today's runs. Now a three-day window in
+   * the driver's zone — long enough to cover a race weekend, short enough that months of leftovers
+   * can never reach the front page — see `resumableDraftLogic` for the rule and why it is not a
+   * delete. `draftIsForToday` is what decides whether this one takes over the primary button.
    */
-  todayDraftRunId: string | null;
-  /** ISO timestamp when today's draft was first saved — powers the "Saved X ago" label on the dashboard card. */
-  todayDraftSavedAt: string | null;
+  draftRunId: string | null;
+  /** ISO timestamp the draft was first saved — powers the "Saved X ago" label on the CTA. */
+  draftSavedAt: string | null;
+  draftEventName: string | null;
+  draftIsForToday: boolean;
   /** Per-run setup changes made today, chronological (first-of-day uses yesterday's last run as baseline). */
   todaysChanges: Array<{
     runId: string;
@@ -573,8 +581,13 @@ export async function loadIncompleteRunsForImportChooser(
 /**
  * Today's in-progress drafts, most recent first — for the "new run — tap to log it"
  * notification path (`/runs/new?resume=1`). Continuing one preserves any pre-run setup
- * the driver logged before the run; today-scoped so a stale draft from last week doesn't
- * get offered as the run they just completed.
+ * the driver logged before the run.
+ *
+ * **Today-scoped, deliberately, and tighter than the dashboard's three-day window** (2026-08-25).
+ * The dashboard asks "what have you got on the go". This one asks something narrower and riskier:
+ * "you just came off the track — is this the run you drove?" Yesterday's draft is not the answer,
+ * and offering one invites a set of fresh lap times to be attached to the wrong session, which is
+ * worse than an extra tap.
  */
 export async function loadTodaysIncompleteRuns(
   userId: string,
@@ -663,7 +676,7 @@ export async function loadDashboardHomeModel(
     recentRun,
     todaysRuns,
     priorRuns,
-    incompleteRunsRows,
+    draftRows,
     completedRunRows,
     [thingsToTryRows, thingsToDoRows],
   ] = await Promise.all([
@@ -679,8 +692,14 @@ export async function loadDashboardHomeModel(
     // Today's runs in chronological order, with setup snapshot + lap summary.
     // Drives the "today's best" widget and the "changes today" feed (per-run
     // diff vs. the immediately prior logged snapshot).
+    //
+    // Scoped on `sortAt`, not `createdAt` (2026-08-25). `createdAt` is when the ROW was
+    // written; `sortAt` is which day the run belongs to, which is the question being asked
+    // here. They are the same instant for a run logged in one sitting and differ for a draft
+    // banked the night before — which used to mean a run driven this morning was missing from
+    // today's best, the changes-today feed and the day's run numbering.
     prisma.run.findMany({
-      where: { userId, createdAt: { gte: todayStart, lt: todayEnd } },
+      where: { userId, sortAt: { gte: todayStart, lt: todayEnd } },
       orderBy: { sortAt: "asc" },
       select: {
         id: true,
@@ -716,17 +735,18 @@ export async function loadDashboardHomeModel(
     // no such field. A day spent on the second car in the garage is ordinary, so the
     // window covers a few runs back rather than only the very last one.
     prisma.run.findMany({
-      where: { userId, createdAt: { lt: todayStart } },
+      // `sortAt` for the same reason today's runs use it — this is the OTHER half of the same
+      // split, and reading one half on `createdAt` would let a draft banked last night appear
+      // in both windows at once, diffing a run against itself.
+      where: { userId, sortAt: { lt: todayStart } },
       orderBy: { sortAt: "desc" },
       take: 12,
       select: { carId: true, setupSnapshot: { select: { id: true, data: true } } },
     }),
-    prisma.run.findMany({
-      where: { userId, loggingComplete: false, incompleteLoggingPromptDismissedAt: null },
-      orderBy: { sortAt: "desc" },
-      take: 5,
-      select: incompleteRunSelect,
-    }),
+    // The dashboard only ever renders `[0]`, but the RANKING needs the field: a draft banked for
+    // the meeting that starts today has to be able to outrank a newer scratch one, and it cannot
+    // do that if the query already threw it away. Small `take`, then one row survives.
+    loadResumableDrafts(userId, timeZone, { take: 8 }),
     // All completed runs. Kept lean: lap arrays (lap count + wheel time + race
     // pace), stored best lap + avg-top-5, and the track+class comparability key.
     // Feeds the rolling summary and the all-time records board.
@@ -754,6 +774,8 @@ export async function loadDashboardHomeModel(
     actionItemRowsPromise,
   ]);
   const hasRunToday = todaysRuns.length > 0;
+  // Already ranked by `loadResumableDrafts`; `[0]` is the one the resume bar should offer.
+  const leadDraft: ResumableDraft | null = draftRows[0] ?? null;
 
   const summaryInputs: SummaryRunInput[] = completedRunRows.map((r) => {
     const included = getIncludedLaps(primaryLapRowsFromRun(r));
@@ -932,10 +954,22 @@ export async function loadDashboardHomeModel(
   }
 
   // Unlabeled testing runs get their position in today's chronological order as
-  // their name ("Run 2") instead of the bare "—" fallback.
-  const dayRunNumberByRunId = new Map(todaysRuns.map((r, i) => [r.id, i + 1]));
+  // their name ("Run 2") instead of the bare "—" fallback — and so does any name
+  // TODAY REPEATS, because a day of five practice sessions names all five of them
+  // "Practice" and every line that points at one of them points at nothing. See
+  // `resolveDayRunNames`.
+  const dayRunNames = resolveDayRunNames(
+    todaysRuns.map((r, i) => ({
+      name: formatRunSessionDisplay(r, { dayRunNumber: i + 1 }),
+      dayRunNumber: i + 1,
+    }))
+  );
+  const dayRunNameByRunId = new Map(todaysRuns.map((r, i) => [r.id, dayRunNames[i]]));
   const todayRunLabel = (r: (typeof todaysRuns)[number]) =>
-    formatRunSessionDisplay(r, { dayRunNumber: dayRunNumberByRunId.get(r.id) });
+    dayRunNameByRunId.get(r.id)?.label ?? "—";
+  /** Set only when the run's label IS its position — the card then says "run 3 of 5". */
+  const todayRunPosition = (r: (typeof todaysRuns)[number]) =>
+    dayRunNameByRunId.get(r.id)?.position ?? null;
 
   let todayBestLap: number | null = null;
   let todayBestAvgTop5: number | null = null;
@@ -1050,6 +1084,7 @@ export async function loadDashboardHomeModel(
 
       verdictInputs.push({
         runLabel: todayRunLabel(r),
+        runPosition: todayRunPosition(r),
         bestLap: best,
         avgTop5: avg5,
         carRating: r.carRating ?? null,
@@ -1136,7 +1171,6 @@ export async function loadDashboardHomeModel(
     };
   }
 
-  const incompleteRuns: DashboardIncompleteRunRow[] = incompleteRunsRows.map(toDashboardIncompleteRunRow);
 
   /*
    * Desktop hero (design handoff 2026-08-08, docs/DASHBOARD_NORTH_STAR.md).
@@ -1262,7 +1296,6 @@ export async function loadDashboardHomeModel(
 
   return {
     heroPace,
-    incompleteRuns,
     thingsToTry: thingsToTryRows.map((i) => ({
       id: i.id,
       text: i.text,
@@ -1284,14 +1317,10 @@ export async function loadDashboardHomeModel(
     todayBestRunId,
     todayBestRunLabel,
     todayRunCount: todaysRuns.length,
-    todayDraftRunId:
-      [...todaysRuns]
-        .reverse()
-        .find((r) => r.loggingComplete === false)?.id ?? null,
-    todayDraftSavedAt:
-      [...todaysRuns]
-        .reverse()
-        .find((r) => r.loggingComplete === false)?.createdAt.toISOString() ?? null,
+    draftRunId: leadDraft?.id ?? null,
+    draftSavedAt: leadDraft?.savedAt ?? null,
+    draftEventName: leadDraft?.eventName ?? null,
+    draftIsForToday: leadDraft?.isForToday ?? false,
     todaysChanges,
     todayStrip,
     todayContext,
