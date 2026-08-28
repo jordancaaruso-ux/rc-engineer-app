@@ -312,8 +312,11 @@ export function renderNetEntry(entry: NetEntry): string {
     if (!s) continue;
     lines.push(`  ${entry.words[side].toUpperCase()} [${s.confidence}]`);
     if (entry.two_answers) {
-      lines.push(`    BEFORE THE CAR SETTLES: ${s.before_settled}`);
-      lines.push(`    ONCE SETTLED: ${s.once_settled}`);
+      // Driver words, not physics words: "settled" is corner-regime.md's term and the model was
+      // asking drivers about it (founder, 2026-08-28). The fields keep their names; the labels
+      // the model reads are places on the corner.
+      lines.push(`    ON THE WAY IN: ${s.before_settled}`);
+      lines.push(`    THROUGH THE MIDDLE: ${s.once_settled}`);
     } else {
       lines.push(`    EFFECT: ${s.effect}`);
     }

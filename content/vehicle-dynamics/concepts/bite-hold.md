@@ -63,9 +63,12 @@ facts, never against the words.
 1. **Which end** — front, rear, or the whole car. "Steering" and "won't turn" point at the front;
    "loose", "rotation", "drive" at the rear; "push" is the rear even though it feels like
    understeer.
-2. **Where on the corner's clock** — the first input, the settled middle, or the exit
-   ([[corner-regime]]). "Turn-in", "the flick", "direction change" are the initial; "the apex",
-   "mid-corner", "holding the line" are settled; "on power", "off the corner" are the exit.
+2. **Where in the corner** — going in, the middle, or coming out ([[corner-regime]]). "Turn-in",
+   "the flick", "direction change" are going in; "the apex", "mid-corner", "holding the line" are
+   the middle; "on power", "off the corner" are coming out. "Settled" is this page's word, not the
+   driver's — to them it is simply the middle. Ask where in the corner it is worst — going in, the
+   middle, or coming out — never whether the car has settled, and never in terms that ask them to
+   judge the physics.
 3. **On or off the throttle** — for anything at the rear or on exit, because the diff and the
    fore-aft geometry split on that, not on the clock ([[differential-coupling]],
    [[anti-dive-anti-squat]]).

@@ -15,7 +15,9 @@ gets depends on whether the chassis has finished rolling at the moment they are 
 
 So the **phase** decides which mechanism is running, and **how long the car is in the corner**
 decides how much middle there is. That is a question of time, not shape: a long, slow hairpin can
-have the longest middle on the track, and a fast bend taken flat a short one.
+have the longest middle on the track, and a fast bend taken flat a short one. To the driver these
+are simply places on the corner — the way in, the middle, the way out — and that is the language to
+ask in; "settled" is this page's word, not theirs.
 
 **Where the landmarks fall.** The initial is the turn-in — from the first steering input until roll
 has finished. The apex of a corner the car turns through comes after that, quick or slow, mod or

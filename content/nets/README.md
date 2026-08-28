@@ -58,11 +58,11 @@ diff and anti-squat split on the throttle, not on time in the corner — that sp
 ```
 FRONT ANTI-ROLL BAR (arb_front) | a normal move: 0.1 mm
   STIFFER [consensus]
-    BEFORE THE CAR SETTLES: more initial steering — the front bites sooner and the car turns in quicker, with less roll
-    ONCE SETTLED: more understeer through the middle, and the rear feels more planted behind it
+    ON THE WAY IN: more initial steering — the front bites sooner and the car turns in quicker, with less roll
+    THROUGH THE MIDDLE: more understeer through the middle, and the rear feels more planted behind it
   SOFTER [consensus]
-    BEFORE THE CAR SETTLES: less initial steering — the front bites later and turn-in is smoother, with more roll
-    ONCE SETTLED: more steering through the middle — less understeer — and the rear feels a little less planted behind it
+    ON THE WAY IN: less initial steering — the front bites later and turn-in is smoother, with more roll
+    THROUGH THE MIDDLE: more steering through the middle — less understeer — and the rear feels a little less planted behind it
   WHY: arb.md
 
 DIFF OIL (diff_oil) | a normal move: 1,000 cSt
@@ -73,7 +73,7 @@ DIFF OIL (diff_oil) | a normal move: 1,000 cSt
   WHY: diff-and-driveline.md
 ```
 
-Damper oil is the proof the shape is right: its ONCE SETTLED line says *"no change"* on both sides
+Damper oil is the proof the shape is right: its THROUGH THE MIDDLE line says *"no change"* on both sides
 — `bite-hold.md` is explicit that damping moves *when* load arrives without changing the roll angle
 the car ends up at.
 
