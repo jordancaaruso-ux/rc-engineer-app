@@ -10,7 +10,7 @@ label: "Rear damper oil"
 words:
   more: "thicker"
   less: "thinner"
-step: "50 cSt; 25 is a small one"   # founder-dictated 2026-08-27
+step: "50 cSt"   # founder-dictated 2026-08-27; 2026-08-28: 25 dropped, too small to bother with
 two_answers: true
 more:
   reviewed: true

@@ -66,9 +66,10 @@ facts, never against the words.
 2. **Where in the corner** — going in, the middle, or coming out ([[corner-regime]]). "Turn-in",
    "the flick", "direction change" are going in; "the apex", "mid-corner", "holding the line" are
    the middle; "on power", "off the corner" are coming out. "Settled" is this page's word, not the
-   driver's — to them it is simply the middle. Ask where in the corner it is worst — going in, the
-   middle, or coming out — never whether the car has settled, and never in terms that ask them to
-   judge the physics.
+   driver's — to them it is simply the middle, and so is any other word for the car's state at that
+   point ("leaned over", "loaded up", "taken a set"): say the middle. Ask where in the corner it is
+   worst — going in, the middle, or coming out — never whether the car has settled, and never in
+   terms that ask them to judge the physics.
 3. **On or off the throttle** — for anything at the rear or on exit, because the diff and the
    fore-aft geometry split on that, not on the clock ([[differential-coupling]],
    [[anti-dive-anti-squat]]).
