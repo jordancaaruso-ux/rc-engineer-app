@@ -7,6 +7,8 @@
 # carried over from under-lower-arm-rear-more.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
 # Founder, 2026-08-28: the relative change (front against rear) counts as much as the change itself — said on every side. An earlier
 # wording, "front against rear is what you feel", read as "balance lever" and made these keys vanish from whole-car answers.
+# Founder, 2026-08-28: the relative change (front against rear) counts as much as the change itself — said on every side. An earlier
+# wording, "front against rear is what you feel", read as "balance lever" and made these keys vanish from whole-car answers.
 id: under_lower_arm_shims_rear
 discipline: touring
 parameter: under_lower_arm_shims_rear

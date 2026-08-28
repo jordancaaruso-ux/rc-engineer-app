@@ -4,7 +4,8 @@
 # roll-centre direction only. Raises RC ~1.05 mm per 0.5 mm shim (about as strong as the lower arm); adds camber gain.
 # v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
 # carried over from under-hub-rear-more.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
-# Founder, 2026-08-27: on the roll-centre keys the rear RELATIVE to the other end is as important as the change itself, if not more — said on every side.
+# Founder, 2026-08-28: the relative change (front against rear) counts as much as the change itself — said on every side. An earlier
+# wording, "front against rear is what you feel", read as "balance lever" and made these keys vanish from whole-car answers.
 id: under_hub_shims_rear
 discipline: touring
 parameter: under_hub_shims_rear
@@ -17,13 +18,13 @@ two_answers: true
 more:
   reviewed: true
   confidence: majority
-  before_settled: "the rear bites sooner — more secure from the first input, and more on the track"
-  once_settled: "tends toward oversteer through the middle, though it can go the other way; on exit it can go either way, depending on the day; rear against front is what you feel"
+  before_settled: "the rear bites sooner — more secure from the first input, and more on the track; rear against front counts as much as the change itself"
+  once_settled: "tends toward oversteer through the middle, though it can go the other way; on exit it can go either way, depending on the day"
 less:
   reviewed: false
   confidence: majority
-  before_settled: "the rear bites later — less secure from the first input, and more in the track"
-  once_settled: "tends toward more rear grip through the middle, though it can go the other way; on exit it can go either way, depending on the day; rear against front is what you feel"
+  before_settled: "the rear bites later — less secure from the first input, and more in the track; rear against front counts as much as the change itself"
+  once_settled: "tends toward more rear grip through the middle, though it can go the other way; on exit it can go either way, depending on the day"
 physics:
   - under-hub.md
 sources:
