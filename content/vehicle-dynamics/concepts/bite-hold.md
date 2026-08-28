@@ -91,8 +91,8 @@ facts, never against the words.
    - it **arrives and then goes**, suddenly and without warning — past the bite end of the window,
      or something running out ([[droop-downstop]], [[ride-height-and-rake]]);
    - it **arrives too hard** — too much bite;
-   - the car **moves too fast or too slow** getting there — a damping or droop question, not a grip
-     one ([[damping]]).
+   - the car **moves too much, or too fast or too slow**, getting there — a question of how the car
+     moves, not of its grip.
 5. **What the day is doing** — grip up or down, since the same setting sits in a different place in
    the window on a different day (above), and "no grip" on a low-grip day is more often late grip
    than absent grip.
