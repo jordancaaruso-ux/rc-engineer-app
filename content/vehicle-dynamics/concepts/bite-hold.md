@@ -69,7 +69,9 @@ facts, never against the words.
    driver's — to them it is simply the middle, and so is any other word for the car's state at that
    point ("leaned over", "loaded up", "taken a set"): say the middle. Ask where in the corner it is
    worst — going in, the middle, or coming out — never whether the car has settled, and never in
-   terms that ask them to judge the physics.
+   terms that ask them to judge the physics: how far it rolls, how much travel it uses, whether it
+   touches — a driver cannot know those, even a very good one. They know understeer and oversteer.
+   Explain the physics if it helps, but what a change does to the balance is how they will read it.
 3. **On or off the throttle** — for anything at the rear or on exit, because the diff and the
    fore-aft geometry split on that, not on the clock ([[differential-coupling]],
    [[anti-dive-anti-squat]]).

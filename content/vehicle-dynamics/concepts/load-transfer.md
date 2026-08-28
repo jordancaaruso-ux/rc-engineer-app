@@ -15,10 +15,9 @@ Two facets the setup shapes:
   front/rear roll-stiffness balance.
 
 **The total moves with grip** (founder, 2026-08-28). The g a car pulls is set by what the tyre can
-hold, so more grip means more load transferring through the same corner — more roll, and under
-brakes and power more pitch. A car is set up to work within a certain amount of that movement. As
-grip goes up the car moves further, as it goes down less far, and the setup is being asked to work
-outside the movement it was set for.
+hold, so more grip means more load transferring through the same corner, and the car rolls further
+on the same setup. A car is set up to work within a certain amount of roll; as grip goes up it rolls
+past that, as it goes down it rolls short of it.
 
 **When each facet governs.** At turn-in the springs haven't deflected, so they've moved **no load
 yet** — the split at that moment is set by the **roll-centre heights alone**, and spring/ARB rates
