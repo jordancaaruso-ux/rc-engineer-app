@@ -3,6 +3,7 @@
 # for this set. Hedge accordingly until the founder has passed it.
 # `decrease` = fewer engaged screws = MORE flex. Softer decks and more cuts go the same way.
 # Front-half adjusters bias the front, rear-half the rear; this entry is the whole-car direction.
+# 2026-08-28 (founder): no day words — "low-grip", "bumpy", "high grip" removed; the only net that named a day, so it answered every day question.
 # v5 (2026-08-27): one entry per knob, both directions inside. The LESS side is the founder-reviewed text
 # carried over from chassis-flex-more.yaml; the MORE side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
 id: top_deck_screws
@@ -18,12 +19,12 @@ more:
   reviewed: false
   confidence: majority
   before_settled: "load moves into the tyres faster, so the car feels more pointy and less forgiving on turn-in"
-  once_settled: "more precise on high grip, but less overall grip on a low-grip or bumpy track — the tyre gives before the platform does"
+  once_settled: "more precise through the middle, but less forgiving — the tyre gives before the platform does"
 less:
   reviewed: true
   confidence: majority
   before_settled: "load moves into the tyres more slowly, so the car feels more forgiving and less pointy on turn-in"
-  once_settled: "more overall grip on a low-grip or bumpy track, but less precise on high grip — the platform gives before the tyre does"
+  once_settled: "more forgiving through the middle, but less precise — the platform gives before the tyre does"
 physics:
   - flex-chassis.md
 sources:
