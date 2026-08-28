@@ -5,6 +5,8 @@
 # `under_lower_arm_shims_front` = the FRONT stack, ff and fr raised together. The ff/fr SPLIT is anti-dive, a separate entry.
 # v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
 # carried over from under-lower-arm-front-more.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+# Founder, 2026-08-28: the relative change (front against rear) counts as much as the change itself — said on every side. An earlier
+# wording, "front against rear is what you feel", read as "balance lever" and made these keys vanish from whole-car answers.
 id: under_lower_arm_shims_front
 discipline: touring
 parameter: under_lower_arm_shims_front
@@ -20,12 +22,12 @@ more:
   reviewed: true
   confidence: majority
   before_settled: "feels more direct and precise from the first input — stiffer, more on the track, more initial grip — though less of a bite change than the upper links give"
-  once_settled: "tends toward understeer mid-corner; and it is the front against the rear you feel — raise both together and much of it cancels"
+  once_settled: "tends toward understeer mid-corner; front against rear counts as much as the change itself"
 less:
   reviewed: false
   confidence: majority
   before_settled: "feels less direct from the first input — softer, more in the track, less initial grip — though less of a bite change than the upper links give"
-  once_settled: "tends toward more front grip mid-corner — less understeer; the front against the rear is what you feel"
+  once_settled: "tends toward more front grip mid-corner — less understeer; front against rear counts as much as the change itself"
 physics:
   - under-lower-arm.md
 sources:

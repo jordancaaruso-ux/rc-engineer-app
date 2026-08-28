@@ -5,6 +5,8 @@
 # `under_lower_arm_shims_rear` = the REAR stack, rf and rr raised together. The rf/rr SPLIT is anti-squat, a separate entry.
 # v5 (2026-08-27): one entry per knob, both directions inside. The MORE side is the founder-reviewed text
 # carried over from under-lower-arm-rear-more.yaml; the LESS side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+# Founder, 2026-08-28: the relative change (front against rear) counts as much as the change itself — said on every side. An earlier
+# wording, "front against rear is what you feel", read as "balance lever" and made these keys vanish from whole-car answers.
 id: under_lower_arm_shims_rear
 discipline: touring
 parameter: under_lower_arm_shims_rear
@@ -20,12 +22,12 @@ more:
   reviewed: true
   confidence: majority
   before_settled: "the rear feels more direct and stiff from the first input — more secure, more on the track — though less of a bite change than the upper links give"
-  once_settled: "tends toward oversteer mid-corner, though it can go the other way; exit either way — and it is the rear against the front you feel"
+  once_settled: "tends toward oversteer mid-corner, though it can go the other way; exit either way; rear against front counts as much as the change itself"
 less:
   reviewed: false
   confidence: majority
   before_settled: "the rear feels less direct from the first input — softer, less secure, more in the track — though less of a bite change than the upper links give"
-  once_settled: "tends toward more rear grip mid-corner, though it can go the other way; exit either way; the rear against the front is what you feel"
+  once_settled: "tends toward more rear grip mid-corner, though it can go the other way; exit either way; rear against front counts as much as the change itself"
 physics:
   - under-lower-arm.md
 sources:

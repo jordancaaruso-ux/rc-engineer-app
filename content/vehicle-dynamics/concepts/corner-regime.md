@@ -73,7 +73,9 @@ takes its load **sooner** on the way in, so its grip is there **earlier**. Softe
 
 **Front/rear symmetry.** All of this applies at either axle. A stiffer front loads sooner while
 roll develops and carries a bigger share once roll is constant; a softer front is the mirror of
-both. Which part of the corner decides the sign.
+both. Which part of the corner decides the sign. The same change made at both ends moves when the
+whole car's grip arrives and leaves the share between the ends where it was; a change at one end
+moves both the timing and the share.
 
 **The settled answer at the rear is the least trustworthy claim on this page** (founder, 2026-08-27).
 Stiffer at the rear — bar, spring, or less rear flex — is expected to give up rear grip once the car
