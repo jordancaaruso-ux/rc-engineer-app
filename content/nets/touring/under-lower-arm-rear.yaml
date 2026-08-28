@@ -19,12 +19,12 @@ two_answers: true
 more:
   reviewed: true
   confidence: majority
-  before_settled: "the rear feels more direct and stiff from the first input — more secure, more on the track"
+  before_settled: "the rear feels more direct and stiff from the first input — more secure, more on the track — though less of a bite change than the upper links give"
   once_settled: "tends toward oversteer mid-corner, though it can go the other way; exit either way — and it is the rear against the front you feel"
 less:
   reviewed: false
   confidence: majority
-  before_settled: "the rear feels less direct from the first input — softer, less secure, more in the track"
+  before_settled: "the rear feels less direct from the first input — softer, less secure, more in the track — though less of a bite change than the upper links give"
   once_settled: "tends toward more rear grip mid-corner, though it can go the other way; exit either way; the rear against the front is what you feel"
 physics:
   - under-lower-arm.md

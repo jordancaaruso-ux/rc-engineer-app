@@ -19,12 +19,12 @@ two_answers: true
 more:
   reviewed: true
   confidence: majority
-  before_settled: "a big change in rear bite — noticeably more secure from the first input, and more on the track"
+  before_settled: "the biggest bite change of the roll-centre keys — noticeably more secure from the first input, and more on the track"
   once_settled: "tends toward oversteer through the middle, though it can go the other way; the overall rear grip feel moves with it; exit either way; rear against front is what you feel"
 less:
   reviewed: false
   confidence: majority
-  before_settled: "a big change in rear bite the other way — less secure from the first input, and more in the track; rear against front is what you feel"
+  before_settled: "the biggest bite change of the roll-centre keys, the other way — less secure from the first input, and more in the track; rear against front is what you feel"
   once_settled: "tends toward more rear hold through the middle, though it can go the other way; the overall rear grip feel moves with it; exit either way"
 physics:
   - upper-link-geometry.md

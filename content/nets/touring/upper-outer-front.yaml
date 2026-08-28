@@ -19,12 +19,12 @@ two_answers: true
 more:
   reviewed: true
   confidence: majority
-  before_settled: "a big change in front bite — noticeably more initial steering, and more on the track"
+  before_settled: "the biggest bite change of the roll-centre keys — noticeably more initial steering, and more on the track"
   once_settled: "generally more understeer through the middle; the overall front grip feel moves with this more than with the other keys; front against rear is what you feel"
 less:
   reviewed: false
   confidence: majority
-  before_settled: "a big change in front bite the other way — noticeably less initial steering, and more in the track; front against rear is what you feel"
+  before_settled: "the biggest bite change of the roll-centre keys, the other way — noticeably less initial steering, and more in the track; front against rear is what you feel"
   once_settled: "generally more front grip through the middle, with more roll; the overall front grip feel moves with this more than with the other keys"
 physics:
   - upper-link-geometry.md
