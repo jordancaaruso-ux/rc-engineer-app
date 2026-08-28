@@ -19,6 +19,7 @@
     "db:migrate:resolve:applied": "npx dotenv-cli -e .env.local -- prisma migrate resolve --applied",
     "db:migrate:reconcile": "npx dotenv-cli -e .env.local -- node scripts/reconcile-prisma-migrations.cjs",
     "dev:enforced": "npx dotenv-cli -e .env.local -v BILLING_ENFORCED=1 -- next dev",
+    "dev:worktree": "npx dotenv-cli -e ../../../.env.local -v DEBUG_ENGINEER_WIRE=1 -v DEBUG_ENGINEER_REASONING=1 -- next dev",
     "paydoor:up": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-paid-door.ps1",
     "stripe:launch-live": "npx dotenv-cli -e .env.local -- npx tsx scripts/launch-live-stripe.ts",
     "paydoor:bridge": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/dev-paid-door-bridge.ts",
