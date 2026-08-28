@@ -52,7 +52,7 @@ mid-corner"*): the roll levers are the obvious members, and front toe, caster, A
 gain, bump steer and camber split the same way.
 
 A knob that does the same thing throughout the corner carries **one line per side**
-(`two_answers: false`): rear toe, the diff, anti-squat, anti-dive, body, weight, servo horn. The
+(`two_answers: false`): rear toe, the diff, anti-squat, anti-dive, body, weight. The
 diff and anti-squat split on the throttle, not on time in the corner — that split goes in the line.
 
 ```
@@ -200,3 +200,9 @@ contested topics, never as the source of a claim.
 Thirty-eight knobs, all touring, one founder-reviewed side each and the opposite side AI-drafted
 (2026-08-27). Not yet written: tyres and inserts, track width, wing. Off-road is a separate
 discipline tree, later.
+
+## Knobs deliberately without a net
+
+- **Servo horn** — removed 2026-08-28 (founder): the Engineer was leading a high-grip answer with
+  "shorten the servo horn". The knowledge stays in `servo-horn-steering-response.md` so it answers
+  when a driver asks; it is not a setup lever to surface unasked.
