@@ -447,6 +447,14 @@ export async function readOpenAiResponsesStream(
         const response = parsed.response as Record<string, unknown> | undefined;
         const u = toChatUsage(response?.usage);
         if (u) usage = u;
+        if (type !== "response.completed") {
+          // A failed or cut-off response otherwise surfaces only as an empty answer with no
+          // trace of why — log the reason the API gave.
+          console.error(
+            `[engineer-openai] ${type}:`,
+            JSON.stringify(response?.error ?? response?.incomplete_details ?? null)
+          );
+        }
       }
     }
   }
