@@ -204,7 +204,15 @@ export function toResponsesBody(body: Record<string, unknown>): Record<string, u
   if (tools !== undefined) out.tools = toResponsesTools(tools);
   if (tool_choice !== undefined) out.tool_choice = tool_choice;
   // On Responses, effort and function tools coexist.
-  if (typeof reasoning_effort === "string") out.reasoning = { effort: reasoning_effort };
+  if (typeof reasoning_effort === "string") {
+    out.reasoning = { effort: reasoning_effort };
+    // Audit instrument (dev only): DEBUG_ENGINEER_REASONING=1 asks for the model's reasoning
+    // summary so the server log shows HOW it got to an answer — whether it reduced the driver's
+    // complaint to facts or pattern-matched a phrase. Never on in production.
+    if (process.env.DEBUG_ENGINEER_REASONING === "1" && process.env.NODE_ENV !== "production") {
+      (out.reasoning as Record<string, unknown>).summary = "auto";
+    }
+  }
   if (temperature !== undefined) out.temperature = temperature;
   if (stream !== undefined) out.stream = stream;
   // stream_options.include_usage has no analogue — Responses always reports usage on
@@ -361,6 +369,12 @@ export async function readOpenAiResponsesStream(
         continue;
       }
       const type = typeof parsed.type === "string" ? parsed.type : "";
+
+      // See toResponsesBody: only ever present when DEBUG_ENGINEER_REASONING=1 asked for it.
+      if (type === "response.reasoning_summary_text.done" && typeof parsed.text === "string") {
+        console.log("[engineer-reasoning]", parsed.text);
+        continue;
+      }
 
       if (type === "response.output_text.delta") {
         const delta = typeof parsed.delta === "string" ? parsed.delta : "";
