@@ -35,7 +35,8 @@ stop.
 - **Grip arriving:** `bite`, `initial grip`, `overall grip`, `hold`
 - **Bite end of the window:** `precise`, `pointy`
 - **Hold end of the window:** `planted`, `forgiving`
-- **Too little bite:** `numb`, `unpredictable`, `imprecise`
+- **Too little bite:** `numb`, `unpredictable`, `imprecise`, `vague`, `floaty` (founder, 2026-08-28:
+  floaty is vague, lacks precision, doesn't do what you want — this group, not a damping word)
 - **Roll-centre / link language:** `smoother`, `more rolled-in`, `on the track`, `in the track`
 - **Phase:** `entry`, `mid-corner`, `on power`
 - **Balance** (founder, 2026-08-27): `understeer`, `oversteer` — the overall balance · `steering` —
@@ -84,7 +85,7 @@ facts, never against the words.
    - it **has no bite** — the grip that arrives is progressive and low rather than sharp and high.
      This usually goes hand in hand with arriving late, because the same knobs move both, but it is
      not the same fact: bite is the shape of the arrival, lateness its timing. A driver who says
-     "bite", "numb", "imprecise" or "unpredictable" has used this page's words and named this fact
+     "bite", "numb", "imprecise", "unpredictable", "vague" or "floaty" has used this page's words and named this fact
      — the initial grip, which is going in, so fact 2 is answered too. It is not the never-arrives
      case below, and neither needs separating with a question;
    - it **never arrives** — short of grip overall, or the tyre and track before the car;

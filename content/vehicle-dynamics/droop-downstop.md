@@ -19,4 +19,5 @@ different ways. **Too much front droop:** slow to react — harder to drive on t
 side, and harder to drive on throttle. **Too little front droop:** the front reacts faster and takes a
 direction change quicker, but it can be harder to drive for it — too reactive when grip is up. **Too
 little rear droop:** the rear runs out of extension and lets go suddenly; that abruptness is the sign.
+**Too much rear droop:** too much rotation — hard to drive going into corners (founder, 2026-08-28).
 A move toward one end says nothing about the failure waiting at the other.
