@@ -104,7 +104,14 @@ export async function loadFullVehicleDynamicsKb(): Promise<FullVehicleDynamicsKb
         ""
       );
 
-      const sections = [...approved.parts, ...concepts.parts];
+      // The grip curve is the one picture every other file hangs on (founder, 2026-08-28: "a
+      // first-class thing the engineer reads"), so it goes first — ahead of the alphabetical
+      // parameter files — and nowhere else describes the curve.
+      const FIRST = "concepts/grip-curve.md";
+      const firstIdx = concepts.included.indexOf(FIRST);
+      const firstPart = firstIdx >= 0 ? [concepts.parts[firstIdx]] : [];
+      const restConcepts = concepts.parts.filter((_, i) => i !== firstIdx);
+      const sections = [...firstPart, ...approved.parts, ...restConcepts];
       if (drafts.parts.length > 0) {
         sections.push(FULL_KB_DRAFTS_DIVIDER, ...drafts.parts);
       }

@@ -2,15 +2,15 @@
 *(driver-facing terms for what's canonically "initial vs overall grip"; the Engineer usually says
 "bite / hold")*
 
-**Feel — not physics.** Think of a grip curve: across the bottom is *how hard you're asking the
-tyre* (how much you're leaning on it), up the side is grip.
-- **Bite** (initial grip): the curve peaks **sooner, higher, and narrower**. Grip shows up fast and
-  the ceiling is high — but the peak is a spike, and once you ask past it grip **drops away sharply**.
-  Feels precise and pointy; it answers every input — including bumps and your own mistakes — so it's
-  fast in theory but demands precision and gives little warning when it lets go.
-- **Hold** (overall grip): the curve peaks **later, lower, and wider** — a plateau you can lean on.
-  Less ultimate grip, but it builds progressively and stays, and past the edge it lets go gently with
-  time to catch it. Feels planted and forgiving; too little bite, though, feels **numb,
+**Feel — not physics.** The two ends of the window on the grip curve ([[grip-curve]] — the curve
+itself is described there, once).
+- **Bite** (initial grip): the car's point reaches the peak **sooner and sharper**. Grip shows up
+  fast and the ceiling is high — but the peak is a spike, and once you ask past it grip **drops away
+  sharply**. Feels precise and pointy; it answers every input — including bumps and your own
+  mistakes — so it's fast in theory but demands precision and gives little warning when it lets go.
+- **Hold** (overall grip): the point reaches the peak **later and broader** — a plateau you can lean
+  on. Less ultimate grip, but it builds progressively and stays, and past the edge it lets go gently
+  with time to catch it. Feels planted and forgiving; too little bite, though, feels **numb,
   unpredictable, imprecise** — the car doesn't do what you ask.
 
 Neither end is "better" — there's a window that depends on the driver and the car. More bite leans
@@ -72,7 +72,8 @@ facts, never against the words.
 3. **On or off the throttle** — for anything at the rear or on exit, because the diff and the
    fore-aft geometry split on that, not on the clock ([[differential-coupling]],
    [[anti-dive-anti-squat]]).
-4. **How the grip behaves at that point** — this is the axis this page is about:
+4. **How the grip behaves at that point** — where the car's point sits on the grip curve
+   ([[grip-curve]]):
    - it **arrives late** (there once settled, not on the first input). Read this with fact 2: grip
      that arrives for the last tenth of a corner is, to the driver, no grip in that corner — and in a
      fast car or a quick corner most corners are like that, so "no grip anywhere" and "it arrives
