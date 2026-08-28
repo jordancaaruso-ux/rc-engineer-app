@@ -1,11 +1,45 @@
 {
   "$comment": "Founder curation for the demo seed (scripts/seed-demo-account.ts). Keys under `runs` are ORIGINAL run ids from your own account; `notes`/`driverNotes` replace the scrubbed text wholesale. `includeThreadIds` lists YOUR EngineerChatThread ids to copy as the demo's curated history. `nameScrub` adds mates' names → replacements. Edit and re-run demo:seed — it wipes and reseeds idempotently.",
-  "$includeThreadIdsComment": "Populated 2026-08-06. This array sat EMPTY, which is the entire reason the public demo's Engineer rendered 'No past conversations yet' — the seed's copy loop (seed-demo-account.ts:375) is correct, it simply had nothing to iterate. Ids must be YOUR OWN threads under SOURCE_USER_ID; the seed skips any it cannot find under that user, with a warning, so a deleted thread degrades quietly instead of failing the seed.",
+  "$includeThreadIdsComment": "Populated 2026-08-06. This array sat EMPTY, which is the entire reason the public demo's Engineer rendered 'No past conversations yet' — the seed's copy loop is correct, it simply had nothing to iterate. Ids must be YOUR OWN threads under SOURCE_USER_ID; the seed skips any it cannot find under that user, with a warning, so a deleted thread degrades quietly instead of failing the seed.",
   "$excludedThreadComment": "DELIBERATELY NOT LISTED: cmrwzy4cs0003jl04s86zyd3w, the beginner 'why is it so hard to turn my car' question. It reads well and scripts/dev-copy-demo-engineer-threads.ts copies it, but it belongs to nicshanaya23@gmail.com — a real user, not the founder — and the demo is a PUBLIC page. The seed's userId filter already refuses it; this note exists so nobody 'fixes' that filter to make it work. If you want a beginner question in the demo, ask one from your own account and list that id here.",
+  "$expandedComment": "EXPANDED 2026-08-25 from 2 threads to 16. The demo no longer answers live questions (founder call — /api/engineer/chat came off the demo write allowlist), so this list IS the Engineer in the demo. Two threads was not a history, it was a sample. Chosen for spread rather than volume: what the Engineer read off an actual run, a long back-and-forth where the first change made the car worse, planning a test day from previous ones, and the plain-language questions a driver actually types. Duplicates of the same question were dropped — the founder asked several of these three or four times while testing.",
+  "$readBeforeShippingComment": "ELEVEN OF THESE PREDATE THE v0 ENGINEER REBUILD (2026-08-05), which deliberately runs on less context than the system that answered them (see CLAUDE.md and ENGINEER_NORTH_STAR.md). They are the meatiest answers in the account, which is exactly why they are a risk: a demo that shows answers the shipping Engineer would not produce today oversells, and an oversold demo becomes a refund. Marked `pre-v0` in $threadNotes below. Read those eleven before a public launch and cut any that no longer represent what the app does. cmqm1kpu00001l20451u22ajw ('where is my setup compared to the average') was cut on exactly this test — it leans on community context v0 may no longer carry.",
+  "$threadNotes": {
+    "cms5zgqy60003l204y3w10qfo": "pre-v0 · RUN-anchored · weekend analysis + the setup changes that mattered. Founder-picked 2026-08-06.",
+    "cmrriwzn40001l7041hsrdiwa": "pre-v0 · RUN-anchored · 'I changed FDR a couple times today, which was better' — the Engineer reading your own changes back to you.",
+    "cms6o9kpd000sl404en7ypylz": "pre-v0 · RUN-anchored · more steering without losing the rear, low grip, many hairpins. Founder-picked 2026-08-06.",
+    "cmstllhw5001rvlascraqnytb": "v0 · RUN-anchored · 'No traction on corner exit in the A-main. Should I keep softening the rear spring?' — race day, under time pressure.",
+    "cms82zvjr000vk604akmyiis1": "pre-v0 · 20 messages, the longest in the account · 'Softer rear spring made the car much worse, what should I do now' — the change that backfired.",
+    "cmrc4hpmh000flb04frbvcus8": "pre-v0 · 'Why did more camber help' — wanting to understand, not just be told.",
+    "cmrao9mye0001jp04b8d0fuzi": "pre-v0 · ride height front and rear, six messages deep.",
+    "cms82t6id0003jt047mtfayyj": "pre-v0 · ten messages on preventing mid-corner oversteer.",
+    "cmrw1mx0u0001l504hqioe49c": "pre-v0 · planning a test day at TFTR from how the previous ones went. The clearest 'this thing remembers your season' answer.",
+    "cms860ip9002vk604po3ove6b": "pre-v0 · 'What setup changes should I have tried this weekend that I didn't' — post-event reflection.",
+    "cms7c18ig0003l1045z62ml2q": "pre-v0 · the grip dropped and the car lost more pace than everyone else's.",
+    "cmsfof6p200favlp4q79jkd2k": "v0 · 'my car just doesnt seem as easy to drive as some of the fast guys' — the most human question in the account.",
+    "cmsfopwwo00kcvlp4f1bof1vc": "v0 · 'my car is easy to drive but slow' — the other half of the same problem.",
+    "cmsiigvvn006yvl6s1av84vcq": "v0 · 'super low grip track, like driving on ice'.",
+    "cmsfonhqh00j7vlp4lyzmcd5t": "v0 · 'less front droop - what will it do' — a short, single-parameter question, for contrast with the long ones.",
+    "cmsiid0y70066vl6ss317xnhg": "v0 · how to prevent traction rolling."
+  },
   "nameScrub": [],
   "includeThreadIds": [
     "cms5zgqy60003l204y3w10qfo",
-    "cms6o9kpd000sl404en7ypylz"
+    "cmrriwzn40001l7041hsrdiwa",
+    "cms6o9kpd000sl404en7ypylz",
+    "cmstllhw5001rvlascraqnytb",
+    "cms82zvjr000vk604akmyiis1",
+    "cmrc4hpmh000flb04frbvcus8",
+    "cmrao9mye0001jp04b8d0fuzi",
+    "cms82t6id0003jt047mtfayyj",
+    "cmrw1mx0u0001l504hqioe49c",
+    "cms860ip9002vk604po3ove6b",
+    "cms7c18ig0003l1045z62ml2q",
+    "cmsfof6p200favlp4q79jkd2k",
+    "cmsfopwwo00kcvlp4f1bof1vc",
+    "cmsiigvvn006yvl6s1av84vcq",
+    "cmsfonhqh00j7vlp4lyzmcd5t",
+    "cmsiid0y70066vl6ss317xnhg"
   ],
   "runs": {}
 }

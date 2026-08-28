@@ -4,21 +4,27 @@
  *
  *   npm run demo:seed -- --confirm-host=<db host>          # refuses without the matching host
  *   npm run demo:seed -- --confirm-host=... --months=7     # season window (default 7)
+ *   npm run demo:seed -- --confirm-host=... --lag-days=2   # where the season ends (default 2)
  *
  * What it does, idempotently (wipe-and-reseed keyed STRICTLY by the fixed demo user id):
  *   1. Deletes + recreates the demo User (fixed id ⇒ live demo JWTs survive a reseed),
  *      with AuthAllowedEmail (sign-in gate) and a fake active Pro Subscription (entitlement).
- *   2. Copies the founder's last N months: cars, tracks(+layouts), tire sets, setup
- *      snapshots (incl. base chain + car libraries), lap-import sessions, runs, lap sets +
+ *   2. Copies the founder's last N months: cars, tracks(+layouts), race meetings, tire sets,
+ *      setup snapshots (incl. base chain + car libraries), lap-import sessions, runs, lap sets +
  *      laps, between-run hints + dashboard suggestions, action items, event participations,
  *      and the curated Engineer threads listed in scripts/demo-curation-overlay.json.
  *   3. Anonymizes as it copies (word-boundary name table + transponder masking, deep into
  *      JSON payloads), then applies the founder's per-run overlay text on top.
+ *   4. Anchors the whole season forward so its newest run sits `--lag-days` behind today
+ *      (src/lib/demo/demoDateShift.ts — a frozen copy reads as a dead account within weeks).
  *
  * Deliberately NOT copied: batteries (feature retired), setup documents/calibrations (blob
  * PDFs can carry the founder's name in the sheet itself — runs render from snapshot JSON
  * without them), rendered setup PDFs (same reason), MyLaps/timing tokens, push devices.
- * Events are global rows and are reused, never copied.
+ *
+ * Events ARE copied as of 2026-08-25 — they used to be reused as global rows, which put the
+ * founder's real name on the demo's Teammates card via shared-event co-presence, and pinned the
+ * demo's runs to meetings the season shift cannot move. See the clone block below.
  *
  * Caches: Run.engineerSummaryJson rides along on the run rows. Hint/suggestion rows are
  * copied but their inputFingerprint hashes the OLD ids, so the first demo view of a page may
@@ -37,6 +43,8 @@ import {
   type CurationOverlay,
 } from "@/lib/demo/anonymize";
 import { demoCatalogUserId } from "@/lib/demo/demoAccess";
+import { refreshDemoSeasonDates, settleDemoThreadDates } from "@/lib/demo/applyDemoDateShift";
+import { DEMO_RECENCY_LAG_DAYS } from "@/lib/demo/demoDateShift";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const SOURCE_USER_ID = "cmo75nzr60000vl5kvr0rqhej"; // the founder
@@ -55,6 +63,8 @@ const args = process.argv.slice(2);
 const argValue = (name: string) =>
   args.find((a) => a.startsWith(`--${name}=`))?.split("=").slice(1).join("=");
 const months = Math.max(1, Number(argValue("months") ?? 7) || 7);
+/** How far behind today the copied season's newest run should end up. */
+const lagDays = Math.max(0, Number(argValue("lag-days") ?? DEMO_RECENCY_LAG_DAYS) || DEMO_RECENCY_LAG_DAYS);
 
 async function main() {
   const dbHost = process.env.DATABASE_URL?.split("@")[1]?.split("/")[0] ?? "unknown";
@@ -134,13 +144,14 @@ async function main() {
     if (snapshotIds.size === before) break;
   }
 
-  const [cars, tracks, layouts, tireSets, snapshots, iltsRows] = await Promise.all([
+  const [cars, tracks, layouts, tireSets, snapshots, iltsRows, events] = await Promise.all([
     prisma.car.findMany({ where: { id: { in: [...carIds] } } }),
     prisma.track.findMany({ where: { id: { in: [...trackIds] } } }),
     prisma.trackLayout.findMany({ where: { trackId: { in: [...trackIds] } } }),
     prisma.tireSet.findMany({ where: { id: { in: [...tireSetIds] } } }),
     prisma.setupSnapshot.findMany({ where: { id: { in: [...snapshotIds] } } }),
     prisma.importedLapTimeSession.findMany({ where: { id: { in: [...iltsIds] } } }),
+    prisma.event.findMany({ where: { id: { in: [...eventIds] } } }),
   ]);
 
   // ── 3. Copy with an id map ──────────────────────────────────────────────────
@@ -201,6 +212,39 @@ async function main() {
     });
   }
 
+  /*
+   * Events used to be reused rather than copied — "events are global per track/meeting", which
+   * is true of the model and was wrong for the demo, in two ways at once.
+   *
+   * 1. It leaked. `loadOutWithYou` finds other drivers by shared event, so a demo run pinned to
+   *    the founder's real "TFTR Clubday" put his real name and best lap on the demo's Teammates
+   *    card, in front of every anonymous visitor. Measured on production 2026-08-25. Any other
+   *    driver at those ten meetings would surface the same way.
+   * 2. It froze. A shared meeting cannot be moved by the season shift — moving it would drag
+   *    the date under every real driver who raced it — so a shifted run would sit at a meeting
+   *    still dated last winter.
+   *
+   * Cloned events are demo-owned and hang off the demo's own cloned tracks, and BOTH event
+   * discovery queries (`findEventByTrackAndResultsUrl`, `findJoinableTeamEvent`) are scoped by
+   * trackId, so no real user can reach them. Timing-source URLs come across so the meeting
+   * still reads as real; they are never polled for the demo account.
+   */
+  for (const e of events) {
+    await prisma.event.create({
+      data: {
+        ...strip(e),
+        id: newId(e.id),
+        userId: DEMO_USER_ID,
+        name: scrub(e.name),
+        trackId: remap(e.trackId),
+        trackLayoutId: remap(e.trackLayoutId),
+        trackNameSnapshot: e.trackNameSnapshot ? scrub(e.trackNameSnapshot) : e.trackNameSnapshot,
+        legacyTrackJson: scrubJson(e.legacyTrackJson) as Prisma.InputJsonValue | undefined ?? undefined,
+      },
+    });
+  }
+  console.log(`Cloned ${events.length} race meetings (demo-owned — no shared rows with the founder).`);
+
   // Snapshots pass 1 (base links null), pass 2 patches them.
   for (const s of snapshots) {
     await prisma.setupSnapshot.create({
@@ -234,7 +278,10 @@ async function main() {
         id: newId(ilts.id),
         userId: DEMO_USER_ID,
         linkedRunId: null, // runs point at ILTS, not vice versa — safe to leave null
-        linkedEventId: (ilts as { linkedEventId?: string | null }).linkedEventId ?? null,
+        // Remapped onto the demo's own event clone. A session whose event fell outside the
+        // season window has no clone to point at and is unlinked rather than left pointing at
+        // the founder's global row — same leak the run copy below used to have.
+        linkedEventId: remap((ilts as { linkedEventId?: string | null }).linkedEventId ?? null),
         parsedPayload: scrubJson(ilts.parsedPayload) as Prisma.InputJsonValue,
       } as Prisma.ImportedLapTimeSessionUncheckedCreateInput,
     });
@@ -272,7 +319,7 @@ async function main() {
         tireSetId: remap(r.tireSetId),
         setupSnapshotId: remap(r.setupSnapshotId)!,
         importedLapTimeSessionId: remap(r.importedLapTimeSessionId),
-        eventId: r.eventId, // events are global — reuse
+        eventId: remap(r.eventId), // the demo's own clone — never the founder's shared row
         batteryId: null,
         sourceSetupDocumentId: null,
         sourceSetupCalibrationId: null,
@@ -365,8 +412,12 @@ async function main() {
     const { id, userId, ...rest } = p as Record<string, unknown> & typeof p;
     void id;
     void userId;
+    // `eventId` is required, so a participation whose meeting was not cloned is dropped rather
+    // than written against the founder's global row.
+    const eventId = remap(p.eventId);
+    if (!eventId) continue;
     await prisma.eventParticipation.create({
-      data: { ...(scrubJson(rest) as typeof rest), userId: DEMO_USER_ID },
+      data: { ...(scrubJson(rest) as typeof rest), userId: DEMO_USER_ID, eventId },
     });
   }
 
@@ -421,12 +472,54 @@ async function main() {
     await prisma.appSetting.create({ data: { userId: DEMO_USER_ID, key, value } });
   }
 
-  // ── 4. Review aids ──────────────────────────────────────────────────────────
+  /*
+   * ── 4. Anchor the season ───────────────────────────────────────────────────
+   * The copy above keeps every original date, which is right — the season's shape, its gaps and
+   * its back-to-back weekends are what make it read as real. But the founder's newest run is
+   * whenever he last raced, and the app is full of 30-day windows, so a copy left where it
+   * landed shows a visitor an account that has done nothing all month.
+   *
+   * One delta, applied to everything, moves the whole season without disturbing its shape.
+   * `--lag-days` sets how far behind today the newest run sits; `demo:refresh` re-anchors it on
+   * a schedule from here on, so this pass matters only for the minutes after a re-seed.
+   */
+  const shift = await refreshDemoSeasonDates({ lagDays, force: true });
+  console.log(
+    `\nSeason anchored: moved ${shift.deltaDays >= 0 ? "+" : ""}${shift.deltaDays} days ` +
+      `(${shift.newestRunBefore?.slice(0, 10) ?? "—"} → ${shift.newestRunAfter?.slice(0, 10) ?? "—"}, ` +
+      `newest run now ${lagDays} day(s) ago).`,
+  );
+
+  /*
+   * Conversations get their own pass. They are not bound to the run timeline — the founder kept
+   * asking the Engineer questions for a month after his last run — so the season delta above
+   * overshoots them and parks the demo's history in the FUTURE. Caught on the first real seed:
+   * threads dated 2026-09-18 against a 2026-08-25 today. See `placeDemoThread`.
+   */
+  const settled = await settleDemoThreadDates();
+  console.log(
+    `Conversations settled: ${settled.threads} threads, newest ${settled.newestAfter?.slice(0, 16).replace("T", " ") ?? "—"}` +
+      (settled.movedForRunOrder > 0
+        ? ` (${settled.movedForRunOrder} pushed to sit after the run they discuss)`
+        : ""),
+  );
+
+  // ── 5. Review aids ──────────────────────────────────────────────────────────
   const leftover = await prisma.run.findMany({
     where: { userId: DEMO_USER_ID, OR: [{ notes: { contains: "Jordan", mode: "insensitive" } }, { driverNotes: { contains: "Jordan", mode: "insensitive" } }] },
     select: { id: true },
   });
   console.log(`\nScrub check — demo runs still mentioning "Jordan": ${leftover.length}`);
+
+  /*
+   * Co-presence leak check. The demo must share no event row with anyone, or its Teammates card
+   * names a real driver to the public internet. This counts demo runs whose event is owned by
+   * somebody else — it must be 0.
+   */
+  const sharedEvents = await prisma.run.count({
+    where: { userId: DEMO_USER_ID, eventId: { not: null }, event: { userId: { not: DEMO_USER_ID } } },
+  });
+  console.log(`Leak check — demo runs on an event the demo does not own: ${sharedEvents}`);
   console.log("Done. Founder eyeball next: open the demo, read notes, open threads.");
   console.log(`Original→demo run ids are printed to help curate: edit ${overlayPath} keyed by ORIGINAL ids and re-run.`);
 }

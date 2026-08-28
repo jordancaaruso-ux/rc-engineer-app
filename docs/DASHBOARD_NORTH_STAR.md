@@ -73,13 +73,16 @@ Auto only — no manual toggle. (Revisit if the "reviewing at the track café" c
    good once a setup exists. Most accounts never see it. See the section below.
 3. **Day verdict card** (`DashboardDayVerdictCard`, "three instruments" — variant A of the
    2026-07-19 artifact board). **Computed only, no AI** (`src/lib/dashboardVerdict.ts`):
-   - **Pace** — day trend across today's runs (avg-top-5 preferred, best-lap fallback;
-     ±0.05 s reads as steady), which run was the best, and a per-run sparkline.
+   - **Pace** — where the latest run sits against **the median of today's earlier runs**
+     (avg-top-5 preferred, best-lap fallback; ±0.05 s reads as steady), which run was the
+     best, and a per-run sparkline. Two runs draw the sparkline and print no verdict at
+     all — see the anchor note below.
    - **Last change** — the most recent run that changed setup, and whether it helped
      (metric delta vs the run before it; inside the noise band = "effect unclear").
    - **Handling** (2026-08-15) — the driver's own 1–10 ratings across today, as a
-     `RatingDial` plus the arc ("5 → 6 → 8 across today"); direction is last minus first,
-     the same convention Pace uses. **Replaced Consistency**, which was the spread of the
+     `RatingDial` plus the arc ("5 → 6 → 8 today"); direction is measured against the same
+     anchor Pace uses. Past four runs the arc prints the day's low and high instead of the
+     chain. **Replaced Consistency**, which was the spread of the
      latest run's five *fastest* laps: it scored a run with five clean laps and fifteen
      messy ones as "Tight", and it needed ≥5 imported laps to say anything, so it went
      blank on a club night with no timing import. A rating is required to mark a run
@@ -87,6 +90,20 @@ Auto only — no manual toggle. (Revisit if the "reviewing at the track café" c
      Consistency is untouched on **desktop** — the hero's second dial still reads
      `consistencyWord` / `consistencyPercent`, and the honest all-laps version (100 − CV)
      still lives in Analysis, which is what the Engineer reads.
+   - **The anchor is the median of today's EARLIER runs, not run one** (founder call
+     2026-08-25, `medianOfEarlier` in `dashboardVerdict.ts`). Run one anchored every row
+     and is the worst anchor available: it is the worst run of the day by design, so
+     "trending faster" by run four was close to automatic; it is a single run, so one
+     session lost to traffic set the day's reference; and on pace it partly measures the
+     track coming to everyone rather than the setup. A median uses every earlier run,
+     survives one outlier, and still speaks on a three-run day. **A two-run day gets no
+     direction on either row** — the only comparison available is the one this replaced.
+   - **A day that wandered says so.** Handling has five states, not three: `flat` (every
+     run rated the same — the ONLY day allowed to say "Same all day"), `swinging` (rose
+     two points and fell two points, in either order → "Up and down"), `holding` (moved,
+     but not past the 1.5-point band → "Settled"), plus improving/fading. The reported bug
+     (2026-08-25) was a day that started and finished on the same rating and read "Same all
+     day" on the bold line while the arc collapsed to `6 → … → 6` and hid the middle.
    - **No footer since 2026-08-20.** It read "✦ Ask the Engineer about today" and queued
      "give me your read on today so far" — a request to recite the figures printed directly
      above it. The Engineer moved to card 4 with better questions (founder call).
@@ -102,6 +119,36 @@ Auto only — no manual toggle. (Revisit if the "reviewing at the track café" c
 **No "How you're going" on a track day** (founder call 2026-08-20). One consequence, accepted:
 the new-record celebration lives on that card, so a PB broken mid-meeting has no banner until
 the drive home.
+
+## Drafts on the dashboard — three days, then they stop asking (2026-08-25)
+
+A draft run only exists because the driver tapped **Save draft** (the wizard's silent autosave is
+a `localStorage` snapshot and never writes a `Run`), so every one of them was deliberate. Earlier
+the same day that reasoning was taken a step too far and drafts were made to surface forever.
+Driven on a real account it produced thirteen of them, most four and five months old, stacked
+above the day's actual content with the yellow bar offering one. **Founder call: a draft holds
+its place on the dashboard for three calendar days in the driver's zone — today and the two
+before it — and then goes quiet.** Long enough to cover a race weekend; short enough that months
+of leftovers stop owning the front page.
+
+Two things this is deliberately not:
+
+- **Not a delete.** Nothing is removed from the database for being old. An expired draft is still
+  in run history with its amber "finish me" styling, still the driver's to finish or bin.
+- **Not a drop on the day it is for.** A draft banked a fortnight ahead for a meeting that is
+  running **today** still surfaces. That is the one case prepping ahead exists for.
+
+**The CTA is the only draft surface on the dashboard.** A `DashboardDraftRunsCard` listing the
+rest under the bar was built and cut the same afternoon — *"I don't want draft card to surface on
+the dashboard, that's what the CTA 'finish' is for"*. Do not rebuild it. The consequence, accepted:
+the bar only takes itself over for a draft that is **for today** (saved today, or its event is
+running today), so a draft left from yesterday is not offered anywhere on the dashboard — it is
+found in Sessions under the Drafts filter, which really does filter (`?status=draft`).
+
+Where it lands: `src/lib/runs/resumableDraftLogic.ts` holds the rule (`DRAFT_DASHBOARD_DAYS`) and
+`loadResumableDrafts.ts` the query; the dashboard model exposes one draft, not a list. The
+"new run detected" notification path stays *tighter* than three days — `loadTodaysIncompleteRuns`
+is today-only, because attaching fresh lap times to yesterday's draft is worse than an extra tap.
 
 ## The "add a setup sheet" card (both modes, position 2)
 

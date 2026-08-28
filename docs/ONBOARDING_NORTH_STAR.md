@@ -1,6 +1,6 @@
 # Onboarding North Star — first run, first day
 
-**Status:** ⚠️ **Partly superseded — see "Amendment 2026-08-18" and "Reversal 2026-07-23" below.** The guide chip, the derived
+**Status:** ⚠️ **Partly superseded — see "Amendment 2026-08-26" (current), "Amendment 2026-08-18" and "Reversal 2026-07-23" below.** The guide chip, the derived
 4-step progress, the resume/payoff/intro cards and the required-up-front timing step were retired after
 the founder drove the empty account and found the chip dead-clicked, forced steps, and didn't teach.
 Original spec (2026-07-22, 2 rounds over an artifact board) kept below for history. **Owner:** Jordan.
@@ -12,7 +12,130 @@ first run never gets logged). Visual work on these screens follows `VISUAL_NORTH
 
 ---
 
-## Amendment — 2026-08-18 (current model): the car is not the payoff
+## Amendment — 2026-08-26 (current model): three steps, and the dashboard is the hub
+
+Founder drove a brand-new account end to end. The welcome screen and the add-car flow were called
+good and are untouched. Four things were not.
+
+### 1. The car flow hands back to the dashboard, not to the next step
+
+`CarList`'s first-car confirmation pointed straight at `/settings`. It now points at **`/`**, still
+worded **"Continue setting up"**.
+
+The 08-18 rule that the two surfaces "must never disagree about what comes next" is satisfied a
+better way: the car page no longer has an opinion. It hands back, and the Get-set-up card — which is
+already sitting in its "Add your timing details" state when they land — owns the order. One checklist,
+one place. The extra tap buys the driver watching their own list tick over, which is the only reward
+the step has.
+
+The 2026-08-13 finding it must not undo: adding a car used to leave people stranded on the Garage
+page with no message and nothing pointing onward. Pointing onward is preserved; only the destination
+moved.
+
+### 2. Settings has a way out
+
+Settings is the one step of the walk that lives off the dashboard, and once you were on it nothing
+said you were finished or where to carry on. The bottom dock's Dashboard tab is furniture — it reads
+as "go elsewhere", not "the rest of what you started is waiting".
+
+It renders on `showGetSetUpCard(onboarding)` — the same predicate as the dashboard card, so there is
+no second definition of "still setting up" to drift, and it is on screen from the moment they arrive
+rather than after a save (founder: the complaint was about being stranded on the page, which is true
+before anyone types anything). For everyone else Settings is exactly the page it has always been.
+
+### The hand-off bar — one component, both places
+
+Items 1 and 2 are the same moment twice: finished here, the next thing is elsewhere. They are now
+literally the same component, `SetUpHandoffBar`, and `direction` is the only difference — the Garage
+bar goes forward, the Settings bar goes back.
+
+**Yellow, pinned at the top, and it stays there through the scroll** (founder 2026-08-26, in three
+passes: yellow and sticky on Settings first, then the same material on the Garage, then the same
+*position* there too). All of it matters. Settings is long enough that an in-flow row is gone by the
+time anyone finishes typing their transponder; the Garage's used to be a grey explanatory line above
+a `self-start` chip, which said one thing in two elements, did not read as the way on, and scrolled
+away the moment the driver looked at their new car. Standard `primary` face — no bespoke yellow and
+no rim (see the 2026-08-25 note over `.primary-face`) — destination bold, reason under it at 75%,
+arrow on the far side.
+
+Neither obvious technique can pin it, and both dead ends are already documented elsewhere in the
+tree: `.app-shell` is `overflow-x: hidden`, so the spec computes `overflow-y` to `auto` and the shell
+becomes a scrollport that never scrolls — a `position: sticky` child pins to a box that stays still
+and scrolls away with the page (`TopRail`, `SetupEditorSaveBar`, `SessionsBrowser` all carry the
+finding); and `position: fixed` inside that shell is clipped on iOS, which is why `BottomNav`,
+`MobileBrandMark` and `AccountMenu` are mounted outside it. So the bar **portals to `document.body`**.
+Each page keeps ownership of who is mid-walk — only the pixels move — which beats a mount point in
+`AppShell` that would have to re-derive that client-side.
+
+**It measures the page rather than describing it.** Only the vertical offset is in `globals.css`
+(`.setup-handoff-bar`), because only that is knowable: it clears the 34px corner pills at
+`--top-chrome-y` on the phone — BELOW the band, never in it, since `MobileTitleCondenser` fades the
+compact title into that same band — and the 64px `.top-rail` from md up. Everything else the
+component reads off the live DOM, because every guess was wrong on one of the two pages:
+
+- **The column is not `.page-body`.** Settings is a centred `max-w-2xl` section; the Garage is a
+  full-bleed section with a `max-w-2xl` wrapper inside it, and on desktop no page header at all
+  (`.page-header.is-echo` collapses — the rail's tab names the page). Measuring the section gave a
+  1344px yellow bar over 670px of cards. It measures `.page-body`'s first element child.
+- **The room to reserve is not the bar's height.** The bar's top lands above where `.page-body`
+  starts, by a different amount per page, so what has to be reserved is how far it reaches *past*
+  that. Padding moves a section's content, never its box top, so re-measuring is stable rather than a
+  feedback loop. `--setup-handoff-pad`, applied under `body.has-setup-handoff`.
+
+Measured at 390px and 1440px, both pages: the first card lands 11.9–12.4px under the bar, against
+the 12px every other card gap runs at.
+
+### 3. "Log your first run" is off the card
+
+The 08-18 payoff state put a yellow **Log your first run** button directly beneath the dashboard's
+yellow Start-a-run bar. Two yellow buttons, one job. The bar is the run door and always was.
+
+### 4. The setup sheet is step three, not a footnote
+
+It rode along under **"Optional"** / **"Make it better"**, which is exactly how it read. Founder:
+*"it's not 'make it better', it's add it now or add it when you're logging a run."* Both labels are
+deleted.
+
+**The card now walks CAR → TIMING → SETUP.** Three states:
+
+| State | Eyebrow | Headline | Primary action | Also |
+|---|---|---|---|---|
+| No car | Get set up | "Add your car to log your first run" | — (three rows) | sheet row is the third row, unlabelled |
+| Car, no timing | Get set up | "Add your timing details" | **Continue setting up** → `/settings` | sheet row under **"After that"** |
+| Car + timing | **Last step** | **"Add your setup sheet"** | `UploadSetupSheetBar` | quiet deferral link |
+
+**Every headline is the ask and nothing else** (founder, same day, two passes). The middle one read
+"Car's in — timing next", which put the finished step first so the eye landed on what was already
+done; then "Timing next — car's in", which still spent half a headline congratulating them. The car
+is acknowledged by the car page's own confirmation and by nothing on this card. All three states now
+name the step the way the rows do.
+
+The deferral is a real door and its promise is true: *"Or add it when you log a run — the run form
+asks for it"* → `/runs/new`, whose setup step carries the same upload plus write-from-scratch. It is
+quiet text, not a second yellow button — that is the thing item 3 just removed.
+
+**What has NOT changed: the sheet still gates nothing.** The 08-18 reasoning stands — it is the one
+item needing something the driver may not have on them, and on an uncalibrated chassis it is a 36–40
+box hand-build. Promotion is about how it reads, not about locking anyone out. `isReadyToRun`
+(car + timing) is untouched.
+
+### Rule change in `src/lib/onboarding/visibility.ts`
+
+New **`isSetUpComplete`** (car + timing + sheet), and `showGetSetUpCard` retires on it as well as on
+the first run and Ignore. This restores the exit removed on 08-18, for the reason that removal is now
+moot: back then the complete card carried the payoff button, so retiring deleted the good news at the
+moment it arrived. With that button gone, a complete card shows three ticks and asks for nothing.
+Two questions, both wanted, deliberately not one predicate:
+
+- `isReadyToRun` — can this driver log a run that will work? The sheet does not affect it.
+- `isSetUpComplete` — have we finished asking? The sheet does.
+
+`/debug/onboarding-preview` shows both verdicts per scenario.
+
+---
+
+
+## Amendment — 2026-08-18 (superseded in part by 2026-08-26 above): the car is not the payoff
 
 The 07-23 reversal made a **car** the only thing gating the payoff, so adding one flipped the card
 straight to "You're ready — log your first run". Driven again by the founder: that is both premature
@@ -59,6 +182,10 @@ directly under the one thing being asked for — which read as an apology for as
 the two detours every walk paid) led with "Log your first run"; it now leads with **Continue setting
 up** → `/settings`, taking `hasTimingIdentity` as a prop from
 `src/app/cars/page.tsx`. The two surfaces must never disagree about what comes next.
+
+> **Superseded 2026-08-26:** that button now points at `/` (the dashboard), not `/settings`. The
+> disagreement risk is removed rather than managed — the car page stopped having an opinion about
+> what comes next, and the Get-set-up card is the only checklist.
 
 ### "Log it anyway" — the setup gate has an exit
 

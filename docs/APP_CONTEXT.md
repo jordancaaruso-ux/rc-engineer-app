@@ -411,32 +411,46 @@ Read `docs/HANDLING_CAPTURE_NORTH_STAR.md` before touching ratings/handling capt
 
 ### 10.2 Lap import — `src/lib/lapUrlParsers/`, `lapImport/`, `lapWatch/`
 
-**Parsers, tried in order** (`registry.ts`): LiveRC → MyRCM → Speedhive-practice → Speedhive →
+**Parsers, tried in order** (`registry.ts`): LiveRC → Speedhive-practice → Speedhive →
 generic HTTP timing → stub. Each turns a URL into an `ImportedLapTimeSession` holding a
 `parsedPayload` (laps, session drivers, hints) and `fieldStatsJson` (per-driver best / avgTop5 /
 avgTop10, median field pace, ranks).
 
 - **`fetchText.ts` is the single fetch choke point** for every parser and every discovery/watch
   crawl. SSRF safety is `src/lib/http/timingUrlSafety.ts`.
-- ⚠️ **MyRCM rebuilt its whole site on 2026-08-18 (v9.1.15)** and the reader was rewritten against
-  it on 2026-08-19. Addresses moved (`/myrcm/report/<lang>/<e>/<c>` → `/en/report/<e>/<c>`), the
-  session menu became `button.run-button`, and the tables were renamed. **The eight unit tests
-  stayed green the whole time** — they ran on fixtures of a site that no longer existed, which is
-  why `npm run test:myrcm-live` now exists: it reads myrcm.ch as it is right now and fails when the
-  shapes move. Run it before trusting `test:myrcm`. MyRCM's own machine-readable exports are broken
-  post-rebuild (`cType=XML`/`JSON` return HTML, `cType=CSV` returns HTML as UTF-16 Excel,
-  `/rest/v1/report-pdf/…` returns a PNG) — reading the page is the only working path.
-  MyRCM URL shapes live in `myRcmUrl.ts` (cheerio-free, shared with the client); the HTML reading is
-  `myRcmReport.ts`. **MyRCM is paste-only** — `Track` has `liveRcUrl`/`speedhiveUrl` but no MyRCM
-  field, so "URL Auto" can never find it; the organiser page (`myrcm.ch/en/organizers/<id>`) is the
-  natural track-level anchor if that gets wired.
-- **Discovery:** `discoverLiveRcSessionsForUser`, `discoverMyRcmDaySessions`,
-  `discoverTrackTimingSessions`, `discoverSpeedhive*`, `expandLiveRcEventHub`,
-  `detectActiveRaceMeetingAtTrack`. Driver identity matching is name-normalisation
-  (`liveRcNameNormalize`, `speedhiveDriverNames`, `myRcmDriverName`) plus Speedhive transponder ids.
-  MyRCM publishes no driver id or transponder, so the name is the only handle — and when it doesn't
-  match, the import **keeps the whole field but returns no laps** rather than handing back row 1,
-  which is the session winner. Settings → Name on MyRCM is the override.
+- 🚫 **MyRCM was switched off on 2026-08-26.** Two sources remain: LiveRC and MyLaps/Speedhive.
+  MyRCM publishes no API, and its operator has stated that reading its pages is not permitted
+  (relayed via a TestLogger statement to Jordan), so HTML scraping was the only door and it is now
+  closed. **The gate is `BLOCKED_TIMING_HOST_SUFFIXES` in `http/timingUrlSafetySync.ts`, not the
+  parser registry** — removing `myRcmParser` alone is not enough, because `httpTimingParser`
+  matches any http(s) URL and an admin request carries `allowAnyPublicHost`, which waves every
+  public host through. Measured on the dev server before the denylist existed: an admin paste of a
+  MyRCM report URL still fetched the page and imported four bogus "laps". The denylist outranks
+  both. Removed with it: the class-page session picker, `Settings → Name on MyRCM` and its route,
+  `getMyRcmDriverNamesForUser`, the scan-day-url MyRCM branch, and `scripts/myrcm-live-check.ts`
+  (a canary that hit myrcm.ch on demand). Left in place, dormant and unreachable: `myRcmParser.ts`,
+  `myRcmReport.ts`, `myRcmUrl.ts`, `discoverMyRcmDaySessions.ts` and `npm run test:myrcm` (fixture-
+  only, no network), so the work is recoverable in one line if consent ever arrives. Already
+  imported MyRCM runs still render — `lapImport/labels.ts` keeps the `myrcm` timing source and its
+  wall-clock-as-UTC rule, and the ingest panel's source rail still offers a MyRCM segment for old
+  rows.
+- **Discovery:** `discoverLiveRcSessionsForUser`, `discoverTrackTimingSessions`,
+  `discoverSpeedhive*`, `expandLiveRcEventHub`, `detectActiveRaceMeetingAtTrack`. Driver identity
+  matching is name-normalisation (`liveRcNameNormalize`, `speedhiveDriverNames`) plus Speedhive
+  transponder ids.
+- **Reading an import — `/laps/analysis`** (2026-08-27). Lap analysis used to require being the
+  driver who logged the run: the sheet anchored on a `Run`, so a race you watched had nowhere to
+  be read. `loadImportedSessionAnchor` dresses an `ImportedLapTimeSession` as the shape the sheet
+  anchors on (`import:<id>`, every entrant as an `importedLapSet`), so the SAME
+  `LapComparisonColumnGrid` opens on a session with no run behind it. One route, three states:
+  `?session=` an import, `?run=` your own run full-page (the pop-up's "Detailed analysis" door,
+  carrying `?target=`/`?columns=`), neither = the library. `/laps/import` redirects here; the old
+  JSON-dump bench is gone. Importing a foreign meeting always worked — every parser stores the
+  whole field — so this was a reading surface, not a pipeline.
+- **Known competitors** — `AppSetting.knownCompetitorsJson`, other people's transponders.
+  MYLAPS' practice API serves any chip unauthenticated, so
+  `discoverSpeedhivePracticeSessionsForChip` is the user-scoped walk with the identity as an
+  argument. ⚠️ **Pulled only when asked** (founder call): nothing schedules it.
 - **MyLaps OAuth** (`src/lib/mylaps/`) links a real Speedhive account with PKCE.
 - **Watching:** `WatchedLapSource` rows are polled by `/api/cron/watch-results` to push a
   "new run detected" nudge. ⚠️ **The cron was dropped in `f1991af` and has never fired in
