@@ -5,12 +5,15 @@
 **Physics.** Sets how **front toe changes through travel** — the toe-link angle decides whether a wheel
 gains toe-in or toe-out as it compresses (and the reverse on extension); shims change that angle. It's
 [[toe-and-scrub]] made dynamic: the loaded (compressed) front runs a different toe than its static
-value. Shim count isn't a fixed number — measure toe at ride height vs full compression.
+value.
 
-**Sign (this sheet — Awesomatix):** **more** `bump_steer_shims_front` = more bump-in (front toes in
-as it compresses); fewer = more bump-out (founder-confirmed 2026-07-30). Note this is the
-**opposite sense to the rear toe-gain shims** below, and platform-specific — other cars can run
-the opposite.
+**The move is named by what the toe does, not by the shim** (founder, 2026-08-29): **more bump-in**
+— the front toes in further as it compresses — or **less bump-in**. That is the change to name to
+any driver, on any car; a normal move is 0.5 mm at the toe-link end. How a given car gets there is
+the sheet's business: on this sheet (Awesomatix) **more** `bump_steer_shims_front` = more bump-in,
+fewer = more bump-out (founder-confirmed 2026-07-30) — the opposite sense to the rear toe-gain
+shims below, and other cars can run the opposite. Shim count isn't a fixed number — measure toe at
+ride height vs full compression.
 
 ## Toe gain (rear)
 **Keys:** `toe_gain_shims_rear`
