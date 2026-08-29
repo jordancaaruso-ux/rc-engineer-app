@@ -77,7 +77,8 @@ facts, never against the words.
    fore-aft geometry split on that, not on the clock ([[differential-coupling]],
    [[anti-dive-anti-squat]]).
 4. **How the grip behaves at that point** — where the car's point sits on the grip curve
-   ([[grip-curve]]):
+   ([[grip-curve]]) — or whether it is the angle that is short rather than the grip
+   ([[steering-response]]):
    - it **arrives late** (there once settled, not on the first input). Read this with fact 2: grip
      that arrives for the last tenth of a corner is, to the driver, no grip in that corner — and in a
      fast car or a quick corner most corners are like that, so "no grip anywhere" and "it arrives
