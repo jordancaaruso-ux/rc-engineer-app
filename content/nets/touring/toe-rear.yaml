@@ -9,7 +9,7 @@ label: "Rear toe"
 words:
   more: "more toe-in"
   less: "less toe-in"
-step: "0.25° per side; 0.1° is a very small change, 0.5° a pretty big one"   # founder-dictated 2026-08-27, corrected same day
+step: "0.25° per side is a normal move; 0.5° when the problem is chronic and everywhere; 0.1° is barely felt"   # founder-dictated 2026-08-27, corrected same day
 two_answers: false
 more:
   reviewed: true
