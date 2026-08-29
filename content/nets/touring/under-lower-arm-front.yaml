@@ -14,9 +14,9 @@ discipline: touring
 parameter: under_lower_arm_shims_front
 label: "Front under-lower-arm shims"
 words:
-  more: "more"
-  less: "fewer"
-step: "0.5 mm — raise or lower that pickup by 0.5 mm, however the car does it; 0.25 mm is a small change, still noticeable"   # founder-dictated 2026-08-29
+  more: "more — roll centre up"
+  less: "fewer — roll centre down"
+step: "0.5 mm; 0.25 mm is a small change, still noticeable"   # founder-dictated 2026-08-29; direction lives in the words, not here (a pickup-height step inverted upper-outer once, 12:45 same day)
 two_answers: true
 # Founder, 2026-08-27 (second pass): "support" is not something a driver feels — lead with what they do feel: more direct,
 # precise, stiff. And on this key the front RELATIVE to the rear is as important as the change itself, if not more.

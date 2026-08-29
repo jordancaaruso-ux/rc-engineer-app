@@ -13,9 +13,9 @@ discipline: touring
 parameter: upper_outer_shims_rear
 label: "Rear upper-outer shims"
 words:
-  more: "more"
-  less: "fewer"
-step: "0.5 mm — raise or lower that pickup by 0.5 mm, however the car does it; 0.25 mm is a small change, still noticeable"   # founder-dictated 2026-08-29
+  more: "more — roll centre up"
+  less: "fewer — roll centre down"
+step: "0.5 mm; 0.25 mm is a small change, still noticeable"   # founder-dictated 2026-08-29; direction lives in the words, not here (a pickup-height step inverted upper-outer once, 12:45 same day)
 two_answers: true
 more:
   reviewed: true
