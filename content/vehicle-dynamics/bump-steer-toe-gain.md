@@ -9,11 +9,9 @@ value.
 
 **The move is named by what the toe does, not by the shim** (founder, 2026-08-29): **more bump-in**
 — the front toes in further as it compresses — or **less bump-in**. That is the change to name to
-any driver, on any car; a normal move is 0.5 mm at the toe-link end. How a given car gets there is
-the sheet's business: on this sheet (Awesomatix) **more** `bump_steer_shims_front` = more bump-in,
-fewer = more bump-out (founder-confirmed 2026-07-30) — the opposite sense to the rear toe-gain
-shims below, and other cars can run the opposite. Shim count isn't a fixed number — measure toe at
-ride height vs full compression.
+any driver, on any car; a normal move is 0.5 mm at the toe-link end. How a given car gets there —
+which way its shims go — is the car's business, not this page's. Shim count isn't a fixed number —
+measure toe at ride height vs full compression.
 
 ## Toe gain (rear)
 **Keys:** `toe_gain_shims_rear`
