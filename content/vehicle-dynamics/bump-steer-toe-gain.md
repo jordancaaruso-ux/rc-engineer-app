@@ -23,6 +23,6 @@ curve, not the static toe. What separates gained toe from static rear toe is **w
 toe is always there; gained toe-in appears only as the wheel compresses — under roll, and as the rear
 squats on power — so it arrives exactly when the outer rear is loaded ([[toe-and-scrub]] made dynamic).
 
-**Sign (this sheet — Awesomatix):** **fewer** `toe_gain_shims_rear` = **more** toe gain (more toe-in
-gained in compression); more shims = less (founder-confirmed 2026-07-30). Platform-specific — other
-cars can run the opposite sign, so never carry this direction to a different chassis.
+**The move is named by what the toe does:** **more toe gain** — more toe-in gained in compression —
+or **less**. Which way a given car's shims go is the car's business, not this page's; never carry
+one chassis's shim direction to another.
