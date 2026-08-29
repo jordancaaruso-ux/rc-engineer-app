@@ -3,8 +3,9 @@
 **Keys:** `servo_horn_height` — the length of the servo horn the steering linkage attaches to.
 
 **Answer it when asked; never offer it** (founder, 2026-08-28). This is not a setup change to
-suggest for a handling problem, alone or as an alternative — a driver who asks about the horn or
-about how fast the steering answers their hand gets this page; everyone else gets the chassis.
+suggest for any handling or steering complaint, however it is phrased — "more steering", "straight
+away", "when I turn the wheel" are all chassis questions. Only a driver who asks about the horn
+itself gets this page.
 
 **It effectively changes the speed of the servo: a shorter servo horn is smoother** (founder-confirmed). Mechanism: the horn is the lever between servo rotation and steering-rack movement — a **shorter horn moves the rack less per degree of servo rotation**, so steering inputs arrive slower and finer-grained; a **taller horn** delivers more rack movement per degree — faster, more aggressive steering response.
 
