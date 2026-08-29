@@ -15,7 +15,7 @@ label: "Front upper-outer shims"
 words:
   more: "more"
   less: "fewer"
-step: null   # a normal-sized move, founder-dictated; null = not set yet
+step: "0.5 mm — raise or lower that pickup by 0.5 mm, however the car does it; 0.25 mm is a small change, still noticeable"   # founder-dictated 2026-08-29
 two_answers: true
 more:
   reviewed: true

@@ -12,7 +12,7 @@ label: "Front bump steer (shims)"
 words:
   more: "more — more bump-in"
   less: "fewer — less bump-in"
-step: null   # a normal-sized move, founder-dictated; null = not set yet
+step: "0.5 mm"   # founder-dictated 2026-08-29
 two_answers: true
 more:
   reviewed: true

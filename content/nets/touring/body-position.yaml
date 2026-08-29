@@ -11,7 +11,7 @@ label: "Body position"
 words:
   more: "further back"
   less: "further forward"
-step: null   # a normal-sized move, founder-dictated; null = not set yet
+step: "1 mm"   # founder-dictated 2026-08-29
 two_answers: false
 more:
   reviewed: false
