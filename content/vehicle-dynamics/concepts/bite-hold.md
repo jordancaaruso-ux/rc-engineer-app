@@ -43,8 +43,10 @@ stop.
   balance owed to the front · `rotation` — balance owed to the rear · `forward traction` / `drive` —
   the rear putting power down · `push` — understeer caused by a lack of rotation from the rear, not a
   front problem · `snap` — a quick oversteer
-- `responsive` — reserved: only for **on the track** / **initial bite** / **initial grip**. Never for
-  a lower roll centre or a flatter upper link.
+- `responsive` — how readily the car answers the input. Bite causes response; it is not response.
+  Response comes from several things — the angle the car gives the tyre ([[steering-response]]) as
+  much as initial grip — and bite is one of them (founder, 2026-08-29). Never a word for a lower
+  roll centre or a flatter upper link.
 
 Everything else is a coinage, however natural it sounds. `punchy`, `crisper`, `takes a set`,
 `lined up`, `skatey`, `on top of it`, `nervous-feeling`, `too immediate` are examples, not the
