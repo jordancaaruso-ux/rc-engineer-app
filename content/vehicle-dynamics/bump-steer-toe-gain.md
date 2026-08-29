@@ -1,6 +1,6 @@
 ## Bump steer (front)
 **Keys:** `bump_steer_shims_front`
-**Concepts:** [[toe-and-scrub]], [[bite-hold]]
+**Concepts:** [[toe-and-scrub]], [[steering-response]], [[bite-hold]]
 
 **Physics.** Sets how **front toe changes through travel** — the toe-link angle decides whether a wheel
 gains toe-in or toe-out as it compresses (and the reverse on extension); shims change that angle. It's

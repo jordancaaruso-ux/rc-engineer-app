@@ -1,6 +1,6 @@
 ## Ackermann (steering-link position)
 **Keys:** `inner_steering_angle`
-**Concepts:** [[loaded-wheel]], [[toe-and-scrub]], [[bite-hold]]
+**Concepts:** [[loaded-wheel]], [[toe-and-scrub]], [[steering-response]], [[bite-hold]]
 
 **Physics.** In a corner the **inside** front runs a **tighter** radius, so rolling without scrub asks
 it to take **more** steering angle. Ackermann sets how inner vs outer angles develop as you steer:
