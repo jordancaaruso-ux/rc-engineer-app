@@ -31,22 +31,24 @@
  * The delta is against the values as LOADED, so the arrow reads "what I have changed this session"
  * — the number a driver wants at a pit table. Read-only surfaces pass whatever baseline they hold.
  *
- * ============================== WHY AN EDITION SHEET GETS NO STRIP ==============================
+ * ============================== WHEN AN EDITION SHEET GETS NO STRIP ==============================
  *
- * The calculator reads canonical keys (`camber_front`); a rebuilt EDITION of a sheet speaks its own
- * (`front_camber`). Every lookup misses, so every input defaults, and the missing-data doctrine
- * collapses: defaults stand in for boxes the driver LEFT EMPTY, but here the numbers are written on
- * the paper an inch below — the strip would print the kit car's geometry over a sheet that visibly
- * disagrees with it. A found-a-value gate is no gate either: one coincidentally-canonical key would
- * show one real value dressed in seventeen defaults. So an edition hides the strip outright.
- * FLIP THIS when the aliasing build maps edition keys onto canonical ones — once the calc reads the
- * sheet's real values, the strip is honest again and the gate must go with the gap it covered.
+ * The calculator reads canonical keys (`camber_front`); a rebuilt EDITION used to speak its own
+ * (`front_camber`), every lookup missed, and printing all-defaults over a paper that visibly
+ * disagrees would be a fabricated answer — so editions hid the strip outright. Since editions can
+ * be ALIGNED to the canonical vocabulary (2026-08-31, `alignEditionByGeometry`) that is no longer
+ * a property of the paper: an aligned edition's setups compute exactly like the primary's. The
+ * gate is therefore MEASURED on the setup — `snapshotSpeaksGeometry` asks whether the values carry
+ * enough of the calculator's own input keys to be readable (three, not one: a single
+ * coincidentally-canonical key would show one real value dressed in seventeen defaults). An
+ * unaliased edition's setup speaks none of them and stays hidden, exactly as before.
  */
 
 import { useEffect, useId, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   computeRollCenterFromSnapshot,
+  snapshotSpeaksGeometry,
   solveRollCenterDiagram,
 } from "@/lib/rollCenter/computeFromSnapshot";
 import { resolvePackForTemplateKey } from "@/lib/rollCenter/packs";
@@ -73,8 +75,9 @@ export function SheetGeometryStrip({
    */
   templateKey?: string | null;
   /**
-   * The EDITION blank these values are written on, when not the primary. Set, the strip does not
-   * render at all — see "WHY AN EDITION SHEET GETS NO STRIP" above.
+   * The EDITION blank these values are written on, when not the primary. Set, the strip renders
+   * only when the values speak the calculator's vocabulary — see "WHEN AN EDITION SHEET GETS NO
+   * STRIP" above.
    */
   editionBlankId?: string | null;
   labLabels?: { s?: string; g?: string };
@@ -119,7 +122,7 @@ export function SheetGeometryStrip({
     [expanded, pack, value]
   );
   const bodyId = useId();
-  if (editionBlankId || !computed) return null;
+  if ((editionBlankId && !snapshotSpeaksGeometry(value)) || !computed) return null;
 
   return (
     <div

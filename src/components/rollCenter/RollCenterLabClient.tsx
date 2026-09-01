@@ -7,7 +7,7 @@
  * downloaded sheets · teammate-shared runs), or by freezing the current
  * what-if into B. Tap a slot chip to select it: the selected setup renders
  * solid and drives every value below the diagram; the other renders as the
- * dashed ghost. Knobs edit whichever slot is selected — both stay live.
+ * dashed ghost. Sliders edit whichever slot is selected — both stay live.
  *
  * Delta chips only exist against a real comparison (the other slot) — never
  * against the blank no-shim car. The diff list reads other → selected in
@@ -153,14 +153,14 @@ function parseNum(v: string | undefined): number | null {
 }
 
 /**
- * Per-axle control rows: which sheet keys each knob writes (all legs equalized on edit).
+ * Per-axle control rows: which sheet keys each slider writes (all legs equalized on edit).
  *
- * `teaching` is the name the same knob wears on the teaching model, which has no parts to name —
+ * `teaching` is the name the same slider wears on the teaching model, which has no parts to name —
  * so it says what the adjustment DOES instead. "Under lower arm" is a shim stack, and plenty of
  * chassis move that mount with an eccentric insert and no shim in sight; "raise lower arm inner"
  * is true of all of them.
  */
-const AXLE_KNOBS: Record<
+const AXLE_SLIDERS: Record<
   "front" | "rear",
   { label: string; teaching: string; keys: GeometrySheetKey[]; max: number }[]
 > = {
@@ -178,15 +178,15 @@ const AXLE_KNOBS: Record<
   ],
 };
 
-const SENSITIVITY_KNOBS: { label: string; teaching: string; adjKey: keyof AxleAdjustments }[] = [
+const SENSITIVITY_SLIDERS: { label: string; teaching: string; adjKey: keyof AxleAdjustments }[] = [
   { label: "Under lower arm", teaching: "Lower arm inner", adjKey: "underLowerArmMm" },
   { label: "Under hub", teaching: "Hub off lower ball", adjKey: "underHubMm" },
   { label: "Upper inner", teaching: "Upper link inner", adjKey: "upperInnerMm" },
   { label: "Upper outer", teaching: "Upper link outer", adjKey: "upperOuterMm" },
 ];
 
-/** One knob row: label + 0.25-detent slider + free-typed mm box (founder rulings). */
-function KnobRow({
+/** One slider row: label + 0.25-detent slider + free-typed mm box (founder rulings). */
+function SliderRow({
   label,
   sublabel,
   value,
@@ -246,7 +246,7 @@ type Slot = {
   /** The as-loaded state when the slot came from a real setup; null = blank car. */
   loaded: LabFields | null;
   label: string | null;
-  /** Which chassis's sheet this setup draws on. Null on a bare geometry link — no sheet, knobs only. */
+  /** Which chassis's sheet this setup draws on. Null on a bare geometry link — no sheet, sliders only. */
   setupSheetModelId: string | null;
   /** The row these values came from, kept so the URL stays re-shareable and reloads intact. */
   source: LabSource | null;
@@ -440,13 +440,13 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
   /**
    * Chassis bump, held as movement from the setup's own ride height (0 = at rest) even
    * though the slider reads absolute ride height. Storing the delta is what keeps the
-   * pose meaningful when the ride-height knob moves or the axle toggles: "2mm of squat"
+   * pose meaningful when the ride-height slider moves or the axle toggles: "2mm of squat"
    * stays 2mm of squat, and the absolute readout re-reads itself.
    */
   const [bumpMm, setBumpMm] = useState(0);
   const [copied, setCopied] = useState(false);
-  /** Knobs or the setup's own sheet. Knobs is the default — see the toggle's note below. */
-  const [inputMode, setInputMode] = useState<"knobs" | "sheet">("knobs");
+  /** Sliders or the setup's own sheet. Sliders is the default — see the toggle's note below. */
+  const [inputMode, setInputMode] = useState<"sliders" | "sheet">("sliders");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
@@ -689,7 +689,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
    *
    * The chassis and the source ride inside the encoded blob, so reloading or sharing a Lab URL keeps
    * the sheet drawable and the save door open — without either, a refresh would silently drop the
-   * driver back to knobs on the setup they were just editing.
+   * driver back to sliders on the setup they were just editing.
    */
   const syncUrl = (slotId: SlotId, slot: Slot | null) => {
     try {
@@ -828,7 +828,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
 
   /**
    * The axle's own ride height, and therefore the bump slider's travel: down to 0 (chassis
-   * on the deck) and up to twice static. Same expression the ride-height knob reads.
+   * on the deck) and up to twice static. Same expression the ride-height slider reads.
    */
   const rideHeightKey: GeometrySheetKey = axle === "front" ? "ride_height_front" : "ride_height_rear";
   const staticRh = parseNum(fields[rideHeightKey]) ?? (axle === "front" ? 5.0 : 5.2);
@@ -924,7 +924,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     if (!geo || !adj) return null;
     const base = computeAxleMetrics(geo, adj);
     if (!base) return null;
-    return SENSITIVITY_KNOBS.map(({ label, teaching, adjKey }) => {
+    return SENSITIVITY_SLIDERS.map(({ label, teaching, adjKey }) => {
       const m = computeAxleMetrics(geo, { ...adj, [adjKey]: adj[adjKey] + 1 });
       return { label: sandbox ? teaching : label, perMm: m ? m.rcHeightMm - base.rcHeightMm : null };
     });
@@ -968,7 +968,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     );
   };
 
-  const setKnob = (keys: GeometrySheetKey[], value: string) => {
+  const setSlider = (keys: GeometrySheetKey[], value: string) => {
     updateActiveSlot((slot) => {
       const next = { ...slot.fields };
       for (const k of keys) next[k] = value;
@@ -979,7 +979,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
   /**
    * A box edit on the sheet, folded into the selected slot.
    *
-   * Both halves are kept: the geometry slice drives the solve and the knobs, and the full stored
+   * Both halves are kept: the geometry slice drives the solve and the sliders, and the full stored
    * setup replaces what the slot is holding — so a later save writes the sheet the driver actually
    * edited rather than nineteen keys over the top of a stale snapshot.
    */
@@ -998,7 +998,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     [activeId]
   );
 
-  const knobValue = (keys: GeometrySheetKey[]): { value: number; legsDiffer: boolean } => {
+  const sliderValue = (keys: GeometrySheetKey[]): { value: number; legsDiffer: boolean } => {
     const nums = keys.map((k) => parseNum(fields[k]) ?? 0);
     const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
     return { value: Math.round(mean * 100) / 100, legsDiffer: nums.length > 1 && Math.abs(nums[0] - nums[1]) > 1e-9 };
@@ -1012,6 +1012,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     if (/CARBON/.test(raw)) return "C01B-RC";
     if (/ALU/.test(raw)) return "C01B-RAF";
     if (/STEEL/.test(raw)) return "C01RS";
+    if (/TITAN/.test(raw)) return "TITANIUM";
     return inputs.pack.baseChassisCode;
   }, [fields.chassis, inputs]);
 
@@ -1282,7 +1283,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
    * middle, the slower reading (camber gain, sensitivities, change list) beneath at
    * xl and beside at 2xl. The columns are placed EXPLICITLY (`col-start`/`row-start`)
    * rather than by source order, because the desktop order is not the phone order:
-   * on a phone you meet the drawing before the knobs, on a desktop the knobs are the
+   * on a phone you meet the drawing before the sliders, on a desktop the sliders are the
    * hand you keep on the tool.
    *
    * The desktop geometry itself lives in globals.css under `.lab-grid`, not in
@@ -1482,13 +1483,13 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
         </div>
 
         {/*
-         * Two ways in, one state. The knobs stay the default because they are the fast surface: four
+         * Two ways in, one state. The sliders stay the default because they are the fast surface: four
          * sliders beat panning a page picture to find one box, which is what a driver is doing
          * between runs. The sheet appears only when this slot came from a real setup on a chassis the
          * app can draw — without the whole snapshot behind it the paper would render mostly empty.
          *
          * Mutually exclusive on purpose. The fill surface reads its values once and then owns them
-         * (see `LabSheetPane`), so a knob turned while the sheet was on screen could not reach it;
+         * (see `LabSheetPane`), so a slider moved while the sheet was on screen could not reach it;
          * switching modes remounts the sheet and re-seeds it, which makes that impossible to hit.
          */}
         {sheetAvailable && (
@@ -1496,11 +1497,11 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
             size="sm"
             ariaLabel="How to adjust this setup"
             options={[
-              { value: "knobs", label: "Knobs" },
+              { value: "sliders", label: "Sliders" },
               { value: "sheet", label: "Sheet" },
             ]}
             value={inputMode}
-            onChange={(v) => setInputMode(v as "knobs" | "sheet")}
+            onChange={(v) => setInputMode(v as "sliders" | "sheet")}
           />
         )}
 
@@ -1514,8 +1515,8 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
          * One row while the two legs agree; two rows the moment they don't.
          *
          * The inner shim keys are per-leg — the front and rear pin of the same arm — and a car often
-         * runs them equal, so a single knob is the honest control for the common case. When they are
-         * NOT equal, one knob cannot represent them: it used to show the mean and write that mean
+         * runs them equal, so a single slider is the honest control for the common case. When they are
+         * NOT equal, one slider cannot represent them: it used to show the mean and write that mean
          * into both legs, quietly flattening a real difference on the first touch. Splitting is what
          * makes the Lab safe to save from, and it keeps the per-leg data the side-view model wants.
          *
@@ -1523,49 +1524,49 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
          * this is about not destroying what was stored, not about changing the geometry.
          */}
         {!sheetMode &&
-          AXLE_KNOBS[axle].flatMap((knob) => {
-            const { value, legsDiffer } = knobValue(knob.keys);
-            // The teaching model has no parts to name, so its knobs are named for what they do.
-            const knobLabel = sandbox ? knob.teaching : knob.label;
+          AXLE_SLIDERS[axle].flatMap((slider) => {
+            const { value, legsDiffer } = sliderValue(slider.keys);
+            // The teaching model has no parts to name, so its sliders are named for what they do.
+            const sliderLabel = sandbox ? slider.teaching : slider.label;
             if (!legsDiffer) {
               return [
-                <KnobRow
-                  key={knob.label}
-                  label={knobLabel}
+                <SliderRow
+                  key={slider.label}
+                  label={sliderLabel}
                   value={value}
-                  max={knob.max}
-                  onChange={(v) => setKnob(knob.keys, v)}
+                  max={slider.max}
+                  onChange={(v) => setSlider(slider.keys, v)}
                 />,
               ];
             }
-            return knob.keys.map((key) => (
-              <KnobRow
+            return slider.keys.map((key) => (
+              <SliderRow
                 key={key}
-                label={knobLabel}
+                label={sliderLabel}
                 sublabel={legLabel(key)}
                 value={parseNum(fields[key]) ?? 0}
-                max={knob.max}
-                onChange={(v) => setKnob([key], v)}
+                max={slider.max}
+                onChange={(v) => setSlider([key], v)}
               />
             ));
           })}
 
         {!sheetMode && (
-        <KnobRow
+        <SliderRow
           label="Ride height"
           value={staticRh}
           min={4}
           max={7}
           step={0.1}
-          onChange={(v) => setKnob([rideHeightKey], v)}
+          onChange={(v) => setSlider([rideHeightKey], v)}
         />
         )}
         {!sheetMode && (
-        <KnobRow
+        <SliderRow
           label="Camber (neg °)"
           value={(() => {
             // Sheets record camber as magnitude-of-negative ("2.0" and "-2.0" both = −2°);
-            // the knob always shows the magnitude. Unset → the solved link-default camber.
+            // the slider always shows the magnitude. Unset → the solved link-default camber.
             const raw = parseNum(fields[axle === "front" ? "camber_front" : "camber_rear"]);
             return raw != null
               ? Math.abs(raw)
@@ -1575,13 +1576,15 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
           max={4}
           step={0.25}
           unit="°"
-          onChange={(v) => setKnob([axle === "front" ? "camber_front" : "camber_rear"], v)}
+          onChange={(v) => setSlider([axle === "front" ? "camber_front" : "camber_rear"], v)}
         />
         )}
 
         {/* Label beside the control from sm, but back above it at xl: the desktop
-            Adjustments column is 21rem, and a 9.5rem label leaves the three chassis
-            options ~148px to share, which clipped the last one off the card. */}
+            Adjustments column is 21rem, and a 9.5rem label leaves the chassis
+            options ~148px to share, which clipped the last one off the card.
+            Four plates since 2026-08-29, so the rail is tighter again — the label
+            above it is what buys them the full column. */}
         {!sheetMode && (
         <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3 xl:flex-col xl:items-stretch xl:gap-1.5">
           <span className="type-data-label shrink-0 sm:w-[9.5rem] xl:w-auto">Chassis</span>
@@ -1594,7 +1597,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
               label: o.label,
             }))}
             value={chassisCode ?? inputs.pack.baseChassisCode}
-            onChange={(code) => setKnob(["chassis"], code)}
+            onChange={(code) => setSlider(["chassis"], code)}
           />
         </div>
         )}

@@ -87,6 +87,14 @@ function legMean(
 function detectChassisCode(pack: RollCenterPack, raw: unknown): string | null {
   const text = valueText(raw).toUpperCase();
   if (!text) return null;
+  /*
+   * C01B-RSL is the titanium plate's own part code (founder, 2026-09-01) — it gained a printed
+   * tick box on the rebuilt sheet, but the pack option stays keyed by the material word it wore
+   * when it was Other-box-only, so stored Lab states keep resolving. Checked BEFORE the code scan:
+   * the "C01RSL" shorthand drivers typed before the box existed CONTAINS the steel code "C01RS",
+   * and the substring match would call the titanium plate steel.
+   */
+  if (/RSL/.test(text)) return "TITANIUM";
   // Longest-code-first so "RAF" can't be shadowed by shorter codes.
   const codes = Object.keys(pack.chassisOptions).sort((a, b) => b.length - a.length);
   for (const code of codes) {
@@ -96,6 +104,7 @@ function detectChassisCode(pack: RollCenterPack, raw: unknown): string | null {
   if (/CARBON/.test(text)) return "C01B-RC";
   if (/ALU/.test(text)) return "C01B-RAF";
   if (/STEEL/.test(text)) return "C01RS";
+  if (/TITAN/.test(text)) return "TITANIUM";
   return null;
 }
 
@@ -137,6 +146,38 @@ const REAR_KEYS: AxleKeys = {
   wheelSpacer: "wheel_spacer_rear",
   label: "rear",
 };
+
+/**
+ * Does this setup speak the calculator's vocabulary at all?
+ *
+ * The missing-data doctrine's limit (see the module header): a default stands in for a box the
+ * driver LEFT EMPTY, but a setup written in a vocabulary this file cannot read has no gaps, only
+ * unreadable values — all-defaults there is a fabricated answer. That used to be true of every
+ * sheet EDITION; since editions can be ALIGNED to the canonical vocabulary (2026-08-31), it is a
+ * property of the SETUP, measured here rather than assumed from the paper. Three inputs, not one:
+ * a single coincidentally-canonical key would dress one real value in seventeen defaults.
+ */
+export function snapshotSpeaksGeometry(data: Record<string, unknown>): boolean {
+  const inputKeys = [FRONT_KEYS, REAR_KEYS].flatMap((k) => [
+    k.underLowerLegA,
+    k.underLowerLegB,
+    k.upperInnerLegA,
+    k.upperInnerLegB,
+    k.underHub,
+    k.upperOuter,
+    k.rideHeight,
+    k.camber,
+  ]);
+  let spoken = 0;
+  for (const key of inputKeys) {
+    const v = data[key];
+    if (v == null) continue;
+    if (typeof v === "string" && v.trim() === "") continue;
+    spoken += 1;
+    if (spoken >= 3) return true;
+  }
+  return false;
+}
 
 function axleAdjustments(
   data: Record<string, unknown>,

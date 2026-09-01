@@ -33,8 +33,8 @@ const BASE_SETUP: Record<string, string> = {
   wheel_spacer_rear: "0",
 };
 
-/** The knobs worth turning by hand — the four the pack lists sensitivities for, front axle. */
-const KNOBS: { key: string; label: string; note: string }[] = [
+/** The sliders worth moving by hand — the four the pack lists sensitivities for, front axle. */
+const SLIDERS: { key: string; label: string; note: string }[] = [
   { key: "under_lower_arm_shims_ff", label: "Under lower arm, front-front leg", note: "+2.2mm RC per mm" },
   { key: "under_hub_shims_front", label: "Under hub, front", note: "+2.1mm RC per mm (sign-inverted)" },
   { key: "upper_inner_shims_ff", label: "Upper inner, front-front leg", note: "−1.0mm RC per mm" },
@@ -56,7 +56,7 @@ export function RollCenterStripPreview() {
       </header>
 
       <div className="grid grid-cols-1 gap-2 rounded-lg border border-border bg-card p-3 sm:grid-cols-2">
-        {KNOBS.map((k) => (
+        {SLIDERS.map((k) => (
           <label key={k.key} className="flex flex-col gap-1">
             <span className="text-[11px] text-muted-foreground">{k.label}</span>
             <input

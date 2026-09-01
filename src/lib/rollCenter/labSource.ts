@@ -37,7 +37,7 @@ export type LabWriteTarget =
   | { kind: "copy"; carId: string | null };
 
 export type LabSourceLoad = {
-  /** The geometry slice, for the knobs and the solve. */
+  /** The geometry slice, for the sliders and the solve. */
   fields: LabFields;
   /** Every stored value, so the sheet draws honestly and a save can merge rather than replace. */
   fullData: Record<string, unknown>;
@@ -97,7 +97,7 @@ function asRecord(v: unknown): Record<string, unknown> | null {
  * Load the setup a seed points at, or null when it can't be read.
  *
  * Null is not an error state for the caller: the Lab keeps whatever the URL slice gave it and simply
- * stays in knobs-only mode. A stale link, a deleted setup, or a teammate's row that stopped being
+ * stays in sliders-only mode. A stale link, a deleted setup, or a teammate's row that stopped being
  * shared should all degrade to "the geometry still works", never to an error screen.
  */
 export async function loadLabSource(source: LabSource): Promise<LabSourceLoad | null> {

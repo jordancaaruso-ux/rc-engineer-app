@@ -27,7 +27,7 @@ const RC_EDGE_PAD = 5;
 /**
  * How far below the ground line the frame always reaches, in mm. FIXED on purpose: this is
  * the floor of the drawing, and anything that moves with the setup would resize the car every
- * time a knob turned. 20mm covers the roll centres these cars actually run (measured -9.1mm
+ * time a slider moved. 20mm covers the roll centres these cars actually run (measured -9.1mm
  * front / -8.5mm rear on the blank A800 car); a lower one still shows, pinned and off-scale.
  */
 const RC_WINDOW_BELOW_MM = 20;
@@ -187,7 +187,7 @@ export function AxleSchematic({ solved, ghost, chassis, extraPoints, fitBox, axl
   /**
    * Fill the parent box (h-full w-full, letterboxed) instead of deriving the
    * rendered height from the drawing extents — callers pin the schematic in a
-   * fixed-aspect container so knob/roll changes never reflow the page.
+   * fixed-aspect container so slider/roll changes never reflow the page.
    */
   fitBox?: boolean;
   /** For the accessible name, e.g. "front". */
@@ -220,7 +220,7 @@ export function AxleSchematic({ solved, ghost, chassis, extraPoints, fitBox, axl
      * to 168.6 units, and the browser re-fitted that shorter box into the same on-screen
      * rectangle — scaling the whole car up 7.5%. Measured on the tyre, which is a fixed 64mm
      * object and therefore the honest ruler: 87.65px -> 94.24px at 390, 233.72 -> 251.32 at
-     * 1760. The floor is now a FIXED window, so nothing a knob does can resize the car.
+     * 1760. The floor is now a FIXED window, so nothing a slider does can resize the car.
      */
     const xMin = Math.min(...contacts) - 16;
     const xMax = Math.max(...contacts) + 16;

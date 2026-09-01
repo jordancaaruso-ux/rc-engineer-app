@@ -109,6 +109,7 @@ test("chassis codes shift the mount datum (steel base)", () => {
   assert.equal(chassisMountShiftMm(AWESOMATIX_A800_PACK, "C01RS"), 0);
   assert.equal(chassisMountShiftMm(AWESOMATIX_A800_PACK, "C01B-RC")?.toFixed(1), "1.0");
   assert.equal(chassisMountShiftMm(AWESOMATIX_A800_PACK, "C01B-RAF")?.toFixed(1), "0.8");
+  assert.equal(chassisMountShiftMm(AWESOMATIX_A800_PACK, "TITANIUM")?.toFixed(1), "0.3");
 });
 
 test("computeRollCenterFromSnapshot: realistic sheet values (strings), camber matched", () => {
@@ -241,9 +242,9 @@ test("lab slot codec: carries chassis + source, and still reads the old fields-o
 
 test("per-leg shims survive a Lab edit: only the touched leg moves", () => {
   /*
-   * The regression this locks: one knob used to write its value into BOTH legs, so a sheet with
+   * The regression this locks: one slider used to write its value into BOTH legs, so a sheet with
    * ff 0.5 / fr 0.25 lost the split on first touch. Harmless while the Lab was a dead end — real
-   * data loss now that it can write back. The Lab splits the knob when the legs differ; this asserts
+   * data loss now that it can write back. The Lab splits the slider when the legs differ; this asserts
    * the state that split produces, and that the front-view solve still reads their mean.
    */
   const stored: Record<string, unknown> = {
@@ -360,6 +361,31 @@ test("a real A800 snapshot still resolves to the A800 and still hits the VSUSP a
   assert.ok(computed);
   assert.ok(Math.abs(computed.front.rcHeightMm - -9.09) < 0.02, `front ${computed.front.rcHeightMm}`);
   assert.ok(Math.abs(computed.rear.rcHeightMm - -8.5) < 0.02, `rear ${computed.rear.rcHeightMm}`);
+});
+
+test("C01B-RSL is the titanium plate — its own code and the old free-text shorthand both land there", () => {
+  // Founder 2026-09-01: RSL = titanium (1.5mm). The rebuilt sheet gives it a tick box; before
+  // that, drivers wrote it in the Other box.
+  const base = {
+    ride_height_front: "5.0",
+    ride_height_rear: "5.2",
+  };
+  const asRsl = computeRollCenterFromSnapshot(
+    { ...base, chassis: { selectedPreset: "C01B-RSL", otherText: "" } },
+    AWESOMATIX_A800_PACK
+  );
+  const asWord = computeRollCenterFromSnapshot({ ...base, chassis: "TITANIUM" }, AWESOMATIX_A800_PACK);
+  const asSteel = computeRollCenterFromSnapshot({ ...base, chassis: "C01RS" }, AWESOMATIX_A800_PACK);
+  assert.ok(asRsl && asWord && asSteel);
+  assert.equal(asRsl.front.rcHeightMm, asWord.front.rcHeightMm, "code and word are one plate");
+  assert.notEqual(asRsl.front.rcHeightMm, asSteel.front.rcHeightMm, "titanium is not the steel default");
+
+  const typedShorthand = computeRollCenterFromSnapshot(
+    { ...base, chassis: { selectedPreset: "", otherText: "C01RSL" } },
+    AWESOMATIX_A800_PACK
+  );
+  assert.ok(typedShorthand);
+  assert.equal(typedShorthand.front.rcHeightMm, asWord.front.rcHeightMm);
 });
 
 test("the chassis plate is drawn, never solved", () => {
