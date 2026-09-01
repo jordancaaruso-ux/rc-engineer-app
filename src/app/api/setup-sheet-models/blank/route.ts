@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
+import { isChassisPlatformId } from "@/lib/cars/carClasses";
 import { normalizeSetupSheetModelName } from "@/lib/setupSheetModels/normalizeModelName";
 import { StorageConfigurationError } from "@/lib/setupDocuments/storage";
 import { recordChassisTypeRequest } from "@/lib/setupSheetModels/chassisTypeRequests";
@@ -46,6 +47,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const contentType = request.headers.get("content-type") ?? "";
   let name = "";
+  let discipline = "";
   let derive = false;
   let upload: BlankUploadSource | null = null;
 
@@ -53,6 +55,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // The browser already streamed the file to Blob because it was over the serverless body limit.
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     name = typeof body.name === "string" ? body.name.trim() : "";
+    discipline = typeof body.discipline === "string" ? body.discipline.trim() : "";
     derive = body.derive === true || body.derive === "1";
     const storagePath = typeof body.storagePath === "string" ? body.storagePath.trim() : "";
     if (!storagePath) {
@@ -73,6 +76,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: "Expected multipart form data (name, pdf)." }, { status: 400 });
     }
     name = (typeof form.get("name") === "string" ? (form.get("name") as string) : "").trim();
+    discipline = (
+      typeof form.get("discipline") === "string" ? (form.get("discipline") as string) : ""
+    ).trim();
     derive = form.get("derive") === "1";
     const pdf = form.get("pdf");
     if (!(pdf instanceof File)) {
@@ -82,6 +88,34 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   if (!name) return NextResponse.json({ error: "A chassis name is required." }, { status: 400 });
+
+  /*
+   * DISCIPLINE IS REQUIRED ON THE DRIVER'S DOOR (founder call, 2026-08-26).
+   *
+   * Nothing used to ask. Discipline was inferred from `CHASSIS_PLATFORM_BY_SLUG` — twelve curated
+   * slugs — and a derived row's slug is a fingerprint, so every chassis a driver added read as
+   * "unknown" for the life of the row unless they found the override picker on the car page.
+   *
+   * Required here and not merely on the client, because the client is not the only caller and a
+   * null that reaches the column is indistinguishable from a pre-2026-08-26 row.
+   *
+   * The ADMIN door stays optional: the by-hand path starts from an empty schema and the founder
+   * is authoring a catalog row whose slug the platform map already answers for. Sending it is
+   * still honoured — it is the requirement, not the column, that is scoped to the driver.
+   */
+  if (derive && !isChassisPlatformId(discipline)) {
+    return NextResponse.json(
+      {
+        error: discipline
+          ? "That isn't a discipline we know."
+          : "Pick what this chassis races.",
+      },
+      { status: 400 }
+    );
+  }
+  if (!derive && discipline && !isChassisPlatformId(discipline)) {
+    return NextResponse.json({ error: "That isn't a discipline we know." }, { status: 400 });
+  }
 
   if (!derive && !isAdmin) {
     return NextResponse.json(
@@ -117,6 +151,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     result = await createModelFromBlank({
       user: { id: user.id, email: user.email },
       name,
+      discipline: discipline || null,
       upload,
       derive,
       source: derive && !isAdmin ? "driver" : "admin",

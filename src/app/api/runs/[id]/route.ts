@@ -20,6 +20,9 @@ import { randomUUID } from "crypto";
 import { applyTireRunNumberCascade } from "@/lib/tires/applyTireRunNumberCascade";
 import { applyRunCarMove } from "@/lib/runs/applyRunCarMove";
 import { normalizeTirePrep, tirePrepHasContent, derivedWarmerTimingMinutes } from "@/lib/runs/tirePrep";
+import { getFiveMinuteStintStartingAt, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
+import { normalizeLapTimes } from "@/lib/runLaps";
+import { LAP_SESSION_VERSION } from "@/lib/lapSession/types";
 
 /**
  * Delete a run owned by the current user.
@@ -140,6 +143,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     select: {
       ...runSelectForSetupCorrection,
       additiveTypeId: true,
+      // The 5-minute window choice lives inside lapSession; validating a new
+      // start lap needs the laps themselves.
+      lapTimes: true,
+      lapSession: true,
       // The identity columns a correction may touch, plus what the tire cascade
       // measures its shift against.
       trackId: true,
@@ -252,6 +259,54 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       data.carRating = Math.round(n);
     }
   }
+  /*
+   * The 5-minute window's one handle: which lap it opens on (founder ruling,
+   * 2026-09-01 — per run, auto = best window, with the option to move it).
+   * Stored INSIDE the lapSession blob rather than a new column: it is a
+   * judgement about the laps, same class as the per-lap exclusions that live
+   * there, and additive on the version-1 shape so every existing reader is
+   * unaffected. `null` = back to auto. A start the laps can't fund is refused
+   * here, but readers still re-validate — laps can be re-imported later.
+   */
+  if ("fiveMinStartLap" in body) {
+    const raw = body.fiveMinStartLap;
+    const existingSession =
+      run.lapSession && typeof run.lapSession === "object" && !Array.isArray(run.lapSession)
+        ? (run.lapSession as Record<string, unknown>)
+        : null;
+    if (raw === null) {
+      if (existingSession && existingSession.fiveMinStartLap != null) {
+        data.lapSession = { ...existingSession, fiveMinStartLap: null } as Prisma.InputJsonValue;
+      }
+      // No blob, or nothing stored → already auto; nothing to write.
+    } else {
+      const n = typeof raw === "number" ? raw : Number.NaN;
+      if (!Number.isInteger(n) || n < 1) {
+        return NextResponse.json({ error: "Start lap must be a lap number" }, { status: 400 });
+      }
+      const rows = primaryLapRowsFromRun({ lapTimes: run.lapTimes, lapSession: run.lapSession });
+      if (getFiveMinuteStintStartingAt(rows, n) == null) {
+        return NextResponse.json(
+          { error: "Not five minutes of laps from there" },
+          { status: 400 }
+        );
+      }
+      /*
+       * Older runs logged before structured ingestion have laps only in
+       * `lapTimes` — give them the minimal honest blob (primary laps mirrored,
+       * per the schema's invariant) so the choice has somewhere to live.
+       */
+      const base =
+        existingSession ??
+        ({
+          version: LAP_SESSION_VERSION,
+          source: { kind: "manual", detail: "run laps" },
+          entries: [{ role: "primary", laps: normalizeLapTimes(run.lapTimes) }],
+        } as Record<string, unknown>);
+      data.lapSession = { ...base, fiveMinStartLap: n } as Prisma.InputJsonValue;
+    }
+  }
+
   if ("handlingAssessmentJson" in body) {
     const raw = body.handlingAssessmentJson;
     data.handlingAssessmentJson =
@@ -326,7 +381,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (
     Object.keys(data).length === 0 &&
     additiveDisplayName === undefined &&
-    !wantsCarMove
+    !wantsCarMove &&
+    // "Back to auto" with nothing stored writes nothing — a valid state, not an error.
+    !("fiveMinStartLap" in body)
   ) {
     return NextResponse.json({ error: "Nothing to change" }, { status: 400 });
   }
@@ -384,7 +441,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       const moved = await prisma.run.findFirst({
         where: { id: run.id, userId },
         select: {
-          setupSnapshot: { select: { id: true, data: true, baseSetupSnapshotId: true } },
+          setupSnapshot: {
+            select: { id: true, data: true, baseSetupSnapshotId: true, sheetBlankId: true },
+          },
         },
       });
       await applyRunCarMove({
@@ -404,7 +463,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
    * material, so without this a changed car or session leaves a stale summary sitting
    * under new facts — the same staleness the setup correction had to fix.
    */
-  await clearEngineerReadsReferencing(userId, [run.id]);
+  /*
+   * …except a bare window move: the Engineer never quotes the 5-minute stint
+   * (it reads auto-best metrics), so sliding the window changes nothing the
+   * read was computed from — wiping it would cost a paid re-read for a glance.
+   */
+  const onlyWindowMove = Object.keys(body).length === 1 && "fiveMinStartLap" in body;
+  if (!onlyWindowMove) {
+    await clearEngineerReadsReferencing(userId, [run.id]);
+  }
 
   revalidateAfterRunMutation(userId);
 

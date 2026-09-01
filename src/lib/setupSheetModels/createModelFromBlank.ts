@@ -84,6 +84,15 @@ export type CreateModelFromBlankInput = {
   user: { id: string; email: string | null };
   /** What the driver typed. Never derived from the PDF — duplicates are allowed on purpose. */
   name: string;
+  /**
+   * What the chassis races — a `ChassisPlatformId`, validated by the caller.
+   *
+   * Unlike the name, this is NOT the uploader's private label: the chassis row is global, so the
+   * discipline chosen here answers for every driver who later fingerprint-merges onto it. That is
+   * why a merge does not overwrite it (see below) — the first uploader's answer stands, the same
+   * way their spelling of the name does.
+   */
+  discipline?: string | null;
   upload: BlankUploadSource;
   derive: boolean;
   source: "driver" | "admin";
@@ -133,6 +142,7 @@ export async function createModelFromBlank(
   input: CreateModelFromBlankInput
 ): Promise<CreateModelFromBlankResult> {
   const name = input.name.trim();
+  const discipline = input.discipline?.trim() || null;
 
   const fileRefusal = refusalForBlankFile({
     byteSize: byteSizeOf(input.upload),
@@ -176,9 +186,21 @@ export async function createModelFromBlank(
   if (fingerprintSlug && derived) {
     const existing = await prisma.setupSheetModel.findUnique({
       where: { slug: fingerprintSlug },
-      select: { id: true, name: true, slug: true, defaultCalibrationId: true },
+      select: { id: true, name: true, slug: true, defaultCalibrationId: true, discipline: true },
     });
     if (existing) {
+      // FILL A GAP, NEVER OVERWRITE. The first uploader's discipline stands, exactly as their
+      // spelling of the name does — a shared row cannot hold two answers, and the later arrival
+      // has no better claim. But a row that predates the column (or came from the admin door
+      // without one) has no answer at all, and taking this driver's is strictly better than
+      // leaving the chassis unplaced for everyone on it.
+      const gapFill = discipline && !existing.discipline?.trim() ? discipline : null;
+      if (gapFill) {
+        await prisma.setupSheetModel.update({
+          where: { id: existing.id },
+          data: { discipline: gapFill },
+        });
+      }
       return {
         ok: true,
         model: { id: existing.id, name: existing.name, slug: existing.slug },
@@ -254,6 +276,7 @@ export async function createModelFromBlank(
       userId: input.user.id,
       name,
       slug,
+      discipline,
       // Left unauthorized: the picker badges it "Unreviewed", and community aggregation excludes
       // every car on it until the founder verifies. That gate is deliberate — see
       // `rebuildCommunityTemplateAggregations`.

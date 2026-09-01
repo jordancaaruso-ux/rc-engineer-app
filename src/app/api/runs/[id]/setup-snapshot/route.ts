@@ -58,7 +58,14 @@ const runSelectForPdfReview = {
   // on a teammate's run they are THEIR bookmark and THEIR name, which say nothing about whether
   // the viewer has kept a copy. `buildSaveContext` below decides what the viewer is told.
   setupSnapshot: {
-    select: { id: true, data: true, baseSetupSnapshotId: true, isLibrary: true, name: true },
+    select: {
+      id: true,
+      data: true,
+      baseSetupSnapshotId: true,
+      isLibrary: true,
+      name: true,
+      sheetBlankId: true,
+    },
   },
 } as const;
 
@@ -161,18 +168,20 @@ type SheetContext = {
 async function buildSheetContext(
   userId: string,
   car: { setupSheetModelId: string | null; setupSheetTemplate: string | null } | null,
-  snapshotData: unknown
+  snapshotData: unknown,
+  snapshotSheetBlankId: string | null
 ): Promise<SheetContext> {
   const resolved = car ?? { setupSheetModelId: null, setupSheetTemplate: null };
   // A derived chassis is always attached by id, so no link means no sheet — nothing to resolve.
-  // Which of the chassis's sheets is decided by the SNAPSHOT's keys: a setup imported through a
-  // rebuilt EDITION draws on that edition's paper, not the primary's. See `sheetBlankResolve`.
+  // Which of the chassis's sheets: the paper this setup was born on (its stamp), else the one
+  // whose boxes speak its keys. See `sheetBlankResolve`.
   const blank = resolved.setupSheetModelId
     ? await pickSheetBlankForData(
         resolved.setupSheetModelId,
         snapshotData && typeof snapshotData === "object" && !Array.isArray(snapshotData)
           ? (snapshotData as Record<string, unknown>)
-          : null
+          : null,
+        { sheetBlankId: snapshotSheetBlankId }
       )
     : null;
   const { template, templateKey } = await getSetupSheetTemplateAndKeyForCar(userId, resolved, "setup");
@@ -255,7 +264,12 @@ export async function GET(request: Request, { params }: Params) {
   );
 
   const sheet = wantsSheet
-    ? await buildSheetContext(userId, run.car, run.setupSnapshot?.data ?? null)
+    ? await buildSheetContext(
+        userId,
+        run.car,
+        run.setupSnapshot?.data ?? null,
+        run.setupSnapshot?.sheetBlankId ?? null
+      )
     : null;
 
   return NextResponse.json({
@@ -309,6 +323,8 @@ export async function PATCH(request: Request, { params }: Params) {
         select: {
           id: true,
           data: true,
+          // The paper the setup was born on — a replacement is the same setup retyped.
+          sheetBlankId: true,
           // The setup this run was logged AGAINST — the previous run's, usually. Carried forward
           // below so a correction doesn't rewrite what this run changed.
           baseSetupSnapshotId: true,
@@ -368,6 +384,7 @@ export async function PATCH(request: Request, { params }: Params) {
       carId: run.carId,
       data: resolvedData as object,
       baseSetupSnapshotId: baselineId,
+      sheetBlankId: run.setupSnapshot?.sheetBlankId ?? null,
       setupDeltaJson:
         setupDeltaJson && Object.keys(setupDeltaJson).length > 0
           ? (setupDeltaJson as object)

@@ -20,15 +20,17 @@ import type { ToolsVideoJob } from "@/lib/tools/toolsModel";
  */
 export function VideoBench({ jobs }: { jobs: ToolsVideoJob[] }) {
   return (
-    <CardPanel contentClassName="p-0">
+    /* `h-full` + a flex column: on the three-across desktop Tools grid this card is stretched to
+       the geometry card's height, and the list grows so the door stays on the foot. */
+    <CardPanel className="h-full" contentClassName="flex h-full flex-col p-0">
       <BandHeader label="Video" addHref="/videos" addLabel="Add a video" />
 
       {jobs.length === 0 ? (
-        <p className="px-4 py-3 text-[13px] text-muted-foreground">
+        <p className="flex-1 px-4 py-3 text-[13px] text-muted-foreground">
           No video analysed yet. Upload a session and it lands here.
         </p>
       ) : (
-        <ul>
+        <ul className="flex-1">
           {jobs.map((job) => (
             <li key={job.id} className="border-b border-border/60 last:border-b-0">
               <Link
@@ -50,7 +52,7 @@ export function VideoBench({ jobs }: { jobs: ToolsVideoJob[] }) {
 
       <Link
         href="/videos"
-        className="tap-active flex items-center justify-between gap-3 border-t border-border/60 px-4 py-2.5 transition hover:bg-muted/40"
+        className="tap-active mt-auto flex items-center justify-between gap-3 border-t border-border/60 px-4 py-2.5 transition hover:bg-muted/40"
       >
         <span className="type-timestamp">Video workshop</span>
         <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />

@@ -16,7 +16,6 @@ export type DerivedFieldStatus =
   | "computed_no_imported_comparison"
   | "imported_display_only"
   | "formula_missing"
-  | "lookup_missing"
   | "unsupported_lookup_value"
   | "missing_input_value"
   | "missing_input_mapping"
@@ -91,8 +90,6 @@ function springSideStatus(
       return "missing_input_mapping";
     case "unsupported_lookup_value":
       return "unsupported_lookup_value";
-    case "lookup_missing":
-      return "lookup_missing";
     default:
       return "missing_input_value";
   }

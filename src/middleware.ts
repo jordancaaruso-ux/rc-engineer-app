@@ -51,6 +51,16 @@ export default auth((req) => {
   if (pathname === "/api/stripe/webhook") {
     return NextResponse.next();
   }
+  /*
+   * Scheduled jobs. Vercel Cron sends a plain GET with a `Bearer $CRON_SECRET` header and no
+   * session cookie, so without this the session gate below answers 401 and the job never
+   * reaches its route — every cron in the app was unreachable by construction. Each route
+   * checks CRON_SECRET itself and 401s without it, so this exempts them from the SESSION gate
+   * only, not from authentication.
+   */
+  if (pathname.startsWith("/api/cron/")) {
+    return NextResponse.next();
+  }
   // The paid door: /join (pricing) + /join/success (post-checkout landing) are how strangers pay
   // their way in, and the checkout API they call is public by design (rate-limited in the route).
   if (pathname === "/join" || pathname.startsWith("/join/")) {

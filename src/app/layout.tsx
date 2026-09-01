@@ -25,6 +25,7 @@ import { PwaSplashDismiss } from "@/components/pwa/PwaSplashDismiss";
 import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar";
 
 import { TimeZoneCookieSync } from "@/components/layout/TimeZoneCookieSync";
+import { ReturnTrailTracker } from "@/components/layout/ReturnTrailTracker";
 
 import { PWA_SPLASH_LOCKUP_SVG } from "@/lib/pwa/splashLockup";
 
@@ -351,6 +352,7 @@ export default async function RootLayout({
           <AuthSessionProvider session={session}>
 
             <TimeZoneCookieSync />
+            <ReturnTrailTracker />
 
             <CapacitorDeepLinkBridge />
 

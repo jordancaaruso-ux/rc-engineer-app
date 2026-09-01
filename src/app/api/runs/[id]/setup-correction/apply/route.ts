@@ -12,18 +12,33 @@ import {
 } from "@/lib/runs/applySetupCorrection";
 
 /**
- * Carrying a correction the driver just made onto the later runs that inherited it.
+ * Carrying a correction the driver just made onto the other runs that inherited it.
  *
  * The run ids come from the client, but nothing about them is trusted: each is
- * re-loaded scoped to this user, this car, and `sortAt` strictly after the run the
- * correction started from. An id that fails any of those is dropped silently
- * rather than 400ing the whole request — the list was built from a page that may
- * be a minute stale, and one deleted run should not cost the driver the other six.
+ * re-loaded scoped to this user, to this run's car, and never to the anchor itself.
+ * An id that fails any of those is dropped rather than 400ing the whole request —
+ * the list was built from a page that may be a minute stale, and one deleted run
+ * should not cost the driver the other six. What it must NOT do is drop them
+ * quietly; see the response note below.
+ *
+ * ============================== WHY IT IS NO LONGER "LATER RUNS ONLY" ==============================
+ *
+ * This used to filter `sortAt: { gt: anchor.sortAt }`, from when the cascade only
+ * walked forwards. The walk learned to go backwards on 2026-08-21 and this did not,
+ * so every EARLIER run a driver ticked was silently discarded — and earlier runs are
+ * never ticked by the rule, so the only ticks on that side are deliberate ones. The
+ * backward half of the feature therefore did nothing at all from the day it shipped,
+ * while reporting "those runs already said that" (founder-reported, 2026-08-24).
+ *
+ * The car scope is the guard that matters and it is untouched: a correction may never
+ * reach a run on another car, and the anchor is excluded because it already holds the
+ * value. Direction was never protecting anything — `planSetupCascadeCandidates` decides
+ * how far the offer reaches, on both sides, and the driver confirms it.
  *
  * All of it lands in ONE transaction. A half-applied cascade is a run history that
  * disagrees with itself, which is the exact state this feature exists to fix.
  *
- * The write is field-level on purpose: later runs have their own setups, and the
+ * The write is field-level on purpose: other runs have their own setups, and the
  * only thing that may move on them is the key being corrected.
  */
 
@@ -75,7 +90,8 @@ export async function POST(request: Request, { params }: Params) {
 
   const anchor = await prisma.run.findFirst({
     where: { id, userId },
-    select: { id: true, carId: true, sortAt: true },
+    // No `sortAt`: the targets are no longer filtered by direction, so nothing reads it.
+    select: { id: true, carId: true },
   });
   if (!anchor?.carId) {
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
@@ -86,7 +102,9 @@ export async function POST(request: Request, { params }: Params) {
       id: { in: runIds },
       userId,
       carId: anchor.carId,
-      sortAt: { gt: anchor.sortAt },
+      // Both sides of the correction — see the header. The anchor is excluded because
+      // it already holds the value; letting it through would only mint a no-op snapshot.
+      NOT: { id: anchor.id },
     },
     select: runSelectForSetupCorrection,
     orderBy: { sortAt: "asc" },
@@ -94,10 +112,14 @@ export async function POST(request: Request, { params }: Params) {
 
   const writes: Prisma.PrismaPromise<unknown>[] = [];
   const updatedRunIds: string[] = [];
+  /** Found and owned, but already holding the corrected value — a tick that writes nothing. */
+  const unchangedRunIds: string[] = [];
   for (const run of targets) {
     const built = await buildSetupCorrectionWrites({ userId, run, key, value });
-    // Null means the run already held that value — a tick that writes nothing.
-    if (!built) continue;
+    if (!built) {
+      unchangedRunIds.push(run.id);
+      continue;
+    }
     writes.push(...built.writes);
     updatedRunIds.push(run.id);
   }
@@ -108,5 +130,15 @@ export async function POST(request: Request, { params }: Params) {
     revalidateAfterRunMutation(userId);
   }
 
-  return NextResponse.json({ ok: true, updatedRunIds });
+  /*
+   * Ticked, but never reached: deleted since the sheet was drawn, on another car, or the
+   * anchor itself. Named rather than folded into "nothing to change", because those two
+   * outcomes read identically to a driver and mean opposite things — one says the history
+   * already agrees, the other says the app did not do what was asked. Conflating them is
+   * how a wholly dead backward cascade went unnoticed for three days.
+   */
+  const reached = new Set([...updatedRunIds, ...unchangedRunIds]);
+  const droppedRunIds = runIds.filter((rid) => !reached.has(rid));
+
+  return NextResponse.json({ ok: true, updatedRunIds, unchangedRunIds, droppedRunIds });
 }

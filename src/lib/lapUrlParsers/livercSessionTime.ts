@@ -155,3 +155,43 @@ export function parseLiveRcSessionDisplayTimeToUtcIso(raw: string): string | nul
 
   return null;
 }
+
+/**
+ * What LiveRC calls a race, from the page `<title>`.
+ *
+ * LiveRC titles a race result page as
+ *   `TFTR :: TFTR 2026 Championship Round 10 - Whale CCW :: ISTC Modified A3-Main :: LiveRC`
+ * — track, meeting, session, brand. The last segment before the brand is the only place the
+ * page states which race this is; there is no heading, no meta tag and no field in the results
+ * table that carries it.
+ *
+ * Without this the race parser had nothing to report and filed a diagnostic marker in its
+ * place, which the library then printed as the session's name. Every LiveRC race a driver had
+ * ever pasted in read `racer_laps_session_loaded`.
+ *
+ * Three segments are required after the brand is dropped. A shorter title has no session
+ * segment to take, and returning the meeting name for it would file every race at a meeting
+ * under one name.
+ */
+export function extractLiveRcRaceSessionNameFromHtml(html: string): string | null {
+  const $ = load(html);
+  const sources = [
+    normalizeWhitespace($("title").text()),
+    normalizeWhitespace($('meta[property="og:title"]').attr("content") ?? ""),
+    normalizeWhitespace($('meta[name="twitter:title"]').attr("content") ?? ""),
+  ].filter((s) => s.length > 0);
+
+  for (const text of sources) {
+    const parts = text
+      .split("::")
+      .map((s) => normalizeWhitespace(s))
+      .filter((s) => s.length > 0 && !/^liverc(\.com)?$/i.test(s));
+    if (parts.length < 3) continue;
+    const name = parts[parts.length - 1]!;
+    // A date landed here on at least one layout; a session name is not a date.
+    if (/\d{1,2}\/\d{1,2}\/\d{2,4}/.test(name)) continue;
+    if (name.length < 2 || name.length > 80) continue;
+    return name;
+  }
+  return null;
+}

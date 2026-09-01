@@ -1,4 +1,5 @@
 import type { SetupSnapshotData, SetupSnapshotValue } from "@/lib/runSetup";
+import { PRESET_WITH_OTHER_BASE_KEYS, scalarSetupTextFromUnknown } from "@/lib/setup/presetWithOther";
 import { storedValuesToSurface } from "@/lib/setupSheetModels/sheetSurfaceValues";
 
 /**
@@ -48,9 +49,29 @@ export function sheetValuesFromSnapshot(setup: SetupSnapshotData): Record<string
  * Keys the sheet never mentions are left exactly as they were — that is what protects the tires,
  * the additive and the run context from a surface that has no idea they exist.
  *
- * A box cleared to empty REMOVES its key rather than storing a blank. Merging with a plain spread
- * looks equivalent and is not: an emptied box would keep its old value forever, because an empty
- * string loses to whatever was already there.
+ * ============================== A CLEARED BOX KEEPS ITS KEY, HOLDING "" ==============================
+ *
+ * This used to `delete next[k]`, on the reasoning that a key which is gone cannot bring an old
+ * value back with it. That is true only where the result REPLACES a stored setup. The log-run
+ * wizard does not replace: it posts this object alongside `setupBaselineSnapshotId`, and the
+ * server merges it onto that baseline — so a key that is simply missing is read as "the driver
+ * said nothing about this box", and the baseline's old value is written into the new run.
+ *
+ * A driver reported it and filmed it (2026-08-25): he emptied a text box on the sheet while
+ * logging a run, and it was back on his next run. Reproduced end to end — the browser posted 97
+ * keys and the run stored 98, the extra one being the value he had just deleted. His other edits
+ * that run stuck, because a CHANGED box does say something and a cleared one said nothing. That
+ * is why "some of my changes stay and some don't" had no visible pattern: anything erased came
+ * back, everything typed survived.
+ *
+ * So an emptied box now stays in the object holding `""`, which is the deletion marker
+ * `surfaceValuesToStoredMerge` already produces upstream and which `resolveSetupSnapshot` already
+ * honours downstream (it writes the blank over the baseline, and the storage normaliser then drops
+ * the key). This function was the one link that threw the marker away. It also brings the sheet
+ * into line with the ordinary field list, which has always committed `""` for a cleared field —
+ * the two editors disagreed, and only the sheet's way lost work.
+ *
+ * Callers that count values must not count markers: see `filledSetupValueCount`.
  */
 export function mergeSheetValuesIntoSnapshot(
   previous: SetupSnapshotData,
@@ -59,8 +80,26 @@ export function mergeSheetValuesIntoSnapshot(
   const next: SetupSnapshotData = { ...previous };
   for (const [k, v] of Object.entries(sheetValues)) {
     if (typeof v === "string") {
-      if (v.trim() === "") delete next[k];
-      else next[k] = v;
+      next[k] = v.trim() === "" ? "" : v;
+      // A marker on a `_other` companion whose base is NOT in this save: the previous snapshot
+      // keeps that text inside the base's object (`front_bumper: { otherText: "Plastic" }`), so
+      // blank it there as well — otherwise the marker lands on a key the snapshot never used and
+      // the text comes back (2026-08-29). The sheet now sends the marker on the base too; this
+      // covers a phone still running the old bundle.
+      if (next[k] === "" && k.endsWith("_other") && !(k.slice(0, -6) in sheetValues)) {
+        const base = k.slice(0, -6);
+        const prev = previous[base];
+        if (
+          (PRESET_WITH_OTHER_BASE_KEYS as readonly string[]).includes(base) &&
+          prev != null &&
+          typeof prev === "object" &&
+          !Array.isArray(prev) &&
+          "otherText" in prev
+        ) {
+          const preset = scalarSetupTextFromUnknown((prev as { selectedPreset?: unknown }).selectedPreset).trim();
+          next[base] = preset ? { selectedPreset: preset, otherText: "" } : "";
+        }
+      }
       continue;
     }
     // Stored shapes from a calibrated sheet: a ticked-options array, a preset-with-other object,

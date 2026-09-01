@@ -951,14 +951,14 @@ export function SetupDocumentReviewClient({
               <Link href="/setup-sheet-models/new" className="underline text-accent-foreground hover:text-foreground">
                 Add this chassis type
               </Link>
-              <a
-                href={previewUrl}
+              {/* Through `/pdf-view`, never a raw `_blank` file link — the PWA and iOS shell show
+                  those with no way back (founder report, 2026-09-01). */}
+              <Link
+                href={`/pdf-view?document=${encodeURIComponent(liveDoc.id)}`}
                 className="underline text-accent-foreground/90 hover:text-foreground"
-                target="_blank"
-                rel="noreferrer"
               >
                 Download / view PDF anyway
-              </a>
+              </Link>
             </div>
           </div>
         ) : null}
@@ -1381,7 +1381,7 @@ export function SetupDocumentReviewClient({
             type="button"
             onClick={createSetup}
             disabled={creatingSetup || Boolean(liveDoc.createdSetupId) || savingCarLink}
-            className="tap-active flex w-full items-center justify-center gap-2 rounded-xl primary-face bg-primary px-4 py-2.5 text-[13px] font-bold tracking-tight text-primary-foreground transition hover:bg-[#E6BE00] disabled:cursor-default disabled:opacity-60"
+            className="tap-active flex w-full items-center justify-center gap-2 rounded-xl primary-face bg-primary px-4 py-2.5 text-[13px] font-semibold tracking-tight text-primary-foreground transition hover:bg-[#E6BE00] disabled:cursor-default disabled:opacity-60"
           >
             {liveDoc.createdSetupId
               ? "Setup saved ✓"

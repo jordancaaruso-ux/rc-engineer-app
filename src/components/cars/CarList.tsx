@@ -13,6 +13,7 @@ import { Collapse } from "@/components/ui/Collapse";
 import { AddCarBlankUpload } from "@/components/cars/AddCarBlankUpload";
 import { UploadSetupSheetBar, type UploadSetupCar } from "@/components/setup/UploadSetupSheetBar";
 import { PickerSheet, PickerTrigger } from "@/components/ui/PickerSheet";
+import { SetUpHandoffBar } from "@/components/onboarding/SetUpHandoffBar";
 import { carNameTakenMessage, findCarNameClash } from "@/lib/cars/carName";
 import type { OptionSection } from "@/lib/search/optionSearch";
 
@@ -503,7 +504,6 @@ export function CarList({
             </form>
           </Collapse>
         </li>
-
         {/*
          * The confirmation, and — for their first car — where to go next.
          *
@@ -513,37 +513,45 @@ export function CarList({
          * your first run", which they only ever saw if they thought to navigate back. That was
          * two of the two detours every single walk paid. Pointing onward from here skips both.
          *
-         * What it points AT changed on 2026-08-18 (founder): a car on its own is not ready.
-         * Without the timing identity every lap has to be typed in by hand, so timing is what
-         * the button goes to — the same order the dashboard's Get-set-up card walks, and the
-         * two surfaces must not disagree.
+         * It points at the DASHBOARD, not at the next step (founder 2026-08-26, replacing the
+         * 08-18 jump straight to /settings). Naming the destination here meant this page had to
+         * know which step was outstanding, so the checklist existed in two places and could
+         * disagree. Now the car page only hands back; the Get-set-up card owns the order and is
+         * already sitting in its "Car's in — one thing left" state when they land. It costs one
+         * tap, and buys the driver seeing their own checklist tick over — which is the whole
+         * reward for having done the step.
          *
          * The button is worded as the journey, not the step ("Continue setting up"), and the
-         * "Log a run anyway" link under it came out the same day: the dock's run control never
-         * left the screen, so the link was a second door to the same room sitting directly
-         * under the one thing we're asking them to do.
+         * "Log a run anyway" link under it came out on 08-18: the dock's run control never left
+         * the screen, so the link was a second door to the same room sitting directly under the
+         * one thing we're asking them to do.
          */}
         {message?.startsWith("Car added") && (
           <li className="flex flex-col gap-2.5 px-3 py-3.5 sm:px-4" role="status">
             <p className="text-sm text-primary-ink">{message}</p>
-            {firstCarId && !hasTimingIdentity && (
-              <>
-                <p className="text-xs text-muted-foreground">
-                  One thing left: your name and transponder, so lap times attach to you on their
-                  own.
-                </p>
-                <Link
-                  href="/settings"
-                  className={cn(buttonLinkClassName("primary"), "self-start")}
-                >
-                  Continue setting up
-                </Link>
-              </>
-            )}
-            {firstCarId && hasTimingIdentity && (
-              <Link href="/runs/new" className={cn(buttonLinkClassName("primary"), "self-start")}>
-                Log your first run
-              </Link>
+            {firstCarId && (
+              /*
+               * The SAME bar Settings raises, in the same place — pinned at the top of
+               * the screen and staying there through the scroll (founder 2026-08-26).
+               * It used to be a grey explanatory line above a `self-start` chip, sitting
+               * here in the list: two elements saying one thing, the chip did not read as
+               * the way on, and both scrolled away the moment the driver looked at their
+               * new car. `SetUpHandoffBar` carries the whole treatment; only `direction`
+               * differs between the two call sites (this one goes forward).
+               *
+               * The "Car added" line above stays put — that is the confirmation, and it
+               * belongs beside the list it is confirming.
+               */
+              <SetUpHandoffBar
+                href="/"
+                direction="forward"
+                title="Continue setting up"
+                detail={
+                  hasTimingIdentity
+                    ? "Your checklist is on the dashboard"
+                    : "Timing next — your name and transponder, so lap times find you"
+                }
+              />
             )}
           </li>
         )}
@@ -625,17 +633,13 @@ export function CarList({
                           {setups.map((s) => (
                             <li key={s.id}>
                               {/*
-                                Straight to the editor for a setup nothing depends on. One a run
-                                points at opens its detail page first, the same as the car page's
-                                saved list — the editor there means "correct that run", which is
-                                not what tapping a name from the Garage is asking for.
+                                Always the READ view — same door as the car page's saved list.
+                                A never-run setup used to skip straight into the editor, which
+                                meant a PDF import opened on the fill surface with no Compare, no
+                                PDF, no share (founder, 2026-09-01). Edit is one tap away there.
                               */}
                               <Link
-                                href={
-                                  s.usedInRuns > 0
-                                    ? `/cars/${c.id}/setups/${s.id}`
-                                    : `/cars/${c.id}/setups/${s.id}/edit`
-                                }
+                                href={`/cars/${c.id}/setups/${s.id}`}
                                 onClick={() => haptic("light")}
                                 className="tap-active flex items-center gap-3 border-b border-border/50 py-2 last:border-0"
                               >

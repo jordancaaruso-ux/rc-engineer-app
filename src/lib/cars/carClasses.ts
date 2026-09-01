@@ -51,6 +51,19 @@ export function chassisPlatformLabel(id: string | null | undefined): string | nu
 }
 
 /**
+ * Is this one of the thirteen platforms, exactly?
+ *
+ * Note `chassisPlatformLabel` deliberately echoes an unknown id back rather than refusing it —
+ * it is a display helper and a stored value it has never heard of should still render. This is
+ * the opposite job: the gate on the way IN, so `SetupSheetModel.discipline` and `Car.carClass`
+ * can only ever hold an id the app can place. Trim before calling; a padded id is not an id.
+ */
+export function isChassisPlatformId(id: string | null | undefined): id is ChassisPlatformId {
+  if (!id) return false;
+  return CHASSIS_PLATFORMS.some((p) => p.id === id);
+}
+
+/**
  * Same-platform check for the car-swap rule. Unknown (null) on either side counts as SAME — the
  * safe default: a car whose chassis isn't in the catalog keeps today's behaviour (tires/prep carry
  * across the swap) rather than silently re-deriving them.

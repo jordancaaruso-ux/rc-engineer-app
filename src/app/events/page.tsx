@@ -10,6 +10,8 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { loadUserScopedEvents } from "@/lib/events/eventParticipation";
 import { loadEventsSeasonModel } from "@/lib/events/seasonModel";
+import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
+import { todayYmdInTimeZone } from "@/lib/eventActive";
 
 /** Match /tracks + /runs/new: always load user events/tracks fresh (avoids stale static RSC for selectors). */
 export const dynamic = "force-dynamic";
@@ -53,7 +55,11 @@ export default async function EventsPage({
     );
   }
 
-  const [user, params] = await Promise.all([requireCurrentUser(), searchParams]);
+  const [user, params, timeZone] = await Promise.all([
+    requireCurrentUser(),
+    searchParams,
+    getExplicitTimeZoneForRunFormatting(),
+  ]);
   const [events, tracks, favouriteTrackIds, model] = await Promise.all([
     loadUserScopedEvents({ userId: user.id, take: 120 }),
     // Same catalog scope as /runs/new and /tracks. Scoping this to `userId` predated the
@@ -79,7 +85,11 @@ export default async function EventsPage({
     // Favourites lead the picker. Server-side here because the desktop panel is server-rendered
     // and never refetches; the phone list refreshes both together on navigation.
     getFavouriteTrackIdsForUser(user.id),
-    loadEventsSeasonModel({ userId: user.id, year: parseYear(params.year) }),
+    loadEventsSeasonModel({
+      userId: user.id,
+      year: parseYear(params.year),
+      todayYmd: todayYmdInTimeZone(timeZone),
+    }),
   ]);
 
   // The phone list keeps its own row shape; it only borrows the season model's per-event

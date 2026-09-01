@@ -19,15 +19,22 @@ export async function GET(_request: Request, { params }: Params) {
   });
   if (!track) return NextResponse.json({ error: "Track not found" }, { status: 404 });
 
+  // How many sessions read each set: a set's lines are shared by every session on it, so
+  // redrawing them for one video moves them under the others. The flow needs the number to
+  // say so before it saves.
   const profiles = await prisma.trackCameraProfile.findMany({
     where: { trackId, userId: userId },
     orderBy: { updatedAt: "desc" },
     include: {
       sectorLines: { orderBy: { sortOrder: "asc" } },
+      _count: { select: { analysisJobs: true } },
     },
   });
 
-  return NextResponse.json({ track, profiles });
+  return NextResponse.json({
+    track,
+    profiles: profiles.map(({ _count, ...p }) => ({ ...p, jobCount: _count.analysisJobs })),
+  });
 }
 
 export async function POST(request: Request, { params }: Params) {

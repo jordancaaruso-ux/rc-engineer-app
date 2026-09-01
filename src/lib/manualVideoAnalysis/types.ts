@@ -7,6 +7,15 @@ export const MANUAL_VIDEO_SESSION_VERSION_LEGACY = 1 as const;
 export const LAP_START_LINE_KEY = "__lap_start__" as const;
 
 export type DriverRole = "me" | "competitor";
+
+/**
+ * Which of a field's drivers this analysis is about.
+ *
+ * A timing import brings the whole heat, so most drivers are neither of the two the video is
+ * being read for. Without "other" every one of them read as the competitor, and the app quietly
+ * compared against whoever the timing site happened to list first.
+ */
+export type DriverSlot = DriverRole | "other";
 export type AnchorKind = "sf_start" | "sf_finish";
 export type CompareAlignAt = "sf_start" | "sf_finish";
 
@@ -20,7 +29,7 @@ export type ManualDriver = {
   key: string;
   driverName: string;
   normalizedName: string;
-  role: DriverRole;
+  role: DriverSlot;
   laps: ManualDriverLap[];
 };
 
@@ -32,7 +41,23 @@ export type ManualSyncAnchor = {
 };
 
 export type ManualSessionSync = {
+  /**
+   * The session's anchor — one tie point between the timing clock and the video clock.
+   *
+   * In a race this one point serves the whole field, because everybody leaves together: each
+   * driver then walks their own lap times from it. In practice, drivers start whenever they like,
+   * so their timing clocks share nothing and a single anchor places only the driver it was set on.
+   * That is what `anchorByRole` is for.
+   */
   anchor?: ManualSyncAnchor;
+  /**
+   * A driver's own tie point, when they have one. Beats `anchor` for that driver.
+   *
+   * Without this there was no way to tell the app when the RIVAL went past — their crossings were
+   * placed purely by assuming a shared start, and a driver who could see the rival cross the line
+   * had nowhere to say so.
+   */
+  anchorByRole?: Partial<Record<DriverRole, ManualSyncAnchor>>;
   globalOffsetSec?: number;
   perLapSfEnd?: Record<string, number>;
   /** Video time (sec) at SF lap start when transponder walk differs from scrubbed sync. */
@@ -62,12 +87,93 @@ export type ManualCompareState = {
   offsetNudgeSec?: number;
 };
 
+/** One thing the detector saw cross a line, kept beside a mark so a rule can be re-run without a re-scan. */
+export type ManualScanCandidate = {
+  t: number;
+  quality: number;
+  colour?: { r: number; g: number; b: number };
+  /** Where on the frame, in video pixels — absent on records built before positions were kept. */
+  x?: number;
+  y?: number;
+  /** Which way it crossed — see `CrossingEvent.dir`. */
+  dir?: 1 | -1;
+};
+
+/** One car the picker offered at one line, with every verdict the timing put under it. */
+export type ManualIdentifyOption = ManualScanCandidate & {
+  offsetSec: number;
+  hint?: "yours" | "other";
+  movesWith?: { key: string; name: string; mine: boolean; hits: number; of: number };
+  offLine?: boolean;
+  outOfOrder?: boolean;
+  offField?: boolean;
+  shortLine?: boolean;
+  hairpin?: boolean;
+  wrongWay?: boolean;
+  dropped?: boolean;
+};
+
+/**
+ * The last "Which one is your car?" — every picture offered, what was said under each, what was
+ * picked for the driver and what they tapped. The picker's options were never saved before, so
+ * "S4 picked the wrong crossing" (2026-08-28, a hairpin) could only be argued from a description.
+ */
+export type ManualIdentifyRecord = {
+  at: string;
+  sessionId: string;
+  driverRole: DriverRole;
+  lapNumber: number;
+  lapStartSec: number;
+  lapTimeSec: number;
+  lines: Array<{
+    lineKey: string;
+    options: ManualIdentifyOption[];
+    field?: { fromSec: number; toSec: number; cars: number };
+  }>;
+  /** What the screen picked before any tap, by line key: the option's video time. */
+  prePicked: Record<string, number>;
+  /** What went on to the scan, by line key: the option's video time. Absent if cancelled. */
+  chosen?: Record<string, number>;
+  /** True when every line was decided without a tap and the picker was skipped. */
+  auto?: boolean;
+};
+
 export type ManualFrameMark = {
   sessionId: string;
   driverRole: DriverRole;
   lapNumber: number;
   lineKey: string;
   videoTimeSec: number;
+  /** How the time was reached — absent on a hand mark. */
+  source?: "confirmed" | "rescued" | "unconfirmed";
+  /** Everything else the window saw, when this mark came from the detector. */
+  candidates?: ManualScanCandidate[];
+};
+
+/** One row of the last automatic scan: what was found, held back or missed, and what was on offer. */
+export type ManualScanRow = {
+  driverRole: DriverRole;
+  lapNumber: number;
+  lineKey: string;
+  /** Null when nothing was found for this lap and line. */
+  videoTimeSec: number | null;
+  source: "confirmed" | "rescued" | "unconfirmed" | null;
+  suspect: boolean;
+  claimedBy?: { by: string; key: string; lapNumber: number };
+  candidates: ManualScanCandidate[];
+};
+
+/**
+ * The last automatic scan, complete — found, held back and missing alike, with every candidate.
+ *
+ * A mark is a decision; this is the evidence. Every rule that decides between candidates (the
+ * chain, the plausibility check, the field matching) can be replayed on it in seconds, where a
+ * re-scan costs minutes of decoding and the machine to itself.
+ */
+export type ManualScanRecord = {
+  at: string;
+  sessionId: string;
+  rows: ManualScanRow[];
 };
 
 /** Normalized crop in video pixel space (0–1), persisted in manualJson. */
@@ -89,6 +195,8 @@ export type ManualVideoSessionV2 = {
   compare: ManualCompareState;
   selectedLaps: { me: number[]; competitor: number[] };
   marks: ManualFrameMark[];
+  lastScan?: ManualScanRecord;
+  lastIdentify?: ManualIdentifyRecord;
 };
 
 /** @deprecated v1 shape — migrated on read */
@@ -106,7 +214,7 @@ export type ManualVideoSessionV1 = {
 
 export type ManualVideoSession = ManualVideoSessionV2;
 
-export function lapSfKey(role: DriverRole, lapNumber: number): string {
+export function lapSfKey(role: DriverSlot, lapNumber: number): string {
   return `${role}:${lapNumber}`;
 }
 
@@ -210,6 +318,16 @@ function parseV2(raw: Record<string, unknown>): ManualVideoSessionV2 | null {
     },
     selectedLaps: { me: selected.me as number[], competitor: selected.competitor as number[] },
     marks: raw.marks as ManualFrameMark[],
+    lastScan:
+      raw.lastScan && typeof raw.lastScan === "object" && Array.isArray((raw.lastScan as ManualScanRecord).rows)
+        ? (raw.lastScan as ManualScanRecord)
+        : undefined,
+    lastIdentify:
+      raw.lastIdentify &&
+      typeof raw.lastIdentify === "object" &&
+      Array.isArray((raw.lastIdentify as ManualIdentifyRecord).lines)
+        ? (raw.lastIdentify as ManualIdentifyRecord)
+        : undefined,
   };
 }
 

@@ -39,7 +39,12 @@ export async function applyRunCarMove(params: {
   runId: string;
   toCarId: string;
   /** The run's current snapshot, or null when it was logged without one. */
-  setupSnapshot: { id: string; data: unknown; baseSetupSnapshotId: string | null } | null;
+  setupSnapshot: {
+    id: string;
+    data: unknown;
+    baseSetupSnapshotId: string | null;
+    sheetBlankId: string | null;
+  } | null;
 }): Promise<{ carName: string; setupSnapshotId: string | null }> {
   const car = await prisma.car.findFirst({
     where: { id: params.toCarId, userId: params.userId },
@@ -56,6 +61,7 @@ export async function applyRunCarMove(params: {
         carId: car.id,
         data: normalizeSetupSnapshotForStorage(params.setupSnapshot.data) as object,
         baseSetupSnapshotId: params.setupSnapshot.baseSetupSnapshotId,
+        sheetBlankId: params.setupSnapshot.sheetBlankId,
       },
       select: { id: true },
     });

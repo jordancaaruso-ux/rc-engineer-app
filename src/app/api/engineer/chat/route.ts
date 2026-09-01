@@ -108,11 +108,28 @@ export async function POST(request: Request) {
     const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    // Demo mode (MONETISATION_NORTH_STAR.md Phase 3): the one write a demo session may make.
-    // Per-IP cap below; the shared demo userId also flows through checkAiBudget, whose
-    // AiUsageDaily row doubles as a DB-backed GLOBAL demo ceiling. Persistence is skipped so
-    // live questions never pollute the curated thread history.
+    /*
+     * The demo never asks (MONETISATION_NORTH_STAR.md, "The demo's clock"). Founder call
+     * 2026-08-25 replaced two live questions a visitor with a curated history of answers already
+     * given, so `/api/engineer/chat` came off the demo write allowlist and middleware refuses
+     * this request before it arrives.
+     *
+     * This is the second lock on the same door, and it is FIRST in the handler on purpose. The
+     * middleware's lock is a path string in a Set — rename this route, add an alias, mount it
+     * under a rewrite, and the match quietly stops matching while the handler carries on
+     * answering. Identity cannot drift that way. Ahead of the deterministic lap-history path
+     * too, which is free but is still an answer, and the demo gives none.
+     */
     const isDemo = isDemoIdentity({ id: user.id, email: user.email });
+    if (isDemo) {
+      return NextResponse.json(
+        {
+          error:
+            "The demo shows answers the Engineer has already given. Get your own garage to ask about your own car.",
+        },
+        { status: 403 },
+      );
+    }
 
     const rl = checkApiRateLimit({
       key: `engineer-chat:${user.id}`,

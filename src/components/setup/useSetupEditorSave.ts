@@ -530,3 +530,68 @@ export function useSetupEditorSave({
     note,
   };
 }
+
+/**
+ * ============================== TELLING A HOST WHAT IS UNSAVED ==============================
+ *
+ * The save bar is not always the only way out. The run's setup pop-up hosts an editor inside a
+ * dialog that has three exits of its own — Cancel, Close, and the scrim — and none of them press
+ * a button in the bar. `beforeunload` cannot cover any of them: nothing unloads, a React subtree
+ * simply stops being rendered, and the driver's typing goes with it.
+ *
+ * So an editor publishes where it stands, and the host asks before it takes one of its own exits.
+ * `save` is the mode's PRIMARY door and nothing else — the fork opens a name sheet the host has no
+ * business drawing, and "Correct this run" is the answer the driver came in for.
+ */
+export type HostedSetupSave = {
+  dirty: boolean;
+  /** How many boxes differ from the setup as it was opened. Zero whenever `dirty` is false. */
+  changedCount: number;
+  busy: boolean;
+  /** The last save's message, when it failed. Null otherwise. */
+  error: string | null;
+  /** What the primary door calls itself, so a host asks in the editor's own words. */
+  saveLabel: string;
+  /** Runs the primary door. Resolves true when the save landed. */
+  save: () => Promise<boolean>;
+};
+
+/**
+ * Publish an editor's state to a host that has exits of its own. Null on unmount — leaving edit
+ * mode takes the editor with it, and a host still believing in unsaved work would ask about
+ * changes that no longer exist.
+ */
+export function useReportHostedSave(
+  save: SetupEditorSave,
+  onChange?: (state: HostedSetupSave | null) => void
+): void {
+  /*
+   * Two latest-refs, both to keep this from demanding stability of its caller. `save.primary` is
+   * rebuilt on every render of the editor, so publishing it directly would hand the host a new
+   * function each time and re-render it forever; and a host that passed an inline `onChange` would
+   * otherwise re-fire the publish effect on every one of ITS renders.
+   */
+  const runRef = useRef(save.primary.run);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    runRef.current = save.primary.run;
+    onChangeRef.current = onChange;
+  });
+
+  const runPrimary = useCallback(() => runRef.current(), []);
+
+  const { dirty, changedCount, busy, status, error } = save;
+  const saveLabel = save.primary.label;
+  useEffect(() => {
+    onChangeRef.current?.({
+      dirty,
+      changedCount,
+      busy,
+      error: status === "error" ? error : null,
+      saveLabel,
+      save: runPrimary,
+    });
+  }, [dirty, changedCount, busy, status, error, saveLabel, runPrimary]);
+
+  useEffect(() => () => onChangeRef.current?.(null), []);
+}

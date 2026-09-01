@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { carIdsSharingSetupTemplate } from "@/lib/carSetupScope";
+import { unfinishedRunToCarrySetupFrom } from "@/lib/runs/prefillSetupSource";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -37,24 +38,50 @@ export async function GET(request: Request) {
   // in-progress edits shouldn't become the new run's starting point.
   // Fall back to any run on this car (or shared-template car) if no completed
   // run exists yet.
-  const completedRun = await prisma.run.findFirst({
-    where: {
-      userId: userId,
-      carId: { in: scopeCarIds },
-      loggingComplete: true,
-    },
-    orderBy: { sortAt: "desc" },
-    include: baseInclude,
-  });
-
-  const lastRun =
-    completedRun ??
-    (await prisma.run.findFirst({
+  //
+  // THE SETUP IS THE EXCEPTION, and `prefillSetupSource` says why: screws are where the
+  // driver last put them whether or not the log entry about it was finished, so a draft
+  // sitting in front of the last completed run still hands its setup forward. Skipping it
+  // silently threw away a paying driver's sheet edit (reproduced 2026-08-25).
+  const [completedRun, newestRun] = await Promise.all([
+    prisma.run.findFirst({
+      where: {
+        userId: userId,
+        carId: { in: scopeCarIds },
+        loggingComplete: true,
+      },
+      orderBy: { sortAt: "desc" },
+      include: baseInclude,
+    }),
+    prisma.run.findFirst({
       where: { userId: userId, carId: { in: scopeCarIds } },
       orderBy: { sortAt: "desc" },
       include: baseInclude,
-    }));
+    }),
+  ]);
 
-  return NextResponse.json({ lastRun });
+  const baseRun = completedRun ?? newestRun;
+  const carrySetupFrom = unfinishedRunToCarrySetupFrom({
+    completed: completedRun,
+    newest: newestRun,
+  });
+
+  const lastRun =
+    baseRun && carrySetupFrom?.setupSnapshot
+      ? { ...baseRun, setupSnapshot: carrySetupFrom.setupSnapshot }
+      : baseRun;
+
+  return NextResponse.json({
+    lastRun,
+    // So the prefill card can say whose setup this is rather than quietly implying it
+    // came from the run it named. Null whenever the setup and the context agree.
+    setupFromUnfinishedRun: carrySetupFrom
+      ? {
+          id: carrySetupFrom.id,
+          whenIso: carrySetupFrom.sortAt.toISOString(),
+          sessionLabel: carrySetupFrom.sessionLabel ?? null,
+        }
+      : null,
+  });
 }
 

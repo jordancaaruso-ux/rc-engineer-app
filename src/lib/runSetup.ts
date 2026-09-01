@@ -173,6 +173,31 @@ export function normalizeSetupData(data: unknown): SetupSnapshotData {
 }
 
 /**
+ * How many boxes this setup actually puts a value in.
+ *
+ * `Object.keys(...).length` is not the same number and never was. A setup being EDITED carries
+ * deletion markers — a key holding `""`, meaning "the driver emptied this box on purpose" — which
+ * the storage normaliser drops on the way to the database but which are present in the form's
+ * state until it saves. Counting keys counts those markers, so a driver who cleared a box would
+ * watch the value count sit still, and a setup emptied box by box would still read as "has a
+ * setup". Both editors produce markers: the field list has always committed `""`, and the sheet
+ * does too since the cleared-box fix (see `mergeSheetValuesIntoSnapshot`).
+ *
+ * `0` and `false` are values, not blanks — a zeroed box is a measurement someone took.
+ */
+export function filledSetupValueCount(setup: SetupSnapshotData | null | undefined): number {
+  if (!setup) return 0;
+  let n = 0;
+  for (const v of Object.values(setup)) {
+    if (v === null || v === undefined) continue;
+    if (typeof v === "string" && v.trim() === "") continue;
+    if (Array.isArray(v) && v.every((x) => typeof x === "string" && x.trim() === "")) continue;
+    n += 1;
+  }
+  return n;
+}
+
+/**
  * True when a snapshot value should be treated as missing for merge/repair (incoming may replace).
  * Includes legacy corrupt string from `String(object)` and empty preset+other blobs.
  */

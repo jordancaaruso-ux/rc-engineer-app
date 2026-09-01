@@ -23,6 +23,8 @@ import {
 } from "@/lib/runs/tireSetChange";
 import { TireIndicatorIcon } from "@/components/runs/TireIndicatorIcon";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/runs/RunHistoryModalsLazy";
+import { SetupCascadeQuestions } from "@/components/runs/SetupCascadeQuestions";
+import type { SetupEditorSavedResult } from "@/components/setup/useSetupEditorSave";
 import {
   getAverageTopN,
   getBestLap,
@@ -202,7 +204,7 @@ export function RunHistoryTable({
   memberDisplayByUserId,
   showMemberColumn = false,
   showSessionColumn = true,
-  dayRunNumberByRunId,
+  dayRunNameByRunId,
   matchReasonsById,
   focusRunId = null,
 }: {
@@ -229,8 +231,12 @@ export function RunHistoryTable({
   memberDisplayByUserId?: Record<string, string>;
   showMemberColumn?: boolean;
   showSessionColumn?: boolean;
-  /** runId → position within its day (1-based); names unlabeled testing runs "Run N". */
-  dayRunNumberByRunId?: Record<string, number>;
+  /**
+   * runId → the name to print, resolved against the rest of that run's day
+   * (`buildDayRunNameMap`): unique names pass through, a name the day repeats
+   * becomes the run's position, "Run 3".
+   */
+  dayRunNameByRunId?: Record<string, string>;
   /** runId → why the run matched the active search/setup filters (search only). */
   matchReasonsById?: Record<string, MatchReason[]>;
   /**
@@ -241,6 +247,15 @@ export function RunHistoryTable({
 }) {
   const router = useRouter();
   const [setupModalRunId, setSetupModalRunId] = useState<string | null>(null);
+  /*
+   * The cascade questions a correction made in the setup pop-up earned. Held outside the
+   * modal's own state so closing the sheet doesn't take the question with it.
+   */
+  const [cascade, setCascade] = useState<{
+    runId: string;
+    nonce: number;
+    result: SetupEditorSavedResult;
+  } | null>(null);
   const [lapModalRunId, setLapModalRunId] = useState<string | null>(null);
   /** Run whose inline tire-prep panel is open (toggled from the tire indicator). */
   const [prepOpenRunId, setPrepOpenRunId] = useState<string | null>(null);
@@ -423,9 +438,7 @@ export function RunHistoryTable({
         const avg5Display = formatLap(run.avgTop5LapSeconds ?? getAverageTopN(primaryLapRows, 5));
         const avg10Display = formatLap(getAverageTopN(primaryLapRows, 10));
         const medianLapDisplay = formatLap(listLapDash.median);
-        const sessionDisplay = formatRunSessionDisplay(run, {
-          dayRunNumber: dayRunNumberByRunId?.[run.id],
-        });
+        const sessionDisplay = dayRunNameByRunId?.[run.id] ?? formatRunSessionDisplay(run);
         const runInstant = resolveRunDisplayInstant(run);
         // Team Sessions lists other members' runs. Their missing laps are not
         // yours to chase — the deep link would open an edit page you can't save
@@ -740,7 +753,41 @@ export function RunHistoryTable({
                 runListSource={runListSource}
                 viewerUserId={viewerUserId}
                 memberDisplayByUserId={memberDisplayByUserId}
+                /*
+                 * Without this the wrench opened a sheet you could only read: the modal
+                 * hides its Edit toggle when the host passes no callback, and this table
+                 * passed none until 2026-08-25. Owner-only, on the same test the lap modal
+                 * beside it uses; the route checks again.
+                 */
+                onRunSetupCorrected={
+                  !setupModalRun?.userId ||
+                  !viewerUserId ||
+                  setupModalRun.userId === viewerUserId
+                    ? (result) => {
+                        // And the questions with it. Refreshing alone dropped every
+                        // "did your other runs have this wrong too?" this door earned.
+                        const runId = setupModalRunId;
+                        if (runId) {
+                          setCascade((prev) => ({
+                            runId,
+                            nonce: (prev?.nonce ?? 0) + 1,
+                            result,
+                          }));
+                        }
+                        router.refresh();
+                      }
+                    : undefined
+                }
               />
+              {cascade ? (
+                <SetupCascadeQuestions
+                  key={cascade.runId}
+                  runId={cascade.runId}
+                  displayTimeZone={displayTimeZone}
+                  pending={cascade}
+                  onChanged={() => router.refresh()}
+                />
+              ) : null}
               {lapModalRun ? (
                 <RunLapAnalysisModal
                   open={lapModalRunId !== null}

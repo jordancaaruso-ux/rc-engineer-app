@@ -109,11 +109,6 @@ function NewLapSyncForm() {
         </select>
       </label>
 
-      <p className="text-xs text-muted-foreground">
-        Upload your video on the next screen. LiveRC timing links are optional — add them there when
-        you want lap sync and compare. You pick or draw sector lines inside the flow.
-      </p>
-
       <button
         type="button"
         className="rounded-md primary-face bg-primary px-3 py-2 text-sm text-primary-foreground w-fit disabled:opacity-50"

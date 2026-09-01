@@ -71,6 +71,21 @@ const nextConfig = {
     // "Cannot load @napi-rs/canvas … ReferenceError: DOMMatrix is not defined". Local `next build`
     // cannot catch it — check the route's own `.nft.json` after building.
     "/api/setup-snapshots/**": RASTER_NATIVE_FILES,
+    // MyRCM run-result PDFs (`lapUrlParsers/myRcmPdfText.ts`). `standardFontDataUrl()` resolves the
+    // font directory with `require.resolve` and hands pdfjs a *path*, which the tracer cannot
+    // follow — the same invisible hop as the three rasterizer outages above. Verified against the
+    // route's own `.nft.json`: without this line it traced pdfjs's code and zero of its fonts.
+    //
+    // Deliberately NOT `RASTER_NATIVE_FILES`: this path only calls `getTextContent()`, so it never
+    // touches a canvas and must not drag `@napi-rs/canvas` or `pdf-to-img` onto the function.
+    // …plus the worker build, which the lap reader now imports by a literal path so this copy
+    // of pdf.js is bound to its own worker (see `loadPdfjs`). Listed anyway: pdf.js itself
+    // loads it through a computed `import(workerSrc)` the tracer cannot follow, and a lambda
+    // without the file reports every PDF as unreadable.
+    "/api/lap-time-sessions/**": [
+      "./node_modules/pdfjs-dist/standard_fonts/**/*",
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+    ],
     // The run card's own fonts (Sora / JetBrains Mono / Space Grotesk). `shareFonts.ts` reads them
     // with `readFileSync`, which the tracer cannot follow — same failure mode as the rasterizers
     // above, and it would only show up on Vercel. Satori cannot use the app's `next/font` woff2.

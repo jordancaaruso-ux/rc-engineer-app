@@ -5,7 +5,7 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { CardPanel } from "@/components/ui/CardPanel";
-import { ButtonLink, outlineButtonClassName } from "@/components/ui/ButtonLink";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 import { getSetupSheetTemplateForCar } from "@/lib/setupSheetModels/getTemplateForCar";
 import { chassisFillsAsSheet } from "@/lib/setupSheetModels/sheetPlan";
 import { pickSheetBlankForData } from "@/lib/setupSheetModels/sheetBlankResolve";
@@ -74,6 +74,7 @@ export default async function CarSetupEditPage(props: {
       name: true,
       data: true,
       isLibrary: true,
+      sheetBlankId: true,
       _count: { select: { runs: true } },
       // Which run to correct, and what to call a snapshot that has no name of its own.
       runs: {
@@ -139,9 +140,11 @@ export default async function CarSetupEditPage(props: {
   const template = await getSetupSheetTemplateForCar(user.id, car, "setup");
 
   // A setup edits on the surface it was filled on — the sheet, when the chassis draws one, and
-  // the EDITION of that sheet whose boxes speak this setup's keys. See `sheetBlankResolve`.
+  // the PAPER this setup was born on (its stamp). See `sheetBlankResolve`.
   const blank = car.setupSheetModelId
-    ? await pickSheetBlankForData(car.setupSheetModelId, normalizeSetupData(setup.data))
+    ? await pickSheetBlankForData(car.setupSheetModelId, normalizeSetupData(setup.data), {
+        sheetBlankId: setup.sheetBlankId,
+      })
     : null;
   const sheetMode = chassisFillsAsSheet(blank);
   const editionBlankId = blank?.isEdition ? blank.id : null;
@@ -183,19 +186,20 @@ export default async function CarSetupEditPage(props: {
           share taken mid-edit would send the old numbers. See `setupEditorShare`.
         */}
         <SetupEditorShareProvider>
-          <div className="max-w-4xl space-y-3">
+          <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <a
-                href={`/api/setup-snapshots/${encodeURIComponent(setup.id)}/setup-pdf`}
-                target="_blank"
-                rel="noreferrer"
-                className={outlineButtonClassName()}
+              {/* Through `/pdf-view`, never a raw `_blank` API link — the PWA and iOS shell show
+                  those as a bare PDF with no way back (founder report, 2026-09-01). Kept HERE and
+                  dropped from the details page: there the sheet on screen is the same paper, but
+                  here the boxes are mid-edit and the file is what was last saved. */}
+              <ButtonLink
+                href={`/pdf-view?snapshot=${encodeURIComponent(setup.id)}&title=${encodeURIComponent(title)}&back=${encodeURIComponent(`/cars/${car.id}/setups/${setup.id}/edit`)}`}
+                variant="outline"
               >
                 View as PDF
-              </a>
-              {/* Beside the PDF on purpose, same as the details page: same artifact, one for
-                  filing and one for sending. */}
-              <ShareSetupButton setupSnapshotId={setup.id} label={title} />
+              </ButtonLink>
+              {/* Beside it on purpose: the same file, one to look at and one to keep. */}
+              <ShareSetupButton setupSnapshotId={setup.id} label={title} asPdf={sheetMode} />
               <ButtonLink
                 href={`/cars/${car.id}/setups/${setup.id}${detailsSuffix}`}
                 variant="outline"

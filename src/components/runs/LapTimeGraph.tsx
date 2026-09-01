@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { xLabelStep } from "@/components/runs/chartAxis";
+import type { FadeProfilePoint } from "@/lib/lapAnalysis";
 
 /**
  * Lap-by-lap time graph for a single run (Sessions expanded view). Follows the
@@ -35,6 +36,27 @@ const PAD_BOTTOM = 22;
 const CLAMP_FACTOR = 1.15;
 
 /**
+ * The fade strip under the chart: one bar per rolling window of `getFadeProfile`, up in
+ * loss red when that stretch of the run was getting slower, down in gain green when it was
+ * coming to the driver. It shares the chart's x-axis so a bar sits under the laps it read.
+ *
+ * The scale has a floor of ±0.10 s/lap and only grows past it: a flat run must LOOK flat,
+ * and a rolling rate on six laps swings ±0.05 on nothing, which a scale fitted to the data
+ * would blow up into a mountain range. A real fade (+0.2 s/lap and staying there) fills it.
+ */
+const FADE_STRIP_HEIGHT = 46;
+const FADE_STRIP_PAD_TOP = 6;
+const FADE_STRIP_PAD_BOTTOM = 6;
+const FADE_STRIP_FLOOR = 0.1;
+const FADE_UP_COLOR = "rgb(var(--color-destructive))";
+const FADE_DOWN_COLOR = "rgb(var(--color-gain))";
+
+function formatStripRate(rate: number): string {
+  const r = Math.abs(rate) < 0.005 ? 0 : rate;
+  return `${r > 0 ? "+" : r < 0 ? "−" : ""}${Math.abs(r).toFixed(2)}`;
+}
+
+/**
  * Index-aligned dashed baseline: each included lap becomes a point (clamped
  * into [lo, hi]); excluded laps are skipped entirely, the line bridging their
  * neighbours, so timing artifacts never appear on the trace.
@@ -63,6 +85,7 @@ export function LapTimeGraph({
   baselineLabel,
   lineColor = LINE_COLOR,
   baselineColor,
+  fadeProfile,
 }: {
   rows: LapGraphRow[];
   bestLapNumbers: Set<number>;
@@ -76,6 +99,11 @@ export function LapTimeGraph({
   lineColor?: string;
   /** Identity hue for the dashed baseline; when set it renders bolder than the neutral default. */
   baselineColor?: string;
+  /**
+   * Rolling fade rate (`getFadeProfile`) drawn as a strip under the chart. Empty or absent
+   * draws nothing — the caller's lap count decides, not this component.
+   */
+  fadeProfile?: FadeProfilePoint[] | null;
 }) {
   const [chartWidth, setChartWidth] = useState(340);
   const chartRef = useRef<HTMLDivElement | null>(null);
@@ -280,6 +308,93 @@ export function LapTimeGraph({
           );
         })}
       </svg>
+      {fadeProfile && fadeProfile.length >= 2 ? (
+        <FadeStrip profile={fadeProfile} rows={rows} xAt={xAt} chartWidth={chartWidth} />
+      ) : null}
     </div>
+  );
+}
+
+function FadeStrip({
+  profile,
+  rows,
+  xAt,
+  chartWidth,
+}: {
+  profile: FadeProfilePoint[];
+  rows: LapGraphRow[];
+  xAt: (index: number) => number;
+  chartWidth: number;
+}) {
+  const indexOfLap = new Map(rows.map((r, i) => [r.lapNumber, i]));
+  const limit = Math.max(FADE_STRIP_FLOOR, ...profile.map((p) => Math.abs(p.ratePerLap)));
+  const innerHeight = FADE_STRIP_HEIGHT - FADE_STRIP_PAD_TOP - FADE_STRIP_PAD_BOTTOM;
+  const zeroY = FADE_STRIP_PAD_TOP + innerHeight / 2;
+  // Slower (positive) draws UP, matching the chart above where a slow lap spikes up.
+  const yAt = (rate: number) => zeroY - (rate / limit) * (innerHeight / 2);
+  // One bar per window, centred under the laps it read; bars are as wide as the step
+  // between windows so consecutive bars touch and the strip reads as one shape.
+  const centres = profile.map((p) => {
+    const a = indexOfLap.get(p.fromLap);
+    const b = indexOfLap.get(p.toLap);
+    return a != null && b != null ? (xAt(a) + xAt(b)) / 2 : null;
+  });
+  const step =
+    centres.length >= 2 && centres[0] != null && centres[1] != null
+      ? Math.max(2, centres[1] - centres[0])
+      : 6;
+  const barWidth = Math.max(2, step - 1);
+
+  return (
+    <svg
+      width="100%"
+      height={FADE_STRIP_HEIGHT}
+      viewBox={`0 0 ${chartWidth} ${FADE_STRIP_HEIGHT}`}
+      className="block"
+      role="img"
+      aria-label="Fade per lap across the run, rolling six laps"
+    >
+      <text x={PAD_LEFT - 6} y={yAt(limit) + 3} textAnchor="end" className="fill-faint fig-tick">
+        {formatStripRate(limit)}
+      </text>
+      <text x={PAD_LEFT - 6} y={yAt(-limit) + 3} textAnchor="end" className="fill-faint fig-tick">
+        {formatStripRate(-limit)}
+      </text>
+      <line
+        x1={PAD_LEFT}
+        x2={chartWidth - PAD_RIGHT}
+        y1={zeroY}
+        y2={zeroY}
+        className="stroke-border"
+        strokeWidth={1}
+      />
+      {profile.map((p, i) => {
+        const cx = centres[i];
+        if (cx == null) return null;
+        const y = yAt(p.ratePerLap);
+        const up = p.ratePerLap >= 0;
+        return (
+          <g key={`${p.fromLap}-${p.toLap}`}>
+            <title>{`Laps ${p.fromLap}–${p.toLap}: ${formatStripRate(p.ratePerLap)} s/lap`}</title>
+            <rect
+              x={cx - barWidth / 2}
+              y={up ? y : zeroY}
+              width={barWidth}
+              height={Math.max(1, Math.abs(zeroY - y))}
+              fill={up ? FADE_UP_COLOR : FADE_DOWN_COLOR}
+              opacity={0.85}
+            />
+          </g>
+        );
+      })}
+      <text
+        x={chartWidth - PAD_RIGHT}
+        y={FADE_STRIP_HEIGHT - 1}
+        textAnchor="end"
+        className="fill-faint fig-tick"
+      >
+        fade s/lap · rolling 6
+      </text>
+    </svg>
   );
 }

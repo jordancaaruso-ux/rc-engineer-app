@@ -8,6 +8,7 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { GeometryBench } from "@/components/tools/GeometryBench";
 import { VideoBench } from "@/components/tools/VideoBench";
+import { LapImportBench } from "@/components/tools/LapImportBench";
 
 /**
  * Tools — the benches, in the dock cell the 2026-08-18 restructure freed and then spent on padding.
@@ -29,12 +30,14 @@ import { VideoBench } from "@/components/tools/VideoBench";
  * without opening anything. Video follows, because a queue you are waiting on is worth a glance.
  *
  * It carried two more for one day — Compare and Lap import — and both came off on 2026-08-19 by
- * founder call. The cards are unwired, not deleted (`src/components/tools/CompareBench.tsx`,
- * `LapImportBench.tsx`), and `loadToolsModel` still builds `compare` and `unlinkedLaps` that
- * nothing now reads, so putting either back is an import and a line of JSX.
+ * founder call. Lap import came BACK on 2026-08-27 as Laptime Analysis, because what it leads to
+ * changed: it was a tray of imports waiting to be filed onto a run, and it is now the door to
+ * reading any timing sheet, including one from a race nobody here entered. Compare is still
+ * unwired (`src/components/tools/CompareBench.tsx`), and `loadToolsModel` still builds the
+ * `compare` model nothing reads, so putting it back is an import and a line of JSX.
  *
- * The bands lead to the Lab and `/videos`, unchanged behind them. This is a summary, not a
- * replacement.
+ * The bands lead to the Lab, `/videos` and `/laps/analysis`, unchanged behind them. This is a
+ * summary, not a replacement.
  */
 export const metadata: Metadata = {
   title: "Tools",
@@ -78,17 +81,27 @@ export default async function ToolsPage(): Promise<ReactNode> {
         The clamp goes on `.page-body`, not on an inner div — `.page-body` carries
         `margin-inline: auto`, so the column only centres when the max-width is on IT, and
         `.page-header` mirrors the clamp off its next sibling to keep the title on the same
-        axis as the cards at xl+. Same reasoning, same value as Paddock: the two pages sit in
-        the same two dock cells and must land on the same column.
+        axis as the cards at xl+.
+
+        `max-w-4xl` below xl matches Paddock, the other dock neighbour. From xl `tools-wide`
+        lifts the cap to the dashboard's and the lap sheet's 1760px axis (founder call,
+        2026-08-27: the same width as the dashboard and Laptime Analysis). It has to be plain
+        CSS in globals.css, not an `xl:max-w-*` utility, for the `@layer` reason `.dash-wide`
+        documents there.
       */}
-      <section className="page-body max-w-4xl">
+      <section className="page-body tools-wide max-w-4xl">
         {/*
-          One column at every width. It was a two-column grid from `lg` while there were four
-          bands; with two left, the geometry strip already spanned both and Video would have sat
-          alone in the wide cell with an empty column beside it. The clamp above still matches
-          Paddock's, so the two dock neighbours land on the same axis.
+          One column on a phone, three across from xl (founder call, 2026-08-27).
+
+          It had been one column at every width since the page went to two bands: the geometry
+          drawing spanned it and Video sat under it. With Laptime Analysis back that made three
+          cards stacked in an 896px column on a 1440 monitor — you scrolled to reach the third,
+          on a page whose whole point is that nothing needs opening. Three equal columns put
+          every bench on the first screen, and the grid's default `items-stretch` keeps the
+          three cards one height so no bench reads as the small one: each is `h-full`, its
+          list grows, and its door is pinned to the foot.
         */}
-        <div className="space-y-5">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
           {model.geometry ? (
             <GeometryBench geometry={model.geometry} />
           ) : (
@@ -100,7 +113,7 @@ export default async function ToolsPage(): Promise<ReactNode> {
               One card says what fills them, and the Lab still opens, because it is the one
               bench that genuinely works with nothing.
             */
-            <CardPanel contentClassName="space-y-3">
+            <CardPanel className="h-full" contentClassName="space-y-3">
               <div>
                 <p className="hub-row-title">The benches fill in from your runs</p>
                 <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
@@ -117,9 +130,17 @@ export default async function ToolsPage(): Promise<ReactNode> {
             </CardPanel>
           )}
 
-          {/* Both bands carry their own heading now, as the top row of their own card
+          {/* Each band carries its own heading, as the top row of its own card
               (founder pin, 2026-08-19) — see `BandHeader`. */}
           <VideoBench jobs={model.video} />
+
+          {/*
+            Laptime Analysis, back on the page (founder call 2026-08-27) with a different job from the
+            one it came off for. It was a filing tray — imports "waiting" to be attached to a
+            run — and a filing tray earns no space. It is the front door to lap analysis now:
+            these sessions OPEN, and reading one no longer requires having driven it.
+          */}
+          <LapImportBench sessions={model.unlinkedLaps} total={model.unlinkedLapTotal} />
         </div>
       </section>
     </>

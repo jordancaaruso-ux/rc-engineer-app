@@ -56,7 +56,7 @@ export async function GET(request: Request, ctx: RouteCtx): Promise<NextResponse
       shareWithTeam: true,
       car: { select: { setupSheetModelId: true } },
       // Not returned — read only to choose which of the chassis's sheets these boxes are on.
-      setupSnapshot: { select: { data: true } },
+      setupSnapshot: { select: { data: true, sheetBlankId: true } },
     },
   });
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -83,7 +83,8 @@ export async function GET(request: Request, ctx: RouteCtx): Promise<NextResponse
         run.car.setupSheetModelId,
         snapshotData && typeof snapshotData === "object" && !Array.isArray(snapshotData)
           ? (snapshotData as Record<string, unknown>)
-          : null
+          : null,
+        { sheetBlankId: run.setupSnapshot?.sheetBlankId }
       )
     : null;
 

@@ -60,6 +60,8 @@ desktop-shots/
 # Sheet-fill captures (regenerate with e2e/sheet-fill.spec.ts)
 sheet-fill-shots/
 sheet-race-shots/
+# (regenerate with scripts/dev-derived-box-repro.ts)
+derived-box-shots/
 roll-center-strip-shots/
 roll-center-lab-shots/
 roll-center-lab-sheet-shots/
@@ -108,3 +110,22 @@ compare-shots/
 scripts/engineer-eval/answers/
 scripts/engineer-eval/verdicts/
 scripts/engineer-eval/ratings/
+
+# Day-screen rebuild captures (regenerate with scripts/dev-day-page-shots.ts / dev-day-debug-shots.ts)
+day-page-shots/
+day-debug-shots/
+
+# Analysis outing + run-faces drive (regenerate with scripts/dev-analysis-outing-shots.ts)
+analysis-outing-shots/
+
+# Detached dev-server output (scripts start the server with a redirect)
+dev-server.log
+.next-dev-*.log
+
+# Uploaded source material (Invisible Speed transcripts etc) - copyrighted, never committed
+.local-sources/
+
+# One-off data dumps taken from production, and driver-supplied sheets. Real users' rows and
+# other people's documents: kept on disk when needed, never written into git history.
+scripts/*backup-prod-*.json
+scripts/tmp-*.pdf

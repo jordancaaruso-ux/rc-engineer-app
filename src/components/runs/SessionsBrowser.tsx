@@ -13,6 +13,12 @@ import { ChevronDown, ChevronLeft, ChevronRight, Flag, TriangleAlert, Wrench } f
 import { SessionTrendCard } from "@/components/analysis/SessionTrendCardLazy";
 import { TeamDayCard } from "@/components/runs/TeamDayCard";
 import { RunPageClient } from "@/components/runs/RunPageClient";
+import { RunFaces } from "@/components/runs/RunFaces";
+import { RunListRow } from "@/components/runs/RunListRow";
+import { requestRunSetupExit } from "@/components/runs/runSetupEditGuard";
+import { OutingHeading } from "@/components/runs/OutingHeading";
+import { resolveOutingHeading, type OutingHeadingParts } from "@/lib/runs/outingHeading";
+import { SetupSheetModal, type SetupSheetModalRun } from "@/components/runs/RunHistoryModalsLazy";
 import type { Run } from "@/components/runs/RunDetailPanel";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
@@ -20,7 +26,6 @@ import type { AnalysisTrendModel } from "@/lib/analysis/analysisHomeModel";
 import type {
   WorkbenchDriver,
   WorkbenchGroup,
-  WorkbenchGroupHeadline,
   WorkbenchRunRow,
 } from "@/lib/runs/sessionWorkbenchModel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
@@ -81,6 +86,11 @@ function readSelection(): Selection {
     driverId: params.get(DRIVER_PARAM),
     runId: params.get(RUN_PARAM),
   };
+}
+
+/** The day's heading, by the one rule every surface shares (`resolveOutingHeading`). */
+function headingFor(group: WorkbenchGroup | null | undefined): OutingHeadingParts | null {
+  return group ? resolveOutingHeading(group) : null;
 }
 
 /** True on the layout that shows rail and pane at once. Read at click time, never at render. */
@@ -459,9 +469,15 @@ export function SessionsBrowser({
             }`}
             trend={activeDriver.trend}
             rows={activeDriver.runs}
+            runsById={runsById}
             focusedRunId={focusedRunId}
             onFocusRun={setFocusedRunId}
             onOpenRun={openRun}
+            heading={headingFor(paneGroup)}
+            displayTimeZone={displayTimeZone}
+            pickerRuns={pickerRuns}
+            runListSource={runListSource}
+            viewerUserId={viewerUserId}
           />
         ) : teamMode && paneGroup?.teamDay ? (
           <TeamDayCard
@@ -477,12 +493,17 @@ export function SessionsBrowser({
           <OneSession
             driverLabel={teamMode ? paneGroup.title : "The day"}
             summary={null}
-            headline={paneGroup.headline}
             trend={paneGroup.trend}
             rows={paneGroup.runs}
+            runsById={runsById}
             focusedRunId={focusedRunId}
             onFocusRun={setFocusedRunId}
             onOpenRun={openRun}
+            heading={headingFor(paneGroup)}
+            displayTimeZone={displayTimeZone}
+            pickerRuns={pickerRuns}
+            runListSource={runListSource}
+            viewerUserId={viewerUserId}
           />
         ) : null}
       </div>
@@ -518,42 +539,187 @@ const PANE = {
  * argument for giving solo the same form as team: there was never a second screen
  * to build.
  *
- * The chart is the shipped `SessionTrendCard`, dropped in unchanged — pace, the
- * Line/Spread toggle in its header, the same wrench-and-tyre gutter. The run list
- * under it is `lg:hidden`, because on the split layout those rows are already in
- * the rail.
+ * ## The day, without the round trips (2026-08-24)
+ *
+ * The screen used to open with a 93px figure strip, then a chart carrying its own
+ * title, scope line, hover readout, view toggle and two rows of glyphs — about
+ * half a 390px phone before the first run — and then five rows, each of which was
+ * a door to another page. Reading a day meant leaving it once per run.
+ *
+ * So the strip is gone (its two figures were already on the page: the day's
+ * fastest lap is the green figure in the list, the run count is beside the Runs
+ * heading), the chart runs `compact` on the phone, and a row OPENS IN PLACE — the
+ * WHOLE run, folded into faces. See `RunFaces`, which since 2026-08-25 carries
+ * everything the run page carried, so the row no longer ends in a door out of the
+ * day.
+ *
+ * Desktop keeps the full chart, because the rail two inches left is its run list
+ * and these rows aren't on it: the wrench gutter is still the only way to a run's
+ * setup sheet there. One tree, two instances, only ever one of them visible — no
+ * viewport JS, no hydration seam.
  */
 function OneSession({
   driverLabel,
   summary,
-  headline,
   trend,
   rows,
+  runsById,
   focusedRunId,
   onFocusRun,
   onOpenRun,
+  heading,
+  displayTimeZone,
+  pickerRuns,
+  runListSource,
+  viewerUserId,
 }: {
   driverLabel: string;
   summary: string | null;
-  headline?: WorkbenchGroupHeadline | null;
   trend: AnalysisTrendModel | null;
   rows: WorkbenchRunRow[];
+  /** Full records for the expansions. A row whose run isn't here stays a door. */
+  runsById: Map<string, Run>;
   /** Run under the pointer on the chart — tints its row, selects nothing. */
   focusedRunId: string | null;
   onFocusRun: (runId: string | null) => void;
   onOpenRun: (runId: string) => void;
+  /** The session this is — drawn over the phone's chart, as on `/analysis`. */
+  heading?: OutingHeadingParts | null;
+  /** All four are for the open run — `RunFaces` is the run page, folded. */
+  displayTimeZone: string | null;
+  pickerRuns: CompareRunShape[];
+  runListSource: RunCompareListSource;
+  viewerUserId: string;
 }) {
+  /**
+   * Which runs are open. A Set, not one id: comparing run 2 against run 4 is the
+   * whole reason the rows stopped being doors, and it needs both on screen at
+   * once. Not in the URL — this is reading state, not a selection, and it would
+   * fight the `?r=` the pane uses for the run it opens.
+   */
+  const [openRunIds, setOpenRunIds] = useState<Set<string>>(new Set());
+
+  // A correction lands on a NEW snapshot, so the rows behind the scrim — and the
+  // "setup moved" marks drawn from them — are stale the moment it saves.
+  const router = useRouter();
+
+  /*
+   * ============================== THE WRENCH IS A FACE, NOT A POP-UP ==============================
+   *
+   * This raised `SetupSheetModal` until 2026-08-25 — a fetch of `/api/runs/for-setup-compare`, a
+   * scrim, and the sheet on top of the day. It doesn't any more, because the sheet is now DRAWN
+   * inside the run's own Setup face (`RunFaces`), and two doors onto one picture is how a surface
+   * ends up disagreeing with itself about what a setup is.
+   *
+   * So the wrench opens the row on Setup: same glyph, same promise ("the car as it went out"),
+   * one place it lands. The cost is honest and was weighed — five runs are five unfoldings now
+   * rather than five pop-ups — and it buys the thing a pop-up could never give: the sheet sitting
+   * in the run, under the figures it produced, correctable in place.
+   *
+   * The nonce is what makes a SECOND tap work. A driver who opened a row on Setup, read the laps,
+   * then reached for the wrench again is asking for the sheet back; without a counter that ask is
+   * indistinguishable from the state already stored and nothing would move.
+   */
+  const [setupFocus, setSetupFocus] = useState<{ runId: string; nonce: number } | null>(null);
+  const openRunOnSetup = useCallback((runId: string) => {
+    setOpenRunIds((previous) => (previous.has(runId) ? previous : new Set(previous).add(runId)));
+    setSetupFocus((previous) => ({ runId, nonce: (previous?.nonce ?? 0) + 1 }));
+  }, []);
+
+  /**
+   * Folding a row away UNMOUNTS whatever it was holding, and since 2026-08-25 that can be a setup
+   * sheet with unsaved corrections typed into it. This list has no business knowing what a setup
+   * is, so the open row registers the question and this asks it — see `runSetupEditGuard`. A row
+   * with nothing at stake answers false and folds exactly as before.
+   */
+  const toggleOpen = useCallback(
+    (runId: string) => {
+      const collapse = () =>
+        setOpenRunIds((previous) => {
+          const next = new Set(previous);
+          next.delete(runId);
+          return next;
+        });
+      if (openRunIds.has(runId)) {
+        if (requestRunSetupExit(runId, collapse)) return;
+        collapse();
+        return;
+      }
+      setOpenRunIds((previous) => new Set(previous).add(runId));
+    },
+    [openRunIds]
+  );
+
+  /**
+   * Tapping a point on the phone's chart opens that run's row and scrolls to it,
+   * rather than leaving for `/runs/[id]`.
+   *
+   * The chart used to be the one way to reach a run without leaving the day, and
+   * now it is the only thing that WOULD leave it. Open, never close: you tapped a
+   * point to see that run, and a point that closed the row it just opened would
+   * punish a second tap. Desktop keeps the navigating behaviour — it has a pane
+   * for the run and no expansions.
+   */
+  const openFromChart = useCallback(
+    (runId: string) => {
+      if (!runsById.has(runId) || isSplitLayout()) {
+        onOpenRun(runId);
+        return;
+      }
+      setOpenRunIds((previous) => (previous.has(runId) ? previous : new Set(previous).add(runId)));
+      // After the row has grown, or it scrolls to where the row used to end.
+      requestAnimationFrame(() => {
+        document
+          .getElementById(`session-run-${runId}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    },
+    [onOpenRun, runsById]
+  );
+
   return (
     <div className="flex min-w-0 flex-col gap-3 motion-safe:animate-[rc-pane-in_180ms_ease-out] lg:gap-4">
-      {headline ? <DayHeadline headline={headline} /> : null}
       {summary ? (
         <div className="min-w-0 px-0.5">
-          <Eyebrow className="mb-0">{driverLabel}</Eyebrow>
-          <p className="mt-0.5 truncate text-[12.5px] text-muted-foreground">{summary}</p>
+          {/*
+            Desktop only. The phone's fixed band above already carries this
+            identity — `paneTitle` is the driver's own name once you've drilled
+            into one — so on a teammate's session the name landed twice inside
+            200px, once in the band and once here. Desktop has no band (the rail
+            two inches left is the "where am I"), so the eyebrow is the ONLY
+            heading there and must stay. Hidden, not made generic: "Their
+            session" would mirror "Your session" nicely but would cost desktop
+            the name it has nowhere else.
+          */}
+          <Eyebrow className="mb-0 max-lg:hidden">{driverLabel}</Eyebrow>
+          <p className="truncate text-[12.5px] text-muted-foreground lg:mt-0.5">{summary}</p>
         </div>
       ) : null}
       {trend ? (
-        <SessionTrendCard trend={trend} onSelectRun={onOpenRun} onFocusRun={onFocusRun} />
+        <>
+          {/* Phone: the plot under the day's own name. The chrome that came off for
+              the compact card was the toggles and the readout — not the subject, and
+              without a subject four grey lines are a picture of nothing in
+              particular (founder call, 2026-08-25). Same heading `/analysis` uses. */}
+          <div className="lg:hidden">
+            <SessionTrendCard
+              trend={trend}
+              compact
+              heading={
+                heading ? (
+                  <OutingHeading title={heading.title} where={heading.where} />
+                ) : null
+              }
+              onSelectRun={openFromChart}
+              onFocusRun={onFocusRun}
+            />
+          </div>
+          {/* Desktop: the full card. Its wrench gutter is the door to each run's
+              setup sheet, and no expansion on this layout offers another one. */}
+          <div className="max-lg:hidden">
+            <SessionTrendCard trend={trend} onSelectRun={onOpenRun} onFocusRun={onFocusRun} />
+          </div>
+        </>
       ) : (
         <SurfaceCard variant="panel" contentClassName="p-6 text-[13px] text-muted-foreground">
           No lap times in this session yet. Open a run to see its details, or import laps to chart
@@ -562,14 +728,8 @@ function OneSession({
       )}
       {/* Phone only — on the split layout these rows are the rail. */}
       <div className="lg:hidden">
-        <div className="flex items-baseline gap-2 px-0.5 pb-1.5">
-          <Eyebrow className="mb-0">Runs</Eyebrow>
-          <span className="ml-auto text-[11px] text-muted-foreground">
-            {rows.length} · newest first
-          </span>
-        </div>
         {/*
-          A door, not a table row.
+          A row that opens, not a door that leaves.
 
           This was one 38px line — a 44px-wide label box, everything else at
           10.5px in one weight of grey, and a 3.5px chevron doing all the work of
@@ -579,10 +739,8 @@ function OneSession({
           code (see `runSessionName`).
 
           So: two lines and `min-h-14`, the name at 14px in full ink, the car and
-          lap count demoted beneath it, and the chevron taking ink and sliding on
-          press — the same treatment `AssetListRow` gives every openable row in
-          the app. `group` is on the button so the chevron can answer a press
-          anywhere on the row rather than only under the finger.
+          lap count demoted beneath it, and the chevron taking ink and turning
+          down when the row is open.
 
           It carried ONE figure until 2026-08-17, and one figure is a single hot
           lap. A run can hold the day's second-fastest lap and the day's third
@@ -601,113 +759,79 @@ function OneSession({
           times to say the same three words.
         */}
         <SurfaceCard variant="panel" contentClassName="p-0">
-          <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-3 py-1.5">
-            <span className="min-w-0 flex-1 text-[9.5px] font-semibold uppercase tracking-wider text-faint">
-              Run
+          {/*
+            The heading sits INSIDE the card it heads (2026-08-25). It floated above
+            it on the page ground until then, which read as a label for the gap
+            between two cards rather than for the list — and left the card itself
+            opening on a row of column codes with nothing saying what they counted.
+          */}
+          <div className="flex items-baseline gap-2 px-3 pb-1.5 pt-2.5">
+            <Eyebrow className="mb-0">Runs</Eyebrow>
+            <span className="ml-auto text-[11px] text-muted-foreground">
+              {rows.length} · newest first
             </span>
-            <span className="w-[52px] shrink-0 text-right text-[9.5px] font-semibold uppercase tracking-wider text-faint">
-              Best
-            </span>
-            <span className="w-[50px] shrink-0 text-right text-[9.5px] font-semibold uppercase tracking-wider text-faint">
-              Top 5
-            </span>
-            <span className="w-[50px] shrink-0 text-right text-[9.5px] font-semibold uppercase tracking-wider text-faint">
-              Top 10
-            </span>
-            {/* Holds the chevron's column open so the headings sit over their
-                own figures rather than one slot to the right. */}
-            <span className="h-4 w-4 shrink-0" aria-hidden />
           </div>
-          {rows.map((run) => (
-            <button
-              key={run.id}
-              type="button"
-              onClick={() => onOpenRun(run.id)}
-              className={cn(
-                "group tap-active flex min-h-14 w-full items-center gap-2 border-b border-l-2 border-border px-3 py-2.5 text-left transition-colors last:border-b-0",
-                "active:bg-muted/60 hover:bg-muted/40",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40",
-                // Tapping a point on the chart above lights its row here — the
-                // same fill a pointer on the row would give it, so the gesture
-                // reads as pointing, not as selecting. Tapping the row is what
-                // opens the run.
-                run.id === focusedRunId
-                  ? "border-l-primary-ink/40 bg-muted/40"
-                  : "border-l-transparent"
-              )}
-            >
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate text-[14px] font-semibold leading-tight tracking-tight text-foreground">
-                  {run.label}
-                </span>
-                <span className="truncate text-[11px] leading-none text-faint">
-                  {run.carName} · {run.lapCount} laps
-                </span>
-              </span>
-              {run.needsLapImport ? (
-                <TriangleAlert
-                  className="h-4 w-4 shrink-0 text-warning"
-                  aria-label="No lap times on this run"
-                />
-              ) : null}
-              {/* Green stays on BEST alone. It means "fastest lap of this
-                  session" and it can only go on the figure that claim is about;
-                  tinting all three would turn every row into three verdicts and
-                  the mark would stop meaning anything. */}
-              <span
-                className={cn(
-                  "w-[52px] shrink-0 text-right text-[15px] font-semibold tabular-nums leading-tight",
-                  run.isGroupBest ? "text-gain" : "text-foreground"
-                )}
-              >
-                {run.best != null ? formatLap(run.best) : "—"}
-              </span>
-              <span className="w-[50px] shrink-0 text-right text-[12.5px] tabular-nums leading-tight text-muted-foreground">
-                {run.avgTop5 != null ? formatLap(run.avgTop5) : "—"}
-              </span>
-              <span className="w-[50px] shrink-0 text-right text-[12.5px] tabular-nums leading-tight text-muted-foreground">
-                {run.avgTop10 != null ? formatLap(run.avgTop10) : "—"}
-              </span>
-              <ChevronRight
-                className="h-4 w-4 shrink-0 text-faint transition-all group-hover:translate-x-0.5 group-hover:text-foreground group-active:translate-x-0.5 group-active:text-foreground"
-                aria-hidden
-              />
-            </button>
-          ))}
+          {/*
+            No column strip over these rows since 2026-08-26. It named "Run / Best /
+            Top 10" for figures that now name themselves — best big, `med 16.123`
+            small beneath it. A strip introducing labelled figures is a row spent
+            saying what the row below it already says, and it was the band that made
+            this card read as a spreadsheet rather than as a day.
+          */}
+          <div className="border-t border-border">
+            {rows.map((run) => {
+              const record = runsById.get(run.id) ?? null;
+              const open = openRunIds.has(run.id);
+              return (
+                <RunListRow
+                  key={run.id}
+                  row={run}
+                  domId={`session-run-${run.id}`}
+                  open={open}
+                  // Tapping a point on the chart above lights its row here — the same
+                  // fill a pointer on the row would give it, so the gesture reads as
+                  // pointing, not as selecting.
+                  focused={run.id === focusedRunId}
+                  // A run whose full record the page never loaded (a teammate's, on a
+                  // scope that lists more runs than it fetches) keeps the old
+                  // behaviour rather than opening onto nothing.
+                  hasRecord={record != null}
+                  onOpen={() => (record ? toggleOpen(run.id) : onOpenRun(run.id))}
+                  onOpenSetup={() => (record ? openRunOnSetup(run.id) : onOpenRun(run.id))}
+                >
+                  {record && open ? (
+                    /*
+                      The whole run, opened where it sits (2026-08-25). This is the run
+                      page folded into faces, not a summary of it — so there is no
+                      "Open full run" door under it any more. `/runs/[id]` survives as
+                      an address for shared links and notifications; nothing here points
+                      at it.
+                    */
+                    <RunFaces
+                      run={record}
+                      setupDiff={run.setupDiff}
+                      displayTimeZone={displayTimeZone}
+                      // Owner-only, exactly as the flat table computes it. The routes
+                      // check again — this is the affordance, not the guard.
+                      allowRunMutations={
+                        !record.userId || !viewerUserId || record.userId === viewerUserId
+                      }
+                      pickerRuns={pickerRuns}
+                      runListSource={runListSource}
+                      openFace={
+                        setupFocus?.runId === run.id
+                          ? { face: "setup", nonce: setupFocus.nonce }
+                          : null
+                      }
+                    />
+                  ) : null}
+                </RunListRow>
+              );
+            })}
+          </div>
         </SurfaceCard>
       </div>
-    </div>
-  );
-}
 
-/**
- * The two numbers above a solo day.
- *
- * It carried a third — **vs your last day at this track**, signed lap-delta —
- * plus a line under the tiles explaining that negative is faster. Both are gone
- * (2026-08-16): a strip that stood 93px tall pushed the chart, which is what the
- * screen is actually for, most of the way off a phone. The comparison is not
- * lost work if it comes back somewhere cheaper — `headline.priorDelta` is still
- * computed in `sessionWorkbenchModel`.
- */
-function DayHeadline({ headline }: { headline: WorkbenchGroupHeadline }) {
-  return (
-    <SurfaceCard variant="panel" contentClassName="p-0">
-      <div className="grid grid-cols-2 divide-x divide-border">
-        <Figure label="Best lap" value={headline.best != null ? formatLap(headline.best) : "—"} />
-        <Figure label="Runs" value={String(headline.runCount)} />
-      </div>
-    </SurfaceCard>
-  );
-}
-
-function Figure({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 px-3 py-2">
-      <div className="truncate text-[9.5px] uppercase tracking-wider text-faint">{label}</div>
-      <div className="mt-0.5 text-[17px] font-semibold tabular-nums leading-tight text-foreground">
-        {value}
-      </div>
     </div>
   );
 }

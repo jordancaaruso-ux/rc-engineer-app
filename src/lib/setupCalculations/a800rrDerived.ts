@@ -1,5 +1,6 @@
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import { parseNumericFromSetupString } from "@/lib/setup/parseSetupNumeric";
+import { SPRING_RATE_DECIMALS } from "@/lib/setupCalculations/springRateFormula";
 import {
   computeSpringRateLookupForSide,
   hintForSpringLookup,
@@ -174,9 +175,9 @@ export function applyA800rrDerivedToSetup(setup: SetupSnapshotData): {
   const { computed, diagnostics } = computeA800rrDerived(setup);
   const next: SetupSnapshotData = { ...setup };
   if (computed.frontSpringRateGfMm == null) delete next[DERIVED_FRONT_SPRING_RATE_KEY];
-  else next[DERIVED_FRONT_SPRING_RATE_KEY] = Number(computed.frontSpringRateGfMm.toFixed(3));
+  else next[DERIVED_FRONT_SPRING_RATE_KEY] = Number(computed.frontSpringRateGfMm.toFixed(SPRING_RATE_DECIMALS));
   if (computed.rearSpringRateGfMm == null) delete next[DERIVED_REAR_SPRING_RATE_KEY];
-  else next[DERIVED_REAR_SPRING_RATE_KEY] = Number(computed.rearSpringRateGfMm.toFixed(3));
+  else next[DERIVED_REAR_SPRING_RATE_KEY] = Number(computed.rearSpringRateGfMm.toFixed(SPRING_RATE_DECIMALS));
   if (computed.finalDriveRatio == null) delete next[DERIVED_FINAL_DRIVE_RATIO_KEY];
   else next[DERIVED_FINAL_DRIVE_RATIO_KEY] = Number(computed.finalDriveRatio.toFixed(4));
   return { setup: next, diagnostics };

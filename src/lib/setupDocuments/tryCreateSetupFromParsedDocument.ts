@@ -8,6 +8,7 @@ import {
   unrecognisedSheetMessage,
   type SheetNamePresence,
 } from "@/lib/setupCalibrations/sheetRecognition";
+import { editionBlankIdForCalibration } from "@/lib/setupSheetModels/sheetBlankForCalibration";
 import { linkTireFieldsInSnapshotData } from "@/lib/tires/linkTireFieldsInSnapshot";
 
 export type TryCreateSetupResult =
@@ -104,11 +105,14 @@ export async function tryCreateSetupFromParsedDocument(input: {
       (doc.parsedDataJson ?? {}) as SetupSnapshotData
     ) as SetupSnapshotData;
     const linkedTires = await linkTireFieldsInSnapshotData(normalized);
+    // The paper this setup was born on — an edition's, when the read came through one.
+    const sheetBlankId = await editionBlankIdForCalibration(doc.calibrationResolvedProfileId);
     const setup = await prisma.setupSnapshot.create({
       data: {
         userId: input.userId,
         carId: doc.carId,
         data: normalizeSetupSnapshotForStorage(linkedTires) as object,
+        sheetBlankId,
       },
       select: { id: true },
     });

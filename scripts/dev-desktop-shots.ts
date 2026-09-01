@@ -33,7 +33,7 @@ const EMAIL = argValue("email") ?? "demo@jrcdynamics.com";
 const OUT = `desktop-shots/${TAG}`;
 
 /** The screens a driver actually moves through, plus the two the founder wants for marketing. */
-const ROUTES: Array<{ path: string; name: string }> = [
+const DEFAULT_ROUTES: Array<{ path: string; name: string }> = [
   { path: "/", name: "01-dashboard" },
   { path: "/engineer", name: "02-engineer" },
   { path: "/runs/history", name: "03-run-history" },
@@ -43,6 +43,23 @@ const ROUTES: Array<{ path: string; name: string }> = [
   { path: "/settings", name: "07-settings" },
   { path: "/teams", name: "08-teams" },
 ];
+
+/**
+ * `--routes=/settings,/paddock,/runs/new` captures an ad-hoc list instead of the eight above,
+ * for when a layout change touches pages that are not on the standing review round.
+ * Names are derived from the path, so the files land as 01-settings.png, 02-paddock.png, …
+ */
+const routesArg = argValue("routes");
+const ROUTES = routesArg
+  ? routesArg
+      .split(",")
+      .map((raw) => raw.trim())
+      .filter(Boolean)
+      .map((path, i) => ({
+        path: path.startsWith("/") ? path : `/${path}`,
+        name: `${String(i + 1).padStart(2, "0")}-${path.replace(/^[/]/, "").replace(/[^a-zA-Z0-9]+/g, "-") || "root"}`,
+      }))
+  : DEFAULT_ROUTES;
 
 async function mintSignInUrl(email: string): Promise<string> {
   const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;

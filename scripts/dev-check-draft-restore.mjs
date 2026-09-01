@@ -1,0 +1,22 @@
+// Dev only: draw, do NOT save, reload — the drawing must come back.
+import { chromium } from "@playwright/test";
+const BASE = "http://localhost:3000"; const JOB = process.env.JOB; const VIDEO = process.env.VIDEO_PATH; const OUT = process.env.SHOT_DIR;
+const browser = await chromium.launch({ channel: "msedge", headless: true });
+const page = await browser.newPage({ viewport: { width: 1280, height: 950 } });
+const overlay = () => page.evaluate(() => [...document.querySelectorAll("svg line")].map((l) => `${Number(l.getAttribute("x1")).toFixed(0)},${Number(l.getAttribute("y1")).toFixed(0)}→${Number(l.getAttribute("x2")).toFixed(0)},${Number(l.getAttribute("y2")).toFixed(0)}`));
+await page.goto(`${BASE}/api/auth/dev-signin?email=jordancaaruso@gmail.com`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/videos/analysis/jobs/${JOB}`, { waitUntil: "domcontentloaded" }); await page.waitForTimeout(3000);
+await page.locator('input[type="file"]').first().setInputFiles(VIDEO, { timeout: 15000 }); await page.waitForTimeout(2500);
+await page.locator("button:visible", { hasText: /^Lines$/ }).first().click(); await page.waitForTimeout(1500);
+await page.getByRole("button", { name: /^Edit lines$/ }).first().click(); await page.waitForTimeout(1200);
+const h = page.locator('button[aria-label="Move S1 endpoint 1"]').first(); const b = await h.boundingBox();
+await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down(); await page.mouse.move(b.x + 200, b.y + 120, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(600);
+const drawn = await overlay(); console.log("drawn (unsaved):", drawn.join(" | "));
+await page.reload({ waitUntil: "domcontentloaded" }); await page.waitForTimeout(3500);
+await page.locator('input[type="file"]').first().setInputFiles(VIDEO, { timeout: 15000 }); await page.waitForTimeout(3000);
+const back = await overlay(); console.log("after reload:", back.join(" | "));
+console.log(drawn.join("|") === back.join("|") ? "RESTORED ✓" : "NOT restored ✗");
+const msg = await page.locator("text=/Restored the lines/").first().innerText().catch(() => "(no message)"); console.log("message:", msg.slice(0, 120));
+await page.screenshot({ path: `${OUT}/repro-lines3.png`, fullPage: true });
+await page.getByRole("button", { name: /^Cancel$/ }).first().click().catch(() => {}); await page.waitForTimeout(400);
+await browser.close();

@@ -13,12 +13,15 @@ import { getSetupSheetTemplateForCar } from "@/lib/setupSheetModels/getTemplateF
 import { chassisFillsAsSheet } from "@/lib/setupSheetModels/sheetPlan";
 import { pickSheetBlankForData } from "@/lib/setupSheetModels/sheetBlankResolve";
 import { ReadOnlySetupSheet } from "@/components/setup/ReadOnlySetupSheet";
-import { ReadOnlySheetSurface } from "@/components/setup/ReadOnlySheetSurface";
+import { SetupSheetCompareView } from "@/components/setup/SetupSheetCompareView";
 import { KeepSetupButton } from "@/components/setup/KeepSetupButton";
 import { ShareSetupButton } from "@/components/share/ShareSetupButton";
 import { CardPanel } from "@/components/ui/CardPanel";
-import { ButtonLink, outlineButtonClassName } from "@/components/ui/ButtonLink";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { ActionChip } from "@/components/ui/ActionChip";
 import { PageBackLink } from "@/components/ui/PageBackLink";
+import { IconEngineer } from "@/components/icons/JRCIcons";
+import { Paperclip, Pencil, Timer } from "lucide-react";
 
 /**
  * Read a setup — a baseline, a run's, or one an uploaded sheet created — without opening an editor.
@@ -78,6 +81,7 @@ export default async function CarSetupViewPage(props: {
       isLibrary: true,
       createdAt: true,
       setupDeltaJson: true,
+      sheetBlankId: true,
       // The run is read for its NAME only: a run's snapshot has none of its own, so "Edited from"
       // had nothing to print and said "another setup" for every copy taken off a session.
       baseSetupSnapshot: {
@@ -133,10 +137,12 @@ export default async function CarSetupViewPage(props: {
    * 2026-08-11): the driver's own paper with their values in its boxes. The field list stays for
    * every other chassis, and for the session view's what-changed list, which this page is not.
    */
-  // Which of the chassis's sheets these values are written on: a setup imported through a rebuilt
-  // EDITION speaks that edition's keys, and drawing it on the primary blank shows empty boxes.
+  // Which of the chassis's sheets to draw: the paper this setup was born on (its stamp), else the
+  // one whose boxes speak its keys. See `pickSheetBlankForData`.
   const blank = car.setupSheetModelId
-    ? await pickSheetBlankForData(car.setupSheetModelId, normalizeSetupData(setup.data))
+    ? await pickSheetBlankForData(car.setupSheetModelId, normalizeSetupData(setup.data), {
+        sheetBlankId: setup.sheetBlankId,
+      })
     : null;
   const sheetMode = chassisFillsAsSheet(blank);
   const editionBlankId = blank?.isEdition ? blank.id : null;
@@ -195,6 +201,81 @@ export default async function CarSetupViewPage(props: {
     .filter(Boolean)
     .join(" · ");
 
+  /*
+   * ONE row, and every door in it — no "⋯" on this page any more.
+   *
+   * Founder call 2026-09-01, at his desk: downloading his own sheet took four taps (⋯ → View as
+   * PDF → Download → a share dialog), the Engineer was hidden behind the same "⋯", and "on desktop
+   * all the chips can be shown — there's more than enough room". So the row holds everything, and
+   * Share IS the download: on a sheet chassis it hands over the filled PDF rather than a picture.
+   *
+   * EVERY chip keeps its word at every width. Hiding them below `md` was tried the same afternoon
+   * and pulled: "don't try to make them just icons, just keep the words on all the buttons all the
+   * time". The row wraps on a phone, and that is the accepted cost.
+   *
+   * "View as PDF" is gone as a separate door, and that ends the "what's the difference between
+   * Original PDF and View PDF?" question it created: the app-drawn sheet is already ON this page,
+   * so a second way to look at it earned nothing. What remains is the ONE thing this page can't
+   * show — the file the driver uploaded, under a name that says so.
+   *
+   * Edit says one word, always: the run count used to spell "Correct this run" / "Edit a copy"
+   * onto this button, which asked the driver to understand the storage model before they could
+   * press anything. `?run=` rides along only when they got here from a session.
+   */
+  const leadingActions = (
+    <>
+      <ActionChip
+        href={`/cars/${car.id}/setups/${setup.id}/edit${
+          requestedRunId ? `?run=${encodeURIComponent(requestedRunId)}` : ""
+        }`}
+        label="Edit"
+        // The one yellow chip in the row: this page's #1 action, and the only one that changes
+        // anything. Everything beside it is a door.
+        variant="primary"
+        icon={<Pencil className="size-3.5" strokeWidth={2} aria-hidden />}
+      />
+      <KeepSetupButton setupId={setup.id} name={title} initialSaved={setup.isLibrary} />
+      <ShareSetupButton setupSnapshotId={setup.id} label={title} asPdf={sheetMode} />
+    </>
+  );
+  /*
+    The uploaded file opens through `/pdf-view` — the in-app frame with a header and a way back. It
+    was a raw `target="_blank"` API link, which a desktop browser shows as a closable tab but the
+    installed PWA and the iOS shell show as a bare PDF with no chrome and no back (founder report,
+    2026-09-01).
+  */
+  const backHere = `/cars/${car.id}/setups/${setup.id}`;
+  const trailingActions = (
+    <>
+      {/* Out of the "⋯" by founder call. The pin works for ANY setup, so it no longer waits for a
+          setup to be marked as a baseline before the driver can ask about it. */}
+      <ActionChip
+        href={`/engineer?pin=setup:${setup.id}`}
+        label="Engineer"
+        icon={<IconEngineer size={14} aria-hidden />}
+      />
+      {run ? (
+        <ActionChip
+          href={`/runs/${run.id}`}
+          label="View run"
+          icon={<Timer className="size-3.5" strokeWidth={2} aria-hidden />}
+        />
+      ) : null}
+      {/*
+        The file the driver uploaded, as they uploaded it. This used to point at
+        `/setup-documents/[id]` — the import-review workbench — so tapping it on a perfectly good
+        setup landed on "Review setup: check the imported values look right".
+      */}
+      {document ? (
+        <ActionChip
+          href={`/pdf-view?document=${encodeURIComponent(document.id)}&back=${encodeURIComponent(backHere)}`}
+          label="View original file"
+          icon={<Paperclip className="size-3.5" strokeWidth={2} aria-hidden />}
+        />
+      ) : null}
+    </>
+  );
+
   return (
     <>
       <header className="page-header">
@@ -208,63 +289,17 @@ export default async function CarSetupViewPage(props: {
       </header>
 
       <section className="page-body max-w-4xl">
-        <div className="flex flex-wrap items-center gap-2">
-          {/*
-            Every setup of yours opens an editor — an uploaded sheet is not history just because it
-            arrived as a PDF, and a run's setup is not off limits just because it was raced. One
-            word, always: the run count used to spell "Correct this run" / "Edit a copy" onto this
-            button, which asked the driver to understand the storage model before they could press
-            anything. `?run=` rides along only when they got here from a session.
-          */}
-          <ButtonLink
-            href={`/cars/${car.id}/setups/${setup.id}/edit${
-              requestedRunId ? `?run=${encodeURIComponent(requestedRunId)}` : ""
-            }`}
-          >
-            Edit
-          </ButtonLink>
-          <KeepSetupButton setupId={setup.id} name={title} initialSaved={setup.isLibrary} />
-          {setup.isLibrary ? (
-            <ButtonLink href={`/engineer?pin=setup:${setup.id}`} variant="outline">
-              Ask the Engineer
-            </ButtonLink>
-          ) : null}
-          <a
-            href={`/api/setup-snapshots/${encodeURIComponent(setup.id)}/setup-pdf`}
-            target="_blank"
-            rel="noreferrer"
-            className={outlineButtonClassName()}
-          >
-            View as PDF
-          </a>
-          {/* Beside the PDF on purpose: same artifact, one for filing and one for sending. */}
-          <ShareSetupButton setupSnapshotId={setup.id} label={title} />
-          {run ? (
-            <ButtonLink href={`/runs/${run.id}`} variant="outline">
-              Open run
-            </ButtonLink>
-          ) : null}
-          {/*
-            The file the driver uploaded, as they uploaded it. This used to point at
-            `/setup-documents/[id]` — the import-review workbench — so tapping "Open the sheet" on a
-            perfectly good setup landed on "Review setup: check the imported values look right".
-          */}
-          {document ? (
-            <a
-              href={`/api/setup-documents/${encodeURIComponent(document.id)}/file`}
-              target="_blank"
-              rel="noreferrer"
-              className={outlineButtonClassName()}
-            >
-              Original PDF
-            </a>
-          ) : null}
-          {document && documentNeedsReview ? (
+        {/*
+          The one un-quiet door, kept OUT of the "⋯" sheet: the import never finished, and this
+          page owes the driver that answer before anything else on it can be trusted.
+        */}
+        {document && documentNeedsReview ? (
+          <div className="flex flex-wrap items-center gap-1.5">
             <ButtonLink href={`/setup-documents/${document.id}`} variant="outline">
               Finish importing this sheet
             </ButtonLink>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
         {/*
           Where these numbers came from, in the body rather than the header.
@@ -284,20 +319,44 @@ export default async function CarSetupViewPage(props: {
         ) : null}
 
         {sheetMode && car.setupSheetModelId ? (
-          <ReadOnlySheetSurface
+          /*
+            The same paper as before, with the compare the session view has always had — a setup
+            read from the garage could not be held against another one, only a setup read from its
+            run could. `SetupSheetCompareView` wraps the read-only surface rather than replacing
+            it, so nothing about reading a setup changed.
+          */
+          <SetupSheetCompareView
             setupSheetModelId={car.setupSheetModelId}
             editionBlankId={editionBlankId}
             values={normalizeSetupData(setup.data)}
+            label={title}
             templateKey={template.templateKey}
             labLabels={{ s: title }}
             labSource={{ kind: "setup", id: setup.id }}
+            /*
+              Never offer this setup as its own comparison. A kept run's snapshot is in two pools at
+              once — among your runs under its RUN id, and in your library under its own.
+            */
+            excludeEntryIds={[
+              ...(setup.isLibrary ? [`saved-${setup.id}`] : []),
+              ...(run ? [`run-${run.id}`] : []),
+            ]}
+            leadingActions={leadingActions}
+            trailingActions={trailingActions}
           />
         ) : (
-          <ReadOnlySetupSheet
-            value={normalizeSetupData(setup.data)}
-            template={template}
-            changedKeys={changedKeys}
-          />
+          <>
+            {/* No sheet to flip on this chassis, so the same row minus Compare. */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {leadingActions}
+              {trailingActions}
+            </div>
+            <ReadOnlySetupSheet
+              value={normalizeSetupData(setup.data)}
+              template={template}
+              changedKeys={changedKeys}
+            />
+          </>
         )}
       </section>
     </>

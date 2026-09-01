@@ -135,7 +135,7 @@ export function TrackTimingSourceNotice({
           type="button"
           disabled={saving}
           className={cn(
-            "shrink-0 rounded-md primary-face bg-primary px-2.5 py-1.5 text-[11px] font-bold text-primary-foreground transition hover:brightness-95",
+            "shrink-0 rounded-md primary-face bg-primary px-2.5 py-1.5 text-[11px] font-semibold text-primary-foreground transition hover:brightness-95",
             saving && "opacity-60 pointer-events-none"
           )}
           onClick={() => void save()}

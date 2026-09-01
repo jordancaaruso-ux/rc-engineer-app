@@ -12,6 +12,7 @@ import {
   dominantTrackByNameWhere,
 } from "@/lib/tracks/trackCatalogDominance";
 import { notifyAdminsOfUnverifiedAsset } from "@/lib/assets/notifyAdminReview";
+import { parseCoordinates } from "@/lib/location/coordinates";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -106,6 +107,9 @@ export async function POST(request: Request) {
       location?: string | null;
       liveRcUrl?: string | null;
       speedhiveUrl?: string | null;
+      latitude?: unknown;
+      longitude?: unknown;
+      locationSource?: string | null;
       addToFavourites?: boolean;
     };
     const name = body.name?.trim();
@@ -130,6 +134,23 @@ export async function POST(request: Request) {
       const v = validateSpeedhiveTrackUrl(body.speedhiveUrl);
       if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
       speedhiveUrl = v.normalized;
+    }
+
+    /**
+     * The pin, if whoever is adding the track knows it — they usually do, because they are
+     * standing at the venue. Same vocabulary as the PATCH route, so a track created with
+     * coordinates is indistinguishable from one marked afterwards.
+     */
+    let coordinates: { latitude: number; longitude: number; locationSource: string } | null = null;
+    if (body.latitude != null || body.longitude != null) {
+      const parsed = parseCoordinates(body.latitude, body.longitude);
+      if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+      const src = typeof body.locationSource === "string" ? body.locationSource.trim() : "";
+      coordinates = {
+        latitude: parsed.latitude,
+        longitude: parsed.longitude,
+        locationSource: src === "manual_paste" || src === "device" ? src : "manual_paste",
+      };
     }
 
     const existing = await prisma.track.findFirst({
@@ -165,6 +186,14 @@ export async function POST(request: Request) {
         location: body.location?.trim() || null,
         liveRcUrl,
         speedhiveUrl,
+        ...(coordinates
+          ? {
+              latitude: coordinates.latitude,
+              longitude: coordinates.longitude,
+              locationSource: coordinates.locationSource,
+              locationMarkedAt: new Date(),
+            }
+          : {}),
       },
       select: {
         id: true,

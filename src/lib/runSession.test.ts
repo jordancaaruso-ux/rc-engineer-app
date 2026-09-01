@@ -8,7 +8,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { formatRunSessionDisplay, runSessionName } from "@/lib/runSession";
+import { formatRunSessionDisplay, resolveDayRunNames, runSessionName } from "@/lib/runSession";
 import { shortRunLabel } from "@/lib/analysis/analysisHomeModel";
 
 const meeting = (
@@ -68,6 +68,70 @@ test("runSessionName: a missing sessionType takes the testing branch", () => {
   // WorkbenchRunSource declares it optional so partial rows can pass straight in.
   assert.equal(runSessionName({ sessionLabel: "Shakedown" }), "Shakedown");
   assert.equal(runSessionName({}, { dayRunNumber: 2 }), "Run 2");
+});
+
+test("an imported label that already opens with the type word does not stutter", () => {
+  // A timing provider's session name lands in `sessionLabel` verbatim, and it usually
+  // starts with the type word: "Practice · Practice 3" is what the naive join produced.
+  assert.equal(formatRunSessionDisplay(meeting("PRACTICE", null, "Practice 3")), "Practice 3");
+  assert.equal(runSessionName(meeting("PRACTICE", null, "Practice 3")), "Practice 3");
+  // The label wins outright — it carries the number the type part does not.
+  assert.equal(runSessionName(meeting("QUALIFYING", "Q1", "Qualifier 3")), "Qualifying 1 · Qualifier 3");
+  // Word boundary, not a bare prefix: "Practices" is a different word.
+  assert.equal(formatRunSessionDisplay(meeting("PRACTICE", null, "Practices")), "Practice · Practices");
+  // A label that says something else still rides after the name.
+  assert.equal(formatRunSessionDisplay(meeting("PRACTICE", null, "Wet")), "Practice · Wet");
+});
+
+test("resolveDayRunNames: a name the day repeats becomes the run's position", () => {
+  // The reported bug (2026-08-25): nothing stores a practice NUMBER, so a day of five
+  // practice sessions named all five of them "Practice".
+  const day = resolveDayRunNames([
+    { name: "Practice", dayRunNumber: 1 },
+    { name: "Practice", dayRunNumber: 2 },
+    { name: "Practice", dayRunNumber: 3 },
+  ]);
+  assert.deepEqual(day.map((d) => d.label), ["Run 1", "Run 2", "Run 3"]);
+  assert.deepEqual(day.map((d) => d.position), [1, 2, 3]);
+});
+
+test("resolveDayRunNames: unique names are left completely alone", () => {
+  const day = resolveDayRunNames([
+    { name: "Practice", dayRunNumber: 1 },
+    { name: "Qualifying", dayRunNumber: 2 },
+    { name: "A Main", dayRunNumber: 3 },
+  ]);
+  assert.deepEqual(day.map((d) => d.label), ["Practice", "Qualifying", "A Main"]);
+  // No position, so a sentence built from these keeps its "Best run was …" shape.
+  assert.deepEqual(day.map((d) => d.position), [null, null, null]);
+});
+
+test("resolveDayRunNames: only the repeated names move, not the whole day", () => {
+  const day = resolveDayRunNames([
+    { name: "Practice", dayRunNumber: 1 },
+    { name: "Practice", dayRunNumber: 2 },
+    { name: "A Main", dayRunNumber: 3 },
+  ]);
+  assert.deepEqual(day.map((d) => d.label), ["Run 1", "Run 2", "A Main"]);
+});
+
+test("resolveDayRunNames: a run ALREADY named by position reports itself as positional", () => {
+  // Unlabeled testing runs arrive as "Run 2" from the formatter's own fallback. They are
+  // unique, so nothing is rewritten — but the card must still say "run 2 of 3", not
+  // "Best run was Run 2".
+  const day = resolveDayRunNames([
+    { name: "Run 1", dayRunNumber: 1 },
+    { name: "Tyre test", dayRunNumber: 2 },
+  ]);
+  assert.deepEqual(day.map((d) => d.position), [1, null]);
+});
+
+test("resolveDayRunNames: the match ignores case and surrounding space", () => {
+  const day = resolveDayRunNames([
+    { name: "practice", dayRunNumber: 1 },
+    { name: " Practice ", dayRunNumber: 2 },
+  ]);
+  assert.deepEqual(day.map((d) => d.label), ["Run 1", "Run 2"]);
 });
 
 test("the x-axis label did NOT move — it is still the raw code", () => {

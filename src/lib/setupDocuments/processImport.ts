@@ -6,7 +6,7 @@ import { loadSetupDocumentFileFromStorage, sourceTypeFromMime } from "@/lib/setu
 import { normalizeParsedSetupData } from "@/lib/setupDocuments/normalize";
 import { getEffectiveCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
 import { extractPdfRawDataFromFile, mapExtractedPdfWithCalibration } from "@/lib/setupCalibrations/pdfExtractPipeline";
-import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
+import { derivedMappingsForImport } from "@/lib/setupDocuments/importDerivedMappings";
 import {
   extractImageRawDataFromFile,
   mapExtractedImageWithCalibration,
@@ -382,40 +382,18 @@ export async function processSetupDocumentImport(input: { docId: string; userId:
       if (!calRow) throw new Error(`Calibration not found: ${effectiveCalibration.calibrationId}`);
 
       /*
-       * An EDITION's calibration maps every box of ITS file already, and the union mappings below
-       * belong to the PRIMARY blank — they name the ORIGINAL sheet's fields, which this rebuilt
-       * file does not have (and any accidental name it does have would read a wrong box). An
-       * edition is recognised by its blank: the same uploaded document is both the calibration's
-       * example and the edition blank's source. See `createSheetEditionForModel`.
-       */
-      const isEditionCalibration = calRow.exampleDocumentId
-        ? Boolean(
-            await prisma.setupSheetBlank.findFirst({
-              where: { setupDocumentId: calRow.exampleDocumentId, isEdition: true },
-              select: { id: true },
-            })
-          )
-        : false;
-
-      /*
        * The printed boxes the calibration does not name.
        *
        * Without these the import keeps only what a human named — on a curated chassis that is a
        * fraction of the sheet, and everything else the driver filled in is read and dropped. The
-       * mappings live on the chassis's blank rather than in the calibration because they must be
-       * read raw; see `unionDerivedWithCalibration.ts`. A chassis nobody has unioned yet simply has
-       * none, and the import behaves exactly as it did before.
+       * mappings live on a blank rather than in the calibration because they must be read raw;
+       * see `unionDerivedWithCalibration.ts`. Which blank answers — the primary's union mappings,
+       * or an edition's own — is `derivedMappingsForImport`'s call.
        */
-      const derivedMappings =
-        doc.setupSheetModelId && !isEditionCalibration
-          ? (((
-              await prisma.setupSheetBlank.findFirst({
-                where: { setupSheetModelId: doc.setupSheetModelId, isEdition: false },
-                orderBy: { createdAt: "asc" },
-                select: { derivedMappingsJson: true },
-              })
-            )?.derivedMappingsJson ?? {}) as Record<string, PdfFormFieldMappingRule>)
-          : {};
+      const derivedMappings = await derivedMappingsForImport({
+        setupSheetModelId: doc.setupSheetModelId,
+        calibrationExampleDocumentId: calRow.exampleDocumentId,
+      });
 
       // Extract once, then map calibrations against the extracted dataset (no PDF re-read during mapping).
       const tExtract = procDbg() ? performance.now() : 0;

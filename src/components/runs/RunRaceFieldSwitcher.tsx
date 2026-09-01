@@ -12,15 +12,21 @@ import {
 } from "react";
 import { cn } from "@/lib/utils";
 import { chipToggleClass } from "@/components/ui/chipToggle";
-import { formatLap, formatStintTime } from "@/lib/runLaps";
+import { formatFiveMinuteStint, formatLap, formatStintTime } from "@/lib/runLaps";
 import {
   computeFieldSheet,
   computeMistakeLaps,
+  fadeOverRunSeconds,
   formatConsistencyScorePercent,
+  formatFadePerLap,
   formatMistakeLapDetail,
+  getFadePerLap,
+  getFadeProfile,
   getIncludedLapDashboardMetrics,
   getIncludedLaps,
   lapRowsFromTimesAndFlags,
+  type FieldSheet,
+  type IncludedLapDashboardMetrics,
 } from "@/lib/lapAnalysis";
 import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
 import { LapTimeGraph, type LapGraphRow } from "@/components/runs/LapTimeGraph";
@@ -45,6 +51,43 @@ type RaceFieldDriver = {
   position: number;
   isUser: boolean;
   laps: number[];
+};
+
+/** One driver's recomputed numbers, handed to the host so it can draw them its own way. */
+export type RaceFieldDriverFigures = {
+  rows: LapGraphRow[];
+  dash: IncludedLapDashboardMetrics;
+  /**
+   * Seconds per lap the run drifted, and that spread over the run for the hover. Both `null`
+   * under `MIN_LAPS_FOR_FADE`; the field's mean has no honest "over the run" total, since its
+   * drivers ran different lap counts.
+   */
+  fade: { perLap: number | null; overRunSeconds: number | null };
+  bestLapNumbers: Set<number>;
+  mistakeLapNumbers: Set<number>;
+  mistakeDetailByLapNumber: Map<number, string>;
+  /** Set on the whole-field row, where the labels alone don't say these are averages. */
+  statsTitle?: string;
+};
+
+/**
+ * How the host draws a *competitor's* tab.
+ *
+ * The switcher already takes your own figures, lap card and trace as finished
+ * nodes; without this it drew everyone else with its own built-in instrument
+ * panel, so tapping from YOU to a rival changed the design language mid-compare.
+ * A host that passes `driverChrome` draws every driver — you and the field — with
+ * one set of builders, and the two can no longer drift apart.
+ *
+ * Left optional because the older run page (`RunDetailPanel`) still wears the stat
+ * wells for your own laps; there, matching means keeping the built-in fallback.
+ * When that page goes, so does the fallback.
+ */
+export type RaceFieldDriverChrome = {
+  stats: (figures: RaceFieldDriverFigures) => ReactNode;
+  lapCard: (figures: RaceFieldDriverFigures) => ReactNode;
+  /** Wraps the trace (and its legend) in whatever card the host's own graph sits in. */
+  frameGraph?: (node: ReactNode) => ReactNode;
 };
 
 /** Movement (px) before a drag is claimed as a horizontal driver swipe. */
@@ -88,6 +131,35 @@ function driverTabCode(driver: RaceFieldDriver): string {
   return driverSurname(driver.name).slice(0, 3).toUpperCase() || "—";
 }
 
+/**
+ * The whole field's averages in the shape a host's driver blocks read, so the FIELD
+ * tab wears the same figures as every driver tab. There are no laps, no best-lap
+ * marks and no mistake laps to flag — an average has no lap 7 — so those come back
+ * empty and the host draws only the numbers.
+ */
+function fieldAverageFigures(sheet: FieldSheet): RaceFieldDriverFigures {
+  const avg = sheet.averages;
+  return {
+    rows: [],
+    dash: {
+      lapCount: avg.lapCount ?? 0,
+      stintSeconds: avg.stintSeconds,
+      // No averaged stint: a laps/time pair has no mean a driver could read.
+      fiveMinStint: null,
+      bestLap: avg.bestLap,
+      avgTop5: avg.avgTop5,
+      avgTop10: avg.avgTop10,
+      median: avg.median,
+      consistencyScore: avg.consistencyScore,
+    },
+    fade: { perLap: avg.fadePerLap, overRunSeconds: null },
+    bestLapNumbers: new Set(),
+    mistakeLapNumbers: new Set(),
+    mistakeDetailByLapNumber: new Map(),
+    statsTitle: `Field average across ${avg.driverCount} ranked car${avg.driverCount === 1 ? "" : "s"}`,
+  };
+}
+
 export function RunRaceFieldSwitcher({
   runId,
   userView,
@@ -95,6 +167,7 @@ export function RunRaceFieldSwitcher({
   userLapCard,
   userGraph,
   userLapRows,
+  driverChrome,
   enabled = true,
 }: {
   runId: string;
@@ -108,11 +181,22 @@ export function RunRaceFieldSwitcher({
   userGraph: ReactNode;
   /** Your run's laps — the dashed baseline under other drivers' traces. */
   userLapRows: LapGraphRow[];
+  /** Draw a competitor's tab with the host's own blocks, so it matches the YOU tab. */
+  driverChrome?: RaceFieldDriverChrome;
   /** Skip the field fetch entirely (e.g. manually-typed runs with no import). */
   enabled?: boolean;
 }) {
   const [drivers, setDrivers] = useState<RaceFieldDriver[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Graph mode: overlaid lap traces vs the running gap chart (design locked
+  // 2026-07-19 — bars + sign-coloured cumulative line, raw gap math).
+  //
+  // It lives up here, not in the driver panel below, because each driver gets a
+  // freshly-keyed panel: held one level down, a choice of Gap died the moment you
+  // tapped another name and every driver reopened on Laps. Only an explicit tap
+  // on Laps goes back now. Passing through YOU or FIELD — neither of which has a
+  // gap to draw — leaves the choice standing for the next rival.
+  const [graphMode, setGraphMode] = useState<"laps" | "gap">("laps");
   const tabsRef = useRef<HTMLDivElement | null>(null);
   const gestureRef = useRef<{
     pointerId: number;
@@ -345,12 +429,19 @@ export function RunRaceFieldSwitcher({
       {isFieldTab && fieldSheet ? (
         <>
           {/*
-            The wells stay put on the FIELD tab carrying the field's averages, the
+            The figures stay put on the FIELD tab carrying the field's averages, the
             same way they carry a competitor's figures on their tab — so the labels
             always describe whatever the tab is showing, and switching tabs never
             pulls the strip and sheet up the page.
+
+            Same four figures as every other tab, in the same order, so YOU → KAL →
+            FIELD reads straight down one column of numbers. The field's average best
+            lap isn't among them and doesn't need to be: the sheet below lists every
+            driver's best, which is the stronger number.
           */}
-          <FieldAverageWells sheet={fieldSheet} />
+          {driverChrome
+            ? driverChrome.stats(fieldAverageFigures(fieldSheet))
+            : <FieldAverageWells sheet={fieldSheet} />}
           <div className="min-w-0">
             {tabsNode}
             <RunFieldSheet sheet={fieldSheet} onSelectDriver={setSelectedId} />
@@ -371,6 +462,9 @@ export function RunRaceFieldSwitcher({
           driver={selected}
           userLapRows={userLapRows}
           tabs={tabsNode}
+          chrome={driverChrome}
+          graphMode={graphMode}
+          onGraphModeChange={setGraphMode}
         />
       )}
     </div>
@@ -382,15 +476,20 @@ function RaceFieldDriverPanel({
   driver,
   userLapRows,
   tabs,
+  chrome,
+  graphMode,
+  onGraphModeChange,
 }: {
   driver: RaceFieldDriver;
   userLapRows: LapGraphRow[];
   /** The shared notebook-tab strip, dropped in above this driver's lap card. */
   tabs: ReactNode;
+  /** The host's own blocks. Absent → the built-in stat wells (see the type's note). */
+  chrome?: RaceFieldDriverChrome;
+  /** Laps vs Gap, owned by the switcher so it outlives a change of driver. */
+  graphMode: "laps" | "gap";
+  onGraphModeChange: (mode: "laps" | "gap") => void;
 }) {
-  // Graph mode: overlaid lap traces vs the running gap chart (design locked
-  // 2026-07-19 — bars + sign-coloured cumulative line, raw gap math).
-  const [graphMode, setGraphMode] = useState<"laps" | "gap">("laps");
   // Clean the raw timing-provider laps with the SAME median-band rule the app
   // applies to the user's own imported runs, so a competitor's grid/stats/graph
   // aren't polluted by start-line / transponder artifacts (e.g. an impossible
@@ -401,6 +500,11 @@ function RaceFieldDriverPanel({
   );
   const dash = useMemo(() => getIncludedLapDashboardMetrics(rows), [rows]);
   const mistakes = useMemo(() => computeMistakeLaps(rows), [rows]);
+  const fade = useMemo(
+    () => ({ perLap: getFadePerLap(rows), overRunSeconds: fadeOverRunSeconds(rows) }),
+    [rows]
+  );
+  const fadeProfile = useMemo(() => getFadeProfile(rows), [rows]);
   const mistakeLapNumbers = useMemo(
     () => new Set(mistakes.mistakes.map((m) => m.lapNumber)),
     [mistakes.mistakes]
@@ -422,6 +526,10 @@ function RaceFieldDriverPanel({
   const chips: Array<{ label: string; value: string }> = [
     { label: "Laps", value: String(dash.lapCount) },
     { label: "Stint", value: dash.stintSeconds != null ? formatStintTime(dash.stintSeconds) : "—" },
+    {
+      label: "5-min",
+      value: dash.fiveMinStint != null ? formatFiveMinuteStint(dash.fiveMinStint) : "—",
+    },
     { label: "Best lap", value: formatLap(dash.bestLap) },
     { label: "Avg top 5", value: formatLap(dash.avgTop5) },
     { label: "Avg top 10", value: formatLap(dash.avgTop10) },
@@ -432,19 +540,38 @@ function RaceFieldDriverPanel({
         dash.consistencyScore != null ? formatConsistencyScorePercent(dash.consistencyScore) : "—",
     },
     { label: "Mistakes", value: mistakes.eligible ? String(mistakes.mistakeCount) : "—" },
+    { label: "Fade", value: formatFadePerLap(fade.perLap) },
   ];
+
+  /** This driver's numbers in the shape a host's own blocks read. */
+  const figures: RaceFieldDriverFigures = {
+    rows,
+    dash,
+    fade,
+    bestLapNumbers,
+    mistakeLapNumbers,
+    mistakeDetailByLapNumber,
+  };
+  /** Identity, not a spacer: without a frame the trace stands on the page as it always did. */
+  const frameGraph = chrome?.frameGraph ?? ((node: ReactNode) => node);
 
   return (
     <div className="space-y-3">
-      <StatWellGrid>
-        {chips.map((chip) => (
-          <StatWellCell key={chip.label} label={chip.label} value={chip.value} alignValue />
-        ))}
-      </StatWellGrid>
+      {chrome ? (
+        chrome.stats(figures)
+      ) : (
+        <StatWellGrid>
+          {chips.map((chip) => (
+            <StatWellCell key={chip.label} label={chip.label} value={chip.value} alignValue />
+          ))}
+        </StatWellGrid>
+      )}
 
       <div className="min-w-0">
         {tabs}
-        {rows.length > 0 ? (
+        {chrome ? (
+          chrome.lapCard(figures)
+        ) : rows.length > 0 ? (
           <div
             className={cn(
               "flex flex-wrap gap-x-3 gap-y-1.5 rounded-lg border border-border bg-background/40 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
@@ -513,7 +640,7 @@ function RaceFieldDriverPanel({
                   aria-selected={graphMode === mode}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setGraphMode(mode);
+                    onGraphModeChange(mode);
                   }}
                   className={cn(chipToggleClass(graphMode === mode), "px-2.5 py-1 text-[11px]")}
                 >
@@ -522,54 +649,57 @@ function RaceFieldDriverPanel({
               ))}
             </div>
           ) : null}
-          {graphMode === "gap" && userLapRows.length >= 2 ? (
-            <>
-              <LapGapGraph userRows={userLapRows} competitorRows={rows} />
-              <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] leading-snug text-muted-foreground">
-                <span className="inline-flex items-center gap-1">
-                  <span className="inline-block h-0.5 w-3 rounded bg-gain" />
-                  you ahead
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="inline-block h-0.5 w-3 rounded bg-destructive" />
-                  behind {driver.name}
-                </span>
-                <span>bars = each lap&apos;s gain/loss</span>
-              </p>
-            </>
-          ) : (
-            <>
-              <LapTimeGraph
-                rows={rows}
-                bestLapNumbers={bestLapNumbers}
-                mistakeLapNumbers={mistakeLapNumbers}
-                mistakeDetailByLapNumber={mistakeDetailByLapNumber}
-                medianSeconds={null}
-                lineColor={RACE_IDENTITY.competitor}
-                baseline={userLapRows.length >= 2 ? userLapRows : null}
-                baselineColor={RACE_IDENTITY.you}
-                baselineLabel="Your run"
-              />
-              {userLapRows.length >= 2 ? (
-                <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] leading-snug text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <span
-                      className="inline-block h-0.5 w-3 rounded"
-                      style={{ backgroundColor: RACE_IDENTITY.competitor }}
-                    />
-                    {driver.name}
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <span
-                      className="inline-block h-0.5 w-3 rounded"
-                      style={{ backgroundColor: RACE_IDENTITY.you }}
-                    />
-                    your run
-                  </span>
-                </p>
-              ) : null}
-            </>
-          )}
+          {graphMode === "gap" && userLapRows.length >= 2
+            ? frameGraph(
+                <>
+                  <LapGapGraph userRows={userLapRows} competitorRows={rows} />
+                  <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] leading-snug text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="inline-block h-0.5 w-3 rounded bg-gain" />
+                      you ahead
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="inline-block h-0.5 w-3 rounded bg-destructive" />
+                      behind {driver.name}
+                    </span>
+                    <span>bars = each lap&apos;s gain/loss</span>
+                  </p>
+                </>
+              )
+            : frameGraph(
+                <>
+                  <LapTimeGraph
+                    rows={rows}
+                    bestLapNumbers={bestLapNumbers}
+                    mistakeLapNumbers={mistakeLapNumbers}
+                    mistakeDetailByLapNumber={mistakeDetailByLapNumber}
+                    medianSeconds={null}
+                    lineColor={RACE_IDENTITY.competitor}
+                    baseline={userLapRows.length >= 2 ? userLapRows : null}
+                    baselineColor={RACE_IDENTITY.you}
+                    baselineLabel="Your run"
+                    fadeProfile={fadeProfile}
+                  />
+                  {userLapRows.length >= 2 ? (
+                    <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] leading-snug text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <span
+                          className="inline-block h-0.5 w-3 rounded"
+                          style={{ backgroundColor: RACE_IDENTITY.competitor }}
+                        />
+                        {driver.name}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <span
+                          className="inline-block h-0.5 w-3 rounded"
+                          style={{ backgroundColor: RACE_IDENTITY.you }}
+                        />
+                        your run
+                      </span>
+                    </p>
+                  ) : null}
+                </>
+              )}
         </div>
       ) : null}
     </div>

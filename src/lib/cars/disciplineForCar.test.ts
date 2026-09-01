@@ -22,6 +22,45 @@ test("legacy setupSheetTemplate cars resolve without a model row", () => {
   );
 });
 
+test("a chassis derived from a driver's PDF answers with what they chose", () => {
+  // The whole point of the column (2026-08-26). The slug is a fingerprint, so the catalog map
+  // cannot place it and this used to be null forever.
+  assert.equal(
+    disciplineForCar({ setupSheetModel: { slug: "sheet_a1b2c3d4e5f60718", discipline: "buggy-4wd" } }),
+    "buggy-4wd"
+  );
+  // Same trim rule as carClass: whitespace is not an answer.
+  assert.equal(
+    disciplineForCar({ setupSheetModel: { slug: "sheet_a1b2c3d4e5f60718", discipline: "   " } }),
+    null
+  );
+  // Rows that predate the column keep answering null rather than guessing.
+  assert.equal(
+    disciplineForCar({ setupSheetModel: { slug: "sheet_a1b2c3d4e5f60718", discipline: null } }),
+    null
+  );
+});
+
+test("the curated catalog outranks the chassis's own discipline", () => {
+  // The founder reviewed this slug; a driver's answer on the same row must not override him.
+  assert.equal(
+    disciplineForCar({ setupSheetModel: { slug: "xray_x4", discipline: "crawler" } }),
+    "touring"
+  );
+});
+
+test("the chassis's discipline outranks the per-car override", () => {
+  // Order is catalog → chassis → car. The chassis answer is global and deliberate; carClass is
+  // the last-resort gap filler, so it must not win over a chassis that states its own.
+  assert.equal(
+    disciplineForCar({
+      setupSheetModel: { slug: "sheet_a1b2c3d4e5f60718", discipline: "short-course" },
+      carClass: "buggy-2wd",
+    }),
+    "short-course"
+  );
+});
+
 test("carClass is the override for a chassis the catalog can't place", () => {
   assert.equal(
     disciplineForCar({ setupSheetModel: { slug: "some_users_own_chassis" }, carClass: "buggy-8th" }),
@@ -60,9 +99,11 @@ test("unknown discipline pairs as SAME, so a peer run list never hides on a null
 });
 
 test("today's catalog cannot discriminate: every chassis in it is touring", () => {
-  // Standing note for whoever wires the next discipline filter — this one is inert on current
-  // data by construction, not by accident. It starts biting when a non-touring chassis lands in
-  // CHASSIS_PLATFORM_BY_SLUG, or when something can write carClass again.
+  // Standing note for whoever wires the next discipline filter. The MAP is still touring-only by
+  // construction — but as of 2026-08-26 the answer as a whole no longer is: every chassis created
+  // from a driver's PDF now carries its own discipline, and those are the rows the map never
+  // covered. So a filter built on `disciplineForCar` is live from the first non-touring chassis
+  // somebody uploads, not from the next time this table is edited.
   const slugs = ["awesomatix_a800rr", "mugen_mtc3", "xray_t4", "yokomo_bd12", "arc_r12"];
   for (const slug of slugs) {
     assert.equal(disciplineForCar({ setupSheetModel: { slug } }), "touring", slug);

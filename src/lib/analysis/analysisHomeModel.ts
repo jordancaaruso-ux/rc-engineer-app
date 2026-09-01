@@ -11,7 +11,7 @@ import {
   MISTAKE_IQR_MULTIPLIER,
   MISTAKE_MIN_ABSOLUTE_SEC,
 } from "@/lib/lapAnalysis";
-import { formatRunSessionDisplay } from "@/lib/runSession";
+import { formatRunSessionDisplay, resolveDayRunNames, runSessionName } from "@/lib/runSession";
 import { calendarYmdInTimeZone } from "@/lib/formatDate";
 import type { RunTireIndicator } from "@/lib/runs/tireSetChange";
 import { setupChangedRowsSincePrevious } from "@/lib/setupCompare/changedSincePrevious";
@@ -101,6 +101,14 @@ export type AnalysisTrendRun = {
    * one row between every run in the session and keep `shortLabel`.
    */
   sessionName: string;
+  /**
+   * Clock time the run was logged — "2:41 PM" — in the zone it was logged in
+   * (`resolveRunLocalTimeZone`), so a trip away reads on the track's clock rather
+   * than the reader's. Formatted server-side for the reason every other run time in
+   * the app is: the card is a client component and formatting there would hydrate
+   * against the browser's zone.
+   */
+  timeLabel: string | null;
   createdAtIso: string;
   metrics: AnalysisRunMetrics;
   /** Lap distribution for the spread view; null when too few included laps. */
@@ -109,6 +117,22 @@ export type AnalysisTrendRun = {
   tireIndicator: RunTireIndicator | null;
   /** Setup fields changed vs the previous run on this car; null when none / no baseline. */
   setupChange: RunSetupChangeIndicator | null;
+  /**
+   * The driver's own 1–10 verdict on the car for this run, and the air temperature it
+   * ran in — the two facts the readout strip prints beside the lap times (2026-08-26).
+   *
+   * They are on the run, not on the plot. Four grey lines plus a rating line is two
+   * scales in one frame, where the second one's height means nothing in seconds and can
+   * only ever be read for shape; the version of this that drew them was built, looked at
+   * and dropped in favour of the figures alone. What the strip gives instead is the pair
+   * on one glance — "18.55, and you called it a 5, and it was 27°" — which is the whole
+   * question this card gets asked on a hot afternoon.
+   *
+   * `carRating` is null outside 1–10 so a legacy 0 or a stray 11 can never colour a band;
+   * `airTempC` is the stored Celsius float, rounded where it is drawn, never here.
+   */
+  carRating: number | null;
+  airTempC: number | null;
 };
 
 export type AnalysisCarOption = { carId: string | null; carName: string };
@@ -305,15 +329,18 @@ export function windowAroundViewer<T extends { isViewer: boolean }>(
   return rows.slice(start, start + max);
 }
 
+/**
+ * The page's non-outing half.
+ *
+ * `trend` and `recentRuns` came off on 2026-08-25: the chart is now built from the
+ * SAME day the outing block lists (`loadAnalysisOuting`), and the recent-runs list
+ * is that block. See the loader for why the event-scoped trend went with them.
+ */
 export type AnalysisHomeModel = {
-  /** Null when the user has no runs at all. */
-  trend: AnalysisTrendModel | null;
-  recentRuns: AnalysisRecentRun[];
   /**
    * Every run the driver has logged — RUNS, not session groups (Sessions groups
-   * them by day / meeting, so the two numbers differ). The Recent-runs card's
-   * door to Sessions quotes it: "148 runs" is a reason to tap, "all sessions"
-   * on its own is an abstraction.
+   * them by day / meeting, so the two numbers differ). The Sessions door quotes it:
+   * "148 runs" is a reason to tap, "all sessions" on its own is an abstraction.
    */
   totalRunCount: number;
   /**
@@ -437,6 +464,60 @@ export function shortRunLabel(
   const label = run.sessionLabel?.trim();
   if (label && label.length <= 8) return label;
   return `R${chronologicalIndex + 1}`;
+}
+
+/** One run's place in its scope, and the name that place earned it. */
+export type ScopedRunName = {
+  /** What to print for this run. */
+  label: string;
+  /** Set only when `label` IS the position — the phone card turns it into "run 3 of 5". */
+  position: number | null;
+  /** 1-based position within the scope, counted per car. Also the axis tick's index + 1. */
+  runNumber: number;
+};
+
+/**
+ * Name every run in ONE scope (a day, an event) so that no two of them read the same.
+ *
+ * A run is named by its session TYPE and nothing stores a session number, so a day of
+ * five practice sessions named all five of them "Practice" — see `resolveDayRunNames`
+ * for why the repeat becomes a position rather than an invented "Practice 3".
+ *
+ * The number counts per CAR, matching the axis fallback, so swapping cars mid-day reads
+ * Run 1..n on both rather than one of them jumping. It counts EVERY run in the scope,
+ * including the ones with no laps: the chart drops those points but the rail still lists
+ * them, and two independent counts would have the same run reading "Run 3" in the rail and
+ * "Run 2" in the tooltip beside it. The axis then shows a gap where a run has no laps,
+ * which is the honest drawing — that run has nothing to plot.
+ *
+ * @param chronological runs oldest-first.
+ */
+export function nameScopedRuns<
+  T extends {
+    id: string;
+    carId?: string | null;
+    sessionType?: string | null;
+    meetingSessionType?: string | null;
+    meetingSessionCode?: string | null;
+    sessionLabel?: string | null;
+  },
+>(chronological: readonly T[]): Map<string, ScopedRunName> {
+  const perCarCount = new Map<string, number>();
+  const numbered = chronological.map((run) => {
+    const carKey = run.carId ?? "__none__";
+    const runNumber = (perCarCount.get(carKey) ?? 0) + 1;
+    perCarCount.set(carKey, runNumber);
+    return { id: run.id, runNumber, name: runSessionName(run, { dayRunNumber: runNumber }) };
+  });
+  const resolved = resolveDayRunNames(
+    numbered.map(({ name, runNumber }) => ({ name, dayRunNumber: runNumber }))
+  );
+  return new Map(
+    numbered.map(({ id, runNumber }, i) => [
+      id,
+      { label: resolved[i].label, position: resolved[i].position, runNumber },
+    ])
+  );
 }
 
 const SESSION_TYPE_FALLBACK_LABELS: Record<string, string> = {

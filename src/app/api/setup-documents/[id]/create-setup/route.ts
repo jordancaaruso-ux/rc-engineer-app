@@ -4,6 +4,7 @@ import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { normalizeSetupSnapshotForStorage, type SetupSnapshotData } from "@/lib/runSetup";
 import { isCarValidTargetForSetupDocument } from "@/lib/carSetupScope";
+import { editionBlankIdForCalibration } from "@/lib/setupSheetModels/sheetBlankForCalibration";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -18,7 +19,13 @@ export async function POST(request: Request, ctx: Ctx) {
 
   const doc = await prisma.setupDocument.findFirst({
     where: { id, userId: userId },
-    select: { id: true, createdSetupId: true, carId: true, setupSheetTemplate: true },
+    select: {
+      id: true,
+      createdSetupId: true,
+      carId: true,
+      setupSheetTemplate: true,
+      calibrationResolvedProfileId: true,
+    },
   });
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (doc.createdSetupId) {
@@ -48,6 +55,8 @@ export async function POST(request: Request, ctx: Ctx) {
       userId: userId,
       carId: resolvedCarId,
       data: normalizeSetupSnapshotForStorage(body.setupData ?? {}) as object,
+      // The paper this setup was born on — an edition's, when the read came through one.
+      sheetBlankId: await editionBlankIdForCalibration(doc.calibrationResolvedProfileId),
     },
     select: { id: true, createdAt: true },
   });

@@ -69,6 +69,9 @@ function collectDriverColumns(session: ManualVideoSessionV2): DriverColumn[] {
   const cols: DriverColumn[] = [];
   for (const ts of session.timingSessions) {
     for (const d of ts.drivers) {
+      // This surface only ever holds two drivers. Everyone else in the imported heat is "other",
+      // and has no column here.
+      if (d.role !== "me" && d.role !== "competitor") continue;
       cols.push({
         sessionId: ts.sessionId,
         role: d.role,

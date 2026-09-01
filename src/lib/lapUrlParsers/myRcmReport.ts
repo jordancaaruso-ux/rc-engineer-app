@@ -18,8 +18,14 @@
  *    plus one or more `table.run-lap-table` chunks holding the lap matrix.
  *
  * MyRCM's own machine-readable outputs are **broken** since the rebuild and must not be used:
- * `cType=XML` and `cType=JSON` return HTML with a lying Content-Type, `cType=CSV` returns HTML as
- * UTF-16 Excel, and `/rest/v1/report-pdf/...` returns a PNG. Reading the page is the only path.
+ * `cType=XML` and `cType=JSON` return HTML with a lying Content-Type, and `cType=CSV` returns HTML
+ * as UTF-16 Excel.
+ *
+ * `/rest/v1/report-pdf/...` is the exception, and the line above it used to say it returned a PNG.
+ * Rechecked 2026-08-26: it returns a real text-bearing PDF, and it is what MyRCM's own "Download
+ * PDF" button on a run report calls. That is now the supported path — read by `myRcmPdf.ts` from a
+ * file the **driver** downloaded. The app must never call it: `myrcm.ch` is on the fetch denylist
+ * in `http/timingUrlSafetySync.ts`, and this whole module is dormant behind it.
  *
  * This module is pure parsing (no network) so it is unit-testable against saved fixtures.
  */
@@ -47,6 +53,7 @@ export {
   buildMyRcmCategoryUrl,
   buildMyRcmEventUrl,
   buildMyRcmSessionUrl,
+  classifyMyRcmEventLink,
   isMyRcmCategoryUrl,
   isMyRcmDiscoveryUrl,
   isMyRcmEventUrl,

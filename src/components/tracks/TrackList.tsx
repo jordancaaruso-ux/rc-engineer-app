@@ -13,6 +13,11 @@ import { Collapse } from "@/components/ui/Collapse";
 import { CollapsibleAddRow } from "@/components/assets/CollapsibleAddRow";
 import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 import { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotSetBanner";
+import {
+  TrackCoordinatesField,
+  type TrackCoordinatesFieldHandle,
+  type TrackCoordinatesValue,
+} from "@/components/tracks/TrackCoordinatesField";
 import { TrackNearbyBrowse } from "@/components/tracks/TrackNearbyBrowse";
 import { TrackMetaTagsEditor } from "@/components/tracks/TrackMetaTagsEditor";
 import type { TrackTimingUrls } from "@/lib/tracks/trackTimingUrl";
@@ -80,6 +85,8 @@ export function TrackList({
   // shouldn't have to know which timing column they're filling in.
   const [timingUrls, setTimingUrls] = useState<TrackTimingUrls>(NO_TIMING_URLS);
   const timingFieldRef = useRef<TrackTimingUrlsFieldHandle>(null);
+  const [coordinates, setCoordinates] = useState<TrackCoordinatesValue | null>(null);
+  const coordsFieldRef = useRef<TrackCoordinatesFieldHandle>(null);
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [existingTrackId, setExistingTrackId] = useState<string | null>(null);
@@ -242,6 +249,20 @@ export function TrackList({
       liveRcUrl: committed.value.liveRcUrl ?? null,
       speedhiveUrl: committed.value.speedhiveUrl ?? null,
     };
+    // Same rule for a coordinates paste nobody pressed Enter on.
+    const committedCoords =
+      coordsFieldRef.current?.commit() ?? { ok: true as const, value: coordinates };
+    if (!committedCoords.ok) {
+      setMessage(committedCoords.error);
+      return;
+    }
+    const coords = committedCoords.value
+      ? {
+          latitude: committedCoords.value.latitude,
+          longitude: committedCoords.value.longitude,
+          locationSource: committedCoords.value.locationSource,
+        }
+      : {};
     setMessage(null);
     setExistingTrackId(null);
     setAdding(true);
@@ -253,6 +274,7 @@ export function TrackList({
           name: trimmed,
           location: location.trim() || null,
           ...timing,
+          ...coords,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -273,6 +295,7 @@ export function TrackList({
         setName("");
         setLocation("");
         setTimingUrls(NO_TIMING_URLS);
+        setCoordinates(null);
         setShowAddForm(false);
         setMessage("Track added.");
         router.refresh();
@@ -368,7 +391,7 @@ export function TrackList({
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] text-muted-foreground mb-1">Location (optional)</label>
+                  <label className="block text-[11px] text-muted-foreground mb-1">Town or state (optional)</label>
                   <input
                     className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
                     value={location}
@@ -377,6 +400,14 @@ export function TrackList({
                   />
                 </div>
               </div>
+              <TrackCoordinatesField
+                ref={coordsFieldRef}
+                value={coordinates}
+                onChange={setCoordinates}
+                onError={setMessage}
+                labelClassName="block text-[11px] text-muted-foreground"
+                inputClassName="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+              />
               <TrackTimingUrlsField
                 ref={timingFieldRef}
                 value={timingUrls}

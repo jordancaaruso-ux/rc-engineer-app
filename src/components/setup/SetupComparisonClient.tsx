@@ -30,54 +30,27 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SheetCompareSurface } from "@/components/setup/SheetCompareSurface";
-import { normalizeSetupData } from "@/lib/runSetup";
-import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 import {
-  formatRunCreatedRelativeWhen,
-  formatRunPickerParts,
-  type RunPickerRun,
-} from "@/lib/runPickerFormat";
+  SETUP_COMPARE_SOURCE_LABEL,
+  fetchSetupCompareEntries,
+  pickEditionBlankForPair,
+  type SetupCompareEntry,
+  type SetupComparePickerSource,
+} from "@/lib/setupCompare/setupCompareEntries";
 
-/** Which list a row belongs to. One tab each; a row never appears in two. */
-type PickerSource = "mine" | "teammates" | "setups";
+/*
+ * The rows, their id vocabulary and the edition pick all live in `setupCompareEntries` now, so the
+ * garage's own compare (`SetupSheetCompareView`) offers exactly the list this page does. A second
+ * copy of the list would show a row on one screen and not the other, which reads as data loss.
+ */
+type PickerSource = SetupComparePickerSource;
+type SetupEntry = SetupCompareEntry;
 
 type SlotId = "a" | "b";
 
-/**
- * One pickable setup. `title` answers "which session", `detail` answers "which car, where, how
- * fast" — two lines, because one line at 390px clips exactly the half that tells two rows apart.
- */
-type SetupEntry = {
-  id: string;
-  kind: "run" | "team" | "saved";
-  source: PickerSource;
-  title: string;
-  detail: string;
-  when: string;
-  /** The setup as stored. Normalized once here so the compare surface never has to. */
-  values: Record<string, unknown>;
-  /** The sheet this setup is drawn on. Rows without one are not offered — there is no paper. */
-  setupSheetModelId: string;
-  /** Chassis-type key, for the geometry strip above the paper. */
-  templateKey: string | null;
-};
-
 const PICKER_ROWS_PER_SOURCE = 40;
 
-const SOURCE_LABEL: Record<PickerSource, string> = {
-  mine: "Mine",
-  teammates: "Teammates",
-  setups: "Setups",
-};
-
-function isJsonObject(v: unknown): v is Record<string, unknown> {
-  return v != null && typeof v === "object" && !Array.isArray(v);
-}
-
-/** A setup with no values in it compares to nothing; keep it off the list rather than in it. */
-function hasAnyValue(data: Record<string, unknown>): boolean {
-  return Object.values(data).some((v) => v != null && v !== "");
-}
+const SOURCE_LABEL = SETUP_COMPARE_SOURCE_LABEL;
 
 function entryLabel(e: SetupEntry): string {
   return e.detail ? `${e.title} · ${e.detail}` : e.title;
@@ -162,88 +135,10 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
     fetching.current = true;
     setLoading(true);
     setLoadError(null);
-    const safeJson = (url: string) =>
-      fetch(url)
-        .then((r) => (r.ok ? r.json() : null))
-        .catch(() => null);
-
-    const [runsRes, teamRes, libRes] = await Promise.all([
-      safeJson("/api/runs/for-picker") as Promise<{ runs?: RunPickerRun[] } | null>,
-      safeJson("/api/runs/teammate-for-picker") as Promise<{
-        runs?: (RunPickerRun & { userId?: string | null })[];
-        memberDisplayByUserId?: Record<string, string>;
-      } | null>,
-      safeJson("/api/setups/library-for-picker") as Promise<{
-        setups?: {
-          id: string;
-          name?: string | null;
-          createdAt?: string;
-          carName?: string | null;
-          setupSheetModelId?: string | null;
-          setupSheetTemplate?: string | null;
-          setupData?: unknown;
-        }[];
-      } | null>,
-    ]);
-
-    if (!runsRes && !teamRes && !libRes) {
-      // Keep whatever is already on screen — a failed refetch must not blank a usable list.
-      setLoadError("Couldn't load your setups — check you're signed in.");
-      setLoading(false);
-      fetching.current = false;
-      return;
-    }
-
-    const out: SetupEntry[] = [];
-    const pushRun = (
-      run: RunPickerRun,
-      source: PickerSource,
-      kind: SetupEntry["kind"],
-      displayByUserId?: Record<string, string>
-    ) => {
-      const data = run.setupSnapshot?.data;
-      const modelId = run.car?.setupSheetModelId?.trim();
-      // No sheet, no paper to draw on — and this page is the sheet.
-      if (!modelId || !isJsonObject(data)) return;
-      const values = normalizeSetupData(data) as Record<string, unknown>;
-      if (!hasAnyValue(values)) return;
-      const parts = formatRunPickerParts(run, displayByUserId);
-      out.push({
-        id: `${kind}-${run.id}`,
-        kind,
-        source,
-        title: parts.title,
-        detail: parts.detail,
-        when: parts.when,
-        values,
-        setupSheetModelId: modelId,
-        templateKey: canonicalSetupSheetTemplateId(run.car?.setupSheetTemplate ?? null),
-      });
-    };
-
-    for (const run of runsRes?.runs ?? []) pushRun(run, "mine", "run");
-    for (const run of teamRes?.runs ?? []) {
-      pushRun(run, "teammates", "team", teamRes?.memberDisplayByUserId);
-    }
-    for (const saved of libRes?.setups ?? []) {
-      const modelId = saved.setupSheetModelId?.trim();
-      if (!modelId || !isJsonObject(saved.setupData)) continue;
-      const values = normalizeSetupData(saved.setupData) as Record<string, unknown>;
-      if (!hasAnyValue(values)) continue;
-      out.push({
-        id: `saved-${saved.id}`,
-        kind: "saved",
-        source: "setups",
-        title: saved.name?.trim() || "Untitled setup",
-        detail: saved.carName?.trim() || "",
-        when: saved.createdAt ? formatRunCreatedRelativeWhen(saved.createdAt) : "",
-        values,
-        setupSheetModelId: modelId,
-        templateKey: canonicalSetupSheetTemplateId(saved.setupSheetTemplate ?? null),
-      });
-    }
-
-    setEntries(out);
+    const { entries: rows, error } = await fetchSetupCompareEntries();
+    // Keep whatever is already on screen — a failed refetch must not blank a usable list.
+    if (rows) setEntries(rows);
+    setLoadError(error);
     setLoading(false);
     fetching.current = false;
   }, [dbReady]);
@@ -367,30 +262,13 @@ export function SetupComparisonClient({ dbReady }: { dbReady: boolean }) {
       return;
     }
     const pair = bothRef.current;
-    const keys = [
-      ...new Set([
-        ...Object.keys(pair?.a.values ?? {}),
-        ...Object.keys(pair?.b.values ?? {}),
-      ]),
-    ].slice(0, 200);
-    if (keys.length === 0) {
-      setCompareEditionBlankId(null);
-      return;
-    }
     let cancelled = false;
     setCompareEditionBlankId(undefined);
-    fetch(
-      `/api/setup-sheet-models/${compareModelId}/sheet-blank-pick?keys=${encodeURIComponent(keys.join(","))}`,
-      { cache: "no-store" }
-    )
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { editionBlankId?: string | null } | null) => {
-        if (!cancelled) setCompareEditionBlankId(d?.editionBlankId ?? null);
-      })
-      .catch(() => {
-        // The primary always draws; a failed pick must not cost the comparison.
-        if (!cancelled) setCompareEditionBlankId(null);
-      });
+    void pickEditionBlankForPair(compareModelId, pair?.a.values ?? {}, pair?.b.values ?? {}).then(
+      (blankId) => {
+        if (!cancelled) setCompareEditionBlankId(blankId);
+      }
+    );
     return () => {
       cancelled = true;
     };

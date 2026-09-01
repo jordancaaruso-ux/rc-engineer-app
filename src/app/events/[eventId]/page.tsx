@@ -80,7 +80,7 @@ export default async function EventDetailPage(props: {
         </div>
       </header>
       <section className="page-body">
-        <div className="max-w-2xl space-y-4">
+        <div className="space-y-4">
           {runCount > 0 ? (
             <ButtonLink href={`/engineer?pin=event:${event.id}`} variant="outline">
               Ask the Engineer about this meeting
@@ -100,6 +100,7 @@ export default async function EventDetailPage(props: {
             initialControlledAdditiveTypeId={event.controlledAdditiveTypeId}
             initialPracticeSourceUrl={event.practiceSourceUrl}
             initialResultsSourceUrl={event.resultsSourceUrl}
+            initialMyRcmUrl={event.myRcmUrl}
             initialRaceClass={event.raceClass}
             runCount={runCount}
           />

@@ -21,9 +21,9 @@ import { ChevronRight, type LucideIcon } from "lucide-react";
  * own. The three bands share this ONE component rather than each growing a copy, because three
  * feet that must look identical are exactly the thing that stops looking identical.
  *
- * `.primary-face-static`, not `.primary-face`: a specular band sweeping something this wide reads
- * as a screen wipe rather than shine, so the lit rim carries the material and the motion stays
- * with the small buttons.
+ * Plain `bg-primary` with no face class: `.primary-face`'s lift is drawn for a button raised off
+ * the page, and under something this wide the same shadow reads as a rule ruled across the card
+ * rather than as depth. A yellow band on a pale card is already its own edge.
  */
 export function BandFoot({
   href,
@@ -61,7 +61,7 @@ export function BandFoot({
         </span>
       </span>
 
-      <span className="primary-face-static mt-2.5 flex items-center justify-center gap-1.5 rounded-[10px] bg-primary px-3 py-2.5 text-[13px] font-bold tracking-tight text-primary-foreground transition group-hover:brightness-105 group-active:brightness-95">
+      <span className="mt-2.5 flex items-center justify-center gap-1.5 rounded-[10px] bg-primary px-3 py-2.5 text-[13px] font-semibold tracking-tight text-primary-foreground transition group-hover:brightness-105 group-active:brightness-95">
         {action}
         <ChevronRight
           className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5"

@@ -36,18 +36,36 @@ import type { SetupSaveContext } from "@/lib/setup/setupSaveContext";
 export function SessionSetupSaveButton({
   setupId,
   save,
+  className,
 }: {
   setupId: string;
   save: SetupSaveContext;
+  /** Sizing overrides for the row it sits in — cn is tailwind-merge, so these win. */
+  className?: string;
 }) {
   if (save.action === "none") return null;
   if (save.action === "mark") {
-    return <KeepSetupButton setupId={setupId} name={save.name} initialSaved={save.saved} />;
+    return (
+      <KeepSetupButton
+        setupId={setupId}
+        name={save.name}
+        initialSaved={save.saved}
+        className={className}
+      />
+    );
   }
-  return <CopyToCarButton setupId={setupId} save={save} />;
+  return <CopyToCarButton setupId={setupId} save={save} className={className} />;
 }
 
-function CopyToCarButton({ setupId, save }: { setupId: string; save: SetupSaveContext }) {
+function CopyToCarButton({
+  setupId,
+  save,
+  className,
+}: {
+  setupId: string;
+  save: SetupSaveContext;
+  className?: string;
+}) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [panelOpen, setPanelOpen] = useState(false);
@@ -135,7 +153,8 @@ function CopyToCarButton({ setupId, save }: { setupId: string; save: SetupSaveCo
           cn(
             "gap-1.5 disabled:opacity-50",
             copiedTo &&
-              "border-primary-ink/40 bg-primary/10 text-primary-ink hover:border-primary-ink/40 hover:bg-primary/15"
+              "border-primary-ink/40 bg-primary/10 text-primary-ink hover:border-primary-ink/40 hover:bg-primary/15",
+            className
           )
         )}
       >

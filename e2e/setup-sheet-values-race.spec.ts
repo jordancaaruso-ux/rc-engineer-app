@@ -128,7 +128,10 @@ test("opening a second run's setup never shows the first run's values", async ({
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/runs/history");
 
-  /** Pick a run out of the day card, then open its setup from the detail beside it. */
+  /**
+   * Pick a run out of the day card, then open its setup from the detail beside it. Rows are named
+   * by the run ("Sheet repro A"), not the session label — a day of same-type runs shows names.
+   */
   const openSetupFor = async (row: string) => {
     await page.getByText(row, { exact: true }).first().click({ timeout: 60_000 });
     await page.getByRole("button", { name: "Setup", exact: true }).first().click({ timeout: 60_000 });
@@ -145,7 +148,7 @@ test("opening a second run's setup never shows the first run's values", async ({
 
   // Which of the day's two runs is which marker is the list's business, not this test's: whichever
   // one the first row holds, the SECOND row must not be showing it.
-  await openSetupFor("R1");
+  await openSetupFor("Sheet repro A");
   await expect(page.locator("[data-sheet-box]").first()).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(VALUES_DELAY_MS + 2500);
   const first = await markersOnSheet();
@@ -156,7 +159,7 @@ test("opening a second run's setup never shows the first run's values", async ({
   const secondMarker = firstMarker === "a" ? "b" : "a";
 
   await page.getByRole("button", { name: "Close" }).click();
-  await openSetupFor("R2");
+  await openSetupFor("Sheet repro B");
   await expect(page.locator("[data-sheet-box]").first()).toBeVisible({ timeout: 30_000 });
 
   // Mid-flight: this run's values cannot have arrived yet, so the last run's must NOT be on the

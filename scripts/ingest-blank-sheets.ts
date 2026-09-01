@@ -14,7 +14,12 @@
  *   npm run ingest-blanks -- manifest.json --apply
  *   npm run ingest-blanks -- manifest.json --apply --prod        (after the branch ships)
  *
- * Manifest: [{ "name": "Kyosho MP10", "pdfPath": "C:\\...\\mp10_editable.pdf" }, ...]
+ * Manifest: [{ "name": "Kyosho MP10", "pdfPath": "C:\\...\\mp10_editable.pdf",
+ *              "discipline": "buggy-8th" }, ...]
+ *
+ * `discipline` is optional and is a `ChassisPlatformId` (see `src/lib/cars/carClasses.ts`).
+ * Worth filling in: without it the chassis has no discipline unless its slug happens to be in
+ * `CHASSIS_PLATFORM_BY_SLUG`, and an ingested slug is a fingerprint, so it never is.
  *
  * `--conditions=react-server` is required: `@/lib/prisma` imports `server-only`.
  */
@@ -35,9 +40,10 @@ import {
 } from "@/lib/setupSheetModels/derivedSheetFingerprint";
 import { normalizeSetupSheetModelName } from "@/lib/setupSheetModels/normalizeModelName";
 import { createModelFromBlank } from "@/lib/setupSheetModels/createModelFromBlank";
+import { CHASSIS_PLATFORMS, isChassisPlatformId } from "@/lib/cars/carClasses";
 import { guardDatabaseTarget } from "./lib/neonEnvGuard";
 
-type ManifestEntry = { name: string; pdfPath: string };
+type ManifestEntry = { name: string; pdfPath: string; discipline: string | null };
 
 type Preflight = {
   entry: ManifestEntry;
@@ -59,7 +65,24 @@ function readManifest(path: string): ManifestEntry[] {
     if (typeof row?.pdfPath !== "string" || !row.pdfPath.trim()) {
       throw new Error(`Manifest entry ${i} ("${row?.name}"): missing "pdfPath".`);
     }
-    return { name: row.name.trim(), pdfPath: row.pdfPath.trim() };
+    /*
+     * Optional here, required on the driver's door (2026-08-26).
+     *
+     * The asymmetry is deliberate: a driver gets one chance to say what their chassis races and
+     * nobody else can answer for them, whereas the founder is bulk-loading a catalog he is about
+     * to review anyway, and blocking a 40-file manifest on one missing string helps no one.
+     * Validated when present, because a typo'd discipline is worse than an absent one — it reads
+     * as an answer.
+     */
+    const discipline =
+      typeof row?.discipline === "string" ? row.discipline.trim() || null : null;
+    if (discipline && !isChassisPlatformId(discipline)) {
+      throw new Error(
+        `Manifest entry ${i} ("${row.name}"): "${discipline}" isn't a discipline. ` +
+          `Use one of: ${CHASSIS_PLATFORMS.map((p) => p.id).join(", ")}.`
+      );
+    }
+    return { name: row.name.trim(), pdfPath: row.pdfPath.trim(), discipline };
   });
 }
 
@@ -227,6 +250,7 @@ async function main() {
     const result = await createModelFromBlank({
       user: { id: user.id, email: user.email },
       name: p.entry.name,
+      discipline: p.entry.discipline,
       upload: { kind: "file", file },
       derive: true,
       source: "admin",

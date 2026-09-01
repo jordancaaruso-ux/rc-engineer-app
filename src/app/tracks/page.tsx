@@ -134,7 +134,7 @@ export default async function TracksPage({
         </div>
       </header>
       <section className="page-body">
-        <div className="max-w-2xl">
+        <div>
           <TrackList
             initialTracks={sortedTracks}
             favouriteTrackIds={favouriteTrackIds}

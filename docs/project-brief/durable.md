@@ -43,7 +43,7 @@ Jordan pastes. If an answer depends on current code, say what you need pasted in
   drivers fill them in by hand and photograph them.
 - **A chassis** (e.g. Awesomatix A800) is shared by everyone racing that model, so its sheet layout
   is global data, not per-user.
-- **Lap times** come from public timing sites (LiveRC, MyRCM, MyLaps Speedhive) and are imported
+- **Lap times** come from public timing sites (LiveRC, MyLaps Speedhive) and are imported
   rather than typed.
 
 ## The physics spine

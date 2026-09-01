@@ -4,6 +4,7 @@ import {
   splitMultiSurfaceValue,
   storedValuesToSurface,
   surfaceValuesToStored,
+  surfaceValuesToStoredMerge,
   toggleOptionInSurfaceValue,
 } from "@/lib/setupSheetModels/sheetSurfaceValues";
 import type { SheetPlanField } from "@/lib/setupSheetModels/sheetPlan";
@@ -115,6 +116,35 @@ function planField(p: Partial<SheetPlanField> & { key: string }): SheetPlanField
   assert.ok(!("left_blank" in stored));
 }
 
+// ---- A tapped tick arrives as the schema's minted VALUE and must still read as its preset ----
+// The box's optionValue is `c01b_rsl` while the label prints `C01B-RSL`; treating the separator
+// as a difference demoted a real tick into the "Other" box (founder report, 2026-09-01).
+{
+  const fields: SheetPlanField[] = [
+    planField({
+      key: "chassis",
+      options: ["C01B-RAF", "C01B-RC", "C01RS", "C01B-RSL", "Other"],
+      optionValues: ["c01b_raf", "c01b_rc", "c01rs", "c01b_rsl", "other"],
+    }),
+    planField({ key: "chassis_other" }),
+  ];
+  const stored = surfaceValuesToStored({ chassis: "c01b_rsl" }, fields);
+  assert.deepEqual(stored.chassis, { selectedPreset: "C01B-RSL", otherText: "" });
+
+  const raf = surfaceValuesToStored({ chassis: "c01b_raf" }, fields);
+  assert.deepEqual(raf.chassis, { selectedPreset: "C01B-RAF", otherText: "" });
+
+  // Genuinely unknown text still lands in Other — the demotion rule survives for real free text.
+  const custom = surfaceValuesToStored({ chassis: "MXLR" }, fields);
+  assert.deepEqual(custom.chassis, { selectedPreset: "", otherText: "MXLR" });
+}
+
+// ---- The tick shows: a stored LABEL selects the box that carries the minted value ----
+{
+  assert.equal(optionSelectedInSurfaceValue("C01B-RSL", "c01b_rsl", false), true);
+  assert.equal(optionSelectedInSurfaceValue("C01B-RAF", "c01b_rsl", false), false);
+}
+
 // ---- Round trip: a stored setup survives surface and back unchanged in meaning ----
 {
   const fields: SheetPlanField[] = [
@@ -146,3 +176,35 @@ function planField(p: Partial<SheetPlanField> & { key: string }): SheetPlanField
 }
 
 console.log("sheetSurfaceValues.test.ts ok");
+
+// ---- Emptying the "custom text" box of a preset pair clears the STORED key (2026-08-29) ----
+//
+// "Plastic" lived in `front_bumper: { selectedPreset: "", otherText: "Plastic" }` and was drawn in
+// the paper's `front_bumper_other` box. Clearing that box put the deletion marker on
+// `front_bumper_other` — a key the snapshot never used — and the merge left the base object
+// standing, so the text came back on the next run while every plain box he cleared stayed cleared.
+{
+  const fields: SheetPlanField[] = [
+    planField({ key: "front_bumper", options: ["Foam", "Other"], optionValues: ["Foam", "Other"] }),
+    planField({ key: "front_bumper_other" }),
+    planField({ key: "ride_height_front" }),
+  ];
+  const surface = storedValuesToSurface({
+    front_bumper: { selectedPreset: "", otherText: "Plastic" },
+    ride_height_front: "5.1",
+  });
+  assert.equal(surface.front_bumper_other, "Plastic", "the text is drawn in the companion box");
+  surface.front_bumper_other = "";
+  const merge = surfaceValuesToStoredMerge(surface, fields);
+  assert.equal(merge.front_bumper, "", "the marker sits on the key the snapshot stores the pair under");
+  assert.equal(merge.front_bumper_other, "", "and on the box's own key, as before");
+  assert.equal(merge.ride_height_front, "5.1");
+  // Clearing the text while a preset is chosen keeps the preset: that is a value, not a blank.
+  const kept = surfaceValuesToStoredMerge({ front_bumper: "Foam", front_bumper_other: "" }, fields);
+  assert.deepEqual(kept.front_bumper, { selectedPreset: "Foam", otherText: "" });
+  // A pair the surface never mentions is not touched — no marker out of nowhere.
+  const untouched = surfaceValuesToStoredMerge({ ride_height_front: "5.2" }, fields);
+  assert.equal("front_bumper" in untouched, false);
+}
+
+console.log("sheetSurfaceValues.test.ts OK");

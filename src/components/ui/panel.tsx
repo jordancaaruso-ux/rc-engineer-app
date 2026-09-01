@@ -62,7 +62,8 @@ export function PanelSubtitle({ children, className }: { children: ReactNode; cl
   );
 }
 
-/** Sora bold uppercase section label with the −21° ink notch before it (`.eyebrow-label`). */
+/** Sora bold uppercase section label over a hairline rule (`.eyebrow-label` + `.eyebrow-root`).
+ *  No leading mark since 2026-08-25 — see the `.eyebrow-label` note in globals.css. */
 export function Eyebrow({
   children,
   className,

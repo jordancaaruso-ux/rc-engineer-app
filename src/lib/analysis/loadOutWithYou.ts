@@ -85,7 +85,7 @@ const scopeRunSelect = {
     select: {
       carClass: true,
       setupSheetTemplate: true,
-      setupSheetModel: { select: { slug: true } },
+      setupSheetModel: { select: { slug: true, discipline: true } },
     },
   },
 } as const;

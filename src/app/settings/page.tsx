@@ -4,22 +4,26 @@ import {
   getLiveRcDriverNameSetting,
   getMyNameSetting,
   getSpeedhiveDriverNameSetting,
-  getMyRcmDriverNameSetting,
   getSpeedhiveTransponderNumbersSetting,
+  getKnownCompetitorsSetting,
 } from "@/lib/appSettings";
 import {
   formatSpeedhiveTransponderNumbersForSetting,
   parseSpeedhiveTransponderNumbersSetting,
 } from "@/lib/speedhive/speedhiveTransponder";
+import { parseKnownCompetitorsSetting } from "@/lib/speedhive/knownCompetitors";
 import { YouSection } from "@/components/settings/YouSection";
 import { TimingIdentitySection } from "@/components/settings/TimingIdentitySection";
 import { SettingsNavSection } from "@/components/settings/SettingsNavSection";
 import { DeleteAccountRow } from "@/components/settings/DeleteAccountRow";
 import { OnboardingResetSection } from "@/components/settings/OnboardingResetSection";
+import { SetUpHandoffBar } from "@/components/onboarding/SetUpHandoffBar";
 import { AllowlistAdminSection } from "@/components/settings/AllowlistAdminSection";
 import { ManufacturerBaselineAdminSection } from "@/components/settings/ManufacturerBaselineAdminSection";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { hasDatabaseUrl } from "@/lib/env";
+import { loadOnboardingView } from "@/lib/onboarding/server";
+import { showGetSetUpCard } from "@/lib/onboarding/visibility";
 
 /**
  * Settings, in four sections (resection 2026-08-18).
@@ -66,18 +70,22 @@ export default async function SettingsPage() {
     liveRcDriverId,
     speedhiveDriverName,
     speedhiveTransponderRaw,
-    myRcmDriverName,
+    knownCompetitorsRaw,
+    onboarding,
   ] = await Promise.all([
     getMyNameSetting(user.id),
     getLiveRcDriverNameSetting(user.id),
     getLiveRcDriverIdSetting(user.id),
     getSpeedhiveDriverNameSetting(user.id),
     getSpeedhiveTransponderNumbersSetting(user.id),
-    getMyRcmDriverNameSetting(user.id),
+    getKnownCompetitorsSetting(user.id),
+    loadOnboardingView(user.id),
   ]);
   const speedhiveTransponderNumbersText = formatSpeedhiveTransponderNumbersForSetting(
     parseSpeedhiveTransponderNumbersSetting(speedhiveTransponderRaw)
   );
+  /* The same predicate that puts the Get-set-up card on the dashboard — see BackToSetUpRow. */
+  const stillSettingUp = showGetSetUpCard(onboarding);
 
   return (
     <>
@@ -88,6 +96,14 @@ export default async function SettingsPage() {
       </header>
       <section className="page-body max-w-2xl">
         <div className="space-y-4">
+          {stillSettingUp ? (
+            <SetUpHandoffBar
+              href="/"
+              direction="back"
+              title="Back to setting up"
+              detail="Your checklist is on the dashboard"
+            />
+          ) : null}
           <YouSection
             initialImage={user.image}
             initialName={myName ?? ""}
@@ -101,7 +117,7 @@ export default async function SettingsPage() {
               liveRcDriverId: liveRcDriverId ?? "",
               speedhiveDriverName: speedhiveDriverName ?? "",
               speedhiveTransponderNumbers: speedhiveTransponderNumbersText,
-              myRcmDriverName: myRcmDriverName ?? "",
+              knownCompetitors: parseKnownCompetitorsSetting(knownCompetitorsRaw),
             }}
           />
 

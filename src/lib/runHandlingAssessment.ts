@@ -170,6 +170,31 @@ export function carRatingBandCaption(rating: number): string | null {
   return CAR_RATING_BANDS.find((b) => b.ratings.includes(rating))?.caption ?? null;
 }
 
+/** Band caption → ramp token, keyed by caption so a regroup can't desync it. */
+const CAR_RATING_BAND_TOKEN: Record<string, string> = {
+  Bad: "--color-rating-bad",
+  Workable: "--color-rating-workable",
+  Good: "--color-rating-good",
+  Dialled: "--color-rating-dialled",
+};
+
+/**
+ * CSS colour for a rating, off the `--color-rating-*` ramp — the ink `RatingDial` fills
+ * its arc with and the session-trend strip prints its numeral in.
+ *
+ * It lives beside the bands rather than in either component because two hand-kept copies
+ * of a four-row lookup is exactly how a regroup ends up recoloured in one place only.
+ * Anything outside 1–10 comes back muted, which is the unrated ink in both themes.
+ */
+export function carRatingBandColor(rating: number | null | undefined): string {
+  const caption =
+    typeof rating === "number" && Number.isFinite(rating)
+      ? carRatingBandCaption(Math.round(rating))
+      : null;
+  const token = caption ? CAR_RATING_BAND_TOKEN[caption] : undefined;
+  return `rgb(var(${token ?? "--color-muted-foreground"}))`;
+}
+
 /**
  * URL-safe slug for a band, used by the Sessions rating filter. `unrated` is not a
  * band — it's the fifth choice in the filter, covering drafts and legacy runs that

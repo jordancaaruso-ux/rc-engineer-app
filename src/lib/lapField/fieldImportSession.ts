@@ -1,5 +1,5 @@
 import type { LapRow } from "@/lib/lapAnalysis";
-import { getIncludedLaps, getBestLap, importedSetToLapRows } from "@/lib/lapAnalysis";
+import { getBestLap, getFadePerLap, importedSetToLapRows } from "@/lib/lapAnalysis";
 import { mergeImportedLapSetsByDriver } from "@/lib/lapImport/mergeImportedLapSets";
 
 export type FieldImportDriverInput = {
@@ -15,8 +15,8 @@ export type FieldImportDriverRow = {
   rank: number;
   bestLapSeconds: number | null;
   gapToSessionBestSeconds: number | null;
-  /** Mean(second half) − mean(first half) of included laps (chronological); positive ⇒ slower late in run. */
-  fadeSeconds: number | null;
+  /** Seconds per lap the stint drifted (`getFadePerLap`, the app's one fade); positive ⇒ slower late in run. */
+  fadePerLapSeconds: number | null;
 };
 
 export type FieldImportSession = {
@@ -24,24 +24,6 @@ export type FieldImportSession = {
   sessionBestLapSeconds: number | null;
   ranked: FieldImportDriverRow[];
 };
-
-/**
- * Mean lap time of the first vs second half of the stint (included laps only, by lap number).
- * Requires at least 4 included laps.
- */
-export function computeStintFadeSeconds(rows: LapRow[]): number | null {
-  const inc = getIncludedLaps(rows).sort((a, b) => a.lapNumber - b.lapNumber);
-  if (inc.length < 4) return null;
-  const mid = Math.floor(inc.length / 2);
-  const first = inc.slice(0, mid);
-  const second = inc.slice(mid);
-  const mean = (xs: LapRow[]) =>
-    xs.length === 0 ? null : xs.reduce((s, x) => s + x.lapTimeSeconds, 0) / xs.length;
-  const m1 = mean(first);
-  const m2 = mean(second);
-  if (m1 == null || m2 == null) return null;
-  return m2 - m1;
-}
 
 function labelForDriver(d: FieldImportDriverInput): string {
   const t = (d.displayName?.trim() || d.driverName || "").trim();
@@ -88,7 +70,7 @@ export function computeFieldImportSessionFromSets(
       label: labelForDriver(s),
       isPrimaryUser: Boolean(s.isPrimaryUser),
       best: getBestLap(rows),
-      fade: computeStintFadeSeconds(rows),
+      fade: getFadePerLap(rows),
     });
   }
 
@@ -124,7 +106,7 @@ export function computeFieldImportSessionFromSets(
       rank: pos,
       bestLapSeconds: w.best,
       gapToSessionBestSeconds: gap,
-      fadeSeconds: w.fade,
+      fadePerLapSeconds: w.fade,
     };
   });
 

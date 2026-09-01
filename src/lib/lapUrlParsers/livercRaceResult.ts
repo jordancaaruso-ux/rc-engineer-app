@@ -13,6 +13,7 @@ import {
   normalizeLiveRcDriverNameForMatch,
 } from "@/lib/lapWatch/liveRcNameNormalize";
 import {
+  extractLiveRcRaceSessionNameFromHtml,
   extractLiveRcRaceSessionWhenRaw,
   parseLiveRcSessionDisplayTimeToUtcIso,
 } from "./livercSessionTime";
@@ -703,7 +704,8 @@ export async function importLiveRcRaceResult(pageUrl: string, contextName?: stri
       sessionDrivers,
       message: "Could not parse embedded racerLaps for this session.",
       errorCode: "racer_laps_embed_failed",
-      sessionHint: { name: null, className: "racer_laps_embed_failed" },
+      // No sessionHint at all. `errorCode` above carries the diagnosis; a marker string
+      // parked in the hint was read downstream as the session's NAME and printed to the driver.
     };
   }
 
@@ -731,6 +733,7 @@ export async function importLiveRcRaceResult(pageUrl: string, contextName?: stri
     }
   }
 
+  const sessionName = extractLiveRcRaceSessionNameFromHtml(mainFetch.text);
   const whenRaw = extractLiveRcRaceSessionWhenRaw(mainFetch.text);
   const sessionCompletedAtIso = whenRaw ? parseLiveRcSessionDisplayTimeToUtcIso(whenRaw) : null;
 
@@ -738,6 +741,7 @@ export async function importLiveRcRaceResult(pageUrl: string, contextName?: stri
     drivers: driversWithLaps.length,
     primaryDriver: primary.driverName,
     primaryDriverLapCount: primary.laps.length,
+    sessionName,
     sessionCompletedAtIso,
   });
 
@@ -749,6 +753,12 @@ export async function importLiveRcRaceResult(pageUrl: string, contextName?: stri
     candidates: buildCandidateRows(orderedDrivers),
     sessionDrivers: orderedDrivers,
     message: `Imported session with ${driversWithLaps.length} drivers. Select one or more drivers below.`,
-    sessionHint: { name: null, className: "racer_laps_session_loaded" },
+    /*
+     * The race's own name, and `className` because that is where the LiveRC PRACTICE
+     * parser puts the same kind of string. `name` is not free: `pickPrimarySessionDriver`
+     * reads it as a server-matched DRIVER name, so a session name there would be offered
+     * as an entrant to match against.
+     */
+    sessionHint: { name: null, className: sessionName },
   };
 }

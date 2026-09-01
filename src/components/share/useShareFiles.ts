@@ -11,8 +11,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *     honest test: iOS Safari and Android Chrome expose `navigator.share` for *text* on far more
  *     versions than they accept files on, so feature-detecting `share` alone hands the user a
  *     share sheet that then throws.
- *  2. **Download** — every desktop browser, and any WKWebView that refuses files. The picture
- *     lands in Downloads / Files and the user attaches it themselves. Worse, but never broken.
+ *  2. **Download** — every desktop browser, and any WKWebView that refuses files. The file lands in
+ *     Downloads / Files and the user attaches it themselves. Worse on a phone, RIGHT on a desk:
+ *     path 1 is now gated on a coarse pointer as well, so Windows never opens its share dialog for
+ *     a button the driver read as "Download" (see `prefersShareSheet`).
  *
  * ## The tap has to reach `share()` still warm
  *
@@ -48,9 +50,25 @@ export type ShareTarget = {
    * such a car would fail entirely over an attachment the driver would have shrugged at.
    */
   optional?: boolean;
+  /**
+   * A URL the SERVER answers with `Content-Disposition: attachment`, for a touch device that has
+   * no share sheet — see {@link handOffToBrowser}. Without one, such a device falls to the blob
+   * path, which on an iPhone opens the file as a page and saves nothing.
+   */
+  downloadUrl?: string;
 };
 
 export type ShareState = "idle" | "working" | "shared" | "downloaded" | "error";
+
+/**
+ * HOW the last attempt actually delivered, so a caller can say something TRUE about it.
+ *
+ * "Saved to your downloads" used to print after every non-share path, including the one that saved
+ * nothing at all (founder report, 2026-09-01: "it says save to your downloads. But I never
+ * actually downloaded it"). Only `blob` is a save this code watched happen; `browser` hands the
+ * URL to the platform, which shows its own download UI and tells the driver itself.
+ */
+export type ShareRoute = "share" | "blob" | "browser" | null;
 
 async function fetchAsFile(target: ShareTarget): Promise<File> {
   const res = await fetch(target.url);
@@ -67,17 +85,46 @@ async function fetchAsFile(target: ShareTarget): Promise<File> {
 }
 
 /**
+ * The OS share sheet is for FINGERS. Windows Chrome and Edge both implement Web Share, so asking
+ * "can this browser share files?" answered yes on a desktop and sent a driver who pressed Download
+ * into the Windows share dialog instead of handing them the file (founder report, 2026-09-01,
+ * on his desk). A mouse-and-keyboard machine has a Downloads folder and expects to use it.
+ *
+ * Synchronous like everything else on this path — see the note on `canShareFiles`.
+ */
+function prefersShareSheet(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  return window.matchMedia("(pointer: coarse)").matches;
+}
+
+/**
  * Synchronous, and deliberately so — it runs inside the tap, between the gesture and
  * `navigator.share()`. Anything awaited here would cost the activation the whole fix is about.
  */
 function canShareFiles(files: File[]): boolean {
   return (
     files.length > 0 &&
+    prefersShareSheet() &&
     typeof navigator !== "undefined" &&
     typeof navigator.canShare === "function" &&
     typeof navigator.share === "function" &&
     navigator.canShare({ files })
   );
+}
+
+/**
+ * Let the BROWSER fetch and save the file, from a URL whose response says `attachment`.
+ *
+ * This is the iPhone path. WebKit ignores the `download` attribute, so the blob anchor below
+ * NAVIGATES to the file instead of saving it — the driver lands on a bare PDF, presses back, and
+ * is told it was saved when nothing was (founder report, 2026-09-01). A same-origin navigation to
+ * an attachment response behaves differently: iOS shows its own download sheet and the page stays.
+ *
+ * Not used on a desktop, where the blob path is proven and can show the route's own error sentence
+ * instead of navigating the driver to a JSON body.
+ */
+function handOffToBrowser(url: string): void {
+  window.location.href = url;
 }
 
 function download(file: File): void {
@@ -95,6 +142,24 @@ export function useShareFiles() {
   const [error, setError] = useState<string | null>(null);
   /** Set when an optional attachment couldn't be drawn, so the sheet can explain the gap. */
   const [skipped, setSkipped] = useState<string | null>(null);
+  /** Which path delivered — so a caller never claims a save it didn't see. */
+  const [route, setRoute] = useState<ShareRoute>(null);
+
+  /**
+   * The last resort, chosen by device rather than by capability.
+   *
+   * A touch device with an attachment URL gets a browser hand-off; everything else gets the blob,
+   * which is proven on desktop and is all a phone has when the caller passed no server URL.
+   */
+  const deliverWithoutSharing = useCallback((targets: ShareTarget[], files: File[]): ShareRoute => {
+    const viaServer = prefersShareSheet() ? targets.find((t) => t.downloadUrl)?.downloadUrl : null;
+    if (viaServer) {
+      handOffToBrowser(viaServer);
+      return "browser";
+    }
+    for (const file of files) download(file);
+    return files.length > 0 ? "blob" : null;
+  }, []);
 
   /**
    * url → the drawn picture, or `null` for an optional one that could not be drawn. A `null` is a
@@ -169,6 +234,7 @@ export function useShareFiles() {
         if (canShareFiles(files)) {
           try {
             await navigator.share({ files, title: meta.title, text: meta.text });
+            setRoute("share");
             setState("shared");
             return;
           } catch (e) {
@@ -181,14 +247,14 @@ export function useShareFiles() {
           }
         }
 
-        for (const file of files) download(file);
+        setRoute(deliverWithoutSharing(targets, files));
         setState("downloaded");
       } catch (e) {
         setError(e instanceof Error ? e.message : "Sharing failed");
         setState("error");
       }
     },
-    []
+    [deliverWithoutSharing]
   );
 
   /**
@@ -200,6 +266,7 @@ export function useShareFiles() {
       if (targets.length === 0) return;
       setError(null);
       setSkipped(null);
+      setRoute(null);
 
       const resolved = targets.every((t) => drawn.current.has(t.url));
       if (resolved) {
@@ -215,7 +282,9 @@ export function useShareFiles() {
           if (missed) setSkipped("Your setup sheet couldn't be drawn, so only the run was sent.");
           void sharing
             .then(() => {
-              if (alive.current) setState("shared");
+              if (!alive.current) return;
+              setRoute("share");
+              setState("shared");
             })
             .catch((e: unknown) => {
               if (!alive.current) return;
@@ -229,9 +298,10 @@ export function useShareFiles() {
           return;
         }
 
-        // No file sharing here — hand them over as downloads, still inside the gesture.
+        // No file sharing here — hand them over, still inside the gesture. A touch device with
+        // a server attachment URL is sent there; everything else takes the blob.
         if (files.length > 0) {
-          for (const file of files) download(file);
+          setRoute(deliverWithoutSharing(targets, files));
           setState("downloaded");
           if (missed) setSkipped("Your setup sheet couldn't be drawn, so only the run was saved.");
           return;
@@ -243,14 +313,15 @@ export function useShareFiles() {
       setState("working");
       void shareSlowly(targets, meta);
     },
-    [shareSlowly]
+    [shareSlowly, deliverWithoutSharing]
   );
 
   const reset = useCallback(() => {
     setState("idle");
     setError(null);
     setSkipped(null);
+    setRoute(null);
   }, []);
 
-  return { share, prefetch, preparing, state, error, skipped, reset };
+  return { share, prefetch, preparing, state, error, skipped, route, reset };
 }

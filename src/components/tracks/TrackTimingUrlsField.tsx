@@ -141,7 +141,12 @@ export const TrackTimingUrlsField = forwardRef<
             type="text"
             inputMode="url"
             autoComplete="off"
-            className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+            // No placeholder: colour here on purpose. `text-muted-foreground` is a solid,
+            // contrast-tuned grey meant for real copy, and against the plain boxes above — which
+            // take the app-wide default of foreground at 50% — it rendered noticeably heavier, so
+            // the hint read as a value already typed in (founder, 2026-08-25). Letting the default
+            // apply makes every box in the form say "empty" with the same weight.
+            className="min-w-0 flex-1 bg-transparent outline-none"
             placeholder={
               filled.length > 0 ? "Paste another timing page" : "LiveRC or Speedhive page URL"
             }

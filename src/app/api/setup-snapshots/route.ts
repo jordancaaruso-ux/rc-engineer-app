@@ -89,12 +89,14 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!car) return NextResponse.json({ error: "Car not found" }, { status: 404 });
 
   const baseId = typeof body.baseSetupSnapshotId === "string" ? body.baseSetupSnapshotId.trim() : "";
+  let baseSheetBlankId: string | null = null;
   if (baseId) {
     const base = await prisma.setupSnapshot.findFirst({
       where: { id: baseId, userId: userId },
-      select: { id: true },
+      select: { id: true, sheetBlankId: true },
     });
     if (!base) return NextResponse.json({ error: "Baseline setup not found" }, { status: 400 });
+    baseSheetBlankId = base.sheetBlankId;
   }
 
   // "Save as baseline" on an existing setup (a run's, a sheet's): the server reads the source
@@ -102,12 +104,14 @@ export async function POST(request: Request): Promise<NextResponse> {
   const fromId =
     typeof body.fromSetupSnapshotId === "string" ? body.fromSetupSnapshotId.trim() : "";
   let sourceData: unknown = body.data;
+  let sourceSheetBlankId: string | null = null;
   if (fromId) {
     const source = await prisma.setupSnapshot.findFirst({
       where: { id: fromId },
       select: {
         data: true,
         userId: true,
+        sheetBlankId: true,
         car: { select: { setupSheetModelId: true, setupSheetTemplate: true } },
       },
     });
@@ -154,6 +158,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     sourceData = source.data;
+    sourceSheetBlankId = source.sheetBlankId;
   }
 
   /**
@@ -190,6 +195,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       name,
       isLibrary: true,
       data: normalizeSetupSnapshotForStorage(sourceData),
+      // The paper travels with the copy: the source setup's, else the one it was started from.
+      // A global baseline is authored paper-free, so adopting one stays on the primary (null).
+      sheetBlankId: sourceSheetBlankId ?? baseSheetBlankId,
       ...(baseId ? { baseSetupSnapshotId: baseId } : {}),
       ...(fromBaselineId ? { sourceBaselineId: fromBaselineId } : {}),
     },

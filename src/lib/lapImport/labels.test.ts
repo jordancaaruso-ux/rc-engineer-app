@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   formatImportedSessionTime,
+  importedSessionWeatherInstantIso,
   isWallClockAsUtcTimingSource,
   timingSourceFromParserId,
   timingSourceFromSourceUrl,
@@ -52,4 +53,64 @@ test("timing source detection", () => {
   assert.equal(isWallClockAsUtcTimingSource("myrcm"), true);
   assert.equal(isWallClockAsUtcTimingSource("speedhive"), false);
   assert.equal(isWallClockAsUtcTimingSource(null), false);
+});
+
+test("weather instant: LiveRC wall clock converts in the device zone", () => {
+  const iso = importedSessionWeatherInstantIso(
+    {
+      sessionCompletedAt: "2026-08-30T15:59:06.000Z", // 3:59 PM on the track clock
+      sessionCompletedAtIsWallClock: true,
+      sourceUrl: "https://www.liverc.com/results/?p=view_race_result&id=1",
+    },
+    "Australia/Melbourne"
+  );
+  // AEST +10: the real instant is 05:59 UTC, not 15:59 UTC (which is 2 AM).
+  assert.equal(iso, "2026-08-30T05:59:06.000Z");
+});
+
+test("weather instant: Speedhive instants pass through untouched", () => {
+  const iso = importedSessionWeatherInstantIso(
+    {
+      sessionCompletedAt: "2026-08-30T05:59:06.000Z",
+      sessionCompletedAtIsWallClock: true,
+      sourceUrl: "https://speedhive.mylaps.com/Sessions/123",
+    },
+    "Australia/Melbourne"
+  );
+  assert.equal(iso, "2026-08-30T05:59:06.000Z");
+});
+
+test("weather instant: import-createdAt fallback is already real, passes through", () => {
+  const iso = importedSessionWeatherInstantIso(
+    {
+      sessionCompletedAt: "2026-08-30T05:59:06.000Z",
+      sessionCompletedAtIsWallClock: false,
+      sourceUrl: "https://www.liverc.com/results/?p=view_race_result&id=1",
+    },
+    "Australia/Melbourne"
+  );
+  assert.equal(iso, "2026-08-30T05:59:06.000Z");
+});
+
+test("weather instant: wall clock with no device zone yields null (use current weather)", () => {
+  const iso = importedSessionWeatherInstantIso(
+    {
+      sessionCompletedAt: "2026-08-30T15:59:06.000Z",
+      sessionCompletedAtIsWallClock: true,
+      sourceUrl: "https://www.liverc.com/results/?p=view_race_result&id=1",
+    },
+    null
+  );
+  assert.equal(iso, null);
+});
+
+test("weather instant: no session time yields null", () => {
+  assert.equal(
+    importedSessionWeatherInstantIso(
+      { sessionCompletedAt: null, sessionCompletedAtIsWallClock: true, sourceUrl: null },
+      "Australia/Melbourne"
+    ),
+    null
+  );
+  assert.equal(importedSessionWeatherInstantIso(null, "Australia/Melbourne"), null);
 });

@@ -69,7 +69,7 @@ export default async function AdditivesPage(props: {
         </div>
       </header>
       <section className="page-body">
-        <div className="max-w-2xl">
+        <div>
           <AdditiveGaragePanel initialAdditiveTypes={additiveTypes} isAdmin={isAdmin} />
         </div>
       </section>

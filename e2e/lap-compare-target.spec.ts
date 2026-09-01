@@ -29,14 +29,18 @@ test("the target row wears the opened run's own clock, not its import's", async 
   const dialog = page.getByRole("dialog", { name: "Choose sessions to compare" });
   await expect(dialog).toBeVisible();
 
-  // The `when` line sits directly after the span holding the name + Target badge.
-  const targetWhen = dialog
-    .getByText("Target", { exact: true })
-    .locator("xpath=ancestor::span[1]/following-sibling::span[1]");
-  await expect(targetWhen).toHaveText(headerWhen);
+  /*
+   * The pinned target row: name on the first line, its wall time on the second. It carried
+   * a "Target" badge until 2026-08-27, when the row moved up under the dropdown that picks
+   * it and the badge became a third word for the same idea — so the hook is a testid now.
+   */
+  const targetRow = dialog.getByTestId("lap-compare-target-row");
+  await expect(targetRow).toBeVisible();
+  const targetWhen = targetRow.locator("span > span").nth(1);
+  await expect(targetWhen).toContainText(headerWhen);
 
-  // Same instant again in the dropdown above it, which labels the same series.
-  await expect(page.locator("#sheet-lap-compare-target")).toHaveValue("run:primary");
+  // Same instant again in the session dropdown above it, which names this sheet.
+  await expect(page.locator("#sheet-lap-compare-target")).toHaveValue("this_sheet");
   const selected = await page
     .locator("#sheet-lap-compare-target option:checked")
     .first()

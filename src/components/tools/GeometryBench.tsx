@@ -38,7 +38,10 @@ export function GeometryBench({ geometry }: { geometry: ToolsGeometry }) {
   const rc = geometry.rollCentre;
 
   return (
-    <SurfaceCard variant="hero" contentClassName="p-0" className="rounded-2xl">
+    /* `h-full` + a flex column, like the two list benches beside it: the three cards sit in one
+       row from xl and stretch to one height, with each card's doors pinned to its foot. This is
+       normally the tallest of the three, so the stretch is mostly the OTHER two growing. */
+    <SurfaceCard variant="hero" contentClassName="flex h-full flex-col p-0" className="rounded-2xl">
       <BandHeader label="Geometry Lab" />
 
       <div className="flex items-start justify-between gap-3 px-4 pt-3">
@@ -83,11 +86,15 @@ export function GeometryBench({ geometry }: { geometry: ToolsGeometry }) {
             The schematic is `w-full` on a 360-unit viewBox, so its annotation type scales with
             it: at the full width of this card on a 1440 desktop it rendered ~1100px across, which
             put "ride 5.0mm" at 28px and ran it into the "RC" label. 460 keeps the arm angles near
-            the ~9px they are on a phone — the size the drawing was drawn for. It costs an empty
-            right half on a wide screen, which is the same shape the Video band below already has.
+            the ~9px they are on a phone — the size the drawing was drawn for.
+
+            Centred (founder call, 2026-08-27). It was left-aligned with an empty right half
+            back when the card spanned the whole page; now the card is one of three across on a
+            desktop, and the cap still bites on a wide monitor (a 1760px row gives each card
+            ~560px), so the car sits in the middle of its card rather than against one edge.
           */}
           <div className="px-3 pb-1 pt-2.5">
-            <div className="max-w-[460px]">
+            <div className="mx-auto max-w-[460px]">
               <AxleSchematic
                 solved={rc.frontSolve}
                 chassis={rc.frontPlate}
@@ -109,7 +116,7 @@ export function GeometryBench({ geometry }: { geometry: ToolsGeometry }) {
             it reads as a set with the other two, and a line that skipped from "Rear" to "Rake"
             would ask the driver to go find the third value in the picture.
           */}
-          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 pb-2.5">
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 pb-5">
             <Reading label="Front" value={mm(rc.frontMm)} />
             <Reading label="Rear" value={mm(rc.rearMm)} />
             <Reading label="Rake" value={signedMm(rc.rakeMm)} accent />
@@ -122,7 +129,7 @@ export function GeometryBench({ geometry }: { geometry: ToolsGeometry }) {
             were the same fact twice — and on a 390px phone they truncated to "Roll axis rakes
             do…" while crowding the two doors. The row is only the doors now.
           */}
-          <div className="mt-3 flex items-center justify-end gap-2 border-t border-border bg-muted/40 px-4 py-2.5">
+          <div className="mt-auto flex items-center justify-end gap-2 border-t border-border bg-muted/40 px-4 py-2.5">
             {/*
               The blank calculator (founder pin, 2026-08-19). Every door into the Lab carried a
               setup with it except the two empty-state links, which only a driver with no car or
@@ -148,7 +155,7 @@ export function GeometryBench({ geometry }: { geometry: ToolsGeometry }) {
             geometry wearing this car's name, which is the single failure this app refuses. So
             the band says why it is empty and still opens the door.
           */}
-          <p className="px-4 pb-1 pt-2.5 text-[13px] leading-relaxed text-muted-foreground">
+          <p className="px-4 pb-3 pt-2.5 text-[13px] leading-relaxed text-muted-foreground">
             {geometry.reason === "no-setup"
               ? "This car's latest setup doesn't fill in enough of the suspension to solve. The Lab still opens, and you can move the shims by hand."
               : "No geometry model for this chassis yet — those get measured one car at a time. The Lab still opens, and you can load any setup into it."}
@@ -159,7 +166,7 @@ export function GeometryBench({ geometry }: { geometry: ToolsGeometry }) {
             keeps the lab's own name and takes the yellow: the only action on a band is never a
             quiet one.
           */}
-          <div className="mt-2 flex items-center justify-end border-t border-border bg-muted/40 px-4 py-2.5">
+          <div className="mt-auto flex items-center justify-end border-t border-border bg-muted/40 px-4 py-2.5">
             <ButtonLink href="/analysis/roll-center">Open the lab</ButtonLink>
           </div>
         </>

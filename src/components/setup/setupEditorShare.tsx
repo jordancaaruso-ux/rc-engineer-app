@@ -67,7 +67,7 @@ export function SetupEditorShareNote() {
   const { dirty } = useSetupEditorShareState();
   if (!dirty) return null;
   return (
-    <p className="ui-caption px-1">Sharing sends the saved sheet. Save your changes first.</p>
+    <p className="ui-caption px-1">The file is the saved sheet. Save your changes first.</p>
   );
 }
 

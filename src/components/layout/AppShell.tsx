@@ -15,7 +15,7 @@ import {
 import { PrimaryNavProvider } from "@/components/layout/PrimaryNavProvider";
 import { IdeasEdgeTab } from "@/components/layout/IdeasEdgeTab";
 import { TopRail } from "@/components/layout/TopRail";
-import { TodayDraftRunProvider } from "@/components/layout/TodayDraftRunProvider";
+import { DraftRunProvider } from "@/components/layout/DraftRunProvider";
 import { RouteTransitionProvider } from "@/components/layout/RouteTransitionProvider";
 import { DemoBanner } from "@/components/layout/DemoBanner";
 import { cn } from "@/lib/utils";
@@ -52,7 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <TodayDraftRunProvider>
+    <DraftRunProvider>
       <PrimaryNavProvider>
         <MobileBackProvider>
           <DemoBanner />
@@ -121,6 +121,6 @@ export function AppShell({ children }: { children: ReactNode }) {
            */}
         </MobileBackProvider>
       </PrimaryNavProvider>
-    </TodayDraftRunProvider>
+    </DraftRunProvider>
   );
 }

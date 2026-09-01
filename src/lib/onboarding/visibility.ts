@@ -28,11 +28,13 @@ export type OnboardingFacts = {
  * Set up enough that logging the run is the next thing to do: a car to attach the
  * run to, and the timing identity that makes lap times land on them by themselves.
  *
- * A setup sheet is deliberately NOT part of this (founder 2026-08-18). It is the
- * one item that needs something they may not have on them — the manufacturer's
- * fillable PDF — and asking for it before the first run puts the app's longest
- * chore in front of its first payoff. It stays on the card as an advised extra and
- * carries on nagging from `DashboardAddSetupCard` afterwards.
+ * A setup sheet is deliberately NOT part of this (founder 2026-08-18, still standing
+ * after the 08-26 promotion). It is the one item that needs something they may not
+ * have on them — the manufacturer's fillable PDF — so it must never stand between a
+ * driver at the track and a logged run. It is step three of the walk with two doors
+ * (add it now / add it when you log a run) and carries on nagging from
+ * `DashboardAddSetupCard` afterwards, but it does not gate. See `isSetUpComplete`
+ * for the "have we finished asking" question, which is not this one.
  *
  * Was `isGarageReady` (car + timing + setup) until the same call.
  */
@@ -50,17 +52,36 @@ export function showWelcomeScreen(f: OnboardingFacts): boolean {
 }
 
 /**
- * The dashboard "Get set up" card. Retires exactly two ways: the first run is
- * logged (the card's whole purpose, so it stops asking) or Ignore.
+ * All three steps of the walk are done — car, timing identity, setup sheet — so
+ * there is nothing left to ask for (2026-08-26).
  *
- * It no longer retires on a "ready" garage (amended 2026-08-18). Readiness is now
- * car + timing, and the card's last state is the payoff — "You're ready, log your
- * first run" — so retiring on readiness would delete the card at the exact moment
- * it finally has the good news to deliver.
+ * This is what `isGarageReady` used to mean before the 2026-08-18 split. The two
+ * are not the same question and both are wanted: `isReadyToRun` answers "can this
+ * driver log a run that will work", which the sheet does not affect, and this one
+ * answers "have we finished asking", which it does.
+ */
+export function isSetUpComplete(f: OnboardingFacts): boolean {
+  return f.hasCar && f.hasTimingIdentity && f.hasSetup;
+}
+
+/**
+ * The dashboard "Get set up" card, and — same predicate, no second definition of
+ * "still setting up" — the "Back to setting up" row on Settings.
+ *
+ * Retires three ways: the walk is finished, the first run is logged (the card's
+ * whole purpose, so it stops asking), or Ignore.
+ *
+ * The finished-walk exit came back on 2026-08-26 with the sheet promoted to step
+ * three (founder). It was removed on 08-18 for a good reason that no longer holds:
+ * back then the card's last state was the payoff — "You're ready, log your first
+ * run" — so retiring on a complete garage deleted the card at the moment it finally
+ * had good news. That payoff button is gone (the dashboard's yellow Start-a-run bar
+ * was always the run door, and two yellow buttons stacked was one too many), so a
+ * complete card now shows three ticks and asks for nothing. That is furniture.
  *
  * Note it does NOT depend on `seen` — the card leads whether or not they read the
  * overlay, which is what makes "Look around first" safe.
  */
 export function showGetSetUpCard(f: OnboardingFacts): boolean {
-  return !f.dismissed && !f.hasAnyRun;
+  return !f.dismissed && !f.hasAnyRun && !isSetUpComplete(f);
 }

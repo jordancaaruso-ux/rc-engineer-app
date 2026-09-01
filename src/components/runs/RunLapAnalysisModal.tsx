@@ -2,23 +2,16 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { LapComparisonColumnGrid } from "@/components/runs/LapComparisonColumnGrid";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import { toCompareRunShape } from "@/lib/runCompareShape";
-import type { LapRow } from "@/lib/lapAnalysis";
 import { getIncludedLaps, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { formatRunDateTime } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
-import {
-  formatDriverSessionLabel,
-  resolveImportedSessionDisplayTimeIso,
-  resolveImportedSessionHasWallClockTime,
-  timingSourceFromParserId,
-  timingSourceFromSourceUrl,
-} from "@/lib/lapImport/labels";
-import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import { useImportedLapLibrary } from "@/components/laps/useImportedLapLibrary";
 
 type CompareRunInput = Parameters<typeof toCompareRunShape>[0];
 
@@ -59,19 +52,11 @@ export function RunLapAnalysisModal({
   viewerUserId = null,
   memberDisplayByUserId,
 }: Props) {
+  const router = useRouter();
   const [importedLapSetsFull, setImportedLapSetsFull] = useState<RunWithImports["importedLapSets"] | null>(null);
   const [importedLapsLoading, setImportedLapsLoading] = useState(false);
   const [importedLapsError, setImportedLapsError] = useState<string | null>(null);
-  const [libraryLapSessions, setLibraryLapSessions] = useState<
-    Array<{
-      id: string;
-      selectLabel: string;
-      name: string;
-      laps: LapRow[];
-      sortTimeIso: string;
-      trackName: string | null;
-    }>
-  >([]);
+  const libraryLapSessions = useImportedLapLibrary(open);
 
   /**
    * The sheet names the session it is about, rather than naming itself. "Lap
@@ -167,67 +152,6 @@ export function RunLapAnalysisModal({
     };
   }, [open, run.id, run.importedLapSets, importedLapSetsFull, missingImportedLapRows]);
 
-  useEffect(() => {
-    if (!open) return;
-    let alive = true;
-    fetch("/api/lap-time-sessions", { cache: "no-store" })
-      .then((r) => r.json().catch(() => null))
-      .then(
-        (data: {
-          sessions?: Array<{
-            id: string;
-            createdAt: string;
-            sessionCompletedAt?: string | null;
-            sourceUrl?: string | null;
-            parserId?: string | null;
-            trackName?: string | null;
-            parsedPayload: unknown;
-          }>;
-        } | null) => {
-          if (!alive || !data?.sessions) return;
-          const mapped: Array<{
-            id: string;
-            selectLabel: string;
-            name: string;
-            laps: LapRow[];
-            sortTimeIso: string;
-            trackName: string | null;
-          }> = [];
-          for (const s of data.sessions) {
-            const parsed = primaryLapRowsFromImportedPayload(s.parsedPayload);
-            if (!parsed) continue;
-            const whenIso = resolveImportedSessionDisplayTimeIso({
-              sessionCompletedAt: s.sessionCompletedAt ?? null,
-              parsedPayload: s.parsedPayload,
-              createdAt: s.createdAt,
-            });
-            mapped.push({
-              id: s.id,
-              selectLabel: formatDriverSessionLabel(parsed.driverName, whenIso, {
-                timingSource:
-                  timingSourceFromParserId(s.parserId) ?? timingSourceFromSourceUrl(s.sourceUrl),
-                isWallClockTime: resolveImportedSessionHasWallClockTime({
-                  sessionCompletedAt: s.sessionCompletedAt ?? null,
-                  parsedPayload: s.parsedPayload,
-                }),
-              }),
-              name: parsed.driverName?.trim() || "Imported session",
-              laps: parsed.rows,
-              sortTimeIso: whenIso,
-              trackName: s.trackName ?? null,
-            });
-          }
-          setLibraryLapSessions(mapped);
-        }
-      )
-      .catch(() => {
-        if (alive) setLibraryLapSessions([]);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [open]);
-
   if (!open || typeof document === "undefined") return null;
 
   /*
@@ -303,6 +227,25 @@ export function RunLapAnalysisModal({
               librarySessions={libraryLapSessions}
               viewerUserId={viewerUserId}
               memberDisplayByUserId={memberDisplayByUserId}
+              /*
+               * Same columns, bigger room. The full-page sheet reloads this run from the
+               * server, so every series id the pop-up hands over resolves there too —
+               * which is the whole reason the door carries ids rather than laps.
+               */
+              onOpenFullAnalysis={
+                /*
+                 * Owner only. The full-page sheet loads runs by `userId`, so offering the door
+                 * on a teammate's shared session would promise a page that answers 404.
+                 */
+                runOwnedByViewer
+                  ? ({ targetId, comparisonIds }) => {
+                      const params = new URLSearchParams({ run: run.id });
+                      if (targetId) params.set("target", targetId);
+                      if (comparisonIds.length > 0) params.set("columns", comparisonIds.join(","));
+                      router.push(`/laps/analysis?${params.toString()}`);
+                    }
+                  : undefined
+              }
             />
           )}
         </div>

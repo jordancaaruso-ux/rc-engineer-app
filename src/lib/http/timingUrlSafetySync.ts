@@ -1,15 +1,42 @@
-/** Known public timing hosts (hostname suffix match). */
+/**
+ * Known public timing hosts (hostname suffix match).
+ *
+ * `myrcm.ch` was taken off this list on 2026-08-26 and moved to the denylist below — MyRCM
+ * publishes no API and its operator has stated that reading its pages is not permitted, so the
+ * only way in was HTML scraping. Every import and discovery fetch passes through here, which is
+ * why this file, not the parser registry, is where a source is actually turned off. LiveRC and
+ * MyLaps/Speedhive stay. The MyRCM parser modules (`lapUrlParsers/myRcm*.ts`) are left in the
+ * tree, dormant and unreachable, so already imported MyRCM runs keep rendering and it is a
+ * one-line job to restore if consent ever arrives.
+ */
 const TIMING_HOST_SUFFIXES = [
   "liverc.com",
   "live-rc.com",
   "rcprotiming.com",
   "mylaps.com",
   "rctrack.info",
-  "myrcm.ch",
 ];
+
+/**
+ * Hosts we will not fetch at all, whatever else says yes.
+ *
+ * Taking `myrcm.ch` off the allowlist above is not enough on its own: an admin request carries
+ * `allowAnyPublicHost`, which waves through every public host, and `httpTimingParser` matches any
+ * http(s) URL — so before this list existed an admin pasting a MyRCM report URL still fetched the
+ * page and imported whatever decimals the generic HTML reader found on it. Measured on the dev
+ * server 2026-08-26: it returned four "laps". A denylist that outranks the bypass is the only
+ * version of this that actually holds.
+ */
+const BLOCKED_TIMING_HOST_SUFFIXES = ["myrcm.ch"];
+
+function hostnameBlockedBySuffix(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return BLOCKED_TIMING_HOST_SUFFIXES.some((suffix) => h === suffix || h.endsWith(`.${suffix}`));
+}
 
 function hostnameAllowed(hostname: string, allowAnyPublicHost: boolean): boolean {
   const h = hostname.toLowerCase();
+  if (hostnameBlockedBySuffix(h)) return false;
   if (TIMING_HOST_SUFFIXES.some((suffix) => h === suffix || h.endsWith(`.${suffix}`))) {
     return true;
   }
@@ -58,6 +85,9 @@ export function validateTimingHttpUrlSync(
     if (u.username || u.password) {
       return { ok: false, error: "URL must not include credentials" };
     }
+    if (hostnameBlockedBySuffix(u.hostname)) {
+      return { ok: false, error: "This timing site is not supported." };
+    }
     if (!hostnameAllowed(u.hostname, options.allowAnyPublicHost === true)) {
       return { ok: false, error: "URL host not in allowed timing domains" };
     }
@@ -71,6 +101,7 @@ export function validateTimingHttpUrlSync(
 }
 
 export function isTimingHostnameBlocked(hostname: string): boolean {
+  if (hostnameBlockedBySuffix(hostname)) return true;
   if (hostname === "localhost" || hostname.endsWith(".local")) return true;
   if (isIpv4Literal(hostname) || hostname.includes(":")) return isBlockedIp(hostname);
   return false;

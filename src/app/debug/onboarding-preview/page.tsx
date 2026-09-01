@@ -24,6 +24,7 @@ import { WelcomeScreen } from "@/components/onboarding/WelcomeScreen";
 import type { UploadSetupCar } from "@/components/setup/UploadSetupSheetBar";
 import {
   isReadyToRun,
+  isSetUpComplete,
   showGetSetUpCard,
   showWelcomeScreen,
   type OnboardingFacts,
@@ -130,6 +131,7 @@ function Verdict({ f }: { f: OnboardingFacts }) {
     ["overlay", showWelcomeScreen(f)],
     ["card", showGetSetUpCard(f)],
     ["ready to run", isReadyToRun(f)],
+    ["set up", isSetUpComplete(f)],
   ];
   return (
     <div className="flex flex-wrap gap-1.5">

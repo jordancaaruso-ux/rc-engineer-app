@@ -1,4 +1,5 @@
 import "server-only";
+import { isMyRcmHostUrl } from "@/lib/lapUrlParsers/myRcmPdfSource";
 
 import { prisma } from "@/lib/prisma";
 import { userCanAccessEvent } from "@/lib/events/eventParticipation";
@@ -175,6 +176,12 @@ export async function listMyPendingRaceSessionsForEvent(
       hubRowCount: 0,
       pagesChecked: 0,
     };
+  }
+
+  if (isMyRcmHostUrl(pageUrl)) {
+    // MyRCM is never fetched (it is on the timing denylist). The link is kept so the log-run
+    // form's PDF door can send the driver to their class page; nothing to list, nothing to fix.
+    return { sessions: [], hint: null, hubRowCount: 0, pagesChecked: 0 };
   }
 
   if (!isLiveRcResultsDiscoveryUrl(pageUrl)) {

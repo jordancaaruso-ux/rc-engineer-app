@@ -1,5 +1,6 @@
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 import { sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import { wallClockAsUtcToInstant } from "@/lib/eventActive";
 
 /**
  * Canonical instant for imported lap sessions: stored payload `sessionCompletedAtIso` → DB `sessionCompletedAt` →
@@ -177,4 +178,43 @@ export function formatDriverSessionLabelWithContext(
   const c = context?.trim();
   if (!c) return base;
   return `${base} · ${c}`;
+}
+
+/**
+ * Real instant to ask the weather service for, from an imported lap set's
+ * session time. LiveRC/MyRCM session times are track wall clock stored
+ * as-if-UTC (see {@link isWallClockAsUtcTimingSource}) — sending one to a
+ * weather lookup unconverted reads the forecast a timezone-offset away
+ * (Bendigo's 3:59 PM run was stamped with 1:59 AM's 6.9°C air, 2026-08-30).
+ * Wall clocks are reinterpreted in `deviceTimeZone` (the device is at the
+ * track); true instants (Speedhive, import-`createdAt` fallbacks) pass
+ * through untouched.
+ *
+ * Null when there is no session time — and, unlike the run-save path's
+ * conversion, also when a wall clock has no usable zone: for weather,
+ * "current conditions" is a far better answer than an hour that can be ten
+ * hours wrong.
+ */
+export function importedSessionWeatherInstantIso(
+  set:
+    | {
+        sessionCompletedAt: string | null;
+        sessionCompletedAtIsWallClock: boolean;
+        sourceUrl: string | null;
+      }
+    | null
+    | undefined,
+  deviceTimeZone: string | null | undefined
+): string | null {
+  const raw = set?.sessionCompletedAt?.trim();
+  if (!raw) return null;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return null;
+  const isWallClock =
+    set!.sessionCompletedAtIsWallClock === true &&
+    isWallClockAsUtcTimingSource(timingSourceFromSourceUrl(set!.sourceUrl));
+  if (!isWallClock) return d.toISOString();
+  const tz = deviceTimeZone?.trim();
+  if (!tz) return null;
+  return wallClockAsUtcToInstant(d, tz).toISOString();
 }

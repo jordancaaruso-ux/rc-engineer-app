@@ -42,6 +42,9 @@ export type SectorSegment = {
   name: string;
   fromLabel: string;
   toLabel: string;
+  /** The lines this segment runs between — so the compare can light them on the picture. */
+  fromKey: string;
+  toKey: string;
   aSec: number;
   bSec: number;
   /** aSec - bSec; negative = lap A faster through this segment. */
@@ -68,6 +71,8 @@ export type LapCompareReport = {
 export const EVEN_SEGMENT_THRESHOLD_SEC = 0.02;
 
 const SF_LABEL = "Start/finish";
+/** The lap boundary is not one of the split lines — it is the profile's start/finish. */
+const SF_KEY = "sf";
 
 export function collectCompareCars(
   result: VideoAnalysisResultV1,
@@ -99,11 +104,19 @@ export function collectCompareCars(
   return cars.sort((x, y) => y.lapCount - x.lapCount || x.carId - y.carId);
 }
 
-/** Best + 2nd-best lap of a car (the surface's default compare), or null if <2 laps. */
+/**
+ * Best + 2nd-best lap of a car (the surface's default compare), or null if <2 laps.
+ *
+ * Among laps that have sector splits first: the surface exists to show WHERE a lap was won,
+ * and a best lap with no crossings marked can only say "whole-lap delta only". Falls back to
+ * time alone when fewer than two laps carry splits.
+ */
 export function defaultLapPair(car: CompareCar): { a: CompareLap; b: CompareLap } | null {
   if (car.laps.length < 2) return null;
-  const byTime = [...car.laps].sort((x, y) => x.lapTimeSec - y.lapTimeSec);
-  return { a: byTime[0]!, b: byTime[1]! };
+  const byTime = (laps: CompareLap[]) => [...laps].sort((x, y) => x.lapTimeSec - y.lapTimeSec);
+  const withSplits = byTime(car.laps.filter((l) => Object.keys(l.splits).length > 0));
+  const pool = withSplits.length >= 2 ? withSplits : byTime(car.laps);
+  return { a: pool[0]!, b: pool[1]! };
 }
 
 /**
@@ -157,6 +170,8 @@ export function compareLaps(
       name: lines.length === 0 ? "Full lap" : `S${i + 1}`,
       fromLabel: i === 0 ? SF_LABEL : lineLabel(lines[i - 1]!),
       toLabel: i === boundsA.length - 2 ? SF_LABEL : lineLabel(lines[i]!),
+      fromKey: i === 0 ? SF_KEY : lines[i - 1]!,
+      toKey: i === boundsA.length - 2 ? SF_KEY : lines[i]!,
       aSec,
       bSec,
       deltaSec: aSec - bSec,

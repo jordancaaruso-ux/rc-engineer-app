@@ -158,7 +158,7 @@ export function NewSetupUploadButton({
           type="button"
           onClick={openFilePicker}
           disabled={busy || needsCar}
-          className="rounded-md border border-primary-ink/60 primary-face bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition hover:bg-primary disabled:opacity-60 disabled:cursor-default"
+          className="rounded-md primary-face bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition hover:bg-primary disabled:opacity-60 disabled:cursor-default"
           title={needsCar ? "Add a car first" : "Upload your setup sheet (the fillable PDF)"}
         >
           {stageLabel(stage)}

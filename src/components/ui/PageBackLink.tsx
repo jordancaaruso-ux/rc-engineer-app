@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ComponentProps, type MouseEvent } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { useRegisterMobileBack } from "@/components/layout/MobileBackContext";
+import { cameFromPathname, hrefPathname } from "@/lib/navigation/returnTrail";
 import { cn } from "@/lib/utils";
 
 /** Muted icon-only back control for `.page-header` — not a primary (yellow) action. */
@@ -32,6 +33,7 @@ export function PageBackLink({
   historyBackToken?: { key: string; value: string } | null;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   // Read after mount only — sessionStorage doesn't exist on the server, and the
   // markup must match on both sides of hydration.
   const [useHistoryBack, setUseHistoryBack] = useState(false);
@@ -58,23 +60,37 @@ export function PageBackLink({
     router.back();
   }, [historyBackToken, router]);
 
+  /*
+   * The app-wide return trail (see `returnTrail.ts`): when the page this arrow
+   * points at is the page the driver actually came from, back is real history
+   * navigation — which restores their scroll position — with no per-door token.
+   * The token above still wins where it's wired; the trail covers every other
+   * door. Read after mount for the same hydration reason as the token.
+   */
+  const hrefString = typeof href === "string" ? href : null;
+  const [trailBack, setTrailBack] = useState(false);
+  useEffect(() => {
+    const target = hrefString ? hrefPathname(hrefString) : null;
+    setTrailBack(target != null && pathname != null && cameFromPathname(target, pathname));
+  }, [hrefString, pathname]);
+  const canHistoryBack = useHistoryBack || trailBack;
+
   const onClick = useCallback(
     (e: MouseEvent<HTMLAnchorElement>) => {
       // Leave modified clicks (new tab, new window) to the browser.
-      if (!useHistoryBack || e.defaultPrevented) return;
+      if (!canHistoryBack || e.defaultPrevented) return;
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
       e.preventDefault();
       goBack();
     },
-    [useHistoryBack, goBack]
+    [canHistoryBack, goBack]
   );
 
   // Publish this destination to the fixed mobile chrome so the top-left JRC pill
   // becomes the back button (only string hrefs — the chrome links to a plain URL).
-  const hrefString = typeof href === "string" ? href : null;
   const chromeAdoptedBack = useRegisterMobileBack(
     hrefString ?? "",
-    useHistoryBack ? goBack : null
+    canHistoryBack ? goBack : null
   );
 
   // Only once the chrome is *actually* showing this back control would the header

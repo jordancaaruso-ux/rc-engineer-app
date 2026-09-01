@@ -151,13 +151,19 @@ function AnalyzeFlowPreviewInner() {
   }, []);
 
   return (
-    <main className="page-body mx-auto max-w-md p-4">
-      <p className="type-timestamp mb-4 text-center">
-        DEBUG · analyze flow on stubbed endpoints · library video = generated sample
+    // Same chrome as the real route — no wrapper padding, no in-flow debug banner. The flow
+    // sizes its video against the leftover window height, so anything this page adds above it
+    // makes the preview lie about the layout it exists to show. (A max-w-md wrapper here once
+    // collapsed the desktop video column to zero width.)
+    <main className="page-body">
+      <p className="type-timestamp pointer-events-none fixed bottom-1 right-2 z-50 opacity-70">
+        DEBUG · stubbed endpoints · generated sample video
       </p>
-      {ready ? (
-        <AnalyzeFlowClient jobId="flow_preview" videoUrlForAsset={() => SAMPLE_VIDEO} />
-      ) : null}
+      <div className="pt-[calc(var(--top-chrome-y)+2.25rem)] md:pt-0">
+        {ready ? (
+          <AnalyzeFlowClient jobId="flow_preview" videoUrlForAsset={() => SAMPLE_VIDEO} />
+        ) : null}
+      </div>
     </main>
   );
 }

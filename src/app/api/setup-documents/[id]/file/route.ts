@@ -7,11 +7,14 @@ import { setupDocumentReadableForReviewWhere } from "@/lib/setupCalibrations/cal
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function GET(_request: Request, ctx: Ctx) {
+export async function GET(request: Request, ctx: Ctx) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   const { id } = await ctx.params;
+  // Everything else on this route is a PREVIEW — the calibration editor, the import-review
+  // iframe, the image tracer — so inline stays the default and only an explicit ask changes it.
+  const download = new URL(request.url).searchParams.get("download") === "1";
   const user = await getAuthenticatedApiUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const doc = await prisma.setupDocument.findFirst({
@@ -37,6 +40,14 @@ export async function GET(_request: Request, ctx: Ctx) {
       "Content-Type": contentType,
       "Content-Length": String(bytes.length),
       "Cache-Control": "private, max-age=3600",
+      /*
+       * A phone with no share sheet is sent to this URL rather than a blob anchor, which WebKit
+       * navigates to instead of saving (founder report, 2026-09-01). `attachment` is what makes
+       * iOS show its own download sheet and leave the page where it was.
+       */
+      ...(download
+        ? { "Content-Disposition": `attachment; filename="${encodeURIComponent(doc.originalFilename)}"` }
+        : {}),
     },
   });
 }

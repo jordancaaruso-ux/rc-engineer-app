@@ -20,7 +20,10 @@ export const AWESOMATIX_SINGLE_CHOICE_GROUPS: Record<string, readonly string[]> 
   damping_front: ["Linear", "P1", "P2"],
   damping_rear: ["Linear", "P1", "P2"],
   /** PDF may include an "Other" widget; setup review chips omit it — free text is a separate field. */
-  chassis: ["C01B-RAF", "C01B-RC", "C01RS", "Other"],
+  // C01B-RSL added 2026-09-01 with the aligned edition sheet (the rebuilt A800RR paper prints a
+  // box for it). This list and the model's schemaJson both name the chassis options — keep them
+  // agreeing, or a preset the schema knows reads as "custom text" here.
+  chassis: ["C01B-RAF", "C01B-RC", "C01RS", "C01B-RSL", "Other"],
   front_bumper: ["C07R", "C07RF", "Other"],
   top_deck_front: ["C127S", "C127", "Other"],
   top_deck_rear: ["C127S", "C127", "Other"],

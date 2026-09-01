@@ -16,6 +16,20 @@ export type ComparisonSeries = {
   bestLap: number | null;
   avgTop5: number | null;
   avgTop10: number | null;
+  /**
+   * Spread of the included laps in SECONDS (standard deviation) — lower is tidier.
+   *
+   * The app carries two consistency languages and they are not interchangeable: this one,
+   * and `consistencyScore` (100 − CV%, higher is better) which the FIELD tab, the dashboard
+   * and the Engineer quote. The rule is per-surface, not global — one sheet, one language.
+   * The lap sheet's own stat tile has always read "±0.23", so a column header reading
+   * "98.44%" three centimetres below it was two answers to one question on one screen.
+   */
+  consistencyStdDev: number | null;
+  /** Seconds per lap the run drifted — see `getFadePerLap`. Positive = gave time away. */
+  fadePerLap: number | null;
+  /** The driver's stored 5-minute window start for their own run — see `readFiveMinStartLap`. */
+  fiveMinStartLap?: number | null;
 };
 
 export type LapSeriesAnalysis = {
@@ -73,11 +87,177 @@ export function formatLapRowBreakdown(laps: LapRow[]): string {
   return laps.map((l) => `L${l.lapNumber} ${l.lapTimeSeconds.toFixed(3)}s`).join(" · ");
 }
 
+/**
+ * How far off the best lap a lap can be and still count as driven rather than survived.
+ *
+ * Fade needs this cut and cannot lean on the run form's exclusions to provide it.
+ * Exclusions are a thing the DRIVER does to their OWN run; the whole point of the
+ * analysis surface is reading sessions nobody here drove — a stranger's heat off LiveRC
+ * arrives with every marshal call still in it, and one 40s lap in a 15s class doesn't
+ * shift a mean, it *is* the mean of its third.
+ *
+ * 1.25× is deliberately loose. A bad-but-driven lap (traffic, a wide line, a tap) lands
+ * inside it; getting stood back up does not.
+ *
+ * Consistency deliberately does NOT use this — it stays on plain included laps, matching
+ * the stat tile above the grid, which has always read the same spread the same way.
+ */
+export const CLEAN_LAP_MAX_RATIO_TO_BEST = 1.25;
+
+/**
+ * Minimum clean laps, after the out-lap is dropped, before fade means anything. Six laps
+ * is fifteen pairs for the median to stand on; under that the figure is "—", not zero.
+ */
+export const MIN_LAPS_FOR_FADE = 6;
+
+/** Laps in one rolling window of the fade profile — a third of a typical 5-minute run. */
+export const FADE_PROFILE_WINDOW = 6;
+
+/**
+ * Clean laps before the rolling profile is drawn at all. Under ten laps the profile is
+ * four windows of six laps sharing most of their laps: a picture of the noise, not the run.
+ */
+export const MIN_LAPS_FOR_FADE_PROFILE = 10;
+
+/**
+ * Included laps with the crashes cut out, in lap order.
+ *
+ * Lap order, not the order the array happened to arrive in: fade reads the run as a
+ * sequence, so the sequence IS the measurement.
+ */
+export function getCleanLapsInOrder(laps: LapRow[]): LapRow[] {
+  const included = getIncludedLaps(laps).filter((l) => l.lapTimeSeconds > 0);
+  if (included.length === 0) return [];
+  const best = Math.min(...included.map((l) => l.lapTimeSeconds));
+  const ceiling = best * CLEAN_LAP_MAX_RATIO_TO_BEST;
+  return included
+    .filter((l) => l.lapTimeSeconds <= ceiling)
+    .sort((a, b) => a.lapNumber - b.lapNumber);
+}
+
+/**
+ * The laps fade is measured over: clean laps, minus the out-lap.
+ *
+ * The first lap by number is the run's out-lap — a standing start, a staggered release, the
+ * car still coming up to temperature — and it is not the car going away, whichever way it
+ * reads. It is dropped by lap number, not by position in the clean set, so a lap 1 the
+ * crash cut already removed doesn't cost lap 2 as well.
+ */
+export function getFadeLapsInOrder(laps: LapRow[]): LapRow[] {
+  const included = getIncludedLaps(laps).filter((l) => l.lapTimeSeconds > 0);
+  if (included.length === 0) return [];
+  const outLap = Math.min(...included.map((l) => l.lapNumber));
+  return getCleanLapsInOrder(laps).filter((l) => l.lapNumber !== outLap);
+}
+
+function median(xs: number[]): number {
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
+}
+
+/**
+ * Seconds per lap between every pair of laps, and the median of all of them — the
+ * Theil–Sen slope. The line the middle pair draws, not the line the average pair draws.
+ */
+function medianPairwiseSlope(laps: LapRow[]): number {
+  const slopes: number[] = [];
+  for (let i = 0; i < laps.length; i++) {
+    for (let j = i + 1; j < laps.length; j++) {
+      const dx = laps[j]!.lapNumber - laps[i]!.lapNumber;
+      if (dx > 0) slopes.push((laps[j]!.lapTimeSeconds - laps[i]!.lapTimeSeconds) / dx);
+    }
+  }
+  return median(slopes);
+}
+
+/**
+ * How many seconds per lap the run drifted, over the whole run.
+ *
+ * Positive = the run got slower, which is the tyre going away, the pack sagging, or the
+ * driver tiring — three things a race engineer treats very differently but all of which
+ * start as this one number being positive. Negative = came to the driver.
+ *
+ * Measured as the median of every pairwise "seconds per lap" between two laps of the run
+ * (Theil–Sen). Chosen over the first-third/last-third difference it replaced (2026-08-27)
+ * after both were run over 292 real runs: they agreed on 248, and on every disagreement
+ * read by eye the thirds figure was the one that was wrong — a flat run with four scrappy
+ * laps that happened to land in its closing third read as +0.87s of fade. A median of
+ * pairs can't be pulled by a few bad laps, it uses every lap rather than two ends, and it
+ * is a RATE, so a 12-lap heat and a 30-lap main read on one scale. Multiply by the laps
+ * to get the felt number: `fadeOverRunSeconds`.
+ *
+ * The "best three of each half" idea was rejected first: the laps a driver is best at are
+ * exactly the laps that don't show wear.
+ */
+export function getFadePerLap(laps: LapRow[]): number | null {
+  const fadeLaps = getFadeLapsInOrder(laps);
+  if (fadeLaps.length < MIN_LAPS_FOR_FADE) return null;
+  return medianPairwiseSlope(fadeLaps);
+}
+
+export type FadeProfilePoint = {
+  /** First and last lap number of the window the rate was read over. */
+  fromLap: number;
+  toLap: number;
+  /** Seconds per lap across that window, signed like `getFadePerLap`. */
+  ratePerLap: number;
+};
+
+/**
+ * The fade rate over every `FADE_PROFILE_WINDOW`-lap stretch of the run, in order — the
+ * picture of WHEN the run went away, which one rate over the whole run can't carry.
+ *
+ * This is the whole story the app tells about onset. A "flat, then it goes off at lap N"
+ * fit was tried on the same 292 runs and fired on seven, every one of them two ugly
+ * closing laps of a qualifier being read as the tyre going — with 12–16 laps in a run
+ * there is nothing to tell a driver's mistakes from the car's decline. The rolling rate is
+ * just the data, so it can't make that claim; a reader sees a rate that builds and stays
+ * built and draws the conclusion themselves. Empty under `MIN_LAPS_FOR_FADE_PROFILE`.
+ */
+export function getFadeProfile(laps: LapRow[]): FadeProfilePoint[] {
+  const fadeLaps = getFadeLapsInOrder(laps);
+  if (fadeLaps.length < MIN_LAPS_FOR_FADE_PROFILE) return [];
+  const out: FadeProfilePoint[] = [];
+  for (let i = 0; i + FADE_PROFILE_WINDOW <= fadeLaps.length; i++) {
+    const window = fadeLaps.slice(i, i + FADE_PROFILE_WINDOW);
+    out.push({
+      fromLap: window[0]!.lapNumber,
+      toLap: window[window.length - 1]!.lapNumber,
+      ratePerLap: medianPairwiseSlope(window),
+    });
+  }
+  return out;
+}
+
+/** The rate spread back over the laps it was read on: "≈ +0.6 s over the run". */
+export function fadeOverRunSeconds(laps: LapRow[]): number | null {
+  const rate = getFadePerLap(laps);
+  if (rate == null) return null;
+  const fadeLaps = getFadeLapsInOrder(laps);
+  return rate * (fadeLaps[fadeLaps.length - 1]!.lapNumber - fadeLaps[0]!.lapNumber);
+}
+
+/** "+0.04 s/lap" — two places, signed, the unit on it. Null reads "—". */
+export function formatFadePerLap(rate: number | null): string {
+  if (rate == null || !Number.isFinite(rate)) return "—";
+  const rounded = Math.abs(rate) < 0.005 ? 0 : rate;
+  return `${rounded > 0 ? "+" : rounded < 0 ? "−" : ""}${Math.abs(rounded).toFixed(2)} s/lap`;
+}
+
+/** The hover line under a fade figure: "≈ +0.6 s over the run". */
+export function formatFadeOverRun(seconds: number | null): string | undefined {
+  if (seconds == null || !Number.isFinite(seconds)) return undefined;
+  const rounded = Math.abs(seconds) < 0.05 ? 0 : seconds;
+  return `≈ ${rounded > 0 ? "+" : rounded < 0 ? "−" : ""}${Math.abs(rounded).toFixed(1)} s over the run`;
+}
+
 export function buildComparisonSeries(
   id: string,
   label: string,
   sourceType: "run" | "imported",
-  laps: LapRow[]
+  laps: LapRow[],
+  opts?: { fiveMinStartLap?: number | null }
 ): ComparisonSeries {
   return {
     id,
@@ -87,6 +267,9 @@ export function buildComparisonSeries(
     bestLap: getBestLap(laps),
     avgTop5: getAverageTopN(laps, 5),
     avgTop10: getAverageTopN(laps, 10),
+    consistencyStdDev: analyzeLapRows(laps).consistencyStdDev,
+    fadePerLap: getFadePerLap(laps),
+    fiveMinStartLap: opts?.fiveMinStartLap ?? null,
   };
 }
 
@@ -137,7 +320,8 @@ export function resolveDeltaTintRange(deltas: Iterable<number>): number {
 }
 
 /**
- * Smooth opacity gradient for lap-cell tints (target and comparison columns).
+ * Smooth opacity gradient for lap-cell tints (comparison columns only — the
+ * target is the baseline and stays flat).
  * delta = cell − anchor: positive = slower → loss red (#E5644E), negative =
  * faster → gain green (#4FD089), the north-star data-delta semantics.
  * alpha = 0.06 + normalized * 0.44 where normalized = min(|delta| / maxAbs, 1)
@@ -166,6 +350,10 @@ export type SummaryMetricDeltas = {
   bestDelta: number | null;
   avgTop5Delta: number | null;
   avgTop10Delta: number | null;
+  /** Seconds, signed like the lap rows: positive = this column wandered more. */
+  consistencyDelta: number | null;
+  /** Seconds per lap, signed like the lap rows: positive = this column faded harder. */
+  fadePerLapDelta: number | null;
 };
 
 /** Summary deltas for comparison column headers (comparison − target). */
@@ -185,6 +373,14 @@ export function computeSummaryDeltas(
     avgTop10Delta:
       target.avgTop10 != null && comparison.avgTop10 != null
         ? comparison.avgTop10 - target.avgTop10
+        : null,
+    consistencyDelta:
+      target.consistencyStdDev != null && comparison.consistencyStdDev != null
+        ? comparison.consistencyStdDev - target.consistencyStdDev
+        : null,
+    fadePerLapDelta:
+      target.fadePerLap != null && comparison.fadePerLap != null
+        ? comparison.fadePerLap - target.fadePerLap
         : null,
   };
 }
@@ -360,10 +556,156 @@ export function analyzeLapRows(laps: LapRow[]): LapSeriesAnalysis {
   return analyzeLapSeries(times);
 }
 
+/**
+ * A five-minute window scored the way a timing loop posts a result: laps first,
+ * then the clock when the lap that crossed five minutes was completed. "13 laps,
+ * 5:12.345" — the number every RC driver ranks themselves by.
+ */
+export type FiveMinuteStint = {
+  /** Laps completed when the window's clock passed five minutes — the crossing lap counts. */
+  lapCount: number;
+  /** Wall-clock seconds when that crossing lap was completed; ≥ the window by construction. */
+  seconds: number;
+  /** First lap inside the window — the one handle the window has. */
+  startLapNumber: number;
+  /** Last lap inside the window (the one that crossed five minutes), for highlighting. */
+  endLapNumber: number;
+};
+
+/** The race length the figure answers for — "what's my 5-minute pace". */
+export const FIVE_MIN_STINT_WINDOW_SECONDS = 300;
+
+/**
+ * Best consecutive five minutes of a session — ONE rule for every source and
+ * session type (founder call, 2026-08-31):
+ *
+ * - The window slides over the laps AS DRIVEN. Excluded laps still count: a stint
+ *   is wall clock, and a crash took real time — the best window simply settles
+ *   where the driver didn't crash. This is deliberately unlike every other metric
+ *   here, which filters excluded laps out before doing anything.
+ * - Lap #0 (the out-lap) is dropped, as it is everywhere else; a window may start
+ *   on any real lap.
+ * - The lap in progress at 5:00 counts when completed (the timing-loop rule), so
+ *   `seconds` lands past the window, never at it.
+ * - Best = most laps; on equal laps, least time. The LiveRC ranking rule.
+ * - A session whose laps never reach five minutes has no figure — null, never a
+ *   padded or scaled-up number.
+ *
+ * On a real 5-minute race the window has nowhere to slide — starting after lap 1
+ * leaves under five minutes of laps — so the figure reproduces the posted result
+ * without any race/practice branch.
+ */
+export function getBestFiveMinuteStint(
+  laps: LapRow[],
+  windowSeconds: number = FIVE_MIN_STINT_WINDOW_SECONDS
+): FiveMinuteStint | null {
+  const drive = drivenLapsInOrder(laps);
+  let best: FiveMinuteStint | null = null;
+  for (let i = 0; i < drive.length; i++) {
+    const cand = windowFromIndex(drive, i, windowSeconds);
+    // Ran out of laps before the clock reached the window; every later start is
+    // a suffix of this one, so nothing further can qualify either.
+    if (cand == null) break;
+    if (
+      best == null ||
+      cand.lapCount > best.lapCount ||
+      (cand.lapCount === best.lapCount && cand.seconds < best.seconds)
+    ) {
+      best = cand;
+    }
+  }
+  return best;
+}
+
+/**
+ * The window placed BY HAND: the driver chose the start lap and the clock does
+ * the rest (founder call, 2026-09-01 — "per run, auto should be best consecutive
+ * 5 mins, with option to change"). Same wall-clock scoring as the best window;
+ * null when there aren't five minutes of laps from that start, or the lap
+ * doesn't exist — a stale choice must fall back to auto, never invent a figure.
+ */
+export function getFiveMinuteStintStartingAt(
+  laps: LapRow[],
+  startLapNumber: number,
+  windowSeconds: number = FIVE_MIN_STINT_WINDOW_SECONDS
+): FiveMinuteStint | null {
+  const drive = drivenLapsInOrder(laps);
+  const i = drive.findIndex((l) => l.lapNumber === startLapNumber);
+  if (i < 0) return null;
+  return windowFromIndex(drive, i, windowSeconds);
+}
+
+/** Real laps in driven order — lap #0 dropped, excluded laps KEPT (wall clock). */
+function drivenLapsInOrder(laps: LapRow[]): Array<{ lapNumber: number; lapTimeSeconds: number }> {
+  return [...laps]
+    .filter(
+      (l) =>
+        l.lapNumber !== 0 &&
+        typeof l.lapTimeSeconds === "number" &&
+        Number.isFinite(l.lapTimeSeconds) &&
+        l.lapTimeSeconds > 0
+    )
+    .sort((a, b) => a.lapNumber - b.lapNumber);
+}
+
+/** Timing-loop score of the window opening at drive[i]; null if the laps run out first. */
+function windowFromIndex(
+  drive: Array<{ lapNumber: number; lapTimeSeconds: number }>,
+  i: number,
+  windowSeconds: number
+): FiveMinuteStint | null {
+  let seconds = 0;
+  for (let j = i; j < drive.length; j++) {
+    seconds += drive[j]!.lapTimeSeconds;
+    if (seconds >= windowSeconds) {
+      return {
+        lapCount: j - i + 1,
+        seconds,
+        startLapNumber: drive[i]!.lapNumber,
+        endLapNumber: drive[j]!.lapNumber,
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * The driver's stored window choice, off `Run.lapSession` — an optional
+ * `fiveMinStartLap` on the version-1 blob (additive; older readers ignore it).
+ * Null = auto (best window). Validity against the CURRENT laps is the reader's
+ * problem by design: laps can be re-imported after the choice was made, so
+ * surfaces run it through `getFiveMinuteStintStartingAt` and fall back to auto.
+ */
+export function readFiveMinStartLap(lapSession: unknown): number | null {
+  if (!lapSession || typeof lapSession !== "object") return null;
+  const o = lapSession as Record<string, unknown>;
+  if (o.version !== 1) return null;
+  const raw = o.fiveMinStartLap;
+  return typeof raw === "number" && Number.isInteger(raw) && raw >= 1 ? raw : null;
+}
+
+/**
+ * The stint a surface should DISPLAY for a run: the driver's chosen window when
+ * one is stored and still valid, otherwise the best window. One helper so the
+ * run card and the lap sheet can never disagree about the same run.
+ */
+export function getDisplayFiveMinuteStint(
+  laps: LapRow[],
+  chosenStartLap: number | null | undefined
+): FiveMinuteStint | null {
+  if (chosenStartLap != null) {
+    const chosen = getFiveMinuteStintStartingAt(laps, chosenStartLap);
+    if (chosen != null) return chosen;
+  }
+  return getBestFiveMinuteStint(laps);
+}
+
 export type IncludedLapDashboardMetrics = {
   lapCount: number;
   /** Sum of included lap times (seconds). */
   stintSeconds: number | null;
+  /** Best consecutive five minutes, timing-loop scored — see `getBestFiveMinuteStint`. */
+  fiveMinStint: FiveMinuteStint | null;
   bestLap: number | null;
   avgTop5: number | null;
   avgTop10: number | null;
@@ -406,6 +748,7 @@ export function getIncludedLapDashboardMetrics(laps: LapRow[]): IncludedLapDashb
     return {
       lapCount: 0,
       stintSeconds: null,
+      fiveMinStint: null,
       bestLap: null,
       avgTop5: null,
       avgTop10: null,
@@ -433,6 +776,8 @@ export function getIncludedLapDashboardMetrics(laps: LapRow[]): IncludedLapDashb
   return {
     lapCount: times.length,
     stintSeconds,
+    // From the RAW rows, not `times`: the window is wall clock, so excluded laps count.
+    fiveMinStint: getBestFiveMinuteStint(laps),
     bestLap,
     avgTop5,
     avgTop10,
@@ -633,6 +978,8 @@ export type FieldSheetRow = {
   consistencyScore: number | null;
   /** Null when the driver has too few laps for the mistake rule (`MIN_LAPS_FOR_MISTAKES`). */
   mistakeCount: number | null;
+  /** Seconds per lap the driver drifted (`getFadePerLap`); null under `MIN_LAPS_FOR_FADE`. */
+  fadePerLap: number | null;
   /** Competition ranks (ties share a rank); null while `eligible` is false. */
   rankByBest: number | null;
   rankByPace: number | null;
@@ -661,6 +1008,7 @@ export type FieldAverages = {
   median: number | null;
   consistencyScore: number | null;
   mistakeCount: number | null;
+  fadePerLap: number | null;
 };
 
 export type FieldSheet = {
@@ -750,6 +1098,7 @@ export function computeFieldSheet(drivers: FieldSheetDriverInput[]): FieldSheet 
       median: b.dash.median,
       consistencyScore: b.dash.consistencyScore,
       mistakeCount: b.mistakes.eligible ? b.mistakes.mistakeCount : null,
+      fadePerLap: getFadePerLap(b.input.rows),
       rankByBest: bestRanks.get(b.input.id) ?? null,
       rankByPace: paceRanks.get(b.input.id) ?? null,
       rankByConsistency: consistencyRanks.get(b.input.id) ?? null,
@@ -792,6 +1141,7 @@ export function computeFieldSheet(drivers: FieldSheetDriverInput[]): FieldSheet 
     median: meanOf((r) => r.median),
     consistencyScore: meanOf((r) => r.consistencyScore),
     mistakeCount: meanOf((r) => r.mistakeCount),
+    fadePerLap: meanOf((r) => r.fadePerLap),
   };
 
   return {

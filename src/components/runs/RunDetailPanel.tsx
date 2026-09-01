@@ -35,6 +35,11 @@ import {
   formatMistakeAnalysisSummary,
   formatMistakeLapDetail,
   formatLapRowBreakdown,
+  fadeOverRunSeconds,
+  formatFadeOverRun,
+  formatFadePerLap,
+  getFadePerLap,
+  getFadeProfile,
   getFastestIncludedLaps,
   getIncludedLaps,
   formatConsistencyScorePercent,
@@ -46,7 +51,7 @@ import { RunRaceFieldSwitcher, RACE_IDENTITY } from "@/components/runs/RunRaceFi
 import Link from "next/link";
 import { ChevronRight, SquarePen, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTodayDraftRunOptional } from "@/components/layout/TodayDraftRunProvider";
+import { useDraftRunOptional } from "@/components/layout/DraftRunProvider";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { StatWellGrid, StatWellCell } from "@/components/runs/LapStatStrip";
@@ -61,8 +66,7 @@ import { ShareRunButton } from "@/components/share/ShareRunButton";
 import { runIsShareable } from "@/lib/share/shareCardModel";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { InlineValueEdit } from "@/components/runs/InlineValueEdit";
-import { InlineAdditiveEdit } from "@/components/runs/InlineAdditiveEdit";
-import { InlinePickEdit } from "@/components/runs/InlinePickEdit";
+import { InlinePickEdit, type InlinePickOption } from "@/components/runs/InlinePickEdit";
 import { RunCarMoveSheet } from "@/components/runs/RunCarMoveSheet";
 import { TirePrepSheet } from "@/components/runs/TirePrepSheet";
 import { lapImportHref } from "@/lib/runs/lapImportHref";
@@ -96,6 +100,12 @@ export type Run = {
   userId?: string | null;
   createdAt: Date | string;
   sessionCompletedAt?: Date | string | null;
+  /**
+   * The zone the run was LOGGED in — the clock its times are printed on, ahead of
+   * the reader's (`RunFaces`). Null on rows written before the column existed; the
+   * driver's account zone is the fallback, and the host resolves that.
+   */
+  localTimeZone?: string | null;
   /** First save with logging complete; see resolveRunDisplayInstant. */
   loggingCompletedAt?: Date | string | null;
   /**
@@ -298,7 +308,7 @@ export function RunDetailPanel({
   columnClassName?: string;
 }) {
   const router = useRouter();
-  const todayDraft = useTodayDraftRunOptional();
+  const todayDraft = useDraftRunOptional();
   /*
    * Correcting a logged run happens HERE now, not only behind the pencil that
    * opens the six-step wizard. Owner-only — `allowRunMutations` is the same flag
@@ -368,6 +378,21 @@ export function RunDetailPanel({
     setPickerOptions(payload);
     return payload;
   }, [pickerOptions, run.id]);
+  /**
+   * The additive catalog. Its own request and its own cache because it is global rather
+   * than per-run — `correction-options` answers "what may THIS run be changed to", and
+   * the additive list has no such question to answer.
+   */
+  const [additiveOptions, setAdditiveOptions] = useState<InlinePickOption[] | null>(null);
+  const loadAdditiveOptions = useCallback(async (): Promise<InlinePickOption[]> => {
+    if (additiveOptions) return additiveOptions;
+    const res = await fetch("/api/additive-types");
+    if (!res.ok) throw new Error("Couldn’t load the list");
+    const payload = (await res.json()) as { additiveTypes?: { id: string; displayName: string }[] };
+    const next = (payload.additiveTypes ?? []).map((a) => ({ id: a.id, label: a.displayName }));
+    setAdditiveOptions(next);
+    return next;
+  }, [additiveOptions]);
   // Holds the detail text through its collapse animation (the live value goes
   // null the instant a chip closes, which would otherwise pop the height to 0).
   const [lastLapStatDetail, setLastLapStatDetail] = useState<string | null>(null);
@@ -399,7 +424,7 @@ export function RunDetailPanel({
         throw new Error(payload.error || `Delete failed (${res.status})`);
       }
       // If we just deleted today's draft, the persistent Log-run FAB and the
-      // dashboard Start-run CTA read the draft from TodayDraftRunProvider's own
+      // dashboard Start-run CTA read the draft from DraftRunProvider's own
       // fetched state — which `router.refresh()` (server components only) does
       // not touch. Without this the FAB keeps its flag+green-dot and both point
       // at the now-deleted run's edit page (a dead 404). Re-fetch so the draft
@@ -513,6 +538,11 @@ export function RunDetailPanel({
     [mistakeAnalysis.mistakes]
   );
   const mistakeSummary = formatMistakeAnalysisSummary(mistakeAnalysis);
+  const fadeProfile = useMemo(() => getFadeProfile(ownRows), [ownRows]);
+  const fade = useMemo(
+    () => ({ perLap: getFadePerLap(ownRows), overRunSeconds: fadeOverRunSeconds(ownRows) }),
+    [ownRows]
+  );
   const bestLapRows = useMemo(() => getFastestIncludedLaps(ownRows, 1), [ownRows]);
   const top5LapRows = useMemo(() => getFastestIncludedLaps(ownRows, 5), [ownRows]);
   const top10LapRows = useMemo(() => getFastestIncludedLaps(ownRows, 10), [ownRows]);
@@ -770,6 +800,12 @@ export function RunDetailPanel({
           onToggle={() => toggleLapStat("mistakes")}
           alignValue
         />
+        <StatWellCell
+          label="Fade"
+          title={formatFadeOverRun(fade.overRunSeconds) ?? "Seconds per lap the run drifted; positive = slower late"}
+          value={formatFadePerLap(fade.perLap)}
+          alignValue
+        />
       </StatWellGrid>
       <Collapse open={Boolean(expandedLapStat && expandedLapStatDetail)}>
         <p
@@ -838,6 +874,7 @@ export function RunDetailPanel({
           mistakeDetailByLapNumber={mistakeDetailByLapNumber}
           medianSeconds={null}
           lineColor={lineColor}
+          fadeProfile={fadeProfile}
         />
       </div>
     ) : null;
@@ -1014,10 +1051,22 @@ export function RunDetailPanel({
             label="Additive"
             value={
               canEdit ? (
-                <InlineAdditiveEdit
+                /*
+                  Same control as Car and Tire set above it, down to the left alignment —
+                  it was its own near-duplicate component with a native `<select>` and a
+                  right-aligned value until 2026-08-24. Three pickers in one grid that
+                  behave differently is the thing the founder called out; the additive
+                  catalog being short changes what the sheet SHOWS (no search field under
+                  ten rows) and not what tapping the value does.
+                */
+                <InlinePickEdit
+                  ariaLabel="Additive"
                   value={additiveDisplay}
                   valueId={run.additiveType?.id ?? null}
+                  loadOptions={loadAdditiveOptions}
+                  allowEmpty
                   onSave={corrections.saveAdditive}
+                  align="left"
                 />
               ) : (
                 additiveDisplay

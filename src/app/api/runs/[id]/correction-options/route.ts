@@ -72,13 +72,18 @@ export async function GET(_req: Request, ctx: Ctx) {
     .map((r) => r.tireTypeId)
     .filter((tid): tid is string => Boolean(tid) && byId.has(tid!));
   const seen = new Set(recentIds);
+  /*
+   * The break between the two is NAMED, not just ordered. The picker is a searchable
+   * sheet now: an unlabelled list that runs a dozen compounds and then starts again
+   * at "A" reads as a sorting bug. A driver with no history gets no first group.
+   */
   const orderedTires = [
-    ...recentIds.map((tid) => byId.get(tid)!),
-    ...tireTypes.filter((t) => !seen.has(t.id)),
+    ...recentIds.map((tid) => ({ ...byId.get(tid)!, group: "Recently used" })),
+    ...tireTypes.filter((t) => !seen.has(t.id)).map((t) => ({ ...t, group: "All tire types" })),
   ];
 
   return NextResponse.json({
     cars: cars.map((c) => ({ id: c.id, label: c.name })),
-    tireTypes: orderedTires.map((t) => ({ id: t.id, label: t.displayName })),
+    tireTypes: orderedTires.map((t) => ({ id: t.id, label: t.displayName, group: t.group })),
   });
 }

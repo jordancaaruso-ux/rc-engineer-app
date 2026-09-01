@@ -114,7 +114,7 @@ export default function PrivacyPage() {
           <li>Open-Meteo — weather lookup by track location and time.</li>
         </ul>
         <p>
-          When you import lap times, the app fetches publicly available timing pages (LiveRC, MyRCM,
+          When you import lap times, the app fetches publicly available timing pages (LiveRC,
           Speedhive) using the URL or driver name you provide. Those sites are not sent your account
           data.
         </p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
@@ -107,8 +107,17 @@ type Series = {
   width: number;
   /** Ticked, or you — drawn at full strength and scrubbable. */
   lit: boolean;
-  /** `dayKey` rides along so the line can break at a band edge instead of leaping it. */
-  points: Array<{ x: number; y: number; index: number; dayKey: string }>;
+  /**
+   * `dayKey` rides along so the line can break at a band edge instead of leaping
+   * it. `clip` marks a run the axis couldn't hold — pinned to an edge, not lost.
+   */
+  points: Array<{
+    x: number;
+    y: number;
+    clip: "hi" | "lo" | null;
+    index: number;
+    dayKey: string;
+  }>;
 };
 
 /** A day's band once it has been given its slice of the plot. */
@@ -118,15 +127,100 @@ type PlacedBand = { key: string; label: string; minMinute: number; maxMinute: nu
 const BAND_GUTTER = 18;
 /** No band thinner than its own "Fri 26 Jun" header, however few runs that day held. */
 const MIN_BAND = 54;
+/**
+ * The tightest the y-axis may ever close, in seconds — the absolute half of the
+ * floor `yDomain` applies. `SessionTrendCard` has carried its own 0.3s version of
+ * this since it shipped; the team chart is the one that went without.
+ */
+const MIN_Y_SPAN = 0.4;
 
-function niceTicks(lo: number, hi: number, want = 5): number[] {
+/**
+ * Gridline values snapped to round increments, AND how many decimals they need.
+ *
+ * The decimals are returned rather than assumed. A tight day can land the step
+ * below 0.1s, and a hardcoded one-decimal label printed the axis as
+ * "14.3, 14.3, 14.4, 14.4" — four gridlines, two numbers, and a chart that reads
+ * as broken. The floor in `yDomain` makes that rare; it does not make it
+ * impossible, and an axis is not the place to lean on another function holding.
+ */
+function niceTicks(lo: number, hi: number, want = 5): { values: number[]; decimals: number } {
   const raw = (hi - lo) / want;
-  if (!Number.isFinite(raw) || raw <= 0) return [lo];
+  if (!Number.isFinite(raw) || raw <= 0) return { values: [lo], decimals: 1 };
   const mag = Math.pow(10, Math.floor(Math.log10(raw)));
   const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) ?? 10 * mag;
-  const out: number[] = [];
-  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(6));
-  return out;
+  const values: number[] = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) values.push(+v.toFixed(6));
+  return { values, decimals: step >= 0.1 ? 1 : step >= 0.01 ? 2 : 3 };
+}
+
+/**
+ * The vertical range — deliberately NOT "whatever is on screen, stretched to fit".
+ *
+ * Fitting the exact fastest and slowest run gave the chart no fixed frame, so one
+ * piece of code drew two unreadable pictures. A day where the whole team ran
+ * within a tenth blew that tenth up to 180px and every scrap of noise looked like
+ * drama; a day holding one scrappy 19-second session squashed everybody's real
+ * 0.1s progress into three pixels of flat line. A tenth of a second meant SIXTY
+ * TIMES more on one day than on the other, decided by who happened to be out.
+ *
+ * So the domain answers to two rules instead. A fence keeps a session that is
+ * nowhere near racing from setting the range — it is still drawn, pinned to the
+ * edge it left and marked there, because a run you cannot see is worse than one
+ * you cannot measure. And the range never closes below a floor, so a consistent
+ * day LOOKS consistent. The floor scales with the lap: half a second is most of a
+ * 1/10 lap's spread and a rounding error on a 30-second nitro one.
+ *
+ * The fence is deliberately WIDE. This is not "trim the tails": a teammate a
+ * second and a half off the pace is the entire reason the field is on the chart,
+ * and a textbook 1.5×IQR fence threw away an ordinary first run of the day —
+ * six runs bunched at the end of a session make the quartiles tight enough to
+ * call the warm-up an outlier. It only has to catch the session that wasn't
+ * racing at all: a red flag, a broken car, a bad import. So it takes the WIDER of
+ * a robust spread and a quarter of the median lap, and nothing a driver could
+ * plausibly have driven ever reaches it.
+ *
+ * What this deliberately does NOT solve: two classes on one team day (a 4WD and a
+ * truck) are two tight clumps two seconds apart. That is a real cluster, not an
+ * outlier — the spread it produces is enormous, so the fence keeps both and the
+ * chart stays squashed, correctly, since no single lap-time axis makes those two
+ * drivers comparable. Fixing that means plotting gap-to-fastest, or scaling to
+ * the lit lines only, and both are a different picture rather than a scale.
+ */
+function yDomain(values: number[]): { lo: number; hi: number } {
+  const sorted = [...values].sort((a, b) => a - b);
+  const at = (q: number) => {
+    const pos = (sorted.length - 1) * q;
+    const base = Math.floor(pos);
+    const next = sorted[base + 1];
+    return next == null ? sorted[base]! : sorted[base]! + (pos - base) * (next - sorted[base]!);
+  };
+  const median = at(0.5);
+  // Spread measured from the MIDDLE outwards, not from the quartiles. Two junk
+  // sessions in one day (a driver whose import came back wrong twice) drag a
+  // quartile out with them and then vouch for each other — the fence widens to
+  // admit exactly the runs it exists to exclude. The median distance from the
+  // median can't be moved that way: it takes half the day being junk to shift it.
+  const spreads = sorted.map((v) => Math.abs(v - median)).sort((a, b) => a - b);
+  const mad = spreads[Math.floor(spreads.length / 2)] ?? 0;
+  const fence = Math.max(mad * 4.45, median * 0.25);
+  // The fence decides which runs the range is measured FROM — it is not itself the
+  // range. Clamping to the fence left the freak session's four wasted seconds in
+  // the axis; dropping it and re-measuring is what hands those seconds back to the
+  // runs that were actually racing.
+  const inside = sorted.filter((v) => Math.abs(v - median) <= fence);
+  const kept = inside.length > 0 ? inside : sorted;
+  let lo = kept[0]!;
+  let hi = kept[kept.length - 1]!;
+  const pad = (hi - lo || 1) * 0.1;
+  lo -= pad;
+  hi += pad;
+  const floor = Math.max(MIN_Y_SPAN, at(0.5) * 0.03);
+  if (hi - lo < floor) {
+    const mid = (lo + hi) / 2;
+    lo = mid - floor / 2;
+    hi = mid + floor / 2;
+  }
+  return { lo, hi };
 }
 
 /**
@@ -207,9 +301,20 @@ export function TeamDayCard({
 
   const chartRef = useRef<HTMLDivElement | null>(null);
   const [chartWidth, setChartWidth] = useState(340);
-  useEffect(() => {
+  /**
+   * Measured BEFORE the first paint, not after it.
+   *
+   * The SVG keeps its aspect ratio, so a viewBox still holding the 340 default
+   * while the pane is 900px wide doesn't stretch to fit — it draws the entire
+   * chart at a third of the width, centred in a sea of blank card, and then snaps
+   * to size when the observer fires. One frame, but it is the frame you get every
+   * time you open a session, and it reads as the chart resizing itself.
+   */
+  useLayoutEffect(() => {
     const el = chartRef.current;
     if (!el) return;
+    const measured = el.getBoundingClientRect().width;
+    if (measured > 0) setChartWidth(measured);
     const observer = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width;
       if (width && width > 0) setChartWidth(width);
@@ -277,11 +382,7 @@ export function TeamDayCard({
     }
     if (values.length === 0 || day.days.length === 0) return { series: [] as Series[], geom: null };
 
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const pad = (max - min || 1) * 0.1;
-    const lo = min - pad;
-    const hi = max + pad;
+    const { lo, hi } = yDomain(values);
     const plotRight = Math.max(PAD_LEFT + 40, chartWidth - padRight);
 
     // Width in proportion to the hours each day used, so a Friday-evening
@@ -321,8 +422,16 @@ export function TeamDayCard({
     };
     // Faster (smaller) laps sit LOWER, exactly as SessionTrendCard draws them —
     // improving reads as the line falling, whichever chart you are looking at.
+    //
+    // Clamped, because the domain no longer promises to hold every run: one far
+    // off the field's pace is pinned to the edge it left (and marked there, see
+    // `clip`) rather than drawing a line out through the side of the card.
+    const plotBottom = CHART_HEIGHT - padBottom;
     const yAt = (value: number) =>
-      PAD_TOP + ((hi - value) / (hi - lo)) * (CHART_HEIGHT - PAD_TOP - padBottom);
+      Math.min(
+        plotBottom,
+        Math.max(PAD_TOP, PAD_TOP + ((hi - value) / (hi - lo)) * (plotBottom - PAD_TOP))
+      );
 
     const built: Series[] = day.drivers.map((driver) => {
       const slot = compare.indexOf(driver.userId);
@@ -335,12 +444,16 @@ export function TeamDayCard({
         points: driver.points
           .map((point, index) => ({ point, index }))
           .filter(({ point }) => point[key] != null)
-          .map(({ point, index }) => ({
-            x: xAt(point.dayKey, point.minute),
-            y: yAt(point[key] as number),
-            index,
-            dayKey: point.dayKey,
-          })),
+          .map(({ point, index }) => {
+            const value = point[key] as number;
+            return {
+              x: xAt(point.dayKey, point.minute),
+              y: yAt(value),
+              clip: value > hi ? ("hi" as const) : value < lo ? ("lo" as const) : null,
+              index,
+              dayKey: point.dayKey,
+            };
+          }),
       };
     });
 
@@ -503,7 +616,7 @@ export function TeamDayCard({
               onSelectRun(press.runId);
             }}
           >
-            {geom.ticks.map((tick) => (
+            {geom.ticks.values.map((tick) => (
               <g key={`y${tick}`}>
                 <line
                   x1={PAD_LEFT}
@@ -520,7 +633,7 @@ export function TeamDayCard({
                   textAnchor="end"
                   className="fill-faint text-[9.5px] tabular-nums"
                 >
-                  {tick.toFixed(1)}
+                  {tick.toFixed(geom.ticks.decimals)}
                 </text>
               </g>
             ))}
@@ -581,19 +694,42 @@ export function TeamDayCard({
                     strokeLinecap="round"
                     opacity={s.lit ? 1 : litCount > 1 ? 0.35 : 0.55}
                   />
-                  {s.lit
-                    ? s.points.map((p) => (
-                        <circle
-                          key={p.index}
-                          cx={p.x}
-                          cy={p.y}
-                          r={3}
-                          fill={s.color}
-                          stroke="rgb(var(--color-card))"
-                          strokeWidth={1.4}
-                        />
-                      ))
-                    : null}
+                  {/*
+                    Dots belong to lit lines only — a dot per run on five hairlines
+                    is the noise this card was built to avoid. A CLIPPED run is the
+                    exception, marked on every line lit or not: it is the one point
+                    whose height is not its lap time, and a 22-second red flag drawn
+                    silently at the same height as a 17.7 would be the chart lying
+                    quietly rather than loudly. Scrub it and the readout still gives
+                    the real number, which is what settles what the run was.
+                  */}
+                  {s.points.map((p) =>
+                    p.clip ? (
+                      <path
+                        key={p.index}
+                        d={
+                          p.clip === "hi"
+                            ? `M${(p.x - 4.2).toFixed(1)} ${(p.y + 3).toFixed(1)} L${p.x.toFixed(1)} ${(p.y - 2.6).toFixed(1)} L${(p.x + 4.2).toFixed(1)} ${(p.y + 3).toFixed(1)} Z`
+                            : `M${(p.x - 4.2).toFixed(1)} ${(p.y - 3).toFixed(1)} L${p.x.toFixed(1)} ${(p.y + 2.6).toFixed(1)} L${(p.x + 4.2).toFixed(1)} ${(p.y - 3).toFixed(1)} Z`
+                        }
+                        fill={s.color}
+                        stroke="rgb(var(--color-card))"
+                        strokeWidth={1.2}
+                        strokeLinejoin="round"
+                        opacity={s.lit ? 1 : 0.75}
+                      />
+                    ) : s.lit ? (
+                      <circle
+                        key={p.index}
+                        cx={p.x}
+                        cy={p.y}
+                        r={3}
+                        fill={s.color}
+                        stroke="rgb(var(--color-card))"
+                        strokeWidth={1.4}
+                      />
+                    ) : null
+                  )}
                 </g>
               ))}
 

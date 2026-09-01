@@ -371,6 +371,17 @@ model SetupSheetModel {
   schemaJson Json
   /// Confirmed/curated catalog entry (admin-managed). User-created models stay false until reviewed.
   isAuthorized Boolean @default(false)
+  /// What the chassis races: a `ChassisPlatformId` from `src/lib/cars/carClasses.ts`.
+  ///
+  /// Asked for, and required, on the driver's create-from-PDF door (2026-08-26). Before that
+  /// nothing on a driver-made chassis said what it was: discipline was inferred from
+  /// `CHASSIS_PLATFORM_BY_SLUG`, a hardcoded list of twelve curated slugs, so every chassis a
+  /// driver derived came back "unknown" forever.
+  ///
+  /// Nullable, not defaulted: the curated rows still answer from the slug map, and a default
+  /// would put every pre-existing row into a discipline nobody chose. `disciplineForCar` reads
+  /// the slug map first and falls through to here, so both eras answer.
+  discipline String?
 
   /// Creator (attribution only; models are shared globally). Null for seeded catalog entries.
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -468,6 +479,9 @@ model SetupSheetBlank {
   /// sheet | form - which surface this chassis fills on. Flipped by an admin once boxes are named,
   /// deliberately, so nobody's fill surface changes underneath them mid-season.
   fillSurface String @default("sheet")
+
+  /// Setups born on this paper — see `SetupSnapshot.sheetBlankId`.
+  setupSnapshots SetupSnapshot[] @relation("SnapshotSheetBlank")
 
   reviewedAt DateTime?
 
@@ -780,6 +794,15 @@ model Event {
   practiceSourceUrl String?
   /** LiveRC results index URL for this event (optional — often added closer to the date). */
   resultsSourceUrl  String?
+  /// This meeting's page on MyRCM — the driver's class page (`/en/report/<event>/<class>`) where
+  /// possible, else the event page.
+  ///
+  /// A destination, never a source. `myrcm.ch` is on the fetch denylist (2026-08-26) so nothing
+  /// in the app may request this URL; it exists so the lap importer's PDF door can hand the
+  /// driver a link to *tap*, landing them on their own class instead of MyRCM's front page.
+  /// Deliberately not folded into `resultsSourceUrl`: that field means "a page we scan", and
+  /// every reader of it fetches. See `lapUrlParsers/myRcmUrl.classifyMyRcmEventLink`.
+  myRcmUrl          String?
   /** Race class to watch on results index (e.g. \"17.5 Stock\"). */
   raceClass         String?
 
@@ -988,6 +1011,17 @@ model SetupSnapshot {
   renderedSetupPdfGeneratedAt   DateTime?
   setupPdfRenderVersion         Int      @default(1)
 
+  /**
+   * The sheet PAPER this setup was born on — the founder's ruling of 2026-08-31: "if someone
+   * uploads a pdf, that same pdf style is what they see in the app, always." Stamped at import
+   * from the resolved calibration's edition blank, inherited by every copy (run snapshots,
+   * corrections, car moves, keep/save), and read first by `pickSheetBlankForData`. Null means the
+   * primary blank — the default paper, and what every pre-existing snapshot renders on.
+   * `SetNull` on purpose: a deleted edition falls back to the primary rather than a dead pointer.
+   */
+  sheetBlank   SetupSheetBlank? @relation("SnapshotSheetBlank", fields: [sheetBlankId], references: [id], onDelete: SetNull)
+  sheetBlankId String?
+
   runs Run[]
   sourceDocuments SetupDocument[] @relation("CreatedSetup")
 
@@ -996,6 +1030,7 @@ model SetupSnapshot {
   @@index([baseSetupSnapshotId])
   @@index([carId, isLibrary])
   @@index([sourceBaselineId])
+  @@index([sheetBlankId])
 }
 
 enum SetupDocumentSourceType {

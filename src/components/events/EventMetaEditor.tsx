@@ -33,6 +33,7 @@ type Props = {
   initialControlledAdditiveTypeId: string | null;
   initialPracticeSourceUrl: string | null;
   initialResultsSourceUrl: string | null;
+  initialMyRcmUrl: string | null;
   initialRaceClass: string | null;
   runCount: number;
 };
@@ -58,6 +59,7 @@ export function EventMetaEditor(props: Props) {
   );
   const [practiceSourceUrl, setPracticeSourceUrl] = useState(props.initialPracticeSourceUrl ?? "");
   const [resultsSourceUrl, setResultsSourceUrl] = useState(props.initialResultsSourceUrl ?? "");
+  const [myRcmUrl, setMyRcmUrl] = useState(props.initialMyRcmUrl ?? "");
   const [raceClass, setRaceClass] = useState(props.initialRaceClass ?? "");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -129,6 +131,7 @@ export function EventMetaEditor(props: Props) {
           controlledAdditiveTypeId: controlAdditiveEnabled ? controlledAdditiveTypeId.trim() || null : null,
           practiceSourceUrl: practiceSourceUrl.trim() || null,
           resultsSourceUrl: resultsSourceUrl.trim() || null,
+          myRcmUrl: myRcmUrl.trim() || null,
           raceClass: raceClass.trim() || null,
         }),
       });
@@ -302,6 +305,34 @@ export function EventMetaEditor(props: Props) {
             />
           ) : null}
         </div>
+      </div>
+      {/*
+        Deliberately NOT inside the advanced block below. Everything in there is LiveRC plumbing
+        that only matters when the track's own page isn't enough; this is the single field that
+        decides whether a MyRCM driver's import has anywhere to send them, and a closed
+        <details> labelled "advanced" is where a field goes to never be filled in.
+      */}
+      <div className="min-w-0 border-t border-border pt-3">
+        <label
+          htmlFor="event-meta-myrcm-url"
+          className="mb-1 block text-[11px] text-muted-foreground"
+        >
+          MyRCM page (optional)
+        </label>
+        <input
+          id="event-meta-myrcm-url"
+          type="url"
+          className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
+          value={myRcmUrl}
+          onChange={(e) => setMyRcmUrl(e.target.value)}
+          placeholder="Your class page on MyRCM"
+          autoComplete="off"
+          aria-label="MyRCM page URL"
+        />
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+          MyRCM results come in as a file, so laps can&rsquo;t pull automatically. Saving your class
+          page here is what lets &ldquo;Import PDF&rdquo; open it for you at the track.
+        </p>
       </div>
       {/*
         Timing sources used to be their own "LiveRC lap detection" card on this page, debug tables

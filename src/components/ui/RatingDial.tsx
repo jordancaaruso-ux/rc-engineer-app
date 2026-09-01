@@ -1,4 +1,8 @@
-import { CAR_RATING_BANDS, carRatingBandCaption } from "@/lib/runHandlingAssessment";
+import {
+  CAR_RATING_BANDS,
+  carRatingBandCaption,
+  carRatingBandColor,
+} from "@/lib/runHandlingAssessment";
 import { cn } from "@/lib/utils";
 
 /**
@@ -31,19 +35,11 @@ import { cn } from "@/lib/utils";
 const RATING_MIN = 1;
 const RATING_MAX = 10;
 
-/** Band caption → ramp token, keyed by caption so a regroup can't desync it. */
-const BAND_TOKEN: Record<string, string> = {
-  Bad: "--color-rating-bad",
-  Workable: "--color-rating-workable",
-  Good: "--color-rating-good",
-  Dialled: "--color-rating-dialled",
-};
-
-function bandColorFor(value: number): string {
-  const caption = carRatingBandCaption(Math.round(value));
-  const token = caption ? BAND_TOKEN[caption] : undefined;
-  return `rgb(var(${token ?? "--color-muted-foreground"}))`;
-}
+/* The caption → `--color-rating-*` lookup this file used to hold now lives beside the
+   bands themselves, in `runHandlingAssessment`: the session-trend strip prints a rating
+   numeral in the same ink, and two hand-kept copies of a four-row table is how a regroup
+   ends up recoloured in one place only. */
+const bandColorFor = carRatingBandColor;
 
 export type RatingDialProps = {
   mode?: "verdict" | "axis";

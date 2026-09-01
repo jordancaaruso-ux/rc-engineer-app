@@ -1,8 +1,18 @@
 /**
- * Authoritative spring rate lookup (gf/mm). Hardcoded table only — no formulas.
+ * RETIRED 2026-08-26 — kept only as the regression fixture for `springRateFormula.test.ts`.
  *
- * Grid: SRS arrangement (I | II) × side (front | rear) × spring hardness (hard | soft) × effective gap (mm).
- * Effective gap = springGap − lowerArmExtension, then rounded to nearest 0.2 mm; keys are "0.0" … "5.0".
+ * This was the app's spring rate: a hand-typed table, snapped to 0.2 mm, refusing anything outside
+ * 0–5 mm. It has been replaced by the formula the A800RR's own PDF carries in its form layer
+ * (`springRateFormula.ts`), which was found by probing the file rather than by fitting this data.
+ *
+ * It stays in the tree because it is the PROOF the replacement is faithful: the formula reproduces
+ * every one of these numbers to within 0.05 gf/mm up to a 4.0 mm gap, which is what establishes
+ * that the script's two checkboxes were read the right way round (CheckBox8 = spring STD/S,
+ * CheckBox11 = SRS I/II). Above 4.0 mm the table goes LINEAR — +1.7 per 0.2 mm step — while the
+ * real curve keeps compounding, and that tail is the transcription error the swap corrects.
+ *
+ * Nothing outside the test may import this. Grid: SRS (I | II) × side × hardness × gap "0.0" … "5.0",
+ * all at a lower arm extension of zero (the only case a flat table can express).
  */
 export const SPRING_RATE_GAP_STEP_MM = 0.2 as const;
 export const SPRING_RATE_GAP_MIN_MM = 0 as const;

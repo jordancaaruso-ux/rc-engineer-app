@@ -40,15 +40,13 @@ export function formatRunSessionDisplay(
   const custom = run.meetingSessionCode?.trim(); // when type is OTHER
   const label = run.sessionLabel?.trim();
 
-  const parts: string[] = [];
-  if (type) {
-    if (type === "OTHER" && custom) {
-      parts.push(custom);
-    } else {
-      parts.push(MEETING_SESSION_TYPE_LABELS[type] ?? type);
-    }
-  }
-  if (label) parts.push(label);
+  const typePart =
+    type != null
+      ? type === "OTHER" && custom
+        ? custom
+        : MEETING_SESSION_TYPE_LABELS[type] ?? type
+      : null;
+  const parts = joinSessionParts(typePart, label ?? null, typeWord(type));
   return parts.length > 0 ? parts.join(" · ") : unlabeled();
 }
 
@@ -94,18 +92,100 @@ export function runSessionName(
   const code = run.meetingSessionCode?.trim();
   const label = run.sessionLabel?.trim();
 
-  const parts: string[] = [];
+  let typePart: string | null = null;
   if (type === "OTHER") {
     // The code IS the name here — there is no type label to pair it with.
-    if (code) parts.push(code);
+    typePart = code ?? null;
   } else if (type) {
     const typeLabel = MEETING_SESSION_TYPE_LABELS[type] ?? type;
-    parts.push(code ? `${typeLabel} ${sessionCodeSuffix(code, typeLabel)}` : typeLabel);
+    typePart = code ? `${typeLabel} ${sessionCodeSuffix(code, typeLabel)}` : typeLabel;
   } else if (code) {
-    parts.push(code);
+    typePart = code;
   }
-  if (label) parts.push(label);
+  const parts = joinSessionParts(typePart, label ?? null, typeWord(type));
   return parts.length > 0 ? parts.join(" · ") : unlabeled();
+}
+
+/**
+ * The bare word a timing site's own label might already begin with. Null for OTHER,
+ * where the "type" is the driver's own words and repeating them is their business.
+ */
+function typeWord(type: string | null | undefined): string | null {
+  if (!type || type === "OTHER") return null;
+  return MEETING_SESSION_TYPE_LABELS[type] ?? type;
+}
+
+/** Prefix match on a word boundary: "Practice 3" starts with "Practice", "Practices" does not. */
+function startsWithWord(text: string, word: string): boolean {
+  if (text.length < word.length) return false;
+  if (text.slice(0, word.length).toLowerCase() !== word.toLowerCase()) return false;
+  const next = text.charAt(word.length);
+  return next === "" || !/[a-z0-9]/i.test(next);
+}
+
+/**
+ * The type part and the session label, joined without stuttering.
+ *
+ * A timing provider's own session name lands in `sessionLabel` verbatim — `classifySession`
+ * keeps the whole string — and it usually already opens with the type word, so an imported
+ * "Practice 3" under type PRACTICE printed as "Practice · Practice 3". When the label starts
+ * with the type's word the label wins outright: it is the more specific of the two, and it
+ * carries the number the type part does not.
+ */
+function joinSessionParts(
+  typePart: string | null,
+  label: string | null,
+  bareTypeWord: string | null
+): string[] {
+  if (label && bareTypeWord && startsWithWord(label, bareTypeWord)) return [label];
+  return [typePart, label].filter((part): part is string => Boolean(part));
+}
+
+/** One run's name within its day, and whether that name is really just its position. */
+export type DayRunName = {
+  /** What to print. */
+  label: string;
+  /** The run's place in the day, set ONLY when the label is that position; null for a real name. */
+  position: number | null;
+};
+
+/**
+ * Name a day's runs so that no two of them read the same.
+ *
+ * A session is named by its TYPE — "Practice", "Qualifying" — and no number is stored
+ * alongside it: the log-run form only writes `meetingSessionCode` when the driver picks
+ * "Other" and types one. So a day of five practice sessions produced five runs all named
+ * "Practice", and every surface that names one run out of the day ("Best run was Practice")
+ * was pointing at nothing (founder report, 2026-08-25).
+ *
+ * The fix deliberately does NOT invent a session number. "Practice 3" would be the app
+ * guessing at the event's timetable, and it would sit next to a printed sheet that may
+ * well say Practice 2. Instead, when a name is shared by more than one run in the day it
+ * carries no information at all, so it is replaced by the one thing that is certainly
+ * true — where the run came in the day (founder call, 2026-08-25: "Run 3 of 5").
+ *
+ * Names that are already unique are left completely alone, so a mixed race day still
+ * reads "Qualifying", "A Main", and only the repeated ones become positions.
+ *
+ * `dayRunNumber` is the CALLER's numbering (the dashboard counts today's runs, the
+ * Sessions workbench counts per car) — this only decides when to print it.
+ */
+export function resolveDayRunNames(
+  named: readonly { name: string; dayRunNumber: number }[]
+): DayRunName[] {
+  const uses = new Map<string, number>();
+  for (const entry of named) {
+    const key = entry.name.trim().toLowerCase();
+    uses.set(key, (uses.get(key) ?? 0) + 1);
+  }
+  return named.map((entry) => {
+    const positional = `Run ${entry.dayRunNumber}`;
+    const shared = (uses.get(entry.name.trim().toLowerCase()) ?? 0) > 1;
+    const label = shared ? positional : entry.name;
+    // A run that was ALREADY named by position (the unlabeled-testing fallback) reports
+    // itself as positional too, so a sentence built from it reads the same either way.
+    return { label, position: label === positional ? entry.dayRunNumber : null };
+  });
 }
 
 /**

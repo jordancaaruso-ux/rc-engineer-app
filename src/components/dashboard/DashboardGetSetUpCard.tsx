@@ -13,31 +13,36 @@ import { guardTapsAfterDismiss } from "@/lib/dismissTapGuard";
 
 /**
  * "Get set up" card — docs/ONBOARDING_NORTH_STAR.md (reversal 2026-07-23,
- * amended 2026-08-18).
+ * amended 2026-08-18 and 2026-08-26).
  *
  * The single first-run surface that replaced the guide chip + resume/payoff cards.
  * Every row navigates — no dead taps; all state is derived, so the card self-retires
- * once a run exists or Ignore is tapped.
+ * once the walk is finished, a run exists, or Ignore is tapped.
  *
- * **The car alone is not the payoff (founder 2026-08-18).** It used to be: adding a
- * car flipped the card straight to "You're ready — log your first run", which was
- * both premature and untrue — with no timing identity their laps do not attach to
- * them, and the run wizard would then refuse to mark the run complete. So the card
- * now walks CAR → TIMING and only then hands over the run. A SETUP SHEET is
- * deliberately not on that path: it is the one item needing something they may not
- * have on them, so it rides along as an advised extra and keeps nagging from
- * `DashboardAddSetupCard` once this card retires.
+ * **The walk is CAR → TIMING → SETUP, three steps of equal weight** (founder
+ * 2026-08-26). The sheet used to ride along under an "Optional" / "Make it better"
+ * heading, which is exactly how it read: a nice-to-have. It is not — without one a
+ * run is a lap time with no car behind it, and the Engineer can only answer in
+ * general. So the label is gone and the sheet is step three.
  *
- * Nothing here gates. The card's own "Log a run anyway" link came out on 2026-08-18
- * (founder): the dock's run control is on screen the whole time, so the escape hatch
- * was a second door to the same room, and printing it under the one thing we're
- * asking for read as an apology for asking. Somebody standing at the track is still
- * never held up by set-up — they just use the dock.
+ * It still does not GATE anything, and that is the 2026-08-18 call standing: the
+ * sheet is the one item needing something the driver may not have on them (the
+ * manufacturer's fillable PDF), and on an uncalibrated chassis it is minutes of
+ * typing rather than a 30-second upload. So step three has two doors — add it now,
+ * or add it when you log a run, which is true: the wizard's setup step carries the
+ * same upload plus write-from-scratch. Somebody standing at the track is never held up.
  *
- * The Setup row delegates entirely to `UploadSetupSheetBar`, which already branches
- * per car: a green-lit chassis opens the photo/PDF/paste doors, everything else
- * routes to the hand-build create-a-setup flow — so the "quick upload vs. slower
- * build" adaptivity lives in one place, not here.
+ * **No "Log your first run" button** (founder 2026-08-26). The card used to end on
+ * "You're ready — log your first run" with a yellow button, sitting directly beneath
+ * the dashboard's yellow Start-a-run bar — two yellow buttons, one job. The bar is
+ * the run door and always was, so the card's last state is now the sheet ask and
+ * nothing else. Once all three are done the card retires (`showGetSetUpCard`) rather
+ * than hanging around with three ticks and no purpose.
+ *
+ * The Setup action delegates entirely to `UploadSetupSheetBar`, which already
+ * branches per car: a green-lit chassis opens the photo/PDF/paste doors, everything
+ * else routes to the hand-build create-a-setup flow — so the "quick upload vs.
+ * slower build" adaptivity lives in one place, not here.
  */
 type Props = {
   hasCar: boolean;
@@ -127,10 +132,6 @@ export function DashboardGetSetUpCard({ hasCar, hasTimingIdentity, hasSetup, set
     router.refresh();
   }
 
-  // Mirrors `isReadyToRun` in lib/onboarding/visibility.ts — a car to attach the run
-  // to, and the timing identity that makes laps land on them by themselves.
-  const readyToRun = hasCar && hasTimingIdentity;
-
   const canUpload = setupCars.some((c) => c.supportsUpload);
   const setupMeta = hasSetup
     ? "The Engineer can read your actual car"
@@ -140,21 +141,11 @@ export function DashboardGetSetUpCard({ hasCar, hasTimingIdentity, hasSetup, set
         ? "Upload your sheet — the fillable PDF, about 30 seconds"
         : "Build it in the app — a few minutes";
 
-  const timingRow = (
-    <LinkRow
-      href="/settings"
-      done={hasTimingIdentity}
-      title="Add your timing details"
-      meta={
-        hasTimingIdentity
-          ? "Laps attach to you on their own"
-          : "Name + transponder so laps attach on their own"
-      }
-    />
-  );
-
-  // The Setup action IS the upload bar (adaptive per chassis). Only actionable once
-  // there's a car and no setup yet; otherwise a plain (done or muted) row.
+  /**
+   * The sheet step's own body. Live once there is a car and no sheet yet; otherwise a
+   * plain (done, or waiting-on-the-car) row. It is a step, never a footnote — the
+   * micro-caps "Optional" / "Make it better" heading that used to sit above it is gone.
+   */
   const setupRow =
     hasCar && !hasSetup && setupCars.length > 0 ? (
       <div className="rounded-xl border border-border bg-card/60 px-3 py-2.5">
@@ -169,11 +160,42 @@ export function DashboardGetSetUpCard({ hasCar, hasTimingIdentity, hasSetup, set
       </div>
     );
 
+  const timingRow = (
+    <LinkRow
+      href="/settings"
+      done={hasTimingIdentity}
+      title="Add your timing details"
+      meta={
+        hasTimingIdentity
+          ? "Laps attach to you on their own"
+          : "Name + transponder so laps attach on their own"
+      }
+    />
+  );
+
+  /**
+   * The deferral door — the reason the sheet can be step three without gating anything.
+   * Deliberately quiet text and not a second yellow button: the dashboard's Start-a-run
+   * bar sits directly above this card, and the loud run button that used to live here is
+   * exactly what came out on 2026-08-26. What it promises is real — the wizard's setup
+   * step offers the same upload.
+   */
+  const laterDoor = (
+    <Link
+      href="/runs/new"
+      className="mt-2.5 block text-[12px] font-semibold text-muted-foreground underline decoration-border underline-offset-4 transition hover:text-foreground"
+    >
+      Or add it when you log a run — the run form asks for it
+    </Link>
+  );
+
+  const onSheetStep = hasCar && hasTimingIdentity;
+
   return (
     <CardPanel className="border-primary-ink/30">
       <div className="flex items-center gap-2">
-        <Eyebrow className={readyToRun ? "text-primary-ink" : undefined}>
-          {readyToRun ? "Ready to run" : "Get set up"}
+        <Eyebrow className={onSheetStep ? "text-primary-ink" : undefined}>
+          {onSheetStep ? "Last step" : "Get set up"}
         </Eyebrow>
         <button
           type="button"
@@ -185,39 +207,46 @@ export function DashboardGetSetUpCard({ hasCar, hasTimingIdentity, hasSetup, set
         </button>
       </div>
 
-      {readyToRun ? (
-        /* The payoff — the only state where the yellow button is the run itself. */
+      {onSheetStep ? (
+        /* Car and timing in, sheet outstanding — the card IS the sheet ask now. No
+           checklist rows here: with two of the three ticked and the third spelled out
+           underneath, the rows would only repeat what the heading already says. */
         <>
           <h2 className="mt-2 text-[17px] font-bold leading-snug tracking-[-0.01em] text-foreground">
-            You’re ready — log your first run
+            Add your setup sheet
           </h2>
-          <ButtonLink href="/runs/new" className="mt-3 w-full gap-1.5 px-4 py-3 text-sm">
-            Log your first run
-            <ArrowRight aria-hidden className="size-4" strokeWidth={2.4} />
-          </ButtonLink>
-
-          {!hasSetup ? (
-            <>
-              <p className="mt-4 micro-caps text-muted-foreground">
-                Make it better
-              </p>
-              <div className="mt-2 flex flex-col gap-2">{setupRow}</div>
-            </>
-          ) : null}
+          <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+            {canUpload
+              ? "This is what lets the Engineer talk about your actual car — your springs, droop and camber — instead of answering in general."
+              : "Your chassis has no readable sheet yet, so this one gets built in the app. It is what lets the Engineer talk about your actual car instead of answering in general."}
+          </p>
+          <div className="mt-3">
+            {setupCars.length > 0 ? <UploadSetupSheetBar cars={setupCars} /> : null}
+            {laterDoor}
+          </div>
         </>
       ) : hasCar ? (
         /* Car in, timing outstanding. Timing is where the yellow button goes: without
            it lap times never find the driver, which is the one job the app exists to
-           do. The sheet sits under it, labelled as what it is.
+           do. The sheet sits under it as what comes next, not as an aside.
 
            The button says "Continue setting up", not the name of the step (founder
            2026-08-18): naming the step made it read as a second chore being demanded
            after the car, when what it actually is is the rest of the same one. The
            sentence above it already says what happens next, so the button only has to
-           carry the momentum. */
+           carry the momentum. It is also the exact wording the car page now hands back
+           with, so finding it again on landing reads as one journey, not two asks.
+
+           The headline is the ASK and nothing else (founder 2026-08-26, in two passes).
+           It read "Car's in — timing next", which put the finished step first, so the eye
+           landed on the thing already done; then "Timing next — car's in", which still
+           spent half a headline congratulating them. The car is acknowledged by the car
+           page's own confirmation and by nothing here. All three states now name the step
+           the same way — "Add your car…", "Add your timing details", "Add your setup
+           sheet" — which is also how the rows read. */
         <>
           <h2 className="mt-2 text-[17px] font-bold leading-snug tracking-[-0.01em] text-foreground">
-            Car’s in — one thing left
+            Add your timing details
           </h2>
           <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
             Your name and transponder, so lap times attach to you on their own instead of being
@@ -230,7 +259,7 @@ export function DashboardGetSetUpCard({ hasCar, hasTimingIdentity, hasSetup, set
 
           {!hasSetup ? (
             <>
-              <p className="mt-4 micro-caps text-muted-foreground">Optional</p>
+              <p className="mt-4 micro-caps text-muted-foreground">After that</p>
               <div className="mt-2 flex flex-col gap-2">{setupRow}</div>
             </>
           ) : null}
@@ -241,8 +270,8 @@ export function DashboardGetSetUpCard({ hasCar, hasTimingIdentity, hasSetup, set
             Add your car to log your first run
           </h2>
           <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-            Runs attach to a car — it’s the one thing we can’t guess. The rest is optional and just
-            makes your runs sharper.
+            Runs attach to a car — it’s the one thing we can’t guess. Then your timing details and
+            your setup sheet, and the app knows what it’s looking at.
           </p>
           <div className="mt-3 flex flex-col gap-2">
             <LinkRow

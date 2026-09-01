@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { GitCompare } from "lucide-react";
@@ -21,7 +21,11 @@ import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { ReadOnlySheetSurface } from "@/components/setup/ReadOnlySheetSurface";
 import { SheetSetupEditorClient } from "@/components/setup/SheetSetupEditorClient";
 import { LibrarySetupEditorClient } from "@/components/setup/LibrarySetupEditorClient";
-import type { SetupEditorSavedResult } from "@/components/setup/useSetupEditorSave";
+import type {
+  HostedSetupSave,
+  SetupEditorSavedResult,
+} from "@/components/setup/useSetupEditorSave";
+import { ExitPromptSheet } from "@/components/ui/ExitPromptSheet";
 import { SheetCompareSurface } from "@/components/setup/SheetCompareSurface";
 import { Eyebrow } from "@/components/ui/panel";
 import { SessionSetupSaveButton } from "@/components/setup/SessionSetupSaveButton";
@@ -174,18 +178,40 @@ export function SetupSheetModal({
     setEditing(open && startEditing);
   }, [open, run?.id, startEditing]);
 
+  /*
+   * ============================== NOTHING IN HERE THROWS TYPING AWAY ==============================
+   *
+   * This dialog has three exits the save bar knows nothing about — Cancel, Close and the scrim —
+   * and the editor is an ordinary React subtree, so taking one of them just stops rendering it and
+   * the driver's numbers go with it. The `beforeunload` prompt armed in `useSetupEditorSave` cannot
+   * help here: nothing unloads.
+   *
+   * So the editor publishes where it stands (`useReportHostedSave`) and every exit asks first. The
+   * question is `ExitPromptSheet`, the same Save / Discard / Stay shape the log-run wizard uses,
+   * because the useful answer to "you have three changes" is usually to save them — sending the
+   * driver back to hunt for a button at the bottom of a scrolled pop-up is a worse ask than the
+   * one that lost the changes in the first place.
+   */
+  const [hostedSave, setHostedSave] = useState<HostedSetupSave | null>(null);
+  /**
+   * Which exit is waiting, and how many changes it was holding when it asked. The COUNT is frozen
+   * here rather than read live: a landed save unmounts the editor under the sheet, and a title
+   * recomputed from live state would flash "0 unsaved changes" on its way out.
+   */
+  const [exitPrompt, setExitPrompt] = useState<{
+    target: "edit" | "modal";
+    count: number;
+  } | null>(null);
+  const [exitSaving, setExitSaving] = useState(false);
+  // Identity-stable so the editor below is not re-rendered by a prop that only looks new.
+  const publishHostedSave = useCallback((state: HostedSetupSave | null) => {
+    setHostedSave(state);
+  }, []);
+
   useEffect(() => {
     setPortalReady(true);
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open, onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -599,13 +625,97 @@ export function SetupSheetModal({
     onRunSetupCorrected?.(result);
   }
 
+  /**
+   * How much typing an exit would cost right now. Zero unless the editor is actually on screen:
+   * picking a compare baseline drops out of edit mode without unmounting the editor, and asking
+   * about changes the driver can no longer see would be a question with no context.
+   */
+  const unsavedCount = editingNow && hostedSave?.dirty ? hostedSave.changedCount : 0;
+
+  /** Back to reading — the Cancel button, and nothing else. */
+  function requestStopEditing() {
+    if (unsavedCount > 0) {
+      setExitPrompt({ target: "edit", count: unsavedCount });
+      return;
+    }
+    setEditing(false);
+  }
+
+  /** Close, and the scrim. */
+  function requestClose() {
+    if (unsavedCount > 0) {
+      setExitPrompt({ target: "modal", count: unsavedCount });
+      return;
+    }
+    onClose();
+  }
+
+  function discardAndExit() {
+    const target = exitPrompt?.target;
+    setExitPrompt(null);
+    setEditing(false);
+    // The editor publishes null as it unmounts, but not until the commit lands — and `onClose`
+    // below runs first. Clearing it here keeps a re-open from inheriting a dead change count.
+    setHostedSave(null);
+    if (target === "modal") onClose();
+  }
+
+  /*
+   * Save from the prompt: the mode's primary door, which in here is always "Correct this run".
+   * A failure LEAVES THE SHEET UP carrying the message — the whole point of asking was not to
+   * lose the numbers, and closing on a 500 would lose them with a tick beside it.
+   *
+   * `hostedSave` is read once up front: a landed save unmounts the editor (`handleCorrected`
+   * drops edit mode), which publishes null underneath us.
+   */
+  async function saveAndExit() {
+    const editor = hostedSave;
+    if (!editor) return;
+    const target = exitPrompt?.target;
+    setExitSaving(true);
+    let ok = false;
+    try {
+      ok = await editor.save();
+    } finally {
+      setExitSaving(false);
+    }
+    if (!ok) return;
+    setExitPrompt(null);
+    if (target === "modal") onClose();
+  }
+
+  /*
+   * Escape closes, and it is an exit like any other — so it runs the same guard. It lives down
+   * here, below the change count it reads, rather than up with the other listeners: a dependency
+   * array is evaluated during render, and referencing `unsavedCount` before its `const` is a
+   * temporal-dead-zone throw rather than a stale read.
+   *
+   * The prompt has an Escape of its own (it closes on Stay). Both handlers fire on one press, so
+   * without the `exitPrompt` line the prompt would close and this would immediately re-open it.
+   */
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (exitPrompt) return;
+      if (unsavedCount > 0) {
+        setExitPrompt({ target: "modal", count: unsavedCount });
+        return;
+      }
+      onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, onClose, exitPrompt, unsavedCount]);
+
   if (!open || !portalReady) return null;
 
   return createPortal(
+    <>
     <div
       data-setup-sheet-modal
       className="setup-sheet-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onClick={(e) => e.target === e.currentTarget && requestClose()}
       role="dialog"
       aria-modal="true"
       aria-label="Setup"
@@ -654,16 +764,23 @@ export function SetupSheetModal({
             {canCorrect ? (
               <button
                 type="button"
-                onClick={() => setEditing((v) => !v)}
+                onClick={() => (editing ? requestStopEditing() : setEditing(true))}
                 aria-pressed={editing}
-                className={cn(
-                  "shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition",
-                  editing
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border hover:bg-muted/90"
-                )}
+                /*
+                 * ============================== WHY THIS IS NOT YELLOW, AND NOT "DONE" ==============================
+                 *
+                 * It was both until 2026-08-24, and the pair was a lie the founder walked into: it
+                 * flipped edit mode off and wrote nothing, while wearing the primary face that means
+                 * "this is the action" everywhere else in the app — at the TOP of the pop-up, where the
+                 * thumb lands first. The real door is `SetupEditorSaveBar` at the bottom, and while
+                 * editing there were two filled yellow buttons on one screen with the fake one on top.
+                 *
+                 * So: one loud button in this dialog, ever, and it is the one that saves. This is the
+                 * way BACK, it is outlined, and "Cancel" cannot be read as "I have finished".
+                 */
+                className="shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-medium transition hover:bg-muted/90"
               >
-                {editing ? "Done" : "Edit setup"}
+                {editing ? "Cancel" : "Edit setup"}
               </button>
             ) : null}
             {/*
@@ -680,7 +797,7 @@ export function SetupSheetModal({
             ) : null}
             <button
               type="button"
-              onClick={onClose}
+              onClick={requestClose}
               className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted/90 transition shrink-0"
             >
               Close
@@ -696,8 +813,17 @@ export function SetupSheetModal({
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <Eyebrow>Setup vs previous run</Eyebrow>
+                  {/*
+                    Unavailable while correcting, and that is not a new rule — `editingNow` has
+                    always dropped out of edit mode the moment a baseline lands, because the compare
+                    surface paints a SECOND setup into the same boxes. What was new on 2026-08-24 is
+                    saying so: it enforced the rule by UNMOUNTING the editor, which threw away
+                    whatever had been typed, with no more warning than the Done button used to give.
+                    Cancel first and the control comes back.
+                  */}
                   <button
                     type="button"
+                    disabled={editingNow}
                     onClick={() => {
                       setCompareOpen((wasOpen) => {
                         if (wasOpen) {
@@ -709,12 +835,16 @@ export function SetupSheetModal({
                     }}
                     aria-pressed={compareOpen}
                     className={cn(
-                      "inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition",
+                      "inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition disabled:opacity-40",
                       compareOpen
                         ? "border-primary-ink bg-accent/15 text-foreground"
                         : "border-border bg-card hover:bg-muted/90"
                     )}
-                    title="Compare this run's setup to another run"
+                    title={
+                      editingNow
+                        ? "Finish or cancel your corrections first — a comparison paints another setup into these boxes"
+                        : "Compare this run's setup to another run"
+                    }
                   >
                     <GitCompare className="h-3.5 w-3.5" aria-hidden />
                     Compare to another run
@@ -727,7 +857,7 @@ export function SetupSheetModal({
                 ) : (
                   <SetupChangedSincePreviousList rows={changedSincePrevious} runId={run?.id ?? null} />
                 )}
-                {compareOpen ? (
+                {compareOpen && !editingNow ? (
                   <div className="space-y-2 pt-1">
                     {comparePickerLoading ? (
                       <span className="text-[11px] text-muted-foreground">Loading runs…</span>
@@ -856,6 +986,7 @@ export function SetupSheetModal({
                     templateKey={template.templateKey}
                     hosted
                     onSaved={handleCorrected}
+                    onSaveStateChange={publishHostedSave}
                   />
                 ) : (
                   <LibrarySetupEditorClient
@@ -867,6 +998,7 @@ export function SetupSheetModal({
                     template={template}
                     hosted
                     onSaved={handleCorrected}
+                    onSaveStateChange={publishHostedSave}
                   />
                 )
               ) : sheetModelId ? (
@@ -896,7 +1028,32 @@ export function SetupSheetModal({
           )}
         </div>
       </div>
-    </div>,
+    </div>
+    {/*
+      Portalled to `<body>` by itself, so it clears this dialog rather than scrolling inside it.
+      Rendered as a sibling of the overlay and not a child: a portal still bubbles its events
+      through the REACT tree, and every tap in here would otherwise reach the scrim handler above.
+    */}
+    <ExitPromptSheet
+      open={exitPrompt !== null}
+      title={
+        exitPrompt?.count === 1 ? "1 unsaved change" : `${exitPrompt?.count ?? 0} unsaved changes`
+      }
+      detail={
+        exitPrompt?.target === "modal"
+          ? "Closing now leaves this run saying what it said before."
+          : "Leaving the sheet now puts every box back the way you found it."
+      }
+      saveLabel={hostedSave?.saveLabel ?? "Correct this run"}
+      discardLabel="Discard changes"
+      stayLabel="Keep editing"
+      error={hostedSave?.error ?? null}
+      busy={exitSaving || Boolean(hostedSave?.busy)}
+      onSave={() => void saveAndExit()}
+      onDiscard={discardAndExit}
+      onStay={() => setExitPrompt(null)}
+    />
+    </>,
     document.body
   );
 }

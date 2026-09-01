@@ -3,9 +3,9 @@
 /**
  * The driver's own setup sheet, as the Geometry Lab's input surface.
  *
- * ============================== WHY THE SHEET AND NOT ONLY KNOBS ==============================
+ * ============================== WHY THE SHEET AND NOT ONLY SLIDERS ==============================
  *
- * The Lab's knobs are an abstraction over the sheet: four sliders per axle standing in for eight
+ * The Lab's sliders are an abstraction over the sheet: four sliders per axle standing in for eight
  * per-leg field keys, at a fixed 0.25mm detent. That is fast, and it stays the default. What it is
  * not is *the thing on the pit table*. A driver reading a stack off their car is holding a sheet with
  * a box for it, and the box is where the number belongs — so on a chassis whose sheet the app can
@@ -23,8 +23,8 @@
  * `SheetFillSurface` reads `initialValues` once and holds its own state after that, because a value
  * set that changed under it would re-render 300 boxes on every keystroke, and remounting to force a
  * re-read resets zoom, pan and page — a view that shifts by a pixel makes every box look like it
- * moved. So the Lab unmounts this pane when it switches back to the knobs and mounts it fresh on the
- * way in. Knob edits reach the sheet at that moment; sheet edits reach the knobs continuously, which
+ * moved. So the Lab unmounts this pane when it switches back to the sliders and mounts it fresh on the
+ * way in. Slider edits reach the sheet at that moment; sheet edits reach the sliders continuously, which
  * is the direction that actually needs to be live.
  */
 

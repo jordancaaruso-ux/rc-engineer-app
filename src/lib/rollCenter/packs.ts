@@ -116,10 +116,15 @@ export const AWESOMATIX_A800_PACK: RollCenterPack = {
     tireCompMm: 0.125,
   },
   // Founder 2026-07-11: RS = steel, RC = carbon, RAF = alu; pack measured on steel.
+  // Titanium added 2026-08-29 (founder, 1.5mm). Keyed by the material word because it had no
+  // Awesomatix code then; since 2026-09-01 it does — C01B-RSL, with its own tick box on the
+  // rebuilt sheet — and `detectChassisCode` maps that code (and old "C01RSL" free text) here.
+  // The key stays the word so stored Lab states keep resolving.
   chassisOptions: {
     C01RS: { label: "Steel", thicknessMm: 1.2 },
     "C01B-RC": { label: "Carbon", thicknessMm: 2.2 },
     "C01B-RAF": { label: "Alu", thicknessMm: 2.0 },
+    TITANIUM: { label: "Titanium", thicknessMm: 1.5 },
   },
   baseChassisCode: "C01RS",
   // Founder-measured 2026-08-19, ruler across the plate at the axle line: 44mm. Drawn only (see

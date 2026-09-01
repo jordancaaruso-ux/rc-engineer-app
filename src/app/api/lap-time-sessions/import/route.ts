@@ -4,7 +4,7 @@ import { runsTag } from "@/lib/cacheTags";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
-import { getLiveRcDriverNameSetting, getMyRcmDriverNamesForUser } from "@/lib/appSettings";
+import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import {
   getSpeedhiveDriverNamesForUser,
   getSpeedhiveTransponderNumbersForUser,
@@ -67,19 +67,17 @@ export async function POST(request: Request) {
   const eventId =
     typeof body?.eventId === "string" && body.eventId.trim() ? body.eventId.trim() : undefined;
 
-  const [liveName, speedhiveNames, transponderNumbers, myRcmNames] = await Promise.all([
+  const [liveName, speedhiveNames, transponderNumbers] = await Promise.all([
     getLiveRcDriverNameSetting(user.id).catch(() => null),
     getSpeedhiveDriverNamesForUser(user.id).catch(() => [] as string[]),
     getSpeedhiveTransponderNumbersForUser(user.id).catch(() => [] as number[]),
-    getMyRcmDriverNamesForUser(user.id).catch(() => [] as string[]),
   ]);
   // `driverName` stays a single value: it's what the LiveRC parser reads.
-  // Speedhive and MyRCM each get their own name set alongside it.
+  // Speedhive gets its own name set alongside it.
   const driverName = (speedhiveNames[0] ?? liveName)?.trim() ?? "";
   const ctx = {
     ...(driverName ? { driverName } : {}),
     ...(speedhiveNames.length > 0 ? { speedhiveDriverNames: speedhiveNames } : {}),
-    ...(myRcmNames.length > 0 ? { myRcmDriverNames: myRcmNames } : {}),
     ...(transponderNumbers.length > 0
       ? { speedhiveTransponderNumbers: transponderNumbers }
       : {}),
@@ -117,7 +115,7 @@ export async function POST(request: Request) {
     results.push(r);
   }
 
-  revalidatePath("/laps/import");
+  revalidatePath("/laps/analysis");
   // An import with no run behind it is exactly what the Tools lap band lists, so a fresh one
   // has to appear there without waiting out the 30s window (`getCachedToolsModel`).
   revalidatePath("/tools");

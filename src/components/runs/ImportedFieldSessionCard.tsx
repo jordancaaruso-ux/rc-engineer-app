@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
+import { formatFadePerLap } from "@/lib/lapAnalysis";
 import {
   computeFieldImportSessionFromSets,
   type FieldImportSession,
@@ -33,8 +34,8 @@ export function ImportedFieldSessionCard({ importedLapSets }: { importedLapSets:
       <Eyebrow>Imported session — field</Eyebrow>
       <p className="text-[11px] leading-snug text-muted-foreground">
         Same timing import, multiple drivers. Rank and gap use each driver&apos;s best included lap vs the session
-        best. Fade is mean(second half) − mean(first half) of included laps (needs ≥4 laps); positive means slower
-        toward the end of the stint.
+        best. Fade is seconds per lap the stint drifted (needs 6 clean laps after the out-lap); positive means
+        slower toward the end of the stint.
       </p>
       <div className="overflow-x-auto inset-panel-deep">
         <table className="w-full text-xs">
@@ -64,7 +65,7 @@ export function ImportedFieldSessionCard({ importedLapSets }: { importedLapSets:
                 <td className="px-2 py-1.5 tabular-nums">
                   {row.gapToSessionBestSeconds == null ? "—" : row.gapToSessionBestSeconds.toFixed(3)}
                 </td>
-                <td className="px-2 py-1.5 tabular-nums">{fmtSec(row.fadeSeconds)}</td>
+                <td className="px-2 py-1.5 tabular-nums">{formatFadePerLap(row.fadePerLapSeconds)}</td>
               </tr>
             ))}
           </tbody>

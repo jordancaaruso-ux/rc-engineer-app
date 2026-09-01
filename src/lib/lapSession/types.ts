@@ -63,4 +63,10 @@ export interface LapSessionV1 {
   /** Summary for the primary entry / whole session (same as primary when single entry). */
   metrics?: LapMetrics;
   context?: LapSessionContext;
+  /**
+   * Driver-chosen start lap for the PRIMARY entry's 5-minute stint window;
+   * absent/null = auto (the best consecutive window). Additive on version 1 —
+   * readers that don't know it ignore it. See `readFiveMinStartLap`.
+   */
+  fiveMinStartLap?: number | null;
 }

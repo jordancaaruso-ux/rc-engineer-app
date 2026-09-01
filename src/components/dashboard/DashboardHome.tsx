@@ -101,8 +101,10 @@ export function DashboardHome({
     newPb,
     hasRunToday,
     todayRunCount,
-    todayDraftRunId,
-    todayDraftSavedAt,
+    draftRunId,
+    draftSavedAt,
+    draftEventName,
+    draftIsForToday,
     todayContext,
     todayVerdict,
     // Both built on every dashboard load and, until 2026-08-07, discarded. They
@@ -113,8 +115,11 @@ export function DashboardHome({
 
   // Server-resolved mode. The client draft provider can only add a draft the
   // server already knows about on next render — good enough for mode choice.
+  // `draftIsForToday`, not "a draft exists": a draft can be up to three days old, and keying this
+  // on mere existence would hold the dashboard in track-day mode for days after the driver went
+  // home, off one run they never finished logging.
   const isTrackDay =
-    hasRunToday || Boolean(todayDraftRunId) || featuredEvent?.status === "active";
+    hasRunToday || draftIsForToday || featuredEvent?.status === "active";
 
   const nextEvent = featuredEvent?.status === "next" ? featuredEvent : null;
   // A meeting already under way keeps the outing card in track-day mode (2026-07-29).
@@ -257,10 +262,17 @@ export function DashboardHome({
         {/* The primary action always leads — the single unmissable run entry point. */}
         <Reveal index={0} className="xl:hidden">
           <DashboardStartRunCta
-            serverDraftRunId={todayDraftRunId}
-            serverDraftSavedAt={todayDraftSavedAt}
+            serverDraftRunId={draftRunId}
+            serverDraftSavedAt={draftSavedAt}
+            serverDraftEventName={draftEventName}
+            serverDraftIsForToday={draftIsForToday}
           />
         </Reveal>
+
+        {/* No drafts list here. A card under the bar listing every unfinished run was built and
+            cut the same day (founder, 2026-08-25): "that's what the CTA 'finish' is for". The bar
+            is the dashboard's one draft surface, and everything it does not offer lives in
+            Sessions under the Drafts filter. */}
 
         {/* Sits UNDER the run CTA on purpose: logging still leads. The ask only, and it
             retires for good once a setup exists — the per-car "what you're running" list

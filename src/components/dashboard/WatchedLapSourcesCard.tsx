@@ -308,7 +308,7 @@ export function WatchedLapSourcesCard() {
                   Log this run
                 </Link>
                 <Link
-                  href={`/laps/import?sessionId=${encodeURIComponent(r.importedSessionId)}`}
+                  href={`/laps/analysis?session=${encodeURIComponent(r.importedSessionId)}`}
                   className={cn(btnGhost("px-2 py-1 text-[10px]"), "no-underline")}
                 >
                   View laps

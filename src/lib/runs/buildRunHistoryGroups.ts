@@ -1,4 +1,5 @@
 import { formatGroupDate } from "@/lib/formatDate";
+import { formatRunSessionDisplay, resolveDayRunNames } from "@/lib/runSession";
 
 export type RunForHistoryGroup = {
   id: string;
@@ -92,38 +93,74 @@ export function runSessionSortInstant(
 }
 
 /**
- * 1-based position of each run within its (user, local calendar day), in
- * time-logged order (`sortAt`, matching group display order). Names unlabeled
- * testing runs — `formatRunSessionDisplay(run, { dayRunNumber })` → "Run 2" —
- * instead of the bare "—" fallback. Plain object so it can cross the
- * server → client component boundary.
+ * The NAME each run shows in the list, resolved against the rest of its day.
+ *
+ * An unlabeled testing run is named by its 1-based position within its (user, local
+ * calendar day), in time-logged order (`sortAt`, matching group display order) —
+ * "Run 2" instead of the bare "—" fallback.
+ *
+ * A session is named by its type and nothing stores a session number, so a day of five
+ * practice sessions listed five rows all reading "Practice". Where a name repeats inside
+ * one day it says nothing, and `resolveDayRunNames` swaps it for the run's position —
+ * "Run 3" — rather than inventing a session number the event's timetable may contradict.
+ *
+ * Plain object so it can cross the server → client component boundary, same as the
+ * number map above.
  */
-export function buildDayRunNumberMap(
+export function buildDayRunNameMap(
   runs: Array<
     Pick<RunForHistoryGroup, "id" | "createdAt" | "sortAt" | "localTimeZone"> & {
       userId?: string | null;
+      sessionType: string;
+      meetingSessionType?: string | null;
+      meetingSessionCode?: string | null;
+      sessionLabel?: string | null;
     }
   >,
   timeZone?: string | null,
   opts?: Pick<RunGroupZoneOptions, "ownerTimeZoneByUserId">
-): Record<string, number> {
+): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const day of groupRunsByDay(runs, timeZone, opts)) {
+    const named = resolveDayRunNames(
+      day.map((run, i) => ({
+        name: formatRunSessionDisplay(run, { dayRunNumber: i + 1 }),
+        dayRunNumber: i + 1,
+      }))
+    );
+    day.forEach((run, i) => {
+      map[run.id] = named[i].label;
+    });
+  }
+  return map;
+}
+
+/**
+ * Today's runs split into (owner, local calendar day) buckets, each in time-logged
+ * order (`sortAt`, matching group display order). Shared so the number map and the
+ * name map above can never disagree about which runs are in the same day.
+ */
+function groupRunsByDay<
+  T extends Pick<RunForHistoryGroup, "id" | "createdAt" | "sortAt" | "localTimeZone"> & {
+    userId?: string | null;
+  },
+>(
+  runs: readonly T[],
+  timeZone?: string | null,
+  opts?: Pick<RunGroupZoneOptions, "ownerTimeZoneByUserId">
+): T[][] {
   const zones: RunGroupZoneOptions = { ...opts, viewerTimeZone: timeZone };
-  const byDay = new Map<string, Array<{ id: string; t: number }>>();
+  const byDay = new Map<string, Array<{ run: T; t: number }>>();
   for (const run of runs) {
     const instant = runSessionSortInstant(run);
     const key = `${run.userId ?? ""}|${dateKey(instant, resolveRunLocalTimeZone(run, zones))}`;
     const list = byDay.get(key) ?? [];
-    list.push({ id: run.id, t: instant.getTime() });
+    list.push({ run, t: instant.getTime() });
     byDay.set(key, list);
   }
-  const map: Record<string, number> = {};
-  for (const list of byDay.values()) {
-    list.sort((a, b) => a.t - b.t);
-    list.forEach((r, i) => {
-      map[r.id] = i + 1;
-    });
-  }
-  return map;
+  return [...byDay.values()].map((list) =>
+    list.sort((a, b) => a.t - b.t).map((entry) => entry.run)
+  );
 }
 
 /**

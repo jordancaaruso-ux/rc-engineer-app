@@ -4,16 +4,27 @@
  * graph). The DB-touching pieces (sign-in route, seed) live elsewhere.
  *
  * Model (MONETISATION_NORTH_STAR.md Phase 3): one shared demo account, seeded from the
- * founder's real season. Visitors browse everything; every write is refused centrally in
- * middleware — except the Engineer chat, which is the demo's centerpiece and gets its own
- * caps in the chat route.
+ * founder's real season. Visitors browse everything and write nothing — every write is refused
+ * centrally in middleware, with no exceptions since 2026-08-25 (see the allowlist below).
  */
 
 /** Fixed id of the shared demo account — mirrors the default in scripts/seed-demo-account.ts. */
 export const DEMO_USER_ID_FALLBACK = "demo0000000000000000user1";
 
-/** Writes a demo session may still perform. Exact-path match, deliberately tiny. */
-const DEMO_WRITE_ALLOWLIST = new Set<string>(["/api/engineer/chat"]);
+/**
+ * Writes a demo session may still perform. Empty — the demo is read-only, full stop.
+ *
+ * `/api/engineer/chat` lived here until 2026-08-25, letting a visitor ask two live questions.
+ * Founder call retired it: the demo does not need to ANSWER questions, it needs a really good
+ * record of questions it has already answered. Simpler product and a strictly better one to
+ * operate — no per-IP throttle to leak on serverless, no global spend ceiling, no way for a
+ * launch-day crowd to make the Engineer go dark for everyone who arrives after them, and no
+ * anonymous path to an LLM bill at all.
+ *
+ * Kept as a Set rather than folded away: the shape of the decision below is the valuable part,
+ * and re-opening a single path is a one-line change if that call is ever reversed.
+ */
+const DEMO_WRITE_ALLOWLIST = new Set<string>();
 
 /** Methods that never mutate — always allowed for demo sessions. */
 const READ_METHODS = new Set<string>(["GET", "HEAD", "OPTIONS"]);
@@ -61,3 +72,4 @@ export function decideDemoRequest(input: {
 /** The message every refused write carries — quiet, never aggressive (founder 2026-08-02).
  *  The selling happens in the banner; the refusal just states the fact. */
 export const DEMO_READ_ONLY_MESSAGE = "The demo is read-only.";
+

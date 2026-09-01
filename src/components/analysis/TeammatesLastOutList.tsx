@@ -47,7 +47,7 @@ export function TeammatesLastOutList({ rows }: { rows: TeammateLastOut[] }) {
   const hidden = rows.slice(TEAMMATES_LAST_OUT_VISIBLE);
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col px-4 pt-1">
       <div className="flex flex-col">
         {visible.map((row, index) => (
           <TeammateRow key={row.userId} row={row} withDivider={index > 0} />
@@ -67,7 +67,7 @@ export function TeammatesLastOutList({ rows }: { rows: TeammateLastOut[] }) {
             type="button"
             onClick={() => setExpanded((v) => !v)}
             aria-expanded={expanded}
-            className="tap-active mt-1 w-full border-t border-border py-2.5 text-[12px] font-semibold text-primary-ink transition-colors hover:bg-elevate/[0.035]"
+            className="tap-active mb-1 mt-1 w-full border-t border-border py-2.5 text-[12px] font-semibold text-primary-ink transition-colors hover:bg-elevate/[0.035]"
           >
             {/* The total, not the remainder: the band's own footer quotes the same number, so the
                 figure a driver taps is the figure they were just given. */}
@@ -77,6 +77,21 @@ export function TeammatesLastOutList({ rows }: { rows: TeammateLastOut[] }) {
       ) : null}
     </div>
   );
+}
+
+/**
+ * "Cooper Webster" → CW, "Glenn" → GL, "NicholasRaceCarDriver" → NI.
+ *
+ * Two letters always, so every disc weighs the same down the column. A one-word name takes its
+ * first two letters rather than one: a single glyph in a 32px circle reads as a bullet, and half
+ * this app's rosters are handles rather than first-and-last names.
+ */
+function initialsOf(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "—";
+  const letters =
+    words.length > 1 ? `${words[0]![0]}${words[1]![0]}` : words[0]!.slice(0, 2);
+  return letters.toUpperCase();
 }
 
 function TeammateRow({ row, withDivider }: { row: TeammateLastOut; withDivider: boolean }) {
@@ -110,6 +125,19 @@ function TeammateRow({ row, withDivider }: { row: TeammateLastOut; withDivider: 
         withDivider && "border-t border-border"
       )}
     >
+      {/*
+        Initials, 2026-08-26. Not decoration and not a stand-in for a photo we do not have: this
+        band is a wall of left-aligned names of wildly different lengths — "Glenn" over
+        "NicholasRaceCarDriver" — and a fixed disc at the head of every row gives the eye a column
+        to run down. It is also the only thing on the card that says a row is a PERSON rather than
+        a record, which is what a roster is.
+      */}
+      <span
+        className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-border bg-secondary text-[10.5px] font-bold tracking-tight text-muted-foreground"
+        aria-hidden
+      >
+        {initialsOf(row.name)}
+      </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex items-baseline justify-between gap-2">
           <span className="truncate text-[13.5px] font-medium tracking-tight text-foreground group-hover/row:text-primary-ink">

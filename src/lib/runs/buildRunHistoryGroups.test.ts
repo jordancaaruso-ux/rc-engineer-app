@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  buildDayRunNumberMap,
+  buildDayRunNameMap,
   buildRunHistoryGroups,
   sessionGroupKey,
 } from "@/lib/runs/buildRunHistoryGroups";
@@ -170,21 +170,82 @@ test("runs without their own zone fall back to the owner's account zone", () => 
   assert.equal(withOwner[0]!.runs.length, 2);
 });
 
-test("buildDayRunNumberMap numbers runs per user per local day, in sortAt order", () => {
+const testingRun = (
+  id: string,
+  iso: string,
+  userId: string,
+  session: Partial<{
+    sessionType: string;
+    meetingSessionType: string | null;
+    sessionLabel: string | null;
+  }> = {}
+) => ({
+  id,
+  createdAt: new Date(iso),
+  sortAt: new Date(iso),
+  userId,
+  sessionType: "TESTING",
+  meetingSessionType: null,
+  sessionLabel: null,
+  ...session,
+});
+
+test("buildDayRunNameMap numbers unnamed runs per user per local day, in sortAt order", () => {
   const runs = [
     // Jordan, day 1 — logged out of array order; sortAt decides.
-    { id: "j-2", createdAt: new Date("2025-07-01T02:00:00Z"), sortAt: new Date("2025-07-01T02:00:00Z"), userId: "jordan" },
-    { id: "j-1", createdAt: new Date("2025-07-01T00:30:00Z"), sortAt: new Date("2025-07-01T00:30:00Z"), userId: "jordan" },
+    testingRun("j-2", "2025-07-01T02:00:00Z", "jordan"),
+    testingRun("j-1", "2025-07-01T00:30:00Z", "jordan"),
     // Jordan, day 2 — numbering restarts.
-    { id: "j-3", createdAt: new Date("2025-07-02T01:00:00Z"), sortAt: new Date("2025-07-02T01:00:00Z"), userId: "jordan" },
+    testingRun("j-3", "2025-07-02T01:00:00Z", "jordan"),
     // Teammate, same day 1 — independent numbering.
-    { id: "t-1", createdAt: new Date("2025-07-01T01:00:00Z"), sortAt: new Date("2025-07-01T01:00:00Z"), userId: "teammate" },
+    testingRun("t-1", "2025-07-01T01:00:00Z", "teammate"),
   ];
-  const map = buildDayRunNumberMap(runs);
-  assert.equal(map["j-1"], 1);
-  assert.equal(map["j-2"], 2);
-  assert.equal(map["j-3"], 1);
-  assert.equal(map["t-1"], 1);
+  const map = buildDayRunNameMap(runs);
+  assert.equal(map["j-1"], "Run 1");
+  assert.equal(map["j-2"], "Run 2");
+  assert.equal(map["j-3"], "Run 1");
+  assert.equal(map["t-1"], "Run 1");
+});
+
+test("buildDayRunNameMap: a name the day REPEATS becomes the run's position", () => {
+  // The reported bug (2026-08-25): five practice sessions, five runs all named
+  // "Practice", so every line pointing at one of them pointed at all of them.
+  const practice = (id: string, iso: string) =>
+    testingRun(id, iso, "jordan", {
+      sessionType: "RACE_MEETING",
+      meetingSessionType: "PRACTICE",
+    });
+  const map = buildDayRunNameMap([
+    practice("p-1", "2025-07-01T00:30:00Z"),
+    practice("p-2", "2025-07-01T02:00:00Z"),
+    practice("p-3", "2025-07-01T04:00:00Z"),
+  ]);
+  assert.deepEqual([map["p-1"], map["p-2"], map["p-3"]], ["Run 1", "Run 2", "Run 3"]);
+});
+
+test("buildDayRunNameMap: names that do NOT repeat are left completely alone", () => {
+  const meeting = (id: string, iso: string, meetingSessionType: string) =>
+    testingRun(id, iso, "jordan", { sessionType: "RACE_MEETING", meetingSessionType });
+  const map = buildDayRunNameMap([
+    meeting("m-1", "2025-07-01T00:30:00Z", "PRACTICE"),
+    meeting("m-2", "2025-07-01T02:00:00Z", "QUALIFYING"),
+    meeting("m-3", "2025-07-01T04:00:00Z", "RACE"),
+  ]);
+  assert.deepEqual([map["m-1"], map["m-2"], map["m-3"]], ["Practice", "Qualifying", "Race"]);
+});
+
+test("buildDayRunNameMap: a repeat is judged inside ONE day, not across the week", () => {
+  const practice = (id: string, iso: string) =>
+    testingRun(id, iso, "jordan", {
+      sessionType: "RACE_MEETING",
+      meetingSessionType: "PRACTICE",
+    });
+  // One practice on each of two days: neither day repeats anything, so both keep the name.
+  const map = buildDayRunNameMap([
+    practice("d1", "2025-07-01T00:30:00Z"),
+    practice("d2", "2025-07-02T00:30:00Z"),
+  ]);
+  assert.deepEqual([map["d1"], map["d2"]], ["Practice", "Practice"]);
 });
 
 test("formatRunSessionDisplay names unlabeled testing runs from dayRunNumber, label still wins", () => {

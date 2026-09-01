@@ -27,13 +27,22 @@ const RC_EDGE_PAD = 5;
 /**
  * How far below the ground line the frame always reaches, in mm. FIXED on purpose: this is
  * the floor of the drawing, and anything that moves with the setup would resize the car every
- * time a knob turned. 20mm covers the roll centres these cars actually run (measured -9.1mm
+ * time a slider moved. 20mm covers the roll centres these cars actually run (measured -9.1mm
  * front / -8.5mm rear on the blank A800 car); a lower one still shows, pinned and off-scale.
  */
 const RC_WINDOW_BELOW_MM = 20;
 
-const armAngleDeg = (inner: Vec2, outer: Vec2): number =>
-  (Math.atan2(outer.z - inner.z, outer.x - inner.x) * 180) / Math.PI;
+/**
+ * Arm inclination, + = outer end higher than inner.
+ *
+ * `mirrored` is for the LEFT side, whose outer end is at more negative x: without it the raw
+ * atan2 comes back near ±180° (−173.3° where the right side reads +6.7° on the same car at
+ * rest). Flipping dx puts both sides in one convention, so a left-hand label can be read against
+ * a right-hand one without the driver doing arithmetic.
+ */
+const armAngleDeg = (inner: Vec2, outer: Vec2, mirrored = false): number =>
+  (Math.atan2(outer.z - inner.z, mirrored ? inner.x - outer.x : outer.x - inner.x) * 180) /
+  Math.PI;
 
 /** Tire quad from contact + wheel-plane centre (leans with real camber). */
 function tireCorners(side: SolvedSide): Vec2[] | null {
@@ -178,7 +187,7 @@ export function AxleSchematic({ solved, ghost, chassis, extraPoints, fitBox, axl
   /**
    * Fill the parent box (h-full w-full, letterboxed) instead of deriving the
    * rendered height from the drawing extents — callers pin the schematic in a
-   * fixed-aspect container so knob/roll changes never reflow the page.
+   * fixed-aspect container so slider/roll changes never reflow the page.
    */
   fitBox?: boolean;
   /** For the accessible name, e.g. "front". */
@@ -211,7 +220,7 @@ export function AxleSchematic({ solved, ghost, chassis, extraPoints, fitBox, axl
      * to 168.6 units, and the browser re-fitted that shorter box into the same on-screen
      * rectangle — scaling the whole car up 7.5%. Measured on the tyre, which is a fixed 64mm
      * object and therefore the honest ruler: 87.65px -> 94.24px at 390, 233.72 -> 251.32 at
-     * 1760. The floor is now a FIXED window, so nothing a knob does can resize the car.
+     * 1760. The floor is now a FIXED window, so nothing a slider does can resize the car.
      */
     const xMin = Math.min(...contacts) - 16;
     const xMax = Math.max(...contacts) + 16;
@@ -240,9 +249,32 @@ export function AxleSchematic({ solved, ghost, chassis, extraPoints, fitBox, axl
       return { cx, cy, offScale: Math.abs(cx - px) > 0.5 || Math.abs(cy - py) > 0.5 };
     };
 
-    const r = solved.right;
-    const lowerMid = { x: (r.innerLower.x + r.lowerBall.x) / 2, z: (r.innerLower.z + r.lowerBall.z) / 2 };
-    const upperMid = { x: (r.innerUpper.x + r.upperBall.x) / 2, z: (r.innerUpper.z + r.upperBall.z) / 2 };
+    /*
+     * Arm angles used to be labelled on the RIGHT side only, which quietly described the wrong
+     * wheel the moment the car leaned: the Lab's roll slider travels positive, positive roll
+     * loads the LEFT, and at 3° on the A800 front the loaded arms sit at 7.7°/9.2° while the
+     * right-hand labels still read 5.6°/5.4°. Both sides are labelled once a pose splits them
+     * — rather than moving the one pair across to the loaded side, which would make the numbers
+     * appear to jump sideways the instant the slider left zero. At rest the sides are identical
+     * and one pair is all the picture needs, so a still car draws exactly as it always did.
+     */
+    const sideArms = (side: SolvedSide, mirrored: boolean) => ({
+      lower: {
+        x: (side.innerLower.x + side.lowerBall.x) / 2,
+        z: (side.innerLower.z + side.lowerBall.z) / 2,
+        deg: armAngleDeg(side.innerLower, side.lowerBall, mirrored),
+      },
+      upper: {
+        x: (side.innerUpper.x + side.upperBall.x) / 2,
+        z: (side.innerUpper.z + side.upperBall.z) / 2,
+        deg: armAngleDeg(side.innerUpper, side.upperBall, mirrored),
+      },
+    });
+    const rightArms = sideArms(solved.right, false);
+    const leftArms = sideArms(solved.left, true);
+    const armsSplit =
+      Math.abs(leftArms.lower.deg - rightArms.lower.deg) > 0.15 ||
+      Math.abs(leftArms.upper.deg - rightArms.upper.deg) > 0.15;
 
     // Per-wheel camber anchors: the tire quad's top-edge midpoint (leans with the tire).
     const camberLabels = ([
@@ -261,10 +293,7 @@ export function AxleSchematic({ solved, ghost, chassis, extraPoints, fitBox, axl
       P,
       main,
       gh,
-      lowerAngle: armAngleDeg(r.innerLower, r.lowerBall),
-      upperAngle: armAngleDeg(r.innerUpper, r.upperBall),
-      lowerMid,
-      upperMid,
+      armLabels: armsSplit ? [leftArms, rightArms] : [rightArms],
       camberLabels,
       mainMark: markFor(main.rc),
       ghostMark: gh ? markFor(gh.rc) : null,
@@ -272,6 +301,8 @@ export function AxleSchematic({ solved, ghost, chassis, extraPoints, fitBox, axl
   }, [solved, ghost, extraPoints, showCamber]);
 
   if (!d) return null;
+
+  const rcLabelBelow = d.main.rc.z < 0 && d.mainMark.cy + 11 <= d.H - 2;
 
   const joints: Vec2[] = [solved.left, solved.right].flatMap((s) => [
     s.innerLower,
@@ -346,7 +377,11 @@ export function AxleSchematic({ solved, ghost, chassis, extraPoints, fitBox, axl
             fill="currentColor"
             fillOpacity={0.65}
           >
-            ride {chassis.rideHeightMm.toFixed(1)}mm
+            {/* Just the figure (founder call, 2026-08-27). The dimension line it sits beside —
+                ground to plate, ticked at both ends — already says what is being measured; the
+                words "Ride Height" doubled that and, at card size on Tools, were the one string
+                long enough to run into the roll-centre marker. */}
+            {chassis.rideHeightMm.toFixed(1)}mm
           </text>
         </g>
       )}
@@ -382,16 +417,23 @@ export function AxleSchematic({ solved, ghost, chassis, extraPoints, fitBox, axl
         </g>
       )}
 
-      {/* Tires (lean with real camber) */}
+      {/*
+        Tires (lean with real camber). Lightened 2026-08-25: a filled quad 64mm tall is by far the
+        largest shape in the picture, and at fill 0.07 + a full-width 1.0 stroke the two of them
+        read heavier than every suspension member (0.5–0.9). That inverts the hierarchy the rest
+        of this file is built on — the linkage is the subject, the plate already carries the
+        thinnest line for exactly this reason. They stay visible because they are also the ruler:
+        a tyre is a fixed 64mm object, so it is what tells you nothing resized.
+      */}
       {d.main.tires.map((corners, i) => (
         <polygon
           key={`tire-${i}`}
           points={corners.map(d.P).join(" ")}
           fill="currentColor"
-          fillOpacity={0.07}
+          fillOpacity={0.04}
           stroke="currentColor"
-          strokeOpacity={0.35}
-          strokeWidth={1}
+          strokeOpacity={0.3}
+          strokeWidth={0.8}
           strokeLinejoin="round"
         />
       ))}
@@ -419,27 +461,17 @@ export function AxleSchematic({ solved, ghost, chassis, extraPoints, fitBox, axl
           </text>
         ))}
 
-      {/* Arm angles, labeled on the arms they measure (right side) */}
-      <text
-        x={d.X(d.lowerMid.x)}
-        y={d.Y(d.lowerMid.z - 4.8)}
-        textAnchor="middle"
-        fontSize={9}
-        fill="currentColor"
-        fillOpacity={0.7}
-      >
-        {d.lowerAngle.toFixed(1)}°
-      </text>
-      <text
-        x={d.X(d.upperMid.x)}
-        y={d.Y(d.upperMid.z + 4.2)}
-        textAnchor="middle"
-        fontSize={9}
-        fill="currentColor"
-        fillOpacity={0.7}
-      >
-        {d.upperAngle.toFixed(1)}°
-      </text>
+      {/* Arm angles, labeled on the arms they measure — one side at rest, both once roll splits them */}
+      {d.armLabels.map((arms, i) => (
+        <g key={`arms-${i}`} fill="currentColor" fillOpacity={0.7} fontSize={9}>
+          <text x={d.X(arms.lower.x)} y={d.Y(arms.lower.z - 4.8)} textAnchor="middle">
+            {arms.lower.deg.toFixed(1)}°
+          </text>
+          <text x={d.X(arms.upper.x)} y={d.Y(arms.upper.z + 4.2)} textAnchor="middle">
+            {arms.upper.deg.toFixed(1)}°
+          </text>
+        </g>
+      ))}
 
       {/* Roll center — the one yellow mark (marker only; doc's visual rule).
           A dot, matching how the Lab's migration chart already marks current RC. Hollow when
@@ -454,9 +486,18 @@ export function AxleSchematic({ solved, ghost, chassis, extraPoints, fitBox, axl
           strokeWidth={1}
         />
       </g>
+      {/*
+        The readout sits BELOW the dot whenever the roll centre is under the ground line, which is
+        where it almost always is. Two reasons, one edit: it stopped the label colliding with the
+        ride-height dimension (measured overlap on the A800, whose 22mm half-plate pulls that
+        dimension in to 7mm off the centreline), and the fixed 20mm window under the ground was
+        otherwise a quarter of the drawing's height holding one 2px dot. Above the dot is kept for
+        a roll centre that has climbed over the ground, and for the rare case where the dot has
+        been pinned so low that a label beneath it would run out of the frame.
+      */}
       <text
         x={d.mainMark.cx}
-        y={d.mainMark.cy - 6}
+        y={rcLabelBelow ? d.mainMark.cy + 11 : d.mainMark.cy - 6}
         textAnchor="middle"
         fontSize={9.5}
         fill="currentColor"

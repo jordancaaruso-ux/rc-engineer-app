@@ -53,8 +53,14 @@ export function fieldUsesPresetWithOther(
   return modelOptionLabels.some((o) => normToken(o) === "other");
 }
 
+/**
+ * Hyphens and underscores compare equal: stored presets and printed labels say `C01B-RSL` while
+ * the schema's minted option values say `c01b_rsl`, and both shapes reach these matchers (a sheet
+ * tick arrives as the minted value). The separator was never a meaningful difference — treating it
+ * as one demoted real presets into "custom text" (founder report, 2026-09-01).
+ */
 function normToken(v: string): string {
-  return v.trim().toLowerCase().replace(/\s+/g, " ");
+  return v.trim().toLowerCase().replace(/\s+/g, " ").replace(/[-_]+/g, "-");
 }
 
 function isPlainObject(x: unknown): x is Record<string, unknown> {
