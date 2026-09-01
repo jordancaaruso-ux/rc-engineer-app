@@ -48,7 +48,16 @@ export function LapCompareDriverChips({
   const selectable = chips.filter((c) => !c.isTarget && c.loaded).length;
   return (
     <div
-      className={cn("flex flex-wrap items-center gap-1.5", className)}
+      /*
+       * Below lg the row scrolls sideways instead of wrapping (founder call, 2026-08-29): ten
+       * drivers wrapped to four rows on a 390px phone, ~170px of chips before a sheet that
+       * already lists the same names in its "Compared with" bar. One line, the target pinned
+       * first, the rest a thumb-scroll away. Desktop has the width, so it still wraps.
+       */
+      className={cn(
+        "run-rail-scroll flex items-center gap-1.5 max-lg:-mx-1 max-lg:flex-nowrap max-lg:overflow-x-auto max-lg:overscroll-x-contain max-lg:px-1 max-lg:pb-0.5 lg:flex-wrap",
+        className
+      )}
       role="group"
       aria-label="Who is on the sheet"
       onMouseLeave={() => onFocus(null)}
@@ -65,7 +74,7 @@ export function LapCompareDriverChips({
             title={c.isTarget ? "The target stays on the sheet" : c.on ? "Remove from the sheet" : "Add to the sheet"}
             className={cn(
               chipToggleClass(c.on),
-              "tap-active max-w-[11rem] truncate px-2 py-1 text-[11px] leading-tight",
+              "tap-active max-w-[11rem] truncate px-2 py-1 text-[11px] leading-tight max-lg:shrink-0",
               c.isTarget && "cursor-default",
               focused && "ring-1 ring-foreground/40"
             )}
@@ -84,7 +93,7 @@ export function LapCompareDriverChips({
         );
       })}
       {/* Ten chips is a lot to tap one by one, in either direction. */}
-      <span className="ml-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+      <span className="ml-1 flex shrink-0 items-center gap-2 whitespace-nowrap text-[10px] text-muted-foreground">
         <button
           type="button"
           className="underline-offset-2 hover:text-foreground hover:underline disabled:opacity-50 disabled:hover:no-underline"

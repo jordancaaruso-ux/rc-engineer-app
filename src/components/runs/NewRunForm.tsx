@@ -116,6 +116,7 @@ import {
 } from "@/lib/lapImport/blockLapRows";
 import { mergeImportedLapSetsByDriver } from "@/lib/lapImport/mergeImportedLapSets";
 import {
+  importedSessionWeatherInstantIso,
   resolveImportedSessionDisplayTimeIso,
   resolveImportedSessionHasWallClockTime,
 } from "@/lib/lapImport/labels";
@@ -2107,7 +2108,7 @@ export function NewRunForm(props: {
     if (!t || !trackHasMarkedLocation(t) || t.latitude == null || t.longitude == null) return;
     const sets = buildImportedLapSetsFromIngest(lapIngest);
     const primary = sets.find((s) => s.isPrimaryUser) ?? sets[0];
-    const atIso = primary?.sessionCompletedAt ?? null;
+    const atIso = importedSessionWeatherInstantIso(primary, Intl.DateTimeFormat().resolvedOptions().timeZone);
     const key = `${t.id}:${t.latitude.toFixed(3)},${t.longitude.toFixed(3)}:${atIso ?? "now"}`;
     if (conditionsAutoFetchKeyRef.current === key) return;
     conditionsAutoFetchKeyRef.current = key;
@@ -3690,7 +3691,12 @@ export function NewRunForm(props: {
       const weatherTrack = tracksList.find((t) => t.id === resolvedTrackId);
       if (weatherTrack?.latitude != null && weatherTrack?.longitude != null) {
         const sets = buildImportedLapSetsFromIngest(lapIngest);
-        const atIso = (sets.find((s) => s.isPrimaryUser) ?? sets[0])?.sessionCompletedAt ?? null;
+        // Imported session times are track wall clock stored as-if-UTC; convert in the
+        // device zone or the lookup reads the wrong side of the planet's clock.
+        const atIso = importedSessionWeatherInstantIso(
+          sets.find((s) => s.isPrimaryUser) ?? sets[0],
+          Intl.DateTimeFormat().resolvedOptions().timeZone
+        );
         const params = new URLSearchParams({
           lat: String(weatherTrack.latitude),
           lon: String(weatherTrack.longitude),
@@ -4042,7 +4048,7 @@ export function NewRunForm(props: {
   const conditionsSessionAtIso = (() => {
     const sets = buildImportedLapSetsFromIngest(lapIngest);
     const primary = sets.find((s) => s.isPrimaryUser) ?? sets[0];
-    return primary?.sessionCompletedAt ?? null;
+    return importedSessionWeatherInstantIso(primary, Intl.DateTimeFormat().resolvedOptions().timeZone);
   })();
   async function handleSaveTrackPin(coords: { latitude: number; longitude: number }) {
     if (!conditionsTrack) return;
@@ -4755,7 +4761,11 @@ export function NewRunForm(props: {
     />
     <form
       className={cn(
-        "max-w-3xl space-y-3",
+        // No clamp of its own: the wizard fills the page column like every other
+        // page since the one-measure change (globals.css, 2026-08-29). It used to be
+        // max-w-3xl, which matched the page clamp exactly and so was invisible —
+        // once the page widened it would have stranded the whole form on the left.
+        "space-y-3",
         // Wizard: clear the fixed F2 bottom bar (all breakpoints — it serves
         // desktop too now).
         wizardActive ? "pb-40" : "pb-16 md:pb-20"
@@ -5913,6 +5923,7 @@ export function NewRunForm(props: {
                 templateKey={sheetChassis.templateKey}
                 seedValues={sheetSeedValues}
                 seedKey={sheetSeedKey}
+                seedSnapshotId={setupBaselineSnapshotId}
                 onValues={applySheetValuesToSetup}
                 // The same save the wizard bar performs — surfaced beside the sheet because
                 // box edits land silently, and on a phone the bar itself is hidden while the

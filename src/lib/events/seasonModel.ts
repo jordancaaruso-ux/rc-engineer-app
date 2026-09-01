@@ -28,7 +28,6 @@ import { prisma } from "@/lib/prisma";
 import { eventDateToYmd } from "@/lib/eventDateParse";
 import { getIncludedLaps, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
-import { localTodayYmd } from "@/lib/events/splitEventsForPicker";
 import {
   resolveEventTrackLocation,
   resolveEventTrackName,
@@ -81,9 +80,12 @@ export async function loadEventsSeasonModel(input: {
   userId: string;
   /** Selected year, or null for all time. Defaults to the newest year with events. */
   year?: number | null;
-  todayYmd?: string;
+  /** "Today" in the VIEWER's timezone (todayYmdInTimeZone). Required — the server's
+     own clock is UTC on Vercel, which held a finished meeting in the Paddock hero until
+     10am Melbourne time (2026-08-31). */
+  todayYmd: string;
 }): Promise<EventsSeasonModel> {
-  const todayYmd = input.todayYmd ?? localTodayYmd();
+  const todayYmd = input.todayYmd;
   const scopedIds = await eventIdsInScopeForUser(input.userId);
 
   const [eventRows, runRows, openTestPlanCount] = await Promise.all([

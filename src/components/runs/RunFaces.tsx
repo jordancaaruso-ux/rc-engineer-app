@@ -40,6 +40,7 @@ import type {
 } from "@/components/setup/useSetupEditorSave";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import type { SetupSaveContext } from "@/lib/setup/setupSaveContext";
+import { SessionSetupSaveButton } from "@/components/setup/SessionSetupSaveButton";
 import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 import { ShareRunButton } from "@/components/share/ShareRunButton";
 import { RatingDial } from "@/components/ui/RatingDial";
@@ -54,8 +55,10 @@ import {
   formatFadePerLap,
   getFadePerLap,
   getFadeProfile,
+  getFiveMinuteStintStartingAt,
   getIncludedLapDashboardMetrics,
   primaryLapRowsFromRun,
+  readFiveMinStartLap,
   type IncludedLapDashboardMetrics,
 } from "@/lib/lapAnalysis";
 import {
@@ -67,7 +70,7 @@ import {
   persistedFromUiState,
   uiStateFromParsed,
 } from "@/lib/runHandlingAssessment";
-import { formatLap, formatStintTime } from "@/lib/runLaps";
+import { formatFiveMinuteStint, formatLap, formatStintTime } from "@/lib/runLaps";
 import { formatRunDateTime } from "@/lib/formatDate";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
@@ -260,6 +263,62 @@ export function RunFaces({
     }
     return numbers;
   }, [dash.bestLap, lapRows]);
+
+  /* ------------------------------------------------ the 5-minute window -- */
+  /*
+   * The window has ONE handle — its start lap; the clock decides the rest
+   * (founder ruling, 2026-09-01: per run, auto = best consecutive 5 minutes,
+   * with the option to change). Tapping a lap on the card moves it; the stored
+   * choice lives inside `run.lapSession` and a stale one (laps re-imported
+   * since) silently falls back to auto rather than inventing a figure.
+   */
+  const storedFiveMinStart = useMemo(() => readFiveMinStartLap(run.lapSession), [run]);
+  /** Optimistic local choice; `undefined` = trust what the server payload says. */
+  const [localFiveMinStart, setLocalFiveMinStart] = useState<number | null | undefined>(undefined);
+  useEffect(() => setLocalFiveMinStart(undefined), [run.id]);
+  const fiveMinStart = localFiveMinStart !== undefined ? localFiveMinStart : storedFiveMinStart;
+  const chosenFiveMinStint = useMemo(
+    () => (fiveMinStart != null ? getFiveMinuteStintStartingAt(lapRows, fiveMinStart) : null),
+    [lapRows, fiveMinStart]
+  );
+  /** What the card displays: the driver's window when set and valid, else the best. */
+  const fiveMinStint = chosenFiveMinStint ?? dash.fiveMinStint;
+  const fiveMinIsCustom =
+    chosenFiveMinStint != null &&
+    chosenFiveMinStint.startLapNumber !== dash.fiveMinStint?.startLapNumber;
+  const fiveMinWindowLapNumbers = useMemo(() => {
+    const s = new Set<number>();
+    if (fiveMinStint) {
+      for (const lap of lapRows) {
+        if (
+          lap.lapNumber >= fiveMinStint.startLapNumber &&
+          lap.lapNumber <= fiveMinStint.endLapNumber
+        ) {
+          s.add(lap.lapNumber);
+        }
+      }
+    }
+    return s;
+  }, [fiveMinStint, lapRows]);
+  const saveFiveMinStart = useCallback(
+    (next: number | null) => {
+      const prev = fiveMinStart;
+      setLocalFiveMinStart(next);
+      void corrections.saveFields({ fiveMinStartLap: next }).catch(() => {
+        setLocalFiveMinStart(prev);
+      });
+    },
+    [corrections, fiveMinStart]
+  );
+  const pickFiveMinStart = useCallback(
+    (lapNumber: number) => {
+      // A lap the clock can't fund five minutes from is not a valid handle — no-op,
+      // the window visibly stays put.
+      if (getFiveMinuteStintStartingAt(lapRows, lapNumber) == null) return;
+      saveFiveMinStart(lapNumber);
+    },
+    [lapRows, saveFiveMinStart]
+  );
   const graphRows = useMemo(
     () =>
       lapRows.map((lap) => ({
@@ -637,17 +696,36 @@ export function RunFaces({
     metrics: IncludedLapDashboardMetrics,
     fade: { perLap: number | null; overRunSeconds: number | null },
     /** Says what the row is where the labels can't — the field tab's average, say. */
-    title?: string
+    title?: string,
+    opts?: {
+      /**
+       * The pinned row above already shows the 5-minute stint, so this row must not —
+       * the same figure twice on one card is two answers to one question. Only your
+       * own row sets this; a rival's tab has no pinned row, so the stint takes the
+       * whole-session Stint figure's seat there instead.
+       */
+      fiveMinShownAbove?: boolean;
+    }
   ) => (
     <div
       className="flex items-stretch rounded-xl border border-border bg-card px-1 py-1.5"
       title={title}
     >
-      <Figure
-        label="Stint"
-        value={metrics.stintSeconds != null ? formatStintTime(metrics.stintSeconds) : "—"}
-        small
-      />
+      {metrics.fiveMinStint != null && opts?.fiveMinShownAbove ? null : metrics.fiveMinStint !=
+        null ? (
+        <Figure
+          label="5 min"
+          value={formatFiveMinuteStint(metrics.fiveMinStint, 1)}
+          title={formatFiveMinuteStint(metrics.fiveMinStint)}
+          small
+        />
+      ) : (
+        <Figure
+          label="Stint"
+          value={metrics.stintSeconds != null ? formatStintTime(metrics.stintSeconds) : "—"}
+          small
+        />
+      )}
       <Figure label="Median" value={formatLap(metrics.median)} small />
       <Figure
         label="Consist."
@@ -683,6 +761,12 @@ export function RunFaces({
       mistakeDetail?: Map<number, string>;
       /** What stands in when a driver has no laps at all. */
       empty: ReactNode;
+      /** Laps inside the 5-minute window — tinted so the stint is on the picture. */
+      window?: Set<number>;
+      /** The "back to auto" control, shown in the header while the window is hand-placed. */
+      windowChip?: ReactNode;
+      /** Owner-only: tapping a lap opens the 5-minute window there. */
+      onPickWindowStart?: (lapNumber: number) => void;
     }
   ) =>
     cardShell(
@@ -692,6 +776,7 @@ export function RunFaces({
             <span className="text-[9.5px] font-semibold uppercase tracking-wider text-faint">
               Lap times
             </span>
+            {opts.windowChip ?? null}
             {opts.bestLap != null ? (
               <span className="ml-auto text-[10.5px] tabular-nums text-muted-foreground">
                 {rows.length} lap{rows.length === 1 ? "" : "s"} · best {formatLap(opts.bestLap)}
@@ -703,27 +788,29 @@ export function RunFaces({
               const isMistake = opts.mistake.has(lap.lapNumber);
               const isBest = opts.best.has(lap.lapNumber);
               const detail = opts.mistakeDetail?.get(lap.lapNumber);
-              return (
-                <span
-                  key={lap.lapNumber}
-                  title={
-                    !lap.isIncluded
-                      ? "Excluded"
-                      : isMistake
-                        ? detail
-                          ? `${detail} vs median`
-                          : "Mistake lap"
-                        : isBest
-                          ? "Best lap"
-                          : undefined
-                  }
-                  className={cn(
-                    "inline-grid grid-cols-[1.4rem_auto] items-baseline gap-x-0.5 rounded px-0.5 tabular-nums",
-                    !lap.isIncluded && "line-through opacity-50",
-                    isMistake && "lap-flag-mistake text-white",
-                    isBest && !isMistake && "lap-flag-best text-white"
-                  )}
-                >
+              const inWindow = opts.window?.has(lap.lapNumber) ?? false;
+              const title = !lap.isIncluded
+                ? "Excluded"
+                : isMistake
+                  ? detail
+                    ? `${detail} vs median`
+                    : "Mistake lap"
+                  : isBest
+                    ? "Best lap"
+                    : opts.onPickWindowStart
+                      ? "5-min window from here"
+                      : undefined;
+              const chipClass = cn(
+                "inline-grid grid-cols-[1.4rem_auto] items-baseline gap-x-0.5 rounded px-0.5 tabular-nums",
+                // The window tint sits UNDER the flag colours: a mistake inside the
+                // window is still a mistake, and the window still counts its time.
+                inWindow && !isMistake && !isBest && "bg-secondary",
+                !lap.isIncluded && "line-through opacity-50",
+                isMistake && "lap-flag-mistake text-white",
+                isBest && !isMistake && "lap-flag-best text-white"
+              );
+              const inner = (
+                <>
                   <span
                     className={cn(
                       "text-right",
@@ -733,6 +820,21 @@ export function RunFaces({
                     {lap.lapNumber}.
                   </span>
                   <span>{lap.lapTimeSeconds.toFixed(3)}s</span>
+                </>
+              );
+              return opts.onPickWindowStart ? (
+                <button
+                  key={lap.lapNumber}
+                  type="button"
+                  onClick={() => opts.onPickWindowStart!(lap.lapNumber)}
+                  title={title}
+                  className={cn(chipClass, "tap-active")}
+                >
+                  {inner}
+                </button>
+              ) : (
+                <span key={lap.lapNumber} title={title} className={chipClass}>
+                  {inner}
                 </span>
               );
             })}
@@ -743,12 +845,25 @@ export function RunFaces({
       )
     );
 
-  const numbersLine = numbersLineFor(dash, fade);
+  const numbersLine = numbersLineFor(dash, fade, undefined, { fiveMinShownAbove: true });
 
   const lapCard = lapCardFor(graphRows, {
     bestLap: dash.bestLap ?? null,
     best: bestLapNumbers,
     mistake: mistakeLapNumbers,
+    window: fiveMinWindowLapNumbers,
+    windowChip: fiveMinIsCustom && fiveMinStint ? (
+      <button
+        type="button"
+        onClick={() => saveFiveMinStart(null)}
+        className="tap-active rounded-full border border-border bg-secondary px-2 text-[9.5px] font-semibold tabular-nums text-muted-foreground hover:text-foreground"
+        title="Back to the best five minutes"
+      >
+        5 min: laps {fiveMinStint.startLapNumber}–{fiveMinStint.endLapNumber} ✕
+      </button>
+    ) : null,
+    onPickWindowStart:
+      allowRunMutations && dash.fiveMinStint != null ? pickFiveMinStart : undefined,
     empty: (
       <p className="text-[12.5px] text-muted-foreground">
         {"No lap times on this run yet. "}
@@ -792,8 +907,32 @@ export function RunFaces({
       <div className="flex items-stretch rounded-xl border border-border bg-card px-1 py-2">
         <Figure label="Best" value={formatLap(dash.bestLap)} tone="gain" />
         <Figure label="Top 5" value={formatLap(dash.avgTop5)} />
-        <Figure label="Top 10" value={formatLap(dash.avgTop10)} />
-        <Figure label="Laps" value={String(dash.lapCount)} />
+        {/*
+          The 5-minute stint — best consecutive five minutes, laps/time the way LiveRC
+          posts a result — is the headline pace figure (founder call, 2026-08-31: "best,
+          top five, then five-minute stint"). It takes BOTH Top 10's and Laps' seats when
+          the session is long enough to have one: a "18/5:07.6" cell is physically ~2 cells
+          wide at 390px (measured — five cells + the dial truncated every value), the lap
+          count is already the front half of the figure, and Top 10's over-a-run question
+          is what the stint answers. One decimal in the cell; the full three ride on hover.
+        */}
+        {fiveMinStint != null ? (
+          <Figure
+            label="5 min"
+            value={formatFiveMinuteStint(fiveMinStint, 1)}
+            title={
+              fiveMinIsCustom && dash.fiveMinStint != null
+                ? `${formatFiveMinuteStint(fiveMinStint)} from lap ${fiveMinStint.startLapNumber} · best ${formatFiveMinuteStint(dash.fiveMinStint)}`
+                : formatFiveMinuteStint(fiveMinStint)
+            }
+            wide
+          />
+        ) : (
+          <>
+            <Figure label="Top 10" value={formatLap(dash.avgTop10)} />
+            <Figure label="Laps" value={String(dash.lapCount)} />
+          </>
+        )}
         <div className="flex flex-1 items-center justify-center px-1">
           {/*
             The dashboard's dial, not "7/10". Same ring, same band ramp, same word —
@@ -1032,7 +1171,7 @@ export function RunFaces({
           */}
           {snapshotId ? (
             <div className="rounded-xl border border-border bg-card px-1.5 py-2.5">
-              <div className="mb-2 flex items-center gap-2 px-1.5">
+              <div className="relative mb-2 flex items-center gap-2 px-1.5">
                 <span className="text-[9.5px] font-semibold uppercase tracking-wider text-faint">
                   {sheetEditing ? "Correcting the sheet" : "The sheet"}
                 </span>
@@ -1042,6 +1181,23 @@ export function RunFaces({
                   sheet here is armed — a fillable box showing one value and writing to another is
                   the bug the modal already ruled out for itself.
                 */}
+                {/*
+                  The bookmark from the All-setups list, at the paper it saves (founder ask,
+                  2026-08-31): mark on your own run, copy on a teammate's — the same control the
+                  Compare pop-up already carries. Keyed by snapshot so a correction's new id does
+                  not inherit the old one's Saved state. Both this and Compare wear ml-auto: the
+                  first consumes the free space, the second's collapses, so Compare stays put
+                  while the sheet (and its save context) is still loading. The header row is
+                  relative for the copy flavour's own panel.
+                */}
+                {inlineSheet?.save && snapshotId ? (
+                  <SessionSetupSaveButton
+                    key={snapshotId}
+                    setupId={snapshotId}
+                    save={inlineSheet.save}
+                    className="ml-auto min-h-8 text-[11px] font-semibold"
+                  />
+                ) : null}
                 <button
                   type="button"
                   onClick={openSetupSheet}
@@ -1440,6 +1596,7 @@ function Figure({
   tone,
   small,
   title,
+  wide,
 }: {
   label: string;
   value: string;
@@ -1448,15 +1605,25 @@ function Figure({
   small?: boolean;
   /** Hover detail for the one figure whose felt size isn't its own unit (fade). */
   title?: string;
+  /** A ~1.5 flex share for the one figure that is laps AND a clock ("18/5:07.6"). */
+  wide?: boolean;
 }) {
   return (
     <div
-      className="flex min-w-0 flex-1 flex-col items-center justify-center border-r border-border px-1 last:border-r-0"
+      className={cn(
+        // px-0.5, not px-1: measured at 390px with the 5-minute stint in the row,
+        // "16.566" needed 63px of a 62px cell — the gutter was the missing pixel.
+        "flex min-w-0 flex-col items-center justify-center border-r border-border px-0.5 last:border-r-0",
+        wide ? "flex-[1.5]" : "flex-1"
+      )}
       title={title}
     >
+      {/* max-w-full so truncate actually clips: in a column flex the span otherwise
+          sizes to its content and a long value bleeds into the neighbouring cell
+          (seen at 390px the day the 5-minute stint joined the row). */}
       <span
         className={cn(
-          "truncate font-semibold leading-tight tabular-nums",
+          "max-w-full truncate font-semibold leading-tight tabular-nums",
           small ? "text-[13px]" : "text-[15px]",
           tone === "gain" ? "text-gain" : "text-foreground"
         )}

@@ -49,6 +49,20 @@ const PAD_BOTTOM = 22;
 /** Two end labels closer than this are pushed apart. */
 const LABEL_STEP_PX = 11;
 
+/**
+ * The phone version, decided by the card's own width rather than a breakpoint (founder
+ * call, 2026-08-29 — the charts were `hidden lg:block` before, so a phone had none).
+ * Under this width the plot is shorter, and the 84px name gutter is dropped: only the
+ * target and the lifted driver are named, written at the end of their own lines inside
+ * the plot. Ten surnames stacked down a 390px screen's right edge named nobody legibly
+ * and took a quarter of the width doing it.
+ */
+const COMPACT_WIDTH_PX = 560;
+const COMPACT_CHART_HEIGHT = 170;
+const COMPACT_PAD_RIGHT = 10;
+/** ~Sora at `.fig-tick`: enough to decide whether an in-plot label fits left of its point. */
+const LABEL_CHAR_PX = 6.5;
+
 const INK = "rgb(var(--color-foreground))";
 const FIELD = "rgb(var(--color-muted-foreground))";
 
@@ -62,7 +76,12 @@ function endLabel(name: string): string {
 
 function useMeasuredWidth(fallback = 600) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const [width, setWidth] = useState(fallback);
+  // Start from the viewport when there is one, so a phone's first frame is already the
+  // compact plot rather than a desktop one that snaps a frame later. This card only ever
+  // mounts client-side (the sheet gates on hydration), so `window` is safe to read here.
+  const [width, setWidth] = useState(() =>
+    typeof window !== "undefined" ? Math.min(fallback, Math.max(1, window.innerWidth - 40)) : fallback
+  );
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof ResizeObserver === "undefined") return;
@@ -128,6 +147,9 @@ type LineChartProps = {
   onFocus: (id: string | null) => void;
   formatValue: (v: number) => string;
   width: number;
+  height: number;
+  /** The phone drawing — see `COMPACT_WIDTH_PX`. */
+  compact: boolean;
 };
 
 function LineChart({
@@ -140,10 +162,13 @@ function LineChart({
   onFocus,
   formatValue,
   width,
+  height,
+  compact,
 }: LineChartProps) {
-  const innerWidth = Math.max(1, width - PAD_LEFT - PAD_RIGHT);
+  const padRight = compact ? COMPACT_PAD_RIGHT : PAD_RIGHT;
+  const innerWidth = Math.max(1, width - PAD_LEFT - padRight);
   const xAt = (i: number) => PAD_LEFT + (lapCount <= 1 ? innerWidth / 2 : (i / (lapCount - 1)) * innerWidth);
-  const labelStep = xLabelStep(lapCount, width - (PAD_RIGHT - 10), lapCount);
+  const labelStep = xLabelStep(lapCount, width - (padRight - 10), lapCount);
   const labelYs = useMemo(
     () =>
       spreadLabels(
@@ -151,11 +176,39 @@ function LineChart({
           .filter((l) => l.values.length > 0)
           .map((l) => ({ id: l.id, y: yAt(l.values[l.values.length - 1]!) })),
         PAD_TOP,
-        CHART_HEIGHT - PAD_BOTTOM
+        height - PAD_BOTTOM
       ),
-    [lines, yAt]
+    [lines, yAt, height]
   );
   const anyFocus = focusedId != null && lines.some((l) => l.id === focusedId);
+
+  /**
+   * Compact: two labels at most, each written at the end of its own line. The target's
+   * sits above its last point; the lifted driver's goes above too unless that would land
+   * on the target's, in which case it drops below. A line that ended early (a driver who
+   * stopped) may not have room to its left, so the label flips to run rightwards.
+   */
+  const targetLine = lines.find((l) => l.isTarget && l.values.length > 0) ?? null;
+  const targetEndY = targetLine ? yAt(targetLine.values[targetLine.values.length - 1]!) : null;
+  const inPlotLabel = (line: LineChartProps["lines"][number], lastX: number, lastY: number) => {
+    const text = endLabel(line.name);
+    const fitsLeft = lastX - text.length * LABEL_CHAR_PX >= PAD_LEFT;
+    const collides =
+      !line.isTarget && targetEndY != null && Math.abs(lastY - targetEndY) < LABEL_STEP_PX + 3;
+    // A line that ends on the top rule (P1, or a 0s gap drawn at the bottom) has no room on
+    // that side: the label goes the other way rather than off the plot.
+    const above = lastY - 7;
+    const below = lastY + 13;
+    const roomAbove = above >= 9;
+    const roomBelow = below <= height - PAD_BOTTOM + 2;
+    const y = collides ? (roomBelow ? below : above) : roomAbove ? above : below;
+    return {
+      text,
+      x: fitsLeft ? lastX - 4 : lastX + 4,
+      anchor: (fitsLeft ? "end" : "start") as "end" | "start",
+      y,
+    };
+  };
 
   // Target on top of the field, the focused line on top of everything.
   const drawOrder = [...lines].sort(
@@ -166,18 +219,18 @@ function LineChart({
   return (
     <svg
       width="100%"
-      height={CHART_HEIGHT}
-      viewBox={`0 0 ${width} ${CHART_HEIGHT}`}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
       className="block"
       role="img"
       aria-label={ariaLabel}
       onMouseLeave={() => onFocus(null)}
     >
       {ticks.map((t) => (
-        <g key={t.label}>
+        <g key={t.v}>
           <line
             x1={PAD_LEFT}
-            x2={width - PAD_RIGHT + 6}
+            x2={width - padRight + (compact ? 0 : 6)}
             y1={yAt(t.v)}
             y2={yAt(t.v)}
             className="stroke-border"
@@ -196,7 +249,7 @@ function LineChart({
           <text
             key={i}
             x={xAt(i)}
-            y={CHART_HEIGHT - 8}
+            y={height - 8}
             textAnchor={i === 0 ? "start" : isLast ? "end" : "middle"}
             className="fill-faint fig-tick"
           >
@@ -215,12 +268,15 @@ function LineChart({
         const lastY = yAt(line.values[lastIndex]!);
         const labelY = labelYs.get(line.id) ?? lastY;
         const title = `${line.name} · ${formatValue(line.values[lastIndex]!)} after lap ${line.values.length}`;
+        const plotLabel = compact && (focused || line.isTarget) ? inPlotLabel(line, lastX, lastY) : null;
         return (
           <g
             key={line.id}
             className="transition-opacity duration-150"
             style={{ opacity: dimmed ? 0.28 : 1 }}
             onMouseEnter={() => onFocus(line.id)}
+            /* A finger has no hover: tapping a line lifts it, tapping it again lets go. */
+            onClick={() => onFocus(focused ? null : line.id)}
           >
             <title>{title}</title>
             {/* A wide invisible stroke so a 1.5px line can be pointed at. */}
@@ -246,26 +302,46 @@ function LineChart({
                 strokeWidth={1}
               />
             ))}
-            {/* Leader line from the last point across to its label, when the label was nudged. */}
-            {Math.abs(labelY - lastY) > 1 ? (
-              <line
-                x1={lastX + 3}
-                y1={lastY}
-                x2={width - PAD_RIGHT + 10}
-                y2={labelY}
-                stroke={stroke}
-                strokeOpacity={0.35}
-                strokeWidth={1}
-              />
-            ) : null}
-            <text
-              x={width - PAD_RIGHT + 12}
-              y={labelY + 3}
-              textAnchor="start"
-              className={cn("fig-tick", focused || line.isTarget ? "fill-foreground font-semibold" : "fill-faint")}
-            >
-              {endLabel(line.name)}
-            </text>
+            {compact ? (
+              plotLabel ? (
+                <text
+                  x={plotLabel.x}
+                  y={plotLabel.y}
+                  textAnchor={plotLabel.anchor}
+                  className="fig-tick fill-foreground font-semibold"
+                  /* Paper behind the letters so the name reads across whatever lines it sits on. */
+                  paintOrder="stroke"
+                  stroke="rgb(var(--color-card))"
+                  strokeWidth={3}
+                  strokeLinejoin="round"
+                >
+                  {plotLabel.text}
+                </text>
+              ) : null
+            ) : (
+              <>
+                {/* Leader line from the last point across to its label, when the label was nudged. */}
+                {Math.abs(labelY - lastY) > 1 ? (
+                  <line
+                    x1={lastX + 3}
+                    y1={lastY}
+                    x2={width - PAD_RIGHT + 10}
+                    y2={labelY}
+                    stroke={stroke}
+                    strokeOpacity={0.35}
+                    strokeWidth={1}
+                  />
+                ) : null}
+                <text
+                  x={width - PAD_RIGHT + 12}
+                  y={labelY + 3}
+                  textAnchor="start"
+                  className={cn("fig-tick", focused || line.isTarget ? "fill-foreground font-semibold" : "fill-faint")}
+                >
+                  {endLabel(line.name)}
+                </text>
+              </>
+            )}
           </g>
         );
       })}
@@ -277,10 +353,13 @@ function PaceRangeRows({
   series,
   focusedId,
   onFocus,
+  compact,
 }: {
   series: LapChartSeries[];
   focusedId: string | null;
   onFocus: (id: string | null) => void;
+  /** Two lines per driver — name and figures, then the bar — instead of five columns. */
+  compact: boolean;
 }) {
   const ranges = useMemo(
     () => buildPaceRanges(series.map((s) => ({ id: s.id, laps: s.series.laps }))),
@@ -293,6 +372,80 @@ function PaceRangeRows({
   const span = Math.max(0.2, hi - lo);
   const pct = (v: number) => `${(((v - lo) / span) * 100).toFixed(2)}%`;
   const leaderAvg = ranges.find((r) => r.ranked)?.average ?? null;
+
+  if (compact) {
+    return (
+      <div className="space-y-0.5" onMouseLeave={() => onFocus(null)}>
+        <div className="flex items-center justify-between px-1 pb-1">
+          <span className="ui-label-caps whitespace-nowrap text-[9px] uppercase tracking-wider">
+            Clean laps · avg marked
+          </span>
+          <span className="ui-label-caps whitespace-nowrap text-[9px] uppercase tracking-wider">
+            Best · avg · slowest
+          </span>
+        </div>
+        {ranges.map((r) => {
+          const s = byId.get(r.id);
+          if (!s) return null;
+          const focused = r.id === focusedId;
+          const gapToLeader =
+            r.ranked && leaderAvg != null && r.average != null ? r.average - leaderAvg : null;
+          return (
+            <div
+              key={r.id}
+              className={cn(
+                "rounded-md px-1 py-1.5 transition-colors",
+                focused && "bg-surface-runna-inset",
+                !r.ranked && "opacity-60"
+              )}
+              onMouseEnter={() => onFocus(r.id)}
+              onClick={() => onFocus(focused ? null : r.id)}
+            >
+              <div className="flex items-baseline justify-between gap-2 leading-tight">
+                <span
+                  className={cn(
+                    "min-w-0 truncate text-[12px] text-foreground",
+                    s.isTarget && "font-semibold"
+                  )}
+                >
+                  {s.name}
+                </span>
+                <span className="fig-cell shrink-0 text-foreground">
+                  {formatLap(r.best)}
+                  <span className="text-muted-foreground"> · {formatLap(r.average)}</span>
+                  <span className="text-muted-foreground"> · {formatLap(r.slowest)}</span>
+                </span>
+              </div>
+              <div className="relative mt-1.5 h-2.5 rounded-full bg-border/60">
+                {r.best != null && r.slowest != null ? (
+                  <div
+                    className={cn(
+                      "absolute inset-y-0 rounded-full",
+                      s.isTarget || focused ? "bg-foreground/80" : "bg-muted-foreground/55"
+                    )}
+                    style={{ left: pct(r.best), width: `calc(${pct(r.slowest)} - ${pct(r.best)})`, minWidth: 3 }}
+                  />
+                ) : null}
+                {r.average != null ? (
+                  <div
+                    className="absolute -inset-y-0.5 w-0.5 rounded-sm bg-primary-ink"
+                    style={{ left: pct(r.average) }}
+                    title={`Average ${formatLap(r.average)}`}
+                  />
+                ) : null}
+              </div>
+              <div className="mt-1 truncate text-[10px] tabular-nums text-muted-foreground">
+                {r.cleanCount} clean
+                {r.offPaceCount > 0 ? ` · ${r.offPaceCount} off-pace` : ""}
+                {!r.ranked ? ` · under ${MIN_CLEAN_LAPS_FOR_PACE_RANGE}, not ranked` : ""}
+                {gapToLeader != null && gapToLeader > 0 ? ` · ${formatLapDelta(gapToLeader)} avg` : ""}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-1" onMouseLeave={() => onFocus(null)}>
@@ -377,6 +530,8 @@ export function LapCompareCharts({
   traceBestLapNumbers: Set<number>;
 }) {
   const { ref, width } = useMeasuredWidth();
+  const compact = width < COMPACT_WIDTH_PX;
+  const chartHeight = compact ? COMPACT_CHART_HEIGHT : CHART_HEIGHT;
   const target = series.find((s) => s.isTarget) ?? null;
   const raceSeries = useMemo(
     () => series.filter((s) => s.sameSessionAsTarget && s.series.laps.length > 0),
@@ -413,22 +568,27 @@ export function LapCompareCharts({
     const max = Math.max(0.5, ...progress.drivers.flatMap((d) => d.gaps));
     const step = niceStep(max);
     const top = Math.ceil(max / step) * step;
-    const innerHeight = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
+    const innerHeight = chartHeight - PAD_TOP - PAD_BOTTOM;
     // Bigger gap plots higher — the same way round as the trace, where a slower lap is higher.
     const yAt = (v: number) => PAD_TOP + innerHeight - (v / top) * innerHeight;
     const ticks: Array<{ v: number; label: string }> = [];
     for (let v = 0; v <= top + 1e-9; v += step) ticks.push({ v, label: `${v % 1 === 0 ? v : v.toFixed(1)}s` });
     return { yAt, ticks };
-  }, [progress]);
+  }, [progress, chartHeight]);
 
   const positionGeometry = useMemo(() => {
     if (!progress) return null;
     const n = Math.max(2, progress.drivers.filter((d) => d.lapsCompleted > 0).length);
-    const innerHeight = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
+    const innerHeight = chartHeight - PAD_TOP - PAD_BOTTOM;
     const yAt = (p: number) => PAD_TOP + ((p - 1) / (n - 1)) * innerHeight;
-    const ticks = Array.from({ length: n }, (_, i) => ({ v: i + 1, label: `P${i + 1}` }));
+    // A ten-car field on a 170px plot is a rule every 15px; label every other place.
+    const labelEvery = compact && n > 6 ? 2 : 1;
+    const ticks = Array.from({ length: n }, (_, i) => ({
+      v: i + 1,
+      label: i % labelEvery === 0 || i === n - 1 ? `P${i + 1}` : "",
+    }));
     return { yAt, ticks };
-  }, [progress]);
+  }, [progress, chartHeight, compact]);
 
   const nameOf = (id: string) => series.find((s) => s.id === id)?.name ?? id;
 
@@ -450,14 +610,21 @@ export function LapCompareCharts({
 
   return (
     <div className="rounded-md border border-border bg-surface-runna p-2.5">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+      {/* Compact: the tabs take the whole line and the readout sits under them — side by
+          side they wrapped unevenly, a 16rem control and a name fighting for 348px. */}
+      <div
+        className={cn(
+          "mb-2 flex justify-between gap-x-3 gap-y-1",
+          compact ? "flex-col" : "flex-wrap items-center"
+        )}
+      >
         <PillToggle
           options={options}
           value={tab}
           onChange={onTabChange}
           role="tablist"
           ariaLabel="Which chart to show"
-          className="w-auto min-w-[16rem]"
+          className={compact ? "w-full" : "w-auto min-w-[16rem]"}
         />
         <p className="min-w-0 truncate text-[11px] tabular-nums text-muted-foreground" aria-live="polite">
           {readout}
@@ -527,6 +694,8 @@ export function LapCompareCharts({
             focusedId={focusedId}
             onFocus={onFocus}
             formatValue={(v) => (v === 0 ? "leading" : `+${v.toFixed(3)}s`)}
+            height={chartHeight}
+            compact={compact}
           />
         ) : null}
 
@@ -546,10 +715,14 @@ export function LapCompareCharts({
             focusedId={focusedId}
             onFocus={onFocus}
             formatValue={(v) => `P${v}`}
+            height={chartHeight}
+            compact={compact}
           />
         ) : null}
 
-        {tab === "pace" ? <PaceRangeRows series={series} focusedId={focusedId} onFocus={onFocus} /> : null}
+        {tab === "pace" ? (
+          <PaceRangeRows series={series} focusedId={focusedId} onFocus={onFocus} compact={compact} />
+        ) : null}
 
         {(tab === "gap" || tab === "position") && progress?.lap0Dropped ? (
           <p className="mt-1 text-[10px] text-muted-foreground">

@@ -28,6 +28,8 @@ export type ComparisonSeries = {
   consistencyStdDev: number | null;
   /** Seconds per lap the run drifted — see `getFadePerLap`. Positive = gave time away. */
   fadePerLap: number | null;
+  /** The driver's stored 5-minute window start for their own run — see `readFiveMinStartLap`. */
+  fiveMinStartLap?: number | null;
 };
 
 export type LapSeriesAnalysis = {
@@ -254,7 +256,8 @@ export function buildComparisonSeries(
   id: string,
   label: string,
   sourceType: "run" | "imported",
-  laps: LapRow[]
+  laps: LapRow[],
+  opts?: { fiveMinStartLap?: number | null }
 ): ComparisonSeries {
   return {
     id,
@@ -266,6 +269,7 @@ export function buildComparisonSeries(
     avgTop10: getAverageTopN(laps, 10),
     consistencyStdDev: analyzeLapRows(laps).consistencyStdDev,
     fadePerLap: getFadePerLap(laps),
+    fiveMinStartLap: opts?.fiveMinStartLap ?? null,
   };
 }
 
@@ -552,10 +556,156 @@ export function analyzeLapRows(laps: LapRow[]): LapSeriesAnalysis {
   return analyzeLapSeries(times);
 }
 
+/**
+ * A five-minute window scored the way a timing loop posts a result: laps first,
+ * then the clock when the lap that crossed five minutes was completed. "13 laps,
+ * 5:12.345" — the number every RC driver ranks themselves by.
+ */
+export type FiveMinuteStint = {
+  /** Laps completed when the window's clock passed five minutes — the crossing lap counts. */
+  lapCount: number;
+  /** Wall-clock seconds when that crossing lap was completed; ≥ the window by construction. */
+  seconds: number;
+  /** First lap inside the window — the one handle the window has. */
+  startLapNumber: number;
+  /** Last lap inside the window (the one that crossed five minutes), for highlighting. */
+  endLapNumber: number;
+};
+
+/** The race length the figure answers for — "what's my 5-minute pace". */
+export const FIVE_MIN_STINT_WINDOW_SECONDS = 300;
+
+/**
+ * Best consecutive five minutes of a session — ONE rule for every source and
+ * session type (founder call, 2026-08-31):
+ *
+ * - The window slides over the laps AS DRIVEN. Excluded laps still count: a stint
+ *   is wall clock, and a crash took real time — the best window simply settles
+ *   where the driver didn't crash. This is deliberately unlike every other metric
+ *   here, which filters excluded laps out before doing anything.
+ * - Lap #0 (the out-lap) is dropped, as it is everywhere else; a window may start
+ *   on any real lap.
+ * - The lap in progress at 5:00 counts when completed (the timing-loop rule), so
+ *   `seconds` lands past the window, never at it.
+ * - Best = most laps; on equal laps, least time. The LiveRC ranking rule.
+ * - A session whose laps never reach five minutes has no figure — null, never a
+ *   padded or scaled-up number.
+ *
+ * On a real 5-minute race the window has nowhere to slide — starting after lap 1
+ * leaves under five minutes of laps — so the figure reproduces the posted result
+ * without any race/practice branch.
+ */
+export function getBestFiveMinuteStint(
+  laps: LapRow[],
+  windowSeconds: number = FIVE_MIN_STINT_WINDOW_SECONDS
+): FiveMinuteStint | null {
+  const drive = drivenLapsInOrder(laps);
+  let best: FiveMinuteStint | null = null;
+  for (let i = 0; i < drive.length; i++) {
+    const cand = windowFromIndex(drive, i, windowSeconds);
+    // Ran out of laps before the clock reached the window; every later start is
+    // a suffix of this one, so nothing further can qualify either.
+    if (cand == null) break;
+    if (
+      best == null ||
+      cand.lapCount > best.lapCount ||
+      (cand.lapCount === best.lapCount && cand.seconds < best.seconds)
+    ) {
+      best = cand;
+    }
+  }
+  return best;
+}
+
+/**
+ * The window placed BY HAND: the driver chose the start lap and the clock does
+ * the rest (founder call, 2026-09-01 — "per run, auto should be best consecutive
+ * 5 mins, with option to change"). Same wall-clock scoring as the best window;
+ * null when there aren't five minutes of laps from that start, or the lap
+ * doesn't exist — a stale choice must fall back to auto, never invent a figure.
+ */
+export function getFiveMinuteStintStartingAt(
+  laps: LapRow[],
+  startLapNumber: number,
+  windowSeconds: number = FIVE_MIN_STINT_WINDOW_SECONDS
+): FiveMinuteStint | null {
+  const drive = drivenLapsInOrder(laps);
+  const i = drive.findIndex((l) => l.lapNumber === startLapNumber);
+  if (i < 0) return null;
+  return windowFromIndex(drive, i, windowSeconds);
+}
+
+/** Real laps in driven order — lap #0 dropped, excluded laps KEPT (wall clock). */
+function drivenLapsInOrder(laps: LapRow[]): Array<{ lapNumber: number; lapTimeSeconds: number }> {
+  return [...laps]
+    .filter(
+      (l) =>
+        l.lapNumber !== 0 &&
+        typeof l.lapTimeSeconds === "number" &&
+        Number.isFinite(l.lapTimeSeconds) &&
+        l.lapTimeSeconds > 0
+    )
+    .sort((a, b) => a.lapNumber - b.lapNumber);
+}
+
+/** Timing-loop score of the window opening at drive[i]; null if the laps run out first. */
+function windowFromIndex(
+  drive: Array<{ lapNumber: number; lapTimeSeconds: number }>,
+  i: number,
+  windowSeconds: number
+): FiveMinuteStint | null {
+  let seconds = 0;
+  for (let j = i; j < drive.length; j++) {
+    seconds += drive[j]!.lapTimeSeconds;
+    if (seconds >= windowSeconds) {
+      return {
+        lapCount: j - i + 1,
+        seconds,
+        startLapNumber: drive[i]!.lapNumber,
+        endLapNumber: drive[j]!.lapNumber,
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * The driver's stored window choice, off `Run.lapSession` — an optional
+ * `fiveMinStartLap` on the version-1 blob (additive; older readers ignore it).
+ * Null = auto (best window). Validity against the CURRENT laps is the reader's
+ * problem by design: laps can be re-imported after the choice was made, so
+ * surfaces run it through `getFiveMinuteStintStartingAt` and fall back to auto.
+ */
+export function readFiveMinStartLap(lapSession: unknown): number | null {
+  if (!lapSession || typeof lapSession !== "object") return null;
+  const o = lapSession as Record<string, unknown>;
+  if (o.version !== 1) return null;
+  const raw = o.fiveMinStartLap;
+  return typeof raw === "number" && Number.isInteger(raw) && raw >= 1 ? raw : null;
+}
+
+/**
+ * The stint a surface should DISPLAY for a run: the driver's chosen window when
+ * one is stored and still valid, otherwise the best window. One helper so the
+ * run card and the lap sheet can never disagree about the same run.
+ */
+export function getDisplayFiveMinuteStint(
+  laps: LapRow[],
+  chosenStartLap: number | null | undefined
+): FiveMinuteStint | null {
+  if (chosenStartLap != null) {
+    const chosen = getFiveMinuteStintStartingAt(laps, chosenStartLap);
+    if (chosen != null) return chosen;
+  }
+  return getBestFiveMinuteStint(laps);
+}
+
 export type IncludedLapDashboardMetrics = {
   lapCount: number;
   /** Sum of included lap times (seconds). */
   stintSeconds: number | null;
+  /** Best consecutive five minutes, timing-loop scored — see `getBestFiveMinuteStint`. */
+  fiveMinStint: FiveMinuteStint | null;
   bestLap: number | null;
   avgTop5: number | null;
   avgTop10: number | null;
@@ -598,6 +748,7 @@ export function getIncludedLapDashboardMetrics(laps: LapRow[]): IncludedLapDashb
     return {
       lapCount: 0,
       stintSeconds: null,
+      fiveMinStint: null,
       bestLap: null,
       avgTop5: null,
       avgTop10: null,
@@ -625,6 +776,8 @@ export function getIncludedLapDashboardMetrics(laps: LapRow[]): IncludedLapDashb
   return {
     lapCount: times.length,
     stintSeconds,
+    // From the RAW rows, not `times`: the window is wall clock, so excluded laps count.
+    fiveMinStint: getBestFiveMinuteStint(laps),
     bestLap,
     avgTop5,
     avgTop10,

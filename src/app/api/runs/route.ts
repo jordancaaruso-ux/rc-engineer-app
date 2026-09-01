@@ -351,7 +351,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       baselineId
         ? prisma.setupSnapshot.findFirst({
             where: { id: baselineId, userId: params.userId },
-            select: { data: true },
+            select: { data: true, sheetBlankId: true },
           })
         : null,
       resolveSourcePdfLinksForNewRun(
@@ -490,6 +490,8 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       carId,
       data: resolvedData as object,
       baseSetupSnapshotId: baselineId,
+      // The run's setup stays on the paper the setup it started from was born on.
+      sheetBlankId: baselineRow?.sheetBlankId ?? null,
       setupDeltaJson:
         setupDeltaJson === null || Object.keys(setupDeltaJson).length === 0
           ? undefined

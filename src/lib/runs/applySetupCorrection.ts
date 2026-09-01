@@ -48,6 +48,8 @@ export const runSelectForSetupCorrection = {
     select: {
       id: true,
       data: true,
+      // The paper the setup was born on — a correction is the same setup, one value moved.
+      sheetBlankId: true,
       baseSetupSnapshotId: true,
       baseSetupSnapshot: { select: { id: true, data: true } },
     },
@@ -117,6 +119,7 @@ export async function buildSetupCorrectionWrites(params: {
       carId: run.carId,
       data: nextData as object,
       baseSetupSnapshotId: baselineId,
+      sheetBlankId: run.setupSnapshot?.sheetBlankId ?? null,
       setupDeltaJson:
         setupDeltaJson && Object.keys(setupDeltaJson).length > 0
           ? (setupDeltaJson as object)

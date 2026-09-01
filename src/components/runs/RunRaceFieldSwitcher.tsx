@@ -12,7 +12,7 @@ import {
 } from "react";
 import { cn } from "@/lib/utils";
 import { chipToggleClass } from "@/components/ui/chipToggle";
-import { formatLap, formatStintTime } from "@/lib/runLaps";
+import { formatFiveMinuteStint, formatLap, formatStintTime } from "@/lib/runLaps";
 import {
   computeFieldSheet,
   computeMistakeLaps,
@@ -144,6 +144,8 @@ function fieldAverageFigures(sheet: FieldSheet): RaceFieldDriverFigures {
     dash: {
       lapCount: avg.lapCount ?? 0,
       stintSeconds: avg.stintSeconds,
+      // No averaged stint: a laps/time pair has no mean a driver could read.
+      fiveMinStint: null,
       bestLap: avg.bestLap,
       avgTop5: avg.avgTop5,
       avgTop10: avg.avgTop10,
@@ -524,6 +526,10 @@ function RaceFieldDriverPanel({
   const chips: Array<{ label: string; value: string }> = [
     { label: "Laps", value: String(dash.lapCount) },
     { label: "Stint", value: dash.stintSeconds != null ? formatStintTime(dash.stintSeconds) : "—" },
+    {
+      label: "5-min",
+      value: dash.fiveMinStint != null ? formatFiveMinuteStint(dash.fiveMinStint) : "—",
+    },
     { label: "Best lap", value: formatLap(dash.bestLap) },
     { label: "Avg top 5", value: formatLap(dash.avgTop5) },
     { label: "Avg top 10", value: formatLap(dash.avgTop10) },

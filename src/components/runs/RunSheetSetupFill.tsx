@@ -50,6 +50,7 @@ export function RunSheetSetupFill({
   chassisName,
   seedValues,
   seedKey,
+  seedSnapshotId,
   onValues,
   onSaveToRun,
   canSave,
@@ -59,6 +60,12 @@ export function RunSheetSetupFill({
 }: {
   setupSheetModelId: string;
   chassisName: string;
+  /**
+   * The snapshot the seed values came from, when the wizard knows it. Sent with the pick so the
+   * sheet drawn is the PAPER that setup was born on (`SetupSnapshot.sheetBlankId`) — aligned
+   * editions share the primary's keys, so the keys alone can no longer tell the papers apart.
+   */
+  seedSnapshotId?: string | null;
   /** Chassis-type key, for the computed-geometry strip. No key, no strip. */
   templateKey?: string | null;
   /** The run's current setup, as sheet values. Read when the sheet is opened, not while it is up. */
@@ -157,6 +164,10 @@ export function RunSheetSetupFill({
   useEffect(() => {
     seedValuesRef.current = seedValues;
   });
+  const seedSnapshotIdRef = useRef(seedSnapshotId);
+  useEffect(() => {
+    seedSnapshotIdRef.current = seedSnapshotId;
+  });
   useEffect(() => {
     let cancelled = false;
     const keys = Object.entries(seedValuesRef.current)
@@ -169,8 +180,11 @@ export function RunSheetSetupFill({
       return;
     }
     setEditionBlankId(undefined);
+    const snapshotParam = seedSnapshotIdRef.current
+      ? `&snapshot=${encodeURIComponent(seedSnapshotIdRef.current)}`
+      : "";
     fetch(
-      `/api/setup-sheet-models/${setupSheetModelId}/sheet-blank-pick?keys=${encodeURIComponent(keys.join(","))}`,
+      `/api/setup-sheet-models/${setupSheetModelId}/sheet-blank-pick?keys=${encodeURIComponent(keys.join(","))}${snapshotParam}`,
       { cache: "no-store" }
     )
       .then((r) => (r.ok ? r.json() : null))

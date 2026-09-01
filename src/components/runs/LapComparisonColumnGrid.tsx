@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Wrench } from "lucide-react";
+import { ChevronDown, Wrench } from "lucide-react";
 import type { ComparisonSeries, LapRow, SummaryMetricDeltas } from "@/lib/lapAnalysis";
 import { mergeImportedLapSetsByDriver } from "@/lib/lapImport/mergeImportedLapSets";
 import {
@@ -14,8 +14,10 @@ import {
   formatFadePerLap,
   formatLapDelta,
   getDeltaStyle,
+  getDisplayFiveMinuteStint,
   importedSetToLapRows,
   primaryLapRowsFromRun,
+  readFiveMinStartLap,
   resolveDeltaTintRange,
 } from "@/lib/lapAnalysis";
 import {
@@ -35,7 +37,7 @@ import {
   lapSeriesMatchesCompareScope,
   sameLocalCalendarDay,
 } from "@/lib/lapCompareScope";
-import { formatLap, normalizeLapTimes } from "@/lib/runLaps";
+import { formatFiveMinuteStint, formatLap, normalizeLapTimes } from "@/lib/runLaps";
 import { formatRunDateTime } from "@/lib/formatDate";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { buildDayRunNameMap } from "@/lib/runs/buildRunHistoryGroups";
@@ -682,7 +684,10 @@ export function LapComparisonColumnGrid({
       "run:primary",
       primaryRunLabel,
       "run",
-      primaryLaps
+      primaryLaps,
+      // The driver's own 5-minute window choice rides along, so this sheet and
+      // the run card can never quote two different stints for one run.
+      { fiveMinStartLap: readFiveMinStartLap(run.lapSession) }
     );
     /*
      * The target is the run you opened, so it wears that run's clock — the same
@@ -805,7 +810,8 @@ export function LapComparisonColumnGrid({
         `history:${r.id}`,
         runDriverLabel,
         "run",
-        primaryLapRowsFromRun({ lapTimes: r.lapTimes, lapSession: r.lapSession })
+        primaryLapRowsFromRun({ lapTimes: r.lapTimes, lapSession: r.lapSession }),
+        { fiveMinStartLap: readFiveMinStartLap(r.lapSession) }
       );
       rawHistory.push(ser);
       const metaLine = formatCompareRunMetaLine(r);
@@ -1627,6 +1633,7 @@ export function LapComparisonColumnGrid({
         all.length % 2 === 1 ? all[Math.floor(mid)]! : (all[mid - 1]! + all[mid]!) / 2;
       fieldTile = {
         label: "Vs field",
+        shortLabel: "Field",
         value: `P${rank}`,
         valueSuffix: `/${all.length}`,
         note: `median ${median.toFixed(3)}`,
@@ -1634,17 +1641,82 @@ export function LapComparisonColumnGrid({
       };
     }
 
+    /*
+     * The 5-minute stint — best consecutive five minutes, timing-loop scored, the
+     * figure LiveRC posts as the result. Laps carry the value; the clock rides as
+     * the suffix, the same emphasis a results sheet gives it. Its note compares the
+     * RC way: laps first ("+1 lap on…"), and only on equal laps does the clock
+     * decide. On the phone band it takes Avg top 10's place — the settled row is
+     * five across, and a 13-lap stint already answers the over-a-run question.
+     */
+    // A driver's own hand-placed window (when stored and still valid) is the
+    // figure their run shows everywhere; imported rivals are always auto-best.
+    const targetStint = getDisplayFiveMinuteStint(targetSeries.laps, targetSeries.fiveMinStartLap);
+    const vsStint = vs ? getDisplayFiveMinuteStint(vs.laps, vs.fiveMinStartLap) : null;
+    /** "/5:12.345" — the time half of the stint figure, sized down beside the lap count. */
+    const stintTimeSuffix = (stint: { lapCount: number; seconds: number }, decimals: 0 | 1 | 3) => {
+      const full = formatFiveMinuteStint(stint, decimals);
+      return full.slice(full.indexOf("/"));
+    };
+    let stintNote: { note: string | null; noteTone?: "good" | "bad" } = { note: null };
+    if (targetStint != null && vsStint != null && vsName) {
+      const lapDiff = targetStint.lapCount - vsStint.lapCount;
+      if (lapDiff !== 0) {
+        stintNote = {
+          note: `${lapDiff > 0 ? "+" : "−"}${Math.abs(lapDiff)} lap${
+            Math.abs(lapDiff) === 1 ? "" : "s"
+          } on ${vsName}`,
+          noteTone: lapDiff > 0 ? "good" : "bad",
+        };
+      } else {
+        // Read from the target's side like every other note: negative = this session
+        // covered the same laps in less time.
+        const secDiff = targetStint.seconds - vsStint.seconds;
+        stintNote = {
+          note: `${formatLapDelta(secDiff)} on ${vsName}`,
+          noteTone: secDiff < 0 ? "good" : "bad",
+        };
+      }
+    }
+
     const tiles: LapStatTile[] = [
       {
         label: "Best lap",
+        shortLabel: "Best",
         value: formatLap(targetSeries.bestLap),
         accent: true,
         ...noteFor(d?.bestDelta),
       },
-      { label: "Avg top 5", value: formatLap(targetSeries.avgTop5), ...noteFor(d?.avgTop5Delta) },
-      { label: "Avg top 10", value: formatLap(targetSeries.avgTop10), ...noteFor(d?.avgTop10Delta) },
+      {
+        label: "Avg top 5",
+        shortLabel: "Avg5",
+        value: formatLap(targetSeries.avgTop5),
+        ...noteFor(d?.avgTop5Delta),
+      },
+      ...(targetStint != null
+        ? [
+            {
+              label: "5-min stint",
+              shortLabel: "5min",
+              value: String(targetStint.lapCount),
+              valueSuffix: stintTimeSuffix(targetStint, 3),
+              // Whole seconds: a ~60px band cell clips "/5:04.0" one character short
+              // (measured); the tenth lives on desktop, the run card, and hover.
+              bandValueSuffix: stintTimeSuffix(targetStint, 0),
+              ...stintNote,
+            } satisfies LapStatTile,
+          ]
+        : []),
+      {
+        label: "Avg top 10",
+        shortLabel: "Avg10",
+        value: formatLap(targetSeries.avgTop10),
+        hideOnBand: targetStint != null,
+        ...noteFor(d?.avgTop10Delta),
+      },
       {
         label: "Consistency",
+        shortLabel: "Cons",
         value:
           targetAnalysis.consistencyStdDev != null
             ? `±${targetAnalysis.consistencyStdDev.toFixed(2)}`
@@ -1761,12 +1833,46 @@ export function LapComparisonColumnGrid({
    * One control, two homes, distinct ids. Null when the session has one driver — a select
    * that can only be set to what it already says reads as broken.
    */
-  function renderTargetDriverSelect(idPrefix: string, opts?: { fullWidth?: boolean }) {
+  function renderTargetDriverSelect(
+    idPrefix: string,
+    opts?: { fullWidth?: boolean; variant?: "heading" }
+  ) {
     const drivers = targetSession?.drivers ?? [];
     if (drivers.length < 2) return null;
     // Finishing positions are only known for THIS sheet's field, and only mean something
     // when the sheet is a race somebody imported in finishing order.
     const numbered = targetSession?.key === "this_sheet" && anchorIsImportedSheet;
+    const options = drivers.map((d, i) => (
+      <option key={d.id} value={d.id} disabled={!d.loaded}>
+        {numbered ? `P${i + 1} · ` : ""}
+        {d.name}
+        {d.loaded ? ` · ${formatLap(d.bestLap)}` : " · loading…"}
+      </option>
+    ));
+    if (opts?.variant === "heading") {
+      /*
+       * The phone band's heading: the same select, drawn as the name rather than beside
+       * it. At 390px there is no room for a name AND a 16rem dropdown on one line, and the
+       * two said the same thing anyway. The chevron is the only tell that it opens.
+       */
+      return (
+        <span className="relative inline-flex max-w-full items-center">
+          <select
+            id={`${idPrefix}-lap-compare-target-driver`}
+            className="tap-active max-w-full appearance-none truncate rounded-md bg-transparent py-0.5 pl-0 pr-5 text-[13px] font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            value={targetId}
+            onChange={(e) => chooseTarget(e.target.value)}
+            aria-label="Target driver"
+          >
+            {options}
+          </select>
+          <ChevronDown
+            className="pointer-events-none absolute right-0 size-3.5 text-muted-foreground"
+            aria-hidden
+          />
+        </span>
+      );
+    }
     return (
       <select
         id={`${idPrefix}-lap-compare-target-driver`}
@@ -1778,14 +1884,45 @@ export function LapComparisonColumnGrid({
         onChange={(e) => chooseTarget(e.target.value)}
         aria-label="Target driver"
       >
-        {drivers.map((d, i) => (
-          <option key={d.id} value={d.id} disabled={!d.loaded}>
-            {numbered ? `P${i + 1} · ` : ""}
-            {d.name}
-            {d.loaded ? ` · ${formatLap(d.bestLap)}` : " · loading…"}
-          </option>
-        ))}
+        {options}
       </select>
+    );
+  }
+
+  /**
+   * The headline figures, in the layout the width calls for: tiles across the top of the
+   * desktop, a band under the context line on the phone. Both are mounted and one is
+   * hidden by breakpoint, so each gets its own id prefix for the target select inside it.
+   */
+  function renderStatTiles(layout: "tiles" | "band") {
+    const heading = targetSeries
+      ? {
+          name: metaFor(targetSeries).name,
+          context: [
+            "target",
+            metaFor(targetSeries).sortIso ? formatRunDateTime(metaFor(targetSeries).sortIso) : null,
+            // A rival off this sheet carries no context of their own (the sheet IS
+            // the context), so the session names them — unless it already did.
+            metaFor(targetSeries).context ??
+              (targetSession && targetSession.name !== metaFor(targetSeries).name
+                ? targetSession.name
+                : null),
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          control:
+            layout === "band"
+              ? renderTargetDriverSelect("band", { variant: "heading" })
+              : renderTargetDriverSelect("tiles"),
+        }
+      : null;
+    return (
+      <LapCompareStatTiles
+        tiles={statTiles}
+        heading={heading}
+        layout={layout}
+        className={layout === "band" ? "lg:hidden" : "hidden lg:block"}
+      />
     );
   }
 
@@ -1919,6 +2056,10 @@ export function LapComparisonColumnGrid({
        * had to work through before the first lap time was on screen, on a sheet
        * opened to look at lap times.
        */}
+      {/* Phone: whose sheet this is and their five figures, before what they are compared with.
+          Until 2026-08-29 the phone had none of this — the tiles were desktop-only. */}
+      {renderStatTiles("band")}
+
       <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface-runna px-3 py-2 lg:hidden">
         <div className="min-w-0">
           <p className="ui-label-caps text-[9px] uppercase tracking-wider">Compared with</p>
@@ -1953,30 +2094,7 @@ export function LapComparisonColumnGrid({
       {/* Desktop: the tiles, then the rail beside the grid. The rail renders the
           same picker the phone opens in a sheet — at this width there is room to
           leave it standing, so choosing what to compare stops being a mode. */}
-      <LapCompareStatTiles
-        tiles={statTiles}
-        heading={
-          targetSeries
-            ? {
-                name: metaFor(targetSeries).name,
-                context: [
-                  "target",
-                  metaFor(targetSeries).sortIso ? formatRunDateTime(metaFor(targetSeries).sortIso) : null,
-                  // A rival off this sheet carries no context of their own (the sheet IS
-                  // the context), so the session names them — unless it already did.
-                  metaFor(targetSeries).context ??
-                    (targetSession && targetSession.name !== metaFor(targetSeries).name
-                      ? targetSession.name
-                      : null),
-                ]
-                  .filter(Boolean)
-                  .join(" · "),
-                control: renderTargetDriverSelect("tiles"),
-              }
-            : null
-        }
-        className="hidden lg:block"
-      />
+      {renderStatTiles("tiles")}
 
       {/*
        * The rail took 17rem while the grid took everything else, which on a full-page sheet
@@ -2005,18 +2123,18 @@ export function LapComparisonColumnGrid({
 
           {/* The charts answer "what shape was the race?" before the grid answers
               "by how much, lap by lap?". Hidden until a comparison is ticked —
-              on its own the trace repeats what the single-run views already show. */}
+              on its own the trace repeats what the single-run views already show.
+              Drawn at every width since 2026-08-29 (it was `hidden lg:block`): the
+              card measures itself and draws the phone version under ~560px. */}
           {targetSeries && comparisonSeries.length > 0 ? (
-            <div className="hidden lg:block">
-              <LapCompareCharts
-                series={chartSeries}
-                tab={chartTab}
-                onTabChange={setChartTab}
-                focusedId={focusedSeriesId}
-                onFocus={setFocusedSeriesId}
-                traceBestLapNumbers={traceBestLapNumbers}
-              />
-            </div>
+            <LapCompareCharts
+              series={chartSeries}
+              tab={chartTab}
+              onTabChange={setChartTab}
+              focusedId={focusedSeriesId}
+              onFocus={setFocusedSeriesId}
+              traceBestLapNumbers={traceBestLapNumbers}
+            />
           ) : null}
 
       {/*
