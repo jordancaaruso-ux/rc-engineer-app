@@ -310,7 +310,11 @@ export function renderNetEntry(entry: NetEntry): string {
   for (const side of NET_SIDES) {
     const s = entry[side];
     if (!s) continue;
-    lines.push(`  ${entry.words[side].toUpperCase()} [${s.confidence}]`);
+    // The confidence tag is validated in the files but never rendered (founder, 2026-09-01):
+    // it measured how uniformly the source guides spoke, and the model was using it to rank
+    // levers — consensus knobs led every answer while majority ones (all the geometry) never
+    // did. Every founder-passed net now reaches the model on equal footing.
+    lines.push(`  ${entry.words[side].toUpperCase()}`);
     if (entry.two_answers) {
       // Driver words, not physics words: "settled" is corner-regime.md's term and the model was
       // asking drivers about it (founder, 2026-08-28). The fields keep their names; the labels

@@ -23,19 +23,20 @@ const NETS_DIR = path.join(process.cwd(), "content", "nets");
 const NETS_DRAFTS_DIR = path.join(NETS_DIR, "drafts");
 
 /**
- * Header on the nets block. States the confidence semantics — the rendering rule per
- * confidence level is the model's instruction, so it lives with the data it governs.
+ * Header on the nets block. Since 2026-09-01 (founder call) the per-side confidence tag is not
+ * rendered and the header says every entry carries the same weight — the tags had become a lever
+ * ranking (consensus knobs led every answer; the geometry, all majority, never did).
  */
 export const ENGINEER_NETS_HEADER = `SETUP EFFECT PRIORS ("nets") — outcomes, in the driver's words. Probabilistic: "most likely", never "will".
-Each entry is one knob, with what each direction most likely does — both directions side by side, each with its own confidence. A knob that does one thing on the way into the corner and another through the middle carries TWO lines per direction — ON THE WAY IN and THROUGH THE MIDDLE — because it genuinely has two answers, and which one matters today depends on how long the corner lasts against how long this car takes to settle. The knowledge base above carries that rule; work out from it and from what the driver has told you which line applies, and say so. Speak of places on the corner — going in, the middle, coming out — never of whether the car has "settled": that is the knowledge base's word, not the driver's. A knob with one EFFECT line per direction does the same thing throughout the corner, whatever its clock says. A longer entry is not a better lever.
+Each entry is one knob, with what each direction most likely does — both directions side by side. A knob that does one thing on the way into the corner and another through the middle carries TWO lines per direction — ON THE WAY IN and THROUGH THE MIDDLE — because it genuinely has two answers, and which one matters today depends on how long the corner lasts against how long this car takes to settle. The knowledge base above carries that rule; work out from it and from what the driver has told you which line applies, and say so. Speak of places on the corner — going in, the middle, coming out — never of whether the car has "settled": that is the knowledge base's word, not the driver's. A knob with one EFFECT line per direction does the same thing throughout the corner, whatever its clock says. A longer entry is not a better lever.
 Nothing here says why, and nothing here says what makes an effect bigger, smaller or worth the opposite move — that all lives in the knowledge base, once. Never treat a prior as evidence about the mechanism it points at.
 Where a knob shows only one direction, the opposite move most likely does the opposite. A line that says "can" or "tends toward" means exactly that: it goes that way more often than not, and not always.
-Confidence: "consensus" — state it plainly; "majority" — state it, naming the minority view when the driver's context matches it; "contested" — present both claims and the on-track discriminator, never pick silently. A "normal move" is what a typical-sized change looks like; size the move to the problem — a chronic one that is everywhere takes a big move, a small complaint a small one.
+Every entry carries the same weight: no prior outranks another — choose by fit to the driver's problem, never by how an entry is worded. Where an entry carries CONTESTED claims, present both and the on-track discriminator, never pick silently. A "normal move" is what a typical-sized change looks like; size the move to the problem — a chronic one that is everywhere takes a big move, a small complaint a small one.
 
 `;
 
 const NETS_DRAFTS_DIVIDER = `──────── AI-DRAFTED PRIORS (below this line) ────────
-Everything below is AI-drafted from published setup guides and NOT yet founder-reviewed. Hedge one step further than the stated confidence when using these.`;
+Everything below is AI-drafted from published setup guides and NOT yet founder-reviewed. Hedge these harder than the entries above.`;
 
 export type LoadedNets = {
   /** Rendered block: header content only (no ENGINEER_NETS_HEADER prefix), byte-stable. */
