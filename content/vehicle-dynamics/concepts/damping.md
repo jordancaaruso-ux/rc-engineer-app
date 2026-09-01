@@ -3,7 +3,8 @@
 near nothing at rest, more on a quick input or bump. So it doesn't set *where* the car sits (springs
 do) — it sets **how fast** the car gets there: how quickly it rolls and pitches, and how long it keeps
 moving after an input. More damping → slower movement, fewer cycles; less → faster movement, more
-cycles. Because it acts on rate, it governs the **speed of the elastic (spring) path** of load transfer.
+cycles. Because it acts on rate, it sets **how fast the car moves into roll**, and so when the load
+reaches the outside tyres: **less damping is the faster side** ([[load-transfer]]).
 
 **Because force grows with speed, the same damper is near-rigid to a fast input and soft to a slow
 one.** A bump or kerb is fast, so the wheel cannot move out of the way and more of the input passes
@@ -23,5 +24,5 @@ imprecise. **Too little:** the car moves too quickly — too reactive, harder to
 spot sits is not derivable from the change alone; a rougher surface pulls it toward less.
 
 **Moved by:** damper oil [[damper-oil]] (thicker → more damping), plus pistons and holes.
-**Affects:** [[load-transfer]] (rate of the slow/elastic path); what that timing does to grip
+**Affects:** [[load-transfer]] (how fast the car moves into roll); what that timing does to grip
 character lives in [[bite-hold]].

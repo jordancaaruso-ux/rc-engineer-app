@@ -121,9 +121,10 @@ point on the clock the driver named.
 
 **Caused by:** the speed of load transfer ([[load-transfer]]) — fast transfer → bite, slow → hold —
 but only through the knobs that change **how much roll is taken** by the time load arrives.
-**Damping is the exception** (founder-confirmed 2026-08-07): it changes *when* the load gets there
-without changing the roll angle the car ends up at, so camber and alignment at peak load are
-unmoved. Slowing the movement does not buy bite.
+**Damping reaches it by a narrower route** (founder-confirmed 2026-08-07, extended 2026-09-01): it
+changes *when* the load gets there without changing the roll angle the car **ends up at**, but an
+earlier load peaks with less roll taken, so thinner oil is the bitier side and thicker the more
+settled one.
 
 **Physics (what sets the timing).** Lateral load reaches the outside tyres through two channels on
 different clocks: **geometric transfer** through the suspension links — immediate, its share grows
@@ -136,6 +137,6 @@ when load peaks — an earlier peak tends to be a higher peak. The knobs shift t
 not add load: roll-centre height moves the split itself; spring/ARB stiffness speeds or slows the
 elastic channel but also moves that end's steady-state share of transfer. Those two move the roll
 angle itself, which is why they reach bite. Damping acts only while the suspension is moving and
-leaves the final roll angle where it was, so it moves the timing without moving what the tyre sits
-at when load peaks. Which part of the grip build the driver samples is the phase
+leaves the **final** roll angle where it was, but it moves how much of that roll has happened by the
+time load peaks, which is how it reaches bite too — less damping, sooner, with less roll taken. Which part of the grip build the driver samples is the phase
 ([[corner-regime]]): on the way in samples the early part, the middle the late part.

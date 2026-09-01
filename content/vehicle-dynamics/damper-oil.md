@@ -23,13 +23,14 @@ Both are load-steadiness costs in the same currency — thicker costs at the mom
 thinner costs after it — and **where a given car sits between them is not derivable from the oil
 alone**.
 
-Through the corner itself, damping governs the **speed of the spring path** of load transfer, so a
-thicker end takes its load sooner and a thinner end later ([[load-transfer]]). That is timing only:
-it moves **when** the load arrives, not how much grip that end makes when it gets there — slower
-movement does not buy initial grip (founder-confirmed 2026-08-07). Whether **pack** — damping force
-that climbs steeply with shaft speed, set by the piston and its holes rather than the oil — can
-raise it is unverified (founder hedged: it might). Damping matters most on the way in and least once
-the middle has settled ([[corner-regime]]).
+Through the corner itself, damping sets **how fast that end moves into roll**, so a **thinner** end
+takes its load **faster** and a thicker end **slower** ([[load-transfer]]). **This is the exception to
+the usual direction** (founder, 2026-09-01): on most knobs the stiffer choice loads that end sooner;
+on oil the thicker choice loads it later. Thicker means slower transitions, more settled grip and
+less initial grip; thinner is the mirror — the load arrives sooner and there is **more initial grip**
+for it (founder, 2026-09-01). Whether **pack** — damping force that climbs steeply with shaft speed,
+set by the piston and its holes rather than the oil — adds to that is unverified (founder hedged: it
+might). Damping matters most on the way in and least once the middle has settled ([[corner-regime]]).
 
 **What makes the change bigger or smaller.**
 

@@ -34,5 +34,5 @@ mostly the first, a long sweeper mostly the second.
 
 **Affects:** [[bite-hold]] (via speed).
 **Moved by:** roll centre [[roll-center]] & anti-dive/anti-squat [[anti-dive-anti-squat]] (fast fraction),
-springs / ARBs [[roll-stiffness]] (split & elastic path), dampers [[damping]] (how fast the elastic
-path arrives), track width & CoG / ride height / weight (the total).
+springs / ARBs [[roll-stiffness]] (split & elastic path), dampers [[damping]] (how fast the car moves
+into roll — thinner oil is faster), track width & CoG / ride height / weight (the total).
