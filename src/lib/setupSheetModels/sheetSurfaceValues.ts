@@ -23,8 +23,14 @@ import type { SheetPlanField } from "@/lib/setupSheetModels/sheetPlan";
 
 const MULTI_SEPARATOR = ", ";
 
+/**
+ * Hyphens and underscores compare equal on purpose: a box's `optionValue` is the schema's minted
+ * value (`c01b_rsl`) while stored presets and labels carry the printed name (`C01B-RSL`). The two
+ * vocabularies meet in every comparison here, and the separator was the one honest difference —
+ * ticking C01B-RAF on the sheet fell through to "custom text" over it (founder report, 2026-09-01).
+ */
 function norm(v: string): string {
-  return v.trim().toLowerCase().replace(/\s+/g, " ");
+  return v.trim().toLowerCase().replace(/\s+/g, " ").replace(/[-_]+/g, "-");
 }
 
 /** Split a surface multi string back into tokens. Tolerates hand-typed separators. */
@@ -134,7 +140,10 @@ export function surfaceValuesToStored(
   }
 
   for (const field of presetBases) {
-    const preset = surface[field.key] ?? "";
+    // A tapped tick writes the box's optionValue (the schema's minted value, `c01b_rsl`); the
+    // preset normaliser matches against printed LABELS. Resolve value → label first, or a real
+    // tick reads as text the driver typed and lands in the "Other" box.
+    const preset = presetLabelForSurfaceToken(surface[field.key] ?? "", field);
     const otherText = surface[legacyOtherKeyForPresetField(field.key)] ?? "";
     if (!preset.trim() && !otherText.trim()) continue;
     out[field.key] = normalizePresetWithOtherFromUnknown(preset, otherText, field.options ?? null);
@@ -174,6 +183,20 @@ export function surfaceValuesToStoredMerge(
     if (field.key in surface || companion in surface) out[field.key] = "";
   }
   return out;
+}
+
+/** The printed label for a surface token that may be a label OR the schema's minted value. */
+function presetLabelForSurfaceToken(value: string, field: SheetPlanField): string {
+  if (!value.trim()) return value;
+  const labels = field.options ?? [];
+  const values = field.optionValues ?? [];
+  for (let i = 0; i < labels.length; i++) {
+    const label = labels[i]!;
+    if (norm(label) === norm(value)) return label;
+    const v = values[i];
+    if (v != null && norm(v) === norm(value)) return label;
+  }
+  return value;
 }
 
 /** The schema's own casing for a typed/tapped token, when the field declares options. */

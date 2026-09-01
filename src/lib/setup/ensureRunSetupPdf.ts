@@ -76,13 +76,14 @@ type PdfSource = {
  * with a deleted account — all of which mean there is no shared paper to fill, and the caller falls
  * back to the driver's own upload.
  *
- * WHICH of the chassis's sheets is decided by the SETUP's keys: a setup imported through a rebuilt
- * EDITION exports on that edition's paper, written through that edition's own calibration — filling
- * the primary blank with edition keys would print almost nothing. See `sheetBlankResolve`.
+ * WHICH of the chassis's sheets: the paper the setup was born on (`SetupSnapshot.sheetBlankId`),
+ * else the one whose boxes speak its keys — a setup born on a rebuilt EDITION exports on that
+ * edition's paper, written through that edition's own calibration. See `sheetBlankResolve`.
  */
 async function resolveChassisBlankSource(
   carId: string | null,
-  setupData: unknown
+  setupData: unknown,
+  snapshotSheetBlankId: string | null
 ): Promise<PdfSource | null> {
   if (!carId) return null;
 
@@ -102,7 +103,9 @@ async function resolveChassisBlankSource(
   const modelId = car?.setupSheetModelId;
   if (!model || !modelId) return null;
 
-  const picked = await pickSheetBlankForData(modelId, normalizeSetupData(setupData));
+  const picked = await pickSheetBlankForData(modelId, normalizeSetupData(setupData), {
+    sheetBlankId: snapshotSheetBlankId,
+  });
   if (!picked) return null;
   const blank = await prisma.setupSheetBlank.findFirst({
     where: { id: picked.id },
@@ -136,16 +139,36 @@ async function resolveChassisBlankSource(
   }
 
   if (blank.isEdition) {
-    // The edition's calibration maps every box of ITS file; the primary's calibration, union
-    // mappings and computed boxes all name the ORIGINAL sheet's fields and stay out of it.
+    /*
+     * The edition's own rules, which name ITS file's fields. Since editions are ALIGNED to the
+     * canonical vocabulary (`alignEditionByGeometry`), the edition mirrors the primary's whole
+     * architecture: calibration rules, its blank's derived mappings, and the computed boxes —
+     * whose edition-side field names the align pass persists on the calibration as
+     * `extraSimpleKeys` (the primary's `A800RR_EXTRA_SIMPLE_KEYS` name the original file's
+     * fields, which this file does not have).
+     */
     const editionCal = await prisma.setupSheetCalibration.findFirst({
       where: { setupSheetModelId: modelId, exampleDocumentId: blank.setupDocument!.id },
       select: { calibrationDataJson: true },
     });
     if (!editionCal) return null;
+    const editionExtra =
+      ((editionCal.calibrationDataJson as Record<string, unknown> | null)?.extraSimpleKeys ?? {}) as
+        Record<string, string>;
+    const editionComputedBoxes: Record<string, PdfFormFieldMappingRule> = Object.fromEntries(
+      Object.entries(editionExtra).map(([key, pdfFieldName]) => [key, { pdfFieldName }])
+    );
+    const editionDerived = (blank.derivedMappingsJson ?? {}) as Record<
+      string,
+      PdfFormFieldMappingRule
+    >;
     return {
       bytes,
-      mappings: normalizeCalibrationData(editionCal.calibrationDataJson).formFieldMappings ?? {},
+      mappings: {
+        ...editionDerived,
+        ...editionComputedBoxes,
+        ...(normalizeCalibrationData(editionCal.calibrationDataJson).formFieldMappings ?? {}),
+      },
       calibrationJson: editionCal.calibrationDataJson,
     };
   }
@@ -410,6 +433,7 @@ export async function ensureRenderedSetupSnapshotPdf(params: {
       id: true,
       data: true,
       carId: true,
+      sheetBlankId: true,
       renderedSetupPdfPath: true,
       setupPdfRenderVersion: true,
     },
@@ -422,7 +446,7 @@ export async function ensureRenderedSetupSnapshotPdf(params: {
   }
 
   const source =
-    (await resolveChassisBlankSource(snap.carId, snap.data))
+    (await resolveChassisBlankSource(snap.carId, snap.data, snap.sheetBlankId))
     ?? (await resolveUploadedPdfSourceForSetupSnapshot(params.userId, snap.id));
   if (!source) return null;
 
@@ -461,7 +485,7 @@ export async function ensureRenderedRunSetupPdf(params: {
       sourceSetupDocumentId: true,
       sourceSetupCalibrationId: true,
       setupSnapshot: {
-        select: { baseSetupSnapshotId: true, data: true, carId: true },
+        select: { baseSetupSnapshotId: true, data: true, carId: true, sheetBlankId: true },
       },
     },
   });
@@ -473,7 +497,11 @@ export async function ensureRenderedRunSetupPdf(params: {
   }
 
   const source =
-    (await resolveChassisBlankSource(run.setupSnapshot.carId, run.setupSnapshot.data))
+    (await resolveChassisBlankSource(
+      run.setupSnapshot.carId,
+      run.setupSnapshot.data,
+      run.setupSnapshot.sheetBlankId
+    ))
     ?? (await resolveUploadedPdfSourceForRun(params.userId, run));
   if (!source) return null;
 

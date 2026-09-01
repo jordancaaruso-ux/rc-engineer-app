@@ -2,7 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { calibrationReadableByIdWhere } from "@/lib/setupCalibrations/calibrationAccess";
-import type { PdfFormFieldMappingRule } from "@/lib/setupCalibrations/types";
+import { derivedMappingsForImport } from "@/lib/setupDocuments/importDerivedMappings";
 import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
 import { applyCalibrationToPdf } from "@/lib/setupCalibrations/extract";
 import { normalizeParsedSetupData } from "@/lib/setupDocuments/normalize";
@@ -64,28 +64,12 @@ export async function applyCalibrationToSetupDocument(input: {
     const file = new File([new Uint8Array(bytes)], doc.originalFilename || "setup.pdf", {
       type: doc.mimeType || "application/pdf",
     });
-    // An EDITION's calibration maps its whole file already, and the union mappings name the
-    // ORIGINAL sheet's fields — skip them, same rule as `processImport`.
-    const isEditionCalibration = calibration.exampleDocumentId
-      ? Boolean(
-          await prisma.setupSheetBlank.findFirst({
-            where: { setupDocumentId: calibration.exampleDocumentId, isEdition: true },
-            select: { id: true },
-          })
-        )
-      : false;
     // Same reason as the first import: the calibration names a fraction of the printed boxes, and
-    // the rest of the sheet's mappings live on the chassis's PRIMARY blank.
-    const derivedMappings =
-      doc.setupSheetModelId && !isEditionCalibration
-        ? (((
-            await prisma.setupSheetBlank.findFirst({
-              where: { setupSheetModelId: doc.setupSheetModelId, isEdition: false },
-              orderBy: { createdAt: "asc" },
-              select: { derivedMappingsJson: true },
-            })
-          )?.derivedMappingsJson ?? {}) as Record<string, PdfFormFieldMappingRule>)
-        : {};
+    // the rest live on a blank — the primary's, or an edition's own. See `derivedMappingsForImport`.
+    const derivedMappings = await derivedMappingsForImport({
+      setupSheetModelId: doc.setupSheetModelId,
+      calibrationExampleDocumentId: calibration.exampleDocumentId,
+    });
     const extracted = await applyCalibrationToPdf({
       file,
       calibrationDataJson: calibration.calibrationDataJson,

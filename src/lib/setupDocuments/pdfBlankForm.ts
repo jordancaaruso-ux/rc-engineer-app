@@ -2,8 +2,11 @@ import "server-only";
 
 import {
   PDFCheckBox,
+  PDFDict,
   PDFDocument,
   PDFDropdown,
+  PDFName,
+  PDFObject,
   PDFOptionList,
   PDFRadioGroup,
   PDFTextField,
@@ -66,6 +69,28 @@ export async function blankPdfFormValues(
     }
   }
 
+  /*
+   * `updateFieldAppearances` clears the drawn text — and REWRITES every field's and widget's `/DA`
+   * to name the substitute font pdf-lib used, in the size it chose. On the A800RR blank that turned
+   * 109 fields saying `/Verdana,Italic 0 Tf 1 0 0 rg` into `/Helvetica 10 Tf`, on the shared paper,
+   * before a single value had been written. Everything downstream then inherited it: the export
+   * drew upright Helvetica at a fixed 10pt where the sheet asks for auto-sized Verdana Italic, so a
+   * downloaded sheet looked nothing like the one on screen and clipped `7.4643` to `4643` (founder,
+   * 2026-09-01).
+   *
+   * The instruction is the SHEET'S, not ours. It is taken down before and put back after — the
+   * clearing is what this function is for, and the rewrite was collateral.
+   */
+  const originalDa: Array<{ dict: PDFDict; da: PDFObject }> = [];
+  for (const field of form.getFields()) {
+    const fieldDa = field.acroField.dict.get(PDFName.of("DA"));
+    if (fieldDa) originalDa.push({ dict: field.acroField.dict, da: fieldDa });
+    for (const widget of field.acroField.getWidgets()) {
+      const widgetDa = widget.dict.get(PDFName.of("DA"));
+      if (widgetDa) originalDa.push({ dict: widget.dict, da: widgetDa });
+    }
+  }
+
   // Without this the file still says the boxes are empty while the drawn appearance streams keep
   // showing the old text — which is exactly the thing being fixed, just harder to notice.
   try {
@@ -73,6 +98,8 @@ export async function blankPdfFormValues(
   } catch {
     /* some fields need a font pdf-lib cannot supply; the values are cleared regardless */
   }
+
+  for (const { dict, da } of originalDa) dict.set(PDFName.of("DA"), da);
 
   return pdf.save({ updateFieldAppearances: false });
 }

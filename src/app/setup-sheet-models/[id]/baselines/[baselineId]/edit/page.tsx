@@ -64,7 +64,7 @@ export default async function EditBaselineSetupPage({
         </div>
       </header>
       <section className="page-body">
-        <div className="max-w-2xl">
+        <div>
           {ctx.template ? (
             <BaselineSetupEditorClient
               modelId={ctx.model.id}

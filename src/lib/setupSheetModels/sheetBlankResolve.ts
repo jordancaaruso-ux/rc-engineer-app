@@ -65,12 +65,20 @@ export function scoreBlankForKeys(boxesJson: unknown, dataKeys: ReadonlySet<stri
 }
 
 /**
- * The blank a setup with these keys should be drawn on. Null when the chassis has no blanks at
- * all (a hand-mapped chassis with no sheet), in which case the caller falls back to the form.
+ * The blank a setup should be drawn on. Null when the chassis has no blanks at all (a hand-mapped
+ * chassis with no sheet), in which case the caller falls back to the form.
+ *
+ * The stamp outranks the keys (founder ruling 2026-08-31: the paper a driver uploaded is the paper
+ * they see, always). `SetupSnapshot.sheetBlankId` says which paper a setup was born on, and once
+ * an edition is ALIGNED to the canonical vocabulary its boxes carry the same keys as the primary's
+ * — key overlap then ties on every setup and can no longer tell the papers apart. The overlap
+ * measurement stays as the fallback for unstamped setups on a chassis whose edition still speaks
+ * its own minted keys.
  */
 export async function pickSheetBlankForData(
   setupSheetModelId: string,
-  data: Record<string, unknown> | null | undefined
+  data: Record<string, unknown> | null | undefined,
+  opts?: { sheetBlankId?: string | null }
 ): Promise<PickedSheetBlank | null> {
   const blanks = await prisma.setupSheetBlank.findMany({
     where: { setupSheetModelId, status: "FILLABLE" },
@@ -80,6 +88,15 @@ export async function pickSheetBlankForData(
   if (blanks.length === 0) return null;
 
   const primary = blanks.find((b) => !b.isEdition) ?? blanks[0]!;
+
+  // The paper the setup was born on, when it says so and that paper still exists here. A stamp
+  // pointing at a retired blank falls through to the measurement rather than erroring.
+  const stampedId = opts?.sheetBlankId ?? null;
+  if (stampedId) {
+    const stamped = blanks.find((b) => b.id === stampedId);
+    if (stamped) return stamped;
+  }
+
   if (blanks.length === 1) return primary;
 
   const dataKeys = new Set(Object.keys(data ?? {}));
@@ -106,8 +123,9 @@ export async function pickSheetBlankForData(
  */
 export async function editionBlankIdForData(
   setupSheetModelId: string,
-  data: Record<string, unknown> | null | undefined
+  data: Record<string, unknown> | null | undefined,
+  opts?: { sheetBlankId?: string | null }
 ): Promise<string | null> {
-  const picked = await pickSheetBlankForData(setupSheetModelId, data);
+  const picked = await pickSheetBlankForData(setupSheetModelId, data, opts);
   return picked && picked.isEdition ? picked.id : null;
 }

@@ -53,6 +53,18 @@ export async function renderPdfFirstPageToPng(
  * `pageCountOf` exists alongside it because the caller needs to know how many pages to offer
  * before it can ask for one.
  */
+/** How many pages the file has — parse only, no rasterising. */
+export async function pdfPageCount(bytes: Uint8Array): Promise<number> {
+  const doc = await pdf(Buffer.from(bytes), {
+    ...(STANDARD_FONT_DATA_URL ? { docInitParams: { standardFontDataUrl: STANDARD_FONT_DATA_URL } } : {}),
+  });
+  try {
+    return doc.length;
+  } finally {
+    await doc.destroy().catch(() => {});
+  }
+}
+
 export async function renderPdfPageToPng(
   bytes: Uint8Array,
   pageNumber: number,

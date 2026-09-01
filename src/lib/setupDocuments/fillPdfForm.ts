@@ -8,11 +8,13 @@ import {
   PDFName,
   PDFOptionList,
   PDFRadioGroup,
+  PDFString,
   PDFTextField,
   StandardFonts,
 } from "pdf-lib";
 import { acroFieldTypeName, orderedFieldWidgets } from "@/lib/setupDocuments/pdfFormFields";
-import { parseDefaultAppearance, parsePdfFontName } from "@/lib/setupDocuments/pdfFieldAppearance";
+import { bakeValueAppearances, nearestStandardFont } from "@/lib/setupDocuments/pdfValueAppearances";
+import { parseDefaultAppearance } from "@/lib/setupDocuments/pdfFieldAppearance";
 
 /**
  * Write a driver's answers back into the manufacturer's own blank, so what comes out is their
@@ -51,61 +53,27 @@ export type PdfFillResult = {
 const OFF = PDFName.of("Off");
 
 /**
- * The nearest of the fourteen fonts every PDF reader must have, to a font this sheet names.
+ * The boxes the drawing engine leaves behind: the ones that WRAP.
  *
- * WHY NOT JUST THE ONE FONT. The baked drawing below used plain Helvetica for every sheet. In
- * Acrobat that is invisible — `NeedAppearances` makes it redraw in the sheet's own face — but in
- * Preview, Chrome's viewer and iOS Quick Look, none of which honour that flag, a sheet printed in
- * navy Verdana Italic came back with its values in upright Helvetica. Measured on the A800RR blank
- * 2026-08-14: the field says `/Verdana,Italic 0 Tf 1 0 0 rg`, the baked stream said `/Helvetica`.
- *
- * Verdana itself cannot be embedded — it is not ours to ship, and the blank does not carry it — so
- * the closest honest answer is the base-14 face of the right CLASS: serif stays serif, fixed stays
- * fixed, and italic stays italic. Upright-vs-italic is the difference a driver actually notices.
+ * A note box is a different problem — leading, line breaking, and a size rule of its own — so it
+ * still goes through pdf-lib's generator, which knows how to do all three. The cost is that the
+ * generator rewrites the field's and the widget's `/DA` to name its own font at its own size, so
+ * the sheet's instruction is taken down and put back afterwards. Restoring only the FIELD was the
+ * original bug: a redrawing viewer reads the WIDGET's, and that one missed line is why an exported
+ * sheet came back upright and clipped (founder, 2026-09-01).
  */
-function nearestStandardFont(fontName: string | undefined): StandardFonts {
-  const { family, bold, italic } = parsePdfFontName(fontName ?? "Helv");
-  const f = family.toLowerCase();
-  if (f.includes("courier") || f.includes("mono") || f.includes("consol")) {
-    if (bold && italic) return StandardFonts.CourierBoldOblique;
-    if (bold) return StandardFonts.CourierBold;
-    if (italic) return StandardFonts.CourierOblique;
-    return StandardFonts.Courier;
-  }
-  // Times covers the serif faces a setup sheet is likely to name — Times, Georgia, Garamond, Book.
-  if (f.includes("times") || f.includes("georgia") || f.includes("garamond") || f.includes("serif")
-      || f.includes("roman") || f.includes("book") || f.includes("minion")) {
-    if (bold && italic) return StandardFonts.TimesRomanBoldItalic;
-    if (bold) return StandardFonts.TimesRomanBold;
-    if (italic) return StandardFonts.TimesRomanItalic;
-    return StandardFonts.TimesRoman;
-  }
-  if (bold && italic) return StandardFonts.HelveticaBoldOblique;
-  if (bold) return StandardFonts.HelveticaBold;
-  if (italic) return StandardFonts.HelveticaOblique;
-  return StandardFonts.Helvetica;
-}
-
-/**
- * Draw every text value into the file, for readers that show only what is already drawn.
- *
- * The field's own instructions are put back afterwards. pdf-lib rewrites them to name the font it
- * just used, which would leave a viewer that redraws — Acrobat, with `NeedAppearances` set — using
- * a substitute instead of the manufacturer's Verdana Italic. Restoring them costs nothing and keeps
- * the good case good; `nearestStandardFont` is what the other readers get.
- *
- * Fonts are embedded once each and reused: a sheet has one or two faces across two hundred fields,
- * and embedding per field would put two hundred copies of Helvetica in the file.
- */
-async function bakeTextAppearances(
+async function bakeWrappingBoxes(
   pdfDoc: PDFDocument,
   form: ReturnType<PDFDocument["getForm"]>,
-  formDa: string | undefined
+  formDa: string | undefined,
+  /** Fields the drawing engine has already handled — see `pdfValueAppearances`. */
+  alreadyDrawn: ReadonlySet<string>
 ): Promise<void> {
   const embedded = new Map<StandardFonts, Awaited<ReturnType<PDFDocument["embedFont"]>>>();
   for (const field of form.getFields()) {
     if (!(field instanceof PDFTextField)) continue;
     if (!field.getText()) continue;
+    if (alreadyDrawn.has(field.getName())) continue;
     try {
       const originalDa = field.acroField.getDefaultAppearance();
       const named = parseDefaultAppearance(originalDa ?? formDa).fontName;
@@ -116,7 +84,14 @@ async function bakeTextAppearances(
         embedded.set(standard, font);
       }
       field.defaultUpdateAppearances(font);
-      if (originalDa) field.acroField.setDefaultAppearance(originalDa);
+      if (originalDa) {
+        field.acroField.setDefaultAppearance(originalDa);
+        for (const widget of field.acroField.getWidgets()) {
+          if (widget.dict.lookup(PDFName.of("DA"))) {
+            widget.dict.set(PDFName.of("DA"), PDFString.of(originalDa));
+          }
+        }
+      }
     } catch {
       // A field pdf-lib cannot draw still carries its value; a viewer that redraws will show it.
     }
@@ -254,7 +229,16 @@ export async function fillPdfForm(input: {
    * cross, Mugen's bullet — because redrawing those would replace the sheet's own marks with plain
    * squares, and nothing is gained: flipping which appearance is showing is enough.
    */
-  await bakeTextAppearances(pdfDoc, form, formDefaultAppearance(form));
+  const formDa = formDefaultAppearance(form);
+  /*
+   * The sheet's OWN font first. Where the blank embeds the face its fields ask for — Verdana
+   * Italic on the Awesomatix blanks — the value is drawn in it, at the size the app uses, by
+   * referencing the font object already in the file. Anything that leaves behind (a wrapping note
+   * box, a sheet naming a font it does not embed) falls to the substitute below, which is what the
+   * whole export used to be.
+   */
+  const drawn = await bakeValueAppearances(pdfDoc, form, formDa);
+  await bakeWrappingBoxes(pdfDoc, form, formDa, drawn.handled);
   form.acroForm.dict.set(PDFName.of("NeedAppearances"), PDFBool.True);
 
   const bytes = await pdfDoc.save({ updateFieldAppearances: false });

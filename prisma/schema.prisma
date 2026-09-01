@@ -480,6 +480,9 @@ model SetupSheetBlank {
   /// deliberately, so nobody's fill surface changes underneath them mid-season.
   fillSurface String @default("sheet")
 
+  /// Setups born on this paper — see `SetupSnapshot.sheetBlankId`.
+  setupSnapshots SetupSnapshot[] @relation("SnapshotSheetBlank")
+
   reviewedAt DateTime?
 
   @@index([status, reviewedAt, createdAt])
@@ -1008,6 +1011,17 @@ model SetupSnapshot {
   renderedSetupPdfGeneratedAt   DateTime?
   setupPdfRenderVersion         Int      @default(1)
 
+  /**
+   * The sheet PAPER this setup was born on — the founder's ruling of 2026-08-31: "if someone
+   * uploads a pdf, that same pdf style is what they see in the app, always." Stamped at import
+   * from the resolved calibration's edition blank, inherited by every copy (run snapshots,
+   * corrections, car moves, keep/save), and read first by `pickSheetBlankForData`. Null means the
+   * primary blank — the default paper, and what every pre-existing snapshot renders on.
+   * `SetNull` on purpose: a deleted edition falls back to the primary rather than a dead pointer.
+   */
+  sheetBlank   SetupSheetBlank? @relation("SnapshotSheetBlank", fields: [sheetBlankId], references: [id], onDelete: SetNull)
+  sheetBlankId String?
+
   runs Run[]
   sourceDocuments SetupDocument[] @relation("CreatedSetup")
 
@@ -1016,6 +1030,7 @@ model SetupSnapshot {
   @@index([baseSetupSnapshotId])
   @@index([carId, isLibrary])
   @@index([sourceBaselineId])
+  @@index([sheetBlankId])
 }
 
 enum SetupDocumentSourceType {

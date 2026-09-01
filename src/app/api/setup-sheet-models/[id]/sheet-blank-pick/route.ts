@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
+import { prisma } from "@/lib/prisma";
 import { editionBlankIdForData } from "@/lib/setupSheetModels/sheetBlankResolve";
 
 export const dynamic = "force-dynamic";
@@ -28,15 +29,32 @@ export async function GET(request: Request, ctx: RouteCtx): Promise<NextResponse
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await ctx.params;
-  const keys = (new URL(request.url).searchParams.get("keys") ?? "")
+  const url = new URL(request.url);
+  const keys = (url.searchParams.get("keys") ?? "")
     .split(",")
     .map((k) => k.trim())
     .filter(Boolean)
     .slice(0, MAX_KEYS);
 
+  /*
+   * The seeded setup's STAMP, when the caller knows which snapshot it seeded from. Aligned
+   * editions carry the same keys as the primary, so keys alone can no longer tell the papers
+   * apart — the stamp can (see `pickSheetBlankForData`). Scoped to the caller's own snapshots:
+   * the id is client-supplied, and reading a stranger's row — even one column of it — is not
+   * this route's to give. A teammate-seeded fill falls back to keys, as before.
+   */
+  const snapshotId = url.searchParams.get("snapshot")?.trim() || null;
+  const snapshot = snapshotId
+    ? await prisma.setupSnapshot.findFirst({
+        where: { id: snapshotId, userId },
+        select: { sheetBlankId: true },
+      })
+    : null;
+
   const editionBlankId = await editionBlankIdForData(
     id,
-    Object.fromEntries(keys.map((k) => [k, true]))
+    Object.fromEntries(keys.map((k) => [k, true])),
+    { sheetBlankId: snapshot?.sheetBlankId }
   );
   return NextResponse.json({ editionBlankId }, { headers: { "Cache-Control": "no-store" } });
 }

@@ -116,6 +116,35 @@ function planField(p: Partial<SheetPlanField> & { key: string }): SheetPlanField
   assert.ok(!("left_blank" in stored));
 }
 
+// ---- A tapped tick arrives as the schema's minted VALUE and must still read as its preset ----
+// The box's optionValue is `c01b_rsl` while the label prints `C01B-RSL`; treating the separator
+// as a difference demoted a real tick into the "Other" box (founder report, 2026-09-01).
+{
+  const fields: SheetPlanField[] = [
+    planField({
+      key: "chassis",
+      options: ["C01B-RAF", "C01B-RC", "C01RS", "C01B-RSL", "Other"],
+      optionValues: ["c01b_raf", "c01b_rc", "c01rs", "c01b_rsl", "other"],
+    }),
+    planField({ key: "chassis_other" }),
+  ];
+  const stored = surfaceValuesToStored({ chassis: "c01b_rsl" }, fields);
+  assert.deepEqual(stored.chassis, { selectedPreset: "C01B-RSL", otherText: "" });
+
+  const raf = surfaceValuesToStored({ chassis: "c01b_raf" }, fields);
+  assert.deepEqual(raf.chassis, { selectedPreset: "C01B-RAF", otherText: "" });
+
+  // Genuinely unknown text still lands in Other — the demotion rule survives for real free text.
+  const custom = surfaceValuesToStored({ chassis: "MXLR" }, fields);
+  assert.deepEqual(custom.chassis, { selectedPreset: "", otherText: "MXLR" });
+}
+
+// ---- The tick shows: a stored LABEL selects the box that carries the minted value ----
+{
+  assert.equal(optionSelectedInSurfaceValue("C01B-RSL", "c01b_rsl", false), true);
+  assert.equal(optionSelectedInSurfaceValue("C01B-RAF", "c01b_rsl", false), false);
+}
+
 // ---- Round trip: a stored setup survives surface and back unchanged in meaning ----
 {
   const fields: SheetPlanField[] = [
