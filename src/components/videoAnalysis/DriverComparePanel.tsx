@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ArrowLeftRight, Flag } from "lucide-react";
 import { chipToggleClass } from "@/components/ui/chipToggle";
 import { SectorClipPlayer } from "@/components/videoAnalysis/SectorClipPlayer";
+import { mappableLines } from "@/components/videoAnalysis/SectorLineMap";
 import { getDeltaStyle, resolveDeltaTintRange } from "@/lib/lapAnalysis";
 import type { SectorLineInfo } from "@/lib/manualVideoAnalysis/sectors";
 import type { ManualVideoSessionV2 } from "@/lib/manualVideoAnalysis/types";
@@ -26,6 +27,7 @@ import {
   type SegmentStats,
   type SegmentTime,
 } from "@/lib/videoAnalysis/driverCompare";
+import { SF_LINE_KEY } from "@/lib/videoAnalysis/findCrossings/fromSession";
 import { formatSignedDeltaSec, type SegmentWindow } from "@/lib/videoAnalysis/lapCompare";
 
 /**
@@ -217,6 +219,14 @@ export function DriverComparePanel({
   })();
 
   const segName = shown && shown.seg !== "lap" ? (segments[shown.seg]?.name ?? "") : "whole lap";
+
+  // The split, drawn on the picture. Every line stays on screen; the two that bound what is
+  // playing are lit, so "watch S2" also answers "where is S2". A whole-lap clip lights them all.
+  const mapLines = mappableLines(lines);
+  const watchedSeg = shown && shown.seg !== "lap" ? (segments[shown.seg] ?? null) : null;
+  // segmentDefs names the lap start "start" and the lap end "end" — both are the S/F line.
+  const boundKey = (key: string | undefined) =>
+    key == null ? null : key === "start" || key === "end" ? SF_LINE_KEY : key;
   // The gap from your side, whatever is solid: with an overlay it is you (the ghost) minus them;
   // on your own laps it is this lap minus your base. Positive = you are slower = red.
   const gap = solid && ghost ? (overlay ? ghost.clip.sec - solid.sec : solid.sec - ghost.clip.sec) : null;
@@ -245,6 +255,9 @@ export function DriverComparePanel({
           bLabel={bClip ? `${bClip.label} · ${fmt(bClip.sec)}` : "—"}
           fit="window"
           ticks={swapped ? undefined : solidTicks}
+          lines={mapLines}
+          fromKey={boundKey(watchedSeg?.fromKey)}
+          toKey={boundKey(watchedSeg?.toKey)}
         />
       ) : aClip ? (
         <p className="rounded-lg border border-dashed border-border px-3 py-2 text-[11.5px] text-muted-foreground">
@@ -610,15 +623,8 @@ export function DriverComparePanel({
             : "Your laps have no sector crossings yet."}
         </p>
       )}
-
-      <p className="text-[10.5px] leading-relaxed text-faint">
-        {overlay
-          ? `Every gap is yours: red = you are slower than ${overlay.name} there (against ${BASE_LABEL[base]}), green = you are faster, deeper = more; the small grey figure is ${overlay.name}'s actual time. `
-          : "Your own laps, plain. Pick an overlay to colour the sheet. "}
-        An outlined cell is a quarter off the driver&rsquo;s own median there and is left out of the figures.{" "}
-        <Flag className="inline h-2.5 w-2.5" aria-hidden /> means nobody tapped that car: their times come
-        from what the scan&rsquo;s windows happened to see, and may be partial.
-      </p>
+      {/* The explanatory caption under the board came off on 2026-08-29 (founder call): the
+          colours, the outlined cells and the flag say it on the sheet itself. */}
     </div>
   );
 }

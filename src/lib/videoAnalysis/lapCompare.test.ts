@@ -139,6 +139,8 @@ function lap(overrides: Partial<CompareLap>): CompareLap {
     name,
     fromLabel: "Start/finish",
     toLabel,
+    fromKey: "sf",
+    toKey: name,
     aSec: 5,
     bSec: 5 - deltaSec,
     deltaSec,

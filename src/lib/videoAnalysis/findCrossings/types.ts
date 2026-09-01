@@ -24,7 +24,7 @@ export type SectorLine = {
 export type DetectorParams = {
   /** Half-width of the band hugging the line, as a fraction of full frame width. */
   bandFrac: number;
-  /** How far past each end of the line the band runs, as a fraction of line length. */
+  /** Extra reach past each end of the line, as a fraction of line length, on top of the fixed one-band-width cap. */
   extend: number;
   /** Frame-to-frame channel difference above which a pixel counts as moving. */
   thresh: number;
@@ -36,10 +36,21 @@ export type DetectorParams = {
   select: "nearest";
 };
 
-/** The converged recipe. Do not change without re-running the validation harness. */
+/**
+ * The converged recipe. Do not change without re-running the validation harness.
+ *
+ * `extend` was 0.35 from July to 2026-08-29: the band ran a third of the line past each end so a
+ * car clipping just beyond a line still counted. On a long line that was harmless; on the short
+ * lines a fisheye shot forces (Test A3 S1: 80px at 1080p, shorter than the band is wide) it turned
+ * the line into a box, and crossings scattered across 1.8s. A line now ends where the driver
+ * ended it — Jordan, 2026-08-29: "the detector line needs to be where you draw it, period."
+ * The band itself still runs one band-width past each end (see `bandMask`): a fixed car-length
+ * cap, so a car reaching the line at its tip is seen on both sides, without a short line growing
+ * into a box.
+ */
 export const RECIPE_B22_T14: DetectorParams = {
   bandFrac: 0.022,
-  extend: 0.35,
+  extend: 0,
   thresh: 14,
   minArea: 12,
   blur: 5,

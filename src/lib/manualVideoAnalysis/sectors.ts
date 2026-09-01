@@ -8,6 +8,12 @@ export type SectorLineInfo = {
   lineKey: string;
   label: string;
   sortOrder: number;
+  /** Normalised frame coords (0..1) of the drawn line — absent on legacy rows. Carried so the
+   *  compare can draw the split on the picture, not only measure with it. */
+  x1?: number;
+  y1?: number;
+  x2?: number;
+  y2?: number;
 };
 
 export type ComputedSectorSplit = {

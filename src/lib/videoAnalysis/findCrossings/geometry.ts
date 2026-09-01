@@ -80,8 +80,16 @@ export function bandMask(
   const w = roi.x1 - roi.x0;
   const h = roi.y1 - roi.y0;
   const band = Math.max(20, Math.trunc(frameW * params.bandFrac));
-  const lo = -params.extend;
-  const hi = 1 + params.extend;
+  // A capsule, not a rectangle: the band runs one band-width (about a car length) past each end
+  // of the line, plus whatever fraction `extend` asks for. A car that reaches the line at its
+  // very tip — the far end of a fisheye shot, where the cars hug one edge and a drawn line only
+  // just reaches them (Test A3 S1, 2026-08-29) — is then seen on BOTH sides of the line, which
+  // is what a crossing is. Measured in pixels so a short line stays short: the old 35% of the
+  // line's length was nothing on a long line and, on that 100px S1, reached the return lane of
+  // the hairpin beside it and read the wrong piece of track.
+  const capPx = band;
+  const lo = -params.extend - capPx / g.norm;
+  const hi = 1 + params.extend + capPx / g.norm;
 
   const mask = new Uint8Array(w * h);
   for (let row = 0; row < h; row++) {

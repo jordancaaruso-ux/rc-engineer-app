@@ -7,6 +7,7 @@ import {
   describeVideoError,
   diagnoseMissingPicture,
 } from "@/lib/videos/videoPlaybackDiagnosis";
+import { SectorLineMap, type MappedSectorLine } from "./SectorLineMap";
 
 /**
  * Ghosted sector clip: the same analyzed video loaded twice, both laps seeked to
@@ -22,6 +23,9 @@ export function SectorClipPlayer({
   bLabel,
   fit = "card",
   ticks,
+  lines,
+  fromKey = null,
+  toKey = null,
 }: {
   videoUrl: string;
   aWindow: SegmentWindow;
@@ -39,6 +43,13 @@ export function SectorClipPlayer({
    * so a wide phone clip is not a strip inside a 16:9 hole.
    */
   fit?: "card" | "window";
+  /**
+   * Every sector line of this analysis, drawn over the picture so the split is on screen the whole
+   * time — the two bounding this clip are lit, the rest stay visible and quiet.
+   */
+  lines?: MappedSectorLine[];
+  fromKey?: string | null;
+  toKey?: string | null;
 }) {
   const aRef = useRef<HTMLVideoElement | null>(null);
   const bRef = useRef<HTMLVideoElement | null>(null);
@@ -177,7 +188,16 @@ export function SectorClipPlayer({
             if (bRef.current) bRef.current.currentTime = bWindow.startSec;
           }}
         />
-        <div className="pointer-events-none absolute inset-x-2 top-2 flex justify-between">
+        {lines && lines.length > 0 ? (
+          <SectorLineMap
+            lines={lines}
+            fromKey={fromKey}
+            toKey={toKey}
+            containerAspect={fit === "window" ? aspect : 16 / 9}
+            videoAspect={aspect}
+          />
+        ) : null}
+        <div className="pointer-events-none absolute inset-x-2 top-2 z-20 flex justify-between">
           <span className="rounded bg-background/70 px-1.5 py-0.5 tabular-nums text-[9px] tracking-[0.15em] text-foreground backdrop-blur-sm">
             {aLabel}
           </span>

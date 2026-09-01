@@ -147,55 +147,60 @@ const MIN_PLAUSIBILITY_SAMPLES = 4;
 /** Fewest laps that must agree before disagreement means anything. */
 const MIN_CLUSTER_LAPS = 3;
 
+/**
+ * The driver a lap key belongs to — everything before the lap number ("me:7" → "me"), or "" when
+ * the key is a bare lap number and there is only one driver.
+ */
+function driverOfKey(key: string): string {
+  const i = key.lastIndexOf(":");
+  return i < 0 ? "" : key.slice(0, i);
+}
+
 export function flagImplausible<T extends RefinableResult>(
   results: T[],
   sfKey: string,
   lapKey: LapKeyOf<T> = defaultLapKey
 ): Set<string> {
   const shape = learnLapShape(results, sfKey, lapKey);
-  const byLine = new Map<string, Array<{ id: string; offset: number }>>();
+
+  // **One driver at a time.** The first version pooled both scanned drivers on a line into one
+  // sample, and it fell over on the first race where one was quicker: at Test A3 (2026-08-29)
+  // Sandy ran 0.8s a lap faster than Jordan, so by the second line she was half a second earlier
+  // relative to her own lap start than he was to his. The pooled centre sat between them and
+  // belonged to neither — half of EACH driver's rows fell outside it, and a scan came back
+  // "20 added, 20 odd" with the detector having found 36 of 40. The transponder gives every
+  // driver their own lap starts; the agreement that matters is a driver with themselves.
+  const byDriverLine = new Map<string, Array<{ id: string; offset: number }>>();
   for (const r of results) {
     if (r.lineKey === sfKey || r.detectedSec == null) continue;
-    const start = shape.sfAt.get(lapKey(r));
+    const key = lapKey(r);
+    const start = shape.sfAt.get(key);
     if (start == null) continue;
-    const list = byLine.get(r.lineKey) ?? [];
+    const group = `${driverOfKey(key)}|${r.lineKey}`;
+    const list = byDriverLine.get(group) ?? [];
     list.push({ id: r.id, offset: r.detectedSec - start });
-    byLine.set(r.lineKey, list);
+    byDriverLine.set(group, list);
   }
 
   const suspect = new Set<string>();
-  for (const [, list] of byLine) {
+  for (const [, list] of byDriverLine) {
     // Too few laps and any cluster is a coincidence — better to flag nothing than to flag at random.
     if (list.length < MIN_PLAUSIBILITY_SAMPLES) continue;
     const core = largestCluster(list.map((l) => l.offset), PLAUSIBLE_TOL_SEC);
-    if (core.length < MIN_CLUSTER_LAPS) continue;
+    if (core.length < MIN_CLUSTER_LAPS) {
+      // A car we could not follow at all. On the Boronia heat of 2026-08-28 every crossing
+      // written for one driver was another car's: against that driver's own lap starts the
+      // offsets drifted three quarters of a second a lap and never clustered — and "no cluster"
+      // used to mean "hold nothing", so all of it was written as fact and the compare read
+      // "gained eight seconds in S3". Enough rows to expect agreement and none of it is a car
+      // that was not followed, and the honest answer is to hold every one of them, not none.
+      for (const l of list) suspect.add(l.id);
+      continue;
+    }
     // The tolerance is measured from the cluster's own centre, so a cluster that happens to sit at
     // one end of its window does not lose a member to the arithmetic.
     const centre = median(core);
     for (const l of list) if (Math.abs(l.offset - centre) > PLAUSIBLE_TOL_SEC) suspect.add(l.id);
-  }
-
-  // A car we could not follow at all. On the Boronia heat of 2026-08-28 every crossing written
-  // for one driver was another car's: against that driver's own lap starts the offsets drifted
-  // three quarters of a second a lap and never clustered — and "no cluster" used to mean "hold
-  // nothing", so all of it was written as fact and the compare read "gained eight seconds in
-  // S3". Per driver and line: enough rows to expect agreement and none of it is a car that was
-  // not followed, and the honest answer is to hold every one of them, not none.
-  const byRoleLine = new Map<string, Array<{ id: string; offset: number }>>();
-  for (const r of results) {
-    if (r.lineKey === sfKey || r.detectedSec == null) continue;
-    const start = shape.sfAt.get(lapKey(r));
-    if (start == null) continue;
-    const key = `${r.id.split(":")[0]}|${r.lineKey}`;
-    const list = byRoleLine.get(key) ?? [];
-    list.push({ id: r.id, offset: r.detectedSec - start });
-    byRoleLine.set(key, list);
-  }
-  for (const [, list] of byRoleLine) {
-    if (list.length < MIN_PLAUSIBILITY_SAMPLES) continue;
-    const core = largestCluster(list.map((l) => l.offset), PLAUSIBLE_TOL_SEC);
-    if (core.length >= MIN_CLUSTER_LAPS) continue;
-    for (const l of list) suspect.add(l.id);
   }
 
   // Second opinion, by segment: a slow lap in traffic pushes every later corner away from its
@@ -232,10 +237,10 @@ export function flagImplausible<T extends RefinableResult>(
     const lap = lapKey(r);
     const prev = trustedBefore(r.lineKey, lap);
     if (!prev) continue;
-    // The same gap on every other lap where both corners were found and trusted.
+    // The same gap on every other lap of THIS driver where both corners were found and trusted.
     const samples: number[] = [];
     for (const other of laps) {
-      if (other === lap) continue;
+      if (other === lap || driverOfKey(other) !== driverOfKey(lap)) continue;
       const a = prev.key === sfKey ? shape.sfAt.get(other) : found.get(`${prev.key}|${other}`);
       const b = found.get(`${r.lineKey}|${other}`);
       if (a == null || b == null || b <= a) continue;
@@ -249,6 +254,101 @@ export function flagImplausible<T extends RefinableResult>(
     if (Math.abs(r.detectedSec - prev.t - median(core)) <= PLAUSIBLE_TOL_SEC) suspect.delete(r.id);
   }
   return suspect;
+}
+
+/**
+ * Which untracked crossings the timing vouches for.
+ *
+ * A window's answer is "unconfirmed" when no tracked object backed it — a frame-pair sign flip,
+ * which is also what shaken paint looks like — and those are held back rather than written.
+ * But the same evidence that convicts a wrong crossing can acquit a right one: on the Fisheye
+ * race of 2026-08-28 two unconfirmed rows sat within a twentieth of a second of where that
+ * driver crossed that line on every other lap, and were held anyway. So: an unconfirmed row is
+ * vouched for when its offset from its own lap start sits inside the tolerance of the cluster
+ * formed by that driver's TRACKED, undoubted crossings of the same line (at least three of
+ * them — flickers never vouch for each other), or when its gap from the previous trusted corner
+ * matches that gap on the driver's other laps. Rows already held by `flagImplausible` are never
+ * vouched for. A vouched row still says "unconfirmed", so the review can call it less certain.
+ */
+export function vouchedUnconfirmed<T extends RefinableResult>(
+  results: T[],
+  sfKey: string,
+  lapKey: LapKeyOf<T> = defaultLapKey,
+  suspect: ReadonlySet<string> = new Set()
+): Set<string> {
+  const shape = learnLapShape(results, sfKey, lapKey);
+  const trusted = (r: T) =>
+    r.detectedSec != null && r.source !== "unconfirmed" && !suspect.has(r.id);
+
+  const vouched = new Set<string>();
+  const trustedOffsets = new Map<string, number[]>();
+  for (const r of results) {
+    if (r.lineKey === sfKey || !trusted(r)) continue;
+    const key = lapKey(r);
+    const start = shape.sfAt.get(key);
+    if (start == null) continue;
+    const group = `${driverOfKey(key)}|${r.lineKey}`;
+    const list = trustedOffsets.get(group) ?? [];
+    list.push(r.detectedSec! - start);
+    trustedOffsets.set(group, list);
+  }
+
+  const rank = new Map(shape.order.map((k, i) => [k, i]));
+  const rowAt = new Map<string, T>();
+  for (const r of results) rowAt.set(`${r.lineKey}|${lapKey(r)}`, r);
+  const laps = [...new Set(results.map(lapKey))];
+  const trustedBefore = (lineKey: string, lap: string): { key: string; t: number } | null => {
+    const mine = rank.get(lineKey);
+    if (mine == null) return null;
+    for (let i = mine - 1; i >= 0; i--) {
+      const key = shape.order[i]!;
+      if (key === sfKey) {
+        const t = shape.sfAt.get(lap);
+        return t == null ? null : { key, t };
+      }
+      const row = rowAt.get(`${key}|${lap}`);
+      if (row && trusted(row)) return { key, t: row.detectedSec! };
+    }
+    return null;
+  };
+
+  for (const r of results) {
+    if (r.lineKey === sfKey || r.detectedSec == null || r.source !== "unconfirmed") continue;
+    if (suspect.has(r.id)) continue;
+    const key = lapKey(r);
+    const start = shape.sfAt.get(key);
+    if (start == null) continue;
+
+    const own = trustedOffsets.get(`${driverOfKey(key)}|${r.lineKey}`) ?? [];
+    if (own.length >= MIN_CLUSTER_LAPS) {
+      const core = largestCluster(own, PLAUSIBLE_TOL_SEC);
+      if (core.length >= MIN_CLUSTER_LAPS && Math.abs(r.detectedSec - start - median(core)) <= PLAUSIBLE_TOL_SEC) {
+        vouched.add(r.id);
+        continue;
+      }
+    }
+
+    const prev = trustedBefore(r.lineKey, key);
+    if (!prev) continue;
+    const samples: number[] = [];
+    for (const other of laps) {
+      if (other === key || driverOfKey(other) !== driverOfKey(key)) continue;
+      let at: number | null = null;
+      if (prev.key === sfKey) at = shape.sfAt.get(other) ?? null;
+      else {
+        const a = rowAt.get(`${prev.key}|${other}`);
+        at = a && trusted(a) ? a.detectedSec! : null;
+      }
+      const b = rowAt.get(`${r.lineKey}|${other}`);
+      if (at == null || !b || !trusted(b) || b.detectedSec! <= at) continue;
+      samples.push(b.detectedSec! - at);
+    }
+    if (samples.length < MIN_CLUSTER_LAPS) continue;
+    const core = largestCluster(samples, PLAUSIBLE_TOL_SEC);
+    if (core.length < MIN_CLUSTER_LAPS) continue;
+    if (Math.abs(r.detectedSec - prev.t - median(core)) <= PLAUSIBLE_TOL_SEC) vouched.add(r.id);
+  }
+  return vouched;
 }
 
 /**

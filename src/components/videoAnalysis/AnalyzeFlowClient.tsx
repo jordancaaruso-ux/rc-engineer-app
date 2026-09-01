@@ -73,7 +73,7 @@ import {
   type IdentifyResult,
 } from "@/lib/videoAnalysis/findCrossings/identify";
 import { toleranceFor } from "@/lib/videoAnalysis/findCrossings/carColour";
-import type { CrossingEvent } from "@/lib/videoAnalysis/findCrossings/types";
+import { RECIPE_B22_T14, type CrossingEvent } from "@/lib/videoAnalysis/findCrossings/types";
 import {
   fastestLaps,
   realLaps,
@@ -230,11 +230,29 @@ export function AnalyzeFlowClient({
   const [lineSets, setLineSets] = useState<LineSet[]>([]);
   const [switchingSet, setSwitchingSet] = useState(false);
   const [videoDims, setVideoDims] = useState<{ w: number; h: number } | null>(null);
+  /** The picture's true size, from whichever event first carries it; 0×0 is "not yet", not a size. */
+  const readVideoDims = useCallback((v: HTMLVideoElement) => {
+    const w = v.videoWidth;
+    const h = v.videoHeight;
+    if (!w || !h) return;
+    setVideoDims((d) => (d && d.w === w && d.h === h ? d : { w, h }));
+  }, []);
   const lineDragRef = useRef<{ idx: number; end: 1 | 2 } | null>(null);
   // The ref drives the drag maths every pointer move; this mirrors it for the crosshair,
   // which only has to repaint when a drag starts or ends.
   const [activeHandle, setActiveHandle] = useState<{ idx: number; end: 1 | 2 } | null>(null);
   const overlayElRef = useRef<HTMLDivElement | null>(null);
+  // Width of the painted frame on screen, so the detector's band can be drawn at the width it
+  // really reads (a fraction of frame width) rather than as a hairline that hides it.
+  const [overlayPx, setOverlayPx] = useState(0);
+  useEffect(() => {
+    const el = overlayElRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setOverlayPx(el.getBoundingClientRect().width));
+    ro.observe(el);
+    setOverlayPx(el.getBoundingClientRect().width);
+    return () => ro.disconnect();
+  }, [videoSrc]);
   // Automatic crossing detection — reads the video itself and fills in the unmarked corners.
   const [autoState, setAutoState] = useState<
     "idle" | "learning" | "identifying" | "choosing" | "running" | "review"
@@ -1495,6 +1513,13 @@ export function AnalyzeFlowClient({
   /** `from` is passed explicitly right after creating a set, when `data` in this
    * closure is still the previous profile's. */
   function openLineEditor(from?: SectorLineApi[]) {
+    // Lines are fractions of the picture. Until the browser has told us the picture's shape the
+    // box is a 16:9 guess with the clip letterboxed inside it, and anything drawn now would be
+    // measured against black bars.
+    if (videoSrc && !videoDims) {
+      setMsg("The picture is still loading — try again in a moment.");
+      return;
+    }
     const existing = (from ?? data?.sectorLines ?? [])
       .slice()
       .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -1534,9 +1559,26 @@ export function AnalyzeFlowClient({
     setActiveHandle(null);
   }
 
+  /** Where the picture is painted inside the <video> box (object-contain), in viewport pixels. */
+  function paintedRect(v: HTMLVideoElement | null): DOMRect | null {
+    if (!v || !v.videoWidth || !v.videoHeight) return null;
+    const r = v.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
+    const va = v.videoWidth / v.videoHeight;
+    const ea = r.width / r.height;
+    if (va >= ea) {
+      const h = r.width / va;
+      return new DOMRect(r.left, r.top + (r.height - h) / 2, r.width, h);
+    }
+    const w = r.height * va;
+    return new DOMRect(r.left + (r.width - w) / 2, r.top, w, r.height);
+  }
+
   function dragLinePoint(clientX: number, clientY: number, idx: number, end: 1 | 2) {
     const d = lineDragRef.current;
-    const rect = overlayElRef.current?.getBoundingClientRect();
+    // The picture itself, measured from the element as it is painted right now — the overlay
+    // box is meant to match it, but the picture is the thing the fractions describe.
+    const rect = paintedRect(videoRef.current) ?? overlayElRef.current?.getBoundingClientRect();
     if (!d || !rect || !rect.width || !rect.height || d.idx !== idx || d.end !== end) return;
     const x = clamp01((clientX - rect.left) / rect.width);
     const y = clamp01((clientY - rect.top) / rect.height);
@@ -1744,28 +1786,29 @@ export function AnalyzeFlowClient({
     return { left: `${(100 - w) / 2}%`, top: "0%", width: `${w}%`, height: "100%" };
   })();
 
-  // Static guide lines: SF while syncing, the current target while marking.
+  // Static guide lines. Every line the set holds is on the picture the whole way through — Sync
+  // and Mark each used to show exactly one, and the driver could not see where the rest of the
+  // split sat ("all the sectors should be visible on the track at all times", 2026-08-29). The
+  // one being worked on is lit; the others stay quiet behind it.
   const staticGuides: DraftLine[] = (() => {
-    if (draftLines) return [];
-    const withGeom = (l?: SectorLineApi): DraftLine | null =>
-      l && l.x1 != null && l.y1 != null && l.x2 != null && l.y2 != null
-        ? { lineKey: l.lineKey, label: l.label, x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2 }
-        : null;
-    if (step === 3) {
-      // Previewing a set: show every line it holds.
-      return data.sectorLines.map(withGeom).filter((l): l is DraftLine => l != null);
-    }
-    if (step === 4) {
-      const sf = withGeom(data.sectorLines.find((l) => l.lineKey === "sf"));
-      return sf ? [sf] : [];
-    }
-    if (step === 5) {
-      const target = markQueue[markCursor];
-      const line = withGeom(data.sectorLines.find((l) => l.lineKey === target?.lineKey));
-      return line ? [line] : [];
-    }
-    return [];
+    if (draftLines || step < 3 || step > 5) return [];
+    return data.sectorLines
+      .map((l): DraftLine | null =>
+        l.x1 != null && l.y1 != null && l.x2 != null && l.y2 != null
+          ? { lineKey: l.lineKey, label: l.label, x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2 }
+          : null
+      )
+      .filter((l): l is DraftLine => l != null);
   })();
+
+  /** The guide the current step is about — lit, with the rest of the set behind it. */
+  const guideActiveKey: string | null = draftLines
+    ? null
+    : step === 4
+      ? "sf"
+      : step === 5
+        ? (markQueue[markCursor]?.lineKey ?? null)
+        : null;
 
   const overlayLines = draftLines ?? staticGuides;
 
@@ -1796,24 +1839,52 @@ export function AnalyzeFlowClient({
         preserveAspectRatio="none"
         className="absolute inset-0 h-full w-full"
       >
-        {overlayLines.map((l) => (
-          <line
-            key={l.lineKey}
-            x1={l.x1 * 1000}
-            y1={l.y1 * 1000}
-            x2={l.x2 * 1000}
-            y2={l.y2 * 1000}
-            stroke={l.lineKey === "sf" ? "rgb(var(--color-foreground))" : "rgb(var(--color-primary-ink))"}
-            strokeWidth={2}
-            vectorEffect="non-scaling-stroke"
-            strokeDasharray={l.lineKey === "sf" ? "6 4" : undefined}
-          />
-        ))}
+        {/* While drawing: the strip the detector actually reads, at true width and exactly the
+            drawn length. The hairline on its own hid this, and a line shorter than the strip is
+            wide was a box the driver could not see (Test A3 S1, 2026-08-29). */}
+        {draftLines && overlayPx > 0
+          ? overlayLines.map((l) => (
+              <line
+                key={`band-${l.lineKey}`}
+                x1={l.x1 * 1000}
+                y1={l.y1 * 1000}
+                x2={l.x2 * 1000}
+                y2={l.y2 * 1000}
+                stroke={l.lineKey === "sf" ? "rgb(var(--color-foreground))" : "rgb(var(--color-primary-ink))"}
+                strokeOpacity={0.18}
+                strokeWidth={2 * RECIPE_B22_T14.bandFrac * overlayPx}
+                strokeLinecap="butt"
+                vectorEffect="non-scaling-stroke"
+              />
+            ))
+          : null}
+        {overlayLines.map((l) => {
+          const lit = guideActiveKey == null || l.lineKey === guideActiveKey;
+          return (
+            <line
+              key={l.lineKey}
+              x1={l.x1 * 1000}
+              y1={l.y1 * 1000}
+              x2={l.x2 * 1000}
+              y2={l.y2 * 1000}
+              stroke={l.lineKey === "sf" ? "rgb(var(--color-foreground))" : "rgb(var(--color-primary-ink))"}
+              strokeWidth={2}
+              strokeOpacity={lit ? 1 : 0.35}
+              vectorEffect="non-scaling-stroke"
+              strokeDasharray={l.lineKey === "sf" || !lit ? "6 4" : undefined}
+            />
+          );
+        })}
       </svg>
       {overlayLines.map((l) => (
         <span
           key={`lbl-${l.lineKey}`}
-          className="pointer-events-none absolute -translate-x-1/2 -translate-y-[150%] rounded bg-background/70 px-1 py-px tabular-nums text-[9px] text-foreground backdrop-blur-sm"
+          className={cn(
+            "pointer-events-none absolute -translate-x-1/2 -translate-y-[150%] rounded bg-background/70 px-1 py-px tabular-nums text-[9px] backdrop-blur-sm",
+            guideActiveKey == null || l.lineKey === guideActiveKey
+              ? "text-foreground"
+              : "text-foreground/45"
+          )}
           style={{ left: `${((l.x1 + l.x2) / 2) * 100}%`, top: `${((l.y1 + l.y2) / 2) * 100}%` }}
         >
           {l.label}
@@ -1936,12 +2007,17 @@ export function AnalyzeFlowClient({
             // a black panel — no message, nothing to act on.
             setVideoError(describeVideoError(e.currentTarget));
           }}
+          // loadedmetadata is not always the moment the size is known: WebKit can report 0×0
+          // there and fire `resize` when it arrives. Every event that can carry it feeds the
+          // same reader, which ignores 0×0.
+          onResize={(e) => readVideoDims(e.currentTarget)}
+          onLoadedData={(e) => readVideoDims(e.currentTarget)}
           onLoadedMetadata={(e) => {
             // A dropped video track raises NO error and still reports readyState 4,
             // so the black-picture case has to be caught here, by size.
             setVideoError(diagnoseMissingPicture(e.currentTarget)?.message ?? null);
             setDuration(e.currentTarget.duration || 0);
-            setVideoDims({ w: e.currentTarget.videoWidth, h: e.currentTarget.videoHeight });
+            readVideoDims(e.currentTarget);
             if (coarseElRef.current) {
               coarseElRef.current.max = String(Math.max(e.currentTarget.duration || 0, 0.01));
             }
@@ -2164,10 +2240,6 @@ export function AnalyzeFlowClient({
               {(primary?.drivers.length ?? 0) > 1 ? (
                 <div className="space-y-1.5 border-t border-border pt-3">
                   <span className="type-data-label">Compare against (optional)</span>
-                  <p className="text-[11px] leading-relaxed text-muted-foreground">
-                    Their crossings are found from their own lap times — you never have to pick
-                    their car out of the video.
-                  </p>
                   <div className="flex flex-wrap gap-1.5">
                     <button
                       type="button"
@@ -2235,10 +2307,28 @@ export function AnalyzeFlowClient({
       ) : null}
 
       {/* ---------- STEP 4: sync ---------- */}
-      {step === 4 && session ? (
+      {/* ---------- one player for every video step ----------
+          The player used to be rendered inside each step's own branch (Lines, the line editor,
+          Sync, Mark), so React rebuilt the <video> on every step change — five elements in one
+          pass, the file reloaded each time, and the frame's shape re-derived from one fresh
+          loadedmetadata. On a phone that report can be 0×0: the box then falls back to 16:9, the
+          overlay covers the letterbox, and lines drawn on that mount land somewhere else on the
+          next one (2026-08-29, "I edited the lines and they were correct, then the next step
+          they are wrong"). One position in the tree, one element, for as long as a video step
+          is showing. */}
+      {session && isVideoStep ? (
         <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-4 lg:items-start">
-          <div className="lg:sticky lg:top-4">{transport}</div>
+          <div className={cn("lg:sticky lg:top-4", step === 5 && !draftLines && "space-y-2.5")}>
+            {step === 5 && !draftLines && markQueue[markCursor] ? (
+              <p className="micro-caps text-primary-ink">
+                L{markQueue[markCursor]!.lapNumber} · {markQueue[markCursor]!.label} line
+              </p>
+            ) : null}
+            {transport}
+          </div>
           <div className="mt-4 space-y-3 lg:mt-0">
+      {step === 4 ? (
+        <>
           <div>
             <h2 className="text-[16px] font-bold tracking-tight">Sync the laps</h2>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
@@ -2348,15 +2438,12 @@ export function AnalyzeFlowClient({
               </details>
             </>
           ) : null}
-          </div>
-        </div>
+        </>
       ) : null}
 
       {/* ---------- line editor (opens from Lines / Mark) ---------- */}
-      {session && draftLines ? (
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-4 lg:items-start">
-          <div className="lg:sticky lg:top-4">{transport}</div>
-          <div className="mt-4 space-y-3 lg:mt-0">
+      {draftLines ? (
+        <>
           <div>
             <h2 className="text-[16px] font-bold tracking-tight">Draw sector lines</h2>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
@@ -2476,15 +2563,12 @@ export function AnalyzeFlowClient({
               {savingLines ? "Saving…" : "Save lines"}
             </button>
           </div>
-          </div>
-        </div>
+        </>
       ) : null}
 
       {/* ---------- STEP 3: line sets ---------- */}
-      {step === 3 && session && !draftLines ? (
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-4 lg:items-start">
-          <div className="lg:sticky lg:top-4">{transport}</div>
-          <div className="mt-4 space-y-3 lg:mt-0">
+      {step === 3 && !draftLines ? (
+        <>
           <div>
             <h2 className="text-[16px] font-bold tracking-tight">Which sector lines?</h2>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
@@ -2593,47 +2677,11 @@ export function AnalyzeFlowClient({
               </button>
             </div>
           )}
-          </div>
-        </div>
+        </>
       ) : null}
 
-      {step === 5 && session && !draftLines && nonSfLines.length === 0 ? (
-        <div className="space-y-3">
-          <div>
-            <h2 className="text-[16px] font-bold tracking-tight">No sector lines here yet</h2>
-            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              Start/finish is already synced from timing — nothing to re-mark. Pick or draw a set of
-              corner lines to get corner-by-corner deltas.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setStep(3)}
-            className="w-full rounded-xl primary-face bg-primary py-3.5 text-[13px] font-semibold text-primary-foreground"
-          >
-            Back to line sets
-          </button>
-          <button
-            type="button"
-            onClick={() => setStep(6)}
-            className="w-full rounded-lg border border-border bg-secondary py-2.5 text-[12px] font-semibold text-muted-foreground"
-          >
-            Skip — whole-lap compare only
-          </button>
-        </div>
-      ) : null}
-
-      {step === 5 && session && !draftLines && nonSfLines.length > 0 ? (
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-4 lg:items-start">
-          <div className="space-y-2.5 lg:sticky lg:top-4">
-            {markQueue[markCursor] ? (
-              <p className="micro-caps text-primary-ink">
-                L{markQueue[markCursor]!.lapNumber} · {markQueue[markCursor]!.label} line
-              </p>
-            ) : null}
-            {transport}
-          </div>
-          <div className="mt-4 space-y-3 lg:mt-0">
+      {step === 5 && !draftLines && nonSfLines.length > 0 ? (
+        <>
           <div className="flex items-start justify-between gap-2">
             <div>
               <h2 className="text-[16px] font-bold tracking-tight">Mark sector crossings</h2>
@@ -2714,18 +2762,30 @@ export function AnalyzeFlowClient({
                 <p className="text-[12.5px] leading-relaxed text-foreground">
                   <strong className="tabular-nums">{autoReview.found.length}</strong> crossing
                   {autoReview.found.length === 1 ? "" : "s"} ready to add
-                  {autoReview.suspect.length > 0 ? (
-                    <>
-                      , <strong className="tabular-nums">{autoReview.suspect.length}</strong> held
-                      back as odd
-                    </>
-                  ) : null}
-                  {autoReview.missing.length > 0 ? (
-                    <>
-                      , <strong className="tabular-nums">{autoReview.missing.length}</strong> not
-                      found
-                    </>
-                  ) : null}
+                  {(() => {
+                    // A crossing the timing gives to another driver, with nothing else seen when
+                    // this driver was due, is not a doubt — it is a settled miss, and the driver
+                    // has nothing to decide about it. It counts as "not found" (Jordan, 2026-08-29:
+                    // "if you know that, just fix it silently"). The row stays in the saved scan
+                    // with its claim, so a replay still sees the evidence. "Odd" is the rest.
+                    const other = autoReview.suspect.filter((r) => r.claimedBy && r.claimedBy.key !== r.role).length;
+                    const odd = autoReview.suspect.length - other;
+                    const notFound = autoReview.missing.length + other;
+                    return (
+                      <>
+                        {odd > 0 ? (
+                          <>
+                            , <strong className="tabular-nums">{odd}</strong> held back as odd
+                          </>
+                        ) : null}
+                        {notFound > 0 ? (
+                          <>
+                            , <strong className="tabular-nums">{notFound}</strong> not found
+                          </>
+                        ) : null}
+                      </>
+                    );
+                  })()}
                   .
                 </p>
                 {autoReview.found.some((r) => r.source === "unconfirmed") ? (
@@ -2734,7 +2794,7 @@ export function AnalyzeFlowClient({
                     are less certain — worth a look after adding.
                   </p>
                 ) : null}
-                {autoReview.suspect.length > 0 ? (
+                {autoReview.suspect.some((r) => !r.claimedBy || r.claimedBy.key === r.role) ? (
                   <p className="text-[11px] leading-relaxed text-muted-foreground">
                     The odd ones sit a long way off that corner&rsquo;s time on every other lap,
                     so they are probably a different car. Add them only if you want to check them
@@ -2765,22 +2825,6 @@ export function AnalyzeFlowClient({
                     </p>
                   ));
                 })()}
-                {autoReview.suspect.some((r) => r.claimedBy) ? (
-                  <ul className="space-y-0.5 text-[11px] leading-relaxed text-faint">
-                    {autoReview.suspect
-                      .filter((r) => r.claimedBy)
-                      .map((r) => (
-                        <li key={r.id}>
-                          {r.role === "me" ? "Your" : `${compDriver?.driverName ?? "Their"}`} lap{" "}
-                          {r.lapNumber} {r.lineKey.toUpperCase()} — the timing says that was{" "}
-                          {r.claimedBy!.key === r.role
-                            ? `lap ${r.claimedBy!.lapNumber}`
-                            : `${r.claimedBy!.by}'s car`}
-                          .
-                        </li>
-                      ))}
-                  </ul>
-                ) : null}
                 {autoError ? (
                   <p className="text-[11.5px] leading-relaxed text-loss">{autoError}</p>
                 ) : null}
@@ -3213,7 +3257,35 @@ export function AnalyzeFlowClient({
           >
             Done marking
           </button>
+        </>
+      ) : null}
           </div>
+        </div>
+      ) : null}
+
+      {step === 5 && session && !draftLines && nonSfLines.length === 0 ? (
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-[16px] font-bold tracking-tight">No sector lines here yet</h2>
+            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+              Start/finish is already synced from timing — nothing to re-mark. Pick or draw a set of
+              corner lines to get corner-by-corner deltas.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStep(3)}
+            className="w-full rounded-xl primary-face bg-primary py-3.5 text-[13px] font-semibold text-primary-foreground"
+          >
+            Back to line sets
+          </button>
+          <button
+            type="button"
+            onClick={() => setStep(6)}
+            className="w-full rounded-lg border border-border bg-secondary py-2.5 text-[12px] font-semibold text-muted-foreground"
+          >
+            Skip — whole-lap compare only
+          </button>
         </div>
       ) : null}
 
@@ -3320,7 +3392,7 @@ export function AnalyzeFlowClient({
             <DriverComparePanel
               key={`drivers-${session.marks.length}-${session.lastScan?.at ?? ""}`}
               session={session}
-              lines={drawnLines.map((l) => ({ lineKey: l.lineKey, label: l.label, sortOrder: l.sortOrder }))}
+              lines={drawnLines}
               videoUrl={videoSrc}
             />
           ) : (

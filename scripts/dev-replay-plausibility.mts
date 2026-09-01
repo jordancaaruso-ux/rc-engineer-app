@@ -24,13 +24,16 @@ if (lastScan) console.log(`replaying the saved scan (${marks.length} rows with a
 const sessions = (m.timingSessions as Array<{ isOnVideo: boolean; sync: { anchor: { videoTimeSec: number } }; drivers: Array<{ role: string; driverName: string; laps: Lap[] }> }>) ?? [];
 const primary = sessions.find((s) => s.isOnVideo) ?? sessions[0]!;
 const anchor = primary.sync.anchor;
+// Under an sf_finish anchor (the END of lap 1) the walk starts one lap-1 earlier, at the tone.
+const meLaps = primary.drivers.find((d) => d.role === "me")?.laps ?? [];
+const tone = anchor.videoTimeSec - ((anchor as { anchorKind?: string }).anchorKind === "sf_finish" ? (meLaps.find((l) => l.lapNumber === 1)?.lapTimeSec ?? 0) : 0);
 
 const SF = "sf";
 const results: RefinableResult[] = [];
 const lapTimeOf = new Map<string, number>();
 for (const d of primary.drivers) {
   if (d.role !== "me" && d.role !== "competitor") continue;
-  let t = anchor.videoTimeSec;
+  let t = tone;
   for (const lap of [...d.laps].sort((a, b) => a.lapNumber - b.lapNumber)) {
     results.push({ id: `${d.role}:${lap.lapNumber}:${SF}`, lineKey: SF, lapNumber: lap.lapNumber, centerSec: t, detectedSec: t, quality: null, candidates: [], source: "confirmed" });
     lapTimeOf.set(`${d.role}:${lap.lapNumber}`, lap.lapTimeSec);

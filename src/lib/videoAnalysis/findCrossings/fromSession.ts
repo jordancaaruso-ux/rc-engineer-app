@@ -24,6 +24,7 @@ import {
 import {
   dropDuplicates,
   flagImplausible,
+  vouchedUnconfirmed,
   flagOutOfOrder,
   refineByChaining,
   type RefinableResult,
@@ -469,6 +470,7 @@ export function reviewResults(opts: {
   const liveResults = chained.filter((r) => !duplicateIds.has(r.id));
   const outOfOrderIds = flagOutOfOrder(liveResults, SF_LINE_KEY, lapKeyOf);
   const suspectIds = flagImplausible(liveResults, SF_LINE_KEY, lapKeyOf);
+  const vouchedIds = vouchedUnconfirmed(liveResults, SF_LINE_KEY, lapKeyOf, suspectIds);
 
   const found: ReviewedCrossing[] = [];
   const suspect: ReviewedCrossing[] = [];
@@ -483,9 +485,11 @@ export function reviewResults(opts: {
       missing.push(target);
       continue;
     }
-    // An untracked flicker is held back, always. It passed no "moves like a car" test — it is a
-    // frame-pair sign flip and nothing more — and writing it as a mark is how shaken paint became
-    // a sector time on three lines of a whole race. It stays visible so a driver can look at it.
+    // An untracked flicker is held back unless the timing vouches for it. It passed no "moves
+    // like a car" test — it is a frame-pair sign flip and nothing more — and writing it as a mark
+    // is how shaken paint became a sector time on three lines of a whole race. But a flicker at
+    // the moment this driver crosses this line on every other lap is the car, and it goes in
+    // marked less certain. Everything else stays visible so a driver can look at it.
     const row: ReviewedCrossing = {
       id: r.id,
       role: target.role,
@@ -496,7 +500,7 @@ export function reviewResults(opts: {
       suspect:
         suspectIds.has(r.id) ||
         outOfOrderIds.has(r.id) ||
-        r.source === "unconfirmed" ||
+        (r.source === "unconfirmed" && !vouchedIds.has(r.id)) ||
         r.claimedBy != null,
       claimedBy: r.claimedBy,
       colour: colourById.get(r.id),

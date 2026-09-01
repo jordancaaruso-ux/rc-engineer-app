@@ -42,6 +42,9 @@ export type SectorSegment = {
   name: string;
   fromLabel: string;
   toLabel: string;
+  /** The lines this segment runs between — so the compare can light them on the picture. */
+  fromKey: string;
+  toKey: string;
   aSec: number;
   bSec: number;
   /** aSec - bSec; negative = lap A faster through this segment. */
@@ -68,6 +71,8 @@ export type LapCompareReport = {
 export const EVEN_SEGMENT_THRESHOLD_SEC = 0.02;
 
 const SF_LABEL = "Start/finish";
+/** The lap boundary is not one of the split lines — it is the profile's start/finish. */
+const SF_KEY = "sf";
 
 export function collectCompareCars(
   result: VideoAnalysisResultV1,
@@ -165,6 +170,8 @@ export function compareLaps(
       name: lines.length === 0 ? "Full lap" : `S${i + 1}`,
       fromLabel: i === 0 ? SF_LABEL : lineLabel(lines[i - 1]!),
       toLabel: i === boundsA.length - 2 ? SF_LABEL : lineLabel(lines[i]!),
+      fromKey: i === 0 ? SF_KEY : lines[i - 1]!,
+      toKey: i === boundsA.length - 2 ? SF_KEY : lines[i]!,
       aSec,
       bSec,
       deltaSec: aSec - bSec,

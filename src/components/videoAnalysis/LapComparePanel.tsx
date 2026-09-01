@@ -33,6 +33,7 @@ import {
 } from "@/lib/videoAnalysis/lapCompare";
 import { compareCarsFromManualSession } from "@/lib/videoAnalysis/manualCompareAdapter";
 import { SectorClipPlayer } from "@/components/videoAnalysis/SectorClipPlayer";
+import { mappableLines, type MappedSectorLine } from "@/components/videoAnalysis/SectorLineMap";
 import { useLocalVideoSource } from "@/lib/videos/useLocalVideoSource";
 
 const GAIN_TEXT = "text-gain";
@@ -50,6 +51,8 @@ type JobSummary = {
 type PanelData = {
   cars: CompareCar[];
   lineDefs: Array<{ id: string; label: string }>;
+  /** Where those lines are on the picture — drawn over every clip. Empty for legacy profiles. */
+  mapLines: MappedSectorLine[];
   videoUrl: string | null;
   /** File name the analysis was marked against (manual sessions) — the pick hint. */
   expectedVideoName: string | null;
@@ -236,6 +239,7 @@ export function LapComparePanel({
         setData({
           cars,
           lineDefs,
+          mapLines: mappableLines(profileLines),
           source,
           videoUrl: detail.job?.videoAssetId
             ? `/api/videos/${encodeURIComponent(detail.job.videoAssetId)}/file`
@@ -480,6 +484,9 @@ export function LapComparePanel({
             aLabel={`${crossCar ? `${la.carLabel} ` : ""}L${la.lapIndex}`}
             bLabel={`${crossCar ? `${lb.carLabel} ` : ""}L${lb.lapIndex}`}
             fit="window"
+            lines={data?.mapLines ?? []}
+            fromKey={shownSeg.fromKey}
+            toKey={shownSeg.toKey}
           />
         ) : (
           <div className="flex aspect-video items-center justify-center rounded-lg border border-border bg-secondary/60 text-[12px] text-muted-foreground">
@@ -736,6 +743,9 @@ export function LapComparePanel({
                         bWindow={seg.bWindow}
                         aLabel={`${crossCar ? `${la.carLabel} ` : ""}L${la.lapIndex}`}
                         bLabel={`${crossCar ? `${lb.carLabel} ` : ""}L${lb.lapIndex}`}
+                        lines={d.mapLines}
+                        fromKey={seg.fromKey}
+                        toKey={seg.toKey}
                       />
                     ) : null}
                   </div>

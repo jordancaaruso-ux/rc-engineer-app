@@ -4,7 +4,7 @@
  *
  * Every case here is taken from the Boronia race of 2026-08-26, where all three fired for real.
  */
-import { dropDuplicates, flagImplausible, flagOutOfOrder, type RefinableResult } from "./refine";
+import { dropDuplicates, flagImplausible, flagOutOfOrder, vouchedUnconfirmed, type RefinableResult } from "./refine";
 import { realLaps, sfAnchorTime, SF_AGREE_SEC } from "./fromSession";
 
 function assert(cond: unknown, msg: string): asserts cond {
@@ -227,3 +227,58 @@ function at(
 }
 
 console.log("findCrossings refine.test.ts OK");
+
+/* ---------- a quicker driver is not an odd one ---------- */
+{
+  // Test A3, 2026-08-29: Sandy ran 0.8s a lap faster than Jordan. By the second line she was at
+  // 11.15s after her own lap start on every lap, he at 11.68s after his — each of them steady to
+  // a quarter of a second. Pooled, the centre sat between them and half of both were held.
+  const results: RefinableResult[] = [];
+  const mine = [11.62, 11.76, 11.7, 11.84, 11.42, 11.75, 11.86, 11.66, 11.37, 11.45];
+  const hers = [11.04, 11.12, 11.32, 11.19, 11.07, 11.25, 10.93, 11.23, 11.1, 11.2];
+  mine.forEach((off, i) => {
+    const start = 100 + i * 16.75;
+    results.push(at("me", i + 3, SF, start, { source: "confirmed" }));
+    results.push(at("me", i + 3, "s2", start + off, { source: "confirmed" }));
+  });
+  hers.forEach((off, i) => {
+    const start = 100.5 + i * 15.92;
+    results.push(at("competitor", i + 3, SF, start, { source: "confirmed" }));
+    results.push(at("competitor", i + 3, "s2", start + off, { source: "confirmed" }));
+  });
+  const odd = flagImplausible(results, SF, lapKey);
+  assert(odd.size === 0, `two steady drivers at different offsets: nothing is odd, got ${[...odd].join(",")}`);
+
+  // The segment rescue must not borrow the other driver's laps either: a slow lap of hers, judged
+  // from HER other laps, is fine; judged against his it would not be.
+  const slow = results.map((r) => (r.id === "competitor:7:s2" ? { ...r, detectedSec: r.detectedSec! + 0.5 } : r));
+  const held = flagImplausible(slow, SF, lapKey);
+  assert(held.has("competitor:7:s2"), "half a second off her own pattern is still held");
+  assert(![...held].some((id) => id.startsWith("me:")), "his rows are untouched by her slow lap");
+}
+
+/* ---------- the timing vouches for an untracked crossing ---------- */
+{
+  // Fisheye race, 2026-08-28: Sandy's S2 on lap 10 was "unconfirmed" — no tracked object backed
+  // it — and sat 0.05s from where she crossed S2 on every other lap. Held, wrongly.
+  const results: RefinableResult[] = [];
+  for (let lap = 3; lap <= 10; lap++) {
+    const start = 100 + (lap - 3) * 16;
+    results.push(at("competitor", lap, SF, start, { source: "confirmed" }));
+    results.push(at("competitor", lap, "s2", start + 2.2 + (lap % 2 ? 0.03 : -0.02), { source: lap === 10 ? "unconfirmed" : "confirmed" }));
+  }
+  const odd = flagImplausible(results, SF, lapKey);
+  const ok = vouchedUnconfirmed(results, SF, lapKey, odd);
+  assert(ok.has("competitor:10:s2"), "an untracked crossing at the driver's usual offset is vouched for");
+
+  // A flicker somewhere else on the line is not.
+  const stray = results.map((r) => (r.id === "competitor:10:s2" ? { ...r, detectedSec: r.detectedSec! + 1.1 } : r));
+  const oddStray = flagImplausible(stray, SF, lapKey);
+  const notOk = vouchedUnconfirmed(stray, SF, lapKey, oddStray);
+  assert(!notOk.has("competitor:10:s2"), "a flicker a second off is not vouched for");
+
+  // Flickers never vouch for each other: with only unconfirmed rows on the line, nobody is vouched.
+  const allFlicker = results.map((r) => (r.lineKey === "s2" ? { ...r, source: "unconfirmed" as const } : r));
+  const none = vouchedUnconfirmed(allFlicker, SF, lapKey, flagImplausible(allFlicker, SF, lapKey));
+  assert(none.size === 0, "unconfirmed rows cannot vouch for one another");
+}
