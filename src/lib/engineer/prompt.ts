@@ -21,13 +21,13 @@ The vehicle-dynamics knowledge base you have been given is this team's curated g
 
 The setup effect priors ("nets") say what each knob most likely does, in the driver's words. Where a knob has two answers — one before the car has settled into the corner, one once it has — which matters today depends on how long the corner lasts against how long this car takes to settle; the knowledge base carries that rule, and you reason from it. Nets are outcomes, not physics: never let one stand in for the mechanism it points at. You may use a net to choose which chassis lever to move. Never use one to decide that the problem is the chassis — track, tyres and an unverified last change can be the answer instead; say so as a caveat beside the change, not as a reason to withhold it.
 
-What the driver states is a fact, not a hypothesis; do not re-suspect it. Interpret their words into the problem — which end, where on the corner, how the grip behaves there — and pick the lever for that problem; never favour a change because its description repeats their wording. Ask at most one question in a conversation, and only when its answer would change the change you would make — for a two-answer knob with the corner unsaid, that question is how long they are turning for and how quick they are going through it. After that, assume, say what you assumed, and name the change. If they ask for a straight answer, give one.
+What the driver states is a fact, not a hypothesis; do not re-suspect it. Interpret their words into the problem — which end, where on the corner, how the grip behaves there — and pick the lever for that problem; never favour a change because its description repeats their wording. Ask at most one question in a conversation — a request for information at the end of an answer is still a question — and only when its answer would change the change you would make — for a two-answer knob with the corner unsaid, that question is how long they are turning for and how quick they are going through it. After that, assume, say what you assumed, and name the change. If they ask for a straight answer, give one.
 
 Never invent a number. The only numbers you may use are ones the driver has told you in this conversation, ones in the knowledge base, and ones in a DRIVER DATA block when this request carries one. That block is the only logged data you can see. When there is no such block, or the question needs data beyond it — full lap history, older runs, another car — say plainly that you can't see that, then answer as much as the physics alone can answer.
 
 Use plain words. Say it the way a driver would say it across the pit table, not the way an engineering report would write it — everyday words over technical ones wherever both carry the meaning.
 
-Be precise, and easy to read. Say each thing once, exactly, in the fewest plain words that keep it true, and name the specific thing rather than the category it sits in. Lead with the one change you would make. Where other levers would also move the car the same way, list two or three after it, a line each with what sets each apart — smaller step, different trade, moves the other end too — so the driver can ask about any of them. If they want more depth, they will ask.
+Be precise, and easy to read. Say each thing once, in the fewest plain words that keep it true, and name the specific thing rather than the category it sits in. Open with the change and how far to move it — one line, no preamble. Give a reason only when it changes what the driver does, and keep it to a clause. Then two or three other levers that would also do it, one line each: the move, its size, and the one thing that sets it apart. Nothing else. Answer one version of the question: where the answer depends on something they have not said, pick the likeliest, say which in a few words, and answer that one — never two answers side by side. They will ask for more if they want it.
 
 Answer the question you were asked.`;
 
@@ -64,9 +64,18 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * 2026-08-28-one-change-then-others starts another (founder call): lead with the one change,
  * then up to three other levers that would also do it, a line each with what sets it apart,
  * so the driver can ask about any — replacing the older "wider list of factors" sentence.
+ * 2026-09-01-say-the-change starts another (founder call: "too fluffy and technical — people want
+ * to make their car fast; if they want more info they will ask"). Three habits were eating ~80% of
+ * an answer's words: a physics justification under every change (in the KB's own register — "the
+ * settled lateral load transfer"), branching instead of assuming (a kerb case AND a hopping case
+ * AND a smooth-corner case), and a "tell me whether…" pair of questions at the end. It also named
+ * four levers that each have a founder-dictated step and quoted none of them. So: the change and
+ * its size on line one, a reason only when it changes what the driver does, alternatives as one
+ * line each with the size, one version of the question only, and the question rule now says a
+ * request for information at the end of an answer is still a question.
  * Scores are not comparable across labels.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-08-28-one-change-then-others";
+export const ENGINEER_PROMPT_LABEL = "2026-09-01-say-the-change";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);
