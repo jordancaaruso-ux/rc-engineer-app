@@ -4,11 +4,20 @@ import { prisma } from "@/lib/prisma";
 import { normalizeSetupData } from "@/lib/runSetup";
 import { isTuningComparisonKey } from "@/lib/setupComparison/tuningComparisonKeys";
 import { findComparableRunsForEngineer } from "@/lib/engineer/findComparableRuns";
+import {
+  getAverageTopN,
+  getBestLap,
+  getDisplayFiveMinuteStint,
+  primaryLapRowsFromRun,
+  readFiveMinStartLap,
+} from "@/lib/lapAnalysis";
+import { formatFiveMinuteStint } from "@/lib/runLaps";
+import { runLocalDayKey } from "@/lib/runs/buildRunHistoryGroups";
 import type { EngineerPayloadBlock } from "@/lib/engineer/payload";
 
 /**
- * Driver-data blocks: the driver's own latest session, its setup, and the nearest earlier
- * runs, fed to the Engineer as per-turn payload blocks.
+ * Driver-data blocks: the driver's own latest session, its setup, the rest of that day, and
+ * the nearest earlier runs, fed to the Engineer as per-turn payload blocks.
  *
  * Lineage: these are v0's Engineer-lab fact blocks (engineerChat/lab/factBlocks.ts,
  * admin-gated, measured per-rung), promoted to always-on for every user by founder call
@@ -29,6 +38,10 @@ import type { EngineerPayloadBlock } from "@/lib/engineer/payload";
  */
 
 const MAX_SETUP_ROWS = 120;
+/** A run where twenty things moved is noise, not evidence — say how many instead. */
+const MAX_CHANGES_LISTED = 8;
+/** Wide enough to hold a whole day either side of the anchor in any time zone. */
+const DAY_WINDOW_MS = 40 * 3600_000;
 
 function fmtValue(v: unknown): string | null {
   if (v == null) return null;
@@ -59,6 +72,86 @@ function fmtWhenPrecise(iso: string): string {
   return time ? `${iso.slice(0, 10)} ${time}` : iso.slice(0, 10);
 }
 
+function fmtSecs(v: number | null | undefined): string | null {
+  return v == null || !Number.isFinite(v) ? null : v.toFixed(2);
+}
+
+/**
+ * Time of day in the zone the run was logged in. A run's clock belongs to the driver who
+ * was there, not to whoever is reading — the same rule the sessions list groups on.
+ */
+function fmtLocalTime(instant: Date, zone: string | null): string {
+  try {
+    return new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: zone ?? undefined,
+    }).format(instant);
+  } catch {
+    return instant.toISOString().slice(11, 16);
+  }
+}
+
+type PaceInput = { lapTimes: unknown; lapSession: unknown };
+
+/**
+ * The three pace figures the app itself shows, from the same helpers the run card uses —
+ * so the Engineer can never quote a number the driver cannot find on screen. The stint
+ * honours a window the driver moved by hand; the other two are exclusion-aware.
+ */
+function runPace(run: PaceInput) {
+  const rows = primaryLapRowsFromRun(run);
+  const stint = getDisplayFiveMinuteStint(rows, readFiveMinStartLap(run.lapSession));
+  return {
+    lapCount: rows.length,
+    best: getBestLap(rows),
+    top5: getAverageTopN(rows, 5),
+    stint: stint ? formatFiveMinuteStint(stint, 1) : null,
+  };
+}
+
+/** The tuning keys only — the blob also carries tyres, battery, body and free text. */
+function tuningValues(data: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(normalizeSetupData(data))) {
+    if (!isTuningComparisonKey(key)) continue;
+    const value = fmtValue(raw);
+    if (value) out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * What moved between two sheets. Null — not an empty list — when either side has no
+ * readable setup: only a calibrated sheet gives values, and "nothing changed" and "we
+ * cannot see the setup" are different facts (founder call 2026-09-01).
+ */
+function diffTuning(prev: Record<string, string>, next: Record<string, string>): string[] | null {
+  if (Object.keys(prev).length === 0 || Object.keys(next).length === 0) return null;
+  const changes: string[] = [];
+  for (const key of [...new Set([...Object.keys(prev), ...Object.keys(next)])].sort()) {
+    if (sameSetupValue(prev[key], next[key])) continue;
+    changes.push(`${readableKey(key)} ${prev[key] ?? "—"} → ${next[key] ?? "—"}`);
+  }
+  return changes;
+}
+
+/**
+ * `1` and `1.0`, or `STD` and `std`, are the same setting written twice — not a change the
+ * driver made. Sheets store what was keyed, and canonicalising the box labels (2026-09-01)
+ * recased a batch of preset values, so a naive string compare reports a day's worth of
+ * changes nobody touched. Numbers compare as numbers, text ignores case and padding.
+ */
+function sameSetupValue(a: string | undefined, b: string | undefined): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  const na = Number(a);
+  const nb = Number(b);
+  if (Number.isFinite(na) && Number.isFinite(nb)) return na === nb;
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 async function loadRun(userId: string, runId: string | null) {
   return prisma.run.findFirst({
     where: runId ? { id: runId, userId } : { userId },
@@ -66,7 +159,10 @@ async function loadRun(userId: string, runId: string | null) {
     select: {
       id: true,
       createdAt: true,
+      sortAt: true,
+      localTimeZone: true,
       sessionCompletedAt: true,
+      carId: true,
       raceClass: true,
       carRating: true,
       tireRunNumber: true,
@@ -77,12 +173,13 @@ async function loadRun(userId: string, runId: string | null) {
       trackLayoutNameSnapshot: true,
       trackDirection: true,
       setupSnapshot: { select: { data: true } },
-      car: { select: { name: true, chassis: true } },
+      car: { select: { id: true, name: true, chassis: true, setupSheetModelId: true } },
       track: { select: { name: true, gripTags: true, layoutTags: true } },
       trackLayout: { select: { name: true } },
       tireType: { select: { displayName: true, modelCode: true } },
       additiveType: { select: { displayName: true } },
       lapTimes: true,
+      lapSession: true,
     },
   });
 }
@@ -112,7 +209,12 @@ function buildSessionFactsBlock(run: LoadedRun, latestFallback: boolean): string
   push("air temp °C", run.conditionsAirTempC);
   push("track temp °C", run.conditionsTrackTempC);
   push("humidity %", run.conditionsHumidityPct);
-  push("laps recorded", Array.isArray(run.lapTimes) ? run.lapTimes.length || null : null);
+
+  const pace = runPace(run);
+  push("laps recorded", pace.lapCount || null);
+  push("best lap (s)", fmtSecs(pace.best));
+  push("average of the best 5 laps (s)", fmtSecs(pace.top5));
+  push("best five minutes (laps/time)", pace.stint);
   push("driver's rating of the car (1-10)", run.carRating);
   push("session date", fmtWhen((run.sessionCompletedAt ?? run.createdAt).toISOString()));
 
@@ -140,6 +242,136 @@ function buildSetupSheetBlock(run: LoadedRun): string | null {
     "These are the values the car actually ran. Reason with them; do not read them back.",
     "",
     ...rows.sort(),
+  ].join("\n");
+}
+
+/**
+ * Every car of the SAME TYPE as the anchor's — two chassis of one model share a setup
+ * vocabulary, and a driver running both is having one conversation about one platform
+ * (founder call 2026-09-01). Falls back to the chassis string, then to the car alone.
+ */
+async function sameTypeCarIds(userId: string, car: LoadedRun["car"]): Promise<string[]> {
+  if (!car) return [];
+  const where = car.setupSheetModelId
+    ? { userId, setupSheetModelId: car.setupSheetModelId }
+    : car.chassis
+      ? { userId, chassis: car.chassis }
+      : null;
+  if (!where) return [car.id];
+  const rows = await prisma.car.findMany({ where, select: { id: true } });
+  return rows.length > 0 ? rows.map((r) => r.id) : [car.id];
+}
+
+/**
+ * The anchor's whole local day across cars of that type, plus enough history either side
+ * that the first run of the day still has a predecessor to be compared against. The day
+ * is resolved in the LOGGING device's zone (`runLocalDayKey`) — the rule the sessions list
+ * groups on — or a day straddling UTC midnight arrives here split in two.
+ */
+function loadRunsAround(userId: string, carIds: string[], centre: number) {
+  return prisma.run.findMany({
+    where: {
+      userId,
+      carId: { in: carIds },
+      sortAt: { gte: new Date(centre - DAY_WINDOW_MS), lte: new Date(centre + DAY_WINDOW_MS) },
+    },
+    orderBy: { sortAt: "asc" },
+    select: {
+      id: true,
+      createdAt: true,
+      sortAt: true,
+      localTimeZone: true,
+      sessionCompletedAt: true,
+      carId: true,
+      carRating: true,
+      tireRunNumber: true,
+      conditionsAirTempC: true,
+      lapTimes: true,
+      lapSession: true,
+      car: { select: { name: true } },
+      setupSnapshot: { select: { data: true } },
+    },
+  });
+}
+
+type DayRun = Awaited<ReturnType<typeof loadRunsAround>>[number];
+
+async function loadDayRuns(
+  userId: string,
+  anchor: LoadedRun
+): Promise<{ day: DayRun[]; predecessorOf: Map<string, DayRun> }> {
+  const carIds = await sameTypeCarIds(userId, anchor.car);
+  const predecessorOf = new Map<string, DayRun>();
+  if (carIds.length === 0) return { day: [], predecessorOf };
+
+  const rows = await loadRunsAround(userId, carIds, (anchor.sortAt ?? anchor.createdAt).getTime());
+  const anchorDay = runLocalDayKey(anchor);
+  const day = rows.filter((r) => runLocalDayKey(r) === anchorDay);
+
+  // A change belongs to ONE physical car. Two cars of a type sitting side by side in the
+  // list must never have their sheets diffed against each other — that is a car swap, not
+  // a change the driver made (founder call 2026-09-01).
+  const seenPerCar = new Map<string, DayRun>();
+  for (const r of rows) {
+    const key = r.carId ?? "unknown";
+    const prev = seenPerCar.get(key);
+    if (prev) predecessorOf.set(r.id, prev);
+    seenPerCar.set(key, r);
+  }
+  return { day, predecessorOf };
+}
+
+function buildDayBlock(
+  anchor: LoadedRun,
+  day: DayRun[],
+  predecessorOf: Map<string, DayRun>
+): string | null {
+  if (day.length < 2) return null;
+  const zone = anchor.localTimeZone ?? null;
+  const multiCar = new Set(day.map((r) => r.carId)).size > 1;
+  const lines: string[] = [];
+
+  for (const run of day) {
+    const pace = runPace(run);
+    const bits = [
+      fmtLocalTime(run.sessionCompletedAt ?? run.createdAt, zone),
+      multiCar ? (run.car?.name ?? "unknown car") : null,
+      fmtSecs(pace.best) ? `best ${fmtSecs(pace.best)}` : "no lap times",
+      fmtSecs(pace.top5) ? `top5 ${fmtSecs(pace.top5)}` : null,
+      pace.stint ? `5min ${pace.stint}` : null,
+      run.carRating != null ? `rated ${run.carRating}/10` : "not rated",
+      run.tireRunNumber != null ? `tyre run ${run.tireRunNumber}` : null,
+      run.conditionsAirTempC != null ? `${run.conditionsAirTempC}°C` : null,
+      run.id === anchor.id ? "(the session above)" : null,
+    ].filter(Boolean);
+    lines.push(bits.join("  "));
+
+    const prev = predecessorOf.get(run.id);
+    if (!prev) continue;
+    const changes = diffTuning(tuningValues(prev.setupSnapshot?.data), tuningValues(run.setupSnapshot?.data));
+    if (changes == null) continue; // No readable sheet one side — unknown, not unchanged.
+    const prevDay = fmtWhen((prev.sessionCompletedAt ?? prev.createdAt).toISOString());
+    const thisDay = fmtWhen((run.sessionCompletedAt ?? run.createdAt).toISOString());
+    const since = prevDay !== thisDay ? ` since the run of ${prevDay}` : "";
+    if (changes.length === 0) {
+      lines.push(`    no setup change${since}`);
+    } else {
+      const shown = changes.slice(0, MAX_CHANGES_LISTED).join(", ");
+      const more = changes.length > MAX_CHANGES_LISTED ? `, +${changes.length - MAX_CHANGES_LISTED} more` : "";
+      lines.push(`    changed${since}: ${shown}${more}`);
+    }
+  }
+
+  const dayLabel = fmtWhen((day[0].sessionCompletedAt ?? day[0].createdAt).toISOString());
+  const what = multiCar ? "cars of this type" : (anchor.car?.name ?? "this car");
+  return [
+    // Not "the whole day": a run logged without a car cannot be attributed to a car type,
+    // so it is absent here even though the driver was out in it.
+    `THIS DAY'S RUNS ON ${multiCar ? "CARS OF THIS TYPE" : "THIS CAR"} — ${dayLabel}, ${what}, ${day.length} runs. Earliest first.`,
+    `"changed" is what moved on the setup sheet since that same car's previous run. A run`,
+    `with no readable sheet has no "changed" line: that is unknown, not unchanged.`,
+    "",
+    ...lines,
   ].join("\n");
 }
 
@@ -177,6 +409,14 @@ export async function buildDriverDataBlocks(params: {
   if (facts) parts.push(facts);
   const setup = buildSetupSheetBlock(run);
   if (setup) parts.push(setup);
+
+  const { day, predecessorOf } = await loadDayRuns(params.userId, run).catch(() => ({
+    day: [] as DayRun[],
+    predecessorOf: new Map<string, DayRun>(),
+  }));
+  const dayBlock = buildDayBlock(run, day, predecessorOf);
+  if (dayBlock) parts.push(dayBlock);
+
   const rows = await findComparableRunsForEngineer(params.userId, run.id, { limit: 3 }).catch(
     () => []
   );
