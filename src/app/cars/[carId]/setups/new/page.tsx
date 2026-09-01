@@ -257,7 +257,7 @@ export default async function NewCarSetupPage(props: {
         </div>
       </header>
       <section className="page-body">
-        <div className="max-w-2xl">
+        <div>
           {sheetMode && car.setupSheetModelId ? (
             /*
              * The sheet opens straight into empty boxes, and that is still the default: on this

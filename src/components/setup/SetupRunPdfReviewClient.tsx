@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { PageBackLink } from "@/components/ui/PageBackLink";
@@ -41,6 +42,8 @@ function stableSetupJson(data: SetupSnapshotData): string {
 }
 
 export function SetupRunPdfReviewClient({ runId }: { runId: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [payload, setPayload] = useState<PdfReviewPayload | null>(null);
@@ -145,7 +148,12 @@ export function SetupRunPdfReviewClient({ runId }: { runId: string }) {
         const j = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(j?.error ?? `Could not generate PDF (${res.status})`);
       }
-      window.open(url, "_blank", "noopener,noreferrer");
+      // Through `/pdf-view`, never `window.open` — the PWA and iOS shell show a bare PDF with no
+      // way back (founder report, 2026-09-01). The fetch above already forced the render, so the
+      // frame loads instantly.
+      router.push(
+        `/pdf-view?run=${encodeURIComponent(runId)}${pathname ? `&back=${encodeURIComponent(pathname)}` : ""}`
+      );
     } catch (err) {
       setPdfError(err instanceof Error ? err.message : "Could not generate PDF.");
     }

@@ -51,3 +51,14 @@ test("the A800 option list still parses its own values into preset vs free text"
   const foreign = getPresetWithOtherFromData({ chassis: "GRAPHITE" }, "chassis", A800_CHASSIS_OPTIONS);
   assert.deepEqual(foreign, { selectedPreset: "", otherText: "GRAPHITE" });
 });
+
+test("a schema-minted value token matches its label — hyphen and underscore compare equal", () => {
+  // A sheet tick arrives as the minted value (`c01b_raf`); the label prints `C01B-RAF`. Treating
+  // the separator as a difference demoted real ticks into "Other" (founder report, 2026-09-01).
+  const fromValueToken = getPresetWithOtherFromData(
+    { chassis: "c01b_raf" },
+    "chassis",
+    A800_CHASSIS_OPTIONS
+  );
+  assert.deepEqual(fromValueToken, { selectedPreset: "C01B-RAF", otherText: "" });
+});

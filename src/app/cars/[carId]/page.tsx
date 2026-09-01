@@ -196,7 +196,7 @@ export default async function CarDetailPage(props: {
         </div>
       </header>
       <section className="page-body">
-        <div className="max-w-2xl space-y-4">
+        <div className="space-y-4">
           {/*
             Making a setup is its own job, so it gets its own door at the top of the page — the same
             full-width bar the Garage opens with (founder call 2026-08-11). It used to be a link in

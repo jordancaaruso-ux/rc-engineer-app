@@ -201,7 +201,7 @@ export default async function CarManagerPage({
         </div>
       </header>
       <section className="page-body">
-        <div className="max-w-2xl space-y-4">
+        <div className="space-y-4">
           {uploadCars.length > 0 ? (
             <UploadSetupSheetBar cars={uploadCars} preselectCarId={preselectCarId} />
           ) : null}

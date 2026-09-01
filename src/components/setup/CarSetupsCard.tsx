@@ -192,12 +192,13 @@ export function CarSetupsCard({
               className="flex items-center justify-between gap-3 border-b border-border/60 px-1 py-2.5 last:border-0"
             >
               <Link
-                // A run's record opens read-only; only a setup nothing has run opens the editor.
-                href={
-                  s.usedInRuns > 0
-                    ? `/cars/${carId}/setups/${s.id}`
-                    : `/cars/${carId}/setups/${s.id}/edit`
-                }
+                /*
+                  Always the READ view. A never-run setup used to skip straight into the editor
+                  ("only a setup nothing has run opens the editor") — which meant a setup imported
+                  from a PDF landed on the fill surface with no Compare, no PDF, no share (founder,
+                  2026-09-01, off his phone). Edit is one tap away on the page this opens.
+                */
+                href={`/cars/${carId}/setups/${s.id}`}
                 className="min-w-0 flex-1"
               >
                 <div className="truncate text-sm text-foreground">{s.name ?? "Untitled setup"}</div>

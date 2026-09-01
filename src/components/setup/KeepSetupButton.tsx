@@ -21,11 +21,14 @@ export function KeepSetupButton({
   setupId,
   name,
   initialSaved,
+  className,
 }: {
   setupId: string;
   /** The title on screen. Becomes the setup's name when it doesn't have one yet. */
   name: string;
   initialSaved: boolean;
+  /** Sizing overrides for the row it sits in — cn is tailwind-merge, so these win. */
+  className?: string;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -71,6 +74,7 @@ export function KeepSetupButton({
         onClick={() => void toggle()}
         disabled={busy}
         aria-pressed={saved}
+        title={saved ? "Saved" : "Save"}
         className={outlineButtonClassName(
           cn(
             /*
@@ -80,7 +84,8 @@ export function KeepSetupButton({
              */
             "gap-1.5 disabled:opacity-50",
             saved &&
-              "border-primary-ink/40 bg-primary/10 text-primary-ink hover:border-primary-ink/40 hover:bg-primary/15"
+              "border-primary-ink/40 bg-primary/10 text-primary-ink hover:border-primary-ink/40 hover:bg-primary/15",
+            className
           )
         )}
       >

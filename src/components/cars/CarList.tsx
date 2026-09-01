@@ -633,17 +633,13 @@ export function CarList({
                           {setups.map((s) => (
                             <li key={s.id}>
                               {/*
-                                Straight to the editor for a setup nothing depends on. One a run
-                                points at opens its detail page first, the same as the car page's
-                                saved list — the editor there means "correct that run", which is
-                                not what tapping a name from the Garage is asking for.
+                                Always the READ view — same door as the car page's saved list.
+                                A never-run setup used to skip straight into the editor, which
+                                meant a PDF import opened on the fill surface with no Compare, no
+                                PDF, no share (founder, 2026-09-01). Edit is one tap away there.
                               */}
                               <Link
-                                href={
-                                  s.usedInRuns > 0
-                                    ? `/cars/${c.id}/setups/${s.id}`
-                                    : `/cars/${c.id}/setups/${s.id}/edit`
-                                }
+                                href={`/cars/${c.id}/setups/${s.id}`}
                                 onClick={() => haptic("light")}
                                 className="tap-active flex items-center gap-3 border-b border-border/50 py-2 last:border-0"
                               >

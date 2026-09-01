@@ -11,7 +11,7 @@ import {
   type BaselineSetupKindValue,
 } from "@/lib/baselineSetups/baselineSetupShape";
 import { ReadOnlySetupSheet } from "@/components/setup/ReadOnlySetupSheet";
-import { ReadOnlySheetSurface } from "@/components/setup/ReadOnlySheetSurface";
+import { SetupSheetCompareView } from "@/components/setup/SetupSheetCompareView";
 import { CopyBaselineButton } from "@/components/setup/CopyBaselineButton";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
@@ -106,9 +106,12 @@ export default async function CarBaselineViewPage(props: {
       </header>
 
       <section className="page-body max-w-4xl">
-        <div className="flex flex-wrap items-center gap-2">
-          <CopyBaselineButton carId={car.id} baselineId={baseline.id} name={baseline.name} />
-        </div>
+        {/* On a sheetless chassis the compare view isn't rendered, so the row is drawn here. */}
+        {!(sheetMode && car.setupSheetModelId) ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <CopyBaselineButton carId={car.id} baselineId={baseline.id} name={baseline.name} />
+          </div>
+        ) : null}
 
         <p className="ui-caption px-1">
           Published for every {template.label} driver, so it can&apos;t be changed here. Save a copy
@@ -122,9 +125,20 @@ export default async function CarBaselineViewPage(props: {
         ) : null}
 
         {sheetMode && car.setupSheetModelId ? (
-          <ReadOnlySheetSurface
+          /*
+            Compare reaches a baseline too (founder call 2026-08-31). A published baseline sits in
+            the car's "All setups" list beside every other row, so finding it the one row that
+            cannot be held against your own setup would read as the feature being broken.
+            Baselines live in their own table and are in none of the picker pools, so unlike a saved
+            setup there is nothing here to exclude from its own list.
+          */
+          <SetupSheetCompareView
             setupSheetModelId={car.setupSheetModelId}
             values={normalizeSetupData(baseline.data)}
+            label={baseline.name}
+            leadingActions={
+              <CopyBaselineButton carId={car.id} baselineId={baseline.id} name={baseline.name} />
+            }
             templateKey={template.templateKey}
             labLabels={{ s: baseline.name }}
           />
