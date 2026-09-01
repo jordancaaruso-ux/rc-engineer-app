@@ -103,9 +103,17 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * guides spoke, not lever strength, so they are no longer rendered (netsSchema.ts) and the nets
  * header now says every entry carries the same weight. Tags stay in the YAML; one commit restores
  * them. CONTESTED claims still render and the prompt's contested sentence still applies.
+ * 2026-09-01-rc-direction-guard starts another (founder call: "add something deterministic that
+ * means the engineer can never get the direction of rc wrong"). The model inverted a roll-centre
+ * move a second time ("raise the RC with upper-outer removed or upper-inner added" — both lower
+ * it) and sized it as an RC distance ("by 0.25 mm" — one chassis's shim/RC coincidence, per the
+ * founder). rcDirections.ts now (1) renders a goal→move table into the nets block, derived from
+ * the founder-owned words lines so it cannot drift, and (2) checks every finished reply in code:
+ * a shim-move/RC-direction contradiction or an RC-distance claim gets its correction appended to
+ * the stream and the stored message. upper-link-geometry.md carries the sizing ruling.
  * Scores are not comparable across labels.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-09-01-no-confidence-tiers";
+export const ENGINEER_PROMPT_LABEL = "2026-09-01-rc-direction-guard";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);

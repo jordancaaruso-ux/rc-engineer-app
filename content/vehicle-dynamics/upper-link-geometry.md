@@ -30,7 +30,11 @@ it moves RC without taking camber gain with it.
 
 **Removing** shims reverses each. The two upper-link ends run **opposite senses** and are **equal in
 strength** (~0.5 mm of RC each); the **under-lower-arm and under-hub shims move the roll centre
-about twice as far** as either upper-link end.
+about twice as far** as either upper-link end. The upper links' near-1:1 is **this chassis's
+coincidence, not a rule** (founder, 2026-09-01) — the shim-to-RC ratio changes car to car, and on
+the other keys it is nowhere near 1:1 even here. So a move is **sized in shim millimetres and never
+quoted as a roll-centre distance**: say what shim to change and which way the roll centre goes,
+never how far it goes.
 
 **What each key leans toward, relative to the others.** All four move camber gain by a similar
 amount — −0.015 to −0.019° per mm of bump for a 0.5 mm shim (solver-verified 2026-08-27) — while

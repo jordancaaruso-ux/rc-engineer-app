@@ -97,6 +97,7 @@
     "test:sheet-layout": "node --conditions=react-server --import tsx --test src/lib/setupSheetModels/layoutCanvasOps.test.ts src/lib/setupSheetModels/layoutGroupOps.test.ts src/lib/setupSheetModels/layoutEditorOps.test.ts src/lib/setupSheetModels/inferStructuredLayout.test.ts",
     "test:cross-model-disambig": "node --conditions=react-server --import tsx src/lib/setupCalibrations/crossModelDisambiguation.test.ts",
     "test:engineer-ratings": "npx tsx src/lib/engineer/ratings.test.ts",
+    "test:rc-guard": "npx tsx --test src/lib/engineer/rcDirections.test.ts",
     "test:primary-driver": "npx tsx src/lib/lapImport/pickPrimarySessionDriver.test.ts",
     "test:speedhive-identity": "npx tsx --test src/lib/speedhive/speedhiveDriverNames.test.ts src/lib/speedhive/speedhiveTransponder.test.ts",
     "verify:speedhive-import": "node --conditions=react-server --import tsx scripts/verify-speedhive-import.ts",

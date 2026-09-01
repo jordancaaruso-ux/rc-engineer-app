@@ -8,6 +8,7 @@ import {
   validateNetEntry,
   type NetEntry,
 } from "@/lib/engineer/netsSchema";
+import { rcLeversFromNets, rcMovesBlock } from "@/lib/engineer/rcDirections";
 
 /**
  * Loader for the nets artifact (content/nets/ — empirical setup priors; authoring rules in
@@ -136,8 +137,13 @@ export async function loadNets(params?: { discipline?: string | null }): Promise
       sections.push(NETS_DRAFTS_DIVIDER, ...drafts.entries.map(renderNetEntry));
     }
 
+    // The goal→move roll-centre table, derived from the founder-owned words lines so it can
+    // never drift from them (rcDirections.ts — the model inverts RC→shim lookups it derives
+    // itself). Rendered ahead of the entries, still inside the cache-stable nets block.
+    const rcTable = rcMovesBlock(rcLeversFromNets([...reviewed, ...drafts.entries]));
+
     return {
-      text: sections.join("\n\n"),
+      text: [rcTable, ...sections].filter((s) => s.length > 0).join("\n\n"),
       files: reviewedFiles,
       draftFiles: drafts.included,
       entries: [...reviewed, ...drafts.entries],

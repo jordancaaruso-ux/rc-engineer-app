@@ -2,6 +2,7 @@ import "server-only";
 
 import { loadFullVehicleDynamicsKb } from "@/lib/engineer/kb";
 import { ENGINEER_NETS_HEADER, loadNets } from "@/lib/engineer/nets";
+import { rcGuardCorrections, rcLeversFromNets } from "@/lib/engineer/rcDirections";
 import { engineerOpenAiUserMessage } from "@/lib/openAiRetry";
 import {
   buildEngineerMessages,
@@ -117,13 +118,28 @@ export async function generateEngineerChatReply(params: {
     throw new Error(engineerOpenAiUserMessage(rawMsg));
   }
 
-  const reply =
+  let reply =
     res.streamResult != null
       ? (res.streamResult.content ?? "").trim()
       : (
           (res.data?.choices as Array<{ message?: { content?: string } }> | undefined)?.[0]?.message
             ?.content ?? ""
         ).trim();
+
+  // Deterministic roll-centre direction guard (rcDirections.ts, founder call 2026-09-01):
+  // a shim-move/RC-direction pairing that contradicts the solver-checked table, or a move
+  // sized as a roll-centre distance, gets its correction appended — to the live stream too,
+  // which is still open here — so an inverted direction never reaches the driver uncorrected.
+  if (reply) {
+    const netsForGuard = await loadNets({ discipline: "touring" });
+    const corrections = rcGuardCorrections(reply, rcLeversFromNets(netsForGuard.entries));
+    if (corrections.length > 0) {
+      const tail = "\n\n" + corrections.join("\n");
+      console.warn(`[engineer-rc-guard] ${corrections.length} correction(s) appended: ${corrections.join(" | ")}`);
+      params.onToken?.(tail);
+      reply += tail;
+    }
+  }
 
   return {
     reply:
