@@ -115,7 +115,7 @@ export default async function TrackDetailPage(props: {
         </div>
       </header>
       <section className="page-body">
-        <div className="max-w-2xl space-y-4">
+        <div className="space-y-4">
           <CardPanel contentClassName="text-[13px]">
             <div className="grid gap-2">
               <div><span className="font-medium text-muted-foreground">Created</span> <span className="ml-2 fig-stat">{formatRunCreatedAtDateTime(track.createdAt, displayTimeZone)}</span></div>

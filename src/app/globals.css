@@ -1486,6 +1486,20 @@ html[data-nav-pending] .page {
   display: none;
 }
 
+/* Below md both corners of the screen are FIXED chrome — the back circle / brand
+   mark on the left (ends 56px in: 20px inset + 36px circle) and AccountMenu's
+   avatar on the right — and the title block used to span the full header width,
+   so a long name ran UNDER both circles and its ellipsis hid beneath the avatar
+   (founder, 2026-09-01, off his phone). The compact `.title-condenser` has
+   always inset itself for this; the full-size title now does too. 40px on top of
+   the header's 1.25rem padding puts the text box at 60px from either edge —
+   clear of the back circle with room to spare before the avatar. */
+@media (max-width: 767.98px) {
+  .page-header div:has(> .page-title) {
+    margin-inline: 40px;
+  }
+}
+
 /* ---------------------------------------------------------------------------
    `is-echo` — the title the desktop rail already says (founder call 2026-08-13)
 
@@ -1561,6 +1575,11 @@ html[data-nav-pending] .page {
   line-height: 1.15;
   position: relative;
   width: fit-content;
+  /* Without this, `truncate` on a long title never fires: its nowrap makes the
+     text's min-content the WHOLE string, and `width: fit-content` then grows the
+     box past the container instead of shrinking — so the ellipsis has nothing to
+     do and the name runs under the corner chrome (founder, 2026-09-01). */
+  max-width: 100%;
   margin-inline: auto;
   padding-bottom: 10px;
   @apply text-foreground;
@@ -1911,6 +1930,24 @@ html[data-nav-pending] .page {
   .page-body {
     padding-left: max(2rem, env(safe-area-inset-left));
     padding-right: max(2rem, env(safe-area-inset-right));
+    /*
+     * One desktop measure for the whole app (founder call, 2026-08-29: "use the dashboard
+     * padding for everything"). Every page now runs to the dashboard's 1760px cap with the
+     * same gutters, instead of the per-page max-w-2xl/3xl/4xl/6xl clamps that left settings,
+     * the log-run wizard, Paddock and a run page as a narrow column in the middle of a 1440
+     * monitor.
+     *
+     * It has to be HERE and it has to be plain CSS. `.page-body` is UNLAYERED and Tailwind 4
+     * puts utilities in `@layer utilities`, so this beats every `max-w-*` sitting on a call
+     * site regardless of source order (the trap `.dash-wide` documents below) — which is why
+     * the clamps could be retired from one rule instead of edited at 28 call sites. The
+     * `-wide` classes further down now set the identical cap and are redundant as widths,
+     * kept because their pages also hang a desktop grid off the class name.
+     *
+     * No phone or tablet effect: below 1024px the per-page clamps still stand, and the phone
+     * column is narrower than all of them anyway.
+     */
+    max-width: 110rem; /* 1760px — the dashboard axis */
   }
 }
 
@@ -1977,25 +2014,17 @@ html[data-nav-pending] .page {
     display: none;
   }
 
-  /* The mirror of `.page-body`'s clamp. Adjacent-sibling `:has()` rather than a
-     class on the header, because the header is always the element immediately
-     before `.page-body` (verified across all 60 call sites) and this way a page
-     cannot align its title to a column it no longer has. Equal specificity, so
-     the `-wide` overrides must stay last — same reason they win on the body. */
-  .page-header:has(+ .page-body.max-w-md) { max-width: 28rem; }
-  .page-header:has(+ .page-body.max-w-lg) { max-width: 32rem; }
-  .page-header:has(+ .page-body.max-w-2xl) { max-width: 42rem; }
-  .page-header:has(+ .page-body.max-w-3xl) { max-width: 48rem; }
-  .page-header:has(+ .page-body.max-w-4xl) { max-width: 56rem; }
-  .page-header:has(+ .page-body.max-w-6xl) { max-width: 72rem; }
-  .page-header:has(+ .page-body.dash-wide),
-  .page-header:has(+ .page-body.events-wide),
-  .page-header:has(+ .page-body.lab-wide),
-  .page-header:has(+ .page-body.laps-wide),
-  .page-header:has(+ .page-body.tools-wide) { max-width: 110rem; }
-  /* Engineer's clamp is `lg:`-prefixed; the escaped class name is not something to
-     put in a selector, so the page carries a plain marker for the mirror. */
-  .page-header:has(+ .page-body.engineer-wide) { max-width: 72rem; }
+  /*
+   * The header sits on the body's axis, and since 2026-08-29 there is only one axis: the body
+   * runs to 110rem on every page (see `.page-body` above), so the header takes the same cap
+   * flat rather than mirroring a per-page clamp off its next sibling. The old
+   * `:has(+ .page-body.max-w-*)` mirror list went with the clamps it mirrored — leaving it in
+   * would have pinned a title at 56rem while its cards ran on to 110rem, because `:has()`
+   * takes the specificity of its argument and so outranks this rule.
+   */
+  .page-header {
+    max-width: 110rem; /* 1760px — same as `.page-body` */
+  }
 
   /*
    * Back-arrow pages. The arrow hangs in the gutter, OUTSIDE the column, so the
@@ -2162,9 +2191,9 @@ html[data-nav-pending] .page {
    Geometry Lab desktop shell (2026-08-13). Third page on the 1760px axis.
 
    The Lab was a 672px phone column at every width, so on a desktop you turned a
-   shim knob at the bottom of the page and had to scroll up to see the schematic
+   shim slider at the bottom of the page and had to scroll up to see the schematic
    move — the one thing the tool exists to show. At xl it becomes a three-region
-   instrument (knobs | drawing | readouts) laid out by `RollCenterLabClient`'s
+   instrument (sliders | drawing | readouts) laid out by `RollCenterLabClient`'s
    own `xl:grid`; only the cap lives here.
 
    Same `@layer` trap as `.dash-wide` and `.events-wide`: `.page-body` is
@@ -2211,10 +2240,10 @@ html[data-nav-pending] .page {
     max-width: 110rem; /* 1760px */
   }
 
-  /* Two tracks: knobs on the left, the drawing and its readout on the right, the
+  /* Two tracks: sliders on the left, the drawing and its readout on the right, the
      slower reading (migration, sensitivities, change list) beneath. Explicit
      placement, not source order — on a phone you meet the drawing before the
-     knobs, on a desktop the knobs are the hand you keep on the tool. */
+     sliders, on a desktop the sliders are the hand you keep on the tool. */
   .lab-grid {
     display: grid;
     grid-template-columns: 21rem minmax(0, 1fr);
@@ -3422,16 +3451,19 @@ body.has-setup-handoff .page-body {
    Here the arrow rejoins the flow as the first thing in the column, so its left
    edge is the cards' left edge and the title follows it on the same line.
    Scoped to pages that opt in — every other back-arrow page keeps the gutter.
---------------------------------------------------------------------------- */
-.page-header.back-in-column {
-  justify-content: flex-start;
-  gap: 0.625rem;
-}
 
-.page-header.back-in-column a[aria-label="Back"] {
-  position: static;
-  transform: none;
-}
+   xl and up ONLY. That is the width from which every page title in the app is
+   left-aligned as the top of its card column (the block above), so a title after
+   an in-flow arrow lands on the same axis as every other title. Below xl the app
+   centres every title, and this page must centre too: from 2026-08-27 to
+   2026-08-29 the in-flow arrow applied from md, which left this one page with a
+   flush-left title on a tablet or a half-width window while every other page was
+   centred ("the laptime analysis heading is to the left? All need to be centered",
+   founder, 2026-08-29). Below md the fixed mobile chrome turns its top-left pill
+   into the back control and the header's own arrow hides itself, so a phone was
+   never affected. Between md and xl the app-wide rule already pins the arrow at
+   the header's padding edge — the cards' edge — with the title centred beside it.
+--------------------------------------------------------------------------- */
 
 /* The gutter widening exists to make room for an arrow that hangs outside the
    column. Nothing hangs outside here, so the page keeps the ordinary gutter and
@@ -3441,5 +3473,14 @@ body.has-setup-handoff .page-body {
   .page:has(.page-header.back-in-column) .page-body {
     padding-left: max(2rem, env(safe-area-inset-left));
     padding-right: max(2rem, env(safe-area-inset-right));
+  }
+
+  .page-header.back-in-column {
+    gap: 0.625rem;
+  }
+
+  .page-header.back-in-column a[aria-label="Back"] {
+    position: static;
+    transform: none;
   }
 }

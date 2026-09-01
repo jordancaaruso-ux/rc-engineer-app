@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { formatRunDateOnly } from "@/lib/formatDate";
 import { loadEventsSeasonModel } from "@/lib/events/seasonModel";
+import { todayYmdInTimeZone } from "@/lib/eventActive";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
 import { trackCatalogScopeWhere, type TrackCatalogViewer } from "@/lib/tracks/communityTrackAccess";
 import { lastRunAtMsByCarId, orderCarsByRecentUse } from "@/lib/cars/orderCarsByRecentUse";
@@ -55,7 +56,7 @@ export async function loadPaddockModel(input: {
   ] = await Promise.all([
     // `year: null` is all-time, not "the newest year with events" — a meeting booked for
     // next January must still be the next one up while it is still December.
-    loadEventsSeasonModel({ userId, year: null }),
+    loadEventsSeasonModel({ userId, year: null, todayYmd: todayYmdInTimeZone(timeZone) }),
     prisma.car.findMany({
       where: { userId },
       // Only the tie-break; re-sorted below by most recent USE, which this query can't see.

@@ -119,3 +119,8 @@ dev-server.log
 
 # Uploaded source material (Invisible Speed transcripts etc) - copyrighted, never committed
 .local-sources/
+
+# One-off data dumps taken from production, and driver-supplied sheets. Real users' rows and
+# other people's documents: kept on disk when needed, never written into git history.
+scripts/*backup-prod-*.json
+scripts/tmp-*.pdf

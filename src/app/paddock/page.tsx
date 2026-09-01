@@ -94,14 +94,13 @@ export default async function PaddockPage(): Promise<ReactNode> {
       </header>
 
       {/*
-        The clamp goes on `.page-body`, not on an inner div: `.page-body` carries
-        `margin-inline: auto`, so the column only centres when the max-width is on IT — and
-        `.page-header` mirrors the clamp off its next sibling (`:has(+ .page-body.max-w-4xl)`)
-        to keep the title on the same axis as the cards at xl+. An inner clamp gets neither,
-        which is how the first build ended up with 1024px of content jammed against the left
-        edge of a 1440px window. `max-w-4xl` and not `5xl` because the mirror list has no
-        5xl rule, and a `lg:`-prefixed clamp cannot be mirrored at all — the escaped class
-        name is not usable in a selector (see the note by `engineer-wide` in globals.css).
+        `max-w-4xl` only governs the tablet band now. From 1024px `.page-body` takes the
+        app-wide 1760px measure (globals.css, 2026-08-29) and wins outright — it is unlayered
+        CSS and this is a Tailwind utility — so the page runs the full width like the dashboard.
+        The class stays because between 768 and 1023px it is still the clamp, and it stays on
+        `.page-body` rather than an inner div: `.page-body` carries `margin-inline: auto`, so a
+        clamped column only CENTRES when the max-width is on it. An inner clamp is how the first
+        build ended up with 1024px of content jammed against the left edge of a 1440px window.
       */}
       <section className="page-body max-w-4xl">
         {/*
@@ -153,22 +152,27 @@ export default async function PaddockPage(): Promise<ReactNode> {
             was the label and its `+` floating in the gutter above the card, and the `mt-5` those
             rows carried is the only thing this page still owes them: the gap between the hero and
             the bands. The wide column's `<div>` stays even when the cars band renders null — a
-            brand-new account has no cars — because Tracks is what holds that column open now.
+            brand-new account has no cars — because Events is what holds that column open now.
           */}
           {/*
-            Tracks sits above Tyres (founder call, 2026-08-19), which on the phone is simply the
-            order you read them in, and on desktop puts Tracks under Cars in the WIDE column and
-            sends Tyres across to join Additives. The earlier argument for Tyres-beside-the-garage
-            lost to a plainer one: tracks are a place you go, tyres are a thing you buy, and the
-            two consumable catalogs read better as a pair. The column split is unchanged — two
-            bands left, three right — so the heights land where they did before.
+            Band order is a straight ranking, given as one (founder call, 2026-08-29): events,
+            cars, tracks, tyres, additives. Events used to sit LAST, on the argument that the band
+            is empty most weeks; the ranking overrides that — a meeting you have entered outranks
+            a cupboard you might restock, and the hero directly above is about the same weekend.
+
+            The DOM order IS the phone order (one column below `lg`), so the ranking has to read
+            straight down these two divs: everything before the split lands in the WIDE left
+            column, everything after it in the narrow right one. The split stays where it was —
+            two bands left, three right — so each band simply moves down one slot and the columns
+            keep roughly the heights they had. Measure before moving anything else.
           */}
           <div className="mt-5 space-y-5">
+            <PaddockMeetings meetings={model.upcoming} total={model.meetingTotal} />
             {hasCars ? <PaddockCars cars={model.cars} total={model.carTotal} /> : null}
-            <PaddockTracks tracks={model.tracks} catalogCount={model.trackCatalogCount} />
           </div>
 
           <div className="mt-5 space-y-5">
+            <PaddockTracks tracks={model.tracks} catalogCount={model.trackCatalogCount} />
             <PaddockConsumables
               label="Tyres"
               items={model.tires}
@@ -201,8 +205,6 @@ export default async function PaddockPage(): Promise<ReactNode> {
                   : "Browse the catalog"
               }
             />
-            {/* Meetings stays last, as it was put deliberately: the band is empty most weeks. */}
-            <PaddockMeetings meetings={model.upcoming} total={model.meetingTotal} />
           </div>
         </div>
       </section>

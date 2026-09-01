@@ -69,7 +69,7 @@ export default async function TiresPage(props: {
         </div>
       </header>
       <section className="page-body">
-        <div className="max-w-2xl">
+        <div>
           <TireGaragePanel initialTireTypes={tireTypes} isAdmin={isAdmin} />
         </div>
       </section>

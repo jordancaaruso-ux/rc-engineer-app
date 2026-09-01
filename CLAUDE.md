@@ -142,6 +142,11 @@ read it to find the right north star, then read that.
   dock visible. **One theme since 2026-08-18** — ash paper, stamped as `data-theme="light"` by
   `src/lib/theme/appTheme.ts`; there is no switch and no `rc_theme` cookie. The dark values remain
   as the `:root` ground that paper overrides, so build for paper and don't add a second theme path.
+- **No explanatory blurbs in the UI.** Do not write helper paragraphs telling the driver how a
+  feature works ("Upload your video on the next screen...", "Their crossings are found from their
+  own lap times..."). They read as clutter, especially at 390px, and the control should explain
+  itself. A label, a placeholder, or a few words on the button is the whole budget. If a screen
+  genuinely cannot be understood without a sentence, ask first instead of shipping the paragraph.
 - **Delta sign convention:** lap deltas are `cell − anchor`, so **positive = slower**. Pace vs field
   is user − field, so **negative = faster than the field**.
 - **Canonical units:** lap times in seconds, temperatures °C, wind km/h, geometry mm and degrees,

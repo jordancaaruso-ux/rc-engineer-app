@@ -326,7 +326,7 @@ function buildGeometry(comparable: Comparable[], timeZone: string): ToolsGeometr
       sourceLabel: sourceLabel || formatRunDateOnly(latest.run.createdAt, timeZone),
       /*
        * Seeded with the run it came from, not just the geometry slice. The slice alone opens the
-       * Lab in knobs-only mode; naming the source lets it fetch the whole setup and draw the
+       * Lab in sliders-only mode; naming the source lets it fetch the whole setup and draw the
        * sheet, which is what makes "open the lab" continue this setup rather than start a blank.
        */
       labHref: `/analysis/roll-center?s=${encodeLabSlot({
