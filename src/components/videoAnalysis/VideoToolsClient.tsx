@@ -1,16 +1,26 @@
 "use client";
 
 /**
- * Slim Video tools page (VIDEO_ANALYSIS_REWORK Phase A): recent analysis
- * sessions + the video library (both resurrected from orphaned components) +
- * the advanced worker lane. Sessions stay the real home — this is the door for
- * cross-run work and orphan videos.
+ * The Video page: start an analysis, open one you have made, keep a file in the library.
+ *
+ * Three cards across on a desktop, one column on a phone — the same grid and the same measure
+ * as Tools, which is the page this one opens from (founder call 2026-09-02: "the whole screen,
+ * same borders as the dashboard"). It had been a 672px column with the start button on another
+ * page again; now the track picker is the first card, so "+ Add a video" on Tools lands one tap
+ * from the video itself.
+ *
+ * Both lists stop at three rows with a "View more" under them (2026-09-03). Drawing every
+ * analysis ever made was what made this page metres long. The worker-JSON lane that used to
+ * sit under a `<details>` here is gone — it was two paragraphs and no link, and the worker's own
+ * job page still exists for the one person who runs it.
  */
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Film, Play, Upload } from "lucide-react";
-import { Eyebrow } from "@/components/ui/panel";
+import { BandHeader } from "@/components/ui/BandHeader";
+import { CardPanel } from "@/components/ui/CardPanel";
+import { NewAnalysisCard } from "@/components/videoAnalysis/NewAnalysisCard";
 import { uploadVideoToLibrary } from "@/lib/videos/clientUpload";
 
 type JobRow = {
@@ -33,9 +43,41 @@ type VideoRow = {
   bytes: number;
 };
 
-function jobStatusLabel(j: JobRow): string {
-  if (j.hasResult) return "Analyzed";
-  if (j.hasManual) return "Sync in progress";
+/**
+ * How many rows a list card shows before "View more".
+ *
+ * Founder call 2026-09-03: every analysis ever made was drawn at once, so the page ran metres
+ * long and the Start button — level with the foot of the tallest card — sat off the bottom of
+ * the monitor. Three is a glance at what you were last working on; the rest is one tap away.
+ */
+const PREVIEW_ROWS = 3;
+
+/** The quiet footer that opens the rest of a list. */
+function MoreRow({
+  hidden,
+  open,
+  onToggle,
+}: {
+  hidden: number;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  if (hidden <= 0) return null;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="tap-active border-t border-border/60 px-4 py-2.5 text-left text-[12px] font-semibold text-muted-foreground transition hover:bg-muted/40 hover:text-foreground"
+    >
+      {open ? "Show fewer" : `View more (${hidden})`}
+    </button>
+  );
+}
+
+/** The driver's word for where a session got to — muted text, never a coloured pill. */
+function jobStateWord(j: JobRow): string {
+  if (j.hasResult) return "analysed";
+  if (j.hasManual) return "in progress";
   return j.status.toLowerCase();
 }
 
@@ -50,8 +92,12 @@ export function VideoToolsClient() {
   /** null = idle; a number = uploading, 0–100. */
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [allJobs, setAllJobs] = useState(false);
+  const [allVideos, setAllVideos] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const uploading = uploadPct !== null;
+  const shownJobs = allJobs ? (jobs ?? []) : (jobs ?? []).slice(0, PREVIEW_ROWS);
+  const shownVideos = allVideos ? (videos ?? []) : (videos ?? []).slice(0, PREVIEW_ROWS);
 
   useEffect(() => {
     void fetch("/api/video-analysis/jobs")
@@ -83,106 +129,94 @@ export function VideoToolsClient() {
   }
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
-      <section className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Eyebrow>Recent analysis sessions</Eyebrow>
-          <Link
-            href="/videos/analysis/manual/new"
-            className="rounded-lg primary-face bg-primary px-3 py-1.5 text-[11.5px] font-semibold text-primary-foreground no-underline transition-colors hover:bg-[#E6BE00]"
-          >
-            New analysis
-          </Link>
-        </div>
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+      <NewAnalysisCard stretch />
+
+      <CardPanel className="h-full" contentClassName="flex h-full flex-col p-0">
+        <BandHeader label="Analyses" />
         {jobs === null ? null : jobs.length === 0 ? (
-          <p className="rounded-lg border border-border bg-secondary/50 px-3 py-3 text-xs text-muted-foreground">
-            No analysis sessions yet. Start one from a run&apos;s Video section, or with New
-            analysis above.
-          </p>
+          <p className="px-4 py-3 text-[13px] text-muted-foreground">Nothing analysed yet.</p>
         ) : (
-          <ul className="space-y-1.5">
-            {jobs.slice(0, 12).map((j) => (
-              <li
-                key={j.id}
-                className="flex items-center gap-2.5 rounded-lg border border-border bg-secondary/50 px-3 py-2.5"
-              >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background/50 text-muted-foreground">
-                  <Play className="h-3.5 w-3.5" aria-hidden />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <Link
-                    href={`/videos/analysis/jobs/${encodeURIComponent(j.id)}`}
-                    className="block truncate text-[12.5px] font-semibold tracking-tight text-foreground no-underline hover:underline"
-                  >
-                    {j.track?.name ?? "Track"} — {j.profile?.name ?? "camera"}
-                  </Link>
-                  <span className="type-timestamp block truncate">
-                    {new Date(j.createdAt).toLocaleDateString()} · {jobStatusLabel(j)}
+          <ul>
+            {shownJobs.map((j) => (
+              <li key={j.id} className="border-b border-border/60 last:border-b-0">
+                <Link
+                  href={`/videos/analysis/jobs/${encodeURIComponent(j.id)}`}
+                  className="tap-active flex items-center gap-3 px-4 py-2.5 no-underline transition hover:bg-muted/40"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background/50 text-muted-foreground">
+                    <Play className="h-3.5 w-3.5" aria-hidden />
                   </span>
-                </span>
-                {j.run ? (
-                  <Link
-                    href={`/runs/history`}
-                    className="shrink-0 rounded-md border border-border bg-muted px-1.5 py-0.5 micro-caps text-muted-foreground no-underline hover:text-foreground"
-                    title={j.run.sessionLabel ?? "Linked run"}
-                  >
-                    Run ↗
-                  </Link>
-                ) : (
-                  <span className="shrink-0 micro-caps text-faint">
-                    No run
+                  <span className="min-w-0 flex-1">
+                    <span className="ui-title block truncate text-[13px] font-semibold text-foreground">
+                      {j.track?.name ?? "Track"}
+                      {j.profile?.name ? (
+                        <span className="font-normal text-muted-foreground"> · {j.profile.name}</span>
+                      ) : null}
+                    </span>
+                    <span className="ui-caption mt-0.5 block truncate">
+                      {new Date(j.createdAt).toLocaleDateString()}
+                      {j.run ? ` · ${j.run.sessionLabel ?? "on a run"}` : ""}
+                    </span>
                   </span>
-                )}
+                  <span className="type-timestamp shrink-0">{jobStateWord(j)}</span>
+                </Link>
               </li>
             ))}
           </ul>
         )}
-      </section>
+        <MoreRow
+          hidden={(jobs?.length ?? 0) - PREVIEW_ROWS}
+          open={allJobs}
+          onToggle={() => setAllJobs((v) => !v)}
+        />
+      </CardPanel>
 
-      <section className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Eyebrow>Library</Eyebrow>
-          <button
-            type="button"
-            disabled={uploading}
-            onClick={() => fileRef.current?.click()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-1.5 text-[11.5px] font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-60"
-          >
-            <Upload className="h-3 w-3" aria-hidden />
-            {uploading ? `Uploading… ${uploadPct}%` : "Upload video"}
-          </button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="video/mp4,video/webm,video/quicktime,.mov"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void handleUpload(f);
-            }}
-          />
-        </div>
-        {uploadError ? <p className="text-[11px] text-destructive">{uploadError}</p> : null}
+      <CardPanel className="h-full" contentClassName="flex h-full flex-col p-0">
+        <BandHeader
+          label="Library"
+          action={
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={() => fileRef.current?.click()}
+              className="tap-active inline-flex h-9 items-center gap-1.5 rounded-lg border border-dashed border-border bg-secondary px-3 text-[11.5px] font-semibold text-muted-foreground transition hover:border-primary-ink/40 hover:text-foreground disabled:opacity-60"
+            >
+              <Upload className="h-3.5 w-3.5" aria-hidden />
+              {uploading ? `${uploadPct}%` : "Upload"}
+            </button>
+          }
+        />
+        <input
+          ref={fileRef}
+          type="file"
+          accept="video/mp4,video/webm,video/quicktime,.mov"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void handleUpload(f);
+          }}
+        />
+        {uploadError ? <p className="px-4 pt-2 text-[11px] text-destructive">{uploadError}</p> : null}
         {videos === null ? null : videos.length === 0 ? (
-          <p className="rounded-lg border border-border bg-secondary/50 px-3 py-3 text-xs text-muted-foreground">
-            No saved videos. Analysis works straight off files on your phone — save one here
-            when you want ghost clips available everywhere.
+          <p className="px-4 py-3 text-[13px] text-muted-foreground">
+            No saved videos. Analysis works straight off the file on your phone.
           </p>
         ) : (
-          <ul className="space-y-1.5">
-            {videos.slice(0, 12).map((v) => (
+          <ul>
+            {shownVideos.map((v) => (
               <li
                 key={v.id}
-                className="flex items-center gap-2.5 rounded-lg border border-border bg-secondary/50 px-3 py-2.5"
+                className="flex items-center gap-3 border-b border-border/60 px-4 py-2.5 last:border-b-0"
               >
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-background/50 text-muted-foreground">
                   <Film className="h-3.5 w-3.5" aria-hidden />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12.5px] font-semibold tracking-tight">
+                  <span className="ui-title block truncate text-[13px] font-semibold text-foreground">
                     {v.label?.trim() || v.originalFilename}
                   </span>
-                  <span className="type-timestamp block">
+                  <span className="ui-caption mt-0.5 block">
                     {formatBytes(v.bytes)} · {new Date(v.createdAt).toLocaleDateString()}
                   </span>
                 </span>
@@ -190,25 +224,12 @@ export function VideoToolsClient() {
             ))}
           </ul>
         )}
-      </section>
-
-      <details className="rounded-xl border border-border bg-secondary/40">
-        <summary className="cursor-pointer px-3 py-3 text-[12px] font-semibold text-muted-foreground">
-          Advanced · automatic analysis (worker import)
-        </summary>
-        <div className="space-y-2 px-3 pb-3 text-[11.5px] leading-relaxed text-muted-foreground">
-          <p>
-            Run the Python worker (<span className="tabular-nums">video-analysis/</span> in the
-            repo) on a computer for automatic multi-car tracking, then import its{" "}
-            <span className="tabular-nums">results.json</span> on the analysis session page.
-            Results land in the same compare surface as manual marks.
-          </p>
-          <p>
-            Worker jobs start from a track&apos;s camera profile page (sector lines +
-            reference still), reachable from any analysis session.
-          </p>
-        </div>
-      </details>
+        <MoreRow
+          hidden={(videos?.length ?? 0) - PREVIEW_ROWS}
+          open={allVideos}
+          onToggle={() => setAllVideos((v) => !v)}
+        />
+      </CardPanel>
     </div>
   );
 }

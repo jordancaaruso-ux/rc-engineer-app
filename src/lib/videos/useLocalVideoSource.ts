@@ -196,6 +196,31 @@ export function useLocalVideoSource(key: string | null) {
     }
   }, [key, setObjectUrl]);
 
+  /**
+   * Reopen the remembered file ONLY if the browser already holds permission — never
+   * prompts, never raises an error, never clears the handle. The sibling of
+   * `reopenRemembered`, for the load path: a permission request needs a user gesture, so
+   * calling that one on mount would set the "browser blocked access" error against a
+   * driver who never asked for anything. This one just returns false and stays quiet, and
+   * the visible Reopen control is still there for the tap that can prompt.
+   */
+  const reopenIfGranted = useCallback(async (): Promise<boolean> => {
+    if (!key) return false;
+    const handle = await idbGet(key);
+    if (!handle) return false;
+    try {
+      if (handle.queryPermission) {
+        const perm = await handle.queryPermission({ mode: "read" });
+        if (perm !== "granted") return false;
+      }
+      setObjectUrl(await handle.getFile());
+      return true;
+    } catch {
+      // Moved, renamed, or permission withdrawn — the tap path reports it properly.
+      return false;
+    }
+  }, [key, setObjectUrl]);
+
   const clear = useCallback(() => setObjectUrl(null), [setObjectUrl]);
 
   return {
@@ -207,6 +232,7 @@ export function useLocalVideoSource(key: string | null) {
     attachFile,
     pickWithPicker,
     reopenRemembered,
+    reopenIfGranted,
     clear,
     error,
   };
