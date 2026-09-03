@@ -45,7 +45,7 @@ import {
   type Rgb,
 } from "./carColour";
 import type { CarColours } from "./field";
-import { SF_LINE_KEY, targetId, type SessionRole, type SessionTarget } from "./fromSession";
+import { roleOf, SF_LINE_KEY, targetId, type SessionRole, type SessionTarget } from "./fromSession";
 import type { CrossingEvent } from "./types";
 
 /** How far apart two laps' offsets may be and still be the same corner. */
@@ -167,7 +167,7 @@ export function candidatesFrom(
 ): Candidate[] {
   const out: Candidate[] = [];
   for (const r of results) {
-    const role = r.id.split(":")[0] === "competitor" ? "competitor" : "me";
+    const role = roleOf(r.id);
     r.candidates.forEach((c, i) => {
       out.push({
         role,
@@ -228,7 +228,10 @@ export function carColoursFromLapStarts(
   }>
 ): CarColours {
   const out: CarColours = {};
-  for (const role of ["me", "competitor"] as const) {
+  // Whoever the pass actually read, not a fixed pair: practice footage can carry a third and a
+  // fourth driver, and each needs their own reference or the field matching judges them all
+  // against one car's paint.
+  for (const role of [...new Set(sfResults.map((r) => roleOf(r.id)))]) {
     const own: Rgb[] = [];
     const rivals: Rgb[] = [];
     for (const r of sfResults) {

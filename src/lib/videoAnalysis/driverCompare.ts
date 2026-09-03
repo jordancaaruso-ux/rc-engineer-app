@@ -19,9 +19,13 @@
  */
 
 import type { SectorLineInfo } from "@/lib/manualVideoAnalysis/sectors";
-import { primaryTimingSession } from "@/lib/manualVideoAnalysis/sessionModel";
+import {
+  participants,
+  primaryTimingSession,
+  type Participant,
+} from "@/lib/manualVideoAnalysis/sessionModel";
 import { predictSfStartTime } from "@/lib/manualVideoAnalysis/sync";
-import type { ManualVideoSessionV2 } from "@/lib/manualVideoAnalysis/types";
+import type { DriverRole, ManualVideoSessionV2 } from "@/lib/manualVideoAnalysis/types";
 import { assignToField, type FieldDriver } from "./findCrossings/field";
 import { realLaps, SF_LINE_KEY, targetId } from "./findCrossings/fromSession";
 import type { RefinableResult } from "./findCrossings/refine";
@@ -46,7 +50,8 @@ export type DriverLap = {
 export type CompareDriver = {
   key: string;
   name: string;
-  role?: "me" | "competitor";
+  /** Absent for a driver the field matcher found who nobody added by name. */
+  role?: DriverRole;
   trust: DriverTrust;
   laps: DriverLap[];
 };
@@ -208,10 +213,18 @@ export function buildCompareDrivers(
   if (!primary) return [];
 
   const out: CompareDriver[] = [];
+  const roster: Participant[] = participants(session);
   const cars = compareCarsFromManualSession(session, lines);
   for (const car of cars) {
-    const role = car.carId === 1 ? "me" : "competitor";
-    const d = primary.drivers.find((x) => x.role === role);
+    // The adapter labels each car with the driver it belongs to; matching on that keeps the two
+    // in step however many people are on the video, where car-number arithmetic did not.
+    const seat =
+      car.carId === 1
+        ? roster.find((p) => p.role === "me")
+        : roster.find((p) => p.driver.driverName === car.carLabel) ??
+          roster.filter((p) => p.role !== "me")[car.carId - 2];
+    const role = seat?.role ?? (car.carId === 1 ? "me" : "competitor");
+    const d = seat?.driver;
     out.push({
       key: role,
       name: role === "me" ? "You" : displayName(d?.driverName ?? car.carLabel),
@@ -227,24 +240,29 @@ export function buildCompareDrivers(
     });
   }
 
-  // The rest of the field, from the saved scan. Nothing without a race anchor: without it a
-  // rival's laps are not on the video clock at all.
+  // The rest of the field, from the saved scan. Nothing without an anchor: without one a rival's
+  // laps are not on the video clock at all. This is the partial path — crossings picked up inside
+  // somebody else's scan windows. Anyone added by their own link came through the loop above with
+  // their whole session, and is skipped here.
   const rows = session.lastScan?.rows ?? [];
   if (rows.length && primary.isOnVideo && primary.sync.anchor) {
     const field: FieldDriver[] = [];
-    for (const d of primary.drivers) {
-      const lapStarts: FieldDriver["lapStarts"] = [];
-      for (const lap of realLaps(d.laps)) {
-        const s = predictSfStartTime(d, lap.lapNumber, primary);
-        if (s != null) lapStarts.push({ lapNumber: lap.lapNumber, startSec: s });
-      }
-      if (lapStarts.length) {
-        field.push({
-          key: driverKey(d),
-          name: d.driverName,
-          role: d.role === "other" ? undefined : d.role,
-          lapStarts,
-        });
+    for (const ts of session.timingSessions) {
+      if (!ts.isOnVideo || !ts.sync.anchor) continue;
+      for (const d of ts.drivers) {
+        const lapStarts: FieldDriver["lapStarts"] = [];
+        for (const lap of realLaps(d.laps)) {
+          const s = predictSfStartTime(d, lap.lapNumber, ts);
+          if (s != null) lapStarts.push({ lapNumber: lap.lapNumber, startSec: s });
+        }
+        if (lapStarts.length) {
+          field.push({
+            key: driverKey(d),
+            name: d.driverName,
+            role: d.role === "other" ? undefined : d.role,
+            lapStarts,
+          });
+        }
       }
     }
     const results: RefinableResult[] = rows.map((r) => ({
@@ -259,39 +277,43 @@ export function buildCompareDrivers(
     }));
     const assignment = assignToField({ results, field, sfKey: SF_LINE_KEY });
 
-    for (const d of primary.drivers) {
-      if (d.role !== "other") continue;
-      const fd = field.find((f) => f.key === d.key);
-      if (!fd) continue;
-      const byLap = new Map<number, Record<string, number>>();
-      for (const [line, xs] of assignment.fieldCrossings) {
-        for (const x of xs) {
-          if (x.key !== d.key) continue;
-          const start = fd.lapStarts.find((l) => l.lapNumber === x.lapNumber)?.startSec;
-          if (start == null) continue;
-          const split = x.t - start;
-          if (!(split > 0)) continue;
-          const splits = byLap.get(x.lapNumber) ?? {};
-          // Two candidates for one slot cannot happen (one slot, one candidate); guard anyway.
-          if (splits[line] == null) splits[line] = split;
-          byLap.set(x.lapNumber, splits);
+    const seated = new Set(roster.map((p) => p.driver.key));
+    for (const ts of session.timingSessions) {
+      if (!ts.isOnVideo || !ts.sync.anchor) continue;
+      for (const d of ts.drivers) {
+        if (d.role !== "other" || seated.has(d.key)) continue;
+        const fd = field.find((f) => f.key === d.key);
+        if (!fd) continue;
+        const byLap = new Map<number, Record<string, number>>();
+        for (const [line, xs] of assignment.fieldCrossings) {
+          for (const x of xs) {
+            if (x.key !== d.key) continue;
+            const start = fd.lapStarts.find((l) => l.lapNumber === x.lapNumber)?.startSec;
+            if (start == null) continue;
+            const split = x.t - start;
+            if (!(split > 0)) continue;
+            const splits = byLap.get(x.lapNumber) ?? {};
+            // Two candidates for one slot cannot happen (one slot, one candidate); guard anyway.
+            if (splits[line] == null) splits[line] = split;
+            byLap.set(x.lapNumber, splits);
+          }
         }
-      }
-      const laps: DriverLap[] = [];
-      for (const lap of realLaps(d.laps)) {
-        const splits = byLap.get(lap.lapNumber);
-        const startSec = fd.lapStarts.find((l) => l.lapNumber === lap.lapNumber)?.startSec;
-        if (!splits || startSec == null || !(lap.lapTimeSec > 0)) continue;
-        laps.push({
-          lapNumber: lap.lapNumber,
-          lapTimeSec: lap.lapTimeSec,
-          startSec,
-          endSec: startSec + lap.lapTimeSec,
-          splits,
-        });
-      }
-      if (laps.length) {
-        out.push({ key: d.key, name: displayName(d.driverName), trust: "assigned", laps });
+        const laps: DriverLap[] = [];
+        for (const lap of realLaps(d.laps)) {
+          const splits = byLap.get(lap.lapNumber);
+          const startSec = fd.lapStarts.find((l) => l.lapNumber === lap.lapNumber)?.startSec;
+          if (!splits || startSec == null || !(lap.lapTimeSec > 0)) continue;
+          laps.push({
+            lapNumber: lap.lapNumber,
+            lapTimeSec: lap.lapTimeSec,
+            startSec,
+            endSec: startSec + lap.lapTimeSec,
+            splits,
+          });
+        }
+        if (laps.length) {
+          out.push({ key: d.key, name: displayName(d.driverName), trust: "assigned", laps });
+        }
       }
     }
   }
@@ -417,6 +439,22 @@ export function ghostClip(
     if (pick == null || Math.abs(t.sec - st.top5) < Math.abs(pick.sec - st.top5)) pick = t;
   }
   return pick ? { lapNumber: pick.lapNumber, sec: pick.sec, window: pick.window } : null;
+}
+
+/**
+ * A driver's best through every sector, stitched into one row — the "ideal lap" every timing
+ * screen shows. Each cell is a real lap's real crossing pair, so every one of them can be
+ * watched; only the total is a thing that never happened.
+ */
+export function idealLap(segStats: SegmentStats[]): {
+  cells: Array<SegmentTime | null>;
+  total: number | null;
+} {
+  const cells = segStats.map((st) => st.best);
+  const total = cells.every((c): c is SegmentTime => c != null)
+    ? cells.reduce((s, c) => s + c.sec, 0)
+    : null;
+  return { cells, total };
 }
 
 export type SectorLeader = { driver: CompareDriver; sec: number };

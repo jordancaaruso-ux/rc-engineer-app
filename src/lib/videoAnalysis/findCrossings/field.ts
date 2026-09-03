@@ -483,7 +483,7 @@ export function applyFieldAssignment<T extends RefinableResult>(
         ...r,
         detectedSec: alt.t,
         quality: alt.quality,
-        source: "rescued" as const,
+        source: alt.source ?? ("rescued" as const),
         movedBy: alt.t - r.detectedSec,
       };
     }

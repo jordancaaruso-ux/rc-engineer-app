@@ -617,6 +617,8 @@ export function orderFlags(
 
 export type IdentifyContext = {
   video: HTMLVideoElement;
+  /** The picked file, when there is one: frames are decoded straight out of it. */
+  file?: Blob | null;
   frameW: number;
   frameH: number;
   durationSec: number;
@@ -706,6 +708,7 @@ export async function collectCarOptions(
 
   const scan = await findCrossingsInBrowser({
     video,
+    file: ctx.file,
     frameW,
     frameH,
     lines,

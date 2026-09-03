@@ -9,7 +9,7 @@ import { compareVideoToTransponder } from "@/lib/videoAnalysis/compareTransponde
 import { parseManualVideoSession } from "@/lib/manualVideoAnalysis/types";
 import { normalizeManualSession } from "@/lib/manualVideoAnalysis/timing";
 import { buildSfPredictions } from "@/lib/manualVideoAnalysis/sync";
-import { primaryTimingSession } from "@/lib/manualVideoAnalysis/sessionModel";
+import { participants } from "@/lib/manualVideoAnalysis/sessionModel";
 import {
   compareBestLaps,
   averageSectorSplits,
@@ -65,29 +65,29 @@ export async function GET(_request: Request, { params }: Params) {
 
   let manualPayload: Record<string, unknown> | null = null;
   if (manualSession) {
-    const primary = primaryTimingSession(manualSession);
-    const lapNums: { role: "me" | "competitor"; lapNumber: number }[] = [
-      ...manualSession.selectedLaps.me.map((lapNumber) => ({
-        role: "me" as const,
-        lapNumber,
-      })),
-      ...manualSession.selectedLaps.competitor.map((lapNumber) => ({
-        role: "competitor" as const,
-        lapNumber,
-      })),
-    ];
-    const sfPredictions = primary ? buildSfPredictions(primary, lapNums) : [];
-    const primaryId = primary?.sessionId ?? "";
+    // Per person, against the timing session their own laps came from: a race link puts everybody
+    // in one, while several practice links put each driver in their own.
+    const roster = participants(manualSession);
+    const sfPredictions = roster.flatMap((p) =>
+      buildSfPredictions(
+        p.timingSession,
+        (manualSession.selectedLaps[p.role] ?? []).map((lapNumber) => ({ role: p.role, lapNumber }))
+      )
+    );
+    const avgSectors: Record<string, Record<string, number>> = {};
+    for (const p of roster) {
+      avgSectors[p.role] = Object.fromEntries(
+        averageSectorSplits(manualSession, sectorLineInfos, p.sessionId, p.role)
+      );
+    }
     manualPayload = {
       session: manualSession,
       sfPredictions,
       compareBest: compareBestLaps(manualSession, sectorLineInfos),
-      avgSectorsMe: Object.fromEntries(
-        averageSectorSplits(manualSession, sectorLineInfos, primaryId, "me")
-      ),
-      avgSectorsCompetitor: Object.fromEntries(
-        averageSectorSplits(manualSession, sectorLineInfos, primaryId, "competitor")
-      ),
+      /** Keyed by driver role — the two below are the same numbers under their older names. */
+      avgSectors,
+      avgSectorsMe: avgSectors.me ?? {},
+      avgSectorsCompetitor: avgSectors.competitor ?? {},
     };
   }
 

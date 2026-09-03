@@ -1,4 +1,4 @@
-import type { ManualFrameMark, ManualVideoSessionV2 } from "./types";
+import type { DriverRole, ManualFrameMark, ManualVideoSessionV2 } from "./types";
 import { LAP_START_LINE_KEY, lapSfKey } from "./types";
 import { findTimingSession, primaryTimingSession } from "./sessionModel";
 import { predictSfEndTime, predictSfStartTime } from "./sync";
@@ -26,7 +26,7 @@ export type ComputedSectorSplit = {
 
 export type LapSectorBreakdown = {
   sessionId: string;
-  driverRole: "me" | "competitor";
+  driverRole: DriverRole;
   lapNumber: number;
   lapTimeSec: number;
   lapStartSec: number | null;
@@ -38,7 +38,7 @@ export type LapSectorBreakdown = {
 function getMark(
   marks: ManualFrameMark[],
   sessionId: string,
-  role: "me" | "competitor",
+  role: DriverRole,
   lapNumber: number,
   lineKey: string
 ): number | undefined {
@@ -56,7 +56,7 @@ export function computeLapBreakdown(
   session: ManualVideoSessionV2,
   sectorLines: SectorLineInfo[],
   sessionId: string,
-  driverRole: "me" | "competitor",
+  driverRole: DriverRole,
   lapNumber: number
 ): LapSectorBreakdown | null {
   const timingSession = findTimingSession(session, sessionId);
@@ -217,7 +217,7 @@ export function averageSectorSplits(
   session: ManualVideoSessionV2,
   sectorLines: SectorLineInfo[],
   sessionId: string,
-  role: "me" | "competitor"
+  role: DriverRole
 ): Map<string, number> {
   const laps = bestIncludedLapNumbers(session, sessionId, role, 3);
   const sums = new Map<string, { sum: number; count: number }>();

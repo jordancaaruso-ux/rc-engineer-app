@@ -27,7 +27,7 @@ import {
   resultFromWindow,
   type TrackedResult,
 } from "../src/lib/videoAnalysis/findCrossings/detector";
-import { bandMask, roiFor } from "../src/lib/videoAnalysis/findCrossings/geometry";
+import { bandMask, blurKernelForLine, roiFor } from "../src/lib/videoAnalysis/findCrossings/geometry";
 import { spansFromMask } from "../src/lib/videoAnalysis/findCrossings/spans";
 import {
   bandFrameDiffs,
@@ -36,7 +36,8 @@ import {
 } from "../src/lib/videoAnalysis/findCrossings/calibrate";
 import { refineByChaining } from "../src/lib/videoAnalysis/findCrossings/refine";
 import { WINDOW_SEC, cornerTargets, sfBoundaryTargets } from "../src/lib/videoAnalysis/findCrossings/predict";
-import { RECIPE_B22_T14 } from "../src/lib/videoAnalysis/findCrossings/types";
+import { RECIPE_B22_T14, RECIPE_VARIANTS } from "../src/lib/videoAnalysis/findCrossings/types";
+import { bandHalfPxFor, lineGeom } from "../src/lib/videoAnalysis/findCrossings/geometry";
 import type {
   CrossingResult,
   CrossingTarget,
@@ -239,14 +240,20 @@ async function main() {
   const limit = Number(arg("limit", "0"));
   const outPath = arg("out");
   const qualityFloor = Number(arg("quality", "0"));
-  const minArea = Number(arg("minarea", String(RECIPE_B22_T14.minArea)));
+  // Which parameter set is on trial. Everything below reads THIS, so a variant is a fair test.
+  // Defaults to the recipe the app runs: grading a change on the July recipe's wide zones read
+  // as a 91→75 regression on 2026-09-02 that was no regression at all.
+  const recipeName = arg("recipe", "far")!;
+  const recipe = RECIPE_VARIANTS[recipeName];
+  if (!recipe) throw new Error("unknown recipe " + recipeName + " — have: " + Object.keys(RECIPE_VARIANTS).join(", "));
+  const minArea = Number(arg("minarea", String(recipe.minArea)));
   // The recipe takes the largest of the three colour channels, to catch a coloured car against
   // similar-brightness tarmac. On this footage that also amplifies chroma reconstruction noise on
   // painted kerbs by an order of magnitude, which is what floods the corner bands.
   const lumaOnly = process.argv.includes("--luma");
   // Threshold 14 was tuned with colour noise present. On luma alone the real signal is smaller
   // too, so the gate may now be too high — hence sweepable.
-  const thresh = Number(arg("thresh", String(RECIPE_B22_T14.thresh)));
+  const thresh = Number(arg("thresh", String(recipe.thresh)));
   // Judge each frame pair alone, the way the offline probe did — the before picture for tracking.
   const noTrack = process.argv.includes("--notrack");
 
@@ -262,6 +269,20 @@ async function main() {
 
   const { width, height, durationSec } = await probeVideo(probe.videoPath);
   console.log(`video ${width}x${height}, ${durationSec.toFixed(2)}s — ${probe.videoPath}`);
+  // What each line actually watches under this recipe — the number the far-hairpin argument turns
+  // on. A zone several times longer than the line is a zone mostly looking at track nobody drew.
+  console.log(`recipe ${recipeName}: ${JSON.stringify(recipe)}`);
+  for (const l of probe.lines) {
+    const g = lineGeom(l, width, height);
+    const half = bandHalfPxFor(g, width, recipe);
+    const cap = half * (recipe.endCapBands ?? 1);
+    const zoneLen = g.norm + 2 * cap;
+    console.log(
+      `  ${l.lineKey.padEnd(3)} line ${g.norm.toFixed(0).padStart(4)}px` +
+        ` · zone ${zoneLen.toFixed(0).padStart(4)} x ${(2 * half).toFixed(0).padStart(3)}px` +
+        ` · zone length ${(zoneLen / g.norm).toFixed(1)}x the line`
+    );
+  }
 
   const lineByKey = new Map(probe.lines.map((l) => [l.lineKey, l]));
   let targets: CrossingTarget[] = [];
@@ -286,24 +307,25 @@ async function main() {
       const roi = roiFor(line, width, height);
       const roiW = roi.x1 - roi.x0;
       const roiH = roi.y1 - roi.y0;
-      const bm = bandMask(line, roi, width, height, RECIPE_B22_T14);
+      const bm = bandMask(line, roi, width, height, recipe);
       const spans = spansFromMask(bm, roiW, roiH);
       // Several clips spread through the session, keeping the quietest: on a busy heat any one
       // sample is likely to have a car in the band, and a car reads as noise.
       const colourDiffs = [];
       const lumaDiffs = [];
+      const kernel = blurKernelForLine(line, width, height, recipe);
       for (const at of CAL_TIMES) {
         const [cf, lf] = await Promise.all([
           decodeSample(probe.videoPath, roiW, roiH, roi.x0, roi.y0, at, CAL_SEC, false),
           decodeSample(probe.videoPath, roiW, roiH, roi.x0, roi.y0, at, CAL_SEC, true),
         ]);
-        const cd = bandFrameDiffs(cf, bm, spans);
-        const ld = bandFrameDiffs(lf, bm, spans);
+        const cd = bandFrameDiffs(cf, bm, spans, kernel);
+        const ld = bandFrameDiffs(lf, bm, spans, kernel);
         const n = Math.min(cd.length, ld.length);
         colourDiffs.push(...cd.slice(0, n));
         lumaDiffs.push(...ld.slice(0, n));
       }
-      const cal = calibrateFromDiffs(colourDiffs, lumaDiffs);
+      const cal = calibrateFromDiffs(colourDiffs, lumaDiffs, kernel);
       calibrations.set(key, cal);
       console.log(
         `  ${key.padEnd(3)} colour ${String(cal.colour?.quiet ?? "-").padStart(3)}/${String(cal.colour?.typical ?? "-").padStart(3)} · ` +
@@ -335,7 +357,7 @@ async function main() {
       roi,
       width,
       height,
-      { ...RECIPE_B22_T14, minArea, thresh: useThresh },
+      { ...recipe, minArea, thresh: useThresh },
       3
     );
     const frames = await scanWindow(
@@ -362,6 +384,7 @@ async function main() {
         }
       : resultFromWindow(target, scanner.samples, scanner.frames, scanner.trackerConfig, {
           qualityFloor,
+          bounds: scanner.bounds,
         });
     // Keep every candidate event, not just the chosen one: re-picking offline is seconds,
     // re-decoding 115 windows of 4K is minutes.
@@ -402,6 +425,8 @@ async function main() {
   if (!noTrack) {
     const by = (s: string) => results.filter((r) => r.source === s).length;
     const trimmed = results.filter((r) => r.source === "confirmed" && r.rawEventCount > 1).length;
+    const offLine = results.reduce((n, r) => n + (r.offLineRejected ?? 0), 0);
+    console.log(`off-line rejected: ${offLine} candidates changed sides away from the drawn line\n`);
     console.log(
       `tracking: ${by("confirmed")} confirmed · ${by("rescued")} rescued · ` +
         `${by("unconfirmed")} unconfirmed · ${results.filter((r) => r.source === null).length} miss\n` +

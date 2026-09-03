@@ -289,6 +289,163 @@ sector deltas already deliver most of a speed trace's value). Then **Engineer in
 - No server-side worker until the pipeline earns it; the Python worker stays an import lane.
 
 **Changelog:**
+- 2026-09-03 (two clocks) — **A practice driver is placed on the video with no tap, and a lap is
+  fitted whole.** From the four-driver Bendigo practice (IMG_4521, job `cmtkvgho2…`), where
+  "Cooper has no sectors": his sync tap sat 35s before his session had begun. Three findings,
+  three builds:
+  1. **The wall clock.** A LiveRC practice page stamps the session start to the SECOND (the
+     `timing.ts` note calling it minute-resolution was wrong for these pages), and a phone's
+     `mvhd` stamps when recording began (`readRecordingStart` in `mp4.ts`; iPhone 14 Pro Max
+     checked). Stamp minus recording start is that driver's lap 1 on the video: Justin 758.0
+     (tapped 758.42), Jordan 1290.0 (1289.55), Sandy 1562.0 (1562.19), Cooper 50.0 (tapped
+     14.73). `wallClock.ts` predicts; `scanLapStarts` (run.ts) reads eight 3s start-line windows
+     where the opening laps are due; `fitLapsToCrossings` confirms, and must land within
+     `CLOCK_CONFIRM_SEC`+0.5 of the prediction. The Sync step runs it itself once per driver per
+     recording, you included (`clockTriedRef`), falls back to the blind sweep for anyone it cannot
+     place, and a hand tap more than `CLOCK_DISAGREE_SEC` (2s) from the clock gets one line and a
+     "Go there" button — never a refusal. `localVideoRecordedAtIso` is new on the session.
+     Cooper re-scanned with his anchor at 50.0 and nothing else changed: 12 → 59 of 60 written,
+     start line seen on all ten laps.
+  2. **`lapFit.ts` replaces `refineByChaining` in `reviewResults`.** Jordan's lap 14: S2 was a
+     12px dot with no candidate, the window took a stranger 1.4s late, the chain anchored on it
+     and S3–S6 followed — with the right crossing in the pool on three of them. Each lap is now
+     a small dynamic programme over the lines: gap from the previous chosen corner (per driver,
+     ≥3 laps; pooled otherwise; capped at 1.2s, 2.5s from the lap start) + 0.4 × the distance
+     from the driver's usual offset for the line (largest cluster, ≥3 laps) + a miss cost of 1.5s,
+     so a stranger the gap likes still pays at the offset. Then a second pass: where the chosen
+     corners agree on how late the lap runs (≥3 lines within 0.4s), the usual offsets are moved
+     by that much and the lap re-fitted — a warm-up lap 1.3s late at every corner is judged as a
+     late lap, not skipped line by line (IMG_4523 lap 1 showed exactly that with one pass). Never
+     invents, never moves off a candidate, never removes a fitting pick; a row it leaves out
+     keeps the window's answer for the vote. Replayed on the saved scan: the 5 recoverable held
+     rows (me L14 S3–S6, Sandy L2 S6) come back at the right times; 3 genuine misses stay held;
+     nothing that was right changed. A/B against the old chain (sed-swapped, same footage): truth
+     grade IMG_4523 identical (18/18, median 10ms, worst 47ms, held 15 / written 87); Justin on
+     IMG_4522 held 7→5, missing 2→1, written 92→95. `refineByChaining` stays for
+     `find-crossings-validate.ts` and the debug page.
+  3. **Direction is a penalty, not a veto.** 28–40% of candidates on IMG_4521 arrived as ±
+     pairs within 60ms — the read is noisy — and the strip in `applyLineDirections` had thrown
+     away Jordan's real S5 (rescued, read −) and Sandy's real S6. The fit sees every candidate
+     the window saw (`evidence`), wrong-way ones at `WRONG_WAY_SEC`; rows below the fit still
+     carry only right-way candidates for the field and the vote; a wrong-way pick the fit does
+     not want is emptied as before (`emptiedByFit`).
+  Rigs: `scripts/tmp/sheet.mjs` (contact sheets with the line drawn; `FINE=1` zooms),
+  `replay-lapfit.mts` (the CURRENT review over a saved scan), `clone-with-anchor.mjs`,
+  `clone-unsynced.mjs`, `session-stamps.mjs`. Not touched: the detector, the field, the vote.
+- 2026-09-02 (the flow, desktop-wide) — **The steps are Set up · Lines · Sync · Scan · Compare,
+  hand-marking is off the rail, and the compare is your laps against one of theirs.** The
+  rulings and the build are in `VIDEO_ANALYSIS_REWORK_NORTH_STAR.md`'s changelog of the same
+  date. For this plan: `dev-drive-scan.mts` now looks for the SCAN chip; the scan targets come
+  from `scanLaps` (everyone's quickest ten) rather than `selectedLaps.me`; `hasMarkedLap` counts
+  any whole lap of yours.
+- 2026-09-02 (the file, decoded) — **The scan reads the file directly, and calibrates on its
+  quietest clip.** Jordan: "Is there a better way to read the video rather than actually view
+  it on the browser? … sounds like a no brainer. Build it."
+
+  1. **`mp4.ts` + `frameSource.ts`.** A small QuickTime/MP4 index reader (moov only — a few
+     hundred KB of a 300MB phone file, `moov` at either end, HEVC and H.264, edit lists,
+     negative reorder offsets shifted the way ffmpeg does it) and a WebCodecs `VideoDecoder` fed
+     the compressed frames for each window straight out of the file. Every frame arrives, in
+     order, with its own timestamp, at decoder speed. Checked in Node against ffprobe's packet
+     list on the three phone files (9745 / 8567 / 22415 samples): every offset, size, keyframe
+     and presentation time exact. The old seek-and-play reader stays as the fallback
+     (`PlaybackSource`) for a browser without WebCodecs or a codec it can't decode, a library
+     asset streamed by URL, or a decoder failure mid-scan; `localStorage.rc_frame_reader =
+     "playback"` forces it for a comparison.
+  2. **The real cause of the browser's S2 holes was its calibration, not dropped frames.** With
+     every frame decoded the holes were still there. The browser's four calibration clips are
+     spread across the session; pooled, two busy ones (a car parked in S5's band, the phone
+     being picked up at the end) lifted the 5th percentile until S1 gated at 22, S2 at 18 and S5
+     at 64 — the harness's single clip had 8, 8 and 5. `calibrateFromClips`: the noise floor is
+     the quietest clip's. The browser now logs `[scan] cal-clips …` per clip and `[scan] cal …`
+     per line so a browser run and a harness run can be compared gate for gate.
+  3. **`scripts/dev-drive-scan.mts`** presses "Find every crossing" in a real Chrome (signed in
+     through the dev door, the file handed to the page) and streams the page's `[frames]`,
+     `[scan]` and `[review]` lines — the check the harness could never make. The harness
+     itself now builds the field (both drivers' lap starts) like the app, and takes `--cal
+     s2=colour@12` and `--dump-candidates`.
+
+  Measured, Bendigo IMG_4522 on a clean clone, the app's own button: **decoded 56s, 109 found,
+  2 held, 2 missing, 0 starved** (both drivers' S1 and S2 on every lap, every S5 on the same
+  pass); the same scan on the playback reader **317s** for the same rows. Before either fix the
+  same button gave 92 found / 19 missing. Times agree with the harness to the frame (me L3 S2
+  45.030 vs 45.03). Regressions unchanged: 4523 truth 18/18 median 10ms, 4K 15/15 ref 91/100,
+  synthetic 9/10. Chrome on this PC decodes the phone's HEVC in hardware; iPhone Safari has
+  WebCodecs with HEVC from 16.4. Anything else falls back to playback and says so in the log.
+- 2026-09-02 (hairpin, two cars) — **A line is crossed one way, and a window offers every car
+  it tracked.** Bendigo IMG_4522 again, once the rival was placed on the right lap: his S1 and
+  S2 came back on a handful of laps, and his S4→S5 read 1.2s against Jordan's 2.1s.
+
+  1. **S5 sits across both legs of a hairpin.** Frame by frame: the car crosses it heading out
+     1.15s after S4 and again heading back a second later. Both are real crossings; each window
+     took whichever sat nearer its guess, and the guess differed by driver. `direction.ts` gives
+     each line ONE direction — a tap at the picker, or the marks an earlier scan wrote (marks
+     now carry `dir`), else the majority of picks across every driver scanned, an even split
+     going to "me" — and holds every row to it before the chain, the field matching and the
+     odd-lap vote run. Wrong-way candidates leave the row (the full list stays as evidence); a
+     row with nothing right-way is emptied for the bracket pass. The start line is exempt: it
+     answers to the transponder, and a big car on a long near line throws flips both ways.
+  2. **A window keeps every car it tracked.** In the browser, Jordan's S2 windows on the laps
+     the rival was 1.1s behind held ONE candidate — the rival's — so the duplicate rule rightly
+     left a hole; headless held both cars. `resultFromWindow` now offers tracked-only crossings
+     clear of every confirmed one (0.4s), the two best-supported (≥6 observations), tagged
+     `source: "rescued"`. The window's own pick is unchanged; the chain prefers a confirmed
+     candidate by half a second; the field matching sees them all. Candidates and marks carry
+     `source`.
+  3. **A measured start line beats the drift model.** Lap 1's slow first sector read as +0.39s
+     of clock drift, and the start line seen 19ms from the transponder was thrown out for
+     disagreeing with that invented number. `sfStartFor` keeps a detection that agrees with the
+     corrected start OR the plain walk.
+  4. On the way: `reviewResults` keyed its lap times by the literal string ":" so the
+     timing-vs-footage disagreement list could never find a lap time.
+
+  Graded: S5 on the second pass for both drivers on every lap (spread 0.35s / 0.46s); the
+  rival scanned with windows on the FIRST pass and the corner declared the other way turns six
+  rows and lands on the identical numbers; 4523 hand marks 18/18 within 100ms, median 10ms,
+  worst 47ms; 4K 15/15, median 11ms, reference 91/100, two chain moves — unchanged; synthetic
+  9/10, refusals 10/10. **Trap:** `find-crossings-validate.ts` defaulted to `b22-t14` (July's
+  wide zones), which read as a 91→75 regression that was nothing of the kind — it now defaults
+  to the active recipe. **Not verified in the browser:** the S2 holes are a browser-only loss
+  (frames the trace never sampled), so the second fix is proven by construction
+  (`windowPool.test.ts`) and wants a re-scan of the job. Harness: `find-crossings-job.ts
+  --dump-candidates` prints every window's flips, tracks and pool; `--dir s5=+1` declares a
+  direction as the picker would.
+- 2026-09-02 (far lines) — **A far line is read with less blur, and one crossing is one car.**
+  Bendigo practice, 1080p fisheye, IMG_4522: the rival's S1 came back empty on every lap, and
+  with it sector 2 (measured from S1). Measured frame by frame, not inferred:
+
+  1. **At S1 the car is four pixels on a tan strip near its own tone, moving two pixels a
+     frame.** The detector blurs each frame (5-tap) before differencing: the pass reads 15–24
+     raw and 6–10 after the blur, against a gate of 8. Jordan's car poked over on 8 laps of 10,
+     the rival's on none (6–7 every frame). S2 and S5 are the same length and work — S2 is on
+     blue carpet and the car moves ten pixels a frame there; frame differencing measures change,
+     so its signal shrinks with speed. Length was never the problem (Jordan: "they're short
+     because that's what the track looks like at that point").
+  2. **The blur is chosen per line** (`blurKernelFor`: 5-tap from 40px, 3-tap from 16px, none
+     below), and **the gate is measured under that blur** (`calibrate.ts` takes the kernel).
+     The floors (8 colour / 5 brightness) stay: a gate of 3 was tried and moved S3 33ms late on
+     every hand-marked lap — the floor is what keeps a fast near car's blob crisp, not the
+     sensor's noise.
+  3. **Stolen crossings no longer vote.** Every S1 the rival was handed was Jordan's car to the
+     millisecond; the field matcher labelled them but they still sat in the plausibility sample,
+     and four stolen times outvoted his two real ones (2.24s, 2.33s — where everyone's S1 is).
+     `dropCrossDriverDuplicates` removes the other driver's copy of one event before the vote.
+  4. **Built, graded, and left OFF:** comparing each pixel with the learnt empty track
+     (`motionMaskInBandBg`, `bgGateMultiple`). Its signal does not shrink with speed and it saw
+     the one lap the blur change still misses (a car crawling through S1 at the noise floor).
+     But it invents crossings where a car stops in the band — median start, learning only from
+     real change, and requiring a blob to contain real change all reduced it and none removed
+     it — and doubled the rows held back. Kept behind the knob for the harness.
+
+  Graded: rival's S1 **0 of 9 → 16 of 17** laps, fifteen within four tenths; the 18 Bendigo hand
+  marks (IMG_4523, scanned blind) 18/18 within 100ms, median 10ms; the 15 4K hand marks
+  15/15, median 11ms, reference agreement 91/100 within a frame (was 94) with 7 more corners
+  found than the reference; synthetic suite unchanged. Harness: `find-crossings-job.ts` grew `--truth`
+  (grade against frozen hand marks, their laps scanned blind), `--role`, `--seeds`, `--no-marks`,
+  `--debug-targets`; `crossings-truth.mts` freezes hand marks to `data/crossing-truth/`.
+  Traps met on the way: a job whose anchor was re-synced to another lap leaves every mark two
+  laps stale (the walk still keys them by lap number); the script had been handing the rival
+  Jordan's anchor. Tests: `crossDriver.test.ts`, `imageOps.test.ts`.
 - 2026-08-28 (sector board) — **The Done step is the video, then ONE table.** Five artifact
   rounds after "this whole workflow is just bad… I don't know what I'm looking at": the matrix +
   story cards + chip picker + second (lap-vs-lap) video are gone. What replaced them is the lap
