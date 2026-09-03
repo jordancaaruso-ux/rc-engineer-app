@@ -16,12 +16,16 @@ two_answers: true
 more:
   reviewed: false
   confidence: majority
-  before_settled: "with the nose higher than the tail, more likely a little less initial steering"
+  before_settled: "with the nose higher than the tail, more likely a little less initial steering — the contested claim below, the other way"
   once_settled: "more likely a touch less front grip through the middle, but hard to call — the geometry moves with it"
 less:
   reviewed: true
-  confidence: majority
+  confidence: contested
   before_settled: "with the nose lower than the tail, more likely a little more initial steering"
+  contested:   # founder 2026-09-02: "genuinely can't call it"; claims and discriminator AI-drafted, awaiting his check
+    claim_a: "nose lower gives a little more initial steering — weight and rake ahead of the front tyres"
+    claim_b: "nose lower drops the front roll centre, so a little less initial steering"
+    discriminator: "a 0.2 mm move tells you: if the first input comes in stronger the weight won today; if it comes in weaker, the roll centre did"
   once_settled: "more likely a touch more front grip through the middle, but hard to call — the geometry moves with it; too low and it touches, unpredictable with no warning"
 physics:
   - ride-height-and-rake.md

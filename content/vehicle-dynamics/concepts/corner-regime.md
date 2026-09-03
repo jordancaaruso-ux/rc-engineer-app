@@ -20,15 +20,13 @@ are simply places on the corner — the way in, the middle, the way out — and 
 ask in; "settled" is this page's word, not theirs.
 
 **Where the landmarks fall.** The initial is the turn-in — from the first steering input until roll
-has finished. The apex of a corner the car turns through comes after that, quick or slow, mod or
-stock: roll takes a fixed, short time, and even a quick corner lasts several times longer. So a driver
-describing the apex is describing the settled car. What the corner's clock changes is how much of the
-corner comes before that point, not whether the apex is settled — in a faster car the initial is a
-bigger slice of the corner, so its answer is felt for more of the lap, but a settled-phase change
-still lands at the apex. A direction change is the exception: it has no apex to settle into.
+has finished. The apex of a corner the car turns through comes after that. Whether roll has
+finished by the apex is the two clocks below set against each other. A direction change is the
+exception: it has no apex to settle into.
 
-**Speed decides how much middle there is, as much as the corner does.** Chassis roll time is fixed;
-corner time is length divided by speed. So the same corner has more middle for a slower car and less
+**Speed decides how much middle there is, as much as the corner does.** Roll finishes in a time set
+by damping ([[damping]]); corner time is length divided by speed. The middle is whatever of the
+corner is left once roll has finished. So the same corner has more middle for a slower car and less
 for a faster one — a stock or blinky car spends more of the lap settled, a modified car more of it
 still rolling. The same change therefore lands differently on the two: more of a settled-phase
 change on the slower car, more of a timing one on the faster, so a setting proven in one class can
@@ -81,3 +79,7 @@ moves both the timing and the share.
 Stiffer at the rear — bar, spring, or less rear flex — is expected to give up rear grip once the car
 has settled, and on track it often does the opposite: more rear grip and less rotation. The mechanism
 for that is not yet understood. Hold the settled-rear answer more loosely than the rest, and say so.
+Where the softer rear's extra rotation shows most is in the long, slow corners (founder-confirmed
+2026-09-02); the founder's reading is that the car is in transition for longer there, so the late
+grip of the softer end lasts longer — **not derivable from this page**, which says the opposite
+about how much middle a slow corner has, and unverified.

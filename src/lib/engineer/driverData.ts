@@ -13,6 +13,7 @@ import {
 } from "@/lib/lapAnalysis";
 import { formatFiveMinuteStint } from "@/lib/runLaps";
 import { runLocalDayKey } from "@/lib/runs/buildRunHistoryGroups";
+import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import type { EngineerPayloadBlock } from "@/lib/engineer/payload";
 
 /**
@@ -59,37 +60,52 @@ function readableKey(key: string): string {
   return key.replace(/[_\-]+/g, " ").trim();
 }
 
-function fmtWhen(iso: string): string {
-  return iso.slice(0, 10);
-}
-
-/**
- * Date plus time of day. A practice day puts several runs on one date, and without the
- * clock they render as identical lines that say nothing about which is which.
- */
-function fmtWhenPrecise(iso: string): string {
-  const time = iso.slice(11, 16);
-  return time ? `${iso.slice(0, 10)} ${time}` : iso.slice(0, 10);
-}
-
 function fmtSecs(v: number | null | undefined): string | null {
   return v == null || !Number.isFinite(v) ? null : v.toFixed(2);
 }
 
 /**
- * Time of day in the zone the run was logged in. A run's clock belongs to the driver who
- * was there, not to whoever is reading — the same rule the sessions list groups on.
+ * One clock for every block (2026-09-02). Before this, the day block read
+ * `sessionCompletedAt` in the anchor's zone and the comparable block read
+ * `resolveRunDisplayInstant` in UTC, so the same run printed 02:28 in one block and 16:28
+ * in the next — and rows stamped by the old wall-clock-as-UTC bug shifted a further ten
+ * hours. Every date and clock now comes from the instant the app itself displays, in the
+ * zone the run was logged in (falling back to the driver's profile zone, as the sessions
+ * list does).
  */
-function fmtLocalTime(instant: Date, zone: string | null): string {
+type RunInstantInput = Parameters<typeof resolveRunDisplayInstant>[0];
+
+/** Calendar date in the logging zone; UTC when no zone is known at all. */
+function fmtLocalDate(run: RunInstantInput, zone: string | null): string {
+  const instant = resolveRunDisplayInstant(run);
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      timeZone: zone ?? "UTC",
+    }).format(instant);
+  } catch {
+    return instant.toISOString().slice(0, 10);
+  }
+}
+
+/**
+ * Time of day in the zone the run was logged in. A run's clock belongs to the driver who
+ * was there, not to whoever is reading. No zone → no clock: a wrong clock is worse than
+ * none, and the lines are already in time order.
+ */
+function fmtLocalTime(run: RunInstantInput, zone: string | null): string | null {
+  if (!zone) return null;
   try {
     return new Intl.DateTimeFormat("en-GB", {
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
-      timeZone: zone ?? undefined,
-    }).format(instant);
+      timeZone: zone,
+    }).format(resolveRunDisplayInstant(run));
   } catch {
-    return instant.toISOString().slice(11, 16);
+    return null;
   }
 }
 
@@ -162,6 +178,7 @@ async function loadRun(userId: string, runId: string | null) {
       sortAt: true,
       localTimeZone: true,
       sessionCompletedAt: true,
+      loggingCompletedAt: true,
       carId: true,
       raceClass: true,
       carRating: true,
@@ -186,7 +203,11 @@ async function loadRun(userId: string, runId: string | null) {
 
 type LoadedRun = NonNullable<Awaited<ReturnType<typeof loadRun>>>;
 
-function buildSessionFactsBlock(run: LoadedRun, latestFallback: boolean): string | null {
+function buildSessionFactsBlock(
+  run: LoadedRun,
+  latestFallback: boolean,
+  zone: string | null
+): string | null {
   const facts: string[] = [];
   const push = (label: string, value: string | number | null | undefined) => {
     if (value == null || value === "") return;
@@ -216,7 +237,7 @@ function buildSessionFactsBlock(run: LoadedRun, latestFallback: boolean): string
   push("average of the best 5 laps (s)", fmtSecs(pace.top5));
   push("best five minutes (laps/time)", pace.stint);
   push("driver's rating of the car (1-10)", run.carRating);
-  push("session date", fmtWhen((run.sessionCompletedAt ?? run.createdAt).toISOString()));
+  push("session date", fmtLocalDate(run, zone));
 
   if (facts.length === 0) return null;
   const heading = latestFallback
@@ -282,6 +303,7 @@ function loadRunsAround(userId: string, carIds: string[], centre: number) {
       sortAt: true,
       localTimeZone: true,
       sessionCompletedAt: true,
+      loggingCompletedAt: true,
       carId: true,
       carRating: true,
       tireRunNumber: true,
@@ -298,15 +320,19 @@ type DayRun = Awaited<ReturnType<typeof loadRunsAround>>[number];
 
 async function loadDayRuns(
   userId: string,
-  anchor: LoadedRun
+  anchor: LoadedRun,
+  zone: string | null
 ): Promise<{ day: DayRun[]; predecessorOf: Map<string, DayRun> }> {
   const carIds = await sameTypeCarIds(userId, anchor.car);
   const predecessorOf = new Map<string, DayRun>();
   if (carIds.length === 0) return { day: [], predecessorOf };
 
   const rows = await loadRunsAround(userId, carIds, (anchor.sortAt ?? anchor.createdAt).getTime());
-  const anchorDay = runLocalDayKey(anchor);
-  const day = rows.filter((r) => runLocalDayKey(r) === anchorDay);
+  // The profile zone stands in for runs logged before per-run capture — the same fallback
+  // the sessions list uses, so "the day" here is the day the driver sees on screen.
+  const zones = { viewerTimeZone: zone ?? undefined };
+  const anchorDay = runLocalDayKey(anchor, zones);
+  const day = rows.filter((r) => runLocalDayKey(r, zones) === anchorDay);
 
   // A change belongs to ONE physical car. Two cars of a type sitting side by side in the
   // list must never have their sheets diffed against each other — that is a car swap, not
@@ -324,17 +350,17 @@ async function loadDayRuns(
 function buildDayBlock(
   anchor: LoadedRun,
   day: DayRun[],
-  predecessorOf: Map<string, DayRun>
+  predecessorOf: Map<string, DayRun>,
+  zone: string | null
 ): string | null {
   if (day.length < 2) return null;
-  const zone = anchor.localTimeZone ?? null;
   const multiCar = new Set(day.map((r) => r.carId)).size > 1;
   const lines: string[] = [];
 
   for (const run of day) {
     const pace = runPace(run);
     const bits = [
-      fmtLocalTime(run.sessionCompletedAt ?? run.createdAt, zone),
+      fmtLocalTime(run, zone),
       multiCar ? (run.car?.name ?? "unknown car") : null,
       fmtSecs(pace.best) ? `best ${fmtSecs(pace.best)}` : "no lap times",
       fmtSecs(pace.top5) ? `top5 ${fmtSecs(pace.top5)}` : null,
@@ -350,8 +376,8 @@ function buildDayBlock(
     if (!prev) continue;
     const changes = diffTuning(tuningValues(prev.setupSnapshot?.data), tuningValues(run.setupSnapshot?.data));
     if (changes == null) continue; // No readable sheet one side — unknown, not unchanged.
-    const prevDay = fmtWhen((prev.sessionCompletedAt ?? prev.createdAt).toISOString());
-    const thisDay = fmtWhen((run.sessionCompletedAt ?? run.createdAt).toISOString());
+    const prevDay = fmtLocalDate(prev, zone);
+    const thisDay = fmtLocalDate(run, zone);
     const since = prevDay !== thisDay ? ` since the run of ${prevDay}` : "";
     if (changes.length === 0) {
       lines.push(`    no setup change${since}`);
@@ -362,7 +388,7 @@ function buildDayBlock(
     }
   }
 
-  const dayLabel = fmtWhen((day[0].sessionCompletedAt ?? day[0].createdAt).toISOString());
+  const dayLabel = fmtLocalDate(day[0], zone);
   const what = multiCar ? "cars of this type" : (anchor.car?.name ?? "this car");
   return [
     // Not "the whole day": a run logged without a car cannot be attributed to a car type,
@@ -376,13 +402,19 @@ function buildDayBlock(
 }
 
 function buildComparableRunsBlock(
-  rows: Awaited<ReturnType<typeof findComparableRunsForEngineer>>
+  rows: Awaited<ReturnType<typeof findComparableRunsForEngineer>>,
+  zone: string | null
 ): string | null {
   if (rows.length === 0) return null;
   const lines = rows.map((r) => {
+    // whenIso is already the display instant; wrap it so the date and clock print in the
+    // same zone as the day block above.
+    const asRun = { createdAt: r.whenIso };
+    const clock = fmtLocalTime(asRun, zone);
+    const when = `${fmtLocalDate(asRun, zone)}${clock ? ` ${clock}` : ""}`;
     const where = r.trackName ? ` at ${r.trackName}` : "";
     const rating = r.carRating != null ? `rated ${r.carRating}/10` : "not rated";
-    return `${fmtWhenPrecise(r.whenIso)}${where} — ${rating}. ${r.howClose}.`;
+    return `${when}${where} — ${rating}. ${r.howClose}.`;
   });
   return [
     "EARLIER RUNS ON THIS CAR IN THE MOST SIMILAR CONDITIONS.",
@@ -404,23 +436,30 @@ export async function buildDriverDataBlocks(params: {
   const run = await loadRun(params.userId, params.runId).catch(() => null);
   if (!run) return [];
 
+  // The zone every date and clock below is printed in: the run's own, else the driver's
+  // profile zone (runs logged before per-run capture), else none — and no clock at all.
+  const owner = await prisma.user
+    .findUnique({ where: { id: params.userId }, select: { timeZone: true } })
+    .catch(() => null);
+  const zone = run.localTimeZone ?? owner?.timeZone ?? null;
+
   const parts: string[] = [];
-  const facts = buildSessionFactsBlock(run, params.runId == null);
+  const facts = buildSessionFactsBlock(run, params.runId == null, zone);
   if (facts) parts.push(facts);
   const setup = buildSetupSheetBlock(run);
   if (setup) parts.push(setup);
 
-  const { day, predecessorOf } = await loadDayRuns(params.userId, run).catch(() => ({
+  const { day, predecessorOf } = await loadDayRuns(params.userId, run, zone).catch(() => ({
     day: [] as DayRun[],
     predecessorOf: new Map<string, DayRun>(),
   }));
-  const dayBlock = buildDayBlock(run, day, predecessorOf);
+  const dayBlock = buildDayBlock(run, day, predecessorOf, zone);
   if (dayBlock) parts.push(dayBlock);
 
   const rows = await findComparableRunsForEngineer(params.userId, run.id, { limit: 3 }).catch(
     () => []
   );
-  const comparable = buildComparableRunsBlock(rows);
+  const comparable = buildComparableRunsBlock(rows, zone);
   if (comparable) parts.push(comparable);
 
   if (parts.length === 0) return [];

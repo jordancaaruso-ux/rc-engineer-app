@@ -29,8 +29,9 @@ said the opposite words in the opposite direction. At decision time a literal li
 one every time, so the unwritten direction — softening, the everyday move — was never in the
 running. Founder call: *"one entry for each parameter, then the net for each direction within it."*
 
-So each file is one knob. Both directions sit inside it, each with its own confidence and its own
-`reviewed` flag, and the knob names its own pair of direction words — stiffer/softer,
+So each file is one knob. Both directions sit inside it, each with its own `reviewed` flag (the
+per-side `confidence` tag is validated but no longer rendered — founder call 2026-09-01, it had
+become a lever ranking), and the knob names its own pair of direction words — stiffer/softer,
 thicker/thinner, more negative/less negative, higher/lower — so the sheet-sign convention is said
 once, in a driver's word, instead of a generic "more/less" gloss.
 
@@ -56,22 +57,27 @@ A knob that does the same thing throughout the corner carries **one line per sid
 diff and anti-squat split on the throttle, not on time in the corner — that split goes in the line.
 
 ```
-FRONT ANTI-ROLL BAR (arb_front) | a normal move: 0.1 mm
-  STIFFER [consensus]
+FRONT ANTI-ROLL BAR | a normal move: 0.1 mm
+  STIFFER
     ON THE WAY IN: more initial steering — the front bites sooner and the car turns in quicker, with less roll
-    THROUGH THE MIDDLE: more understeer through the middle, and the rear feels more planted behind it
-  SOFTER [consensus]
+    THROUGH THE MIDDLE AND OUT: more understeer through the middle, and the rear feels more planted behind it
+  SOFTER
     ON THE WAY IN: less initial steering — the front bites later and turn-in is smoother, with more roll
-    THROUGH THE MIDDLE: more steering through the middle — less understeer — and the rear feels a little less planted behind it
-  WHY: arb.md
+    THROUGH THE MIDDLE AND OUT: more steering through the middle — less understeer — and the rear feels a little less planted behind it
 
-DIFF OIL (diff_oil) | a normal move: 1,000 cSt
-  THICKER [consensus]
+DIFF OIL | a normal move: 1,000 cSt
+  THICKER
     EFFECT: less rotation off throttle and more rotation on throttle — …
-  THINNER [consensus]
+  THINNER
     EFFECT: more rotation off throttle and less on throttle — …
-  WHY: diff-and-driveline.md
 ```
+
+Since 2026-09-02 the heading carries no parameter id and there is no WHY line: the ids leaked into
+answers (and "FRONT ANTI-DIVE (under_lower_arm_shims_fr)" told every driver anti-dive IS one
+chassis's shim), and the WHY line named KB files under a header that forbids naming them. The
+second phase label reads AND OUT because the `once_settled` field has always carried exit and
+on-power content too. A side whose claim genuinely splits carries a CONTESTED block — both claims
+and the on-track discriminator — rendered under its lines.
 
 Damper oil is the proof the shape is right: its THROUGH THE MIDDLE line says *"no change"* on both sides
 — `bite-hold.md` is explicit that damping moves *when* load arrives without changing the roll angle
@@ -197,8 +203,8 @@ contested topics, never as the source of a claim.
 
 ## Coverage
 
-Thirty-eight knobs, all touring, one founder-reviewed side each and the opposite side AI-drafted
-(2026-08-27). Not yet written: tyres and inserts, track width, wing. Off-road is a separate
+Thirty-seven knobs, all touring, one founder-reviewed side each and the opposite side AI-drafted
+(2026-08-27; `nets:check` lists the sides still owed a pass). Not yet written: tyres and inserts, track width, wing. Off-road is a separate
 discipline tree, later.
 
 ## Knobs deliberately without a net

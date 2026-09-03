@@ -3,9 +3,9 @@
 **Concepts:** [[roll-center]], [[camber-gain]]
 
 **Physics.** Adding shims under the inner end of the lower arm raises that pickup, tilting the lower
-arm — which **raises the roll centre** on that corner. It is the **strongest single lever on roll
-centre** (far more RC per shim than the upper link or the hub), and it moves RC and camber gain
-together in the same direction.
+arm — which **raises the roll centre** on that corner. Per shim it moves the roll centre about
+**twice as far as an upper-link end** and about the **same as the under-hub shim** (solver-verified,
+table on [[upper-link-geometry]]), and it moves RC and camber gain together in the same direction.
 
 **Effects (context-dependent — confirm on track).**
 - The RC change carries everything with it via [[roll-center]] — higher → more bite / response, more

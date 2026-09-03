@@ -19,12 +19,12 @@ more:
   reviewed: true
   confidence: majority
   before_settled: "smoother and less immediate on turn-in, so it often feels like less steering at first"
-  once_settled: "can give more steering right in the middle — not a lever for more steering overall; a touch of straight-line speed and tyre life goes with every degree"
+  once_settled: "can give more steering, but late in the corner — well after the middle; not a lever for more steering overall; straight-line speed and tyre life go with every degree"
 less:
   reviewed: false
   confidence: majority
-  before_settled: "more immediate on turn-in — more initial steering, and more reactive right around centre"
-  once_settled: "a little less steering right in the middle; a touch more straight-line speed and tyre life"
+  before_settled: "more immediate on turn-in, so it often feels like more steering at first"
+  once_settled: "a little less steering late in the corner — well after the middle; a touch more straight-line speed and tyre life with every degree"
 physics:
   - toe.md
 sources:

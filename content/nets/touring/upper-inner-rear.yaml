@@ -22,12 +22,16 @@ more:
   reviewed: true
   confidence: majority
   before_settled: "the biggest bite change of the roll-centre keys, the other way — less secure from the first input, and more in the track; rear vs front counts as much as the change"
-  once_settled: "tends toward more rear hold through the middle, though it can go the other way; the overall rear grip feel moves with it; exit either way"
+  once_settled: "tends toward more rear hold through the middle — the contested claim below, the other way; the overall rear grip feel moves with it; exit either way"
 less:
   reviewed: false
-  confidence: majority
+  confidence: contested
   before_settled: "the biggest bite change of the roll-centre keys — noticeably more secure from the first input, and more on the track; rear vs front counts as much as the change"
-  once_settled: "tends toward oversteer through the middle, though it can go the other way; the overall rear grip feel moves with it; exit either way"
+  once_settled: "tends toward oversteer through the middle; the overall rear grip feel moves with it; exit either way"
+  contested:   # the settled-rear split (corner-regime.md); founder 2026-09-02: softer rear rotates most in long, slow corners. discriminator reworded to an on-track observable 2026-09-03 (the corner-clock question came out of the prompt: drivers cannot answer it accurately)
+    claim_a: "rear roll centre up gives up rear grip once the car is leaning — oversteer through the middle"
+    claim_b: "rear roll centre up gives more rear grip and less rotation — on track, often the way it goes"
+    discriminator: "make the change and compare the long, slow turns against the quick direction changes: better in the quick ones and worse in the long ones means the rear roll centre has gone too high"
 physics:
   - upper-link-geometry.md
 sources:

@@ -23,28 +23,35 @@ Engineer is judged against this sentence and nothing else. Sub-goals, in order:
 
 ## 2. The answer contract
 
-Every advice answer has one layered shape — no settings, no skill profiles. The reader stops
-when they have what they came for:
+The answer is shaped to the question, not to one fixed layering — no settings, no skill
+profiles. The prompt (`src/lib/engineer/prompt.ts`) is the contract; this section describes it
+and must never promise more than it sends. Founder call 2026-09-02: an earlier four-layer shape
+(change / mechanism / what to feel for / when it wouldn't apply) is retired — people want to make
+the car fast, and they ask when they want more.
 
-1. **The change.** Lever, direction, amount, one line — with its condition fused into the same
-   sentence ("if it's pushing on entry, soften the front bar one step"), never trailing after it
-   where a skimmer misses it.
-2. **The mechanism.** One or two sentences of why, in pit-table words, built from the KB.
-3. **What to feel for.** A falsifiable prediction for the next run: "expect more front bite
-   mid-corner; if it starts pushing on exit instead, come back — that tells us the cause was X,
-   and the run wasn't wasted."
-4. **When this wouldn't apply.** The context that flips or mutes the effect, briefly.
+- **A problem** ("it's loose on power"): the change and how far, one line, no preamble; then two
+  or three other levers, a line each — move, size, what sets it apart — so the driver can ask
+  about any of them.
+- **What a change does** ("what does more rear droop do"): the feel and where on the corner, in
+  the nets' register — what the driver will feel, not what moves inside the car; other levers
+  only if the Engineer would truly reach for them, at most two.
+- **Why or how**: the mechanism, plainly.
+
+A reason rides along only when it changes what the driver does, and only as a clause. A change is
+described by what the driver will feel and where on the corner, never by what moves inside the car.
 
 Rules that ride on the shape:
 
-- **Confidence comes from coverage, not self-rating.** Three levels, each checkable against the
-  wire dump: *the KB is direct on this* / *this extends the KB's physics* / *this is outside my
-  vetted physics* (still answered, labeled as general knowledge). The model never rates its own
-  confidence numerically — measured to be junk.
-- **At most one clarifying question, and only on a direction flip.** If the plausible readings of
-  the question lead to different levers or opposite directions (entry vs exit, low vs high grip),
-  ask the one question that separates them. If they only change magnitude, answer and state the
-  assumption in the first line. Never more than one question.
+- **The KB is the whole of the physics.** Where it is silent the Engineer says so; it never fills
+  in from general racing knowledge. Coverage is stated in words when it matters, never as a
+  numeric self-rating — measured to be junk.
+- **What the driver states is fact.** Their words become the problem — which end, where on the
+  corner, how the grip behaves — and the lever is picked for that problem, never for wording that
+  matches theirs.
+- **At most one clarifying question per conversation, and only when the answer would change the
+  change.** A request for information at the end of an answer counts as the question. For a
+  two-answer knob with the corner unsaid, the one question is how long they are turning for and
+  how quick. Otherwise the Engineer assumes the likeliest reading, says so, and answers it alone.
 - **Contested lore gets both claims + the discriminator.** Where good-faith experts genuinely
   split (bar stiffness on low grip), state the majority line, name the minority line, and give
   the on-track observable that tells *this* driver which applies today. Never pick silently.
@@ -142,6 +149,13 @@ Each of these was deleted or declined for a reason. They return only through the
   blind audit for anything user-visible.
 
 ## Changelog
+
+- **2026-09-02** — §2 rewritten to describe the prompt as it ships (label
+  `2026-09-01-rc-direction-guard`), by founder call after a whole-system audit found the doc
+  promising a four-layer answer (change / mechanism / what to feel for / when it wouldn't apply)
+  and three coverage-confidence levels that the wire had not sent since the 2026-09-01 cuts. The
+  prompt is the contract; this document follows it. The 2026-08-27 → 09-01 prompt history lives
+  in the doc comment on `ENGINEER_PROMPT_LABEL`.
 
 - **2026-08-25** — Founder call: ship the rebuilt Engineer to production ahead of harness
   calibration, then iterate. Three changes land together: (1) the nets enter the shipped

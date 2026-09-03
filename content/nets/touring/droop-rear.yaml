@@ -15,12 +15,12 @@ more:
   reviewed: true
   confidence: consensus
   before_settled: "more rotation on entry — the car turns in more freely"
-  once_settled: "the rear stays loaded for longer instead of going light; when droop is too limited the rear lets go suddenly"
+  once_settled: "the rear stays loaded for longer instead of going light; too far and it is too much rotation — hard to drive going in"
 less:
   reviewed: false
   confidence: consensus
   before_settled: "less rotation on entry — the car turns in less freely, the rear is more tied down"
-  once_settled: "the rear goes light sooner; when droop is too limited the rear lets go suddenly"
+  once_settled: "the rear goes light sooner; too far and it runs out of travel and lets go suddenly"
 physics:
   - droop-downstop.md
 sources:

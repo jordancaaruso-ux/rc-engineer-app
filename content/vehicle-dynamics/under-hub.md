@@ -3,8 +3,9 @@
 **Concepts:** [[roll-center]], [[camber-gain]]
 
 **Physics.** Adding shims under the hub pushes the **outer** end of the lower arm down — further from
-the hub — flattening the lower arm, which **raises the roll centre** on that corner and adds
-[[camber-gain]] with it. Removing shims does the reverse.
+the hub — which **raises the roll centre** on that corner (solver-checked; the sign lives in the table
+on [[upper-link-geometry]], never in how the arm looks) and adds [[camber-gain]] with it. Removing
+shims does the reverse.
 
 **Effects (context-dependent — confirm on track).**
 - All of them are that roll-centre change working through [[roll-center]] — higher RC → more bite /

@@ -19,9 +19,9 @@ export const ENGINEER_CHAT_SYSTEM_PROMPT = `You are an RC touring car race engin
 
 Build your physics from the knowledge base alone. Where it is silent, say so; never fill in from general racing knowledge.
 
-Nets are outcomes, not physics: reason from the knowledge base, never from a net's wording. A net may pick the lever, never decide the problem is the chassis — track, tyres or an unverified last change can be the answer; say so beside the change, not instead of it.
+Nets are outcomes, not physics: reason from the knowledge base, never from a net's wording. A net may pick the lever, never decide the problem is the chassis — track, tyres, an unverified last change, or nothing on the car at all can be the answer; say so beside the change, or instead of it when there is no change worth making.
 
-What the driver states is fact; never re-suspect it. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. One question per conversation at most (a request for information counts), only when the answer would change your change; for a two-answer knob with the corner unsaid, ask how long they are turning for and how quick. Otherwise assume the likeliest reading, say so, and answer it alone. A contested prior is the exception: both claims, plus what on track decides it.
+What the driver states is fact; never re-suspect it. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. Ask a question only when the answer would change what you tell them, and never more than one in a reply (a request for information counts). Otherwise assume the likeliest reading, say so, and answer it alone. A contested prior is the exception: both claims, plus what on track decides it.
 
 Never invent a number: use only numbers from the driver, the knowledge base, or this request's DRIVER DATA block — the only logged data you can see. Anything beyond that, say you can't see it, then answer what the physics alone can.
 
@@ -111,9 +111,38 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * the founder-owned words lines so it cannot drift, and (2) checks every finished reply in code:
  * a shim-move/RC-direction contradiction or an RC-distance claim gets its correction appended to
  * the stream and the stored message. upper-link-geometry.md carries the sizing ruling.
+ * 2026-09-02-audit-pass starts another. A whole-system audit (payload, prompt, driver data, KB,
+ * nets, bench) found the wire contradicting itself and the doc promising what the wire did not
+ * send; nothing in this file's prompt text changed. What did: the KB drafts divider no longer
+ * tells the model to cite files or lean on general theory (kb.ts); the nets header lost three dead
+ * sentences and its second phase label became THROUGH THE MIDDLE AND OUT; the render dropped the
+ * WHY lines and the snake_case ids; the day block prints clocks from the same instant and zone the
+ * app shows (driverData.ts); the genuine splits became real CONTESTED blocks; and eight KB pages
+ * took founder rulings from the interview (bite mechanism, damper oil timing, roll time, motion
+ * ratio, under-hub framing). docs/ENGINEER_NORTH_STAR.md §2 now describes this prompt.
+ * 2026-09-03-questions-per-reply starts another (founder call, from a live conversation). Asked
+ * "my car feels pretty good but its just slow" the Engineer asked the right question — corners or
+ * the straight — the driver answered something else ("same tyres and prep as the fast guys"), and
+ * the one-question-per-CONVERSATION cap then forbade re-asking, so it answered blind and filled the
+ * alternatives slots with a bodyshell and a diff move, each wrapped in an "only if" it had no basis
+ * for. The cap is now per REPLY: ask while the answer still changes what you say, one at a time.
+ * The corner-clock clause ("ask how long they are turning for and how quick") came out with it —
+ * founder: "a lot of drivers would struggle to answer that accurately". The nets header still says
+ * to work the corner out rather than ask, so nothing else needed to move; the seven CONTESTED
+ * discriminators now name an observable after the change instead of that question.
+ * 2026-09-03-no-change-is-an-answer starts another (founder call, same conversation). Asked "my car
+ * feels okay but just slow" and told it has grip, the Engineer produced a bodyshell move and a
+ * thinner diff, each behind an "only if" it had no basis for. Two causes: (1) "say so beside the
+ * change, NOT INSTEAD OF IT" — written to stop it dodging with "get another run on it" — forbade
+ * the honest answer that nothing on the car is the problem, so it had to name a lever; (2) only
+ * four nets carry any speed vocabulary and two of them are the body, so "slow" pattern-matches
+ * there. That clause now permits "no change worth making". The diff net gained the drive axis the
+ * KB already carried inside its argument (thicker = both rear tyres put the power down): it was a
+ * rotation-only entry, so "more drive off the corner" was unreachable and the model reached for
+ * thinner. Gearing, motor and line still have no KB page — the founder's to write, not invented here.
  * Scores are not comparable across labels.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-09-01-rc-direction-guard";
+export const ENGINEER_PROMPT_LABEL = "2026-09-03-no-change-is-an-answer";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);

@@ -17,12 +17,16 @@ more:
   reviewed: false
   confidence: majority
   before_settled: "the rear bites sooner — more secure from the first steering input, but less progressive"
-  once_settled: "tends toward less rear grip through the middle, though it often goes the other way — a stiffer rear giving more rear grip and less rotation"
+  once_settled: "tends toward less rear grip through the middle and more rotation — the contested claim below, the other way"
 less:
   reviewed: true
-  confidence: majority
+  confidence: contested
   before_settled: "the rear bites later — a little less secure from the first steering input, but more progressive"
-  once_settled: "tends toward more rear grip through the middle, though it can go the other way — often it is LESS rear flex that gives more rear grip and less rotation"
+  once_settled: "tends toward more rear grip through the middle and less rotation — the usual answer on a touring car"
+  contested:   # founder 2026-09-02: "normally more rear grip", and the split relates to corner regime; discriminator reworded to an on-track observable 2026-09-03
+    claim_a: "more rear flex gives more rear grip through the middle and less rotation"
+    claim_b: "the stiffer rear is the one with the rear grip, and more flex gives rotation instead"
+    discriminator: "make the change and compare the long, slow turns against the quick direction changes: better in the quick ones and worse in the long ones means the stiffer rear has gone too far"
 physics:
   - flex-chassis.md
 sources:

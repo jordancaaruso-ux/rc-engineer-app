@@ -98,6 +98,9 @@ export async function findComparableRunsForEngineer(
       id: true,
       createdAt: true,
       sessionCompletedAt: true,
+      // Without this the display instant fell through to sessionCompletedAt, which on rows
+      // stamped by the old wall-clock-as-UTC bug printed the run ten hours out (2026-09-02).
+      loggingCompletedAt: true,
       carRating: true,
       tireTypeId: true,
       gripLevel: true,
@@ -132,6 +135,7 @@ export async function findComparableRunsForEngineer(
       whenIso: resolveRunDisplayInstant({
         createdAt: peer.createdAt,
         sessionCompletedAt: peer.sessionCompletedAt,
+        loggingCompletedAt: peer.loggingCompletedAt,
       }).toISOString(),
       trackName: peer.track?.name ?? null,
       carRating: peer.carRating,

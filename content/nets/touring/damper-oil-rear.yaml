@@ -16,12 +16,12 @@ more:
   reviewed: true
   confidence: consensus
   before_settled: "the rear takes its set slower — more forgiving into the corner and settling onto the power; too far and it reacts too slowly, and is just slower"
-  once_settled: "no change — damping only acts while the car is moving, and a settled car has stopped"
+  once_settled: "no change — damping only acts while the car is moving, and by the middle of the corner it is not"
 less:
   reviewed: false
   confidence: consensus
-  before_settled: "the rear takes its set faster — quicker to rotate into the corner and less settled onto the power; too far and it moves too quickly, harder to drive"
-  once_settled: "no change — damping only acts while the car is moving, and a settled car has stopped"
+  before_settled: "the rear takes its set faster — less forgiving into the corner and onto the power; too far and it moves too quickly, harder to drive"
+  once_settled: "no change — damping only acts while the car is moving, and by the middle of the corner it is not"
 physics:
   - damper-oil.md
 sources:

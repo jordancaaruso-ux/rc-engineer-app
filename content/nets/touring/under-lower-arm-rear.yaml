@@ -22,14 +22,18 @@ two_answers: true
 # stiff, secure. And on this key the rear RELATIVE to the front is as important as the change itself, if not more.
 more:
   reviewed: true
-  confidence: majority
+  confidence: contested
   before_settled: "the rear feels more direct and stiff from the first input — more secure, more on the track — though less of a bite change than the upper links give"
-  once_settled: "tends toward oversteer mid-corner, though it can go the other way; exit either way; rear against front counts as much as the change itself"
+  once_settled: "tends toward oversteer mid-corner; exit either way; rear against front counts as much as the change itself"
+  contested:   # the settled-rear split (corner-regime.md); founder 2026-09-02: softer rear rotates most in long, slow corners. discriminator reworded to an on-track observable 2026-09-03 (the corner-clock question came out of the prompt: drivers cannot answer it accurately)
+    claim_a: "rear roll centre up gives up rear grip once the car is leaning — oversteer through the middle"
+    claim_b: "rear roll centre up gives more rear grip and less rotation — on track, often the way it goes"
+    discriminator: "make the change and compare the long, slow turns against the quick direction changes: better in the quick ones and worse in the long ones means the rear roll centre has gone too high"
 less:
   reviewed: false
   confidence: majority
   before_settled: "the rear feels less direct from the first input — softer, less secure, more in the track — though less of a bite change than the upper links give"
-  once_settled: "tends toward more rear grip mid-corner, though it can go the other way; exit either way; rear against front counts as much as the change itself"
+  once_settled: "tends toward more rear grip mid-corner — the contested claim above, the other way; exit either way; rear against front counts as much as the change itself"
 physics:
   - under-lower-arm.md
 sources:

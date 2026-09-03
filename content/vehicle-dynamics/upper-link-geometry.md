@@ -44,6 +44,14 @@ measured against each other, the under-lower-arm and under-hub shims lean toward
 change, the upper-link ends toward a camber-gain change. Every key moves both; the lean is relative,
 not a split.
 
+**Why an upper-link move is felt as more of a bite change** (founder-confirmed 2026-09-02). For the
+same roll-centre move, an upper-link shim carries about twice the camber-gain change of a lower-arm
+or hub shim (the numbers above). Camber gain is what holds the loaded tyre's camber nearer its best
+as load arrives ([[camber-gain]] → [[camber-grip]]), so the grip that move makes arrives **sooner
+and sharper** — on the first input and as the car leans — without there being **more** of it. That
+is bite, not grip ([[bite-hold]]): the upper links change bite more than the other keys do, per
+roll-centre millimetre, and the overall front-grip *feel* moves with them for the same reason.
+
 Directions hold for normal double-wishbone geometry; the magnitudes are this chassis
 (solver-verified 2026-08-01, 0.5 mm perturbations from the pack baseline).
 

@@ -26,9 +26,11 @@ alone**.
 Through the corner itself, damping sets **how fast that end moves into roll**, so a **thinner** end
 takes its load **faster** and a thicker end **slower** ([[load-transfer]]). **This is the exception to
 the usual direction** (founder, 2026-09-01): on most knobs the stiffer choice loads that end sooner;
-on oil the thicker choice loads it later. Thicker means slower transitions, more settled grip and
-less initial grip; thinner is the mirror — the load arrives sooner and there is **more initial grip**
-for it (founder, 2026-09-01). Whether **pack** — damping force that climbs steeply with shaft speed,
+on oil the thicker choice loads it later. Thicker means slower transitions and initial grip that
+arrives later; thinner is the mirror — the load arrives sooner. The **amount** of grip is the same
+either way: what thinner changes is *when* it is there, and because the car then sits at that
+amount for longer, it can **read as more steering** without there being more grip (founder,
+2026-09-02, replacing the 2026-09-01 "more initial grip"). Whether **pack** — damping force that climbs steeply with shaft speed,
 set by the piston and its holes rather than the oil — adds to that is unverified (founder hedged: it
 might). Damping matters most on the way in and least once the middle has settled ([[corner-regime]]).
 

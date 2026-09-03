@@ -16,12 +16,16 @@ more:
   reviewed: false
   confidence: majority
   before_settled: "with the tail higher than the nose, more likely a little more initial steering"
-  once_settled: "more likely a touch less rear grip through the middle and less planted on power — but hard to call, the geometry moves with it"
+  once_settled: "more likely a touch less rear grip through the middle and less planted on power — the contested claim below, the other way"
 less:
   reviewed: true
-  confidence: majority
+  confidence: contested
   before_settled: "with the tail lower than the nose, more likely a little less initial steering"
-  once_settled: "more likely a touch more rear grip through the middle and more planted on power — but hard to call, the geometry moves with it; too low and it touches under power"
+  once_settled: "more likely a touch more rear grip through the middle and more planted on power; too low and it touches under power"
+  contested:   # founder 2026-09-02: a real split, not a hedge; claims and discriminator AI-drafted, awaiting his check
+    claim_a: "tail lower gives a touch more rear grip through the middle and more planted on power"
+    claim_b: "tail lower drops the rear roll centre, so the rear bites later and holds less"
+    discriminator: "a 0.2 mm move tells you: more planted on power and the weight won today; later to bite from the first input and the roll centre did"
 physics:
   - ride-height-and-rake.md
 sources:

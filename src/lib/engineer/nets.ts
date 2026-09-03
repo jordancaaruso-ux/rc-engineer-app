@@ -27,12 +27,19 @@ const NETS_DRAFTS_DIR = path.join(NETS_DIR, "drafts");
  * Header on the nets block. Since 2026-09-01 (founder call) the per-side confidence tag is not
  * rendered and the header says every entry carries the same weight — the tags had become a lever
  * ranking (consensus knobs led every answer; the geometry, all majority, never did).
+ *
+ * 2026-09-02 (whole-system audit): three sentences cut because the corpus no longer matched them —
+ * "where a knob shows only one direction" (all 74 sides are written), "one EFFECT line means the
+ * same thing throughout the corner" (diff oil's one line splits on the throttle), and "nothing here
+ * says why" (lines carry short why-clauses). The second phase label became THROUGH THE MIDDLE AND
+ * OUT: about ten lines carry exit content and the old label told the model they were about the
+ * middle. CONTESTED stays — since this date the genuine splits are real contested blocks.
  */
 export const ENGINEER_NETS_HEADER = `SETUP EFFECT PRIORS ("nets") — outcomes, in the driver's words. Probabilistic: "most likely", never "will".
-Each entry is one knob, with what each direction most likely does — both directions side by side. A knob that does one thing on the way into the corner and another through the middle carries TWO lines per direction — ON THE WAY IN and THROUGH THE MIDDLE — because it genuinely has two answers, and which one matters today depends on how long the corner lasts against how long this car takes to settle. The knowledge base above carries that rule; work out from it and from what the driver has told you which line applies, and say so. Speak of places on the corner — going in, the middle, coming out — never of whether the car has "settled": that is the knowledge base's word, not the driver's. A knob with one EFFECT line per direction does the same thing throughout the corner, whatever its clock says. A longer entry is not a better lever.
-Nothing here says why, and nothing here says what makes an effect bigger, smaller or worth the opposite move — that all lives in the knowledge base, once. Never treat a prior as evidence about the mechanism it points at.
-Where a knob shows only one direction, the opposite move most likely does the opposite. A line that says "can" or "tends toward" means exactly that: it goes that way more often than not, and not always.
-Every entry carries the same weight: no prior outranks another — choose by fit to the driver's problem, never by how an entry is worded. Where an entry carries CONTESTED claims, present both and the on-track discriminator, never pick silently. A "normal move" is what a typical-sized change looks like; size the move to the problem — a chronic one that is everywhere takes a big move, a small complaint a small one.
+Each entry is one knob, with what each direction most likely does — both directions side by side. A knob that does one thing on the way into the corner and another from the middle on carries TWO lines per direction — ON THE WAY IN and THROUGH THE MIDDLE AND OUT — because it genuinely has two answers, and which one matters today depends on how long the corner lasts against how long this car takes to settle. The knowledge base above carries that rule; work out from it and from what the driver has told you which line applies, and say so. Speak of places on the corner — going in, the middle, coming out — never of whether the car has "settled": that is the knowledge base's word, not the driver's. A knob with one EFFECT line per direction has one answer for the corner; where that answer splits on something else — throttle, car speed — the line says so. A longer entry is not a better lever.
+What makes an effect bigger, smaller or worth the opposite move lives in the knowledge base, once — never in these lines. Never treat a prior as evidence about the mechanism it points at.
+A line that says "can" or "tends toward" means exactly that: it goes that way more often than not, and not always.
+Every entry carries the same weight: no prior outranks another — choose by fit to the driver's problem, never by how an entry is worded. Where a side carries CONTESTED claims, present both and the on-track discriminator, never pick silently. A "normal move" is what a typical-sized change looks like; size the move to the problem — a chronic one that is everywhere takes a big move, a small complaint a small one.
 
 `;
 

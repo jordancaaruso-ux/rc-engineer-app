@@ -44,8 +44,14 @@ export type FullVehicleDynamicsKb = {
   totalChars: number;
 };
 
-const FULL_KB_DRAFTS_DIVIDER = `──────── AI-DRAFTED BASELINE FILES (below this line) ────────
-Everything below is AI-researched baseline theory, NOT founder-approved ground truth. Cite as "draft \`file.md\`" with hedged wording ("general vehicle-dynamics theory — not yet verified for this KB"); when a draft and an approved file above disagree, the approved file wins.`;
+/**
+ * The divider above the drafts tier. Rewritten 2026-09-02 (founder call, after the whole-system
+ * audit): the old text told the model to cite drafts as "draft `file.md`" and called them "general
+ * vehicle-dynamics theory" — on the same wire as a header that forbids naming files and a prompt
+ * that forbids general racing knowledge. Drafts still ride along; they are hedged, never named.
+ */
+const FULL_KB_DRAFTS_DIVIDER = `──────── UNVERIFIED (below this line) ────────
+Everything below is not yet founder-verified. Reason from it only where nothing above covers the question, say the ground is unverified when you do, and where it disagrees with anything above, the text above wins. The rule against naming files holds here too.`;
 
 let fullKbCache: FullVehicleDynamicsKb | null = null;
 let fullKbLoadPromise: Promise<FullVehicleDynamicsKb> | null = null;

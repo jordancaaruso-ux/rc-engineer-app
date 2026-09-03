@@ -24,7 +24,9 @@ earlier; softer brings it in later.
 
 The same change answers **opposite ways** in the two phases. A stiffer rear carries a **larger
 share** of the settled transfer, so it makes **less** side grip in the middle; the same stiffer rear
-takes its load **sooner** on the way in, so its grip is there **earlier**. Softer mirrors both.
+takes its load **sooner** on the way in, so its grip is there **earlier**. Softer mirrors both. The
+settled-rear half of that is the claim [[corner-regime]] holds most loosely — on track a stiffer rear
+often gives more rear grip, not less — and the hedge lives there, once.
 
 **What a bar changes that a spring does not.** A bar moves roll stiffness **only**. A spring of the
 same effect also changes how that end carries a bump under both wheels and how deep it rides in its

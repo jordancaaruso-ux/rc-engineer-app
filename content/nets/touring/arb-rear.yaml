@@ -13,14 +13,18 @@ step: "0.1 mm"   # founder-dictated 2026-08-27
 two_answers: true
 more:
   reviewed: true
-  confidence: consensus
+  confidence: contested
   before_settled: "the rear bites sooner — secure from the first steering input, and quicker through direction changes"
-  once_settled: "tends toward more oversteer through the middle, though this one can go the other way; more rear support on power, so it can drive straighter off the corner"
+  once_settled: "tends toward more oversteer through the middle; more rear support on power, so it can drive straighter off the corner"
+  contested:   # the settled-rear split (corner-regime.md); founder 2026-09-02: softer rear rotates most in long, slow corners. discriminator reworded to an on-track observable 2026-09-03 (the corner-clock question came out of the prompt: drivers cannot answer it accurately)
+    claim_a: "stiffer at the rear gives up rear grip once the car is leaning — more oversteer through the middle"
+    claim_b: "stiffer at the rear gives more rear grip and less rotation — on track, often the way it goes"
+    discriminator: "make the change and compare the long, slow turns against the quick direction changes: better in the quick ones and worse in the long ones means the stiffer rear has gone too far"
 less:
   reviewed: false
   confidence: consensus
   before_settled: "the rear bites later — a little less secure from the first steering input, and slower through direction changes"
-  once_settled: "tends toward more rear grip through the middle — less oversteer — though this one can go the other way; less rear support on power"
+  once_settled: "tends toward more rear grip through the middle — less oversteer — the contested claim above, the other way; less rear support on power"
 physics:
   - arb.md
 sources:

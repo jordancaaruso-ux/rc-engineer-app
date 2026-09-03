@@ -17,14 +17,18 @@ step: "0.5 mm; 0.25 mm is a small change, still noticeable"   # founder-dictated
 two_answers: true
 more:
   reviewed: true
-  confidence: majority
+  confidence: contested
   before_settled: "the rear bites sooner — more secure from the first input, and more on the track; rear against front counts as much as the change itself"
-  once_settled: "tends toward oversteer through the middle, though it can go the other way; on exit it can go either way, depending on the day"
+  once_settled: "tends toward oversteer through the middle; on exit it can go either way, depending on the day"
+  contested:   # the settled-rear split (corner-regime.md); founder 2026-09-02: softer rear rotates most in long, slow corners. discriminator reworded to an on-track observable 2026-09-03 (the corner-clock question came out of the prompt: drivers cannot answer it accurately)
+    claim_a: "rear roll centre up gives up rear grip once the car is leaning — oversteer through the middle"
+    claim_b: "rear roll centre up gives more rear grip and less rotation — on track, often the way it goes"
+    discriminator: "make the change and compare the long, slow turns against the quick direction changes: better in the quick ones and worse in the long ones means the rear roll centre has gone too high"
 less:
   reviewed: false
   confidence: majority
   before_settled: "the rear bites later — less secure from the first input, and more in the track; rear against front counts as much as the change itself"
-  once_settled: "tends toward more rear grip through the middle, though it can go the other way; on exit it can go either way, depending on the day"
+  once_settled: "tends toward more rear grip through the middle — the contested claim above, the other way; on exit it can go either way, depending on the day"
 physics:
   - under-hub.md
 sources:

@@ -16,11 +16,11 @@ two_answers: false
 more:
   reviewed: true
   confidence: consensus
-  effect: "less rotation off throttle and more rotation on throttle — the two move opposite ways, so name which one is missing before touching it; biggest in tight corners"
+  effect: "more drive off the corner — both rear tyres put the power down — with more rotation on throttle; less rotation off throttle; biggest in tight corners"
 less:
   reviewed: false
   confidence: consensus
-  effect: "more rotation off throttle and less on throttle — the two move opposite ways, so name which is missing before touching it; too thin lacks drive; biggest in tight corners"
+  effect: "less drive off the corner and less rotation on throttle; more rotation off throttle; too thin and it will not put the power down; biggest in tight corners"
 physics:
   - diff-and-driveline.md
 sources:

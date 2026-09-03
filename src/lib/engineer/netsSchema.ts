@@ -85,7 +85,10 @@ export const NET_CONTESTED_FIELD_MAX = 200;
  * an entry growing back into the one the model favours by bulk. Two sides now, so roughly double
  * the v4 ceiling: a full two-sided, two-line knob with a long step lands near 900.
  */
-export const NET_RENDER_MAX = 1100;
+export const NET_RENDER_MAX = 1400;
+// 1100 → 1400 on 2026-09-02: the genuine splits (settled rear, rear flex, ride height) became
+// real CONTESTED blocks on both sides, three lines each, and the two-line rear roll levers were
+// already near 900. The ceiling still bites: a contested block is structure, not prose bulk.
 
 /** Fields from earlier formats that must not come back, each with a pointer to its replacement. */
 const RETIRED_FIELDS: Readonly<Record<string, string>> = {
@@ -301,12 +304,17 @@ export function unreviewedSides(entry: NetEntry): string[] {
  * Render one net for the model. Byte-stable field order. Sources and the reviewed flag are never
  * rendered — the north star forbids naming sources to drivers, and a draft marker would make the
  * local test read differently from what ships once the founder has passed it.
+ *
+ * 2026-09-02 (whole-system audit): the heading no longer carries the parameter id and the WHY
+ * line is gone. The ids were leaking into answers and several misled — "FRONT ANTI-DIVE
+ * (under_lower_arm_shims_fr)" told every driver anti-dive IS the fr shim, one chassis's truth —
+ * and the WHY line named KB files under a header that forbids naming files, on a wire where the
+ * whole KB is present anyway. `physics:` stays in the YAML as the validator's anti-substitution
+ * hook; the model never needed it.
  */
 export function renderNetEntry(entry: NetEntry): string {
   const lines: string[] = [];
-  lines.push(
-    `${entry.label.toUpperCase()} (${entry.parameter})` + (entry.step ? ` | a normal move: ${entry.step}` : "")
-  );
+  lines.push(entry.label.toUpperCase() + (entry.step ? ` | a normal move: ${entry.step}` : ""));
   for (const side of NET_SIDES) {
     const s = entry[side];
     if (!s) continue;
@@ -320,7 +328,9 @@ export function renderNetEntry(entry: NetEntry): string {
       // asking drivers about it (founder, 2026-08-28). The fields keep their names; the labels
       // the model reads are places on the corner.
       lines.push(`    ON THE WAY IN: ${s.before_settled}`);
-      lines.push(`    THROUGH THE MIDDLE: ${s.once_settled}`);
+      // "AND OUT" since 2026-09-02: the once_settled field has always carried exit and on-power
+      // content too, and the old label told the model it was about the middle only.
+      lines.push(`    THROUGH THE MIDDLE AND OUT: ${s.once_settled}`);
     } else {
       lines.push(`    EFFECT: ${s.effect}`);
     }
@@ -330,6 +340,5 @@ export function renderNetEntry(entry: NetEntry): string {
       lines.push(`              what decides it on track: ${s.contested.discriminator}`);
     }
   }
-  lines.push(`  WHY: ${entry.physics.join(", ")}`);
   return lines.join("\n");
 }
