@@ -1,5 +1,7 @@
 import "server-only";
 
+import { timingUserAgent } from "@/lib/http/timingUserAgent";
+
 const API_BASE = "https://api2.mylaps.com";
 const DEFAULT_TIMEOUT_MS = 18_000;
 
@@ -63,7 +65,7 @@ async function speedhiveFetchJson<T>(path: string, query?: Record<string, string
       signal: controller.signal,
       headers: {
         Accept: "application/json",
-        "User-Agent": process.env.LAP_IMPORT_USER_AGENT?.trim() || "RC-Engineer/1.0",
+        "User-Agent": timingUserAgent(),
       },
     });
     if (!res.ok) {
