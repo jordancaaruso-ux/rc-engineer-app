@@ -321,9 +321,13 @@ export function EngineerChatPanel({
   const inConversation = messages.length > 0 || sending;
 
   return (
-    <div className="flex min-h-0 flex-col lg:flex-row">
+    /* The panel owns its height, as the panel it replaced did: a phone gets a scroll-well under
+       the question, a desktop window gets a bounded conversation with the composer on screen.
+       Without a bound the transcript grows the page and every answer streams in below the fold —
+       the 2026-09-01 complaint — and nothing the transcript does to its own scrollTop can help. */
+    <div className="flex min-h-0 flex-col lg:h-[min(76dvh,48rem)] lg:flex-row">
       {/* History */}
-      <aside className="order-2 border-t border-border lg:order-1 lg:w-64 lg:shrink-0 lg:border-r lg:border-t-0">
+      <aside className="order-2 border-t border-border lg:order-1 lg:min-h-0 lg:w-64 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-t-0">
         <div className="flex items-center justify-between px-4 pt-3">
           <Eyebrow>History</Eyebrow>
           <button
@@ -381,7 +385,7 @@ export function EngineerChatPanel({
         <div
           ref={transcriptRef}
           data-testid="engineer-transcript"
-          className="min-h-[16rem] flex-1 overflow-y-auto p-4"
+          className="max-h-[min(42vh,340px)] min-h-[16rem] flex-1 overflow-y-auto p-4 lg:max-h-none"
         >
           {/* The inner box is what the ResizeObserver watches: a scroll container never reports its
               own content growing, so the following would stop the moment tokens arrived. */}
