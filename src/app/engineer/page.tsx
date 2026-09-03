@@ -84,7 +84,7 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
           </CardPanel>
         )}
         <Suspense fallback={<EngineerClientSkeleton />}>
-          <EngineerPageClient ratingsEnabled={ratingsEnabled} />
+          <EngineerPageClient ratingsEnabled={ratingsEnabled} hasRuns={hasAnyRun} />
         </Suspense>
       </section>
     </>

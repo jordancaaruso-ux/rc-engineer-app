@@ -1,19 +1,34 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUp, MessageSquarePlus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowUp, ChevronDown, MessageSquarePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EngineerMessageRatingRow } from "@/components/engineer/EngineerMessageRatingRow";
+import { EngineerStarterQuestions } from "@/components/engineer/EngineerStarterQuestions";
+import { EngineerThinkingIndicator } from "@/components/engineer/EngineerThinkingIndicator";
 import { Button } from "@/components/ui/Button";
 import { EngineerMarkdown } from "@/components/ui/EngineerMarkdown";
 import { Eyebrow } from "@/components/ui/panel";
 import { RelativeTime } from "@/components/ui/RelativeTime";
+import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import {
+  ENGINEER_STARTER_BOARD_COUNT,
+  selectEngineerStarterQuestions,
+  type EngineerStarterQuestion,
+} from "@/lib/engineerStarterQuestions";
 
 /**
- * The Engineer chat, rebuilt minimal (2026-08-13, docs/ENGINEER_NORTH_STAR.md):
- * thread history, the conversation, the composer, and ratings. The anchor picker,
- * subject bar, choice chips and status theatre all died with the old pipeline —
- * anything that returns must earn its place through the eval harness first.
+ * The Engineer chat: the conversation card and the history card, the starter questions, the
+ * composer, and ratings.
+ *
+ * The brain behind it is the 2026-08-13 rebuild (docs/ENGINEER_NORTH_STAR.md): one chat route,
+ * the knowledge base, a short prompt, the driver's own recent runs, and nothing else. The LOOK is
+ * the page as it stood on 2026-09-01 (founder call 2026-09-03: "revert the appearance, keep the
+ * mind") — two cards, the drifting rail of starter questions on a phone and the board of six on a
+ * desktop, the composer that a starter fills but never sends. What did not come back: the subject
+ * bar and its pin picker (the new brain reads your latest run on its own and ignores pins, so a
+ * bar that pretended to steer it would lie), the follow-up choice chips (the reply no longer
+ * carries them), and the trivia in the thinking bubble.
  */
 
 type RatingContext = {
@@ -34,6 +49,8 @@ type ThreadSummary = {
   id: string;
   title: string;
   preview: string | null;
+  /** A plain-text taste of the ENGINEER's last answer. Only the first few threads carry one. */
+  answerPreview?: string | null;
   updatedAt: string;
 };
 
@@ -46,12 +63,14 @@ type EngineerChatFeedback = {
 export type EngineerQueuedChatPrompt = { id: number; text: string };
 
 // History starts collapsed to the most recent few conversations; the rest live
-// behind a "Show all" toggle so the panel doesn't scroll into a wall of threads.
+// behind a "Show all" toggle so the card doesn't scroll into a wall of threads.
 const HISTORY_COLLAPSED_COUNT = 4;
+/** The top few history rows read as previews (question + a taste of the answer). */
+const HISTORY_PREVIEW_COUNT = 3;
 
 async function readSseStream(
   res: Response,
-  handlers: { onToken?: (text: string) => void }
+  handlers: { onToken?: (text: string) => void; onStatus?: (phase: string) => void }
 ): Promise<{ reply: string; feedback: EngineerChatFeedback | null }> {
   const reader = res.body?.getReader();
   if (!reader) throw new Error("Stream had no body");
@@ -79,6 +98,8 @@ async function readSseStream(
       if (event === "token" && typeof data.t === "string") {
         reply += data.t;
         handlers.onToken?.(data.t);
+      } else if (event === "status" && typeof data.phase === "string") {
+        handlers.onStatus?.(data.phase);
       } else if (event === "done") {
         if (typeof data.reply === "string" && data.reply.trim()) reply = data.reply;
         if (data.feedback && typeof data.feedback === "object") {
@@ -129,19 +150,33 @@ export function EngineerChatPanel({
   queuedPrompt = null,
   onQueuedPromptConsumed,
   ratingsEnabled = false,
+  hasRuns = false,
 }: {
   queuedPrompt?: EngineerQueuedChatPrompt | null;
   onQueuedPromptConsumed?: () => void;
   ratingsEnabled?: boolean;
+  /**
+   * The driver has logged at least one run. The Engineer reads their latest run on its own, so
+   * this is also "a run is in focus" for the starter questions — the run-family chips only make
+   * sense when there is a run to read.
+   */
+  hasRuns?: boolean;
 } = {}) {
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
+  const [threadsLoading, setThreadsLoading] = useState(true);
+  const [threadsErr, setThreadsErr] = useState<string | null>(null);
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  // null = not touched: open while there is no conversation, shut once one is on screen.
+  const [historyOpen, setHistoryOpen] = useState<boolean | null>(null);
+  const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [statusPhase, setStatusPhase] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
   // The transcript follows the newest words as they arrive. `stickToBottom` drops to false the
   // moment the driver scrolls up to re-read an earlier answer, and comes back the moment they
   // return to the foot of the thread (or send anything), so following never fights a deliberate
@@ -151,14 +186,21 @@ export function EngineerChatPanel({
   const stickToBottom = useRef(true);
   const consumedPromptIdRef = useRef<number | null>(null);
 
+  const panelBusy = sending || loadingThread;
+  const showNewChat = Boolean(threadId || messages.length > 0);
+
   const refreshThreads = useCallback(async () => {
     try {
       const res = await fetch("/api/engineer/threads?limit=30");
-      if (!res.ok) return;
+      if (!res.ok) throw new Error("Could not load past conversations");
       const data = (await res.json()) as { threads?: ThreadSummary[] };
       if (Array.isArray(data.threads)) setThreads(data.threads);
-    } catch {
-      /* history is a convenience — never block the chat on it */
+      setThreadsErr(null);
+    } catch (e) {
+      // History is a convenience — it never blocks the chat, it just says so.
+      setThreadsErr(e instanceof Error ? e.message : "Could not load past conversations");
+    } finally {
+      setThreadsLoading(false);
     }
   }, []);
 
@@ -205,6 +247,17 @@ export function EngineerChatPanel({
     };
   }, [hasMessages]);
 
+  // The composer ships as `rows={1}` with a `max-h-28` cap, which was fine while every message
+  // was typed a character at a time. A tapped starter question arrives ~90 characters at once
+  // and the second line was clipped in half, so the box grows to fit what's in it — capped by
+  // the same CSS max-height.
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
+
   const openThread = useCallback(async (id: string) => {
     setLoadingThread(true);
     setError(null);
@@ -217,6 +270,9 @@ export function EngineerChatPanel({
       setThreadId(id);
       stickToBottom.current = true;
       setMessages(mapApiMessages(data.messages ?? []));
+      // Opening a conversation on a phone is leaving the list: shut it so the chat is what's
+      // on screen. Untouched at lg, where the list is always open.
+      setHistoryOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load that conversation");
     } finally {
@@ -225,26 +281,35 @@ export function EngineerChatPanel({
   }, []);
 
   const deleteThread = useCallback(
-    async (id: string) => {
+    async (id: string, title: string) => {
+      const ok = window.confirm(`Delete "${title}"?\n\nThis removes the conversation permanently.`);
+      if (!ok) return;
+      setDeletingThreadId(id);
+      setThreadsErr(null);
       try {
-        await fetch(`/api/engineer/threads/${encodeURIComponent(id)}`, { method: "DELETE" });
-      } catch {
-        /* refresh below shows the truth either way */
+        const res = await fetch(`/api/engineer/threads/${encodeURIComponent(id)}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Could not delete that conversation");
+        if (threadId === id) {
+          setThreadId(null);
+          setMessages([]);
+        }
+      } catch (e) {
+        setThreadsErr(e instanceof Error ? e.message : "Could not delete that conversation");
+      } finally {
+        setDeletingThreadId(null);
+        void refreshThreads();
       }
-      if (threadId === id) {
-        setThreadId(null);
-        setMessages([]);
-      }
-      void refreshThreads();
     },
     [refreshThreads, threadId]
   );
 
-  const newChat = useCallback(() => {
+  const startNewChat = useCallback(() => {
     setThreadId(null);
     stickToBottom.current = true;
     setMessages([]);
     setError(null);
+    setInput("");
+    setHistoryOpen(null);
   }, []);
 
   const send = useCallback(
@@ -253,6 +318,7 @@ export function EngineerChatPanel({
       if (!question || sending) return;
       setError(null);
       setSending(true);
+      setStatusPhase(null);
       stickToBottom.current = true;
       setInput("");
 
@@ -283,6 +349,7 @@ export function EngineerChatPanel({
           throw new Error(body.error ?? `HTTP ${res.status}`);
         }
         const { reply, feedback } = await readSseStream(res, {
+          onStatus: (phase) => setStatusPhase(phase),
           onToken: (t) => applyAssistant((prev) => ({ ...prev, content: prev.content + t })),
         });
         applyAssistant((prev) => ({
@@ -304,6 +371,7 @@ export function EngineerChatPanel({
         setError(e instanceof Error ? e.message : "Engineer chat failed");
       } finally {
         setSending(false);
+        setStatusPhase(null);
       }
     },
     [messages, refreshThreads, sending, threadId]
@@ -317,153 +385,325 @@ export function EngineerChatPanel({
     void send(queuedPrompt.text);
   }, [onQueuedPromptConsumed, queuedPrompt, send]);
 
-  const visibleThreads = historyExpanded ? threads : threads.slice(0, HISTORY_COLLAPSED_COUNT);
-  const inConversation = messages.length > 0 || sending;
+  // Starter questions only exist on an empty thread (engineerStarterQuestions.ts).
+  const startersVisible = messages.length === 0;
+  const starterQuestions = useMemo(
+    () =>
+      startersVisible
+        ? selectEngineerStarterQuestions({ runInFocus: hasRuns, hasHistory: hasRuns })
+        : [],
+    [startersVisible, hasRuns]
+  );
+
+  const fillFromStarter = (question: EngineerStarterQuestion) => {
+    // Fills, never sends: a mis-tap costs nothing, and it can't spend a request from the
+    // monthly cap. The driver adds which corner, which round, then sends.
+    setInput(question.text);
+    const el = composerRef.current;
+    if (!el) return;
+    el.focus();
+    const end = question.text.length;
+    el.setSelectionRange(end, end);
+  };
+
+  const historyShown = historyOpen ?? messages.length === 0;
+  const canCollapseHistory = threads.length > HISTORY_COLLAPSED_COUNT;
+
+  // Collapsed view shows the most recent few, but always keeps the active conversation visible
+  // so its highlight isn't hidden behind "Show all".
+  const visibleThreads =
+    historyExpanded || !canCollapseHistory
+      ? threads
+      : (() => {
+          const head = threads.slice(0, HISTORY_COLLAPSED_COUNT);
+          if (threadId && !head.some((t) => t.id === threadId)) {
+            const active = threads.find((t) => t.id === threadId);
+            if (active) return [...head, active];
+          }
+          return head;
+        })();
 
   return (
-    /* The panel owns its height, as the panel it replaced did: a phone gets a scroll-well under
-       the question, a desktop window gets a bounded conversation with the composer on screen.
-       Without a bound the transcript grows the page and every answer streams in below the fold —
-       the 2026-09-01 complaint — and nothing the transcript does to its own scrollTop can help. */
-    <div className="flex min-h-0 flex-col lg:h-[min(76dvh,48rem)] lg:flex-row">
-      {/* History */}
-      <aside className="order-2 border-t border-border lg:order-1 lg:min-h-0 lg:w-64 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-t-0">
-        <div className="flex items-center justify-between px-4 pt-3">
-          <Eyebrow>History</Eyebrow>
-          <button
-            type="button"
-            onClick={newChat}
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground transition hover:text-foreground"
+    /*
+     * TWO CARDS (2026-08-18): the conversation is one card, past conversations are their own.
+     * At lg history sits in a 19rem left column with its own border and stops at its own
+     * content instead of stretching the chat's full height.
+     *
+     * Phone: chat card, then a history card that starts SHUT (a count row you tap), so the page
+     * ends on the thing you came for. DOM order is chat → history; the lg grid puts history back
+     * on the left.
+     */
+    <div className="flex flex-col gap-3 lg:grid lg:h-[min(76dvh,48rem)] lg:grid-cols-[19rem_1fr] lg:gap-3">
+      <SurfaceCard
+        variant="panel"
+        overflowHidden={false}
+        className="lg:col-start-2 lg:row-start-1 lg:min-h-0"
+        /* Row 1 is `1fr` so that before the first question the empty track still absorbs the
+           slack and the composer sits at the bottom — the way every chat app resolves an empty
+           thread. `h-full` re-pins the height the outer grid owns. */
+        contentClassName="p-0 flex flex-col lg:grid lg:h-full lg:min-h-0 lg:grid-rows-[1fr_auto]"
+      >
+        {messages.length > 0 ? (
+          /* A hard 340px scroll-well is right on a phone and absurd on a 1440px monitor; at lg
+             the grid row owns the height instead. */
+          <div
+            ref={transcriptRef}
+            data-testid="engineer-transcript"
+            className="max-h-[min(42vh,340px)] overflow-y-auto border-b border-border/80 px-3 py-2.5 lg:row-start-1 lg:max-h-none lg:min-h-0 lg:border-b-0 lg:px-5 lg:py-4"
           >
-            <MessageSquarePlus className="h-3.5 w-3.5" aria-hidden />
-            New chat
-          </button>
-        </div>
-        <ul className="space-y-0.5 p-2">
-          {visibleThreads.map((t) => (
-            <li key={t.id} className="group flex items-start gap-1">
-              <button
-                type="button"
-                onClick={() => void openThread(t.id)}
-                className={cn(
-                  "min-w-0 flex-1 rounded-md px-2 py-1.5 text-left transition hover:bg-muted/50",
-                  threadId === t.id && "bg-muted/60"
-                )}
-              >
-                <span className="block truncate text-[13px] text-foreground">{t.title}</span>
-                <span className="block text-[10px] text-muted-foreground">
-                  <RelativeTime iso={t.updatedAt} fallback="" />
-                </span>
-              </button>
-              <button
-                type="button"
-                aria-label="Delete conversation"
-                onClick={() => void deleteThread(t.id)}
-                className="mt-1.5 rounded p-1 text-muted-foreground/50 opacity-0 transition hover:text-destructive group-hover:opacity-100"
-              >
-                <Trash2 className="h-3.5 w-3.5" aria-hidden />
-              </button>
-            </li>
-          ))}
-          {threads.length === 0 ? (
-            <li className="px-2 py-1.5 text-xs text-muted-foreground">No conversations yet.</li>
-          ) : null}
-        </ul>
-        {threads.length > HISTORY_COLLAPSED_COUNT ? (
-          <button
-            type="button"
-            onClick={() => setHistoryExpanded((v) => !v)}
-            className="px-4 pb-3 text-xs text-muted-foreground transition hover:text-foreground"
-          >
-            {historyExpanded ? "Show fewer" : `Show all (${threads.length})`}
-          </button>
-        ) : null}
-      </aside>
-
-      {/* Conversation */}
-      <div className="order-1 flex min-h-0 flex-1 flex-col lg:order-2">
-        <div
-          ref={transcriptRef}
-          data-testid="engineer-transcript"
-          className="max-h-[min(42vh,340px)] min-h-[16rem] flex-1 overflow-y-auto p-4 lg:max-h-none"
-        >
-          {/* The inner box is what the ResizeObserver watches: a scroll container never reports its
-              own content growing, so the following would stop the moment tokens arrived. */}
-          <div ref={transcriptInnerRef} className="space-y-4">
-          {loadingThread ? (
-            <p className="text-sm text-muted-foreground">Loading conversation…</p>
-          ) : !inConversation ? (
-            <div className="max-w-prose space-y-1 pt-2">
-              <p className="text-sm text-foreground">Ask about setup, handling, or the physics behind either.</p>
-              <p className="text-xs text-muted-foreground">
-                “Pushes mid-corner on high grip — what would you try first?”
-              </p>
-            </div>
-          ) : (
-            messages.map((m, i) => (
-              <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
-                <div
-                  className={cn(
-                    "max-w-[92%] rounded-xl px-3 py-2 text-sm lg:max-w-[80%]",
-                    m.role === "user"
-                      ? "bg-primary/10 text-foreground"
-                      : "bg-muted/40 text-foreground"
-                  )}
-                >
-                  {m.role === "assistant" ? (
-                    m.content ? (
+            {/* The inner box is what the ResizeObserver watches: a scroll container never reports
+                its own content growing, so the following would stop the moment tokens arrived. */}
+            <div ref={transcriptInnerRef} className="space-y-2">
+              {messages.map((m, idx) => {
+                const pending = m.role === "assistant" && !m.content && sending && idx === messages.length - 1;
+                return (
+                  <div
+                    key={m.messageId ?? `${m.role}-${idx}`}
+                    className={cn(
+                      "text-sm leading-relaxed rounded-lg px-3 py-2 border",
+                      m.role === "user"
+                        ? "border-border/60 bg-muted/40 text-foreground mr-6"
+                        : "border-border/70 bg-background/30 ml-6 text-foreground/95"
+                    )}
+                  >
+                    <div className="text-[10px] ui-title text-muted-foreground mb-1">
+                      {m.role === "user" ? "You" : "Engineer"}
+                    </div>
+                    {m.role === "assistant" && m.content ? (
                       <EngineerMarkdown>{m.content}</EngineerMarkdown>
+                    ) : pending ? (
+                      <EngineerThinkingIndicator statusPhase={statusPhase} />
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-muted-foreground">
-                        <span className="animate-pulse">Thinking…</span>
-                      </span>
-                    )
-                  ) : (
-                    <p className="whitespace-pre-wrap">{m.content}</p>
-                  )}
-                  {m.role === "assistant" && ratingsEnabled && m.messageId ? (
-                    <EngineerMessageRatingRow
-                      messageId={m.messageId}
-                      initialContext={m.ratingContext}
-                    />
-                  ) : null}
-                </div>
-              </div>
-            ))
-          )}
-          {error ? <p className="text-xs text-destructive">{error}</p> : null}
+                      <div className="whitespace-pre-wrap break-words">
+                        {m.content || (m.role === "assistant" ? "—" : "")}
+                      </div>
+                    )}
+                    {ratingsEnabled && m.role === "assistant" && m.messageId ? (
+                      <EngineerMessageRatingRow
+                        messageId={m.messageId}
+                        disabled={sending}
+                        initialContext={m.ratingContext}
+                      />
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : loadingThread ? (
+          <p className="px-3 py-2.5 text-sm text-muted-foreground lg:row-start-1 lg:px-5 lg:py-4">
+            Loading conversation…
+          </p>
+        ) : null}
+
+        {error ? (
+          <div className="text-xs text-destructive px-3 pt-2 space-y-1">
+            <div className="ui-title text-[11px]">Error</div>
+            <pre className="whitespace-pre-wrap break-words font-sans text-[11px] leading-snug opacity-95">
+              {error}
+            </pre>
+          </div>
+        ) : null}
+
+        {/*
+         * Desktop-only empty state. On a phone the composer is the first thing in the card, so an
+         * empty thread reads as "ready" without being told. At lg the transcript owns a
+         * full-height grid row, and with no conversation loaded that row is a large blank panel —
+         * so it says what belongs there. `hidden lg:flex` is what keeps this off the phone.
+         */}
+        {messages.length === 0 && !loadingThread ? (
+          <div className="hidden lg:row-start-1 lg:flex lg:min-h-0 lg:flex-col lg:items-center lg:justify-center lg:gap-2 lg:px-8 lg:text-center">
+            <p className="text-sm font-medium text-foreground">Ask the Engineer about your car.</p>
+            <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
+              It reads the runs, setups and conditions you&rsquo;ve logged. Start with one of these,
+              or type your own.
+            </p>
+            {/* The board owns this row at lg; the rail below is `lg:hidden`, so the same list is
+                never on screen twice. */}
+            <EngineerStarterQuestions
+              variant="board"
+              questions={starterQuestions.slice(0, ENGINEER_STARTER_BOARD_COUNT)}
+              disabled={panelBusy}
+              onPick={fillFromStarter}
+              className="mt-2"
+            />
+          </div>
+        ) : null}
+
+        <div className="p-3 space-y-2 lg:row-start-2 lg:border-t lg:border-border/80 lg:px-5 lg:py-4">
+          {/* Reads as a sentence top to bottom: things worth asking → the box. Phone only; the
+              desktop board above owns lg, and wrapping three rows of chips at 390px pushes the
+              composer under the bottom dock. */}
+          <EngineerStarterQuestions
+            variant="rail"
+            questions={starterQuestions}
+            disabled={panelBusy}
+            onPick={fillFromStarter}
+            className="lg:hidden"
+          />
+
+          {/* A div, not a form: the demo tour listens on this anchor and watches the Send button
+              and Enter-without-Shift, so it stays correct if the composer is restyled. */}
+          <div className="flex items-end gap-2" data-tour="engineer-composer">
+            <textarea
+              ref={composerRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void send(input);
+                }
+              }}
+              rows={1}
+              className="flex-1 min-h-9 max-h-28 resize-none rounded-lg border border-border bg-background px-2.5 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+              placeholder="Ask the Engineer…"
+              disabled={panelBusy}
+              aria-label="Message to engineer"
+            />
+            {showNewChat ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={startNewChat}
+                disabled={panelBusy}
+                aria-label="New chat"
+                className="shrink-0 min-h-9 gap-1.5 px-2.5"
+              >
+                <MessageSquarePlus className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />
+                <span className="hidden min-[400px]:inline">New chat</span>
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => void send(input)}
+              disabled={panelBusy || !input.trim()}
+              aria-label="Send"
+              className="shrink-0 min-h-9 min-w-9 p-0"
+            >
+              <ArrowUp className="size-4" strokeWidth={2.5} aria-hidden />
+            </Button>
           </div>
         </div>
+      </SurfaceCard>
 
-        {/* Composer */}
-        <form
-          data-tour="engineer-composer"
-          className="flex items-end gap-2 border-t border-border p-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void send(input);
-          }}
+      {/* The history card. At lg it is the left column and always open; on a phone it is a
+          closed row you tap, so the chat card is the last thing before the dock. `self-start`
+          keeps it at its own height instead of stretching to the chat's 76dvh. */}
+      <SurfaceCard
+        variant="panel"
+        overflowHidden={false}
+        className="lg:col-start-1 lg:row-start-1 lg:max-h-full lg:self-start lg:overflow-y-auto"
+        contentClassName="p-0 px-3 py-3 md:px-4 lg:px-4"
+      >
+        <button
+          type="button"
+          onClick={() => setHistoryOpen(!historyShown)}
+          aria-expanded={historyShown}
+          aria-controls="engineer-history-list"
+          /* Inert at lg — the list is always on screen there, so the row is just a heading. */
+          className="tap-active -mx-1 flex w-full items-center justify-between gap-2 rounded-lg px-1 py-0.5 text-left lg:pointer-events-none"
         >
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void send(input);
-              }
-            }}
-            rows={2}
-            aria-label="Message to engineer"
-            placeholder="Ask the Engineer…"
-            className="min-h-[3rem] flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
-            disabled={sending}
+          <Eyebrow>{threads.length > 0 ? `History · ${threads.length}` : "History"}</Eyebrow>
+          <ChevronDown
+            className={cn(
+              "size-4 shrink-0 text-muted-foreground transition-transform lg:hidden",
+              historyShown && "rotate-180"
+            )}
+            strokeWidth={2}
+            aria-hidden
           />
-          <Button type="submit" disabled={sending || !input.trim()} aria-label="Send">
-            <ArrowUp className="h-4 w-4" aria-hidden />
-          </Button>
-        </form>
-      </div>
+        </button>
+
+        <div id="engineer-history-list" className={cn("mt-2", historyShown ? "block" : "hidden lg:block")}>
+          {threadsLoading ? (
+            <p className="text-[11px] text-muted-foreground">Loading conversations…</p>
+          ) : threadsErr ? (
+            <p className="text-[11px] text-destructive">{threadsErr}</p>
+          ) : threads.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground">No past conversations yet.</p>
+          ) : (
+            <>
+              <ul className="space-y-1">
+                {visibleThreads.map((t, threadIndex) => {
+                  const active = t.id === threadId;
+                  // The top few read as previews; the tail stays a one-line list. Indexed off the
+                  // rendered order, so "Show all" never turns a preview into a plain row.
+                  const showPreview = threadIndex < HISTORY_PREVIEW_COUNT && Boolean(t.answerPreview);
+                  const rowBusy = panelBusy || deletingThreadId === t.id;
+                  return (
+                    <li key={t.id}>
+                      <div
+                        className={cn(
+                          "group flex items-stretch gap-1 rounded-lg border transition",
+                          active
+                            ? "border-border bg-muted/50"
+                            : "border-transparent hover:border-border/70 hover:bg-muted/30"
+                        )}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => void openThread(t.id)}
+                          disabled={rowBusy}
+                          className={cn(
+                            "tap-active min-w-0 flex-1 rounded-lg px-3 py-2.5 text-left",
+                            rowBusy && "opacity-60"
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "text-sm text-foreground",
+                              /* The question wraps to two lines on a preview row — it IS the
+                                 headline there — and stays clipped to one in the compact list. */
+                              showPreview ? "line-clamp-2 font-medium leading-snug" : "truncate"
+                            )}
+                          >
+                            {t.title}
+                          </div>
+                          {showPreview ? (
+                            <p className="mt-1 line-clamp-2 text-[12px] leading-[1.45] text-muted-foreground">
+                              <span aria-hidden className="mr-1 text-primary-ink">✦</span>
+                              {t.answerPreview}
+                            </p>
+                          ) : null}
+                          <div className="mt-0.5">
+                            <RelativeTime iso={t.updatedAt} fallback="…" display="relative" />
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void deleteThread(t.id, t.title)}
+                          disabled={rowBusy}
+                          aria-label={`Delete ${t.title}`}
+                          className={cn(
+                            /* Full-height target, label at the TOP: on a preview row the button is
+                               three lines tall, and a centred "Delete" floated alongside the
+                               answer as if it belonged to it. */
+                            "tap-active flex shrink-0 items-start rounded-lg px-2.5 pt-2.5 text-[11px] text-muted-foreground transition hover:text-destructive hover:bg-destructive/10",
+                            rowBusy && "opacity-60 pointer-events-none"
+                          )}
+                        >
+                          {deletingThreadId === t.id ? "…" : "Delete"}
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+              {canCollapseHistory ? (
+                <button
+                  type="button"
+                  onClick={() => setHistoryExpanded((v) => !v)}
+                  className="tap-active mt-2 w-full rounded-lg border border-transparent px-3 py-1.5 text-left text-[11px] font-medium text-muted-foreground transition hover:border-border/70 hover:bg-muted/30 hover:text-foreground"
+                >
+                  {historyExpanded ? "Show fewer" : `Show all ${threads.length} conversations`}
+                </button>
+              ) : null}
+            </>
+          )}
+        </div>
+      </SurfaceCard>
     </div>
   );
 }
