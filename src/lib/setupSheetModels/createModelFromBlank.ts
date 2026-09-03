@@ -85,7 +85,7 @@ export type CreateModelFromBlankInput = {
   /** What the driver typed. Never derived from the PDF — duplicates are allowed on purpose. */
   name: string;
   /**
-   * What the chassis races — a `ChassisPlatformId`, validated by the caller.
+   * What the chassis races — an encoded discipline (`carClasses.ts`), validated by the caller.
    *
    * Unlike the name, this is NOT the uploader's private label: the chassis row is global, so the
    * discipline chosen here answers for every driver who later fingerprint-merges onto it. That is

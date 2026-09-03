@@ -55,6 +55,8 @@ import type { CarColours, FieldDriver } from "./field";
 
 export type RunContext = {
   video: HTMLVideoElement;
+  /** The picked file, when there is one: frames are decoded straight out of it. */
+  file?: Blob | null;
   frameW: number;
   frameH: number;
   durationSec: number;
@@ -142,6 +144,7 @@ export async function learnTheLap(ctx: RunContext): Promise<LearnResult> {
   // and it is only a second of video per lap.
   const sfScan = await findCrossingsInBrowser({
     video,
+    file: ctx.file,
     frameW,
     frameH,
     lines,
@@ -188,6 +191,7 @@ export async function learnTheLap(ctx: RunContext): Promise<LearnResult> {
   const bootTargets = bootstrapTargets(bootLaps, cornerKeys, durationSec);
   const scan = await findCrossingsInBrowser({
     video,
+    file: ctx.file,
     frameW,
     frameH,
     lines,
@@ -219,6 +223,169 @@ export async function learnTheLap(ctx: RunContext): Promise<LearnResult> {
   };
 }
 
+/** How much video one sweep window covers. Short enough that the tracker's memory stays small. */
+const SWEEP_CHUNK_SEC = 20;
+/** Overlap between windows, so a car crossing on a seam is seen whole by one of them. */
+const SWEEP_LAP_SEC = 0.6;
+/** Two sightings this close are the same car going past once. */
+const SWEEP_DEDUPE_SEC = 0.15;
+
+export type SweepResult = {
+  /** Every crossing of the start/finish line in the stretch, whoever it belonged to. */
+  crossingsSec: number[];
+  framesRead: number;
+  starvedSegments: number;
+  elapsedMs: number;
+};
+
+/**
+ * Read the start/finish line right through a stretch of video and keep everything that crosses it.
+ *
+ * The rest of the scan looks in narrow windows, because it already knows when the car is due.
+ * Somebody added from their own practice link is exactly the case where nothing is known — their
+ * transponder clock and this video share no zero — so there is nothing to aim at and the line has
+ * to be watched instead. What comes back is a list of moments, with no claim about whose car made
+ * any of them: `fitLapsToCrossings` decides that from the lap times afterwards.
+ *
+ * Deliberately colour-blind. The detector's colour tiebreak exists to keep hold of ONE car, and
+ * here every car is the point.
+ */
+export async function sweepStartFinish(
+  ctx: RunContext,
+  span: { fromSec: number; toSec: number }
+): Promise<SweepResult> {
+  const { video, frameW, frameH, durationSec, lines, signal } = ctx;
+  const startedAt = performance.now();
+  const from = Math.max(0, span.fromSec);
+  const to = Math.min(durationSec, span.toSec);
+  if (!(to > from)) {
+    return { crossingsSec: [], framesRead: 0, starvedSegments: 0, elapsedMs: 0 };
+  }
+
+  const targets = [];
+  for (let i = 0, at = from; at < to; i++, at += SWEEP_CHUNK_SEC) {
+    const chunkTo = Math.min(to, at + SWEEP_CHUNK_SEC + SWEEP_LAP_SEC);
+    targets.push({
+      id: `sweep:${i}:${SF_LINE_KEY}`,
+      role: "me" as SessionRole,
+      lineKey: SF_LINE_KEY,
+      lapNumber: i,
+      centerSec: (at + chunkTo) / 2,
+      // Nothing is expected here — that is the point of a sweep.
+      truthSec: null,
+      searchFrom: at,
+      searchTo: chunkTo,
+    });
+  }
+
+  const scan = await findCrossingsInBrowser({
+    video,
+    file: ctx.file,
+    frameW,
+    frameH,
+    lines,
+    targets,
+    car: null,
+    onProgress: scaled(ctx.onProgress, 0, 1, "Watching the start line — "),
+    signal,
+  });
+
+  const seen = scan.results
+    .flatMap((r) => r.candidates.map((c) => c.t))
+    .sort((a, b) => a - b);
+  const crossingsSec: number[] = [];
+  for (const t of seen) {
+    const last = crossingsSec[crossingsSec.length - 1];
+    if (last == null || t - last > SWEEP_DEDUPE_SEC) crossingsSec.push(t);
+  }
+
+  return {
+    crossingsSec,
+    framesRead: scan.framesRead,
+    starvedSegments: scan.starvedSegments,
+    elapsedMs: performance.now() - startedAt,
+  };
+}
+
+/**
+ * Half-window either side of the clock's guess for a lap start. The timing page rounds its stamp
+ * to a whole second and the phone's header to another, so the guess is good to about a second;
+ * anything further off than this is a different car, and the fingerprint is what says so.
+ */
+export const CLOCK_CONFIRM_SEC = 1.5;
+/** How many of a driver's opening laps are looked for on the start line to confirm the clock. */
+export const CLOCK_CONFIRM_LAPS = 8;
+/** Two sightings this close are the same car going past once. */
+const CONFIRM_DEDUPE_SEC = 0.15;
+
+export type LapStartScan = {
+  /** Every crossing seen in the windows, whoever made it, in time order. */
+  crossingsSec: number[];
+  framesRead: number;
+  starvedSegments: number;
+  elapsedMs: number;
+};
+
+/**
+ * Look at the start line where the wall clock says a driver's opening laps begin.
+ *
+ * The clock's guess is good to a second; this reads a short window around each of the first few
+ * lap starts and hands back everything that crossed. Whether those crossings are this driver's
+ * is the fingerprint's question (`fitLapsToCrossings`): their own lap times must land on them,
+ * lap after lap, which a stranger's cannot. Eight windows of three seconds is a fraction of the
+ * blind sweep, which read the start line right through the session to find the same thing.
+ *
+ * Colour-blind, like the sweep: nothing is known about the car yet.
+ */
+export async function scanLapStarts(
+  ctx: RunContext,
+  opts: { role: SessionRole; starts: Array<{ lapNumber: number; startSec: number }> }
+): Promise<LapStartScan> {
+  const { video, frameW, frameH, durationSec, lines, signal } = ctx;
+  const startedAt = performance.now();
+  const targets = opts.starts
+    .filter((s) => s.startSec + CLOCK_CONFIRM_SEC > 0 && s.startSec - CLOCK_CONFIRM_SEC < durationSec)
+    .map((s) => ({
+      id: `clock:${opts.role}:${s.lapNumber}:${SF_LINE_KEY}`,
+      role: opts.role,
+      lineKey: SF_LINE_KEY,
+      lapNumber: s.lapNumber,
+      centerSec: s.startSec,
+      // Not a truth: a guess to look around, and the fingerprint decides.
+      truthSec: null,
+      searchFrom: Math.max(0, s.startSec - CLOCK_CONFIRM_SEC),
+      searchTo: Math.min(durationSec, s.startSec + CLOCK_CONFIRM_SEC),
+    }));
+  if (!targets.length) return { crossingsSec: [], framesRead: 0, starvedSegments: 0, elapsedMs: 0 };
+
+  const scan = await findCrossingsInBrowser({
+    video,
+    file: ctx.file,
+    frameW,
+    frameH,
+    lines,
+    targets,
+    car: null,
+    onProgress: scaled(ctx.onProgress, 0, 1, "Checking the start line — "),
+    signal,
+  });
+
+  const seen = scan.results
+    .flatMap((r) => [...r.candidates.map((c) => c.t), ...(r.detectedSec != null ? [r.detectedSec] : [])])
+    .sort((a, b) => a - b);
+  const crossingsSec: number[] = [];
+  for (const t of seen) {
+    const last = crossingsSec[crossingsSec.length - 1];
+    if (last == null || t - last > CONFIRM_DEDUPE_SEC) crossingsSec.push(t);
+  }
+  return {
+    crossingsSec,
+    framesRead: scan.framesRead,
+    starvedSegments: scan.starvedSegments,
+    elapsedMs: performance.now() - startedAt,
+  };
+}
+
 export type FindResult = {
   review: Review;
   calibrations: Record<string, LineCalibration>;
@@ -238,6 +405,8 @@ export async function findEveryCrossing(
     car: CarColour | null;
     /** Per-driver references; each target is judged against its own driver's. */
     cars?: CarColours;
+    /** Which way through a line is the corner, where the driver said so at the picker. */
+    lineDirections?: Partial<Record<string, 1 | -1>>;
   }
 ): Promise<FindResult> {
   const { video, frameW, frameH, durationSec, lines, laps, marks, lapStart, signal } = ctx;
@@ -255,6 +424,7 @@ export async function findEveryCrossing(
 
   const main = await findCrossingsInBrowser({
     video,
+    file: ctx.file,
     frameW,
     frameH,
     lines,
@@ -274,6 +444,7 @@ export async function findEveryCrossing(
     lapStarts: built.lapStarts,
     laps,
     field: ctx.field,
+    lineDirections: opts.lineDirections,
   });
 
   // Second pass: whatever is still missing, searched for between the corners either side of it.
@@ -306,6 +477,7 @@ export async function findEveryCrossing(
     if (brackets.length) {
       const second = await findCrossingsInBrowser({
         video,
+        file: ctx.file,
         frameW,
         frameH,
         lines,
@@ -323,6 +495,7 @@ export async function findEveryCrossing(
         results,
         targets: built.targets,
         marks,
+        lineDirections: opts.lineDirections,
         lapStarts: built.lapStarts,
         laps,
         field: ctx.field,

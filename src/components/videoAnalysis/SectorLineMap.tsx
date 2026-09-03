@@ -95,8 +95,8 @@ export function SectorLineMap({
                 y1={l.y1 * 1000}
                 x2={l.x2 * 1000}
                 y2={l.y2 * 1000}
-                stroke="rgba(0,0,0,0.55)"
-                strokeWidth={on ? 4 : 3}
+                stroke="rgba(0,0,0,0.6)"
+                strokeWidth={on ? 3 : 2.5}
                 vectorEffect="non-scaling-stroke"
                 strokeLinecap="round"
               />
@@ -105,13 +105,11 @@ export function SectorLineMap({
                 y1={l.y1 * 1000}
                 x2={l.x2 * 1000}
                 y2={l.y2 * 1000}
-                stroke={
-                  on
-                    ? "rgb(var(--color-primary-ink))"
-                    : "rgba(255,255,255,0.55)"
-                }
-                strokeOpacity={on ? 1 : 0.7}
-                strokeWidth={on ? 2.5 : 1.5}
+                // Full yellow, not the paper ink: over a picture this is a fill, and #8A6A00
+                // reads as brown mud on asphalt.
+                stroke={on ? "rgb(var(--color-primary))" : "rgba(255,255,255,0.8)"}
+                strokeOpacity={on ? 1 : 0.75}
+                strokeWidth={on ? 1.5 : 1}
                 strokeDasharray={on ? undefined : "5 5"}
                 vectorEffect="non-scaling-stroke"
                 strokeLinecap="round"

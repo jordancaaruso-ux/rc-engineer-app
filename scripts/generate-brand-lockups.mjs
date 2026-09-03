@@ -1,11 +1,24 @@
-// Builds the JRC TRACKSIDE lockups from the one mark geometry, so the glyph is never redrawn.
+// Builds every derived brand file from the one mark geometry, so the glyph is never redrawn.
 //
 // The mark path is read verbatim from `public/brand/jrc-mark-yellow.svg` (single path,
-// viewBox 0 0 731 241); the TRACKSIDE wordmark is outlined type and lives in this file.
-// Two arrangements, three colourways each:
+// viewBox 0 0 731 241) — that file is the source of truth. Change the glyph there and
+// re-run this script; nothing else holds a copy of the geometry by hand.
 //
+// The mark is a single even-odd path, and the SVGs written here say so. Its three
+// contours do not actually overlap, though (raster diff, evenodd vs nonzero: identical,
+// 2026-09-03), so a renderer that ignores `fill-rule` still draws it correctly.
+//
+// Writes:
+//   public/brand/jrc-mark-{white,ink}.svg     colour variants of the mark
+//   public/brand/jrc-mark.svg                 currentColor variant
+//   public/landing/assets/jrc-mark-white.svg  the landing page's copy
+//   public/brand/lockup-trackside-*.svg       6 lockups (brand kit / exports)
+//   src/lib/pwa/splashMark.ts                 the inlined mark for the launch splash
+//   src/lib/share/brandMark.ts                the bundled path satori draws share cards with
+//
+// Two lockup arrangements, three colourways each:
 //   horizontal  mark | rule | TRACKSIDE      viewBox 0 -1129 14521 1529
-//   stacked     mark / rule / TRACKSIDE      viewBox 0 0 9091 5341   <- the launch splash
+//   stacked     mark / rule / TRACKSIDE      viewBox 0 0 9091 5341
 //
 // colour = yellow mark + graphite rule + paper word (dark surfaces only)
 // mono   = one ink or one paper, everything
@@ -24,11 +37,22 @@ const MARK_D = markSvg.match(/ d="([^"]+)"/)[1];
 // TRACKSIDE, outlined. Baseline at y=0, so both lockups translate it into place.
 const WORD_D = readFileSync(new URL("./brand-word-trackside.txt", import.meta.url), "utf8").trim();
 
+/** The mark on its own, in one colour. `fill` may be a hex or `currentColor`. */
+function mark(fill) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 731 241"><title>JRC mark</title><path fill="${fill}" fill-rule="evenodd" d="${MARK_D}"/></svg>\n`;
+}
+
+writeFileSync("public/brand/jrc-mark-white.svg", mark(PAPER));
+writeFileSync("public/brand/jrc-mark-ink.svg", mark(INK));
+writeFileSync("public/brand/jrc-mark.svg", mark("currentColor"));
+// The landing page ships its own asset folder so it can be lifted out whole.
+writeFileSync("public/landing/assets/jrc-mark-white.svg", mark(PAPER));
+
 /** Horizontal: mark, hairline rule, word on one line. */
 function horizontal({ mark, rule, word }) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -1129 14521 1529" width="14521" height="1529">
   <title>JRC TRACKSIDE lockup</title>
-  <g transform="translate(0 -1129) scale(6.344398)" fill="${mark}"><path d="${MARK_D}"/></g>
+  <g transform="translate(0 -1129) scale(6.344398)" fill="${mark}"><path fill-rule="evenodd" d="${MARK_D}"/></g>
   <rect x="5402" y="-1071" width="59" height="1412" fill="${rule}"/>
   <path transform="translate(6225 0)" d="${WORD_D}" fill="${word}"/>
 </svg>
@@ -39,7 +63,7 @@ function horizontal({ mark, rule, word }) {
 function stacked({ mark, rule, word }) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9091 5341" width="9091" height="5341">
   <title>JRC TRACKSIDE stacked lockup</title>
-  <g transform="scale(12.436389)" fill="${mark}"><path d="${MARK_D}"/></g>
+  <g transform="scale(12.436389)" fill="${mark}"><path fill-rule="evenodd" d="${MARK_D}"/></g>
   <rect x="2273" y="3770" width="4545" height="68" fill="${rule}"/>
   <path transform="translate(398 5341)" d="${WORD_D}" fill="${word}"/>
 </svg>
@@ -60,27 +84,58 @@ for (const [name, colours] of Object.entries(WAYS)) {
 /*
  * The launch splash (`#pwa-splash`, layout.tsx). Inlined as a string rather than fetched,
  * so it paints with the first frame of a cold standalone launch instead of waiting on a
- * network round trip. `currentColor` everywhere: globals.css sets the colour, and the three
- * parts carry classes so the entrance can build mark -> rule -> word.
+ * network round trip. Only the MARK is inlined: the rule, the TRACKSIDE letters and the
+ * footer are ordinary DOM in layout.tsx, laid out and animated by globals.css.
  */
 const splashTs = `/**
- * The JRC TRACKSIDE lockup, inlined as a raw SVG string, for the PWA launch splash
- * (\`#pwa-splash\` in \`layout.tsx\`). Inlined — not \`<img src="/brand/...">\` — so the
- * lockup paints with the very first frame of a cold standalone launch instead of waiting
+ * The JRC mark, inlined as a raw SVG string, for the PWA launch splash
+ * (\`#pwa-splash\` in \`layout.tsx\`). Inlined — not \`<img src="/brand/...">\` — so it
+ * paints with the very first frame of a cold standalone launch instead of waiting
  * on a network fetch (which pops in late on the first launch, before the service worker
  * has cached the asset).
  *
- * GENERATED by \`scripts/generate-brand-lockups.mjs\` from the same geometry as
- * \`public/brand/lockup-trackside-stacked-mono-black.svg\` — edit the script, not this file.
- * The three parts (\`.splash-mark\`, \`.splash-rule\`, \`.splash-word\`) are separately
- * classed so the entrance in globals.css can build them in sequence. Each is a WRAPPER
- * group: a CSS \`transform\` replaces an SVG \`transform\` attribute outright, so animating
- * the placed element itself would throw the lockup apart. The colour comes from
- * \`currentColor\` so the splash follows the page ink rather than baking a hex.
+ * GENERATED by \`scripts/generate-brand-lockups.mjs\` from \`public/brand/jrc-mark-yellow.svg\`
+ * — edit the mark or the script, never this file. \`currentColor\` so the splash follows
+ * the ink colour set in globals.css, and \`fill-rule="evenodd"\` because the R bowl and the
+ * C aperture are counter-contours inside the one path.
  */
-export const PWA_SPLASH_LOCKUP_SVG =
-  \`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9091 5341" fill="currentColor" aria-hidden="true"><g class="splash-mark"><g transform="scale(12.436389)"><path d="${MARK_D}"/></g></g><g class="splash-rule"><rect x="2273" y="3770" width="4545" height="68"/></g><g class="splash-word"><path transform="translate(398 5341)" d="${WORD_D}"/></g></svg>\`;
+export const PWA_SPLASH_MARK_SVG =
+  \`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 731 241" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="${MARK_D}"/></svg>\`;
 `;
-writeFileSync("src/lib/pwa/splashLockup.ts", splashTs);
+writeFileSync("src/lib/pwa/splashMark.ts", splashTs);
 
-console.log("wrote 6 lockups to public/brand/ + src/lib/pwa/splashLockup.ts");
+/*
+ * The share-card mark. Satori cannot fetch a relative URL and has no access to `public/`,
+ * so the geometry has to arrive inside the bundle rather than as a file reference.
+ */
+const brandMarkTs = `/**
+ * The JRC mark, as one path, for satori (share cards).
+ *
+ * Satori cannot fetch a relative URL and has no access to \`public/\`, so the mark has to
+ * arrive inside the bundle. Kept as a bare path rather than a data-URI \`<img>\` so the fill
+ * stays a prop: the card draws it yellow, and anything on a light ground can draw the same
+ * shape in ink without a second file.
+ *
+ * GENERATED by \`scripts/generate-brand-lockups.mjs\` from \`public/brand/jrc-mark-yellow.svg\`
+ * — edit the mark or the script, never this file. The source path is even-odd, but its three
+ * contours do not overlap (verified by raster diff, 2026-09-03), so a renderer that ignores
+ * \`fill-rule\` — satori among them — draws it identically and no rule is passed through.
+ */
+
+/** The source SVG's viewBox: 731 wide by 241 tall. Width follows from a chosen height. */
+export const MARK_VIEWBOX = '0 0 731 241';
+export const MARK_ASPECT = 731 / 241;
+
+/** Width in px for a mark drawn at \`height\`, rounded so satori lays out on whole pixels. */
+export function markWidth(height: number): number {
+  return Math.round(height * MARK_ASPECT);
+}
+
+export const MARK_PATH =
+  "${MARK_D}";
+`;
+writeFileSync("src/lib/share/brandMark.ts", brandMarkTs);
+
+console.log(
+  "wrote 4 mark variants + 6 lockups to public/brand/, src/lib/pwa/splashMark.ts and src/lib/share/brandMark.ts",
+);

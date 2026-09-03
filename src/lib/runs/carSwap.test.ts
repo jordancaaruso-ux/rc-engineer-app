@@ -13,11 +13,11 @@ test("unknown platform on either side counts as the same platform (safe default)
 });
 
 test("platform is inferred from the chassis slug; unknown chassis stays null", () => {
-  assert.equal(platformForChassisSlug("awesomatix_a800rr"), "touring");
-  assert.equal(platformForChassisSlug("xray_x4"), "touring");
-  assert.equal(platformForChassisSlug("mugen_mtc3"), "touring");
+  assert.equal(platformForChassisSlug("awesomatix_a800rr"), "touring~electric");
+  assert.equal(platformForChassisSlug("xray_x4"), "touring~electric");
+  assert.equal(platformForChassisSlug("mugen_mtc3"), "touring~electric");
   // User-created duplicates are slug-suffixed but are still the same platform.
-  assert.equal(platformForChassisSlug("mugen_mtc3_2"), "touring");
+  assert.equal(platformForChassisSlug("mugen_mtc3_2"), "touring~electric");
   // Not in the curated catalog → unknown, which isSamePlatform treats as "same".
   assert.equal(platformForChassisSlug("some_users_own_chassis"), null);
   assert.equal(platformForChassisSlug(null), null);

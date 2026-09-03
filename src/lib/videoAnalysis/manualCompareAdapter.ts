@@ -17,30 +17,44 @@ import {
   computeLapBreakdown,
   type SectorLineInfo,
 } from "@/lib/manualVideoAnalysis/sectors";
-import { primaryTimingSession } from "@/lib/manualVideoAnalysis/sessionModel";
+import { participants } from "@/lib/manualVideoAnalysis/sessionModel";
 import { realLaps } from "./findCrossings/fromSession";
 import type { CompareCar, CompareLap } from "./lapCompare";
 
-const ROLE_CAR_IDS = { me: 1, competitor: 2 } as const;
+/**
+ * Which car number a driver gets on the compare.
+ *
+ * "You" is always car 1 and the first rival car 2, because that is what every saved analysis and
+ * the worker path already mean by those numbers. Anyone after them is numbered by their place in
+ * the roster — a third and fourth driver only became possible once several practice links could
+ * be added, one per person.
+ */
+function carIdFor(role: string, index: number): number {
+  if (role === "me") return 1;
+  if (role === "competitor") return 2;
+  return index + 1;
+}
+
+const ME_CAR_ID = 1;
 
 export function compareCarsFromManualSession(
   session: ManualVideoSessionV2,
   sectorLines: SectorLineInfo[]
 ): CompareCar[] {
-  const primary = primaryTimingSession(session);
-  if (!primary) return [];
+  const roster = participants(session);
+  if (roster.length === 0) return [];
 
   const cars: CompareCar[] = [];
-  for (const role of ["me", "competitor"] as const) {
-    const driver = primary.drivers.find((d) => d.role === role);
-    if (!driver) continue;
-    const carId = ROLE_CAR_IDS[role];
+  // Everyone on the video, each read against the timing session their own laps came from — one
+  // shared session off a race link, one apiece off practice links.
+  for (const [index, { role, sessionId, timingSession: primary, driver }] of roster.entries()) {
+    const carId = carIdFor(role, index);
     const carLabel = role === "me" ? "You" : driver.driverName?.trim() || "Competitor";
 
     // Without an anchor, predicted lap starts are raw transponder offsets, not
     // video times (predictSfStartTime falls back to transponderSfStartSec) —
     // only laps with an explicit mark/override are trustworthy then.
-    const anchored = Boolean(primary.sync.anchor);
+    const anchored = Boolean(primary.sync.anchor || primary.sync.anchorByRole?.[role]);
 
     const laps: CompareLap[] = [];
     // A race's opening "lap" is the run from the grid to the line — 1.7s against a 17s median
@@ -52,13 +66,13 @@ export function compareCarsFromManualSession(
       const hasExplicitStart =
         session.marks.some(
           (m) =>
-            m.sessionId === primary.sessionId &&
+            m.sessionId === sessionId &&
             m.driverRole === role &&
             m.lapNumber === lap.lapNumber &&
             m.lineKey === LAP_START_LINE_KEY
         ) || primary.sync.perLapSfStart?.[lapSfKey(role, lap.lapNumber)] != null;
       if (!anchored && !hasExplicitStart) continue;
-      const bd = computeLapBreakdown(session, sectorLines, primary.sessionId, role, lap.lapNumber);
+      const bd = computeLapBreakdown(session, sectorLines, sessionId, role, lap.lapNumber);
       // Without a video time for the lap start there is nothing to compare
       // (no splits are anchorable, no clip windows derivable).
       if (!bd || bd.lapStartSec == null) continue;
@@ -98,6 +112,6 @@ export function compareCarsFromManualSession(
   // "You" first when present, else most laps first — same primary heuristic
   // the worker path uses.
   return cars.sort((x, y) =>
-    x.carId === ROLE_CAR_IDS.me ? -1 : y.carId === ROLE_CAR_IDS.me ? 1 : y.lapCount - x.lapCount
+    x.carId === ME_CAR_ID ? -1 : y.carId === ME_CAR_ID ? 1 : y.lapCount - x.lapCount
   );
 }

@@ -371,7 +371,12 @@ model SetupSheetModel {
   schemaJson Json
   /// Confirmed/curated catalog entry (admin-managed). User-created models stay false until reviewed.
   isAuthorized Boolean @default(false)
-  /// What the chassis races: a `ChassisPlatformId` from `src/lib/cars/carClasses.ts`.
+  /// What the chassis races: an encoded value from `src/lib/cars/carClasses.ts` — a class id plus
+  /// the power that drives it, e.g. `touring~electric`, `buggy-8th-4wd~nitro`, or
+  /// `other-onroad~electric~Legends` for a class the app doesn't list. Never string-compare it by
+  /// hand: `isSamePlatform` compares, `disciplineLabel` renders. Rows written before 2026-09-03
+  /// hold a bare class id (`touring`) and stay valid — power splits a class only when both sides
+  /// of a comparison state it.
   ///
   /// Asked for, and required, on the driver's create-from-PDF door (2026-08-26). Before that
   /// nothing on a driver-made chassis said what it was: discipline was inferred from
@@ -625,7 +630,8 @@ model Car {
   id                 String   @id @default(cuid())
   name               String
   chassis            String?
-  /// Discipline OVERRIDE (ids from src/lib/cars/carClasses.ts, e.g. "touring"). Only consulted
+  /// Discipline OVERRIDE (encoded values from src/lib/cars/carClasses.ts, e.g. "touring~electric";
+  /// pre-2026-09-03 rows hold a bare class id like "touring"). Only consulted
   /// when the chassis catalog cannot place the car - resolve with disciplineForCar(), never by
   /// reading this directly. Drives the log-run car-swap rule (same/unknown discipline keeps the
   /// days tires+prep, different re-derives from the new cars last run), same-class tire

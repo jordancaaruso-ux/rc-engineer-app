@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
-import { isChassisPlatformId } from "@/lib/cars/carClasses";
+import { isDisciplineValue } from "@/lib/cars/carClasses";
 import { templateKeyFromModelSlug } from "@/lib/setupSheetModels/resolveModelForCar";
 import { revalidateAfterCarMutation } from "@/lib/revalidateUser";
 import { carNameTakenMessage, findCarNameClash } from "@/lib/cars/carName";
@@ -128,13 +128,14 @@ export async function PATCH(
    * it can't place. It was unsettable from 2026-07-22, when the always-on picker was dropped as
    * noise on a touring-only app — the column survived that, so there is nothing to migrate.
    *
-   * Validated against `CHASSIS_PLATFORMS` rather than stored free-text: `isSamePlatform` compares
+   * Validated against `RACE_CLASSES` rather than stored free-text: `isSamePlatform` compares
    * these by equality to scope teammate run lists and the car-swap tire rule, and two spellings of
-   * "buggy" would silently read as two disciplines.
+   * "buggy" would silently read as two disciplines. Strict since 2026-09-03: the class alone is
+   * not an answer, the power (electric/nitro) has to be in it too.
    */
   if (body.carClass !== undefined) {
     const raw = body.carClass?.trim() || null;
-    if (raw && !isChassisPlatformId(raw)) {
+    if (raw && !isDisciplineValue(raw)) {
       return NextResponse.json({ error: "Unknown discipline" }, { status: 400 });
     }
     data.carClass = raw;

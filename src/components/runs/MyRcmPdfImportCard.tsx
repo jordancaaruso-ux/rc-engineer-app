@@ -129,6 +129,7 @@ const TEXT_LINK =
 export function MyRcmPdfImportCard({
   pastedUrl,
   openUrl,
+  onSaveOpenUrl,
   hasImported,
   onImported,
   selectedDriverIdFor,
@@ -139,6 +140,13 @@ export function MyRcmPdfImportCard({
   pastedUrl: string | null;
   /** The event's MyRCM page when one is saved; "Open MyRCM" lands on MyRCM's front page otherwise. */
   openUrl: string | null;
+  /**
+   * Save `openUrl` onto the meeting. Given, the card offers the paste itself — this is the only
+   * screen where a MyRCM class page does anything, so it is the only screen that asks for one
+   * (founder 2026-09-03; it used to be a box on the run form's event step, three screens early).
+   * Omitted where there is no meeting to save it to, and the offer disappears with it.
+   */
+  onSaveOpenUrl?: (url: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   /** A PDF result is already on this run — Choose file leads from then on. */
   hasImported: boolean;
   /** The server accepted the file; the panel attaches it to the run. */
@@ -162,6 +170,11 @@ export function MyRcmPdfImportCard({
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [howOpen, setHowOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  /** The class-page paste, folded away until asked for so it never competes with the two doors. */
+  const [pageOpen, setPageOpen] = useState(false);
+  const [pageDraft, setPageDraft] = useState("");
+  const [pageSaving, setPageSaving] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
 
   // A pasted MyRCM link is the driver asking for this; open on it rather than making them find
   // the row underneath the message that just told them the paste went nowhere.
@@ -185,6 +198,25 @@ export function MyRcmPdfImportCard({
   function pickFile() {
     setHowOpen(false);
     fileRef.current?.click();
+  }
+
+  async function savePage() {
+    if (!onSaveOpenUrl || pageSaving) return;
+    const draft = pageDraft.trim();
+    if (!draft) {
+      setPageError("Paste your class page first.");
+      return;
+    }
+    setPageSaving(true);
+    setPageError(null);
+    const saved = await onSaveOpenUrl(draft);
+    setPageSaving(false);
+    if (!saved.ok) {
+      setPageError(saved.error);
+      return;
+    }
+    setPageDraft("");
+    setPageOpen(false);
   }
 
   async function upload(file: File) {
@@ -419,16 +451,65 @@ export function MyRcmPdfImportCard({
             every round, and a standing paragraph of instructions is a wall to everyone who already
             knows. Small and quiet, so it reads as help on tap rather than a third action.
           */}
-          <div className="flex items-center gap-3 pt-0.5">
+          <div className="flex flex-wrap items-center gap-3 pt-0.5">
             <button type="button" className={TEXT_LINK} onClick={() => setHowOpen(true)}>
               How do I get the file?
             </button>
+            {/*
+              Saving the class page turns "Open MyRCM" from a front door into their own class,
+              so it earns a link here and nowhere else. A word, not a sentence — the button
+              above is what it changes, and the driver is looking straight at it.
+            */}
+            {onSaveOpenUrl && !pageOpen ? (
+              <button type="button" className={TEXT_LINK} onClick={() => setPageOpen(true)}>
+                {featured ? "Change class page" : "Save your class page"}
+              </button>
+            ) : null}
             {!pastedUrl && !hasImported && !leadsWithFile && !featured ? (
               <button type="button" className={TEXT_LINK} onClick={() => setExpanded(false)}>
                 Not on MyRCM
               </button>
             ) : null}
           </div>
+          {onSaveOpenUrl && pageOpen ? (
+            <div className="space-y-1.5">
+              <div className="flex flex-col gap-1.5 sm:flex-row">
+                <input
+                  type="url"
+                  inputMode="url"
+                  autoComplete="off"
+                  autoFocus
+                  className="min-w-0 flex-1 rounded-md border border-border bg-surface-runna px-2.5 py-1.5 text-[12px] outline-none"
+                  placeholder="Your class page on MyRCM"
+                  aria-label="Your class page on MyRCM"
+                  value={pageDraft}
+                  onChange={(e) => setPageDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void savePage();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={pageSaving}
+                  className={cn(
+                    "shrink-0 rounded-md primary-face bg-primary px-2.5 py-1.5 text-[11px] font-semibold text-primary-foreground transition hover:brightness-95",
+                    pageSaving && "pointer-events-none opacity-60"
+                  )}
+                  onClick={() => void savePage()}
+                >
+                  {pageSaving ? "Saving…" : "Save"}
+                </button>
+              </div>
+              {pageError ? (
+                <p role="alert" className="text-[11px] leading-snug text-destructive">
+                  {pageError}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       )}
 

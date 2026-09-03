@@ -26,13 +26,37 @@ import {
   flagImplausible,
   vouchedUnconfirmed,
   flagOutOfOrder,
-  refineByChaining,
   type RefinableResult,
   type RefineOutcome,
+  dropCrossDriverDuplicates,
 } from "./refine";
+import { refineByLapFit } from "./lapFit";
 import type { CrossingEvent, CrossingTarget } from "./types";
+import {
+  applyLineDirections,
+  directionsFromMarks,
+  lineDirections,
+  pickedCandidate,
+  withDirection,
+  type LineDir,
+} from "./direction";
+import {
+  clockDisagreements,
+  correctedLapStarts,
+  lapDrift,
+  type ClockDisagreement,
+} from "./lapClock";
 
-export type SessionRole = "me" | "competitor";
+/**
+ * Whose crossing this is. Mirrors `DriverRole` in the manual-analysis model, spelled out again
+ * rather than imported because this folder is deliberately free of app imports — the replay
+ * scripts run it under bare tsx.
+ *
+ * More than two because practice footage can hold more than two people: one LiveRC practice link
+ * is one driver, so several drivers means several links, and each takes a seat here. The role is
+ * the whole of a target's identity (`role:lap:line`), so no two drivers may share one.
+ */
+export type SessionRole = "me" | "competitor" | `r${number}`;
 
 /** One line the driver has drawn, in the shape the detector wants. */
 export type SessionLine = {
@@ -50,6 +74,8 @@ export type SessionMark = {
   lapNumber: number;
   lineKey: string;
   videoTimeSec: number;
+  /** Which way the car crossed, when a scan chose this time. Absent on a hand mark. */
+  dir?: LineDir;
 };
 
 /** One crossing the detector should look for, tagged with whose lap it is. */
@@ -90,6 +116,23 @@ export const SF_AGREE_SEC = 0.25;
 export function sfAnchorTime(detectedSec: number | undefined, walkSec: number): number {
   if (detectedSec == null) return walkSec;
   return Math.abs(detectedSec - walkSec) <= SF_AGREE_SEC ? detectedSec : walkSec;
+}
+
+/**
+ * The lap start to use when the walk has been drift-corrected: the detection when it agrees
+ * with EITHER the corrected start or the plain walk, the corrected start otherwise.
+ *
+ * The walk is exact at the anchor lap and only ever drifts slowly, so a detection sitting on it
+ * is a measurement whatever the drift model says. The model reads a lap whose every line came
+ * late as a clock error — which is also what a slow first sector on a warm-up lap looks like: on
+ * Bendigo lap 1 (2026-09-02) it moved the start by +0.39s and then threw away a start line seen
+ * within 20ms of the transponder for disagreeing with the very number it had just invented.
+ */
+function sfStartFor(detectedSec: number | undefined, correctedSec: number, walkSec: number): number {
+  if (detectedSec == null) return correctedSec;
+  if (Math.abs(detectedSec - correctedSec) <= SF_AGREE_SEC) return detectedSec;
+  if (Math.abs(detectedSec - walkSec) <= SF_AGREE_SEC) return detectedSec;
+  return correctedSec;
 }
 
 function median(xs: number[]): number {
@@ -367,8 +410,22 @@ export type ReviewedCrossing = {
   /** Set when the field's timing says this crossing was somebody else's car (or another lap). */
   claimedBy?: Claim;
   colour?: Rgb;
+  /** Which way the car crossed — the line's direction, held to across every lap and driver. */
+  dir?: LineDir;
   /** Everything the window saw, so the decision can be re-run later without a re-scan. */
   candidates: CrossingEvent[];
+};
+
+/** One line's direction, and what holding the rows to it did — see `direction.ts`. */
+export type LineDirection = {
+  lineKey: string;
+  dir: LineDir;
+  /** Who settled it: a tap at the picker, an earlier scan's marks, or the majority of picks. */
+  from: "picker" | "marks" | "majority";
+  /** Rows whose pick went the other way and took the nearest right-way candidate instead. */
+  turned: number;
+  /** Rows whose pick went the other way with nothing right-way on offer — sent back as gaps. */
+  emptied: number;
 };
 
 export type Review = {
@@ -383,11 +440,31 @@ export type Review = {
   colourLines: Array<{ lineKey: string; roles: SessionRole[] }>;
   /** Track order learnt from the detections, first line to last. */
   order: string[];
+  /** The direction each line was held to, and how many rows that turned or emptied. */
+  directions: LineDirection[];
   /**
    * Start/finish crossings, which are never marks. The gaps between them must reproduce the
    * official lap times — the free accuracy check on the whole scan.
    */
   lapStartError: { laps: number; medianMs: number; worstMs: number } | null;
+  /**
+   * Where each lap actually starts on the video clock: the detected start/finish when there was
+   * one, otherwise the transponder's walk moved by the drift that lap's own crossings show.
+   *
+   * Written back as `perLapSfStart` / `perLapSfEnd`, which is what makes sector 1 a measurement
+   * rather than a subtraction against an accumulating clock — see `lapClock.ts`.
+   */
+  measuredLapStarts: Array<{
+    role: SessionRole;
+    lapNumber: number;
+    videoTimeSec: number;
+    /** True when a detected crossing set it, false when it is the corrected walk. */
+    detected: boolean;
+    /** How far this lap's start moved from the transponder's walk. */
+    driftSec: number;
+  }>;
+  /** Laps where the footage and the timing sheet disagree about how long the lap took. */
+  clockDisagreements: ClockDisagreement[];
 };
 
 /**
@@ -410,8 +487,44 @@ export function reviewResults(opts: {
    * because it was nearest to where they were expected.
    */
   field?: FieldDriver[];
+  /**
+   * Which way through a line is the corner, where somebody already said: the driver at the
+   * picker, or the marks an earlier scan wrote. Lines not listed go by majority — `direction.ts`.
+   */
+  lineDirections?: Partial<Record<string, LineDir>>;
 }): Review {
-  const { results, targets, marks, lapStarts, laps = [], field } = opts;
+  const { results: scanned, targets, marks, lapStarts, laps = [], field } = opts;
+  const lapTimeByKey = new Map(laps.map((l) => [`${l.role}:${l.lapNumber}`, l.lapTimeSec]));
+
+  // **One way through each line, before anything else judges a row.** A line at a hairpin is
+  // crossed twice a lap in opposite directions and a window takes whichever pass sits nearer its
+  // guess. The chain, the field matching and the odd-lap vote all take the picks as given, so the
+  // wrong leg has to be turned before they run, and the wrong-way candidates taken out of their
+  // reach. The full list every window saw is kept as the evidence on each row.
+  // The start line is left out: it answers to the transponder (`sfAnchorTime`), which is a far
+  // stronger check than a majority, and a big car passing a long near line throws several flips
+  // both ways within a few tenths — turning one of those to "the other way" moved a measured lap
+  // start off by four tenths on the first try.
+  const declared = new Map<string, LineDir>();
+  for (const [line, d] of Object.entries(opts.lineDirections ?? {})) if (d) declared.set(line, d);
+  const fromMarks = directionsFromMarks(marks);
+  const known = new Map<string, LineDir>([...fromMarks, ...declared]);
+  known.delete(SF_LINE_KEY);
+  const dirs = lineDirections(
+    scanned.filter((r) => r.lineKey !== SF_LINE_KEY),
+    known
+  );
+  const oriented = applyLineDirections(scanned, dirs);
+  const results = oriented.rows.map((r) => withDirection(r, dirs.get(r.lineKey)));
+  const evidence = new Map(scanned.map((r) => [r.id, r.candidates]));
+  const onLine = (ids: string[], lineKey: string) => ids.filter((id) => id.endsWith(`:${lineKey}`)).length;
+  const directions: LineDirection[] = [...dirs].map(([lineKey, dir]) => ({
+    lineKey,
+    dir,
+    from: declared.has(lineKey) ? "picker" : fromMarks.has(lineKey) ? "marks" : "majority",
+    turned: onLine(oriented.turned, lineKey),
+    emptied: onLine(oriented.emptied, lineKey),
+  }));
 
   const fixed = (id: string, lineKey: string, lapNumber: number, t: number): RefinableResult => ({
     id,
@@ -430,12 +543,23 @@ export function reviewResults(opts: {
     if (r.lineKey === SF_LINE_KEY && r.detectedSec != null) detectedSf.set(r.id, r.detectedSec);
   }
 
-  // A lap start anchors the chain whether or not the detector saw it: the transponder time is
-  // already the best answer we have, and a detection only ever confirms it.
+  // **The walked lap starts, moved by the drift each lap's own crossings show.**
+  //
+  // The walk is one anchor plus every lap time added up, so a single wrong lap time is carried
+  // for the rest of the session: at Bendigo (2026-09-01) the sheet's lap 8 was half a second
+  // longer than the footage, and every lap after it sat that much out. A detected start/finish
+  // was then measured against the drifted walk, disagreed by more than `SF_AGREE_SEC`, and was
+  // thrown away in favour of the very thing that was wrong. So the drift is taken off first, and
+  // a detection is judged against where the lap actually is.
+  const walked = new Map(lapStarts.map((l) => [`${l.role}:${l.lapNumber}`, l.videoTimeSec]));
+  const drift = lapDrift(results, walked, SF_LINE_KEY, lapKeyOf);
+  const corrected = correctedLapStarts(walked, drift);
+
   const anchors: RefinableResult[] = [
     ...lapStarts.map((l) => {
       const id = targetId(l.role, l.lapNumber, SF_LINE_KEY);
-      return fixed(id, SF_LINE_KEY, l.lapNumber, sfAnchorTime(detectedSf.get(id), l.videoTimeSec));
+      const start = corrected.get(`${l.role}:${l.lapNumber}`) ?? l.videoTimeSec;
+      return fixed(id, SF_LINE_KEY, l.lapNumber, sfStartFor(detectedSf.get(id), start, l.videoTimeSec));
     }),
     ...marks
       .filter((m) => m.lineKey !== SF_LINE_KEY)
@@ -446,7 +570,14 @@ export function reviewResults(opts: {
   const anchorIds = new Set(anchors.map((a) => a.id));
 
   const all = [...anchors, ...results.filter((r) => !anchorIds.has(r.id))];
-  const chainedOnly = refineByChaining(all, SF_LINE_KEY, lapKeyOf);
+  // Each lap fitted whole against the driver's own rhythm — `lapFit.ts`. It sees every candidate
+  // a window offered, wrong-way ones included at a price, where the rows below carry only the
+  // right-way ones: direction is a penalty here and a filter for the field and the vote.
+  const chainedOnly = refineByLapFit(all, SF_LINE_KEY, lapKeyOf, {
+    dirs,
+    candidatesOf: (r) => evidence.get(r.id) ?? r.candidates,
+    fixed: anchorIds,
+  });
 
   // The field's turn: every candidate on a line, matched to whoever was due there. A time the
   // field gives to a rival is swapped for the candidate that fits this driver's own slot, or —
@@ -467,6 +598,11 @@ export function reviewResults(opts: {
     (r) => `${roleOf(r.id)}:${r.lineKey}`,
     minCrossingGapSec(laps)
   );
+  // One event handed to two drivers is one car: the other driver's copy goes before the vote,
+  // or four stolen times outvote two real ones and a whole line is held (Bendigo S1, 2026-09-01).
+  for (const id of dropCrossDriverDuplicates(chained, (r) => roleOf(r.id), anchorIds)) {
+    duplicateIds.add(id);
+  }
   const liveResults = chained.filter((r) => !duplicateIds.has(r.id));
   const outOfOrderIds = flagOutOfOrder(liveResults, SF_LINE_KEY, lapKeyOf);
   const suspectIds = flagImplausible(liveResults, SF_LINE_KEY, lapKeyOf);
@@ -504,13 +640,14 @@ export function reviewResults(opts: {
         r.claimedBy != null,
       claimedBy: r.claimedBy,
       colour: colourById.get(r.id),
-      candidates: r.candidates,
+      dir: dirs.get(target.lineKey) ?? pickedCandidate(r)?.dir,
+      candidates: evidence.get(r.id) ?? r.candidates,
     };
     (row.suspect ? suspect : found).push(row);
   }
 
   const candidatesById: Record<string, CrossingEvent[]> = {};
-  for (const r of results) candidatesById[r.id] = r.candidates;
+  for (const r of scanned) candidatesById[r.id] = r.candidates;
 
   return {
     found,
@@ -521,13 +658,34 @@ export function reviewResults(opts: {
       ? [...assignment.colourLines].map(([lineKey, roles]) => ({ lineKey, roles }))
       : [],
     order: learntOrder(chained),
+    directions,
     lapStartError: sfAccuracy(results, laps),
+    measuredLapStarts: lapStarts.map((l) => {
+      const key = `${l.role}:${l.lapNumber}`;
+      const id = targetId(l.role, l.lapNumber, SF_LINE_KEY);
+      const start = corrected.get(key) ?? l.videoTimeSec;
+      const seen = detectedSf.get(id);
+      const used = sfStartFor(seen, start, l.videoTimeSec);
+      return {
+        role: l.role,
+        lapNumber: l.lapNumber,
+        videoTimeSec: used,
+        detected: seen != null && used === seen,
+        driftSec: start - l.videoTimeSec,
+      };
+    }),
+    clockDisagreements: clockDisagreements(
+      chained,
+      (key) => lapTimeByKey.get(key) ?? null,
+      SF_LINE_KEY,
+      lapKeyOf
+    ),
   };
 }
 
 /** The driver a target id belongs to — ids are `role:lap:line` by construction. */
-function roleOf(id: string): string {
-  return id.split(":")[0] ?? "";
+export function roleOf(id: string): SessionRole {
+  return (id.split(":")[0] ?? "me") as SessionRole;
 }
 
 /**

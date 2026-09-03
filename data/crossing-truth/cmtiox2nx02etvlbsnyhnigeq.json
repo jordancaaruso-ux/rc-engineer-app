@@ -1,0 +1,273 @@
+{
+  "jobId": "cmtiox2nx02etvlbsnyhnigeq",
+  "frozenAt": "2026-09-01T13:25:52.958Z",
+  "label": "Bendigo practice · IMG_4523",
+  "video": "IMG_4523.MOV",
+  "profile": "Bendigo",
+  "lines": [
+    {
+      "lineKey": "sf",
+      "label": "Start / Finish",
+      "sortOrder": 0,
+      "x1": 0.2242112834015994,
+      "y1": 0.4851873523611382,
+      "x2": 0.2600997171835381,
+      "y2": 0.4699304336519082
+    },
+    {
+      "lineKey": "s1",
+      "label": "S1",
+      "sortOrder": 1,
+      "x1": 0.3537217183538132,
+      "y1": 0.4144507292547082,
+      "x2": 0.3537217183538132,
+      "y2": 0.4061287735951282
+    },
+    {
+      "lineKey": "s2",
+      "label": "S2",
+      "sortOrder": 2,
+      "x1": 0.5908974546518432,
+      "y1": 0.3964198253256182,
+      "x2": 0.5908974546518432,
+      "y2": 0.3890514270853651
+    },
+    {
+      "lineKey": "s3",
+      "label": "S3",
+      "sortOrder": 3,
+      "x1": 0.7180673395748001,
+      "y1": 0.5267971306590382,
+      "x2": 0.7906243904817633,
+      "y2": 0.6442580673124851
+    },
+    {
+      "lineKey": "s4",
+      "label": "S4",
+      "sortOrder": 4,
+      "x1": 0.5651514043300175,
+      "y1": 0.432048197993195,
+      "x2": 0.5651514043300175,
+      "y2": 0.4602214853823982
+    },
+    {
+      "lineKey": "s5",
+      "label": "S5",
+      "sortOrder": 5,
+      "x1": 0.5472071874390482,
+      "y1": 0.3991938105454782,
+      "x2": 0.5487675541252194,
+      "y2": 0.4061287735951282
+    },
+    {
+      "lineKey": "s6",
+      "label": "S6",
+      "sortOrder": 6,
+      "x1": 0.3521613516676419,
+      "y1": 0.4616084779923282,
+      "x2": 0.3427991515506144,
+      "y2": 0.4477385518930282
+    }
+  ],
+  "sync": {
+    "anchor": {
+      "lapNumber": 1,
+      "anchorKind": "sf_start",
+      "driverRole": "me",
+      "videoTimeSec": 8.609991
+    },
+    "anchorByRole": {
+      "me": {
+        "lapNumber": 1,
+        "anchorKind": "sf_start",
+        "driverRole": "me",
+        "videoTimeSec": 8.609991
+      }
+    }
+  },
+  "laps": [
+    {
+      "lapNumber": 1,
+      "lapTimeSec": 17.006
+    },
+    {
+      "lapNumber": 2,
+      "lapTimeSec": 16.187
+    },
+    {
+      "lapNumber": 3,
+      "lapTimeSec": 16.295
+    },
+    {
+      "lapNumber": 4,
+      "lapTimeSec": 15.013
+    },
+    {
+      "lapNumber": 5,
+      "lapTimeSec": 15.344
+    },
+    {
+      "lapNumber": 6,
+      "lapTimeSec": 15.326
+    },
+    {
+      "lapNumber": 7,
+      "lapTimeSec": 14.866
+    },
+    {
+      "lapNumber": 8,
+      "lapTimeSec": 15.151
+    },
+    {
+      "lapNumber": 9,
+      "lapTimeSec": 15.018
+    },
+    {
+      "lapNumber": 10,
+      "lapTimeSec": 15.409
+    },
+    {
+      "lapNumber": 11,
+      "lapTimeSec": 15.218
+    },
+    {
+      "lapNumber": 12,
+      "lapTimeSec": 17.128
+    },
+    {
+      "lapNumber": 13,
+      "lapTimeSec": 15.511
+    },
+    {
+      "lapNumber": 14,
+      "lapTimeSec": 15.13
+    },
+    {
+      "lapNumber": 15,
+      "lapTimeSec": 15.359
+    },
+    {
+      "lapNumber": 16,
+      "lapTimeSec": 15.138
+    },
+    {
+      "lapNumber": 17,
+      "lapTimeSec": 51.849
+    }
+  ],
+  "markedLaps": [
+    4,
+    7,
+    9
+  ],
+  "marks": [
+    {
+      "driverRole": "me",
+      "lapNumber": 7,
+      "lineKey": "s1",
+      "videoTimeSec": 105.996692
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 7,
+      "lineKey": "s2",
+      "videoTimeSec": 107.713071
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 7,
+      "lineKey": "s3",
+      "videoTimeSec": 110.168799
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 7,
+      "lineKey": "s4",
+      "videoTimeSec": 112.807843
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 7,
+      "lineKey": "s5",
+      "videoTimeSec": 115.025559
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 7,
+      "lineKey": "s6",
+      "videoTimeSec": 116.339938
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 4,
+      "lineKey": "s1",
+      "videoTimeSec": 60.380354
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 4,
+      "lineKey": "s2",
+      "videoTimeSec": 62.1134
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 4,
+      "lineKey": "s3",
+      "videoTimeSec": 64.585795
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 4,
+      "lineKey": "s4",
+      "videoTimeSec": 67.324834
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 4,
+      "lineKey": "s5",
+      "videoTimeSec": 69.509219
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 4,
+      "lineKey": "s6",
+      "videoTimeSec": 70.823597
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 9,
+      "lineKey": "s1",
+      "videoTimeSec": 135.930356
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 9,
+      "lineKey": "s2",
+      "videoTimeSec": 137.696736
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 9,
+      "lineKey": "s3",
+      "videoTimeSec": 140.185799
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 9,
+      "lineKey": "s4",
+      "videoTimeSec": 142.874841
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 9,
+      "lineKey": "s5",
+      "videoTimeSec": 145.142554
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 9,
+      "lineKey": "s6",
+      "videoTimeSec": 146.523598
+    }
+  ]
+}

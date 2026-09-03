@@ -142,7 +142,13 @@ export function EngineerChatPanel({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  // The transcript follows the newest words as they arrive. `stickToBottom` drops to false the
+  // moment the driver scrolls up to re-read an earlier answer, and comes back the moment they
+  // return to the foot of the thread (or send anything), so following never fights a deliberate
+  // scroll back.
+  const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const transcriptInnerRef = useRef<HTMLDivElement | null>(null);
+  const stickToBottom = useRef(true);
   const consumedPromptIdRef = useRef<number | null>(null);
 
   const refreshThreads = useCallback(async () => {
@@ -160,10 +166,44 @@ export function EngineerChatPanel({
     void refreshThreads();
   }, [refreshThreads]);
 
+  const hasMessages = messages.length > 0;
+
   useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, sending]);
+    const el = transcriptRef.current;
+    const inner = transcriptInnerRef.current;
+    if (!el || !inner) return;
+
+    /*
+     * Direction, not distance, is what tells a driver's scroll apart from ours. Measuring "am I
+     * near the bottom?" on every scroll event looked right and wasn't: our own jump to the foot
+     * lands, the next tokens make the thread taller before the event is handled, and the panel
+     * concludes the driver has scrolled away from an answer it moved itself. Following stopped
+     * one reply in. Our jumps only ever move down, so only an upward move gives up the follow.
+     */
+    let lastTop = el.scrollTop;
+    const onScroll = () => {
+      const top = el.scrollTop;
+      const movedUp = top < lastTop;
+      lastTop = top;
+      if (movedUp) stickToBottom.current = false;
+      else if (el.scrollHeight - top - el.clientHeight < 48) stickToBottom.current = true;
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+
+    // Tokens land a few at a time and the markdown re-lays out after them, so the height of the
+    // content — not the message count — is what tells us there is more thread to follow.
+    const ro = new ResizeObserver(() => {
+      if (stickToBottom.current) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(inner);
+    el.scrollTop = el.scrollHeight;
+    lastTop = el.scrollTop;
+
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      ro.disconnect();
+    };
+  }, [hasMessages]);
 
   const openThread = useCallback(async (id: string) => {
     setLoadingThread(true);
@@ -175,6 +215,7 @@ export function EngineerChatPanel({
         messages?: Array<{ id?: string; role?: string; content?: string; ratingContext?: RatingContext }>;
       };
       setThreadId(id);
+      stickToBottom.current = true;
       setMessages(mapApiMessages(data.messages ?? []));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load that conversation");
@@ -201,6 +242,7 @@ export function EngineerChatPanel({
 
   const newChat = useCallback(() => {
     setThreadId(null);
+    stickToBottom.current = true;
     setMessages([]);
     setError(null);
   }, []);
@@ -211,6 +253,7 @@ export function EngineerChatPanel({
       if (!question || sending) return;
       setError(null);
       setSending(true);
+      stickToBottom.current = true;
       setInput("");
 
       const history = [...messages, { role: "user" as const, content: question }];
@@ -335,7 +378,14 @@ export function EngineerChatPanel({
 
       {/* Conversation */}
       <div className="order-1 flex min-h-0 flex-1 flex-col lg:order-2">
-        <div ref={scrollRef} className="min-h-[16rem] flex-1 space-y-4 overflow-y-auto p-4">
+        <div
+          ref={transcriptRef}
+          data-testid="engineer-transcript"
+          className="min-h-[16rem] flex-1 overflow-y-auto p-4"
+        >
+          {/* The inner box is what the ResizeObserver watches: a scroll container never reports its
+              own content growing, so the following would stop the moment tokens arrived. */}
+          <div ref={transcriptInnerRef} className="space-y-4">
           {loadingThread ? (
             <p className="text-sm text-muted-foreground">Loading conversation…</p>
           ) : !inConversation ? (
@@ -378,6 +428,7 @@ export function EngineerChatPanel({
             ))
           )}
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
+          </div>
         </div>
 
         {/* Composer */}
@@ -399,6 +450,7 @@ export function EngineerChatPanel({
               }
             }}
             rows={2}
+            aria-label="Message to engineer"
             placeholder="Ask the Engineer…"
             className="min-h-[3rem] flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
             disabled={sending}

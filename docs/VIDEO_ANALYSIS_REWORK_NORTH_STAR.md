@@ -57,12 +57,16 @@ Session expanded view (Sessions / dashboard cards)
 Assets → Tracks → [track]
   └─ Video / camera section: camera profiles + sector-line editor (relocated)
 
-Full-screen analyze flow (mobile-first, launched from session or tools page)
-  1 video  → pick/relink file (or library asset)
-  2 timing → run laps (default when launched from a run) or LiveRC URLs
-  3 sync   → anchor SF crossing (touch scrubber + coarse/fine stepping)
-  4 mark   → optional sector crossings per lap (feeds sector deltas)
-  5 done   → results ARE the session's compare section (+ ghost overlay)
+Full-screen analyze flow (desktop-first since 2026-09-02, still works at 390; launched from
+the Video page, its New analysis card, or a run)
+  1 set up  → the video (file or library asset) AND the timing (run laps / one LiveRC link per
+              person, "That's me" on any chip) on one screen
+  2 lines   → pick or draw the line set
+  3 sync    → one button: "My car is on the line here" for the chosen crossing
+  4 scan    → "Find every crossing" reads everyone's quickest ten laps; the dots are a folded
+              check, not a queue — hand-marking is gone from the rail
+  5 compare → the sector board: rows = your laps, a reference row = one rival lap (or their
+              best sectors, or your own best); tap = a real lap vs a real lap in the player
 ```
 
 **Retire:** `/videos/overlay` route + `VideoOverlayClient` family (orphaned, superseded), `VideoAnalysisHub.tsx` and `VideoLibraryClient.tsx` as components (their *content* is resurrected inside the tools page), `/videos` marketing page (folds into the tools page), `jobs/new` as a user page (worker import moves into the tools page's advanced lane).
@@ -95,6 +99,30 @@ Prototype v1 (2026-07-10): https://claude.ai/code/artifact/2029c403-62a7-47af-83
 ---
 
 **Changelog:**
+- 2026-09-03 — **The Video page stops at three rows.** Every analysis ever made was drawn at
+  once, so the page ran metres long and "Start video analysis" — pinned to the foot of the
+  tallest card — sat below the monitor. Both lists now show three with "View more (n)" /
+  "Show fewer" under them, and Start sits directly under the track picker on every screen size.
+- 2026-09-02 — **The flow goes desktop-wide and loses a step.** Founder walk-through of the whole
+  path from Tools: every page "should take up the whole screen, same borders as the dashboard",
+  and "video analysis in general is more of a desktop thing". `/videos` is three cards on the
+  1760px measure (New analysis with the track picker, Analyses, Library); the standalone new-
+  analysis page keeps working for run doors and wears the same card. In `AnalyzeFlowClient`
+  Video + Timing merged into **Set up** (two cards side by side at `lg`); the "Paste LiveRC URL"
+  button became a heading over an always-open lane; the lap chooser ("best 3 pre-selected") is
+  gone because the scan reads the quickest ten itself; every driver chip carries **"That's me"**
+  (`swapDriverRoles` in `sessionModel.ts` moves marks, anchors, pins, scan rows and the picker
+  record with the person) and a later link whose name matches the LiveRC name in Settings swaps
+  itself in. **Sync** is one button with one name — "My car is on the line here" — instead of a
+  label that changed to "Move your anchor…" after the press. **Mark → Scan**: no Skip / Mark
+  crossing, no paragraphs, no "Show me the cars" button (the picker still opens on its own when
+  two cars share a rhythm); the dots table shows every scanned lap for every driver, folded under
+  "Crossings · n of m"; the step ends in **View analysis**. `hasMarkedLap` now counts any whole
+  lap of yours, not a ticked one. **Compare**: `DriverComparePanel` rebuilt — rows are your
+  laps, a pinned reference row is one rival lap (their best by default; "Their lap" chips pick
+  another, or "Best sectors"), tap a cell and that sector plays solid with the reference as the
+  ghost; the top-5 average is a footer of numbers only ("impossible as a video"). Player across the whole width, sheet below (a side-by-side was tried the same day and pulled: "make the compare page video take up the whole width — put the table below").
+  Rail: Set up · Lines · Sync · Scan · Compare.
 - 2026-07-12 — **First real-footage findings + scrub fix.** Founder test on a real phone video: no live preview while scrubbing + page crash. Cause: a seek issued per drag event (decoder starvation on ~1GB files) + full re-render per event. Fixed in `AnalyzeFlowClient`: gated seek pump (one in-flight seek, always retargeting newest), `fastSeek` while coarse-dragging with an exact seek on release, imperative timecode/slider updates (scrub path leaves React entirely), `preload="auto"`, and anchor/pin/mark reads take the pending seek target so mid-seek taps can't record stale frames. Docs locked same day; storage = local-first; speed trace demoted (founder: sector deltas ≈ most of a speed trace's value).
 - 2026-07-11 — **Phase B built**: `AnalyzeFlowClient` (5-step mobile flow: library/file pick with durable `videoAssetId` link, run-laps timing default, anchor sync, guided mark queue with sibling-lap predictions, done-step compare preview + save-to-library). `VideoAnalysisJobRouter` now routes manual jobs to it; job PATCH accepts ownership-checked `videoAssetId`. Verified headless end-to-end (`/debug/analyze-flow-preview`: pick→timing→3-frame nudge→anchor→3 marks→−0.200s preview, predictions exact). Legacy `UnifiedVideoAnalysisClient` now unreferenced — Phase C retirement candidate. Known gaps: crop UI not in the new flow; negative sibling predictions clamp to 0s; real-footage pass pending.
 - 2026-07-11 — **Phase A built**: run Video section (status row + Analyze CTA + both engines via `manualCompareAdapter`), `/videos` tools page (sessions list + library resurrected), nav doors.

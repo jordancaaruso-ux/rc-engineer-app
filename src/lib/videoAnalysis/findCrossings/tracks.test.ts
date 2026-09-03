@@ -8,7 +8,8 @@
 import { frameMotions, trackCrossings, buildTracks, defaultTrackerConfig, type FrameObs } from "./tracks";
 import { resultFromWindow } from "./detector";
 import { reviewResults } from "./fromSession";
-import type { BandSample } from "./types";
+import { RECIPE_B22_T14, RECIPE_SEGMENT, type BandSample } from "./types";
+import { bandHalfPxFor, lineGeom } from "./geometry";
 
 function assert(cond: unknown, msg: string): asserts cond {
   if (!cond) throw new Error(msg);
@@ -98,3 +99,55 @@ const blob = (x: number, y: number) => ({ x, y, area: 30, signed: x - 500 });
 }
 
 console.log("findCrossings tracks.test.ts OK");
+
+/* ---------- a pass in the next lane is not a crossing of THIS line ---------- */
+{
+  // A hairpin at the far end of the track. The line is drawn across one lane — vertical, from
+  // (500,100) to (500,200) — and a car goes past on the return lane 300px below it. It changes
+  // sides of the line's DIRECTION exactly like the real thing, which is all the sign test sees.
+  const line = { lineKey: "s4", label: "S4", sortOrder: 4, x1: 0.5, y1: 0.1, x2: 0.5, y2: 0.2 };
+  const frameW = 1000;
+  const frameH = 1000;
+  const geom = lineGeom(line, frameW, frameH);
+  const returnLane: BandSample[] = [
+    { t: 0.0, signed: -9, x: 491, y: 500 },
+    { t: dt, signed: -4, x: 496, y: 500 },
+    { t: 2 * dt, signed: 6, x: 506, y: 500 },
+    { t: 3 * dt, signed: 11, x: 511, y: 500 },
+  ];
+  const target = { id: "me:3:s4", lineKey: "s4", lapNumber: 3, centerSec: 0.05, truthSec: null };
+
+  const blind = resultFromWindow(target, returnLane, [], cfg);
+  assert(blind.detectedSec != null, "without bounds the return lane reads as a crossing");
+
+  const bounded = resultFromWindow(target, returnLane, [], cfg, {
+    bounds: { geom, frameW, params: RECIPE_SEGMENT },
+  });
+  assert(bounded.detectedSec == null, "a flip 300px past the end of the line is not this corner");
+  assert(bounded.offLineRejected === 1, `expected 1 rejected, got ${bounded.offLineRejected}`);
+
+  // The car that really does cross, at the middle of the drawn line, still counts.
+  const onIt = returnLane.map((s) => ({ ...s, y: 150 }));
+  const real = resultFromWindow(target, onIt, [], cfg, {
+    bounds: { geom, frameW, params: RECIPE_SEGMENT },
+  });
+  assert(real.detectedSec != null, "the real crossing survives the bound");
+}
+
+/* ---------- the band is a car wide wherever the line sits ---------- */
+{
+  const near = lineGeom({ lineKey: "sf", label: "SF", sortOrder: 0, x1: 0.2, y1: 0.5, x2: 0.5, y2: 0.5 }, 3840, 2160);
+  const far = lineGeom({ lineKey: "s4", label: "S4", sortOrder: 4, x1: 0.5, y1: 0.3, x2: 0.51, y2: 0.3 }, 3840, 2160);
+  const old = bandHalfPxFor(near, 3840, RECIPE_B22_T14);
+  assert(old === bandHalfPxFor(far, 3840, RECIPE_B22_T14), "b22-t14 watches both at the same width");
+  assert(
+    bandHalfPxFor(far, 3840, RECIPE_SEGMENT) < bandHalfPxFor(near, 3840, RECIPE_SEGMENT),
+    "the far line's band must be thinner than the near one's"
+  );
+  assert(
+    bandHalfPxFor(near, 3840, RECIPE_SEGMENT) === old,
+    "a line long enough to set its own scale keeps the frame-width band"
+  );
+}
+
+console.log("findCrossings tracks.test.ts (segment bounds) OK");
