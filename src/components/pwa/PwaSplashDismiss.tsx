@@ -32,11 +32,12 @@ export function PwaSplashDismiss(): null {
     // instead of leaving both splashes to play out.
     if (isNative) el.setAttribute("data-native", "true");
 
-    // The web lockup builds mark -> rule -> word over ~820ms (globals.css). Dismissing
-    // before that finishes would cut the word off mid-fade, so the minimum clears it.
-    // The native splash has no entrance to protect and has been up since the icon tap,
-    // so it goes the instant the app is ready — a minimum there is just a slower launch.
-    const MIN_VISIBLE_MS = isNative ? 0 : 950;
+    // The web splash lifts the lockup in, then fades the foot under it, landing at
+    // ~1140ms (globals.css). Dismissing before that finishes would cut the foot off
+    // mid-fade, so the minimum clears it. The native splash has no entrance to protect
+    // and has been up since the icon tap, so it goes the instant the app is ready — a
+    // minimum there is just a slower launch.
+    const MIN_VISIBLE_MS = isNative ? 0 : 1150;
     const MAX_WAIT_MS = 2600; // never hold the splash longer than this
     const FADE_MS = 420; // matches the CSS opacity transition
 

@@ -64,7 +64,7 @@ function iconSvg({ markPct = MARK_PCT, rounded = false } = {}) {
   <g${rounded ? ' clip-path="url(#squircle)"' : ""}>
     <rect width="${SIZE}" height="${SIZE}" fill="url(#lit)"/>
     <g transform="translate(${tx.toFixed(2)} ${ty.toFixed(2)}) scale(${scale.toFixed(6)})" fill="${INK}" filter="url(#cast)">
-      <path d="${D}"/>
+      <path fill-rule="evenodd" d="${D}"/>
     </g>
   </g>
 </svg>`;
@@ -95,4 +95,12 @@ for (const t of targets) {
     .toFile(join(ROOT, t.file));
   console.log(`OK ${t.file}  (${t.size}px)`);
 }
+// The magic-link email's header logo. Email clients don't render SVG, so the mark ships
+// as a transparent PNG at 3x the 91x30 box `src/lib/auth/magicLinkEmail.ts` draws it in.
+await sharp(readFileSync(join(ROOT, "public/brand/jrc-mark-yellow.svg")), { density: 384 })
+  .resize(273, 90)
+  .png({ compressionLevel: 9 })
+  .toFile(join(ROOT, "public/brand/jrc-mark-yellow-3x.png"));
+console.log("OK public/brand/jrc-mark-yellow-3x.png  (273x90, email header)");
+
 console.log("Done - all icons regenerated from the locked mark.");

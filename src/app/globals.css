@@ -525,8 +525,12 @@ html[data-standalone="true"] .no-select {
 /*
  * PWA launch splash — hidden by default; shown only on installed (standalone)
  * launches. Because `data-standalone` is set pre-paint, this covers the cold-launch
- * gap with the TRACKSIDE lockup on the page background. `PwaSplashDismiss` fades
- * then removes it.
+ * gap; `PwaSplashDismiss` fades it then removes it.
+ *
+ * It is the app icon held open (founder design, 2026-09-03): the same lit yellow field
+ * and ink mark, so tapping the tile and landing on the splash is one surface rather than
+ * a swap from yellow icon to paper screen. Yellow is the FIELD here, not an action — the
+ * one place in the app that reads that way, and it reads that way because the icon does.
  *
  * The box is deliberately NOT `inset: 0`. Its height is `--splash-vh`, the viewport
  * height frozen on the first frame by the bootstrap script in layout.tsx: a live
@@ -547,9 +551,34 @@ html[data-standalone="true"] #pwa-splash {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--page-bg-base);
-  /* The lockup is drawn in `currentColor`, so it follows the page ink. */
-  color: rgb(var(--color-foreground));
+  /*
+   * Everything on the splash is sized off the mark's width, so the whole lockup scales
+   * as one piece. 47.7vw is the founder artboard's 186px on a 390px screen; the cap
+   * keeps a tablet launch from wearing a billboard.
+   */
+  --splash-mark-w: min(47.7vw, 240px);
+  --splash-ink: rgb(var(--color-primary-foreground));
+  /*
+   * The lit field, matching `scripts/generate-app-icons.mjs`: a warm highlight off the
+   * top-left, a shade falling to the bottom-right, and a corner vignette over both.
+   * Lighting rather than palette, so the tints are literal here as they are there.
+   */
+  background-color: rgb(var(--color-primary));
+  background-image:
+    radial-gradient(130% 96% at 12% 6%, rgb(0 0 0 / 0) 52%, rgb(74 51 0 / 0.2) 100%),
+    linear-gradient(
+      142deg,
+      rgb(120 84 0 / 0) 34%,
+      rgb(120 84 0 / 0.144) 66%,
+      rgb(84 58 0 / 0.36) 100%
+    ),
+    radial-gradient(
+      88% 68% at 16% 10%,
+      rgb(255 228 92 / 0.9) 0%,
+      rgb(255 222 70 / 0.495) 34%,
+      rgb(255 214 10 / 0) 72%
+    );
+  color: var(--splash-ink);
   opacity: 1;
   /*
    * Safety net: if hydration stalls or PwaSplashDismiss never runs, this clears
@@ -558,68 +587,111 @@ html[data-standalone="true"] #pwa-splash {
    */
   animation: pwa-splash-safety 700ms ease 4200ms forwards;
 }
-/*
- * Sized so the MARK lands at the width it always had (40vw, capped at 220px) — the
- * lockup is as wide as its mark, with the rule and word hung underneath. Bigger than
- * this and the traced glyph shows its polygon edges (founder call, 2026-08-18).
- */
-html[data-standalone="true"] #pwa-splash svg {
-  width: 40vw;
-  max-width: 220px;
+
+/* The lockup: mark over a hairline rule over TRACKSIDE, all one mark-width wide. */
+html[data-standalone="true"] #pwa-splash .splash-lockup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--splash-mark-w) * 0.118);
+  animation: pwa-splash-rise 820ms cubic-bezier(0.16, 1, 0.3, 1) 100ms both;
+}
+html[data-standalone="true"] #pwa-splash .splash-mark,
+html[data-standalone="true"] #pwa-splash .splash-mark svg {
+  display: block;
+  width: var(--splash-mark-w);
   height: auto;
 }
-/*
- * The entrance: the lockup builds in the order it was drawn — mark, then the rule
- * wiping out from its centre, then the word. Total ~820ms, which is why
- * PwaSplashDismiss holds the splash for at least 950ms; the point is that a cold
- * launch reads as the app arriving rather than as a static logo waiting on a server.
- *
- * Each part is a wrapper <g> (see splashLockup.ts): a CSS transform REPLACES an SVG
- * transform attribute, so animating the placed element itself scatters the lockup.
- * `transform-box: fill-box` makes `transform-origin: center` mean the part's own
- * centre rather than the whole 9091x5341 canvas.
- */
-html[data-standalone="true"] #pwa-splash svg > g {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-html[data-standalone="true"] #pwa-splash .splash-mark {
-  animation: pwa-splash-mark-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
 html[data-standalone="true"] #pwa-splash .splash-rule {
-  animation: pwa-splash-rule-in 420ms cubic-bezier(0.22, 1, 0.36, 1) 240ms both;
+  width: var(--splash-mark-w);
+  height: 1px;
+  margin-bottom: calc(var(--splash-mark-w) * -0.032);
+  background: rgb(var(--color-primary-foreground) / 0.42);
 }
+/*
+ * TRACKSIDE, spread letter by letter across the mark's width. `space-between` is what
+ * makes this font-proof: whichever face has painted by the first frame, the letters end
+ * up evenly set between the same two edges rather than tracked out by a fixed em.
+ */
 html[data-standalone="true"] #pwa-splash .splash-word {
-  animation: pwa-splash-word-in 440ms cubic-bezier(0.22, 1, 0.36, 1) 380ms both;
+  display: flex;
+  justify-content: space-between;
+  width: var(--splash-mark-w);
+  font-family: var(--font-ui), system-ui, sans-serif;
+  font-size: calc(var(--splash-mark-w) * 0.0806);
+  font-weight: 600;
+  line-height: 1;
 }
-@keyframes pwa-splash-mark-in {
+
+/* The foot: a three-dot pulse over the company name. */
+html[data-standalone="true"] #pwa-splash .splash-foot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: max(54px, calc(28px + env(safe-area-inset-bottom, 0px)));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  animation: pwa-splash-fade 620ms ease-out 520ms both;
+}
+html[data-standalone="true"] #pwa-splash .splash-dots {
+  display: flex;
+  gap: 6px;
+}
+html[data-standalone="true"] #pwa-splash .splash-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgb(var(--color-primary-foreground) / 0.38);
+  animation: pwa-splash-dot 1400ms ease-in-out infinite;
+}
+html[data-standalone="true"] #pwa-splash .splash-dots i:nth-child(2) {
+  animation-delay: 180ms;
+}
+html[data-standalone="true"] #pwa-splash .splash-dots i:nth-child(3) {
+  animation-delay: 360ms;
+}
+html[data-standalone="true"] #pwa-splash .splash-name {
+  font-family: var(--font-ui), system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  color: rgb(var(--color-primary-foreground) / 0.74);
+}
+
+/*
+ * The entrance: the lockup lifts in as one piece, then the foot fades under it. It lands
+ * at ~1140ms, which is why PwaSplashDismiss holds the splash for at least 1150ms; the
+ * point is that a cold launch reads as the app arriving rather than as a static logo
+ * waiting on a server.
+ */
+@keyframes pwa-splash-rise {
   from {
     opacity: 0;
-    transform: scale(0.965);
+    transform: translateY(14px) scale(0.985);
   }
   to {
     opacity: 1;
     transform: none;
   }
 }
-@keyframes pwa-splash-rule-in {
+@keyframes pwa-splash-fade {
   from {
     opacity: 0;
-    transform: scaleX(0);
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
-@keyframes pwa-splash-word-in {
-  from {
-    opacity: 0;
-    transform: translateY(14%);
+@keyframes pwa-splash-dot {
+  0%,
+  60%,
+  100% {
+    background: rgb(var(--color-primary-foreground) / 0.38);
   }
-  to {
-    opacity: 1;
-    transform: none;
+  30% {
+    background: rgb(var(--color-primary-foreground) / 0.85);
   }
 }
 @keyframes pwa-splash-safety {
@@ -645,7 +717,8 @@ html.pwa-splash-done[data-standalone="true"] #pwa-splash {
  * longer hold, so the sequence read JRC → a flash of the app → JRC TRACKSIDE →
  * the app. One splash, and it is the one that starts first: `capacitor.config.ts`
  * now holds the native splash open and `PwaSplashDismiss` hides it on the same
- * readiness signal this element used to fade on.
+ * readiness signal this element used to fade on. The native art is generated from
+ * this same design by `scripts/generate-ios-splash.mjs`, so the two agree.
  *
  * Equal specificity to the `[data-standalone]` rules above and placed after them,
  * so source order wins and no `!important` is needed.
@@ -654,7 +727,9 @@ html[data-native="true"] #pwa-splash {
   display: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  html[data-standalone="true"] #pwa-splash svg > g {
+  html[data-standalone="true"] #pwa-splash .splash-lockup,
+  html[data-standalone="true"] #pwa-splash .splash-foot,
+  html[data-standalone="true"] #pwa-splash .splash-dots i {
     animation: none;
   }
 }

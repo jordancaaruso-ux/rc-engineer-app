@@ -27,7 +27,7 @@ import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar"
 import { TimeZoneCookieSync } from "@/components/layout/TimeZoneCookieSync";
 import { ReturnTrailTracker } from "@/components/layout/ReturnTrailTracker";
 
-import { PWA_SPLASH_LOCKUP_SVG } from "@/lib/pwa/splashLockup";
+import { PWA_SPLASH_MARK_SVG } from "@/lib/pwa/splashMark";
 
 import { RC_TIMEZONE_COOKIE } from "@/lib/rcTimeZoneCookie";
 
@@ -275,14 +275,39 @@ export default async function RootLayout({
          * PWA launch splash — CSS-gated to installed (standalone) launches via
          * `html[data-standalone]` (set pre-paint by the bootstrap script below), so it
          * covers the cold-launch gap; `PwaSplashDismiss` fades it once the app is ready.
-         * Inline SVG (not next/image) so it paints without a client loader, and the
-         * TRACKSIDE lockup builds mark → rule → word on the way in (globals.css).
+         *
+         * The yellow field with the ink mark is the app icon, held open: tapping the
+         * icon and landing on the splash is one continuous surface rather than a swap
+         * from yellow tile to paper screen (founder design, 2026-09-03).
+         *
+         * Only the MARK is inline SVG (no client loader, no network round trip — it
+         * paints with the first frame). The rule, the TRACKSIDE letters and the footer
+         * are plain DOM: the letters are spread with `space-between` across the mark's
+         * width, so they stay evenly set whichever font has loaded. All of it is laid
+         * out and animated in globals.css.
          */}
-        <div
-          id="pwa-splash"
-          aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: PWA_SPLASH_LOCKUP_SVG }}
-        />
+        <div id="pwa-splash" aria-hidden="true">
+          <div className="splash-lockup">
+            <div
+              className="splash-mark"
+              dangerouslySetInnerHTML={{ __html: PWA_SPLASH_MARK_SVG }}
+            />
+            <div className="splash-rule" />
+            <div className="splash-word">
+              {"TRACKSIDE".split("").map((letter, i) => (
+                <span key={i}>{letter}</span>
+              ))}
+            </div>
+          </div>
+          <div className="splash-foot">
+            <div className="splash-dots">
+              <i />
+              <i />
+              <i />
+            </div>
+            <div className="splash-name">JRC DYNAMICS</div>
+          </div>
+        </div>
 
         <div className="app-root">
 
