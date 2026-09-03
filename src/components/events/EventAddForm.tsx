@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
@@ -14,6 +13,7 @@ import {
 } from "@/components/runs/InlineNewTrackRow";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
 import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
+import { EventDateRangeField } from "@/components/events/EventDateRangeField";
 
 export type TrackOption = {
   id: string;
@@ -85,11 +85,6 @@ export function EventAddForm({
     if (suggestedStartYmd) setStartDate((prev) => prev || suggestedStartYmd);
   }, [suggestedStartYmd]);
 
-  const dateRangeInvalid = useMemo(
-    () => isEndDateBeforeStartDateYmd(startDate, endDate),
-    [startDate, endDate]
-  );
-
   /** Catalog plus anything added from inside the picker, first row of a name winning. */
   const allTracks = useMemo(() => {
     const byId = new Map<string, TrackOption>();
@@ -129,10 +124,6 @@ export function EventAddForm({
     }
     if (!trackId.trim()) {
       setMessage("Select a track for this event.");
-      return;
-    }
-    if (dateRangeInvalid) {
-      setMessage(null);
       return;
     }
     setMessage(null);
@@ -242,33 +233,16 @@ export function EventAddForm({
           />
         </div>
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="min-w-0">
-          <label className="block text-[11px] text-muted-foreground mb-1">Start date</label>
-          <input
-            type="date"
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            aria-label="Start date"
-          />
-        </div>
-        <div className="min-w-0">
-          <label className="block text-[11px] text-muted-foreground mb-1">End date</label>
-          <input
-            type="date"
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            aria-label="End date"
-          />
-        </div>
-      </div>
-      {dateRangeInvalid ? (
-        <p className="text-[11px] text-destructive">
-          End date must be on or after the start date.
-        </p>
-      ) : null}
+      <EventDateRangeField
+        label="Dates"
+        startYmd={startDate}
+        endYmd={endDate}
+        onChange={(next) => {
+          setStartDate(next.startYmd);
+          setEndDate(next.endYmd);
+        }}
+        triggerClassName="rounded-md border border-border bg-card"
+      />
       <div>
         <label className="block text-[11px] text-muted-foreground mb-1">Notes (optional)</label>
         <input
@@ -381,10 +355,10 @@ export function EventAddForm({
       <div className="flex items-center gap-2">
         <button
           type="submit"
-          disabled={adding || !trackId.trim() || dateRangeInvalid}
+          disabled={adding || !trackId.trim()}
           className={cn(
             buttonLinkClassName("primary"),
-            (adding || !trackId.trim() || dateRangeInvalid) && "opacity-70 pointer-events-none"
+            (adding || !trackId.trim()) && "opacity-70 pointer-events-none"
           )}
         >
           {adding ? "Creating…" : "Create event"}

@@ -1,4 +1,3 @@
-import type { ChassisPlatformId } from "@/lib/cars/carClasses";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 
 /**
@@ -13,19 +12,19 @@ import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
  * `isSamePlatform` treats as "same platform" — so drift degrades safely (tires keep carrying)
  * rather than silently re-deriving a driver's tires mid-day.
  */
-export const CHASSIS_PLATFORM_BY_SLUG: Readonly<Record<string, ChassisPlatformId>> = {
-  awesomatix_a800rr: "touring",
-  mugen_mtc3: "touring",
-  mugen_mtc2: "touring",
-  xray_t4: "touring",
-  xray_x4: "touring",
-  yokomo_bd11: "touring",
-  yokomo_bd12: "touring",
-  tamiya_trf421: "touring",
-  infinity_if14: "touring",
-  schumacher_atom2: "touring",
-  destiny_rx10: "touring",
-  arc_r12: "touring",
+export const CHASSIS_PLATFORM_BY_SLUG: Readonly<Record<string, string>> = {
+  awesomatix_a800rr: "touring~electric",
+  mugen_mtc3: "touring~electric",
+  mugen_mtc2: "touring~electric",
+  xray_t4: "touring~electric",
+  xray_x4: "touring~electric",
+  yokomo_bd11: "touring~electric",
+  yokomo_bd12: "touring~electric",
+  tamiya_trf421: "touring~electric",
+  infinity_if14: "touring~electric",
+  schumacher_atom2: "touring~electric",
+  destiny_rx10: "touring~electric",
+  arc_r12: "touring~electric",
 };
 
 /**
@@ -35,7 +34,7 @@ export const CHASSIS_PLATFORM_BY_SLUG: Readonly<Record<string, ChassisPlatformId
  */
 export function platformForChassisSlug(
   slug: string | null | undefined
-): ChassisPlatformId | null {
+): string | null {
   const s = slug?.trim().toLowerCase();
   if (!s) return null;
   const exact = CHASSIS_PLATFORM_BY_SLUG[s];
@@ -71,8 +70,11 @@ export type CarDisciplineInput = {
  * app read as "unknown".
  *
  * Be aware what this can still return on OLD data: every slug in `CHASSIS_PLATFORM_BY_SLUG` is
- * `touring`, and rows created before the discipline column exists have none — so a chassis
- * derived before 2026-08-26 stays null until someone sets it.
+ * `touring~electric`, and rows created before the discipline column exists have none — so a
+ * chassis derived before 2026-08-26 stays null until someone sets it.
+ *
+ * The answer is an ENCODED value (`carClasses.ts`), not a bare class id — compare with
+ * `isSamePlatform` and render with `disciplineLabel`; never string-equal it by hand.
  */
 export function disciplineForCar(car: CarDisciplineInput | null | undefined): string | null {
   if (!car) return null;

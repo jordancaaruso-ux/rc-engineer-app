@@ -15,9 +15,10 @@
  *   npm run ingest-blanks -- manifest.json --apply --prod        (after the branch ships)
  *
  * Manifest: [{ "name": "Kyosho MP10", "pdfPath": "C:\\...\\mp10_editable.pdf",
- *              "discipline": "buggy-8th" }, ...]
+ *              "discipline": "buggy-8th-4wd~nitro" }, ...]
  *
- * `discipline` is optional and is a `ChassisPlatformId` (see `src/lib/cars/carClasses.ts`).
+ * `discipline` is optional: a class id from `RACE_CLASSES`, optionally with `~electric` or
+ * `~nitro` after it (see `src/lib/cars/carClasses.ts`).
  * Worth filling in: without it the chassis has no discipline unless its slug happens to be in
  * `CHASSIS_PLATFORM_BY_SLUG`, and an ingested slug is a fingerprint, so it never is.
  *
@@ -40,7 +41,7 @@ import {
 } from "@/lib/setupSheetModels/derivedSheetFingerprint";
 import { normalizeSetupSheetModelName } from "@/lib/setupSheetModels/normalizeModelName";
 import { createModelFromBlank } from "@/lib/setupSheetModels/createModelFromBlank";
-import { CHASSIS_PLATFORMS, isChassisPlatformId } from "@/lib/cars/carClasses";
+import { RACE_CLASSES, isKnownDisciplineClass } from "@/lib/cars/carClasses";
 import { guardDatabaseTarget } from "./lib/neonEnvGuard";
 
 type ManifestEntry = { name: string; pdfPath: string; discipline: string | null };
@@ -76,10 +77,10 @@ function readManifest(path: string): ManifestEntry[] {
      */
     const discipline =
       typeof row?.discipline === "string" ? row.discipline.trim() || null : null;
-    if (discipline && !isChassisPlatformId(discipline)) {
+    if (discipline && !isKnownDisciplineClass(discipline)) {
       throw new Error(
         `Manifest entry ${i} ("${row.name}"): "${discipline}" isn't a discipline. ` +
-          `Use one of: ${CHASSIS_PLATFORMS.map((p) => p.id).join(", ")}.`
+          `Use one of: ${RACE_CLASSES.map((c) => c.id).join(", ")} — optionally with "~electric" or "~nitro".`
       );
     }
     return { name: row.name.trim(), pdfPath: row.pdfPath.trim(), discipline };

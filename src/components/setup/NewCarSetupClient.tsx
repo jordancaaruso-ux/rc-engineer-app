@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
-import { SetupFillFlow } from "@/components/setup/SetupFillFlow";
 import { SetupFillDraftResumeCard } from "@/components/setup/SetupFillDraftResumeCard";
-import { useSetupFillDraft } from "@/components/setup/useSetupFillDraft";
+import {
+  useSetupFillAutosave,
+  useSetupFillDraft,
+  type SetupFillDraftBinding,
+} from "@/components/setup/useSetupFillDraft";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
@@ -18,11 +21,16 @@ import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
  * Kept as two explicit steps rather than dropping straight into the questions: the starting point
  * is the single biggest lever on how long the fill takes, and it can't be changed halfway through.
  *
- * The starting point also picks the surface (2026-07-29). A blank sheet gets the sequential
- * one-question-at-a-time flow, which is the only way to fill 40-70 values you've never seen. A
- * baseline or previous setup gets the grid instead: you're changing a handful of values against a
- * sheet that's already right, and stepping past 60 correct answers to reach them is the whole
- * complaint.
+ * ONE surface, whichever starting point you pick (founder call 2026-09-03). Starting empty used to
+ * open a sequential one-question-per-screen flow, on the argument that 40-70 unseen values need
+ * rhythm more than they need an overview. Two things killed it. A chassis that draws its own sheet
+ * never came here at all, so the flow only ever ran for chassis with no paper — where the generic
+ * template is 43 fields in five sections, not the 150 it was designed for. And the log-run wizard
+ * fills that same template from scratch on the grid, so the same driver entering the same values
+ * met two different surfaces depending on which door they used.
+ *
+ * The autosave the sequential flow carried is kept and moved onto the grid, because the failure it
+ * existed for is unchanged: a long first fill lost whole to a back-swipe or a phone lock.
  *
  * "Start from a previous setup" leads and carries a dropdown (founder call 2026-07-29). Adjusting
  * the setup you're already on is the common case, it was previously locked to whichever row was
@@ -162,16 +170,18 @@ export function NewCarSetupClient({
     }
   };
 
-  if (started && mode === "empty") {
+  if (started) {
     return (
-      <SetupFillFlow
+      <NewSetupSheetFill
         template={template}
         initialValues={resumed && parkedDraft ? parkedDraft.values : startValues}
-        initialStepIndex={resumed ? parkedDraft?.stepIndex : undefined}
-        initialPendingText={resumed ? parkedDraft?.pendingText : null}
-        initialPendingStepKey={resumed ? parkedDraft?.pendingStepKey : null}
-        fillDraft={draftBinding}
         subject={name.trim() || carName}
+        /*
+         * Drafts are for the from-scratch fill only. Copying a previous setup or a baseline lands
+         * a full sheet of values in one tap, and parking that would clobber a real half-finished
+         * fill — the draft's natural key is (user, car), so there is nowhere else for it to go.
+         */
+        fillDraft={mode === "empty" ? draftBinding : undefined}
         saving={saving}
         error={error}
         onSave={(values) => void save(values)}
@@ -181,20 +191,6 @@ export function NewCarSetupClient({
           // The draft may have just been saved or discarded; re-read so the card matches.
           router.refresh();
         }}
-      />
-    );
-  }
-
-  if (started) {
-    return (
-      <NewSetupSheetFill
-        template={template}
-        initialValues={startValues}
-        subject={name.trim() || carName}
-        saving={saving}
-        error={error}
-        onSave={(values) => void save(values)}
-        onCancel={() => setStarted(false)}
       />
     );
   }
@@ -363,7 +359,7 @@ export function NewCarSetupClient({
             setStarted(true);
           }}
         >
-          {mode === "empty" ? "Start filling" : "Open the sheet"}
+          Open the sheet
         </button>
       </div>
       </SurfaceCard>
@@ -372,9 +368,12 @@ export function NewCarSetupClient({
 }
 
 /**
- * Whole sheet at once, for a setup that starts from values that are already mostly right. Same
- * grid the editor uses, so there is one thing to learn — but this one isn't saved until you say so,
- * because the setup doesn't exist yet.
+ * The whole sheet at once. Same grid the editor uses, so there is one thing to learn — but this one
+ * isn't written until you say so, because the setup doesn't exist yet.
+ *
+ * Given `fillDraft`, what has been typed is also parked on the server as you go. It is a pill and
+ * never a blocker: a driver mid-sheet is still filling it in, and the save at the end is the one
+ * that counts.
  */
 function NewSetupSheetFill({
   template,
@@ -382,6 +381,7 @@ function NewSetupSheetFill({
   subject,
   saving,
   error,
+  fillDraft,
   onSave,
   onCancel,
 }: {
@@ -390,30 +390,48 @@ function NewSetupSheetFill({
   subject: string;
   saving: boolean;
   error: string | null;
+  /** Omit and nothing is parked until the final save. */
+  fillDraft?: SetupFillDraftBinding;
   onSave: (values: SetupSnapshotData) => void;
   onCancel: () => void;
 }) {
   const [values, setValues] = useState<SetupSnapshotData>(initialValues);
+  const { state: draftState, report } = useSetupFillAutosave(fillDraft, template);
+
+  const onChange = useCallback(
+    (next: SetupSnapshotData) => {
+      setValues(next);
+      report?.(next);
+    },
+    [report]
+  );
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <Eyebrow>{subject}</Eyebrow>
-        <button
-          type="button"
-          className="ui-caption text-muted-foreground underline"
-          onClick={onCancel}
-          disabled={saving}
-        >
-          Back
-        </button>
+        <div className="flex items-center gap-3">
+          {fillDraft && draftState !== "idle" ? (
+            <span className="ui-caption text-muted-foreground">
+              {draftState === "saving" ? "Saving…" : draftState === "saved" ? "Saved" : "Not saved"}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            className="ui-caption text-muted-foreground underline"
+            onClick={onCancel}
+            disabled={saving}
+          >
+            Back
+          </button>
+        </div>
       </div>
 
       <SetupSheetView
         value={values}
         template={template}
         enableFieldSearch
-        onChange={setValues}
+        onChange={onChange}
       />
 
       {error ? <p className="ui-caption text-destructive">{error}</p> : null}

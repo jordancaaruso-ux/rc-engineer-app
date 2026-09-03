@@ -99,7 +99,6 @@ import {
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { AutoGrowTextarea } from "@/components/ui/AutoGrowTextarea";
 import { Switch } from "@/components/ui/Switch";
-import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { splitEventsForPicker } from "@/lib/events/splitEventsForPicker";
 import { normalizeLapTimes } from "@/lib/runLaps";
 import type { LapRow } from "@/lib/lapAnalysis";
@@ -125,6 +124,8 @@ import {
   defaultLapIngestValue,
   type LapIngestFormValue,
 } from "@/components/runs/LapTimesIngestPanel";
+import { TrackTimingSourceNotice } from "@/components/runs/TrackTimingSourceNotice";
+import { EventDateRangeField } from "@/components/events/EventDateRangeField";
 import { ImportedFieldSessionCard } from "@/components/runs/ImportedFieldSessionCard";
 import { HandlingAssessmentFields } from "@/components/runs/HandlingAssessmentFields";
 import { CarHandlingRatingQuickPick } from "@/components/runs/CarHandlingRatingQuickPick";
@@ -193,7 +194,7 @@ const fabPillOutlineClass =
 type CarOption = {
   id: string;
   name: string;
-  /** Chassis platform (`CHASSIS_PLATFORMS` id, resolved server-side) — drives the car-swap rule. */
+  /** Discipline (an encoded `carClasses.ts` value, resolved server-side) — drives the car-swap rule. */
   platform?: string | null;
   setupSheetTemplate?: string | null;
   setupSheetModelId?: string | null;
@@ -658,17 +659,25 @@ export function NewRunForm(props: {
   const [newEventDirection, setNewEventDirection] = useState<"" | "CW" | "CCW">("");
   const [newEventStartDate, setNewEventStartDate] = useState("");
   const [newEventEndDate, setNewEventEndDate] = useState("");
-  const [newEventPracticeUrl, setNewEventPracticeUrl] = useState("");
-  const [newEventResultsUrl, setNewEventResultsUrl] = useState("");
-  const [newEventMyRcmUrl, setNewEventMyRcmUrl] = useState("");
   const [newEventTireControlled, setNewEventTireControlled] = useState(false);
   const [newEventControlledTireTypeId, setNewEventControlledTireTypeId] = useState("");
   const [newEventControlAdditiveEnabled, setNewEventControlAdditiveEnabled] = useState(false);
   const [newEventControlledAdditiveTypeId, setNewEventControlledAdditiveTypeId] = useState("");
-  /** When logging an event day, timing URLs (stored on the Event; edited here, PATCH on save). */
+  /**
+   * The meeting's own timing URLs, read from the selected event and never typed here.
+   *
+   * They used to be three boxes on this step, which asked the driver to re-enter per meeting
+   * what belongs on the track once (founder 2026-09-03). The track's timing page is now the
+   * only thing this form collects — see `TrackTimingSourceNotice` below — and these stay as
+   * read-only state because the lap scan still falls back to them when the Events page has
+   * set one.
+   */
   const [eventPracticeTimingUrl, setEventPracticeTimingUrl] = useState("");
   const [eventRaceTimingUrl, setEventRaceTimingUrl] = useState("");
-  /** This meeting's MyRCM page. Only ever handed to the driver as a link to tap. */
+  /**
+   * This meeting's MyRCM page. Only ever handed to the driver as a link to tap, and now saved
+   * from beside the Import PDF button where it is actually used, not from this step.
+   */
   const [eventMyRcmUrl, setEventMyRcmUrl] = useState("");
   const [eventControlledTireTypeId, setEventControlledTireTypeId] = useState("");
   const [eventControlAdditiveEnabled, setEventControlAdditiveEnabled] = useState(false);
@@ -1899,21 +1908,75 @@ export function NewRunForm(props: {
     [trackId, tracksList]
   );
   /**
-   * LiveRC root URL of the selected/new event's track, if any. When present, the
-   * timing pages are discoverable from the track root, so the manual practice /
-   * race timing URL inputs are redundant and hidden.
+   * The track behind the selected / about-to-be-created event, when it carries no timing page
+   * at all.
+   *
+   * Null is the good case and draws nothing: the track already points at LiveRC or Speedhive,
+   * so every meeting there is discovered from the track root and there is nothing to ask for.
+   * A row here means lap discovery would search nothing, and the fix is one paste that sticks
+   * to the track for every meeting and every driver — which is why the old per-meeting timing
+   * URL boxes are gone.
    */
-  const selectedEventTrackLiveRc = useMemo(() => {
+  const selectedEventTrackNeedingTiming = useMemo(() => {
     const ev = eventId ? events.find((e) => e.id === eventId) : null;
     const tid = ev?.trackId ?? null;
-    return tid ? tracksList.find((t) => t.id === tid)?.liveRcUrl?.trim() || null : null;
+    const track = tid ? tracksList.find((t) => t.id === tid) ?? null : null;
+    if (!track) return null;
+    return track.liveRcUrl?.trim() || track.speedhiveUrl?.trim() ? null : track;
   }, [eventId, events, tracksList]);
-  const newEventTrackLiveRc = useMemo(
-    () =>
-      newEventTrackId
-        ? tracksList.find((t) => t.id === newEventTrackId)?.liveRcUrl?.trim() || null
-        : null,
-    [newEventTrackId, tracksList]
+  const newEventTrackNeedingTiming = useMemo(() => {
+    const track = newEventTrackId
+      ? tracksList.find((t) => t.id === newEventTrackId) ?? null
+      : null;
+    if (!track) return null;
+    return track.liveRcUrl?.trim() || track.speedhiveUrl?.trim() ? null : track;
+  }, [newEventTrackId, tracksList]);
+  /**
+   * Ask for the track's timing page here, or leave it to the lap step?
+   *
+   * The lap panel already carries the same card for the run's own track — and picking an event
+   * locks the run to that very track. In the wizard they are different screens, so asking early
+   * is a head start; in classic mode they would be two identical boxes on one page, so the one
+   * beside the sessions it feeds wins.
+   */
+  const askForEventTrackTiming = useCallback(
+    (track: { id: string } | null) =>
+      Boolean(track) && (wizardActive || track!.id !== trackId.trim()),
+    [wizardActive, trackId]
+  );
+  /**
+   * Save the meeting's MyRCM class page, from the one place it is ever used: beside Import PDF.
+   *
+   * Saves on its own rather than riding the run's save, because the driver pastes it *to get
+   * out to MyRCM* — the trip has to work in the same breath, not after the run is banked.
+   * The server normalises a single-heat link up to the class page; whatever comes back is what
+   * we hold, so the "Open MyRCM" link and this state can never drift.
+   */
+  const saveEventMyRcmUrl = useCallback(
+    async (url: string): Promise<{ ok: true } | { ok: false; error: string }> => {
+      if (!eventId) return { ok: false, error: "Pick the event first." };
+      try {
+        const res = await fetch(`/api/events/${encodeURIComponent(eventId)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ myRcmUrl: url }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          event?: { myRcmUrl?: string | null };
+        };
+        if (!res.ok) return { ok: false, error: data.error ?? "Could not save that link." };
+        const saved = data.event?.myRcmUrl?.trim() ?? url.trim();
+        setEventMyRcmUrl(saved);
+        setEvents((prev) =>
+          prev.map((e) => (e.id === eventId ? { ...e, myRcmUrl: saved } : e))
+        );
+        return { ok: true };
+      } catch {
+        return { ok: false, error: "Could not save that link." };
+      }
+    },
+    [eventId]
   );
   /** Event day + event with a track: run track follows the event (picker disabled). */
   const trackLockedToEvent = Boolean(selectedEventForRun?.trackId);
@@ -3354,10 +3417,6 @@ export function NewRunForm(props: {
       setEventError("Select the track for this event.");
       return;
     }
-    if (isEndDateBeforeStartDateYmd(newEventStartDate, newEventEndDate)) {
-      setEventError("End date must be on or after the start date.");
-      return;
-    }
     setEventError(null);
     setStatus(null);
     setCreatingEvent(true);
@@ -3374,9 +3433,6 @@ export function NewRunForm(props: {
           trackDirection: newEventDirection || null,
           startDate: start,
           endDate: end,
-          practiceSourceUrl: newEventPracticeUrl.trim() || null,
-          resultsSourceUrl: newEventResultsUrl.trim() || null,
-          myRcmUrl: newEventMyRcmUrl.trim() || null,
           controlledTireTypeId: newEventControlledTireTypeId.trim() || null,
           controlledAdditiveTypeId: newEventControlAdditiveEnabled
             ? newEventControlledAdditiveTypeId.trim() || null
@@ -3403,8 +3459,6 @@ export function NewRunForm(props: {
       setNewEventTrackId("");
       setNewEventStartDate("");
       setNewEventEndDate("");
-      setNewEventPracticeUrl("");
-      setNewEventResultsUrl("");
       setNewEventTireControlled(false);
       setNewEventControlledTireTypeId("");
       setNewEventControlAdditiveEnabled(false);
@@ -3908,18 +3962,17 @@ export function NewRunForm(props: {
       setStatus(isEditing ? "Changes saved." : "Run saved.");
 
       if (sessionType === "RACE_MEETING" && needsEvent && eventId) {
-        const p = eventPracticeTimingUrl.trim() || null;
-        const r = eventRaceTimingUrl.trim() || null;
-        const m = eventMyRcmUrl.trim() || null;
+        /*
+         * Tire rules only. The meeting's timing URLs used to ride along here, written back from
+         * boxes on this step; they are gone (founder 2026-09-03) and writing them from state
+         * would only mean a save could blank a URL the Events page had set.
+         */
         const c = eventControlledTireTypeId.trim() || null;
         const a = eventControlAdditiveEnabled ? eventControlledAdditiveTypeId.trim() || null : null;
         void fetch(`/api/events/${encodeURIComponent(eventId)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            practiceSourceUrl: p,
-            resultsSourceUrl: r,
-            myRcmUrl: m,
             controlledTireTypeId: c,
             controlledAdditiveTypeId: a,
           }),
@@ -3931,9 +3984,6 @@ export function NewRunForm(props: {
                 e.id === eventId
                   ? {
                       ...e,
-                      practiceSourceUrl: p,
-                      resultsSourceUrl: r,
-                      myRcmUrl: m,
                       controlledTireTypeId: c,
                       controlledAdditiveTypeId: a,
                     }
@@ -4959,21 +5009,6 @@ export function NewRunForm(props: {
                     : meetingSessionType.charAt(0) +
                       meetingSessionType.slice(1).toLowerCase()}
                 </span>
-                {eventPracticeTimingUrl.trim() ? (
-                  <span className="min-w-0 truncate text-[11px] text-muted-foreground">
-                    Practice timing URL set
-                  </span>
-                ) : null}
-                {eventRaceTimingUrl.trim() ? (
-                  <span className="min-w-0 truncate text-[11px] text-muted-foreground">
-                    Race timing URL set
-                  </span>
-                ) : null}
-                {eventMyRcmUrl.trim() ? (
-                  <span className="min-w-0 truncate text-[11px] text-muted-foreground">
-                    MyRCM page set
-                  </span>
-                ) : null}
                 {eventControlledTireTypeId.trim() ? (
                   <span className="min-w-0 truncate text-[11px] text-muted-foreground">Spec tire set</span>
                 ) : null}
@@ -5124,61 +5159,23 @@ export function NewRunForm(props: {
 
           {eventId ? (
             <div className="mt-2 space-y-2 text-sm">
-              {!selectedEventForRun?.trackId ? null : selectedEventTrackLiveRc ? null : (
-                <>
-                  <div className="space-y-1">
-                    <label
-                      htmlFor="event-practice-timing-url"
-                      className="block text-xs font-medium text-muted-foreground"
-                    >
-                      Practice timing URL (optional)
-                    </label>
-                    <input
-                      id="event-practice-timing-url"
-                      type="url"
-                      value={eventPracticeTimingUrl}
-                      onChange={(e) => setEventPracticeTimingUrl(e.target.value)}
-                      placeholder="LiveRC practice session list URL"
-                      className="form-control w-full px-3 py-2 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label
-                      htmlFor="event-race-timing-url"
-                      className="block text-xs font-medium text-muted-foreground"
-                    >
-                      Race timing URL (optional)
-                    </label>
-                    <input
-                      id="event-race-timing-url"
-                      type="url"
-                      value={eventRaceTimingUrl}
-                      onChange={(e) => setEventRaceTimingUrl(e.target.value)}
-                      placeholder="LiveRC results / race timing page URL"
-                      className="form-control w-full px-3 py-2 text-xs"
-                    />
-                  </div>
-                </>
-              )}
-              {/* Outside the LiveRC block on purpose: a track with a LiveRC page can still hold
-                  a MyRCM meeting, and nothing about MyRCM is auto-pulled either way. */}
-              <div className="space-y-1">
-                <label
-                  htmlFor="event-myrcm-url"
-                  className="block text-xs font-medium text-muted-foreground"
-                >
-                  MyRCM page (optional)
-                </label>
-                <input
-                  id="event-myrcm-url"
-                  type="url"
-                  value={eventMyRcmUrl}
-                  onChange={(e) => setEventMyRcmUrl(e.target.value)}
-                  placeholder="Your class page on MyRCM"
-                  className="form-control w-full px-3 py-2 text-xs"
+              {/* One paste, saved to the track, and every meeting here is found from it. Draws
+                  nothing once the track has a page — there is nothing left to ask for. */}
+              {askForEventTrackTiming(selectedEventTrackNeedingTiming) ? (
+                <TrackTimingSourceNotice
+                  trackId={selectedEventTrackNeedingTiming!.id}
+                  trackName={selectedEventTrackNeedingTiming!.name}
+                  liveRcUrl={null}
+                  speedhiveUrl={null}
+                  onSaved={(next) =>
+                    setTracksList((prev) =>
+                      prev.map((t) =>
+                        t.id === selectedEventTrackNeedingTiming!.id ? { ...t, ...next } : t
+                      )
+                    )
+                  }
                 />
-                <p className="ui-label-meta">Results come in as a file — this is where Import PDF sends you.</p>
-              </div>
+              ) : null}
               {/* Open vs Controlled is event config — set when the event is created
                   (New event panel or the Events page). Read-only here; a controlled
                   event locks the run's Tires step to it. */}
@@ -5257,70 +5254,33 @@ export function NewRunForm(props: {
                 value={newEventName}
                 onChange={(e) => setNewEventName(e.target.value)}
               />
-              <div className="grid grid-cols-2 gap-2">
-                <div className="min-w-0 space-y-1">
-                  <label className="block ui-label-meta">Start date</label>
-                  <input
-                    type="date"
-                    aria-label="Event start date"
-                    className="form-control w-full px-3 py-2 text-sm"
-                    value={newEventStartDate}
-                    onChange={(e) => {
-                      setNewEventStartDate(e.target.value);
-                      setEventError(null);
-                    }}
-                  />
-                </div>
-                <div className="min-w-0 space-y-1">
-                  <label className="block ui-label-meta">End date</label>
-                  <input
-                    type="date"
-                    aria-label="Event end date"
-                    className="form-control w-full px-3 py-2 text-sm"
-                    value={newEventEndDate}
-                    onChange={(e) => {
-                      setNewEventEndDate(e.target.value);
-                      setEventError(null);
-                    }}
-                  />
-                </div>
-              </div>
-              {/* Timing URLs are only relevant once a track without a LiveRC link
-                  is chosen — otherwise laps auto-pull (or the track is unknown). */}
-              {!newEventTrackId ? null : newEventTrackLiveRc ? null : (
-                <>
-                  <div className="space-y-1">
-                    <label className="block ui-label-meta">Practice timing URL (optional)</label>
-                    <input
-                      type="url"
-                      className="form-control w-full px-3 py-2 text-xs"
-                      value={newEventPracticeUrl}
-                      onChange={(e) => setNewEventPracticeUrl(e.target.value)}
-                      placeholder="LiveRC practice session list URL"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block ui-label-meta">Race timing URL (optional)</label>
-                    <input
-                      type="url"
-                      className="form-control w-full px-3 py-2 text-xs"
-                      value={newEventResultsUrl}
-                      onChange={(e) => setNewEventResultsUrl(e.target.value)}
-                      placeholder="LiveRC results / race timing page URL"
-                    />
-                  </div>
-                </>
-              )}
-              <div className="space-y-1">
-                <label className="block ui-label-meta">MyRCM page (optional)</label>
-                <input
-                  type="url"
-                  className="form-control w-full px-3 py-2 text-xs"
-                  value={newEventMyRcmUrl}
-                  onChange={(e) => setNewEventMyRcmUrl(e.target.value)}
-                  placeholder="Your class page on MyRCM"
+              <EventDateRangeField
+                label="Dates"
+                startYmd={newEventStartDate}
+                endYmd={newEventEndDate}
+                onChange={(next) => {
+                  setNewEventStartDate(next.startYmd);
+                  setNewEventEndDate(next.endYmd);
+                  setEventError(null);
+                }}
+              />
+              {/* Only when the chosen track points at nothing: laps are found from the track,
+                  so that is the one link worth taking here. */}
+              {askForEventTrackTiming(newEventTrackNeedingTiming) ? (
+                <TrackTimingSourceNotice
+                  trackId={newEventTrackNeedingTiming!.id}
+                  trackName={newEventTrackNeedingTiming!.name}
+                  liveRcUrl={null}
+                  speedhiveUrl={null}
+                  onSaved={(next) =>
+                    setTracksList((prev) =>
+                      prev.map((t) =>
+                        t.id === newEventTrackNeedingTiming!.id ? { ...t, ...next } : t
+                      )
+                    )
+                  }
                 />
-              </div>
+              ) : null}
               <div className="space-y-1.5">
                 <label className="block ui-label-meta">Tire</label>
                 <SegmentedControl<"open" | "controlled">
@@ -5372,25 +5332,12 @@ export function NewRunForm(props: {
                   />
                 ) : null}
               </div>
-              {isEndDateBeforeStartDateYmd(newEventStartDate, newEventEndDate) ? (
-                <p className="text-[11px] text-destructive">
-                  End date must be on or after the start date.
-                </p>
-              ) : null}
               <button
                 type="button"
-                disabled={
-                  creatingEvent ||
-                  !newEventName.trim() ||
-                  !newEventTrackId ||
-                  isEndDateBeforeStartDateYmd(newEventStartDate, newEventEndDate)
-                }
+                disabled={creatingEvent || !newEventName.trim() || !newEventTrackId}
                 className={cn(
                   buttonLinkClassName("primary"),
-                  (creatingEvent ||
-                    !newEventName.trim() ||
-                    !newEventTrackId ||
-                    isEndDateBeforeStartDateYmd(newEventStartDate, newEventEndDate)) &&
+                  (creatingEvent || !newEventName.trim() || !newEventTrackId) &&
                     "opacity-60 pointer-events-none"
                 )}
                 onClick={(e) => createEvent(e)}
@@ -6020,6 +5967,9 @@ export function NewRunForm(props: {
         lapImportEventId={sessionType === "RACE_MEETING" && eventId ? eventId : null}
         eventMyRcmUrl={
           sessionType === "RACE_MEETING" && eventId ? eventMyRcmUrl.trim() || null : null
+        }
+        onSaveEventMyRcmUrl={
+          sessionType === "RACE_MEETING" && eventId ? saveEventMyRcmUrl : undefined
         }
         trackId={trackId.trim() || null}
         trackName={selectedRunTrack?.name ?? null}

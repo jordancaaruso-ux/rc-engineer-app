@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { Check, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptics";
-import { CHASSIS_PLATFORMS } from "@/lib/cars/carClasses";
+import { DisciplineField } from "@/components/cars/DisciplineField";
 import {
   uploadBlankSheetForChassis,
   type BlankUploadModel,
@@ -41,10 +41,14 @@ import {
  * answer stayed "unknown" for the life of the row unless the driver later found the override
  * dropdown on the car page — which is the same control, three screens away, after the fact.
  *
- * It follows the name gate's rule rather than the file picker's: the select is on screen from the
+ * It follows the name gate's rule rather than the file picker's: the control is on screen from the
  * first render and never disabled, and the confirm step names whichever answer is still missing.
  * The chassis row is global, so this answer is the one every driver who later merges onto the same
  * sheet inherits — which is the argument for asking once, here, rather than per car.
+ *
+ * Since 2026-09-03 the answer is a class AND its power (electric or nitro), and `DisciplineField`
+ * owns both. `discipline` here holds `""` until BOTH are chosen, so `placed` needs no new test:
+ * a half-answered question still reads as unanswered, which is what it is.
  */
 
 /**
@@ -140,25 +144,11 @@ export function AddCarBlankUpload({
       <div>
         <label className="mb-1 block text-[11px] text-muted-foreground">What it races</label>
         {/*
-          A native select, deliberately — the same control the car page uses for this exact
-          question (`CarDetailsCard`'s SelectRow), and thirteen fixed options is not a list that
-          earns a searchable PickerSheet. Full width here rather than the settings row's 190px
-          because this card is a form, not a list of answers.
+          `DisciplineField` — the same control the car page uses for this exact question, so the
+          answer can only ever be built one way. It hands back `""` until the class AND its power
+          are both chosen, which is precisely what `placed` below is testing.
         */}
-        <select
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
-          value={discipline}
-          onChange={(e) => setDiscipline(e.target.value)}
-          disabled={busy}
-          aria-label="What it races"
-        >
-          <option value="">Choose…</option>
-          {CHASSIS_PLATFORMS.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label}
-            </option>
-          ))}
-        </select>
+        <DisciplineField value={discipline} onChange={setDiscipline} disabled={busy} />
       </div>
 
       <div>
