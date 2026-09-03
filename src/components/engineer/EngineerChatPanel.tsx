@@ -445,6 +445,14 @@ export function EngineerChatPanel({
   // driver can keep typing the detail that makes the answer good.
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
+  // The transcript follows the newest words as they arrive. `stickToBottom` drops to false the
+  // moment the driver scrolls up to re-read an earlier answer, and comes back the moment they
+  // return to the foot of the thread (or send anything), so following never fights a deliberate
+  // scroll back.
+  const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const transcriptInnerRef = useRef<HTMLDivElement | null>(null);
+  const stickToBottom = useRef(true);
+
   useEffect(() => {
 
     onQueuedConsumedRef.current = onQueuedPromptConsumed;
@@ -738,6 +746,8 @@ export function EngineerChatPanel({
           router.replace(`${pathname}?${sp.toString()}`, { scroll: false });
         }
 
+        stickToBottom.current = true;
+
         setMessages(mapped);
 
         messagesRef.current = mapped;
@@ -765,6 +775,8 @@ export function EngineerChatPanel({
     initialUrlThreadLoaded.current = null;
 
     setThreadId(null);
+
+    stickToBottom.current = true;
 
     setMessages([]);
 
@@ -822,7 +834,48 @@ export function EngineerChatPanel({
 
 
 
+  const hasMessages = messages.length > 0;
+
+  useEffect(() => {
+    const el = transcriptRef.current;
+    const inner = transcriptInnerRef.current;
+    if (!el || !inner) return;
+
+    /*
+     * Direction, not distance, is what tells a driver's scroll apart from ours. Measuring "am I
+     * near the bottom?" on every scroll event looked right and wasn't: our own jump to the foot
+     * lands, the next tokens make the thread taller before the event is handled, and the panel
+     * concludes the driver has scrolled away from an answer it moved itself. Following stopped
+     * one reply in. Our jumps only ever move down, so only an upward move gives up the follow.
+     */
+    let lastTop = el.scrollTop;
+    const onScroll = () => {
+      const top = el.scrollTop;
+      const movedUp = top < lastTop;
+      lastTop = top;
+      if (movedUp) stickToBottom.current = false;
+      else if (el.scrollHeight - top - el.clientHeight < 48) stickToBottom.current = true;
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+
+    // Tokens land a few at a time and the markdown re-lays out after them, so the height of the
+    // content — not the message count — is what tells us there is more thread to follow.
+    const ro = new ResizeObserver(() => {
+      if (stickToBottom.current) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(inner);
+    el.scrollTop = el.scrollHeight;
+    lastTop = el.scrollTop;
+
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      ro.disconnect();
+    };
+  }, [hasMessages]);
+
   async function submitConversation(apiMessages: ChatMessage[]) {
+
+    stickToBottom.current = true;
 
     setChatBusy(true);
 
@@ -1404,7 +1457,15 @@ export function EngineerChatPanel({
         /* `lg:max-h-none` is the point of this whole pass: a hard 340px scroll-well is right on a
            phone and absurd on a 1440px monitor, where it left the bottom 45% of the screen empty.
            At lg the grid row owns the height instead. */
-        <div className="max-h-[min(42vh,340px)] overflow-y-auto border-b border-border/80 px-3 py-2.5 space-y-2 lg:row-start-1 lg:max-h-none lg:min-h-0 lg:border-b-0 lg:px-5 lg:py-4">
+        <div
+          ref={transcriptRef}
+          data-testid="engineer-transcript"
+          className="max-h-[min(42vh,340px)] overflow-y-auto border-b border-border/80 px-3 py-2.5 lg:row-start-1 lg:max-h-none lg:min-h-0 lg:border-b-0 lg:px-5 lg:py-4"
+        >
+
+        {/* The inner box is what the ResizeObserver watches: a scroll container never reports its
+            own content growing, so the following would stop the moment tokens arrived. */}
+        <div ref={transcriptInnerRef} className="space-y-2">
 
           {messages.map((m, idx) => {
 
@@ -1513,6 +1574,8 @@ export function EngineerChatPanel({
             );
 
           })}
+
+        </div>
 
         </div>
 
