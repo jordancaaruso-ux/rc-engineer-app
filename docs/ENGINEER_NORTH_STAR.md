@@ -141,14 +141,24 @@ Each of these was deleted or declined for a reason. They return only through the
   (`driverData.ts`) — plain statements of what is true, nothing about how to think. The
   prompt sentence that once denied data exists now draws the line around exactly what is
   attached, and it is still load-bearing.
-- **No tools, no modes, no choice chips, no status theatre.** The old pipeline grew to ~99K
+- **No tools, no choice chips, no status theatre.** The old pipeline grew to ~99K
   chars a turn one reasonable addition at a time; the payload-contract test exists so additions
-  fail loudly instead of accreting.
+  fail loudly instead of accreting. The one switch the driver holds is the subject bar
+  (2026-09-03): Auto reads the latest run, a pin reads a chosen run, General attaches no run —
+  three requests the route already sent, never a fourth.
 - **No unmeasured ships.** A change to prompt, payload, model, KB tiering, or nets rendering
   ships only on: physics gate clean, harness win ≥65/35 (or judge-gated at κ≥0.75), and a Jordan
   blind audit for anything user-visible.
 
 ## Changelog
+
+- **2026-09-03** — Founder call: the Engineer page wears its 1 September look again (starter
+  questions, two cards) over the rebuilt mind, and the subject bar returns with three honest
+  states. Auto and a pinned run are the `runId` `driverData.ts` already honoured; **General** is
+  new on the wire only as a flag (`mode: "general"`) that skips the driver-data blocks — the
+  request a driver with no runs has always received, so no new payload shape. Setup pins, event
+  pins, compare pairs and the choice chips stay deleted: the mind reads none of them. Shipped on a
+  founder call, measured after, as on 2026-08-25.
 
 - **2026-09-02** — §2 rewritten to describe the prompt as it ships (label
   `2026-09-01-rc-direction-guard`), by founder call after a whole-system audit found the doc

@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowUp, ChevronDown, MessageSquarePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EngineerMessageRatingRow } from "@/components/engineer/EngineerMessageRatingRow";
+import { EngineerRunPicker } from "@/components/engineer/EngineerRunPicker";
 import { EngineerStarterQuestions } from "@/components/engineer/EngineerStarterQuestions";
+import { EngineerSubjectBar } from "@/components/engineer/EngineerSubjectBar";
 import { EngineerThinkingIndicator } from "@/components/engineer/EngineerThinkingIndicator";
 import { Button } from "@/components/ui/Button";
 import { EngineerMarkdown } from "@/components/ui/EngineerMarkdown";
@@ -12,23 +15,31 @@ import { Eyebrow } from "@/components/ui/panel";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import {
+  buildRunCandidate,
+  sortCandidates,
+  type RunCandidate,
+  type RunCandidateRow,
+} from "@/lib/engineer/runCandidates";
+import {
   ENGINEER_STARTER_BOARD_COUNT,
   selectEngineerStarterQuestions,
   type EngineerStarterQuestion,
 } from "@/lib/engineerStarterQuestions";
 
 /**
- * The Engineer chat: the conversation card and the history card, the starter questions, the
- * composer, and ratings.
+ * The Engineer chat: the conversation card and the history card, the subject bar, the starter
+ * questions, the composer, and ratings.
  *
  * The brain behind it is the 2026-08-13 rebuild (docs/ENGINEER_NORTH_STAR.md): one chat route,
  * the knowledge base, a short prompt, the driver's own recent runs, and nothing else. The LOOK is
  * the page as it stood on 2026-09-01 (founder call 2026-09-03: "revert the appearance, keep the
  * mind") — two cards, the drifting rail of starter questions on a phone and the board of six on a
- * desktop, the composer that a starter fills but never sends. What did not come back: the subject
- * bar and its pin picker (the new brain reads your latest run on its own and ignores pins, so a
- * bar that pretended to steer it would lie), the follow-up choice chips (the reply no longer
- * carries them), and the trivia in the thinking bubble.
+ * desktop, the composer that a starter fills but never sends, and the subject bar with three
+ * states the brain actually honours: Auto (your latest run), a pinned run, General (no run).
+ *
+ * What did not come back: setup pins, event pins and compare pairs (the brain reads none of
+ * them), the follow-up choice chips (the reply no longer carries them), and the trivia in the
+ * thinking bubble.
  */
 
 type RatingContext = {
@@ -146,6 +157,22 @@ function mapApiMessages(
   return out;
 }
 
+/**
+ * The subject lives in the URL, so a link from a run page opens the Engineer already pinned
+ * (`?pin=run:<id>`, and the older `?runId=<id>` that the lap-analysis compare still sends), and
+ * a reload keeps it. `?mode=general` is General. Nothing in the URL is Auto.
+ */
+function readSubject(searchParams: URLSearchParams): { pinnedRunId: string | null; general: boolean } {
+  if (searchParams.get("mode") === "general") return { pinnedRunId: null, general: true };
+  const pin = searchParams.get("pin")?.trim() ?? "";
+  if (pin.startsWith("run:")) {
+    const id = pin.slice("run:".length).trim();
+    if (id) return { pinnedRunId: id, general: false };
+  }
+  const runId = searchParams.get("runId")?.trim() ?? "";
+  return { pinnedRunId: runId || null, general: false };
+}
+
 export function EngineerChatPanel({
   queuedPrompt = null,
   onQueuedPromptConsumed,
@@ -156,12 +183,16 @@ export function EngineerChatPanel({
   onQueuedPromptConsumed?: () => void;
   ratingsEnabled?: boolean;
   /**
-   * The driver has logged at least one run. The Engineer reads their latest run on its own, so
-   * this is also "a run is in focus" for the starter questions — the run-family chips only make
-   * sense when there is a run to read.
+   * The driver has logged at least one run. With a run in focus (Auto or pinned) the run-family
+   * starter questions make sense; in General they don't, because no run is attached.
    */
   hasRuns?: boolean;
 } = {}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { pinnedRunId, general: generalMode } = readSubject(searchParams);
+
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(true);
   const [threadsErr, setThreadsErr] = useState<string | null>(null);
@@ -176,6 +207,10 @@ export function EngineerChatPanel({
   const [statusPhase, setStatusPhase] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
+  const [candidates, setCandidates] = useState<RunCandidate[]>([]);
+  const [candidatesLoading, setCandidatesLoading] = useState(true);
+  const [candidatesErr, setCandidatesErr] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   // The transcript follows the newest words as they arrive. `stickToBottom` drops to false the
   // moment the driver scrolls up to re-read an earlier answer, and comes back the moment they
@@ -207,6 +242,29 @@ export function EngineerChatPanel({
   useEffect(() => {
     void refreshThreads();
   }, [refreshThreads]);
+
+  // The runs the bar can name and pin. Loaded once: the Auto label needs the newest one, the
+  // picker needs the list, and a pinned run needs its label.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/engineer/run-candidates");
+        const data = (await res.json().catch(() => ({}))) as { error?: string; runs?: RunCandidateRow[] };
+        if (!res.ok) throw new Error(data.error ?? `Failed to load runs (${res.status})`);
+        if (cancelled) return;
+        setCandidates(sortCandidates((data.runs ?? []).map(buildRunCandidate)));
+        setCandidatesErr(null);
+      } catch (e) {
+        if (!cancelled) setCandidatesErr(e instanceof Error ? e.message : "Failed to load runs");
+      } finally {
+        if (!cancelled) setCandidatesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const hasMessages = messages.length > 0;
 
@@ -257,6 +315,40 @@ export function EngineerChatPanel({
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
   }, [input]);
+
+  // ── The subject: written to the URL, read back from it ─────────────────────────────────────
+  const writeSubject = useCallback(
+    (next: { pinnedRunId: string | null; general: boolean }) => {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.delete("pin");
+      sp.delete("runId");
+      sp.delete("compareRunId");
+      sp.delete("mode");
+      if (next.general) sp.set("mode", "general");
+      else if (next.pinnedRunId) sp.set("pin", `run:${next.pinnedRunId}`);
+      const qs = sp.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
+  const pinRun = (c: RunCandidate) => {
+    setPickerOpen(false);
+    writeSubject({ pinnedRunId: c.id, general: false });
+  };
+  const clearPin = () => writeSubject({ pinnedRunId: null, general: false });
+  const enterGeneral = () => {
+    setPickerOpen(false);
+    writeSubject({ pinnedRunId: null, general: true });
+  };
+  const leaveGeneral = () => writeSubject({ pinnedRunId: null, general: false });
+
+  const latestRun = candidates[0] ?? null;
+  const autoLabel = latestRun?.chipLabel ?? null;
+  // A pinned run outside the recent window (a deep link to an old run) still reads as pinned.
+  const pinnedLabel = pinnedRunId
+    ? candidates.find((c) => c.id === pinnedRunId)?.chipLabel ?? "Run"
+    : null;
+  // ───────────────────────────────────────────────────────────────────────────────────────────
 
   const openThread = useCallback(async (id: string) => {
     setLoadingThread(true);
@@ -321,6 +413,7 @@ export function EngineerChatPanel({
       setStatusPhase(null);
       stickToBottom.current = true;
       setInput("");
+      setPickerOpen(false);
 
       const history = [...messages, { role: "user" as const, content: question }];
       setMessages([...history, { role: "assistant", content: "" }]);
@@ -342,6 +435,9 @@ export function EngineerChatPanel({
             messages: history.map((m) => ({ role: m.role, content: m.content })),
             threadId: threadId ?? undefined,
             stream: true,
+            // The subject bar, on the wire: General attaches no run; a pin names the run to
+            // read; Auto sends nothing and the route reads the latest run itself.
+            ...(generalMode ? { mode: "general" } : pinnedRunId ? { runId: pinnedRunId } : {}),
           }),
         });
         if (!res.ok || !res.body) {
@@ -374,7 +470,7 @@ export function EngineerChatPanel({
         setStatusPhase(null);
       }
     },
-    [messages, refreshThreads, sending, threadId]
+    [generalMode, messages, pinnedRunId, refreshThreads, sending, threadId]
   );
 
   // A `?prompt=` handoff (dashboard cards) lands in the composer and sends itself once.
@@ -385,14 +481,16 @@ export function EngineerChatPanel({
     void send(queuedPrompt.text);
   }, [onQueuedPromptConsumed, queuedPrompt, send]);
 
-  // Starter questions only exist on an empty thread (engineerStarterQuestions.ts).
+  // Starter questions only exist on an empty thread (engineerStarterQuestions.ts). The run
+  // family needs a run in focus — Auto or pinned, never General.
   const startersVisible = messages.length === 0;
+  const runInFocus = !generalMode && hasRuns;
   const starterQuestions = useMemo(
     () =>
       startersVisible
-        ? selectEngineerStarterQuestions({ runInFocus: hasRuns, hasHistory: hasRuns })
+        ? selectEngineerStarterQuestions({ runInFocus, hasHistory: hasRuns })
         : [],
-    [startersVisible, hasRuns]
+    [startersVisible, runInFocus, hasRuns]
   );
 
   const fillFromStarter = (question: EngineerStarterQuestion) => {
@@ -531,9 +629,21 @@ export function EngineerChatPanel({
         ) : null}
 
         <div className="p-3 space-y-2 lg:row-start-2 lg:border-t lg:border-border/80 lg:px-5 lg:py-4">
-          {/* Reads as a sentence top to bottom: things worth asking → the box. Phone only; the
-              desktop board above owns lg, and wrapping three rows of chips at 390px pushes the
-              composer under the bottom dock. */}
+          {/* Reads as a sentence top to bottom: what I'm asking about → things worth asking →
+              the box. */}
+          <EngineerSubjectBar
+            mode={generalMode ? "general" : "data"}
+            pinnedLabel={pinnedLabel}
+            autoLabel={autoLabel}
+            disabled={panelBusy}
+            onOpenPicker={() => setPickerOpen((v) => !v)}
+            onClearPin={clearPin}
+            onSelectData={leaveGeneral}
+            onSelectGeneral={enterGeneral}
+          />
+
+          {/* Phone only; the desktop board above owns lg, and wrapping three rows of chips at
+              390px pushes the composer under the bottom dock. */}
           <EngineerStarterQuestions
             variant="rail"
             questions={starterQuestions}
@@ -541,6 +651,18 @@ export function EngineerChatPanel({
             onPick={fillFromStarter}
             className="lg:hidden"
           />
+
+          {pickerOpen && !generalMode ? (
+            <EngineerRunPicker
+              candidates={candidates}
+              loading={candidatesLoading}
+              error={candidatesErr}
+              pinnedRunId={pinnedRunId}
+              disabled={panelBusy}
+              onPick={pinRun}
+              onClose={() => setPickerOpen(false)}
+            />
+          ) : null}
 
           {/* A div, not a form: the demo tour listens on this anchor and watches the Send button
               and Enter-without-Shift, so it stays correct if the composer is restyled. */}

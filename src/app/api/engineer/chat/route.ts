@@ -59,6 +59,11 @@ type ChatRequestBody = {
   includeRunCatalog?: boolean;
   paceVsFieldRunDigest?: unknown;
   paceVsFieldRunDigestSubset?: unknown;
+  /**
+   * `"general"` = attach NO driver data — the subject bar's General segment (founder call
+   * 2026-09-03). It is the request a driver with no runs already gets, not a new shape. Every
+   * other value is an old-era mode and is ignored.
+   */
   mode?: unknown;
 };
 
@@ -152,6 +157,7 @@ export async function POST(request: Request) {
 
     const runId = typeof body?.runId === "string" ? body.runId.trim() : "";
     const compareRunId = typeof body?.compareRunId === "string" ? body.compareRunId.trim() : "";
+    const generalMode = body?.mode === "general";
     const useStream = body?.stream === true;
 
     // Streaming clients only understand error FRAMES, so refusals ship as a 200 SSE stream
@@ -234,12 +240,15 @@ export async function POST(request: Request) {
     }
 
     // The driver's own data rides along on every turn: an explicit runId from the client
-    // wins (old-era clients still send one), otherwise their latest run. A driver with no
-    // runs gets [] and the request is byte-identical to the data-less one.
-    const driverBlocks = await buildDriverDataBlocks({
-      userId: user.id,
-      runId: runId || null,
-    }).catch(() => []);
+    // wins (a pinned run, or an old-era client), otherwise their latest run. A driver with no
+    // runs gets [] and the request is byte-identical to the data-less one — and General asks
+    // for exactly that request on purpose (theory only, nothing from the logs attached).
+    const driverBlocks = generalMode
+      ? []
+      : await buildDriverDataBlocks({
+          userId: user.id,
+          runId: runId || null,
+        }).catch(() => []);
 
     if (useStream) {
       const encoder = new TextEncoder();
