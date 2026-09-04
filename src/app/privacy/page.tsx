@@ -63,6 +63,10 @@ export default function PrivacyPage() {
           location and time), timestamps, and standard server logs used to operate and secure the
           service.
         </p>
+        <p>
+          We count page views to see which pages people visit. This uses no cookies, stores no IP
+          address, and is aggregate only — it cannot identify you or follow you to another site.
+        </p>
       </Section>
 
       <Section title="AI features">
@@ -105,7 +109,7 @@ export default function PrivacyPage() {
       <Section title="Who we share it with">
         <p>We use these providers to run the service. We do not sell your data to anyone.</p>
         <ul className="list-disc space-y-1 pl-5">
-          <li>Vercel — application hosting and file storage (uploads).</li>
+          <li>Vercel — application hosting, file storage (uploads), and anonymous page counts.</li>
           <li>Neon — managed PostgreSQL database.</li>
           <li>OpenAI — AI features, as described above.</li>
           <li>Our email provider — sending sign-in links and notifications.</li>

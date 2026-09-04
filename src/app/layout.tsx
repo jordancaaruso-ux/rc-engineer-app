@@ -4,6 +4,8 @@ import { Sora, Space_Grotesk } from "next/font/google";
 
 import Script from "next/script";
 
+import { Analytics } from "@vercel/analytics/next";
+
 import "./globals.css";
 
 import type { ReactNode } from "react";
@@ -392,6 +394,19 @@ export default async function RootLayout({
             <ServiceWorkerRegistrar />
 
             {PERF_ENABLED ? <WebVitalsReporterMount /> : null}
+
+            {/*
+              Anonymous page views (Vercel Web Analytics). Covers every React page — the paid
+              door (/join), /login, the legal pages, and the whole signed-in app. It does NOT
+              cover the pitch page at /welcome: that is `public/landing/index.html` served
+              verbatim by a rewrite, so it never renders this layout and carries its own
+              script tag instead. Change one, look at the other.
+
+              Cookieless and aggregate-only by design — no identifier, no IP stored — so it
+              answers "how many strangers looked" and can never answer "which stranger".
+              Every page view is a billed event, pooled across the whole Vercel account.
+            */}
+            <Analytics />
 
             {/* Dev-only markup layer: tap anything to pin a note. Never ships. */}
             {process.env.NODE_ENV !== "production" ? <DevMarkupLayer /> : null}

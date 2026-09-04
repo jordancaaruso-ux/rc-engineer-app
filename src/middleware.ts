@@ -31,6 +31,15 @@ export default auth((req) => {
   if (pathname.startsWith("/_next")) {
     return NextResponse.next();
   }
+  // Vercel platform routes — today just Web Analytics (`/_vercel/insights/script.js` and the
+  // `/view` beacon it posts to). Same trap the /landing/ exemption below records: the matcher
+  // only lets image extensions past, so a signed-out visitor's request for the analytics
+  // script would be answered with a redirect to /login. The page would still render, the
+  // count would just silently stay at zero — which is the one failure mode a visit counter
+  // cannot survive, because a real zero and a broken zero look identical.
+  if (pathname.startsWith("/_vercel/")) {
+    return NextResponse.next();
+  }
   if (pathname === "/login" || pathname.startsWith("/login/")) {
     return NextResponse.next();
   }

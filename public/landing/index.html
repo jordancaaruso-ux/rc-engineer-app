@@ -1738,5 +1738,21 @@ class Component extends DCLogic {
   }, true);
 })();
 </script>
+<!--
+  Anonymous page views for the pitch page (Vercel Web Analytics).
+
+  This file is served verbatim by the /welcome rewrite, so it never renders
+  src/app/layout.tsx and the <Analytics /> component there does not reach it. A plain
+  script tag is the documented path for static HTML. This is the page a stranger sees
+  first, so leaving it out would miss the only traffic worth counting.
+
+  Needs Web Analytics ENABLED in the Vercel dashboard — until then this 404s and does
+  nothing, which is harmless but also silent. Verify by loading /welcome in production
+  and looking for a request to /_vercel/insights/view in the network tab.
+-->
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
