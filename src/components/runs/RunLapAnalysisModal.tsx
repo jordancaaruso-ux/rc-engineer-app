@@ -32,6 +32,8 @@ type Props = {
   onClose: () => void;
   run: RunWithImports;
   pickerRunsSameCar: CompareRunShape[];
+  /** The whole day, every car — read for run NAMES only, so "Run 3" counts what Sessions counts. */
+  dayRuns?: CompareRunShape[];
   runListSource: RunCompareListSource;
   /** Driver of THIS run — a teammate's name on a shared session, not the viewer's. */
   userDisplayName?: string | null;
@@ -46,6 +48,7 @@ export function RunLapAnalysisModal({
   onClose,
   run,
   pickerRunsSameCar,
+  dayRuns,
   runListSource,
   userDisplayName,
   runOwnedByViewer = true,
@@ -221,6 +224,7 @@ export function RunLapAnalysisModal({
               run={runForLapCompare}
               currentRunId={run.id}
               otherRuns={pickerRunsSameCar.filter((r) => r.id !== run.id)}
+              dayRuns={dayRuns}
               compareAnchorRun={toCompareRunShape(run)}
               pickerRunsForModal={pickerRunsSameCar}
               runListSource={runListSource}

@@ -179,13 +179,21 @@ const RUN_JUL_FIELD = [
   },
 ];
 
+const RUN_2 = run("run_2", "Run 2", 2.65, 15.11);
+
 const OTHERS = [
   run("run_6", "Run 6", -3.7, 15.01),
   run("run_5", "Run 5", -2.5, 15.06),
   { ...RUN_3, importedLapSets: RUN_3_FIELD_NAMES_ONLY },
-  run("run_2", "Run 2", 2.65, 15.11),
+  RUN_2,
+  // The same timing block attached twice — listed greyed as "Same laps as Run 2".
+  { ...run("run_2b", "Run 2 (again)", 2.6, 15.11), lapTimes: RUN_2.lapTimes, lapSession: RUN_2.lapSession },
+  // Logged, never timed — listed greyed as "No lap times", so the day has no hole in it.
+  { ...run("run_1", "Run 1", 4.0, 15.2), lapTimes: [], lapSession: null },
   // A teammate on the same day, to exercise the Teammates segment.
   run("run_t1", "Run 3", 1.0, 14.88, { userId: "usr_mara" }),
+  // Same venue, the NEXT day — the "Later at MR33 Arena" group.
+  run("run_next", "Run 1", 2.0, 14.9, { dayOffset: -1 }),
   // Same venue, three weeks back — the "Earlier at MR33 Arena" group.
   { ...RUN_JUL, importedLapSets: RUN_JUL_FIELD },
   // Somewhere else entirely — only visible once the scope is widened.

@@ -28,6 +28,14 @@ export type LapPickerRow = {
   /** Wall time, pre-formatted by the caller so this file owns no date policy. */
   when: string;
   bestLap: number | null;
+  /**
+   * Listed but not tickable — no laps, or laps that copy another row's. These used to be
+   * dropped from the list outright, which left a day reading "Run 1 · Run 3 · Run 4" with
+   * nothing to say where Run 2 went (reported 2026-09-05).
+   */
+  disabled?: boolean;
+  /** Why it can't be ticked, printed after the time: "No lap times", "Same laps as Run 1". */
+  note?: string | null;
 };
 
 export type LapPickerGroup = {
@@ -112,26 +120,30 @@ function PickerRow({
   checked: boolean;
   onToggle: (id: string) => void;
 }) {
+  const disabled = Boolean(row.disabled);
   return (
     <li>
       <label
         className={cn(
-          "flex cursor-pointer items-center gap-2.5 rounded-md border px-2 py-1.5 transition",
-          checked
-            ? "border-border bg-surface-runna-inset"
-            : "border-border/60 bg-transparent hover:bg-surface-runna-inset/60"
+          "flex items-center gap-2.5 rounded-md border px-2 py-1.5 transition",
+          disabled
+            ? "cursor-default border-border/40 bg-transparent opacity-60"
+            : checked
+              ? "cursor-pointer border-border bg-surface-runna-inset"
+              : "cursor-pointer border-border/60 bg-transparent hover:bg-surface-runna-inset/60"
         )}
       >
         <input
           type="checkbox"
           className="shrink-0 accent-primary"
           checked={checked}
+          disabled={disabled}
           onChange={() => onToggle(row.id)}
         />
         <span className="min-w-0 flex-1 leading-tight">
           <span className="block truncate text-[12px] text-foreground">{row.name}</span>
           <span className="block truncate text-[10px] tabular-nums text-muted-foreground">
-            {row.when}
+            {[row.when, row.note ?? null].filter(Boolean).join(" · ")}
           </span>
         </span>
         {/* Best lap earns the right-hand column: it is the one number that decides

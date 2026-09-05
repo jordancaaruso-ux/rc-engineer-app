@@ -1501,6 +1501,7 @@ export function RunFaces({
           onClose={() => setLapsOpen(false)}
           run={run}
           pickerRunsSameCar={lapComparePickerRuns}
+          dayRuns={pickerRuns}
           runListSource={runListSource}
           userDisplayName={runOwnerDisplayName}
           runOwnedByViewer={allowRunMutations}

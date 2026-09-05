@@ -117,6 +117,15 @@ type SeriesMeta = {
  */
 type CompareSegmentKey = "driver" | "teammates" | "field" | "library";
 
+/**
+ * The default for the run-list props. One shared instance, NOT `= []` in the signature: a
+ * fresh array per render is a new dependency per render, and the memos hanging off it
+ * (`dayRunNames` → the series list → the scope rows → the tick-pruning effect's setState)
+ * re-ran until React threw "Maximum update depth exceeded" (found driving the preview,
+ * 2026-09-05).
+ */
+const NO_RUNS: readonly CompareRunShape[] = [];
+
 const MS_PER_DAY = 86400000;
 
 function startOfLocalDay(d: Date): number {
@@ -159,7 +168,14 @@ function lapAt(series: ComparisonSeries, lapNumber: number): LapRow | undefined 
  * `CompareRunShape` first. Until then a session that crosses your midnight can
  * still land in "Earlier at …" rather than "This test day".
  */
-type DayTrackBucket = "today" | "here" | "elsewhere";
+type DayTrackBucket = "today" | "later" | "here" | "elsewhere";
+
+/** Every bucket, in the order the picker lists them: newest first, like the rows inside. */
+const DAY_TRACK_BUCKETS: readonly DayTrackBucket[] = ["today", "later", "here", "elsewhere"];
+
+function emptyDayTrackBuckets<T>(): Record<DayTrackBucket, T[]> {
+  return { today: [], later: [], here: [], elsewhere: [] };
+}
 
 function dayTrackBucketFor(input: {
   sortIso: string;
@@ -173,12 +189,18 @@ function dayTrackBucketFor(input: {
   const here = !input.anchorTrackKey || input.trackKey === input.anchorTrackKey;
   if (!here) return "elsewhere";
   if (input.sortIso && sameLocalCalendarDay(input.sortIso, input.anchorInstantIso)) return "today";
+  // Another day at this track — before or after. "Earlier at …" used to take both, so a
+  // 22 Aug sheet filed its 23 Aug runs under "Earlier" (reported 2026-09-05).
+  const t = new Date(input.sortIso).getTime();
+  const anchorT = new Date(input.anchorInstantIso).getTime();
+  if (Number.isFinite(t) && Number.isFinite(anchorT) && t > anchorT) return "later";
   return "here";
 }
 
 function dayTrackBucketLabels(anchorTrackName: string | null): Record<DayTrackBucket, string> {
   return {
     today: anchorTrackName ? `This test day · ${anchorTrackName}` : "This test day",
+    later: anchorTrackName ? `Later at ${anchorTrackName}` : "Later sessions",
     here: anchorTrackName ? `Earlier at ${anchorTrackName}` : "Earlier sessions",
     elsewhere: "Other tracks and events",
   };
@@ -415,9 +437,10 @@ export function LapComparisonColumnGrid({
   primaryIsViewer = true,
   run,
   currentRunId,
-  otherRuns = [],
+  otherRuns = NO_RUNS as CompareRunShape[],
+  dayRuns = NO_RUNS as CompareRunShape[],
   compareAnchorRun,
-  pickerRunsForModal = [],
+  pickerRunsForModal = NO_RUNS as CompareRunShape[],
   runListSource = "my_runs",
   librarySessions = [],
   viewerUserId = null,
@@ -444,6 +467,13 @@ export function LapComparisonColumnGrid({
   currentRunId: string;
   /** Same user’s other runs (newest-first); used as extra lap columns. */
   otherRuns?: CompareRunShape[];
+  /**
+   * Every run the driver logged on the days in play — all cars, laps or not. Only NAMES are
+   * read off it: "Run 3" is a position in the whole day, and a host that hands `otherRuns`
+   * a one-car slice would otherwise number the day short. Optional; hosts whose `otherRuns`
+   * is already the whole list need not pass it.
+   */
+  dayRuns?: CompareRunShape[];
   /** Full shape for this run (setup + meta); must match `run` laps. */
   compareAnchorRun: CompareRunShape;
   /** All runs for setup modal picker (e.g. full history list). */
@@ -505,31 +535,54 @@ export function LapComparisonColumnGrid({
 
   const primaryLaps = useMemo(() => primaryLapRowsFromRun(run), [run]);
 
-  const historyPickOptions = useMemo(() => {
-    return otherRuns.filter((r) => {
-      if (r.id === currentRunId) return false;
-      if (normalizeLapTimes(r.lapTimes).length === 0) return false;
+  /**
+   * Runs the sheet cannot put in a column, and the words for why: nothing to plot, or laps
+   * that are a copy of the run you opened. They stay in the picker greyed with the reason
+   * (`pickerGroups`) instead of vanishing — a run that duplicates another row is decided
+   * later, once the rows exist (`heldBackDuplicates`).
+   */
+  const heldBackByAnchor = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const r of otherRuns) {
+      if (r.id === currentRunId) continue;
+      if (normalizeLapTimes(r.lapTimes).length === 0) {
+        out.set(r.id, "No lap times");
+        continue;
+      }
       const rows = primaryLapRowsFromRun({ lapTimes: r.lapTimes, lapSession: r.lapSession });
-      if (areLapSeriesEquivalent(primaryLaps, rows)) return false;
-      return true;
-    });
+      if (areLapSeriesEquivalent(primaryLaps, rows)) out.set(r.id, "Same laps as this run");
+    }
+    return out;
   }, [otherRuns, currentRunId, primaryLaps]);
+
+  const historyPickOptions = useMemo(
+    () => otherRuns.filter((r) => r.id !== currentRunId && !heldBackByAnchor.has(r.id)),
+    [otherRuns, currentRunId, heldBackByAnchor]
+  );
 
   /**
    * What each of those runs is CALLED — "Run 3", "Qualifying Q2", "A Main".
    *
    * The rows were headed with the car ("A800RR", seven times over) because the label they
    * used leads with it, and an unlabelled test run has no session name of its own to fall
-   * back to. The number comes from the run's position in its day, which needs the whole day
-   * in hand — so it is computed here over the same list the picker offers, by the same
-   * function Run History uses, and the car moves to the line underneath (founder,
-   * 2026-08-27: "the heading should be the name of the run and the time").
+   * back to. The number is the run's position in its day, by the same function Run History
+   * uses, and the car moves to the line underneath (founder, 2026-08-27: "the heading should
+   * be the name of the run and the time").
+   *
+   * Counted over the WHOLE day — every run handed in, laps or not, plus `dayRuns` for the
+   * cars a host filtered out. It used to count only the runs the picker offers, so a day
+   * with one lapless run early on had "Run 4" on the Sessions list open as "Run 3" here
+   * (reported 2026-09-05). A name is only a name if every screen agrees on it.
    */
   const dayRunNames = useMemo(() => {
-    // The anchor rides along: on its own sheet it is "Run 1" like its siblings, not the
-    // car's name — its day-mates are in the list, so the number comes out the same.
+    const seen = new Set<string>();
+    const wholeDay = [compareAnchorRun, ...otherRuns, ...dayRuns].filter((r) => {
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
     return buildDayRunNameMap(
-      [compareAnchorRun, ...historyPickOptions].map((r) => ({
+      wholeDay.map((r) => ({
         id: r.id,
         createdAt: new Date(r.createdAt),
         sortAt: r.sortAt ? new Date(r.sortAt) : null,
@@ -540,7 +593,7 @@ export function LapComparisonColumnGrid({
         sessionLabel: r.sessionLabel ?? null,
       }))
     );
-  }, [compareAnchorRun, historyPickOptions]);
+  }, [compareAnchorRun, otherRuns, dayRuns]);
 
   const [setupModalRun, setSetupModalRun] = useState<CompareRunShape | null>(null);
   /*
@@ -677,7 +730,7 @@ export function LapComparisonColumnGrid({
     // and a cleanup that dropped the in-flight response would lose every fetch.
   }, [expandedFieldRunIds, selectedComparisonIds, targetId, fieldSetsByRunId, fieldFetchState, otherFieldRuns]);
 
-  const { seriesList, metaById } = useMemo(() => {
+  const { seriesList, metaById, heldBackDuplicates } = useMemo(() => {
     const metaById = new Map<string, SeriesMeta>();
 
     const primarySeries = buildComparisonSeries(
@@ -933,8 +986,32 @@ export function LapComparisonColumnGrid({
       ...rawHistory,
       ...rawOtherField,
     ]);
+    /*
+     * One of the driver's own runs that the dedupe threw out is remembered with the row
+     * it copies, so the picker can still list it — greyed, "Same laps as Run 1". Two runs
+     * with identical laps is nearly always one timing block attached twice, and hiding
+     * the second copy hid the mistake along with it.
+     */
+    const heldBackDuplicates = new Map<string, string>();
+    const keptIds = new Set(dedupedOthers.map((s) => s.id));
+    for (const s of rawHistory) {
+      if (keptIds.has(s.id)) continue;
+      const twin = [primarySeries, ...dedupedOthers].find((k) =>
+        areLapSeriesEquivalent(s.laps, k.laps)
+      );
+      const twinName =
+        twin == null
+          ? null
+          : twin.id === "run:primary"
+            ? "this run"
+            : metaById.get(twin.id)?.name ?? twin.label;
+      heldBackDuplicates.set(
+        s.id.slice("history:".length),
+        twinName ? `Same laps as ${twinName}` : "Same laps as another row"
+      );
+    }
     const list = [primarySeries, ...dedupedOthers, ...rawOtherFieldPending];
-    return { seriesList: list, metaById };
+    return { seriesList: list, metaById, heldBackDuplicates };
   }, [
     run,
     primaryRunLabel,
@@ -1166,11 +1243,7 @@ export function LapComparisonColumnGrid({
       return groups;
     }
 
-    const buckets: Record<DayTrackBucket, LapPickerRow[]> = {
-      today: [],
-      here: [],
-      elsewhere: [],
-    };
+    const buckets = emptyDayTrackBuckets<{ row: LapPickerRow; sortIso: string }>();
     for (const r of compareOptionRows) {
       const bucket = dayTrackBucketFor({
         sortIso: r.sortIso,
@@ -1178,13 +1251,57 @@ export function LapComparisonColumnGrid({
         anchorTrackKey,
         anchorInstantIso,
       });
-      buckets[bucket].push(toRow(r));
+      buckets[bucket].push({ row: toRow(r), sortIso: r.sortIso });
+    }
+
+    /*
+     * The runs held back (no laps, a copy of this run, a copy of another row) take their
+     * place in the same groups, greyed, with the reason on the time line. Same tab, same
+     * scope, same name as everywhere else — so the day's numbering has no holes, and a
+     * missing "Run 2" is one line of explanation rather than a mystery.
+     */
+    if (activeSegment === "driver" || activeSegment === "teammates") {
+      for (const r of otherRuns) {
+        const note = heldBackByAnchor.get(r.id) ?? heldBackDuplicates.get(r.id) ?? null;
+        if (!note) continue;
+        const segment: CompareSegmentKey =
+          compareAnchorRun.userId && r.userId && r.userId !== compareAnchorRun.userId
+            ? "teammates"
+            : "driver";
+        if (segment !== activeSegment) continue;
+        const sortIso = resolveRunDisplayInstant(r).toISOString();
+        if (!seriesMatchesScope(`history:${r.id}`, sortIso)) continue;
+        const trackCtx = r.track?.name?.trim() || r.trackNameSnapshot?.trim() || null;
+        const carName = r.car?.name?.trim() || r.carNameSnapshot?.trim() || null;
+        const included = primaryLapRowsFromRun({ lapTimes: r.lapTimes, lapSession: r.lapSession })
+          .filter((l) => l.isIncluded)
+          .map((l) => l.lapTimeSeconds);
+        const bucket = dayTrackBucketFor({
+          sortIso,
+          trackKey: lapCompareTrackKey(trackCtx),
+          anchorTrackKey,
+          anchorInstantIso,
+        });
+        buckets[bucket].push({
+          sortIso,
+          row: {
+            id: `held:${r.id}`,
+            name: dayRunNames[r.id] || formatRunSessionDisplay(r, { fallback: carName ?? "Run" }),
+            when: [formatRunDateTime(sortIso), carName].filter(Boolean).join(" · "),
+            bestLap: included.length > 0 ? Math.min(...included) : null,
+            disabled: true,
+            note,
+          },
+        });
+      }
     }
 
     const labels = dayTrackBucketLabels(anchorTrackName);
-    return (["today", "here", "elsewhere"] as const)
-      .map((key) => ({ key, label: labels[key], rows: buckets[key] }))
-      .filter((g) => g.rows.length > 0);
+    return DAY_TRACK_BUCKETS.map((key) => ({
+      key,
+      label: labels[key],
+      rows: buckets[key].sort(compareOptionSort).map((b) => b.row),
+    })).filter((g) => g.rows.length > 0);
   }, [
     compareOptionRows,
     metaById,
@@ -1198,6 +1315,11 @@ export function LapComparisonColumnGrid({
     fieldFetchState,
     toggleFieldRun,
     anchorIsImportedSheet,
+    heldBackByAnchor,
+    heldBackDuplicates,
+    compareAnchorRun.userId,
+    seriesMatchesScope,
+    dayRunNames,
   ]);
 
   /*
@@ -1475,7 +1597,7 @@ export function LapComparisonColumnGrid({
    */
   const targetSessionGroups = useMemo(() => {
     const labels = dayTrackBucketLabels(anchorTrackName);
-    const buckets: Record<DayTrackBucket, TargetSession[]> = { today: [], here: [], elsewhere: [] };
+    const buckets = emptyDayTrackBuckets<TargetSession>();
     const pinned: TargetSession[] = [];
     for (const session of targetSessions) {
       if (session.key === "this_sheet") {
@@ -1496,7 +1618,7 @@ export function LapComparisonColumnGrid({
     const groups: Array<{ key: string; label: string | null; sessions: TargetSession[] }> = [
       { key: "this_sheet", label: null, sessions: pinned },
     ];
-    for (const bucket of ["today", "here", "elsewhere"] as DayTrackBucket[]) {
+    for (const bucket of DAY_TRACK_BUCKETS) {
       groups.push({ key: bucket, label: labels[bucket], sessions: buckets[bucket] });
     }
     return groups.filter((g) => g.sessions.length > 0);
