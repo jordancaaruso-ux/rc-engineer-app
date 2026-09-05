@@ -6,7 +6,14 @@ import Link from "next/link";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { RelativeTime } from "@/components/ui/RelativeTime";
+import { ActionToast } from "@/components/ui/ActionToast";
 import { setupFillDraftProgressLabel } from "@/lib/setup/setupFillDraft";
+import { deleteSetup, keepSetup, renameSetup } from "@/lib/setup/keepSetupClient";
+import {
+  decideSetupRemoval,
+  setupDeleteConfirmMessage,
+  setupUsageLabel,
+} from "@/lib/setup/setupRemoveMode";
 
 /**
  * The car's setup library — named, reusable setups. Rows are hairline-separated inside one card
@@ -22,8 +29,28 @@ import { setupFillDraftProgressLabel } from "@/lib/setup/setupFillDraft";
  *
  * ONE EXCEPTION, since 2026-08-11: a setup kept from a run is that run's own record, so it opens
  * read-only. Saving from "All setups" marks the run's snapshot rather than copying it, and editing
- * the values afterwards would rewrite what that run says it ran. Those rows offer Rename, never
- * Delete — the API refuses both edits, and the row should not offer what it cannot do.
+ * the values afterwards would rewrite what that run says it ran.
+ *
+ * ============================== EVERY ROW HAS A WAY OUT ==============================
+ *
+ * Since 2026-09-03. The card used to show Delete only where `runs + derivedSnapshots === 0`, and
+ * logging a run FROM a saved setup adds a derived snapshot — so the setups a driver actually raced
+ * were the ones that could never leave the list, with nothing on screen saying why (founder report).
+ * Worse, the API would have allowed most of them: only a run's own record is truly undeletable.
+ *
+ * So the row asks `decideSetupRemoval` — the same function the API asks — and offers whichever door
+ * is real:
+ *
+ *  - **Delete** destroys the setup. Runs that started from it keep their own full values, which is
+ *    why a raced setup is deletable at all; the confirm says so rather than making the driver guess.
+ *  - **Remove** un-saves: the row leaves this list and the setup stays wherever it is still needed —
+ *    a logged run's record, or the sheet an upload left behind. No confirm, because nothing is lost
+ *    and the toast carries Undo; a dialog for a reversible act is the friction this card keeps
+ *    removing.
+ *
+ * The count under the name splits along the same line: "3 runs" means three runs ARE this setup,
+ * "3 runs from it" means three started here. Adding them together is what produced a row claiming
+ * runs it never had.
  *
  * The create door is deliberately NOT in this header. It sits at the top of the car page, where the
  * Garage puts it, because making a setup and keeping a setup are different jobs (founder call
@@ -37,7 +64,12 @@ export type CarLibrarySetup = {
   id: string;
   name: string | null;
   createdAtLabel: string;
-  usedInRuns: number;
+  /** Logged runs whose record IS this snapshot. These are why a setup can't be deleted. */
+  runCount: number;
+  /** Runs and setups that STARTED from this one. They hold their own values and block nothing. */
+  derivedCount: number;
+  /** Uploaded sheets that produced this setup. */
+  sourceDocumentCount: number;
 };
 
 /** A sequential fill parked on this car. Progress is the client's last report — see the row below. */
@@ -64,6 +96,10 @@ export function CarSetupsCard({
   const [pending, startTransition] = useTransition();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Carries the row it removed, so Undo can put that exact setup back under its own name. */
+  const [toast, setToast] = useState<{ message: string; setupId: string; name: string } | null>(
+    null
+  );
 
   /** The draft is not a setup, so it has no snapshot id to key `busyId` on. */
   const discardDraft = async () => {
@@ -95,15 +131,7 @@ export function CarSetupsCard({
     setBusyId(setup.id);
     setError(null);
     try {
-      const res = await fetch(`/api/setup-snapshots/${setup.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? "Could not rename this setup.");
-      }
+      await renameSetup(setup.id, name);
       startTransition(() => router.refresh());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not rename this setup.");
@@ -112,24 +140,47 @@ export function CarSetupsCard({
     }
   };
 
-  const remove = async (setup: CarLibrarySetup) => {
+  const destroy = async (setup: CarLibrarySetup, derivedCount: number) => {
     const label = setup.name ?? "this setup";
-    if (!window.confirm(`Delete "${label}"? Runs already logged keep their own setup record.`)) {
-      return;
-    }
+    if (!window.confirm(setupDeleteConfirmMessage(label, derivedCount))) return;
     setBusyId(setup.id);
     setError(null);
     try {
-      const res = await fetch(`/api/setup-snapshots/${setup.id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? "Could not delete this setup.");
-      }
+      await deleteSetup(setup.id);
       startTransition(() => router.refresh());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not delete this setup.");
     } finally {
       setBusyId(null);
+    }
+  };
+
+  /**
+   * Take the row off this list without touching the setup — the door for the two kinds that cannot
+   * be deleted. Nothing is destroyed, so it asks nothing first and offers Undo afterwards instead.
+   */
+  const unsave = async (setup: CarLibrarySetup) => {
+    const label = setup.name ?? "Untitled setup";
+    setBusyId(setup.id);
+    setError(null);
+    try {
+      await keepSetup({ setupId: setup.id, saved: false, name: label });
+      setToast({ message: `Removed “${label}”.`, setupId: setup.id, name: label });
+      startTransition(() => router.refresh());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not remove this setup.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const undoUnsave = async (undo: { setupId: string; name: string }) => {
+    setToast(null);
+    try {
+      await keepSetup({ setupId: undo.setupId, saved: true, name: undo.name });
+      startTransition(() => router.refresh());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not put this setup back.");
     }
   };
 
@@ -186,56 +237,85 @@ export function CarSetupsCard({
         </p>
       ) : (
         <ul className="-mx-1">
-          {setups.map((s) => (
-            <li
-              key={s.id}
-              className="flex items-center justify-between gap-3 border-b border-border/60 px-1 py-2.5 last:border-0"
-            >
-              <Link
-                /*
-                  Always the READ view. A never-run setup used to skip straight into the editor
-                  ("only a setup nothing has run opens the editor") — which meant a setup imported
-                  from a PDF landed on the fill surface with no Compare, no PDF, no share (founder,
-                  2026-09-01, off his phone). Edit is one tap away on the page this opens.
-                */
-                href={`/cars/${carId}/setups/${s.id}`}
-                className="min-w-0 flex-1"
+          {setups.map((s) => {
+            // Saved by definition — this list is `isLibrary: true` — so the decision turns purely on
+            // what points at the row. The API asks the same question of the same numbers.
+            const removal = decideSetupRemoval({
+              isLibrary: true,
+              runCount: s.runCount,
+              derivedCount: s.derivedCount,
+              sourceDocumentCount: s.sourceDocumentCount,
+            });
+            const usage = setupUsageLabel(s);
+            return (
+              <li
+                key={s.id}
+                className="flex items-center justify-between gap-3 border-b border-border/60 px-1 py-2.5 last:border-0"
               >
-                <div className="truncate text-sm text-foreground">{s.name ?? "Untitled setup"}</div>
-                <div className="text-[11px] tabular-nums text-muted-foreground">
-                  {s.createdAtLabel}
-                  {s.usedInRuns > 0
-                    ? ` · ${s.usedInRuns} run${s.usedInRuns === 1 ? "" : "s"}`
-                    : ""}
-                </div>
-              </Link>
-              <div className="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  className="rounded-md px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground disabled:opacity-50"
-                  onClick={() => void rename(s)}
-                  disabled={busyId === s.id || pending}
+                <Link
+                  /*
+                    Always the READ view. A never-run setup used to skip straight into the editor
+                    ("only a setup nothing has run opens the editor") — which meant a setup imported
+                    from a PDF landed on the fill surface with no Compare, no PDF, no share (founder,
+                    2026-09-01, off his phone). Edit is one tap away on the page this opens.
+                  */
+                  href={`/cars/${carId}/setups/${s.id}`}
+                  className="min-w-0 flex-1"
                 >
-                  Rename
-                </button>
-                {/* Deleting a run's record is refused by the API — don't offer the door. */}
-                {s.usedInRuns === 0 ? (
+                  <div className="truncate text-sm text-foreground">{s.name ?? "Untitled setup"}</div>
+                  <div className="text-[11px] tabular-nums text-muted-foreground">
+                    {s.createdAtLabel}
+                    {usage ? ` · ${usage}` : ""}
+                  </div>
+                </Link>
+                <div className="flex shrink-0 items-center gap-1">
                   <button
                     type="button"
-                    className="rounded-md px-2 py-1 text-[11px] text-muted-foreground transition hover:text-destructive disabled:opacity-50"
-                    onClick={() => void remove(s)}
+                    className="rounded-md px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+                    onClick={() => void rename(s)}
                     disabled={busyId === s.id || pending}
                   >
-                    Delete
+                    Rename
                   </button>
-                ) : null}
-              </div>
-            </li>
-          ))}
+                  {/*
+                    One of these, always — the row is never a dead end. Delete is destructive and
+                    wears the destructive hover; Remove only takes the row off this list.
+                  */}
+                  {removal.kind === "delete" ? (
+                    <button
+                      type="button"
+                      className="rounded-md px-2 py-1 text-[11px] text-muted-foreground transition hover:text-destructive disabled:opacity-50"
+                      onClick={() => void destroy(s, removal.derivedCount)}
+                      disabled={busyId === s.id || pending}
+                    >
+                      Delete
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="rounded-md px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+                      onClick={() => void unsave(s)}
+                      disabled={busyId === s.id || pending}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
+
+      <ActionToast
+        message={toast?.message ?? null}
+        action={
+          toast ? { label: "Undo", onClick: () => void undoUnsave({ ...toast }) } : null
+        }
+        onDismiss={() => setToast(null)}
+      />
     </CardPanel>
   );
 }

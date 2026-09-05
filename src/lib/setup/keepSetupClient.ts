@@ -51,6 +51,21 @@ export async function copySetupToCar(input: {
   return { id: body.setup.id };
 }
 
+/**
+ * Delete a setup for good.
+ *
+ * Only ever offered where `decideSetupRemoval` says "delete" — the server checks the same rule and
+ * answers 409 with the reason if it disagrees, so the message it sends is worth showing as-is.
+ * Runs that STARTED from the setup are untouched: they hold their own full values.
+ */
+export async function deleteSetup(setupId: string): Promise<void> {
+  const res = await fetch(`/api/setup-snapshots/${setupId}`, { method: "DELETE" });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? "Could not delete this setup.");
+  }
+}
+
 /** Rename a saved setup. Allowed even on a run's own record — only its values are frozen. */
 export async function renameSetup(setupId: string, name: string): Promise<void> {
   const res = await fetch(`/api/setup-snapshots/${setupId}`, {

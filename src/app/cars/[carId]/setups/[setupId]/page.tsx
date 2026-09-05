@@ -15,6 +15,8 @@ import { pickSheetBlankForData } from "@/lib/setupSheetModels/sheetBlankResolve"
 import { ReadOnlySetupSheet } from "@/components/setup/ReadOnlySetupSheet";
 import { SetupSheetCompareView } from "@/components/setup/SetupSheetCompareView";
 import { KeepSetupButton } from "@/components/setup/KeepSetupButton";
+import { DeleteSetupButton } from "@/components/setup/DeleteSetupButton";
+import { decideSetupRemoval } from "@/lib/setup/setupRemoveMode";
 import { ShareSetupButton } from "@/components/share/ShareSetupButton";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { ButtonLink } from "@/components/ui/ButtonLink";
@@ -82,6 +84,10 @@ export default async function CarSetupViewPage(props: {
       createdAt: true,
       setupDeltaJson: true,
       sheetBlankId: true,
+      // What points at this setup, which is the whole of what decides whether it may be deleted.
+      // The relations below take 1 for their labels and cannot answer "how many". See
+      // `decideSetupRemoval` — the API checks the same three numbers.
+      _count: { select: { runs: true, derivedSnapshots: true, sourceDocuments: true } },
       // The run is read for its NAME only: a run's snapshot has none of its own, so "Edited from"
       // had nothing to print and said "another setup" for every copy taken off a session.
       baseSetupSnapshot: {
@@ -176,6 +182,12 @@ export default async function CarSetupViewPage(props: {
    * plain run snapshot: every run points at the previous run's setup through the same field, and
    * "edited from" would then read as an edit on every run the driver ever logged.
    */
+  const removal = decideSetupRemoval({
+    isLibrary: setup.isLibrary,
+    runCount: setup._count.runs,
+    derivedCount: setup._count.derivedSnapshots,
+    sourceDocumentCount: setup._count.sourceDocuments,
+  });
   const baseRun = setup.baseSetupSnapshot?.runs[0] ?? null;
   const baseLabel =
     setup.baseSetupSnapshot?.name ??
@@ -271,6 +283,20 @@ export default async function CarSetupViewPage(props: {
           href={`/pdf-view?document=${encodeURIComponent(document.id)}&back=${encodeURIComponent(backHere)}`}
           label="View original file"
           icon={<Paperclip className="size-3.5" strokeWidth={2} aria-hidden />}
+        />
+      ) : null}
+      {/*
+        Last in the row, and only when it is real: a setup a run recorded, or one an uploaded sheet
+        left in the middle of a lineage, cannot go — and un-saving it is the `KeepSetupButton` at the
+        other end of the row, already on screen. Offering a Delete that 409s would be the old car-page
+        mistake in a new place.
+      */}
+      {removal.kind === "delete" ? (
+        <DeleteSetupButton
+          setupId={setup.id}
+          carId={car.id}
+          name={title}
+          derivedCount={removal.derivedCount}
         />
       ) : null}
     </>

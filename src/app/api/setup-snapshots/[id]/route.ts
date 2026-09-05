@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { normalizeSetupSnapshotForStorage } from "@/lib/runSetup";
+import { decideSetupRemoval, setupDeleteRefusalMessage } from "@/lib/setup/setupRemoveMode";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -29,8 +30,10 @@ async function loadOwnedSetup(id: string, userId: string) {
       data: true,
       isLibrary: true,
       carId: true,
+      // The parent this setup started from. Read for DELETE, which splices it into the children.
+      baseSetupSnapshotId: true,
       car: { select: { setupSheetModelId: true } },
-      _count: { select: { runs: true } },
+      _count: { select: { runs: true, derivedSnapshots: true, sourceDocuments: true } },
     },
   });
 }
@@ -146,29 +149,49 @@ export async function DELETE(_request: Request, ctx: Ctx): Promise<NextResponse>
   if (!existing) return NextResponse.json({ error: "Setup not found" }, { status: 404 });
 
   /*
-   * Delete stays library-only, and deliberately did not follow the PATCH gate down. A setup an
-   * upload created is the only record that the sheet was ever read: `SetupDocument.createdSetupId`
-   * points at it, and deleting it would leave that row pointing at nothing while the file itself
-   * survives. Un-bookmarking is the driver's door for "I don't want this in my list".
+   * WHAT MAY GO, AND WHY, LIVES IN ONE PLACE: `decideSetupRemoval`.
+   *
+   * The Saved setups card reads the same function, because these two used to decide separately and
+   * disagreed — this route refused only when a RUN pointed at the snapshot, while the card hid the
+   * button whenever `runs + derivedSnapshots > 0`. Logging a run from a saved setup writes a derived
+   * snapshot, so every setup the driver actually raced lost its Delete while this route would have
+   * allowed it (founder report, 2026-09-03).
+   *
+   * Delete stays library-only: a row the driver never kept is reached through All setups, where the
+   * bookmark — not a delete — is the door.
    */
-  if (!existing.isLibrary) {
+  const decision = decideSetupRemoval({
+    isLibrary: existing.isLibrary,
+    runCount: existing._count.runs,
+    derivedCount: existing._count.derivedSnapshots,
+    sourceDocumentCount: existing._count.sourceDocuments,
+  });
+  if (decision.kind === "none") {
     return NextResponse.json({ error: "Setup not found" }, { status: 404 });
   }
-
-  // `Run.setupSnapshot` is a required relation, so deleting a snapshot a run points at would fail
-  // at the FK anyway — refuse with a message the UI can show instead of a 500.
-  if (existing._count.runs > 0) {
-    return NextResponse.json(
-      {
-        error: `This setup is used by ${existing._count.runs} logged run${
-          existing._count.runs === 1 ? "" : "s"
-        } and can't be deleted.`,
-      },
-      { status: 409 }
-    );
+  if (decision.kind !== "delete") {
+    // `Run.setupSnapshot` is a required relation, so the run case would fail at the FK anyway —
+    // refuse with a message the row can show, and name the door that does work.
+    return NextResponse.json({ error: setupDeleteRefusalMessage(decision) }, { status: 409 });
   }
 
-  // Runs derived *from* this setup keep their own resolved data; the lineage link is onDelete: SetNull.
-  await prisma.setupSnapshot.delete({ where: { id } });
+  /*
+   * SPLICE, DON'T SEVER.
+   *
+   * The self-relation is `onDelete: SetNull`, so deleting a setup in the middle of a chain would
+   * orphan everything below it — and `resolveUploadedPdfSourceForRun` walks that chain to find the
+   * driver's own uploaded paper. Handing the children this row's own parent keeps the walk intact
+   * one link shorter, which is exactly what "this setup no longer exists" should mean.
+   *
+   * Runs that started here keep their own resolved values either way: `SetupSnapshot.data` is always
+   * the full setup, never a diff against the parent.
+   */
+  await prisma.$transaction([
+    prisma.setupSnapshot.updateMany({
+      where: { baseSetupSnapshotId: id },
+      data: { baseSetupSnapshotId: existing.baseSetupSnapshotId },
+    }),
+    prisma.setupSnapshot.delete({ where: { id } }),
+  ]);
   return NextResponse.json({ ok: true });
 }

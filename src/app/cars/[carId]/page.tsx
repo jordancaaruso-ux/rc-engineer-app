@@ -90,7 +90,7 @@ export default async function CarDetailPage(props: {
      *
      * `isLibrary` used to mean "not a run's snapshot", because the only way to keep a run's setup
      * was to copy it. Saving marks the snapshot now, so a run-backed row belongs in this list too —
-     * that is the point, and it is why the card offers Rename but not Delete on those.
+     * that is the point, and it is why those rows offer Remove (un-save) rather than Delete.
      */
     prisma.setupSnapshot.findMany({
       where: { userId: user.id, carId, isLibrary: true },
@@ -99,7 +99,7 @@ export default async function CarDetailPage(props: {
         id: true,
         name: true,
         createdAt: true,
-        _count: { select: { runs: true, derivedSnapshots: true } },
+        _count: { select: { runs: true, derivedSnapshots: true, sourceDocuments: true } },
       },
     }),
     prisma.run.findMany({
@@ -237,7 +237,14 @@ export default async function CarDetailPage(props: {
               id: s.id,
               name: s.name,
               createdAtLabel: formatRunCreatedAtDateTime(s.createdAt, displayTimeZone),
-              usedInRuns: s._count.runs + s._count.derivedSnapshots,
+              /*
+                Three separate numbers, not one sum. Adding runs to derived snapshots is what made
+                every raced setup undeletable and had rows claiming runs they never had — the card
+                and the API both read them through `decideSetupRemoval` now.
+              */
+              runCount: s._count.runs,
+              derivedCount: s._count.derivedSnapshots,
+              sourceDocumentCount: s._count.sourceDocuments,
             }))}
           />
 

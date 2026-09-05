@@ -129,7 +129,10 @@ export default async function CarManagerPage({
       id: s.id,
       name: s.name,
       createdAtLabel: formatRunCreatedAtDateTime(s.createdAt, displayTimeZone),
-      usedInRuns: s._count.runs + s._count.derivedSnapshots,
+      // Runs that ARE this setup, and runs that merely started from it. Summing them told a driver
+      // a setup no run had ever used was on "6 runs" — see `setupUsageLabel`.
+      runCount: s._count.runs,
+      derivedCount: s._count.derivedSnapshots,
     });
   }
   const sheetsByCar = new Map(sheetCounts.map((r) => [r.carId ?? "", r._count._all]));

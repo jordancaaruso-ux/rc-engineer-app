@@ -92,6 +92,8 @@
     "test:setup-fill-draft": "npx tsx --test src/lib/setup/setupFillDraft.test.ts",
     "test:setup-dirty": "npx tsx --test src/lib/setup/setupValuesFingerprint.test.ts",
     "test:setup-holds-values": "npx tsx --test src/lib/setup/setupHoldsValues.test.ts",
+    "test:setup-remove": "npx tsx --test src/lib/setup/setupRemoveMode.test.ts",
+    "test:setup-delete-doors": "playwright test e2e/setup-delete-doors.spec.ts --project=mobile-chromium",
     "test:setup-sheet-race": "playwright test e2e/setup-sheet-values-race.spec.ts --project=mobile-chromium --no-deps",
     "test:setup-history": "npx tsx --test src/lib/setup/carSetupHistory.test.ts",
     "test:preset-with-other": "npx tsx --test src/lib/setup/presetWithOther.test.ts",

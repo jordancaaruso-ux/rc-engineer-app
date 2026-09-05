@@ -15,6 +15,7 @@ import { UploadSetupSheetBar, type UploadSetupCar } from "@/components/setup/Upl
 import { PickerSheet, PickerTrigger } from "@/components/ui/PickerSheet";
 import { SetUpHandoffBar } from "@/components/onboarding/SetUpHandoffBar";
 import { carNameTakenMessage, findCarNameClash } from "@/lib/cars/carName";
+import { setupUsageLabel } from "@/lib/setup/setupRemoveMode";
 import type { OptionSection } from "@/lib/search/optionSearch";
 
 type SetupSheetModelOption = { id: string; name: string; slug: string; isAuthorized?: boolean };
@@ -24,7 +25,10 @@ export type CarInlineSetup = {
   id: string;
   name: string | null;
   createdAtLabel: string;
-  usedInRuns: number;
+  /** Logged runs whose record IS this setup. */
+  runCount: number;
+  /** Runs and setups that STARTED from it — a different fact, and it used to be added to the above. */
+  derivedCount: number;
 };
 
 type Car = {
@@ -649,9 +653,7 @@ export function CarList({
                                   </span>
                                   <span className="block text-[11px] tabular-nums text-muted-foreground">
                                     {s.createdAtLabel}
-                                    {s.usedInRuns > 0
-                                      ? ` · ${s.usedInRuns} run${s.usedInRuns === 1 ? "" : "s"}`
-                                      : ""}
+                                    {setupUsageLabel(s) ? ` · ${setupUsageLabel(s)}` : ""}
                                   </span>
                                 </span>
                                 <ChevronRight
