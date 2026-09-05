@@ -335,7 +335,7 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
               <span className="font-semibold text-primary-ink">
                 {PRO_ENGINEER_MONTHLY_QUESTIONS} questions a month
               </span>{" "}
-              + roll centre, video, the lot
+              + roll centre, geometry, the lot
             </span>
           </span>
         </button>

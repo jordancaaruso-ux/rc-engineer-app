@@ -26,6 +26,7 @@
  */
 import { prisma } from "@/lib/prisma";
 import { eventDateToYmd } from "@/lib/eventDateParse";
+import { calendarYmdInTimeZone } from "@/lib/formatDate";
 import { getIncludedLaps, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import {
@@ -84,6 +85,8 @@ export async function loadEventsSeasonModel(input: {
      own clock is UTC on Vercel, which held a finished meeting in the Paddock hero until
      10am Melbourne time (2026-08-31). */
   todayYmd: string;
+  /** The viewer's IANA timezone — every run's calendar day is taken in it, never in UTC. */
+  timeZone: string;
 }): Promise<EventsSeasonModel> {
   const todayYmd = input.todayYmd;
   const scopedIds = await eventIdsInScopeForUser(input.userId);
@@ -139,14 +142,18 @@ export async function loadEventsSeasonModel(input: {
     return {
       eventId: r.eventId,
       trackId: r.trackId,
-      ymd: resolveRunDisplayInstant({
-        createdAt: r.createdAt,
-        sessionCompletedAt: r.sessionCompletedAt,
-        loggingCompletedAt: r.loggingCompletedAt,
-        sortAt: r.sortAt,
-      })
-        .toISOString()
-        .slice(0, 10),
+      // In the viewer's zone, not UTC: a Bayside evening run (22:33Z on 31 July) is 1 August
+      // in Brisbane, and the venue record said "31 JUL" beside a Sessions list saying
+      // "1 Aug" for the same lap (2026-09-05 pre-release walk).
+      ymd: calendarYmdInTimeZone(
+        resolveRunDisplayInstant({
+          createdAt: r.createdAt,
+          sessionCompletedAt: r.sessionCompletedAt,
+          loggingCompletedAt: r.loggingCompletedAt,
+          sortAt: r.sortAt,
+        }),
+        input.timeZone,
+      ),
       bestLapSeconds:
         stored ?? (included.length ? Math.min(...included.map((l) => l.lapTimeSeconds)) : null),
       lapCount: included.length,

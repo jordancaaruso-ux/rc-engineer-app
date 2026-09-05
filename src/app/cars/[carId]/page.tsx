@@ -103,12 +103,20 @@ export default async function CarDetailPage(props: {
       },
     }),
     prisma.run.findMany({
-      where: { userId: user.id, carId, tireTypeId: { not: null } },
+      // A run's compound is on the run itself OR on the tyre set it was logged with. Most real
+      // runs carry only the set (146 of 193 non-demo runs on 2026-09-05), so filtering on
+      // `tireTypeId` alone told a driver with a season on one car "No tires logged yet".
+      where: {
+        userId: user.id,
+        carId,
+        OR: [{ tireTypeId: { not: null } }, { tireSet: { tireTypeId: { not: null } } }],
+      },
       orderBy: { createdAt: "desc" },
       select: {
         tireTypeId: true,
         tireRunNumber: true,
         tireType: { select: { displayName: true } },
+        tireSet: { select: { tireTypeId: true, tireType: { select: { displayName: true } } } },
       },
     }),
     // An unfinished sequential fill, if any. Summary only — no sheet JSON for one label.
@@ -173,11 +181,13 @@ export default async function CarDetailPage(props: {
   const furthestRunByTire = new Map<string, number>();
   const tireSetsOnCar: Array<{ id: string; label: string }> = [];
   for (const r of tireRunRows) {
-    const id = r.tireTypeId!;
+    const id = r.tireTypeId ?? r.tireSet?.tireTypeId;
+    if (!id) continue;
     runsOnCarByTire.set(id, (runsOnCarByTire.get(id) ?? 0) + 1);
     furthestRunByTire.set(id, Math.max(furthestRunByTire.get(id) ?? 0, r.tireRunNumber));
     if (!tireSetsOnCar.some((t) => t.id === id)) {
-      tireSetsOnCar.push({ id, label: r.tireType?.displayName ?? "Tires" });
+      const label = r.tireType?.displayName ?? r.tireSet?.tireType?.displayName ?? "Tires";
+      tireSetsOnCar.push({ id, label });
     }
   }
   tireSetsOnCar.sort((a, b) => a.label.localeCompare(b.label));

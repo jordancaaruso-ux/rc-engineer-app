@@ -11,7 +11,10 @@ export default async function LoginLayout({ children }: { children: ReactNode })
   const authRaw = process.env.AUTH_URL?.trim();
 
   let mismatchBanner: string | null = null;
-  if (authRaw && host) {
+  // Dev-only. In production the same host mismatch is routine — the apex domain, a Vercel
+  // preview URL, the *.vercel.app alias — and a stranger must never read a note about .env.local
+  // and `npm run dev` on the sign-in page (found by the 2026-09-05 pre-release walk).
+  if (process.env.NODE_ENV !== "production" && authRaw && host) {
     try {
       const authOrigin = new URL(authRaw);
       if (authOrigin.host !== host) {

@@ -89,6 +89,7 @@ export default async function EventsPage({
       userId: user.id,
       year: parseYear(params.year),
       todayYmd: todayYmdInTimeZone(timeZone),
+      timeZone,
     }),
   ]);
 

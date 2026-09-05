@@ -56,7 +56,7 @@ export async function loadPaddockModel(input: {
   ] = await Promise.all([
     // `year: null` is all-time, not "the newest year with events" — a meeting booked for
     // next January must still be the next one up while it is still December.
-    loadEventsSeasonModel({ userId, year: null, todayYmd: todayYmdInTimeZone(timeZone) }),
+    loadEventsSeasonModel({ userId, year: null, todayYmd: todayYmdInTimeZone(timeZone), timeZone }),
     prisma.car.findMany({
       where: { userId },
       // Only the tie-break; re-sorted below by most recent USE, which this query can't see.

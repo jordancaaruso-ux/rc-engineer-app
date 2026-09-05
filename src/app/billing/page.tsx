@@ -35,8 +35,15 @@ export default async function BillingPage() {
   }));
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-4 text-2xl font-semibold">Subscription</h1>
+    <>
+      {/* The standard header, not a bare <h1>: on a phone the title has to clear the corner
+          pills, and the bare heading sat under the JRC mark (2026-09-05 pre-release walk). */}
+      <header className="page-header">
+        <div className="min-w-0">
+          <h1 className="page-title">Subscription</h1>
+        </div>
+      </header>
+      <section className="page-body max-w-2xl">
       <BillingClient
         plans={plans}
         entitled={entitlement.entitled}
@@ -46,6 +53,7 @@ export default async function BillingPage() {
         enforced={isBillingEnforced()}
         subscription={subscription}
       />
-    </main>
+      </section>
+    </>
   );
 }
