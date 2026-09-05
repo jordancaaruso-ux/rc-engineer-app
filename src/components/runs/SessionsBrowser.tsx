@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -167,14 +168,36 @@ export function SessionsBrowser({
     );
   }, [initialGroupId, initialRunId]);
 
-  // Back/forward should walk selections, not leave the page.
-  useEffect(() => {
-    const onPop = () => setSelection(readSelection());
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
+  /*
+   * Where the phone's LIST was scrolled to when a day was opened over it.
+   *
+   * On a phone the list and the open day share one window scroll: the list is
+   * hidden, the day takes the screen, and the moment you come back the list is
+   * simply shown again at whatever the window's offset now is — the top, near
+   * enough, since a day is shorter than a season. "I click QLD State Titles then
+   * go back and it takes me to the top" (founder, 2026-09-05). So the offset is
+   * taken the instant a selection leaves the list — before React has hidden it,
+   * while `scrollY` still means the list — and put back the instant it returns.
+   * The desktop rail scrolls in its own box and never leaves, so it is skipped.
+   */
+  const depthRef = useRef(0);
+  const listScrollTopRef = useRef(0);
+  const rememberListScroll = useCallback(() => {
+    if (depthRef.current === 0 && !isSplitLayout()) listScrollTopRef.current = window.scrollY;
   }, []);
 
+  // Back/forward should walk selections, not leave the page.
+  useEffect(() => {
+    const onPop = () => {
+      rememberListScroll();
+      setSelection(readSelection());
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [rememberListScroll]);
+
   const select = useCallback((next: Selection) => {
+    rememberListScroll();
     setSelection(next);
     const params = new URLSearchParams(window.location.search);
     for (const [key, value] of [
@@ -194,7 +217,7 @@ export function SessionsBrowser({
       "",
       query ? `${window.location.pathname}?${query}` : window.location.pathname
     );
-  }, []);
+  }, [rememberListScroll]);
 
   const groupsById = useMemo(() => new Map(groups.map((g) => [g.id, g])), [groups]);
   const runsById = useMemo(() => new Map(runs.map((r) => [r.id, r])), [runs]);
@@ -245,11 +268,31 @@ export function SessionsBrowser({
    * attribute rather than lifting the chrome into this component, because the
    * header is server-rendered and shared with the flat list.
    */
-  useEffect(() => {
+  // Layout effect, and declared BEFORE the scroll restore below: it unfolds the header
+  // and ribbon above the list, and the restore needs the page at its full height or
+  // the browser clamps the offset — 489px asked for, 350px given, measured.
+  useLayoutEffect(() => {
     document.body.dataset.sessionsDepth = depth > 0 ? "deep" : "top";
     return () => {
       delete document.body.dataset.sessionsDepth;
     };
+  }, [depth]);
+
+  /*
+   * A pushed screen starts at its top; the list comes back where it was. Layout
+   * effect, so the offset is applied before the frame paints — with a plain
+   * effect the list flashes at the top for a frame, which is the very thing being
+   * fixed. `depthRef` is kept here too, so `rememberListScroll` always reads the
+   * depth that is actually on screen.
+   */
+  const prevDepthRef = useRef(depth);
+  useLayoutEffect(() => {
+    const prev = prevDepthRef.current;
+    prevDepthRef.current = depth;
+    depthRef.current = depth;
+    if (prev === depth || isSplitLayout()) return;
+    if (depth === 0) window.scrollTo({ top: listScrollTopRef.current, behavior: "auto" });
+    else if (prev === 0) window.scrollTo({ top: 0, behavior: "auto" });
   }, [depth]);
 
   const backHref = useCallback(() => {
