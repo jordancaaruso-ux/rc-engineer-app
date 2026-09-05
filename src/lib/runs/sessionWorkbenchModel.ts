@@ -20,6 +20,7 @@ import {
 import { isExcludedSetupChangeKey } from "@/lib/setupCompare/setupChangeNoise";
 import { normalizeSetupData } from "@/lib/runSetup";
 import { formatRunDateShort, formatRunTimeOnly } from "@/lib/formatDate";
+import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { runSessionName } from "@/lib/runSession";
 import { runNeedsLapImport } from "@/lib/runs/lapImportPrompt";
 import type { TeamDayModel } from "@/lib/runs/teamDayModel";
@@ -48,6 +49,13 @@ export type WorkbenchRunSource = {
   carNameSnapshot?: string | null;
   car?: { name: string } | null;
   createdAt: Date | string;
+  /**
+   * Both read by `resolveRunDisplayInstant`, the ONE clock a run's time is printed from:
+   * on-track time off the timing sheet first, then the save. A row that showed
+   * `createdAt` here read a different hour from the lap sheet for the same run.
+   */
+  sessionCompletedAt?: Date | string | null;
+  loggingCompletedAt?: Date | string | null;
   /** Zone the run was logged in — the clock its time of day is printed on. */
   localTimeZone?: string | null;
   lapTimes: unknown;
@@ -130,7 +138,7 @@ function runTimeLabel(run: WorkbenchRunSource, zones?: RunGroupZoneOptions): str
     { localTimeZone: run.localTimeZone ?? null, userId: run.userId ?? null },
     zones
   );
-  return formatRunTimeOnly(run.createdAt, zone);
+  return formatRunTimeOnly(resolveRunDisplayInstant(run), zone);
 }
 
 /**
@@ -384,7 +392,7 @@ export function buildGroupRunRows(
       // One string, not two joined at the row: the comma between the date and the
       // clock is part of the format, and a row that had to know that would be the
       // second place the rule lives.
-      whenLabel: `${formatRunDateShort(run.createdAt, zone)}, ${formatRunTimeOnly(run.createdAt, zone)}`,
+      whenLabel: `${formatRunDateShort(resolveRunDisplayInstant(run), zone)}, ${formatRunTimeOnly(resolveRunDisplayInstant(run), zone)}`,
       carName: carNameOf(run),
       best: metrics.best,
       avgTop5: metrics.cleanLapCount >= 5 ? metrics.avgTop5 : null,

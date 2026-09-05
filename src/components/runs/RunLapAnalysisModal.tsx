@@ -34,6 +34,8 @@ type Props = {
   pickerRunsSameCar: CompareRunShape[];
   /** The whole day, every car — read for run NAMES only, so "Run 3" counts what Sessions counts. */
   dayRuns?: CompareRunShape[];
+  /** The run's own zone — every time in the header and the sheet is printed on it. */
+  timeZone?: string | null;
   runListSource: RunCompareListSource;
   /** Driver of THIS run — a teammate's name on a shared session, not the viewer's. */
   userDisplayName?: string | null;
@@ -49,6 +51,7 @@ export function RunLapAnalysisModal({
   run,
   pickerRunsSameCar,
   dayRuns,
+  timeZone = null,
   runListSource,
   userDisplayName,
   runOwnedByViewer = true,
@@ -78,11 +81,11 @@ export function RunLapAnalysisModal({
     ).length;
     const parts = [
       userDisplayName?.trim() || (runOwnedByViewer ? null : "Teammate"),
-      formatRunDateTime(resolveRunDisplayInstant(run)),
+      formatRunDateTime(resolveRunDisplayInstant(run), timeZone),
       lapCount > 0 ? `${lapCount} lap${lapCount === 1 ? "" : "s"}` : null,
     ].filter(Boolean);
     return parts.join(" · ");
-  }, [run, userDisplayName, runOwnedByViewer]);
+  }, [run, userDisplayName, runOwnedByViewer, timeZone]);
 
   const missingImportedLapRows =
     (run.importedLapSets?.length ?? 0) > 0 && run.importedLapSets!.some((s) => !("laps" in s));
@@ -225,6 +228,7 @@ export function RunLapAnalysisModal({
               currentRunId={run.id}
               otherRuns={pickerRunsSameCar.filter((r) => r.id !== run.id)}
               dayRuns={dayRuns}
+              timeZone={timeZone}
               compareAnchorRun={toCompareRunShape(run)}
               pickerRunsForModal={pickerRunsSameCar}
               runListSource={runListSource}

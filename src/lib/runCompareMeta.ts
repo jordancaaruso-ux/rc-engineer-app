@@ -1,22 +1,25 @@
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 
 /**
- * Wallclock shown next to a run in lists / headers / compare lines. Deliberately
- * **does not** read `sortAt`: the displayed time must stay put even when the
- * driver drags a run to a new position in the history list. Ordering lives in
- * a different column (`sortAt`, set once at create, mutated only by explicit
- * drag); display reflects when the run was first marked logging-complete (or
- * legacy fallbacks), not the draggable order key.
+ * THE wallclock shown next to a run — every list, header, row and compare line reads
+ * this one function, so no two screens can ever print two times for one run.
  *
  * Preference order:
- *   1. `loggingCompletedAt` — first server instant the run was saved as complete
- *      (non-draft); set once and kept immutable.
- *   2. `sessionCompletedAt` — on-track wall time from a timing import (legacy rows
- *      and drafts that never stamped `loggingCompletedAt`).
- *   3. `createdAt` — row insert / first-save time.
+ *   1. `sessionCompletedAt` — when the car was actually on track, off the timing sheet.
+ *      The one time a racer means by "the 2:34 heat", and the one nothing else can
+ *      reconstruct.
+ *   2. `loggingCompletedAt` — when the run was saved as complete. Minutes after the run
+ *      when logged trackside; the honest answer when no timing sheet was imported.
+ *   3. `createdAt` — the row's first write, for legacy rows that stamped neither.
  *
- * Accept `sortAt` in the input type (so callers that already select it still
- * compile) but intentionally ignore it here.
+ * It used to prefer the save time, with the on-track time second — and the Sessions row
+ * printed the row's CREATION time, its own third choice. On a club race day imported from
+ * LiveRC the two screens never agreed to within an hour (reported 2026-09-05, Bayside
+ * 23 May), and the one time that was actually right was the one neither of them showed.
+ *
+ * Deliberately **never** reads `sortAt`: that is the draggable ordering axis, and a drag
+ * rewrites it to a midpoint that was no moment at all. Accepted in the input type so
+ * callers that already select it still compile.
  */
 export function resolveRunDisplayInstant(run: {
   createdAt: Date | string;
@@ -24,14 +27,14 @@ export function resolveRunDisplayInstant(run: {
   sortAt?: Date | string | null;
   loggingCompletedAt?: Date | string | null;
 }): Date {
-  const lc = run.loggingCompletedAt;
-  if (lc != null) {
-    const d = typeof lc === "string" ? new Date(lc) : lc;
-    if (!Number.isNaN(d.getTime())) return d;
-  }
   const s = run.sessionCompletedAt;
   if (s != null) {
     const d = typeof s === "string" ? new Date(s) : s;
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  const lc = run.loggingCompletedAt;
+  if (lc != null) {
+    const d = typeof lc === "string" ? new Date(lc) : lc;
     if (!Number.isNaN(d.getTime())) return d;
   }
   return typeof run.createdAt === "string" ? new Date(run.createdAt) : run.createdAt;

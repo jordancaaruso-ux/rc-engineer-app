@@ -179,6 +179,32 @@ export function formatRunCreatedAtDateWeekday(d: string | Date): string {
   return new Intl.DateTimeFormat(RUN_DATETIME_LOCALE, RUN_WEEKDAY_DATE_OPTIONS).format(dt);
 }
 
+/**
+ * "Sat 19 Jul" — a day heading in the run's zone, with the year only when it isn't this
+ * one. The lap-times picker heads every other day with this: a date says which way you
+ * are looking, where "Earlier"/"Later" made the reader work it out from a clock.
+ */
+export function formatRunDateWeekday(
+  d: string | Date,
+  timeZone?: string | null,
+  now: Date = new Date()
+): string {
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return "—";
+  const tz = timeZone?.trim();
+  const withYear = yearInZone(dt, tz) !== yearInZone(now, tz);
+  // `LOCALE`, like the row time under it ("19 Jul, 12:50 PM"): en-AU spells the short
+  // month out for June and July, and a heading reading "July" over rows reading "Jul"
+  // looks like two different dates.
+  return new Intl.DateTimeFormat(LOCALE, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    ...(withYear ? { year: "numeric" } : {}),
+    ...(tz ? { timeZone: tz } : {}),
+  }).format(dt);
+}
+
 export function formatRunPickerScanDate(d: string | Date): string {
   const dt = new Date(d);
   if (Number.isNaN(dt.getTime())) return "—";

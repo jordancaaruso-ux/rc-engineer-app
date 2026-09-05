@@ -35,10 +35,9 @@ import {
   lapCompareFieldSeriesRunId,
   lapCompareTrackKey,
   lapSeriesMatchesCompareScope,
-  sameLocalCalendarDay,
 } from "@/lib/lapCompareScope";
 import { formatFiveMinuteStint, formatLap, normalizeLapTimes } from "@/lib/runLaps";
-import { formatRunDateTime } from "@/lib/formatDate";
+import { calendarYmdInTimeZone, formatRunDateTime, formatRunDateWeekday } from "@/lib/formatDate";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { buildDayRunNameMap } from "@/lib/runs/buildRunHistoryGroups";
 import { cn } from "@/lib/utils";
@@ -60,7 +59,7 @@ import {
   resolveImportedSessionDisplayTimeIso,
   timingSourceFromSourceUrl,
 } from "@/lib/lapImport/labels";
-import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
+import { resolveRunDisplayInstant, resolveRunSortInstant } from "@/lib/runCompareMeta";
 
 type ImportedSet = {
   id: string;
@@ -83,8 +82,20 @@ type SeriesMeta = {
   setupRun: CompareRunShape | null;
   /** Target dropdown + compare list label */
   selectLabel: string;
-  /** Ordering: true session / run instant as ISO (for sorting compare options). */
+  /**
+   * ORDERING instant, ISO — the axis the Sessions list orders and cuts days on (`sortAt`
+   * for a run). Never printed: a drag-reorder can rewrite it to a midpoint that was no
+   * moment at all.
+   */
   sortIso: string;
+  /**
+   * The instant PRINTED beside the row (`resolveRunDisplayInstant`: on track if known,
+   * else logged). Absent on series whose two clocks are one and the same (rivals off a
+   * timing sheet), where `sortIso` is read instead.
+   */
+  whenIso?: string;
+  /** The venue's name for a day heading; `trackKey` is the match, this is the word. */
+  trackName?: string | null;
   /**
    * Session name on its own, with no timestamp glued to it. The picker prints
    * name and time on separate lines, and splitting `selectLabel` back apart on
@@ -155,55 +166,60 @@ function lapAt(series: ComparisonSeries, lapNumber: number): LapRow | undefined 
   return series.laps.find((l) => l.lapNumber === lapNumber);
 }
 
-/**
- * The three buckets a driver actually thinks in: what happened today, what
- * happened at this track before, and everything else.
- *
- * Shared by the target dropdown and the tick-list under it so the two can never
- * name the same session differently. Day membership uses `sameLocalCalendarDay`
- * — the same test the `same_day` scope uses — so grouping and filtering can't
- * disagree. It resolves the day in the READER's zone, not the driver's:
- * `resolveRunLocalTimeZone` is the zone-correct answer and is already used by
- * the Sessions groups, but it needs `Run.localTimeZone` plumbed onto
- * `CompareRunShape` first. Until then a session that crosses your midnight can
- * still land in "Earlier at …" rather than "This test day".
+/*
+ * Day-and-track grouping for the picker — shared by the target dropdown and the
+ * tick-list under it, so the two can never file one session under two headings.
+ * Days are cut in the zone the host passes (`timeZone`, the run's own); the `same_day`
+ * scope still uses `sameLocalCalendarDay` in the reader's zone, which agrees at home.
  */
-type DayTrackBucket = "today" | "later" | "here" | "elsewhere";
+type DayTrackGroup<T> = { key: string; label: string; sortIso: string; items: T[] };
 
-/** Every bucket, in the order the picker lists them: newest first, like the rows inside. */
-const DAY_TRACK_BUCKETS: readonly DayTrackBucket[] = ["today", "later", "here", "elsewhere"];
-
-function emptyDayTrackBuckets<T>(): Record<DayTrackBucket, T[]> {
-  return { today: [], later: [], here: [], elsewhere: [] };
+function instantMs(iso: string): number {
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? t : 0;
 }
 
-function dayTrackBucketFor(input: {
-  sortIso: string;
-  trackKey: string | null;
-  anchorTrackKey: string | null;
-  anchorInstantIso: string;
-}): DayTrackBucket {
-  // "This test day" is a day AND a place. A session run the same afternoon at a
-  // different venue filed under a heading naming this one would be a lie about
-  // where you were — so a track mismatch beats the calendar.
-  const here = !input.anchorTrackKey || input.trackKey === input.anchorTrackKey;
-  if (!here) return "elsewhere";
-  if (input.sortIso && sameLocalCalendarDay(input.sortIso, input.anchorInstantIso)) return "today";
-  // Another day at this track — before or after. "Earlier at …" used to take both, so a
-  // 22 Aug sheet filed its 23 Aug runs under "Earlier" (reported 2026-09-05).
-  const t = new Date(input.sortIso).getTime();
-  const anchorT = new Date(input.anchorInstantIso).getTime();
-  if (Number.isFinite(t) && Number.isFinite(anchorT) && t > anchorT) return "later";
-  return "here";
-}
-
-function dayTrackBucketLabels(anchorTrackName: string | null): Record<DayTrackBucket, string> {
-  return {
-    today: anchorTrackName ? `This test day · ${anchorTrackName}` : "This test day",
-    later: anchorTrackName ? `Later at ${anchorTrackName}` : "Later sessions",
-    here: anchorTrackName ? `Earlier at ${anchorTrackName}` : "Earlier sessions",
-    elsewhere: "Other tracks and events",
-  };
+/**
+ * The picker's groups: this run's day at this track first, then every other day, newest
+ * first, each headed by its DATE — "Sat 19 Jul", with the venue appended only when it is
+ * not this one.
+ *
+ * Direction words were tried and read as no system at all: "Earlier at …" took every
+ * other day (so a 22 Aug sheet filed 23 Aug under it), and splitting it into Earlier and
+ * Later only moved the problem — which way is "later" depends on a clock the reader can't
+ * see, while a date says it outright (founder, 2026-09-05). Days are cut in the run's
+ * zone, the same one the Sessions list cuts them in, on the same ordering instant.
+ */
+function groupByDayAndTrack<T>(
+  items: readonly T[],
+  read: (item: T) => { sortIso: string; trackKey: string | null; trackName: string | null },
+  anchor: { instantIso: string; trackKey: string | null; trackName: string | null },
+  zone: string
+): DayTrackGroup<T>[] {
+  const anchorKey = `${calendarYmdInTimeZone(anchor.instantIso, zone)}|${anchor.trackKey ?? ""}`;
+  const groups = new Map<string, DayTrackGroup<T>>();
+  for (const item of items) {
+    const { sortIso, trackKey, trackName } = read(item);
+    const key = `${sortIso ? calendarYmdInTimeZone(sortIso, zone) : ""}|${trackKey ?? ""}`;
+    let group = groups.get(key);
+    if (!group) {
+      let label: string;
+      if (key === anchorKey) {
+        label = anchor.trackName ? `This test day · ${anchor.trackName}` : "This test day";
+      } else {
+        const venue = trackName && trackKey !== anchor.trackKey ? ` · ${trackName}` : "";
+        label = `${sortIso ? formatRunDateWeekday(sortIso, zone) : "Undated"}${venue}`;
+      }
+      group = { key, label, sortIso, items: [] };
+      groups.set(key, group);
+    }
+    group.items.push(item);
+  }
+  return [...groups.values()].sort((a, b) => {
+    if (a.key === anchorKey) return -1;
+    if (b.key === anchorKey) return 1;
+    return instantMs(b.sortIso) - instantMs(a.sortIso);
+  });
 }
 
 /**
@@ -329,10 +345,13 @@ function ColumnHeaderBlock({
   compact = false,
   summaryDelta,
   onViewSetup,
+  timeZone = null,
 }: {
   series: ComparisonSeries;
   meta: SeriesMeta;
   isTarget: boolean;
+  /** The sheet's clock — see the grid's `timeZone` prop. */
+  timeZone?: string | null;
   /** The column is a driver off a timing sheet, so its name splits into first / SURNAME. */
   isPerson?: boolean;
   /** Under ~100px of column: one type size down on the metric rows so label + value fit a line. */
@@ -359,7 +378,7 @@ function ColumnHeaderBlock({
              * 2026-08-27), and it leads the line so it can never truncate away.
              */}
             {isTarget ? "target · " : ""}
-            {meta.sortIso ? formatRunDateTime(meta.sortIso) : ""}
+            {meta.sortIso ? formatRunDateTime(meta.whenIso ?? meta.sortIso, timeZone) : ""}
             {meta.context ? ` · ${meta.context}` : ""}
           </div>
         </div>
@@ -439,6 +458,7 @@ export function LapComparisonColumnGrid({
   currentRunId,
   otherRuns = NO_RUNS as CompareRunShape[],
   dayRuns = NO_RUNS as CompareRunShape[],
+  timeZone = null,
   compareAnchorRun,
   pickerRunsForModal = NO_RUNS as CompareRunShape[],
   runListSource = "my_runs",
@@ -474,6 +494,12 @@ export function LapComparisonColumnGrid({
    * is already the whole list need not pass it.
    */
   dayRuns?: CompareRunShape[];
+  /**
+   * The zone every time on the sheet is printed in and every day is cut in — the run's
+   * own, as the Sessions row uses. Null falls back to the reader's device, which is the
+   * same clock at home and a different one interstate.
+   */
+  timeZone?: string | null;
   /** Full shape for this run (setup + meta); must match `run` laps. */
   compareAnchorRun: CompareRunShape;
   /** All runs for setup modal picker (e.g. full history list). */
@@ -534,6 +560,14 @@ export function LapComparisonColumnGrid({
   );
 
   const primaryLaps = useMemo(() => primaryLapRowsFromRun(run), [run]);
+
+  /** One clock for every time the sheet prints — see the `timeZone` prop. */
+  const fmtWhen = useCallback((iso: string) => formatRunDateTime(iso, timeZone), [timeZone]);
+  /** The zone the picker cuts its days in; `calendarYmdInTimeZone` needs a real name. */
+  const pickerZone = useMemo(
+    () => timeZone?.trim() || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    [timeZone]
+  );
 
   /**
    * Runs the sheet cannot put in a column, and the words for why: nothing to plot, or laps
@@ -776,7 +810,11 @@ export function LapComparisonColumnGrid({
         timingSource: timingSourceFromSourceUrl(primaryImport?.sourceUrl),
         isWallClockTime: primaryImport?.sessionCompletedAt != null,
       }),
-      sortIso: meSortIso,
+      // Ordered by the same axis as its day-mates; PRINTED with its on-track clock.
+      sortIso: resolveRunSortInstant(compareAnchorRun).toISOString(),
+      whenIso: meSortIso,
+      trackName:
+        compareAnchorRun.track?.name?.trim() || compareAnchorRun.trackNameSnapshot?.trim() || null,
       /*
        * On your own run the column is named after the SESSION ("Run 5", "Qualifying") and the
        * car rides the subline — three of your runs side by side all read "Jordan Caruso"
@@ -870,12 +908,15 @@ export function LapComparisonColumnGrid({
       const metaLine = formatCompareRunMetaLine(r);
       const carName = r.car?.name?.trim() || r.carNameSnapshot?.trim() || primaryRunLabel;
       const whenIso = resolveRunDisplayInstant(r).toISOString();
+      const sortIso = resolveRunSortInstant(r).toISOString();
       const trackCtx = r.track?.name?.trim() || r.trackNameSnapshot?.trim() || null;
       metaById.set(ser.id, {
         metaLine,
         setupRun: r,
         selectLabel: formatDriverSessionLabelWithContext(carName, whenIso, trackCtx ?? undefined),
-        sortIso: whenIso,
+        sortIso,
+        whenIso,
+        trackName: trackCtx,
         name: dayRunNames[r.id] || formatRunSessionDisplay(r, { fallback: carName }),
         // Team Sessions mixes every member's runs into this list; a run that
         // isn't the anchor driver's belongs under Teammates, not under their name.
@@ -906,6 +947,8 @@ export function LapComparisonColumnGrid({
         setupRun: null,
         selectLabel: lib.selectLabel,
         sortIso: lib.sortTimeIso,
+        whenIso: lib.sortTimeIso,
+        trackName: lib.trackName ?? null,
         name: lib.name?.trim() || lib.selectLabel,
         segment: "library",
         trackKey: lapCompareTrackKey(lib.trackName),
@@ -948,6 +991,7 @@ export function LapComparisonColumnGrid({
           }))
       );
       const whenIso = resolveRunDisplayInstant(r).toISOString();
+      const sortIso = resolveRunSortInstant(r).toISOString();
       const raceName = formatRunSessionDisplay(r, {
         fallback: r.car?.name?.trim() || r.carNameSnapshot?.trim() || primaryRunLabel,
       });
@@ -967,9 +1011,11 @@ export function LapComparisonColumnGrid({
           metaLine: null,
           setupRun: null,
           selectLabel: formatDriverSessionLabelWithContext(label, whenIso, raceName),
-          // The run's own instant, not the timing sheet's: it is the same clock
+          // The run's own instants, not the timing sheet's: the same two clocks
           // that run's "My runs" row reads, so the two are scoped identically.
-          sortIso: whenIso,
+          sortIso,
+          whenIso,
+          trackName: trackCtx,
           name: label,
           segment: "field",
           trackKey: lapCompareTrackKey(trackCtx),
@@ -1026,8 +1072,9 @@ export function LapComparisonColumnGrid({
     anchorIsImportedSheet,
   ]);
 
+  /** The anchor's ORDERING instant — where it sits in the day, never what time it prints. */
   const anchorInstantIso = useMemo(
-    () => resolveRunDisplayInstant(compareAnchorRun).toISOString(),
+    () => resolveRunSortInstant(compareAnchorRun).toISOString(),
     [compareAnchorRun]
   );
 
@@ -1151,6 +1198,24 @@ export function LapComparisonColumnGrid({
     return m;
   }, [seriesList]);
 
+  /**
+   * The driver's own runs either side of this one, in the order the Sessions list keeps —
+   * the two a lap sheet is opened to compare with far more often than any other (founder,
+   * 2026-09-05). Judged across every day in scope, so the first run of a morning still has
+   * a run before it (last time out at this track), and only over runs that can be ticked.
+   */
+  const neighbourRunSeries = useMemo(() => {
+    const own = scopeFilteredRows
+      .filter((r) => r.series.id.startsWith("history:") && segmentFor(r.series.id) === "driver")
+      .map((r) => ({ id: r.series.id, t: instantMs(r.sortIso) }))
+      .sort((a, b) => b.t - a.t);
+    const anchorT = instantMs(anchorInstantIso);
+    const previousId = own.find((r) => r.t < anchorT)?.id ?? null;
+    const later = own.filter((r) => r.t > anchorT);
+    const nextId = later.length > 0 ? later[later.length - 1]!.id : null;
+    return { previousId, nextId };
+  }, [scopeFilteredRows, segmentFor, anchorInstantIso]);
+
   const anchorTrackName =
     compareAnchorRun.track?.name?.trim() || compareAnchorRun.trackNameSnapshot?.trim() || null;
 
@@ -1167,14 +1232,23 @@ export function LapComparisonColumnGrid({
          * the race name and the group heading already says it.
          */
         when: [
-          r.sortIso ? formatRunDateTime(r.sortIso) : "—",
+          r.sortIso ? fmtWhen(m?.whenIso ?? r.sortIso) : "—",
           m?.segment === "field" ? null : m?.context ?? null,
         ]
           .filter(Boolean)
           .join(" · "),
         bestLap: seriesById.get(r.id)?.bestLap ?? null,
+        note:
+          r.id === neighbourRunSeries.previousId
+            ? "Previous run"
+            : r.id === neighbourRunSeries.nextId
+              ? "Next run"
+              : null,
       };
     };
+    /** A rival off a timing sheet carries no venue of its own; it was run where its sheet was. */
+    const trackNameOf = (m: SeriesMeta | undefined): string | null =>
+      m?.trackName ?? (m?.trackKey != null && m.trackKey === anchorTrackKey ? anchorTrackName : null);
 
     /*
      * The field is grouped by RACE, not by day and track: this run's own sheet
@@ -1206,7 +1280,7 @@ export function LapComparisonColumnGrid({
         // On an imported race the race's name is the anchor's CONTEXT (the driver names the
         // column); on your own run it is the anchor's NAME (the car is the context).
         const sessionName = anchorIsImportedSheet ? pm?.context : pm?.name;
-        const label = [sessionName ?? null, pm?.sortIso ? formatRunDateTime(pm.sortIso) : null]
+        const label = [sessionName ?? null, pm?.sortIso ? fmtWhen(pm.whenIso ?? pm.sortIso) : null]
           .filter(Boolean)
           .join(" · ");
         groups.push({ key: "field", label: label || "This session", rows: own });
@@ -1224,7 +1298,7 @@ export function LapComparisonColumnGrid({
           key: `field:${rid}`,
           label: [
             m?.context ?? null,
-            m?.sortIso ? formatRunDateTime(m.sortIso) : null,
+            m?.sortIso ? fmtWhen(m.whenIso ?? m.sortIso) : null,
             elsewhere ? trackName : null,
           ]
             .filter(Boolean)
@@ -1243,24 +1317,24 @@ export function LapComparisonColumnGrid({
       return groups;
     }
 
-    const buckets = emptyDayTrackBuckets<{ row: LapPickerRow; sortIso: string }>();
-    for (const r of compareOptionRows) {
-      const bucket = dayTrackBucketFor({
-        sortIso: r.sortIso,
-        trackKey: metaById.get(r.id)?.trackKey ?? null,
-        anchorTrackKey,
-        anchorInstantIso,
-      });
-      buckets[bucket].push({ row: toRow(r), sortIso: r.sortIso });
-    }
+    type Placed = {
+      row: LapPickerRow;
+      sortIso: string;
+      trackKey: string | null;
+      trackName: string | null;
+    };
+    const placed: Placed[] = compareOptionRows.map((r) => {
+      const m = metaById.get(r.id);
+      return { row: toRow(r), sortIso: r.sortIso, trackKey: m?.trackKey ?? null, trackName: trackNameOf(m) };
+    });
 
-    /*
-     * The runs held back (no laps, a copy of this run, a copy of another row) take their
-     * place in the same groups, greyed, with the reason on the time line. Same tab, same
-     * scope, same name as everywhere else — so the day's numbering has no holes, and a
-     * missing "Run 2" is one line of explanation rather than a mystery.
-     */
     if (activeSegment === "driver" || activeSegment === "teammates") {
+      /*
+       * The runs held back (no laps, a copy of this run, a copy of another row) take their
+       * place in the same groups, greyed, with the reason on the time line. Same tab, same
+       * scope, same name as everywhere else — so the day's numbering has no holes, and a
+       * missing "Run 2" is one line of explanation rather than a mystery.
+       */
       for (const r of otherRuns) {
         const note = heldBackByAnchor.get(r.id) ?? heldBackDuplicates.get(r.id) ?? null;
         if (!note) continue;
@@ -1269,39 +1343,67 @@ export function LapComparisonColumnGrid({
             ? "teammates"
             : "driver";
         if (segment !== activeSegment) continue;
-        const sortIso = resolveRunDisplayInstant(r).toISOString();
+        const sortIso = resolveRunSortInstant(r).toISOString();
         if (!seriesMatchesScope(`history:${r.id}`, sortIso)) continue;
         const trackCtx = r.track?.name?.trim() || r.trackNameSnapshot?.trim() || null;
         const carName = r.car?.name?.trim() || r.carNameSnapshot?.trim() || null;
         const included = primaryLapRowsFromRun({ lapTimes: r.lapTimes, lapSession: r.lapSession })
           .filter((l) => l.isIncluded)
           .map((l) => l.lapTimeSeconds);
-        const bucket = dayTrackBucketFor({
+        placed.push({
           sortIso,
           trackKey: lapCompareTrackKey(trackCtx),
-          anchorTrackKey,
-          anchorInstantIso,
-        });
-        buckets[bucket].push({
-          sortIso,
+          trackName: trackCtx,
           row: {
             id: `held:${r.id}`,
             name: dayRunNames[r.id] || formatRunSessionDisplay(r, { fallback: carName ?? "Run" }),
-            when: [formatRunDateTime(sortIso), carName].filter(Boolean).join(" · "),
+            when: [fmtWhen(resolveRunDisplayInstant(r).toISOString()), carName]
+              .filter(Boolean)
+              .join(" · "),
             bestLap: included.length > 0 ? Math.min(...included) : null,
             disabled: true,
             note,
           },
         });
       }
+
+      /*
+       * This run, in its own place in the day, greyed: "above or below" was a thing the
+       * reader had to work out from times, and now it is a thing they can see — the row
+       * directly under it is the run before, the row above it the run after. Only while
+       * it is the target; once another session is measured against, its own laps are an
+       * ordinary tickable row and appear as one.
+       */
+      if (activeSegment === "driver" && !anchorIsImportedSheet && targetId === "run:primary") {
+        const pm = metaById.get("run:primary");
+        placed.push({
+          sortIso: anchorInstantIso,
+          trackKey: anchorTrackKey,
+          trackName: anchorTrackName,
+          row: {
+            id: `held:${compareAnchorRun.id}`,
+            name: pm?.name ?? "This run",
+            when: [fmtWhen(pm?.whenIso ?? pm?.sortIso ?? anchorInstantIso), pm?.context ?? null]
+              .filter(Boolean)
+              .join(" · "),
+            bestLap: seriesById.get("run:primary")?.bestLap ?? null,
+            disabled: true,
+            note: "This run",
+          },
+        });
+      }
     }
 
-    const labels = dayTrackBucketLabels(anchorTrackName);
-    return DAY_TRACK_BUCKETS.map((key) => ({
-      key,
-      label: labels[key],
-      rows: buckets[key].sort(compareOptionSort).map((b) => b.row),
-    })).filter((g) => g.rows.length > 0);
+    return groupByDayAndTrack(
+      placed,
+      (p) => p,
+      { instantIso: anchorInstantIso, trackKey: anchorTrackKey, trackName: anchorTrackName },
+      pickerZone
+    ).map((g) => ({
+      key: g.key,
+      label: g.label,
+      rows: g.items.sort(compareOptionSort).map((p) => p.row),
+    }));
   }, [
     compareOptionRows,
     metaById,
@@ -1317,9 +1419,14 @@ export function LapComparisonColumnGrid({
     anchorIsImportedSheet,
     heldBackByAnchor,
     heldBackDuplicates,
+    compareAnchorRun.id,
     compareAnchorRun.userId,
     seriesMatchesScope,
     dayRunNames,
+    fmtWhen,
+    pickerZone,
+    targetId,
+    neighbourRunSeries,
   ]);
 
   /*
@@ -1335,6 +1442,21 @@ export function LapComparisonColumnGrid({
     setSelectedComparisonIds([]);
     setExpandedFieldRunIds([]);
   }, [currentRunId]);
+
+  /*
+   * Opens compared with the run before, already ticked (founder, 2026-09-05: "automatically
+   * compare to run previous"). Once per anchor, and only when nothing was handed in to
+   * restore — the full-page sheet arrives carrying its own columns — so unticking
+   * everything stays unticked for as long as the reader is on the sheet.
+   */
+  const autoTickedForRef = useRef<string | null>(initialComparisonIds?.length ? currentRunId : null);
+  useEffect(() => {
+    if (autoTickedForRef.current === currentRunId) return;
+    autoTickedForRef.current = currentRunId;
+    const previousId = neighbourRunSeries.previousId;
+    if (!previousId) return;
+    setSelectedComparisonIds((prev) => (prev.length > 0 ? prev : [previousId]));
+  }, [currentRunId, neighbourRunSeries.previousId]);
 
   /*
    * Pruned against everything in SCOPE, not against the open segment. It used
@@ -1445,8 +1567,11 @@ export function LapComparisonColumnGrid({
   type TargetSession = {
     key: string;
     name: string;
+    /** Ordering and day-cutting instant; `whenIso` is the one printed. */
     sortIso: string;
+    whenIso: string;
     trackKey: string | null;
+    trackName: string | null;
     /** Every tab this session belongs under. A heat you drove is both yours and a field. */
     segments: CompareSegmentKey[];
     /** `loaded` is false while a rival's laps are still on their way from the server. */
@@ -1473,7 +1598,11 @@ export function LapComparisonColumnGrid({
           key,
           name: "",
           sortIso: m?.sortIso ?? "",
+          whenIso: m?.whenIso ?? m?.sortIso ?? "",
           trackKey: m?.trackKey ?? null,
+          trackName:
+            m?.trackName ??
+            (m?.trackKey != null && m.trackKey === anchorTrackKey ? anchorTrackName : null),
           segments: [],
           drivers: [],
         };
@@ -1515,6 +1644,7 @@ export function LapComparisonColumnGrid({
       // Race name on an imported sheet (the anchor's context); the run's name on your own.
       thisSheet.name = (anchorIsImportedSheet ? pm?.context : pm?.name) ?? "This sheet";
       thisSheet.sortIso = pm?.sortIso ?? thisSheet.sortIso;
+      thisSheet.whenIso = pm?.whenIso ?? thisSheet.sortIso;
     }
 
     for (const session of byKey.values()) {
@@ -1561,6 +1691,8 @@ export function LapComparisonColumnGrid({
     dayRunNames,
     seriesMatchesScope,
     anchorIsImportedSheet,
+    anchorTrackKey,
+    anchorTrackName,
   ]);
 
   /** The session the current target sits in. Derived, so the two can never disagree. */
@@ -1596,33 +1728,39 @@ export function LapComparisonColumnGrid({
    * while the grid measures against another.
    */
   const targetSessionGroups = useMemo(() => {
-    const labels = dayTrackBucketLabels(anchorTrackName);
-    const buckets = emptyDayTrackBuckets<TargetSession>();
     const pinned: TargetSession[] = [];
+    const rest: TargetSession[] = [];
     for (const session of targetSessions) {
       if (session.key === "this_sheet") {
         pinned.push(session);
         continue;
       }
       const wanted = session.segments.includes(targetSegment) || session.key === targetSessionKey;
-      if (!wanted) continue;
-      buckets[
-        dayTrackBucketFor({
-          sortIso: session.sortIso,
-          trackKey: session.trackKey,
-          anchorTrackKey,
-          anchorInstantIso,
-        })
-      ].push(session);
+      if (wanted) rest.push(session);
     }
     const groups: Array<{ key: string; label: string | null; sessions: TargetSession[] }> = [
       { key: "this_sheet", label: null, sessions: pinned },
     ];
-    for (const bucket of DAY_TRACK_BUCKETS) {
-      groups.push({ key: bucket, label: labels[bucket], sessions: buckets[bucket] });
+    // The same day-and-track groups the tick-list below wears, so the two halves of the
+    // picker never file one session under two headings.
+    for (const g of groupByDayAndTrack(
+      rest,
+      (s) => s,
+      { instantIso: anchorInstantIso, trackKey: anchorTrackKey, trackName: anchorTrackName },
+      pickerZone
+    )) {
+      groups.push({ key: g.key, label: g.label, sessions: g.items });
     }
     return groups.filter((g) => g.sessions.length > 0);
-  }, [targetSessions, targetSegment, targetSessionKey, anchorTrackName, anchorTrackKey, anchorInstantIso]);
+  }, [
+    targetSessions,
+    targetSegment,
+    targetSessionKey,
+    anchorTrackName,
+    anchorTrackKey,
+    anchorInstantIso,
+    pickerZone,
+  ]);
 
   /**
    * Changing the target never loses a column. Making Michael the target used to drop Jordan
@@ -1680,12 +1818,12 @@ export function LapComparisonColumnGrid({
       name: m?.name ?? targetSeries.label,
       // The driver above, the session and its time below — the same two lines every
       // other row in the picker reads, and the same two the column header prints.
-      when: [m?.sortIso ? formatRunDateTime(m.sortIso) : "—", m?.context ?? null]
+      when: [m?.sortIso ? fmtWhen(m.whenIso ?? m.sortIso) : "—", m?.context ?? null]
         .filter(Boolean)
         .join(" · "),
       bestLap: targetSeries.bestLap,
     };
-  }, [targetSeries, metaById]);
+  }, [targetSeries, metaById, fmtWhen]);
 
   /** What the "Compared with" bar reads out, so the grid never has to be scrolled to find out. */
   const comparedWithLabel = useMemo(() => {
@@ -1944,7 +2082,7 @@ export function LapComparisonColumnGrid({
    * the rail's select anyway.
    */
   function targetSessionLabel(session: TargetSession): string {
-    const when = session.sortIso ? formatRunDateTime(session.sortIso) : null;
+    const when = session.sortIso ? fmtWhen(session.whenIso || session.sortIso) : null;
     const n = session.drivers.length;
     return [session.name, when, n > 1 ? `${n} drivers` : null].filter(Boolean).join(" · ");
   }
@@ -2022,7 +2160,9 @@ export function LapComparisonColumnGrid({
           name: metaFor(targetSeries).name,
           context: [
             "target",
-            metaFor(targetSeries).sortIso ? formatRunDateTime(metaFor(targetSeries).sortIso) : null,
+            metaFor(targetSeries).sortIso
+              ? fmtWhen(metaFor(targetSeries).whenIso ?? metaFor(targetSeries).sortIso)
+              : null,
             // A rival off this sheet carries no context of their own (the sheet IS
             // the context), so the session names them — unless it already did.
             metaFor(targetSeries).context ??
@@ -2319,6 +2459,7 @@ export function LapComparisonColumnGrid({
                     compact={compactColumns}
                     summaryDelta={null}
                     onViewSetup={setSetupModalRun}
+                    timeZone={timeZone}
                   />
                 </th>
               ) : null}
@@ -2340,6 +2481,7 @@ export function LapComparisonColumnGrid({
                       compact={compactColumns}
                       summaryDelta={d}
                       onViewSetup={setSetupModalRun}
+                      timeZone={timeZone}
                     />
                   </th>
                 );

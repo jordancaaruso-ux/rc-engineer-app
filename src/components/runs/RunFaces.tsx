@@ -1502,6 +1502,7 @@ export function RunFaces({
           run={run}
           pickerRunsSameCar={lapComparePickerRuns}
           dayRuns={pickerRuns}
+          timeZone={runZone}
           runListSource={runListSource}
           userDisplayName={runOwnerDisplayName}
           runOwnedByViewer={allowRunMutations}
