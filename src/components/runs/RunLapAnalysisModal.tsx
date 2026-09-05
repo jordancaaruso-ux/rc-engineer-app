@@ -12,6 +12,7 @@ import { formatRunSessionDisplay } from "@/lib/runSession";
 import { formatRunDateTime } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { useImportedLapLibrary } from "@/components/laps/useImportedLapLibrary";
+import { useRunsAtTrackForPicker } from "@/components/runs/useRunsAtTrackForPicker";
 
 type CompareRunInput = Parameters<typeof toCompareRunShape>[0];
 
@@ -31,7 +32,15 @@ type Props = {
   open: boolean;
   onClose: () => void;
   run: RunWithImports;
-  pickerRunsSameCar: CompareRunShape[];
+  /**
+   * Runs offered as lap columns — EVERY car. It was the same-car slice until 2026-09-05,
+   * which hid a whole month at a track raced on a different chassis. The viewer's own
+   * runs at this venue are fetched on top, so the list never depends on what the page
+   * underneath happened to load.
+   */
+  pickerRuns: CompareRunShape[];
+  /** Runs for the setup-sheet pop-up off a column — same car, since a sheet is per chassis. Defaults to `pickerRuns`. */
+  setupPickerRuns?: CompareRunShape[];
   /** The whole day, every car — read for run NAMES only, so "Run 3" counts what Sessions counts. */
   dayRuns?: CompareRunShape[];
   /** The run's own zone — every time in the header and the sheet is printed on it. */
@@ -49,7 +58,8 @@ export function RunLapAnalysisModal({
   open,
   onClose,
   run,
-  pickerRunsSameCar,
+  pickerRuns,
+  setupPickerRuns,
   dayRuns,
   timeZone = null,
   runListSource,
@@ -63,6 +73,23 @@ export function RunLapAnalysisModal({
   const [importedLapsLoading, setImportedLapsLoading] = useState(false);
   const [importedLapsError, setImportedLapsError] = useState<string | null>(null);
   const libraryLapSessions = useImportedLapLibrary(open);
+
+  // Only on the viewer's own run: on a teammate's sheet the viewer's runs would land under
+  // the teammate's name, and the page's list already carries what the team shares.
+  const runsAtTrack = useRunsAtTrackForPicker({
+    enabled: open && runOwnedByViewer,
+    trackName: run.track?.name?.trim() || run.trackNameSnapshot?.trim() || null,
+  });
+  const otherRuns = useMemo(() => {
+    const seen = new Set<string>([run.id]);
+    const merged: CompareRunShape[] = [];
+    for (const r of [...pickerRuns, ...runsAtTrack]) {
+      if (seen.has(r.id)) continue;
+      seen.add(r.id);
+      merged.push(r);
+    }
+    return merged;
+  }, [pickerRuns, runsAtTrack, run.id]);
 
   /**
    * The sheet names the session it is about, rather than naming itself. "Lap
@@ -226,11 +253,11 @@ export function RunLapAnalysisModal({
               primaryIsViewer={runOwnedByViewer}
               run={runForLapCompare}
               currentRunId={run.id}
-              otherRuns={pickerRunsSameCar.filter((r) => r.id !== run.id)}
+              otherRuns={otherRuns}
               dayRuns={dayRuns}
               timeZone={timeZone}
               compareAnchorRun={toCompareRunShape(run)}
-              pickerRunsForModal={pickerRunsSameCar}
+              pickerRunsForModal={setupPickerRuns ?? pickerRuns}
               runListSource={runListSource}
               librarySessions={libraryLapSessions}
               viewerUserId={viewerUserId}

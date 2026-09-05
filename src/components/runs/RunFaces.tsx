@@ -1500,7 +1500,8 @@ export function RunFaces({
           open={lapsOpen}
           onClose={() => setLapsOpen(false)}
           run={run}
-          pickerRunsSameCar={lapComparePickerRuns}
+          pickerRuns={pickerRuns}
+          setupPickerRuns={lapComparePickerRuns}
           dayRuns={pickerRuns}
           timeZone={runZone}
           runListSource={runListSource}

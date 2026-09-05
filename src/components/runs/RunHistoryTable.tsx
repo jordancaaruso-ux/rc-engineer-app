@@ -793,7 +793,8 @@ export function RunHistoryTable({
                   open={lapModalRunId !== null}
                   onClose={() => setLapModalRunId(null)}
                   run={lapModalRun}
-                  pickerRunsSameCar={lapModalPickerRuns}
+                  pickerRuns={allRunsDescending}
+                  setupPickerRuns={lapModalPickerRuns}
                   runListSource={runListSource}
                   userDisplayName={lapModalUserDisplayName}
                   runOwnedByViewer={lapModalRunOwnedByViewer}

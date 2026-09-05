@@ -153,7 +153,8 @@ export function RunPageClient({
           open={lapsOpen}
           onClose={() => setLapsOpen(false)}
           run={run}
-          pickerRunsSameCar={lapComparePickerRuns}
+          pickerRuns={pickerRuns}
+          setupPickerRuns={lapComparePickerRuns}
           runListSource={runListSource}
           userDisplayName={runOwnerDisplayName}
           runOwnedByViewer={runOwnedByViewer}

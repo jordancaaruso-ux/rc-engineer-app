@@ -1,21 +1,45 @@
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
 
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+
+function asValidDate(v: Date | string | null | undefined): Date | null {
+  if (v == null) return null;
+  const d = typeof v === "string" ? new Date(v) : v;
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 /**
  * THE wallclock shown next to a run — every list, header, row and compare line reads
- * this one function, so no two screens can ever print two times for one run.
+ * this one function, so no two screens can ever print two times for one run. (The
+ * Sessions row printed raw `createdAt` until 2026-09-05 while the lap sheet read this,
+ * and on a LiveRC race weekend the two never agreed to within an hour.)
  *
- * Preference order:
- *   1. `sessionCompletedAt` — when the car was actually on track, off the timing sheet.
- *      The one time a racer means by "the 2:34 heat", and the one nothing else can
- *      reconstruct.
- *   2. `loggingCompletedAt` — when the run was saved as complete. Minutes after the run
- *      when logged trackside; the honest answer when no timing sheet was imported.
- *   3. `createdAt` — the row's first write, for legacy rows that stamped neither.
+ * The stamps a run carries, and how far each can be trusted (read off Jordan's own
+ * Bayside rows, 25–29 Jun 2026):
  *
- * It used to prefer the save time, with the on-track time second — and the Sessions row
- * printed the row's CREATION time, its own third choice. On a club race day imported from
- * LiveRC the two screens never agreed to within an hour (reported 2026-09-05, Bayside
- * 23 May), and the one time that was actually right was the one neither of them showed.
+ *   `createdAt`          — the log was STARTED. Trackside that is 30–80 min BEFORE the
+ *                          heat (tyres and setup go in first); a draft banked the night
+ *                          before is a day early.
+ *   `loggingCompletedAt` — the log was FINISHED: within minutes after the heat when the
+ *                          laps were imported on the spot, or a day+ later when they
+ *                          weren't (a Sunday main saved Monday 5:50 PM).
+ *   `sessionCompletedAt` — meant to be the on-track time off the timing sheet, and for
+ *                          an auto-created practice run it is. But a race-result import
+ *                          with no wall clock stored the IMPORT time here, and some
+ *                          practice imports stored the wall clock as if it were UTC
+ *                          (9:25 AM showing as 7:25 PM). Nothing in the row says which.
+ *
+ * So no stamp is preferred blindly; each is admitted only when it is plausible against
+ * the others:
+ *
+ *   1. `sessionCompletedAt`, when it is no later than the log's finish (a real on-track
+ *      time always precedes the import that recorded it; a UTC-mangled one lands hours
+ *      after) and no more than a fortnight before the row (an auto-created run can be
+ *      synced days after the day).
+ *   2. `loggingCompletedAt`, when it is within a day of `createdAt` — the same outing.
+ *   3. `createdAt`.
  *
  * Deliberately **never** reads `sortAt`: that is the draggable ordering axis, and a drag
  * rewrites it to a midpoint that was no moment at all. Accepted in the input type so
@@ -27,17 +51,25 @@ export function resolveRunDisplayInstant(run: {
   sortAt?: Date | string | null;
   loggingCompletedAt?: Date | string | null;
 }): Date {
-  const s = run.sessionCompletedAt;
-  if (s != null) {
-    const d = typeof s === "string" ? new Date(s) : s;
-    if (!Number.isNaN(d.getTime())) return d;
+  const created = asValidDate(run.createdAt) ?? new Date(NaN);
+  const createdMs = created.getTime();
+
+  const logged = asValidDate(run.loggingCompletedAt);
+  const loggedSameOuting =
+    logged != null &&
+    Number.isFinite(createdMs) &&
+    logged.getTime() >= createdMs - 10 * MINUTE_MS &&
+    logged.getTime() <= createdMs + DAY_MS;
+
+  const session = asValidDate(run.sessionCompletedAt);
+  if (session != null) {
+    const upper = (loggedSameOuting ? logged!.getTime() : createdMs) + 10 * MINUTE_MS;
+    const lower = createdMs - 14 * DAY_MS;
+    const t = session.getTime();
+    if (!Number.isFinite(createdMs) || (t >= lower && t <= upper)) return session;
   }
-  const lc = run.loggingCompletedAt;
-  if (lc != null) {
-    const d = typeof lc === "string" ? new Date(lc) : lc;
-    if (!Number.isNaN(d.getTime())) return d;
-  }
-  return typeof run.createdAt === "string" ? new Date(run.createdAt) : run.createdAt;
+  if (loggedSameOuting) return logged!;
+  return created;
 }
 
 /**

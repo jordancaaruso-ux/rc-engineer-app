@@ -615,6 +615,9 @@ export function LapComparisonColumnGrid({
       seen.add(r.id);
       return true;
     });
+    // Days cut in the run's zone, like the Sessions list. With no zone the map cut them at
+    // UTC midnight — 9:30 AM local — so a Sunday 8:40 AM run was numbered as Saturday's
+    // seventh and a Friday morning as Thursday's second (Bayside, reported 2026-09-05).
     return buildDayRunNameMap(
       wholeDay.map((r) => ({
         id: r.id,
@@ -625,9 +628,10 @@ export function LapComparisonColumnGrid({
         meetingSessionType: r.meetingSessionType ?? null,
         meetingSessionCode: r.meetingSessionCode ?? null,
         sessionLabel: r.sessionLabel ?? null,
-      }))
+      })),
+      pickerZone
     );
-  }, [compareAnchorRun, otherRuns, dayRuns]);
+  }, [compareAnchorRun, otherRuns, dayRuns, pickerZone]);
 
   const [setupModalRun, setSetupModalRun] = useState<CompareRunShape | null>(null);
   /*
@@ -1026,10 +1030,17 @@ export function LapComparisonColumnGrid({
       }
     }
 
+    /*
+     * First wins, so the order is the ranking. A RUN outranks the library import that
+     * put the laps on it: the library used to come first, which dropped every imported
+     * run from "My runs" as a duplicate of a row named after the driver — "Same laps as
+     * Jordan Caruso", seven times over a weekend (reported 2026-09-05). The run carries
+     * the car, the setup and the session name; the library row carries the laps twice.
+     */
     const dedupedOthers = filterDuplicateImportedSeries(primarySeries, [
       ...rawImported,
-      ...rawLibrary,
       ...rawHistory,
+      ...rawLibrary,
       ...rawOtherField,
     ]);
     /*

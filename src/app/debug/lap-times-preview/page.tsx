@@ -258,7 +258,7 @@ function Inner() {
           open={open}
           onClose={() => setOpen(false)}
           run={ANCHOR}
-          pickerRunsSameCar={OTHERS.map(toCompareRunShape)}
+          pickerRuns={OTHERS.map(toCompareRunShape)}
           runListSource="my_runs"
           userDisplayName="Dayne Warren"
           runOwnedByViewer

@@ -115,6 +115,7 @@
     "test:lap-merge": "npx tsx src/lib/lapImport/mergeImportedLapSets.test.ts && npx tsx src/lib/lapImport/blockLapRows.test.ts",
     "check:yellow": "node scripts/check-yellow-buttons.mjs",
     "test:lap-compare-scope": "npx tsx --test src/lib/lapCompareScope.test.ts",
+    "test:run-compare-meta": "npx tsx --test src/lib/runCompareMeta.test.ts",
     "test:car-swap": "npx tsx --test src/lib/runs/carSwap.test.ts",
     "test:setup-source": "npx tsx --test src/lib/runs/setupSourceDefault.test.ts src/lib/runs/prefillSetupSource.test.ts",
     "test:car-discipline": "npx tsx --test src/lib/cars/disciplineForCar.test.ts",
