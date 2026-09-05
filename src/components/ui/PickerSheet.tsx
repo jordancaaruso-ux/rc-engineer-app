@@ -133,6 +133,7 @@ export function PickerSheet<T extends SearchableOption>({
   searchAction,
   mono = false,
   searchable,
+  multiple = null,
 }: {
   open: boolean;
   onClose: () => void;
@@ -140,6 +141,13 @@ export function PickerSheet<T extends SearchableOption>({
   title: string;
   value: string;
   onSelect: (value: string) => void;
+  /**
+   * Multi-select mode: rows tick from `values` instead of `value`, tapping a row calls
+   * `onSelect` with no expectation of closing, and a Done button ends the visit. The
+   * clear row (if any) means "none of these". Built for the sessions filter rail,
+   * where Cars / Tracks / Tires are sets, not a single choice.
+   */
+  multiple?: { values: string[]; doneLabel?: string } | null;
   /** Unfiltered and pre-grouped; the sheet does the searching. */
   sections: OptionSection<T>[];
   searchPlaceholder?: string;
@@ -256,6 +264,24 @@ export function PickerSheet<T extends SearchableOption>({
   }, [open, onClose]);
 
   if (!sheet.mounted || typeof document === "undefined") return null;
+
+  const isSelected = (v: string) =>
+    multiple ? (v === "" ? multiple.values.length === 0 : multiple.values.includes(v)) : v === value;
+  // In multi mode every row wears a box, so the list reads as tick-any rather than pick-one.
+  const tickFor = (selected: boolean) =>
+    multiple ? (
+      <span
+        className={cn(
+          "flex size-[18px] shrink-0 items-center justify-center rounded-[5px] border transition-colors",
+          selected ? "border-foreground bg-foreground text-background" : "border-foreground/35"
+        )}
+        aria-hidden
+      >
+        {selected ? <Check className="size-3" strokeWidth={3} /> : null}
+      </span>
+    ) : selected ? (
+      <Check className="size-4 shrink-0 text-primary-ink" strokeWidth={2.5} aria-hidden />
+    ) : null;
 
   const rowClass = (selected: boolean, disabled: boolean) =>
     cn(
@@ -396,15 +422,13 @@ export function PickerSheet<T extends SearchableOption>({
                 <button
                   type="button"
                   role="option"
-                  aria-selected={value === ""}
-                  ref={value === "" ? selectedRowRef : undefined}
+                  aria-selected={isSelected("")}
+                  ref={isSelected("") ? selectedRowRef : undefined}
                   onClick={() => onSelect("")}
-                  className={cn(rowClass(value === "", false), "text-muted-foreground")}
+                  className={cn(rowClass(isSelected(""), false), "text-muted-foreground")}
                 >
                   <span className="min-w-0 flex-1 truncate">{clearRow.label}</span>
-                  {value === "" ? (
-                    <Check className="size-4 shrink-0 text-primary-ink" strokeWidth={2.5} aria-hidden />
-                  ) : null}
+                  {tickFor(isSelected(""))}
                 </button>
               ) : null}
 
@@ -424,7 +448,7 @@ export function PickerSheet<T extends SearchableOption>({
                       </div>
                     ) : null}
                     {section.options.map((o) => {
-                      const selected = o.value === value;
+                      const selected = isSelected(o.value);
                       return (
                         <button
                           key={o.value}
@@ -444,13 +468,7 @@ export function PickerSheet<T extends SearchableOption>({
                               </span>
                             ) : null}
                           </span>
-                          {selected ? (
-                            <Check
-                              className="size-4 shrink-0 text-primary-ink"
-                              strokeWidth={2.5}
-                              aria-hidden
-                            />
-                          ) : null}
+                          {tickFor(selected)}
                         </button>
                       );
                     })}
@@ -462,6 +480,18 @@ export function PickerSheet<T extends SearchableOption>({
             {footer && resultCount > 0 ? (
               <div className="border-t border-white/10 px-2 pt-1.5">
                 {typeof footer === "function" ? footer(trimmedQuery) : footer}
+              </div>
+            ) : null}
+
+            {multiple ? (
+              <div className="border-t border-white/10 px-3 pb-1 pt-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="tap-active w-full rounded-md primary-face bg-primary px-3 py-2.5 text-[13px] font-semibold text-primary-foreground transition hover:opacity-90"
+                >
+                  {multiple.doneLabel ?? "Done"}
+                </button>
               </div>
             ) : null}
           </>

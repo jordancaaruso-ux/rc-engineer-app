@@ -24,8 +24,8 @@ import {
   runRatingBandCaption,
 } from "@/lib/runHandlingAssessment";
 import { OPEN_GROUP_PARAM } from "@/lib/runs/sessionsReturn";
-import { Button } from "@/components/ui/Button";
 import { AnchoredMenu } from "@/components/ui/AnchoredMenu";
+import { PickerSheet } from "@/components/ui/PickerSheet";
 import { chipToggleClass } from "@/components/ui/chipToggle";
 
 type Option = { id: string; label: string };
@@ -111,28 +111,10 @@ function FilterPill({
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const active = Boolean(summary);
 
   return (
-    <div ref={wrapRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        aria-label={active ? `${label}: ${summary}` : label}
-        className={`tap-active flex max-w-full items-center gap-1.5 px-2.5 py-1.5 text-xs ${chipToggleClass(
-          active
-        )}`}
-      >
-        <span className={active ? "shrink-0 text-muted-foreground" : "shrink-0"}>{label}</span>
-        {active ? <span className="min-w-0 truncate font-semibold">{summary}</span> : null}
-        <ChevronDown
-          className={`size-3 shrink-0 opacity-60 transition-transform ${open ? "rotate-180" : ""}`}
-          strokeWidth={2.4}
-          aria-hidden
-        />
-      </button>
+    <div ref={wrapRef} className="relative shrink-0">
+      <PillTrigger label={label} summary={summary} open={open} onClick={() => setOpen((v) => !v)} />
       <AnchoredMenu
         open={open}
         anchorRef={wrapRef}
@@ -145,43 +127,105 @@ function FilterPill({
   );
 }
 
-function CheckboxList({
+/**
+ * The chip every filter shows when closed. The summary is capped so a long car or
+ * track name can't stretch one chip across the whole rail and push the others off
+ * screen — the rail is a single row now and each chip has to stay chip-sized.
+ */
+function PillTrigger({
+  label,
+  summary,
+  open,
+  onClick,
+}: {
+  label: string;
+  summary?: string | null;
+  open: boolean;
+  onClick: () => void;
+}) {
+  const active = Boolean(summary);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={open}
+      aria-haspopup="dialog"
+      aria-label={active ? `${label}: ${summary}` : label}
+      className={`tap-active flex max-w-[14rem] shrink-0 items-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 text-xs ${chipToggleClass(
+        active
+      )}`}
+    >
+      <span className={active ? "shrink-0 text-muted-foreground" : "shrink-0"}>{label}</span>
+      {active ? <span className="min-w-0 truncate font-semibold">{summary}</span> : null}
+      <ChevronDown
+        className={`size-3 shrink-0 opacity-60 transition-transform ${open ? "rotate-180" : ""}`}
+        strokeWidth={2.4}
+        aria-hidden
+      />
+    </button>
+  );
+}
+
+/**
+ * A set-valued filter (cars, tracks, tires, drivers) as a chip that opens the
+ * app's picker sheet in multi-tick mode. These are the lists that grow without
+ * bound — every track you've ever run — and the old anchored checkbox menu had no
+ * search and a 14rem viewport, so a long list meant scrolling blind through a
+ * little window. The sheet brings the search field past ten rows and the same
+ * big rows as every other picker; ticks apply live, Done just closes it.
+ */
+function ListFilterPill({
+  label,
   options,
   selectedIds,
   onChange,
-  emptyLabel = "None",
+  plural,
+  clearLabel,
 }: {
+  label: string;
   options: Option[];
   selectedIds: string[];
   onChange: (ids: string[]) => void;
-  emptyLabel?: string;
+  /** "cars", "tracks" — used in the chip summary once more than one is ticked. */
+  plural: string;
+  /** The sheet's top row: "Any car" clears the set. */
+  clearLabel: string;
 }) {
-  const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const [open, setOpen] = useState(false);
+  const sections = useMemo(
+    () => [{ key: "all", label: null, options: options.map((o) => ({ value: o.id, label: o.label })) }],
+    [options]
+  );
   const toggle = (id: string) => {
-    const next = new Set(selected);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    onChange([...next]);
+    if (id === "") {
+      onChange([]);
+      return;
+    }
+    onChange(
+      selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id]
+    );
   };
 
-  if (options.length === 0) return <p className="px-1 py-1 ui-label-meta">{emptyLabel}</p>;
   return (
-    <div className="max-h-56 min-w-[11rem] overflow-y-auto">
-      {options.map((opt) => (
-        <label
-          key={opt.id}
-          className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 ui-control hover:bg-muted/50"
-        >
-          <input
-            type="checkbox"
-            checked={selected.has(opt.id)}
-            onChange={() => toggle(opt.id)}
-            className="rounded border-border"
-          />
-          <span className="truncate">{opt.label}</span>
-        </label>
-      ))}
-    </div>
+    <>
+      <PillTrigger
+        label={label}
+        summary={listSummary(options, selectedIds, plural)}
+        open={open}
+        onClick={() => setOpen(true)}
+      />
+      <PickerSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title={label}
+        value=""
+        onSelect={toggle}
+        sections={sections}
+        clearRow={{ label: clearLabel }}
+        searchPlaceholder={`Search ${plural}…`}
+        multiple={{ values: selectedIds }}
+      />
+    </>
   );
 }
 
@@ -582,19 +626,30 @@ export function SessionsFilterBar({
             onBlur={flushQuery}
           />
         </div>
-        {filtersActive ? (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={clearFilters}
-            className="shrink-0 self-end sm:self-auto"
-          >
-            Clear
-          </Button>
-        ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filters">
+      {/* One row, always. The rail scrolls sideways under the finger instead of
+          wrapping, so six filters take the height of one chip at 390px; the negative
+          margin lets it bleed to the screen edge the way the run rail does. Clear
+          leads the row when anything is set — first, not last, because the end of a
+          scrolling rail is the one place a phone can't see. */}
+      <div
+        className="run-rail-scroll -mx-4 flex items-center gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0"
+        role="group"
+        aria-label="Filters"
+      >
+        {filtersActive ? (
+          <button
+            type="button"
+            onClick={clearFilters}
+            aria-label="Clear filters"
+            className={`tap-active flex shrink-0 items-center gap-1 whitespace-nowrap px-2 py-1.5 text-xs ${chipToggleClass(false)}`}
+          >
+            <X className="size-3" strokeWidth={2.6} aria-hidden />
+            Clear
+          </button>
+        ) : null}
+
         <FilterPill label="Rating" summary={ratingSummary} menuClassName="w-[17.5rem]">
           <p className="ui-label-meta pb-1.5">Handling rating</p>
           <div className="flex flex-wrap gap-1.5">
@@ -615,32 +670,33 @@ export function SessionsFilterBar({
           </div>
         </FilterPill>
 
-        <FilterPill label="Cars" summary={listSummary(cars, filters.carIds, "cars")}>
-          <CheckboxList
-            options={cars}
-            selectedIds={filters.carIds}
-            onChange={(carIds) => patch({ carIds })}
-            emptyLabel="No cars yet"
-          />
-        </FilterPill>
+        <ListFilterPill
+          label="Cars"
+          options={cars}
+          selectedIds={filters.carIds}
+          onChange={(carIds) => patch({ carIds })}
+          plural="cars"
+          clearLabel="Any car"
+        />
 
-        <FilterPill label="Tracks" summary={listSummary(tracks, filters.trackIds, "tracks")}>
-          <CheckboxList
-            options={tracks}
-            selectedIds={filters.trackIds}
-            onChange={(trackIds) => patch({ trackIds })}
-            emptyLabel="No tracks yet"
-          />
-        </FilterPill>
+        <ListFilterPill
+          label="Tracks"
+          options={tracks}
+          selectedIds={filters.trackIds}
+          onChange={(trackIds) => patch({ trackIds })}
+          plural="tracks"
+          clearLabel="Any track"
+        />
 
         {showDriverPill ? (
-          <FilterPill label="Driver" summary={listSummary(drivers, filters.driverIds, "drivers")}>
-            <CheckboxList
-              options={drivers}
-              selectedIds={filters.driverIds}
-              onChange={(driverIds) => patch({ driverIds })}
-            />
-          </FilterPill>
+          <ListFilterPill
+            label="Driver"
+            options={drivers}
+            selectedIds={filters.driverIds}
+            onChange={(driverIds) => patch({ driverIds })}
+            plural="drivers"
+            clearLabel="Any driver"
+          />
         ) : null}
 
         <FilterPill label="Date" summary={dateSummary} menuClassName="w-[15rem]">
@@ -689,14 +745,14 @@ export function SessionsFilterBar({
           </div>
         </FilterPill>
 
-        <FilterPill label="Tires" summary={listSummary(tireTypes, filters.tireTypes, "compounds")}>
-          <CheckboxList
-            options={tireTypes}
-            selectedIds={filters.tireTypes}
-            onChange={(next) => patch({ tireTypes: next })}
-            emptyLabel="No tires logged yet"
-          />
-        </FilterPill>
+        <ListFilterPill
+          label="Tires"
+          options={tireTypes}
+          selectedIds={filters.tireTypes}
+          onChange={(next) => patch({ tireTypes: next })}
+          plural="compounds"
+          clearLabel="Any tire"
+        />
 
         <FilterPill
           label="More"
