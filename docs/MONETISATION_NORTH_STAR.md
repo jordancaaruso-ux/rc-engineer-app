@@ -253,6 +253,16 @@ comp codes must reach testers BEFORE enforcement flips, or every tester lands on
    tester account entitled; an incognito visit to `/` gets the landing.
 6. **Watch week one:** Stripe dashboard for failed payments/disputes, `topAiSpenders` for cap
    behaviour, and the "paid but no email" support case (webhook logs + Stripe event retries).
+   Added 2026-09-05 after the pre-release walk found nothing outside the app could tell whether
+   production was up:
+   - **Uptime ping.** `GET https://www.jrcdynamics.com/api/health/db` needs no session and
+     answers `200 {"ok":true}` when the app can reach its database, `503` when it cannot. Point
+     a free uptime monitor at it (UptimeRobot or Better Stack, 1-minute interval, alert by
+     email + push after two consecutive failures). Five minutes to set up; nothing to deploy.
+   - **Vercel.** Account → Notifications: turn on deployment-failure alerts for the project.
+     Project → Observability → Errors: open it once a day in week one and after every push.
+   - **Stripe.** Developers → Webhooks → the production endpoint: the "failed" count must stay
+     at zero; a non-zero count is the "paid but no email" case before the buyer reports it.
 
 ## Non-goals
 
