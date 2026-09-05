@@ -129,3 +129,6 @@ dev-server.log
 # other people's documents: kept on disk when needed, never written into git history.
 scripts/*backup-prod-*.json
 scripts/tmp-*.pdf
+
+# Website screenshots (regenerate with scripts/dev-marketing-shots.ts)
+marketing-shots/
