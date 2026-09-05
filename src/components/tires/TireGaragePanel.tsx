@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Search, X } from "lucide-react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptics";
@@ -30,6 +31,14 @@ export function TireGaragePanel({
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // 150-odd compounds in one column was a scroll with no way to jump (2026-09-05 walk); the
+  // Tracks page had a search row and this one did not. Same control, filtered locally.
+  const [search, setSearch] = useState("");
+  const visibleTireTypes = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return tireTypes;
+    return tireTypes.filter((t) => t.displayName.toLowerCase().includes(q));
+  }, [tireTypes, search]);
 
   async function toggleVerify(t: TireTypeOption) {
     const nextVerified = !t.verifiedAt;
@@ -164,6 +173,33 @@ export function TireGaragePanel({
     <div className="space-y-2">
       {error ? <p className="text-sm text-destructive px-1">{error}</p> : null}
 
+      <div className="search-row-composite flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-2 transition-colors focus-within:border-ring/45">
+        <Search className="size-4 shrink-0 text-muted-foreground" strokeWidth={2} aria-hidden />
+        <input
+          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          type="text"
+          inputMode="search"
+          enterKeyHint="search"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          aria-label="Search tire types"
+          placeholder={`Search ${tireTypes.length.toLocaleString()} tire types`}
+        />
+        {search ? (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            aria-label="Clear search"
+            className="tap-active -mr-1 flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+          >
+            <X className="size-4" strokeWidth={2} aria-hidden />
+          </button>
+        ) : null}
+      </div>
+
       <SurfaceCard variant="panel" contentClassName="p-0" overflowHidden={false}>
         <ul className="divide-y divide-border">
           <CollapsibleAddRow label="Add tire type" open={addOpen} onOpenChange={setAddOpen}>
@@ -189,10 +225,12 @@ export function TireGaragePanel({
             </form>
           </CollapsibleAddRow>
 
-          {tireTypes.length === 0 ? (
-            <li className="px-4 py-4 text-sm text-muted-foreground">No tire types yet.</li>
+          {visibleTireTypes.length === 0 ? (
+            <li className="px-4 py-4 text-sm text-muted-foreground">
+              {search.trim() ? `Nothing matches “${search.trim()}”.` : "No tire types yet."}
+            </li>
           ) : (
-            tireTypes.map((t) => {
+            visibleTireTypes.map((t) => {
               // Non-admins have no per-row actions — render a plain, non-expanding row.
               if (!isAdmin) {
                 return (
