@@ -17,21 +17,16 @@
 //
 // Run:  node scripts/generate-ios-splash.mjs   (then `npm run cap:sync`)
 import sharp from "sharp";
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+// The mark, the word and the lit field come from the one shared scene module, so this,
+// the iOS startup images and the web splash cannot drift apart in geometry or tint.
+import { INK, LIT_FIELD_DEFS, MARK_D, MARK_VB, WORD_D, WORD_VB } from "./splash-scene.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-const markSvg = readFileSync(join(ROOT, "public/brand/jrc-mark-yellow.svg"), "utf8");
-const MARK_D = markSvg.match(/ d="([^"]+)"/)[1];
-const WORD_D = readFileSync(join(ROOT, "scripts/brand-word-trackside.txt"), "utf8").trim();
-
-const MARK_VB = { w: 731, h: 241 };
-// The outlined TRACKSIDE, as drawn: baseline at y=0, rising to -752.
-const WORD_VB = { w: 8243, h: 752 };
 const SIZE = 2732;
-const INK = "#121110";
 
 // The artboard, and this square's px per artboard pt on a 390x844 phone.
 const ART = { w: 390, h: 844, mark: 186, foot: 54, rule: 16, gap: 22, word: 15 };
@@ -59,11 +54,7 @@ const dotsLeft = (SIZE - (3 * dot + 2 * dotGap)) / 2;
 
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SIZE} ${SIZE}" width="${SIZE}" height="${SIZE}">
   <defs>
-    <radialGradient id="lit" cx="28%" cy="10%" r="112%">
-      <stop offset="0%" stop-color="#FFE862"/>
-      <stop offset="46%" stop-color="#FFD60A"/>
-      <stop offset="100%" stop-color="#E4BB00"/>
-    </radialGradient>
+    ${LIT_FIELD_DEFS}
   </defs>
   <rect width="${SIZE}" height="${SIZE}" fill="url(#lit)"/>
   <g transform="translate(${left.toFixed(2)} ${top.toFixed(2)}) scale(${(markW / MARK_VB.w).toFixed(6)})" fill="${INK}">

@@ -31,12 +31,16 @@ export default function manifest(): MetadataRoute.Manifest {
     // where the >=768px breakpoints would swap the bottom dock for the desktop sidebar mid-race.
     // That is a product call about the trackside experience, not a layout fix, so it stays as-is.
     orientation: "portrait",
-    // Ash paper — the one app background (matches `--page-bg-rgb` under
-    // `[data-theme="light"]` in globals.css / viewport themeColor) so the Android splash
-    // + status chrome never flash off-palette. Was charcoal until 2026-08-18, when light
-    // stopped being a per-device choice and became the app; a manifest has no media
-    // queries, so it could not follow the old cookie and always flashed the wrong colour.
-    background_color: "#EAE7E0",
+    // The launch field, not the page. Android paints its own splash from this colour
+    // (icon centred on it) before the page's first frame, and that frame is the yellow
+    // `#pwa-splash` — so this is yellow too, and the launch is one surface from the tile
+    // to the app (2026-09-04; was paper, which showed as a paper beat before the yellow).
+    // Must match `plugins.SplashScreen.backgroundColor` in capacitor.config.ts.
+    background_color: "#FFD60A",
+    // Ash paper — the in-app chrome colour (matches `--page-bg-rgb` under
+    // `[data-theme="light"]` in globals.css / viewport themeColor). Was charcoal until
+    // 2026-08-18, when light stopped being a per-device choice and became the app; a
+    // manifest has no media queries, so it could not follow the old cookie.
     theme_color: "#EAE7E0",
     icons: [
       {

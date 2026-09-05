@@ -36,7 +36,7 @@ Already present before this pass: `viewportFit: "cover"`, `themeColor` (ash warm
 ### Still to do on the PWA track
 - [ ] **`PushSubscription` Prisma model** + `/api/push/subscribe|unsubscribe` (persist devices) — required before any *real* trigger. Migration via committed SQL + `migrate deploy` (never `db push` on prod).
 - [ ] **Contextual permission ask** after first run log (Q: chosen UX) — reuse the Settings enable flow.
-- [ ] True per-device iOS `startupImage` splash PNGs (current splash is the CSS/JS overlay).
+- [x] True per-device iOS `startupImage` splash PNGs — shipped 2026-09-04 (see below).
 - [ ] Optional: passive "Get the app" entry in `AccountMenu` for users who dismissed the popup.
 
 ---
@@ -52,10 +52,18 @@ Create `public/icons/` and add:
 | `icon-512.png` | 512×512 | Android install / splash source. |
 | `icon-maskable-512.png` | 512×512 | Android adaptive icon — keep the mark inside the center 80% "safe zone" (outer 10% each edge may be cropped). |
 
-**iOS launch splash (optional, removes the white cold-launch flash):** iOS needs one PNG per
-device resolution, wired via `metadata.appleWebApp.startupImage` (media-query'd). Generate with
-a tool (e.g. `pwa-asset-generator`) from a single 2048×2732 source, output to `public/icons/splash/`,
-then add the `startupImage` array to `layout.tsx`. Do this once the icon art is final.
+**iOS launch splash (shipped 2026-09-04).** A cold home-screen launch walks through three
+pictures that must be the same picture: the iOS **startup image** (`public/brand/splash/`, one
+PNG per screen size, wired by exact media query through `appleWebApp.startupImage` in
+`layout.tsx`, shown from the icon tap until the page paints), then the page's own first frame
+(`#pwa-splash`), then the app. All three are drawn from `scripts/splash-scene.mjs` — the lit
+field, the mark and the TRACKSIDE outline — so the hand-off is invisible; the web splash has no
+entrance animation for that reason. Regenerate with `node scripts/generate-pwa-startup-images.mjs`
+after any change to the mark or the splash layout in `globals.css`. Two traps found the hard way:
+a `next/script strategy="beforeInteractive"` is NOT an inline script in the App Router (it is
+queued behind the framework chunks, so the splash switched on seconds after first paint — the
+standalone bootstrap is a raw `<script>` at the top of `<body>` now), and without a startup image
+iOS shows a white (light mode) or black (dark mode) screen until the HTML arrives.
 
 > Brand note: the existing `public/brand/jrc-race-engineer-logo.svg` is the **off-brand
 > red→blue** gradient (see VISUAL_NORTH_STAR Known Gaps #2). Do **not** derive the app icon from

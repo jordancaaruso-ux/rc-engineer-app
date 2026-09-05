@@ -36,6 +36,9 @@ const MARK_D = markSvg.match(/ d="([^"]+)"/)[1];
 
 // TRACKSIDE, outlined. Baseline at y=0, so both lockups translate it into place.
 const WORD_D = readFileSync(new URL("./brand-word-trackside.txt", import.meta.url), "utf8").trim();
+// Its box: 8243 wide, rising 752 above the baseline (same figures as `splash-scene.mjs`).
+const WORD_VB_W = 8243;
+const WORD_VB_H = 752;
 
 /** The mark on its own, in one colour. `fill` may be a hex or `currentColor`. */
 function mark(fill) {
@@ -101,6 +104,16 @@ const splashTs = `/**
  */
 export const PWA_SPLASH_MARK_SVG =
   \`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 731 241" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="${MARK_D}"/></svg>\`;
+
+/**
+ * TRACKSIDE, outlined — the brand kit's word path (\`scripts/brand-word-trackside.txt\`),
+ * for the same splash. An outline rather than live text so the word is the same
+ * geometry the iOS startup images are drawn with (\`scripts/splash-scene.mjs\`) and
+ * needs no font: the two hand over without the letters changing shape. Baseline at
+ * y=0, so the viewBox starts at -${WORD_VB_H}.
+ */
+export const PWA_SPLASH_WORD_SVG =
+  \`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -${WORD_VB_H} ${WORD_VB_W} ${WORD_VB_H}" fill="currentColor" aria-hidden="true"><path d="${WORD_D}"/></svg>\`;
 `;
 writeFileSync("src/lib/pwa/splashMark.ts", splashTs);
 

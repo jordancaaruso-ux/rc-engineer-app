@@ -32,12 +32,12 @@ export function PwaSplashDismiss(): null {
     // instead of leaving both splashes to play out.
     if (isNative) el.setAttribute("data-native", "true");
 
-    // The web splash lifts the lockup in, then fades the foot under it, landing at
-    // ~1140ms (globals.css). Dismissing before that finishes would cut the foot off
-    // mid-fade, so the minimum clears it. The native splash has no entrance to protect
-    // and has been up since the icon tap, so it goes the instant the app is ready — a
-    // minimum there is just a slower launch.
-    const MIN_VISIBLE_MS = isNative ? 0 : 1150;
+    // Neither splash has an entrance to protect any more (2026-09-04): on iOS the web one
+    // is a continuation of the startup image that has been up since the icon tap, and the
+    // native one likewise. So both go as soon as the app is ready. The web one keeps a
+    // short floor — just enough that the fade never begins on the same frame the page
+    // first painted, which read as a flicker rather than a splash on a warm launch.
+    const MIN_VISIBLE_MS = isNative ? 0 : 300;
     const MAX_WAIT_MS = 2600; // never hold the splash longer than this
     const FADE_MS = 420; // matches the CSS opacity transition
 

@@ -29,7 +29,8 @@ import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar"
 import { TimeZoneCookieSync } from "@/components/layout/TimeZoneCookieSync";
 import { ReturnTrailTracker } from "@/components/layout/ReturnTrailTracker";
 
-import { PWA_SPLASH_MARK_SVG } from "@/lib/pwa/splashMark";
+import { PWA_SPLASH_MARK_SVG, PWA_SPLASH_WORD_SVG } from "@/lib/pwa/splashMark";
+import { PWA_STARTUP_IMAGES } from "@/lib/pwa/startupImages";
 
 import { RC_TIMEZONE_COOKIE } from "@/lib/rcTimeZoneCookie";
 
@@ -166,6 +167,15 @@ export const metadata: Metadata = {
 
     statusBarStyle: "default",
 
+    /*
+     * The picture iOS shows from the icon tap until the page has painted (2026-09-04).
+     * Without it iOS shows its own blank launch screen — white, or black on a phone in
+     * dark mode — so a cold launch read as black → white → the splash. One PNG per
+     * screen size, generated from the same geometry the web splash below is laid out
+     * to (`scripts/generate-pwa-startup-images.mjs`), so the hand-off is invisible.
+     */
+    startupImage: [...PWA_STARTUP_IMAGES],
+
   },
 
   // Favicon + apple-touch-icon come from the `app/icon.png` + `app/apple-icon.png`
@@ -260,6 +270,47 @@ export default async function RootLayout({
       <body className="min-h-[100dvh] bg-background font-sans font-normal antialiased">
 
         {/*
+         * Standalone bootstrap — a REAL inline script, first thing in the body, so it runs
+         * while the HTML is still being parsed and before anything below it can paint.
+         *
+         * It was a `next/script` with `strategy="beforeInteractive"` until 2026-09-04.
+         * In the App Router that does not emit an inline script: it emits
+         * `self.__next_s.push([...])`, a queue the framework drains once its own chunks
+         * have loaded. "Before hydration", yes — but seconds after first paint on a phone
+         * leaving the pits, and this script is what switches the launch splash on. So a
+         * cold launch painted paper and a half-built page first, then the splash arrived
+         * late over the top: the "white, then the loading screen" the founder saw.
+         *
+         * What it does:
+         *  · stamps `data-standalone` when launched from the home screen (installed PWA),
+         *    which gates the native-feel CSS and shows `#pwa-splash`;
+         *  · stamps `data-native` inside the iOS shell (Capacitor injects its bridge at
+         *    document start, so `window.Capacitor` is already there) — the shell counts as
+         *    standalone regardless of what `display-mode` reports in a WKWebView, and
+         *    `data-native` is what SUPPRESSES the web splash there: the shell has its own
+         *    native one from the icon tap, and two in a row read as going backwards;
+         *  · publishes `--splash-vh`, the viewport height as measured on the very first
+         *    frame, which the splash uses instead of a live unit. A `100dvh`/`100svh` box
+         *    is re-measured whenever the viewport changes, and a standalone launch does
+         *    change it (the web view settles, the status strip gets reserved): the lockup
+         *    was centred in the first measurement, then jumped when the second arrived.
+         *    It goes in a constructed stylesheet rather than `documentElement.style`: an
+         *    adopted sheet is not part of the DOM tree, so React cannot see it, while an
+         *    inline style on <html> the server never rendered is one more root attribute
+         *    for hydration to diff. (A standalone launch already logs the "attributes
+         *    didn't match" warning from `data-standalone` — verified 2026-08-18 that it
+         *    predates this; don't read it as this line's doing.) Where the API is missing
+         *    the property is simply absent and the CSS falls back to `100svh`.
+         */}
+        <script
+          id="rc-pwa-standalone-bootstrap"
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var n=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());if(n){document.documentElement.setAttribute('data-native','true');}var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true||n;if(!s){return;}document.documentElement.setAttribute('data-standalone','true');var h=window.innerHeight;if(h&&typeof CSSStyleSheet==='function'&&'adoptedStyleSheets' in document){var sheet=new CSSStyleSheet();sheet.replaceSync(':root{--splash-vh:'+h+'px}');document.adoptedStyleSheets=document.adoptedStyleSheets.concat([sheet]);}}catch(e){}})();",
+          }}
+        />
+
+        {/*
 
          * Single fixed background at z-index 0 (never negative): duplicate fixed layers
 
@@ -282,11 +333,15 @@ export default async function RootLayout({
          * icon and landing on the splash is one continuous surface rather than a swap
          * from yellow tile to paper screen (founder design, 2026-09-03).
          *
-         * Only the MARK is inline SVG (no client loader, no network round trip — it
-         * paints with the first frame). The rule, the TRACKSIDE letters and the footer
-         * are plain DOM: the letters are spread with `space-between` across the mark's
-         * width, so they stay evenly set whichever font has loaded. All of it is laid
-         * out and animated in globals.css.
+         * On iOS this frame is a continuation, not a start: the startup image
+         * (`appleWebApp.startupImage` above) has shown this exact picture since the icon
+         * tap, and this element takes over at first paint without moving a pixel. That is
+         * why the mark AND the TRACKSIDE word are inline SVG outlines (no client loader, no
+         * network round trip, no font to wait for), why nothing here has an entrance
+         * animation any more (a lockup that lifted in would first have to vanish), and
+         * why the layout is mirrored in `scripts/splash-scene.mjs`. Only the "JRC
+         * DYNAMICS" line is live text, and it fades in after the hand-off over dots that
+         * do not move. All of it is laid out in globals.css.
          */}
         <div id="pwa-splash" aria-hidden="true">
           <div className="splash-lockup">
@@ -295,11 +350,10 @@ export default async function RootLayout({
               dangerouslySetInnerHTML={{ __html: PWA_SPLASH_MARK_SVG }}
             />
             <div className="splash-rule" />
-            <div className="splash-word">
-              {"TRACKSIDE".split("").map((letter, i) => (
-                <span key={i}>{letter}</span>
-              ))}
-            </div>
+            <div
+              className="splash-word"
+              dangerouslySetInnerHTML={{ __html: PWA_SPLASH_WORD_SVG }}
+            />
           </div>
           <div className="splash-foot">
             <div className="splash-dots">
@@ -314,40 +368,10 @@ export default async function RootLayout({
         <div className="app-root">
 
           {/*
-           * Mark the document when launched from the home screen (installed PWA) so
-           * native-feel CSS (no rubber-band, no tap-callout) applies only there and the
-           * in-browser experience is untouched. Runs pre-hydration to avoid a flash.
+           * The standalone bootstrap used to sit here as a `next/script`; it is now the
+           * real inline <script> at the top of <body> — see the note there. The two
+           * below are not paint-critical, so the queued strategy is fine for them.
            *
-           * It also stamps `data-native` inside the iOS shell (Capacitor injects its
-           * bridge at document start, so `window.Capacitor` is already there), and the
-           * shell counts as standalone regardless of what `display-mode` reports in a
-           * WKWebView. `data-native` is what suppresses the web launch splash: the
-           * shell has its own native one from the instant the icon is tapped, and two
-           * splashes in a row read as the app going backwards (see globals.css).
-           *
-           * It also publishes `--splash-vh` — the viewport height as measured on the very
-           * first frame — which is the height the launch splash uses instead of a live
-           * unit. A `100dvh`/`100svh` box is re-measured whenever the viewport changes,
-           * and a standalone launch does change it (the web view settles, the status bar
-           * strip gets reserved): the lockup was centred in the first measurement, then
-           * jumped when the second arrived. A frozen pixel height cannot move.
-           *
-           * It goes in a constructed stylesheet rather than `documentElement.style`:
-           * an adopted sheet is not part of the DOM tree, so React cannot see it, while
-           * an inline style on <html> that the server never rendered is one more root
-           * attribute for hydration to diff. (A standalone launch already logs the
-           * "attributes didn't match" warning from `data-standalone` above — verified
-           * 2026-08-18 that it predates this line; don't read it as this one's doing.)
-           * Where the API is missing the property is simply absent and the CSS falls
-           * back to `100svh` — the old behaviour, not a broken splash.
-           */}
-          <Script id="rc-pwa-standalone-bootstrap" strategy="beforeInteractive">
-
-            {`(function(){try{var n=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());if(n){document.documentElement.setAttribute('data-native','true');}var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true||n;if(!s){return;}document.documentElement.setAttribute('data-standalone','true');var h=window.innerHeight;if(h&&typeof CSSStyleSheet==='function'&&'adoptedStyleSheets' in document){var sheet=new CSSStyleSheet();sheet.replaceSync(':root{--splash-vh:'+h+'px}');document.adoptedStyleSheets=document.adoptedStyleSheets.concat([sheet]);}}catch(e){}})();`}
-
-          </Script>
-
-          {/*
            * No-zoom guard for mobile Safari, which ignores `user-scalable=no`.
            * `gesturestart`/`gesturechange` fire only on pinch; preventing them
            * blocks pinch-zoom without touching normal scroll/tap. Double-tap zoom
