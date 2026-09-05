@@ -58,8 +58,9 @@ function shortDate(ymd: string): string {
  * thing that bar could do was open it. Booking a NEW one is the `+` on the Meetings band,
  * where adding lives on every other band too.
  *
- * Nothing here is Space Grotesk. The display face is `.page-title` only (VISUAL_NORTH_STAR),
- * so the meeting name is Sora 700 at hero size — the same voice as every other card title.
+ * The meeting name is Sora 700 at hero size — the same voice as every other card title. Since
+ * 2026-09-05 that is the only voice in the app: Space Grotesk is deleted and `.page-title` is
+ * Sora too, separated from a card title by size (26–32px vs 20–22px), not by a second typeface.
  */
 export function NextOutHero({ nextUp }: { nextUp: NextUp }) {
   const { event } = nextUp;

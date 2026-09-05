@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 
-import { Sora, Space_Grotesk } from "next/font/google";
+import { Sora } from "next/font/google";
 
 import Script from "next/script";
 
@@ -64,13 +64,17 @@ const sora = Sora({
 
 });
 
-/** Display — Space Grotesk; page-title voice only (technical instrument register). */
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
-  // Titles use weight 700 only (`.page-title`, `.page-title-condensed`).
-  weight: ["700"],
-  variable: "--font-display",
-});
+/* Space Grotesk was deleted 2026-09-05 (founder call). It carried the page titles — and only
+   the page titles — since the v3 identity, and it was the one place in the app where its
+   lowercase `a g e y r` appeared at size. Those five letters are why the titles read soft and
+   a little cartoon against an otherwise instrument-flat screen, and why the all-caps TRACKSIDE
+   wordmark looked straighter than the words underneath it. Titles are Sora now, on the ramp
+   below (`.page-title` at 26–34px / 700, `-0.02em`) — the step over `PanelTitle`'s 20–22px is
+   what separates a page from a card, together with the yellow nav sector line. ONE face loads.
+   Do not reintroduce a display-only page-title font; this has now been argued and settled.
+   Two surfaces still carry Space Grotesk deliberately and are NOT part of this: the share-card
+   renderer (`src/lib/share/shareFonts.ts`, satori TTFs, server-side only — no browser cost) and
+   the static landing page, which is served verbatim by founder call 2026-08-06. */
 
 
 
@@ -263,7 +267,7 @@ export default async function RootLayout({
          the first byte of HTML rather than from a script, so there is no flash. */
       data-theme={APP_THEME}
 
-      className={`${sora.variable} ${spaceGrotesk.variable}`}
+      className={sora.variable}
 
     >
 

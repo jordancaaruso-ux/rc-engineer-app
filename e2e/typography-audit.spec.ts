@@ -5,10 +5,12 @@
  * drifted row listed at the top of VISUAL_NORTH_STAR.md drifted for the same reason: nothing
  * failed when it did. A rule written only in prose is a rule that decays. Four assertions:
  *
- *   1. ONE FACE      — every visible element resolves to Sora, or Space Grotesk inside the
- *                      three title selectors, or the platform mono stack inside `.type-machine`
- *                      / <pre> / <code>. Catches a reintroduced webfont, a stray `font-mono`,
- *                      and display-face creep onto cards.
+ *   1. ONE FACE      — every visible element resolves to Sora, or the platform mono stack
+ *                      inside `.type-machine` / <pre> / <code>. Catches a reintroduced
+ *                      webfont and a stray `font-mono`. Space Grotesk was allowed inside the
+ *                      three title selectors until 2026-09-05; it is now a failure ANYWHERE,
+ *                      which is what makes “one face” a rule the suite enforces rather than
+ *                      a sentence in a doc.
  *   2. FIGURES ARE   — any element whose own text reads as a figure must compute
  *      TABULAR         `tabular-nums`. Sora's digits are proportional without it, so this is
  *                      the assertion that keeps columns straight.
@@ -145,16 +147,15 @@ test("one face, tabular figures, and a closed ramp on every page", async ({ page
 
             // ── 1. one face ──
             const isSora = /Sora/i.test(firstFamily);
-            // next/font mangles the family name ("__Space_Grotesk_abc123"), but a plain
-            // build reports "Space Grotesk" — allow both spellings.
+            // Deleted 2026-09-05 — the app loads ONE face. next/font mangles family names
+            // ("__Space_Grotesk_abc123") and a plain build reports "Space Grotesk", so match
+            // both spellings and fail on either, wherever it appears.
             const isDisplay = /Space[\s_]?Grotesk/i.test(firstFamily);
             const isMono = /mono|consolas|menlo|courier/i.test(firstFamily);
             if (isDisplay) {
-              if (!el.closest(".page-title, .page-title-condensed, .demo-door-title")) {
-                faceProblems.push({
-                  detail: `Space Grotesk outside a title selector: <${el.tagName.toLowerCase()} class="${el.className}"> "${text.slice(0, 40)}"`,
-                });
-              }
+              faceProblems.push({
+                detail: `Space Grotesk is deleted (2026-09-05) — found on <${el.tagName.toLowerCase()} class="${el.className}"> "${text.slice(0, 40)}"`,
+              });
             } else if (isMono) {
               if (!el.closest(".type-machine, pre, code, kbd, samp")) {
                 faceProblems.push({

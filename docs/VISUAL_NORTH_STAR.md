@@ -28,7 +28,7 @@ warm ash paper. `e2e/light-mode-audit.spec.ts` is the colour regression net; `e2
 
 ## North star sentence
 
-> A premium racing instrument: **charcoal graphite** surfaces, **electric-but-confident yellow** for every action, **Sora** for everything the driver reads, **Space Grotesk** for page titles alone. **One voice** — the instrument register comes from tabular figures on a six-step ramp, not from a second typeface. Friendly prose to learn, an instrument panel to trust — never cold, never gimmicky.
+> A premium racing instrument: **charcoal graphite** surfaces, **electric-but-confident yellow** for every action, **Sora** for everything the driver reads, page titles included. **One voice, one face** — the instrument register comes from tabular figures on a six-step ramp and from the size step between a page and a card, not from a second typeface. Friendly prose to learn, an instrument panel to trust — never cold, never gimmicky.
 
 ### Personality (locked)
 
@@ -108,14 +108,14 @@ Use **Tailwind semantic tokens** (`bg-background`, `text-foreground`, `border-bo
 
 ## Typography
 
-**Three faces load.** Every text element maps to exactly one tier below — no Heebo, HK Grotesk Wide, Montserrat, Archivo, Geist, or Plus Jakarta in production UI.
+**ONE face loads.** Every text element maps to exactly one tier below — no Heebo, HK Grotesk Wide, Montserrat, Archivo, Geist, Plus Jakarta, and since 2026-09-05 no Space Grotesk either, in production UI.
 
 Loaded in `src/app/layout.tsx` (lines 47–80):
 
 | Tier | Font | Weights used | CSS hook |
 |------|------|--------------|----------|
 | **1 — UI sans** | **Sora** (Google Fonts via `next/font`) | 400 body · 500 inactive nav · 600 micro headings · 700 sections/nav active/buttons/**hero `PanelTitle`** · **600 semibold entity names** | `--font-ui`, `font-sans`, `PanelTitle`, `.hub-row-title` / `HubRowTitle`, `.section-title`, `.session-group-title`, `.run-details-tab`, `.ui-title`, `.ui-label-*`, `.ui-control`, `.primary-action-chip`, nav labels, chat body + speaker tags |
-| **2 — Display** | **Space Grotesk** | **700 only** | `--font-display` — **exactly three selectors**: `.page-title`, `.page-title-condensed`, `.demo-door-title`. No Tailwind utility maps to it; a `className="font-display"` is a silent no-op. |
+| **2 — Display** | ~~Space Grotesk~~ **deleted 2026-09-05** | — | `--font-display` no longer exists. The six selectors that used it — `.page-title`, `.page-title-condensed`, `.demo-door-title`, `.door-headline`, `.door-price`, `.door-price-sm` — are Sora 700. A page title is separated from a card title by SIZE, POSITION and its timing line (22–28px, centred in its own band between the corner pills, hairline track beneath) — not by a face. |
 | **3 — Data** | **JetBrains Mono** | 500 stat values · 400–500 lap figures | `font-mono`, `.lap-figure`, `<StatTile>` value |
 
 **The one-voice pass (2026-07-16) intended to shrink tier 3 to almost nothing, and only half
@@ -137,7 +137,7 @@ Sora, Space Grotesk and JetBrains Mono are SIL OFL.
 
 | Element | Tier | Size | Weight | Case / tracking |
 |---------|------|------|--------|-----------------|
-| Page title (`.page-title`) | **Space Grotesk** (`--font-display`) | 22–30px (`clamp`) | **700 bold** | Sentence · `-0.01em` · nav-positional timing line beneath (hairline track spanning the title + yellow sector segment skewed −21°, positioned by the page's dock slot; brackets retired 2026-07-13) |
+| Page title (`.page-title`) | **Sora** (2026-09-05) | **22–28px** (`clamp(22px, 3.9vw, 28px)`) | **700 bold** | Sentence · `-0.02em` · nav-positional timing line beneath: a hairline track spanning the title + a −21° yellow sector at the page's dock slot. Brackets retired 2026-07-13. The line was removed and restored the same day, 2026-09-05 — read the note under the rule before removing it again. Below md the header gives it 12px above and 16px from the track to the first card |
 | Hub row title (`HubRowTitle`, `.hub-row-title`) | Sora | 17–18px | **600 semibold** | Sentence · `tracking-tight` |
 | Hero card title (`PanelTitle`) | Sora | 20–22px | **700** | Sentence · `tracking-tight` |
 | Section header (`.section-title`, `SectionTitle`, `.run-details-tab`) | Sora | 13–14px | 700 | Sentence · `tracking-tight` |
@@ -164,7 +164,7 @@ Sora, Space Grotesk and JetBrains Mono are SIL OFL.
 ### Rules
 
 1. **Never mix tiers on the same semantic role** — e.g. section signposts are always `<Eyebrow>`, never `.ui-title`.
-2. **One display face, three places** — Space Grotesk (`--font-display`) is used at `.page-title`, `.page-title-condensed` and `.demo-door-title`, in **sentence case** (not uppercase). Nowhere else; do not spread the display face to cards, nav, or body.
+2. **There is no display face.** Deleted 2026-09-05 (founder: the titles read “slightly artsy / cartoony”). It was Space Grotesk, and the titles were the ONLY place in the app where its lowercase `a g e y r` appeared at size — five letters carrying a soft, retro register against an otherwise flat instrument screen, while the all-caps TRACKSIDE wordmark above them stayed straight. Sora carries the titles now, in **sentence case**. Six alternatives were set side by side at real size on paper before the call (Sora, Instrument Sans, IBM Plex Sans, Archivo, Barlow Semi Condensed); Sora-only won on one voice and one fewer font download. **Do not reintroduce a display-only page-title font.**
 3. **Micro labels are Sora, sentence case, `tracking-normal`, muted grey** (`.type-data-label`, `.table-col-header`). The old `0.28em` mono uppercase recipe is retired. Where a label genuinely needs the tracked machine-chrome voice, use `.micro-caps` — one step, not a per-site `0.2em` / `0.14em` one-off.
 4. **Never write a bare numeric font-size — pick a `.fig-*` step.** Size and `tabular-nums` are one decision, and separating them is exactly how three Sora numbers ended up sitting among six mono ones in a single nine-cell grid (`RunDetailPanel`, fixed 2026-08-14). `font-mono` no longer resolves to a webfont; if you type it you get Consolas, which is the point.
 5. **Do not set inline `fontFamily`** in components — globals + shared classes win.
@@ -174,6 +174,10 @@ Sora, Space Grotesk and JetBrains Mono are SIL OFL.
 ### Retired (removed June 2026)
 
 `Heebo`, `HK Grotesk Wide`, `Montserrat`, `Geist Sans`, and **Archivo Expanded** are **no longer loaded**. Do not reintroduce a second UI sans or display-only page-title font.
+
+### Retired 2026-09-05
+
+**Space Grotesk.** See rule 2 above. Two surfaces still carry it ON PURPOSE and are not part of the app’s font payload: the share-card renderer (`src/lib/share/shareFonts.ts` — satori TTFs read server-side, never sent to a browser) and the static landing page under `public/landing/`, served verbatim by founder call 2026-08-06. Flip either only if asked.
 
 ---
 
@@ -291,7 +295,7 @@ Use these shared primitives so every screen reads as one system. **Do not invent
 ### Page chrome
 
 - **Header:** `.page-header` + `h1.page-title` + `p.page-subtitle` — title block uses `gap-1` via `:has(.page-title)`; subtitle matches `PanelSubtitle` (`13px`, `leading-relaxed`, `text-muted-foreground`).
-- **Hierarchy:** page title (**Space Grotesk 700, sentence case**, timing line beneath) → page subtitle (Sora muted) → section `<Eyebrow>` (**Sora 17px bold uppercase ink, 3px yellow tick**) — hero `PanelTitle` (Sora 700 sentence case) stays the in-card headline voice.
+- **Hierarchy:** page title (**Sora 700, sentence case, 22–28px, timing line beneath**) → page subtitle (Sora muted) → section `<Eyebrow>` (**Sora 17px bold uppercase ink, no leading mark**) — hero `PanelTitle` (Sora 700 sentence case, 20–22px) stays the in-card headline voice. The page/card distinction is size, position and the timing line: the title is centred in its own band between the two corner pills, and the largest bold heading inside a card is 17px.
 - **Body:** `.page-body` with `max-w-*` as appropriate; `gap-3` between major blocks (locked in CSS).
 - **Mobile dock (2026-07-14, supersedes 2026-07-06 two-row chrome):** one row — a 56px glass bar holding the **Ideas** utility cap (lightbulb, hairline divider, opens the Ideas & reminders sheet app-wide, no count badge) plus the five destinations (Dashboard · Analysis · Assets · Engineer · Teams, 26px icons), with the icon-only yellow **Log run** circle (56px, specular shine rim; draft state = flag icon + green dot) floating beside the bar's right end. Static on scroll — nothing collapses. On create/edit routes the circle is suppressed and the bar stretches (`shouldShowLogRunFab`). **Settings** lives behind the top-right account avatar (`AccountMenu`). Desktop sidebar keeps Add run + Settings and gains Teams.
 
@@ -391,7 +395,7 @@ Track these when prioritizing rework:
 3. **Partial primitive adoption** — `panel.tsx` only on dashboard + partial engineer; 37+ other routes use ad-hoc patterns.
 4. **Numeric typography** — ✅ **Resolved 2026-08-14.** Was the largest open gap: two contradictory rules at once, ~460 `font-mono` sites across 126 files, 23 distinct numeric font sizes, ~20 figures with `tabular-nums` and no font class, ~20 with `font-mono` and no `tabular-nums`. Now a six-step `.fig-*` ramp with `tabular-nums` welded to each step, enforced by `e2e/typography-audit.spec.ts`.
 5. **Theme preview switcher** — alternate themes still reference old red/blue palette; section label uses `<Eyebrow>`.
-6. **Legacy font cleanup** — Heebo + HK Grotesk Wide retired (June 2026); Sora replaced Inter 2026-07-03 (the `"Inter"` fallback still sitting in `tailwind.config.ts`'s `sans` stack is dead — Inter has not been loaded since). Tier C section labels migrated to `<Eyebrow>` (June 2026 pass); remaining `ui-title` is entity names, field labels, badges, and chat speaker tags only. **JetBrains Mono deleted 2026-08-14** — two faces load now (Sora + Space Grotesk), and the font payload dropped from 11 woff2 files to 5.
+6. **Legacy font cleanup** — Heebo + HK Grotesk Wide retired (June 2026); Sora replaced Inter 2026-07-03 (the `"Inter"` fallback still sitting in `tailwind.config.ts`'s `sans` stack is dead — Inter has not been loaded since). Tier C section labels migrated to `<Eyebrow>` (June 2026 pass); remaining `ui-title` is entity names, field labels, badges, and chat speaker tags only. **JetBrains Mono deleted 2026-08-14** — that took the payload from 11 woff2 files to 5. **Space Grotesk deleted 2026-09-05** — ONE face loads now, and the four Sora weights are the whole payload.
 7. **Figma** — screen templates for Tier A were planned but blocked by MCP rate limits; code-first rollout proceeded without full Figma component library.
 
 ---

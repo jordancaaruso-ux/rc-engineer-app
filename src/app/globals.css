@@ -201,11 +201,23 @@
   /*
    * Vertical anchor for the fixed mobile corner chrome (JRC pill + account
    * avatar, both 34px tall) so their centres line up with the page title.
-   * Title centre = header padding-top (1.5rem) + half its line-box; the title is
-   * `clamp(22px,4vw,30px)` at line-height 1.15, so half-line = 0.575 × that.
-   * Pill top = title-centre − 17px (half the pill). Tracks the title across the
-   * whole < md range where the pills are visible. If `.page-title`'s font-size
-   * or line-height changes, update this. Shared by MobileBrandMark + AccountMenu.
+   * Title centre = header padding-top (0.75rem below md) + half its line-box; the
+   * title is `clamp(22px,3.9vw,28px)` at line-height 1.15, so half-line = 0.575 ×
+   * that. Pill top = title-centre − 17px (half the pill), i.e. 12 − 17 = −5px.
+   * Tracks the title across the whole < md range where the pills are visible.
+   * Shared by MobileBrandMark + AccountMenu, and through `--top-chrome-y` by
+   * `.title-condenser` and `.setup-handoff-bar`, so the whole top band moves as
+   * one. THREE numbers feed it — `.page-header`'s below-md padding-top, and
+   * `.page-title`'s font-size and line-height. Change any of them and change this,
+   * or the pills stop being level with the title they were drawn to balance.
+   *
+   * Retuned 2026-09-05 (founder, off his phone: "quite a bit of dead space between
+   * the heading, user icon and JRC logo and the island above"). Header padding-top
+   * went 1.5rem → 0.75rem below md and the constant went +7px → −5px with it, so
+   * the band sits ~10px under the safe-area inset instead of ~20px. The inset
+   * itself is untouched: it is the only thing holding this content clear of the
+   * notch in the installed app, and zeroing it has already broken this screen once
+   * (see the sessions-deep note below).
    *
    * Split in two (2026-08-16): `--top-chrome-inset` is the pill's distance from
    * the top of the CONTENT, with the safe area and the demo banner factored out.
@@ -216,7 +228,23 @@
    * hanging over the card below. Anything positioning against the VIEWPORT still
    * wants `--top-chrome-y`; only in-flow content wants the inset alone.
    */
-  --top-chrome-inset: calc(7px + 0.575 * clamp(22px, 4vw, 30px));
+  --top-chrome-inset: calc(-5px + 0.575 * clamp(22px, 3.9vw, 28px));
+
+  /*
+   * The page gutter — ONE source for the distance from the screen edge to the content,
+   * so the fixed mobile corner chrome lines up with the cards it floats over.
+   *
+   * Added 2026-09-05 because it did not: `.page-body` padded to `1.25rem` while
+   * `MobileBrandMark` and `AccountMenu` were pinned with Tailwind's `left-4` / `right-4`
+   * (1rem), so the JRC pill sat 4px outside the card edge below it and the avatar sat 4px
+   * outside on the other side. Two numbers meaning "the gutter", 4px apart, and nothing
+   * connecting them. Both pills read these now, as do `.page-body` and `.page-header`.
+   *
+   * Base (phone) value only. The lg/xl/2xl rules below still set their own wider desktop
+   * padding directly, and the pills are `md:hidden`, so they never disagree.
+   */
+  --page-gutter-left: max(1.25rem, env(safe-area-inset-left));
+  --page-gutter-right: max(1.25rem, env(safe-area-inset-right));
   --top-chrome-y: calc(
     env(safe-area-inset-top, 0px) + var(--demo-banner-h, 0px) + var(--top-chrome-inset)
   );
@@ -1296,12 +1324,12 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
   justify-content: center;
   /*
    * Exactly the page gutter, so the tab's inner edge lands on the line the cards
-   * start from instead of reaching past it into the reading column. Written as the
-   * same expression `.page-body` uses for its padding rather than the 20px it
-   * usually resolves to — on a notched phone in landscape the gutter grows with
-   * the safe-area inset and this has to grow with it.
+   * start from instead of reaching past it into the reading column. It reads the
+   * shared `--page-gutter-left` rather than the 20px that usually resolves to — on
+   * a notched phone in landscape the gutter grows with the safe-area inset and this
+   * has to grow with it.
    */
-  width: max(1.25rem, env(safe-area-inset-left));
+  width: var(--page-gutter-left);
   height: 56px;
   /* Rounded on the inward side only — it is anchored to the left edge now. */
   border-radius: 0 12px 12px 0;
@@ -1497,23 +1525,35 @@ html[data-nav-pending] .page {
 }
 
 /*
- * Page header — no divider line (the bracketed title is the only chrome).
- * Vertical rhythm is balanced: gap above the title (padding-top) equals the
- * gap below it to the first card (padding-bottom + .page-body pt-2 = 24px).
+ * Page header — no divider line (the title is the only chrome).
+ *
+ * The rhythm was symmetrical until 2026-09-05: 24px above the title and 24px below
+ * it to the first card (padding-bottom 1rem + `.page-body`'s pt-2). On a phone that
+ * top 24px sits UNDER the safe-area inset, which on an Island phone is already ~59px
+ * of cleared screen, and the two read as one dead band above the title, the JRC pill
+ * and the avatar (founder, off his phone). Below md it is 12px now; the title leans
+ * toward the page it names instead of floating between the notch and the cards.
+ * Desktop keeps 1.5rem — there is no inset stacked under it there.
+ *
+ * The gap BELOW came down in the same pass, 24px → 16px (this 0.5rem plus `.page-body`'s
+ * pt-2). It is a real 26px closer to the cards than it looks, because the title also gave
+ * up the 10px of padding that reserved room for its underline when that was removed.
+ *
+ * `--top-chrome-inset` is derived from the padding-top. Change one, change the other.
  */
 .page-header {
   @apply relative flex items-center justify-center;
-  padding-top: calc(1.5rem + env(safe-area-inset-top, 0px));
-  padding-bottom: 1rem;
-  padding-left: max(1.25rem, env(safe-area-inset-left));
-  padding-right: max(1.25rem, env(safe-area-inset-right));
+  padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));
+  padding-bottom: 0.5rem;
+  padding-left: var(--page-gutter-left);
+  padding-right: var(--page-gutter-right);
 }
 
 /* Centered page chrome: title sits in the middle of the screen; the back
    control (if any) is pinned to the far left so the title stays truly centered. */
 .page-header a[aria-label="Back"] {
   position: absolute;
-  left: max(1.25rem, env(safe-area-inset-left));
+  left: var(--page-gutter-left);
   top: 50%;
   transform: translateY(-50%);
 }
@@ -1626,19 +1666,35 @@ html[data-nav-pending] .page {
 }
 
 /*
- * Page title — Space Grotesk over a nav-positional timing line (approved
- * artifact v4 "segment = nav position", 2026-07-13; replaces the drafting
- * corner brackets). A hairline track spans the title's width; a yellow sector
- * segment (skewed to the JRC glyph's ~21° cut) sits at the page's slot in the
- * 5-destination mobile dock — `--title-nav-sector` + `data-nav-sector` are set
- * by AppShell from `resolveActiveNavId`. Off-dock routes (settings, add run,
- * login) show the bare track. Yellow here carries location, not decoration.
+ * Page title — Sora 700 over a nav-positional timing line.
+ *
+ * A hairline track spans the title's width; a −21° yellow sector (skewed to the JRC glyph's
+ * cut) sits at the page's slot in the mobile dock. `--title-nav-sector` + `data-nav-sector`
+ * are set by AppShell from `resolveActiveNavId`; off-dock routes (settings, add run, login)
+ * show the bare track. Yellow here carries location, not decoration. Approved as artifact v4
+ * "segment = nav position", 2026-07-13, replacing the drafting corner brackets before it.
+ *
+ * It was removed on 2026-09-05 and restored the same day — see the note under the rule,
+ * which is worth reading before removing it a second time.
  */
 .page-title {
-  font-family: var(--font-display), var(--font-ui), sans-serif;
+  font-family: var(--font-ui), system-ui, sans-serif;
   font-weight: 700;
-  font-size: clamp(22px, 4vw, 30px);
-  letter-spacing: -0.01em;
+  /* 22 → 26 → 24 → 22px, all on 2026-09-05, each step read back on his phone. It landed
+     where it started, but not for the reason it started there: at 22px WITH the hairline
+     track and the −21° sector under it the title needed the size to out-rank a card, and
+     22px did not. With nothing beneath it, centred in its own band between the two corner
+     pills, position does that work and the size does not have to.
+
+     Measured on the pages themselves rather than argued from the ramp: the largest bold
+     heading inside a card is 17px (a session name on Analysis), and the Garage's row
+     headings are 13–14px. `PanelTitle`'s 20–22px hero variant is the only thing that comes
+     close, and it appears on other pages than these. 22px still clears all of it.
+
+     Every literal title fits on one line at 390px (286px of header between the 44px chevron
+     and the avatar) — this is the roomiest the header has been all day. */
+  font-size: clamp(22px, 3.9vw, 28px);
+  letter-spacing: -0.02em;
   line-height: 1.15;
   position: relative;
   width: fit-content;
@@ -1648,9 +1704,25 @@ html[data-nav-pending] .page {
      do and the name runs under the corner chrome (founder, 2026-09-01). */
   max-width: 100%;
   margin-inline: auto;
+  /* Room for the track below. Goes with it if it is ever removed again. */
   padding-bottom: 10px;
   @apply text-foreground;
 }
+
+/* REMOVED and RESTORED on 2026-09-05, both on founder call, in that order.
+   Keep this note: the argument for taking it off is a good one and will be made again.
+
+   It came off because the bottom dock already says where you are and the title says it in
+   words directly above, so the sector was a third statement of one fact — the same reasoning
+   that took the leading tick off `<Eyebrow>` on 2026-08-25. Seen on the phone with the title
+   bare, that reasoning lost to what the page actually looked like: with nothing under it the
+   heading floats, and the track is what seats it on the page. So it is back, unchanged.
+
+   What did NOT come back with it is the old size: the title is 22px, not the 26px it needed
+   during the bare spell to out-rank a card. The track carries that job again.
+
+   `--title-nav-sector` / `--title-nav-count` are read by the rules below and are live again;
+   AppShell writes them, along with `data-nav-sector`, from `resolveActiveNavId`. */
 
 /* The track — full title width, hairline. */
 .page-title::after {
@@ -1684,6 +1756,7 @@ html[data-nav-pending] .page {
   transition: left 0.34s cubic-bezier(0.3, 0.9, 0.35, 1);
 }
 
+/* Off-dock routes (settings, add run, login) show the bare track. */
 [data-nav-sector] .page-title::before {
   display: block;
 }
@@ -1707,8 +1780,8 @@ html[data-nav-pending] .page {
   position: fixed;
   top: var(--top-chrome-y);
   /* Clear the 34px corner pills on both sides (1.25rem inset + 34px + ~8px). */
-  left: calc(max(1.25rem, env(safe-area-inset-left)) + 44px);
-  right: calc(max(1.25rem, env(safe-area-inset-right)) + 44px);
+  left: calc(var(--page-gutter-left) + 44px);
+  right: calc(var(--page-gutter-right) + 44px);
   height: 34px;
   z-index: 30;
   display: flex;
@@ -1742,6 +1815,9 @@ html[data-nav-pending] .page {
    If the label turns out unreadable over busy content, the answer is a backing
    on the LABEL, not a full-width wash. */
 
+/* The compact echo of `.page-title`'s −21° sector, for the scrolled state. It and the title's
+   own sector were removed and restored together on 2026-09-05, and they must stay coupled:
+   keeping one without the other makes the mark appear or vanish purely on scroll position. */
 .title-condenser .title-condenser-mark {
   flex: none;
   width: 14px;
@@ -1752,7 +1828,7 @@ html[data-nav-pending] .page {
 }
 
 .title-condenser .page-title-condensed {
-  font-family: var(--font-display), var(--font-ui), sans-serif;
+  font-family: var(--font-ui), system-ui, sans-serif;
   font-weight: 700;
   font-size: 14px;
   letter-spacing: -0.01em;
@@ -1984,8 +2060,8 @@ html[data-nav-pending] .page {
      @apply list here while emitting the other seven, so the rule shipped without them. */
   width: 100%;
   margin-inline: auto;
-  padding-left: max(1.25rem, env(safe-area-inset-left));
-  padding-right: max(1.25rem, env(safe-area-inset-right));
+  padding-left: var(--page-gutter-left);
+  padding-right: var(--page-gutter-right);
 }
 
 /*
@@ -2749,11 +2825,13 @@ html[data-nav-pending] .page {
     inset 0 1px 0 rgb(255 255 255 / 0.05);
 }
 
-/* Headline voice for the door — Space Grotesk at hero scale. Distinct from
-   .page-title (no underline, no centering opinion): this is the marketing tail's
-   register, shared with the landing page, not an app page header. */
+/* Headline voice for the door — Sora 700 at hero scale (Space Grotesk until 2026-09-05).
+   Distinct from .page-title (no underline, no centering opinion): this is the marketing
+   tail's register, not an app page header. It is no longer identical to the static landing
+   page, which still serves Space Grotesk verbatim by founder call 2026-08-06 — flip that
+   file's Google Fonts link and its h1 if the two should read the same again. */
 .door-headline {
-  font-family: var(--font-display), var(--font-ui), sans-serif;
+  font-family: var(--font-ui), system-ui, sans-serif;
   font-weight: 700;
   font-size: clamp(28px, 5.2vw, 44px);
   letter-spacing: -0.03em;
@@ -2763,7 +2841,7 @@ html[data-nav-pending] .page {
 
 /* Plan price — display voice so the number reads as the card's headline. */
 .door-price {
-  font-family: var(--font-display), var(--font-ui), sans-serif;
+  font-family: var(--font-ui), system-ui, sans-serif;
   font-weight: 700;
   font-size: clamp(28px, 3.4vw, 34px);
   letter-spacing: -0.04em;
@@ -2773,7 +2851,7 @@ html[data-nav-pending] .page {
 
 /* Same voice at row scale — the phone fold's tier rows. */
 .door-price-sm {
-  font-family: var(--font-display), var(--font-ui), sans-serif;
+  font-family: var(--font-ui), system-ui, sans-serif;
   font-weight: 700;
   font-size: 20px;
   letter-spacing: -0.03em;
@@ -3182,7 +3260,7 @@ html.video-overlay-fullscreen-active body {
    it's `width: fit-content; margin-inline: auto` and carries the yellow nav-sector
    track, which means location — and this screen isn't anywhere in the dock yet. */
 .demo-door-title {
-  font-family: var(--font-display), var(--font-ui), sans-serif;
+  font-family: var(--font-ui), system-ui, sans-serif;
   font-weight: 700;
   font-size: clamp(28px, 8vw, 38px);
   letter-spacing: -0.02em;
@@ -3325,11 +3403,14 @@ html.video-overlay-fullscreen-active body {
   }
 }
 
-/* Progress rail — the page title's own timing line at popover scale.
-   `.page-title::before` already draws a −21deg yellow sector on a hairline
-   track to say which of N destinations you are in ("yellow here carries
-   location, not decoration"). Reusing it means the app has ONE way of showing
-   position in a sequence, not two. */
+/* Progress rail — a −21deg yellow sector on a hairline track, saying which of N steps
+   you are in ("yellow here carries location, not decoration").
+
+   It was copied from `.page-title::before`, which drew the same device under every page
+   title. That one was REMOVED on 2026-09-05: a third statement of where you are, sitting
+   under a heading that already says it, over a dock that already shows it. This rail is
+   not that — inside the tour popover it is the only thing saying which step you are on,
+   so it stays. */
 .rc-tour-rail {
   position: relative;
   height: 2px;
@@ -3343,9 +3424,8 @@ html.video-overlay-fullscreen-active body {
   height: 4px;
   width: calc(100% / var(--rc-tour-n, 7));
   left: calc(var(--rc-tour-i, 0) * (100% / var(--rc-tour-n, 7)));
-  /* `primary-ink`, matching `.page-title::before` above — this rail is a copy of
-     that sector, and it carries location, which makes it ink and not fill. Plain
-     `primary` is 1.4:1 on a pale card, so on paper the progress mark vanished. */
+  /* `primary-ink`, not `primary`: this mark carries location, which makes it ink and
+     not fill. Plain `primary` is 1.4:1 on a pale card, so on paper it vanished. */
   background: rgb(var(--color-primary-ink));
   transform: skewX(-21deg);
   transition: left 0.34s cubic-bezier(0.3, 0.9, 0.35, 1);
@@ -3487,8 +3567,8 @@ html.video-overlay-fullscreen-active body {
 .setup-handoff-bar {
   position: fixed;
   top: calc(var(--top-chrome-y) + 44px);
-  left: var(--setup-handoff-left, max(1.25rem, env(safe-area-inset-left)));
-  right: var(--setup-handoff-right, max(1.25rem, env(safe-area-inset-right)));
+  left: var(--setup-handoff-left, var(--page-gutter-left));
+  right: var(--setup-handoff-right, var(--page-gutter-right));
   /* Above page content, below the corner pills (z-40) and compact title (z-30). */
   z-index: 29;
 }

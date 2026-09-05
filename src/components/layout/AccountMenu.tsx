@@ -73,8 +73,12 @@ export function AccountMenu({ variant = "floating" }: { variant?: "floating" | "
   return (
     <div
       ref={wrapRef}
-      className={cn(inline ? "relative shrink-0" : "fixed right-4 z-40 md:hidden")}
-      style={inline ? undefined : { top: "var(--top-chrome-y)" }}
+      className={cn(inline ? "relative shrink-0" : "fixed z-40 md:hidden")}
+      /* No `right-4`. Pinned with `--page-gutter-right`, the same value `.page-body` pads
+         with, so the avatar's outer edge lands exactly on the right edge of the cards below
+         it. Tailwind's `right-4` is 1rem against the gutter's 1.25rem, so it used to hang
+         4px proud (founder, 2026-09-05). `MobileBrandMark` carries the mirror of this. */
+      style={inline ? undefined : { top: "var(--top-chrome-y)", right: "var(--page-gutter-right)" }}
     >
       <button
         type="button"

@@ -23,8 +23,9 @@ import type { ToolsGeometry } from "@/lib/tools/toolsModel";
  * about five pixels at card width. Two ordinary setups draw the same car. That is exactly why the
  * numbers stayed, and why "drawing only" was the option that lost.
  *
- * Nothing here is Space Grotesk. The display face is `.page-title` only (VISUAL_NORTH_STAR), so
- * the car name is Sora 700 at hero size — the same voice as the Paddock hero it sits level with.
+ * The car name is Sora 700 at hero size — the same voice as the Paddock hero it sits level with.
+ * Since 2026-09-05 that is the only voice in the app: Space Grotesk is deleted and `.page-title`
+ * is Sora too, separated from a card title by size (26–32px vs 20–22px), not by a second face.
  *
  * ── It is called the Geometry Lab, 2026-08-19 ────────────────────────────────────────────────
  * Founder call from a `.markup` pin on `/tools`. Video carried a band label and this one did not,

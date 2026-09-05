@@ -16,7 +16,7 @@ export const metadata = { title: `Join ${PRODUCT_NAME}` };
  * The paid door's decision page. Rebuilt 2026-08-02 to the decision-board picks (one table,
  * monthly/annual toggle); redesigned 2026-08-15 onto the signed-out family's shared scene —
  * the baked drivers-meeting photo with the login telemetry running over it (`DoorScene`),
- * Space Grotesk headline, frosted plan cards. Desktop shows two cards side by side; under
+ * a Sora 700 headline (Space Grotesk until 2026-09-05), frosted plan cards. Desktop shows two cards side by side; under
  * `md:` they fold into two selectable rows and a single checkout button (the fold lives in
  * `JoinPlansClient`). Public via middleware; checkout unchanged.
  *

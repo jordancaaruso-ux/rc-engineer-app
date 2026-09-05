@@ -108,6 +108,9 @@ export function MobileTitleCondenser() {
 
   return (
     <div className="title-condenser" data-shown={shown} aria-hidden>
+      {/* The compact echo of `.page-title`'s −21° sector. Both were removed and then restored
+          on 2026-09-05; they move together, because keeping one without the other means the
+          mark appears or vanishes purely on scroll position. */}
       {hasSector ? <span className="title-condenser-mark" /> : null}
       <span className="page-title-condensed">{title}</span>
     </div>
