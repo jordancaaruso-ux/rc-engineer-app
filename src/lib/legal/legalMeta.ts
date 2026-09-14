@@ -14,7 +14,7 @@ import { COMPANY_NAME } from "@/lib/brand/brandNames";
  */
 export const LEGAL_OPERATOR = `Jordan Caruso (${COMPANY_NAME})`;
 
-export const LEGAL_CONTACT_EMAIL = "jordancaaruso@gmail.com";
+export const LEGAL_CONTACT_EMAIL = "support@jrcdynamics.com";
 
 /** Bump whenever the wording of /privacy or /terms materially changes. */
-export const LEGAL_LAST_UPDATED = "July 2026";
+export const LEGAL_LAST_UPDATED = "September 2026";

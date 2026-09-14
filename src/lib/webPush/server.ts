@@ -18,7 +18,7 @@ function ensureConfigured(): void {
   if (configured) return;
   const publicKey = process.env.VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
-  const subject = process.env.VAPID_SUBJECT || "mailto:admin@jrcraceengineer.app";
+  const subject = process.env.VAPID_SUBJECT || "mailto:support@jrcdynamics.com";
   if (!publicKey || !privateKey) {
     throw new Error(
       "Web push not configured — set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY.",
