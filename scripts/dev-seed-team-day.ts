@@ -66,7 +66,7 @@ async function cleanup() {
   await prisma.team.deleteMany({ where: { name: TEAM_NAME } });
   for (const u of users) {
     await prisma.user.delete({ where: { id: u.id } });
-    await prisma.authAllowedEmail.deleteMany({ where: { email: u.email } });
+    if (u.email) await prisma.authAllowedEmail.deleteMany({ where: { email: u.email } });
     console.log(`  deleted ${u.email}`);
   }
   console.log(`\nRemoved ${users.length} fixture accounts.\n`);
@@ -162,8 +162,8 @@ async function main() {
   await logRun(alex, kilsyth, 2 * 24 * 60 + 15, 15.5);
   await logRun(lucas, kilsyth, 3, 14.8); // stranger — must not surface
 
-  const signIn = (email: string) =>
-    `${BASE}/api/auth/dev-signin?email=${encodeURIComponent(email)}&to=${encodeURIComponent("/analysis")}`;
+  const signIn = (email: string | null) =>
+    `${BASE}/api/auth/dev-signin?email=${encodeURIComponent(email ?? "")}&to=${encodeURIComponent("/analysis")}`;
 
   const out = {
     teamId: team.id,
