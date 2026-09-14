@@ -173,76 +173,20 @@ export type AnalysisRecentRun = {
 };
 
 /**
- * One driver on the "Out with you" card — the people who were at the same meeting, or at the
- * same track on the same day, and where they got to.
+ * One teammate on the **Your team** card — every teammate you have. Added 2026-08-20 on founder
+ * request: *"the list below should be expansive, every teammate you have."*
  *
- * Founder call (2026-08-19), after two team-scoped drafts were rejected: teams are the wrong
- * denominator, and the timing-import field is the wrong source because it only exists when the
- * import was a multi-driver race result — a practice session is one Speedhive link with one
- * driver in it, so that version of this card would be blank on exactly the days you are testing.
- * This reads other drivers' OWN logged runs instead.
- *
- * The exchange rate is coverage: this can only ever show people who use the app. Eighteen
- * entrants at a club round might be two rows. `driverCount` exists so the card can say so.
- */
-export type OutWithYouDriver = {
-  userId: string;
-  /** What to print. "You" on the viewer's own row — never an email; see `loadOutWithYou`. */
-  name: string;
-  isViewer: boolean;
-  /** Their best lap in this scope. Never null — a driver with no timed lap is not a row. */
-  bestLapSeconds: number;
-  /**
-   * `theirs − yours`, so **positive = slower than you**, matching the app-wide delta convention
-   * (cell − anchor, and you are the anchor). Null on the viewer's own row.
-   */
-  deltaSeconds: number | null;
-  /**
-   * A team BOTH of you are in, and therefore the one place the viewer may already read this
-   * driver's runs — `/runs/history?teamId=…&driverIds=…`. Null on the viewer's own row, and null
-   * for anyone who is only a co-presence match, which is most of them (2026-08-20).
-   *
-   * This is the whole reason the row can be a link. The card's scope is who was at the track, not
-   * who is on your team, so a door built on the card's own scope would promise a history the
-   * viewer has no right to. Built on the shared team instead, the link opens a page that was
-   * already theirs to open — the row is a shortcut, never a grant. `/runs/history` re-checks
-   * membership on arrival regardless; this only decides whether to draw the door.
-   */
-  sharedTeamId: string | null;
-};
-
-export type OutWithYouModel = {
-  /** The meeting's name, or "TFTR · Sunday 19 July" for a track day with no event row. */
-  scopeLabel: string;
-  /**
-   * True when the grouping is an event. An event is exact — everyone on it entered the same
-   * meeting. The day fallback is a guess: one venue can run a morning club practice and an
-   * evening race, and two people there may never have shared the track. The card shows which
-   * kind it is rather than presenting them identically.
-   */
-  isEvent: boolean;
-  /** Sorted by best lap, then windowed around the viewer. Always contains the viewer. */
-  drivers: OutWithYouDriver[];
-  /** Every driver this card could show in scope, including the viewer, before the window. */
-  driverCount: number;
-};
-
-/** Rows on the card. Odd, so "two above and two below" is symmetrical around the viewer. */
-export const OUT_WITH_YOU_ROWS = 5;
-
-/**
- * One teammate on the **Last out** band — the lower half of the Teammates card, added
- * 2026-08-20 on founder request: *"the list below should be expansive, every teammate you have."*
- *
- * This half is scoped by `TeamMembership` and nothing else, which is the opposite of the meeting
- * half above it and is the whole point of having both. The meeting half answers *how am I going
- * against the people here*; this answers *who on my team has been out, and when* — everyone, at
- * any track, going back as far as they have run. A teammate who has never shared a run is still a
- * row (`lastRunAtIso: null`): the band claims to be every teammate, so silently dropping the
- * quiet ones would make it a different list than the one it says it is.
+ * Scoped by `TeamMembership` and nothing else. Until 2026-09-14 a second card sat above this one
+ * ("Out with you") that listed whoever had logged a run at the same track that day, teammate or
+ * not — a stranger's name and best lap on your screen. Founder ruling that day: *"nobody outside
+ * my team ever sees anything I logged."* That card is deleted, not hidden, and this one took over
+ * the part of its job that survives the rule as an ORDER rather than a second scope — see
+ * `sortTeammatesByLastOut`. A teammate who has never shared a run is still a row
+ * (`lastRunAtIso: null`): the card claims to be every teammate, so silently dropping the quiet
+ * ones would make it a different list than the one it says it is.
  *
  * Because membership is mutual and retroactive, every row here is a door the viewer already had —
- * `/runs/history?teamId=…&driverIds=…`. None of them needs the meeting half's `sharedTeamId` test.
+ * `/runs/history?teamId=…&driverIds=…`.
  */
 export type TeammateLastOut = {
   userId: string;
@@ -255,78 +199,61 @@ export type TeammateLastOut = {
   /**
    * Server-rendered label for that timestamp ("3 days ago", "No shared runs"). `RelativeTime`
    * replaces it on the client after mount and then re-ticks; this is what SSR paints, so it has
-   * to be a real answer rather than a dash — the band gets read on a phone that just woke up.
+   * to be a real answer rather than a dash — the card gets read on a phone that just woke up.
    */
   lastRunLabel: string;
   /** Best lap of that run. Null when the run carried no timed lap. */
   bestLapSeconds: number | null;
   /**
-   * Where that run was. DRAWN next to the lap, and load-bearing rather than decorative: this band
+   * Where that run was. DRAWN next to the lap, and load-bearing rather than decorative: this card
    * spans every track, so a bare lap time beside a name invites a comparison between two
    * different circuits that means nothing. The track is what makes the number readable.
    */
   trackName: string | null;
   /** Ran inside `TEAMMATE_LIVE_WINDOW_MS` — the pip. Stale by at most the cache window. */
   isLive: boolean;
+  /** That run was today, in the run's own local day. Decides the second tier of the order. */
+  isToday: boolean;
+  /**
+   * That run was today AND at the track you are at today — the first tier. "The track you are
+   * at" is where your own most recent run was, and only if that run is today; see
+   * `loadTeammatesLastOut`. Implies `isToday`.
+   */
+  isHere: boolean;
 };
 
-/** Rows the Last-out band draws before the fold. The rest sit behind "Show all N". */
+/** Rows the card draws before the fold. The rest sit behind "Show all N". */
 export const TEAMMATES_LAST_OUT_VISIBLE = 5;
 
 /** How recent a run has to be to light the pip. Roughly one heat cycle at a club round. */
 export const TEAMMATE_LIVE_WINDOW_MS = 20 * 60 * 1000;
 
 /**
- * Newest run first, with teammates who have shared nothing at the end.
+ * Out with you today, then out today anywhere, then everyone newest run first, then the quiet
+ * tail by name.
  *
- * That tail is sorted by name rather than left in query order, so the quiet half of a big team
+ * Founder ruling 2026-09-14, when the co-presence card above this list was deleted: *"the first
+ * people I wanna see, other people logging now and at the same track, then people logging now at
+ * a different track and then everything beyond that."* "Now" is the local calendar day rather
+ * than the pip's 20 minutes, because a heat at a club round is every 45–60 minutes and a
+ * teammate who ran the heat before yours is still out with you.
+ *
+ * The tail is sorted by name rather than left in query order, so the quiet half of a big team
  * does not reshuffle between loads — a list that reorders under you while you read it looks like
  * it is reporting a change.
  */
-export function sortTeammatesByLastOut<T extends { lastRunAtIso: string | null; name: string }>(
-  rows: T[]
-): T[] {
+export function sortTeammatesByLastOut<
+  T extends { lastRunAtIso: string | null; name: string; isToday: boolean; isHere: boolean },
+>(rows: T[]): T[] {
+  const tier = (row: T): number => (row.isHere ? 0 : row.isToday ? 1 : 2);
   return [...rows].sort((a, b) => {
+    const byTier = tier(a) - tier(b);
+    if (byTier !== 0) return byTier;
     if (a.lastRunAtIso && b.lastRunAtIso) return b.lastRunAtIso.localeCompare(a.lastRunAtIso);
     if (a.lastRunAtIso) return -1;
     if (b.lastRunAtIso) return 1;
     return a.name.localeCompare(b.name);
   });
-}
-
-/**
- * The whole Teammates card: the meeting you shared with other drivers, then your team.
- *
- * Two halves with two different scopes, deliberately not reconciled. The meeting half is
- * **co-presence** — whoever was at that event, or at that track that day, teammate or stranger.
- * The Last-out half is **membership** — your team, wherever they were. Either can be empty: a
- * solo driver at a club round gets only the meeting half, and a team whose members never race
- * together gets only the lower one. The card is dropped only when both are.
- */
-export type TeammatesModel = {
-  /** The co-presence half; null when no recent meeting of yours had another driver on it. */
-  meeting: OutWithYouModel | null;
-  /** Every teammate, newest run first. Empty when the driver is on no teams. */
-  lastOut: TeammateLastOut[];
-};
-
-/**
- * The rows nearest the viewer, keeping the viewer in the middle where the list is long enough.
- *
- * Anchored on the viewer rather than the leader on purpose: a list you always lead, or always
- * trail, is a list you stop reading — and the two people either side of you are the ones you are
- * actually racing. Clamps at both ends, so a viewer who IS fastest still gets a full-length card.
- */
-export function windowAroundViewer<T extends { isViewer: boolean }>(
-  rows: T[],
-  max: number = OUT_WITH_YOU_ROWS
-): T[] {
-  if (rows.length <= max) return rows;
-  const viewerIndex = rows.findIndex((row) => row.isViewer);
-  if (viewerIndex < 0) return rows.slice(0, max);
-  const half = Math.floor(max / 2);
-  const start = Math.min(Math.max(0, viewerIndex - half), rows.length - max);
-  return rows.slice(start, start + max);
 }
 
 /**
@@ -351,16 +278,16 @@ export type AnalysisHomeModel = {
    */
   hasTeam: boolean;
   /**
-   * The Teammates card — the meeting you shared with other drivers, and every teammate by how
-   * recently they last ran. Null when BOTH halves are empty (no runs, nobody in scope, no teams),
-   * and the card is then dropped rather than drawn: an empty state reading "no one else here logs
-   * runs" is a card about the app's adoption, not about the driver.
+   * The Your-team card — every teammate, the ones out with you today first. Empty when the driver
+   * is on no teams, and the card is then dropped rather than drawn: an empty state reading "no
+   * one on your team" is a card about the app's adoption, not about the driver.
    *
-   * This replaced the video card on 2026-08-19. Video was a straight duplicate — `/tools` carries
-   * a full Video band over the same job list — so a page about reviewing the day had a toolbox
-   * stapled to it for the second time.
+   * This slot has held three things. The video card (a duplicate of the Video band on `/tools`)
+   * until 2026-08-19; then that plus an "Out with you" standing of everyone at your track that
+   * day, teammate or stranger; then, from 2026-09-14, the team list alone — see `TeammatesCard`
+   * for the ruling that deleted the standing.
    */
-  teammates: TeammatesModel | null;
+  teammates: TeammateLastOut[];
 };
 
 /** Median of included lap times (seconds); null when empty. */

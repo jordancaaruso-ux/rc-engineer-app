@@ -216,10 +216,11 @@ async function main() {
    * Events used to be reused rather than copied — "events are global per track/meeting", which
    * is true of the model and was wrong for the demo, in two ways at once.
    *
-   * 1. It leaked. `loadOutWithYou` finds other drivers by shared event, so a demo run pinned to
-   *    the founder's real "TFTR Clubday" put his real name and best lap on the demo's Teammates
-   *    card, in front of every anonymous visitor. Measured on production 2026-08-25. Any other
-   *    driver at those ten meetings would surface the same way.
+   * 1. It leaked. The Analysis "Out with you" card (deleted 2026-09-14) found other drivers by
+   *    shared event, so a demo run pinned to the founder's real "TFTR Clubday" put his real name
+   *    and best lap on the demo's Teammates card, in front of every anonymous visitor. Measured
+   *    on production 2026-08-25. The card is gone; the cloning stays, because a shared event row
+   *    is still a door any future cross-driver read could walk through.
    * 2. It froze. A shared meeting cannot be moved by the season shift — moving it would drag
    *    the date under every real driver who raced it — so a shifted run would sit at a meeting
    *    still dated last winter.

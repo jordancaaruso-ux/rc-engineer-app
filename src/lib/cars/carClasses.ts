@@ -5,8 +5,7 @@
  * (event/track/session/laps/notes always); tires + prep carry only between cars in the SAME
  * discipline (the same wheels bolt on), while a cross-discipline swap re-derives them from the new
  * car's own last run. Setup is always car-specific and swaps regardless. The teammate lap-compare
- * and `loadOutWithYou` scope the same way — a buggy lap in a touring list is a card nobody trusts
- * twice.
+ * scopes the same way — a buggy lap in a touring list is a card nobody trusts twice.
  *
  * How a car gets one — inference first, override second (`disciplineForCar` in
  * `chassisPlatform.ts` is the only correct way to ask):

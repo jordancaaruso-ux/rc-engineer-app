@@ -6069,24 +6069,21 @@ export function NewRunForm(props: {
       ) : null}
 
       {/*
-        Shown to EVERYONE since 2026-08-19, not just team members.
-        It used to be gated on `hasTeams`, which was right while the flag only governed team
-        surfaces — a driver with no team had nothing to decide. The Analysis "Out with you" card
-        changed that: this same flag now also decides whether the people who were out with you can
-        see this run's best lap, so a solo driver who never saw the switch would be sharing by
-        default with no control at all. The copy below says both halves for the same reason.
+        Team members only. A driver with no team has nothing to decide: this flag governs team
+        surfaces and nothing else, so for them the switch would be a control over nobody.
 
-        `shareWithTeam` keeps its column name; renaming it is a migration for no behaviour. Read
-        it as "share this run" — see `src/lib/analysis/loadOutWithYou.ts`.
+        It was shown to everyone from 2026-08-19 to 2026-09-14, while the Analysis "Out with you"
+        card let the drivers at your track that day — teammate or not — see this run's best lap
+        under the same flag. That card is gone on the founder's ruling that nobody outside your
+        team sees anything you logged, so the flag means teams again, the copy says only that,
+        and the gate is back.
       */}
-      {!wizardActive || wizardStep === "feel" ? (
+      {hasTeams && (!wizardActive || wizardStep === "feel") ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
           <div className="min-w-0">
             <div className="text-sm text-foreground">Share this run</div>
             <div className="text-[11px] text-muted-foreground leading-snug">
-              {hasTeams
-                ? "Teammates see the run and its setup. Drivers who were out with you see your best lap."
-                : "Drivers who were out with you see your best lap — nothing else."}
+              Teammates see the run and its setup.
             </div>
           </div>
           <Switch

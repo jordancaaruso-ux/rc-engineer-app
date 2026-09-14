@@ -13,7 +13,7 @@ import { Reveal } from "@/components/ui/Reveal";
 
 /**
  * Analysis debrief — the "review the day" surface: the last runs, the session trend chart, and
- * who else was out with you.
+ * your team.
  *
  * The setup-comparison and Geometry Lab doors came off on 2026-08-19. They were here because the
  * phone had no other way to reach the benches — Tools was a desktop-only tab — so a page about
@@ -112,19 +112,19 @@ export default async function AnalysisHubPage(): Promise<ReactNode> {
           </Reveal>
         )}
         {/*
-          Two more cards — the pace standing at your last shared meeting, then your team — or
-          neither. Dropped entirely when there is nobody to stand against AND no team to list,
-          rather than drawn empty; see `TeammatesCard`, which also carries why those are two cards
-          and not two halves of one.
+          One more card — your team, the teammates out with you today first — or nothing.
+          Dropped entirely when there is no team to list, rather than drawn empty; see
+          `TeammatesCard`, which also carries the 2026-09-14 ruling that deleted the co-presence
+          standing that used to sit above it (nobody outside your team sees anything you logged).
 
-          They sit last so the standing's heading breaks the fold on a 390px phone. The outing
-          above spends everything from the rail to ~750px — chart included — and that budget is
-          why the chart is the compact one and why the run list shows three. Anything added above
-          here comes out of the same purse.
+          It sits last so its heading breaks the fold on a 390px phone. The outing above spends
+          everything from the rail to ~750px — chart included — and that budget is why the chart
+          is the compact one and why the run list shows three. Anything added above here comes
+          out of the same purse.
         */}
-        {model.teammates ? (
+        {model.teammates.length > 0 ? (
           <Reveal index={1}>
-            <TeammatesCard model={model.teammates} />
+            <TeammatesCard rows={model.teammates} />
           </Reveal>
         ) : null}
       </section>

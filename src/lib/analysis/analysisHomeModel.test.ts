@@ -16,7 +16,6 @@ import {
   runRowTitle,
   shortRunLabel,
   sortTeammatesByLastOut,
-  windowAroundViewer,
 } from "@/lib/analysis/analysisHomeModel";
 import { formatRelativeFromNow } from "@/lib/formatRelative";
 
@@ -298,53 +297,20 @@ test("collectCarOptions: distinct, first-seen order, null car bucket", () => {
   ]);
 });
 
-/*
- * "Out with you" windowing. The viewer must survive every trim — the whole card is a comparison
- * against them, so a window that drops their row shows a leaderboard with no anchor in it.
- */
-const row = (id: string, isViewer = false) => ({ id, isViewer });
+/* ── Your team: every teammate, out with you today first, then by when they last ran ─────── */
 
-test("windowAroundViewer: short lists pass through untouched", () => {
-  const rows = [row("a"), row("me", true), row("b")];
-  assert.deepEqual(windowAroundViewer(rows, 5), rows);
+const teammate = (
+  name: string,
+  lastRunAtIso: string | null,
+  flags: { isToday?: boolean; isHere?: boolean } = {}
+) => ({
+  name,
+  lastRunAtIso,
+  isToday: flags.isToday ?? flags.isHere ?? false,
+  isHere: flags.isHere ?? false,
 });
 
-test("windowAroundViewer: centres the viewer when there is room both sides", () => {
-  const rows = [row("a"), row("b"), row("c"), row("me", true), row("d"), row("e"), row("f")];
-  assert.deepEqual(
-    windowAroundViewer(rows, 5).map((r) => r.id),
-    ["b", "c", "me", "d", "e"]
-  );
-});
-
-test("windowAroundViewer: clamps at the top without shortening the card", () => {
-  const rows = [row("me", true), row("a"), row("b"), row("c"), row("d"), row("e")];
-  const out = windowAroundViewer(rows, 5);
-  assert.equal(out.length, 5);
-  assert.deepEqual(
-    out.map((r) => r.id),
-    ["me", "a", "b", "c", "d"]
-  );
-});
-
-test("windowAroundViewer: clamps at the bottom, and the viewer is still in it", () => {
-  const rows = [row("a"), row("b"), row("c"), row("d"), row("e"), row("me", true)];
-  const out = windowAroundViewer(rows, 5);
-  assert.equal(out.length, 5);
-  assert.equal(out.at(-1)?.id, "me");
-  assert.ok(out.some((r) => r.isViewer));
-});
-
-test("windowAroundViewer: no viewer at all still returns a full card", () => {
-  const rows = [row("a"), row("b"), row("c"), row("d"), row("e"), row("f")];
-  assert.equal(windowAroundViewer(rows, 5).length, 5);
-});
-
-/* ── Last out: every teammate, ordered by when they last ran ───────────────────────────────── */
-
-const teammate = (name: string, lastRunAtIso: string | null) => ({ name, lastRunAtIso });
-
-test("sortTeammatesByLastOut: newest run first", () => {
+test("sortTeammatesByLastOut: newest run first when nobody is out today", () => {
   const rows = [
     teammate("Dane", "2026-08-19T02:10:00.000Z"),
     teammate("Marc", "2026-08-19T04:40:00.000Z"),
@@ -353,6 +319,24 @@ test("sortTeammatesByLastOut: newest run first", () => {
   assert.deepEqual(
     sortTeammatesByLastOut(rows).map((r) => r.name),
     ["Marc", "Dane", "Alex"]
+  );
+});
+
+test("sortTeammatesByLastOut: with you today, then out today elsewhere, then the rest", () => {
+  const rows = [
+    // Newest of all, but at home last night — third tier.
+    teammate("Alex", "2026-09-14T09:30:00.000Z"),
+    // Out today at another track.
+    teammate("Marc", "2026-09-14T01:40:00.000Z", { isToday: true }),
+    // Out with you today, older than Marc's run — still leads.
+    teammate("Dane", "2026-09-14T00:10:00.000Z", { isHere: true }),
+    teammate("Zoe", null),
+    // Out with you today, newest in the tier — leads the card.
+    teammate("Cooper", "2026-09-14T02:05:00.000Z", { isHere: true }),
+  ];
+  assert.deepEqual(
+    sortTeammatesByLastOut(rows).map((r) => r.name),
+    ["Cooper", "Dane", "Marc", "Alex", "Zoe"]
   );
 });
 

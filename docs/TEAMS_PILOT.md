@@ -46,6 +46,22 @@ The seed script creates **one** team with that name and a `TeamMembership` for e
 | Privacy (hide run from team) | Per-run `shareWithTeam` (default on) | Now absolute — no peer type bypasses it |
 | Leaving a team | Team loses access to everything that member logged | Visibility follows current membership |
 
+### Nobody outside your team sees anything you logged (ruling 2026-09-14)
+
+A standing rule, not a setting. No surface may show one driver's logged data — a name beside a
+lap time, a run's existence, its timing — to another driver they do not share a team with.
+The public timing sites (LiveRC, Speedhive) are a different source and are not covered: the
+Field tab and the lap picker may name every car on the day because that is the site's result
+sheet, not what anyone logged here.
+
+Why it is written down: the Analysis "Out with you" card (2026-08-19 to 2026-09-14) showed every
+app user at the same track that day, teammate or not, gated only by the per-run share flag. It
+was built that way deliberately, because most accounts are on no team and a team-scoped card was
+empty for them. A driver opened Analysis and saw a stranger's name and best lap, and the founder
+reversed the call: the card is deleted, the "Your team" card orders teammates out with you today
+first instead, and the share toggle is once again shown only to drivers on a team, since with no
+team there is nobody it could reach.
+
 **Note:** `prisma db seed` with `TEAM_PILOT_MEMBER_EMAILS` still creates memberships directly, bypassing
 the invite. That is deliberate — it is local DB-owner tooling, not a user-facing path.
 

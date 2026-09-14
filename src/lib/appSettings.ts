@@ -126,9 +126,9 @@ export async function getMyNameSettingsForUsers(
  * One setting for a set of users, as a `userId → value` map holding only the users who have a
  * non-empty value.
  *
- * Generalised out of `getMyNameSettingsForUsers` when the Analysis "Out with you" card needed the
- * same batch shape for `liveRcDriverName` — it resolves a driver's display name through both keys
- * in turn, and two near-identical readers is how the two fall out of step.
+ * Generalised out of `getMyNameSettingsForUsers` when a second key needed the same batch shape
+ * (`liveRcDriverName`, for a card since deleted) — two near-identical readers is how the two fall
+ * out of step, so the specific one delegates to this.
  */
 export async function getSettingForUsers(
   userIds: string[],

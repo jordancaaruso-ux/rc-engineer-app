@@ -93,7 +93,12 @@ export async function getCachedAnalysisHomeModel(userId: string, timeZone: strin
       // in it, and the two it no longer reads are simply ignored), so this bump buys nothing
       // but a clean line between the two shapes — which is worth more than the 30 seconds it
       // costs, given how often a stale entry has made working code look broken here.
-      [`analysis-home-v10-${userId}-${timeZone}`],
+      // v11: `teammates` is now the plain team list (2026-09-14) — the "Out with you" standing of
+      // everyone at your track, teammate or not, was deleted on the founder's ruling that nobody
+      // outside your team sees anything you logged. A v10 entry still carries `{ meeting, lastOut }`
+      // and the page would try to `.length` an object; worse, for 30 seconds it would still hold
+      // the strangers' rows this change exists to remove.
+      [`analysis-home-v11-${userId}-${timeZone}`],
       { tags: [runsTag(userId), dashboardTag(userId)], revalidate: 30 }
     )()
   );

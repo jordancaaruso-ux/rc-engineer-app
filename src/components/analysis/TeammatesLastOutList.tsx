@@ -12,20 +12,21 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * The **Last out** band — every teammate, newest run first.
+ * The **Your team** list — every teammate, out with you today first, then by when they last ran
+ * (`sortTeammatesByLastOut` decides; the rows arrive in order).
  *
- * ── Why the rows are two lines when the half above them is one ───────────────────────────────
- * Because these lap times are not comparable and the one-line rows above them are. The meeting
- * half puts every driver at one track on one day, so a bare column of figures is a standing. This
- * band spans every track a teammate has ever run, so the same column would be a lie — 24.4 at one
- * circuit against 26.0 at another says nothing about who is quicker. Line two names the track the
- * lap was set at, which is the only thing that makes the number readable, and there is no room
- * for it beside a name and a timestamp at 390px.
+ * ── Why the rows are two lines ───────────────────────────────────────────────────────────────
+ * Because these lap times are not comparable. The list spans every track a teammate has ever
+ * run, so a bare column of figures would be a lie — 24.4 at one circuit against 26.0 at another
+ * says nothing about who is quicker. Line two names the track the lap was set at, which is the
+ * only thing that makes the number readable, and there is no room for it beside a name and a
+ * timestamp at 390px. Even the teammates at YOUR track today print theirs: the order says they
+ * are with you, and the track name is what lets a reader check that claim.
  *
- * That also settles what the right-hand column is: **when**, not how far off. No deltas here. Two
- * lists of names each carrying a green-and-red number would read as one badly sorted list; giving
- * each half its own axis is what lets a driver tell in half a second which question they are
- * looking at the answer to.
+ * That also settles what the right-hand column is: **when**, not how far off. No deltas here.
+ * A standing of the drivers at your track used to sit above this list and carried the gaps; it
+ * was deleted 2026-09-14 (see `TeammatesCard`), and its axis did not move down here — a lap set
+ * at a different track two rows below is still not a gap.
  *
  * ── The pip ──────────────────────────────────────────────────────────────────────────────────
  * Lit for a run inside `TEAMMATE_LIVE_WINDOW_MS`. It is computed server-side, so it can lag the
