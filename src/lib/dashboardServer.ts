@@ -54,6 +54,7 @@ import {
 } from "@/lib/dashboardVerdict";
 import { pickHeroSeries } from "@/lib/dashboardHeroSeries";
 import { perfSpan } from "@/lib/perfLog";
+import type { DashboardPendingSweep } from "@/lib/sweep/pendingSweep";
 
 export type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
 export type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
@@ -334,6 +335,13 @@ export type DashboardHomeModel = {
   draftSavedAt: string | null;
   draftEventName: string | null;
   draftIsForToday: boolean;
+  /**
+   * What the timing sweep left for the driver today, if anything: the first placeholder run to
+   * fill in, else sessions waiting for a car. The second door beside "Start a run".
+   */
+  pendingSweep: DashboardPendingSweep | null;
+  /** Today's track, for the app-open arming beacon: latest run today, else the day's loose imports. */
+  todayTrackId: string | null;
   /** Per-run setup changes made today, chronological (first-of-day uses yesterday's last run as baseline). */
   todaysChanges: Array<{
     runId: string;
@@ -368,6 +376,8 @@ export type DashboardHomeModel = {
      */
     carRating: number | null;
     loggingComplete: boolean;
+    /** Filed by the app from the timing sheet and not yet opened; the strip says so. */
+    unconfirmed: boolean;
     /** Best-lap delta vs the previous run today (negative = faster); null on the first run of the day. */
     bestDeltaVsPrev: number | null;
     changedRows: Array<{
@@ -678,6 +688,7 @@ export async function loadDashboardHomeModel(
     priorRuns,
     draftRows,
     completedRunRows,
+    looseImportsToday,
     [thingsToTryRows, thingsToDoRows],
   ] = await Promise.all([
     loadUserScopedEvents({ userId, take: 40 }),
@@ -716,6 +727,7 @@ export async function loadDashboardHomeModel(
         lapTimes: true,
         lapSession: true,
         loggingComplete: true,
+        unconfirmedAt: true,
         // Feeds the desktop hero's handling dial for the day's latest run. A column on
         // a query that already runs, not a new read.
         carRating: true,
@@ -770,6 +782,13 @@ export async function loadDashboardHomeModel(
         trackId: true,
         track: { select: { name: true } },
       },
+    }),
+    // Sessions the timing sweep imported today that sit on no run: the app could not tell which
+    // car. Cheap (indexed on `[userId, sweepFiledAt]`), and empty for anyone the sweep never saw.
+    prisma.importedLapTimeSession.findMany({
+      where: { userId, linkedRunId: null, sweepFiledAt: { gte: todayStart } },
+      orderBy: { sessionCompletedAt: "asc" },
+      select: { id: true, trackId: true },
     }),
     actionItemRowsPromise,
   ]);
@@ -1077,6 +1096,7 @@ export async function loadDashboardHomeModel(
         lapCount: m.lapCount,
         carRating: r.carRating ?? null,
         loggingComplete: r.loggingComplete === true || Boolean(r.loggingCompletedAt),
+        unconfirmed: r.unconfirmedAt != null,
         bestDeltaVsPrev: best != null && prevBest != null ? best - prevBest : null,
         changedRows,
       });
@@ -1321,6 +1341,16 @@ export async function loadDashboardHomeModel(
     draftSavedAt: leadDraft?.savedAt ?? null,
     draftEventName: leadDraft?.eventName ?? null,
     draftIsForToday: leadDraft?.isForToday ?? false,
+    pendingSweep: (() => {
+      const idx = todaysRuns.findIndex((r) => r.unconfirmedAt != null);
+      if (idx >= 0) return { kind: "placeholder" as const, runId: todaysRuns[idx]!.id, position: idx + 1 };
+      const loose = looseImportsToday[0];
+      if (loose) {
+        return { kind: "loose" as const, importedLapTimeSessionId: loose.id, count: looseImportsToday.length };
+      }
+      return null;
+    })(),
+    todayTrackId: todaysRuns[todaysRuns.length - 1]?.track?.id ?? looseImportsToday[0]?.trackId ?? null,
     todaysChanges,
     todayStrip,
     todayContext,

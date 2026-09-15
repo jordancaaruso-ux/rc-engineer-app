@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidateAfterRunMutation } from "@/lib/revalidateUser";
+import { applyRunWindow } from "@/lib/runs/runWindow";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -59,6 +60,10 @@ export async function DELETE(
   }
 
   await prisma.run.delete({ where: { id: existing.id } });
+
+  // One fewer run in the plan window: the newest hidden run, if there is one, comes back
+  // (Starter keeps fifteen; docs/STARTER_TIER_PLAN.md).
+  await applyRunWindow(userId);
 
   revalidateAfterRunMutation(userId);
 
@@ -154,6 +159,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       tireTypeId: true,
       tireStintId: true,
       tireRunNumber: true,
+      unconfirmedAt: true,
       conditionsAirTempC: true,
       conditionsTrackTempC: true,
       conditionsCloudCoverPct: true,
@@ -378,12 +384,28 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const wantsCarMove =
     typeof body.carId === "string" && body.carId.trim() && body.carId.trim() !== run.carId;
 
+  /*
+   * ============================== CONFIRMING A RUN THE APP FILED ==============================
+   *
+   * A run created by "Add N other runs from today" wears `unconfirmedAt` until the driver
+   * vouches for it. Corrections on this route never clear it on their own — fixing one tyre
+   * count is not a statement that the rest of the carried record is right — so confirming is
+   * its own explicit key. It comes from the Confirm control on the run's own card (and from
+   * "Confirm" in place of "Done" while that card is in edit mode); the wizard's whole-run
+   * save clears the same column in `PUT /api/runs`.
+   */
+  if (body.confirm === true && run.unconfirmedAt != null) {
+    data.unconfirmedAt = null;
+  }
+
   if (
     Object.keys(data).length === 0 &&
     additiveDisplayName === undefined &&
     !wantsCarMove &&
     // "Back to auto" with nothing stored writes nothing — a valid state, not an error.
-    !("fiveMinStartLap" in body)
+    !("fiveMinStartLap" in body) &&
+    // Confirming an already-confirmed run is a no-op, not a mistake.
+    body.confirm !== true
   ) {
     return NextResponse.json({ error: "Nothing to change" }, { status: 400 });
   }

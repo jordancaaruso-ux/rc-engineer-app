@@ -29,6 +29,7 @@ export async function GET() {
       name: true,
       slug: true,
       isAuthorized: true,
+      discipline: true,
       createdAt: true,
       updatedAt: true,
       _count: { select: { cars: true, calibrations: true } },
@@ -36,12 +37,15 @@ export async function GET() {
   });
 
   const authById = new Map(models.map((m) => [m.id, m.isAuthorized] as const));
+  // The picker groups by class; without this the fallback fetch would ungroup the whole list.
+  const disciplineById = new Map(models.map((m) => [m.id, m.discipline] as const));
   return NextResponse.json({
     models: models.map((m) => ({
       id: m.id,
       name: m.name,
       slug: m.slug,
       isAuthorized: m.isAuthorized,
+      discipline: m.discipline,
       createdAt: m.createdAt.toISOString(),
       updatedAt: m.updatedAt.toISOString(),
       carCount: m._count.cars,
@@ -58,7 +62,11 @@ export async function GET() {
         // duplicate name group, and a driver-authored row must never beat the curated one.
         isAuthorized: m.isAuthorized,
       }))
-    ).map((m) => ({ ...m, isAuthorized: authById.get(m.id) ?? false })),
+    ).map((m) => ({
+      ...m,
+      isAuthorized: authById.get(m.id) ?? false,
+      discipline: disciplineById.get(m.id) ?? null,
+    })),
   });
 }
 

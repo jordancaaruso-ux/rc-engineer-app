@@ -42,6 +42,8 @@ try {
   for (const d of fs.readdirSync(NETS_DIR, { withFileTypes: true })) {
     if (!d.isDirectory()) continue;
     for (const f of listYaml(path.join(NETS_DIR, d.name))) {
+      // "_" files are not one-knob entries: _whole-car.yaml is checked separately below.
+      if (f.startsWith("_")) continue;
       files.push({ rel: `${d.name}/${f}`, abs: path.join(NETS_DIR, d.name, f) });
     }
   }
@@ -95,5 +97,39 @@ if (unreviewed.length > 0) {
   console.log(`\n${unreviewed.length} of ${sidesWritten} sides AI-drafted, not yet founder-reviewed:`);
   for (const s of unreviewed) console.log(`  - ${s}`);
 }
-console.log(`\n${files.length - failures}/${files.length} entries valid`);
+// Whole-car pairs (both ends together): shape, knobs resolve to entries, both edges named, no day words.
+let wholeCarBad = 0;
+const wholeCarUnreviewed: string[] = [];
+for (const d of fs.readdirSync(NETS_DIR, { withFileTypes: true })) {
+  if (!d.isDirectory()) continue;
+  const wc = path.join(NETS_DIR, d.name, "_whole-car.yaml");
+  if (!fs.existsSync(wc)) continue;
+  const parsed = parseYaml(fs.readFileSync(wc, "utf8")) as { pairs?: Array<Record<string, unknown>> };
+  for (const p of parsed?.pairs ?? []) {
+    const problems: string[] = [];
+    const id = String(p.id ?? "?");
+    if (!Array.isArray(p.knobs) || p.knobs.length < 2) problems.push("knobs: at least two");
+    for (const k of (Array.isArray(p.knobs) ? p.knobs : []) as string[]) {
+      if (!seen.has(`${d.name}:${k}`)) problems.push(`knob "${k}" has no entry in ${d.name}/`);
+    }
+    for (const side of ["more", "less"] as const) {
+      const text = typeof p[side] === "string" ? (p[side] as string) : "";
+      if (!text.trim()) problems.push(`${side}: required`);
+      if (!/\btoo (high|low|stiff|soft|thick|thin|far|much|little)\b/.test(text)) problems.push(`${side}: names no too-far edge (founder ruling 2026-09-09)`);
+      if (/low[- ]grip|high[- ]grip|grip comes up|grip drops|low-grip|high-grip/i.test(text)) problems.push(`${side}: carries a day word (founder ruling 2026-08-28)`);
+    }
+    if (p.reviewed !== true) wholeCarUnreviewed.push(`${d.name}/_whole-car.yaml ${id}`);
+    if (problems.length) {
+      wholeCarBad++;
+      console.error(`FAIL  ${d.name}/_whole-car.yaml ${id}`);
+      for (const pr of problems) console.error(`      - ${pr}`);
+    } else console.log(`ok    ${d.name}/_whole-car.yaml ${id}`);
+  }
+}
+if (wholeCarUnreviewed.length > 0) {
+  console.log(`\n${wholeCarUnreviewed.length} whole-car pairs AI-drafted, not yet founder-reviewed:`);
+  for (const s of wholeCarUnreviewed) console.log(`  - ${s}`);
+}
+failures += wholeCarBad;
+console.log(`\n${files.length - (failures - wholeCarBad)}/${files.length} entries valid${wholeCarBad ? `, ${wholeCarBad} whole-car pair(s) invalid` : ""}`);
 process.exit(failures > 0 ? 1 : 0);

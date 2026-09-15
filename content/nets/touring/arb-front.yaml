@@ -14,12 +14,12 @@ two_answers: true
 more:
   reviewed: true
   confidence: consensus
-  before_settled: "more initial steering — the front bites sooner and the car turns in quicker, with less roll"
+  before_settled: "more initial steering — the front grips up sooner as you turn in and the car turns in quicker, with less roll"
   once_settled: "more understeer through the middle, and the rear feels more planted behind it"
 less:
   reviewed: false
   confidence: consensus
-  before_settled: "less initial steering — the front bites later and turn-in is smoother, with more roll"
+  before_settled: "less initial steering — the front grips up later as you turn in and turn-in is smoother, with more roll"
   once_settled: "more steering through the middle — less understeer — and the rear feels a little less planted behind it"
 physics:
   - arb.md

@@ -5,7 +5,9 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { ChipListField } from "@/components/settings/ChipListField";
 import { KnownCompetitorsField } from "@/components/settings/KnownCompetitorsField";
+import { TransponderCarsField } from "@/components/settings/TransponderCarsField";
 import type { KnownCompetitor } from "@/lib/speedhive/knownCompetitors";
+import type { TransponderCarMap } from "@/lib/speedhive/transponderCars";
 import { postSetting, SaveNote, type SaveState } from "@/components/settings/saveState";
 import {
   formatSpeedhiveTransponderNumbersForSetting,
@@ -43,6 +45,10 @@ type InitialTiming = {
   speedhiveDriverName: string;
   /** Other drivers' chips this account has saved — see `KnownCompetitorsField`. */
   knownCompetitors: KnownCompetitor[];
+  /** Which car each chip lives in — see `TransponderCarsField`. */
+  transponderCars: TransponderCarMap;
+  /** The driver's cars, for the chip→car picker. */
+  cars: { id: string; name: string }[];
 };
 
 export function TimingIdentitySection({ initial }: { initial: InitialTiming }) {
@@ -76,12 +82,13 @@ export function TimingIdentitySection({ initial }: { initial: InitialTiming }) {
   return (
     <CardPanel contentClassName="p-0">
       {/* Heading and its one line of context both sit IN the card now (2026-08-18) — see
-          the note in YouSection. The hint travels with the label: it explains the section,
-          not any single field, so it belongs under the same hairline. */}
-      <div className="px-4 pt-3.5">
-        <Eyebrow>Timing &amp; results</Eyebrow>
-        <p className="ui-caption">How we spot your runs on LiveRC and MYLAPS.</p>
+          the note in YouSection. The hint explains the section, not any single field, so it
+          is the first thing under the band; below it rather than inside it, so every
+          settings card opens on the same 29px band (2026-09-15). */}
+      <div className="eyebrow-band px-4">
+        <Eyebrow className="mb-0">Timing &amp; results</Eyebrow>
       </div>
+      <p className="ui-caption px-4 pt-2.5">How we spot your runs on LiveRC and MYLAPS.</p>
       <div className="space-y-1.5 px-4 pb-3.5 pt-3">
         <ChipListField<number>
           id="speedhive-transponder-input"
@@ -106,6 +113,11 @@ export function TimingIdentitySection({ initial }: { initial: InitialTiming }) {
               setSavingSpeedhiveTransponder
             );
           }}
+        />
+        <TransponderCarsField
+          chips={parseSpeedhiveTransponderNumbersSetting(speedhiveTransponderNumbers).map(String)}
+          cars={initial.cars}
+          initial={initial.transponderCars}
         />
       </div>
 

@@ -4,11 +4,18 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasOpenAiApiKey } from "@/lib/openaiServerEnv";
 import { generateEngineerChatReply } from "@/lib/engineer/chat";
 import { buildDriverDataBlocks } from "@/lib/engineer/driverData";
+import { buildDriverHistoryBlocks } from "@/lib/engineer/driverHistory";
+import { parseRangeScope } from "@/lib/engineer/rangeScope";
 import type { EngineerChatMessage } from "@/lib/engineer/payload";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
 import { checkAiBudget, engineerQuotaSnapshot, recordAiUsage } from "@/lib/aiUsage/ledger";
 import { getEntitlement } from "@/lib/entitlement";
-import { isBillingEnforced } from "@/lib/entitlementLogic";
+import {
+  isBillingEnforced,
+  isFeatureEntitled,
+  upgradeTierFor,
+} from "@/lib/entitlementLogic";
+import { TIER_LABELS } from "@/lib/brand/brandNames";
 import { isDemoIdentity } from "@/lib/demo/demoAccess";
 import { clientIpKey } from "@/lib/clientIp";
 import { persistEngineerChatExchange } from "@/lib/engineer/persistExchange";
@@ -49,6 +56,12 @@ type ChatRequestBody = {
   /** Stamped on the persisted exchange so the thread still records what was on screen. */
   runId?: unknown;
   compareRunId?: unknown;
+  /**
+   * A RANGE of runs instead of one (rangeScope.ts; founder call 2026-09-14): the subject bar's
+   * fourth state. When present it replaces the per-run block — the Engineer reads a run or a
+   * range, never both. Ignored in General.
+   */
+  scope?: unknown;
   stream?: unknown;
   threadId?: unknown;
   /** Ignored — old clients still send these. */
@@ -80,6 +93,7 @@ async function maybePersistEngineerReply(params: {
   reply: string;
   runId: string;
   compareRunId: string;
+  range?: EngineerMessageContextSnapshot["range"];
   source?: string;
 }): Promise<EngineerChatFeedbackPayload | null> {
   const userQuestion = [...params.messages].reverse().find((m) => m.role === "user")?.content ?? "";
@@ -93,6 +107,7 @@ async function maybePersistEngineerReply(params: {
       assistantReply: params.reply,
       runId: params.runId,
       compareRunId: params.compareRunId,
+      range: params.range,
       source: params.source,
     });
   } catch (err) {
@@ -158,6 +173,7 @@ export async function POST(request: Request) {
     const runId = typeof body?.runId === "string" ? body.runId.trim() : "";
     const compareRunId = typeof body?.compareRunId === "string" ? body.compareRunId.trim() : "";
     const generalMode = body?.mode === "general";
+    const rangeScope = generalMode ? null : parseRangeScope(body?.scope);
     const useStream = body?.stream === true;
 
     // Streaming clients only understand error FRAMES, so refusals ship as a 200 SSE stream
@@ -223,6 +239,14 @@ export async function POST(request: Request) {
         402,
       );
     }
+    // Starter has no Engineer (docs/STARTER_TIER_PLAN.md). The page is already locked; this is
+    // the second lock on the same door, for stale clients and the iOS shell.
+    if (isBillingEnforced() && !isFeatureEntitled(entitlement.tier, "engineer")) {
+      return refuseAllowance(
+        `The Engineer is part of ${TIER_LABELS[upgradeTierFor("engineer")]} — upgrade on the Subscription page to ask it.`,
+        402,
+      );
+    }
     const tier =
       isBillingEnforced() &&
       !entitlement.grandfathered &&
@@ -243,12 +267,17 @@ export async function POST(request: Request) {
     // wins (a pinned run, or an old-era client), otherwise their latest run. A driver with no
     // runs gets [] and the request is byte-identical to the data-less one — and General asks
     // for exactly that request on purpose (theory only, nothing from the logs attached).
+    // The latest question rides along so a driver NAMED in it can be compared (rivals.ts).
+    const latestQuestion = [...messages].reverse().find((m) => m.role === "user")?.content ?? null;
     const driverBlocks = generalMode
       ? []
-      : await buildDriverDataBlocks({
-          userId: user.id,
-          runId: runId || null,
-        }).catch(() => []);
+      : rangeScope
+        ? await buildDriverHistoryBlocks({ userId: user.id, scope: rangeScope, question: latestQuestion }).catch(() => [])
+        : await buildDriverDataBlocks({
+            userId: user.id,
+            runId: runId || null,
+            question: latestQuestion,
+          }).catch(() => []);
 
     if (useStream) {
       const encoder = new TextEncoder();
@@ -289,6 +318,7 @@ export async function POST(request: Request) {
                   reply: out.reply,
                   runId,
                   compareRunId,
+                  range: rangeScope,
                   source: "llm",
                 });
             send("done", {
@@ -337,6 +367,7 @@ export async function POST(request: Request) {
           reply: out.reply,
           runId,
           compareRunId,
+          range: rangeScope,
           source: "llm",
         });
 

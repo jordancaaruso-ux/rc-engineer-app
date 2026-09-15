@@ -26,19 +26,28 @@ with nothing on the car changed.
 
 ## Feel vocabulary (the closed list)
 
-These are the **only** words available for describing how a change feels. The list is closed:
+These are the **only** words available for describing how a change feels, for asking the driver
+where a problem is, and for naming their problem back to them (founder, 2026-09-08). Their own
+words stay theirs to repeat; this list is what the Engineer adds. The list is closed:
 anything outside it is not a feel word that needs replacing with a better adjective, it is a sign
 the change has not been understood well enough to predict its feel — in which case say what the
 change does **mechanically**, or name **where in the corner** and **what the car does there**, and
 stop.
 
-- **Grip arriving:** `bite`, `initial grip`, `overall grip`, `hold`
+- **Grip, and when in the corner it comes** (founder, 2026-09-09): `bite`, `initial grip`, `overall grip`; to
+  a driver grip is `sooner` or `later in the corner`, `more grip in the middle`, `more grip through the
+  whole corner`. "Arrives", and `hold` for the middle, are this page's words for the physics, never the
+  driver's — "grip arrives later" reads to them as later in the day
 - **Bite end of the window:** `precise`, `pointy`
 - **Hold end of the window:** `planted`, `forgiving`
 - **Too little bite:** `numb`, `unpredictable`, `imprecise`, `vague`, `floaty` (founder, 2026-08-28:
   floaty is vague, lacks precision, doesn't do what you want — this group, not a damping word)
 - **Roll-centre / link language:** `smoother`, `more rolled-in`, `on the track`, `in the track`
-- **Phase:** `entry`, `mid-corner`, `on power`
+- **Phase** (founder, 2026-09-08): `entering` / `turning in`, `in the middle`, `exiting` — the
+  three places in the driver's words; "entry", "mid-corner", "going in" and "coming out" are ours
+- **Throttle:** `on power`, `off power` — a separate axis from the phase above for entering and the
+  middle: the diff and the fore-aft geometry split on it, not on where the car is in the corner.
+  Exiting is always on power (founder, 2026-09-09)
 - **Balance** (founder, 2026-08-27): `understeer`, `oversteer` — the overall balance · `steering` —
   balance owed to the front · `rotation` — balance owed to the rear · `forward traction` / `drive` —
   the rear putting power down · `push` — understeer caused by a lack of rotation from the rear, not a
@@ -63,24 +72,45 @@ facts, never against the words.
 
 **The facts a complaint reduces to:**
 
-1. **Which end** — front, rear, or the whole car. "Steering" and "won't turn" point at the front;
-   "loose", "rotation", "drive" at the rear; "push" is the rear even though it feels like
-   understeer.
-2. **Where in the corner** — going in, the middle, or coming out ([[corner-regime]]). "Turn-in",
-   "the flick", "direction change" are going in; "the apex", "mid-corner", "holding the line" are
-   the middle; "on power", "off the corner" are coming out. "Settled" is this page's word, not the
+1. **Which end** — front, rear, or the whole car. A balance word names a ratio, not an end
+   (founder, 2026-09-08): "loose" and "oversteer" say the front has more than the rear, and that is
+   either the rear giving up or the front taking more than the rear can match — the words do not
+   say which. "Push" is the same thing the other way, understeer owed to the rear. What separates
+   them is what the other end is doing at the same point: a front that is pointy while the rear
+   steps out is the front past its window; a rear that is also numb or vague elsewhere is the rear
+   short of its own. The last change, if it was at one end, is the first suspect (fact 6).
+   "Steering" and "won't turn" are asked of the front, "rotation" and "drive" of the rear, as the
+   end the driver wants moved, never as the end that is wrong.
+2. **Where in the corner** — entering, in the middle, or exiting ([[corner-regime]]). "Turn-in",
+   "the flick", "direction change" are entering; "the apex", "mid-corner", "holding the line" are
+   the middle; "on power", "off the corner" are exiting. **A corner named is a phase given**
+   (founder, 2026-09-09): its time decides it before any assumption — length divided by speed against
+   how long the car takes to finish rolling ([[corner-regime]]). A hairpin is long and slow, so it is
+   mostly the middle, more than any other corner on the track; a chicane, a flick or a direction change
+   is over before the car has finished rolling, so it is entering. Never assume turn-in for a corner
+   whose name says otherwise — a lever that costs steering in the middle is the wrong lever for a
+   hairpin, however much it gives on the first input. "Settled" is this page's word, not the
    driver's — to them it is simply the middle, and so is any other word for the car's state at that
-   point ("leaned over", "loaded up", "taken a set"): say the middle. Ask where in the corner it is
-   worst — going in, the middle, or coming out — never whether the car has settled, and never in
-   terms that ask them to judge the physics: how far it rolls, how much travel it uses, whether it
-   touches — a driver cannot know those, even a very good one. They know understeer and oversteer.
-   Explain the physics if it helps, but what a change does to the balance is how they will read it.
-3. **On or off the throttle** — for anything at the rear or on exit, because the diff and the
-   fore-aft geometry split on that, not on the clock ([[differential-coupling]],
-   [[anti-dive-anti-squat]]).
+   point ("leaned over", "loaded up", "taken a set"): say the middle. When the phase is the open fact
+   of a problem the driver has named, ask where in the corner it is worst — entering the corner, in
+   the middle, or exiting — never whether the car has settled, and never in terms that ask them to
+   judge the physics: how far it rolls, how much travel it uses, whether it touches — a driver cannot
+   know those, even a very good one. They know understeer and oversteer. Explain the physics if it
+   helps, but what a change does to the balance is how they will read it. **A driver who has named
+   no problem is not asked where** (founder, 2026-09-09): asked what to test next time, or what they
+   should have tried, the question is whether the car gave them any problems and what they tried for
+   them — the facts come out of that answer, and a phase question before it is a question about a
+   problem nobody has named.
+3. **On or off the throttle** — for anything at the rear, because the diff and the fore-aft
+   geometry split on that, not on the clock ([[differential-coupling]], [[anti-dive-anti-squat]]).
+   **Exiting is on power** (founder, 2026-09-09): there is no exit off the throttle — where the
+   throttle comes on is where the middle ends and exiting begins — so a problem named on exit has
+   answered this fact, and asking whether it is on or off power there asks what they have already
+   said. Entering and the middle can be either.
 4. **How the grip behaves at that point** — where the car's point sits on the grip curve
-   ([[grip-curve]]) — or whether it is the angle that is short rather than the grip
-   ([[steering-response]]):
+   ([[grip-curve]]) — or whether it is the angle the car gives the tyre rather than the grip
+   ([[steering-response]]; "initial steering", more of it or a calmer first input, is the angle
+   first, as that page says):
    - it **arrives late** (there once settled, not on the first input). Read this with fact 2: grip
      that arrives for the last tenth of a corner is, to the driver, no grip in that corner — and in a
      fast car or a quick corner most corners are like that, so "no grip anywhere" and "it arrives
@@ -89,9 +119,10 @@ facts, never against the words.
      This usually goes hand in hand with arriving late, because the same knobs move both, but it is
      not the same fact: bite is the shape of the arrival, lateness its timing. A driver who says
      "bite", "numb", "imprecise", "unpredictable", "vague" or "floaty" has used this page's words and named this fact
-     — the initial grip, which is going in, so fact 2 is answered too. It is not the never-arrives
+     — the initial grip, which is entering the corner, so fact 2 is answered too. It is not the never-arrives
      case below, and neither needs separating with a question;
-   - it **never arrives** — short of grip overall, or the tyre and track before the car;
+   - it **never arrives** — the grip is not there at all, or the tyre and track are the limit
+     before the car is;
    - it **arrives and then goes**, suddenly and without warning — past the bite end of the window,
      or something running out ([[droop-downstop]], [[ride-height-and-rake]]);
    - it **arrives too hard** — too much bite;
@@ -102,14 +133,23 @@ facts, never against the words.
    the window on a different day (above), and "no grip" on a low-grip day is more often late grip
    than absent grip.
 6. **Whether it is the car at all** — tyres, prep, track state, other cars on the same rubber, and
-   whether the last change has even been verified. These come first, always.
+   whether the last change has even been verified. These come first, always. **A change the
+   driver says made the car worse everywhere is the strongest evidence on the sheet** (founder,
+   2026-09-09): they have just run a test on one lever and read the result. It names a lever whose
+   direction matters today, so the first move is that same lever the other way, one step past where
+   it started. If that is worse too, the setting they had was right and the problem is elsewhere.
+   Back to where it was is what to do when they want the old car, not a better one. Worse in one
+   phase and better in another is not a wrong lever — it is a two-answer knob doing what its lines
+   say, and reads as the phase fact it is (fact 2).
 
 Most complaints supply two or three of these and leave the rest open. The open ones are the
 candidates: carry every reading that still fits, and ask for the fact that separates them **only
-when the answer would change the advice**. "Like ice" on a low-grip day leaves fact 4 open between
-*late* and *never* — one question ("does it grip up once you're into the corner, or is it never
-there?") decides it,
-and the two answers lead to different mechanisms. "Good on entry but not mid" has already answered
+when the answer would change the advice**. "Like ice" on a low-grip track has answered facts 1, 2
+and 5 — both ends, the whole corner, grip down — and fact 4 is read from fact 5, never asked
+(founder, 2026-09-09): on a low-grip day it is late grip, so the car is moved toward grip that
+comes sooner at both ends, with the tyre-and-track check said beside the change. "Does it grip up
+once you're in, or is it never there?" asks the driver to tell apart two things that feel the same
+from the seat, and they cannot. "Good on entry but not mid" has already answered
 facts 1, 2 and 4 and needs no question. "More steering" and "more grip" on their own have answered
 almost nothing.
 

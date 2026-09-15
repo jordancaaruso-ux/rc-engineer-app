@@ -1,12 +1,16 @@
 import { requireCurrentUser } from "@/lib/currentUser";
+import { prisma } from "@/lib/prisma";
 import {
   getLiveRcDriverIdSetting,
   getLiveRcDriverNameSetting,
   getMyNameSetting,
   getSpeedhiveDriverNameSetting,
+  getSpeedhiveTransponderCarsSetting,
   getSpeedhiveTransponderNumbersSetting,
   getKnownCompetitorsSetting,
 } from "@/lib/appSettings";
+import { parseTransponderCarsSetting } from "@/lib/speedhive/transponderCars";
+import { NotificationsSection } from "@/components/settings/NotificationsSection";
 import {
   formatSpeedhiveTransponderNumbersForSetting,
   parseSpeedhiveTransponderNumbersSetting,
@@ -16,6 +20,7 @@ import { YouSection } from "@/components/settings/YouSection";
 import { TimingIdentitySection } from "@/components/settings/TimingIdentitySection";
 import { SettingsNavSection } from "@/components/settings/SettingsNavSection";
 import { DeleteAccountRow } from "@/components/settings/DeleteAccountRow";
+import { HelpRow } from "@/components/settings/HelpRow";
 import { OnboardingResetSection } from "@/components/settings/OnboardingResetSection";
 import { SetUpHandoffBar } from "@/components/onboarding/SetUpHandoffBar";
 import { AllowlistAdminSection } from "@/components/settings/AllowlistAdminSection";
@@ -35,8 +40,9 @@ import { showGetSetUpCard } from "@/lib/onboarding/visibility";
  * and the one irreversible action sits alone at the bottom.
  *
  * Two things came off the page in the same pass, both founder calls:
- *   · Notifications — nothing is wired to send one (the cron was dropped in f1991af and has
- *     never fired in production), so the section was offering a switch attached to nothing.
+ *   · Notifications — nothing was wired to send one (the cron was dropped in f1991af and never
+ *     fired in production), so the section offered a switch attached to nothing. Back since
+ *     2026-09-14: the timing sweep sends "Run N is in" and the evening summary through it.
  *     `NotificationsSection` is unmounted, not deleted: re-add the one line when push is real.
  *   · The loaner / club-chip declaration — see `TimingIdentitySection`.
  *
@@ -72,6 +78,8 @@ export default async function SettingsPage() {
     speedhiveTransponderRaw,
     knownCompetitorsRaw,
     onboarding,
+    transponderCarsRaw,
+    cars,
   ] = await Promise.all([
     getMyNameSetting(user.id),
     getLiveRcDriverNameSetting(user.id),
@@ -80,6 +88,12 @@ export default async function SettingsPage() {
     getSpeedhiveTransponderNumbersSetting(user.id),
     getKnownCompetitorsSetting(user.id),
     loadOnboardingView(user.id),
+    getSpeedhiveTransponderCarsSetting(user.id),
+    prisma.car.findMany({
+      where: { userId: user.id },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
   ]);
   const speedhiveTransponderNumbersText = formatSpeedhiveTransponderNumbersForSetting(
     parseSpeedhiveTransponderNumbersSetting(speedhiveTransponderRaw)
@@ -118,8 +132,14 @@ export default async function SettingsPage() {
               speedhiveDriverName: speedhiveDriverName ?? "",
               speedhiveTransponderNumbers: speedhiveTransponderNumbersText,
               knownCompetitors: parseKnownCompetitorsSetting(knownCompetitorsRaw),
+              transponderCars: parseTransponderCarsSetting(transponderCarsRaw),
+              cars,
             }}
           />
+
+          {/* Remounted 2026-09-14 with the timing sweep: "Run 3 is in" and the evening summary
+              go by push to anyone who has said yes here, by email to everyone else. */}
+          <NotificationsSection />
 
           <SettingsNavSection isAdmin={isAdmin} />
 
@@ -140,6 +160,7 @@ export default async function SettingsPage() {
           ) : null}
         </div>
 
+        <HelpRow />
         <DeleteAccountRow />
       </section>
     </>

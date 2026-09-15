@@ -5,13 +5,13 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
 import { trackCatalogScopeWhere } from "@/lib/tracks/communityTrackAccess";
 import { NewRunForm } from "@/components/runs/NewRunFormDynamic";
-import { RunVideoAnalysisSection } from "@/components/videoAnalysis/RunVideoAnalysisSection";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { getDashboardNewRunPrefill } from "@/lib/dashboardServer";
 import { runConditionsFromRecord } from "@/lib/weather/runConditionsRecord";
 import { deriveEditEntry } from "@/lib/runs/wizardEntry";
 import { WIZARD_STEPS } from "@/lib/runs/wizardWalk";
 import { safeAppPath } from "@/lib/navigation/safeAppPath";
+import { confirmRunReturnHref } from "@/lib/runs/confirmRunHref";
 
 export const dynamic = "force-dynamic";
 
@@ -119,6 +119,7 @@ export default async function EditRunPage({
         orderBy: { createdAt: "desc" },
       },
       loggingComplete: true,
+      unconfirmedAt: true,
       shareWithTeam: true,
       conditionsAirTempC: true,
       conditionsTrackTempC: true,
@@ -223,17 +224,28 @@ export default async function EditRunPage({
    * Null when nobody said, which keeps the wizard's own landings exactly as they were — a
    * run logged from the dock still finishes on the dashboard with its `?suggestRun` nudge.
    */
-  const returnHref = safeAppPath(sp.back);
+  /*
+   * A run the app filed from the timing sheet is here to be CONFIRMED, and a confirmation
+   * lands back on that day's Sessions list, where the rest of the day's unconfirmed runs are —
+   * not on the dashboard with a `?suggestRun` nudge meant for a run just logged. Anyone who
+   * said where they came from (`?back=`) still wins.
+   */
+  const confirming = wizardEnabled && run.loggingComplete && run.unconfirmedAt != null;
+  const returnHref = safeAppPath(sp.back) ?? (confirming ? confirmRunReturnHref(run.id) : null);
 
   return (
     <>
       <header className="page-header">
         <div>
-          <h1 className="page-title">{finishingDraft ? "Finish your run" : "Edit run"}</h1>
+          <h1 className="page-title">
+            {finishingDraft ? "Finish your run" : confirming ? "Confirm run" : "Edit run"}
+          </h1>
           <p className="page-subtitle">
             {finishingDraft
               ? "Pick up where you left off — laps, feedback, done."
-              : "Update notes, laps, tire context, or setup details."}
+              : confirming
+                ? "Check what was carried over, rate it, confirm."
+                : "Update notes, laps, tire context, or setup details."}
           </p>
         </div>
       </header>
@@ -321,14 +333,13 @@ export default async function EditRunPage({
               parsedPayload: s.parsedPayload,
             })),
             loggingComplete: run.loggingComplete,
+            unconfirmedAt: run.unconfirmedAt?.toISOString() ?? null,
             shareWithTeam: run.shareWithTeam,
             conditions: runConditionsFromRecord(run),
           }}
         />
-        <CardPanel className="mt-8 max-w-2xl">
-          <h2 className="text-sm font-medium mb-2">Video lap sync</h2>
-          <RunVideoAnalysisSection runId={run.id} trackId={run.trackId} />
-        </CardPanel>
+        {/* The "Video lap sync" card (`RunVideoAnalysisSection`) came off 2026-09-15 by founder
+            call: video is on no surface for now. The component is still in the tree. */}
       </section>
     </>
   );

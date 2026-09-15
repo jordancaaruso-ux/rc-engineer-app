@@ -3,6 +3,8 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
+import { getEntitlement } from "@/lib/entitlement";
+import { countRunsHiddenByPlan } from "@/lib/runs/runWindow";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getMyNameSetting } from "@/lib/appSettings";
 import { loadTeamMemberDisplays, memberDisplayLabelRecord } from "@/lib/teams/teamMemberDisplay";
@@ -15,8 +17,12 @@ import {
   buildGroupHeadline,
   buildGroupRunRows,
   buildGroupTrendModel,
+  type WorkbenchDebrief,
   type WorkbenchGroup,
 } from "@/lib/runs/sessionWorkbenchModel";
+import { debriefIdentityForGroup } from "@/lib/debrief/debriefKey";
+import { buildDebriefRecap } from "@/lib/debrief/buildDebriefRecap";
+import { loadDebriefsForIdentities } from "@/lib/debrief/loadDebrief";
 import { buildTeamDayModel } from "@/lib/runs/teamDayModel";
 import { RunHistoryViewMore } from "@/components/runs/RunHistoryViewMore";
 import { OPEN_GROUP_PARAM } from "@/lib/runs/sessionsReturn";
@@ -24,6 +30,7 @@ import { SessionsFilterBar } from "@/components/runs/SessionsFilterBar";
 import {
   buildDayRunNameMap,
   buildRunHistoryGroups,
+  resolveSessionGroupKeys,
   runSessionSortInstant,
   sessionGroupKey,
   type RunHistoryGroup,
@@ -90,6 +97,8 @@ const runHistorySelect = {
   sessionCompletedAt: true,
   loggingCompletedAt: true,
   loggingComplete: true,
+  // The app made this run from the timing sheet and nobody has opened it — the row says so.
+  unconfirmedAt: true,
   // Read by the row's "no lap times — import them" warning (runNeedsLapImport).
   lapImportPromptDismissedAt: true,
   sessionType: true,
@@ -281,6 +290,17 @@ async function loadSessionRunTotals(input: {
         localTimeZone: true,
         trackNameSnapshot: true,
         track: { select: { name: true } },
+        // The event's days and track, so an eventless run at the meeting folds into it here
+        // exactly as it does in the list (`resolveSessionGroupKeys`).
+        event: {
+          select: {
+            name: true,
+            startDate: true,
+            endDate: true,
+            trackNameSnapshot: true,
+            track: { select: { name: true } },
+          },
+        },
       },
       take: SESSION_TOTALS_TAKE_CAP + 1,
     })
@@ -291,9 +311,10 @@ async function loadSessionRunTotals(input: {
     ownerTimeZoneByUserId: input.ownerTimeZoneByUserId,
     viewerTimeZone: input.displayTimeZone,
   };
+  const keyByRunId = resolveSessionGroupKeys(rows, zones);
   const totals = new Map<string, number>();
   for (const row of rows) {
-    const key = sessionGroupKey(row, zones);
+    const key = keyByRunId.get(row.id) ?? sessionGroupKey(row, zones);
     totals.set(key, (totals.get(key) ?? 0) + 1);
   }
   return totals;
@@ -369,11 +390,21 @@ export default async function RunHistoryPage({
   const openGroupRaw = Array.isArray(rawOpenGroup) ? rawOpenGroup[0] : rawOpenGroup;
   const openGroupParam =
     typeof openGroupRaw === "string" && openGroupRaw.trim() ? openGroupRaw.trim() : null;
+  /*
+   * `level=day` stops the `openGroup` trip at the day's list instead of on the run itself.
+   * Confirming a run the app filed lands here (`confirmRunReturnHref`): the driver came to
+   * vouch for one of a day's carried runs, and the rest of that day's are rows on this list
+   * with their own Confirm — landing on the one just finished would put them a level away.
+   */
+  const rawLevel = resolvedSearch.level;
+  const openAtDay = (Array.isArray(rawLevel) ? rawLevel[0] : rawLevel) === "day";
 
   let runs: RunInGroup[] = [];
   let totalRunCount = 0;
   let viewAll = effectiveViewAllRequested;
   let hasMoreRuns = false;
+  /** Runs the viewer's own plan is hiding — the "N older runs · Upgrade" row. Solo scope only. */
+  let hiddenByPlanCount = 0;
   let teamTitle: string | null = null;
   let memberDisplayByUserId: Record<string, string> = {};
   let teamAccessDenied = false;
@@ -444,6 +475,13 @@ export default async function RunHistoryPage({
     totalRunCount = loaded.totalRunCount;
     viewAll = loaded.viewAll;
     hasMoreRuns = loaded.hasMoreRuns;
+    // The Starter upsell (docs/STARTER_TIER_PLAN.md) belongs to the member's own list only — a
+    // teammate looking at a Starter member's runs simply sees ten. Tier-checked as well as
+    // counted, so a stamp left behind by a missed plan-change webhook never sells an upgrade to
+    // a member who already has one.
+    const entitlement = await getEntitlement(user);
+    hiddenByPlanCount =
+      entitlement.tier === "starter" ? await countRunsHiddenByPlan(user.id) : 0;
   }
 
   if (!teamAccessDenied) {
@@ -616,6 +654,32 @@ export default async function RunHistoryPage({
       }
     });
   }
+  /**
+   * Your debrief of each meeting — the note and the figures beside it, drawn between the day's
+   * chart and its runs. Solo only, like the headline: in team scope the day is the field's.
+   * One query for every group on the page; the recap is computed from rows already here.
+   */
+  const debriefByGroupId = new Map<string, WorkbenchDebrief>();
+  if (browserActive && !teamMode) {
+    const identityByGroupId = new Map(
+      groups.map((group) => [group.id, debriefIdentityForGroup(group, groupZones)] as const)
+    );
+    const stored = await loadDebriefsForIdentities(
+      user.id,
+      [...identityByGroupId.values()].filter((identity) => identity != null)
+    );
+    for (const group of groups) {
+      const identity = identityByGroupId.get(group.id);
+      if (!identity) continue;
+      const row = stored.get(identity.meetingKey) ?? null;
+      debriefByGroupId.set(group.id, {
+        identity,
+        text: row?.text ?? "",
+        updatedAtIso: row?.updatedAtIso ?? null,
+        recap: buildDebriefRecap(group, { zones: groupZones }),
+      });
+    }
+  }
   const browserGroups: WorkbenchGroup[] = browserActive
     ? groups.map((group) => {
         const rows = buildGroupRunRows(group, groupZones, { setupDataByRunId });
@@ -632,6 +696,7 @@ export default async function RunHistoryPage({
           headline: teamMode
             ? null
             : buildGroupHeadline(rows, priorRowsByGroupId.get(group.id) ?? null),
+          debrief: debriefByGroupId.get(group.id) ?? null,
           drivers: teamMode
             ? buildGroupDrivers(group, { memberDisplayByUserId, setupDataByRunId, zones: groupZones })
             : null,
@@ -765,6 +830,7 @@ export default async function RunHistoryPage({
       hasMoreRuns={hasMoreRuns}
       totalRunCount={totalRunCount}
       loadedRunCount={dbMatchedCount}
+      hiddenByPlanCount={hiddenByPlanCount}
       teamId={teamId}
       openGroup={focusRunId}
       filterQuery={filterQuery}
@@ -877,7 +943,7 @@ export default async function RunHistoryPage({
             filterLabels={browserFilterLabels}
             railFooter={viewMore}
             initialGroupId={focusGroupId}
-            initialRunId={focusRunId}
+            initialRunId={openAtDay ? null : focusRunId}
           />
         )}
       </section>

@@ -95,6 +95,14 @@ export type OptionSection<T extends SearchableOption = SearchableOption> = {
   key: string;
   /** `null` when the section is the whole list and a heading would be noise. */
   label: string | null;
+  /**
+   * Coarser grouping for a filter-chip rail, where one chip may cover several sections: the
+   * chassis picker heads electric and nitro separately but wants one "1/10 Touring" chip, because
+   * a rail with a chip per heading does not fit on a phone. Defaults to this section's own
+   * `key`/`label`. Only read when a picker turns `sectionFilter` on.
+   */
+  filterKey?: string;
+  filterLabel?: string;
   options: T[];
 };
 

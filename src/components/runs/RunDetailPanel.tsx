@@ -37,8 +37,8 @@ import {
   formatLapRowBreakdown,
   fadeOverRunSeconds,
   formatFadeOverRun,
-  formatFadePerLap,
-  getFadePerLap,
+  formatFadePerMinute,
+  getFadePerMinute,
   getFadeProfile,
   getFastestIncludedLaps,
   getIncludedLaps,
@@ -49,13 +49,12 @@ import {
 import { LapTimeGraph } from "@/components/runs/LapTimeGraph";
 import { RunRaceFieldSwitcher, RACE_IDENTITY } from "@/components/runs/RunRaceFieldSwitcher";
 import Link from "next/link";
-import { ChevronRight, SquarePen, Trash2 } from "lucide-react";
+import { ChevronRight, CircleCheck, SquarePen, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useDraftRunOptional } from "@/components/layout/DraftRunProvider";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { StatWellGrid, StatWellCell } from "@/components/runs/LapStatStrip";
-import dynamic from "next/dynamic";
 import { CarHandlingRatingQuickPick } from "@/components/runs/CarHandlingRatingQuickPick";
 import {
   HandlingAssessmentFields,
@@ -85,13 +84,13 @@ import type { RunCorrectionOptions } from "@/lib/runs/runCorrectionOptions";
 import { persistedFromUiState } from "@/lib/runHandlingAssessment";
 import { skyLabelFromCloudCover, skyLabelFromWeatherCode } from "@/lib/weather/conditions";
 
-const LapComparePanel = dynamic(
-  () =>
-    import("@/components/videoAnalysis/LapComparePanel").then((m) => ({
-      default: m.LapComparePanel,
-    })),
-  { loading: () => null }
-);
+/*
+ * `LapComparePanel` (the "No video analysis on this run yet · Analyze" row, and the analysed
+ * session's "Open session" link) came off this page on 2026-09-15 by founder call: video is on
+ * no surface for now, in the app or on the site. The component is still in the tree at
+ * `@/components/videoAnalysis/LapComparePanel`; putting it back is a `dynamic()` import and the
+ * one element that sat above the delete controls.
+ */
 
 /** Row shape shared by the Sessions table and `/runs/[id]` (SSR-selected). */
 export type Run = {
@@ -116,6 +115,8 @@ export type Run = {
   sortAt?: Date | string | null;
   /** False until user marks "Run completed" when saving. */
   loggingComplete?: boolean;
+  /** Filed by the app from the timing sheet; cleared only by a wizard save. */
+  unconfirmedAt?: Date | string | null;
   /** Set once the driver silences the Sessions-row "no lap times" warning. */
   lapImportPromptDismissedAt?: Date | string | null;
   carId: string | null;
@@ -338,6 +339,30 @@ export function RunDetailPanel({
   const [editing, setEditing] = useState(false);
   useEffect(() => setEditing(false), [run.id]);
   const canEdit = allowRunMutations && editing;
+  /*
+   * Confirming a run the app filed from the timing sheet — the same door `RunFaces` has,
+   * because `/runs/[id]` still lands shared links and notifications. One tap in read mode;
+   * in edit mode it is what "Done" becomes, since finishing the check IS the confirmation.
+   */
+  const unconfirmed = run.unconfirmedAt != null;
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const confirmRun = useCallback(
+    async (thenLeaveEdit: boolean) => {
+      if (confirming) return;
+      setConfirming(true);
+      setConfirmError(null);
+      try {
+        await corrections.confirmRun();
+        if (thenLeaveEdit) setEditing(false);
+      } catch (err) {
+        setConfirmError(err instanceof Error ? err.message : "Could not confirm this run");
+      } finally {
+        setConfirming(false);
+      }
+    },
+    [confirming, corrections]
+  );
   /** The car change the driver has picked but not yet confirmed. See `RunCarMoveSheet`. */
   const [pendingCarMove, setPendingCarMove] = useState<{ id: string; label: string } | null>(null);
   const [carMoveBusy, setCarMoveBusy] = useState(false);
@@ -540,7 +565,7 @@ export function RunDetailPanel({
   const mistakeSummary = formatMistakeAnalysisSummary(mistakeAnalysis);
   const fadeProfile = useMemo(() => getFadeProfile(ownRows), [ownRows]);
   const fade = useMemo(
-    () => ({ perLap: getFadePerLap(ownRows), overRunSeconds: fadeOverRunSeconds(ownRows) }),
+    () => ({ perMinute: getFadePerMinute(ownRows), overRunSeconds: fadeOverRunSeconds(ownRows) }),
     [ownRows]
   );
   const bestLapRows = useMemo(() => getFastestIncludedLaps(ownRows, 1), [ownRows]);
@@ -802,8 +827,8 @@ export function RunDetailPanel({
         />
         <StatWellCell
           label="Fade"
-          title={formatFadeOverRun(fade.overRunSeconds) ?? "Seconds per lap the run drifted; positive = slower late"}
-          value={formatFadePerLap(fade.perLap)}
+          title={formatFadeOverRun(fade.overRunSeconds) ?? "Seconds per minute the run drifted; positive = slower late"}
+          value={formatFadePerMinute(fade.perMinute)}
           alignValue
         />
       </StatWellGrid>
@@ -941,6 +966,39 @@ export function RunDetailPanel({
         </div>
 
         {/*
+          The state, on the card itself — the page subtitle that also says it is hidden on
+          a phone, which left the run page with no sign of it at all (390px drive,
+          2026-09-14). Its own row rather than a pill in the header line: there the eyebrow,
+          the pill and three controls fought over 350px and the pill lost half its letters.
+          State on the left, the one act it asks for on the right; the act moves into the
+          edit banner below while editing, where it is what "Done" becomes.
+        */}
+        {unconfirmed ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="shrink-0 rounded-full bg-warning/12 px-2 py-[2px] text-[9px] font-bold uppercase tracking-[0.07em] text-warning">
+              Unconfirmed
+            </span>
+            {allowRunMutations && !editing ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void confirmRun(false);
+                }}
+                disabled={confirming}
+                className={cn(
+                  "tap-active inline-flex h-8 shrink-0 items-center gap-1 rounded-md border border-border bg-background px-2.5",
+                  "text-[11.5px] font-semibold text-foreground transition hover:bg-muted/80 disabled:opacity-60"
+                )}
+                title="This run is right as it stands"
+              >
+                <CircleCheck className="h-3.5 w-3.5" aria-hidden />
+                Confirm
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        {/*
           The mode's only banner. It exists because edit mode is otherwise invisible on a
           phone once the header scrolls away — and because "Done" has to be reachable
           without hunting for the pencil that turned it on.
@@ -950,15 +1008,18 @@ export function RunDetailPanel({
             <span className="text-[11.5px] font-semibold text-primary-ink">
               Editing — tap anything underlined
             </span>
+            {/* On a carried record the finishing tap vouches for it; see `confirmRun`. */}
             <button
               type="button"
-              onClick={() => setEditing(false)}
-              className="tap-active shrink-0 rounded-md bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground"
+              onClick={() => (unconfirmed ? void confirmRun(true) : setEditing(false))}
+              disabled={confirming}
+              className="tap-active shrink-0 rounded-md bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground disabled:opacity-60"
             >
-              Done
+              {unconfirmed ? "Confirm" : "Done"}
             </button>
           </div>
         ) : null}
+        {confirmError ? <p className="text-[11px] text-destructive">{confirmError}</p> : null}
         {/*
           ============================== WHAT A CORRECTION MAY NOT TOUCH ==============================
 
@@ -1236,7 +1297,12 @@ export function RunDetailPanel({
         <Eyebrow>{setupPreview.mode === "no_setup" ? "Setup" : "Setup vs previous run"}</Eyebrow>
         {setupPreview.mode === "no_setup" ? (
           <p className="text-muted-foreground text-xs">
-            No setup recorded for this run — it was logged without one.
+            {/* A carried sheet that is empty was never "logged" by anyone — it is a copy of a
+                run that was completed without one. Saying "logged without one" about a run
+                nobody logged was the untrue line a drive turned up (2026-09-14). */}
+            {unconfirmed
+              ? "No setup recorded — the run this was carried from had none."
+              : "No setup recorded for this run — it was logged without one."}
           </p>
         ) : (
           /*
@@ -1353,12 +1419,6 @@ export function RunDetailPanel({
           />
         ) : null}
       </div>
-
-      <LapComparePanel
-        runId={run.id}
-        trackId={run.track?.id ?? null}
-        allowMutations={allowRunMutations}
-      />
 
       {/*
         Delete lives inside edit mode now. It sat permanently on the page before, which

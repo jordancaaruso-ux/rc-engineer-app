@@ -17,7 +17,7 @@ two_answers: true
 more:
   reviewed: false
   confidence: majority
-  before_settled: "more initial steering — the front bites sooner, and comes in less progressively"
+  before_settled: "more initial steering — the front grips up sooner as you turn in, and comes in less progressively"
   once_settled: "less front grip through the middle and less forgiving over bumps; the rate stays more even through the travel"
 less:
   reviewed: true

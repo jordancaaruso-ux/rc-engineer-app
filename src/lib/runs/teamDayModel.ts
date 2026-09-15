@@ -5,6 +5,7 @@ import {
 import {
   resolveRunLocalTimeZone,
   runLocalDayKey,
+  formatRunDayLabel,
   runSessionSortInstant,
   type RunGroupZoneOptions,
 } from "@/lib/runs/buildRunHistoryGroups";
@@ -127,21 +128,6 @@ function minutesOfDay(run: TeamDayRunSource, zones: RunGroupZoneOptions): number
   return ((hour % 24) * 60 + minute) % (24 * 60);
 }
 
-/**
- * "Fri 26 Jun" from a YYYY-MM-DD day key. The key is already in the driver's zone,
- * so it is formatted at UTC noon — anything else re-applies a zone shift to a date
- * that has already had one and can slide the label to the wrong day.
- */
-function formatBandLabel(dayKey: string): string {
-  const date = new Date(`${dayKey}T12:00:00Z`);
-  if (Number.isNaN(date.getTime())) return dayKey;
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "UTC",
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  }).format(date);
-}
 
 export function formatClock(minute: number): string {
   const h = Math.floor(minute / 60) % 24;
@@ -273,7 +259,7 @@ export function buildTeamDayModel(
       }
       return {
         key,
-        label: formatBandLabel(key),
+        label: formatRunDayLabel(key),
         minMinute,
         maxMinute,
         runCount: dayMinutes.length,

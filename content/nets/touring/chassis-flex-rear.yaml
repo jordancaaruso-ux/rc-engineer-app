@@ -16,12 +16,12 @@ two_answers: true
 more:
   reviewed: false
   confidence: majority
-  before_settled: "the rear bites sooner — more secure from the first steering input, but less progressive"
+  before_settled: "the rear grips up sooner as you turn in — more secure from the first steering input, but less progressive"
   once_settled: "tends toward less rear grip through the middle and more rotation — the contested claim below, the other way"
 less:
   reviewed: true
   confidence: contested
-  before_settled: "the rear bites later — a little less secure from the first steering input, but more progressive"
+  before_settled: "the rear grips up later as you turn in — a little less secure from the first steering input, but more progressive"
   once_settled: "tends toward more rear grip through the middle and less rotation — the usual answer on a touring car"
   contested:   # founder 2026-09-02: "normally more rear grip", and the split relates to corner regime; discriminator reworded to an on-track observable 2026-09-03
     claim_a: "more rear flex gives more rear grip through the middle and less rotation"

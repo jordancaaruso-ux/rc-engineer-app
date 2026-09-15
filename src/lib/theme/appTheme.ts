@@ -35,4 +35,4 @@ export const APP_THEME = "light" as const;
  * Android install shows the OS splash in paper for a beat before ours — untested on a
  * device, left alone rather than guessed at.
  */
-export const PAGE_BG = "#EAE7E0";
+export const PAGE_BG = "#F4F4F3";

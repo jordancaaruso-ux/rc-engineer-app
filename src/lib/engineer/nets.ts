@@ -9,6 +9,15 @@ import {
   type NetEntry,
 } from "@/lib/engineer/netsSchema";
 import { rcLeversFromNets, rcMovesBlock } from "@/lib/engineer/rcDirections";
+import {
+  groupNets,
+  loadNetFamilies,
+  renderGroupHeading,
+  renderWholeCarLines,
+  wholeCarPairsFor,
+  type NetFamily,
+  type WholeCarPair,
+} from "@/lib/engineer/netFamilies";
 
 /**
  * Loader for the nets artifact (content/nets/ — empirical setup priors; authoring rules in
@@ -34,9 +43,15 @@ const NETS_DRAFTS_DIR = path.join(NETS_DIR, "drafts");
  * says why" (lines carry short why-clauses). The second phase label became THROUGH THE MIDDLE AND
  * OUT: about ten lines carry exit content and the old label told the model they were about the
  * middle. CONTESTED stays — since this date the genuine splits are real contested blocks.
+ *
+ * 2026-09-08 (founder call): entries render under GROUP lines derived from the KB's own
+ * `**Moved by:**` links (netFamilies.ts). A rear spring and a rear bar were arriving as two
+ * unrelated levers and coming back as two separate alternatives; the header now says a group is
+ * one change and alternatives come from other groups. No list is maintained anywhere.
  */
 export const ENGINEER_NETS_HEADER = `SETUP EFFECT PRIORS ("nets") — outcomes, in the driver's words. Probabilistic: "most likely", never "will".
-Each entry is one knob, with what each direction most likely does — both directions side by side. A knob that does one thing on the way into the corner and another from the middle on carries TWO lines per direction — ON THE WAY IN and THROUGH THE MIDDLE AND OUT — because it genuinely has two answers, and which one matters today depends on how long the corner lasts against how long this car takes to settle. The knowledge base above carries that rule; work out from it and from what the driver has told you which line applies, and say so. Speak of places on the corner — going in, the middle, coming out — never of whether the car has "settled": that is the knowledge base's word, not the driver's. A knob with one EFFECT line per direction has one answer for the corner; where that answer splits on something else — throttle, car speed — the line says so. A longer entry is not a better lever.
+Each entry is one knob, with what each direction most likely does — both directions side by side. A knob that does one thing on the way into the corner and another from the middle on carries TWO lines per direction — ENTERING THE CORNER and IN THE MIDDLE AND EXITING — because it genuinely has two answers, and which one matters today depends on how long the corner lasts against how long this car takes to settle. The knowledge base above carries that rule; work out from it and from what the driver has told you which line applies, and say so. Speak of places on the corner — entering the corner, in the middle, exiting — never of whether the car has "settled": that is the knowledge base's word, not the driver's. A knob with one EFFECT line per direction has one answer for the corner; where that answer splits on something else — throttle, car speed — the line says so. A longer entry is not a better lever.
+Entries under a GROUP line are versions of one change — the thing the group is named for, at the end the label says. Name the group and the end. Where something the driver said separates the knobs, pick the knob and say what makes it the one (the knowledge base says what separates them); where nothing does, give the group move with a step on each knob as the ways to make it, and say which you would try first for carrying the least cost. Take the other levers from other groups, never from the same one. A knob with no GROUP line stands alone. A GROUP line may carry BOTH ENDS TOGETHER lines: the same move at both ends, which moves when the whole car's grip comes and not the front-to-rear balance — the answer to "both front and rear" questions.
 What makes an effect bigger, smaller or worth the opposite move lives in the knowledge base, once — never in these lines. Never treat a prior as evidence about the mechanism it points at.
 A line that says "can" or "tends toward" means exactly that: it goes that way more often than not, and not always.
 Every entry carries the same weight: no prior outranks another — choose by fit to the driver's problem, never by how an entry is worded. Where a side carries CONTESTED claims, present both and the on-track discriminator, never pick silently. A "normal move" is what a typical-sized change looks like; size the move to the problem — a chronic one that is everywhere takes a big move, a small complaint a small one.
@@ -54,11 +69,18 @@ export type LoadedNets = {
   /** Draft entry files included, sorted. */
   draftFiles: string[];
   entries: NetEntry[];
+  /** Lever families derived from the KB's Moved-by links — what the GROUP lines were built from. */
+  families: NetFamily[];
+  /** Whole-car pairs (both ends together), rendered on their family's GROUP line. */
+  wholeCar: WholeCarPair[];
 };
 
 async function listYamlFiles(dir: string): Promise<string[]> {
   try {
-    return (await fs.readdir(dir)).filter((f) => f.endsWith(".yaml") || f.endsWith(".yml")).sort();
+    // Files starting with "_" are not one-knob entries (_whole-car.yaml) and load by name.
+    return (await fs.readdir(dir))
+      .filter((f) => (f.endsWith(".yaml") || f.endsWith(".yml")) && !f.startsWith("_"))
+      .sort();
   } catch {
     return [];
   }
@@ -99,6 +121,49 @@ async function readEntries(
   return { entries, included };
 }
 
+/**
+ * Whole-car pairs for one discipline dir. Tolerant: a malformed file must never take the Engineer
+ * down, so a bad pair is skipped loudly and the rest render.
+ */
+async function readWholeCarPairs(dir: string): Promise<WholeCarPair[]> {
+  let raw = "";
+  try {
+    raw = await fs.readFile(path.join(dir, "_whole-car.yaml"), "utf8");
+  } catch {
+    return [];
+  }
+  let parsed: unknown;
+  try {
+    parsed = parseYaml(raw);
+  } catch {
+    console.warn(`[nets] ${dir}/_whole-car.yaml: YAML parse failed — skipped`);
+    return [];
+  }
+  const list = (parsed as { pairs?: unknown })?.pairs;
+  if (!Array.isArray(list)) return [];
+  const out: WholeCarPair[] = [];
+  for (const p of list as Array<Record<string, unknown>>) {
+    const ok =
+      typeof p.id === "string" && typeof p.label === "string" && Array.isArray(p.knobs) &&
+      p.knobs.length >= 2 && p.knobs.every((k) => typeof k === "string") &&
+      typeof p.more === "string" && typeof p.less === "string";
+    if (!ok) {
+      console.warn(`[nets] _whole-car.yaml: pair ${String(p.id ?? "?")} malformed — skipped`);
+      continue;
+    }
+    out.push({
+      id: p.id as string,
+      label: p.label as string,
+      knobs: p.knobs as string[],
+      step: typeof p.step === "string" && p.step.trim() ? p.step : null,
+      reviewed: p.reviewed === true,
+      more: p.more as string,
+      less: p.less as string,
+    });
+  }
+  return out;
+}
+
 const cache = new Map<string, Promise<LoadedNets>>();
 
 /**
@@ -126,11 +191,13 @@ export async function loadNets(params?: { discipline?: string | null }): Promise
 
     const reviewed: NetEntry[] = [];
     const reviewedFiles: string[] = [];
+    const wholeCar: WholeCarPair[] = [];
     for (const d of disciplineDirs.sort()) {
       const dir = path.join(NETS_DIR, d);
       const { entries, included } = await readEntries(dir, await listYamlFiles(dir), null);
       reviewed.push(...entries);
       reviewedFiles.push(...included.map((f) => `${d}/${f}`));
+      wholeCar.push(...(await readWholeCarPairs(dir)));
     }
 
     const drafts = await readEntries(
@@ -139,7 +206,14 @@ export async function loadNets(params?: { discipline?: string | null }): Promise
       discipline
     );
 
-    const sections: string[] = reviewed.map(renderNetEntry);
+    // Reviewed entries render under GROUP lines (a family with two or more knobs) or alone.
+    // Drafts stay flat below their divider — they are hedged, not organised.
+    const families = await loadNetFamilies();
+    const sections: string[] = groupNets(reviewed, families).map((u) =>
+      u.kind === "group"
+        ? [renderGroupHeading(u), ...renderWholeCarLines(wholeCarPairsFor(u, wholeCar)), ...u.entries.map(renderNetEntry)].join("\n")
+        : renderNetEntry(u.entry)
+    );
     if (drafts.entries.length > 0) {
       sections.push(NETS_DRAFTS_DIVIDER, ...drafts.entries.map(renderNetEntry));
     }
@@ -154,6 +228,8 @@ export async function loadNets(params?: { discipline?: string | null }): Promise
       files: reviewedFiles,
       draftFiles: drafts.included,
       entries: [...reviewed, ...drafts.entries],
+      families,
+      wholeCar,
     };
   })();
 

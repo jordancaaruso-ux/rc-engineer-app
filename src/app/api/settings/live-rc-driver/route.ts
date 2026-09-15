@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import {
@@ -7,6 +7,7 @@ import {
   setLiveRcDriverIdSetting,
   setLiveRcDriverNameSetting,
 } from "@/lib/appSettings";
+import { refreshPlanUser } from "@/lib/sweep/buildSweepPlan";
 
 export async function GET() {
   if (!hasDatabaseUrl()) {
@@ -43,5 +44,7 @@ export async function POST(request: Request) {
     getLiveRcDriverNameSetting(userId),
     getLiveRcDriverIdSetting(userId),
   ]);
+  // A name saved this afternoon is listened for this afternoon — see the Speedhive route.
+  after(() => refreshPlanUser(userId).catch(() => {}));
   return NextResponse.json({ liveRcDriverName, liveRcDriverId });
 }

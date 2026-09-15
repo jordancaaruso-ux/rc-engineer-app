@@ -1463,8 +1463,8 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
 
       {/* ── Adjustments (edit the selected slot) ───────────────────── */}
       <CardPanel className="lab-adjust" contentClassName="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <Eyebrow>
+        <div className="eyebrow-band flex items-center justify-between gap-2">
+          <Eyebrow className="mb-0">
             Adjustments · {axle}
             {comparing ? ` · ${activeId.toUpperCase()}` : ""}
           </Eyebrow>

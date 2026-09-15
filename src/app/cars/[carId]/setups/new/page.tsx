@@ -167,6 +167,8 @@ export default async function NewCarSetupPage(props: {
       isLibrary: true,
       createdAt: true,
       runs: {
+        // Relation reads bypass the run window's query gate (docs/STARTER_TIER_PLAN.md).
+        where: { hiddenByPlanAt: null },
         orderBy: { createdAt: "desc" },
         take: 1,
         select: {

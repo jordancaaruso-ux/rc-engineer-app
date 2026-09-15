@@ -162,6 +162,10 @@ export type ManualScanCandidate = {
   dir?: 1 | -1;
   /** How sure the window was of it — see `CrossingEvent.source`. */
   source?: "confirmed" | "rescued" | "unconfirmed";
+  /** How fast the tracked object was moving as it crossed, frame pixels a second — see `CrossingEvent.speedPxPerSec`. */
+  speedPxPerSec?: number;
+  /** Share of the window something was moving at this place, 0..1 — see `CrossingEvent.dwell`. */
+  dwell?: number;
 };
 
 /** One car the picker offered at one line, with every verdict the timing put under it. */
@@ -246,6 +250,151 @@ export type ManualScanRecord = {
   rows: ManualScanRow[];
 };
 
+/* ---------- the race pass ---------- */
+
+/** How one driver's laps came out of a race pass. */
+export type RaceRecordDriver = {
+  key: string;
+  name: string;
+  role?: DriverRole;
+  laps: Array<{
+    lapNumber: number;
+    /** Share of the lap's frames the car was seen in. */
+    coverage: number;
+    /** The two start-line crossings are the sheet's lap time apart. */
+    sfMatched: boolean;
+    /** Both ends came off one path, so there is a racing line for this lap. */
+    pathComplete: boolean;
+  }>;
+};
+
+/**
+ * The last race pass, as a summary — what was read, who was named, and what was given up on.
+ *
+ * Deliberately not the evidence: `lastScan` already carries every candidate at every line, and
+ * the raw sightings live on disk beside the drive script. This is what the review panel needs to
+ * say honestly how the pass went, and what a later session needs to know before trusting it.
+ */
+export type ManualRaceRecord = {
+  at: string;
+  sessionId: string;
+  /** Which pass wrote it. */
+  recipe: string;
+  spanFromSec: number;
+  spanToSec: number;
+  frames: number;
+  readMs: number;
+  /** How much smaller than the frame the picture it followed cars in was. */
+  scale: number;
+  drivers: RaceRecordDriver[];
+  /** Paths that matched nobody's crossings — people, marshals, flags. */
+  unnamed: number;
+  /** Paths dropped for never going anywhere. */
+  standing: number;
+  /** Paths cut where two cars became one blob. */
+  merges: number;
+  /** Paths joined through the strip's crossing at a shaded start line. */
+  bridged: number;
+  /** Paths whose crossings fitted two drivers equally — reported rather than guessed. */
+  ties: number;
+  /** Frames thrown out as the camera moving rather than the cars. */
+  shakeFrames: number;
+  /** Share of the sheet's (driver, lap) starts that got a measured crossing. */
+  namedShare: number;
+  /** Measured lap lengths against the sheet's own. */
+  sheetCheck: { laps: number; medianMs: number; worstMs: number } | null;
+  /** "doesnt-line-up" means the footage and the timing disagree and nothing was written. */
+  verdict: "ok" | "doesnt-line-up";
+};
+
+/* ---------- traced laps ---------- */
+
+export const LAP_TRACE_VERSION = 1 as const;
+
+/**
+ * One point of a car's path through the video: [video sec, x, y, w, h], everything but the time
+ * as a fraction of the frame — the same normalisation as a sector line, so a proxy and the master
+ * carry identical numbers. `w`/`h` is the box of the moving blob: kept so a later pass can put
+ * a scale on the picture from the car's known size without tracing the lap again.
+ */
+export type TracePoint = [number, number, number, number, number];
+
+export type TraceHoleWhy = "lost" | "missing-crossing" | "ambiguous";
+
+/** A stretch of the lap with no path. Drawn as a break; never bridged. */
+export type TraceHole = { fromT: number; toT: number; why: TraceHoleWhy };
+
+/** One sector of a traced lap, line to line, with how well the car was followed through it. */
+export type TraceSegment = {
+  fromKey: string;
+  toKey: string;
+  fromT: number;
+  toT: number;
+  /** Frames the car was placed in, over frames read. */
+  coverage: number;
+  /**
+   * How far the traced path sits from the stored crossing at the moment it was detected, in car
+   * lengths. Null when the crossing has no position or the path has a hole there.
+   */
+  anchorErr: { from: number | null; to: number | null };
+  /**
+   * Why the frames that carry no point carry none. `read` is every frame of the sector; `saw`
+   * is how many held anything moving at all; `shake` is how many were thrown out as the camera
+   * rather than the car. Coverage says a sector went wrong; these three say which of the three
+   * things went wrong, which is the difference between fixing it and guessing.
+   */
+  frames?: { read: number; saw: number; shake: number };
+  /**
+   * Whether each bounding crossing had a position on the picture. A line the scan never located
+   * is a line the path was never checked at, so no delta is read there — measured 2026-09-07: on
+   * the one lap with two unlocated lines, the reading at one of them was 0.32 s out, while every
+   * reading at a located line on the same footage sat inside 0.09 s.
+   */
+  pinned?: { from: boolean; to: boolean };
+};
+
+/**
+ * A car's path round one lap, read off the footage — "Trace this lap" on the compare step.
+ *
+ * Positions are what the tracer saw, never interpolated: a stretch it could not follow is a hole,
+ * and `quality.ok` says whether the whole thing is honest enough to draw.
+ */
+export type ManualLapTrace = {
+  version: typeof LAP_TRACE_VERSION;
+  at: string;
+  sessionId: string;
+  driverRole: DriverRole;
+  lapNumber: number;
+  /** The frame size the positions were read against. */
+  frame: { w: number; h: number };
+  startSec: number;
+  endSec: number;
+  /** One per frame the car was seen in, `t` strictly increasing. */
+  points: TracePoint[];
+  holes: TraceHole[];
+  segments: TraceSegment[];
+  quality: {
+    coverage: number;
+    anchorsHit: number;
+    anchorsTotal: number;
+    ambiguousFrames: number;
+    /** Good enough to draw. */
+    ok: boolean;
+  };
+  /** Which tracer wrote it. */
+  recipe: string;
+};
+
+export function traceKey(role: DriverRole, lapNumber: number): string {
+  return `${role}:${lapNumber}`;
+}
+
+/** The role a trace key is filed under, or null for a key that is not one. */
+export function traceKeyRole(key: string): DriverRole | null {
+  const i = key.indexOf(":");
+  return i < 0 ? null : asDriverRole(key.slice(0, i));
+}
+
 /** Normalized crop in video pixel space (0–1), persisted in manualJson. */
 export type VideoViewCropNorm = {
   x: number;
@@ -272,6 +421,10 @@ export type ManualVideoSessionV2 = {
   marks: ManualFrameMark[];
   lastScan?: ManualScanRecord;
   lastIdentify?: ManualIdentifyRecord;
+  /** The last race pass, as a summary — see `ManualRaceRecord`. */
+  lastRace?: ManualRaceRecord;
+  /** Traced laps, by `traceKey(role, lap)`. */
+  traces?: Record<string, ManualLapTrace>;
 };
 
 /** @deprecated v1 shape — migrated on read */
@@ -376,6 +529,116 @@ function parseSelectedLaps(raw: Record<string, unknown>): SelectedLaps {
   return out;
 }
 
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
+const TRACE_HOLE_WHYS: ReadonlySet<string> = new Set(["lost", "missing-crossing", "ambiguous"]);
+
+/** One trace off disk, or null when it is not one worth keeping. */
+function parseTrace(raw: unknown): ManualLapTrace | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (o.version !== LAP_TRACE_VERSION) return null;
+  const driverRole = asDriverRole(o.driverRole);
+  if (!driverRole || typeof o.sessionId !== "string" || !isFiniteNumber(o.lapNumber)) return null;
+  if (!isFiniteNumber(o.startSec) || !isFiniteNumber(o.endSec)) return null;
+  const frame = o.frame as Record<string, unknown> | undefined;
+  if (!frame || !isFiniteNumber(frame.w) || !isFiniteNumber(frame.h)) return null;
+  if (!Array.isArray(o.points)) return null;
+  const points: TracePoint[] = [];
+  let lastT = -Infinity;
+  for (const p of o.points as unknown[]) {
+    if (!Array.isArray(p) || p.length !== 5 || !p.every(isFiniteNumber)) return null;
+    const pt = p as number[];
+    if (pt[0]! <= lastT) return null;
+    lastT = pt[0]!;
+    points.push([pt[0]!, pt[1]!, pt[2]!, pt[3]!, pt[4]!]);
+  }
+  const holes: TraceHole[] = [];
+  for (const h of Array.isArray(o.holes) ? (o.holes as unknown[]) : []) {
+    if (!h || typeof h !== "object") continue;
+    const x = h as Record<string, unknown>;
+    if (!isFiniteNumber(x.fromT) || !isFiniteNumber(x.toT) || !TRACE_HOLE_WHYS.has(String(x.why))) continue;
+    holes.push({ fromT: x.fromT, toT: x.toT, why: x.why as TraceHoleWhy });
+  }
+  const segments: TraceSegment[] = [];
+  for (const sg of Array.isArray(o.segments) ? (o.segments as unknown[]) : []) {
+    if (!sg || typeof sg !== "object") continue;
+    const x = sg as Record<string, unknown>;
+    if (typeof x.fromKey !== "string" || typeof x.toKey !== "string") continue;
+    if (!isFiniteNumber(x.fromT) || !isFiniteNumber(x.toT) || !isFiniteNumber(x.coverage)) continue;
+    const err = (x.anchorErr ?? {}) as Record<string, unknown>;
+    const fr = (x.frames ?? {}) as Record<string, unknown>;
+    const pin = (x.pinned ?? {}) as Record<string, unknown>;
+    segments.push({
+      fromKey: x.fromKey,
+      toKey: x.toKey,
+      fromT: x.fromT,
+      toT: x.toT,
+      coverage: x.coverage,
+      anchorErr: {
+        from: isFiniteNumber(err.from) ? err.from : null,
+        to: isFiniteNumber(err.to) ? err.to : null,
+      },
+      ...(isFiniteNumber(fr.read) && isFiniteNumber(fr.saw) && isFiniteNumber(fr.shake)
+        ? { frames: { read: fr.read, saw: fr.saw, shake: fr.shake } }
+        : {}),
+      ...(typeof pin.from === "boolean" && typeof pin.to === "boolean"
+        ? { pinned: { from: pin.from, to: pin.to } }
+        : {}),
+    });
+  }
+  const q = o.quality as Record<string, unknown> | undefined;
+  if (
+    !q ||
+    !isFiniteNumber(q.coverage) ||
+    !isFiniteNumber(q.anchorsHit) ||
+    !isFiniteNumber(q.anchorsTotal) ||
+    !isFiniteNumber(q.ambiguousFrames)
+  ) {
+    return null;
+  }
+  return {
+    version: LAP_TRACE_VERSION,
+    at: typeof o.at === "string" ? o.at : "",
+    sessionId: o.sessionId,
+    driverRole,
+    lapNumber: o.lapNumber,
+    frame: { w: frame.w, h: frame.h },
+    startSec: o.startSec,
+    endSec: o.endSec,
+    points,
+    holes,
+    segments,
+    quality: {
+      coverage: q.coverage,
+      anchorsHit: q.anchorsHit,
+      anchorsTotal: q.anchorsTotal,
+      ambiguousFrames: q.ambiguousFrames,
+      ok: q.ok === true,
+    },
+    recipe: typeof o.recipe === "string" ? o.recipe : "",
+  };
+}
+
+/**
+ * Every trace that reads back whole. A damaged one is dropped on its own — the `lastScan`
+ * leniency — rather than taking the session with it; the lap can be traced again.
+ */
+function parseTraces(raw: unknown): Record<string, ManualLapTrace> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const out: Record<string, ManualLapTrace> = {};
+  let n = 0;
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const trace = parseTrace(value);
+    if (!trace || traceKey(trace.driverRole, trace.lapNumber) !== key) continue;
+    out[key] = trace;
+    n++;
+  }
+  return n ? out : undefined;
+}
+
 function parseV2(raw: Record<string, unknown>): ManualVideoSessionV2 | null {
   if (raw.version !== MANUAL_VIDEO_SESSION_VERSION) return null;
   if (!Array.isArray(raw.timingSessions) || !Array.isArray(raw.marks)) return null;
@@ -425,6 +688,16 @@ function parseV2(raw: Record<string, unknown>): ManualVideoSessionV2 | null {
       Array.isArray((raw.lastIdentify as ManualIdentifyRecord).lines)
         ? (raw.lastIdentify as ManualIdentifyRecord)
         : undefined,
+    // Read back explicitly, and only when it is whole: a damaged summary must not take the
+    // session with it, the same leniency `lastScan` and the traces get.
+    lastRace:
+      raw.lastRace &&
+      typeof raw.lastRace === "object" &&
+      Array.isArray((raw.lastRace as ManualRaceRecord).drivers) &&
+      typeof (raw.lastRace as ManualRaceRecord).verdict === "string"
+        ? (raw.lastRace as ManualRaceRecord)
+        : undefined,
+    traces: parseTraces(raw.traces),
   };
 }
 

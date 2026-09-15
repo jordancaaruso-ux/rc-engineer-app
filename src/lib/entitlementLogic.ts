@@ -3,13 +3,21 @@
  * (`npm run test:entitlement`) and to import from anywhere. The DB-backed resolvers live in
  * `entitlement.ts`, mirroring the `authAdminLogic.ts` / `authAdmin.ts` split.
  *
- * Model: feature-gated tiers (paywall plan, 2026-07-23). Standard = the smart notebook; Pro adds
- * the heavy/premium features. The Engineer is available to BOTH tiers — the Standard-vs-Pro
- * difference is a usage cap (an AiUsageDaily budget), not a feature gate, so "engineer" is in both
- * feature sets.
+ * Model: feature-gated tiers (paywall plan, 2026-07-23; third tier 2026-09-09). Starter = the
+ * notebook that only remembers the last fifteen runs and has no Engineer. Standard = the smart
+ * notebook; Pro adds the heavy/premium features. The Engineer is available to Standard AND Pro —
+ * the Standard-vs-Pro difference is a usage cap (an AiUsageDaily budget), not a feature gate, so
+ * "engineer" is in both of those feature sets and absent from Starter's
+ * (docs/STARTER_TIER_PLAN.md).
  */
 
-export type Tier = "none" | "standard" | "pro";
+export type Tier = "none" | "starter" | "standard" | "pro";
+
+/** The tiers a member can actually hold — `Tier` minus the lapsed/unsubscribed state. */
+export type PaidTier = Exclude<Tier, "none">;
+
+/** Cheapest first — the order `lowestTierWithFeature` walks. */
+export const PAID_TIERS: readonly PaidTier[] = ["starter", "standard", "pro"];
 
 export type Feature =
   | "logging"
@@ -19,11 +27,13 @@ export type Feature =
   | "video"
   | "roll-center";
 
-const STANDARD_FEATURES: Feature[] = ["logging", "review", "compare", "engineer"];
+const STARTER_FEATURES: Feature[] = ["logging", "review", "compare"];
+const STANDARD_FEATURES: Feature[] = [...STARTER_FEATURES, "engineer"];
 const PRO_FEATURES: Feature[] = [...STANDARD_FEATURES, "video", "roll-center"];
 
 const TIER_FEATURES: Record<Tier, ReadonlySet<Feature>> = {
   none: new Set<Feature>(),
+  starter: new Set(STARTER_FEATURES),
   standard: new Set(STANDARD_FEATURES),
   pro: new Set(PRO_FEATURES),
 };
@@ -32,6 +42,38 @@ const TIER_FEATURES: Record<Tier, ReadonlySet<Feature>> = {
 export function isFeatureEntitled(tier: Tier, feature: Feature): boolean {
   return TIER_FEATURES[tier].has(feature);
 }
+
+/**
+ * The cheapest tier that includes a feature. Not the name a locked door sells: that is
+ * `upgradeTierFor`, which differs for the Engineer.
+ */
+export function lowestTierWithFeature(feature: Feature): PaidTier {
+  for (const tier of PAID_TIERS) {
+    if (TIER_FEATURES[tier].has(feature)) return tier;
+  }
+  return "pro";
+}
+
+/**
+ * The tier a locked surface sells for a feature: what "Included in …", "Upgrade to …" and a 402
+ * refusal name. The cheapest tier that has it, except the Engineer: Notebook's one question a day
+ * is a taste, not the feature, so a locked Engineer points at Race Engineer (founder call
+ * 2026-09-15). Gating never reads this; `isFeatureEntitled` decides who gets in.
+ */
+export function upgradeTierFor(feature: Feature): PaidTier {
+  if (feature === "engineer") return "pro";
+  return lowestTierWithFeature(feature);
+}
+
+/**
+ * How many of a Starter member's runs stay visible (docs/STARTER_TIER_PLAN.md). Fifteen runs is
+ * a race weekend plus a club night (ten at 2026-09-09, raised to fifteen by founder call
+ * 2026-09-15); the sixteenth run hides the first. Hidden, never deleted — `applyRunWindow`
+ * (src/lib/runs/runWindow.ts) stamps `Run.hiddenByPlanAt`, and an upgrade clears it. Lives here
+ * rather than beside the routine so the join page can print the number without importing a
+ * server-only module.
+ */
+export const STARTER_RUN_WINDOW = 15;
 
 /**
  * Stripe subscription statuses that grant access. Everything else (canceled, past_due, incomplete,
@@ -65,9 +107,14 @@ export type SubscriptionShape = {
 export const SUBSCRIPTION_GRACE_MS = 3 * 24 * 60 * 60 * 1000;
 
 /**
- * Effective tier from a subscription row. `null` / inactive / expired-past-grace → "none". A row
- * whose `tier` string isn't exactly "pro" resolves to "standard" — fail-safe to the cheaper grant,
- * never accidentally to Pro.
+ * Effective tier from a subscription row. `null` / inactive / expired-past-grace → "none". The
+ * `tier` string has to match an id exactly ("pro", "starter"); anything else resolves to
+ * "standard" — fail-safe to the cheaper of the two original grants, never accidentally to Pro.
+ * Starter is cheaper still, but a genuinely unknown string is a config fault, not a Starter
+ * purchase, and hiding a paying member's runs is the wrong way to be wrong.
+ *
+ * The flip side (docs/STARTER_TIER_PLAN.md, deploy order): code that does not know "starter"
+ * hands a Starter buyer full Notebook. Ship this before the live Starter price exists.
  *
  * `graceMs` is a parameter (not an env read) to keep this function pure and unit-testable; pass 0
  * to assert the hard expiry boundary.
@@ -85,7 +132,9 @@ export function deriveSubscriptionTier(
   ) {
     return "none";
   }
-  return sub.tier === "pro" ? "pro" : "standard";
+  if (sub.tier === "pro") return "pro";
+  if (sub.tier === "starter") return "starter";
+  return "standard";
 }
 
 /**

@@ -5,8 +5,8 @@ import { getPricePlansWithAmounts, getStripe, stripeConfigured } from "@/lib/str
 import { TIER_LABELS } from "@/lib/brand/brandNames";
 import {
   PRO_ENGINEER_MONTHLY_QUESTIONS,
-  STANDARD_ENGINEER_DAILY_QUESTIONS,
 } from "@/lib/aiUsage/budgets";
+import { STARTER_RUN_WINDOW } from "@/lib/entitlementLogic";
 import { EnterSignInCode } from "@/app/login/verify-request/EnterSignInCode";
 
 export const metadata = { title: "Check your email" };
@@ -16,7 +16,8 @@ type PaidPlan = {
   label: string;
   amount: string | null;
   interval: "month" | "year";
-  questions: string;
+  /** The one number worth confirming: Engineer questions for Race Engineer, runs kept otherwise. */
+  detail: { label: string; value: string };
 };
 
 /**
@@ -68,10 +69,12 @@ export default async function JoinSuccessPage({
                     }).format(plan.unitAmount / 100)
                   : null,
               interval: plan.interval,
-              questions:
+              detail:
                 plan.tier === "pro"
-                  ? `${PRO_ENGINEER_MONTHLY_QUESTIONS} a month`
-                  : `${STANDARD_ENGINEER_DAILY_QUESTIONS} a day`,
+                  ? { label: "Engineer questions", value: `${PRO_ENGINEER_MONTHLY_QUESTIONS} a month` }
+                  : plan.tier === "standard"
+                    ? { label: "Runs kept", value: "All" }
+                    : { label: "Runs kept", value: `Last ${STARTER_RUN_WINDOW}` },
             };
           }
         }
@@ -121,8 +124,8 @@ export default async function JoinSuccessPage({
                 </dd>
               </div>
               <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-faint">Engineer questions</dt>
-                <dd className="fig-stat font-semibold text-primary-ink">{paidPlan.questions}</dd>
+                <dt className="text-faint">{paidPlan.detail.label}</dt>
+                <dd className="fig-stat font-semibold text-primary-ink">{paidPlan.detail.value}</dd>
               </div>
             </dl>
           ) : null}

@@ -1,0 +1,176 @@
+DRIVER DATA — RUNS IN A RANGE. The driver chose this range: TFTR, from 1 Jun, every car. 32 runs shown, earliest first. Nothing outside this range is attached; the driver's other runs are not visible here.
+"changed" is what moved on the setup sheet since that same physical car's previous run in this list. A run with no "changed" line has no readable sheet on one side: that is unknown, not unchanged. "tyre run N" is the Nth run on that set of rubber; a "?" means the driver was not sure how old the set was.
+"vs field" is from the timing sheet of that session: your place by best lap out of the timed entrants, your best lap minus the fastest driver's (0.00 = you were fastest), the same for the top-5 average, and your best minus the field's median best (negative = faster than the middle of the field). Everyone in the session drove the same track at the same time, so these cancel the track's own movement in a way lap times cannot. A run without it was not imported from a timing sheet with two or more drivers.
+
+RUNS
+2026-06-07  14:35  A800R  best 16.16  top5 16.34  5min 18/5:06.9  21 laps  rated 7/10  tyre run 17
+2026-06-07  14:58  A800R  best 16.03  top5 16.20  5min 16/5:13.3  25 laps  rated 7/10  tyre run 1
+    no setup change
+2026-06-07  16:53  A800R  best 15.77  top5 15.92  5min 16/5:07.7  21 laps  rated 7/10  tyre run 6
+    changed: toe rear 3.5 → 4
+2026-06-07  16:54  A800R  best 15.91  top5 15.99  14 laps  rated 7/10  tyre run 7
+    changed: arb front 1 → -, arb rear 1.1 → -
+2026-06-07  16:56  A800R  best 15.53  top5 15.87  5min 17/5:00.5  19 laps  rated 8/10  tyre run 8
+    changed: arb front - → 1.2, arb rear - → 1.3
+2026-06-08  13:00  A800R  best 15.83  top5 15.93  14 laps  rated 8/10  tyre run 23
+    changed: c45 installed rear Yes → —, inner steering angle 26 → 28, rear hrb setting 2.75 → 3.5, upper inner shims ff 3 → 2.25, upper inner shims fr 3 → 2.25, upper inner shims rf 4 → 3.25, upper inner shims rr 4 → 3.25
+2026-06-08  14:39  A800R  best 15.78  top5 15.93  5min 16/5:12.9  19 laps  rated 6/10  tyre run 1
+    changed: camber front -1.5 → -2, camber rear -1.5 → -2, rear spring rate gf mm 119.6 → 125, spring gap rear 3.2 → 3.6
+2026-06-08  15:24  A800R  best 15.79  top5 16.23  6 laps  rated 4/10  tyre run 1
+    no setup change
+2026-06-08  16:01  A800R  best 15.62  top5 15.77  5min 19/5:15.1  21 laps  rated 7/10  tyre run 1
+    changed: camber front -2 → -1.5
+2026-06-08  16:33  A800R  best 15.95  top5 16.00  5min 16/5:06.2  16 laps  rated 7/10  tyre run 1
+    changed: upper inner shims rf 3.25 → 2.25, upper inner shims rr 3.25 → 2.25
+2026-06-08  17:31  A800R  best 15.76  top5 15.89  5min 19/5:11.7  21 laps  rated 6/10  tyre run 1
+    changed: camber front -1.5 → -2, upper inner shims rf 2.25 → 3.25, upper inner shims rr 2.25 → 3.25
+2026-06-14  12:52  A800RR  best 16.87  top5 17.18  14 laps  rated 7/10  tyre run 4
+2026-06-14  13:54  A800RR  best 16.01  top5 16.12  vs field P1/3, 0.00 to P1 (top5 0.00), -0.30 vs median  5min 19/5:10.3  19 laps  rated 7/10  tyre run 5
+    no setup change
+2026-06-14  14:40  A800RR  best 16.19  top5 16.24  vs field P2/5, +0.32 to P1 (top5 +0.12), -0.12 vs median  5min 19/5:10.6  19 laps  rated 6/10  tyre run 4
+    changed: under lower arm shims fr 2.5 → 3  (gap to P1 vs previous run: +0.32)
+2026-06-14  15:32  A800RR  best 15.79  top5 15.87  vs field P1/5, 0.00 to P1 (top5 0.00), -0.46 vs median  5min 19/5:01.3  19 laps  rated 8/10  tyre run 5
+    changed: under lower arm shims fr 3 → 2.5  (gap to P1 vs previous run: -0.32)
+2026-06-14  16:15  A800RR  best 15.86  top5 15.90  vs field P1/4, 0.00 to P1 (top5 0.00), -0.41 vs median  5min 19/5:05.1  19 laps  rated 8/10  tyre run 6
+    changed: damping front Linear → p2, damping rear Linear → p2, rear spring rate gf mm 125 → 127.7, ride height front 5.2 → 5, ride height rear 5.4 → 5.2, spring gap rear 3.6 → 3.8  (gap to P1 vs previous run: 0.00)
+2026-06-14  17:27  A800RR  best 15.73  top5 15.89  5min 19/5:10.0  21 laps  rated 8/10  tyre run 7
+    no setup change
+2026-06-21  13:52  A800RR  best 17.95  top5 18.17  5min 21/5:12.5  29 laps  rated 7/10  tyre run 1  Vaulk 36SK
+    no setup change
+2026-06-21  14:34  A800RR  best 16.50  top5 16.56  13 laps  rated 7/10  tyre run 2  Vaulk 36SK
+    changed: damping front p2 → linear, damping rear p2 → linear
+2026-06-21  15:02  A800RR  best 15.89  top5 15.96  16 laps  rated 7/10  tyre run 4  Vaulk 36SK
+    changed: damping front linear → p2, damping rear linear → p2, rear spring rate gf mm 127.7 → 125, spring gap rear 3.8 → 3.6
+2026-06-21  16:15  A800RR  best 15.81  top5 15.88  5min 18/5:00.5  21 laps  rated 7/10  tyre run 5  Vaulk 36SK
+    changed: upper inner shims ff 2.25 → 1.25, upper inner shims fr 2.25 → 1.25, upper inner shims rf 3.25 → 2.25, upper inner shims rr 3.25 → 2.25
+2026-06-21  17:45  A800RR  best 15.72  top5 15.81  5min 19/5:06.1  31 laps  rated 8/10  tyre run 6  Vaulk 36SK
+    changed: upper inner shims ff 1.25 → 2.75, upper inner shims fr 1.25 → 2.75, upper inner shims rf 2.25 → 3.75, upper inner shims rr 2.25 → 3.75
+2026-07-05  14:53  A800RR  best 17.35  top5 17.61  15 laps  rated 5/10  tyre run 6  Vaulk 36SK
+    changed: arb front 1.2 → 1, arb rear 1.3 → 1.1, camber front -2 → -1.5, camber rear -2 → -1.5, damper oil rear 450 → 500, damping front p2 → Linear, damping rear p2 → Linear, front spring rate gf mm 61.4 → 68.4, +8 more
+2026-07-05  14:53  A800RR  best 17.03  top5 17.11  16 laps  rated 6/10  tyre run 7  Vaulk 36SK
+    no setup change
+2026-07-05  15:39  A800RR  best 16.93  top5 17.11  5min 16/5:08.2  25 laps  rated 7/10  tyre run 8  Vaulk 36SK
+    no setup change
+2026-07-05  16:43  A800RR  best 16.38  top5 16.44  5min 17/5:02.9  26 laps  rated 7/10  tyre run 9  Vaulk 36SK
+    no setup change
+2026-07-05  18:07  A800RR  best 16.23  top5 16.39  5min 15/5:11.8  24 laps  rated 8/10  tyre run 10  Vaulk 36SK
+    changed: arb front 1 → 1.2, arb rear 1.1 → 1.3
+2026-07-19  15:07  A800RR  best 16.20  top5 16.35  5min 14/5:19.6  18 laps  rated 6/10  tyre run 9  Vaulk 36SK  16.6°C
+    changed: c45 installed rear — → 1, camber rear -1.5 → -2, damper percent front 100 → 80, damper percent rear 100 → 80, rear hrb setting 3.5 → 2.75, toe rear 3.5 → 3
+2026-07-19  15:42  A800RR  best 15.89  top5 16.04  5min 16/5:13.1  18 laps  rated 7/10  tyre run 3  Vaulk 36SK  16.3°C
+    changed: toe rear 3 → 3.2
+2026-07-19  16:10  A800RR  best 16.04  top5 16.23  14 laps  rated 7/10  tyre run 4  Vaulk 36SK  16.3°C
+    changed: damper percent front 80 → 100, damper percent rear 80 → 100
+2026-07-19  16:47  A800RR  best 15.80  top5 16.06  18 laps  rated 7/10  tyre run 2  Vaulk 36SK  15.3°C
+    changed: damper percent front 100 → 80, damper percent rear 100 → 80
+2026-07-19  16:52  A800RR  best 15.90  top5 16.03  5min 19/5:13.5  20 laps  rated 7/10  tyre run 3  Vaulk 36SK  15.6°C
+    changed: damper percent front 80 → 100, damper percent rear 80 → 95, toe front -1.2 → -1.1, toe rear 3.2 → 3
+
+DAYS — one line per day. "first → last" is the best lap of the first timed run against the
+last: how the day moved, whatever the cause.
+
+2026-06-07  5 runs  best of day 15.53  first timed run best 16.16 → last 15.53 (-0.64)
+2026-06-08  6 runs  best of day 15.62  first timed run best 15.83 → last 15.76 (-0.07)
+2026-06-14  6 runs  best of day 15.73  first timed run best 16.87 → last 15.73 (-1.14)
+2026-06-21  5 runs  best of day 15.72  first timed run best 17.95 → last 15.72 (-2.23)
+2026-07-05  5 runs  best of day 16.23  first timed run best 17.35 → last 16.23 (-1.11)
+2026-07-19  5 runs  best of day 15.80  first timed run best 16.20 → last 15.90 (-0.29)  air 15.3–16.6°C
+
+Across 6 days with two or more timed runs, first → last best lap moved -0.91 on average (range -2.23 to -0.07).
+
+TYRES — one line per set of tyres with two or more timed runs. Run 1 = the first run on that
+rubber. Deltas are against run 1 on the same set: positive = slower. A set that spans more
+than one day carries the day-to-day change in grip inside its deltas; a run marked "at" another
+track is a different circuit and its delta is not a tyre delta.
+
+set 1  2026-06-07
+    run 6 best 15.77 top5 15.92  ·  run 7 best 15.91 (+0.15) top5 15.99 (+0.07)  ·  run 8 best 15.53 (-0.24) top5 15.87 (-0.06)
+set 2  2026-06-14
+    run 4 best 16.87 top5 17.18  ·  run 5 best 16.01 (-0.86) top5 16.12 (-1.06)
+set 3  2026-06-14
+    run 4 best 16.19 top5 16.24  ·  run 5 best 15.79 (-0.40) top5 15.87 (-0.37)  ·  run 6 best 15.86 (-0.33) top5 15.90 (-0.34)  ·  run 7 best 15.73 (-0.46) top5 15.89 (-0.34)
+set 4  2026-06-21  Vaulk 36SK  (spans 2 days)
+    run 1 best 17.95 top5 18.17  ·  run 2 best 16.50 (-1.45) top5 16.56 (-1.61)  ·  run 3 best 15.89 (-2.06) top5 16.04 (-2.13) on 2026-07-19  ·  run 4 best 16.04 (-1.91) top5 16.23 (-1.94) on 2026-07-19
+set 5  2026-06-21  Vaulk 36SK
+    run 4 best 15.89 top5 15.96  ·  run 5 best 15.81 (-0.08) top5 15.88 (-0.07)  ·  run 6 best 15.72 (-0.18) top5 15.81 (-0.15)
+set 6  2026-07-05  Vaulk 36SK
+    run 6 best 17.35 top5 17.61  ·  run 7 best 17.03 (-0.32) top5 17.11 (-0.50)  ·  run 8 best 16.93 (-0.42) top5 17.11 (-0.49)  ·  run 9 best 16.38 (-0.96) top5 16.44 (-1.17)  ·  run 10 best 16.23 (-1.11) top5 16.39 (-1.21)
+set 7  2026-07-19  Vaulk 36SK
+    run 2 best 15.80 top5 16.06  ·  run 3 best 15.90 (+0.10) top5 16.03 (-0.03)
+
+Average across 1 set with a known run 1, same track as run 1 — run 2 vs run 1: best -1.45 (1 set), top5 -1.61; run 3 vs run 1: best -2.06 (1 set), top5 -2.13; run 4 vs run 1: best -1.91 (1 set), top5 -1.94
+Same-day pairs only (no day-to-day grip change inside the delta) — run 2 vs run 1: best -1.45 (1 set), top5 -1.61
+
+TYRES, AGAINST THE FIELD — the same sets, but "best" here is your gap to the fastest driver's best
+lap in that session and "top5" your gap to the best top-5 average in the field (0.00 = you were the
+fastest). Deltas are still against run 1 on the set, positive = you fell further from the front.
+The field aged its tyres and felt the track move too, so this is the tyre effect with the day taken
+out. Only runs imported from a timing sheet with two or more drivers appear.
+
+set 1  2026-06-14
+    run 4 best 0.32 top5 0.12  ·  run 5 best 0.00 (-0.32) top5 0.00 (-0.12)  ·  run 6 best 0.00 (-0.32) top5 0.00 (-0.12)
+
+BEST RUNS, AGAINST THE FIELD — closest to the fastest driver's best lap first. The field drove the
+same track at the same time, so this ranking cancels the track's own movement; tyre age is still
+inside it.
+
+1. 0.00 to P1  P1/3  2026-06-14 13:54  (best 16.01 on tyre run 5, -0.30 vs field median)
+2. 0.00 to P1  P1/5  2026-06-14 15:32  (best 15.79 on tyre run 5, -0.46 vs field median)
+3. 0.00 to P1  P1/4  2026-06-14 16:15  (best 15.86 on tyre run 6, -0.41 vs field median)
+4. +0.32 to P1  P2/5  2026-06-14 14:40  (best 16.19 on tyre run 4, -0.12 vs field median)
+
+SETUP ON THE CAR AT THE LAST RUN SHOWN (A800RR, 2026-07-19).
+These are the values the car ran that day. Reason with them; do not read them back.
+
+ackermann position: Rearward
+arb front: 1.2
+arb rear: 1.3
+body position from windshield: 58
+bump steer shims front: 2.5
+c45 installed front: no
+c45 installed rear: 1
+camber front: -1.5
+camber rear: -2
+caster front: 4
+caster rear: -3
+damper oil front: 450
+damper oil rear: 500
+damper percent front: 100
+damper percent rear: 95
+damping front: linear
+damping rear: linear
+diff height front: Up
+diff height rear: Up
+diff oil: 6K
+downstop front: 23.4
+downstop rear: 22.4
+front spring rate gf mm: 68.4
+inner steering angle: 28
+motor lateral shift: 0
+rear hrb setting: 2.75
+rear spring rate gf mm: 119.6
+ride height front: 5
+ride height rear: 5.2
+servo horn height: 17mm
+spring front: std
+spring gap front: 0
+spring gap rear: 3.2
+spring rear: std
+toe front: -1.1
+toe gain shims rear: 3
+toe rear: 3
+under hub shims front: 0
+under hub shims rear: 0
+under lower arm shims ff: 2.5
+under lower arm shims fr: 2.5
+under lower arm shims rf: 3
+under lower arm shims rr: 3
+upper inner shims ff: 3.5
+upper inner shims fr: 3.5
+upper inner shims rf: 4.5
+upper inner shims rr: 4.5
+upper outer shims front: 1.5
+upper outer shims rear: 1.5
+upstop front: -
+upstop rear: -
+weight balance front percent: 50

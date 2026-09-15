@@ -17,7 +17,7 @@ import {
 
 export type RunHistorySort = "completed_desc" | "completed_asc" | "best_lap_asc" | "best_lap_desc";
 export type RunHistoryLayout = "grouped" | "flat";
-export type RunHistoryStatus = "all" | "draft" | "complete";
+export type RunHistoryStatus = "all" | "draft" | "complete" | "unconfirmed";
 /** Setup-value comparison. `eq` is contains-text; the rest compare parsed numbers. */
 export type SetupValueOp = "eq" | "gte" | "lte" | "between";
 /** Direction constraint for the setup-changed filter (numeric fields). */
@@ -124,6 +124,7 @@ function parseSort(raw: string): RunHistorySort {
 function parseStatus(raw: string): RunHistoryStatus {
   if (raw === "draft") return "draft";
   if (raw === "complete") return "complete";
+  if (raw === "unconfirmed") return "unconfirmed";
   return "all";
 }
 
@@ -348,7 +349,7 @@ export function describeRunHistoryFilters(
           : " changed";
     out.push(`${field}${dir}`);
   }
-  if (filters.status !== "all") out.push(filters.status === "draft" ? "Drafts" : "Complete");
+  if (filters.status !== "all") out.push(describeRunHistoryStatus(filters.status));
   return out;
 }
 
@@ -452,7 +453,15 @@ export function buildRunHistoryPrismaWhere(
   }
   if (filters.status === "draft") where.loggingComplete = false;
   if (filters.status === "complete") where.loggingComplete = true;
+  if (filters.status === "unconfirmed") where.unconfirmedAt = { not: null };
   return where;
+}
+
+/** The chip word for a status filter — one spelling for the bar and the "Also filtering by" line. */
+export function describeRunHistoryStatus(status: RunHistoryStatus): string {
+  if (status === "draft") return "Drafts";
+  if (status === "unconfirmed") return "Unconfirmed";
+  return "Complete";
 }
 
 export type RunForHistoryFilter = {

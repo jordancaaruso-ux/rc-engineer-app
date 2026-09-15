@@ -112,7 +112,7 @@ const OG_IMAGE_ALT =
 
 /* Bumped with the picture. Preview images are cached by URL by iMessage, WhatsApp, Slack and
    Discord, so a changed card always ships under a new filename rather than overwriting. */
-const OG_IMAGE = "/landing/assets/og-card-v3.jpg";
+const OG_IMAGE = "/landing/assets/og-card-v4.jpg";
 
 export const metadata: Metadata = {
 

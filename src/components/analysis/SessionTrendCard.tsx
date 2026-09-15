@@ -804,6 +804,8 @@ export function SessionTrendCard({
       null,
     [carRuns, readRunId, markedRunId]
   );
+  // A meeting spans days (2026-09-14); a clock alone no longer says which one.
+  const multiDay = useMemo(() => new Set(carRuns.map((run) => run.dayKey)).size > 1, [carRuns]);
   const toggleSeries = useCallback((key: SeriesKey) => {
     setHidden((previous) => {
       const next = new Set(previous);
@@ -897,7 +899,7 @@ export function SessionTrendCard({
           it is. The figures are READ OFF the plot, so they sit under it, where your eye
           already is when you take your finger off.
         */}
-        <RunCaptionLine run={readoutRun} />
+        <RunCaptionLine run={readoutRun} multiDay={multiDay} />
 
         <PaceTrendChart
           carRuns={carRuns}
@@ -1300,6 +1302,25 @@ function PaceTrendChart({
   }, [carRuns, markedRunId, activeIndex]);
 
   /*
+   * The days on the plot (2026-09-14). A meeting spans days now, so consecutive runs on
+   * one calendar day form a band: a hairline where the day changes, and the day's name
+   * on the axis row IN PLACE OF the run labels. At ten runs a day the run labels were
+   * already stepping over most of themselves, and "Sat 13" under a band says more than
+   * "Q2" under one column of it; the caption above the plot still names the run being
+   * read. A single day draws nothing extra and keeps its run labels.
+   */
+  const dayBands = useMemo(() => {
+    const bands: Array<{ dayKey: string; dayLabel: string; start: number; end: number }> = [];
+    carRuns.forEach((run, index) => {
+      const last = bands[bands.length - 1];
+      if (last && last.dayKey === run.dayKey) last.end = index;
+      else bands.push({ dayKey: run.dayKey, dayLabel: run.dayLabel, start: index, end: index });
+    });
+    return bands;
+  }, [carRuns]);
+  const multiDay = dayBands.length > 1;
+
+  /*
    * Publish the hovered run so a list beside the chart can light the same row.
    *
    * `hoverRun`, not `displayRun`: the strip's resting fallback is the latest run,
@@ -1477,7 +1498,60 @@ function PaceTrendChart({
               strokeWidth={1}
             />
 
+            {multiDay && geometry
+              ? dayBands.map((band, bandIndex) => {
+                  const left =
+                    band.start === 0
+                      ? PAD_LEFT
+                      : (geometry.xAt(band.start - 1) + geometry.xAt(band.start)) / 2;
+                  const right =
+                    bandIndex === dayBands.length - 1
+                      ? chartWidth - PAD_RIGHT
+                      : (geometry.xAt(band.end) + geometry.xAt(band.end + 1)) / 2;
+                  const width = right - left;
+                  // "Sat 13 Sep" → "Sat 13" → "13" → nothing, by the room the band has.
+                  const parts = band.dayLabel.split(" ");
+                  const label =
+                    width >= 68
+                      ? band.dayLabel
+                      : width >= 40
+                        ? parts.slice(0, 2).join(" ")
+                        : width >= 11
+                          ? (parts[1] ?? "")
+                          : "";
+                  const newest = bandIndex === dayBands.length - 1;
+                  return (
+                    <g key={band.dayKey}>
+                      {band.start > 0 ? (
+                        <line
+                          x1={left}
+                          x2={left}
+                          y1={PAD_TOP - 2}
+                          y2={dims.labelBaseline + 3}
+                          className="stroke-border"
+                          strokeWidth={1}
+                        />
+                      ) : null}
+                      {label ? (
+                        <text
+                          x={left + (band.start === 0 ? 0 : 4)}
+                          y={dims.labelBaseline}
+                          textAnchor="start"
+                          className={cn(
+                            "tabular-nums text-[9px]",
+                            newest ? "fill-muted-foreground" : "fill-faint"
+                          )}
+                        >
+                          {label}
+                        </text>
+                      ) : null}
+                    </g>
+                  );
+                })
+              : null}
+
             {carRuns.map((run, index) => {
+              if (multiDay) return null;
               const step = Math.max(1, Math.ceil(carRuns.length / dims.labelBudget));
               const isLast = index === carRuns.length - 1;
               const stepped = index % step === 0 && carRuns.length - 1 - index >= step;
@@ -1746,8 +1820,12 @@ function SeriesMark({ color, width }: { color: string; width: number }) {
  * The session's name is what the run WAS ("Practice", "Qualifying 2"), not where it
  * fell in the day — the same reversal the rows below made on the same date.
  */
-function RunCaptionLine({ run }: { run: AnalysisTrendRun | null }) {
+function RunCaptionLine({ run, multiDay = false }: { run: AnalysisTrendRun | null; multiDay?: boolean }) {
   if (!run) return null;
+  // "Sat 13, 2:41 PM" on a meeting that spans days; the bare clock on a single day.
+  const clock = multiDay
+    ? [run.dayLabel.split(" ").slice(0, 2).join(" "), run.timeLabel].filter(Boolean).join(", ")
+    : run.timeLabel;
   return (
     <div className="flex min-w-0 items-baseline gap-2 px-0.5">
       <span className="shrink-0 text-[11.5px] font-semibold tracking-tight text-foreground">
@@ -1766,9 +1844,7 @@ function RunCaptionLine({ run }: { run: AnalysisTrendRun | null }) {
       */}
       <span className="ml-auto flex shrink-0 items-baseline gap-2">
         <RunExtraFigures run={run} />
-        {run.timeLabel ? (
-          <span className="text-[10px] tabular-nums text-faint">{run.timeLabel}</span>
-        ) : null}
+        {clock ? <span className="text-[10px] tabular-nums text-faint">{clock}</span> : null}
       </span>
     </div>
   );

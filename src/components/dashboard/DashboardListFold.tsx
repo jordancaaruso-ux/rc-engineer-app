@@ -26,8 +26,9 @@ import { Collapse } from "@/components/ui/Collapse";
  * have to be read after hydration, which means the card jumps open a beat after the page
  * paints, on every load, for the sake of a state one tap restores.
  *
- * The header hairline lives INSIDE the fold, so a closed card is one clean row rather than a
- * label with a rule hanging off nothing.
+ * The fold's row is the card's band, and its hairline is drawn only while open
+ * (`.eyebrow-band[aria-expanded="false"]` in globals.css): a closed card is one clean tinted row,
+ * not a label with a rule hanging off nothing just above the card's own edge.
  */
 export function DashboardListFold({
   label,
@@ -53,15 +54,16 @@ export function DashboardListFold({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls={bodyId}
-        className="tap-active flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        className="tap-active eyebrow-band flex min-h-11 w-full items-center justify-between gap-3 px-4 text-left"
       >
         {/* The raw `.eyebrow-label`, not the `Eyebrow` wrapper — same reasoning as `BandHeader`:
-            the wrapper carries its own bottom rule and margin, which is the floating-in-the-gutter
-            spacing this row replaces. */}
+            the wrapper brings `mb-2`, spacing for a heading above content, not one that IS a row.
+            The row is the card's band (2026-09-15); `min-h-11` keeps the 44px a thumb needs,
+            which a 29px band alone would not. */}
         <span className="eyebrow-label min-w-0">{label}</span>
         <span className="flex shrink-0 items-center gap-2">
           {count > 0 ? (
-            <span className="text-[12px] tabular-nums text-muted-foreground">{count}</span>
+            <span className="text-[11px] leading-[1.25] tabular-nums text-muted-foreground">{count}</span>
           ) : null}
           <ChevronDown
             className={cn(
@@ -74,7 +76,7 @@ export function DashboardListFold({
       </button>
 
       <Collapse open={open} id={bodyId}>
-        <div className="border-t border-border px-4 pb-4 pt-3">{children}</div>
+        <div className="px-4 pb-4 pt-3">{children}</div>
       </Collapse>
     </CardPanel>
   );

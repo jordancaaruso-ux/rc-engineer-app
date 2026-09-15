@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { revalidateAfterRunMutation } from "@/lib/revalidateUser";
+import { applyRunWindow } from "@/lib/runs/runWindow";
+import { armAndPollTrackNow } from "@/lib/sweep/runSweepTick";
+import { reportSweepFailure } from "@/lib/observability/reportSweep";
 import { Prisma } from "@prisma/client";
 import type { Prisma as PrismaTypes } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -35,8 +38,10 @@ import {
   NULL_RUN_CONDITIONS_COLUMNS,
   type RunConditionsRecord,
 } from "@/lib/weather/runConditionsRecord";
-import { fetchRunConditionsFromOpenMeteo } from "@/lib/weather/openMeteo";
+import { backfillRunConditionsFromTrack } from "@/lib/weather/backfillRunConditionsFromTrack";
 import { trackHasMarkedLocation } from "@/lib/location/coordinates";
+import { writeRunImportedLapSets, type ImportedLapSetInput } from "@/lib/runs/writeRunImportedLapSets";
+import { createBackfilledRuns } from "@/lib/runs/createBackfilledRuns";
 
 type RunUpsertBody = {
   runId?: string;
@@ -95,20 +100,16 @@ type RunUpsertBody = {
   raceClass?: string | null;
   /** Optional LiveRC practice day URL captured while logging the run. */
   practiceDayUrl?: string | null;
-  importedLapSets?: Array<{
-    sourceUrl?: string | null;
-    driverId?: string | null;
-    driverName?: string;
-    normalizedName?: string;
-    isPrimaryUser?: boolean;
-    /** UTC ISO instant from timing page when known. */
-    sessionCompletedAt?: string | null;
-    /** True when `sessionCompletedAt` is on-track wall clock (LiveRC/MyRCM store as-if-UTC) vs import-time fallback. */
-    sessionCompletedAtIsWallClock?: boolean;
-    laps?: number[] | Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded?: boolean }>;
-  }>;
+  importedLapSets?: ImportedLapSetInput[];
   /** Optional: link persisted ImportedLapTimeSession rows from URL import(s) to this run. */
   importedLapTimeSessionIds?: string[];
+  /**
+   * The day's OTHER timing sessions, to become runs beside this one ("Add N other runs from
+   * today" on the lap step). Each is an `ImportedLapTimeSession` id the client imported first.
+   * Honoured only on a completed save; a draft says nothing about the rest of the day. The runs
+   * it creates are stamped `unconfirmedAt` — see `createBackfilledRuns`.
+   */
+  backfillImportedLapTimeSessionIds?: string[];
   /**
    * `draft` = save progress without marking logging complete.
    * Omitted or `completed` = treat as logging complete (backward compatible).
@@ -136,32 +137,6 @@ type RunUpsertBody = {
    */
   conditions?: unknown;
 };
-
-/**
- * Effortless-capture backfill: fetch run conditions server-side for a pinned
- * track when the client attached none (fast save, a transient weather-fetch
- * failure, or the client fetch simply not landing before submit). Reuses the
- * client's normalize/clamp path so stored columns match a client-side capture,
- * and preserves the Open-Meteo source stamp. Best-effort — any failure
- * (network, no reading for that time/place) resolves to null and the run saves
- * without conditions, exactly as before.
- */
-async function backfillRunConditionsFromTrack(params: {
-  latitude: number;
-  longitude: number;
-  atIso: string | null;
-}): Promise<RunConditionsRecord | null> {
-  try {
-    const conditions = await fetchRunConditionsFromOpenMeteo({
-      latitude: params.latitude,
-      longitude: params.longitude,
-      atIso: params.atIso,
-    });
-    return normalizeRunConditionsInput(conditions);
-  } catch {
-    return null;
-  }
-}
 
 function normalizeCarRating(raw: unknown): number | null {
   if (raw == null) return null;
@@ -597,6 +572,21 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       ? body.meetingSessionCode.trim()
       : null;
 
+  /**
+   * The day's other timing sessions, to be filed as runs beside this one. Only a completed save
+   * asks for it, and only then does the ordering exception below apply: those runs sort on the
+   * timing sheet's clock, so this one must too, or a later heat lands above it. See the `sortAt`
+   * note in the schema.
+   */
+  const backfillIds =
+    loggingComplete && Array.isArray(body.backfillImportedLapTimeSessionIds)
+      ? body.backfillImportedLapTimeSessionIds.filter(
+          (id): id is string => typeof id === "string" && id.trim().length > 0
+        )
+      : [];
+  const sortAtForBackfill =
+    backfillIds.length > 0 && sessionCompletedAtResolved ? sessionCompletedAtResolved : null;
+
   let run: { id: string; createdAt: Date };
   /** Non-null only when correcting this run's count also moved later runs on the same set. */
   let tireRunNumberCascade: { updatedRuns: number; delta: number } | null = null;
@@ -644,6 +634,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         loggingComplete,
         loggingCompletedAt: loggingComplete ? new Date() : null,
         shareWithTeam,
+        ...(sortAtForBackfill ? { sortAt: sortAtForBackfill } : {}),
         ...(conditionsColumns ?? {}),
       } as PrismaTypes.RunUncheckedCreateInput,
       select: { id: true, createdAt: true },
@@ -690,6 +681,11 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       engineerSummaryComputedAt: null,
       sessionCompletedAt: sessionCompletedAtResolved,
       loggingComplete,
+      // A wizard save is the driver vouching for the run. This is the ONLY place the mark a
+      // backfilled run carries comes off — the sparse PATCH, reorder and setup-correction doors
+      // leave it alone (founder ruling 2026-08-31: confirming is a deliberate act).
+      unconfirmedAt: null,
+      ...(sortAtForBackfill ? { sortAt: sortAtForBackfill } : {}),
       ...(conditionsColumns ?? {}),
     };
     if (loggingComplete && existing.loggingComplete === false && existing.loggingCompletedAt == null) {
@@ -760,61 +756,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   }
 
   const importedLapSets = Array.isArray(body.importedLapSets) ? body.importedLapSets : [];
-  for (const set of importedLapSets) {
-    const driverName = typeof set.driverName === "string" ? set.driverName.trim() : "";
-    if (!driverName) continue;
-    const rawLaps = Array.isArray(set.laps) ? set.laps : [];
-    const lapsForSet: Array<{ lapNumber: number; lapTimeSeconds: number; isIncluded: boolean }> = [];
-    if (rawLaps.length > 0 && typeof rawLaps[0] === "number") {
-      const nums = rawLaps.filter((n): n is number => typeof n === "number" && Number.isFinite(n));
-      for (let i = 0; i < nums.length; i++) {
-        lapsForSet.push({ lapNumber: i + 1, lapTimeSeconds: nums[i], isIncluded: true });
-      }
-    } else {
-      for (const row of rawLaps) {
-        if (!row || typeof row !== "object") continue;
-        const r = row as Record<string, unknown>;
-        const lapNumber = typeof r.lapNumber === "number" && Number.isFinite(r.lapNumber) ? Math.floor(r.lapNumber) : 0;
-        const lapTimeSeconds =
-          typeof r.lapTimeSeconds === "number" && Number.isFinite(r.lapTimeSeconds) ? r.lapTimeSeconds : NaN;
-        if (!Number.isFinite(lapTimeSeconds)) continue;
-        lapsForSet.push({
-          lapNumber,
-          lapTimeSeconds,
-          isIncluded: r.isIncluded !== false,
-        });
-      }
-    }
-    if (lapsForSet.length === 0) continue;
-    const normalizedName = typeof set.normalizedName === "string" && set.normalizedName.trim()
-      ? set.normalizedName.trim().toLowerCase()
-      : driverName.toLowerCase();
-    let sessionCompletedAt: Date | null = null;
-    if (typeof set.sessionCompletedAt === "string" && set.sessionCompletedAt.trim()) {
-      const d = new Date(set.sessionCompletedAt.trim());
-      if (!Number.isNaN(d.getTime())) sessionCompletedAt = d;
-    }
-    const createdSet = await prisma.runImportedLapSet.create({
-      data: {
-        runId: run.id,
-        sourceUrl: typeof set.sourceUrl === "string" && set.sourceUrl.trim() ? set.sourceUrl.trim() : null,
-        driverId: typeof set.driverId === "string" && set.driverId.trim() ? set.driverId.trim() : null,
-        driverName,
-        normalizedName,
-        isPrimaryUser: Boolean(set.isPrimaryUser),
-        sessionCompletedAt,
-      },
-      select: { id: true },
-    });
-    await prisma.runImportedLap.createMany({
-      data: lapsForSet.map((row) => ({
-        lapSetId: createdSet.id,
-        lapNumber: row.lapNumber,
-        lapTimeSeconds: row.lapTimeSeconds,
-        isIncluded: row.isIncluded,
-      })),
-    });
-  }
+  await writeRunImportedLapSets(prisma, run.id, importedLapSets);
 
   // Presence of the key is the instruction, not its length: the run form always
   // sends the full list, so `[]` means "detach what was there". A caller that
@@ -831,6 +773,18 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     });
   }
 
+  // After this run's own sessions are linked, so its session is skipped as "already on a run"
+  // rather than filed twice. Before the plan window settles, so Starter's ten count these too.
+  const backfilled =
+    backfillIds.length > 0
+      ? await createBackfilledRuns({
+          userId: params.userId,
+          context: { kind: "parent", parentRunId: run.id },
+          importedLapTimeSessionIds: backfillIds,
+          deviceTimeZone,
+        })
+      : null;
+
   // Keep the account-level zone current so runs logged before `Run.localTimeZone`
   // existed still resolve to a sensible day for their driver. `updateMany` with the
   // inequality means this only writes when the zone actually changed, so the common
@@ -842,7 +796,32 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     });
   }
 
+  // The write above may have moved the owner's plan window — a new run, or a draft filed onto
+  // the day it was driven (Starter keeps fifteen; docs/STARTER_TIER_PLAN.md). Settle it before
+  // anything is revalidated so no cache is rebuilt from the in-between state.
+  await applyRunWindow(params.userId);
+
   revalidateAfterRunMutation(params.userId);
+
+  // A run at a track today — draft or saved — arms the timing sweep for that track and has it
+  // look once now, after the response: a draft is "I'm about to go out", a saved run without
+  // laps may already have its session waiting on the timing site.
+  if (body.trackId) {
+    const armTrackId = body.trackId;
+    const armedBy = loggingComplete ? "run" : "draft";
+    after(async () => {
+      try {
+        await armAndPollTrackNow({
+          trackId: armTrackId,
+          userId: params.userId,
+          armedBy,
+          poll: loggingComplete,
+        });
+      } catch (err) {
+        reportSweepFailure(err, { stage: "arm", trackId: armTrackId, userId: params.userId });
+      }
+    });
+  }
 
   const newlyCompleted =
     loggingComplete &&
@@ -872,7 +851,16 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   });
 
   return NextResponse.json(
-    { run, tireStintId, promptMarkTrackLocation, tireRunNumberCascade },
+    {
+      run,
+      tireStintId,
+      promptMarkTrackLocation,
+      tireRunNumberCascade,
+      /** Present when the save also filed the day's other sessions as runs. */
+      backfilled: backfilled
+        ? { created: backfilled.created.length, skipped: backfilled.skipped.length }
+        : null,
+    },
     { status: params.mode === "create" ? 201 : 200 }
   );
 }

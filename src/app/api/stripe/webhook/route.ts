@@ -7,6 +7,8 @@ import { getStripe, stripeConfigured, resolveTierForPriceId } from "@/lib/stripe
 import { deriveSubscriptionSchedule } from "@/lib/stripeSubscriptionSync";
 import { extractCheckoutEmail, isPublicSignupSession } from "@/lib/billing/paidSignupLogic";
 import { provisionPaidUser, sendPaidSignupSignInLink } from "@/lib/billing/paidSignup";
+import { applyRunWindow } from "@/lib/runs/runWindow";
+import { revalidateAfterRunMutation } from "@/lib/revalidateUser";
 
 /**
  * Stripe webhook — the ONLY source of truth for entitlement. Public (server-to-server), verified
@@ -41,6 +43,11 @@ async function syncSubscription(sub: Stripe.Subscription): Promise<void> {
     create: { userId: user.id, ...data },
     update: data,
   });
+
+  // The plan just changed hands, so the run window follows it: a new Starter member's older runs
+  // hide, an upgrade brings every hidden run straight back (docs/STARTER_TIER_PLAN.md).
+  const window = await applyRunWindow(user.id);
+  if (window.hidden + window.revealed > 0) revalidateAfterRunMutation(user.id);
 }
 
 async function syncFromCheckoutSession(session: Stripe.Checkout.Session): Promise<void> {

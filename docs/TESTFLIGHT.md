@@ -100,3 +100,20 @@ After sign-in:
 2. Relaunch and confirm you remain signed in (JWT session cookie behavior).
 
 If sessions drop, verify `AUTH_URL` matches the loaded origin and cookie `Secure` / `SameSite` settings for your domain.
+
+## 8. Android (added 2026-09-14)
+
+`android/` is a generated Capacitor project (`npx cap add android`), same hosted-origin shell as
+iOS: `CAPACITOR_SERVER_URL=… npm run cap:sync:android`, then `npm run cap:open:android` (Android
+Studio). Push goes through FCM: create a Firebase project, add the Android app with package
+`com.rcengineer.app`, drop `google-services.json` into `android/app/`, and set
+`FCM_SERVICE_ACCOUNT_JSON` on Vercel (service-account key, one line). `sendPushToUser` fans out to
+`platform: "android"` devices automatically.
+
+Play Store: a new personal developer account must run a 14-day closed test with 12 testers before
+production, so the store listing follows the App Store one. The installable web app (PWA) with web
+push covers Android at launch.
+
+**Both shells** append `JRCShell/1` to the user agent (`capacitor.config.ts`). The join and billing
+pages render a plan notice with no prices or checkout inside the shell — the stores' rule for a
+subscription bought on the web.

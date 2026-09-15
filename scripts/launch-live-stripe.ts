@@ -8,8 +8,9 @@
  *   2. npm run stripe:launch-live -- --origin=https://app.jrcdynamics.com --comp-codes=8
  *
  * Does, in live mode:
- *   - products + prices: Notebook $9.99/$99.90 · Race Engineer $19.99/$199.90 AUD (same lookup
- *     keys as test; amount changes create a replacement price and transfer the key)
+ *   - products + prices: Starter $2.99 · Notebook $9.99/$99.90 · Race Engineer $19.99/$199.90 AUD
+ *     (same lookup keys as test; amount changes create a replacement price and transfer the key)
+ *   - the portal's plan-switch list (all three products), which /billing's Upgrade button needs
  *   - "Founders comp" 100%-off-forever coupon + N single-use promo codes (JRC-XXXXXX) — one per
  *     tester so a comp can be revoked individually by cancelling that subscription
  *   - webhook endpoint at <origin>/api/stripe/webhook with exactly the events the route handles
@@ -45,7 +46,15 @@ const APP = "rc-engineer";
 // deliberately unchanged; only the labels and the amounts move. Re-running this against live
 // creates REPLACEMENT prices (Stripe prices are immutable) and transfers the lookup keys, so
 // existing members keep renewing at what they signed up for.
+// Starter added 2026-09-09 (docs/STARTER_TIER_PLAN.md): $2.99, monthly only.
 const TIERS = [
+  {
+    tier: "starter",
+    productName: `${PRODUCT_NAME} — ${TIER_LABELS.starter}`,
+    prices: [
+      { envVar: "STRIPE_PRICE_STARTER_MONTHLY", lookupKey: "rc_engineer_starter_monthly", interval: "month" as const, unitAmount: 299 },
+    ],
+  },
   {
     tier: "standard",
     productName: `${PRODUCT_NAME} — ${TIER_LABELS.standard}`,
@@ -112,6 +121,45 @@ async function ensurePrice(
   return price.id;
 }
 
+/**
+ * The portal's plan switcher (docs/STARTER_TIER_PLAN.md): `/api/billing/portal` opens Stripe's
+ * `subscription_update` flow so an existing member upgrades on the subscription they already
+ * hold, prorated — never through a second checkout. Stripe only allows that flow when the portal
+ * configuration lists every product and price a member may switch between, so the default
+ * configuration is brought up to date here every run. Same routine as stripe-setup-prices.ts.
+ */
+async function ensurePortalPlanSwitching(
+  entries: Array<{ product: string; prices: string[] }>,
+): Promise<void> {
+  const subscriptionUpdate = {
+    enabled: true,
+    default_allowed_updates: ["price" as const],
+    proration_behavior: "create_prorations" as const,
+    products: entries,
+  };
+  const existing = await stripe.billingPortal.configurations.list({ is_default: true, limit: 1 });
+  const current = existing.data[0];
+  if (current) {
+    await stripe.billingPortal.configurations.update(current.id, {
+      features: { subscription_update: subscriptionUpdate },
+    });
+    console.log(`Portal configuration ${current.id}: plan switching covers ${entries.length} products`);
+    return;
+  }
+  const created = await stripe.billingPortal.configurations.create({
+    business_profile: { headline: `${PRODUCT_NAME} billing` },
+    features: {
+      subscription_update: subscriptionUpdate,
+      invoice_history: { enabled: true },
+      payment_method_update: { enabled: true },
+      subscription_cancel: { enabled: true, mode: "at_period_end" },
+    },
+  });
+  console.log(
+    `Portal configuration ${created.id} created — confirm it is the default under Settings → Billing → Customer portal.`,
+  );
+}
+
 async function ensureCompCoupon(): Promise<string> {
   // Coupons can't be searched by metadata; list and match by name.
   const coupons = await stripe.coupons.list({ limit: 100 });
@@ -145,14 +193,19 @@ async function main() {
   console.log(`LIVE mode against ${origin}\n`);
 
   const envLines: string[] = [];
+  const portalEntries: Array<{ product: string; prices: string[] }> = [];
   for (const tier of TIERS) {
     const productId = await ensureProduct(tier.tier, tier.productName);
+    const priceIds: string[] = [];
     for (const p of tier.prices) {
       const priceId = await ensurePrice(productId, p);
+      priceIds.push(priceId);
       console.log(`${tier.productName} — $${(p.unitAmount / 100).toFixed(2)} AUD/${p.interval}: ${priceId}`);
       envLines.push(`${p.envVar}=${priceId}`);
     }
+    portalEntries.push({ product: productId, prices: priceIds });
   }
+  await ensurePortalPlanSwitching(portalEntries);
 
   const couponId = await ensureCompCoupon();
   console.log(`\nFounders comp coupon: ${couponId}`);

@@ -49,6 +49,7 @@ import {
   lapSfKey,
   LAP_START_LINE_KEY,
   nextRivalRole,
+  traceKey,
   withSelectedLaps,
 } from "@/lib/manualVideoAnalysis/types";
 import {
@@ -76,8 +77,10 @@ import {
   predictedLapOneSec,
 } from "@/lib/manualVideoAnalysis/wallClock";
 import type { FieldDriver } from "@/lib/videoAnalysis/findCrossings/field";
-import { blobSource } from "@/lib/videoAnalysis/findCrossings/frameSource";
-import { readRecordingStart } from "@/lib/videoAnalysis/findCrossings/mp4";
+import { blobSource, isAborted } from "@/lib/videoAnalysis/findCrossings/frameSource";
+import { parseMovie, readRecordingStart } from "@/lib/videoAnalysis/findCrossings/mp4";
+import { lapAnchors } from "@/lib/videoAnalysis/trace/anchors";
+import { traceLapInBrowser } from "@/lib/videoAnalysis/trace/browserTrace";
 import {
   findTimingSession,
   hasMarkedLap,
@@ -109,6 +112,7 @@ import {
   type CarOption,
   type IdentifyResult,
 } from "@/lib/videoAnalysis/findCrossings/identify";
+import type { OwnColours } from "@/lib/videoAnalysis/findCrossings/ownColour";
 import { toleranceFor } from "@/lib/videoAnalysis/findCrossings/carColour";
 import { ACTIVE_RECIPE, type CrossingEvent } from "@/lib/videoAnalysis/findCrossings/types";
 import { bandHalfPxFor, lineGeom } from "@/lib/videoAnalysis/findCrossings/geometry";
@@ -116,6 +120,7 @@ import {
   fastestLaps,
   realLaps,
   SF_LINE_KEY,
+  targetId,
   type LapInput,
   type Review,
   type SessionLine,
@@ -466,6 +471,10 @@ export function AnalyzeFlowClient({
   const [autoNotes, setAutoNotes] = useState<string[]>([]);
   const [autoError, setAutoError] = useState<string | null>(null);
   const autoAbortRef = useRef<AbortController | null>(null);
+  /* ---------- trace a lap (compare step) ---------- */
+  const [tracing, setTracing] = useState<{ key: string; progress: number; note: string } | null>(null);
+  const [traceError, setTraceError] = useState<string | null>(null);
+  const traceAbortRef = useRef<AbortController | null>(null);
 
   /* ---------- load ---------- */
 
@@ -800,7 +809,7 @@ export function AnalyzeFlowClient({
         timingUrls: source === "url" ? urls ?? [] : session.timingUrls,
         timingSessions,
         marks: keptMarks,
-        ...(droppedMarks ? { lastScan: undefined } : {}),
+        ...(droppedMarks ? { lastScan: undefined, traces: undefined } : {}),
         compare: { ...session.compare, my: null, competitor: null, offsetNudgeSec: 0 },
       })
     );
@@ -1555,6 +1564,125 @@ export function AnalyzeFlowClient({
     };
   }
 
+  /**
+   * The picture's size, off an element that is not on the page.
+   *
+   * The compare step has no player of the flow's own, so nothing has read the frame size when a
+   * finished job opens straight onto it. A detached element reports it from the file's header;
+   * a browser that drops the video track (no hardware HEVC) reports 0×0, and then the file's
+   * own index says how big the coded picture is — close enough to place a window, though a
+   * coded height can carry a few padding rows the picture does not show.
+   */
+  async function frameSizeOf(video: HTMLVideoElement, file: Blob): Promise<{ w: number; h: number } | null> {
+    const fromElement = await new Promise<{ w: number; h: number } | null>((resolve) => {
+      const done = () => {
+        video.removeEventListener("loadedmetadata", done);
+        clearTimeout(timer);
+        resolve(video.videoWidth > 0 && video.videoHeight > 0 ? { w: video.videoWidth, h: video.videoHeight } : null);
+      };
+      const timer = setTimeout(done, 8000);
+      if (video.readyState >= 1) done();
+      else video.addEventListener("loadedmetadata", done);
+    });
+    if (fromElement) return fromElement;
+    try {
+      const movie = await parseMovie(blobSource(file));
+      return movie.video.codedWidth > 0 ? { w: movie.video.codedWidth, h: movie.video.codedHeight } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Trace one lap of one driver off the footage — "Trace L7" on the compare step.
+   *
+   * Reads the lap once through a window that follows the car, pinned to the crossings the scan
+   * already found (`lapAnchors`), and keeps the path on the session. A lap the tracer could not
+   * follow cleanly is kept too, marked not ok, so the chip can say so and offer another go.
+   */
+  async function traceLap(role: DriverRole, lapNumber: number) {
+    if (!session || !primary || tracing) return;
+    if (autoState === "running" || autoState === "learning" || autoState === "identifying") return;
+    const file = pickedFile ?? local.file ?? null;
+    if (!file) {
+      setTraceError("Pick the video file on this device to trace a lap.");
+      return;
+    }
+    const seat = roster.find((p) => p.role === role);
+    const sessionId = seat?.sessionId ?? primary.sessionId;
+    // Dev measurement door only — `rc_trace_corners_off` in localStorage, set by
+    // `scripts/dev-trace-lap.mts --corners-off`. See `LapAnchorOptions.cornersOff`.
+    const cornersOff =
+      process.env.NODE_ENV !== "production" &&
+      typeof window !== "undefined" &&
+      window.localStorage.getItem("rc_trace_corners_off") === "1";
+    const la = lapAnchors(session, drawnLines, sessionId, role, lapNumber, { cornersOff });
+    if (!la) {
+      setTraceError(`L${lapNumber} has no start on the video clock to pin a path to.`);
+      return;
+    }
+    const key = traceKey(role, lapNumber);
+    setTraceError(null);
+    setTracing({ key, progress: 0, note: "Getting ready…" });
+    traceAbortRef.current?.abort();
+    const abort = new AbortController();
+    traceAbortRef.current = abort;
+    try {
+      // The decoder reads the file itself; the element only matters for the playback fallback
+      // and for the frame size, and the flow's own player is not on this step.
+      let video = videoRef.current;
+      let ownUrl: string | null = null;
+      if (!video) {
+        video = document.createElement("video");
+        video.muted = true;
+        video.playsInline = true;
+        video.preload = "metadata";
+        ownUrl = videoSrc ? null : URL.createObjectURL(file);
+        video.src = videoSrc ?? ownUrl!;
+      }
+      let dims = videoDims;
+      if (!dims) {
+        dims = await frameSizeOf(video, file);
+        if (dims) setVideoDims(dims);
+      }
+      if (ownUrl) URL.revokeObjectURL(ownUrl);
+      if (!dims) throw new Error("Couldn't read the video's frame size.");
+      const outcome = await traceLapInBrowser({
+        video,
+        file,
+        frameW: dims.w,
+        frameH: dims.h,
+        lines: drawnLines,
+        anchors: la.anchors,
+        startSec: la.startSec,
+        endSec: la.endSec,
+        sessionId,
+        driverRole: role,
+        lapNumber,
+        car: autoLearned?.cars?.[role] ?? null,
+        // Every other lap already traced off this video, whoever drove it: where one of them was
+        // followed cleanly, it knows where the track goes.
+        priors: Object.entries(session.traces ?? {})
+          .filter(([k]) => k !== key)
+          .map(([, t]) => t),
+        onProgress: (p) => setTracing({ key, progress: p.fraction, note: p.note }),
+        signal: abort.signal,
+      });
+      const q = outcome.trace.quality;
+      schedulePersist((prev) => ({ ...prev, traces: { ...prev.traces, [key]: outcome.trace } }));
+      if (!q.ok) {
+        setTraceError(
+          `L${lapNumber}: couldn't follow the car cleanly — ${Math.round(q.coverage * 100)}% of the lap, ${q.anchorsHit} of ${q.anchorsTotal} crossings met.`
+        );
+      }
+    } catch (e) {
+      if (!isAborted(e)) setTraceError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setTracing(null);
+      if (traceAbortRef.current === abort) traceAbortRef.current = null;
+    }
+  }
+
   /** A stable key for one car at one line, so a picture and a tap agree on what they mean. */
   function optionKey(lineKey: string, o: CarOption): string {
     return `${lineKey}:${o.t.toFixed(3)}`;
@@ -1567,7 +1695,10 @@ export function AnalyzeFlowClient({
    * wrong in a race — on the first race footage the opening three lines followed somebody else all
    * session. Repetition is a fine guess; a driver looking at a picture is not a guess at all.
    */
-  async function runIdentify(role: DriverRole) {
+  async function runIdentify(
+    role: DriverRole,
+    learned?: { seeds: Record<string, number>; ambiguous: Array<{ lineKey: string }>; ownColours?: OwnColours } | null
+  ) {
     if (!session || !primary) return;
     if (autoState === "running" || autoState === "learning" || autoState === "identifying") return;
     setAutoError(null);
@@ -1585,24 +1716,31 @@ export function AnalyzeFlowClient({
     try {
       const ctx = runContext();
       if (!ctx) throw new Error("The video is not ready yet.");
-      const found = await collectCarOptions(ctx, { role });
+      const found = await collectCarOptions(ctx, { role, ownColours: learned?.ownColours });
       if (!found) throw new Error("Couldn't find a lap to look at — check the timing and the sync.");
       setIdentify(found);
-      // Where only one car is left, or one kept step every lap, it is picked already — the
-      // driver confirms rather than hunts. Anything else is theirs to tap.
-      const picks = defaultPicks(found.lines);
+      // Where only one car is left, or one kept step every lap, or the learning pass had already
+      // settled the line, it is picked already — the driver confirms rather than hunts. Anything
+      // else is theirs to tap.
+      const picks = defaultPicks(
+        found.lines,
+        learned ? { seeds: learned.seeds, ambiguous: learned.ambiguous.map((a) => a.lineKey) } : undefined
+      );
       setIdentifyPick(picks);
       setIdentifyAuto(Object.fromEntries(Object.entries(picks).map(([k, o]) => [k, o.t])));
       // Every line with anything on it decided: nothing to ask. The pictures are still cut, so
       // the review can show what was taken as the car and offer to change it.
       const decided = found.lines.every((l) => l.options.every((o) => o.dropped) || picks[l.lineKey]);
       // What the picker was handed, one line per corner — the review's equivalent for the door.
+      console.log(
+        `[scan] picker colour lines ${[...(learned?.ownColours?.keys() ?? [])].join(" ") || "none"}`
+      );
       for (const l of found.lines) {
         console.log(
           `[scan] picker ${l.lineKey}: ${l.options
             .map(
               (o) =>
-                `${o.offsetSec.toFixed(2)}${o.dir ? (o.dir > 0 ? "+" : "-") : ""}${o.movesWith ? `(${o.movesWith.mine ? "mine" : o.movesWith.name} ${o.movesWith.hits}/${o.movesWith.of})` : ""}${o.offLine ? "[off]" : ""}${o.shortLine ? "[short]" : ""}${o.hairpin ? "[hairpin]" : ""}${o.outOfOrder ? "[order]" : ""}${o.wrongWay ? "[wrong-way]" : ""}${o.offField ? "[field]" : ""}${o.dropped ? "[dropped]" : ""}${o.hint ? `[${o.hint}]` : ""}`
+                `${o.offsetSec.toFixed(2)}${o.dir ? (o.dir > 0 ? "+" : "-") : ""}${o.movesWith ? `(${o.movesWith.mine ? "mine" : o.movesWith.name} ${o.movesWith.hits}/${o.movesWith.of})` : ""}${o.offLine ? "[off]" : ""}${o.shortLine ? "[short]" : ""}${o.hairpin ? "[hairpin]" : ""}${o.outOfOrder ? "[order]" : ""}${o.wrongWay ? "[wrong-way]" : ""}${o.lingers ? "[lingers]" : ""}${o.dwell != null ? `~${Math.round(o.dwell * 100)}%` : ""}${o.speedPxPerSec != null ? `@${Math.round(o.speedPxPerSec)}px/s` : ""}${o.offField ? "[field]" : ""}${o.dropped ? "[dropped]" : ""}${o.hint ? `[${o.hint}]` : ""}`
             )
             .join(" ")}${l.field ? ` | field ${l.field.fromSec.toFixed(1)}-${l.field.toSec.toFixed(1)} (${l.field.centres.map((c) => c.toFixed(1)).join(" ")})` : ""}${picks[l.lineKey] ? ` → picked ${picks[l.lineKey]!.offsetSec.toFixed(2)}` : ""}`
         );
@@ -1636,6 +1774,9 @@ export function AnalyzeFlowClient({
                 ...(o.shortLine ? { shortLine: true } : {}),
                 ...(o.hairpin ? { hairpin: true } : {}),
                 ...(o.wrongWay ? { wrongWay: true } : {}),
+                ...(o.lingers ? { lingers: true } : {}),
+                ...(o.dwell != null ? { dwell: Math.round(o.dwell * 100) / 100 } : {}),
+                ...(o.speedPxPerSec != null ? { speedPxPerSec: Math.round(o.speedPxPerSec) } : {}),
                 ...(o.dropped ? { dropped: true } : {}),
               })),
               ...(l.field ? { field: { fromSec: l.field.fromSec, toSec: l.field.toSec, cars: l.field.cars } } : {}),
@@ -1708,6 +1849,7 @@ export function AnalyzeFlowClient({
       // Start/finish still runs: it is the alignment proof and the colour sample, and the taps
       // say nothing about either.
       const learned = await learnTheLap(ctx);
+      logLearned(learned);
       setAutoLearned(learned);
       // Your own picks also improve the shared fallback, because a corner sits at much the same
       // point of the lap for anyone driving it.
@@ -1738,6 +1880,7 @@ export function AnalyzeFlowClient({
       const ctx = runContext();
       if (!ctx) throw new Error("The video is not ready yet.");
       const learned = await learnTheLap(ctx);
+      logLearned(learned);
       setAutoLearned(learned);
 
       if (learned.unresolved.length === drawnCornerLines.length) {
@@ -1765,7 +1908,7 @@ export function AnalyzeFlowClient({
         // Two cars keep the same rhythm all race — usually one the driver followed. Numbers cannot
         // separate them, so show the moment instead of describing it.
         setAutoState("idle");
-        await runIdentify("me");
+        await runIdentify("me", learned);
         return;
       }
       await scanWith(learned.seeds, learned);
@@ -1784,6 +1927,13 @@ export function AnalyzeFlowClient({
     try {
       const ctx = runContext();
       if (!ctx) throw new Error("The video is not ready yet.");
+      // Where every corner's window is actually aimed, after the picker and the driver's own
+      // marks have had their say — the learning pass's own answer is logged separately.
+      console.debug(
+        `[scan] aiming ${Object.entries(seeds)
+          .map(([k, v]) => `${k} ${v.toFixed(2)}`)
+          .join(" · ")}`
+      );
       const result = await findEveryCrossing(ctx, {
         seeds,
         seedsByRole: seedsByRole ?? seenSeeds,
@@ -1811,6 +1961,14 @@ export function AnalyzeFlowClient({
       for (const t of result.review.missing) {
         console.debug(`[review] missing ${t.role} L${t.lapNumber} ${t.lineKey} centre ${t.centerSec.toFixed(3)}`);
       }
+      {
+        const own = result.review.ownColour;
+        console.debug(
+          `[review] colour lines ${own.lines.map((l) => `${l.role}:${l.lineKey}(${l.samples})`).join(" ") || "none"}${
+            own.swapped.length ? ` · swapped ${own.swapped.join(" ")}` : ""
+          }${own.held.length ? ` · held ${own.held.join(" ")}` : ""}`
+        );
+      }
       for (const d of result.review.directions) {
         console.debug(
           `[review] direction ${d.lineKey} ${d.dir > 0 ? "+" : "-"} (${d.from}) turned ${d.turned} emptied ${d.emptied}`
@@ -1831,6 +1989,8 @@ export function AnalyzeFlowClient({
             ...(c.x != null && c.y != null ? { x: c.x, y: c.y } : {}),
             ...(c.dir ? { dir: c.dir } : {}),
             ...(c.source ? { source: c.source } : {}),
+            ...(c.speedPxPerSec != null ? { speedPxPerSec: Math.round(c.speedPxPerSec) } : {}),
+            ...(c.dwell != null ? { dwell: Math.round(c.dwell * 100) / 100 } : {}),
           }));
         const rows: ManualScanRow[] = [
           ...[...review.found, ...review.suspect].map((r) => ({
@@ -1861,6 +2021,20 @@ export function AnalyzeFlowClient({
         // their laps came from — one shared session in a race, one apiece off practice links.
         const perSession = new Map<string, { start: Record<string, number>; end: Record<string, number> }>();
         for (const l of review.measuredLapStarts) {
+          // Whether the picture or the walked clock set this start: the scorecard rig reads it.
+          console.debug(
+            `[review] start ${l.role} L${l.lapNumber} ${l.videoTimeSec.toFixed(3)} ${l.detected ? "seen" : "walked"} drift ${l.driftSec.toFixed(3)}`
+          );
+          // Everything the start-line window saw for this lap, so a start that lands frames from
+          // the transponder can be judged from the console rather than re-scanned.
+          const sfCands = review.candidatesById[targetId(l.role, l.lapNumber, SF_LINE_KEY)] ?? [];
+          if (sfCands.length) {
+            console.debug(
+              `[review] sf ${l.role} L${l.lapNumber} cands ${sfCands
+                .map((c) => `${c.t.toFixed(3)}${c.dir ? (c.dir > 0 ? "+" : "-") : ""}q${c.quality}`)
+                .join(" ")}`
+            );
+          }
           const sessionId = sessionIdFor(l.role);
           const ts = sessionId ? findTimingSession(session, sessionId) : undefined;
           if (!ts) continue;
@@ -1874,6 +2048,11 @@ export function AnalyzeFlowClient({
           );
           if (prev) bucket.end[lapSfKey(l.role, l.lapNumber - 1)] = l.videoTimeSec;
           perSession.set(ts.sessionId, bucket);
+        }
+        if (review.lapStartError) {
+          console.debug(
+            `[review] start-line clock: ${review.lapStartError.laps} laps median ${Math.round(review.lapStartError.medianMs)}ms worst ${Math.round(review.lapStartError.worstMs)}ms`
+          );
         }
         let withStarts = session;
         for (const [sessionId, bucket] of perSession) {
@@ -1918,6 +2097,25 @@ export function AnalyzeFlowClient({
   }
 
   /** Plain sentences about how the scan went — the trust line, not a debug dump. */
+  /**
+   * One console line per corner with the offset the footage taught, so a driven scan can be
+   * graded on where it AIMED as well as on what it found — a window centred on a rival's rhythm
+   * finds the rival (`scripts/video-score.mts`).
+   */
+  function logLearned(learned: LearnResult) {
+    for (const v of learned.verdicts) {
+      console.debug(
+        `[scan] learned ${v.lineKey} ${v.offsetSec.toFixed(2)}s (${v.laps} laps)${
+          v.rival ? ` rival ${v.rival.offsetSec.toFixed(2)}s (${v.rival.laps} laps)` : ""
+        }`
+      );
+    }
+    for (const k of learned.unresolved) console.debug(`[scan] learned ${k} unresolved`);
+    console.debug(
+      `[scan] learned from ${learned.from} · read ${learned.read.laps} laps, ${learned.read.frames} frames`
+    );
+  }
+
   function describeScan(learned: LearnResult, result: FindResult): string[] {
     const out: string[] = [];
     const check = learned.lapStartError;
@@ -1943,6 +2141,16 @@ export function AnalyzeFlowClient({
       );
     } else if (drawnCornerLines.length) {
       out.push("Colour could not tell the cars apart here — decided on timing alone.");
+    }
+    // The per-line reference (`ownColour.ts`) is mentioned only when it changed something.
+    const own = result.review.ownColour;
+    const mineSwapped = own.swapped.filter((id) => id.startsWith("me:")).length;
+    const mineHeld = own.held.filter((id) => id.startsWith("me:")).length;
+    if (mineSwapped || mineHeld) {
+      const parts: string[] = [];
+      if (mineSwapped) parts.push(`moved ${mineSwapped} crossing${mineSwapped === 1 ? "" : "s"} onto your car`);
+      if (mineHeld) parts.push(`held ${mineHeld} that ${mineHeld === 1 ? "was" : "were"} another colour`);
+      out.push(`Your car's colour on each line ${parts.join(" and ")}.`);
     }
     if (result.bracketFilled > 0) {
       out.push(
@@ -2006,6 +2214,8 @@ export function AnalyzeFlowClient({
             ...(c.x != null && c.y != null ? { x: c.x, y: c.y } : {}),
             ...(c.dir ? { dir: c.dir } : {}),
             ...(c.source ? { source: c.source } : {}),
+            ...(c.speedPxPerSec != null ? { speedPxPerSec: Math.round(c.speedPxPerSec) } : {}),
+            ...(c.dwell != null ? { dwell: Math.round(c.dwell * 100) / 100 } : {}),
           })),
         })),
       ],
@@ -2014,6 +2224,57 @@ export function AnalyzeFlowClient({
     setAutoReview(null);
     setAutoProgress(null);
     setMsg(`${added.length} crossing${added.length === 1 ? "" : "s"} added.`);
+  }
+
+  /**
+   * The last scan's found crossings that never became marks.
+   *
+   * A scan is saved the moment it finishes, before the driver decides anything (see the persist
+   * block in `scanWith`). But the review panel that offers them lives in component state, so a
+   * driver who scanned, closed the tab and came back found "Find every crossing" and nothing
+   * else — and re-read the whole race to get an answer that was already on the session.
+   * Measured 2026-09-09 on a fresh clone: 98 crossings saved, none offered. Held-back rows stay
+   * held back; only what the scan was sure of is on offer here.
+   */
+  const savedScanPending = useMemo(() => {
+    const scan = session?.lastScan;
+    if (!scan || !primary || scan.sessionId !== primary.sessionId) return [];
+    const marked = new Set(liveMarks.map((m) => `${m.driverRole}:${m.lapNumber}:${m.lineKey}`));
+    return scan.rows.filter(
+      (r) =>
+        r.videoTimeSec != null &&
+        r.source != null &&
+        !r.suspect &&
+        !marked.has(`${r.driverRole}:${r.lapNumber}:${r.lineKey}`) &&
+        sessionIdFor(r.driverRole)
+    );
+    // sessionIdFor reads the roster, which is a dep of liveMarks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.lastScan, primary, liveMarks]);
+
+  function applySavedScan() {
+    if (!session || !savedScanPending.length) return;
+    schedulePersist({
+      ...session,
+      marks: [
+        ...session.marks,
+        ...savedScanPending.map((r) => {
+          // The row's own time is the candidate that was picked; its direction rides with it.
+          const picked = r.candidates.find((c) => Math.abs(c.t - r.videoTimeSec!) <= 0.001);
+          return {
+            sessionId: sessionIdFor(r.driverRole)!,
+            driverRole: r.driverRole,
+            lapNumber: r.lapNumber,
+            lineKey: r.lineKey,
+            videoTimeSec: r.videoTimeSec!,
+            source: r.source!,
+            ...(picked?.dir ? { dir: picked.dir } : {}),
+            candidates: r.candidates,
+          };
+        }),
+      ],
+    });
+    setMsg(`${savedScanPending.length} crossing${savedScanPending.length === 1 ? "" : "s"} added.`);
   }
   /* ---------- line sets ---------- */
 
@@ -3727,7 +3988,13 @@ export function AnalyzeFlowClient({
                       <span className="micro-caps text-faint">{line.label}</span>
                       {line.options.length > 0 ? (
                         <span className="grow text-[10.5px] text-faint">
-                          {(() => { const n = line.options.filter((o) => !o.dropped).length; return n === 1 ? "1 car" : `${n} cars`; })()}
+                          {(() => {
+                            // Count what is on show, not what is folded behind "Show more": a line
+                            // with one car and two folded marshal pictures is "1 car".
+                            const offered = line.options.filter((o) => !o.dropped);
+                            const n = offered.filter((o) => foldReasonFor(o) == null).length || offered.length;
+                            return n === 1 ? "1 car" : `${n} cars`;
+                          })()}
                         </span>
                       ) : null}
                       {identifyPick[line.lineKey] ? (
@@ -3818,6 +4085,8 @@ export function AnalyzeFlowClient({
                                 <img
                                   src={shot}
                                   alt={`Car crossing ${line.label} at ${o.t.toFixed(2)}s`}
+                                  data-line={line.lineKey}
+                                  data-offset={o.offsetSec.toFixed(3)}
                                   className="block aspect-square w-full object-cover"
                                 />
                               ) : (
@@ -3834,6 +4103,8 @@ export function AnalyzeFlowClient({
                                   <span className="block text-faint">out of track order</span>
                                 ) : o.wrongWay ? (
                                   <span className="block text-faint">crosses the other way to the field</span>
+                                ) : o.lingers ? (
+                                  <span className="block text-faint">stands on the line</span>
                                 ) : o.offField && o.movesWith?.mine ? (
                                   <span className="block text-faint">yours — later in the lap, not this corner</span>
                                 ) : o.offField && line.field ? (
@@ -3983,6 +4254,15 @@ export function AnalyzeFlowClient({
                 >
                   Find every crossing
                 </button>
+                {savedScanPending.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={applySavedScan}
+                    className="w-full rounded-lg border border-border bg-secondary py-2 text-[12px] font-semibold text-foreground tabular-nums"
+                  >
+                    Add {savedScanPending.length} from the last scan
+                  </button>
+                ) : null}
                 {!videoSrc ? (
                   <p className="text-[11px] text-muted-foreground">Pick the video first.</p>
                 ) : !autoReady ? (
@@ -4192,6 +4472,17 @@ export function AnalyzeFlowClient({
               session={session}
               lines={drawnLines}
               videoUrl={videoSrc}
+              traces={session.traces}
+              onTraceLap={(role, lap) => void traceLap(role, lap)}
+              tracing={tracing}
+              traceError={traceError}
+              canTrace={
+                !!(pickedFile ?? local.file) &&
+                typeof VideoDecoder !== "undefined" &&
+                autoState !== "running" &&
+                autoState !== "learning" &&
+                autoState !== "identifying"
+              }
             />
           ) : (
             <p className="rounded-lg border border-border bg-secondary/50 px-3 py-3 text-[12px] text-muted-foreground">

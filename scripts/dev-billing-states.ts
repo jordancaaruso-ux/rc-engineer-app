@@ -1,17 +1,18 @@
 /**
  * dev-billing-states.ts — DEV/TEST ONLY. One command to see every paywall state without paying:
- * creates three throwaway subscriber accounts directly in the dev DB and prints a sign-in link
+ * creates four throwaway subscriber accounts directly in the dev DB and prints a sign-in link
  * for each. They authenticate via the Subscription-row branch of `isEmailAuthAllowed` — no
  * allowlist rows, exactly like real payers (docs/MONETISATION_NORTH_STAR.md).
  *
  *   npm run dev:enforced          # dev server with BILLING_ENFORCED=1
- *   npm run billing:states        # prints three links + what each should show
+ *   npm run billing:states        # prints four links + what each should show
  *   npm run billing:states:cleanup
  *
- * States: LAPSED (canceled sub → every page bounces to /billing) · STANDARD (active, today's 2
- * Engineer questions already spent → locked video/roll-center, "0 of 2 left" meter, next ask
- * refused with the Pro upsell) · PRO (active → everything open, "300 of 300 left this month").
- * With enforcement OFF all three behave like any full-access account — run dev:enforced.
+ * States: LAPSED (canceled sub → every page bounces to /billing) · STARTER (active → /engineer
+ * locked, only the last fifteen runs visible, docs/STARTER_TIER_PLAN.md) · STANDARD (active, today's
+ * Engineer question already spent → locked video/roll-center, "0 of 1 left" meter, next ask
+ * refused with the Pro upsell) · PRO (active → everything open, "100 of 100 left this month").
+ * With enforcement OFF all four behave like any full-access account — run dev:enforced.
  *
  * The `+ob` aliases are the same family dev-fresh-onboarding reaps, so `npm run
  * onboarding:cleanup` also removes them. Subscription rows use fake `sub_devstate_*` ids —
@@ -25,6 +26,8 @@ import {
   STANDARD_ENGINEER_DAILY_QUESTIONS,
 } from "@/lib/aiUsage/budgets";
 import { todayYmdInTimeZone } from "@/lib/eventActive";
+import { STARTER_RUN_WINDOW } from "@/lib/entitlementLogic";
+import { TIER_LABELS } from "@/lib/brand/brandNames";
 
 const BASE = (process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000")
   .trim()
@@ -38,6 +41,14 @@ const STATES = [
     status: "canceled",
     periodEnd: () => new Date(Date.now() - 40 * 86400000),
     expect: "every page → /billing (renew wall)",
+  },
+  {
+    key: "starter",
+    email: "jordancaaruso+ob-billing-starter@gmail.com",
+    tier: "starter",
+    status: "active",
+    periodEnd: () => new Date(Date.now() + 30 * 86400000),
+    expect: `/engineer locked ('Included in ${TIER_LABELS.standard}') · /videos + /analysis/roll-center locked · Sessions ends with 'N older runs · Upgrade' once more than ${STARTER_RUN_WINDOW} runs are logged`,
   },
   {
     key: "standard",

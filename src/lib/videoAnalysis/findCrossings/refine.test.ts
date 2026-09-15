@@ -277,8 +277,25 @@ console.log("findCrossings refine.test.ts OK");
   const notOk = vouchedUnconfirmed(stray, SF, lapKey, oddStray);
   assert(!notOk.has("competitor:10:s2"), "a flicker a second off is not vouched for");
 
-  // Flickers never vouch for each other: with only unconfirmed rows on the line, nobody is vouched.
+  // Quiet flickers vouch for each other: a window that offered ONE flip, at the driver's usual
+  // offset on lap after lap, is a car the tracker could not follow (Sandy's S2 on a 30px far-side
+  // tick, Bendigo 4K, 2026-09-09 — six laps within 0.13s, five held).
   const allFlicker = results.map((r) => (r.lineKey === "s2" ? { ...r, source: "unconfirmed" as const } : r));
-  const none = vouchedUnconfirmed(allFlicker, SF, lapKey, flagImplausible(allFlicker, SF, lapKey));
-  assert(none.size === 0, "unconfirmed rows cannot vouch for one another");
+  const quiet = vouchedUnconfirmed(allFlicker, SF, lapKey, flagImplausible(allFlicker, SF, lapKey));
+  assert(quiet.size === 8, `every quiet flicker at the usual offset is vouched for (${quiet.size})`);
+
+  // …but not when the flips land anywhere: shaken paint has no rhythm.
+  const scattered = allFlicker.map((r, i) =>
+    r.lineKey === "s2" ? { ...r, detectedSec: r.detectedSec! + ((i % 5) - 2) * 0.6 } : r
+  );
+  const none = vouchedUnconfirmed(scattered, SF, lapKey, flagImplausible(scattered, SF, lapKey));
+  assert(none.size === 0, `scattered flickers vouch for nobody (${none.size})`);
+
+  // …and not from a busy window: a flip near the usual moment proves nothing where something is
+  // always crossing.
+  const busy = allFlicker.map((r) =>
+    r.lineKey === "s2" ? { ...r, candidates: [1, 2, 3].map((k) => ({ t: r.detectedSec! + k, quality: 3 })) } : r
+  );
+  const noisy = vouchedUnconfirmed(busy, SF, lapKey, flagImplausible(busy, SF, lapKey));
+  assert(noisy.size === 0, `busy windows vouch for nobody (${noisy.size})`);
 }

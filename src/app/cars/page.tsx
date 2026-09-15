@@ -104,6 +104,9 @@ export default async function CarManagerPage({
     ]);
 
   const authById = new Map(allModels.map((m) => [m.id, m.isAuthorized] as const));
+  // Stitched back on after the dedupe, like `isAuthorized` — but unlike it, the score has no use
+  // for the class, so it stays out of the row the dedupe sees.
+  const disciplineById = new Map(allModels.map((m) => [m.id, m.discipline] as const));
   const setupSheetModels = dedupeSetupSheetModelsForPicker(
     allModels.map((m) => ({
       id: m.id,
@@ -120,6 +123,7 @@ export default async function CarManagerPage({
     name: m.name,
     slug: m.slug,
     isAuthorized: authById.get(m.id) ?? false,
+    discipline: disciplineById.get(m.id) ?? null,
   }));
 
   const setupsByCarId: Record<string, CarInlineSetup[]> = {};

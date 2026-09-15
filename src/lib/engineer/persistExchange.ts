@@ -30,6 +30,8 @@ export async function persistEngineerChatExchange(params: {
   /** Old clients may still send these; they land in the rating snapshot and nowhere else. */
   runId?: string;
   compareRunId?: string;
+  /** The range read instead of a run, when the subject bar was on a range. */
+  range?: EngineerMessageContextSnapshot["range"];
   source?: string;
   promptVersion?: string;
 }): Promise<PersistedChatExchange> {
@@ -43,6 +45,7 @@ export async function persistEngineerChatExchange(params: {
     answer: params.assistantReply.slice(0, 8192),
     runId: params.runId?.trim() || null,
     compareRunId: params.compareRunId?.trim() || null,
+    range: params.range ?? null,
     source: params.source,
     promptVersion: params.promptVersion ?? ENGINEER_PROMPT_VERSION,
   };

@@ -108,6 +108,7 @@ async function runsFromActivity(
         .filter(Boolean)
         .join(" · "),
       bestLapSeconds,
+      lapCount,
       alreadyImported: false,
       linkedRunId: null,
       timingSource: "speedhive",
@@ -162,12 +163,16 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
     };
   }
 
-  const location = await fetchPracticeLocation(locationId);
-  const locationLabel = location?.name?.trim() || `Track ${locationId}`;
   const activityIds = new Map<number, string | null>();
   let discovered: SpeedhiveDiscoveredSession[] = [];
+  let location: Awaited<ReturnType<typeof fetchPracticeLocation>> = null;
 
   try {
+    // Inside the try, not above it: this was the one MYLAPS call the scan made unguarded, so a
+    // refusal here (a 429 during a burst) escaped as a 500 and the card read as a broken site
+    // rather than a busy one.
+    location = await fetchPracticeLocation(locationId);
+    const locationLabel = location?.name?.trim() || `Track ${locationId}`;
     if (chipCodes.length > 0) {
       for (const chipCode of chipCodes) {
         const sessions = await fetchPracticeSessionsForChipAtLocation(locationId, chipCode);

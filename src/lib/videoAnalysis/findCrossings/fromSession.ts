@@ -32,11 +32,14 @@ import {
 } from "./refine";
 import { refineByLapFit } from "./lapFit";
 import type { CrossingEvent, CrossingTarget } from "./types";
+import { learnOwnColours, repickByColour } from "./ownColour";
 import {
   applyLineDirections,
   directionsFromMarks,
   lineDirections,
+  linePlaces,
   pickedCandidate,
+  unreliableDirections,
   withDirection,
   type LineDir,
 } from "./direction";
@@ -88,6 +91,16 @@ export const SF_LINE_KEY = "sf";
 
 /** Ignore predictions this close to either end of the file — the window would be clipped. */
 const EDGE_SEC = 2;
+
+/**
+ * How far from every place a line is crossed counts as nowhere, as a share of the frame's width:
+ * about half a car length on the footage this was measured on (19px at 4K, 10px at 1080p). Over
+ * 524 crossings the distance to the nearest other crossing on the same line ran to 24px at the
+ * 99th percentile and 36px at the very worst, so this sits clear of every honest crossing and
+ * still catches the one that was a person standing at the tip of a hairpin line — `direction.ts:
+ * linePlaces`. Only a candidate that is ALSO the wrong way round is refused for it.
+ */
+const PLACE_BAR_SHARE = 0.005;
 
 /** Base half-window, before any widening for a slow lap. */
 export const BASE_WINDOW_SEC = 2.0;
@@ -306,13 +319,28 @@ export function buildTargets(opts: {
     });
   };
 
+  const asked = new Set(laps.map((l) => `${l.role}:${l.lapNumber}`));
+  const ended = new Set<string>();
   for (const lap of laps) {
     const start = lapStart(lap.role, lap.lapNumber);
     if (start == null) continue;
     lapStarts.push({ role: lap.role, lapNumber: lap.lapNumber, videoTimeSec: start });
     const half = windowForLap(lap.lapTimeSec, medianLap);
 
-    if (includeSf) push(lap.role, lap.lapNumber, SF_LINE_KEY, start, SF_WINDOW_SEC);
+    if (includeSf) {
+      push(lap.role, lap.lapNumber, SF_LINE_KEY, start, SF_WINDOW_SEC);
+      // A lap ENDS where the next one starts, and that crossing was only searched for when the
+      // next lap was asked for too. The quickest ten laps are rarely consecutive, so the last
+      // sector of most laps ran to a walked clock — measured 2026-09-09 across six videos: only
+      // 58 of 89 laps had both ends seen. One more short window on the start line closes it.
+      const nextKey = `${lap.role}:${lap.lapNumber + 1}`;
+      if (!asked.has(nextKey) && !ended.has(nextKey)) {
+        ended.add(nextKey);
+        const end = lapStart(lap.role, lap.lapNumber + 1) ?? start + lap.lapTimeSec;
+        lapStarts.push({ role: lap.role, lapNumber: lap.lapNumber + 1, videoTimeSec: end });
+        push(lap.role, lap.lapNumber + 1, SF_LINE_KEY, end, SF_WINDOW_SEC);
+      }
+    }
 
     for (const line of corners) {
       const offset = opts.seedsByRole?.[lap.role]?.[line.lineKey] ?? seeds[line.lineKey];
@@ -420,8 +448,12 @@ export type ReviewedCrossing = {
 export type LineDirection = {
   lineKey: string;
   dir: LineDir;
-  /** Who settled it: a tap at the picker, an earlier scan's marks, or the majority of picks. */
-  from: "picker" | "marks" | "majority";
+  /**
+   * Who settled it: a tap at the picker, an earlier scan's marks, or the majority of picks —
+   * or "unreliable": a direction that emptied a quarter of the line's rows, discarded, the line
+   * left direction-blind (`turned`/`emptied` are then what holding to it would have done).
+   */
+  from: "picker" | "marks" | "majority" | "unreliable";
   /** Rows whose pick went the other way and took the nearest right-way candidate instead. */
   turned: number;
   /** Rows whose pick went the other way with nothing right-way on offer — sent back as gaps. */
@@ -438,6 +470,15 @@ export type Review = {
   candidatesById: Record<string, CrossingEvent[]>;
   /** Lines where a driver's colour proved able to tell the cars apart and helped decide. */
   colourLines: Array<{ lineKey: string; roles: SessionRole[] }>;
+  /**
+   * Each driver's colour on each line, learnt from the laps they crossed it alone, and the rows
+   * it moved onto the car or held back for being another colour — `ownColour.ts`.
+   */
+  ownColour: {
+    lines: Array<{ role: SessionRole; lineKey: string; samples: number }>;
+    swapped: string[];
+    held: string[];
+  };
   /** Track order learnt from the detections, first line to last. */
   order: string[];
   /** The direction each line was held to, and how many rows that turned or emptied. */
@@ -492,6 +533,12 @@ export function reviewResults(opts: {
    * picker, or the marks an earlier scan wrote. Lines not listed go by majority — `direction.ts`.
    */
   lineDirections?: Partial<Record<string, LineDir>>;
+  /**
+   * The frame's width in pixels, which is the only scale the review has for "how far is far" —
+   * see `PLACE_BAR_SHARE`. Omitted, a wrong-way crossing is never refused for standing on its
+   * own, which is how this behaved before positions were used.
+   */
+  frameW?: number;
 }): Review {
   const { results: scanned, targets, marks, lapStarts, laps = [], field } = opts;
   const lapTimeByKey = new Map(laps.map((l) => [`${l.role}:${l.lapNumber}`, l.lapTimeSec]));
@@ -514,17 +561,36 @@ export function reviewResults(opts: {
     scanned.filter((r) => r.lineKey !== SF_LINE_KEY),
     known
   );
-  const oriented = applyLineDirections(scanned, dirs);
+  // A direction that empties a quarter of a line's rows is noise (a line the cars cross at its
+  // end reads either way lap to lap, and there is no second pass to turn to) — that line goes
+  // direction-blind rather than have its real crossings turned onto whatever went the other way
+  // or thrown out. See `unreliableDirections`.
+  const firstPass = applyLineDirections(scanned, dirs);
+  const unreliable = unreliableDirections(scanned, firstPass);
+  const discarded: LineDirection[] = [...unreliable].map((lineKey) => ({
+    lineKey,
+    dir: dirs.get(lineKey)!,
+    from: "unreliable",
+    turned: firstPass.turned.filter((id) => id.endsWith(`:${lineKey}`)).length,
+    emptied: firstPass.emptied.filter((id) => id.endsWith(`:${lineKey}`)).length,
+  }));
+  for (const lineKey of unreliable) dirs.delete(lineKey);
+  const oriented = unreliable.size ? applyLineDirections(scanned, dirs) : firstPass;
   const results = oriented.rows.map((r) => withDirection(r, dirs.get(r.lineKey)));
   const evidence = new Map(scanned.map((r) => [r.id, r.candidates]));
   const onLine = (ids: string[], lineKey: string) => ids.filter((id) => id.endsWith(`:${lineKey}`)).length;
-  const directions: LineDirection[] = [...dirs].map(([lineKey, dir]) => ({
-    lineKey,
-    dir,
-    from: declared.has(lineKey) ? "picker" : fromMarks.has(lineKey) ? "marks" : "majority",
-    turned: onLine(oriented.turned, lineKey),
-    emptied: onLine(oriented.emptied, lineKey),
-  }));
+  const directions: LineDirection[] = [
+    ...[...dirs].map(
+      ([lineKey, dir]): LineDirection => ({
+        lineKey,
+        dir,
+        from: declared.has(lineKey) ? "picker" : fromMarks.has(lineKey) ? "marks" : "majority",
+        turned: onLine(oriented.turned, lineKey),
+        emptied: onLine(oriented.emptied, lineKey),
+      })
+    ),
+    ...discarded,
+  ];
 
   const fixed = (id: string, lineKey: string, lapNumber: number, t: number): RefinableResult => ({
     id,
@@ -577,6 +643,8 @@ export function reviewResults(opts: {
     dirs,
     candidatesOf: (r) => evidence.get(r.id) ?? r.candidates,
     fixed: anchorIds,
+    places: linePlaces(scanned),
+    placeBarPx: (opts.frameW ?? 0) * PLACE_BAR_SHARE,
   });
 
   // The field's turn: every candidate on a line, matched to whoever was due there. A time the
@@ -586,9 +654,23 @@ export function reviewResults(opts: {
     field && field.length
       ? assignToField({ results: chainedOnly, field, sfKey: SF_LINE_KEY })
       : null;
-  const chained: Array<FieldOutcome<RefineOutcome<RefinableResult>>> = assignment
+  const fielded: Array<FieldOutcome<RefineOutcome<RefinableResult>>> = assignment
     ? applyFieldAssignment(chainedOnly, assignment, anchorIds)
     : chainedOnly;
+
+  // **Your car is a colour, and on any one line it is the same colour every lap.** Each line's
+  // reference is learnt from the laps this driver crossed it alone, and a pick that is clearly
+  // another colour is swapped for the matching candidate in its window, or held when there is
+  // none — `ownColour.ts`. After the field, so the field's own swaps are what get judged; before
+  // the duplicate and plausibility checks, so a swapped time is what they see. (Bendigo S3,
+  // 2026-09-09: a grey-blue kerb flicker a third of a second before the pink car on three laps.)
+  // Learnt from the rows as scanned, before any direction was applied: a lone confirmed crossing
+  // is the car whichever way its blob's path was read, and on a line where the direction is a
+  // coin flip (S3 above) holding to it emptied the very rows that teach the colour.
+  const ownColours = learnOwnColours(scanned, SF_LINE_KEY, roleOf, (r) => evidence.get(r.id) ?? r.candidates);
+  const coloured = repickByColour(fielded, ownColours, SF_LINE_KEY, roleOf, anchorIds);
+  const chained = coloured.rows;
+  const colourHeldIds = new Set(coloured.held);
 
   // Two laps sharing a crossing, and a lap visiting its corners out of order, are both provably
   // wrong from the numbers alone — no reference data, no watching. They are settled before
@@ -635,6 +717,7 @@ export function reviewResults(opts: {
       source: r.source,
       suspect:
         suspectIds.has(r.id) ||
+        colourHeldIds.has(r.id) ||
         outOfOrderIds.has(r.id) ||
         (r.source === "unconfirmed" && !vouchedIds.has(r.id)) ||
         r.claimedBy != null,
@@ -657,6 +740,15 @@ export function reviewResults(opts: {
     colourLines: assignment
       ? [...assignment.colourLines].map(([lineKey, roles]) => ({ lineKey, roles }))
       : [],
+    ownColour: {
+      lines: [...ownColours.values()].map((l) => ({
+        role: l.role as SessionRole,
+        lineKey: l.lineKey,
+        samples: l.ref.samples,
+      })),
+      swapped: coloured.swapped,
+      held: coloured.held,
+    },
     order: learntOrder(chained),
     directions,
     lapStartError: sfAccuracy(results, laps),

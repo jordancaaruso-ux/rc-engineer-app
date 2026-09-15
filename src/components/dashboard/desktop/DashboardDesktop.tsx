@@ -148,6 +148,7 @@ export function DashboardDesktop({
           serverDraftSavedAt={draftSavedAt}
           serverDraftEventName={draftEventName}
           serverDraftIsForToday={draftIsForToday}
+          pendingSweep={model.pendingSweep}
           footer={ctaFooter}
         />
 

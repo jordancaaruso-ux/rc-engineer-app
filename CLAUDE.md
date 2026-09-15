@@ -35,7 +35,10 @@ npx next build            # LOCAL production build
   anonymised. Drift repair is `npm run db:migrate:reconcile` or `prisma migrate resolve` — never
   `db push`. Use `DATABASE_URL_UNPOOLED` for `prisma migrate`; the pooler throws P1002 lock timeouts.
 - Slow and costly, only when asked: `engineer:eval*` (the rebuilt harness), `setup-extract:eval`.
-- iOS shell: `npm run cap:sync` / `npm run cap:open`.
+- iOS shell: `npm run cap:sync` / `npm run cap:open`. Android shell: `cap:sync:android` /
+  `cap:open:android` (`android/` generated 2026-09-14; needs `google-services.json` for push).
+- Timing sweep crons (`/api/cron/timing-sweep`, `timing-sweep-plan`) are Bearer `CRON_SECRET`;
+  the sweep is dark on production until `TIMING_SWEEP_ENABLED=1` and always live on a dev server.
 
 Verification order before calling something done: `npx tsc --noEmit` → the matching `test:*` →
 `npx next build`. There is no CI — nothing else will catch it.
@@ -128,6 +131,7 @@ read it to find the right north star, then read that.
 | Roll centre calculator | `docs/ROLL_CENTER_NORTH_STAR.md` |
 | Video analysis, traces, sector compare | `docs/VIDEO_ANALYSIS_REWORK_NORTH_STAR.md`, `docs/VIDEO_TRACE_NORTH_STAR.md`, `docs/SECTOR_COMPARE_NORTH_STAR.md` |
 | PWA, service worker, push | `docs/PWA_NORTH_STAR.md` |
+| Timing sweep — runs filed from the timing site, draft claims, placeholders, evening summary, arming, Blob schedule | `docs/TIMING_SWEEP_NORTH_STAR.md` |
 | iOS shell, TestFlight, native push | `docs/TESTFLIGHT.md` |
 | Billing, pricing, the paid door | `docs/MONETISATION_NORTH_STAR.md` |
 | Writing KB drafts | `docs/VEHICLE_DYNAMICS_PHYSICS_KB_ROADMAP.md` |

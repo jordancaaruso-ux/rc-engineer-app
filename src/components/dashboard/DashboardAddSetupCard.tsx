@@ -16,8 +16,8 @@ export function DashboardAddSetupCard({ cars }: { cars: UploadSetupCar[] }) {
 
   return (
     <CardPanel className="border-primary-ink/25">
-      <div className="flex items-center gap-2">
-        <Eyebrow>Setup</Eyebrow>
+      <div className="eyebrow-band mb-2 flex items-center gap-2">
+        <Eyebrow className="mb-0">Setup</Eyebrow>
         <span className="ml-auto micro-caps text-muted-foreground">
           Recommended
         </span>

@@ -39,22 +39,25 @@ import {
 export type { GoldCase, FieldVerdict } from "./mtc3-loop/mtc3-common";
 
 /** Live calibration + the blank AcroForm bytes, loaded for any calibration id. */
-export type VerifyCalibration = LiveCalibration & { calId: string; blankPdfBytes: Buffer };
+export type VerifyCalibration = LiveCalibration & { calId: string; blankPdfBytes: Buffer; exampleDocumentId?: string | null };
 
-export async function loadCalibrationForVerify(calId: string): Promise<VerifyCalibration> {
+export async function loadCalibrationForVerify(calId: string, opts: { allowMissingImageMap?: boolean } = {}): Promise<VerifyCalibration> {
   const cal = await prisma.setupSheetCalibration.findUnique({
     where: { id: calId },
     select: {
       id: true,
       calibrationDataJson: true,
       setupSheetModelId: true,
+      exampleDocumentId: true,
       exampleDocument: { select: { storagePath: true, mimeType: true } },
     },
   });
   if (!cal) throw new Error(`Calibration ${calId} not found`);
   const rawData = cal.calibrationDataJson as Record<string, unknown>;
   const data = normalizeCalibrationData(rawData);
-  if (!data.imageCalibration) throw new Error(`Calibration ${calId} has no imageCalibration (derive the image map first)`);
+  if (!data.imageCalibration && !opts.allowMissingImageMap) {
+    throw new Error(`Calibration ${calId} has no imageCalibration (derive the image map first, or pass --rederive)`);
+  }
   if (!cal.exampleDocument || cal.exampleDocument.mimeType !== "application/pdf") {
     throw new Error(`Calibration ${calId} needs an editable PDF example document`);
   }
@@ -69,7 +72,8 @@ export async function loadCalibrationForVerify(calId: string): Promise<VerifyCal
 
   return {
     calId,
-    imageCalibration: data.imageCalibration,
+    imageCalibration: data.imageCalibration as ImageCalibration,
+    exampleDocumentId: cal.exampleDocumentId,
     rawData,
     mappings: (rawData.formFieldMappings ?? {}) as Record<string, { pdfFieldName?: string }>,
     labelByKey,
@@ -87,7 +91,7 @@ export async function rederiveImageMap(live: VerifyCalibration): Promise<{ conte
   const built = await buildDerivedImageCalibration({
     pdfBytes: new Uint8Array(live.blankPdfBytes),
     calibrationDataJson: live.rawData,
-    exampleDocumentId: (live.imageCalibration.reference.exampleDocumentId as string) || null,
+    exampleDocumentId: (live.imageCalibration?.reference?.exampleDocumentId as string) || live.exampleDocumentId || null,
   });
   if (!built.ok) throw new Error(`re-derive failed: ${built.error}`);
   const merged = { ...live.rawData, imageCalibration: built.imageCalibration };
@@ -98,6 +102,24 @@ export async function rederiveImageMap(live: VerifyCalibration): Promise<{ conte
   live.imageCalibration = built.imageCalibration;
   live.rawData = merged;
   return { contentBoxDetected: built.contentBoxDetected, derivedFields: built.derivedFields };
+}
+
+/**
+ * The derive step decides text-vs-checkbox from the KEY (the field catalog), so a sheet whose keys
+ * are placeholders ("check_box29__b2", "checkboxformfield_114") comes out all-text and every empty
+ * tick box OCRs as "0". The blank AcroForm already says which boxes are tick boxes; believe it.
+ * In-memory only — nothing is written back. Returns how many fields were re-typed.
+ */
+export function retypeFieldsFromAcro(live: LiveCalibration, geo: Map<string, AcroFieldInfo>): number {
+  let n = 0;
+  live.imageCalibration.fields = live.imageCalibration.fields.map((f) => {
+    if (f.kind !== "text") return f;
+    const pdfName = live.mappings[f.key]?.pdfFieldName;
+    if (!pdfName || geo.get(pdfName)?.kind !== "checkbox") return f;
+    n++;
+    return { kind: "checkbox" as const, key: f.key, region: f.region, checkedValue: "1", uncheckedValue: "" };
+  });
+  return n;
 }
 
 // ---------- Synthetic fill (generalized, no model-specific string pools) ----------
@@ -158,6 +180,16 @@ export async function fillSyntheticCase(input: {
     try {
       const f = form.getField(pdfName);
       if (f instanceof PDFTextField) f.setText(syntheticValueForField(calField.key, rnd));
+    } catch { /* gold self-corrects from the saved pdf */ }
+  }
+
+  for (const calField of input.live.imageCalibration.fields) {
+    if (calField.kind !== "checkbox") continue;
+    const pdfName = input.live.mappings[calField.key]?.pdfFieldName;
+    if (!pdfName || rnd() < 0.5) continue;
+    try {
+      const f = form.getField(pdfName);
+      if (f instanceof PDFCheckBox) f.check();
     } catch { /* gold self-corrects from the saved pdf */ }
   }
 
@@ -269,6 +301,23 @@ export function scoreCaseRaw(gold: GoldCase, read: ReadResult, cal: ImageCalibra
     verdicts.push({ key: field.key, kind, gold: goldV, read: readV, ok, ...(failMode ? { failMode } : {}) });
   }
   return verdicts;
+}
+
+/** Gold with standalone tick boxes read by their PDF field name (region matching is contentBox-fragile). */
+export async function extractGoldWithNamedCheckboxes(pdfBytes: Buffer, live: LiveCalibration): Promise<GoldCase> {
+  const gold = await extractGoldFromFilledPdf(pdfBytes, live);
+  const doc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+  const form = doc.getForm();
+  for (const calField of live.imageCalibration.fields) {
+    if (calField.kind !== "checkbox") continue;
+    const pdfName = live.mappings[calField.key]?.pdfFieldName;
+    if (!pdfName) continue;
+    try {
+      const f = form.getField(pdfName);
+      if (f instanceof PDFCheckBox) gold.values[calField.key] = f.isChecked() ? (calField.checkedValue ?? "1") : "";
+    } catch { /* keep region-based gold */ }
+  }
+  return gold;
 }
 
 export { loadAcroGeometry, extractGoldFromFilledPdf, renderPdfFirstPageToPng };

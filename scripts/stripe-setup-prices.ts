@@ -6,8 +6,9 @@
  *   npm run stripe:setup-prices
  *   (= npx dotenv-cli -e .env.local -- npx tsx scripts/stripe-setup-prices.ts)
  *
- * Prints the four price IDs as env lines to paste into .env.local. Uses AUD; amounts in cents.
- * Annual = 10x monthly (~2 months free).
+ * Prints the five price IDs as env lines to paste into .env.local. Uses AUD; amounts in cents.
+ * Annual = 10x monthly (~2 months free); Starter is monthly only. Also keeps the portal's
+ * plan-switch list current, so the Upgrade button on /billing works.
  */
 import Stripe from "stripe";
 // Relative, not `@/` — this runs under tsx outside the Next build, so no path aliases.
@@ -35,7 +36,7 @@ type PriceDef = {
 };
 
 type TierDef = {
-  tier: "standard" | "pro";
+  tier: "starter" | "standard" | "pro";
   productName: string;
   prices: PriceDef[];
 };
@@ -44,7 +45,16 @@ type TierDef = {
 // Notebook/Race Engineer. The tier IDS below are unchanged on purpose — they are the values in
 // `Subscription.tier` and in each product's `metadata.tier`, and the webhook resolves entitlement
 // through them. Only the labels moved. See docs/MONETISATION_NORTH_STAR.md.
+// Starter added 2026-09-09 (docs/STARTER_TIER_PLAN.md): $2.99, monthly only, no annual price.
 const TIERS: TierDef[] = [
+  {
+    tier: "starter",
+    productName: `${PRODUCT_NAME} — ${TIER_LABELS.starter}`,
+    prices: [
+      // No Engineer, so no answer cost to fund; the card on file is the point of the price.
+      { envVar: "STRIPE_PRICE_STARTER_MONTHLY", lookupKey: "rc_engineer_starter_monthly", interval: "month", unitAmount: 299 },
+    ],
+  },
   {
     tier: "standard",
     productName: `${PRODUCT_NAME} — ${TIER_LABELS.standard}`,
@@ -111,17 +121,61 @@ async function ensurePrice(productId: string, def: PriceDef): Promise<string> {
   return price.id;
 }
 
+/**
+ * The portal's plan switcher (docs/STARTER_TIER_PLAN.md): `/api/billing/portal` opens Stripe's
+ * `subscription_update` flow so an existing member upgrades on the subscription they already
+ * hold, prorated — never through a second checkout. Stripe only allows that flow when the portal
+ * configuration lists every product and price a member may switch between, so the default
+ * configuration is brought up to date here every run.
+ */
+async function ensurePortalPlanSwitching(
+  entries: Array<{ product: string; prices: string[] }>,
+): Promise<void> {
+  const subscriptionUpdate = {
+    enabled: true,
+    default_allowed_updates: ["price" as const],
+    proration_behavior: "create_prorations" as const,
+    products: entries,
+  };
+  const existing = await stripe.billingPortal.configurations.list({ is_default: true, limit: 1 });
+  const current = existing.data[0];
+  if (current) {
+    await stripe.billingPortal.configurations.update(current.id, {
+      features: { subscription_update: subscriptionUpdate },
+    });
+    console.log(`\nPortal configuration ${current.id}: plan switching covers ${entries.length} products`);
+    return;
+  }
+  const created = await stripe.billingPortal.configurations.create({
+    business_profile: { headline: `${PRODUCT_NAME} billing` },
+    features: {
+      subscription_update: subscriptionUpdate,
+      invoice_history: { enabled: true },
+      payment_method_update: { enabled: true },
+      subscription_cancel: { enabled: true, mode: "at_period_end" },
+    },
+  });
+  console.log(
+    `\nPortal configuration ${created.id} created — confirm it is the default under Settings → Billing → Customer portal.`,
+  );
+}
+
 async function main() {
   const envLines: string[] = [];
+  const portalEntries: Array<{ product: string; prices: string[] }> = [];
   for (const tier of TIERS) {
     const productId = await ensureProduct(tier.tier, tier.productName);
+    const priceIds: string[] = [];
     for (const p of tier.prices) {
       const priceId = await ensurePrice(productId, p);
+      priceIds.push(priceId);
       const dollars = (p.unitAmount / 100).toFixed(2);
       console.log(`${tier.productName} — $${dollars} AUD / ${p.interval}: ${priceId}`);
       envLines.push(`${p.envVar}="${priceId}"`);
     }
+    portalEntries.push({ product: productId, prices: priceIds });
   }
+  await ensurePortalPlanSwitching(portalEntries);
   console.log("\n--- paste into .env.local ---");
   console.log(envLines.join("\n"));
 }

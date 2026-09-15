@@ -11,6 +11,7 @@ import {
   directionsFromMarks,
   lineDirections,
   pickedCandidate,
+  unreliableDirections,
   withDirection,
 } from "./direction";
 import { reviewResults, type LapInput, type SessionTarget } from "./fromSession";
@@ -195,6 +196,55 @@ function row(
   const s5again = again.directions.find((d) => d.lineKey === "s5");
   assert(s5again?.dir === 1 && s5again.from === "marks", "the earlier scan's marks settle it");
   assert(s5again.turned === 10, "every leaning row is turned back");
+}
+
+/* ---------- a direction half the line's own picks contradict is discarded ---------- */
+{
+  // Bendigo S3 (2026-09-09): the cars cross the line at its very end and the direction reads
+  // either way lap to lap. The picker's tap read "−"; held to it, the review turned the car's
+  // crossings onto a kerb flicker 0.3s earlier wherever one existed, and emptied the rest.
+  const lapStarts: Array<{ role: "me"; lapNumber: number; videoTimeSec: number }> = [];
+  const targets: SessionTarget[] = [];
+  const results: RefinableResult[] = [];
+  const laps: LapInput[] = [];
+  const carAt = new Map<string, number>();
+  for (let lap = 1; lap <= 6; lap++) {
+    const s = 100 + (lap - 1) * 15;
+    lapStarts.push({ role: "me", lapNumber: lap, videoTimeSec: s });
+    laps.push({ role: "me", lapNumber: lap, lapTimeSec: 15 });
+    const car = s + 6.47 + (lap % 3) * 0.03;
+    const centre = s + 6.5;
+    const id = `me:${lap}:s3`;
+    carAt.set(id, car);
+    targets.push({ id, role: "me", lineKey: "s3", lapNumber: lap, centerSec: centre, truthSec: null, searchFrom: centre - 2, searchTo: centre + 2 });
+    // Every other lap a kerb flicker went the other way, a third of a second before the car.
+    const flicker = lap % 2 === 0;
+    results.push({
+      id,
+      lineKey: "s3",
+      lapNumber: lap,
+      centerSec: centre,
+      detectedSec: car,
+      quality: 8,
+      candidates: flicker ? [ev(car - 0.3, -1), ev(car, 1)] : [ev(car, 1)],
+      source: "confirmed",
+    });
+  }
+  const held = applyLineDirections(results, new Map([["s3", -1]]));
+  assert(held.turned.length === 3 && held.emptied.length === 3, "held to the tap, three rows turn onto the flicker and three empty");
+  assert(unreliableDirections(results, held).has("s3"), "three rows in six had nothing the tap's way: the direction is noise");
+  assert(unreliableDirections(results, { emptied: [] }).size === 0, "rows turned onto a second pass are a hairpin, not noise — however many");
+  assert(unreliableDirections(results, { emptied: ["me:6:s3"] }).size === 0, "one row emptied in six is a window that closed early");
+  assert(unreliableDirections(results, { emptied: ["me:4:s3", "me:6:s3"] }).has("s3"), "two in six is the bar");
+
+  const review = reviewResults({ results, targets, marks: [], lapStarts, laps, lineDirections: { s3: -1 } });
+  const s3 = review.directions.find((d) => d.lineKey === "s3");
+  assert(s3 && s3.from === "unreliable" && s3.dir === -1, `the tap's direction is reported as discarded, got ${JSON.stringify(s3)}`);
+  assert(s3.turned === 3 && s3.emptied === 3, `and what holding to it would have done, got ${s3.turned}/${s3.emptied}`);
+  assert(review.found.length === 6 && review.suspect.length === 0, `every lap keeps the car: found ${review.found.length}, held ${review.suspect.length}`);
+  for (const r of review.found) {
+    assert(Math.abs(r.videoTimeSec - carAt.get(r.id)!) < 1e-9, `${r.id} is the car, not the flicker`);
+  }
 }
 
 console.log("direction.test.ts: OK");

@@ -220,9 +220,10 @@ export function BaselineSetupEditorClient({
       ) : null}
 
       <SurfaceCard>
+      {/* The card's first child, so it is the card's band (2026-09-15). */}
+      <Eyebrow>{modelName}</Eyebrow>
       <div className="space-y-5">
         <div className="space-y-3">
-          <Eyebrow>{modelName}</Eyebrow>
           <label className="block">
             <span className="ui-label-meta text-muted-foreground">Name</span>
             <input

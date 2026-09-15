@@ -16,11 +16,11 @@ two_answers: false
 more:
   reviewed: true
   confidence: majority
-  effect: "the nose dives less on the brakes, so the front bites sooner into a braking corner; less forgiving over bumps under brakes"
+  effect: "the nose dives less on the brakes, so the front grips up sooner into a braking corner; less forgiving over bumps under brakes"
 less:
   reviewed: false
   confidence: majority
-  effect: "the nose dives more on the brakes, so the front bites later into a braking corner; more forgiving over bumps under brakes"
+  effect: "the nose dives more on the brakes, so the front grips up later into a braking corner; more forgiving over bumps under brakes"
 physics:
   - anti-dive-anti-squat.md
 sources:

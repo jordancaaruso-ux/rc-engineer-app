@@ -32,9 +32,6 @@ export function NotificationsSection() {
   const [isNative, setIsNative] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [testUrl, setTestUrl] = useState("");
-  const [testBusy, setTestBusy] = useState(false);
-  const [testReport, setTestReport] = useState<string | null>(null);
 
   useEffect(() => {
     // In the shell the Push API is absent, so the web checks below would wrongly
@@ -138,27 +135,6 @@ export function NotificationsSection() {
     }
   }, [isNative]);
 
-  const runWatchTest = useCallback(
-    async (force: boolean) => {
-      setTestBusy(true);
-      setTestReport(null);
-      try {
-        const res = await fetch("/api/push/watch-test", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ speedhiveUrl: testUrl.trim() || undefined, force }),
-        });
-        const body = (await res.json().catch(() => ({}))) as { note?: string; error?: string };
-        setTestReport(res.ok ? body.note ?? "Done." : body.error ?? `HTTP ${res.status}`);
-      } catch (e) {
-        setTestReport(e instanceof Error ? e.message : "Test failed.");
-      } finally {
-        setTestBusy(false);
-      }
-    },
-    [testUrl],
-  );
-
   const sendTest = useCallback(async () => {
     setBusy(true);
     setStatus(null);
@@ -193,9 +169,7 @@ export function NotificationsSection() {
     <CardPanel className="mt-10">
       <h2 className="text-sm font-semibold text-foreground">Notifications</h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        Get a nudge to log a run when your transponder posts a result on Speedhive — or a reminder
-        on race days at tracks without live timing. Tap opens Add Run; add laps the usual way. Beta
-        — enable per device.
+        &ldquo;Run 3 is in&rdquo; at the track, your day at 8 pm. Per device.
       </p>
 
       {supported === false ? (
@@ -247,49 +221,6 @@ export function NotificationsSection() {
         </p>
       ) : null}
       {status ? <p className="mt-2 text-xs text-muted-foreground">{status}</p> : null}
-
-      {subscribed ? (
-        <div className="mt-5 border-t border-border pt-4">
-          <h3 className="text-xs font-semibold text-foreground">Test result detection</h3>
-          <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-            Leave blank to use a Speedhive URL from one of your tracks. <strong>Check now</strong>{" "}
-            runs exactly what the cron does — skips only the active-day gate, then pushes just the
-            genuinely new, recent (&lt;4h) sessions; if there&apos;s nothing fresh it tells you the
-            newest match and how old it is. <strong>Send test push</strong> sends a canned test
-            notification to check the tap → Add Run flow — it does <em>not</em> look up real
-            sessions, so it never surfaces an old run. Tapping either opens the normal Add Run — no
-            laps are imported; add them the usual way.
-          </p>
-          <input
-            type="url"
-            value={testUrl}
-            onChange={(e) => setTestUrl(e.target.value)}
-            placeholder="Speedhive org/practice URL (optional)"
-            className="ui-control mt-3 w-full rounded-lg border border-border bg-input px-3 py-2 text-xs text-foreground outline-none placeholder:text-faint focus:border-primary-ink"
-          />
-          <div className="mt-3 flex flex-wrap gap-3">
-            <button
-              type="button"
-              disabled={testBusy}
-              onClick={() => void runWatchTest(false)}
-              className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
-            >
-              {testBusy ? "Checking…" : "Check now"}
-            </button>
-            <button
-              type="button"
-              disabled={testBusy}
-              onClick={() => void runWatchTest(true)}
-              className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
-            >
-              Send test push
-            </button>
-          </div>
-          {testReport ? (
-            <p className="mt-2 text-[11px] leading-snug text-muted-foreground">{testReport}</p>
-          ) : null}
-        </div>
-      ) : null}
     </CardPanel>
   );
 }

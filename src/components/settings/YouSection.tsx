@@ -132,10 +132,10 @@ export function YouSection({
           holding its headings out in the page ground; every other surface in the app
           names itself from inside, so a card can be read — or lifted somewhere else —
           without the page around it explaining what it is. */}
-      <div className="px-4 pt-3.5">
-        <Eyebrow>You</Eyebrow>
+      <div className="eyebrow-band px-4">
+        <Eyebrow className="mb-0">You</Eyebrow>
       </div>
-      <div className="flex items-center gap-3 px-4 pb-4 pt-1">
+      <div className="flex items-center gap-3 px-4 pb-4 pt-3">
         <button
           type="button"
           disabled={busy !== null}

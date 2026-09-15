@@ -570,6 +570,14 @@ export function RunHistoryTable({
                             Draft
                           </span>
                         ) : null}
+                        {run.unconfirmedAt ? (
+                          <span
+                            className="mt-0.5 inline-block rounded border border-amber-500/40 bg-amber-500/10 px-0.5 py-px text-[8px] ui-title text-amber-900 dark:text-amber-100"
+                            title="Added from the timing sheet — open it to confirm"
+                          >
+                            Unconfirmed
+                          </span>
+                        ) : null}
                         {showLapImportWarning ? (
                           <LapImportWarning
                             compact
@@ -663,6 +671,14 @@ export function RunHistoryTable({
                         title="Logging not marked complete"
                       >
                         Draft
+                      </span>
+                    ) : null}
+                    {run.unconfirmedAt ? (
+                      <span
+                        className="shrink-0 rounded border border-amber-500/40 bg-amber-500/10 px-1 py-0.5 text-[8px] md:text-[9px] ui-title text-amber-900 dark:text-amber-100"
+                        title="Added from the timing sheet — open it to confirm"
+                      >
+                        Unconfirmed
                       </span>
                     ) : null}
                     {showLapImportWarning ? (

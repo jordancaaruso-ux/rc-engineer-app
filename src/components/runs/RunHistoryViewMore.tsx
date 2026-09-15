@@ -20,11 +20,15 @@ export function buildRunHistoryHref(opts: {
   return q ? `/runs/history?${q}` : "/runs/history";
 }
 
+const FOOT_LINK_CLASS =
+  "rounded-lg border border-border bg-card px-4 py-2 text-xs font-medium text-foreground hover:bg-muted/60 transition";
+
 export function RunHistoryViewMore({
   viewAll,
   hasMoreRuns,
   totalRunCount,
   loadedRunCount,
+  hiddenByPlanCount = 0,
   teamId,
   openGroup,
   filterQuery,
@@ -33,31 +37,46 @@ export function RunHistoryViewMore({
   hasMoreRuns: boolean;
   totalRunCount: number;
   loadedRunCount: number;
+  /** Runs the viewer's own plan is hiding (Starter keeps fifteen — docs/STARTER_TIER_PLAN.md). */
+  hiddenByPlanCount?: number;
   teamId?: string | null;
   openGroup?: string | null;
   filterQuery?: string | null;
 }) {
-  if (viewAll) {
-    return (
+  // The Starter upsell, and the whole of it: one row at the foot of the list, in every
+  // placement, saying what the plan is holding back. It sits after "Show recent only", and
+  // yields to "View more" while there are still visible runs the page has not loaded.
+  const upgradeRow =
+    hiddenByPlanCount > 0 ? (
       <div className="flex items-center justify-center pt-2">
-        <Link
-          href={buildRunHistoryHref({ teamId, openGroup, filterQuery })}
-          className="rounded-lg border border-border bg-card px-4 py-2 text-xs font-medium text-foreground hover:bg-muted/60 transition"
-        >
-          Show recent only
+        <Link href="/billing" className={FOOT_LINK_CLASS}>
+          {hiddenByPlanCount} older run{hiddenByPlanCount === 1 ? "" : "s"} ·{" "}
+          <span className="text-primary-ink">Upgrade</span>
         </Link>
       </div>
+    ) : null;
+
+  if (viewAll) {
+    return (
+      <>
+        <div className="flex items-center justify-center pt-2">
+          <Link href={buildRunHistoryHref({ teamId, openGroup, filterQuery })} className={FOOT_LINK_CLASS}>
+            Show recent only
+          </Link>
+        </div>
+        {upgradeRow}
+      </>
     );
   }
 
-  if (!hasMoreRuns) return null;
+  if (!hasMoreRuns) return upgradeRow;
 
   const olderRuns = totalRunCount - loadedRunCount;
   return (
     <div className="flex items-center justify-center pt-2">
       <Link
         href={buildRunHistoryHref({ viewAll: true, teamId, openGroup, filterQuery })}
-        className="rounded-lg border border-border bg-card px-4 py-2 text-xs font-medium text-foreground hover:bg-muted/60 transition"
+        className={FOOT_LINK_CLASS}
       >
         View more · {olderRuns} older run{olderRuns === 1 ? "" : "s"}
       </Link>

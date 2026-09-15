@@ -13,6 +13,7 @@ import { Check, ChevronDown, Loader2, Search, User, Users, X } from "lucide-reac
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   DEFAULT_RUN_HISTORY_FILTERS,
+  describeRunHistoryStatus,
   filtersToSearchParams,
   parseRunHistoryFilters,
   runHistoryFiltersActive,
@@ -583,7 +584,7 @@ export function SessionsFilterBar({
   if (filters.status !== "all") {
     activeChips.push({
       key: "status",
-      label: filters.status === "draft" ? "Drafts" : "Complete",
+      label: describeRunHistoryStatus(filters.status),
       onRemove: () => patch({ status: "all" }),
     });
   }
@@ -857,7 +858,9 @@ export function SessionsFilterBar({
                   onChange={(e) =>
                     patch({
                       status:
-                        e.target.value === "draft" || e.target.value === "complete"
+                        e.target.value === "draft" ||
+                        e.target.value === "complete" ||
+                        e.target.value === "unconfirmed"
                           ? e.target.value
                           : "all",
                     })
@@ -866,6 +869,7 @@ export function SessionsFilterBar({
                   <option value="all">All runs</option>
                   <option value="complete">Complete</option>
                   <option value="draft">Draft</option>
+                  <option value="unconfirmed">Unconfirmed</option>
                 </select>
               </PopRow>
             </PopGroup>

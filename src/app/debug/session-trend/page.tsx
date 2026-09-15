@@ -24,6 +24,8 @@ function trendRun(index: number): AnalysisTrendRun {
     shortLabel: `R${index + 1}`,
     sessionName: `Run ${index + 1}`,
     timeLabel: TIMES[index]!,
+    dayKey: "2026-07-19",
+    dayLabel: "Sun 19 Jul",
     createdAtIso: "2026-07-19T04:00:00.000Z",
     metrics: {
       best,
@@ -71,6 +73,8 @@ const ROWS: WorkbenchRunRow[] = BESTS.map((best, index) => ({
   label: `R${index + 1}`,
   title: "Practice · A800 RR",
   timeLabel: TIMES[index]!,
+  dayKey: "2026-07-19",
+  dayLabel: "Sun 19 Jul",
   whereLabel: "TFTR",
   whenLabel: `19 Jul, ${TIMES[index]!}`,
   carName: "A800 RR",
@@ -82,6 +86,7 @@ const ROWS: WorkbenchRunRow[] = BESTS.map((best, index) => ({
   lapCount: 18,
   isGroupBest: best === Math.min(...BESTS),
   needsLapImport: false,
+  unconfirmed: false,
   // Alternating, so the preview shows both faces of the expansion: a run that
   // changed the car, and one that went back out as it came in.
   setupDiff:
@@ -147,6 +152,7 @@ const GROUP: WorkbenchGroup = {
   runs: ROWS,
   trend: TREND,
   headline: { best: 15.802, runCount: 5, lapCount: 91, priorLabel: "5 Jul 2026", priorDelta: -0.43 },
+  debrief: null,
   drivers: null,
   teamDay: null,
   totalRuns: null,

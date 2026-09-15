@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowUp, ChevronDown, MessageSquarePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EngineerMessageRatingRow } from "@/components/engineer/EngineerMessageRatingRow";
+import { EngineerRangePicker, type EngineerRangeOptions } from "@/components/engineer/EngineerRangePicker";
 import { EngineerRunPicker } from "@/components/engineer/EngineerRunPicker";
 import { EngineerStarterQuestions } from "@/components/engineer/EngineerStarterQuestions";
 import { EngineerSubjectBar } from "@/components/engineer/EngineerSubjectBar";
@@ -20,6 +21,18 @@ import {
   type RunCandidate,
   type RunCandidateRow,
 } from "@/lib/engineer/runCandidates";
+import {
+  RANGE_URL_KEYS,
+  describeRangeScope,
+  eventScope,
+  rangeScopeFromSearchParams,
+  rangeScopeToQuery,
+  sameRangeScope,
+  trackScope,
+  writeRangeScopeToSearchParams,
+  type EngineerRangeScope,
+} from "@/lib/engineer/rangeScope";
+import { matchNamedScope } from "@/lib/engineer/nameMatch";
 import {
   ENGINEER_STARTER_BOARD_COUNT,
   selectEngineerStarterQuestions,
@@ -160,17 +173,23 @@ function mapApiMessages(
 /**
  * The subject lives in the URL, so a link from a run page opens the Engineer already pinned
  * (`?pin=run:<id>`, and the older `?runId=<id>` that the lap-analysis compare still sends), and
- * a reload keeps it. `?mode=general` is General. Nothing in the URL is Auto.
+ * a reload keeps it. `?mode=general` is General; `?mode=range&track=…&from=…&to=…` is a range
+ * of runs (rangeScope.ts). Nothing in the URL is Auto.
  */
-function readSubject(searchParams: URLSearchParams): { pinnedRunId: string | null; general: boolean } {
-  if (searchParams.get("mode") === "general") return { pinnedRunId: null, general: true };
+type Subject = { pinnedRunId: string | null; general: boolean; range: EngineerRangeScope | null };
+const AUTO: Subject = { pinnedRunId: null, general: false, range: null };
+
+function readSubject(searchParams: URLSearchParams): Subject {
+  if (searchParams.get("mode") === "general") return { pinnedRunId: null, general: true, range: null };
+  const range = rangeScopeFromSearchParams(searchParams);
+  if (range) return { pinnedRunId: null, general: false, range };
   const pin = searchParams.get("pin")?.trim() ?? "";
   if (pin.startsWith("run:")) {
     const id = pin.slice("run:".length).trim();
-    if (id) return { pinnedRunId: id, general: false };
+    if (id) return { pinnedRunId: id, general: false, range: null };
   }
   const runId = searchParams.get("runId")?.trim() ?? "";
-  return { pinnedRunId: runId || null, general: false };
+  return { pinnedRunId: runId || null, general: false, range: null };
 }
 
 export function EngineerChatPanel({
@@ -191,7 +210,10 @@ export function EngineerChatPanel({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { pinnedRunId, general: generalMode } = readSubject(searchParams);
+  const { pinnedRunId, general: generalMode, range: rangeScope } = readSubject(searchParams);
+  // Stable identity for effects and the send callback: the URL re-parses to a new object
+  // every render, but the same query string is the same range.
+  const rangeQuery = rangeScope ? rangeScopeToQuery(rangeScope) : null;
 
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(true);
@@ -211,6 +233,12 @@ export function EngineerChatPanel({
   const [candidatesLoading, setCandidatesLoading] = useState(true);
   const [candidatesErr, setCandidatesErr] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // The range picker and what it offers. Options load the first time the picker opens or a
+  // range is already in the URL; the count for the URL's range rides on the same fetch.
+  const [rangePickerOpen, setRangePickerOpen] = useState(false);
+  const [rangeOptions, setRangeOptions] = useState<EngineerRangeOptions | null>(null);
+  const [rangeOptionsErr, setRangeOptionsErr] = useState<string | null>(null);
+  const [rangeCount, setRangeCount] = useState<number | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   // The transcript follows the newest words as they arrive. `stickToBottom` drops to false the
   // moment the driver scrolls up to re-read an earlier answer, and comes back the moment they
@@ -266,6 +294,39 @@ export function EngineerChatPanel({
     };
   }, []);
 
+  // The meetings, tracks and cars the pickers offer, and how many runs the URL's filter holds
+  // — one route. Fetched on load: the run picker lists meetings, and a meeting or track named
+  // in a question is matched against this list before the question is sent (nameMatch.ts).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const qs = rangeQuery != null ? `?count=1${rangeQuery ? `&${rangeQuery}` : ""}` : "";
+        const res = await fetch(`/api/engineer/range-options${qs}`);
+        const data = (await res.json().catch(() => ({}))) as Partial<EngineerRangeOptions> & {
+          error?: string;
+          count?: number | null;
+        };
+        if (!res.ok) throw new Error(data.error ?? `Failed to load tracks (${res.status})`);
+        if (cancelled) return;
+        setRangeOptions({
+          events: data.events ?? [],
+          tracks: data.tracks ?? [],
+          cars: data.cars ?? [],
+          first: data.first ?? null,
+          last: data.last ?? null,
+        });
+        setRangeCount(typeof data.count === "number" ? data.count : null);
+        setRangeOptionsErr(null);
+      } catch (e) {
+        if (!cancelled) setRangeOptionsErr(e instanceof Error ? e.message : "Failed to load tracks");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [rangeQuery]);
+
   const hasMessages = messages.length > 0;
 
   useEffect(() => {
@@ -318,13 +379,15 @@ export function EngineerChatPanel({
 
   // ── The subject: written to the URL, read back from it ─────────────────────────────────────
   const writeSubject = useCallback(
-    (next: { pinnedRunId: string | null; general: boolean }) => {
+    (next: Subject) => {
       const sp = new URLSearchParams(searchParams.toString());
       sp.delete("pin");
       sp.delete("runId");
       sp.delete("compareRunId");
       sp.delete("mode");
+      for (const key of RANGE_URL_KEYS) sp.delete(key);
       if (next.general) sp.set("mode", "general");
+      else if (next.range) writeRangeScopeToSearchParams(sp, next.range);
       else if (next.pinnedRunId) sp.set("pin", `run:${next.pinnedRunId}`);
       const qs = sp.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
@@ -333,14 +396,27 @@ export function EngineerChatPanel({
   );
   const pinRun = (c: RunCandidate) => {
     setPickerOpen(false);
-    writeSubject({ pinnedRunId: c.id, general: false });
+    writeSubject({ ...AUTO, pinnedRunId: c.id });
   };
-  const clearPin = () => writeSubject({ pinnedRunId: null, general: false });
+  const clearPin = () => writeSubject(AUTO);
   const enterGeneral = () => {
     setPickerOpen(false);
-    writeSubject({ pinnedRunId: null, general: true });
+    setRangePickerOpen(false);
+    writeSubject({ ...AUTO, general: true });
   };
-  const leaveGeneral = () => writeSubject({ pinnedRunId: null, general: false });
+  const leaveGeneral = () => writeSubject(AUTO);
+  const openRangePicker = () => {
+    setPickerOpen(false);
+    setRangePickerOpen((v) => !v);
+  };
+  const applyRange = (scope: EngineerRangeScope) => {
+    setRangePickerOpen(false);
+    writeSubject({ ...AUTO, range: scope });
+  };
+  const clearRange = () => {
+    setRangePickerOpen(false);
+    writeSubject(AUTO);
+  };
 
   const latestRun = candidates[0] ?? null;
   const autoLabel = latestRun?.chipLabel ?? null;
@@ -348,6 +424,30 @@ export function EngineerChatPanel({
   const pinnedLabel = pinnedRunId
     ? candidates.find((c) => c.id === pinnedRunId)?.chipLabel ?? "Run"
     : null;
+  const rangeLabel = rangeScope
+    ? describeRangeScope(rangeScope, {
+        events: rangeOptions?.events ?? [],
+        tracks: rangeOptions?.tracks ?? [],
+        cars: rangeOptions?.cars ?? [],
+        count: rangeCount,
+      })
+    : null;
+
+  /**
+   * A meeting or track NAMED in the question becomes the filter for it (founder call
+   * 2026-09-14: "if I say 'search sa state titles' can it not just look for that by itself").
+   * Plain matching against the driver's own names, typos forgiven — never in General, which
+   * is the driver saying "nothing from my logs". The bar switches to show what was attached.
+   */
+  const scopeNamedIn = useCallback(
+    (question: string): EngineerRangeScope | null => {
+      if (generalMode || !rangeOptions) return null;
+      const hit = matchNamedScope(question, { events: rangeOptions.events, tracks: rangeOptions.tracks });
+      if (!hit) return null;
+      return hit.kind === "event" ? eventScope(hit.id) : trackScope(hit.id);
+    },
+    [generalMode, rangeOptions]
+  );
   // ───────────────────────────────────────────────────────────────────────────────────────────
 
   const openThread = useCallback(async (id: string) => {
@@ -414,6 +514,13 @@ export function EngineerChatPanel({
       stickToBottom.current = true;
       setInput("");
       setPickerOpen(false);
+      setRangePickerOpen(false);
+
+      // A meeting or track named in the question wins over whatever the bar showed, and the
+      // bar follows so nothing is attached silently.
+      const named = scopeNamedIn(question);
+      const scopeToSend = named && !sameRangeScope(named, rangeScope) ? named : rangeScope;
+      if (named && !sameRangeScope(named, rangeScope)) writeSubject({ ...AUTO, range: named });
 
       const history = [...messages, { role: "user" as const, content: question }];
       setMessages([...history, { role: "assistant", content: "" }]);
@@ -435,9 +542,16 @@ export function EngineerChatPanel({
             messages: history.map((m) => ({ role: m.role, content: m.content })),
             threadId: threadId ?? undefined,
             stream: true,
-            // The subject bar, on the wire: General attaches no run; a pin names the run to
-            // read; Auto sends nothing and the route reads the latest run itself.
-            ...(generalMode ? { mode: "general" } : pinnedRunId ? { runId: pinnedRunId } : {}),
+            // The subject bar, on the wire: General attaches no run; a filter names the runs
+            // to read (rangeScope.ts); a pin names the run; Auto sends nothing and the route
+            // reads the latest run itself.
+            ...(generalMode
+              ? { mode: "general" }
+              : scopeToSend
+                ? { scope: scopeToSend }
+                : pinnedRunId
+                  ? { runId: pinnedRunId }
+                  : {}),
           }),
         });
         if (!res.ok || !res.body) {
@@ -470,7 +584,8 @@ export function EngineerChatPanel({
         setStatusPhase(null);
       }
     },
-    [generalMode, messages, pinnedRunId, refreshThreads, sending, threadId]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rangeScope is re-parsed each render; rangeQuery is its identity
+    [generalMode, messages, pinnedRunId, rangeQuery, refreshThreads, scopeNamedIn, sending, threadId, writeSubject]
   );
 
   // A `?prompt=` handoff (dashboard cards) lands in the composer and sends itself once.
@@ -484,13 +599,14 @@ export function EngineerChatPanel({
   // Starter questions only exist on an empty thread (engineerStarterQuestions.ts). The run
   // family needs a run in focus — Auto or pinned, never General.
   const startersVisible = messages.length === 0;
-  const runInFocus = !generalMode && hasRuns;
+  const rangeInFocus = !generalMode && rangeScope != null && hasRuns;
+  const runInFocus = !generalMode && !rangeInFocus && hasRuns;
   const starterQuestions = useMemo(
     () =>
       startersVisible
-        ? selectEngineerStarterQuestions({ runInFocus, hasHistory: hasRuns })
+        ? selectEngineerStarterQuestions({ runInFocus, hasHistory: hasRuns, rangeInFocus })
         : [],
-    [startersVisible, runInFocus, hasRuns]
+    [startersVisible, runInFocus, rangeInFocus, hasRuns]
   );
 
   const fillFromStarter = (question: EngineerStarterQuestion) => {
@@ -632,13 +748,19 @@ export function EngineerChatPanel({
           {/* Reads as a sentence top to bottom: what I'm asking about → things worth asking →
               the box. */}
           <EngineerSubjectBar
-            mode={generalMode ? "general" : "data"}
+            mode={generalMode ? "general" : rangeScope ? "range" : "data"}
             pinnedLabel={pinnedLabel}
             autoLabel={autoLabel}
+            rangeLabel={rangeLabel}
             disabled={panelBusy}
-            onOpenPicker={() => setPickerOpen((v) => !v)}
+            onOpenPicker={() => {
+              setRangePickerOpen(false);
+              setPickerOpen((v) => !v);
+            }}
             onClearPin={clearPin}
             onSelectData={leaveGeneral}
+            onOpenRangePicker={openRangePicker}
+            onClearRange={clearRange}
             onSelectGeneral={enterGeneral}
           />
 
@@ -652,14 +774,31 @@ export function EngineerChatPanel({
             className="lg:hidden"
           />
 
-          {pickerOpen && !generalMode ? (
+          {rangePickerOpen ? (
+            <EngineerRangePicker
+              options={rangeOptions}
+              loading={rangeOptions == null && rangeOptionsErr == null}
+              error={rangeOptionsErr}
+              scope={rangeScope}
+              disabled={panelBusy}
+              onApply={applyRange}
+              onClose={() => setRangePickerOpen(false)}
+            />
+          ) : null}
+
+          {pickerOpen && !generalMode && !rangeScope ? (
             <EngineerRunPicker
               candidates={candidates}
+              events={rangeOptions?.events ?? []}
               loading={candidatesLoading}
               error={candidatesErr}
               pinnedRunId={pinnedRunId}
               disabled={panelBusy}
               onPick={pinRun}
+              onPickEvent={(e) => {
+                setPickerOpen(false);
+                writeSubject({ ...AUTO, range: eventScope(e.id) });
+              }}
               onClose={() => setPickerOpen(false)}
             />
           ) : null}

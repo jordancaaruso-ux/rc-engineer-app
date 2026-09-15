@@ -1,0 +1,177 @@
+DRIVER DATA — RUNS IN A RANGE. The driver chose this range: the meeting "SA State Titles 2026" at Radio Racing Cars SA, 11 – 13 Sep, every car. 20 runs shown, earliest first. Nothing outside this range is attached; the driver's other runs are not visible here.
+"changed" is what moved on the setup sheet since that same car's previous run in this list. A run with no "changed" line has no readable sheet on one side: that is unknown, not unchanged. "tyre run N" is the Nth run on that set of rubber; a "?" means the driver was not sure how old the set was.
+"new-tyre eq" is the best lap / top 5 with the average loss for that tyre run taken back out (the TYRES table's averages), so runs on different-age rubber can be compared; "≤" marks a run past the last averaged number, corrected by that last average. It is arithmetic on this driver's own pairs, not a tyre model.
+"vs field" is from the timing sheet of that session: your place by best lap out of the timed entrants, your best lap minus the fastest driver's (0.00 = you were fastest), the same for the top-5 average, and your best minus the field's median best (negative = faster than the middle of the field). Everyone in the session drove the same track at the same time, so these cancel the track's own movement in a way lap times cannot. A run without it was not imported from a timing sheet with two or more drivers.
+
+RUNS
+2026-09-11 Fri  09:37  Practice  best 18.86  top5 19.19  new-tyre eq ≤18.38 / 18.78  5min 15/5:15.9  15 laps  rated 6/10  tyre run 5  Sweep D-32  11.8°C
+2026-09-11 Fri  10:04  Practice  best 18.28  top5 18.48  new-tyre eq ≤17.81 / 18.07  14 laps  rated 7/10  tyre run 6  Sweep D-32  11.8°C
+    no setup change  (new-tyre eq vs previous run: -0.58)
+2026-09-11 Fri  10:36  Practice  best 18.02  top5 18.19  new-tyre eq ≤17.55 / 17.78  11 laps  rated 7/10  tyre run 7  Sweep D-32  13.2°C
+    no setup change  (new-tyre eq vs previous run: -0.26)
+2026-09-11 Fri  11:42  Practice  best 17.65  top5 17.76  new-tyre eq 17.65 / 17.76  16 laps  rated 7/10  tyre run 1  Sweep D-32  14.3°C
+    no setup change  (new-tyre eq vs previous run: +0.11)
+2026-09-11 Fri  12:59  Practice  best 18.02  top5 18.18  new-tyre eq 17.65 / 17.82  5min 16/5:01.8  18 laps  rated 7/10  tyre run 2  Sweep D-32  15.2°C
+    changed: upper outer shims front 1.5 → 2, upper outer shims rear 1.5 → 2  (new-tyre eq vs previous run: +0.00)
+2026-09-11 Fri  13:14  Practice  best 18.14  top5 18.22  new-tyre eq 17.74 / 17.85  10 laps  rated 7/10  tyre run 3  Sweep D-32  15.2°C
+    changed: downstop front 23.4 → 23.6, downstop rear 22.4 → 22.6  (new-tyre eq vs previous run: +0.08)
+2026-09-11 Fri  14:25  Practice  best 18.00  top5 18.05  new-tyre eq 17.52 / 17.64  5min 16/5:02.4  17 laps  rated 8/10  tyre run 4  Sweep D-32  15.8°C
+    changed: downstop rear 22.6 → 22.4, ride height front 4.8 → 4.6, upper outer shims front 2 → 1.5, upper outer shims rear 2 → 1.5  (new-tyre eq vs previous run: -0.21)
+2026-09-11 Fri  15:53  Practice  best 17.44  top5 17.65  new-tyre eq 17.44 / 17.65  5min 17/5:11.9  20 laps  rated 8/10  tyre run 1  Sweep D-32  16.1°C
+    changed: camber front -2 → -1.8  (new-tyre eq vs previous run: -0.08)
+2026-09-11 Fri  17:14  Practice  best 17.84  top5 17.96  new-tyre eq 17.48 / 17.60  5min 17/5:10.2  18 laps  rated 8/10  tyre run 2  Sweep D-32  15.3°C
+    changed: bump steer shims front 3.5 → 3  (new-tyre eq vs previous run: +0.04)
+2026-09-11 Fri  17:14  Practice  best 17.79  top5 17.97  new-tyre eq 17.39 / 17.60  5min 17/5:12.9  18 laps  rated 8/10  tyre run 3  Sweep D-32  15.3°C
+    changed: diff oil 6k → 5k  (new-tyre eq vs previous run: -0.09)
+2026-09-11 Fri  18:01  Practice  best 18.04  top5 18.17  new-tyre eq 17.57 / 17.76  5min 16/5:02.1  32 laps  rated 7/10  tyre run 4  Sweep D-32  13.4°C
+    no setup change  (new-tyre eq vs previous run: +0.18)
+2026-09-11 Fri  23:19  Practice  best 18.00  top5 18.15  new-tyre eq ≤17.53 / 17.73  5min 17/5:18.0  32 laps  rated 7/10  tyre run 5  Sweep D-32  10.6°C
+    no setup change  (new-tyre eq vs previous run: -0.04)
+2026-09-12 Sat  08:58  Practice  best 17.83  top5 18.12  new-tyre eq 17.83 / 18.12  14 laps  rated 7/10  tyre run 1  Sweep D-32  14.7°C
+    no setup change
+2026-09-12 Sat  10:21  Practice  best 17.66  top5 17.78  new-tyre eq 17.66 / 17.78  vs field P1/7, 0.00 to P1 (top5 0.00), -0.92 vs median  5min 18/5:15.2  18 laps  rated 7/10  tyre run 1  Sweep D-32  16.7°C
+    changed: toe rear 3 → 3.2  (new-tyre eq vs previous run: -0.17)
+2026-09-12 Sat  12:15  Practice  best 17.39  top5 17.58  new-tyre eq 17.39 / 17.58  vs field P1/7, 0.00 to P1 (top5 0.00), -0.86 vs median  5min 17/5:05.5  17 laps  rated 8/10  tyre run 1  Sweep D-32  19.1°C
+    no setup change  (new-tyre eq vs previous run: -0.27; gap to P1 vs previous run: 0.00)
+2026-09-12 Sat  13:41  Practice  best 17.70  top5 17.92  new-tyre eq 17.34 / 17.56  vs field P1/7, 0.00 to P1 (top5 0.00), -0.56 vs median  5min 17/5:10.2  17 laps  rated 7/10  tyre run 2  Sweep D-32  19.8°C
+    changed: toe rear 3.2 → 3  (new-tyre eq vs previous run: -0.04; gap to P1 vs previous run: 0.00)
+2026-09-12 Sat  15:31  Practice  best 17.76  top5 17.90  new-tyre eq 17.35 / 17.53  vs field P1/5, 0.00 to P1 (top5 0.00), -0.25 vs median  5min 17/5:11.5  17 laps  rated 8/10  tyre run 3  Sweep D-32  19.6°C
+    changed: camber front -1.8 → -2  (new-tyre eq vs previous run: +0.01; gap to P1 vs previous run: 0.00)
+2026-09-12 Sat  16:53  Practice  best 17.68  top5 17.88  new-tyre eq 17.68 / 17.88  vs field P1/6, 0.00 to P1 (top5 0.00), -0.51 vs median  5min 17/5:09.8  17 laps  rated 8/10  tyre run 1  Sweep D-32  18.8°C
+    changed: camber front -2 → -1.8, inner steering angle 27 → 26, toe front -1.2 → -1.3  (new-tyre eq vs previous run: +0.33; gap to P1 vs previous run: 0.00)
+2026-09-12 Sat  17:48  Practice  best 17.94  top5 18.00  new-tyre eq ≤17.46 / 17.59  vs field P2/7, +0.04 to P1 (top5 0.00), -0.43 vs median  5min 17/5:12.4  17 laps  rated 7/10  tyre run 5  Sweep D-32  16.1°C
+    no setup change  (new-tyre eq vs previous run: -0.22; gap to P1 vs previous run: +0.04)
+2026-09-13 Sun  11:09  Practice  best 18.29  top5 18.37  new-tyre eq 17.93 / 18.01  15 laps  rated 7/10  tyre run 2  Sweep D-32  16.2°C
+    changed: inner steering angle 26 → 26.5, toe rear 3 → 3.2
+
+DAYS — one line per day. "first → last" is the best lap of the first timed run against the
+last: how the day moved, whatever the cause.
+
+2026-09-11 Fri  12 runs  best of day 17.44  first timed run best 18.86 → last 18.00 (-0.86)  air 10.6–16.1°C
+2026-09-12 Sat  7 runs  best of day 17.39  first timed run best 17.83 → last 17.94 (+0.11)  air 14.7–19.8°C
+2026-09-13 Sun  1 run  best of day 18.29  air 16.2°C
+
+Across 2 days with two or more timed runs, first → last best lap moved -0.37 on average (range -0.86 to +0.11).
+
+TYRES — one line per set of tyres with two or more timed runs. Run 1 = the first run on that
+rubber. Deltas are against run 1 on the same set: positive = slower. A set that spans more
+than one day carries the day-to-day change in grip inside its deltas; a run marked "at" another
+track is a different circuit and its delta is not a tyre delta.
+
+set 1  2026-09-11 Fri  Sweep D-32
+    run 5 best 18.86 top5 19.19  ·  run 6 best 18.28 (-0.58) top5 18.48 (-0.70)  ·  run 7 best 18.02 (-0.84) top5 18.19 (-1.00)
+set 2  2026-09-11 Fri  Sweep D-32
+    run 1 best 17.65 top5 17.76  ·  run 2 best 18.02 (+0.36) top5 18.18 (+0.42)  ·  run 3 best 18.14 (+0.49) top5 18.22 (+0.47)  ·  run 4 best 18.00 (+0.35) top5 18.05 (+0.30)
+set 3  2026-09-11 Fri  Sweep D-32
+    run 1 best 17.44 top5 17.65  ·  run 2 best 17.84 (+0.41) top5 17.96 (+0.32)  ·  run 3 best 17.79 (+0.35) top5 17.97 (+0.32)  ·  run 4 best 18.04 (+0.61) top5 18.17 (+0.52)  ·  run 5 best 18.00 (+0.56) top5 18.15 (+0.50)
+set 4  2026-09-12 Sat  Sweep D-32
+    run 1 best 17.39 top5 17.58  ·  run 2 best 17.70 (+0.32) top5 17.92 (+0.34)  ·  run 3 best 17.76 (+0.37) top5 17.90 (+0.31)
+
+Average across 3 sets with a known run 1, same track as run 1 — run 2 vs run 1: best +0.36 (3 sets), top5 +0.36; run 3 vs run 1: best +0.40 (3 sets), top5 +0.37; run 4 vs run 1: best +0.48 (2 sets), top5 +0.41; run 5 vs run 1: best +0.56 (1 set), top5 +0.50
+
+BEST RUNS, NEW-TYRE EQUIVALENT — best lap minus the average loss for that tyre run (from the TYRES
+table). Setup changes and the track's own movement are still inside these numbers.
+
+1. 17.34  2026-09-12 Sat 13:41  (raw 17.70 on tyre run 2)
+2. 17.35  2026-09-12 Sat 15:31  (raw 17.76 on tyre run 3)
+3. 17.39  2026-09-12 Sat 12:15  (raw 17.39 on tyre run 1)
+4. 17.39  2026-09-11 Fri 17:14  (raw 17.79 on tyre run 3)
+5. 17.44  2026-09-11 Fri 15:53  (raw 17.44 on tyre run 1)
+
+TYRES, AGAINST THE FIELD — the same sets, but "best" here is your gap to the fastest driver's best
+lap in that session and "top5" your gap to the best top-5 average in the field (0.00 = you were the
+fastest). Deltas are still against run 1 on the set, positive = you fell further from the front.
+The field aged its tyres and felt the track move too, so this is the tyre effect with the day taken
+out. Only runs imported from a timing sheet with two or more drivers appear.
+
+set 1  2026-09-12 Sat  Sweep D-32
+    run 1 best 0.00 top5 0.00  ·  run 2 best 0.00 (0.00) top5 0.00 (0.00)  ·  run 3 best 0.00 (0.00) top5 0.00 (0.00)
+
+Average across 1 set with a known run 1, same track as run 1 — run 2 vs run 1: best 0.00 (1 set), top5 0.00; run 3 vs run 1: best 0.00 (1 set), top5 0.00
+
+BEST RUNS, AGAINST THE FIELD — closest to the fastest driver's best lap first. The field drove the
+same track at the same time, so this ranking cancels the track's own movement; tyre age is still
+inside it.
+
+1. 0.00 to P1  P1/7  2026-09-12 Sat 10:21  (best 17.66 on tyre run 1, -0.92 vs field median)
+2. 0.00 to P1  P1/7  2026-09-12 Sat 12:15  (best 17.39 on tyre run 1, -0.86 vs field median)
+3. 0.00 to P1  P1/7  2026-09-12 Sat 13:41  (best 17.70 on tyre run 2, -0.56 vs field median)
+4. 0.00 to P1  P1/5  2026-09-12 Sat 15:31  (best 17.76 on tyre run 3, -0.25 vs field median)
+5. 0.00 to P1  P1/6  2026-09-12 Sat 16:53  (best 17.68 on tyre run 1, -0.51 vs field median)
+
+RIVALS — the drivers who shared the most timed sessions with you in this filter, and your gap to
+each (you minus them: negative = you were quicker). Name one to see it session by session.
+
+JUSTIN VERGUNST — 6 shared sessions: best lap -0.66 on average, top 5 -0.66; you were quicker on best lap in 6 of 6
+RHYS MARSHALL — 6 shared sessions: best lap -0.54 on average, top 5 -0.50; you were quicker on best lap in 5 of 5 (1 left out for a cut lap)
+RICHARD GRONCKI — 6 shared sessions: best lap -0.90 on average, top 5 -0.92; you were quicker on best lap in 6 of 6
+MARTIN GRANTHAM — 5 shared sessions: best lap -0.77 on average, top 5 -0.74; you were quicker on best lap in 5 of 5
+TIMOTHY HILYEAR — 5 shared sessions: best lap -0.18 on average, top 5 -0.13; you were quicker on best lap in 4 of 5
+TOMAS BURATOVICH — 3 shared sessions: best lap -0.99 on average, top 5 -1.00; you were quicker on best lap in 2 of 2 (1 left out for a cut lap)
+
+VS TIMOTHY HILYEAR — every timed session you both ran in this filter. Gaps are you minus TIMOTHY HILYEAR: negative = you
+were quicker. A session with a cut lap on either side is shown but left out of the averages.
+
+2026-09-12 Sat  12:15  Practice  you best 17.39 top5 17.58  TIMOTHY HILYEAR best 17.80 top5 17.89  → best -0.42  top5 -0.30
+2026-09-12 Sat  13:41  Practice  you best 17.70 top5 17.92  TIMOTHY HILYEAR best 17.90 top5 18.03  → best -0.20  top5 -0.11
+2026-09-12 Sat  15:31  Practice  you best 17.76 top5 17.90  TIMOTHY HILYEAR best 17.77 top5 17.93  → best -0.02  top5 -0.03
+2026-09-12 Sat  16:53  Practice  you best 17.68 top5 17.88  TIMOTHY HILYEAR best 17.98 top5 18.07  → best -0.30  top5 -0.20
+2026-09-12 Sat  17:48  Practice  you best 17.94 top5 18.00  TIMOTHY HILYEAR best 17.89 top5 18.03  → best +0.04  top5 -0.03
+
+Across 5 clean shared sessions: best lap -0.18 on average, top 5 -0.13; you were quicker on best lap in 4 of 5.
+
+SETUP ON THE CAR AT THE LAST RUN SHOWN (A800RR, 2026-09-13).
+These are the values the car ran that day. Reason with them; do not read them back.
+
+ackermann position: Rearward
+arb front: 1.2
+arb rear: 1.3
+body position from windshield: 58
+bump steer shims front: 3
+c45 installed front: no
+c45 installed rear: yes
+camber front: -1.8
+camber rear: -2
+caster front: 4
+caster rear: -3
+damper oil front: 400
+damper oil rear: 450
+damper percent front: 60
+damper percent rear: 60
+damping front: linear
+damping rear: linear
+diff height front: Up
+diff height rear: Up
+diff oil: 5k
+downstop front: 23.6
+downstop rear: 22.4
+front spring rate gf mm: 76.3
+inner steering angle: 26.5
+motor lateral shift: 1.75
+rear hrb setting: 3.5
+rear spring rate gf mm: 119.6
+ride height front: 4.6
+ride height rear: 5
+servo horn height: 17mm
+spring front: std
+spring gap front: 1
+spring gap rear: 3.2
+spring rear: std
+toe front: -1.3
+toe gain shims rear: 3.5
+toe rear: 3.2
+under hub shims front: 0
+under hub shims rear: 0
+under lower arm shims ff: 2.5
+under lower arm shims fr: 2.5
+under lower arm shims rf: 3
+under lower arm shims rr: 3
+upper inner shims ff: 2
+upper inner shims fr: 2
+upper inner shims rf: 2.75
+upper inner shims rr: 2.75
+upper outer shims front: 1.5
+upper outer shims rear: 1.5
+upstop front: -
+upstop rear: -
+weight balance front percent: 50

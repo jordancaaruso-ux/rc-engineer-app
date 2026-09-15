@@ -1,12 +1,12 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { perfSpan } from "@/lib/perfLog";
-import { calendarYmdInTimeZone, formatRunDateOnly } from "@/lib/formatDate";
 import {
   buildGroupRunRows,
   buildGroupTrendModel,
   type WorkbenchRunRow,
 } from "@/lib/runs/sessionWorkbenchModel";
+import { buildRunHistoryGroups, runSessionSortInstant } from "@/lib/runs/buildRunHistoryGroups";
 import type { AnalysisTrendModel } from "@/lib/analysis/analysisHomeModel";
 import { toCompareRunShape } from "@/lib/runCompareShape";
 import { resolveOutingHeading } from "@/lib/runs/outingHeading";
@@ -15,16 +15,23 @@ import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 /**
  * Your last time at the track — the block `/analysis` is built around (2026-08-25).
  *
- * ## One DAY, never a whole event
+ * ## The whole meeting, cut into days (founder ruling 2026-09-14, reversing 2026-08-25)
  *
- * The trend chart on this page used to scope itself to the most recent *event* when
- * the latest run belonged to one, which on a three-day title meeting meant unfolding
- * Friday, Saturday and Sunday into a single list of twenty runs. Founder call: don't
- * unfold the whole event. The block is the most recent **calendar day**, in the zone
- * the run was logged in, and the event only lends the block its NAME.
+ * From 2026-08-25 this block was one calendar day — the founder had seen a three-day
+ * title unfold into a single undivided list of twenty runs and ruled "don't unfold the
+ * whole event". The day rule had its own failure, reported 2026-09-14: one run on the
+ * Sunday of a meeting left a one-dot chart on this page *"forever, until I go to the
+ * track again"*. The ruling now: **the block is the meeting, broken up into days.**
  *
- * That also makes the chart and the list underneath it the same runs, which is the
- * point of the page: a dot and a row are the same thing.
+ * "The meeting" is exactly what Sessions calls a session — `buildRunHistoryGroups`
+ * decides it here too, so the two pages cannot disagree about which runs belong
+ * together. An event holds every run under it plus the eventless runs at its track on
+ * days that touch it (the Friday practice before the title — *"yes, fold it in"*). A
+ * run with no event and nothing to fold into is still its own day. **Events only**: two
+ * back-to-back test days with no event stay two outings, by the same ruling.
+ *
+ * The chart draws a band per day and the list breaks on the same key, so a dot and a
+ * row are still the same thing — that part of the 2026-08-25 call stands.
  *
  * ## Why it fetches whole run records
  *
@@ -34,10 +41,20 @@ import type { CompareRunShape } from "@/components/runs/RunComparePanel";
  * that only the prop types catch.
  */
 
-/** A day's runs, with headroom: a 24-run club day is normal, 60 is not. */
-const OUTING_TAKE = 60;
-/** Query window around the latest run; the exact day match happens in JS, per zone. */
-const DAY_WINDOW_MS = 36 * 60 * 60 * 1000;
+/**
+ * A meeting's runs, with headroom: a 24-run club day is normal, a ten-day international at
+ * ten runs a day is the biggest thing this block will ever be asked to hold.
+ */
+const OUTING_TAKE = 120;
+/**
+ * How far back from the newest run a meeting can reach. The fold itself walks at most
+ * `MAX_EVENT_FOLD_DAYS` (14); this only bounds the candidate query, and 36h forward covers
+ * a run whose clock sits after the newest `createdAt` in some zone.
+ */
+const LOOKBACK_MS = 16 * 24 * 60 * 60 * 1000;
+const LOOKAHEAD_MS = 36 * 60 * 60 * 1000;
+/** Candidate rows are light (no laps, no setup); a season at one track fits. */
+const CANDIDATE_TAKE = 400;
 
 export const analysisOutingSelect = {
   id: true,
@@ -47,6 +64,7 @@ export const analysisOutingSelect = {
   localTimeZone: true,
   sessionCompletedAt: true,
   loggingComplete: true,
+  unconfirmedAt: true,
   lapImportPromptDismissedAt: true,
   sessionType: true,
   meetingSessionType: true,
@@ -122,11 +140,11 @@ export type AnalysisOutingModel = {
   kind: "Event" | "Testing";
   /** "Glen Innes RC Raceway · Sun 24 Aug 2026" — where and when, under the title. */
   where: string;
-  /** Newest-first, exactly as the Sessions day view lists them. */
+  /** Newest-first, exactly as the Sessions day view lists them; `dayKey` breaks the days. */
   rows: WorkbenchRunRow[];
   /** Full records keyed by id, for the row that opens. */
   runs: AnalysisOutingRun[];
-  /** Offered to the open run's lap-compare picker: the rest of the same day. */
+  /** Offered to the open run's lap-compare picker: the rest of the same meeting. */
   pickerRuns: CompareRunShape[];
   /** The same picture the day view draws, run for run. */
   trend: AnalysisTrendModel | null;
@@ -173,28 +191,61 @@ export async function loadAnalysisOuting(
   if (!latest) return null;
   const accountZone = account?.timeZone ?? null;
 
-  const ymd = calendarYmdInTimeZone(latest.createdAt, zoneOf(latest, accountZone, viewerTimeZone));
+  const zones = { ownerTimeZoneByUserId: { [userId]: accountZone }, viewerTimeZone };
 
-  const window = await perfSpan("analysisOutingRuns", () =>
+  // Which runs are "the meeting" is decided on light rows first — the same fields and
+  // the same function the Sessions list groups by — and only the members are then
+  // fetched in full. Fetching every run in the window in full would drag lap JSON and
+  // setup ids for a fortnight through the page to throw most of it away.
+  const candidates = await perfSpan("analysisOutingCandidates", () =>
     prisma.run.findMany({
       where: {
         userId,
         createdAt: {
-          gte: new Date(latest.createdAt.getTime() - DAY_WINDOW_MS),
-          lte: new Date(latest.createdAt.getTime() + DAY_WINDOW_MS),
+          gte: new Date(latest.createdAt.getTime() - LOOKBACK_MS),
+          lte: new Date(latest.createdAt.getTime() + LOOKAHEAD_MS),
         },
       },
       orderBy: { createdAt: "desc" },
-      take: OUTING_TAKE,
+      take: CANDIDATE_TAKE,
+      select: {
+        id: true,
+        userId: true,
+        createdAt: true,
+        sortAt: true,
+        localTimeZone: true,
+        eventId: true,
+        trackNameSnapshot: true,
+        track: { select: { name: true } },
+        event: {
+          select: {
+            name: true,
+            startDate: true,
+            endDate: true,
+            trackNameSnapshot: true,
+            track: { select: { name: true } },
+          },
+        },
+      },
+    })
+  );
+  const meeting = buildRunHistoryGroups(candidates, viewerTimeZone, {
+    ownerTimeZoneByUserId: zones.ownerTimeZoneByUserId,
+  }).find((group) => group.runs.some((run) => run.id === latest.id));
+  if (!meeting) return null;
+
+  // Group runs are newest-first by the Sessions clock, so the cap keeps the newest.
+  const memberIds = meeting.runs.slice(0, OUTING_TAKE).map((run) => run.id);
+  const fetched = await perfSpan("analysisOutingRuns", () =>
+    prisma.run.findMany({
+      where: { id: { in: memberIds } },
       select: analysisOutingSelect,
     })
   );
-
-  // The window is generous on purpose — a run logged at 11pm and one at 1am are a
-  // day apart by the clock and often the same outing by the driver's reckoning, so
-  // the exact match is done here, per run, in the zone that run was logged in.
-  const runs = window.filter(
-    (run) => calendarYmdInTimeZone(run.createdAt, zoneOf(run, accountZone, viewerTimeZone)) === ymd
+  // Newest-first on the same clock Sessions lists by, not by `createdAt`: a re-imported
+  // run keeps its place in the day (`sortAt`), and the chart reverses this to draw.
+  const runs = [...fetched].sort(
+    (a, b) => runSessionSortInstant(b).getTime() - runSessionSortInstant(a).getTime()
   );
   if (runs.length === 0) return null;
 
@@ -215,22 +266,19 @@ export async function loadAnalysisOuting(
   );
 
   const dayZone = zoneOf(runs[0], accountZone, viewerTimeZone);
-  const dateLabel = formatRunDateOnly(runs[0].createdAt, dayZone);
-  const trackName = runs[0].track?.name ?? runs[0].trackNameSnapshot ?? null;
-  // An event names the day; it does not widen it. A meeting that ran three days
-  // still shows one of them here — see the file note.
-  const eventName = runs.find((r) => r.event?.name?.trim())?.event?.name?.trim() ?? null;
+  // The meeting names itself the way the Sessions rail does — title, venue and a date
+  // RANGE when it spans days ("12 – 14 Sep 2026"). A test day's stored title is the
+  // rail's own "Test day – <date>" string; `resolveOutingHeading` names it by its track.
+  const trackName = meeting.trackName === "—" ? null : meeting.trackName;
+  const dateLabel = meeting.dateLabel;
 
   const group = {
-    title: eventName ?? "Test day",
-    type: (eventName ? "Event" : "Testing") as "Event" | "Testing",
+    title: meeting.type === "Event" ? meeting.title : "Test day",
+    type: meeting.type,
     trackName,
     dateLabel,
     runs,
   };
-  // The row builders resolve each run's clock through this — see `zoneOf` for what
-  // the account entry fixes.
-  const zones = { ownerTimeZoneByUserId: { [userId]: accountZone }, viewerTimeZone };
 
   // One rule for how a day names itself, shared with the Sessions day screen so the
   // two can never disagree about the same outing. See `resolveOutingHeading`.

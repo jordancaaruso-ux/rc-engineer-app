@@ -86,7 +86,8 @@ export async function getCarSetupHistory(input: {
      * anchor the oldest visible run diffs against.
      */
     prisma.run.findMany({
-      where: { userId: input.userId, carId },
+      // Backfilled runs hold a carried copy of a logged run's sheet — not a setup state of their own.
+      where: { userId: input.userId, carId, unconfirmedAt: null },
       orderBy: { sortAt: "desc" },
       take: CAR_SETUP_HISTORY_CANDIDATE_CAP + 1,
       select: {
@@ -130,7 +131,12 @@ export async function getCarSetupHistory(input: {
         parseStatus: true,
         createdSetupId: true,
         createdSetup: {
-          select: { isLibrary: true, name: true, _count: { select: { runs: true } } },
+          select: {
+            isLibrary: true,
+            name: true,
+            // Relation reads bypass the run window's query gate (docs/STARTER_TIER_PLAN.md).
+            _count: { select: { runs: { where: { hiddenByPlanAt: null } } } },
+          },
         },
       },
     }),
@@ -145,7 +151,8 @@ export async function getCarSetupHistory(input: {
         userId: input.userId,
         carId,
         isLibrary: true,
-        runs: { none: {} },
+        // A library setup whose only runs are plan-hidden reads as unused (docs/STARTER_TIER_PLAN.md).
+        runs: { none: { hiddenByPlanAt: null } },
         sourceDocuments: { none: {} },
       },
       orderBy: { createdAt: "desc" },

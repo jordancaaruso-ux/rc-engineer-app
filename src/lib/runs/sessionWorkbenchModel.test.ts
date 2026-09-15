@@ -24,6 +24,40 @@ function laps(n: number): number[] {
   return Array.from({ length: n }, (_, i) => 16.0 + i * 0.1);
 }
 
+test("a run the app filed from the timing sheet wears the mark; a logged one doesn't", () => {
+  const rows = buildGroupRunRows(
+    group([
+      { ...run("r2", laps(8)), unconfirmedAt: new Date("2026-09-12T03:00:00Z") },
+      run("r1", laps(8)),
+    ])
+  );
+  assert.equal(rows[0]!.unconfirmed, true);
+  assert.equal(rows[1]!.unconfirmed, false);
+});
+
+test("a backfilled run is never the setup baseline for the run after it", () => {
+  // Newest first: r3 (logged), r2 (backfilled, carrying r1's sheet), r1 (logged).
+  const setupDataByRunId = new Map<string, unknown>([
+    ["r3", { camber_front: -3.0 }],
+    ["r2", { camber_front: -2.5 }],
+    ["r1", { camber_front: -2.5 }],
+  ]);
+  const rows = buildGroupRunRows(
+    group([
+      run("r3", laps(8)),
+      { ...run("r2", laps(8)), unconfirmedAt: new Date("2026-09-12T03:00:00Z") },
+      run("r1", laps(8)),
+    ]),
+    undefined,
+    { setupDataByRunId }
+  );
+  const r3 = rows[0]!.setupDiff;
+  assert.ok(r3 && r3.mode === "diff");
+  // Diffed against r1 — the logged run — so its label names r1, not the carried copy.
+  assert.equal(r3.previousLabel, rows[2]!.label);
+  assert.deepEqual(r3.rows.map((r) => r.key), ["camber_front"]);
+});
+
 function group(runs: WorkbenchGroupSource["runs"]): WorkbenchGroupSource {
   return { title: "Test day", type: "Testing", runs };
 }

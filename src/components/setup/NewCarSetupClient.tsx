@@ -248,9 +248,10 @@ export function NewCarSetupClient({
       ) : null}
 
       <SurfaceCard>
+      {/* The card's first child, so it is the card's band (2026-09-15). */}
+      <Eyebrow>{carName}</Eyebrow>
       <div className="space-y-5">
         <div>
-          <Eyebrow>{carName}</Eyebrow>
           <label className="mt-2 block">
             <span className="ui-label-meta text-muted-foreground">Setup name</span>
             <input

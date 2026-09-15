@@ -27,7 +27,7 @@ more:
   once_settled: "tends toward oversteer mid-corner; exit either way; rear against front counts as much as the change itself"
   contested:   # the settled-rear split (corner-regime.md); founder 2026-09-02: softer rear rotates most in long, slow corners. discriminator reworded to an on-track observable 2026-09-03 (the corner-clock question came out of the prompt: drivers cannot answer it accurately)
     claim_a: "rear roll centre up gives up rear grip once the car is leaning — oversteer through the middle"
-    claim_b: "rear roll centre up gives more rear grip and less rotation — on track, often the way it goes"
+    claim_b: "rear roll centre up often feels like more rear grip and less rotation, even in the middle of the corner"
     discriminator: "make the change and compare the long, slow turns against the quick direction changes: better in the quick ones and worse in the long ones means the rear roll centre has gone too high"
 less:
   reviewed: false

@@ -69,7 +69,7 @@ export function roiFor(line: SectorLine, frameW: number, frameH: number): Roi {
 /** The knobs that decide the band's shape — everything that reads it takes only these. */
 export type BandParams = Pick<
   DetectorParams,
-  "bandFrac" | "extend" | "endCapBands" | "bandLineFrac" | "minBandPx"
+  "bandFrac" | "extend" | "endCapBands" | "bandLineFrac" | "minBandPx" | "endCapFrameBands"
 >;
 
 /** No line is watched thinner than this: below it there are too few pixels to blur or blob. */
@@ -133,13 +133,17 @@ export function blurKernelForLine(
 export function crossedOnLine(
   g: LineGeom,
   frameW: number,
-  params: BandParams & Pick<DetectorParams, "onLineSlackBands">,
+  params: BandParams & Pick<DetectorParams, "onLineSlackBands" | "onLineSlackFrameBands">,
   x: number | undefined,
   y: number | undefined
 ): boolean {
   if (params.onLineSlackBands == null) return true;
   if (x == null || y == null) return true;
-  const slack = (bandHalfPxFor(g, frameW, params) * params.onLineSlackBands) / g.norm;
+  const slackPx = Math.max(
+    bandHalfPxFor(g, frameW, params) * params.onLineSlackBands,
+    Math.trunc(frameW * params.bandFrac) * (params.onLineSlackFrameBands ?? 0)
+  );
+  const slack = slackPx / g.norm;
   const along = alongLine(g, x, y);
   return along >= -slack && along <= 1 + slack;
 }
@@ -167,7 +171,10 @@ export function bandMask(
   // is what a crossing is. Measured in pixels so a short line stays short: the old 35% of the
   // line's length was nothing on a long line and, on that 100px S1, reached the return lane of
   // the hairpin beside it and read the wrong piece of track.
-  const capPx = band * (params.endCapBands ?? 1);
+  // Floored at a share of the FRAME band when asked (`endCapFrameBands`): the line-scaled band
+  // is 20px on a far tick, and a car passing a car length beyond the tick's end sat outside it.
+  const frameBand = Math.trunc(frameW * params.bandFrac);
+  const capPx = Math.max(band * (params.endCapBands ?? 1), frameBand * (params.endCapFrameBands ?? 0));
   const lo = -params.extend - capPx / g.norm;
   const hi = 1 + params.extend + capPx / g.norm;
 

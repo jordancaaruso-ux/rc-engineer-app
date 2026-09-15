@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
+import { applyRunWindow } from "@/lib/runs/runWindow";
 
 /**
  * Move a run to a new position in the owner's chronological list by updating
@@ -125,6 +126,10 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     data: { sortAt: new Date(newMs) },
     select: { id: true, sortAt: true },
   });
+
+  // A drag can carry a run across the plan window's edge (Starter keeps fifteen by `sortAt`;
+  // docs/STARTER_TIER_PLAN.md).
+  await applyRunWindow(userId);
 
   return NextResponse.json({
     ok: true,

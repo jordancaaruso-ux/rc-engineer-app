@@ -201,7 +201,7 @@ export function CarAllSetups({
   return (
     <div className="space-y-2">
       <SurfaceCard variant="panel" contentClassName="p-0">
-      <div className="flex items-center justify-between gap-2 px-4 pt-4">
+      <div className="eyebrow-band flex items-center justify-between gap-2 px-4">
         <Eyebrow className="mb-0">All setups</Eyebrow>
         <span className="ui-caption">Bookmark one to save it</span>
       </div>

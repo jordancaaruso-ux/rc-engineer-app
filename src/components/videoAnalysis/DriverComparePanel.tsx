@@ -4,10 +4,18 @@ import { useMemo, useState } from "react";
 import { ArrowLeftRight, Flag } from "lucide-react";
 import { chipToggleClass } from "@/components/ui/chipToggle";
 import { SectorClipPlayer } from "@/components/videoAnalysis/SectorClipPlayer";
+import { TraceDeltaChart } from "@/components/videoAnalysis/TraceDeltaChart";
+import { TracePathLayer, type TraceLayerLap } from "@/components/videoAnalysis/TracePathLayer";
 import { mappableLines } from "@/components/videoAnalysis/SectorLineMap";
 import { getDeltaStyle, resolveDeltaTintRange } from "@/lib/lapAnalysis";
 import type { SectorLineInfo } from "@/lib/manualVideoAnalysis/sectors";
-import type { ManualVideoSessionV2 } from "@/lib/manualVideoAnalysis/types";
+import {
+  traceKey,
+  type DriverRole,
+  type ManualLapTrace,
+  type ManualVideoSessionV2,
+} from "@/lib/manualVideoAnalysis/types";
+import { consistencyCheck, deltaCurve, type DeltaCurve } from "@/lib/videoAnalysis/trace/delta";
 import { cn } from "@/lib/utils";
 import {
   bestLap,
@@ -87,15 +95,119 @@ function clipOfTime(t: SegmentTime | null, who: string): Clip | null {
   return t ? { label: `${who} L${t.lapNumber}`, sec: t.sec, window: t.window, lapNumber: t.lapNumber } : null;
 }
 
+/** The chart's curve for two traced laps, checked against the board, or null with fewer than two. */
+type CurveInfo = { curve: DeltaCurve; note: string | null; labels: Record<string, string> };
+
+/** The curve and the board must agree at every line to this; further apart and the chart says so. */
+const BOARD_TOLERANCE_SEC = 0.08;
+
+function buildCurve(
+  mineTrace: ManualLapTrace | null,
+  otherTrace: ManualLapTrace | null,
+  mineRow: LapRow | undefined,
+  otherRow: LapRow | undefined,
+  segments: SegmentDef[]
+): CurveInfo | null {
+  if (!mineTrace?.quality.ok || !otherTrace?.quality.ok) return null;
+  const aspect = mineTrace.frame.h > 0 ? mineTrace.frame.w / mineTrace.frame.h : 16 / 9;
+  const curve = deltaCurve(mineTrace, otherTrace, { aspect, baseIsYou: true });
+  const labels: Record<string, string> = {};
+  const board: Array<{ lineKey: string; youMinusThem: number }> = [];
+  segments.forEach((seg, i) => {
+    const key = seg.toKey === "end" ? SF_LINE_KEY : seg.toKey;
+    labels[key] = seg.name;
+    const a = mineRow?.cells[i];
+    const b = otherRow?.cells[i];
+    if (!mineRow || !otherRow || !a || !b) return;
+    board.push({
+      lineKey: key,
+      youMinusThem: a.window.endSec - mineRow.window.startSec - (b.window.endSec - otherRow.window.startSec),
+    });
+  });
+  const check = consistencyCheck(curve, board, BOARD_TOLERANCE_SEC);
+  const worst = check.disagreeing.sort((x, y) => Math.abs(y.diff ?? 0) - Math.abs(x.diff ?? 0))[0];
+  const note = worst
+    ? `Δ at ${labels[worst.lineKey] ?? worst.lineKey} differs from the board by ${Math.abs(worst.diff ?? 0).toFixed(2)}s`
+    : null;
+  return { curve, note, labels };
+}
+
+/** The delta line under the player, for two traced laps; nothing with fewer. */
+function TraceDeltaSection({
+  mineTrace,
+  otherTrace,
+  mineRow,
+  otherRow,
+  segments,
+  solidIsMine,
+  playSec,
+  watchedSeg,
+  onSeek,
+}: {
+  mineTrace: ManualLapTrace | null;
+  otherTrace: ManualLapTrace | null;
+  mineRow: LapRow | undefined;
+  otherRow: LapRow | undefined;
+  segments: SegmentDef[];
+  /** Whether the solid clip is your lap — the hairline and a seek follow the solid clip. */
+  solidIsMine: boolean;
+  playSec: number | null;
+  watchedSeg: SegmentDef | null;
+  onSeek: (aSec: number) => void;
+}) {
+  const info = useMemo(
+    () => buildCurve(mineTrace, otherTrace, mineRow, otherRow, segments),
+    [mineTrace, otherTrace, mineRow, otherRow, segments]
+  );
+  if (!info) return null;
+  const { curve } = info;
+  const cursorS =
+    playSec == null ? null : solidIsMine ? curve.sOfBaseTime(playSec) : curve.sOfOtherTime(playSec);
+  const tickS = (key: string): number | null =>
+    key === "start" ? 0 : key === "end" ? 1 : (curve.ticks.find((t) => t.lineKey === key && t.s < 0.999)?.s ?? null);
+  let watched: { fromS: number; toS: number } | null = null;
+  if (watchedSeg) {
+    const fromS = tickS(watchedSeg.fromKey);
+    const toS = tickS(watchedSeg.toKey);
+    if (fromS != null && toS != null) watched = { fromS, toS };
+  }
+  return (
+    <TraceDeltaChart
+      curve={curve}
+      cursorS={cursorS}
+      labels={info.labels}
+      note={info.note}
+      watched={watched}
+      onSeekS={(sFrac) => {
+        const t = solidIsMine ? curve.baseTimeOfS(sFrac) : curve.otherTimeOfS(sFrac);
+        if (t != null) onSeek(t);
+      }}
+    />
+  );
+}
+
 export function DriverComparePanel({
   session,
   lines,
   videoUrl,
+  traces,
+  onTraceLap,
+  tracing = null,
+  traceError = null,
+  canTrace = false,
 }: {
   session: ManualVideoSessionV2;
   lines: SectorLineInfo[];
   /** The analysed video, for the player. Null: the sheet shows, nothing plays. */
   videoUrl: string | null;
+  /** Traced laps, by `traceKey`. */
+  traces?: Record<string, ManualLapTrace>;
+  /** Trace this driver's lap off the footage. Absent: no chips. */
+  onTraceLap?: (role: DriverRole, lapNumber: number) => void;
+  tracing?: { key: string; progress: number; note: string } | null;
+  traceError?: string | null;
+  /** The footage is in hand and the browser can read it. */
+  canTrace?: boolean;
 }) {
   const drivers = useMemo(() => buildCompareDrivers(session, lines), [session, lines]);
   const segments = useMemo(() => segmentDefs(lines), [lines]);
@@ -119,6 +231,9 @@ export function DriverComparePanel({
   const [refPick, setRefPick] = useState<RefPick | null>(null);
   const [watch, setWatch] = useState<Watch | null>(null);
   const [swapped, setSwapped] = useState(false);
+  /** Where the solid clip is on the video clock, for the path's dot and the chart's hairline. */
+  const [playSec, setPlaySec] = useState<number | null>(null);
+  const [seekRequest, setSeekRequest] = useState<{ aSec: number; nonce: number } | null>(null);
 
   const overlay = overlayKey ? (rivals.find((r) => r.key === overlayKey) ?? null) : null;
 
@@ -266,6 +381,56 @@ export function DriverComparePanel({
 
   // The gap from your side, whatever is solid: you minus them. Positive = you are slower = red.
   const gap = mine && other ? mine.sec - other.sec : null;
+
+  // ---- traced paths ------------------------------------------------------------------------
+  // Whose lap each clip is. The reference is yours with nobody chosen; a driver the field
+  // matching found has no seat and no marks, so nothing of theirs can be traced.
+  const otherRole: DriverRole | null = ref ? (ref.mine ? "me" : (overlay?.role ?? null)) : null;
+  const solidRole: DriverRole | null = solid === mine ? "me" : otherRole;
+  const ghostRole: DriverRole | null = ghost === mine ? "me" : otherRole;
+  const traceFor = (role: DriverRole | null, clip: Clip | null): ManualLapTrace | null =>
+    role && clip ? (traces?.[traceKey(role, clip.lapNumber)] ?? null) : null;
+  const solidTrace = traceFor(solidRole, solid);
+  const ghostTrace = traceFor(ghostRole, ghost);
+  const mineTrace = traceFor("me", mine);
+  const otherTrace = traceFor(otherRole, other);
+  const otherRows = other && ref && !ref.mine ? overlayRows : meRows;
+  const mineRow = mine ? meRows.find((r) => r.lapNumber === mine.lapNumber) : undefined;
+  const otherRow = other ? otherRows.find((r) => r.lapNumber === other.lapNumber) : undefined;
+  const solidIsMine = solid === mine;
+  const traceChip = (clip: Clip | null, role: DriverRole | null) => {
+    if (!clip || !role || !onTraceLap || !canTrace) return null;
+    const key = traceKey(role, clip.lapNumber);
+    const tr = traces?.[key];
+    const busy = tracing?.key === key;
+    const label = busy
+      ? `Tracing L${clip.lapNumber} · ${Math.round((tracing?.progress ?? 0) * 100)}%`
+      : tr?.quality.ok
+        ? `L${clip.lapNumber} traced`
+        : tr
+          ? `Trace L${clip.lapNumber} again`
+          : `Trace L${clip.lapNumber}`;
+    return (
+      <button
+        key={key}
+        type="button"
+        disabled={!!tracing}
+        onClick={() => onTraceLap(role, clip.lapNumber)}
+        className={cn(chipToggleClass(!!tr?.quality.ok), "inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px]")}
+      >
+        {label}
+      </button>
+    );
+  };
+  const pathOverlay =
+    solidTrace?.quality.ok || ghostTrace?.quality.ok
+      ? (s: { aSec: number; bSec: number; containerAspect: number; videoAspect: number }) => {
+          const laps: TraceLayerLap[] = [];
+          if (solidTrace?.quality.ok) laps.push({ trace: solidTrace, kind: "solid", atSec: s.aSec });
+          if (ghostTrace?.quality.ok) laps.push({ trace: ghostTrace, kind: "ghost", atSec: s.bSec });
+          return <TracePathLayer laps={laps} containerAspect={s.containerAspect} videoAspect={s.videoAspect} />;
+        }
+      : undefined;
   const segName = shown && shown.seg !== "lap" ? (segments[shown.seg]?.name ?? "") : "whole lap";
 
   // The split, drawn on the picture. Every line stays on screen; the two that bound what is
@@ -297,6 +462,9 @@ export function DriverComparePanel({
           lines={mapLines}
           fromKey={boundKey(watchedSeg?.fromKey)}
           toKey={boundKey(watchedSeg?.toKey)}
+          overlay={pathOverlay}
+          onTime={setPlaySec}
+          seekRequest={seekRequest}
         />
       ) : solid ? (
         <p className="rounded-lg border border-dashed border-border px-3 py-2 text-[11.5px] text-muted-foreground">
@@ -357,6 +525,25 @@ export function DriverComparePanel({
           ) : null}
         </div>
       ) : null}
+      {solid && (traceChip(solid, solidRole) || (ghost && ghost !== solid && traceChip(ghost, ghostRole))) ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {traceChip(solid, solidRole)}
+          {ghost && ghost !== solid ? traceChip(ghost, ghostRole) : null}
+          {tracing ? <span className="text-[11px] text-muted-foreground">{tracing.note}</span> : null}
+        </div>
+      ) : null}
+      {traceError ? <p className="text-[11px] text-destructive">{traceError}</p> : null}
+      <TraceDeltaSection
+        mineTrace={mineTrace}
+        otherTrace={otherTrace}
+        mineRow={mineRow}
+        otherRow={otherRow}
+        segments={segments}
+        solidIsMine={solidIsMine}
+        playSec={playSec}
+        watchedSeg={watchedSeg}
+        onSeek={(aSec) => setSeekRequest({ aSec, nonce: (seekRequest?.nonce ?? 0) + 1 })}
+      />
     </div>
   );
 

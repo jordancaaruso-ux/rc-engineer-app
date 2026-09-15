@@ -44,6 +44,7 @@ const runDetailSelect = {
   sessionCompletedAt: true,
   loggingCompletedAt: true,
   loggingComplete: true,
+  unconfirmedAt: true,
   sessionType: true,
   meetingSessionType: true,
   meetingSessionCode: true,
@@ -233,6 +234,8 @@ export default async function RunPage(props: {
     run.car?.name ?? run.carNameSnapshot ?? null,
     run.track?.name ?? run.trackNameSnapshot ?? null,
     formatRunDateTime(resolveRunDisplayInstant(run), displayTimeZone),
+    // Filed by the app from the timing sheet and not yet opened in the wizard.
+    run.unconfirmedAt ? "Unconfirmed" : null,
     isOwner ? null : "Shared by a teammate — read only",
   ]
     .filter(Boolean)

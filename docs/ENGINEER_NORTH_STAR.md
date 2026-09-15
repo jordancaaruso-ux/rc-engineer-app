@@ -29,9 +29,10 @@ and must never promise more than it sends. Founder call 2026-09-02: an earlier f
 (change / mechanism / what to feel for / when it wouldn't apply) is retired — people want to make
 the car fast, and they ask when they want more.
 
-- **A problem** ("it's loose on power"): the change and how far, one line, no preamble; then two
-  or three other levers, a line each — move, size, what sets it apart — so the driver can ask
-  about any of them.
+- **A problem** ("it's loose on power"): the change and how far, one line, no preamble; where that
+  change costs a part of the corner, the change that gets it back without touching the gain, one
+  clause (since 2026-09-09); then two or three other levers, a line each — move, size, what sets it
+  apart — so the driver can ask about any of them.
 - **What a change does** ("what does more rear droop do"): the feel and where on the corner, in
   the nets' register — what the driver will feel, not what moves inside the car; other levers
   only if the Engineer would truly reach for them, at most two.
@@ -67,7 +68,7 @@ Three artifacts, strictly tiered:
 |---|---|---|---|
 | **Physics KB** | Mechanisms — what a change does physically, never composed outcomes | Founder's "cannot be argued" test | `content/vehicle-dynamics/` |
 | **Nets** | Empirical priors — "this change most likely feels like Y, and here's what flips/mutes it" | Probabilistic by design; AI-drafted from trusted sources, cross-checked against the KB, founder bulk-reviewed | `content/nets/` |
-| **Driver data** | The driver's runs, setup, track, tyres | Facts, not instructions — plain statements only, v0-lab lineage; shipped 2026-08-25 ahead of harness calibration (changelog) | `src/lib/engineer/driverData.ts` |
+| **Driver data** | The driver's runs, setup, track, tyres — one run and its day, or a range of runs the driver chose | Facts, not instructions — plain statements only, v0-lab lineage; shipped 2026-08-25 ahead of harness calibration (changelog); the arithmetic (tyre-run deltas, day movement) is done in code, never left to the model | `src/lib/engineer/driverData.ts` (a run), `src/lib/engineer/driverHistory.ts` + `historyShape.ts` (a range) |
 
 Nets are **change-first** (the transpose of every symptom→fix guide), in RC-canonical
 coordinates: corner phase × on/off power × end of car. Modifiers are first-class and may
@@ -143,14 +144,94 @@ Each of these was deleted or declined for a reason. They return only through the
   attached, and it is still load-bearing.
 - **No tools, no choice chips, no status theatre.** The old pipeline grew to ~99K
   chars a turn one reasonable addition at a time; the payload-contract test exists so additions
-  fail loudly instead of accreting. The one switch the driver holds is the subject bar
-  (2026-09-03): Auto reads the latest run, a pin reads a chosen run, General attaches no run —
-  three requests the route already sent, never a fourth.
+  fail loudly instead of accreting. The one switch the driver holds is the subject bar:
+  Auto reads the latest run, a pin reads a chosen run, a **range** reads the runs the driver
+  named (a track, a car type, a span of dates — since 2026-09-14), General attaches no run.
+  The range is always the driver's choice, never inferred from the wording of the question:
+  the Engineer has no tools and cannot query the log, so the app attaches exactly what was
+  named and the block says what is and isn't in it.
 - **No unmeasured ships.** A change to prompt, payload, model, KB tiering, or nets rendering
   ships only on: physics gate clean, harness win ≥65/35 (or judge-gated at κ≥0.75), and a Jordan
   blind audit for anything user-visible.
 
 ## Changelog
+
+- **2026-09-15** — Founder call, round 03: a group's knobs are named together when nothing the driver
+  said separates them ("more front roll stiffness — a step on the spring or 0.1 mm on the bar"), with the
+  one carrying the least cost first. Nets header only; label `2026-09-15-group-move`. No family rule for
+  "lazy into the fast stuff" — refused as a static rule.
+
+- **2026-09-14, night** — Founder call: "I'd want to be able to compare to individual drivers."
+  Both blocks now carry a RIVALS summary whenever any run has a field (the drivers who shared the
+  most timed sessions, your average best-lap and top-5 gap to each, how often you were quicker),
+  and a driver NAMED in the question gets a VS section: every shared session with both drivers'
+  best and top 5 and the gaps, the clean averages, a line per day. Names come off the timing
+  sheets; the match is by surname with typos forgiven (`matchDriverName`), a shared surname needs
+  a first name. A session with a cut lap on either side (a best lap implausibly under that
+  driver's own top-5) is shown, marked, and left out of every average. The latest question now
+  rides into both block builders for this; nothing else reads it. `rivals.ts` is pure and tested.
+
+- **2026-09-14, evening** — Founder call: "does engineer use relative laptimes to everyone else?
+  that would be where the real value is." It did not. Now every run in both driver-data blocks
+  carries **vs field** from the timing sheet it was imported from (`fieldPace.ts`,
+  `fieldPaceLoad.ts`): place by best lap out of the timed entrants, best lap minus the fastest
+  driver's (0.00 = fastest), the same for the top-5 average, best minus the field's average best.
+  The filter block adds a TYRES, AGAINST THE FIELD table (the tyre deltas measured as gap to P1,
+  which cancels the day because the field aged its tyres and felt the track move too), a BEST
+  RUNS, AGAINST THE FIELD ranking, and a "gap to P1 vs previous run" figure on every changed /
+  unchanged line (allowed to cross days, unlike the tyre-corrected one). "You" is picked off the
+  sheet the race-field view's way: saved primary name, then lap-for-lap match, then the parser's
+  first row. Read-time uses STORED field stats only; `npm run db:backfill-field-stats` fills the
+  sessions imported before stats existed (scratch-dev: 702 without → 159 gained a field of 2+,
+  538 older imports hold only the driver's own laps and cannot). Production still needs that
+  backfill run. Sign convention throughout: you minus them, positive = slower.
+
+- **2026-09-14, later** — Founder calls on the first pass. (1) "Range" is **Filter** on the bar and
+  in the URL (`mode=filter`). (2) A **meeting** is a filter in its own right: `eventId` on the
+  scope, resolved server-side to the event's runs plus its track on its declared days; the run
+  picker lists the driver's meetings above their runs, and the filter picker leads with them.
+  (3) "If I say 'search sa state titles' can it not just look for that by itself … it needs to
+  interpret errors a bit": before a question is sent, its words are matched against the names
+  of the driver's OWN meetings and tracks (`nameMatch.ts` — edit distance, one slip on a short
+  word, two on a long one, a year in the message picks that year's meeting, four-letter names
+  exact only). A hit becomes the filter for that question and the bar switches to show it; never
+  in General. No model, no tools, nothing inferred beyond a name the driver typed. (4) After the
+  Engineer correctly did twenty subtractions itself to rank SA State Titles runs by tyre age,
+  the block now carries **new-tyre equivalent** figures: each run line's best / top 5 with the
+  TYRES table's average loss for that tyre run taken out, the same delta on every "changed" and
+  "no setup change" line against the previous same-day run, and a BEST RUNS, NEW-TYRE
+  EQUIVALENT top five. The model reads them; it no longer has to make them. Also: a "run 1"
+  inside an existing stint splits the set (production had a morning on runs 5–7 and new rubber
+  at 11:42 under one stint id).
+
+- **2026-09-14** — Founder call: "ask the Engineer to look at lap times from a certain track or
+  set of dates … what the delta is in lap time from new tyre to second run to third run". The
+  subject bar gains a fourth state, **Range** — a track (or all), a car type (or all), a span of
+  dates (or all time) — and the route attaches a range block (`driverHistory.ts`, shaped by
+  `historyShape.ts`) *instead of* the run block: one line per run (date, clock, session, best,
+  top 5, five-minute stint, laps, rating, tyre run, compound, air and track temperature, what
+  changed on that car's sheet), a DAYS table (best of day, first-to-last movement, air), a
+  TYRES table (one line per set of rubber with two or more timed runs, every run's delta
+  against run 1 on that set, the across-set averages for run 2..5 vs run 1, same-day pairs
+  separated because a set that spans days carries a day's grip change in its delta), and the
+  sheet on the car at the last run shown. Capped at the most recent 60 runs; the block says
+  how many older ones it left out and that nothing outside the range is attached. Every delta
+  is computed in code and signed the app's way (positive = slower) — the prompt's "never invent
+  a number" now covers subtraction across forty laps. Starter questions gain a `range` family
+  (tyre deltas, best run here, getting faster, changes that worked, morning to afternoon, pace
+  vs air). The prompt is unchanged. Eval: `questions/range-set.json` against a captured real
+  render (`capture-range-fixture.ts`). This reopens, deliberately and on founder call, the
+  history work parked on 2026-09-09; the "car's life" document and drift-corrected pattern
+  finder stay parked — the range block prints facts and arithmetic, it finds no patterns.
+
+- **2026-09-09** — Founder call, from round 01 of the launch review: a change can need a second
+  change to show its worth. The physics went on `corner-regime.md` first ("Two changes can share one
+  test") and moved no answer; the shape now carries the slot — where the lead change costs a part of
+  the corner, the change that gets it back, one clause, conditional on a cost. Label
+  `2026-09-09-paired-changes`. Same day, in the knowledge base rather than the prompt: a corner named
+  is a phase given (hairpin = the middle), and a change that made the car worse everywhere sends the
+  same lever the other way first; whole-car moves render as BOTH ENDS TOGETHER lines on their family's
+  GROUP heading, derived from the KB's own links.
 
 - **2026-09-03** — Founder call: the Engineer page wears its 1 September look again (starter
   questions, two cards) over the rebuilt mind, and the subject bar returns with three honest

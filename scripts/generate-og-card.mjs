@@ -20,7 +20,7 @@ import { dirname, join } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CARD = join(ROOT, "scripts/og-card/card.html");
-const OUT = join(ROOT, "public/landing/assets/og-card-v3.jpg");
+const OUT = join(ROOT, "public/landing/assets/og-card-v4.jpg");
 
 const WIDTH = 1200;
 const HEIGHT = 630;

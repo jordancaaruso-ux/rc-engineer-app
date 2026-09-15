@@ -170,6 +170,7 @@ export function LogRunWizardBottomBar({
   onSelect,
   rows,
   editingCompleted,
+  confirming = false,
   canSave,
   saving,
   saveSuccess,
@@ -189,6 +190,12 @@ export function LogRunWizardBottomBar({
   /** The run was already saved complete — completion is preserved, never
    *  offered again (single "Save edits"). */
   editingCompleted: boolean;
+  /**
+   * The completed run is one the app filed from the timing sheet and the driver is here to
+   * vouch for it. Same save as "Save edits"; the words say what the save means, because
+   * "Save edits" on a run they never edited did not (found driving it, 2026-09-14).
+   */
+  confirming?: boolean;
   canSave: boolean;
   saving: boolean;
   saveSuccess: boolean;
@@ -309,12 +316,18 @@ export function LogRunWizardBottomBar({
     onExitOpenChange(true);
   };
 
+  const saveEditsLabel = confirming ? "Confirm run" : "Save edits";
+  const savedLabel = confirming ? "Confirmed ✓" : "Saved ✓";
+  const saveEditsTitle = confirming
+    ? "Confirm this run — tyres, prep and setup as shown."
+    : "Save changes — the run stays complete.";
+
   const primaryContent =
     current === "feel" ? (
       editingCompleted ? (
         <>
           <CtaNotch />
-          {saveSuccess ? "Saved ✓" : saving ? "Saving…" : "Save edits"}
+          {saveSuccess ? savedLabel : saving ? "Saving…" : saveEditsLabel}
         </>
       ) : saving ? (
         <>
@@ -438,10 +451,10 @@ export function LogRunWizardBottomBar({
                   : "border-white/10 bg-card/80 text-foreground",
                 busy && "opacity-60"
               )}
-              aria-label={editingCompleted ? "Save edits" : "Save draft"}
+              aria-label={editingCompleted ? saveEditsLabel : "Save draft"}
               title={
                 editingCompleted
-                  ? "Save changes — the run stays complete."
+                  ? saveEditsTitle
                   : "Save what you have — finish the run any time."
               }
             >
@@ -468,7 +481,7 @@ export function LogRunWizardBottomBar({
                 title={
                   current === "feel"
                     ? editingCompleted
-                      ? "Save changes — the run stays complete."
+                      ? saveEditsTitle
                       : "Mark this run finished and save."
                     : `Go to ${nextId ? stepLabel(nextId) : ""}`
                 }
@@ -608,9 +621,9 @@ export function LogRunWizardBottomBar({
                   onClick={onComplete}
                   disabled={busy}
                   aria-busy={saving && !saveSuccess}
-                  title="Save changes — the run stays complete."
+                  title={saveEditsTitle}
                 >
-                  {saveSuccess ? "Saved ✓" : saving ? "Saving…" : "Save edits"}
+                  {saveSuccess ? savedLabel : saving ? "Saving…" : saveEditsLabel}
                 </button>
               ) : (
                 <>
@@ -658,9 +671,11 @@ export function LogRunWizardBottomBar({
               Leave this run?
             </div>
             <div className="pb-3 text-center font-sans text-[11px] text-muted-foreground">
-              {editingCompleted
-                ? "The run stays complete either way — this is only about your edits."
-                : "A draft keeps everything — finish it any time from the dashboard."}
+              {confirming
+                ? "Leaving without confirming keeps it marked unconfirmed."
+                : editingCompleted
+                  ? "The run stays complete either way — this is only about your edits."
+                  : "A draft keeps everything — finish it any time from the dashboard."}
             </div>
             <div className="grid gap-2">
               <button
@@ -672,9 +687,11 @@ export function LogRunWizardBottomBar({
               >
                 {saving
                   ? "Saving…"
-                  : editingCompleted
-                    ? "Save changes & exit"
-                    : "Save draft 💾 & exit"}
+                  : confirming
+                    ? "Confirm & exit"
+                    : editingCompleted
+                      ? "Save changes & exit"
+                      : "Save draft 💾 & exit"}
               </button>
               <button
                 type="button"

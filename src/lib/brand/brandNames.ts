@@ -28,6 +28,8 @@
  *                            through the whole first rename because this list said three.)
  */
 
+import type { PaidTier } from "@/lib/entitlementLogic";
+
 /** The product. What a driver calls the thing they log runs in. */
 export const PRODUCT_NAME = "JRC Trackside";
 
@@ -44,24 +46,27 @@ export const BRAND_DOMAIN = "jrcdynamics.com";
 export const DEV_EMAIL_FROM = `${PRODUCT_NAME} <dev@localhost>`;
 
 /**
- * What each paid tier is CALLED. The ids stay `standard`/`pro` forever; only these move.
+ * What each paid tier is CALLED. The ids stay `starter`/`standard`/`pro` forever; only these move.
  *
  * Renamed 2026-08-06 (Standard → Notebook, Pro → Race Engineer) alongside the price cut to
  * $9.99/$19.99. The ids deliberately did NOT change: `Subscription.tier` is a plain string column,
- * and `deriveSubscriptionTier` maps anything that isn't exactly "pro" to "standard" — so renaming
- * the stored values means a data migration whose failure mode is silently demoting a paying member.
- * Nothing a member ever sees depends on the id, so there is no reason to take that risk.
+ * and `deriveSubscriptionTier` maps anything that isn't exactly "pro" or "starter" to "standard" —
+ * so renaming the stored values means a data migration whose failure mode is silently demoting a
+ * paying member. Nothing a member ever sees depends on the id, so there is no reason to take that
+ * risk. Starter ($2.99, the last fifteen runs, no Engineer) was added 2026-09-09 under a working label
+ * (docs/STARTER_TIER_PLAN.md) — if it gets a real name, this is the one edit.
  *
  * These are constants for the same reason `PRODUCT_NAME` is: the labels were previously hardcoded
  * in ~10 places including a private `TIER_LABEL` map on the billing page, and `BillingClient` just
  * rendered the raw id, so a member was shown literally "standard · active".
  */
-export const TIER_LABELS: Record<"standard" | "pro", string> = {
+export const TIER_LABELS: Record<PaidTier, string> = {
+  starter: "Starter",
   standard: "Notebook",
   pro: "Race Engineer",
 };
 
-/** Label for a tier id from the database, which is a bare string and may be neither of ours. */
+/** Label for a tier id from the database, which is a bare string and may be none of ours. */
 export function tierLabel(tier: string): string {
-  return TIER_LABELS[tier as "standard" | "pro"] ?? tier;
+  return TIER_LABELS[tier as PaidTier] ?? tier;
 }

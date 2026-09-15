@@ -147,34 +147,27 @@ export async function importOneTimingUrl(
   const fieldStatsJson: Prisma.InputJsonValue | typeof Prisma.DbNull =
     fieldStats === null ? Prisma.DbNull : (fieldStats as Prisma.InputJsonValue);
 
-  const existing = await prisma.importedLapTimeSession.findFirst({
-    where: { userId, sourceUrl: normalized },
+  // One row per (user, URL) — enforced by the unique index, so a sweep tick and a wizard
+  // import racing on the same session converge on one row instead of minting two.
+  const row = await prisma.importedLapTimeSession.upsert({
+    where: { userId_sourceUrl: { userId, sourceUrl: normalized } },
+    update: {
+      parserId: parsed.parserId,
+      parsedPayload: payload,
+      sessionCompletedAt,
+      fieldStatsJson,
+    },
+    create: {
+      userId,
+      sourceUrl: normalized,
+      parserId: parsed.parserId,
+      sourceType: inferSourceType(normalized),
+      parsedPayload: payload,
+      sessionCompletedAt,
+      fieldStatsJson,
+    },
     select: { id: true, createdAt: true, sessionCompletedAt: true },
   });
-
-  const row = existing
-    ? await prisma.importedLapTimeSession.update({
-        where: { id: existing.id },
-        data: {
-          parserId: parsed.parserId,
-          parsedPayload: payload,
-          sessionCompletedAt,
-          fieldStatsJson,
-        },
-        select: { id: true, createdAt: true, sessionCompletedAt: true },
-      })
-    : await prisma.importedLapTimeSession.create({
-        data: {
-          userId,
-          sourceUrl: normalized,
-          parserId: parsed.parserId,
-          sourceType: inferSourceType(normalized),
-          parsedPayload: payload,
-          sessionCompletedAt,
-          fieldStatsJson,
-        },
-        select: { id: true, createdAt: true, sessionCompletedAt: true },
-      });
 
   return {
     url: normalized,
@@ -234,6 +227,23 @@ export async function linkImportedSessionsToRun(params: {
         data: { importedLapTimeSessionId: null },
       });
       return;
+    }
+
+    // A placeholder is never precious. If the app filed a run for one of these sessions and a
+    // human run now claims it (a late-opened draft picking the session on the lap step), the
+    // placeholder dissolves — its laps are the same laps, now on the run the driver made. A run
+    // the driver confirmed is never touched here; it only loses the primary pointer below.
+    const placeholders = await tx.run.findMany({
+      where: {
+        userId: params.userId,
+        importedLapTimeSessionId: { in: ids },
+        id: { not: params.runId },
+        unconfirmedAt: { not: null },
+      },
+      select: { id: true },
+    });
+    if (placeholders.length > 0) {
+      await tx.run.deleteMany({ where: { id: { in: placeholders.map((p) => p.id) } } });
     }
 
     for (const id of ids) {

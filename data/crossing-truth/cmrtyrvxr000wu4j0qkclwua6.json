@@ -1,0 +1,242 @@
+{
+  "jobId": "cmrtyrvxr000wu4j0qkclwua6",
+  "frozenAt": "2026-09-09T00:28:03.077Z",
+  "label": "TFTR heat IMG_4044 Cooper",
+  "video": "IMG_4044.MOV",
+  "profile": "Wild Willy CW",
+  "lines": [
+    {
+      "lineKey": "sf",
+      "label": "Start / Finish",
+      "sortOrder": 0,
+      "x1": 0.6150518868772543,
+      "y1": 0.6157247681931228,
+      "x2": 0.7145328795084473,
+      "y2": 0.8479431926722895
+    },
+    {
+      "lineKey": "s1",
+      "label": "S1",
+      "sortOrder": 1,
+      "x1": 0.3355984978699338,
+      "y1": 0.523702478463812,
+      "x2": 0.3191753949973718,
+      "y2": 0.5049331471444276
+    },
+    {
+      "lineKey": "s2",
+      "label": "S2",
+      "sortOrder": 2,
+      "x1": 0.3512260581884138,
+      "y1": 0.5779577341046713,
+      "x2": 0.4322057959690346,
+      "y2": 0.6190903607536765
+    },
+    {
+      "lineKey": "s3",
+      "label": "S3",
+      "sortOrder": 3,
+      "x1": 0.5170847614358351,
+      "y1": 0.496347605563365,
+      "x2": 0.5616349068708345,
+      "y2": 0.4859669827259948
+    },
+    {
+      "lineKey": "s4",
+      "label": "S4",
+      "sortOrder": 4,
+      "x1": 0.6598183216816115,
+      "y1": 0.4571319192888553,
+      "x2": 0.6645761334224256,
+      "y2": 0.4713571937851427
+    },
+    {
+      "lineKey": "s5",
+      "label": "S5",
+      "sortOrder": 5,
+      "x1": 0.8196366829621554,
+      "y1": 0.5359477358843353,
+      "x2": 0.7945501256355332,
+      "y2": 0.5205690588505623
+    }
+  ],
+  "sync": {
+    "anchor": {
+      "lapNumber": 18,
+      "anchorKind": "sf_start",
+      "driverRole": "me",
+      "videoTimeSec": 330.156661
+    }
+  },
+  "laps": [
+    {
+      "lapNumber": 1,
+      "lapTimeSec": 17.115
+    },
+    {
+      "lapNumber": 2,
+      "lapTimeSec": 16.662
+    },
+    {
+      "lapNumber": 3,
+      "lapTimeSec": 16.31
+    },
+    {
+      "lapNumber": 4,
+      "lapTimeSec": 23.003
+    },
+    {
+      "lapNumber": 5,
+      "lapTimeSec": 17.044
+    },
+    {
+      "lapNumber": 6,
+      "lapTimeSec": 16.931
+    },
+    {
+      "lapNumber": 7,
+      "lapTimeSec": 17.256
+    },
+    {
+      "lapNumber": 8,
+      "lapTimeSec": 16.823
+    },
+    {
+      "lapNumber": 9,
+      "lapTimeSec": 16.422
+    },
+    {
+      "lapNumber": 10,
+      "lapTimeSec": 16.934
+    },
+    {
+      "lapNumber": 11,
+      "lapTimeSec": 16.813
+    },
+    {
+      "lapNumber": 12,
+      "lapTimeSec": 16.662
+    },
+    {
+      "lapNumber": 13,
+      "lapTimeSec": 16.749
+    },
+    {
+      "lapNumber": 14,
+      "lapTimeSec": 16.985
+    },
+    {
+      "lapNumber": 15,
+      "lapTimeSec": 16.77
+    },
+    {
+      "lapNumber": 16,
+      "lapTimeSec": 16.821
+    },
+    {
+      "lapNumber": 17,
+      "lapTimeSec": 16.317
+    },
+    {
+      "lapNumber": 18,
+      "lapTimeSec": 16.346
+    }
+  ],
+  "markedLaps": [
+    3,
+    17,
+    18
+  ],
+  "marks": [
+    {
+      "driverRole": "me",
+      "lapNumber": 3,
+      "lineKey": "s1",
+      "videoTimeSec": 90.879236
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 3,
+      "lineKey": "s2",
+      "videoTimeSec": 92.980992
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 3,
+      "lineKey": "s3",
+      "videoTimeSec": 96.293728
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 3,
+      "lineKey": "s4",
+      "videoTimeSec": 82.982986
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 3,
+      "lineKey": "s5",
+      "videoTimeSec": 84.811391
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 17,
+      "lineKey": "s1",
+      "videoTimeSec": 332.335567
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 17,
+      "lineKey": "s2",
+      "videoTimeSec": 334.470658
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 17,
+      "lineKey": "s3",
+      "videoTimeSec": 337.566722
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 17,
+      "lineKey": "s4",
+      "videoTimeSec": 324.539318
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 17,
+      "lineKey": "s5",
+      "videoTimeSec": 326.384389
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 18,
+      "lineKey": "s1",
+      "videoTimeSec": 348.835898
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 18,
+      "lineKey": "s2",
+      "videoTimeSec": 350.970986
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 18,
+      "lineKey": "s3",
+      "videoTimeSec": 354.133724
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 18,
+      "lineKey": "s4",
+      "videoTimeSec": 340.872984
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 18,
+      "lineKey": "s5",
+      "videoTimeSec": 342.784719
+    }
+  ]
+}

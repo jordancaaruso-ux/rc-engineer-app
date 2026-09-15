@@ -78,7 +78,7 @@ export function DashboardNextOutingCard({
     <SurfaceCard variant="hero">
       <div className="eyebrow-root mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <span className="eyebrow-label">{isActive ? "At the track" : "Next outing"}</span>
-        <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
+        <span className="min-w-0 flex-1 truncate text-[11px] leading-[1.25] text-muted-foreground">
           {[event.name, event.trackLabel].filter(Boolean).join(" · ")}
         </span>
       </div>

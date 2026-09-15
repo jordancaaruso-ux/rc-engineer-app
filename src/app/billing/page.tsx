@@ -1,10 +1,12 @@
 import { requireCurrentUserAllowUnpaid } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { getEntitlement } from "@/lib/entitlement";
-import { isBillingEnforced } from "@/lib/entitlementLogic";
+import { isActiveSubscriptionStatus, isBillingEnforced } from "@/lib/entitlementLogic";
 import { getPricePlans } from "@/lib/stripe";
 import { tierLabel } from "@/lib/brand/brandNames";
 import { BillingClient, type BillingPlan } from "@/components/billing/BillingClient";
+import { ShellPlanNotice } from "@/components/billing/ShellPlanNotice";
+import { isNativeShellRequest } from "@/lib/nativeShellServer";
 
 export const metadata = { title: "Subscription" };
 
@@ -16,6 +18,10 @@ export const metadata = { title: "Subscription" };
 export default async function BillingPage() {
   const user = await requireCurrentUserAllowUnpaid();
   const entitlement = await getEntitlement(user);
+  // Inside the native shell the plan is shown, never sold — see `lib/nativeShell.ts`.
+  if (await isNativeShellRequest()) {
+    return <ShellPlanNotice tierLabel={entitlement.entitled ? tierLabel(entitlement.tier) : null} />;
+  }
   const sub = await prisma.subscription.findUnique({ where: { userId: user.id } });
   const subscription = sub
     ? {
@@ -33,6 +39,11 @@ export default async function BillingPage() {
     priceId: p.priceId,
     label: `${tierLabel(p.tier)} · ${p.interval === "year" ? "Annual" : "Monthly"}`,
   }));
+  // A live subscription changes plan through Stripe's portal, never a second checkout
+  // (docs/STARTER_TIER_PLAN.md). Read off the row, not the entitlement: with billing dark the
+  // entitlement says "full access" for everyone, and that must not re-open checkout to a payer.
+  const activeSubscriber = sub != null && isActiveSubscriptionStatus(sub.status);
+  const canUpgrade = activeSubscriber && sub.tier !== "pro";
 
   return (
     <>
@@ -52,6 +63,8 @@ export default async function BillingPage() {
         hasCustomer={Boolean(user.stripeCustomerId)}
         enforced={isBillingEnforced()}
         subscription={subscription}
+        activeSubscriber={activeSubscriber}
+        canUpgrade={canUpgrade}
       />
       </section>
     </>

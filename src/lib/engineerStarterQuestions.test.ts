@@ -19,6 +19,7 @@ import {
 const RUN_IN_FOCUS = { runInFocus: true, hasHistory: true };
 const GENERAL_MODE = { runInFocus: false, hasHistory: true };
 const BRAND_NEW = { runInFocus: false, hasHistory: false };
+const RANGE_IN_FOCUS = { runInFocus: false, hasHistory: true, rangeInFocus: true };
 
 test("ids are unique — React keys and any future analytics depend on it", () => {
   const ids = ENGINEER_STARTER_QUESTIONS.map((q) => q.id);
@@ -82,9 +83,13 @@ test("selection is deterministic — same state, same chips, same order", () => 
 });
 
 test("nothing is lost or duplicated by the rotation", () => {
+  // A run and a range are never both the subject, so the two families are counted apart.
   const picked = selectEngineerStarterQuestions(RUN_IN_FOCUS);
-  assert.equal(picked.length, ENGINEER_STARTER_QUESTIONS.length);
+  assert.equal(picked.length, ENGINEER_STARTER_QUESTIONS.filter((q) => q.family !== "range").length);
   assert.equal(new Set(picked.map((q) => q.id)).size, picked.length);
+  const pickedRange = selectEngineerStarterQuestions(RANGE_IN_FOCUS);
+  assert.equal(pickedRange.length, ENGINEER_STARTER_QUESTIONS.filter((q) => q.family !== "run").length);
+  assert.equal(new Set(pickedRange.map((q) => q.id)).size, pickedRange.length);
 });
 
 test("limit trims without reordering", () => {
@@ -133,5 +138,23 @@ test("the card never offers more than it can cycle through, and never repeats on
     const picked = selectDashboardStarterQuestions({ hasRuns: true, isTrackDay });
     assert.ok(picked.length <= DASHBOARD_STARTER_COUNT);
     assert.equal(new Set(picked.map((q) => q.id)).size, picked.length);
+  }
+});
+
+test("a range as the subject offers the read-across-runs questions and none that read one run", () => {
+  const picked = selectEngineerStarterQuestions(RANGE_IN_FOCUS);
+  assert.ok(picked.some((q) => q.id === "range-tyres"), "the tyre-delta question is the one that started the range subject");
+  assert.equal(picked.some((q) => q.family === "run"), false, "no one run is in focus on a range");
+  assert.equal(picked[0].family, "range", "the first chip on the rail is about the range");
+  assert.ok(picked.length >= ENGINEER_STARTER_BOARD_COUNT);
+});
+
+test("range questions never appear without a range as the subject", () => {
+  for (const state of [RUN_IN_FOCUS, GENERAL_MODE, BRAND_NEW]) {
+    assert.equal(
+      selectEngineerStarterQuestions(state).some((q) => q.family === "range"),
+      false,
+      "a range question with no range attached is a dead end",
+    );
   }
 });

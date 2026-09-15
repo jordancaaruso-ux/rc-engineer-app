@@ -41,7 +41,7 @@ export function DeleteAccountRow() {
   }
 
   return (
-    <div className="mt-10 border-t border-border pt-5">
+    <div className="mt-4">
       <button
         type="button"
         disabled={busy}

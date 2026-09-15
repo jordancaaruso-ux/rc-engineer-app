@@ -11,7 +11,7 @@ import {
   buildComparisonSeries,
   computeSummaryDeltas,
   filterDuplicateImportedSeries,
-  formatFadePerLap,
+  formatFadePerMinute,
   formatLapDelta,
   getDeltaStyle,
   getDisplayFiveMinuteStint,
@@ -274,14 +274,15 @@ const HEADER_METRIC_ROWS: Array<{
     /*
      * Signed in its own cell, not just in the delta: "fade 0.04" reads as a quantity of
      * fade, when the sign is the entire finding. A run that came to the driver has to say
-     * −0.04 in the column itself. A rate (s/lap, 2026-08-27), so a rival's 30-lap main and
-     * your 12-lap heat sit on one scale; the delta wears the same unit for the same reason.
+     * −0.04 in the column itself. A rate (2026-08-27), so a rival's 30-lap main and your
+     * 12-lap heat sit on one scale; per minute of track time (2026-09-14) so a 12-second
+     * track and a 35-second one do too. The delta wears the same unit for the same reason.
      */
     label: "fade",
-    pick: (s) => s.fadePerLap,
-    delta: (d) => d.fadePerLapDelta,
-    format: formatFadePerLap,
-    formatDelta: (d) => `${formatLapDelta(d).slice(0, -1)}/lap`,
+    pick: (s) => s.fadePerMinute,
+    delta: (d) => d.fadePerMinuteDelta,
+    format: formatFadePerMinute,
+    formatDelta: (d) => `${formatLapDelta(d).slice(0, -1)}/min`,
   },
 ];
 

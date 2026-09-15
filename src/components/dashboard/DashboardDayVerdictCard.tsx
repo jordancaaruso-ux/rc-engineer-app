@@ -217,7 +217,7 @@ export function DashboardDayVerdictCard({
         : "effect unclear so far";
 
   return (
-    <SurfaceCard variant="hero" className="relative">
+    <SurfaceCard variant="hero" className="relative" contentClassName="pt-0">
       <Link
         href="/runs/history?expandLatest=1"
         prefetch
@@ -225,9 +225,12 @@ export function DashboardDayVerdictCard({
         className="tap-active absolute inset-0 z-0 cursor-pointer rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
       />
       <div className="pointer-events-none relative z-10">
-        <div className="eyebrow-root mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        {/* The card's band (2026-09-15). Explicit `.eyebrow-band` + `pt-0` on the card: the
+            whole-card link sits first in the DOM, so this is never the card's first child and
+            the automatic first-child band can't find it. */}
+        <div className="eyebrow-root eyebrow-band mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
           <span className="eyebrow-label">Today</span>
-          <span className="text-[12px] text-muted-foreground">{metaBits.join(" · ")}</span>
+          <span className="text-[11px] leading-[1.25] text-muted-foreground">{metaBits.join(" · ")}</span>
         </div>
 
         <div className="flex items-baseline gap-2 py-1.5">

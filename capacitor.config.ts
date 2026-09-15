@@ -17,6 +17,12 @@ const config: CapacitorConfig = {
   // the installed native app on the device home screen.
   appName: "JRC Trackside",
   webDir: "capacitor-www",
+  /**
+   * Lets the server tell the shell from a browser (`src/lib/nativeShell.ts`): the join and
+   * billing pages show the plan without selling it inside the app — the app stores' rule for a
+   * subscription bought on the web. Keep in sync with NATIVE_SHELL_UA_TOKEN.
+   */
+  appendUserAgent: "JRCShell/1",
   server: serverUrl
     ? {
         url: serverUrl,
@@ -32,7 +38,7 @@ const config: CapacitorConfig = {
      */
     contentInset: "never",
     /** Match the page background (ash paper) so rubber-band overscroll is not a dark band. */
-    backgroundColor: "#EAE7E0",
+    backgroundColor: "#F4F4F3",
   },
   plugins: {
     /**

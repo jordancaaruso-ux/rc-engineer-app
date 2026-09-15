@@ -45,6 +45,7 @@ import { RunTireSelectionPanel, type TireStintValue } from "@/components/runs/Ru
 import { RunAdditiveTimingPanel } from "@/components/runs/RunAdditiveTimingPanel";
 import { collectSetupSheetTemplateKeys } from "@/lib/setupSheetModels/collectTemplateKeys";
 import { applyRunContextToSetupSnapshot } from "@/lib/runs/applyRunContextToSetupSnapshot";
+import { chosenBackfillSessions } from "@/lib/runs/backfillCandidates";
 import { formatTirePrepSummaryFromSnapshot } from "@/lib/runs/runTireContextDisplay";
 import {
   normalizeTirePrep,
@@ -318,6 +319,12 @@ type LastRun = {
    * post-run section when the form is opened to edit an existing run.
    */
   loggingComplete?: boolean;
+  /**
+   * Filed by the app from the timing sheet ("Add N other runs from today") and not yet vouched
+   * for. Saving through this form is one of the two things that clears it, so the form says
+   * "Confirm run" where it would say "Save edits".
+   */
+  unconfirmedAt?: string | null;
   /** When false, mutual team members do not see this run in team Sessions / team-only Engineer lists. */
   shareWithTeam?: boolean;
   /** Weather / conditions captured for this session (metric); populated when editing. */
@@ -1169,6 +1176,12 @@ export function NewRunForm(props: {
   const isDraft = isEditing && editRun?.loggingComplete === false;
   /** Run was already marked complete — edits must not flip back to draft or bump the tire run # (server enforces too). */
   const editingCompletedRun = isEditing && editRun?.loggingComplete === true;
+  /**
+   * A run the app filed from the timing sheet, opened to be vouched for. Complete already (it
+   * counts everywhere pace counts), so it walks the edit path — but the badge, the primary
+   * button and the exit prompt all say "confirm", because that is what the save does.
+   */
+  const confirmingRun = editingCompletedRun && editRun?.unconfirmedAt != null;
   const focusSection = props.focusSection ?? null;
   const setupSectionRef = useRef<HTMLDivElement>(null);
   const feedbackRequiredRef = useRef<HTMLDivElement>(null);
@@ -3671,7 +3684,14 @@ export function NewRunForm(props: {
       const missingCarRating = carRating == null || carRating < 1 || carRating > 10;
       // A controlled additive is auto-filled (running none is allowed), so it is
       // never a save blocker.
-      const missingSetup = !opts?.waiveSetup && filledSetupValueCount(setupData) === 0;
+      //
+      // The setup gate guards COMPLETING a run. A run that is already complete answered it
+      // once — by putting a value on the sheet or by waiving it — and asking again on every
+      // later save is the gate biting twice: a catch-up run logged without a setup, then every
+      // run the app filed beside it (each carrying that same empty sheet) refused on confirm
+      // (found driving it, 2026-09-14).
+      const missingSetup =
+        !opts?.waiveSetup && !editingCompletedRun && filledSetupValueCount(setupData) === 0;
       if (missingCarRating || missingSetup) {
         const parts: string[] = [];
         if (missingCarRating) parts.push("rate the car 1–10");
@@ -3794,6 +3814,50 @@ export function NewRunForm(props: {
         lapTimes = parseLapTimes(lapIngest.manualText);
       }
       const importedLapSets = buildImportedLapSetsFromIngest(lapIngest);
+      /*
+       * "Add N other runs from today" (lap step). Those sessions become runs beside this one on
+       * the server, but a scanned session is only a URL until it is imported — so the ones this
+       * account doesn't hold yet are fetched here first, in one batch, and every id goes in the
+       * body. A session the timing site won't give up right now is counted, not fatal: the run
+       * itself still saves, and the driver is told how many didn't make it.
+       */
+      const backfillImportedLapTimeSessionIds: string[] = [];
+      let backfillImportFailures = 0;
+      // Only what the driver left ticked in the sheet — the offer minus their exclusions.
+      const backfillChosen = lapIngest.backfill?.ticked ? chosenBackfillSessions(lapIngest.backfill) : [];
+      if (intent === "completed" && backfillChosen.length > 0) {
+        const urlsToImport: string[] = [];
+        for (const s of backfillChosen) {
+          if (s.importedSessionId) backfillImportedLapTimeSessionIds.push(s.importedSessionId);
+          else urlsToImport.push(s.sessionUrl);
+        }
+        if (urlsToImport.length > 0) {
+          try {
+            const res = await fetch("/api/lap-time-sessions/import", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                urls: urlsToImport,
+                ...(sessionType === "RACE_MEETING" && eventId ? { eventId } : {}),
+              }),
+            });
+            const data = (await res.json().catch(() => ({}))) as {
+              results?: Array<{ success?: boolean; importedSessionId?: string }>;
+            };
+            const results = res.ok && Array.isArray(data.results) ? data.results : [];
+            let imported = 0;
+            for (const r of results) {
+              if (r?.success === true && typeof r.importedSessionId === "string") {
+                backfillImportedLapTimeSessionIds.push(r.importedSessionId);
+                imported += 1;
+              }
+            }
+            backfillImportFailures += Math.max(0, urlsToImport.length - imported);
+          } catch {
+            backfillImportFailures += urlsToImport.length;
+          }
+        }
+      }
       // A stay-save's minted run counts as "the run being edited" from then on — PUT, not POST.
       const effectiveEditId = editRun?.id ?? createdRunId;
       const {
@@ -3801,6 +3865,7 @@ export function NewRunForm(props: {
         tireStintId: savedStintId,
         promptMarkTrackLocation,
         tireRunNumberCascade,
+        backfilled,
       } = await jsonFetch<{
         run: { id: string; createdAt: string };
         /** The stint the run landed on — freshly minted when the client sent null. */
@@ -3808,6 +3873,8 @@ export function NewRunForm(props: {
         promptMarkTrackLocation?: { trackId: string; trackName: string } | null;
         /** Present when correcting this run's tire count also moved later runs on the set. */
         tireRunNumberCascade?: { updatedRuns: number; delta: number } | null;
+        /** Present when the save also filed the day's other sessions as runs. */
+        backfilled?: { created: number; skipped: number } | null;
       }>("/api/runs", {
         method: effectiveEditId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -3912,6 +3979,7 @@ export function NewRunForm(props: {
                   .map((b) => b.importedSessionId.trim())
                   .filter(Boolean)
               : [],
+          backfillImportedLapTimeSessionIds,
         })
       });
 
@@ -3923,10 +3991,26 @@ export function NewRunForm(props: {
       if (!editRun?.id) setCreatedRunId(run.id);
 
       const cascadedRuns = tireRunNumberCascade?.updatedRuns ?? 0;
-      const cascadeMessage =
-        cascadedRuns > 0
-          ? `Tire count corrected — ${cascadedRuns} later ${cascadedRuns === 1 ? "run" : "runs"} on this set renumbered too.`
+      const backfilledRuns = backfilled?.created ?? 0;
+      const backfillMessage =
+        backfilledRuns > 0
+          ? `Added ${backfilledRuns} other ${backfilledRuns === 1 ? "run" : "runs"} from that day — unconfirmed until you check and confirm ${backfilledRuns === 1 ? "it" : "them"}.`
           : null;
+      const backfillFailureMessage =
+        backfillImportFailures > 0
+          ? `${backfillImportFailures} of the day's other ${backfillImportFailures === 1 ? "run" : "runs"} couldn't be fetched from the timing site.`
+          : null;
+      // One toast, same departure as the tyre cascade's: runs the driver never opened just changed.
+      const cascadeMessage =
+        [
+          cascadedRuns > 0
+            ? `Tire count corrected — ${cascadedRuns} later ${cascadedRuns === 1 ? "run" : "runs"} on this set renumbered too.`
+            : null,
+          backfillMessage,
+          backfillFailureMessage,
+        ]
+          .filter(Boolean)
+          .join(" ") || null;
 
       if (intent === "completed" && promptMarkTrackLocation) {
         setTrackLocationPrompt({
@@ -4829,7 +4913,16 @@ export function NewRunForm(props: {
            meter/rows/jumps live in the bottom bar + map sheet now; the rail
            is gone on desktop too (the bar serves both). */
         <div className="flex items-center gap-2 px-0.5">
-          {wizardMarkedComplete ? (
+          {confirmingRun ? (
+            /* The state the driver came to change. "COMPLETE" here was true and useless —
+               it said nothing about why they were looking at this run (2026-09-14). */
+            <span
+              className="shrink-0 rounded-md border border-warning/40 bg-warning/10 px-2 py-[3px] text-[10px] font-semibold uppercase tracking-[0.09em] text-warning"
+              title="Filed from the timing sheet — tyres, prep and setup were carried from the run before."
+            >
+              Unconfirmed
+            </span>
+          ) : wizardMarkedComplete ? (
             <span
               className="shrink-0 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-[3px] text-[10px] font-semibold uppercase tracking-[0.09em] text-emerald-600 dark:text-emerald-300"
               title="This run is marked complete."
@@ -4892,7 +4985,7 @@ export function NewRunForm(props: {
       {!wizardActive ? (
         <div className="flex items-center gap-3 pt-2">
           <div className="h-px flex-1 bg-border/60" />
-          <Eyebrow dot="muted" className="shrink-0 justify-center">
+          <Eyebrow dot="muted" className="mb-0 shrink-0 justify-center">
             Before the run
           </Eyebrow>
           <div className="h-px flex-1 bg-border/60" />
@@ -5399,9 +5492,9 @@ export function NewRunForm(props: {
         className={cn("run-section--details", isDraft && "border-emerald-500/40")}
         contentClassName="space-y-3"
       >
-        <div className={cn("flex flex-wrap items-center justify-between gap-2", wizardActive && "hidden")}>
+        <div className={cn("eyebrow-band flex flex-wrap items-center justify-between gap-2", wizardActive && "hidden")}>
           <div className="flex items-center gap-2">
-            <Eyebrow>Run details</Eyebrow>
+            <Eyebrow className="mb-0">Run details</Eyebrow>
             <PrefillBadge
               show={
                 prefillHighlights?.car ||
@@ -5650,7 +5743,9 @@ export function NewRunForm(props: {
               onClick={(e) => void saveRun(e, "completed", { waiveSetup: true })}
               className="mt-1.5 font-semibold underline underline-offset-4 disabled:opacity-50"
             >
-              This run doesn’t have a setup — log it anyway
+              {/* Names what the tap does. "Log it anyway" read as an opinion; the tap IS the
+                  save, which surprised a driver on a real walk (2026-09-14). */}
+              Complete the run without a setup
             </button>
             <p className="mt-1 opacity-80">
               Laps, tyres and how it felt are all still recorded. The Engineer just won’t have a
@@ -5921,7 +6016,7 @@ export function NewRunForm(props: {
               isDraft ? "bg-amber-500/50" : "bg-border/60"
             )}
           />
-          <Eyebrow dot="muted" className="shrink-0 justify-center">
+          <Eyebrow dot="muted" className="mb-0 shrink-0 justify-center">
             After the run
           </Eyebrow>
           <div
@@ -5981,6 +6076,7 @@ export function NewRunForm(props: {
           )
         }
         editingRunId={isEditing ? editRun?.id ?? null : null}
+        stepVisible={!wizardActive || wizardStep === "laps"}
         /* No forward callback: importing no longer advances the wizard, and the
            step no longer offers its own Next. The jump had to go so a second
            timing session could be attached; the readout fills the step the jump
@@ -6096,8 +6192,10 @@ export function NewRunForm(props: {
 
       {editingCompletedRun ? (
         <p className="text-[11px] text-muted-foreground leading-snug sm:max-w-md">
-          The run stays marked complete. Correcting how many runs are on the tires also renumbers
-          every later run on that same set.
+          {confirmingRun
+            ? // The one fact a driver checking a carried run needs: what on this form is a guess.
+              "Tyres, prep and setup were carried from the run before this one."
+            : "The run stays marked complete. Correcting how many runs are on the tires also renumbers every later run on that same set."}
         </p>
       ) : null}
 
@@ -6113,6 +6211,7 @@ export function NewRunForm(props: {
           onSelect={goToWizardStep}
           rows={wizardSummaryRows}
           editingCompleted={editingCompletedRun}
+          confirming={confirmingRun}
           canSave={canSave}
           saving={saving}
           saveSuccess={saveSuccess}
@@ -6176,9 +6275,21 @@ export function NewRunForm(props: {
               onClick={(e) => saveRun(e, "completed")}
               disabled={!canSave || saving}
               aria-busy={saving && !saveSuccess}
-              title="Save changes — the run stays complete."
+              title={
+                confirmingRun
+                  ? "Confirm this run — tyres, prep and setup as shown."
+                  : "Save changes — the run stays complete."
+              }
             >
-              {saveSuccess ? "Saved ✓" : saving ? "Saving…" : "Save edits"}
+              {saveSuccess
+                ? confirmingRun
+                  ? "Confirmed ✓"
+                  : "Saved ✓"
+                : saving
+                  ? "Saving…"
+                  : confirmingRun
+                    ? "Confirm run"
+                    : "Save edits"}
             </button>
           ) : (
             <>

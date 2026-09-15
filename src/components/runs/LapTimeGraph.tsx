@@ -40,14 +40,15 @@ const CLAMP_FACTOR = 1.15;
  * loss red when that stretch of the run was getting slower, down in gain green when it was
  * coming to the driver. It shares the chart's x-axis so a bar sits under the laps it read.
  *
- * The scale has a floor of ±0.10 s/lap and only grows past it: a flat run must LOOK flat,
- * and a rolling rate on six laps swings ±0.05 on nothing, which a scale fitted to the data
- * would blow up into a mountain range. A real fade (+0.2 s/lap and staying there) fills it.
+ * The scale has a floor of ±0.40 s/min and only grows past it: a flat run must LOOK flat,
+ * and a rolling rate on six laps swings ±0.2 s/min on nothing, which a scale fitted to the
+ * data would blow up into a mountain range. A real fade (+0.8 s/min and staying there)
+ * fills it. (Was ±0.10 per lap until 2026-09-14 — the same floor on a 15-second lap.)
  */
 const FADE_STRIP_HEIGHT = 46;
 const FADE_STRIP_PAD_TOP = 6;
 const FADE_STRIP_PAD_BOTTOM = 6;
-const FADE_STRIP_FLOOR = 0.1;
+const FADE_STRIP_FLOOR = 0.4;
 const FADE_UP_COLOR = "rgb(var(--color-destructive))";
 const FADE_DOWN_COLOR = "rgb(var(--color-gain))";
 
@@ -327,7 +328,7 @@ function FadeStrip({
   chartWidth: number;
 }) {
   const indexOfLap = new Map(rows.map((r, i) => [r.lapNumber, i]));
-  const limit = Math.max(FADE_STRIP_FLOOR, ...profile.map((p) => Math.abs(p.ratePerLap)));
+  const limit = Math.max(FADE_STRIP_FLOOR, ...profile.map((p) => Math.abs(p.ratePerMinute)));
   const innerHeight = FADE_STRIP_HEIGHT - FADE_STRIP_PAD_TOP - FADE_STRIP_PAD_BOTTOM;
   const zeroY = FADE_STRIP_PAD_TOP + innerHeight / 2;
   // Slower (positive) draws UP, matching the chart above where a slow lap spikes up.
@@ -352,7 +353,7 @@ function FadeStrip({
       viewBox={`0 0 ${chartWidth} ${FADE_STRIP_HEIGHT}`}
       className="block"
       role="img"
-      aria-label="Fade per lap across the run, rolling six laps"
+      aria-label="Fade per minute of track time across the run, rolling six laps"
     >
       <text x={PAD_LEFT - 6} y={yAt(limit) + 3} textAnchor="end" className="fill-faint fig-tick">
         {formatStripRate(limit)}
@@ -371,11 +372,11 @@ function FadeStrip({
       {profile.map((p, i) => {
         const cx = centres[i];
         if (cx == null) return null;
-        const y = yAt(p.ratePerLap);
-        const up = p.ratePerLap >= 0;
+        const y = yAt(p.ratePerMinute);
+        const up = p.ratePerMinute >= 0;
         return (
           <g key={`${p.fromLap}-${p.toLap}`}>
-            <title>{`Laps ${p.fromLap}–${p.toLap}: ${formatStripRate(p.ratePerLap)} s/lap`}</title>
+            <title>{`Laps ${p.fromLap}–${p.toLap}: ${formatStripRate(p.ratePerMinute)} s/min`}</title>
             <rect
               x={cx - barWidth / 2}
               y={up ? y : zeroY}
@@ -393,7 +394,7 @@ function FadeStrip({
         textAnchor="end"
         className="fill-faint fig-tick"
       >
-        fade s/lap · rolling 6
+        fade s/min · rolling 6 laps
       </text>
     </svg>
   );

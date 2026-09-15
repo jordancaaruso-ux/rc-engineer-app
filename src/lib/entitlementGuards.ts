@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 import type { User } from "@prisma/client";
 import { getAuthenticatedApiUser, requireCurrentUser } from "@/lib/currentUser";
-import { isFeatureEntitled, type Feature } from "@/lib/entitlementLogic";
+import { isFeatureEntitled, upgradeTierFor, type Feature } from "@/lib/entitlementLogic";
 import { getEntitlement, type Entitlement } from "@/lib/entitlement";
 import { TIER_LABELS } from "@/lib/brand/brandNames";
 
@@ -45,10 +45,11 @@ export async function getEntitledApiUser(): Promise<{ user: User; entitlement: E
 }
 
 /**
- * Segment layouts / server pages — is this Pro feature LOCKED for the current viewer?
+ * Segment layouts / server pages — is this paid feature LOCKED for the current viewer?
  * `requireCurrentUser` inside already bounces unauthenticated → /login and unpaid → /billing, so
- * "locked" here means exactly one thing: a paying Standard subscriber one tier short — the
- * visible-but-locked upsell state (`ProLockedPanel`), never a redirect.
+ * "locked" here means exactly one thing: a paying subscriber whose tier is short of the feature
+ * (Notebook at the Geometry Lab, Starter at the Engineer) — the visible-but-locked upsell state
+ * (`ProLockedPanel`), never a redirect.
  */
 export async function isFeatureLockedForCurrentUser(feature: Feature): Promise<boolean> {
   const user = await requireCurrentUser();
@@ -57,9 +58,10 @@ export async function isFeatureLockedForCurrentUser(feature: Feature): Promise<b
 }
 
 /**
- * Route Handlers — one-line feature guard for the expensive Pro APIs. Returns the user, or a
- * ready-to-return 401/402 response. 402 (not 403) so clients can distinguish "pay for this"
- * from "not yours".
+ * Route Handlers — one-line feature guard for the paid-tier APIs (video, and the Engineer for
+ * Starter). Returns the user, or a ready-to-return 401/402 response. 402 (not 403) so clients can
+ * distinguish "pay for this" from "not yours". The message names the cheapest tier that has the
+ * feature, which is the one the member is being sold.
  */
 export async function requireApiFeature(
   feature: Feature,
@@ -76,7 +78,7 @@ export async function requireApiFeature(
       user: null,
       response: NextResponse.json(
         {
-          error: `This feature is part of ${TIER_LABELS.pro}. Upgrade on the Subscription page.`,
+          error: `This feature is part of ${TIER_LABELS[upgradeTierFor(feature)]}. Upgrade on the Subscription page.`,
         },
         { status: 402 },
       ),

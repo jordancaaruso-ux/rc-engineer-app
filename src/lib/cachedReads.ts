@@ -41,7 +41,7 @@ export async function getCachedDashboardHomeModel(userId: string, timeZone: stri
       // the drafts card renders "NaN waiting" off an undefined count, and it lists the OLD
       // unwindowed array, so months-old drafts reappear under a card that says "from the last
       // three days". Measured on a warm dev page before this line existed.
-      [`dashboard-home-v7-${userId}-${timeZone}`],
+      [`dashboard-home-v8-${userId}-${timeZone}`],
       { tags: [dashboardTag(userId)], revalidate: 30 }
     )()
   );
@@ -195,6 +195,8 @@ export async function getCachedToolsModel(userId: string, timeZone: string) {
  *
  * v2 (2026-08-15): gained `createdAtMs`, so /cars can order by most recent use. A v1 entry has no
  * such field, which would sort every car as if it were created at the epoch — hence the bump.
+ * v3 (2026-09-08): gained `discipline` on the chassis rows. A v2 entry has none, which would drop
+ * the whole catalog into the picker's "class not set" group — hence the bump.
  */
 export async function getCachedCarManagerData(userId: string) {
   return perfSpan("cachedCarManager", () =>
@@ -208,6 +210,9 @@ export async function getCachedCarManagerData(userId: string) {
               name: true,
               slug: true,
               isAuthorized: true,
+              // What the chassis races, so the picker can group by class instead of running one
+              // flat A–Z list past a touring driver's eleven buggies.
+              discipline: true,
               _count: { select: { cars: true, calibrations: true } },
             },
           }),
@@ -232,7 +237,7 @@ export async function getCachedCarManagerData(userId: string) {
               rows.map(({ createdAt, ...car }) => ({ ...car, createdAtMs: createdAt.getTime() }))
             ),
         ]),
-      [`car-manager-v2-${userId}`],
+      [`car-manager-v3-${userId}`],
       { tags: [carsTag(userId)], revalidate: 30 }
     )()
   );

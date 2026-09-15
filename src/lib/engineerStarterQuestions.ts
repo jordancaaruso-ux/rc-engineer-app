@@ -16,7 +16,7 @@
  * a request for a mechanism rather than a rule of thumb.
  */
 
-export type EngineerStarterFamily = "run" | "feel" | "plan" | "learn";
+export type EngineerStarterFamily = "range" | "run" | "feel" | "plan" | "learn";
 
 export type EngineerStarterQuestion = {
   id: string;
@@ -32,6 +32,12 @@ export type EngineerStarterState = {
   runInFocus: boolean;
   /** The driver has logged at least one run, whether or not it's in focus. */
   hasHistory: boolean;
+  /**
+   * A RANGE of runs is the subject (rangeScope.ts, 2026-09-14) — a track, a span of dates.
+   * The range family reads across those runs; the run family is off, because no one run is
+   * in focus.
+   */
+  rangeInFocus?: boolean;
 };
 
 /**
@@ -68,6 +74,51 @@ const RUN_QUESTIONS: EngineerStarterQuestion[] = [
     label: "Worth changing at all?",
     text: "Is there enough here to justify a change, or should I run it back to see if the last one was repeatable?",
     family: "run",
+  },
+];
+
+/**
+ * The range family (founder call 2026-09-14): the questions a driver asks of a span of runs
+ * rather than one — the block carries per-run pace, the day table and the tyre deltas, so
+ * every one of these is answerable from what is attached. The tyre one is the question that
+ * started it: "what is the delta in lap time from new tyre to second run to third run".
+ */
+const RANGE_QUESTIONS: EngineerStarterQuestion[] = [
+  {
+    id: "range-tyres",
+    label: "New tyres to run 3",
+    text: "Across these runs, how does my pace move from the first run on a set of tyres to the second and third? Use the tyre deltas, and say whether that looks like wear or the track.",
+    family: "range",
+  },
+  {
+    id: "range-best",
+    label: "My best run here",
+    text: "Which run in this range was my best, what was on the car and what were the conditions — and what was different on the days I was slower?",
+    family: "range",
+  },
+  {
+    id: "range-trend",
+    label: "Am I getting faster?",
+    text: "Across these runs, am I getting faster, or is it the track and the weather? Separate the two as far as the data lets you.",
+    family: "range",
+  },
+  {
+    id: "range-changes",
+    label: "Changes that worked",
+    text: "Which setup changes across these runs lined up with faster laps, and which didn't? Say where two things moved together so you can't tell them apart.",
+    family: "range",
+  },
+  {
+    id: "range-day",
+    label: "Morning to afternoon",
+    text: "How does my pace move through a day here, first run to last? What does that say about how to set the car up for the first run?",
+    family: "range",
+  },
+  {
+    id: "range-air",
+    label: "Pace vs air temp",
+    text: "How does air temperature line up with my pace across these runs, and what would you change for a cold day here?",
+    family: "range",
   },
 ];
 
@@ -173,10 +224,14 @@ const LEARN_QUESTIONS: EngineerStarterQuestion[] = [
 /** Needs a run as the subject — hidden in General mode and with nothing logged. */
 const NEEDS_RUN_IN_FOCUS = new Set(RUN_QUESTIONS.map((q) => q.id));
 
+/** Needs a range as the subject — hidden unless the subject bar is on a range. */
+const NEEDS_RANGE_IN_FOCUS = new Set(RANGE_QUESTIONS.map((q) => q.id));
+
 /** Needs runs to read across, even though the subject can be anything. */
 const NEEDS_HISTORY = new Set(["learn-what-worked", "learn-untouched"]);
 
 export const ENGINEER_STARTER_QUESTIONS: EngineerStarterQuestion[] = [
+  ...RANGE_QUESTIONS,
   ...RUN_QUESTIONS,
   ...FEEL_QUESTIONS,
   ...PLAN_QUESTIONS,
@@ -184,7 +239,7 @@ export const ENGINEER_STARTER_QUESTIONS: EngineerStarterQuestion[] = [
 ];
 
 /** Fixed rotation, so the first four on the rail are never four of the same kind. */
-const FAMILY_ORDER: EngineerStarterFamily[] = ["run", "feel", "plan", "learn"];
+const FAMILY_ORDER: EngineerStarterFamily[] = ["range", "run", "feel", "plan", "learn"];
 
 /**
  * Which questions to show, in order.
@@ -203,6 +258,7 @@ export function selectEngineerStarterQuestions(
 ): EngineerStarterQuestion[] {
   const eligible = ENGINEER_STARTER_QUESTIONS.filter((q) => {
     if (NEEDS_RUN_IN_FOCUS.has(q.id) && !state.runInFocus) return false;
+    if (NEEDS_RANGE_IN_FOCUS.has(q.id) && !state.rangeInFocus) return false;
     if (NEEDS_HISTORY.has(q.id) && !state.hasHistory) return false;
     return true;
   });

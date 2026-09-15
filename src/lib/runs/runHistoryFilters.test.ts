@@ -128,6 +128,18 @@ test("buildRunHistoryPrismaWhere turns rating bands into carRating clauses", () 
   ]);
 });
 
+test("status=unconfirmed selects runs the app filed from the timing sheet, and names itself", () => {
+  const filters = parseRunHistoryFilters({ status: "unconfirmed" });
+  assert.equal(filters.status, "unconfirmed");
+  const where = buildRunHistoryPrismaWhere(filters, {});
+  assert.deepEqual(where.unconfirmedAt, { not: null });
+  assert.equal("loggingComplete" in where, false, "an unconfirmed run is complete, not a draft");
+  assert.deepEqual(describeRunHistoryFilters(filters), ["Unconfirmed"]);
+  assert.equal(filtersToSearchParams(filters).get("status"), "unconfirmed");
+  // Unknown words still fall back to everything.
+  assert.equal(parseRunHistoryFilters({ status: "carried" }).status, "all");
+});
+
 test("buildRunHistoryPrismaWhere composes with an existing AND instead of clobbering it", () => {
   const where = buildRunHistoryPrismaWhere(
     parseRunHistoryFilters({ ratingBands: "dialled", tireTypes: encodeURIComponent("Sweep 36") }),

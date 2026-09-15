@@ -189,6 +189,21 @@ export function useRunCorrections({
   );
 
   /**
+   * Vouch for a run the app filed from the timing sheet ("Add N other runs from today").
+   *
+   * The only thing that clears `unconfirmedAt` outside the wizard's whole-run save. A
+   * correction made in place never does it on the driver's behalf: fixing the tyre count
+   * says the tyre count was wrong, not that the rest of the carried record is right. So
+   * confirming is one deliberate tap — the Confirm control on the card, or "Confirm" where
+   * "Done" would be while the card is in edit mode.
+   */
+  const confirmRun = useCallback(async () => {
+    await patchJson(`/api/runs/${encodeURIComponent(runId)}`, { confirm: true });
+    onChanged();
+    setToast({ message: "Run confirmed." });
+  }, [runId, onChanged]);
+
+  /**
    * Take the timing import off this run. The laps go, and so does everything derived
    * from them — see the route. Never offered without the source being named first: a
    * button that removes laps whose origin the page never showed is a trap.
@@ -264,6 +279,7 @@ export function useRunCorrections({
   return {
     saveAdditive,
     saveFields,
+    confirmRun,
     detachLapImport,
     offerCorrections,
     pendingCorrection: pending,

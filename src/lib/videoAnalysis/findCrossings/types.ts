@@ -51,6 +51,15 @@ export type DetectorParams = {
    * next lane from reading as a crossing of this one. Undefined leaves the position unchecked.
    */
   onLineSlackBands?: number;
+  /**
+   * Floors on the end cap and the landing slack in FRAME band widths (`bandFrac` × frame width),
+   * for lines drawn shorter than the track is wide. A 24px tick at the far end of a 2606px
+   * picture gets a 20px cap and a 10px slack from the line-scaled band, and a car passing a car
+   * length beyond the tick is refused — IMG_4483, 2026-09-09: 10 of 100 crossings lost against
+   * the 08-29 scan, and one written wrong. Undefined leaves both as they were.
+   */
+  endCapFrameBands?: number;
+  onLineSlackFrameBands?: number;
   /** Frame-to-frame channel difference above which a pixel counts as moving. */
   thresh: number;
   /** Minimum contour area (OpenCV `contourArea`, not pixel count) for a blob to count. */
@@ -156,6 +165,19 @@ export const RECIPE_FAR: DetectorParams = {
 export const ACTIVE_RECIPE: DetectorParams = RECIPE_FAR;
 
 /**
+ * How much further a SECOND look reaches past a line's ends, on top of the recipe — for the rows
+ * the first pass left empty for this driver (nothing found, or the field gave the only candidate
+ * to a rival). Two line-scaled bands: 40 px on a tick at the 20 px floor, where a car passing a
+ * car length beyond the tick's end was refused (IMG_4483, 2026-09-09). The same reach on EVERY
+ * window let other cars in and cost the Boronia race 7 crossings and 2 wrong marks (scorecard
+ * run reach2, same day), so it is confined to the windows that had nothing to lose.
+ */
+export const SECOND_LOOK_REACH: Pick<DetectorParams, "endCapBands" | "onLineSlackBands"> = {
+  endCapBands: 2,
+  onLineSlackBands: 2,
+};
+
+/**
  * The zone as small as the geometry allows: nothing past the ends at all, and the floor dropped
  * so a far corner is watched as a strip rather than a bubble. Jordan on sight of the drawn
  * shape, 2026-09-01: "still big issues here".
@@ -188,6 +210,22 @@ export const RECIPE_VARIANTS: Record<string, DetectorParams> = {
   "seg-tight": RECIPE_SEGMENT_TIGHT,
   /** The far-line work, and the background test it deliberately leaves out. */
   far: RECIPE_FAR,
+  /**
+   * The far recipe with the end cap and the landing slack floored at one FRAME band (a car
+   * length at the near straight's scale), so a line drawn as a tick still catches a car passing
+   * a car length beyond its end. Scorecard candidate, 2026-09-09.
+   */
+  "far-reach": { ...RECIPE_FAR, endCapFrameBands: 1, onLineSlackFrameBands: 1 },
+  /** Same, half a frame band. */
+  "far-reach-half": { ...RECIPE_FAR, endCapFrameBands: 0.5, onLineSlackFrameBands: 0.5 },
+  /**
+   * The reach in LINE-scaled bands instead: two bands past each end (40 px on a tick at the
+   * 20 px floor, 168 px on the 4K start line), and a crossing may land that far past an end.
+   * Scorecard candidate, 2026-09-09.
+   */
+  "far-cap2": { ...RECIPE_FAR, endCapBands: 2, onLineSlackBands: 2 },
+  /** One and a half. */
+  "far-cap15": { ...RECIPE_FAR, endCapBands: 1.5, onLineSlackBands: 1.5 },
   "far-bg": { ...RECIPE_FAR, bgGateMultiple: 1.0 },
   "far-bg-first": { ...RECIPE_FAR, bgGateMultiple: 1.0, bgInit: "first" },
   /**
@@ -266,6 +304,18 @@ export type CrossingEvent = {
    * row's own source applied to all of them.
    */
   source?: "confirmed" | "rescued" | "unconfirmed";
+  /**
+   * How fast the tracked object was moving as it crossed, in frame pixels a second. Only a
+   * tracked crossing ("confirmed" or "rescued") has one; a bare flip says nothing about speed.
+   * A person walking the outside of the track crosses a line too — at a tenth of a car's pace.
+   */
+  speedPxPerSec?: number;
+  /**
+   * Share of the window's frames, 0..1, in which something was moving at this crossing's place.
+   * A car is at a line for a few frames a lap; a person standing or walking at the line's end is
+   * there for most of the window. Absent on data built before it was measured.
+   */
+  dwell?: number;
 };
 
 /** One thing the detector is asked to find: a line, and roughly when to look. */

@@ -12,6 +12,7 @@ import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { canManageCatalogRow } from "@/lib/assets/catalogAccessLogic";
 import { trackUsedByOthers } from "@/lib/assets/catalogUsage";
 import { archiveTrackLegacyDataBeforeDelete } from "@/lib/tracks/legacyTrackSnapshot";
+import { timeZoneForCoordinates } from "@/lib/tracks/trackTimeZone";
 
 /**
  * Unified catalog rule for aggregation-affecting track identity (grip/layout tags) and
@@ -131,6 +132,7 @@ export async function PATCH(
     longitude?: number | null;
     locationMarkedAt?: Date | null;
     locationSource?: string | null;
+    timeZone?: string | null;
     verifiedAt?: Date | null;
   } = {};
   // Verification is admin-only (founder ground truth).
@@ -169,6 +171,7 @@ export async function PATCH(
     data.longitude = null;
     data.locationMarkedAt = null;
     data.locationSource = null;
+    data.timeZone = null;
   } else if (body && ("latitude" in body || "longitude" in body)) {
     const parsed = parseCoordinates(body.latitude, body.longitude);
     if ("error" in parsed) {
@@ -177,6 +180,7 @@ export async function PATCH(
     data.latitude = parsed.latitude;
     data.longitude = parsed.longitude;
     data.locationMarkedAt = new Date();
+    data.timeZone = timeZoneForCoordinates(parsed.latitude, parsed.longitude);
     const src = typeof body.locationSource === "string" ? body.locationSource.trim() : "";
     data.locationSource = src === "manual_paste" || src === "device" ? src : "device";
   }

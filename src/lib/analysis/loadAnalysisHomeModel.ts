@@ -10,13 +10,12 @@ import { loadTeammatesLastOut } from "@/lib/analysis/loadTeammatesLastOut";
  *
  * The trend chart and the recent-runs list both used to be built here, and both are
  * gone from this file. The page is now one thing — your last time at the track — and
- * `loadAnalysisOuting` builds it: one day's runs, the chart drawn from those same
+ * `loadAnalysisOuting` builds it: the meeting's runs, the chart drawn from those same
  * runs, and the whole records behind them so a row can open in place.
  *
- * That deleted the event-scoped trend with it. The old chart widened to a whole
- * *meeting* when the latest run had an event, so a three-day title unfolded Friday
- * through Sunday into one picture and one list. Founder call: don't unfold the whole
- * event. The event still names the day; it no longer widens it.
+ * That deleted the event-scoped trend with it, and for three weeks the block was one
+ * calendar day ("don't unfold the whole event", 2026-08-25). Reversed 2026-09-14: the
+ * block is the whole meeting again, now cut into days — the loader carries the story.
  *
  * "Recent runs" went for a plainer reason: three rows from three different weekends,
  * with nothing saying which day any of them belonged to, is a weaker answer than the

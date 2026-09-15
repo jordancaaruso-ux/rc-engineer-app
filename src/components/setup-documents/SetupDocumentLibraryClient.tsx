@@ -137,8 +137,8 @@ export function SetupDocumentLibraryClient({
             {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
           </CollapsibleAddRow>
 
-          <li className="bg-muted/20 px-4 pb-1.5 pt-3">
-            <Eyebrow>Setup documents</Eyebrow>
+          <li className="bg-[var(--band-fill)] px-4 py-[7px]">
+            <Eyebrow className="mb-0">Setup documents</Eyebrow>
           </li>
 
           {initialDocuments.length === 0 ? (

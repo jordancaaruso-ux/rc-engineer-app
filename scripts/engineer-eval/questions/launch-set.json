@@ -1,0 +1,479 @@
+{
+ "_readme": "Launch set, 2026-09-09: real questions asked of the Engineer (production copy), other drivers' threads whole, the founder's deduped by first question. Each case runs against every context in `contexts` (fixtures/<name>.txt, 'none' = no driver data). Curated by hand; the seed set stays as the fallback.",
+ "contexts": [
+  "none",
+  "run-with-setup"
+ ],
+ "cases": [
+  {
+   "id": "d-01",
+   "shape": "novice",
+   "source": "driver",
+   "turns": [
+    "Why is it so hard to turn my car the right way, I’m only just starting rc, any tips?"
+   ]
+  },
+  {
+   "id": "d-02",
+   "shape": "knob",
+   "source": "driver",
+   "turns": [
+    "What differences should it make if I lower my ride height front and rear",
+    "What should stiffer arbs do front and rear",
+    "What should stiffer arbs do"
+   ]
+  },
+  {
+   "id": "d-03",
+   "shape": "after-a-change",
+   "source": "driver",
+   "turns": [
+    "Why did more camber help",
+    "How",
+    "How can I get more hairpin steering - it’s really only"
+   ]
+  },
+  {
+   "id": "d-04",
+   "shape": "review",
+   "source": "driver",
+   "turns": [
+    "I'm going to tftr in a few days - what are some things i could test based on how the previous day there went",
+    "how can i fix exit oversteer"
+   ]
+  },
+  {
+   "id": "d-05",
+   "shape": "conditions",
+   "source": "driver",
+   "turns": [
+    "My car was quite good, then the grip dropped and it lost more pace relative to everyone else, gets loose and vague",
+    "Exit"
+   ]
+  },
+  {
+   "id": "d-06",
+   "shape": "direction",
+   "source": "driver",
+   "turns": [
+    "How can I prevent mid corner oversteer",
+    "How can I smoothen out initial steering",
+    "How can I make the car easier to drive"
+   ]
+  },
+  {
+   "id": "d-07",
+   "shape": "after-a-change",
+   "source": "driver",
+   "turns": [
+    "Softer rear spring made the car much worse, what should I do now",
+    "Everywhere",
+    "Give me 5 levers for more hairpin steering"
+   ]
+  },
+  {
+   "id": "d-08",
+   "shape": "review",
+   "source": "driver",
+   "turns": [
+    "What setup changes should I have tried this weekend that I didn’t"
+   ]
+  },
+  {
+   "id": "d-09",
+   "shape": "symptom",
+   "source": "driver",
+   "turns": [
+    "my car just doesnt seem as easy to drive as some of the fast guys",
+    "its hard to tell, just hard to drive",
+    "its very reactive over kerbs, i have to be super precise in general"
+   ]
+  },
+  {
+   "id": "d-10",
+   "shape": "knob",
+   "source": "driver",
+   "turns": [
+    "less front droop - what will it do"
+   ]
+  },
+  {
+   "id": "d-11",
+   "shape": "symptom",
+   "source": "driver",
+   "turns": [
+    "my car is easy to drive but slow",
+    "everywhere"
+   ]
+  },
+  {
+   "id": "d-12",
+   "shape": "direction",
+   "source": "driver",
+   "turns": [
+    "how would you prevent traction rolling",
+    "thorugh a flat 90 degree corner"
+   ]
+  },
+  {
+   "id": "d-13",
+   "shape": "conditions",
+   "source": "driver",
+   "turns": [
+    "super low grip track, like driving on ice. how would you generate more overall grip, and a little more rear grip balance"
+   ]
+  },
+  {
+   "id": "d-14",
+   "shape": "direction",
+   "source": "driver",
+   "turns": [
+    "how can i get more rear grip mid corner"
+   ]
+  },
+  {
+   "id": "d-15",
+   "shape": "direction",
+   "source": "driver",
+   "turns": [
+    "how can i get more intiial steering"
+   ]
+  },
+  {
+   "id": "d-16",
+   "shape": "after-a-change",
+   "source": "driver",
+   "turns": [
+    "No traction on corner exit in the A-main. Should I keep softening the rear spring?"
+   ]
+  },
+  {
+   "id": "f-17",
+   "shape": "symptom",
+   "source": "founder",
+   "turns": [
+    "The car is loose on corner entry — the rear steps out as I turn in. What do I try first?"
+   ]
+  },
+  {
+   "id": "f-18",
+   "shape": "symptom",
+   "source": "founder",
+   "turns": [
+    "it runs wide as i turn in"
+   ]
+  },
+  {
+   "id": "f-19",
+   "shape": "symptom",
+   "source": "founder",
+   "turns": [
+    "the car feels good but i lose a bit of time on the brakes into the hairpin"
+   ]
+  },
+  {
+   "id": "f-20",
+   "shape": "symptom",
+   "source": "founder",
+   "turns": [
+    "the front feels lazy going into the fast stuff"
+   ]
+  },
+  {
+   "id": "f-21",
+   "shape": "symptom",
+   "source": "founder",
+   "turns": [
+    "My car is just slow"
+   ]
+  },
+  {
+   "id": "f-22",
+   "shape": "symptom",
+   "source": "founder",
+   "turns": [
+    "The car pushes through the middle of the corner and won't rotate. Where do I start?",
+    "How far off am i"
+   ]
+  },
+  {
+   "id": "f-23",
+   "shape": "direction",
+   "source": "founder",
+   "turns": [
+    "how can i make the car feel easier to drive",
+    "going in, oversteer"
+   ]
+  },
+  {
+   "id": "f-24",
+   "shape": "symptom",
+   "source": "founder",
+   "turns": [
+    "the car understeers through the middle of the fast sweeper"
+   ]
+  },
+  {
+   "id": "f-25",
+   "shape": "symptom",
+   "source": "founder",
+   "turns": [
+    "i dont have enough drive off the corner out of the slow stuff"
+   ]
+  },
+  {
+   "id": "f-26",
+   "shape": "symptom",
+   "source": "founder",
+   "turns": [
+    "my car feels okay but just slow"
+   ]
+  },
+  {
+   "id": "f-27",
+   "shape": "knob",
+   "source": "founder",
+   "turns": [
+    "what does more rear droop do"
+   ]
+  },
+  {
+   "id": "f-28",
+   "shape": "symptom",
+   "source": "founder",
+   "turns": [
+    "they pull away through the middle of the slow corners"
+   ]
+  },
+  {
+   "id": "f-29",
+   "shape": "symptom",
+   "source": "founder",
+   "turns": [
+    "my car feels pretty good but its just slow"
+   ]
+  },
+  {
+   "id": "f-30",
+   "shape": "direction",
+   "source": "founder",
+   "turns": [
+    "how can i get more rear grip, super slow car"
+   ]
+  },
+  {
+   "id": "f-31",
+   "shape": "conditions",
+   "source": "founder",
+   "turns": [
+    "how can i get more rear grip, super high grip very slow car"
+   ]
+  },
+  {
+   "id": "f-32",
+   "shape": "conditions",
+   "source": "founder",
+   "turns": [
+    "how can i get more rear grip, super low grip and extremely fast car",
+    "im already running super high rear toe and toe gain - what are some other options"
+   ]
+  },
+  {
+   "id": "f-33",
+   "shape": "direction",
+   "source": "founder",
+   "turns": [
+    "how can i get more rear grip everywhere"
+   ]
+  },
+  {
+   "id": "f-34",
+   "shape": "direction",
+   "source": "founder",
+   "turns": [
+    "how can i get more rotation everywhere"
+   ]
+  },
+  {
+   "id": "f-35",
+   "shape": "direction",
+   "source": "founder",
+   "turns": [
+    "how can i get more steering everywhere"
+   ]
+  },
+  {
+   "id": "f-36",
+   "shape": "conditions",
+   "source": "founder",
+   "turns": [
+    "how can i get more steering everywhere, low grip technical track",
+    "what roll center change would help",
+    "more steering mid corner"
+   ]
+  },
+  {
+   "id": "f-37",
+   "shape": "symptom",
+   "source": "founder",
+   "turns": [
+    "the rear steps out when i get on the power out of the hairpin, mostly the second half of the run"
+   ]
+  },
+  {
+   "id": "f-38",
+   "shape": "review",
+   "source": "founder",
+   "turns": [
+    "what did the damper percent change do today"
+   ]
+  },
+  {
+   "id": "f-39",
+   "shape": "knob",
+   "source": "founder",
+   "turns": [
+    "how do i raise my front roll centre and what will it do"
+   ]
+  },
+  {
+   "id": "f-40",
+   "shape": "knob",
+   "source": "founder",
+   "turns": [
+    "why does raising the roll centre change how the car feels"
+   ]
+  },
+  {
+   "id": "f-41",
+   "shape": "knob",
+   "source": "founder",
+   "turns": [
+    "what happens if i raise my inner lower arm pickups"
+   ]
+  },
+  {
+   "id": "f-42",
+   "shape": "symptom",
+   "source": "founder",
+   "turns": [
+    "my car loses the rear mid corner"
+   ]
+  },
+  {
+   "id": "f-43",
+   "shape": "knob",
+   "source": "founder",
+   "turns": [
+    "what would happen if i raised the lower inner points on my car front and rear"
+   ]
+  },
+  {
+   "id": "f-44",
+   "shape": "knob",
+   "source": "founder",
+   "turns": [
+    "should i try thicker or thinner rear damping"
+   ]
+  },
+  {
+   "id": "f-45",
+   "shape": "direction",
+   "source": "founder",
+   "turns": [
+    "my car loses the rear mid corner, how can i fix it"
+   ]
+  },
+  {
+   "id": "f-46",
+   "shape": "knob",
+   "source": "founder",
+   "turns": [
+    "does adding rear damping make rear load arrive sooner or later?"
+   ]
+  },
+  {
+   "id": "f-47",
+   "shape": "direction",
+   "source": "founder",
+   "turns": [
+    "the car is slow to take a set on corner entry and i want more initial grip from the front. what should i do with my damper oil and why?"
+   ]
+  },
+  {
+   "id": "f-48",
+   "shape": "direction",
+   "source": "founder",
+   "turns": [
+    "how can i get more rear grip",
+    "on throttle, just feels disconnected a lot of the time on transition too",
+    "direction change"
+   ]
+  },
+  {
+   "id": "f-49",
+   "shape": "review",
+   "source": "founder",
+   "turns": [
+    "how did that day go, and what should i try next time"
+   ]
+  },
+  {
+   "id": "f-50",
+   "shape": "symptom",
+   "source": "founder",
+   "turns": [
+    "car doesnt turn and react to my input"
+   ]
+  },
+  {
+   "id": "f-51",
+   "shape": "symptom",
+   "source": "founder",
+   "turns": [
+    "rear feels loose from the first input"
+   ]
+  },
+  {
+   "id": "f-52",
+   "shape": "symptom",
+   "source": "founder",
+   "turns": [
+    "front bites then lets go through the middle"
+   ]
+  },
+  {
+   "id": "f-53",
+   "shape": "direction",
+   "source": "founder",
+   "turns": [
+    "how do i get more overall bite"
+   ]
+  },
+  {
+   "id": "f-54",
+   "shape": "symptom",
+   "source": "founder",
+   "turns": [
+    "car feels numb, doesnt do what i ask"
+   ]
+  },
+  {
+   "id": "f-55",
+   "shape": "direction",
+   "source": "founder",
+   "turns": [
+    "i want more steering straight away when i turn the wheel"
+   ]
+  },
+  {
+   "id": "f-56",
+   "shape": "direction",
+   "source": "founder",
+   "turns": [
+    "need more steering into corner",
+    "more bump steer?"
+   ]
+  }
+ ]
+}

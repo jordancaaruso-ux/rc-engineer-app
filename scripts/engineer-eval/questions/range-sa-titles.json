@@ -1,0 +1,51 @@
+{
+ "_readme": "SA State Titles 2026 (Radio Racing Cars SA, 11–13 Sep) — the founder's own questions of a meeting range, read-only from production on 2026-09-14. Fixture: fixtures/range-sa-titles.txt.",
+ "contexts": [
+  "range-sa-titles"
+ ],
+ "cases": [
+  {
+   "id": "sa-01",
+   "shape": "range-tyres",
+   "source": "founder",
+   "turns": [
+    "whats the average new tire delta, ie how much time is gained from new tire, whats the drop off per run"
+   ]
+  },
+  {
+   "id": "sa-02",
+   "shape": "review",
+   "source": "founder",
+   "turns": [
+    "how did the sa state titles go, what worked and what didnt",
+    "what would you carry into the next meeting"
+   ]
+  },
+  {
+   "id": "sa-03",
+   "shape": "range-tyres-adjusted",
+   "source": "founder",
+   "turns": [
+    "whats the average new tire delta, ie how much time is gained from new tire, whats the drop off per run",
+    "given this tire delta attitude, what were the best sessions given the average delta, and what were the best setup changes"
+   ]
+  },
+  {
+   "id": "sa-04",
+   "shape": "range-field",
+   "source": "founder",
+   "turns": [
+    "use sa state titles to analyze tire performance and field laptime relativity, when was my pace strongest using derived speed from average drop in tire performance"
+   ]
+  },
+  {
+   "id": "sa-05",
+   "shape": "range-rival",
+   "source": "founder",
+   "turns": [
+    "what was the average laptime delta between me and tim hilyear",
+    "and who was I closest to overall?"
+   ]
+  }
+ ]
+}

@@ -4,6 +4,7 @@ import webpush, { type PushSubscription as WebPushSubscription } from "web-push"
 
 import { prisma } from "@/lib/prisma";
 import { isApnsConfigured, sendApnsToUser } from "@/lib/nativePush/apnsServer";
+import { isFcmConfigured, sendFcmToUser } from "@/lib/nativePush/fcmServer";
 
 /**
  * Server-side web-push send path. VAPID keys come from env (see .env.local /
@@ -63,11 +64,20 @@ export async function sendPushToUser(
   payload: PushPayload,
 ): Promise<{ sent: number; pruned: number; devices: number }> {
   const webConfigured = isWebPushConfigured();
-  if (!webConfigured && !isApnsConfigured()) {
+  if (!webConfigured && !isApnsConfigured() && !isFcmConfigured()) {
     ensureConfigured(); // throws with the actionable "set VAPID_*" message
   }
 
-  const native = await sendApnsToUser(userId, payload);
+  // iOS via APNs, Android via FCM — the shell registers each device with its platform.
+  const [apns, fcm] = await Promise.all([
+    sendApnsToUser(userId, payload),
+    sendFcmToUser(userId, payload),
+  ]);
+  const native = {
+    sent: apns.sent + fcm.sent,
+    pruned: apns.pruned + fcm.pruned,
+    devices: apns.devices + fcm.devices,
+  };
 
   if (!webConfigured) return native;
 

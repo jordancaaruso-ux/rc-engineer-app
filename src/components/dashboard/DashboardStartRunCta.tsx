@@ -3,11 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowRight, Plus } from "lucide-react";
+import { ArrowRight, CircleDashed, Plus } from "lucide-react";
 import { useDraftRun } from "@/components/layout/DraftRunProvider";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { formatAppTimestampUtc } from "@/lib/formatDate";
 import { warmNewRunForm } from "@/lib/runs/warmNewRunForm";
+import {
+  pendingSweepHref,
+  pendingSweepLabel,
+  type DashboardPendingSweep,
+} from "@/lib/sweep/pendingSweep";
 
 /**
  * The dashboard's primary action, pinned to the very top of the page body — the
@@ -43,10 +48,16 @@ export function DashboardStartRunCta({
   serverDraftSavedAt,
   serverDraftEventName,
   serverDraftIsForToday,
+  pendingSweep = null,
   footer,
 }: {
   serverDraftRunId: string | null;
   serverDraftSavedAt: string | null;
+  /**
+   * The timing sweep's door: a run the app filed today that wants filling in, or sessions that
+   * still need a car. One quiet row under the bar — the same shape as "Start a new run instead".
+   */
+  pendingSweep?: DashboardPendingSweep | null;
   serverDraftEventName?: string | null;
   /**
    * Whether that draft is for TODAY. The bar only takes itself over for one that is — a draft
@@ -151,6 +162,18 @@ export function DashboardStartRunCta({
           </span>
         ) : null}
       </Link>
+
+      {pendingSweep ? (
+        <Link
+          href={pendingSweepHref(pendingSweep)}
+          prefetch={false}
+          className="tap-active mt-2 flex w-full items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-[13.5px] font-semibold text-foreground transition hover:border-foreground/30"
+        >
+          <CircleDashed aria-hidden className="size-[15px] shrink-0 text-muted-foreground" strokeWidth={2.2} />
+          <span className="min-w-0 truncate">{pendingSweepLabel(pendingSweep)}</span>
+          <ArrowRight aria-hidden className="ml-auto size-[15px] shrink-0 opacity-60" strokeWidth={2.2} />
+        </Link>
+      ) : null}
 
       {hasDraft ? (
         <Link

@@ -209,8 +209,8 @@ export function SetupCalibrationModelSidebar(props: {
       )}
 
       <CardPanel contentClassName="p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Eyebrow>Parameters</Eyebrow>
+        <div className="eyebrow-band flex flex-wrap items-center justify-between gap-2">
+          <Eyebrow className="mb-0">Parameters</Eyebrow>
           <div className="flex gap-1">
             {(["unmapped", "all"] as const).map((f) => (
               <button

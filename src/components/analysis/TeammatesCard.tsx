@@ -48,7 +48,9 @@ export function TeammatesCard({ rows }: { rows: TeammateLastOut[] }) {
 }
 
 /**
- * The heading the card wears: name left, scope right, hairline under.
+ * The heading the card wears — its band (2026-09-15): name left, scope right, one full-bleed
+ * hairline under both. It is the card's first child, so `.eyebrow-root` makes it the band on its
+ * own; `px-4`, not the old `mx-4 mt-3`, because a top margin leaves a white strip above the tint.
  *
  * Composed by hand rather than through `<Eyebrow>` so the scope can ride the label's row — the
  * same shape `OutingHeading` uses at the top of this page, deliberately, so the cards on
@@ -56,11 +58,11 @@ export function TeammatesCard({ rows }: { rows: TeammateLastOut[] }) {
  */
 function CardHead({ title, scope }: { title: string; scope: string }) {
   return (
-    <div className="eyebrow-root mx-4 mb-1 mt-3 flex items-baseline gap-2">
+    <div className="eyebrow-root mb-1 flex items-baseline gap-2 px-4">
       <h2 className="eyebrow-label min-w-0">
         <span className="min-w-0 truncate">{title}</span>
       </h2>
-      <span className="ml-auto min-w-0 truncate text-[11.5px] text-muted-foreground">{scope}</span>
+      <span className="ml-auto min-w-0 truncate text-[11px] leading-[1.25] text-muted-foreground">{scope}</span>
     </div>
   );
 }

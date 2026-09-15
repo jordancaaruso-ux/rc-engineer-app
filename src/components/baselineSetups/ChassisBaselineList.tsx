@@ -70,8 +70,8 @@ export function ChassisBaselineList({
 
   return (
     <CardPanel contentClassName="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <Eyebrow>Baseline setups</Eyebrow>
+      <div className="eyebrow-band flex items-center justify-between gap-2">
+        <Eyebrow className="mb-0">Baseline setups</Eyebrow>
         {isAdmin ? (
           <Link
             href={`/setup-sheet-models/${modelId}/baselines/new`}

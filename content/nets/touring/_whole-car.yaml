@@ -1,0 +1,56 @@
+# Whole-car moves — the same change at BOTH ENDS together.
+#
+# Founder ruling 2026-09-09 (interview): these live as lines on the family's GROUP heading, both
+# directions, each naming its too-far edge, and NO day words (low grip / high grip stay out — the
+# grip-curve page decides what the day does; the line says what the move does to the whole car).
+# Why they exist: two of the first four founder-reviewed launch cards were whole-car questions
+# ("lower my ride height front and rear", "stiffer arbs front and rear"), no net covered the pair,
+# and the Engineer composed from physics register ("grip arrives later", "more hold").
+#
+# Drafted from the KB (corner-regime symmetry paragraph, the roll-centre window in his words,
+# bite-hold's damping paragraph, ride-height-and-rake.md) and FOUNDER-PASSED 2026-09-09 with one
+# correction in his words: thinner oil both ends "can feel like less overall grip, because it reacts
+# so quickly" — the draft's "held for longer" read as always better. `step` reuses the per-axle
+# normal move, both ends alike.
+# The leading underscore keeps this file out of the one-knob entry loader; nets.ts reads it by name.
+
+pairs:
+  - id: ride_height_both
+    label: "Ride height, both ends"
+    knobs: [ride_height_front, ride_height_rear]
+    step: "0.2 mm both ends"
+    reviewed: true
+    more: "higher — the whole car sits taller and rolls more; grip comes a little sooner as you turn in but there is a little less of it through the corner, the front-to-rear balance where it was; too high and it rolls onto the outside tyres and can traction roll"
+    less: "lower — the whole car sits lower and rolls less; a little more grip through the whole corner, coming a little later as you turn in, balance where it was; too low and it touches the track under load and the grip goes suddenly, with no warning"
+
+  - id: arb_both
+    label: "Anti-roll bars, both ends"
+    knobs: [arb_front, arb_rear]
+    step: "0.1 mm both ends"
+    reviewed: true
+    more: "stiffer — the whole car grips up sooner as you turn in and rolls less, and the front-to-rear balance stays where it was; too stiff and it grips then lets go with little warning, answering every bump and every input"
+    less: "softer — the whole car grips up later in the corner and rolls more, balance where it was; too soft and it never quite grips up — numb and vague, slow through direction changes"
+
+  - id: spring_both
+    label: "Springs, both ends"
+    knobs: [spring_front, spring_rear]
+    step: "one step in the range both ends, often 0.1"
+    reviewed: true
+    more: "stiffer — as the bars, and the car is firmer over bumps and under braking and power too; too stiff and it skips over bumps and grips then lets go"
+    less: "softer — as the bars, and the car is softer over bumps and moves more under braking and power; too soft and it never quite grips up, and it can touch the track under load"
+
+  - id: roll_centre_both
+    label: "Roll centre, matched shims both ends"
+    knobs: [upper_inner_shims_front, upper_inner_shims_rear, upper_outer_shims_front, upper_outer_shims_rear, under_lower_arm_shims_front, under_lower_arm_shims_rear, under_hub_shims_front, under_hub_shims_rear]
+    step: "0.5 mm of the same shim at both ends"
+    reviewed: true
+    more: "both up — the whole car's grip comes sooner and sharper, balance where it was; too high and the grip is there at once and then falls away through the corner — the car reacts, then loses it"
+    less: "both down — the whole car's grip comes later and more progressively, balance where it was; too low and the grip never really comes — it is on its way, through the springs, but too late for the corner"
+
+  - id: damper_oil_both
+    label: "Damper oil, both ends"
+    knobs: [damper_oil_front, damper_oil_rear]
+    step: "50 cSt both ends"
+    reviewed: true
+    more: "thicker — the whole car comes in calmer and more forgiving as you turn in, the same grip later; nothing changes once you are in the middle; too thick and it is slow to take a set and feels lazy through direction changes"
+    less: "thinner — the whole car comes in sooner as you turn in, the same grip sooner; because it reacts so quickly it can feel like less overall grip, not more; nothing changes once you are in the middle; too thin and it is nervous over bumps and kerbs, answering every input"

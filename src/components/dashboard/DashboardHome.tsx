@@ -5,6 +5,7 @@ import { DashboardAskEngineerCard } from "@/components/dashboard/DashboardAskEng
 import { DashboardDayVerdictCard } from "@/components/dashboard/DashboardDayVerdictCard";
 import { DashboardNextOutingCard } from "@/components/dashboard/DashboardNextOutingCard";
 import { DashboardStartRunCta } from "@/components/dashboard/DashboardStartRunCta";
+import { SweepArmBeacon } from "@/components/dashboard/SweepArmBeacon";
 import { DashboardAddSetupCard } from "@/components/dashboard/DashboardAddSetupCard";
 import { DashboardGetSetUpCard } from "@/components/dashboard/DashboardGetSetUpCard";
 import { DashboardSummaryCard } from "@/components/dashboard/DashboardSummaryCard";
@@ -266,8 +267,11 @@ export function DashboardHome({
             serverDraftSavedAt={draftSavedAt}
             serverDraftEventName={draftEventName}
             serverDraftIsForToday={draftIsForToday}
+            pendingSweep={model.pendingSweep}
           />
         </Reveal>
+        {/* Tells the timing sweep which track today is, once per tab per day. Renders nothing. */}
+        <SweepArmBeacon trackId={model.todayTrackId} />
 
         {/* No drafts list here. A card under the bar listing every unfinished run was built and
             cut the same day (founder, 2026-08-25): "that's what the CTA 'finish' is for". The bar

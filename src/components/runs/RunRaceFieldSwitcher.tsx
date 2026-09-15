@@ -18,9 +18,9 @@ import {
   computeMistakeLaps,
   fadeOverRunSeconds,
   formatConsistencyScorePercent,
-  formatFadePerLap,
+  formatFadePerMinute,
   formatMistakeLapDetail,
-  getFadePerLap,
+  getFadePerMinute,
   getFadeProfile,
   getIncludedLapDashboardMetrics,
   getIncludedLaps,
@@ -62,7 +62,7 @@ export type RaceFieldDriverFigures = {
    * under `MIN_LAPS_FOR_FADE`; the field's mean has no honest "over the run" total, since its
    * drivers ran different lap counts.
    */
-  fade: { perLap: number | null; overRunSeconds: number | null };
+  fade: { perMinute: number | null; overRunSeconds: number | null };
   bestLapNumbers: Set<number>;
   mistakeLapNumbers: Set<number>;
   mistakeDetailByLapNumber: Map<number, string>;
@@ -152,7 +152,7 @@ function fieldAverageFigures(sheet: FieldSheet): RaceFieldDriverFigures {
       median: avg.median,
       consistencyScore: avg.consistencyScore,
     },
-    fade: { perLap: avg.fadePerLap, overRunSeconds: null },
+    fade: { perMinute: avg.fadePerMinute, overRunSeconds: null },
     bestLapNumbers: new Set(),
     mistakeLapNumbers: new Set(),
     mistakeDetailByLapNumber: new Map(),
@@ -501,7 +501,7 @@ function RaceFieldDriverPanel({
   const dash = useMemo(() => getIncludedLapDashboardMetrics(rows), [rows]);
   const mistakes = useMemo(() => computeMistakeLaps(rows), [rows]);
   const fade = useMemo(
-    () => ({ perLap: getFadePerLap(rows), overRunSeconds: fadeOverRunSeconds(rows) }),
+    () => ({ perMinute: getFadePerMinute(rows), overRunSeconds: fadeOverRunSeconds(rows) }),
     [rows]
   );
   const fadeProfile = useMemo(() => getFadeProfile(rows), [rows]);
@@ -540,7 +540,7 @@ function RaceFieldDriverPanel({
         dash.consistencyScore != null ? formatConsistencyScorePercent(dash.consistencyScore) : "—",
     },
     { label: "Mistakes", value: mistakes.eligible ? String(mistakes.mistakeCount) : "—" },
-    { label: "Fade", value: formatFadePerLap(fade.perLap) },
+    { label: "Fade", value: formatFadePerMinute(fade.perMinute) },
   ];
 
   /** This driver's numbers in the shape a host's own blocks read. */

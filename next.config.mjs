@@ -1,3 +1,5 @@
+import { withSentryConfig } from "@sentry/nextjs";
+
 /**
  * pdfjs-dist loads its Node canvas with a bare `require("@napi-rs/canvas")` inside a try/catch, and
  * that package hands off again to a per-platform binary package. Neither hop is a static import, so
@@ -94,12 +96,13 @@ const nextConfig = {
   // The landing page is the Claude Design artifact served verbatim from `public/landing/` —
   // founder call 2026-08-06, to keep the design exact rather than re-implement its scroll
   // reveals, video scrubber and card deck in React. `beforeFiles` is required: it runs ahead of
-  // filesystem routes, which is the only way this wins over `src/app/welcome/page.tsx` (kept in
-  // the tree, now unreachable — delete that file, or this rewrite, but never neither).
+  // filesystem routes. The old React version, `src/app/welcome/page.tsx`, sat unreachable behind
+  // this rewrite from 2026-08-06 and was deleted on 2026-09-15 (it had drifted to two plans while
+  // the site sold three). If this rewrite ever comes off, /welcome needs a page again.
   //
-  // Trade-off accepted with it: prices in that HTML are literals ($14.99/$27.99/$149.90/
-  // $279.90), not Stripe reads. They match the live account today. If a price moves, it moves
-  // in Stripe AND in public/landing/index.html.
+  // Trade-off accepted with it: prices in that HTML are literals ($2.99/$9.99/$19.99, annual
+  // $99.90/$199.90), not Stripe reads. They match the live account today. If a price moves, it
+  // moves in Stripe AND in public/landing/index.html.
   async rewrites() {
     return {
       beforeFiles: [{ source: "/welcome", destination: "/landing/index.html" }],
@@ -116,5 +119,21 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * Sentry wraps the config so its build plugin can wire the client/server/edge inits declared in
+ * `src/instrumentation*.ts`. Source-map upload is OFF unless `SENTRY_AUTH_TOKEN` is present in
+ * the build environment (Vercel → Settings → Environment Variables); without it every stack
+ * trace still arrives, just against minified names. `SENTRY_ORG` / `SENTRY_PROJECT` are read
+ * from the environment the same way. The runtime side is inert without `NEXT_PUBLIC_SENTRY_DSN`
+ * (see `src/lib/observability/sentryInit.ts`), so this wrapper changes nothing locally.
+ */
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  telemetry: false,
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  // Vercel cron monitors are a paid Sentry feature and the one cron here is watched by Vercel.
+  automaticVercelMonitors: false,
+  // Strip Sentry's own debug logger from the client bundle.
+  disableLogger: true,
+});
 

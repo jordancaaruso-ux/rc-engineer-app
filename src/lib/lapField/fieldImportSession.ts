@@ -1,5 +1,5 @@
 import type { LapRow } from "@/lib/lapAnalysis";
-import { getBestLap, getFadePerLap, importedSetToLapRows } from "@/lib/lapAnalysis";
+import { getBestLap, getFadePerMinute, importedSetToLapRows } from "@/lib/lapAnalysis";
 import { mergeImportedLapSetsByDriver } from "@/lib/lapImport/mergeImportedLapSets";
 
 export type FieldImportDriverInput = {
@@ -15,8 +15,8 @@ export type FieldImportDriverRow = {
   rank: number;
   bestLapSeconds: number | null;
   gapToSessionBestSeconds: number | null;
-  /** Seconds per lap the stint drifted (`getFadePerLap`, the app's one fade); positive ⇒ slower late in run. */
-  fadePerLapSeconds: number | null;
+  /** Seconds per minute of track time the stint drifted (`getFadePerMinute`, the app's one fade); positive ⇒ slower late in run. */
+  fadePerMinuteSeconds: number | null;
 };
 
 export type FieldImportSession = {
@@ -70,7 +70,7 @@ export function computeFieldImportSessionFromSets(
       label: labelForDriver(s),
       isPrimaryUser: Boolean(s.isPrimaryUser),
       best: getBestLap(rows),
-      fade: getFadePerLap(rows),
+      fade: getFadePerMinute(rows),
     });
   }
 
@@ -106,7 +106,7 @@ export function computeFieldImportSessionFromSets(
       rank: pos,
       bestLapSeconds: w.best,
       gapToSessionBestSeconds: gap,
-      fadePerLapSeconds: w.fade,
+      fadePerMinuteSeconds: w.fade,
     };
   });
 

@@ -9,7 +9,9 @@ import {
   type AnalysisTrendRun,
 } from "@/lib/analysis/analysisHomeModel";
 import {
+  formatRunDayLabel,
   resolveRunLocalTimeZone,
+  runLocalDayKey,
   type RunGroupZoneOptions,
 } from "@/lib/runs/buildRunHistoryGroups";
 import { computeTireIndicatorsByRunId } from "@/lib/runs/tireSetChange";
@@ -24,6 +26,8 @@ import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { runSessionName } from "@/lib/runSession";
 import { runNeedsLapImport } from "@/lib/runs/lapImportPrompt";
 import type { TeamDayModel } from "@/lib/runs/teamDayModel";
+import type { DebriefIdentity } from "@/lib/debrief/debriefKey";
+import type { DebriefRecap } from "@/lib/debrief/buildDebriefRecap";
 
 /**
  * Shaping for the desktop Sessions workbench (`SessionsWorkbench`).
@@ -64,6 +68,8 @@ export type WorkbenchRunSource = {
   importedLapSets?: readonly unknown[] | null;
   lapImportPromptDismissedAt?: Date | string | null;
   loggingComplete?: boolean | null;
+  /** Created by the app from the timing sheet, not yet opened by the driver. */
+  unconfirmedAt?: Date | string | null;
   bestLapSeconds?: number | null;
   avgTop5LapSeconds?: number | null;
   /** All four name the session: `runSessionName` for rows, `shortRunLabel` for the axis. */
@@ -173,6 +179,7 @@ export function buildGroupTrendModel(
           id: run.id,
           carId: run.carId,
           setupData: opts.setupDataByRunId!.get(run.id) ?? null,
+          unconfirmed: run.unconfirmedAt != null,
         }))
       )
     : null;
@@ -208,6 +215,8 @@ export function buildGroupTrendModel(
         carName: null,
       }),
       timeLabel: runTimeLabel(run, opts?.zones),
+      dayKey: runLocalDayKey(run, opts?.zones),
+      dayLabel: formatRunDayLabel(runLocalDayKey(run, opts?.zones)),
       createdAtIso: new Date(run.createdAt).toISOString(),
       metrics,
       distribution: computeLapDistribution(run),
@@ -247,6 +256,23 @@ export function buildGroupTrendModel(
   };
 }
 
+/**
+ * Rows cut into their days, in the order given (newest-first on both lists). One day
+ * comes back as one section, so a single-day outing draws no divider at all — the
+ * section heading is only worth its row when there is a second day to tell apart.
+ */
+export function sectionRowsByDay<T extends { dayKey: string; dayLabel: string }>(
+  rows: readonly T[]
+): Array<{ dayKey: string; dayLabel: string; rows: T[] }> {
+  const sections: Array<{ dayKey: string; dayLabel: string; rows: T[] }> = [];
+  for (const row of rows) {
+    const last = sections[sections.length - 1];
+    if (last && last.dayKey === row.dayKey) last.rows.push(row);
+    else sections.push({ dayKey: row.dayKey, dayLabel: row.dayLabel, rows: [row] });
+  }
+  return sections;
+}
+
 /** Compact per-run figures for the left rail's nested run rows. */
 export type WorkbenchRunRow = {
   id: string;
@@ -276,6 +302,12 @@ export type WorkbenchRunRow = {
   /** "2:41 PM" — see `runTimeLabel`. */
   timeLabel: string;
   /**
+   * The day this row belongs to, and its name — the list breaks a multi-day meeting on
+   * this key, the same one the chart's day bands use (`AnalysisTrendRun.dayKey`).
+   */
+  dayKey: string;
+  dayLabel: string;
+  /**
    * The row's second line — "TFTR · 19 Jul, 4:48 PM": where it ran, then when, on the
    * run's own clock. Copied from the format the founder pointed at (2026-08-26).
    * `whereLabel` is null when the group has no venue, and the line opens with the date.
@@ -304,6 +336,12 @@ export type WorkbenchRunRow = {
    * rail would be the one Sessions surface that stays silent about it.
    */
   needsLapImport: boolean;
+  /**
+   * The app filed this run from the timing sheet ("Add N other runs from today") and the
+   * driver hasn't opened it. Its laps are real; its setup and tyres were carried. The row
+   * wears the word until a wizard save takes it off.
+   */
+  unconfirmed: boolean;
   /**
    * What moved on the car since the previous run on it — the body of the row's
    * expansion on the day screen (2026-08-24), where it replaces the chart's
@@ -355,7 +393,9 @@ export function buildGroupRunRows(
     // the chart's wrench, so the row and the glyph can never disagree.
     let previous: WorkbenchRunSource | null = null;
     for (let j = index + 1; j < group.runs.length; j++) {
-      if (group.runs[j].carId === run.carId) {
+      // A carried sheet is not a baseline: a run the app backfilled holds a copy of the
+      // previous logged run's setup, and diffing against it would hide a real change.
+      if (group.runs[j].carId === run.carId && group.runs[j].unconfirmedAt == null) {
         previous = group.runs[j];
         break;
       }
@@ -388,6 +428,8 @@ export function buildGroupRunRows(
         carName: carNameOf(run),
       }),
       timeLabel: runTimeLabel(run, zones),
+      dayKey: runLocalDayKey(run, zones),
+      dayLabel: formatRunDayLabel(runLocalDayKey(run, zones)),
       whereLabel: track,
       // One string, not two joined at the row: the comma between the date and the
       // clock is part of the format, and a row that had to know that would be the
@@ -401,6 +443,7 @@ export function buildGroupRunRows(
       lapCount: metrics.cleanLapCount,
       isGroupBest: false,
       needsLapImport: runNeedsLapImport(run),
+      unconfirmed: run.unconfirmedAt != null,
       setupDiff: setupDiffFor(index),
     };
   });
@@ -451,6 +494,18 @@ export type WorkbenchGroupHeadline = {
   priorDelta: number | null;
 };
 
+/**
+ * The driver's own note on the meeting, with the figures beside it. `text` is "" until they
+ * write one; the card still renders, because the box IS the invitation. `recap` is computed
+ * live from the day's rows (`buildDebriefRecap`), never stored.
+ */
+export type WorkbenchDebrief = {
+  identity: DebriefIdentity;
+  text: string;
+  updatedAtIso: string | null;
+  recap: DebriefRecap | null;
+};
+
 export type WorkbenchGroup = {
   id: string;
   title: string;
@@ -461,6 +516,8 @@ export type WorkbenchGroup = {
   trend: AnalysisTrendModel | null;
   /** Solo only — the day's own figures. Null in team scope, where the day is a field. */
   headline: WorkbenchGroupHeadline | null;
+  /** Solo only — your debrief of this meeting. Null in team scope: the day belongs to the field. */
+  debrief: WorkbenchDebrief | null;
   /** Team only: the roster that ran this session, fastest first. Null in solo scope. */
   drivers: WorkbenchDriver[] | null;
   /** Team only: everyone on one clock. Null in solo scope, or when no run has laps. */

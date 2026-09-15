@@ -41,7 +41,7 @@ export default function manifest(): MetadataRoute.Manifest {
     // `[data-theme="light"]` in globals.css / viewport themeColor). Was charcoal until
     // 2026-08-18, when light stopped being a per-device choice and became the app; a
     // manifest has no media queries, so it could not follow the old cookie.
-    theme_color: "#EAE7E0",
+    theme_color: "#F4F4F3",
     icons: [
       {
         src: "/icons/icon-192.png",

@@ -50,7 +50,30 @@ import {
   type FrameSource,
   type FrameSourceKind,
 } from "./frameSource";
-import { ACTIVE_RECIPE, type CrossingTarget, type FrameCrop, type Roi, type SectorLine } from "./types";
+import {
+  ACTIVE_RECIPE,
+  RECIPE_VARIANTS,
+  type CrossingTarget,
+  type DetectorParams,
+  type FrameCrop,
+  type Roi,
+  type SectorLine,
+} from "./types";
+
+/**
+ * The recipe this scan reads the lines with: the active one, or a named variant from
+ * `RECIPE_VARIANTS` when `localStorage.rc_recipe` names one — the scorecard's per-run switch
+ * (`scripts/dev-drive-scan.mts --recipe`). The drawing screen keeps showing the active recipe.
+ */
+export function scanRecipe(): DetectorParams {
+  try {
+    const name = typeof window !== "undefined" ? window.localStorage.getItem("rc_recipe") : null;
+    if (name && RECIPE_VARIANTS[name]) return RECIPE_VARIANTS[name]!;
+  } catch {
+    // No storage (a locked-down browser): the active recipe.
+  }
+  return ACTIVE_RECIPE;
+}
 
 /**
  * Rec.709 luma weights. This recovers brightness from decoded RGB; it is NOT the decoder's luma
@@ -134,6 +157,11 @@ export type BrowserScanOptions = {
   cars?: CarColours;
   onProgress?: (p: ScanProgress) => void;
   signal?: AbortSignal;
+  /**
+   * The recipe to read the lines with for THIS call. Omitted, the scan's recipe (`scanRecipe`).
+   * The second look uses a wider one — see `SECOND_LOOK_REACH`.
+   */
+  recipe?: DetectorParams;
 };
 
 /**
@@ -194,7 +222,7 @@ export function isScanAborted(e: unknown): boolean {
  * One line's crop, read straight out of the video into buffers that are reused every frame.
  * Allocating per frame at 4K is what makes a naive version unusably slow.
  */
-class LineCrop {
+export class LineCrop {
   readonly roi: Roi;
   readonly width: number;
   readonly height: number;
@@ -296,7 +324,7 @@ export function segmentsFor(targets: CrossingTarget[], windowSec: number): Segme
  * The clips are not chosen to be quiet — on a busy heat there is no quiet moment, and the
  * comparison in `calibrate.ts` is built to see through traffic.
  */
-async function calibrate(
+export async function calibrateLines(
   source: FrameSource,
   crops: Map<string, LineCrop>,
   lines: SectorLine[],
@@ -305,7 +333,8 @@ async function calibrate(
   spread: { from: number; to: number },
   rate: number,
   onProgress: (done: number, total: number) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  recipe: DetectorParams = scanRecipe()
 ): Promise<Record<string, LineCalibration>> {
   // One frame list per clip per line: the noise floor is judged clip by clip (`calibrateFromClips`).
   const colourClips = new Map<string, FrameCrop[][]>();
@@ -346,10 +375,10 @@ async function calibrate(
   const out: Record<string, LineCalibration> = {};
   for (const line of lines) {
     const crop = crops.get(line.lineKey)!;
-    const band = bandMask(line, crop.roi, frameW, frameH, ACTIVE_RECIPE);
+    const band = bandMask(line, crop.roi, frameW, frameH, recipe);
     const spans = spansFromMask(band, crop.width, crop.height);
     // Measured under the blur this line will be read with — the gate is applied after it.
-    const kernel = blurKernelForLine(line, frameW, frameH, ACTIVE_RECIPE);
+    const kernel = blurKernelForLine(line, frameW, frameH, recipe);
     const cd = colourClips.get(line.lineKey)!.map((frames) => bandFrameDiffs(frames, band, spans, kernel));
     const ld = lumaClips.get(line.lineKey)!.map((frames) => bandFrameDiffs(frames, band, spans, kernel));
     const paired = cd.map((c, k) => {
@@ -392,6 +421,7 @@ export async function findCrossingsInBrowser(
     cars = {},
     onProgress,
     signal,
+    recipe = scanRecipe(),
   } = opts;
   const carFor = (target: CrossingTarget): CarColour | null => {
     // Whoever this target belongs to gets judged against their own paint. Anything without a
@@ -440,7 +470,7 @@ export async function findCrossingsInBrowser(
       calibrations = await calibrateWith(source);
     }
     function calibrateWith(src: FrameSource) {
-      return calibrate(
+      return calibrateLines(
       src,
       crops,
       usedLines,
@@ -450,7 +480,8 @@ export async function findCrossingsInBrowser(
       playbackRate,
       (done, total) =>
         report("calibrating", (done / total) * CAL_SHARE, `Reading the lines (${done}/${total})`),
-      signal
+      signal,
+      recipe
       );
     }
 
@@ -495,7 +526,7 @@ export async function findCrossingsInBrowser(
             crop.roi,
             frameW,
             frameH,
-            { ...ACTIVE_RECIPE, thresh: cal ? cal.thresh : ACTIVE_RECIPE.thresh },
+            { ...recipe, thresh: cal ? cal.thresh : recipe.thresh },
             cal?.mode === "luma" ? 1 : 4
           );
           return {

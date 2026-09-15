@@ -1,10 +1,9 @@
-import { createTransport } from "nodemailer";
 import { prisma } from "@/lib/prisma";
 import { isMagicLinkSmtpConfigured } from "@/lib/emailAuthEnv";
 import { renderMagicLinkEmail } from "@/lib/auth/magicLinkEmail";
 import { mintMagicLinkUrl } from "@/lib/auth/mintMagicLinkUrl";
 import { issueSignInCode } from "@/lib/auth/signInCode";
-import { DEV_EMAIL_FROM } from "@/lib/brand/brandNames";
+import { sendTransactionalEmail } from "@/lib/email/sendTransactionalEmail";
 
 /**
  * Paid-signup provisioning (MONETISATION_NORTH_STAR.md, Phase 1). Called by the Stripe webhook
@@ -67,17 +66,9 @@ export async function sendPaidSignupSignInLink(email: string): Promise<void> {
     console.info(`[paid-signup] Sign-in code for ${email}: ${code}\nMagic link:\n${url}\n`);
     return;
   }
-  const transport = createTransport(process.env.EMAIL_SERVER?.trim());
   const rendered = renderMagicLinkEmail(url, email, code);
-  const result = await transport.sendMail({
-    to: email,
-    from: process.env.EMAIL_FROM?.trim() || DEV_EMAIL_FROM,
-    subject: rendered.subject,
-    text: rendered.text,
-    html: rendered.html,
-  });
-  const failed = (result.rejected || []).concat(result.pending || []).filter(Boolean);
-  if (failed.length) {
-    throw new Error(`Paid-signup email (${failed.join(", ")}) could not be sent`);
-  }
+  await sendTransactionalEmail(
+    { to: email, subject: rendered.subject, text: rendered.text, html: rendered.html },
+    { label: "paid-signup" },
+  );
 }

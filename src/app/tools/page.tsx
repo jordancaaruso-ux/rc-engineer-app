@@ -7,7 +7,6 @@ import { getCachedToolsModel } from "@/lib/cachedReads";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { GeometryBench } from "@/components/tools/GeometryBench";
-import { VideoBench } from "@/components/tools/VideoBench";
 import { LapImportBench } from "@/components/tools/LapImportBench";
 
 /**
@@ -36,8 +35,13 @@ import { LapImportBench } from "@/components/tools/LapImportBench";
  * unwired (`src/components/tools/CompareBench.tsx`), and `loadToolsModel` still builds the
  * `compare` model nothing reads, so putting it back is an import and a line of JSX.
  *
- * The bands lead to the Lab, `/videos` and `/laps/analysis`, unchanged behind them. This is a
- * summary, not a replacement.
+ * The bands lead to the Lab and `/laps/analysis`, unchanged behind them. This is a summary, not
+ * a replacement.
+ *
+ * The Video band (`VideoBench`, the door to `/videos`) came off on 2026-09-15 by founder call:
+ * video is on no surface at all for now, in the app or on the site — not even as "soon". The
+ * component, the model's `video` list and the `/videos` pages are all still in the tree; putting
+ * it back is the import and one line of JSX.
  */
 export const metadata: Metadata = {
   title: "Tools",
@@ -55,7 +59,7 @@ export default async function ToolsPage(): Promise<ReactNode> {
         </header>
         <section className="page-body">
           <CardPanel className="max-w-2xl" contentClassName="text-sm text-muted-foreground">
-            Set DATABASE_URL in .env to load your car and your video.
+            Set DATABASE_URL in .env to load your car.
           </CardPanel>
         </section>
       </>
@@ -117,8 +121,7 @@ export default async function ToolsPage(): Promise<ReactNode> {
               <div>
                 <p className="hub-row-title">The benches fill in from your runs</p>
                 <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-                  Log one and this page arrives set up — your car&apos;s own geometry, and any
-                  video you send off for analysis.
+                  Log one and this page arrives set up with your car&apos;s own geometry.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -131,8 +134,7 @@ export default async function ToolsPage(): Promise<ReactNode> {
           )}
 
           {/* Each band carries its own heading, as the top row of its own card
-              (founder pin, 2026-08-19) — see `BandHeader`. */}
-          <VideoBench jobs={model.video} />
+              (founder pin, 2026-08-19) — see `BandHeader`. Video's band is off (header). */}
 
           {/*
             Laptime Analysis, back on the page (founder call 2026-08-27) with a different job from the

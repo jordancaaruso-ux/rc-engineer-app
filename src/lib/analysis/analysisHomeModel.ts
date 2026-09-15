@@ -109,6 +109,15 @@ export type AnalysisTrendRun = {
    * against the browser's zone.
    */
   timeLabel: string | null;
+  /**
+   * The calendar day this run belongs to, in the driver's zone — YYYY-MM-DD, and the
+   * "Sat 13 Sep" the chart prints for it (2026-09-14). A meeting spans days now, and the
+   * plot draws a band per day off exactly this key, the same one the Sessions list groups
+   * by (`runLocalDayKey`), so a run cannot sit in Saturday on the list and Sunday on the
+   * picture.
+   */
+  dayKey: string;
+  dayLabel: string;
   createdAtIso: string;
   metrics: AnalysisRunMetrics;
   /** Lap distribution for the spread view; null when too few included laps. */
@@ -531,14 +540,20 @@ export function isTrackCarPersonalBest(
  * Tire / battery / additive changes are excluded (see `isExcludedSetupChangeKey`).
  */
 export function computeSetupChangesByRunId(
-  runsDesc: Array<{ id: string; carId: string | null; setupData: unknown }>
+  runsDesc: Array<{
+    id: string;
+    carId: string | null;
+    setupData: unknown;
+    /** Filed by the app from the timing sheet with a carried sheet — never a baseline. */
+    unconfirmed?: boolean;
+  }>
 ): Map<string, RunSetupChangeIndicator> {
   const byRunId = new Map<string, RunSetupChangeIndicator>();
   for (let i = 0; i < runsDesc.length; i++) {
     const run = runsDesc[i];
     let previous: (typeof runsDesc)[number] | null = null;
     for (let j = i + 1; j < runsDesc.length; j++) {
-      if (runsDesc[j].carId === run.carId) {
+      if (runsDesc[j].carId === run.carId && !runsDesc[j].unconfirmed) {
         previous = runsDesc[j];
         break;
       }

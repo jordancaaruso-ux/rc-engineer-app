@@ -95,6 +95,8 @@ export default async function CarSetupViewPage(props: {
           id: true,
           name: true,
           runs: {
+            // Relation reads bypass the run window's query gate (docs/STARTER_TIER_PLAN.md).
+            where: { hiddenByPlanAt: null },
             orderBy: { createdAt: "desc" },
             take: 1,
             select: {
@@ -120,6 +122,7 @@ export default async function CarSetupViewPage(props: {
         },
       },
       runs: {
+        where: { hiddenByPlanAt: null },
         orderBy: { createdAt: "desc" },
         take: 1,
         select: {

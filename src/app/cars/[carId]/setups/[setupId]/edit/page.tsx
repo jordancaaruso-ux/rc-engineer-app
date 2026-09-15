@@ -76,8 +76,11 @@ export default async function CarSetupEditPage(props: {
       isLibrary: true,
       sheetBlankId: true,
       _count: { select: { runs: true } },
-      // Which run to correct, and what to call a snapshot that has no name of its own.
+      // Which run to correct, and what to call a snapshot that has no name of its own. Relation
+      // reads bypass the run window's query gate (docs/STARTER_TIER_PLAN.md), hence the where;
+      // `_count.runs` above deliberately still counts hidden runs — it guards the in-place edit.
       runs: {
+        where: { hiddenByPlanAt: null },
         orderBy: { createdAt: "desc" },
         take: 1,
         select: {

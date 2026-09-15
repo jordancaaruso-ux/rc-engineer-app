@@ -272,6 +272,17 @@ export function calibrateFromClips(
   };
 }
 
+/**
+ * The gate this line would get read on `mode`, whichever channel the calibration preferred —
+ * for a reader that follows one car across every line and has to read them all the same way.
+ * Falls back to the calibration's own gate when that channel was not measured.
+ */
+export function thresholdFor(cal: LineCalibration, mode: ChannelMode): number {
+  const noise = mode === "luma" ? cal.luma : cal.colour;
+  if (!noise) return cal.thresh;
+  return Math.max(MIN_THRESH[mode], noise.quiet * NOISE_MULTIPLE);
+}
+
 /** Calibrate straight from decoded sample clips, under the blur the line will be read with. */
 export function calibrateFromFrames(
   colourFrames: FrameCrop[],

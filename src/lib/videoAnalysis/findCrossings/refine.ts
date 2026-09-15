@@ -281,10 +281,20 @@ export function flagImplausible<T extends RefinableResult>(
  * driver crossed that line on every other lap, and were held anyway. So: an unconfirmed row is
  * vouched for when its offset from its own lap start sits inside the tolerance of the cluster
  * formed by that driver's TRACKED, undoubted crossings of the same line (at least three of
- * them — flickers never vouch for each other), or when its gap from the previous trusted corner
- * matches that gap on the driver's other laps. Rows already held by `flagImplausible` are never
- * vouched for. A vouched row still says "unconfirmed", so the review can call it less certain.
+ * them), or when its gap from the previous trusted corner matches that gap on the driver's other
+ * laps. Rows already held by `flagImplausible` are never vouched for. A vouched row still says
+ * "unconfirmed", so the review can call it less certain.
+ *
+ * Quiet flickers also vouch for each other. "Flickers never vouch for each other" was written for
+ * shaken paint, which flips at random moments — but a window that offered ONE flip, at the same
+ * point of the lap on three or more laps, is a car the tracker could not follow. Sandy's S2 on
+ * the Bendigo 4K practice (2026-09-09), a 30px tick on the far side: six laps within 0.13s of
+ * each other, one tracked, five held, all six accepted by hand on 2026-09-03. A busy window's flip
+ * proves nothing (something is always there), so only windows with at most
+ * `QUIET_WINDOW_CANDIDATES` candidates take part.
  */
+const QUIET_WINDOW_CANDIDATES = 2;
+
 export function vouchedUnconfirmed<T extends RefinableResult>(
   results: T[],
   sfKey: string,
@@ -295,8 +305,22 @@ export function vouchedUnconfirmed<T extends RefinableResult>(
   const trusted = (r: T) =>
     r.detectedSec != null && r.source !== "unconfirmed" && !suspect.has(r.id);
 
+  const quiet = (r: T) =>
+    r.detectedSec != null &&
+    r.source === "unconfirmed" &&
+    !suspect.has(r.id) &&
+    r.candidates.length <= QUIET_WINDOW_CANDIDATES;
+
   const vouched = new Set<string>();
   const trustedOffsets = new Map<string, number[]>();
+  const quietOffsets = new Map<string, number[]>();
+  for (const r of results) {
+    if (r.lineKey === sfKey || !(trusted(r) || quiet(r))) continue;
+    const start = shape.sfAt.get(lapKey(r));
+    if (start == null) continue;
+    const group = `${driverOfKey(lapKey(r))}|${r.lineKey}`;
+    quietOffsets.set(group, [...(quietOffsets.get(group) ?? []), r.detectedSec! - start]);
+  }
   for (const r of results) {
     if (r.lineKey === sfKey || !trusted(r)) continue;
     const key = lapKey(r);
@@ -340,6 +364,17 @@ export function vouchedUnconfirmed<T extends RefinableResult>(
       if (core.length >= MIN_CLUSTER_LAPS && Math.abs(r.detectedSec - start - median(core)) <= PLAUSIBLE_TOL_SEC) {
         vouched.add(r.id);
         continue;
+      }
+    }
+
+    if (quiet(r)) {
+      const peers = quietOffsets.get(`${driverOfKey(key)}|${r.lineKey}`) ?? [];
+      if (peers.length >= MIN_CLUSTER_LAPS) {
+        const core = largestCluster(peers, PLAUSIBLE_TOL_SEC);
+        if (core.length >= MIN_CLUSTER_LAPS && Math.abs(r.detectedSec - start - median(core)) <= PLAUSIBLE_TOL_SEC) {
+          vouched.add(r.id);
+          continue;
+        }
       }
     }
 

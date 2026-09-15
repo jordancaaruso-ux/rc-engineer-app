@@ -40,7 +40,7 @@
  * own answer for the odd-lap vote to judge.
  */
 
-import type { LineDir } from "./direction";
+import { isStranded, type LineDir, type LinePlace } from "./direction";
 import { learnLapShape, type LapKeyOf, type RefinableResult, type RefineOutcome } from "./refine";
 import type { CrossingEvent } from "./types";
 
@@ -100,6 +100,15 @@ export type LapFitOptions<T> = {
   candidatesOf?: (r: T) => CrossingEvent[];
   /** Rows whose time is settled — hand marks, lap starts. Never moved, always on the path. */
   fixed?: ReadonlySet<string>;
+  /**
+   * Where each line is actually crossed — `direction.ts: linePlaces`. A candidate the wrong way
+   * round that also stands further than `placeBarPx` from every one of them is refused outright
+   * rather than priced: see `WRONG_WAY_SEC`. Without these the wrong-way penalty stands alone,
+   * as it did before.
+   */
+  places?: ReadonlyMap<string, ReadonlyArray<LinePlace>>;
+  /** How far from every known place counts as nowhere, in frame pixels. */
+  placeBarPx?: number;
 };
 
 export type LapFitOutcome<T> = RefineOutcome<T> & {
@@ -264,7 +273,15 @@ export function refineByLapFit<T extends RefinableResult>(
           }
           if (c.source === "rescued") cost += RESCUED_SEC;
           else if (c.source === "unconfirmed") cost += UNCONFIRMED_SEC;
-          if (want != null && c.dir != null && c.dir !== want) cost += WRONG_WAY_SEC;
+          if (want != null && c.dir != null && c.dir !== want) {
+            // The wrong way round AND standing where this line is never crossed. Neither on its
+            // own is worth refusing a crossing over — a direction read comes back inverted often
+            // enough, and a hairpin's second leg is a real place a real car really goes. Together
+            // they are nothing the car could have done, so the candidate does not go on the board
+            // at all, the same way an impossible offset does not.
+            if (isStranded(opts.places?.get(line), row.id, c, opts.placeBarPx ?? 0)) continue;
+            cost += WRONG_WAY_SEC;
+          }
           priced.push({ c, cost });
         }
         return priced;

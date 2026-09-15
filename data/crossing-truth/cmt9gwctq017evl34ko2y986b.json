@@ -1,0 +1,262 @@
+{
+  "jobId": "cmt9gwctq017evl34ko2y986b",
+  "frozenAt": "2026-09-09T00:28:01.135Z",
+  "label": "TFTR heat IMG_4044 Jordan",
+  "video": "IMG_4044 (1).mov",
+  "profile": "Wild Willy CW",
+  "lines": [
+    {
+      "lineKey": "sf",
+      "label": "Start / Finish",
+      "sortOrder": 0,
+      "x1": 0.6150518868772543,
+      "y1": 0.6157247681931228,
+      "x2": 0.7145328795084473,
+      "y2": 0.8479431926722895
+    },
+    {
+      "lineKey": "s1",
+      "label": "S1",
+      "sortOrder": 1,
+      "x1": 0.3355984978699338,
+      "y1": 0.523702478463812,
+      "x2": 0.3191753949973718,
+      "y2": 0.5049331471444276
+    },
+    {
+      "lineKey": "s2",
+      "label": "S2",
+      "sortOrder": 2,
+      "x1": 0.3512260581884138,
+      "y1": 0.5779577341046713,
+      "x2": 0.4322057959690346,
+      "y2": 0.6190903607536765
+    },
+    {
+      "lineKey": "s3",
+      "label": "S3",
+      "sortOrder": 3,
+      "x1": 0.5170847614358351,
+      "y1": 0.496347605563365,
+      "x2": 0.5616349068708345,
+      "y2": 0.4859669827259948
+    },
+    {
+      "lineKey": "s4",
+      "label": "S4",
+      "sortOrder": 4,
+      "x1": 0.6598183216816115,
+      "y1": 0.4571319192888553,
+      "x2": 0.6645761334224256,
+      "y2": 0.4713571937851427
+    },
+    {
+      "lineKey": "s5",
+      "label": "S5",
+      "sortOrder": 5,
+      "x1": 0.8196366829621554,
+      "y1": 0.5359477358843353,
+      "x2": 0.7945501256355332,
+      "y2": 0.5205690588505623
+    }
+  ],
+  "sync": {
+    "anchor": {
+      "lapNumber": 2,
+      "anchorKind": "sf_start",
+      "driverRole": "me",
+      "videoTimeSec": 378.528661
+    }
+  },
+  "laps": [
+    {
+      "lapNumber": 1,
+      "lapTimeSec": 18.48
+    },
+    {
+      "lapNumber": 2,
+      "lapTimeSec": 15.812
+    },
+    {
+      "lapNumber": 3,
+      "lapTimeSec": 15.527
+    },
+    {
+      "lapNumber": 4,
+      "lapTimeSec": 16.407
+    },
+    {
+      "lapNumber": 5,
+      "lapTimeSec": 23.237
+    },
+    {
+      "lapNumber": 6,
+      "lapTimeSec": 17.213
+    },
+    {
+      "lapNumber": 7,
+      "lapTimeSec": 16.259
+    },
+    {
+      "lapNumber": 8,
+      "lapTimeSec": 16.031
+    },
+    {
+      "lapNumber": 9,
+      "lapTimeSec": 16.187
+    },
+    {
+      "lapNumber": 10,
+      "lapTimeSec": 15.967
+    },
+    {
+      "lapNumber": 11,
+      "lapTimeSec": 15.996
+    },
+    {
+      "lapNumber": 12,
+      "lapTimeSec": 17.044
+    },
+    {
+      "lapNumber": 13,
+      "lapTimeSec": 30.006
+    },
+    {
+      "lapNumber": 14,
+      "lapTimeSec": 17.588
+    },
+    {
+      "lapNumber": 15,
+      "lapTimeSec": 17.071
+    },
+    {
+      "lapNumber": 16,
+      "lapTimeSec": 16.84
+    },
+    {
+      "lapNumber": 17,
+      "lapTimeSec": 16.634
+    },
+    {
+      "lapNumber": 18,
+      "lapTimeSec": 16.644
+    },
+    {
+      "lapNumber": 19,
+      "lapTimeSec": 17.718
+    }
+  ],
+  "markedLaps": [
+    2,
+    3,
+    10
+  ],
+  "marks": [
+    {
+      "driverRole": "me",
+      "lapNumber": 3,
+      "lineKey": "s1",
+      "videoTimeSec": 396.371826
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 3,
+      "lineKey": "s2",
+      "videoTimeSec": 398.367996
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 3,
+      "lineKey": "s3",
+      "videoTimeSec": 401.412151
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 3,
+      "lineKey": "s4",
+      "videoTimeSec": 404.511991
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 3,
+      "lineKey": "s5",
+      "videoTimeSec": 406.183825
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 2,
+      "lineKey": "s1",
+      "videoTimeSec": 380.6556547084561
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 2,
+      "lineKey": "s2",
+      "videoTimeSec": 382.6793171729795
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 2,
+      "lineKey": "s3",
+      "videoTimeSec": 385.8529406480656
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 2,
+      "lineKey": "s4",
+      "videoTimeSec": 388.9252937718123
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 2,
+      "lineKey": "s5",
+      "videoTimeSec": 390.6520283763682
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 10,
+      "lineKey": "s1",
+      "videoTimeSec": 517.3562952664065
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 10,
+      "lineKey": "s2",
+      "videoTimeSec": 519.45
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 10,
+      "lineKey": "s3",
+      "videoTimeSec": 522.543633505543
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 10,
+      "lineKey": "s4",
+      "videoTimeSec": 525.6965490692515
+    },
+    {
+      "driverRole": "me",
+      "lapNumber": 10,
+      "lineKey": "s5",
+      "videoTimeSec": 527.4
+    }
+  ],
+  "_corrections": [
+    {
+      "lapNumber": 10,
+      "lineKey": "s2",
+      "was": 519.1550234291652,
+      "now": 519.45,
+      "why": "2026-09-09 fine contact sheets (scripts/tmp/sheet-any.mjs): the hand mark sat 0.3–0.6 s before the pink car reached the line; the car is on the line at the corrected time ±1 frame. Both 09-09 scans put it there."
+    },
+    {
+      "lapNumber": 10,
+      "lineKey": "s5",
+      "was": 526.8357495673846,
+      "now": 527.4,
+      "why": "2026-09-09 fine contact sheets (scripts/tmp/sheet-any.mjs): the hand mark sat 0.3–0.6 s before the pink car reached the line; the car is on the line at the corrected time ±1 frame. Both 09-09 scans put it there."
+    }
+  ]
+}

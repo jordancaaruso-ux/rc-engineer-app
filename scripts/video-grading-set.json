@@ -1,0 +1,112 @@
+{
+  "_note": "The videos the scan is graded on. Every gradingJobId is a CLONE on scratch-dev that video-score.mts resets and rescans; never a driver's own job. Durations from ffprobe 2026-09-09.",
+  "frameSec": 0.03337,
+  "entries": [
+    {
+      "key": "4480",
+      "video": "IMG_4480.MOV",
+      "what": "Boronia race, six cars, 1376x600",
+      "path": "F:/Downloads/IMG_4480.MOV",
+      "durationSec": 343.655,
+      "sourceJobId": "cmtdu4n0d005avldc0oz6i5cq",
+      "gradingJobId": "cmttaxeqn0001vlh8rxsmnb0e",
+      "truth": [
+        {
+          "file": "scripts/truth/boronia-IMG_4480-2026-08-27.json",
+          "format": "picks",
+          "excludeLines": [
+            "s2",
+            "s3"
+          ],
+          "note": "s2/s3 are drawn beside the track where it folds back; the reviewer picked a different line than the one drawn (2026-09-09)"
+        }
+      ]
+    },
+    {
+      "key": "4483",
+      "video": "IMG_4483.MOV",
+      "what": "Boronia race, second clip, 2606x1074",
+      "path": "F:/Downloads/IMG_4483.MOV",
+      "durationSec": 346.367,
+      "sourceJobId": "cmtdr88rq01fuvlgsk9udlgy0",
+      "gradingJobId": "cmttd0uec0001vlrkynanletp",
+      "truth": [
+        {
+          "file": "scripts/truth/boronia2-IMG_4483-2026-09-09.json",
+          "format": "picks",
+          "note": "eye picks made 2026-09-09 on the laps today's scan gets wrong or holds"
+        }
+      ]
+    },
+    {
+      "key": "4521",
+      "video": "IMG_4521.MOV",
+      "what": "Bendigo practice, four drivers, 4K fisheye, 29 min",
+      "path": "F:/Downloads/IMG_4521.MOV",
+      "durationSec": 1747.255,
+      "sourceJobId": "cmtsp21030001vlckd1795kcn",
+      "gradingJobId": "cmtsp21030001vlckd1795kcn",
+      "truth": [
+        {
+          "file": "scripts/truth/bendigo-IMG_4521-2026-09-10.json",
+          "format": "picks",
+          "note": "eye picks made 2026-09-10 for Jordan S3 laps 2, 5, 6, 10, 14 — the sector clips that opened with the car away from the line"
+        }
+      ]
+    },
+    {
+      "key": "4522",
+      "video": "IMG_4522.MOV",
+      "what": "Bendigo practice, Jordan + Justin, 1080p fisheye",
+      "path": "F:/Downloads/IMG_4522.MOV",
+      "durationSec": 307.307,
+      "sourceJobId": "cmtk3ur9w00y7vlj4t1036ro6",
+      "gradingJobId": "cmttd0qh10001vlko868plhlq"
+    },
+    {
+      "key": "4523",
+      "video": "IMG_4523.MOV",
+      "what": "Bendigo practice, Jordan, 1080p fisheye",
+      "path": "F:/Downloads/IMG_4523.MOV",
+      "durationSec": 283.092,
+      "sourceJobId": "cmtiox2nx02etvlbsnyhnigeq",
+      "gradingJobId": "cmttd0rl20001vl7s9x09uqxq",
+      "truth": [
+        {
+          "file": "data/crossing-truth/cmtiox2nx02etvlbsnyhnigeq.json",
+          "format": "frozen"
+        }
+      ]
+    },
+    {
+      "key": "4044j",
+      "video": "IMG_4044 (1).mov",
+      "what": "TFTR heat, Jordan, 4K, 12 min",
+      "path": "F:/Downloads/IMG_4044 (1).mov",
+      "durationSec": 710.61,
+      "sourceJobId": "cmt9gwctq017evl34ko2y986b",
+      "gradingJobId": "cmttd0sk00001vl28ma18jgnx",
+      "truth": [
+        {
+          "file": "data/crossing-truth/cmt9gwctq017evl34ko2y986b.json",
+          "format": "frozen"
+        }
+      ]
+    },
+    {
+      "key": "4044c",
+      "video": "IMG_4044.MOV",
+      "what": "TFTR heat, Cooper, 4K, 12 min",
+      "path": "F:/Downloads/IMG_4044.MOV",
+      "durationSec": 710.61,
+      "sourceJobId": "cmrtyrvxr000wu4j0qkclwua6",
+      "gradingJobId": "cmttd0tgr0001vl6039mupi2l",
+      "truth": [
+        {
+          "file": "data/crossing-truth/cmrtyrvxr000wu4j0qkclwua6.json",
+          "format": "frozen"
+        }
+      ]
+    }
+  ]
+}

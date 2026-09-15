@@ -76,3 +76,15 @@ const resolveEntitlement = cache(async function resolveEntitlement(
 export async function getEntitlement(user: User): Promise<Entitlement> {
   return resolveEntitlement(user.id, user.email ?? null);
 }
+
+/**
+ * Entitlement for a member the caller holds no `User` row for. The run window resolves the
+ * OWNER of the runs, not the viewer (docs/STARTER_TIER_PLAN.md), and the Stripe webhook has only
+ * an id. Same memoized resolver as `getEntitlement`.
+ */
+export async function getEntitlementFor(
+  userId: string,
+  email: string | null,
+): Promise<Entitlement> {
+  return resolveEntitlement(userId, email);
+}

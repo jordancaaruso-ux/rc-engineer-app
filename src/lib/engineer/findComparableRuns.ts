@@ -104,6 +104,7 @@ export async function findComparableRunsForEngineer(
       carRating: true,
       tireTypeId: true,
       gripLevel: true,
+      unconfirmedAt: true,
       track: { select: { name: true, gripTags: true, layoutTags: true } },
     },
     take: MAX_CANDIDATES_SCANNED,
@@ -120,6 +121,9 @@ export async function findComparableRunsForEngineer(
   for (const peer of peers) {
     // Only the past can be a reference — a later run is not something he has learned from yet.
     if (sortMs(peer) >= tCurrent) continue;
+    // A run the app filed from the timing sheet carries a copied setup and tyres: its laps are
+    // real but the conditions this scores on are a guess, so it is not evidence.
+    if (peer.unconfirmedAt != null) continue;
 
     const comparability = scoreComparability(currentConditions, {
       tireTypeId: peer.tireTypeId,

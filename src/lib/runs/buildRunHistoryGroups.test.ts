@@ -6,6 +6,7 @@ import { test } from "node:test";
 import {
   buildDayRunNameMap,
   buildRunHistoryGroups,
+  resolveSessionGroupKeys,
   sessionGroupKey,
 } from "@/lib/runs/buildRunHistoryGroups";
 import { formatRunSessionDisplay } from "@/lib/runSession";
@@ -332,4 +333,199 @@ test("sessionGroupKey resolves the day in the driver's zone, not the reader's", 
     sessionGroupKey(noRunZone, { ownerTimeZoneByUserId: { u1: "America/Los_Angeles" } }),
     asDriver
   );
+});
+
+test("an eventless run at the event's track on an event day folds into the event", () => {
+  // Founder ruling 2026-09-06: a teammate who never tapped Join is still at the meeting.
+  const sat = "2026-09-05T02:00:00Z"; // Saturday 12:00 in Sydney
+  const event = {
+    name: "Club Round 4",
+    startDate: new Date("2026-09-05T12:00:00Z"),
+    endDate: new Date("2026-09-05T12:00:00Z"),
+    track: { name: "Ironbark Raceway" },
+  };
+  const onEvent = {
+    id: "mine",
+    userId: "u1",
+    createdAt: new Date(sat),
+    sortAt: new Date(sat),
+    eventId: "e1",
+    localTimeZone: "Australia/Sydney",
+    trackNameSnapshot: "Ironbark Raceway",
+    track: { name: "Ironbark Raceway" },
+    event,
+  };
+  const teammateEventless = {
+    id: "theirs",
+    userId: "u2",
+    createdAt: new Date("2026-09-05T03:00:00Z"),
+    sortAt: new Date("2026-09-05T03:00:00Z"),
+    eventId: null,
+    localTimeZone: "Australia/Sydney",
+    trackNameSnapshot: "Ironbark Raceway",
+    track: { name: "Ironbark Raceway" },
+    event: null,
+  };
+  const otherTrackSameDay = {
+    ...teammateEventless,
+    id: "elsewhere",
+    trackNameSnapshot: "Geelong",
+    track: { name: "Geelong" },
+  };
+  // Two days on: a gap day breaks the chain, so this stays its own test day.
+  const sameTrackTwoDaysOn = {
+    ...teammateEventless,
+    id: "monday",
+    createdAt: new Date("2026-09-07T03:00:00Z"),
+    sortAt: new Date("2026-09-07T03:00:00Z"),
+  };
+  // The eventless run is listed FIRST so the header must still read off the event run.
+  const groups = buildRunHistoryGroups([teammateEventless, onEvent, otherTrackSameDay, sameTrackTwoDaysOn]);
+  const ids = groups.map((g) => g.id);
+  assert.equal(groups.length, 3, ids.join(", "));
+  const meeting = groups.find((g) => g.id === "event-e1")!;
+  assert.equal(meeting.type, "Event");
+  assert.equal(meeting.title, "Club Round 4");
+  assert.deepEqual(meeting.runs.map((r) => r.id).sort(), ["mine", "theirs"]);
+  assert.ok(groups.some((g) => g.type === "Testing" && g.runs[0]!.id === "elsewhere"));
+  assert.ok(groups.some((g) => g.type === "Testing" && g.runs[0]!.id === "monday"));
+});
+
+test("an eventless day touching the meeting folds in, and the chain walks day by day", () => {
+  // Founder ruling 2026-09-14: the practice days before a title are part of the weekend.
+  const event = {
+    name: "State Titles",
+    startDate: new Date("2026-09-05T12:00:00Z"), // Sat
+    endDate: new Date("2026-09-06T12:00:00Z"), // Sun
+    track: { name: "Ironbark Raceway" },
+  };
+  const base = {
+    userId: "u1",
+    localTimeZone: "Australia/Sydney",
+    trackNameSnapshot: "Ironbark Raceway",
+    track: { name: "Ironbark Raceway" },
+  };
+  const at = (iso: string) => ({ createdAt: new Date(iso), sortAt: new Date(iso) });
+  const sun = { ...base, id: "sun", eventId: "e1", event, ...at("2026-09-06T02:00:00Z") };
+  const fri = { ...base, id: "fri", eventId: null, event: null, ...at("2026-09-04T02:00:00Z") };
+  const thu = { ...base, id: "thu", eventId: null, event: null, ...at("2026-09-03T02:00:00Z") };
+  // Tuesday: Wednesday is empty, so the chain never reaches it.
+  const tue = { ...base, id: "tue", eventId: null, event: null, ...at("2026-09-01T02:00:00Z") };
+  // Friday at ANOTHER track is somebody else's practice.
+  const friElsewhere = {
+    ...base,
+    id: "fri-geelong",
+    eventId: null,
+    event: null,
+    trackNameSnapshot: "Geelong",
+    track: { name: "Geelong" },
+    ...at("2026-09-04T04:00:00Z"),
+  };
+  const groups = buildRunHistoryGroups([sun, fri, thu, tue, friElsewhere]);
+  const meeting = groups.find((g) => g.id === "event-e1")!;
+  assert.deepEqual(meeting.runs.map((r) => r.id), ["sun", "fri", "thu"]);
+  // The meeting's dates span what it actually held, not only what the entry form said.
+  assert.match(meeting.dateLabel, /^3 – 6 Sept? 2026$/); // Node spells it "Sept" in en-GB
+  assert.ok(groups.some((g) => g.type === "Testing" && g.runs[0]!.id === "tue"));
+  assert.ok(groups.some((g) => g.type === "Testing" && g.runs[0]!.id === "fri-geelong"));
+  assert.equal(groups.length, 3);
+});
+
+test("the fold covers every day the event declares, not only days it has runs on", () => {
+  const event = {
+    name: "State Titles",
+    startDate: new Date("2026-09-04T12:00:00Z"), // Fri
+    endDate: new Date("2026-09-06T12:00:00Z"), // Sun
+    track: { name: "Ironbark Raceway" },
+  };
+  const runOnSunday = {
+    id: "sun",
+    userId: "u1",
+    createdAt: new Date("2026-09-06T02:00:00Z"),
+    sortAt: new Date("2026-09-06T02:00:00Z"),
+    eventId: "e1",
+    localTimeZone: "Australia/Sydney",
+    trackNameSnapshot: "Ironbark Raceway",
+    track: { name: "Ironbark Raceway" },
+    event,
+  };
+  const practiceFriday = {
+    id: "fri",
+    userId: "u2",
+    createdAt: new Date("2026-09-04T02:00:00Z"),
+    sortAt: new Date("2026-09-04T02:00:00Z"),
+    eventId: null,
+    localTimeZone: "Australia/Sydney",
+    trackNameSnapshot: "Ironbark Raceway",
+    track: { name: "Ironbark Raceway" },
+    event: null,
+  };
+  const groups = buildRunHistoryGroups([runOnSunday, practiceFriday]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0]!.id, "event-e1");
+});
+
+test("a run on a different event never folds; the busier event wins a shared day", () => {
+  const base = {
+    userId: "u1",
+    createdAt: new Date("2026-09-05T02:00:00Z"),
+    sortAt: new Date("2026-09-05T02:00:00Z"),
+    localTimeZone: "Australia/Sydney",
+    trackNameSnapshot: "Ironbark Raceway",
+    track: { name: "Ironbark Raceway" },
+  };
+  const dates = {
+    startDate: new Date("2026-09-05T12:00:00Z"),
+    endDate: new Date("2026-09-05T12:00:00Z"),
+    track: { name: "Ironbark Raceway" },
+  };
+  const a1 = { ...base, id: "a1", eventId: "eA", event: { name: "A", ...dates } };
+  const b1 = { ...base, id: "b1", userId: "u2", eventId: "eB", event: { name: "B", ...dates } };
+  const b2 = { ...base, id: "b2", userId: "u3", eventId: "eB", event: { name: "B", ...dates } };
+  const loose = { ...base, id: "loose", userId: "u4", eventId: null, event: null };
+  const groups = buildRunHistoryGroups([a1, b1, b2, loose]);
+  assert.equal(groups.length, 2);
+  const b = groups.find((g) => g.id === "event-eB")!;
+  assert.deepEqual(b.runs.map((r) => r.id).sort(), ["b1", "b2", "loose"]);
+  assert.deepEqual(groups.find((g) => g.id === "event-eA")!.runs.map((r) => r.id), ["a1"]);
+});
+
+test("resolveSessionGroupKeys gives the count query the same folded key as the list", () => {
+  const event = {
+    name: "Club Round 4",
+    startDate: new Date("2026-09-05T12:00:00Z"),
+    endDate: new Date("2026-09-05T12:00:00Z"),
+    trackNameSnapshot: "Ironbark Raceway",
+    track: { name: "Ironbark Raceway" },
+  };
+  const rows = [
+    {
+      id: "mine",
+      userId: "u1",
+      createdAt: new Date("2026-09-05T02:00:00Z"),
+      sortAt: new Date("2026-09-05T02:00:00Z"),
+      eventId: "e1",
+      localTimeZone: "Australia/Sydney",
+      trackNameSnapshot: "Ironbark Raceway",
+      track: { name: "Ironbark Raceway" },
+      event,
+    },
+    {
+      id: "theirs",
+      userId: "u2",
+      createdAt: new Date("2026-09-05T03:00:00Z"),
+      sortAt: new Date("2026-09-05T03:00:00Z"),
+      eventId: null,
+      localTimeZone: "Australia/Sydney",
+      trackNameSnapshot: "Ironbark Raceway",
+      track: { name: "Ironbark Raceway" },
+      event: null,
+    },
+  ];
+  const keys = resolveSessionGroupKeys(rows);
+  const groups = buildRunHistoryGroups(rows);
+  assert.equal(keys.get("theirs"), "event-e1");
+  assert.equal(keys.get("theirs"), groups[0]!.id);
+  // The plain per-run key is unchanged — it is the unfolded answer.
+  assert.match(sessionGroupKey(rows[1]!), /^day-2026-09-05-/);
 });

@@ -1,6 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  chosenBackfillSessions,
+  selectBackfillCandidates,
+  type BackfillCandidate,
+  type BackfillOffer,
+} from "@/lib/runs/backfillCandidates";
+import { declineSessions, readDeclined, undeclinedSessions } from "@/lib/runs/backfillDeclined";
+import { confirmRunHref } from "@/lib/runs/confirmRunHref";
+import { BackfillOfferSheet, type BackfillOfferSheetSession } from "@/components/runs/BackfillOfferSheet";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { clientId } from "@/lib/clientId";
@@ -97,6 +107,12 @@ export type LapIngestFormValue = {
    * run's laps are these blocks joined in on-track order.
    */
   urlImportBlocks: UrlImportBlock[];
+  /**
+   * "Add N other runs from today": the day's other timing sessions with no run yet, whether the
+   * driver said yes, and the ones they left unticked in the sheet. Recomputed from the scan while
+   * the step is open; read once, at save, by the form. Null when there is nothing to offer.
+   */
+  backfill?: BackfillOffer | null;
 };
 
 type IngestTab = "url-auto" | "url-manual" | "manual" | "photo";
@@ -227,6 +243,7 @@ type ScanDayCandidate = {
   linkedRunId: string | null;
   timingSource?: "liverc" | "speedhive" | "myrcm";
   bestLapSeconds?: number | null;
+  lapCount?: number | null;
 };
 
 /**
@@ -254,6 +271,8 @@ type ImportResultRow = {
 type ImportedSessionRow = ScanDayCandidate & {
   importedSessionId: string;
   linkedRunLabel: string | null;
+  /** Filed under a run the app created from the timing sheet and nobody has opened yet. */
+  linkedRunUnconfirmed?: boolean;
 };
 
 const RECENT_RUNS_COLLAPSED = 3;
@@ -276,8 +295,12 @@ type ImportPickerCandidate = {
   title: string;
   when: string | null;
   bestLapSeconds: number | null;
+  /** Timed laps, when the scan knew them before import. */
+  lapCount: number | null;
   timingSource?: "liverc" | "speedhive" | "myrcm";
   alreadyImported: boolean;
+  /** This account already holds the parse and it is on no run — taken from the store, not the site. */
+  storedImportId?: string | null;
   sortIso: string | null;
 };
 
@@ -302,6 +325,7 @@ function SessionImportListRow({
   disabled,
   onClick,
   note,
+  taken,
 }: {
   title: string;
   when: string | null;
@@ -311,19 +335,28 @@ function SessionImportListRow({
   disabled?: boolean;
   onClick: () => void;
   note?: string | null;
+  /**
+   * Spoken for: the row is drawn at full strength with this word where the button was, and
+   * nothing happens on tap. A session the driver has said will be its own run must not also
+   * offer to pour its laps into this one — that is the mix-up the two doors invite.
+   */
+  taken?: string | null;
 }) {
   // Time first: with a split run the driver picks the halves apart by when each
   // one ran, so it must be the thing the eye lands on, not a trailing detail.
   const meta = [when, timingSourceLabel(timingSource)].filter(Boolean).join(" · ");
+  const inert = Boolean(taken);
   return (
     <button
       type="button"
-      disabled={disabled}
+      disabled={disabled || inert}
+      aria-disabled={inert || undefined}
       className={cn(
         "flex w-full items-center gap-2.5 rounded-md border border-border bg-surface-runna px-2.5 py-2 text-left transition hover:bg-surface-runna-inset",
-        disabled && "opacity-60 pointer-events-none"
+        disabled && "opacity-60 pointer-events-none",
+        inert && "pointer-events-none"
       )}
-      onClick={onClick}
+      onClick={inert ? undefined : onClick}
     >
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[13px] font-semibold text-foreground">{title}</span>
@@ -344,9 +377,15 @@ function SessionImportListRow({
           </span>
         </span>
       ) : null}
-      <span className="shrink-0 rounded-full border border-primary-ink/45 bg-accent/5 px-3 py-1 text-[11px] font-bold text-primary-ink">
-        {actionLabel}
-      </span>
+      {taken ? (
+        <span className="shrink-0 rounded-full border border-border bg-surface-runna-inset px-3 py-1 text-[11px] font-semibold text-muted-foreground">
+          {taken}
+        </span>
+      ) : (
+        <span className="shrink-0 rounded-full border border-primary-ink/45 bg-accent/5 px-3 py-1 text-[11px] font-bold text-primary-ink">
+          {actionLabel}
+        </span>
+      )}
     </button>
   );
 }
@@ -712,9 +751,16 @@ export function LapTimesIngestPanel({
   editingRunId,
   eventMyRcmUrl,
   onSaveEventMyRcmUrl,
+  stepVisible = true,
 }: {
   value: LapIngestFormValue;
   onChange: (next: LapIngestFormValue) => void;
+  /**
+   * False while the wizard has this step hidden (it stays mounted). The "other runs" sheet is
+   * portalled over the whole page, so it must only open while the driver is looking at this step
+   * — a scan finishing after they have moved on waits here until they come back.
+   */
+  stepVisible?: boolean;
   /**
    * LiveRC index URL for "scan" (practice `session_list` day page, or any `/results/` page that lists sessions).
    * Optional override when track has `liveRcUrl` for automatic discovery.
@@ -763,6 +809,7 @@ export function LapTimesIngestPanel({
   const [myRcmPastedUrl, setMyRcmPastedUrl] = useState<string | null>(null);
   const [dayScanBusy, setDayScanBusy] = useState(false);
   const [dayScanStatus, setDayScanStatus] = useState<ScanStatus | null>(null);
+  const router = useRouter();
   const [dayScanCandidates, setDayScanCandidates] = useState<ScanDayCandidate[] | null>(null);
   const [dayScanIndexKind, setDayScanIndexKind] = useState<"practice" | "results" | null>(null);
   const [dayScanHasDriverName, setDayScanHasDriverName] = useState<boolean>(true);
@@ -933,6 +980,7 @@ export function LapTimesIngestPanel({
         title: c.listLinkText?.trim() || "Race session",
         when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime, "liverc"),
         bestLapSeconds: null,
+        lapCount: null,
         timingSource: "liverc",
         alreadyImported: c.alreadyImported,
         sortIso: c.sessionCompletedAtIso,
@@ -947,13 +995,39 @@ export function LapTimesIngestPanel({
         title: c.driverName?.trim() || "Run",
         when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime, c.timingSource),
         bestLapSeconds: c.bestLapSeconds ?? null,
+        lapCount: c.lapCount ?? null,
         timingSource: c.timingSource,
         alreadyImported: c.alreadyImported,
         sortIso: c.sessionCompletedAtIso,
       });
     }
+    /*
+     * Sessions this account imported before but never saved onto a run — an Import tapped and
+     * then abandoned, or a run since deleted. To the driver they are exactly what this list is
+     * for: their sessions with no run yet. Filed behind the "already imported" fold they read as
+     * spent, and a driver catching up at night met "Nothing new to import" over the very session
+     * they had come back for (found driving it, 2026-09-14). Taken from the stored parse, which
+     * is faster and still works when the club's site is asleep.
+     */
+    for (const c of importedCandidates) {
+      if (c.linkedRunId) continue;
+      const url = c.sessionUrl.trim();
+      if (!url || byUrl.has(url) || attachedUrls.has(url)) continue;
+      byUrl.set(url, {
+        key: `stored:${c.importedSessionId}`,
+        sessionUrl: c.sessionUrl,
+        title: c.driverName?.trim() || "Run",
+        when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime, c.timingSource),
+        bestLapSeconds: c.bestLapSeconds ?? null,
+        lapCount: c.lapCount ?? null,
+        timingSource: c.timingSource,
+        alreadyImported: true,
+        storedImportId: c.importedSessionId,
+        sortIso: c.sessionCompletedAtIso,
+      });
+    }
     return sortSessionsNewestFirst(Array.from(byUrl.values()), (r) => r.sortIso);
-  }, [sortedEventRaceSessions, sortedDayScanCandidates, attachedUrls]);
+  }, [sortedEventRaceSessions, sortedDayScanCandidates, importedCandidates, attachedUrls]);
 
   // Backlog list (unimported sessions from before today) — collapsed behind "Show older sessions".
   const olderPickerRows = useMemo<ImportPickerCandidate[]>(() => {
@@ -973,6 +1047,7 @@ export function LapTimesIngestPanel({
       title: c.driverName?.trim() || "Run",
       when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime, c.timingSource),
       bestLapSeconds: c.bestLapSeconds ?? null,
+      lapCount: c.lapCount ?? null,
       timingSource: c.timingSource,
       alreadyImported: c.alreadyImported,
       sortIso: c.sessionCompletedAtIso,
@@ -1041,19 +1116,172 @@ export function LapTimesIngestPanel({
   const canExpandImportRows = visibleImportCandidates.length > RECENT_RUNS_COLLAPSED;
 
   /**
-   * Already-imported sessions, minus whatever this run is holding right now.
+   * Sessions already filed under a run, minus whatever this run is holding right now.
    *
-   * The scan only knows what the database knows, so a session imported a minute ago and sitting in
-   * the form above still comes back as "not on a run" — offering the driver laps they are already
-   * looking at. Same rule the main picker list follows, and the same bug it was written to end.
+   * Only those ON a run: an import sitting loose belongs in the main list above (see
+   * `mergedImportCandidates`). The scan only knows what the database knows, so a session imported
+   * a minute ago and sitting in the form above still comes back as "not on a run" — offering the
+   * driver laps they are already looking at. Same rule the main picker list follows, and the same
+   * bug it was written to end.
    */
   const importedPickerRows = useMemo(
     () =>
       importedCandidates.filter(
-        (row) => !attachedUrls.has(row.sessionUrl.trim()) && matchesSourceFilter(row.timingSource)
+        (row) =>
+          Boolean(row.linkedRunId) &&
+          !attachedUrls.has(row.sessionUrl.trim()) &&
+          matchesSourceFilter(row.timingSource)
       ),
     [importedCandidates, attachedUrls, matchesSourceFilter]
   );
+
+  /**
+   * "Add N other runs from today" — the day's other sessions with no run yet, measured against
+   * the session attached first (earliest on track). Only rows the scan matched to THIS driver:
+   * a results page with no name filter lists the whole field, and none of those are theirs.
+   */
+  const backfillOffer = useMemo(() => {
+    const picked = attachedBlocks[0];
+    if (!picked) return null;
+    const pickedIso = picked.sessionCompletedAtIso?.trim() || picked.sessionCompletedAtDbIso?.trim() || null;
+    const rows = [
+      ...importedCandidates,
+      ...(eventRaceSessions ?? []).map((r) => ({
+        sessionUrl: r.sessionUrl,
+        sessionCompletedAtIso: r.sessionCompletedAtIso,
+        timingSource: "liverc" as const,
+        importedSessionId: r.existingImportedSessionId,
+        linkedRunId: null,
+      })),
+      ...(dayScanCandidates ?? []).filter((c) => c.matchesDriver === true),
+      ...(dayScanOlderCandidates ?? []).filter((c) => c.matchesDriver === true),
+    ];
+    return selectBackfillCandidates({
+      picked: {
+        sessionUrl: picked.sourceUrl,
+        sessionCompletedAtIso: pickedIso,
+        timingSource: timingSourceFromParserId(picked.parserId),
+      },
+      rows,
+      attachedUrls,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
+    });
+  }, [attachedBlocks, attachedUrls, importedCandidates, eventRaceSessions, dayScanCandidates, dayScanOlderCandidates]);
+
+  // Mirror the offer into the form value the save reads, without ever writing the same list
+  // twice: the effect keys on the URLs, and `ticked` survives a rescan that changes nothing.
+  const latestValueRef = useRef(value);
+  latestValueRef.current = value;
+  const latestOnChangeRef = useRef(onChange);
+  latestOnChangeRef.current = onChange;
+  useEffect(() => {
+    const current = latestValueRef.current;
+    const keyOf = (s: readonly BackfillCandidate[]) =>
+      s.map((c) => `${c.sessionUrl}|${c.importedSessionId ?? ""}`).join("\n");
+    const nextSessions = backfillOffer?.sessions ?? [];
+    const currentKey = current.backfill ? keyOf(current.backfill.sessions) : "";
+    const nextKey = keyOf(nextSessions);
+    if (currentKey === nextKey) return;
+    latestOnChangeRef.current({
+      ...current,
+      backfill:
+        nextSessions.length > 0
+          ? {
+              ticked: current.backfill?.ticked ?? false,
+              sessions: nextSessions,
+              excludedUrls: current.backfill?.excludedUrls ?? [],
+            }
+          : null,
+    });
+  }, [backfillOffer]);
+
+  /** What the line will actually file: the offer minus what the driver left unticked in the sheet. */
+  const backfillChosen = useMemo(() => chosenBackfillSessions(value.backfill), [value.backfill]);
+
+  const backfillDayWord = useMemo(() => {
+    const day = describePostedDay(backfillOffer?.dayKey ?? null);
+    if (!day) return "that day";
+    return day.isToday ? "today" : day.label;
+  }, [backfillOffer?.dayKey]);
+
+  /*
+   * The loud half of the offer: a sheet the moment the FIRST session lands on the run, listing
+   * the day's other sessions and offering them as runs. Armed by the tap that attaches (see
+   * `attachImportRow`), never by a block the form restored, and fired once — a second attach is
+   * the driver merging a split run on purpose, and asking again there would be exactly the
+   * confusion the sheet exists to prevent. "Not now" is remembered per session on the device.
+   */
+  const [backfillPromptOpen, setBackfillPromptOpen] = useState(false);
+  const backfillPromptArmedRef = useRef(false);
+  useEffect(() => {
+    if (!backfillPromptArmedRef.current) return;
+    if (attachedBlocks.length === 0) return;
+    if (attachedBlocks.length > 1 || latestValueRef.current.backfill?.ticked) {
+      backfillPromptArmedRef.current = false;
+      return;
+    }
+    if (!stepVisible) return;
+    const sessions = backfillOffer?.sessions ?? [];
+    if (sessions.length === 0) return;
+    backfillPromptArmedRef.current = false;
+    if (undeclinedSessions(sessions, readDeclined()).length === 0) return;
+    setBackfillPromptOpen(true);
+  }, [attachedBlocks.length, backfillOffer, stepVisible]);
+
+  /** The offer's rows as the sheet lists them: the picker's own time label and best lap per session. */
+  const backfillPromptRows = useMemo<BackfillOfferSheetSession[]>(() => {
+    const sessions = backfillOffer?.sessions ?? [];
+    if (sessions.length === 0) return [];
+    const byUrl = new Map<string, ImportPickerCandidate>();
+    for (const row of [...mergedImportCandidates, ...olderPickerRows]) byUrl.set(row.sessionUrl.trim(), row);
+    return sessions.map((s) => {
+      const row = byUrl.get(s.sessionUrl.trim());
+      return {
+        sessionUrl: s.sessionUrl,
+        when: row?.when ?? formatSessionWhen(s.sessionCompletedAtIso, null, s.timingSource),
+        lapCount: row?.lapCount ?? null,
+        bestLapSeconds: row?.bestLapSeconds ?? null,
+      };
+    });
+  }, [backfillOffer, mergedImportCandidates, olderPickerRows]);
+
+  /** "Log them": tick the line for the sessions left ticked in the sheet; the rest are remembered as unticked. */
+  const acceptBackfillPrompt = useCallback(
+    (selectedUrls: readonly string[]) => {
+      setBackfillPromptOpen(false);
+      const current = latestValueRef.current;
+      const sessions = current.backfill?.sessions ?? backfillOffer?.sessions ?? [];
+      if (sessions.length === 0) return;
+      const chosen = new Set(selectedUrls.map((u) => u.trim()));
+      const excludedUrls = sessions.map((s) => s.sessionUrl.trim()).filter((u) => !chosen.has(u));
+      if (excludedUrls.length === sessions.length) return;
+      latestOnChangeRef.current({ ...current, backfill: { ticked: true, sessions, excludedUrls } });
+      haptic("light");
+    },
+    [backfillOffer]
+  );
+  const declineBackfillPrompt = useCallback(() => {
+    setBackfillPromptOpen(false);
+    declineSessions((backfillOffer?.sessions ?? []).map((s) => s.sessionUrl));
+  }, [backfillOffer]);
+  const dismissBackfillPrompt = useCallback(() => setBackfillPromptOpen(false), []);
+
+  /** Sessions the driver has said will be their own runs — drawn as spoken for in the list below. */
+  const backfillTakenUrls = useMemo(
+    () =>
+      value.backfill?.ticked
+        ? new Set(backfillChosen.map((s) => s.sessionUrl.trim()))
+        : new Set<string>(),
+    [value.backfill?.ticked, backfillChosen]
+  );
+  /**
+   * Once a session is on the run, the list's verb changes: another row now adds its LAPS to this
+   * run (a split run), and it has to say so, because the sheet and the checkbox above offer the
+   * same rows as whole RUNS. Two doors, two words — "Import" stops meaning anything once both
+   * are open.
+   */
+  const importRowVerb = hasLinkedLapImport ? "Add laps" : "Import";
+  const takenWord = "Its own run";
 
   /**
    * The day's list, whoever it belongs to. Filtered alongside everything else: it sits inside the
@@ -1234,6 +1462,11 @@ export function LapTimesIngestPanel({
       setDayScanCandidates(candidates);
       setDayScanOlderCandidates(olderCandidates);
       setDayScanOlderTotal(olderCount);
+      // A day with nothing fresh but a backlog opens the backlog. The driver catching up the
+      // next morning, or logging a day from last month, otherwise met "No sessions from today
+      // yet" over a folded list they had to know to open (found driving it, 2026-09-14). A day
+      // WITH fresh sessions keeps the backlog folded — there it really is history.
+      setShowOlderSessions(candidates.length === 0 && olderCandidates.length > 0);
       setSessionsToday(Array.isArray(status?.sessionsToday) ? status.sessionsToday : []);
       setSessionsTodayDayIso(typeof status?.postedDayIso === "string" ? status.postedDayIso : null);
       setImportedCandidates(importedRows);
@@ -1492,6 +1725,11 @@ export function LapTimesIngestPanel({
             : null,
       };
 
+      // The first session to land arms the "other runs" sheet. Only ever reached from a tap in
+      // this panel — a block the form restores from a draft or a dashboard link never comes
+      // through here — so the sheet can't open over a wizard nobody touched.
+      if (value.urlImportBlocks.length === 0) backfillPromptArmedRef.current = true;
+
       // Add, don't replace: a run split by a break holds both halves. Re-importing
       // a session already attached refreshes it in place, so a driver correcting a
       // bad parse doesn't end up with the same laps counted twice.
@@ -1708,12 +1946,12 @@ export function LapTimesIngestPanel({
           because these belong to the run, not to whichever method found them. */}
       {attachedBlocks.length > 0 ? (
         <SurfaceCard variant="panel" overflowHidden={false} contentClassName="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Eyebrow>Laps on this run</Eyebrow>
+          <div className="eyebrow-band flex flex-wrap items-center gap-2">
+            <Eyebrow className="mb-0">Laps on this run</Eyebrow>
             {isUrlTab(tab) ? (
               <button
                 type="button"
-                className="ml-auto shrink-0 rounded-md border border-border bg-surface-runna px-3 py-1 text-[11px] font-medium text-muted-foreground hover:bg-surface-runna-inset hover:text-foreground transition"
+                className="-my-1 ml-auto shrink-0 rounded-md border border-border bg-surface-runna px-3 py-1 text-[11px] font-medium text-muted-foreground hover:bg-surface-runna-inset hover:text-foreground transition"
                 onClick={clearImport}
               >
                 {attachedBlocks.length > 1 ? "Clear all" : "Clear import"}
@@ -1760,6 +1998,32 @@ export function LapTimesIngestPanel({
             })}
           </div>
 
+          {/*
+            The day's other sessions, as runs beside this one. Off by default: nobody gets runs
+            they didn't ask for. The sheet that opened when the session landed is the loud ask;
+            this line is the record of the answer, and the way to change it. The runs it makes
+            wear "Unconfirmed" until opened.
+          */}
+          {value.backfill && backfillChosen.length > 0 ? (
+            <label className="flex cursor-pointer select-none items-center gap-2 text-[12px] font-medium text-foreground">
+              <input
+                type="checkbox"
+                className="shrink-0 accent-primary"
+                checked={value.backfill.ticked}
+                onChange={(e) =>
+                  onChange({
+                    ...value,
+                    backfill: { ...value.backfill!, ticked: e.target.checked },
+                  })
+                }
+              />
+              <span>
+                Add {backfillChosen.length} other {backfillChosen.length === 1 ? "run" : "runs"} from{" "}
+                {backfillDayWord}
+              </span>
+            </label>
+          ) : null}
+
           <LapsLandedReadout
             rows={mergedRunRows}
             improvedBy={landedImprovedBy}
@@ -1770,6 +2034,15 @@ export function LapTimesIngestPanel({
           />
         </SurfaceCard>
       ) : null}
+
+      <BackfillOfferSheet
+        open={backfillPromptOpen}
+        dayWord={backfillDayWord}
+        sessions={backfillPromptRows}
+        onAccept={acceptBackfillPrompt}
+        onDecline={declineBackfillPrompt}
+        onDismiss={dismissBackfillPrompt}
+      />
 
       {/* Card two: where laps come from. Separate surface so the tabs read as a
           tool you reach for, not as more of the run's own record. */}
@@ -1908,9 +2181,24 @@ export function LapTimesIngestPanel({
                           // Named on every row while the list is mixed; dropped once a source is
                           // selected, where the rail above has already said it seven times.
                           timingSource={sourceFilter === "all" ? row.timingSource : undefined}
-                          actionLabel={row.alreadyImported ? "Import again" : "Import"}
+                          // A stored parse is still just "Import" to the driver — where the bytes
+                          // come from is not their problem.
+                          actionLabel={
+                            hasLinkedLapImport
+                              ? importRowVerb
+                              : row.alreadyImported && !row.storedImportId
+                                ? "Import again"
+                                : "Import"
+                          }
+                          taken={backfillTakenUrls.has(row.sessionUrl.trim()) ? takenWord : null}
                           disabled={urlBusy}
-                          onClick={() => void importFromSessionUrl(row.sessionUrl)}
+                          onClick={() => {
+                            const stored = row.storedImportId
+                              ? importedCandidates.find((c) => c.importedSessionId === row.storedImportId)
+                              : null;
+                            if (stored) void takeStoredImport(stored);
+                            else void importFromSessionUrl(row.sessionUrl);
+                          }}
                         />
                       </li>
                     ))}
@@ -2035,7 +2323,8 @@ export function LapTimesIngestPanel({
                               when={row.when}
                               bestLapSeconds={row.bestLapSeconds}
                               timingSource={sourceFilter === "all" ? row.timingSource : undefined}
-                              actionLabel="Import"
+                              actionLabel={importRowVerb}
+                              taken={backfillTakenUrls.has(row.sessionUrl.trim()) ? takenWord : null}
                               disabled={urlBusy}
                               onClick={() => void importFromSessionUrl(row.sessionUrl)}
                             />
@@ -2087,7 +2376,7 @@ export function LapTimesIngestPanel({
                                 .join(" · ")}
                               bestLapSeconds={null}
                               timingSource={sourceFilter === "all" ? row.source : undefined}
-                              actionLabel="Import"
+                              actionLabel={importRowVerb}
                               disabled={urlBusy}
                               onClick={() => void importFromSessionUrl(row.sessionUrl)}
                             />
@@ -2116,8 +2405,8 @@ export function LapTimesIngestPanel({
                     onClick={() => setShowAlreadyImported((prev) => !prev)}
                   >
                     {showAlreadyImported
-                      ? "Hide sessions you've already imported"
-                      : `Show sessions you've already imported (${importedPickerRows.length})`}
+                      ? "Hide sessions already on a run"
+                      : `Show sessions already on a run (${importedPickerRows.length})`}
                   </button>
                   {showAlreadyImported ? (
                     <ul className="space-y-1">
@@ -2130,15 +2419,35 @@ export function LapTimesIngestPanel({
                               row.sessionTime,
                               row.timingSource
                             )}
-                            note={row.linkedRunLabel ? `On ${row.linkedRunLabel}` : "Not on a run"}
+                            // The state leads for a carried run: as a suffix on the run's name it
+                            // was the half that truncated at 390px ("On Run · Mon, 13 Oct · Unco…").
+                            note={
+                              row.linkedRunUnconfirmed
+                                ? "On an unconfirmed run"
+                                : row.linkedRunLabel
+                                  ? `On ${row.linkedRunLabel}`
+                                  : "Not on a run"
+                            }
                             bestLapSeconds={row.bestLapSeconds ?? null}
                             timingSource={sourceFilter === "all" ? row.timingSource : undefined}
                             // Laps sitting loose are simply taken. Laps filed under another run get
-                            // the confirm first, because taking them moves them off it.
-                            actionLabel={row.linkedRunId ? "Use here" : "Use these laps"}
+                            // the confirm first, because taking them moves them off it. Laps on a
+                            // run the app made from the timing sheet open THAT run instead: it is
+                            // this session's run already, waiting to be filled in.
+                            actionLabel={
+                              row.linkedRunId
+                                ? row.linkedRunUnconfirmed
+                                  ? "Open"
+                                  : "Use here"
+                                : "Use these laps"
+                            }
                             disabled={urlBusy}
                             onClick={() => {
-                              if (row.linkedRunId) setMoveConfirmRow(row);
+                              if (row.linkedRunId && row.linkedRunUnconfirmed) {
+                                // Into the wizard as a confirmation, and back to that day's
+                                // Sessions list after — not the dashboard.
+                                router.push(confirmRunHref(row.linkedRunId));
+                              } else if (row.linkedRunId) setMoveConfirmRow(row);
                               else void takeStoredImport(row);
                             }}
                           />
@@ -2215,7 +2524,7 @@ export function LapTimesIngestPanel({
               )}
               onClick={() => void fetchUrlPreview()}
             >
-              {urlBusy ? "Importing…" : "Import"}
+              {urlBusy ? "Importing…" : importRowVerb}
             </button>
           </div>
 

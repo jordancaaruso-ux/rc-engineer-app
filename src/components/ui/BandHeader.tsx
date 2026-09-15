@@ -24,9 +24,13 @@ import { Plus } from "lucide-react";
  * bands plus the log-run circle put five yellow objects on one 390px screen, which turns the accent
  * into wallpaper. The circle is the loud one here; adding a track is not.
  *
- * `-my-1` on the button, not a shorter row: the 36px tap target is the minimum a thumb can find,
- * and letting it set the row height would make every band header 56px of chrome before a word of
- * content. The negative margin keeps the target and hands the row back to the label.
+ * ── The band, 2026-09-15 ─────────────────────────────────────────────────────────────────────
+ * The row is `.eyebrow-band` — the same tinted header, with the same one full-bleed hairline,
+ * that every card in the app now opens on (founder pick off the Heading Height Bench). The `+`
+ * is DRAWN at 24px and pulled 5px into the row, so the 11px label sets the band's 29px height,
+ * not the button; its TAP area is an invisible 44px square hung off it (`after:-inset-2.5`),
+ * bigger than the 36px button it replaced. Drawn size and tap size are separate things — this
+ * used to trade one for the other. An `action` in the right-hand slot is held to the same 24px.
  *
  * It links to the band's full page rather than opening a form: adding a car, a track or a
  * meeting each has a real flow with validation and pickers, and a second inline copy of any
@@ -51,21 +55,20 @@ export function BandHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
-      {/* The raw `.eyebrow-label` span, not the `Eyebrow` wrapper: that wrapper carries
-          `.eyebrow-root` (its own bottom rule) plus `mb-2`, and both are the floating-in-the-gutter
-          spacing this row replaces. The rule here is the card's, full-bleed to its edges. */}
+    <div className="eyebrow-band flex items-center justify-between gap-3 px-4">
+      {/* The raw `.eyebrow-label` span, not the `Eyebrow` wrapper: the wrapper brings `mb-2`,
+          spacing for a heading that sits above content, not for one that IS a row. */}
       <span className="eyebrow-label min-w-0">{label}</span>
       {action ? (
-        <span className="-my-1 flex shrink-0 items-center">{action}</span>
+        <span className="-my-[5px] flex shrink-0 items-center">{action}</span>
       ) : addHref ? (
         <Link
           href={addHref}
           aria-label={addLabel ?? `Add to ${label}`}
           title={addLabel ?? `Add to ${label}`}
-          className="tap-active -my-1 grid size-9 shrink-0 place-items-center rounded-lg border border-dashed border-border bg-secondary text-muted-foreground transition hover:border-primary-ink/40 hover:text-foreground"
+          className="tap-active relative -my-[5px] grid size-6 shrink-0 place-items-center rounded-md border border-dashed border-border bg-secondary text-muted-foreground transition after:absolute after:-inset-2.5 hover:border-primary-ink/40 hover:text-foreground"
         >
-          <Plus className="size-4" aria-hidden />
+          <Plus className="size-3.5" aria-hidden />
         </Link>
       ) : null}
     </div>

@@ -14,21 +14,35 @@ import {
  * multi-car accounts) a quick car filter. Tapping a row pins it. Runs only — see
  * runCandidates.ts for why the setup / event rows and the compare button did not come back.
  */
+export type PickerEvent = { id: string; name: string; trackName: string | null; from: string; runs: number };
+
+/** The picker lists the most recent meetings; the filter picker reaches the rest. */
+const MAX_EVENT_ROWS = 5;
+
 export function EngineerRunPicker({
   candidates,
+  events = [],
   loading,
   error,
   pinnedRunId,
   disabled = false,
   onPick,
+  onPickEvent,
   onClose,
 }: {
   candidates: RunCandidate[];
+  /**
+   * The driver's meetings, newest first (2026-09-14). Picking one attaches the whole meeting —
+   * it is the filter block, not a pin — so the bar lights Filter, and the Engineer reads every
+   * run of that weekend.
+   */
+  events?: PickerEvent[];
   loading: boolean;
   error: string | null;
   pinnedRunId: string | null;
   disabled?: boolean;
   onPick: (candidate: RunCandidate) => void;
+  onPickEvent?: (event: PickerEvent) => void;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
@@ -39,6 +53,13 @@ export function EngineerRunPicker({
     const searched = filterCandidates(candidates, query);
     return carFilter ? searched.filter((c) => c.carId === carFilter) : searched;
   }, [candidates, query, carFilter]);
+  const visibleEvents = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = q
+      ? events.filter((e) => [e.name, e.trackName].some((s) => s?.toLowerCase().includes(q)))
+      : events;
+    return carFilter ? [] : list.slice(0, MAX_EVENT_ROWS);
+  }, [events, query, carFilter]);
 
   return (
     <div className="rounded-lg border border-border bg-background/60">
@@ -85,6 +106,26 @@ export function EngineerRunPicker({
       ) : null}
 
       <div className="max-h-56 overflow-y-auto py-1">
+        {visibleEvents.length > 0 && onPickEvent ? (
+          <div className="border-b border-border/70 pb-1">
+            <div className="px-3 pb-0.5 pt-1 ui-title text-[9px] text-muted-foreground">Meetings</div>
+            {visibleEvents.map((e) => (
+              <div key={e.id} className="flex items-stretch gap-1 px-1.5">
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onPickEvent(e)}
+                  className="tap-active min-w-0 flex-1 rounded-md px-2 py-1.5 text-left transition hover:bg-muted/50"
+                >
+                  <span className="block truncate text-sm text-foreground">{e.name}</span>
+                  <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                    {[e.trackName, `${e.runs} run${e.runs === 1 ? "" : "s"}`].filter(Boolean).join(" — ")}
+                  </span>
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
         {loading ? (
           <p className="px-3 py-2 text-xs text-muted-foreground">Loading recent runs…</p>
         ) : error ? (

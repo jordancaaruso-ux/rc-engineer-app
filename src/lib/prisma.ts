@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 
 import { PERF_ENABLED } from "@/lib/perf/perfConfig";
 import { perfExtension } from "@/lib/perf/prismaPerfExtension";
+import { runWindowExtension } from "@/lib/runs/runWindowExtension";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -27,14 +28,27 @@ const basePrisma =
   });
 
 /**
- * The perf extension only wraps `query` — it adds no delegates, methods, or fields — so
- * casting the extended client back to `PrismaClient` is sound and keeps the exported type
- * identical for every importer. When PERF_INSTRUMENTATION is off we skip `$extends`
- * entirely, so there is not even a proxy between callers and the driver.
+ * Two query extensions, neither of which adds a delegate, method or field — so casting the
+ * extended client back to `PrismaClient` is sound and keeps the exported type identical for every
+ * importer.
+ *
+ * `runWindowExtension` is always on: it is what keeps a Starter member's hidden runs off every
+ * screen (docs/STARTER_TIER_PLAN.md), and it must not be skippable by config. The perf extension
+ * only wraps `query` for timing; when PERF_INSTRUMENTATION is off there is no second proxy.
  */
-export const prisma: PrismaClient = PERF_ENABLED
-  ? (basePrisma.$extends(perfExtension) as unknown as PrismaClient)
-  : basePrisma;
+const withRunWindow = basePrisma.$extends(runWindowExtension);
+export const prisma: PrismaClient = (
+  PERF_ENABLED ? withRunWindow.$extends(perfExtension) : withRunWindow
+) as unknown as PrismaClient;
+
+/**
+ * The `run` delegate WITHOUT the plan window — the base client's own. For the three internals
+ * that must see hidden runs: `applyRunWindow` (it is what hides and reveals them), the Sessions
+ * page's hidden count (the "N older runs · Upgrade" row), and the community setup aggregation
+ * (the shared numbers stay whole; hiding is about what the driver sees). Nothing that shows a run
+ * to its owner may import this.
+ */
+export const runsIncludingHidden = basePrisma.run;
 
 assertActionItemDelegate(prisma);
 

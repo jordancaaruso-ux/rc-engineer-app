@@ -17,6 +17,12 @@ export const APP_SETTING_KEYS = {
    */
   speedhiveTransponderLoanerAt: "speedhiveTransponderLoanerAt",
   /**
+   * Which car each transponder lives in: JSON `{ "<chip>": "<carId>" }`
+   * (`lib/speedhive/transponderCars.ts`). Lets a run the timing sweep files carry a car the
+   * driver declared instead of one the app guessed.
+   */
+  speedhiveTransponderCarsJson: "speedhiveTransponderCarsJson",
+  /**
    * Other people's transponders you know — teammates, rivals. JSON array of
    * `{ name, transponder }`; see `lib/speedhive/knownCompetitors.ts`. Pulled only when
    * asked, never on a schedule.
@@ -192,6 +198,17 @@ export async function setSpeedhiveTransponderNumbersSetting(
   value: string | null
 ): Promise<void> {
   await setUserSetting(userId, APP_SETTING_KEYS.speedhiveTransponderNumbersJson, value);
+}
+
+export async function getSpeedhiveTransponderCarsSetting(userId: string): Promise<string | null> {
+  return getUserSetting(userId, APP_SETTING_KEYS.speedhiveTransponderCarsJson);
+}
+
+export async function setSpeedhiveTransponderCarsSetting(
+  userId: string,
+  value: string | null
+): Promise<void> {
+  await setUserSetting(userId, APP_SETTING_KEYS.speedhiveTransponderCarsJson, value);
 }
 
 export async function getKnownCompetitorsSetting(userId: string): Promise<string | null> {

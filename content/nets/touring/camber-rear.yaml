@@ -16,12 +16,12 @@ more:
   reviewed: true
   confidence: consensus
   before_settled: "little change at the first steering input"
-  once_settled: "more rear hold mid-corner and a shade less forward traction on power; how much you get depends heavily on the tyre"
+  once_settled: "more rear grip in the middle and a shade less forward traction on power; how much you get depends heavily on the tyre"
 less:
   reviewed: false
   confidence: consensus
   before_settled: "little change at the first steering input"
-  once_settled: "less rear hold mid-corner and a shade more forward traction on power; how much you get depends heavily on the tyre"
+  once_settled: "less rear grip in the middle and a shade more forward traction on power; how much you get depends heavily on the tyre"
 physics:
   - camber.md
 sources:

@@ -6,9 +6,12 @@ import { JrcMark } from "@/components/brand/JrcMark";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { getPricePlansWithAmounts } from "@/lib/stripe";
-import { PRODUCT_NAME } from "@/lib/brand/brandNames";
+import { PRODUCT_NAME, TIER_LABELS } from "@/lib/brand/brandNames";
+import type { PaidTier } from "@/lib/entitlementLogic";
 import { isDemoIdentity } from "@/lib/demo/demoAccess";
 import { JoinPlansClient, type JoinPlan } from "@/components/billing/JoinPlansClient";
+import { ShellPlanNotice } from "@/components/billing/ShellPlanNotice";
+import { isNativeShellRequest } from "@/lib/nativeShellServer";
 
 export const metadata = { title: `Join ${PRODUCT_NAME}` };
 
@@ -32,6 +35,9 @@ export const metadata = { title: `Join ${PRODUCT_NAME}` };
  * existed — it just says so now, and points at both ways on.
  */
 export default async function JoinPage(): Promise<ReactNode> {
+  // Inside the native shell nothing is sold — see `lib/nativeShell.ts`.
+  if (await isNativeShellRequest()) return <ShellPlanNotice />;
+
   const session = await auth();
   const viewer = session?.user ?? null;
 
@@ -96,7 +102,7 @@ export default async function JoinPage(): Promise<ReactNode> {
 
   const plans = await getPricePlansWithAmounts();
   const joinPlans: JoinPlan[] = plans
-    .filter((p): p is typeof p & { tier: "standard" | "pro" } => p.tier !== "none")
+    .filter((p): p is typeof p & { tier: PaidTier } => p.tier !== "none")
     .map((p) => ({
       tier: p.tier,
       interval: p.interval,
@@ -145,8 +151,18 @@ export default async function JoinPage(): Promise<ReactNode> {
           {/* Cut on the phone (the fold's whole point is fewer paragraphs before the button):
               the headline and the two row hooks carry it there. */}
           <p className="hidden max-w-[52ch] text-[15px] leading-relaxed text-muted-foreground md:block">
-            Both keep every run, every setup and every lap time. What changes is how often you can
-            ask the Engineer, and whether the heavy tools come with it.
+            {joinPlans.some((p) => p.tier === "starter") ? (
+              <>
+                {TIER_LABELS.standard} keeps every run, every setup and every lap time;{" "}
+                {TIER_LABELS.starter} keeps your last fifteen runs. {TIER_LABELS.pro} adds the
+                Engineer itself, and the heavy tools.
+              </>
+            ) : (
+              <>
+                Both keep every run, every setup and every lap time. {TIER_LABELS.pro} adds the
+                Engineer itself, and the heavy tools.
+              </>
+            )}
           </p>
 
           {joinPlans.length === 0 ? (

@@ -180,9 +180,9 @@ export function VideoToolsClient() {
               type="button"
               disabled={uploading}
               onClick={() => fileRef.current?.click()}
-              className="tap-active inline-flex h-9 items-center gap-1.5 rounded-lg border border-dashed border-border bg-secondary px-3 text-[11.5px] font-semibold text-muted-foreground transition hover:border-primary-ink/40 hover:text-foreground disabled:opacity-60"
+              className="tap-active relative inline-flex h-6 items-center gap-1 rounded-md border border-dashed border-border bg-secondary px-2 text-[11px] font-semibold text-muted-foreground transition after:absolute after:-inset-2.5 hover:border-primary-ink/40 hover:text-foreground disabled:opacity-60"
             >
-              <Upload className="h-3.5 w-3.5" aria-hidden />
+              <Upload className="h-3 w-3" aria-hidden />
               {uploading ? `${uploadPct}%` : "Upload"}
             </button>
           }

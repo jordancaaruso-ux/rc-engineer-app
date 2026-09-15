@@ -327,16 +327,17 @@ export function renderNetEntry(entry: NetEntry): string {
       // Driver words, not physics words: "settled" is corner-regime.md's term and the model was
       // asking drivers about it (founder, 2026-08-28). The fields keep their names; the labels
       // the model reads are places on the corner.
-      lines.push(`    ON THE WAY IN: ${s.before_settled}`);
+      lines.push(`    ENTERING THE CORNER: ${s.before_settled}`);
       // "AND OUT" since 2026-09-02: the once_settled field has always carried exit and on-power
       // content too, and the old label told the model it was about the middle only.
-      lines.push(`    THROUGH THE MIDDLE AND OUT: ${s.once_settled}`);
+      lines.push(`    IN THE MIDDLE AND EXITING: ${s.once_settled}`);
     } else {
       lines.push(`    EFFECT: ${s.effect}`);
     }
     if (s.contested) {
-      lines.push(`    CONTESTED — claim A: ${s.contested.claim_a}`);
-      lines.push(`              claim B: ${s.contested.claim_b}`);
+      // "CONTESTED" was leaking into answers as the word itself (founder, 2026-09-09); a driver reads "it goes either way".
+      lines.push(`    IT GOES EITHER WAY — one way: ${s.contested.claim_a}`);
+      lines.push(`              the other way: ${s.contested.claim_b}`);
       lines.push(`              what decides it on track: ${s.contested.discriminator}`);
     }
   }

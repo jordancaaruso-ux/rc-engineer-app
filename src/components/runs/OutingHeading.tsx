@@ -19,6 +19,12 @@ import { cn } from "@/lib/utils";
  * composed once in `resolveOutingHeading` so both surfaces say it the same way),
  * and this is a heading and a date again. Do not re-add the pill.
  *
+ * ## The band (2026-09-15)
+ *
+ * In both homes it is the first thing in its card, so `.eyebrow-root` turns it into that
+ * card's band — the tint and one full-bleed hairline — with no class of its own. Callers
+ * pass padding (`px-4`), never a top margin, or a white strip opens above the tint.
+ *
  * Composed by hand rather than through `<Eyebrow>`, the same way the trend card's
  * own header is, so the date can ride the label's row. The classes ARE the eyebrow
  * system's: this is the card's heading, not a title sitting under one, and the name
@@ -42,7 +48,7 @@ export function OutingHeading({
         <span className="min-w-0 truncate">{title}</span>
       </h2>
       {where ? (
-        <span className="ml-auto shrink-0 whitespace-nowrap text-[11.5px] text-muted-foreground">
+        <span className="ml-auto shrink-0 whitespace-nowrap text-[11px] leading-[1.25] text-muted-foreground">
           {where}
         </span>
       ) : null}

@@ -5,4 +5,4 @@ flexes, the more of the roll it takes up itself, **softening the effective roll 
 how cleanly the front/rear split tunes; it also adds **compliance** ([[bump-compliance]]) — the whole
 platform gives over bumps and uneven surfaces. Front vs rear flex biases which end is softened.
 
-**Moved by:** chassis material, top decks, brace screws, deck cuts.
+**Moved by:** chassis material, top decks, brace screws, deck cuts [[flex-chassis]].

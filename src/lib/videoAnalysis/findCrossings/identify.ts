@@ -61,6 +61,7 @@ import {
   type CarColour,
   type Rgb,
 } from "./carColour";
+import { learnOwnColours, lineColourVerdict, ownColourKey, type OwnColours } from "./ownColour";
 import type { FieldDriver } from "./field";
 import {
   SF_AGREE_SEC,
@@ -133,10 +134,20 @@ export type CarOption = {
    * 2026-08-28, of a car that moved with Sandy ten seconds into his lap. Kept on the record.
    */
   dropped?: boolean;
+  /** How fast it crossed, in frame pixels a second — only when a track backed it. On the record. */
+  speedPxPerSec?: number;
+  /** Share of the lap something was moving at this crossing's place — see `CrossingEvent.dwell`. */
+  dwell?: number;
+  /**
+   * Something was at this place for a good part of the lap: a marshal standing on the line's end,
+   * a person walking the outside of the track. A car is there for a fraction of a second. Folded,
+   * never picked for the driver.
+   */
+  lingers?: boolean;
 };
 
 /** Why a picture is folded away, when it is. */
-export type FoldReason = "other-car" | "colour" | "order" | "direction" | "field" | "off-line";
+export type FoldReason = "other-car" | "colour" | "order" | "direction" | "field" | "off-line" | "lingers";
 
 /**
  * How many of the other laps read a car must turn up on, where this driver's timing put it, to
@@ -159,6 +170,7 @@ export function foldReasons(o: CarOption): FoldReason[] {
   if (o.movesWith && !o.movesWith.mine) out.push("other-car");
   if (o.outOfOrder) out.push("order");
   if (o.wrongWay) out.push("direction");
+  if (o.lingers) out.push("lingers");
   if (o.offField) out.push("field");
   if (o.hint === "other") out.push("colour");
   if (o.offLine && !o.shortLine) out.push("off-line");
@@ -174,14 +186,43 @@ export function foldReasonFor(o: CarOption): FoldReason | undefined {
 export const HAIRPIN_SEC = 3;
 
 /**
+ * Above this share of the lap with something moving at a crossing's place, the thing that
+ * crossed was there the whole time — a person, not a car.
+ *
+ * On the Bendigo 4K practice (2026-09-09) the picker offered a marshal standing on the end of the
+ * S3 line as the driver's car — three of four pictures. Nothing else told them apart: the tracker
+ * hopped between arms, legs and shadow at a car's speed, the start-line colour reference (a
+ * grey-pink smudge on the far side) called the grey figure "yours", there was no field window on a
+ * solo practice, and the crossings were on the line and in order. Time is what a person cannot
+ * fake: measured on the same footage (2026-09-08), the cars' crossing place had something moving
+ * in it 4% of a lap and the person's spot 41%. Same bar as `MAX_BUSY_SHARE`.
+ *
+ * Judged against the quietest crossing on the same line, never alone: on a 30px far-side tick
+ * the crop is smaller than "the same place" and grain fills it every frame, so every crossing
+ * there reads 100% — the driver's own car included (2026-09-09, S1/S2/S4–S6 of the same clip).
+ * A place is only "busy" where another crossing on that line shows the line can be quiet.
+ */
+export const LINGER_SHARE = 0.25;
+/** …and at least this many times the quietest place on the line. */
+export const LINGER_CONTRAST = 3;
+
+/**
  * Settle the driver's own car against the line's geometry, per line, once every other verdict is
- * in: which kept-step car beside the line is a short line's fault (`shortLine`), and which pair
- * on the line is a hairpin's two passes (`hairpin`).
+ * in: which crossings were made by something that was there all lap (`lingers`), which kept-step
+ * car beside the line is a short line's fault (`shortLine`), and which pair on the line is a
+ * hairpin's two passes (`hairpin`).
  */
 export function settleLineShape(options: CarOption[]): CarOption[] {
-  const mine = options.filter((o) => keptStep(o) && !o.outOfOrder && !o.offField);
+  const measured = options.map((o) => o.dwell).filter((d): d is number => d != null);
+  const quietest = measured.length ? Math.min(...measured) : null;
+  const paced = options.map((o) =>
+    o.dwell != null && quietest != null && o.dwell > LINGER_SHARE && o.dwell > LINGER_CONTRAST * quietest
+      ? { ...o, lingers: true }
+      : o
+  );
+  const mine = paced.filter((o) => keptStep(o) && !o.outOfOrder && !o.offField && !o.lingers);
   const onLine = mine.filter((o) => !o.offLine);
-  return options.map((o) => {
+  return paced.map((o) => {
     if (!mine.includes(o)) return o;
     if (o.offLine) return onLine.length === 0 ? { ...o, shortLine: true } : o;
     const twin = onLine.find(
@@ -255,6 +296,23 @@ const OTHER_RIVAL_FRACTION = 0.75;
 const EXTRA_LAPS = 4;
 /** A crossing this close to where a driver's timing predicts it is that driver's crossing. */
 const STEP_TOL_SEC = 0.35;
+/**
+ * Two crossings this far apart, as a share of the frame's width, came from the same thing — about
+ * half a car length on the footage this was measured on. Used to ask whether a hit came back to
+ * the same place, and to measure how often that place fires. See `movesWithFor`.
+ */
+const SAME_PLACE_SHARE = 0.02;
+/**
+ * How much of a lap a place may be occupied before a hit there stops being worth anything.
+ *
+ * Measured off the Bendigo footage (2026-09-08), watching the two spots directly rather than
+ * trusting the detector: over one whole lap, the place where the cars cross had something moving
+ * in it **4% of the time**, and the spot at the line's bottom end where a person was walking had
+ * something moving in it **41% of the time, in one unbroken spell**. Over five laps the car's spot
+ * came alive five times — once a lap, as it should. A quarter of a lap sits an order of magnitude
+ * above a car passing and comfortably below a person loitering.
+ */
+const MAX_BUSY_SHARE = 0.25;
 /**
  * The least time between one corner and the next, and between the last corner and the line. A
  * tenth-scale car at the closest two lines anyone draws is still a few tenths apart.
@@ -360,6 +418,8 @@ export type ReadWindow = {
   crossings: number[];
   /** Which way each crossing went, parallel to `crossings`; absent on data without directions. */
   dirs?: Array<1 | -1 | undefined>;
+  /** Where each crossing was, parallel to `crossings`; absent on data built without positions. */
+  places?: Array<{ x: number; y: number } | undefined>;
 };
 
 /**
@@ -371,14 +431,63 @@ export type ReadWindow = {
  * driver being asked about ties for it, in which case nothing is said: a rival running nose to
  * tail at a steady gap keeps step with both timings for a couple of laps, and that is exactly
  * when the picture, not the arithmetic, has to decide.
+ *
+ * **A hit has to be worth something, and counting them is not enough.** At Bendigo (2026-09-08) a
+ * person walked up and down the outside of the track where the S3 line was drawn, and the screen
+ * offered them as the driver's car with "on 4 of 4 your laps" against the driver's own car's 3 of
+ * 4. That is not bad luck, it is what counting hits has to produce: this asks whether SOMETHING
+ * crossed near the predicted moment, and a thing that is there the whole lap crosses near every
+ * moment you can name. A car is at a corner for a fraction of a second a lap and can be missed, so
+ * it can only ever score the same or worse. The test could not have preferred the car.
+ *
+ * Two things fix it, and both are about weighing a hit rather than counting it:
+ *
+ *  - **A hit must come from the same place.** The evidence is meant to be "this thing came back",
+ *    and a crossing 300px up the line is a different thing. Without this the busiest spot on a
+ *    line lends its hits to every candidate on it.
+ *  - **A hit only counts if its place was quiet the rest of the lap.** Each window says how much
+ *    of itself that place was occupied, and a spot busy a third of the lap lands inside a ±0.35s
+ *    guess whatever the driver's timing says. Past `MAX_BUSY_SHARE` the arithmetic says nothing at
+ *    all — which is this file's whole disposition anyway, and leaves the picture to decide.
+ *
+ * It cannot silence a real car by mistake: a car is at a place for a few percent of a lap even
+ * when the whole field crosses there, an order of magnitude short of the bar.
  */
 export function movesWithFor(
   t: number,
   field: FieldDriver[],
   mineKey: string,
-  others: ReadWindow[]
+  others: ReadWindow[],
+  at?: { x?: number; y?: number } | null,
+  samePlacePx?: number
 ): MovesWith | undefined {
   if (others.length === 0) return undefined;
+  // Per window, the crossings that came from the same place as the thing being judged, and how
+  // much of the window that place was occupied — which is how likely a hit there was for nothing.
+  const local = others.map((w) => {
+    const times: number[] = [];
+    for (let i = 0; i < w.crossings.length; i++) {
+      const p = w.places?.[i];
+      if (at?.x != null && at.y != null && samePlacePx != null && p) {
+        if (Math.hypot(p.x - at.x, p.y - at.y) > samePlacePx) continue;
+      }
+      times.push(w.crossings[i]!);
+    }
+    // Each crossing owns the ±STEP_TOL_SEC a guess could land in; overlapping ones are one spell.
+    const span = Math.max(w.toSec - w.fromSec, 2 * STEP_TOL_SEC);
+    let covered = 0;
+    let end = Number.NEGATIVE_INFINITY;
+    for (const t of [...times].sort((a, b) => a - b)) {
+      const hi = Math.min(w.toSec, t + STEP_TOL_SEC);
+      if (hi <= end) continue;
+      covered += hi - Math.max(Math.max(w.fromSec, t - STEP_TOL_SEC), end);
+      end = hi;
+    }
+    return { times, busy: covered / span };
+  });
+  // The spot itself is never quiet, so nothing that lines up with it means anything.
+  if (local.reduce((s, l) => s + l.busy, 0) / local.length > MAX_BUSY_SHARE) return undefined;
+
   const scored: Array<{ d: FieldDriver; hits: number; err: number }> = [];
   for (const d of field) {
     const starts = [...d.lapStarts].sort((a, b) => a.startSec - b.startSec);
@@ -387,14 +496,14 @@ export function movesWithFor(
     const offset = t - on.startSec;
     let hits = 0;
     let err = 0;
-    for (const w of others) {
+    for (const [i, w] of others.entries()) {
       // The lap of this driver whose predicted crossing lands inside the window, if any.
       const predicted = starts
         .map((s) => s.startSec + offset)
         .find((p) => p >= w.fromSec && p <= w.toSec);
       if (predicted == null) continue;
       let best = Number.POSITIVE_INFINITY;
-      for (const c of w.crossings) best = Math.min(best, Math.abs(c - predicted));
+      for (const c of local[i]!.times) best = Math.min(best, Math.abs(c - predicted));
       if (best <= STEP_TOL_SEC) {
         hits++;
         err += best;
@@ -640,7 +749,12 @@ export type IdentifyContext = {
  */
 export async function collectCarOptions(
   ctx: IdentifyContext,
-  opts: { role: SessionRole; lapNumber?: number }
+  opts: {
+    role: SessionRole;
+    lapNumber?: number;
+    /** Each line's colour as the learning pass found it (`LearnResult.ownColours`), if it ran. */
+    ownColours?: OwnColours;
+  }
 ): Promise<IdentifyResult | null> {
   const { video, frameW, frameH, durationSec, lines, laps, lapStart, signal } = ctx;
   const lap =
@@ -729,6 +843,15 @@ export async function collectCarOptions(
           Math.abs(r.detectedSec - (truthById.get(r.id) ?? NaN)) <= SF_AGREE_SEC
       )
     )[lap.role] ?? null;
+  // Each line's own colour — the reference that tells a marshal's grey from the pink car at
+  // Bendigo's S3 when the start-line one cannot (`ownColour.ts`). The learning pass's windows
+  // are where a driver is found alone (three of its four quickest laps at that S3); the whole
+  // laps read here rarely are, so its references come first and this pass adds its own on top.
+  // Where a line has one, it outranks the start line's hint.
+  const ownColours: OwnColours = new Map([
+    ...(opts.ownColours ?? []),
+    ...learnOwnColours(scan.results, SF_LINE_KEY, (id) => id.split(":")[0] ?? ""),
+  ]);
 
   // The field to check against: everyone with lap starts, this driver included even when the
   // screen passed nobody (a practice session) — then a picture can only be "yours" or unknown.
@@ -761,12 +884,16 @@ export async function collectCarOptions(
     l: SessionLine,
     o: { lapNumber: number; fromSec: number; toSec: number },
     keep: (c: CrossingEvent) => boolean = () => true
-  ): ReadWindow => ({
-    fromSec: o.fromSec,
-    toSec: o.toSec,
-    crossings: candidatesOf(o.lapNumber, l.lineKey).filter(keep).map((c) => c.t),
-    dirs: candidatesOf(o.lapNumber, l.lineKey).filter(keep).map((c) => c.dir),
-  });
+  ): ReadWindow => {
+    const kept = candidatesOf(o.lapNumber, l.lineKey).filter(keep);
+    return {
+      fromSec: o.fromSec,
+      toSec: o.toSec,
+      crossings: kept.map((c) => c.t),
+      dirs: kept.map((c) => c.dir),
+      places: kept.map((c) => (c.x != null && c.y != null ? { x: c.x, y: c.y } : undefined)),
+    };
+  };
   // Where the field crosses each line, learnt from every window read — the identify lap too —
   // and only from crossings ON the line: a car passing beside it on the neighbouring track
   // repeats every lap just as faithfully, and on the Boronia footage that second cluster
@@ -798,14 +925,18 @@ export async function collectCarOptions(
       quality: c.quality,
       colour: c.colour,
       dir: c.dir,
+      speedPxPerSec: c.speedPxPerSec,
+      dwell: c.dwell,
     }));
     const slack = onLineSlackFor(geom.norm);
     const judged = dedupe(raw).map((o): CarOption => {
       const along = o.x != null && o.y != null ? alongLine(geom, o.x, o.y) : null;
       const base: CarOption = {
         ...o,
-        hint: hintFor(car, o.colour),
-        movesWith: movesWithFor(o.t, field, mineKey, others),
+        hint:
+          lineColourVerdict(ownColours.get(ownColourKey(lap.role, l.lineKey)), o.colour) ??
+          hintFor(car, o.colour),
+        movesWith: movesWithFor(o.t, field, mineKey, others, o, frameW * SAME_PLACE_SHARE),
         offLine: along != null && (along < -slack || along > 1 + slack),
       };
       // The field's window says where the CORNER is; keeping step says whose CAR it is. They are
@@ -860,7 +991,14 @@ export async function collectCarOptions(
  * left" is not evidence: on the Boronia footage a lone unlabelled leftover at 0.87s was picked
  * as S3, and every other line was then judged against it. Everything else stays theirs to tap.
  */
-export function defaultPicks(lines: LineOptions[]): Record<string, CarOption> {
+/**
+ * What the learning pass already knew before the picker opened: the offset it settled on per
+ * line, and which lines it could not settle. A lone picture where the learning pass found the
+ * same rhythm on four laps needs no tap.
+ */
+export type PickPrior = { seeds?: Record<string, number>; ambiguous?: string[] };
+
+export function defaultPicks(lines: LineOptions[], prior?: PickPrior): Record<string, CarOption> {
   const picks: Record<string, CarOption> = {};
   for (const l of lines) {
     const left = l.options.filter((o) => foldReasonFor(o) == null && !o.dropped && !o.hairpin);
@@ -869,7 +1007,19 @@ export function defaultPicks(lines: LineOptions[]): Record<string, CarOption> {
     // "The only one left" was worthless when the folds were weak (a lone stray at 0.87s was
     // picked as S3). With the field's window folding everything outside where the corner is,
     // the one car left inside it IS the corner: "if it knows that's it, why is it asking me?"
-    else if (left.length === 1 && l.field) picks[l.lineKey] = left[0]!;
+    // The same goes for a lone picture the colour calls the driver's, and for one the learning
+    // pass had already settled on — a solo practice has no field window, and on the Bendigo 4K
+    // practice (2026-09-09) that left the driver tapping the only picture on S1 and S2 to confirm
+    // what the screen had just told them.
+    else if (left.length === 1) {
+      const only = left[0]!;
+      const seed = prior?.seeds?.[l.lineKey];
+      const learnt =
+        seed != null &&
+        !prior?.ambiguous?.includes(l.lineKey) &&
+        Math.abs(only.offsetSec - seed) <= STEP_TOL_SEC;
+      if (l.field || only.hint === "yours" || learnt) picks[l.lineKey] = only;
+    }
   }
   return picks;
 }

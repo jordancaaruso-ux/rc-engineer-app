@@ -208,8 +208,8 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
       ) : null}
 
       <CardPanel contentClassName="p-0">
-        <div className="px-4 pt-3">
-          <Eyebrow>Members</Eyebrow>
+        <div className="eyebrow-band px-4">
+          <Eyebrow className="mb-0">Members</Eyebrow>
         </div>
         <ul className="divide-y divide-border/40">
           {detail.members.map((member) => {

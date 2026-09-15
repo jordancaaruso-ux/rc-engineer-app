@@ -21,8 +21,8 @@ export function TeamRosterStrip({
 
   return (
     <CardPanel contentClassName="p-0">
-      <div className="px-4 pt-3">
-        <Eyebrow>Roster</Eyebrow>
+      <div className="eyebrow-band px-4">
+        <Eyebrow className="mb-0">Roster</Eyebrow>
       </div>
       <ul className="divide-y divide-border/40">
         {members.map((member) => {

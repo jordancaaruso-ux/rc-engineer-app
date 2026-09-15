@@ -1,15 +1,22 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import {
   getSpeedhiveDriverNameForUser,
   getSpeedhiveDriverNameSetting,
+  getSpeedhiveTransponderCarsSetting,
   getSpeedhiveTransponderLoanerSetting,
   getSpeedhiveTransponderNumbersSetting,
   setSpeedhiveDriverNameSetting,
+  setSpeedhiveTransponderCarsSetting,
   setSpeedhiveTransponderLoanerSetting,
   setSpeedhiveTransponderNumbersSetting,
 } from "@/lib/appSettings";
+import {
+  formatTransponderCarsSetting,
+  parseTransponderCarsSetting,
+} from "@/lib/speedhive/transponderCars";
+import { refreshPlanUser } from "@/lib/sweep/buildSweepPlan";
 import {
   formatSpeedhiveTransponderNumbersForSetting,
   parseSpeedhiveTransponderNumbersSetting,
@@ -20,12 +27,13 @@ import {
 } from "@/lib/speedhive/speedhiveDriverNames";
 
 async function readIdentity(userId: string) {
-  const [driverNameRaw, effectiveDriverName, transponderRaw, transponderLoaner] =
+  const [driverNameRaw, effectiveDriverName, transponderRaw, transponderLoaner, transponderCarsRaw] =
     await Promise.all([
       getSpeedhiveDriverNameSetting(userId),
       getSpeedhiveDriverNameForUser(userId),
       getSpeedhiveTransponderNumbersSetting(userId),
       getSpeedhiveTransponderLoanerSetting(userId),
+      getSpeedhiveTransponderCarsSetting(userId),
     ]);
   const transponderNumbers = parseSpeedhiveTransponderNumbersSetting(transponderRaw);
   const driverNames = parseSpeedhiveDriverNamesSetting(driverNameRaw);
@@ -38,6 +46,7 @@ async function readIdentity(userId: string) {
     speedhiveTransponderNumbers: transponderNumbers,
     speedhiveTransponderNumbersText: formatSpeedhiveTransponderNumbersForSetting(transponderNumbers),
     speedhiveTransponderLoaner: transponderLoaner,
+    transponderCars: parseTransponderCarsSetting(transponderCarsRaw),
   };
 }
 
@@ -60,6 +69,8 @@ export async function POST(request: Request) {
     speedhiveDriverName?: string | null;
     speedhiveTransponderNumbers?: string | null;
     speedhiveTransponderLoaner?: boolean;
+    /** JSON `{ "<chip>": "<carId>" }` — see `lib/speedhive/transponderCars.ts`. */
+    transponderCarsJson?: string | null;
   } | null;
 
   // Normalised on the way in so the stored value always round-trips through the
@@ -89,6 +100,17 @@ export async function POST(request: Request) {
     // sit there forever telling onboarding not to ask again.
     if (parsed.length > 0) await setSpeedhiveTransponderLoanerSetting(userId, false);
   }
+
+  if (typeof body?.transponderCarsJson === "string" || body?.transponderCarsJson === null) {
+    await setSpeedhiveTransponderCarsSetting(
+      userId,
+      formatTransponderCarsSetting(parseTransponderCarsSetting(body.transponderCarsJson))
+    );
+  }
+
+  // A chip saved this afternoon should be listened for this afternoon, not after tonight's
+  // plan rebuild. After the response: the driver never waits on Blob.
+  after(() => refreshPlanUser(userId).catch(() => {}));
 
   return NextResponse.json(await readIdentity(userId));
 }

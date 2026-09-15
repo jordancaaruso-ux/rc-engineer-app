@@ -51,7 +51,7 @@ Single place to track product notes from app usage (2026-04-27). Edit **Priority
 | FB-18 | Change 'to try' order | Reorder items in **Things to try** (dashboard persistent list and/or per-run list), not only add/delete. | Dashboard / Log run | M | 20 | Shipped (sortOrder + DnD) |
 | FB-19 | Time of day / UTC | Session or event “time of day” still wrong — audit for UTC vs local handling in storage and display. | Data / Log run | M | 2 | Not started |
 | FB-20 | Sync to MyLaps | Integration to pull or link MyLaps timing data. | Integrations | L | 21 | Not started |
-| FB-21 | Day debrief | End-of-day or post-event debrief flow (summary, notes, Engineer hook — scope TBD). | Product | L | 22 | Not started |
+| FB-21 | Day debrief | One free-text note per meeting (event, or same track + same local day) with live figures beside it — best lap, best top 5, best 5-min stint each naming its run (tap opens it), rating arc, tyres (per-tyre figures when more than one), air; no comparison. One home: the Sessions day view, between the chart and the runs. `MeetingDebrief` model, `src/lib/debrief/`, `DebriefCard`. Engineer read + on-tap AI recap (Notebook: limited; Pro: automatic; counts as an ask) ruled for after launch. | Sessions | L | 22 | Built 2026-09-14 (v1: box + figures) |
 | FB-22 | Balance image top down | Setup or help UI: balance diagram viewed from **top** (orientation / asset update). | Content / UI | M | 3 | Not started |
 | FB-23 | Per-car swiping on widget cards | Designed, not built. Extend the `PagedCard` widget-face axis to swipe **between cars/categories**: dashboard summary (all-cars → per-car overview), dashboard last-run (latest run of each car), analysis session-trend (form per category). Deferred until multi-category users are real (interview 2026-07-07). Faces per card already ship; this adds a car dimension. | Dashboard / Analysis | M | 23 | Designed — deferred |
 
@@ -87,7 +87,7 @@ Work through in **Priority** order from the table (after you fill it in). Check 
 - [x] FB-18 Reorder Things to try (ActionItem `sortOrder` + drag on dashboard; `?list=try` / `do`)  
 - [ ] FB-19 UTC / local time-of-day fix  
 - [ ] FB-20 MyLaps sync  
-- [ ] FB-21 Day debrief  
+- [x] FB-21 Day debrief (v1 built 2026-09-14: `MeetingDebrief` + `DebriefCard` on the Sessions day; AI recap post-launch)  
 - [ ] FB-22 Balance image top-down  
 - [ ] FB-23 Per-car swiping on widget cards (designed 2026-07-07, deferred until multi-category users)  
 

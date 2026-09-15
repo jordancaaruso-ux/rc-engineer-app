@@ -27,14 +27,14 @@
      to everyone who has already seen the link. Regenerate with `node scripts/generate-og-card.mjs`;
      if the card changes again, bump to -v4 in that script, here, and in the openGraph block in
      src/app/layout.tsx, which serves the same card for every route that is not /welcome. -->
-<meta property="og:image" content="https://www.jrcdynamics.com/landing/assets/og-card-v3.jpg" />
+<meta property="og:image" content="https://www.jrcdynamics.com/landing/assets/og-card-v4.jpg" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 <meta property="og:image:alt" content="Two matching phone screens: a logged race &mdash; the 2026 QLD State Titles A-main, its lap graph comparing your run against another driver &mdash; and the JRC Trackside Engineer answering a question about that run, beside the line: your race engineer, in your pocket." />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="JRC Trackside &mdash; your race engineer, in your pocket" />
 <meta name="twitter:description" content="Log a run in a minute. Ask what to change next &mdash; the answer is built from your own setups and lap times, not the internet." />
-<meta name="twitter:image" content="https://www.jrcdynamics.com/landing/assets/og-card-v3.jpg" />
+<meta name="twitter:image" content="https://www.jrcdynamics.com/landing/assets/og-card-v4.jpg" />
 <meta name="twitter:image:alt" content="Two matching phone screens: a logged race &mdash; the 2026 QLD State Titles A-main, its lap graph comparing your run against another driver &mdash; and the JRC Trackside Engineer answering a question about that run, beside the line: your race engineer, in your pocket." />
 <script src="/landing/support.js"></script>
 </head>
@@ -46,7 +46,16 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
-  html, body { margin:0; padding:0; background:#171614; color:#EDE8DF; -webkit-font-smoothing:antialiased; }
+  /* The typeface, size, line height and sideways-scroll guard also sit inline on the page
+     wrapper (the first div inside <x-dc>), but the DC runtime drops that element's style
+     attribute when it mounts, so every paragraph without its own font-family fell back to
+     Times New Roman (53 of them, seen live 2026-09-15). Declared here as well: a stylesheet
+     survives the mount. */
+  html, body { margin:0; padding:0; background:#171614; color:#EDE8DF; -webkit-font-smoothing:antialiased;
+    font-family:"Sora",system-ui,sans-serif; font-size:16px; line-height:1.6; }
+  /* On body ONLY. Set on html as well, the body becomes its own scroll box instead of the
+     window, and the hero cards ride down the page. */
+  body { overflow-x:hidden; }
   * { box-sizing:border-box; }
   a { color:#FFD60A; text-decoration:none; }
   a:hover { color:#FFE45C; }
@@ -615,20 +624,34 @@
     </div>
     <div style="position:relative;max-width:1360px;margin:0 auto">
       <h2 data-rv data-rv-delay="80" style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(2rem,4.2vw,3.4rem);line-height:1.03;opacity:0;transform:translateY(22px);transition:opacity .8s cubic-bezier(.2,.6,.2,1),transform .8s cubic-bezier(.2,.6,.2,1)">The notebook, <span style="color:#FFD60A">or the race engineer.</span></h2>
-      <p data-rv data-rv-delay="160" style="margin-top:1.25rem;max-width:42rem;font-size:clamp(1rem,1.35vw,1.15rem);color:#AFAFA6;text-wrap:pretty;opacity:0;transform:translateY(22px);transition:opacity .8s cubic-bezier(.2,.6,.2,1),transform .8s cubic-bezier(.2,.6,.2,1)">Both tiers get the whole notebook &mdash; logging, session review, run and setup comparison, and the Engineer itself. What changes is how often you can ask it, and whether the heavy tools come with it.</p>
+      <p data-rv data-rv-delay="160" style="margin-top:1.25rem;max-width:42rem;font-size:clamp(1rem,1.35vw,1.15rem);color:#AFAFA6;text-wrap:pretty;opacity:0;transform:translateY(22px);transition:opacity .8s cubic-bezier(.2,.6,.2,1),transform .8s cubic-bezier(.2,.6,.2,1)">Every tier is the whole notebook &mdash; logging, session review, run and setup comparison. Starter keeps your last fifteen runs; Notebook keeps them all. Race Engineer adds the Engineer itself, and the heavy tools.</p>
 
       <div data-rv data-rv-delay="160" style="margin-top:2.75rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.25rem;opacity:0;transform:translateY(22px);transition:opacity .8s cubic-bezier(.2,.6,.2,1),transform .8s cubic-bezier(.2,.6,.2,1)">
+        <div data-card="starter" style="border-radius:16px;padding:clamp(1.5rem,3vw,2.25rem);display:flex;flex-direction:column;gap:0.75rem">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:#78786F">Starter</span>
+          <span style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:1.35rem">Your last fifteen runs.</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:clamp(1.9rem,3.4vw,2.6rem);letter-spacing:-0.03em;color:#EDE8DF;line-height:1.1;margin-top:0.5rem">$2.99 <small style="font-family:'Sora',sans-serif;font-size:12px;letter-spacing:0;color:#78786F">AUD / month</small></span>
+          <div style="margin-top:0.5rem;padding:0.7rem 0.9rem;border-radius:9px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);display:flex;justify-content:space-between;gap:0.75rem;align-items:baseline"><span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:#78786F">Runs kept</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#EDE8DF">Last 15</span></div>
+          <ul style="list-style:none;margin:1rem 0 0;padding:0;display:grid;gap:0.6rem;font-size:0.95rem">
+            <li style="display:flex;gap:0.6rem;color:#AFAFA6"><span style="color:#FFD60A">&#8212;</span>Session review &mdash; pace, consistency, mistakes</li>
+            <li style="display:flex;gap:0.6rem;color:#AFAFA6"><span style="color:#FFD60A">&#8212;</span>Run and setup comparison</li>
+            <li style="display:flex;gap:0.6rem;color:#AFAFA6"><span style="color:#FFD60A">&#8212;</span>Lap times attached from all four timing sources</li>
+            <li style="display:flex;gap:0.6rem;color:#7C7C73"><span style="color:#5E5E58">&times;</span>The Engineer</li>
+            <li style="display:flex;gap:0.6rem;color:#7C7C73"><span style="color:#5E5E58">&times;</span>Roll centre and geometry</li>
+          </ul>
+          <a href="/join" style="margin-top:auto;padding-top:1.5rem"><span style="display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;padding:0.8rem 1.4rem;border-radius:9px;border:1px solid #34332F;color:#EDE8DF;transition:border-color .3s ease" style-hover="border-color:#AFAFA6">Get started</span></a>
+        </div>
         <div data-card="std" style="border-radius:16px;padding:clamp(1.5rem,3vw,2.25rem);display:flex;flex-direction:column;gap:0.75rem">
           <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:#78786F">Notebook</span>
           <span style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:1.35rem">The smart race notebook.</span>
           <span style="font-family:'JetBrains Mono',monospace;font-size:clamp(1.9rem,3.4vw,2.6rem);letter-spacing:-0.03em;color:#EDE8DF;line-height:1.1;margin-top:0.5rem">$9.99 <small style="font-family:'Sora',sans-serif;font-size:12px;letter-spacing:0;color:#78786F">AUD / month</small></span>
-          <div style="margin-top:0.5rem;padding:0.7rem 0.9rem;border-radius:9px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);display:flex;justify-content:space-between;gap:0.75rem;align-items:baseline"><span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:#78786F">Engineer questions</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#EDE8DF">1 per day</span></div>
+          <div style="margin-top:0.5rem;padding:0.7rem 0.9rem;border-radius:9px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);display:flex;justify-content:space-between;gap:0.75rem;align-items:baseline"><span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:#78786F">Runs kept</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#EDE8DF">All of them</span></div>
           <ul style="list-style:none;margin:1rem 0 0;padding:0;display:grid;gap:0.6rem;font-size:0.95rem">
             <li style="display:flex;gap:0.6rem;color:#AFAFA6"><span style="color:#FFD60A">&#8212;</span>Unlimited run logging</li>
             <li style="display:flex;gap:0.6rem;color:#AFAFA6"><span style="color:#FFD60A">&#8212;</span>Session review &mdash; pace, consistency, mistakes</li>
             <li style="display:flex;gap:0.6rem;color:#AFAFA6"><span style="color:#FFD60A">&#8212;</span>Run and setup comparison</li>
             <li style="display:flex;gap:0.6rem;color:#AFAFA6"><span style="color:#FFD60A">&#8212;</span>Lap times attached from all four timing sources</li>
-            <li style="display:flex;gap:0.6rem;color:#7C7C73"><span style="color:#5E5E58">&times;</span>Video and sector analysis</li>
+            <li style="display:flex;gap:0.6rem;color:#AFAFA6"><span style="color:#FFD60A">&#8212;</span>A taste of the Engineer &mdash; one question a day</li>
             <li style="display:flex;gap:0.6rem;color:#7C7C73"><span style="color:#5E5E58">&times;</span>Roll centre and geometry</li>
           </ul>
           <a href="/join" style="margin-top:auto;padding-top:1.5rem"><span style="display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;padding:0.8rem 1.4rem;border-radius:9px;border:1px solid #34332F;color:#EDE8DF;transition:border-color .3s ease" style-hover="border-color:#AFAFA6">Get started</span></a>
@@ -639,16 +662,16 @@
           <span style="font-family:'JetBrains Mono',monospace;font-size:clamp(1.9rem,3.4vw,2.6rem);letter-spacing:-0.03em;color:#EDE8DF;line-height:1.1;margin-top:0.5rem">$19.99 <small style="font-family:'Sora',sans-serif;font-size:12px;letter-spacing:0;color:#78786F">AUD / month</small></span>
           <div style="margin-top:0.5rem;padding:0.7rem 0.9rem;border-radius:9px;background:rgba(255,214,10,0.08);border:1px solid rgba(255,214,10,0.25);display:flex;justify-content:space-between;gap:0.75rem;align-items:baseline"><span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:#78786F">Engineer questions</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#FFD60A">100 a month</span></div>
           <ul style="list-style:none;margin:1rem 0 0;padding:0;display:grid;gap:0.6rem;font-size:0.95rem">
+            <li style="display:flex;gap:0.6rem;color:#AFAFA6"><span style="color:#FFD60A">&#8212;</span>The Engineer</li>
             <li style="display:flex;gap:0.6rem;color:#AFAFA6"><span style="color:#FFD60A">&#8212;</span>Everything in Notebook</li>
             <li style="display:flex;gap:0.6rem;color:#AFAFA6"><span style="color:#FFD60A">&#8212;</span>A whole race weekend&rsquo;s worth of questions in one day, if you want</li>
-            <li style="display:flex;gap:0.6rem;color:#AFAFA6"><span style="color:#FFD60A">&#8212;</span>Video and sector analysis <span style="color:#78786F">&middot; soon</span></li>
             <li style="display:flex;gap:0.6rem;color:#AFAFA6"><span style="color:#FFD60A">&#8212;</span>Roll centre and geometry tools</li>
             <li style="display:flex;gap:0.6rem;color:#AFAFA6"><span style="color:#FFD60A">&#8212;</span>Remaining-this-month meter, so you always know where you are</li>
           </ul>
           <a href="/join" style="margin-top:auto;padding-top:1.5rem"><span style="display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;padding:0.8rem 1.4rem;border-radius:9px;background:#FFD60A;border:1px solid #FFD60A;color:#171614;transition:transform .2s ease,box-shadow .3s ease" style-hover="transform:translateY(-1px);box-shadow:0 8px 26px rgba(255,214,10,0.2)">Get started</span></a>
         </div>
       </div>
-      <p data-rv data-rv-delay="240" style="margin-top:1.75rem;max-width:44rem;font-size:0.95rem;color:#78786F;text-wrap:pretty;opacity:0;transform:translateY(22px);transition:opacity .8s cubic-bezier(.2,.6,.2,1),transform .8s cubic-bezier(.2,.6,.2,1)">Race Engineer costs less than a set of tyres, and the questions are yours to spend how you like &mdash; all in one weekend, if that&rsquo;s when you need them. Annual gets two months free &mdash; $99.90 and $199.90. Not for you? Full refund in the first 14 days, no questions.</p>
+      <p data-rv data-rv-delay="240" style="margin-top:1.75rem;max-width:44rem;font-size:0.95rem;color:#78786F;text-wrap:pretty;opacity:0;transform:translateY(22px);transition:opacity .8s cubic-bezier(.2,.6,.2,1),transform .8s cubic-bezier(.2,.6,.2,1)">Race Engineer costs less than a set of tyres, and the questions are yours to spend how you like &mdash; all in one weekend, if that&rsquo;s when you need them. Annual gets two months free on Notebook and Race Engineer &mdash; $99.90 and $199.90. Not for you? Full refund in the first 14 days, no questions.</p>
     </div>
   </section>
 

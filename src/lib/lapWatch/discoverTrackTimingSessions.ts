@@ -15,6 +15,8 @@ export type TrackTimingDiscoveredSession = {
   sessionCompletedAtIso: string | null;
   label: string;
   bestLapSeconds?: number | null;
+  /** Timed laps, when the discovery page carries them (Speedhive practice runs). */
+  lapCount?: number | null;
   alreadyImported: boolean;
   linkedRunId: string | null;
   timingSource: "liverc" | "speedhive";

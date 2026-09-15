@@ -17,8 +17,17 @@ import { SetUpHandoffBar } from "@/components/onboarding/SetUpHandoffBar";
 import { carNameTakenMessage, findCarNameClash } from "@/lib/cars/carName";
 import { setupUsageLabel } from "@/lib/setup/setupRemoveMode";
 import type { OptionSection } from "@/lib/search/optionSearch";
+import { RACE_CLASSES, POWER_TYPES, disciplineLabel, parseDiscipline } from "@/lib/cars/carClasses";
+import { platformForChassisSlug } from "@/lib/cars/chassisPlatform";
 
-type SetupSheetModelOption = { id: string; name: string; slug: string; isAuthorized?: boolean };
+type SetupSheetModelOption = {
+  id: string;
+  name: string;
+  slug: string;
+  isAuthorized?: boolean;
+  /** What it races, for the picker's grouping. Absent on rows nobody has placed yet. */
+  discipline?: string | null;
+};
 
 /** One saved (library) setup on a car, shown inline under the car row. */
 export type CarInlineSetup = {
@@ -149,23 +158,78 @@ export function CarList({
    * mostly-curated with driver rows mixed in — badging the good ones made every unbadged row
    * look equally trustworthy. Same rule as tracks and tires.
    */
-  const chassisSections = useMemo<OptionSection[]>(
-    () => [
-      {
-        key: "all",
-        label: null,
-        options: [...setupSheetModels]
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map((m) => ({
-            value: m.id,
-            label: m.name,
-            detail: m.isAuthorized ? null : "Unreviewed",
-            keywords: m.slug.replace(/_/g, " "),
-          })),
-      },
-    ],
-    [setupSheetModels]
-  );
+  /*
+   * Grouped by what the chassis races (2026-09-08). The catalog was 23 rows and one A–Z list was
+   * the whole answer; seeding Petit RC took it past 200, spanning touring, buggy, pan car and
+   * Formula, and a touring driver's first screenful held two touring cars. Typing still collapses
+   * the sections to one ranked list — `filterOptionSections` does that — so this only changes the
+   * browse view, which is the one that broke.
+   */
+  const chassisSections = useMemo<OptionSection[]>(() => {
+    const classRank = new Map(RACE_CLASSES.map((c, i) => [c.id, i] as const));
+    const powerRank = new Map(POWER_TYPES.map((p, i) => [p.id, i] as const));
+    const groups = new Map<
+      string,
+      { classId: string | null; sort: number; options: OptionSection["options"] }
+    >();
+
+    for (const m of [...setupSheetModels].sort((a, b) => a.name.localeCompare(b.name))) {
+      // The same order of precedence as `disciplineForCar`: the curated slug map is the founder's
+      // own answer and outranks the stored column, so the picker and the car agree about a chassis.
+      const d = parseDiscipline(platformForChassisSlug(m.slug) ?? m.discipline);
+      /*
+       * Keyed on class + power only. An "Other" carries the word a driver typed, and grouping on
+       * that would put a heading over every single car; power stays because a nitro 1/8 buggy and
+       * an electric one are different cars, which is the whole reason the discipline holds it.
+       */
+      const key = d ? `${d.classId}${d.power ? `~${d.power}` : ""}` : "";
+      let group = groups.get(key);
+      if (!group) {
+        group = {
+          classId: d?.classId ?? null,
+          // Class order is the picker's canonical one (`RACE_CLASSES`), power breaks the tie, and
+          // anything unplaced sorts last rather than pretending to a class.
+          sort: d
+            ? (classRank.get(d.classId) ?? RACE_CLASSES.length) * 10 +
+              (d.power ? (powerRank.get(d.power) ?? 8) : 9)
+            : Number.MAX_SAFE_INTEGER,
+          options: [],
+        };
+        groups.set(key, group);
+      }
+      group.options.push({
+        value: m.id,
+        label: m.name,
+        detail: m.isAuthorized ? null : "Unreviewed",
+        keywords: m.slug.replace(/_/g, " "),
+      });
+    }
+
+    // "· Electric" on every heading is noise where the class only ever runs one way; it earns its
+    // place in 1/10 Touring and 1/8 Buggy, which hold both.
+    const powersPerClass = new Map<string, number>();
+    for (const group of groups.values()) {
+      if (!group.classId) continue;
+      powersPerClass.set(group.classId, (powersPerClass.get(group.classId) ?? 0) + 1);
+    }
+
+    return [...groups.entries()]
+      .sort((a, b) => a[1].sort - b[1].sort)
+      .map(([key, group]) => ({
+        key: key || "unplaced",
+        label: group.classId
+          ? disciplineLabel((powersPerClass.get(group.classId) ?? 1) > 1 ? key : group.classId)
+          : "Class not set",
+        /*
+         * Chips are per CLASS, headings are per class and power. A driver reaches for "1/10
+         * Touring", not for "1/10 Touring · Nitro" — and a chip per heading was seventeen of them,
+         * more than fits above the list. The split still shows once they are in there.
+         */
+        filterKey: group.classId ?? "unplaced",
+        filterLabel: (group.classId ? disciplineLabel(group.classId) : null) ?? "Class not set",
+        options: group.options,
+      }));
+  }, [setupSheetModels]);
 
   /** Keep the auto-filled name in sync until the user hand-edits it. */
   function onNameChange(value: string) {
@@ -393,8 +457,12 @@ export function CarList({
                     if (m) selectModel(m);
                   }}
                   sections={chassisSections}
+                  sectionFilter
                   searchPlaceholder="Search chassis types…"
-                  clearRow={{ label: "Select chassis type…" }}
+                  /* No clear row (founder call 2026-09-08). Chassis type is required, so "back to
+                     none" was never a real destination — and sitting at the top wearing the
+                     selected state, because nothing was chosen yet, it read as the first option
+                     rather than as the absence of one. The class chips took its place. */
                   // ONE way past the list, for everybody — the footer, exactly where the tire and
                   // track sheets keep theirs. It opens the blank-sheet upload panel: the driver's
                   // own PDF becomes the chassis, boxes and positions read off the paper. The

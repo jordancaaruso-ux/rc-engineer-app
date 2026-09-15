@@ -186,8 +186,8 @@ export function CarSetupsCard({
 
   return (
     <CardPanel contentClassName="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <Eyebrow>{label}</Eyebrow>
+      <div className="eyebrow-band flex items-center justify-between gap-2">
+        <Eyebrow className="mb-0">{label}</Eyebrow>
         <span className="ui-caption">
           {setups.length > 0 ? `${setups.length} saved` : null}
         </span>

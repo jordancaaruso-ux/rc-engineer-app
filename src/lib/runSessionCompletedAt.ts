@@ -30,7 +30,7 @@ type BodyLike = {
  * timezone cookie is missing. Per-set `RunImportedLapSet.sessionCompletedAt`
  * deliberately stays wall-clock-as-UTC — its display sites freeze it in UTC.
  */
-function toRealInstant(
+export function importedSessionInstantToReal(
   d: Date,
   sourceUrl: string | null | undefined,
   userTimeZone: string | null | undefined
@@ -40,6 +40,8 @@ function toRealInstant(
   if (!isWallClockAsUtcTimingSource(timingSourceFromSourceUrl(sourceUrl))) return d;
   return wallClockAsUtcToInstant(d, tz);
 }
+
+const toRealInstant = importedSessionInstantToReal;
 
 /** Best-effort session time from request body (before or after Run row exists). */
 export async function resolveRunSessionCompletedAtFromUpsertBody(

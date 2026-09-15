@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { normalizeSetupData } from "@/lib/runSetup";
 import { isTuningComparisonKey } from "@/lib/setupComparison/tuningComparisonKeys";
+import { diffTuning, fmtSetupValue as fmtValue, readableSetupKey as readableKey, tuningValues } from "@/lib/engineer/setupDiff";
 import { findComparableRunsForEngineer } from "@/lib/engineer/findComparableRuns";
 import {
   getAverageTopN,
@@ -15,6 +16,10 @@ import { formatFiveMinuteStint } from "@/lib/runLaps";
 import { runLocalDayKey } from "@/lib/runs/buildRunHistoryGroups";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import type { EngineerPayloadBlock } from "@/lib/engineer/payload";
+import type { FieldPace } from "@/lib/engineer/fieldPace";
+import { FIELD_RUN_SELECT, loadFieldPaceForRuns } from "@/lib/engineer/fieldPaceLoad";
+import { matchDriverName } from "@/lib/engineer/nameMatch";
+import { driverKey, driversOnSheets, renderRivalSection, renderRivalsSummary, type RivalRun } from "@/lib/engineer/rivals";
 
 /**
  * Driver-data blocks: the driver's own latest session, its setup, the rest of that day, and
@@ -43,22 +48,6 @@ const MAX_SETUP_ROWS = 120;
 const MAX_CHANGES_LISTED = 8;
 /** Wide enough to hold a whole day either side of the anchor in any time zone. */
 const DAY_WINDOW_MS = 40 * 3600_000;
-
-function fmtValue(v: unknown): string | null {
-  if (v == null) return null;
-  if (typeof v === "number") return Number.isFinite(v) ? String(v) : null;
-  if (typeof v === "string") {
-    const s = v.trim();
-    return s.length > 0 && s.length <= 60 ? s : null;
-  }
-  if (typeof v === "boolean") return v ? "yes" : "no";
-  return null;
-}
-
-/** `front_spring_rate_gf_mm` -> `front spring rate gf mm` — readable without inventing a label. */
-function readableKey(key: string): string {
-  return key.replace(/[_\-]+/g, " ").trim();
-}
 
 function fmtSecs(v: number | null | undefined): string | null {
   return v == null || !Number.isFinite(v) ? null : v.toFixed(2);
@@ -127,47 +116,6 @@ function runPace(run: PaceInput) {
   };
 }
 
-/** The tuning keys only — the blob also carries tyres, battery, body and free text. */
-function tuningValues(data: unknown): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [key, raw] of Object.entries(normalizeSetupData(data))) {
-    if (!isTuningComparisonKey(key)) continue;
-    const value = fmtValue(raw);
-    if (value) out[key] = value;
-  }
-  return out;
-}
-
-/**
- * What moved between two sheets. Null — not an empty list — when either side has no
- * readable setup: only a calibrated sheet gives values, and "nothing changed" and "we
- * cannot see the setup" are different facts (founder call 2026-09-01).
- */
-function diffTuning(prev: Record<string, string>, next: Record<string, string>): string[] | null {
-  if (Object.keys(prev).length === 0 || Object.keys(next).length === 0) return null;
-  const changes: string[] = [];
-  for (const key of [...new Set([...Object.keys(prev), ...Object.keys(next)])].sort()) {
-    if (sameSetupValue(prev[key], next[key])) continue;
-    changes.push(`${readableKey(key)} ${prev[key] ?? "—"} → ${next[key] ?? "—"}`);
-  }
-  return changes;
-}
-
-/**
- * `1` and `1.0`, or `STD` and `std`, are the same setting written twice — not a change the
- * driver made. Sheets store what was keyed, and canonicalising the box labels (2026-09-01)
- * recased a batch of preset values, so a naive string compare reports a day's worth of
- * changes nobody touched. Numbers compare as numbers, text ignores case and padding.
- */
-function sameSetupValue(a: string | undefined, b: string | undefined): boolean {
-  if (a === b) return true;
-  if (a == null || b == null) return false;
-  const na = Number(a);
-  const nb = Number(b);
-  if (Number.isFinite(na) && Number.isFinite(nb)) return na === nb;
-  return a.trim().toLowerCase() === b.trim().toLowerCase();
-}
-
 async function loadRun(userId: string, runId: string | null) {
   return prisma.run.findFirst({
     where: runId ? { id: runId, userId } : { userId },
@@ -179,6 +127,7 @@ async function loadRun(userId: string, runId: string | null) {
       localTimeZone: true,
       sessionCompletedAt: true,
       loggingCompletedAt: true,
+      unconfirmedAt: true,
       carId: true,
       raceClass: true,
       carRating: true,
@@ -197,16 +146,23 @@ async function loadRun(userId: string, runId: string | null) {
       additiveType: { select: { displayName: true } },
       lapTimes: true,
       lapSession: true,
+      ...FIELD_RUN_SELECT,
     },
   });
 }
 
 type LoadedRun = NonNullable<Awaited<ReturnType<typeof loadRun>>>;
 
+function fmtDelta(v: number): string {
+  const s = Math.abs(v).toFixed(2);
+  return v > 0 ? `+${s}` : v < 0 ? `-${s}` : "0.00";
+}
+
 function buildSessionFactsBlock(
   run: LoadedRun,
   latestFallback: boolean,
-  zone: string | null
+  zone: string | null,
+  field: FieldPace | null
 ): string | null {
   const facts: string[] = [];
   const push = (label: string, value: string | number | null | undefined) => {
@@ -236,8 +192,21 @@ function buildSessionFactsBlock(
   push("best lap (s)", fmtSecs(pace.best));
   push("average of the best 5 laps (s)", fmtSecs(pace.top5));
   push("best five minutes (laps/time)", pace.stint);
+  // The field from the timing sheet (fieldPace.ts): the one comparison that cancels the
+  // track's own movement, because everyone drove the same surface at the same time.
+  if (field && field.gapBestToP1 != null) {
+    push("place in the session by best lap", `P${field.rank} of ${field.n} timed drivers`);
+    push("best lap vs the fastest driver's best (s, positive = slower; 0.00 = you were fastest)", fmtDelta(field.gapBestToP1));
+    if (field.gapTop5ToP1 != null) push("average of best 5 vs the best top-5 in the field (s)", fmtDelta(field.gapTop5ToP1));
+    if (field.gapBestToMean != null) push("best lap vs the field's median best (s, negative = faster than the middle of the field)", fmtDelta(field.gapBestToMean));
+  }
   push("driver's rating of the car (1-10)", run.carRating);
   push("session date", fmtLocalDate(run, zone));
+  if (run.unconfirmedAt != null) {
+    facts.push(
+      "unconfirmed: the app filed this run from the timing sheet. The laps are real; the setup, tyres and additive were copied from the previous logged run and the driver has not confirmed them."
+    );
+  }
 
   if (facts.length === 0) return null;
   const heading = latestFallback
@@ -304,12 +273,14 @@ function loadRunsAround(userId: string, carIds: string[], centre: number) {
       localTimeZone: true,
       sessionCompletedAt: true,
       loggingCompletedAt: true,
+      unconfirmedAt: true,
       carId: true,
       carRating: true,
       tireRunNumber: true,
       conditionsAirTempC: true,
       lapTimes: true,
       lapSession: true,
+      ...FIELD_RUN_SELECT,
       car: { select: { name: true } },
       setupSnapshot: { select: { data: true } },
     },
@@ -351,7 +322,8 @@ function buildDayBlock(
   anchor: LoadedRun,
   day: DayRun[],
   predecessorOf: Map<string, DayRun>,
-  zone: string | null
+  zone: string | null,
+  fieldByRun: Map<string, FieldPace>
 ): string | null {
   if (day.length < 2) return null;
   const multiCar = new Set(day.map((r) => r.carId)).size > 1;
@@ -365,9 +337,13 @@ function buildDayBlock(
       fmtSecs(pace.best) ? `best ${fmtSecs(pace.best)}` : "no lap times",
       fmtSecs(pace.top5) ? `top5 ${fmtSecs(pace.top5)}` : null,
       pace.stint ? `5min ${pace.stint}` : null,
+      fieldByRun.get(run.id)?.gapBestToP1 != null
+        ? `P${fieldByRun.get(run.id)!.rank}/${fieldByRun.get(run.id)!.n} ${fmtDelta(fieldByRun.get(run.id)!.gapBestToP1!)} to P1`
+        : null,
       run.carRating != null ? `rated ${run.carRating}/10` : "not rated",
       run.tireRunNumber != null ? `tyre run ${run.tireRunNumber}` : null,
       run.conditionsAirTempC != null ? `${run.conditionsAirTempC}°C` : null,
+      run.unconfirmedAt != null ? "(unconfirmed — setup and tyres carried, not logged by the driver)" : null,
       run.id === anchor.id ? "(the session above)" : null,
     ].filter(Boolean);
     lines.push(bits.join("  "));
@@ -390,12 +366,28 @@ function buildDayBlock(
 
   const dayLabel = fmtLocalDate(day[0], zone);
   const what = multiCar ? "cars of this type" : (anchor.car?.name ?? "this car");
+  // Only when the day holds one: the sentence is a cost on every other day's block, and the
+  // eval fixtures are frozen snapshots of the ordinary shape.
+  const anyUnconfirmed = day.some((r) => r.unconfirmedAt != null);
   return [
     // Not "the whole day": a run logged without a car cannot be attributed to a car type,
     // so it is absent here even though the driver was out in it.
     `THIS DAY'S RUNS ON ${multiCar ? "CARS OF THIS TYPE" : "THIS CAR"} — ${dayLabel}, ${what}, ${day.length} runs. Earliest first.`,
     `"changed" is what moved on the setup sheet since that same car's previous run. A run`,
     `with no readable sheet has no "changed" line: that is unknown, not unchanged.`,
+    ...(day.some((r) => fieldByRun.has(r.id))
+      ? [
+          `"P3/12 +0.21 to P1" is your place and gap to the fastest driver's best lap in that session's`,
+          `timing sheet — the field drove the same track at the same time, so it cancels the track's movement.`,
+        ]
+      : []),
+    ...(anyUnconfirmed
+      ? [
+          `An "unconfirmed" run was filed by the app from the timing sheet: its laps are real, but its`,
+          `setup and tyres were copied from the previous logged run and the driver has not confirmed`,
+          `them. Read its pace; do not read its sheet as a deliberate change.`,
+        ]
+      : []),
     "",
     ...lines,
   ].join("\n");
@@ -432,6 +424,8 @@ function buildComparableRunsBlock(
 export async function buildDriverDataBlocks(params: {
   userId: string;
   runId: string | null;
+  /** The driver's latest message; a driver named in it gets a VS section over the day (rivals.ts). */
+  question?: string | null;
 }): Promise<EngineerPayloadBlock[]> {
   const run = await loadRun(params.userId, params.runId).catch(() => null);
   if (!run) return [];
@@ -443,18 +437,41 @@ export async function buildDriverDataBlocks(params: {
     .catch(() => null);
   const zone = run.localTimeZone ?? owner?.timeZone ?? null;
 
-  const parts: string[] = [];
-  const facts = buildSessionFactsBlock(run, params.runId == null, zone);
-  if (facts) parts.push(facts);
-  const setup = buildSetupSheetBlock(run);
-  if (setup) parts.push(setup);
-
   const { day, predecessorOf } = await loadDayRuns(params.userId, run, zone).catch(() => ({
     day: [] as DayRun[],
     predecessorOf: new Map<string, DayRun>(),
   }));
-  const dayBlock = buildDayBlock(run, day, predecessorOf, zone);
+  const fieldByRun = await loadFieldPaceForRuns(params.userId, [run, ...day.filter((r) => r.id !== run.id)]).catch(
+    () => new Map<string, FieldPace>()
+  );
+
+  const parts: string[] = [];
+  const facts = buildSessionFactsBlock(run, params.runId == null, zone, fieldByRun.get(run.id) ?? null);
+  if (facts) parts.push(facts);
+  const setup = buildSetupSheetBlock(run);
+  if (setup) parts.push(setup);
+
+  const dayBlock = buildDayBlock(run, day, predecessorOf, zone, fieldByRun);
   if (dayBlock) parts.push(dayBlock);
+
+  // Who else was on the day's timing sheets, and — if the question names one — you against
+  // them session by session. The day's runs, the session itself included.
+  const dayRuns: RivalRun[] = (day.length > 0 ? day : [run]).map((r) => ({
+    dateYmd: fmtLocalDate(r, zone),
+    clock: fmtLocalTime(r, zone),
+    trackName: run.track?.name ?? null,
+    session: null,
+    field: fieldByRun.get(r.id) ?? null,
+  }));
+  const rivals = renderRivalsSummary(dayRuns);
+  if (rivals) parts.push(rivals);
+  const rivalName = params.question
+    ? matchDriverName(params.question, driversOnSheets(dayRuns).map((d) => d.name))
+    : null;
+  if (rivalName) {
+    const vs = renderRivalSection(dayRuns, driverKey(rivalName));
+    if (vs) parts.push(vs);
+  }
 
   const rows = await findComparableRunsForEngineer(params.userId, run.id, { limit: 3 }).catch(
     () => []

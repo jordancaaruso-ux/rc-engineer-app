@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Pause, Play } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Pause, Play, RotateCcw } from "lucide-react";
+import { chipToggleClass } from "@/components/ui/chipToggle";
 import type { SegmentWindow } from "@/lib/videoAnalysis/lapCompare";
 import {
   describeVideoError,
@@ -62,6 +63,9 @@ function waitForSeek(v: HTMLVideoElement, timeoutMs: number): Promise<void> {
  * ghost (lap B) drifts behind/ahead by exactly the sector delta. Playback runs to
  * the slower lap's exit so the gap at the line is visible.
  */
+/** A clip shorter than this opens at half speed — a two-second sector is over in a blink. */
+const HALF_SPEED_UNDER_SEC = 2;
+
 export function SectorClipPlayer({
   videoUrl,
   aWindow,
@@ -73,6 +77,9 @@ export function SectorClipPlayer({
   lines,
   fromKey = null,
   toKey = null,
+  overlay,
+  onTime,
+  seekRequest = null,
 }: {
   videoUrl: string;
   aWindow: SegmentWindow;
@@ -97,6 +104,16 @@ export function SectorClipPlayer({
   lines?: MappedSectorLine[];
   fromKey?: string | null;
   toKey?: string | null;
+  /**
+   * Something drawn over the picture that moves with it — the traced path and its dot. Handed
+   * both clips' moments on the video clock and the box's shape, so it can place itself the way
+   * the sector lines do.
+   */
+  overlay?: (s: { aSec: number; bSec: number; containerAspect: number; videoAspect: number }) => ReactNode;
+  /** Where clip A is on the video clock, whenever it moves. */
+  onTime?: (aSec: number) => void;
+  /** A request to put clip A at this video time; a new nonce is a new request. */
+  seekRequest?: { aSec: number; nonce: number } | null;
 }) {
   const aRef = useRef<HTMLVideoElement | null>(null);
   const bRef = useRef<HTMLVideoElement | null>(null);
@@ -111,6 +128,9 @@ export function SectorClipPlayer({
   const aDur = aWindow.endSec - aWindow.startSec;
   const bDur = bWindow.endSec - bWindow.startSec;
   const clipDur = Math.max(aDur, bDur);
+  // Half speed, on both clips at once. A short sector is over in a blink at full speed, so a
+  // clip under two seconds opens at half; a whole lap opens at full. Either can be flipped.
+  const [half, setHalf] = useState(clipDur < HALF_SPEED_UNDER_SEC);
 
   // Re-seek whenever the sector windows change (new segment tapped).
   useEffect(() => {
@@ -118,10 +138,28 @@ export function SectorClipPlayer({
     setPlaying(false);
     setClock(0);
     seekTo(0);
+    setHalf(clipDur < HALF_SPEED_UNDER_SEC);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aWindow.startSec, bWindow.startSec]);
 
+  useEffect(() => {
+    const rate = half ? 0.5 : 1;
+    if (aRef.current) aRef.current.playbackRate = rate;
+    if (bRef.current) bRef.current.playbackRate = rate;
+  }, [half]);
+
   useEffect(() => stopLoop, []);
+
+  // The chart under the player follows the clip, and can move it.
+  useEffect(() => {
+    onTime?.(aWindow.startSec + Math.min(clock, clipDur));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clock, aWindow.startSec]);
+  useEffect(() => {
+    if (!seekRequest) return;
+    onScrub(Math.max(0, Math.min(clipDur, seekRequest.aSec - aWindow.startSec)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seekRequest?.nonce]);
 
   function stopLoop() {
     if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
@@ -189,6 +227,8 @@ export function SectorClipPlayer({
         b.currentTime = desiredB;
         await waitForSeek(b, ALIGN_WAIT_MS);
       }
+      a.playbackRate = half ? 0.5 : 1;
+      b.playbackRate = a.playbackRate;
       await Promise.all([a.play(), b.play()]);
     } catch {
       return; // autoplay rejection — user can tap again
@@ -268,6 +308,14 @@ export function SectorClipPlayer({
             videoAspect={aspect}
           />
         ) : null}
+        {overlay
+          ? overlay({
+              aSec: aWindow.startSec + Math.min(clock, clipDur),
+              bSec: bWindow.startSec + Math.min(clock, clipDur),
+              containerAspect: fit === "window" ? aspect : 16 / 9,
+              videoAspect: aspect,
+            })
+          : null}
         <div className="pointer-events-none absolute inset-x-2 top-2 z-20 flex justify-between">
           <span className="rounded bg-background/70 px-1.5 py-0.5 tabular-nums text-[9px] tracking-[0.15em] text-foreground backdrop-blur-sm">
             {aLabel}
@@ -278,6 +326,14 @@ export function SectorClipPlayer({
         </div>
       </div>
       <div className="flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={() => seekTo(0)}
+          aria-label="Restart clip"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-muted-foreground hover:bg-muted transition"
+        >
+          <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+        </button>
         <button
           type="button"
           onClick={togglePlay}
@@ -317,6 +373,14 @@ export function SectorClipPlayer({
         <span className="shrink-0 text-[10px] tabular-nums text-faint">
           {Math.min(clock, clipDur).toFixed(1)} / {clipDur.toFixed(1)}s
         </span>
+        <button
+          type="button"
+          aria-pressed={half}
+          onClick={() => setHalf((h) => !h)}
+          className={chipToggleClass(half) + " shrink-0 px-2 py-0.5 text-[10px] tabular-nums"}
+        >
+          ½ speed
+        </button>
       </div>
     </div>
   );

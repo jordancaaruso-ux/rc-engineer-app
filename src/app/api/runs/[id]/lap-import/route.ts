@@ -72,6 +72,8 @@ export async function DELETE(_req: Request, ctx: Ctx) {
       bestLapSeconds: null,
       avgTop5LapSeconds: null,
       sessionCompletedAt: null,
+      // "Not my session" is also the undo for laps the timing sweep put here.
+      lapsAttachedBySweepAt: null,
     },
   });
 

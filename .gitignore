@@ -132,3 +132,10 @@ scripts/tmp-*.pdf
 
 # Website screenshots (regenerate with scripts/dev-marketing-shots.ts)
 marketing-shots/
+
+# Launch reel working files (storyboard, renders, Runway assets)
+marketing-reel/
+
+# Session scratch scripts and walk screenshots taken on production accounts — never committed
+scripts/tmp/
+onboarding-friction-prod/

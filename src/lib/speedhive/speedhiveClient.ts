@@ -58,24 +58,47 @@ async function speedhiveFetchJson<T>(path: string, query?: Record<string, string
       u.searchParams.set(k, v);
     }
   }
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
-  try {
-    const res = await fetch(u.toString(), {
-      signal: controller.signal,
-      headers: {
-        Accept: "application/json",
-        "User-Agent": timingUserAgent(),
-      },
-    });
-    if (!res.ok) {
-      throw new Error(`Speedhive API HTTP ${res.status}`);
+  return fetchTimingJson<T>(u.toString(), {
+    Accept: "application/json",
+    "User-Agent": timingUserAgent(),
+  }, "Speedhive API");
+}
+
+/**
+ * One GET against a MYLAPS API, with a single retry when the site pushes back.
+ *
+ * A burst of scans — the lap step opening, a Refresh tap, a second run logged a minute later —
+ * earns a 429 (or a passing 5xx) from MYLAPS, and the whole scan then failed with "Couldn't check
+ * the timing site just now", seen on a real drive of three runs in a row. One short wait and one
+ * more try is what a driver would do by hand; anything more would hold the page for longer than
+ * the message it replaces. Client errors other than 429 are not retried — they will not change.
+ */
+export async function fetchTimingJson<T>(
+  url: string,
+  headers: Record<string, string>,
+  label: string
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, { signal: controller.signal, headers });
+      if (res.ok) return (await res.json()) as T;
+      const retryable = res.status === 429 || res.status >= 500;
+      if (!retryable || attempt >= 1) throw new Error(`${label} HTTP ${res.status}`);
+      // A retryable refusal on the first try falls through to the wait below.
+    } catch (err) {
+      if (attempt >= 1) throw err;
+      // A definite answer (404, 400…) will not change; a timeout or a dropped socket might.
+      if (err instanceof Error && /HTTP \d{3}$/.test(err.message)) throw err;
+    } finally {
+      clearTimeout(t);
     }
-    return (await res.json()) as T;
-  } finally {
-    clearTimeout(t);
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
   }
 }
+
+const RETRY_DELAY_MS = 1500;
 
 export async function fetchOrganizationEvents(
   organizationId: number,

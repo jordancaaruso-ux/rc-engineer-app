@@ -304,8 +304,10 @@
    Two things carry over from dark rather than inverting, and they are the whole
    character of the theme:
 
-     · Neutrals stay WARM. Every value here is biased toward the yellow, which is
-       what stops the paper reading as office grey.
+     · Neutrals are NEAR-NEUTRAL since 2026-09-15 (founder call: the warm ash
+       read as off-white next to plain white sites). The ground is #F4F4F3, a
+       hair warm, and the card is pure white. The ink, muted text and pace ramp
+       keep their warm bias so type still sits with the yellow.
      · The card is LIGHTER than the page, preserving the dark theme's own
        relationship (card #181716 sits on page #1B1A17). Panels therefore still
        read as surfaces set into the ground rather than cut out of it — which is
@@ -320,34 +322,34 @@
   color-scheme: light;
 
   /* Legacy single-hex aliases, kept in step with the triplets below. */
-  --background: #f4f1ea;
+  --background: #fbfbfa;
   --foreground: #191815;
-  --surface: #fcfbf8;
-  --secondary-bg: #f2efe8;
+  --surface: #ffffff;
+  --secondary-bg: #fafafa;
   --muted-fg: #6b675f;
-  --faint: #9a958b;
-  --border: #ddd8ce;
+  --faint: #959493;
+  --border: #e5e5e3;
   --accent: #ffd60a;
   --primary: #ffd60a;
 
-  --page-bg-rgb: 234 231 224; /* #EAE7E0 — warm ash paper */
+  --page-bg-rgb: 244 244 243; /* #F4F4F3 — near-neutral paper (was #EAE7E0 warm ash until 2026-09-15) */
 
-  --color-background: 244 241 234; /* #F4F1EA */
+  --color-background: 251 251 250; /* #FBFBFA */
   --color-foreground: 25 24 21; /* #191815 — warm ink, never black */
-  --color-card: 252 251 248; /* #FCFBF8 — the lightest surface on screen */
+  --color-card: 255 255 255; /* #FFFFFF — the lightest surface on screen */
   --color-card-foreground: 25 24 21;
   --color-primary: 255 214 10; /* #FFD60A — unchanged, FILL ONLY */
   --color-primary-foreground: 25 24 21; /* dark on yellow, as in dark mode */
-  --color-secondary: 242 239 232; /* #F2EFE8 */
+  --color-secondary: 250 250 250; /* #FAFAFA */
   --color-secondary-foreground: 25 24 21;
-  --color-muted: 242 239 232; /* #F2EFE8 */
+  --color-muted: 250 250 250; /* #FAFAFA */
   --color-muted-foreground: 107 103 95; /* #6B675F — 5.4:1 */
   --color-accent: 255 214 10;
   --color-accent-foreground: 25 24 21;
   --color-destructive: 190 63 39; /* #BE3F27 — 5.2:1 (was 3.2:1 unadjusted) */
-  --color-border: 221 216 206; /* #DDD8CE */
-  --color-input: 242 239 232; /* #F2EFE8 */
-  --color-faint: 154 149 139; /* #9A958B — 2.9:1, decorative only, as in dark */
+  --color-border: 229 229 227; /* #E5E5E3 */
+  --color-input: 250 250 250; /* #FAFAFA */
+  --color-faint: 149 148 147; /* #959493 — 2.9:1, decorative only, as in dark */
 
   /* Yellow's two jobs, finally separated. */
   --color-primary-ink: 138 106 0; /* #8A6A00 — 4.9:1 on card */
@@ -359,25 +361,25 @@
   --color-best-lap: 109 40 217; /* #6D28D9 — 6.6:1 (#A78BFA is 2.5:1) */
   /* Pace ramp, re-stepped for paper: the dark ramp runs bright→deep and inverts
      here, so "best lap" stays the strongest mark on whichever ground it is drawn.
-     Same warm-grey family as the ink on this page. Monotone on #FCFBF8, adjacent
+     Same warm-grey family as the ink on this page. Monotone on #FFFFFF, adjacent
      gaps 0.168 / 0.146 / 0.116; the pale end (median) reads 2.37:1. */
   --color-pace-1: 46 44 40; /* #2E2C28 — best lap, L 0.294, 13.5:1 */
   --color-pace-2: 92 88 79; /* #5C584F — avg top 5, L 0.461, 6.9:1 */
   --color-pace-3: 135 130 118; /* #878276 — avg top 10, L 0.607, 3.7:1 */
   --color-pace-4: 171 165 153; /* #ABA599 — median, L 0.724, 2.37:1 */
-  /* Driver hues, re-stepped for paper: the dark trio sits at 2.4–2.7:1 on #FCFBF8.
+  /* Driver hues, re-stepped for paper: the dark trio sits at 2.4–2.7:1 on #FFFFFF.
      Same three families, same fixed order — validated on this surface, all PASS. */
   --color-series-1: 42 120 214; /* #2A78D6 */
   --color-series-2: 217 92 40; /* #D95C28 */
   --color-series-3: 138 92 214; /* #8A5CD6 */
   /* Darker than the card here, lighter than it in dark — the bar has to sit
      AGAINST the surface, and on paper that means down, not up. */
-  --color-skeleton: 226 221 210; /* #E2DDD2 on #FCFBF8 — 1.31:1 */
+  --color-skeleton: 233 233 232; /* #E9E9E8 on #FFFFFF — 1.31:1 */
 
   /* Inset controls sit BELOW the card here — on charcoal they sat above it. */
-  --color-surface-runna-deep: 228 224 215; /* #E4E0D7 */
-  --color-surface-runna: 252 251 248; /* #FCFBF8 */
-  --color-surface-runna-inset: 242 239 232; /* #F2EFE8 */
+  --color-surface-runna-deep: 234 234 232; /* #EAEAE8 */
+  --color-surface-runna: 255 255 255; /* #FFFFFF */
+  --color-surface-runna-inset: 250 250 250; /* #FAFAFA */
 
   /*
    * Rating ramp, re-stepped rather than darkened. Keeping the shipped hues and
@@ -392,7 +394,7 @@
   --color-rating-workable: 158 98 56; /* #9E6238 — 4.8:1 */
   --color-rating-good: 74 127 99; /* #4A7F63 — 4.5:1, low chroma */
   --color-rating-dialled: 7 121 77; /* #07794D — 5.3:1, high chroma */
-  --color-rating-unrated: 207 201 188; /* #CFC9BC — a step above border, as in dark */
+  --color-rating-unrated: 212 212 210; /* #D4D4D2 — a step above border, as in dark */
 
   /* Paper needs more opacity behind text than charcoal does. */
   --tune-glass-alpha: 0.78;
@@ -776,7 +778,7 @@ html[data-native="true"] #pwa-splash {
 
 /*
  * Light: both halves of the lift are no-ops on a near-white card — a white top
- * sheen over #FCFBF8 is nothing, and `color-mix(… 84%, white)` moves the panel
+ * sheen over #FFFFFF is nothing, and `color-mix(… 84%, white)` moves the panel
  * about two levels. (The comment above claims `color-mix` "keeps it on-palette
  * across every theme". It does not; it only ever worked because the card was
  * dark.) Separation on paper comes from the ground instead: the card is already
@@ -850,7 +852,7 @@ html[data-native="true"] #pwa-splash {
   /* JRC icon negative space (gauge needle, garage door, teams keylines) is
      painted, not punched — it must match the surface the icon actually sits on,
      which is this slab, not the page. On charcoal the two differ by three levels
-     so it never mattered; on paper they are #EAE7E0 against #FCFBF8 and the icons
+     so it never mattered; on paper they are #F4F4F3 against #FFFFFF and the icons
      grow a visible grey smudge where the cutout should disappear. */
   --jrc-icon-cutout: rgb(var(--color-card));
 }
@@ -1317,19 +1319,37 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
    * gesture takes precedence over it, so the cost is a back-swipe that starts on the
    * tab occasionally doing nothing, not a wrong navigation.
    */
-  left: 0;
+  /*
+   * SEATED BELOW THE PAGE (founder pick 2026-09-14, off a four-way bench: as-was /
+   * curved into the edge / seated / both). The tab used to sit ON the page — an
+   * outward drop shadow and a lit rim, which is a raised button's profile — and it
+   * read as a sticker stuck to the edge. Now the page is the upper surface and the
+   * tab is set into a slot cut out of it: the page's edge casts a soft shadow INTO
+   * the yellow (the inset shadows below), a hairline marks the cut, and there is no
+   * outward shadow and no lit rim, because a thing sitting in a slot has neither.
+   *
+   * The 8px overhang past the screen edge is what makes the inset shadow honest.
+   * An inset shadow paints on every inner edge including the left one, and the left
+   * edge of this tab IS the screen edge — nothing is above it there to cast
+   * anything. Pushing that edge 8px off-screen puts its shadow off-screen with it.
+   * The padding puts the icon back in the centre of the VISIBLE part, and every
+   * other number here (the 42% height, the gutter width, the nudge, the ride-out
+   * under the panel) is unchanged by it: the visible tab starts at x=0 as before.
+   */
+  left: -8px;
   top: calc(var(--ideas-tab-y) - 28px);
   z-index: 45;
   align-items: center;
   justify-content: center;
+  padding: 0 0 0 8px;
   /*
-   * Exactly the page gutter, so the tab's inner edge lands on the line the cards
-   * start from instead of reaching past it into the reading column. It reads the
-   * shared `--page-gutter-left` rather than the 20px that usually resolves to — on
-   * a notched phone in landscape the gutter grows with the safe-area inset and this
-   * has to grow with it.
+   * Exactly the page gutter (plus the off-screen overhang), so the tab's inner edge
+   * lands on the line the cards start from instead of reaching past it into the
+   * reading column. It reads the shared `--page-gutter-left` rather than the 20px
+   * that usually resolves to — on a notched phone in landscape the gutter grows
+   * with the safe-area inset and this has to grow with it.
    */
-  width: var(--page-gutter-left);
+  width: calc(var(--page-gutter-left) + 8px);
   height: 56px;
   /* Rounded on the inward side only — it is anchored to the left edge now. */
   border-radius: 0 12px 12px 0;
@@ -1337,11 +1357,12 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
   /* On yellow, always the dark ink — in both themes. */
   color: rgb(var(--color-primary-foreground));
   /*
-   * The rim only — lit top edge, lit INWARD edge, dark lip underneath. It does not
-   * reuse `.primary-face` because that class lights the top and bottom, which is
-   * where a wide button's profile is; this tab is 20px wide and 56 tall pinned to
-   * the screen edge, so the edges you can actually see are the top and the inward
-   * one, and the highlight wraps that corner instead.
+   * Three layers, top to bottom: the hairline lip of the slot on the page side of
+   * the cut; the page's shadow falling into the tab, from above and slightly from
+   * the left, the way the Start-run bar's own lip is lit from above; and a faint
+   * all-round ambient so the far corners still read as under an overhang. The
+   * shadow colour is a dark yellow-brown, not black — black over this yellow goes
+   * green.
    *
    * NO SHEEN (founder call 2026-08-18). It used to carry a vertical version of the
    * Log-run band, turned 90° to cross the 56px axis, looping every 2.6s forever.
@@ -1357,10 +1378,9 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
    * is a utility.
    */
   box-shadow:
-    6px 8px 20px -8px rgba(0, 0, 0, 0.6),
-    inset 0 1.5px 0 rgba(255, 252, 230, 0.62),
-    inset -1.5px 0 0 rgba(255, 252, 230, 0.42),
-    inset 0 -1.5px 0 rgba(122, 90, 0, 0.3);
+    0 0 0 1px rgb(var(--color-foreground) / 0.14),
+    inset 0.6px 2.2px 4.4px rgba(90, 66, 0, 0.42),
+    inset 0 0 1.8px rgba(90, 66, 0, 0.22);
   transition: transform 260ms cubic-bezier(0.2, 0.8, 0.3, 1);
   -webkit-tap-highlight-color: transparent;
 }
@@ -1890,10 +1910,19 @@ html[data-nav-pending] .page {
   @apply font-sans text-[12px] font-semibold tracking-normal text-muted-foreground;
 }
 
-/* Section signpost (redesigned 2026-07-16): Sora bold uppercase ink. The words alone — the
-   hairline under them (`.eyebrow-root`) is what separates one section from the next, not a glyph.
-   Was 10px mono 0.28em yellow — bumped to a readable heading so sections stop being glanced over.
-   Stat/table micro-labels stay small + faint via .type-data-label (unchanged).
+/* Section signpost — the band (founder pick 2026-09-15, rung J off the Heading Height Bench).
+
+   11px Sora semibold uppercase, 0.04em, muted grey: the label stopped being a heading and became
+   part of its card's frame. At 17px bold ink it was 40% letters and 60% air, it competed with the
+   run names underneath it, and four hand-built copies of it (the plain Eyebrow, Analysis,
+   Sessions, Paddock) measured 36, 44, 45 and 49px for one job. The 2026-07-16 bump to 17px was
+   right about the problem — sections were being glanced over — and wrong about the cure: the
+   tinted band and its one full-bleed hairline make a section findable now, not the size of the
+   words. Same register as `.table-col-header`: furniture, not content.
+
+   0.04em, not 0: uppercase this small jams without a little air between the letters. Line-height
+   pinned at 1.25 so the label, and anything riding its row, sets a 29px band — an unpinned 11px
+   count inherits the body's line-height and quietly adds 3px.
 
    NO LEADING MARK (founder call 2026-08-25). The label wore a −21° tick until this date: a 3px
    yellow bar, recoloured 2026-08-18 into the Start-run CTA’s notch in `foreground`. Both went for
@@ -1904,11 +1933,81 @@ html[data-nav-pending] .page {
    label, where it marks the single action the page wants, so it points at something. Do not
    re-add it here; the mark in front of a heading has now been argued twice and lost twice. */
 .eyebrow-label {
-  @apply inline-flex items-baseline gap-2 font-sans text-[17px] font-bold uppercase leading-tight tracking-normal text-foreground;
+  @apply inline-flex items-baseline gap-2 font-sans text-[11px] font-semibold uppercase leading-[1.25] tracking-[0.04em] text-muted-foreground;
 }
-/* Hairline rule under the label block — applied by the Eyebrow component wrapper. */
-.eyebrow-root {
-  @apply border-b border-border pb-1.5;
+
+/* `.eyebrow-root` — the Eyebrow wrapper, and the hand-built headings that borrow its class —
+   draws NOTHING on its own any more: no rule, no padding. A heading in the middle of a card or on
+   the page is the words alone. Its hairline used to stop wherever the words' box stopped, so any
+   heading with a count or a button beside it drew a line of a different length from the card's
+   own rules; "two lines, different lengths" was patched by hand in four places before it was
+   fixed here. The one hairline a heading keeps is the band's, and the band's is full-bleed.
+
+   THE BAND is a card's own header row: a 2.2% ink tint and one hairline, both edge to edge, the
+   label 7px from the top. One look, applied two ways:
+   - automatically, to an `.eyebrow-root` that is the FIRST child of a SurfaceCard body (~48
+     cards, no call-site change);
+   - by hand, with `.eyebrow-band`, on a header row that carries a count, a toggle or a button
+     beside its label (BandHeader, the Sessions list, the dashboard folds, the settings cards).
+
+   `::before` draws the tint and the rule, not the element, so they can reach past the card's
+   padding. In a clipping card the pseudo runs -100vmax each way and the card's own rounded
+   overflow cuts it — exact at any padding. An OPEN card (overflow visible, so a dropdown can
+   escape it) can't cut, so there it reaches SurfaceCard's default 12px exactly and rounds its own
+   top corners. SurfaceCard's `data-card-body` tells the two apart. The tint is an ink overlay, not
+   a flat grey, because the paper card is 78% white glass over #F4F4F3: the bench's flat #FAFAFA
+   vanishes into it, where 2.2% ink reproduces the bench's contrast on any ground.
+
+   A HIDDEN first-child heading (the log-run wizard hides section headers per step) must not take
+   its card's top padding away, or the step's first field sits flush against the card's edge —
+   hence `:not(.hidden):not([hidden])` on every first-child selector. */
+:root {
+  --band-fill: rgb(var(--color-elevate) / 0.022);
+}
+.eyebrow-band,
+[data-card-body] > .eyebrow-root:first-child:not(.hidden):not([hidden]) {
+  position: relative;
+  isolation: isolate;
+  padding-top: 7px;
+  padding-bottom: 8px; /* 7px + the band's 1px hairline, drawn in its last pixel */
+}
+.eyebrow-band::before,
+[data-card-body] > .eyebrow-root:first-child:not(.hidden):not([hidden])::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset-block: 0;
+  background-color: var(--band-fill);
+  border-bottom: 1px solid rgb(var(--color-border));
+  pointer-events: none;
+}
+/* The band's horizontal reach lives in its own rules, never in the one above: that selector's two
+   `:not()`s out-rank every bleed rule below, so an `inset: 0` there silently won and the automatic
+   first-child bands drew inset by the card's padding (caught in the 2026-09-15 build check). */
+.eyebrow-band::before,
+[data-card-body] > .eyebrow-root:first-child::before {
+  inset-inline: 0;
+}
+[data-card-body="clip"] .eyebrow-band::before,
+[data-card-body="clip"] > .eyebrow-root:first-child::before {
+  inset-inline: -100vmax;
+}
+[data-card-body="open"] > :is(.eyebrow-band, .eyebrow-root):first-child::before {
+  inset-inline: -0.75rem;
+  border-top-left-radius: 0.75rem;
+  border-top-right-radius: 0.75rem;
+}
+[data-card-body="open"].rounded-2xl > :is(.eyebrow-band, .eyebrow-root):first-child::before {
+  border-top-left-radius: 1rem;
+  border-top-right-radius: 1rem;
+}
+/* A heading that opens its card meets the card's top edge. */
+[data-card-body]:has(> :is(.eyebrow-band, .eyebrow-root):first-child:not(.hidden):not([hidden])) {
+  padding-top: 0;
+}
+/* A fold draws no rule while shut: the card's own edge is directly beneath it. */
+.eyebrow-band[aria-expanded="false"]::before {
+  border-bottom-color: transparent;
 }
 
 /* Timestamps and IDs — Sora now (one-voice pass); tabular figures, muted grey. */

@@ -65,7 +65,7 @@ export function rawSessionDriversFromImportedPayload(parsed: unknown): LapUrlSes
 }
 
 /** Server-matched driver name (`sessionHint.name`) from a stored `parsedPayload`. */
-function sessionHintNameFromPayload(parsed: unknown): string | null {
+export function sessionHintNameFromPayload(parsed: unknown): string | null {
   if (!parsed || typeof parsed !== "object") return null;
   const hint = (parsed as { sessionHint?: unknown }).sessionHint;
   if (!hint || typeof hint !== "object") return null;

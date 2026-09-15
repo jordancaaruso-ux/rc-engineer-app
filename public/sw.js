@@ -13,7 +13,7 @@
 // cache-first, so an already-installed PWA would keep the old tile forever otherwise.
 // Bumped to v3 on 2026-09-03 with the refit mark — same reason, and /brand/ is
 // cache-first too, so the nav and login marks would have stayed on the old outline.
-const VERSION = "v3";
+const VERSION = "v5";
 const SHELL_CACHE = `jrc-shell-${VERSION}`;
 
 // Static, safe-to-cache assets + the offline fallback page.

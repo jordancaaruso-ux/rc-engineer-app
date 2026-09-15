@@ -16,7 +16,7 @@ gets depends on whether the chassis has finished rolling at the moment they are 
 So the **phase** decides which mechanism is running, and **how long the car is in the corner**
 decides how much middle there is. That is a question of time, not shape: a long, slow hairpin can
 have the longest middle on the track, and a fast bend taken flat a short one. To the driver these
-are simply places on the corner — the way in, the middle, the way out — and that is the language to
+are simply places on the corner — entering, in the middle, exiting — and that is the language to
 ask in; "settled" is this page's word, not theirs.
 
 **Where the landmarks fall.** The initial is the turn-in — from the first steering input until roll
@@ -74,6 +74,14 @@ roll develops and carries a bigger share once roll is constant; a softer front i
 both. Which part of the corner decides the sign. The same change made at both ends moves when the
 whole car's grip arrives and leaves the share between the ends where it was; a change at one end
 moves both the timing and the share.
+
+**Two changes can share one test** (founder, 2026-09-09). A change that gives one phase and costs the
+other can be paired with a change whose gain is that phase and whose cost does not fall on the first
+change's gain. Damping is the lever that gives timing and takes nothing once the car has settled
+([[bite-hold]]), which is why it is the usual second half: soften a bar for the middle, and thinner oil
+brings the first input back without touching the middle the bar just gave. A pair is offered as one
+test when the driver has one run to find out, and as two runs in order when they have the time — the
+first change first, because a pair that works does not say which half did it.
 
 **The settled answer at the rear is the least trustworthy claim on this page** (founder, 2026-08-27).
 Stiffer at the rear — bar, spring, or less rear flex — is expected to give up rear grip once the car

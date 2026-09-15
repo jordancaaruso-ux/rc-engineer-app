@@ -150,6 +150,20 @@ export class WindowScanner {
     this.changed = new Uint8Array(px);
   }
 
+  /**
+   * Forget the frame before this one, so the next push starts a fresh run.
+   *
+   * The crossing scan reads a line's window as one unbroken stretch, so it never needs this. The
+   * race pass reads a line only while something is actually near it — a few dozen frames at a
+   * time, minutes apart — and comparing the first frame of one visit against the last frame of
+   * the previous one would report every car that passed in between as having moved in a single
+   * frame. Nothing else in the scanner's state has to be thrown away: its background is a median
+   * of early frames and its samples are the whole point of keeping it alive between visits.
+   */
+  resetRun(): void {
+    this.hasPrev = false;
+  }
+
   /** Pixels actually visited per frame — useful when deciding whether a device can keep up. */
   get workPixels(): number {
     return spanArea(this.bandSpans);
@@ -537,6 +551,12 @@ const MAX_EXTRA_TRACKS = 2;
 /** Fewest observations behind a tracked-only crossing before it is worth offering. */
 const MIN_EXTRA_SUPPORT = 6;
 
+/**
+ * "The same place" for the dwell measure, as a share of the frame's width — about half a car
+ * length on the footage this was measured on, the same radius the picker uses for keeping step.
+ */
+const DWELL_PLACE_SHARE = 0.02;
+
 /** Where the chosen time came from, so a result can explain itself. */
 export type CrossingSource = "confirmed" | "rescued" | "unconfirmed";
 
@@ -632,9 +652,14 @@ export function resultFromWindow(
     y: c.y,
     dir: c.dir,
     source: "rescued",
+    speedPxPerSec: c.speedPxPerSec,
   });
 
-  let pool: CrossingEvent[] = confirmedPairs.map((p) => ({ ...p.event, source: "confirmed" as const }));
+  let pool: CrossingEvent[] = confirmedPairs.map((p) => ({
+    ...p.event,
+    source: "confirmed" as const,
+    speedPxPerSec: p.track!.speedPxPerSec,
+  }));
   const colourOf = new Map<number, Rgb | undefined>();
   for (const p of confirmedPairs) colourOf.set(p.event.t, p.track!.colour);
   for (const c of crossings) if (!colourOf.has(c.t)) colourOf.set(c.t, c.colour);
@@ -677,6 +702,27 @@ export function resultFromWindow(
   let picked = pickCrossing(pool, target.centerSec, source === "unconfirmed" ? qualityFloor : 0);
   if (picked && car) picked = colourTiebreak(picked, pool, colourOf, car);
   const offered = [...pool, ...extra].sort((a, b) => a.t - b.t);
+  // How much of the window something was moving at each candidate's place. A car is at a line
+  // for a few frames a lap; a person standing or walking at the line's end is there for most of
+  // it. Measured on the Bendigo 4K practice (2026-09-08): the cars' crossing place had something
+  // moving in it 4% of a lap, the spot where a person was walking 41%. On 2026-09-09 the same
+  // footage put a marshal standing on the end of the S3 line into the picker as three of four
+  // pictures, and nothing else told them from the car: the tracker hopped between arms, legs and
+  // shadow at car speed, and a far-side colour reference called grey "yours".
+  const dwellOf = (e: CrossingEvent): { dwell?: number } => {
+    if (bounds == null || e.x == null || e.y == null || frames.length === 0) return {};
+    const r = bounds.frameW * DWELL_PLACE_SHARE;
+    let hit = 0;
+    for (const f of frames) {
+      for (const b of f.blobs) {
+        if (Math.hypot(b.x - e.x, b.y - e.y) <= r) {
+          hit++;
+          break;
+        }
+      }
+    }
+    return { dwell: hit / frames.length };
+  };
   return {
     ...target,
     detectedSec: picked ? picked.t : null,
@@ -687,7 +733,7 @@ export function resultFromWindow(
     trackCrossingCount: crossings.length,
     // Each candidate carries its own colour: the usual reason a window has more than one is that
     // more than one car went through it, and those are exactly the ones that need telling apart.
-    candidates: offered.map((e) => ({ ...e, colour: colourOf.get(e.t) })),
+    candidates: offered.map((e) => ({ ...e, colour: colourOf.get(e.t), ...dwellOf(e) })),
     candidateColours: offered.map((e) => colourOf.get(e.t)),
     colour: picked ? colourOf.get(picked.t) : undefined,
     colourRejected,

@@ -61,6 +61,15 @@ export function revalidateAfterEventMutation(userId: string): void {
   revalidateTag(dashboardTag(userId), IMMEDIATE);
 }
 
+/**
+ * A debrief is read on exactly one surface — the Sessions day — and nothing caches it by tag,
+ * so this is the route drop alone. See `revalidateAfterRunMutation` for why the path matters
+ * even with no tag: `staleTimes.dynamic` would otherwise hand back the pre-save page for 30s.
+ */
+export function revalidateAfterDebriefMutation(): void {
+  revalidatePath("/runs/history");
+}
+
 export function revalidateAfterTrackMutation(userId: string): void {
   revalidatePath("/tracks");
   revalidatePath("/runs/new");

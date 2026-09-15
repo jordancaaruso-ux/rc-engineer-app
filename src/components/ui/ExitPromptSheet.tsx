@@ -16,7 +16,8 @@ import { cn } from "@/lib/utils";
 const PILL_BASE =
   "tap-active inline-flex h-10 items-center justify-center gap-1.5 rounded-full px-4 font-sans text-[12.5px] font-bold transition-transform duration-150 active:scale-95 touch-manipulation";
 
-const PILL_PRIMARY = cn(
+/** The sheet's button recipes, shared with the other yes/no sheets so they all read as one family. */
+export const SHEET_PILL_PRIMARY = cn(
   PILL_BASE,
   "bg-[linear-gradient(180deg,#FFDF3D_0%,#FFD60A_55%,#F1C700_100%)] text-primary-foreground shadow-[0_10px_22px_-8px_rgba(255,214,10,0.35),inset_0_1px_0_rgba(255,255,255,0.4)] hover:brightness-[0.96]"
 );
@@ -24,10 +25,17 @@ const PILL_DANGER = cn(
   PILL_BASE,
   "border border-destructive/40 bg-destructive/10 text-destructive"
 );
-const PILL_OUTLINE = cn(
+export const SHEET_PILL_OUTLINE = cn(
   PILL_BASE,
   "border border-white/10 bg-card/90 text-foreground hover:bg-muted"
 );
+const PILL_PRIMARY = SHEET_PILL_PRIMARY;
+const PILL_OUTLINE = SHEET_PILL_OUTLINE;
+
+/** The sheet's shell — scrim, the handle, the bottom-anchored card — for sheets that carry their own body. */
+export const SHEET_SCRIM_CLASS = "fixed inset-0 z-[60] bg-black/50";
+export const SHEET_CARD_CLASS =
+  "fixed inset-x-0 bottom-0 z-[61] mx-auto w-full max-w-md rounded-t-[22px] border-t border-white/10 bg-muted px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-24px_60px_-12px_rgba(0,0,0,0.8)]";
 
 export type ExitPromptSheetProps = {
   open: boolean;
@@ -76,13 +84,9 @@ export function ExitPromptSheet({
 
   return createPortal(
     <>
+      <div className={SHEET_SCRIM_CLASS} onClick={() => !busy && onStay()} aria-hidden />
       <div
-        className="fixed inset-0 z-[60] bg-black/50"
-        onClick={() => !busy && onStay()}
-        aria-hidden
-      />
-      <div
-        className="fixed inset-x-0 bottom-0 z-[61] mx-auto w-full max-w-md rounded-t-[22px] border-t border-white/10 bg-muted px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-24px_60px_-12px_rgba(0,0,0,0.8)]"
+        className={SHEET_CARD_CLASS}
         role="dialog"
         aria-modal="true"
         aria-label={title}

@@ -17,7 +17,7 @@
  */
 
 import type { RowSpans } from "./spans";
-import type { FrameCrop } from "./types";
+import type { FrameCrop, Roi } from "./types";
 
 /** OpenCV's smallGaussianTab row for ksize 5, in 1/16ths. */
 const BLUR5 = [1, 4, 6, 4, 1] as const;
@@ -361,6 +361,8 @@ export type Blob = {
    * them when neither size, speed, nor how often a pixel fires can.
    */
   compactness: number;
+  /** Bounding box of the traced boundary, crop pixels, inclusive of both edges. */
+  box: { x0: number; y0: number; x1: number; y1: number };
 };
 
 /** 8-neighbour offsets in clockwise order, starting west. */
@@ -501,6 +503,10 @@ function polygonBlob(contour: Array<[number, number]>): Blob | null {
   let m10 = 0;
   let m01 = 0;
   let perimeter = 0;
+  let bx0 = Infinity;
+  let by0 = Infinity;
+  let bx1 = -Infinity;
+  let by1 = -Infinity;
   for (let i = 0; i < contour.length; i++) {
     const [x0, y0] = contour[i];
     const [x1, y1] = contour[(i + 1) % contour.length];
@@ -509,6 +515,10 @@ function polygonBlob(contour: Array<[number, number]>): Blob | null {
     m10 += a * (x0 + x1);
     m01 += a * (y0 + y1);
     perimeter += Math.hypot(x1 - x0, y1 - y0);
+    if (x0 < bx0) bx0 = x0;
+    if (x0 > bx1) bx1 = x0;
+    if (y0 < by0) by0 = y0;
+    if (y0 > by1) by1 = y0;
   }
   m00 /= 2;
   if (m00 === 0) return null;
@@ -521,5 +531,158 @@ function polygonBlob(contour: Array<[number, number]>): Blob | null {
     cy: m01 / m00,
     perimeter,
     compactness: perimeter > 0 ? (4 * Math.PI * area) / (perimeter * perimeter) : 0,
+    box: { x0: bx0, y0: by0, x1: bx1, y1: by1 },
   };
+}
+
+/**
+ * Frame-to-frame motion between two crops cut from DIFFERENT places in the frame.
+ *
+ * The lap tracer reads a small window that moves with the car, so consecutive crops rarely share
+ * an origin. Rather than re-centre only every few frames and lose the diff each time, the two are
+ * compared over the part of the frame they both cover: a pixel in `cur` is looked up in `prev`
+ * by its full-frame coordinate. Same test as `motionMaskInBand` — largest channel difference
+ * above the gate — written in `cur`'s coordinates, zero wherever `prev` did not reach.
+ *
+ * Returns how many pixels moved, which is the tracer's camera-shake tell: a gust moves the whole
+ * window, a car moves a car's worth of it.
+ */
+/**
+ * How much of a window is not track, read two ways at once.
+ *
+ * Against the frame before, a car shows only as the sliver it moved into — its width times how
+ * far it went — and only over the ground the two windows share, which on a quick car is not much
+ * of either. Against a still picture of the empty track it shows whole, wherever it is and however
+ * slowly it is going, but so does every speck of grain: measured on the Bendigo fisheye
+ * (2026-09-07) the still picture alone handed back a median of 181 blobs in one far sector where
+ * the frame before gave two, and the tracer steered onto grain and lost the car for good.
+ *
+ * So a pixel counts when it CHANGED — the old rule, untouched — or when it both differs from the
+ * empty track and changed at least half as much as the gate asks. Grain has to fire twice to be
+ * believed, which it rarely does; a car's body, which barely changes between two frames because
+ * it is sitting on itself, differs plainly from the track and always moves a little. It is the
+ * rule `motionMaskInBandBg` already uses at the sector lines, where it was measured first.
+ *
+ * Where the two windows do not overlap there is no "changed" to read, so the still picture has to
+ * carry the pixel alone and is held to a higher bar.
+ */
+export function diffWindowBg(
+  prev: FrameCrop | null,
+  prevRoi: Roi | null,
+  /** The empty track under `curRoi`, same size as `cur`. Null falls back to the old rule alone. */
+  bg: FrameCrop | null,
+  cur: FrameCrop,
+  curRoi: Roi,
+  thresh: number,
+  out: Uint8Array,
+  inset = 0
+): number {
+  const { width: w, height: h, channels: c } = cur;
+  out.fill(0, 0, w * h);
+  const colorCh = Math.min(3, c, prev?.channels ?? c, bg?.channels ?? c);
+  const bgAlone = thresh * BG_ALONE_MULTIPLE;
+  // The part of the window the frame before also covered, in full-frame coordinates.
+  const pw = prev?.width ?? 0;
+  const ph = prev?.height ?? 0;
+  const has = prev != null && prevRoi != null;
+  const ox0 = has ? Math.max(curRoi.x0, prevRoi!.x0) + inset : 0;
+  const oy0 = has ? Math.max(curRoi.y0, prevRoi!.y0) + inset : 0;
+  const ox1 = has ? Math.min(curRoi.x0 + w, prevRoi!.x0 + pw) - inset : 0;
+  const oy1 = has ? Math.min(curRoi.y0 + h, prevRoi!.y0 + ph) - inset : 0;
+  const x0 = curRoi.x0 + inset;
+  const y0 = curRoi.y0 + inset;
+  const x1 = curRoi.x0 + w - inset;
+  const y1 = curRoi.y0 + h - inset;
+  const pc = prev?.channels ?? 0;
+  let count = 0;
+  for (let fy = y0; fy < y1; fy++) {
+    const cy = fy - curRoi.y0;
+    const curRow = cy * w;
+    const inRow = has && fy >= oy0 && fy < oy1;
+    const prevRow = has ? (fy - prevRoi!.y0) * pw : 0;
+    for (let fx = x0; fx < x1; fx++) {
+      const cx = fx - curRoi.x0;
+      const i = (curRow + cx) * c;
+      let changed = -1;
+      if (inRow && fx >= ox0 && fx < ox1) {
+        const j = (prevRow + (fx - prevRoi!.x0)) * pc;
+        changed = 0;
+        for (let ch = 0; ch < colorCh; ch++) {
+          const d = Math.abs(cur.data[i + ch]! - prev!.data[j + ch]!);
+          if (d > changed) changed = d;
+        }
+        if (changed > thresh) {
+          out[curRow + cx] = 1;
+          count++;
+          continue;
+        }
+      }
+      if (!bg) continue;
+      const q = (curRow + cx) * bg.channels;
+      let off = 0;
+      for (let ch = 0; ch < colorCh; ch++) {
+        const d = Math.abs(cur.data[i + ch]! - bg.data[q + ch]!);
+        if (d > off) off = d;
+      }
+      // Changed a little and plainly not track; or, with nothing to compare against, well clear
+      // of the track on its own.
+      const ok = changed < 0 ? off > bgAlone : off > thresh && changed * 2 > thresh;
+      if (ok) {
+        out[curRow + cx] = 1;
+        count++;
+      }
+    }
+  }
+  return count;
+}
+
+/**
+ * How far past the gate a pixel must sit to be called a car on the still picture alone, with no
+ * frame before it to agree. Only the sliver of window that has just been uncovered is read this
+ * way, and only grain lives there otherwise.
+ */
+const BG_ALONE_MULTIPLE = 2;
+
+export function diffOverlap(
+  prev: FrameCrop,
+  prevRoi: Roi,
+  cur: FrameCrop,
+  curRoi: Roi,
+  thresh: number,
+  out: Uint8Array,
+  inset = 0
+): number {
+  const { width: w, height: h, channels: c } = cur;
+  const pw = prev.width;
+  const colorCh = Math.min(3, c, prev.channels);
+  out.fill(0, 0, w * h);
+  // `inset` pixels inside every edge of both crops are left out: a blur reflects at a crop's own
+  // border, so that rim reads differently in two crops cut from different places.
+  const x0 = Math.max(curRoi.x0, prevRoi.x0) + inset;
+  const y0 = Math.max(curRoi.y0, prevRoi.y0) + inset;
+  const x1 = Math.min(curRoi.x0 + w, prevRoi.x0 + pw) - inset;
+  const y1 = Math.min(curRoi.y0 + h, prevRoi.y0 + prev.height) - inset;
+  if (x1 <= x0 || y1 <= y0) return 0;
+  const pc = prev.channels;
+  let count = 0;
+  for (let fy = y0; fy < y1; fy++) {
+    const cy = fy - curRoi.y0;
+    const py = fy - prevRoi.y0;
+    const curRow = cy * w;
+    const prevRow = py * pw;
+    for (let fx = x0; fx < x1; fx++) {
+      const i = (curRow + (fx - curRoi.x0)) * c;
+      const j = (prevRow + (fx - prevRoi.x0)) * pc;
+      let maxDiff = 0;
+      for (let ch = 0; ch < colorCh; ch++) {
+        const d = Math.abs(cur.data[i + ch]! - prev.data[j + ch]!);
+        if (d > maxDiff) maxDiff = d;
+      }
+      if (maxDiff > thresh) {
+        out[curRow + (fx - curRoi.x0)] = 1;
+        count++;
+      }
+    }
+  }
+  return count;
 }

@@ -193,8 +193,8 @@ export function DashboardGetSetUpCard({ hasCar, hasTimingIdentity, hasSetup, set
 
   return (
     <CardPanel className="border-primary-ink/30">
-      <div className="flex items-center gap-2">
-        <Eyebrow className={onSheetStep ? "text-primary-ink" : undefined}>
+      <div className="eyebrow-band mb-2 flex items-center gap-2">
+        <Eyebrow className={onSheetStep ? "mb-0 text-primary-ink" : "mb-0"}>
           {onSheetStep ? "Last step" : "Get set up"}
         </Eyebrow>
         <button

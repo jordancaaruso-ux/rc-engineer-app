@@ -148,6 +148,37 @@ const RIVALS_SEEN = 0.144 / (0.025 / 3); // separation is rivals' distance in un
   const two = defaultPicks([{ lineKey: "s1", label: "S1", options: [mk(0.7), mk(1.1)], field: { fromSec: 0, toSec: 1.7, cars: 4, centres: [0.6, 0.7, 0.8] } }]);
   assert(two.s1 === undefined, "two inside the window: the driver decides");
   assert(picks.s2?.offsetSec === 2.2, "the only car that kept step every lap is picked");
+
+  // A lone picture with something on its side needs no tap: the colour calls it the driver's, or
+  // the learning pass had already settled the line on the same rhythm. A lone picture with
+  // nothing on its side, or on the line the learning pass could not settle, is still theirs.
+  assert(defaultPicks([{ lineKey: "s1", label: "S1", options: [mk(0.7, { hint: "yours" })] }]).s1?.offsetSec === 0.7, "a lone picture the colour calls yours is picked");
+  assert(defaultPicks([{ lineKey: "s1", label: "S1", options: [mk(0.7)] }], { seeds: { s1: 0.75 }, ambiguous: [] }).s1?.offsetSec === 0.7, "a lone picture on the learnt rhythm is picked");
+  assert(defaultPicks([{ lineKey: "s1", label: "S1", options: [mk(0.7)] }], { seeds: { s1: 0.75 }, ambiguous: ["s1"] }).s1 === undefined, "not on the line the learning pass could not settle");
+  assert(defaultPicks([{ lineKey: "s1", label: "S1", options: [mk(0.7)] }], { seeds: { s1: 3.2 }, ambiguous: [] }).s1 === undefined, "nor when the learnt rhythm is somewhere else");
+
+  // A thing that was at its place for a good part of the lap is not a car, whatever else speaks
+  // for it (Bendigo 4K, 2026-09-09: a marshal standing on the end of the S3 line, offered as three
+  // of four pictures with "looks like yours" under two of them).
+  const stood = settleLineShape([
+    mk(5.0, { dwell: 0.41, hint: "yours" }),
+    mk(6.3, { dwell: 0.04 }),
+    mk(6.7, { dwell: 0.09 }),
+    mk(9.1),
+  ]);
+  assert(stood[0]!.lingers === true, "there for two fifths of the lap is a person");
+  assert(!stood[1]!.lingers && !stood[2]!.lingers, "cars are not");
+  assert(stood[3]!.lingers == null, "unmeasured is no verdict");
+  assert(foldReasonFor(stood[0]!) === "lingers", "and it is folded");
+  assert(defaultPicks([{ lineKey: "s3", label: "S3", options: stood.slice(0, 2) }]).s3 === undefined, "the car left beside it still needs evidence of its own");
+  // On a far-side tick the crop is smaller than "the same place" and grain fills it every frame:
+  // every crossing reads busy, the driver's own car included. Busy means nothing unless another
+  // crossing on the line shows the line can be quiet.
+  const grainy = settleLineShape([mk(2.1, { dwell: 1.0, hint: "yours" })]);
+  assert(grainy[0]!.lingers == null, "a lone crossing on a saturated line is not a person");
+  const allBusy = settleLineShape([mk(2.1, { dwell: 0.98 }), mk(2.6, { dwell: 0.95 })]);
+  assert(allBusy.every((o) => o.lingers == null), "two busy places with nothing quiet to compare against: no verdict");
+  assert(defaultPicks([{ lineKey: "s1", label: "S1", options: grainy }]).s1?.offsetSec === 2.1, "and the lone picture is still pre-ticked");
   assert(picks.s3 === undefined, "two cars neither of which stands out: the driver decides");
   assert(picks.s4 === undefined, "a line whose every car is folded is not picked from");
 }
@@ -262,6 +293,57 @@ const RIVALS_SEEN = 0.144 / (0.025 / 3); // separation is rivals' distance in un
   assert(enoughHits(3, 4) && !enoughHits(2, 4), "three of four, not two of four");
   assert(enoughHits(3, 3) && !enoughHits(2, 3), "three of three, not two of three");
   assert(!enoughHits(0, 0), "nothing read, nothing kept");
+}
+
+// --- a hit is worth what it was hard to get, and has to come back to the same place ---
+// Bendigo 2026-09-08: a person walked the outside of the track where S3 was drawn and the screen
+// offered them as the driver's car on "4 of 4 your laps", against their own car's 3 of 4. Counting
+// hits cannot do otherwise — something that is there all lap crosses near every moment you name.
+{
+  const LAP = 15;
+  const me = { key: "me", name: "Me", lapStarts: [0, 1, 2, 3].map((n) => ({ lapNumber: n + 1, startSec: n * LAP })) };
+  const field = [me];
+  const OFFSET = 6;
+  const CAR = { x: 100, y: 100 };
+  const PERSON = { x: 500, y: 500 };
+  const NOWHERE = { x: 900, y: 900 };
+  const NEAR = 40;
+
+  /** One window, given what crossed in it. */
+  const win = (fromSec: number, xs: Array<{ t: number; at: { x: number; y: number } }>) => ({
+    fromSec,
+    toSec: fromSec + LAP,
+    crossings: xs.map((c) => c.t),
+    places: xs.map((c) => c.at),
+  });
+  // The car crosses once a lap where the car crosses. The person is at their own spot every half
+  // second for the whole lap — including, inevitably, the moment the driver's timing predicts.
+  const busy = (fromSec: number) =>
+    Array.from({ length: 30 }, (_, i) => ({ t: fromSec + i * 0.5, at: PERSON }));
+  const others = [
+    win(0, [{ t: OFFSET, at: CAR }, ...busy(0)]),
+    win(2 * LAP, [{ t: 2 * LAP + OFFSET, at: CAR }, ...busy(2 * LAP)]),
+  ];
+  const t = LAP + OFFSET; // the thing being judged, on the identify lap
+
+  const car = movesWithFor(t, field, "me", others, CAR, NEAR);
+  assert(car && car.mine && car.hits === 2, `the car keeps step and is worth saying: ${JSON.stringify(car)}`);
+
+  const person = movesWithFor(t, field, "me", others, PERSON, NEAR);
+  assert(person === undefined, `a spot that hits every lap by itself proves nothing: ${JSON.stringify(person)}`);
+
+  // A hit has to come back to the same place: the busy spot must not lend its hits to a candidate
+  // somewhere else on the line. Sparse windows, so nothing here fails on chance alone.
+  const sparse = [
+    win(0, [{ t: OFFSET, at: CAR }, { t: 12, at: CAR }]),
+    win(2 * LAP, [{ t: 2 * LAP + OFFSET, at: CAR }, { t: 2 * LAP + 12, at: CAR }]),
+  ];
+  assert(
+    movesWithFor(t, field, "me", sparse, NOWHERE, NEAR) === undefined,
+    "crossings somewhere else on the line are not this thing coming back"
+  );
+  const blind = movesWithFor(t, field, "me", sparse);
+  assert(blind && blind.hits === 2, "with no place to judge by it counts them all, as it always did");
 }
 
 console.log("findCrossings identify.test.ts OK");

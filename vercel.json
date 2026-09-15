@@ -1,5 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["syd1"],
-  "crons": [{ "path": "/api/cron/refresh-demo", "schedule": "10 16 * * *" }]
+  "crons": [
+    { "path": "/api/cron/refresh-demo", "schedule": "10 16 * * *" },
+    { "path": "/api/cron/run-window-sweep", "schedule": "40 16 * * *" },
+    { "path": "/api/cron/timing-sweep-plan", "schedule": "5 14 * * *" },
+    { "path": "/api/cron/timing-sweep", "schedule": "*/5 * * * *" }
+  ]
 }

@@ -37,6 +37,8 @@ export type SpeedhiveDiscoveredSession = {
   label: string;
   /** Fastest lap in seconds, when known at discovery time. */
   bestLapSeconds?: number | null;
+  /** Timed laps in the session, when the discovery page carries them (practice runs do). */
+  lapCount?: number | null;
   alreadyImported: boolean;
   linkedRunId: string | null;
   timingSource: "speedhive";

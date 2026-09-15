@@ -3,6 +3,14 @@ export type EngineerMessageContextSnapshot = {
   answer?: string;
   runId?: string | null;
   compareRunId?: string | null;
+  /** The range the Engineer read instead of a run (rangeScope.ts), when the subject was a range. */
+  range?: {
+    eventId?: string | null;
+    trackId: string | null;
+    carId: string | null;
+    from: string | null;
+    to: string | null;
+  } | null;
   source?: string;
   capturedAtIso?: string;
   /** Engineer build that produced the answer — see engineer/prompt.ts. */

@@ -9,6 +9,9 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { engineerQuotaNote } from "@/lib/aiUsage/engineerQuotaNote";
+import { isFeatureLockedForCurrentUser } from "@/lib/entitlementGuards";
+import { ProLockedPanel } from "@/components/billing/ProLockedPanel";
+import { upgradeTierFor } from "@/lib/entitlementLogic";
 
 function EngineerClientSkeleton() {
   return (
@@ -41,6 +44,28 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
   }
 
   const user = await requireCurrentUser();
+  // Starter has no Engineer at all (docs/STARTER_TIER_PLAN.md): the page keeps its place in the
+  // nav and sells the upgrade — the same visible-but-locked pattern as the Geometry Lab for
+  // Notebook. The chat and run-candidates routes carry the same lock for stale clients.
+  // It sells Race Engineer, not Notebook: the Engineer is Race Engineer's feature and
+  // Notebook's one question a day is only a taste (founder call 2026-09-15).
+  if (await isFeatureLockedForCurrentUser("engineer")) {
+    return (
+      <>
+        <header className="page-header is-echo">
+          <div className="min-w-0">
+            <h1 className="page-title">Engineer</h1>
+            <p className="page-subtitle">Setup guidance from your runs and knowledge base.</p>
+          </div>
+        </header>
+        <ProLockedPanel
+          title="Engineer"
+          blurb="Ask what to change next. It reads your runs — what you changed, how the car felt, what the laps did — and answers from the knowledge base."
+          includedIn={upgradeTierFor("engineer")}
+        />
+      </>
+    );
+  }
   const ratingsEnabled = isAuthAdminEmail(user.email);
   // The chat answers fine with an empty run log, so nothing here was broken —
   // but a first-time user burned a request to discover the tool only gets good

@@ -1,0 +1,105 @@
+/**
+ * Answer the launch set as CONVERSATIONS, in context.
+ *
+ *   npm run engineer:launch -- [--batch launch-2026-09-09] [--arm v1-nets] [--cases questions/launch-set.json] [--only d-01,f-03] [--contexts none,run-with-setup]
+ *
+ * Why this exists beside generate-answers.ts (2026-09-09, founder call): the seed harness answers
+ * one question with no driver data. Real usage (283 threads on the production copy) is a third
+ * one-word follow-ups — "Everywhere", "Exit" — answering the Engineer's own question, and every
+ * live request carries the driver's latest run. So a case here is a list of driver turns, each
+ * Engineer reply is generated live and fed back as history exactly as the chat route does, and
+ * every case runs once per context: `none` (no driver data — 63% of accounts) and a fixture file
+ * under fixtures/<name>.txt used verbatim as the driver-data block (a real render captured from
+ * driverData.ts, trimmed to the majority active user: car, track, laps, setup).
+ *
+ * Writes answers/<batch>/<arm>__<context>.json (gitignored). Resumes per case. Requires
+ * OPENAI_API_KEY (answers run on the Engineer's own model/transport).
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { generateEngineerChatReply } from "@/lib/engineer/chat";
+import type { EngineerChatMessage, EngineerPayloadBlock } from "@/lib/engineer/payload";
+import { ENGINEER_PROMPT_VERSION } from "@/lib/engineer/prompt";
+import { getArm } from "./arms";
+
+type LaunchCase = { id: string; shape: string; source: string; turns: string[] };
+type LaunchSet = { contexts: string[]; cases: LaunchCase[] };
+type Turn = { role: "user" | "assistant"; content: string };
+type CaseResult = { shape: string; source: string; turns: Turn[]; model: string; usage: unknown[] };
+type AnswerFile = {
+  arm: string;
+  context: string;
+  batch: string;
+  promptVersion: string;
+  fixture: string | null;
+  cases: Record<string, CaseResult>;
+};
+
+function argValue(flag: string): string | null {
+  const i = process.argv.indexOf(flag);
+  return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : null;
+}
+
+function loadFixture(name: string): string | null {
+  if (name === "none") return null;
+  const file = path.join(__dirname, "fixtures", `${name}.txt`);
+  if (!fs.existsSync(file)) throw new Error(`No fixture file for context "${name}": ${file}`);
+  return fs.readFileSync(file, "utf8").trim();
+}
+
+async function main() {
+  const armId = argValue("--arm") ?? "v1-nets";
+  const arm = getArm(armId);
+  const batch = argValue("--batch") ?? `launch-${new Date().toISOString().slice(0, 10)}`;
+  const casesPath = argValue("--cases") ?? path.join(__dirname, "questions", "launch-set.json");
+  const set = JSON.parse(fs.readFileSync(casesPath, "utf8")) as LaunchSet;
+  const only = argValue("--only")?.split(",").map((s) => s.trim()) ?? null;
+  const contexts = argValue("--contexts")?.split(",").map((s) => s.trim()) ?? set.contexts;
+  const cases = set.cases.filter((c) => !only || only.includes(c.id));
+
+  const blocks = await arm.buildBlocks();
+  const outDir = path.join(__dirname, "answers", batch);
+  fs.mkdirSync(outDir, { recursive: true });
+
+  for (const context of contexts) {
+    const fixture = loadFixture(context);
+    const driverBlocks: EngineerPayloadBlock[] = fixture
+      ? [{ id: "driver-data", cacheStable: false, content: fixture }]
+      : [];
+    const outPath = path.join(outDir, `${arm.id}__${context}.json`);
+    const file: AnswerFile = fs.existsSync(outPath)
+      ? (JSON.parse(fs.readFileSync(outPath, "utf8")) as AnswerFile)
+      : { arm: arm.id, context, batch, promptVersion: ENGINEER_PROMPT_VERSION, fixture, cases: {} };
+
+    let done = 0;
+    for (const c of cases) {
+      if (file.cases[c.id]) {
+        done++;
+        continue;
+      }
+      process.stdout.write(`[${arm.id} · ${context}] ${c.id} (${c.turns.length} turn${c.turns.length > 1 ? "s" : ""}) … `);
+      const turns: Turn[] = [];
+      const usage: unknown[] = [];
+      let model = "";
+      try {
+        for (const q of c.turns) {
+          turns.push({ role: "user", content: q });
+          const history: EngineerChatMessage[] = turns.map((t) => ({ role: t.role, content: t.content }));
+          const out = await generateEngineerChatReply({ messages: history, blocks, driverBlocks });
+          turns.push({ role: "assistant", content: out.reply });
+          usage.push(out.usage);
+          model = out.model;
+        }
+        file.cases[c.id] = { shape: c.shape, source: c.source, turns, model, usage };
+        done++;
+        console.log(`ok (${turns.filter((t) => t.role === "assistant").map((t) => t.content.length).join("+")} chars)`);
+      } catch (err) {
+        console.log(`FAILED: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      fs.writeFileSync(outPath, JSON.stringify(file, null, 2));
+    }
+    console.log(`${done}/${cases.length} conversations in context "${context}" → ${outPath}\n`);
+  }
+}
+
+void main();

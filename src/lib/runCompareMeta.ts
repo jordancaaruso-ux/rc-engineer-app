@@ -41,18 +41,46 @@ function asValidDate(v: Date | string | null | undefined): Date | null {
  *   2. `loggingCompletedAt`, when it is within a day of `createdAt` — the same outing.
  *   3. `createdAt`.
  *
- * Deliberately **never** reads `sortAt`: that is the draggable ordering axis, and a drag
- * rewrites it to a midpoint that was no moment at all. Accepted in the input type so
- * callers that already select it still compile.
+ * ## The fortnight floor is lifted for a run the app filed at its heat (2026-09-14)
+ *
+ * "Add N other runs from today" writes `sortAt` AND `sessionCompletedAt` from the same
+ * trusted instant — the timing sheet's clock, converted by the app, never an import time —
+ * and the run being saved beside them is stamped the same way. A driver catching up on a
+ * day from last month then has rows whose heat is far more than a fortnight before the row
+ * was written, and the floor printed the SAVE time on every one of them ("14 Sept, 3:38 PM"
+ * on an October day, seen on a real drive). So when the two stamps agree to the
+ * millisecond, the instant is the app's own and the floor does not apply. The upper bound
+ * still does: a dirty stamp is always LATER than the log, never a fortnight earlier.
+ *
+ * Why equality is a safe signal: a drag rewrites `sortAt` to a midpoint between two
+ * neighbours, which can never coincide with a stamp; a draft's day-stamp and a plain create
+ * write `sortAt` from `createdAt`. The April 2026 migration did copy `sessionCompletedAt`
+ * into `sortAt` on legacy rows — checked on the scratch clone (559 runs): no such row
+ * carries a fortnight-old stamp, so none of them moves.
+ *
+ * Otherwise deliberately **never** reads `sortAt` as a time to SHOW: that is the draggable
+ * ordering axis.
  */
 export function resolveRunDisplayInstant(run: {
   createdAt: Date | string;
   sessionCompletedAt?: Date | string | null;
   sortAt?: Date | string | null;
   loggingCompletedAt?: Date | string | null;
+  /**
+   * A run the app filed from the timing sheet ("Add N other runs from today"). Its
+   * `sessionCompletedAt` was written by the app as a real instant — never an import time,
+   * never a wall clock as-if-UTC — so it is trusted outright, however long after the day
+   * the row was written. After confirm the `sortAt` agreement below carries the same trust.
+   */
+  unconfirmedAt?: Date | string | null;
 }): Date {
   const created = asValidDate(run.createdAt) ?? new Date(NaN);
   const createdMs = created.getTime();
+
+  if (run.unconfirmedAt != null) {
+    const stamped = asValidDate(run.sessionCompletedAt);
+    if (stamped != null) return stamped;
+  }
 
   const logged = asValidDate(run.loggingCompletedAt);
   const loggedSameOuting =
@@ -64,8 +92,10 @@ export function resolveRunDisplayInstant(run: {
   const session = asValidDate(run.sessionCompletedAt);
   if (session != null) {
     const upper = (loggedSameOuting ? logged!.getTime() : createdMs) + 10 * MINUTE_MS;
-    const lower = createdMs - 14 * DAY_MS;
     const t = session.getTime();
+    const sortStamp = asValidDate(run.sortAt);
+    const filedAtHeat = sortStamp != null && sortStamp.getTime() === t;
+    const lower = filedAtHeat ? Number.NEGATIVE_INFINITY : createdMs - 14 * DAY_MS;
     if (!Number.isFinite(createdMs) || (t >= lower && t <= upper)) return session;
   }
   if (loggedSameOuting) return logged!;

@@ -195,7 +195,7 @@ function GroupBlock({
         className
       )}
     >
-      <Eyebrow className="mb-0 bg-surface-runna-inset px-2 py-1.5">{title}</Eyebrow>
+      <Eyebrow className="mb-0 border-b border-border bg-surface-runna-inset px-2 py-1.5">{title}</Eyebrow>
       <div className="flex-1 divide-y divide-border/30">{children}</div>
     </div>
   );

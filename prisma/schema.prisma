@@ -75,6 +75,7 @@ model User {
   baselineSetupsCreated BaselineSetup[] @relation("BaselineSetupCreatedBy")
   setupFillDrafts SetupFillDraft[]
   setupSheetBlanksUploaded SetupSheetBlank[] @relation("SetupSheetBlankUploader")
+  meetingDebriefs MeetingDebrief[]
 }
 
 /**
@@ -667,6 +668,12 @@ model Track {
   locationMarkedAt DateTime?
   /** How coordinates were set, e.g. `device`. */
   locationSource String?
+  /**
+   * IANA zone of the venue, derived from the pin (`trackTimeZone.ts`). The timing sweep runs on
+   * a server with no phone to ask what day it is: "today at this track" and "8 pm at this track"
+   * both read this. Null until the track has a pin; falls back to the owner's `User.timeZone`.
+   */
+  timeZone String?
   /** LiveRC track root URL (e.g. https://tftr.liverc.com) for session discovery. */
   liveRcUrl String?
   /** MYLAPS Speedhive organization page URL for session discovery. */
@@ -710,6 +717,7 @@ model Track {
   videoAssets     VideoAsset[]
   videoAnalysisJobs VideoAnalysisJob[]
   locationRunPromptDismissals TrackLocationRunPromptDismissal[]
+  importedLapTimeSessions ImportedLapTimeSession[]
 
   @@unique([catalogSource, catalogSourceRef])
   @@index([userId])
@@ -820,6 +828,7 @@ model Event {
   participations EventParticipation[]
   runs Run[]
   importedLapTimeSessions ImportedLapTimeSession[]
+  debriefs MeetingDebrief[]
   // Future: timetable/scheduled sessions (timetableSessions?), reminders, "most likely session" suggestions
 
   // NOTE: partial UNIQUE(trackId, resultsSourceUrl) WHERE resultsSourceUrl IS NOT NULL is added in a
@@ -1507,8 +1516,44 @@ model Run {
    * is independent (see `sessionCompletedAt` / `createdAt`); this column exists purely
    * so "if B was completed after A, B stays above A forever" holds regardless of edits,
    * re-imports, or lap-time changes. Backfilled from `COALESCE(sessionCompletedAt, createdAt)`.
+   *
+   * One more exception (2026-09-14): a save that also backfills the day's other timing sessions
+   * as runs (`backfillImportedLapTimeSessionIds`) stamps THIS run's `sortAt` to its on-track
+   * instant, and each backfilled run gets its own session's instant. Those runs are ordered by
+   * the timing sheet's clock, so the run they were added beside has to be on the same clock or
+   * a later heat sorts above it. See `createBackfilledRuns.ts`.
    */
   sortAt DateTime @default(now())
+
+  /**
+   * Set when the app created this run from a timing session the driver did not log themselves
+   * — "Add N other runs from today" on the lap step. Its laps are real; its car, track and event
+   * came from the run saved beside it, and its setup and tyres were carried from the nearest
+   * earlier logged run that day. Null = the driver logged it. Cleared ONLY by saving the run
+   * through the wizard (`PUT /api/runs`); viewing it, correcting a tyre count, or reordering
+   * never clears it. Permanent so future-you can't mistake an app copy for your own record.
+   */
+  unconfirmedAt DateTime?
+
+  /**
+   * Set when the timing sweep created this run as a placeholder (always alongside
+   * `unconfirmedAt`). Distinguishes "the app filed it from the timing site" from the lap-step
+   * "Add N other runs" path, which the driver at least asked for.
+   */
+  filedBySweepAt DateTime?
+  /**
+   * Set when the timing sweep attached laps to a run the driver opened themselves (a draft, or a
+   * logged run without laps). The undo is the existing "not my session" unlink.
+   */
+  lapsAttachedBySweepAt DateTime?
+
+  /**
+   * Set when the owner's plan cannot see this run — Starter keeps only the last fifteen
+   * (docs/STARTER_TIER_PLAN.md). Null = visible. Stamped and cleared only by `applyRunWindow`;
+   * every read through `prisma.run` filters on it (`runWindowExtension`), so a hidden run is gone
+   * from every screen but never deleted, and an upgrade brings it straight back.
+   */
+  hiddenByPlanAt DateTime?
 
   /**
    * IANA zone of the device that logged this run (`rc_tz` cookie at create time).
@@ -1580,6 +1625,8 @@ model Run {
   teamComments        TeamRunComment[]
 
   @@index([userId, sortAt])
+  @@index([userId, hiddenByPlanAt])
+  @@index([userId, unconfirmedAt])
   @@index([userId, carId, carRating])
   @@index([carId])
   @@index([trackId])
@@ -1791,10 +1838,22 @@ model ImportedLapTimeSession {
 
   detectedPrimaryForRun Run? @relation("RunDetectedImport")
 
+  /**
+   * Set when the timing sweep imported this session on the driver's behalf. A sweep-filed row
+   * with no `linkedRunId` is a LOOSE import: the app could not tell which car (no run that day,
+   * no chip bound to a car, more than one car), so it waits for the driver to say.
+   */
+  sweepFiledAt DateTime?
+  /** The track the sweep found this session at — a loose import must still know where it was. */
+  track   Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  trackId String?
+
+  @@unique([userId, sourceUrl])
   @@index([userId, createdAt])
-  @@index([userId, sourceUrl])
   @@index([linkedEventId])
   @@index([linkedRunId])
+  @@index([trackId])
+  @@index([userId, sweepFiledAt])
 }
 
 model WatchedLapSource {
@@ -2135,4 +2194,45 @@ model PerfClientMetric {
   @@unique([metricId, name])
   @@index([createdAt])
   @@index([name, route, createdAt])
+}
+
+/// The driver's own note on a meeting, written AFTER the day: "what mattered". One per driver
+/// per meeting, where a meeting is the group the Sessions list already forms — an event, or the
+/// same track on the same local day (`resolveSessionGroupKeys`). It hangs off runs, so a day with
+/// nothing logged or imported has nowhere to be written on (founder ruling 2026-09-14).
+///
+/// Not `EventParticipation.notes`: that is written BEFORE a meeting (spec tyre, plan) and read by
+/// the dashboard's next-outing card. A debrief is the other end of the weekend.
+model MeetingDebrief {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  /// The Sessions group id verbatim: `event-<id>` or `day-<yyyy-mm-dd>-name:<track>`.
+  meetingKey String
+
+  event   Event?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  eventId String?
+
+  /// YYYY-MM-DD in the DRIVER's zone (`runLocalDayKey`) of the meeting's first run, and the
+  /// track as `trackKey()` spells it. Stored for both kinds of meeting so a note survives its
+  /// group changing key — an eventless day whose runs later join an event, or an event that is
+  /// deleted and falls back to a day. A renamed track orphans a day-group note; accepted.
+  localDayKey String
+  trackKey    String
+
+  text String
+
+  /// Post-launch: the Engineer's recap of the meeting, in prose. Same row, one per meeting;
+  /// `aiSummarySourceHash` says which runs + text it was written from, so it can go stale.
+  aiSummary           String?
+  aiSummaryAt         DateTime?
+  aiSummarySourceHash String?
+
+  @@unique([userId, meetingKey])
+  @@index([userId, eventId])
+  @@index([userId, localDayKey, trackKey])
 }

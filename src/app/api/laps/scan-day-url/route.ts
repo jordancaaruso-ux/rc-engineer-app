@@ -49,6 +49,8 @@ export type ScanDayUrlCandidateRow = {
   linkedRunId: string | null;
   timingSource?: "liverc" | "speedhive" | "myrcm";
   bestLapSeconds?: number | null;
+  /** Timed laps in the session, when known before import (Speedhive practice; stored parses). */
+  lapCount?: number | null;
   /**
    * Only on already-imported rows: what that import is currently filed under, so the picker can say
    * "on Run 12 · Sat afternoon" rather than making the driver guess whether taking it costs them
@@ -69,6 +71,12 @@ export type ScanDayUrlCandidateRow = {
 export type ScanDayUrlImportedRow = ScanDayUrlCandidateRow & {
   importedSessionId: string;
   linkedRunLabel: string | null;
+  /**
+   * The run it is filed under was created by the app from the timing sheet ("Add N other runs
+   * from today") and the driver has not opened it. The picker offers to OPEN that run rather
+   * than take its laps onto a new one — the run exists precisely so it can be filled in.
+   */
+  linkedRunUnconfirmed: boolean;
 };
 
 const RESULTS_SCAN_ROW_CAP = 80;
@@ -117,6 +125,7 @@ async function linkedScanCandidatesForRun(
       linkedRunId: runId,
       timingSource: timingSourceFromParserId(sess.parserId),
       bestLapSeconds: Number.isFinite(bestLapSeconds) ? bestLapSeconds : null,
+      lapCount: laps.length > 0 ? laps.length : null,
     };
   });
 }
@@ -136,6 +145,7 @@ async function importedRowsForScan(
     label: string;
     sessionCompletedAtIso: string | null;
     bestLapSeconds?: number | null;
+    lapCount?: number | null;
     timingSource?: "liverc" | "speedhive" | "myrcm";
     alreadyImported: boolean;
   }[],
@@ -168,6 +178,7 @@ async function importedRowsForScan(
             sessionCompletedAt: true,
             sortAt: true,
             trackNameSnapshot: true,
+            unconfirmedAt: true,
           },
         })
       : [];
@@ -193,14 +204,20 @@ async function importedRowsForScan(
       linkedRunId: imp.linkedRunId,
       timingSource: c.timingSource,
       bestLapSeconds: c.bestLapSeconds ?? null,
+      lapCount: c.lapCount ?? null,
       importedSessionId: imp.id,
       linkedRunLabel: run ? runDisplayLabel(run) : null,
+      linkedRunUnconfirmed: run?.unconfirmedAt != null,
     });
   }
   return rows;
 }
 
-/** "Qualifying 2 · Sat 16 Aug" — enough for a driver to recognise which run they'd be taking it off. */
+/**
+ * "Qualifying 2 · Sat 16 Aug" — enough for a driver to recognise which run they'd be taking it
+ * off. The unconfirmed state is NOT appended here: the picker says it in its own words, and as a
+ * suffix it was the half of the line that truncated on a phone ("On Run · Mon, 13 Oct · Unco…").
+ */
 function runDisplayLabel(run: {
   sessionType: string;
   meetingSessionType: string | null;
@@ -302,16 +319,55 @@ export async function POST(request: Request) {
       });
       eventRaceClass = ev?.raceClass?.trim() || null;
     }
-    const [discovered, speedhiveIdentity] = await Promise.all([
-      discoverTrackTimingSessions({
-        userId: userId,
-        liveRcUrl: liveRcUrl || null,
-        speedhiveUrl: speedhiveUrl || null,
-        eventRaceClass,
-        visibleSinceIso: todayStartIso || null,
-      }),
-      speedhiveUrl ? hasSpeedhiveIdentityForUser(userId) : Promise.resolve(false),
-    ]);
+    let discovered: Awaited<ReturnType<typeof discoverTrackTimingSessions>>;
+    let speedhiveIdentity: boolean;
+    try {
+      [discovered, speedhiveIdentity] = await Promise.all([
+        discoverTrackTimingSessions({
+          userId: userId,
+          liveRcUrl: liveRcUrl || null,
+          speedhiveUrl: speedhiveUrl || null,
+          eventRaceClass,
+          visibleSinceIso: todayStartIso || null,
+        }),
+        speedhiveUrl ? hasSpeedhiveIdentityForUser(userId) : Promise.resolve(false),
+      ]);
+    } catch (err) {
+      // A timing site that refuses a burst of scans is a busy site, not a broken one. Answered
+      // as the card's "couldn't reach" state (with its retry) rather than a 500 that the client
+      // can only read as a failed request — seen on a real drive of three runs in a row.
+      console.warn("[scan-day-url] discovery failed", err instanceof Error ? err.message : err);
+      const sources: ("liverc" | "speedhive")[] = [
+        ...(liveRcUrl ? (["liverc"] as const) : []),
+        ...(speedhiveUrl ? (["speedhive"] as const) : []),
+      ];
+      return NextResponse.json({
+        ok: true,
+        dayUrl: liveRcUrl || speedhiveUrl,
+        indexKind: "practice" as ScanDayUrlIndexKind,
+        liveRcDriverName: null,
+        candidates: [],
+        olderCandidates: [],
+        importedCandidates: [],
+        olderCount: 0,
+        totalCandidates: 0,
+        unimportedCount: 0,
+        matchedCount: 0,
+        hasDriverNameSetting: true,
+        driverFilterApplied: true,
+        status: emptyLapDiscoveryStatus("unreachable", sources[0] ?? "liverc", {
+          sources,
+          timingPages: [
+            ...(liveRcUrl ? [{ source: "liverc" as const, url: liveRcUrl }] : []),
+            ...(speedhiveUrl ? [{ source: "speedhive" as const, url: speedhiveUrl }] : []),
+          ],
+        }),
+        scanMessage: null,
+        discoveredFromTrack: true,
+        hasLiveRc: Boolean(liveRcUrl),
+        hasSpeedhive: Boolean(speedhiveUrl),
+      });
+    }
     const hasDriverNameSetting = Boolean(
       (liveRcUrl && discovered.liveRcDriverName?.trim()) || (speedhiveUrl && speedhiveIdentity)
     );
@@ -326,6 +382,7 @@ export async function POST(request: Request) {
       linkedRunId: c.linkedRunId,
       timingSource: c.timingSource,
       bestLapSeconds: c.bestLapSeconds ?? null,
+      lapCount: c.lapCount ?? null,
     });
     const discoveredCandidates: ScanDayUrlCandidateRow[] = discovered.unimportedCandidates.map(toCandidateRow);
     const olderCandidates: ScanDayUrlCandidateRow[] = discovered.olderUnimportedCandidates.map(toCandidateRow);

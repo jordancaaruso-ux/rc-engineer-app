@@ -114,6 +114,8 @@ export type TrackCrossing = {
   /** Where it crossed, in frame pixels — so the moment can be shown, not just described. */
   x: number;
   y: number;
+  /** Net pixels a second over the short window either side of the crossing (see `localMotion`). */
+  speedPxPerSec: number;
 };
 
 /**
@@ -373,6 +375,16 @@ export function trackCrossings(
         colour: a.colour ?? b.colour,
         x: a.x + frac * (b.x - a.x),
         y: a.y + frac * (b.y - a.y),
+        // Net progress over the same short window `local` was judged on, not the step across the
+        // line itself: a person's blob shifts with every stride and reads twice its walking pace
+        // from one frame pair, while a car goes where it is going.
+        speedPxPerSec:
+          local.net /
+          Math.max(
+            1e-3,
+            track.points[Math.min(track.points.length - 1, i + cfg.localHalfWindow)].t -
+              track.points[Math.max(0, i - cfg.localHalfWindow)].t
+          ),
       });
     }
   });

@@ -15,7 +15,8 @@ import {
   loadCalibrationForVerify,
   loadAcroGeometry,
   fillSyntheticCase,
-  extractGoldFromFilledPdf,
+  extractGoldWithNamedCheckboxes,
+  retypeFieldsFromAcro,
   renderPdfFirstPageToPng,
   readThroughProductionPipeline,
   readThroughAcroFormPipeline,
@@ -42,12 +43,14 @@ async function main() {
   const acroform = Boolean(arg("--acroform"));
 
   console.log(`Loading calibration ${calId} …`);
-  const live = await loadCalibrationForVerify(calId);
+  const live = await loadCalibrationForVerify(calId, { allowMissingImageMap: rederive });
   if (rederive) {
     const r = await rederiveImageMap(live);
     console.log(`Re-derived image map: ${r.derivedFields} fields, contentBox=${r.contentBoxDetected ? "yes" : "NO"}.`);
   }
   const geo = await loadAcroGeometry(live.blankPdfBytes);
+  const retyped = retypeFieldsFromAcro(live, geo);
+  if (retyped) console.log(`Re-typed ${retyped} text fields as checkboxes (the PDF says they are tick boxes).`);
   const fieldCount = live.imageCalibration.fields.length;
   console.log(`imageCalibration: ${fieldCount} fields; contentBox=${live.imageCalibration.reference.contentBox ? "yes" : "NO"}; path=${acroform ? "ACROFORM (form fields)" : "IMAGE (render + OCR)"}; running ${onlyCase ? 1 : nCases} case(s)${choicesOnly ? " (choices only)" : ""}.\n`);
 
@@ -58,7 +61,7 @@ async function main() {
   const indices = onlyCase != null ? [onlyCase] : Array.from({ length: nCases }, (_, i) => i + 1);
   for (const i of indices) {
     const filled = await fillSyntheticCase({ caseIndex: i, live, blankPdfBytes: live.blankPdfBytes, geo });
-    const gold = await extractGoldFromFilledPdf(filled, live);
+    const gold = await extractGoldWithNamedCheckboxes(filled, live);
     // --acroform reads the editable PDF straight through the form-field path (no render, no OCR);
     // the default renders it to an image and reads it the way a photo/flattened upload is read.
     const read = acroform

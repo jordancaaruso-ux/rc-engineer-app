@@ -33,6 +33,7 @@ the whole car without moving the balance ([[corner-regime]]).
 **Affects:** [[load-transfer]] (sets both the fast/geometric fraction and that end's share of the
 amount) → and through those [[bite-hold]] and [[tyre-load-sensitivity]]; [[on-in-track]] (height sets
 that feel directly).
-**Moved by:** upper-link geometry (inner + outer shims), inner-lower-arm & under-hub shims — the knobs
+**Moved by:** upper-link geometry [[upper-link-geometry]] (inner + outer shims), inner-lower-arm
+[[under-lower-arm]] & under-hub [[under-hub]] shims — the knobs
 that move the pickup points; and ride height / suspension travel [[ride-height-and-rake]], which moves
 it without touching a shim.

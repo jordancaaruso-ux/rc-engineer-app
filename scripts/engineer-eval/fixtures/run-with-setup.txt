@@ -1,0 +1,64 @@
+THE DRIVER'S MOST RECENT LOGGED SESSION. Unless they say otherwise, assume questions about "the car" mean this one.
+
+car: A800RR
+track: TFTR
+laps recorded: 20
+best lap (s): 15.90
+average of the best 5 laps (s): 16.03
+best five minutes (laps/time): 19/5:13.5
+session date: 2026-07-19
+
+SETUP ON THE CAR (A800RR, the session above).
+These are the values the car actually ran. Reason with them; do not read them back.
+ackermann position: Rearward
+arb front: 1.2
+arb rear: 1.3
+body position from windshield: 58
+bump steer shims front: 2.5
+c45 installed front: no
+c45 installed rear: 1
+camber front: -1.5
+camber rear: -2
+caster front: 4
+caster rear: -3
+damper oil front: 450
+damper oil rear: 500
+damper percent front: 100
+damper percent rear: 95
+damping front: linear
+damping rear: linear
+diff height front: Up
+diff height rear: Up
+diff oil: 6K
+downstop front: 23.4
+downstop rear: 22.4
+front spring rate gf mm: 68.4
+inner steering angle: 28
+motor lateral shift: 0
+rear hrb setting: 2.75
+rear spring rate gf mm: 119.6
+ride height front: 5
+ride height rear: 5.2
+servo horn height: 17mm
+spring front: std
+spring gap front: 0
+spring gap rear: 3.2
+spring rear: std
+toe front: -1.1
+toe gain shims rear: 3
+toe rear: 3
+under hub shims front: 0
+under hub shims rear: 0
+under lower arm shims ff: 2.5
+under lower arm shims fr: 2.5
+under lower arm shims rf: 3
+under lower arm shims rr: 3
+upper inner shims ff: 3.5
+upper inner shims fr: 3.5
+upper inner shims rf: 4.5
+upper inner shims rr: 4.5
+upper outer shims front: 1.5
+upper outer shims rear: 1.5
+upstop front: -
+upstop rear: -
+weight balance front percent: 50

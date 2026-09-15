@@ -4,6 +4,7 @@
  * One corner produced no candidate; the window took a stranger 1.4s late; the old chain anchored
  * on it and every later corner followed, though the right crossing sat in three of those pools.
  */
+import { linePlaces } from "./direction";
 import { refineByLapFit } from "./lapFit";
 import type { RefinableResult } from "./refine";
 import type { CrossingEvent } from "./types";
@@ -194,6 +195,53 @@ const at = (rows: Fitted[], id: string) => rows.find((r) => r.id === id)!;
   const out = refineByLapFit(rows, SF, lapKey, { fixed });
   assert(at(out, "me:8:s2").detectedSec === s + 4.1, "the mark stands");
   assert(Math.abs(at(out, "me:8:s3").detectedSec! - (s + 6.5)) < 1e-9, "S3 chains from the mark");
+}
+
+/* ---------- wrong way AND standing where the line is never crossed: not the car ---------- */
+{
+  // Bendigo, 2026-09-08. The hairpin window saw one thing on lap 8 and it was a person at the
+  // tip of the line. Wrong way round on its own is not enough to refuse — lap 9 is the same read
+  // at the place the car actually crosses, and that one is the car. Only the pair settles it.
+  const dirs = new Map<string, 1 | -1>([["s3", 1]]);
+  const spot = (x: number, y: number) => ({ x, y });
+  const rows: RefinableResult[] = [];
+  for (let lap = 1; lap <= 7; lap++) {
+    rows.push(sfRow(lap));
+    for (const line of LINES) {
+      const t = lap * LAP_SEC + USUAL[line]!;
+      rows.push(row(lap, line, t, [ev(t, line === "s3" ? spot(100, 100) : {})]));
+    }
+  }
+  // Lap 8: the only thing seen ran the wrong way, 200px from anywhere s3 is ever crossed.
+  // Lap 9: the only thing seen ran the wrong way at exactly the place the car crosses.
+  for (const [lap, place] of [[8, spot(300, 100)], [9, spot(100, 100)]] as const) {
+    const s = lap * LAP_SEC;
+    rows.push(sfRow(lap));
+    for (const line of LINES) {
+      const t = s + USUAL[line]!;
+      rows.push(row(lap, line, t, [ev(t, line === "s3" ? { ...place, dir: -1 } : {})]));
+    }
+  }
+
+  const places = linePlaces(rows);
+  const out = refineByLapFit(rows, SF, lapKey, { fixed: fixedIds(rows), dirs, places, placeBarPx: 20 });
+  const eight = at(out, "me:8:s3");
+  assert(eight.detectedSec == null && eight.emptiedByFit, "the stranded wrong-way read is refused, not written");
+  const nine = at(out, "me:9:s3");
+  assert(
+    Math.abs(nine.detectedSec! - (9 * LAP_SEC + 6.5)) < 1e-9,
+    "the same read where the car does cross is still the car"
+  );
+  for (let lap = 1; lap <= 7; lap++) {
+    assert(
+      Math.abs(at(out, `me:${lap}:s3`).detectedSec! - (lap * LAP_SEC + 6.5)) < 1e-9,
+      `lap ${lap} is untouched`
+    );
+  }
+
+  // The control: without the places it is the old behaviour, and lap 8 keeps the stranger.
+  const blind = refineByLapFit(rows, SF, lapKey, { fixed: fixedIds(rows), dirs });
+  assert(at(blind, "me:8:s3").detectedSec != null, "with no places to judge by, the stranger stands");
 }
 
 console.log("lapFit: ok");

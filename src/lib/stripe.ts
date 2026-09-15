@@ -18,6 +18,8 @@ export function getStripe(): Stripe {
 }
 
 const PRICE_ENV_KEYS = {
+  /** Starter is monthly only (docs/STARTER_TIER_PLAN.md): no annual key, by ruling. */
+  starterMonthly: "STRIPE_PRICE_STARTER_MONTHLY",
   standardMonthly: "STRIPE_PRICE_STANDARD_MONTHLY",
   standardAnnual: "STRIPE_PRICE_STANDARD_ANNUAL",
   proMonthly: "STRIPE_PRICE_PRO_MONTHLY",
@@ -34,6 +36,7 @@ export type PricePlan = {
 /** The configured plans (env-driven, so adding a price is config, not a redeploy). */
 export function getPricePlans(): PricePlan[] {
   const defs: Array<{ tier: Tier; interval: "month" | "year"; envKey: string }> = [
+    { tier: "starter", interval: "month", envKey: PRICE_ENV_KEYS.starterMonthly },
     { tier: "standard", interval: "month", envKey: PRICE_ENV_KEYS.standardMonthly },
     { tier: "standard", interval: "year", envKey: PRICE_ENV_KEYS.standardAnnual },
     { tier: "pro", interval: "month", envKey: PRICE_ENV_KEYS.proMonthly },
@@ -111,6 +114,9 @@ function tierFromEnvPriceId(priceId: string): Tier | null {
   ) {
     return "standard";
   }
+  if (priceId === process.env[PRICE_ENV_KEYS.starterMonthly]) {
+    return "starter";
+  }
   return null;
 }
 
@@ -142,7 +148,7 @@ export async function resolveTierForPriceId(priceId: string | null | undefined):
       typeof product === "object" && product && "metadata" in product
         ? product.metadata?.tier
         : undefined;
-    if (tier === "pro" || tier === "standard") return tier;
+    if (tier === "pro" || tier === "standard" || tier === "starter") return tier;
     console.error(`[stripe] price ${priceId} has no usable product metadata.tier — using standard`);
   } catch (error) {
     // Never throw here: this runs inside the webhook, and a Stripe blip must not wedge the event.

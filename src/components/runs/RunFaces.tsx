@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { GitCompare, Sparkles, SquarePen, Timer, Trash2 } from "lucide-react";
+import { CircleCheck, GitCompare, Sparkles, SquarePen, Timer, Trash2 } from "lucide-react";
 import type { Run } from "@/components/runs/RunDetailPanel";
 import type { WorkbenchSetupDiff } from "@/lib/runs/sessionWorkbenchModel";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
@@ -52,8 +52,8 @@ import {
   fadeOverRunSeconds,
   formatConsistencyScorePercent,
   formatFadeOverRun,
-  formatFadePerLap,
-  getFadePerLap,
+  formatFadePerMinute,
+  getFadePerMinute,
   getFadeProfile,
   getFiveMinuteStintStartingAt,
   getIncludedLapDashboardMetrics,
@@ -248,7 +248,7 @@ export function RunFaces({
     [mistakes]
   );
   const fade = useMemo(
-    () => ({ perLap: getFadePerLap(lapRows), overRunSeconds: fadeOverRunSeconds(lapRows) }),
+    () => ({ perMinute: getFadePerMinute(lapRows), overRunSeconds: fadeOverRunSeconds(lapRows) }),
     [lapRows]
   );
   const fadeProfile = useMemo(() => getFadeProfile(lapRows), [lapRows]);
@@ -649,6 +649,32 @@ export function RunFaces({
   const [carMoveBusy, setCarMoveBusy] = useState(false);
   const [carMoveError, setCarMoveError] = useState<string | null>(null);
 
+  /*
+   * Confirming a run the app filed from the timing sheet. One tap from read mode, or the
+   * "Done" tile's job while the card is in edit mode — a driver who opened it to check the
+   * carried tyres and setup finishes by vouching for them, not by merely putting the
+   * underlines away. Viewing never clears the mark; only this tap and the wizard save do.
+   */
+  const unconfirmed = run.unconfirmedAt != null;
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const handleConfirm = useCallback(
+    async (thenLeaveEdit: boolean) => {
+      if (confirming) return;
+      setConfirming(true);
+      setConfirmError(null);
+      try {
+        await corrections.confirmRun();
+        if (thenLeaveEdit) setEditing(false);
+      } catch (err) {
+        setConfirmError(err instanceof Error ? err.message : "Could not confirm this run");
+      } finally {
+        setConfirming(false);
+      }
+    },
+    [confirming, corrections]
+  );
+
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const handleDelete = useCallback(async () => {
@@ -694,7 +720,7 @@ export function RunFaces({
 
   const numbersLineFor = (
     metrics: IncludedLapDashboardMetrics,
-    fade: { perLap: number | null; overRunSeconds: number | null },
+    fade: { perMinute: number | null; overRunSeconds: number | null },
     /** Says what the row is where the labels can't — the field tab's average, say. */
     title?: string,
     opts?: {
@@ -744,7 +770,7 @@ export function RunFaces({
       */}
       <Figure
         label="Fade"
-        value={formatFadePerLap(fade.perLap)}
+        value={formatFadePerMinute(fade.perMinute)}
         title={formatFadeOverRun(fade.overRunSeconds)}
         small
       />
@@ -965,6 +991,16 @@ export function RunFaces({
       */}
       <div className="flex flex-col gap-0.5 rounded-xl border border-border bg-card px-2.5 py-1.5 text-[11.5px] text-muted-foreground">
         <div className="flex min-w-0 items-center gap-2">
+          {/*
+            At the head of the carried line, because these are the carried facts: the app
+            filed this run from the timing sheet and copied car, tyres and setup from the
+            run before it. The word stays until a wizard save, whatever is corrected here.
+          */}
+          {run.unconfirmedAt ? (
+            <span className="shrink-0 rounded-full bg-warning/12 px-2 py-[2px] text-[9px] font-bold uppercase tracking-[0.07em] text-warning">
+              Unconfirmed
+            </span>
+          ) : null}
           {canEdit ? (
             <InlinePickEdit
               ariaLabel="Car"
@@ -1152,7 +1188,13 @@ export function RunFaces({
             {setupDiff == null ? (
               <p className="text-[12.5px] text-muted-foreground">Setup not loaded for this session.</p>
             ) : setupDiff.mode === "no_setup" ? (
-              <p className="text-[12.5px] text-muted-foreground">No setup was recorded on this run.</p>
+              <p className="text-[12.5px] text-muted-foreground">
+                {/* A carried sheet that is empty was never "recorded" by anyone — it is
+                    a copy of a run that was completed without one. */}
+                {unconfirmed
+                  ? "No setup — the run this was carried from had none."
+                  : "No setup was recorded on this run."}
+              </p>
             ) : setupDiff.mode === "no_baseline" ? (
               <SetupChangedSincePreviousList rows={null} runId={run.id} />
             ) : (
@@ -1407,6 +1449,21 @@ export function RunFaces({
             onClick={() => setLapsOpen(true)}
             icon={<Timer className="h-4 w-4" aria-hidden />}
           />
+        {allowRunMutations && unconfirmed && !editing ? (
+          /*
+            The door the unconfirmed state was missing (found driving it, 2026-09-14). Before
+            this, "Edit" and the run page's pencil were the only things to press, both of them
+            the corrections mode, and neither ever clears the mark — so a run could be rated,
+            re-tyred and annotated in place and stay "Unconfirmed" forever. One tap here says
+            "this carried record is right as it stands".
+          */
+          <Action
+            label="Confirm"
+            onClick={() => void handleConfirm(false)}
+            disabled={confirming}
+            icon={<CircleCheck className="h-4 w-4" aria-hidden />}
+          />
+        ) : null}
         {allowRunMutations ? (
           /*
             ============================== WHY IT SAYS "CANCEL" OVER THE SHEET ==============================
@@ -1421,12 +1478,30 @@ export function RunFaces({
 
             So while the sheet is armed this is the way BACK, it is called Cancel, and it asks
             first if there is anything to lose.
+
+            On an UNCONFIRMED run the finishing tap reads "Confirm" instead of "Done": the only
+            reason to be in edit mode on a carried record is to check it, and finishing the
+            check is vouching for it. Folding the row is the way out that vouches for nothing.
           */
           <Action
-            label={sheetEditing ? "Cancel" : editing ? "Done" : "Edit"}
+            label={sheetEditing ? "Cancel" : editing ? (unconfirmed ? "Confirm" : "Done") : "Edit"}
             pressed={editing && !sheetEditing}
-            onClick={() => (editing ? leaveSheetEditor(() => setEditing(false)) : setEditing(true))}
-            icon={<SquarePen className="h-4 w-4" aria-hidden />}
+            disabled={confirming}
+            onClick={() =>
+              editing
+                ? leaveSheetEditor(() => {
+                    if (unconfirmed && !sheetEditing) void handleConfirm(true);
+                    else setEditing(false);
+                  })
+                : setEditing(true)
+            }
+            icon={
+              editing && unconfirmed && !sheetEditing ? (
+                <CircleCheck className="h-4 w-4" aria-hidden />
+              ) : (
+                <SquarePen className="h-4 w-4" aria-hidden />
+              )
+            }
           />
         ) : null}
         {shareable ? (
@@ -1454,6 +1529,7 @@ export function RunFaces({
         ) : null}
       </div>
       {deleteError ? <p className="text-[11px] text-destructive">{deleteError}</p> : null}
+      {confirmError ? <p className="text-[11px] text-destructive">{confirmError}</p> : null}
 
       {/* ── overlays ────────────────────────────────────────────────────── */}
       {/*

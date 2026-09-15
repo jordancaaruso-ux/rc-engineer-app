@@ -26,8 +26,8 @@ export type ComparisonSeries = {
    * "98.44%" three centimetres below it was two answers to one question on one screen.
    */
   consistencyStdDev: number | null;
-  /** Seconds per lap the run drifted — see `getFadePerLap`. Positive = gave time away. */
-  fadePerLap: number | null;
+  /** Seconds per minute of track time the run drifted — see `getFadePerMinute`. Positive = gave time away. */
+  fadePerMinute: number | null;
   /** The driver's stored 5-minute window start for their own run — see `readFiveMinStartLap`. */
   fiveMinStartLap?: number | null;
 };
@@ -156,52 +156,162 @@ function median(xs: number[]): number {
   return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
 }
 
+export type TimedLap = LapRow & {
+  /** Minutes of track time at the middle of this lap — see `lapClockMinutes`. */
+  atMinutes: number;
+};
+
 /**
- * Seconds per lap between every pair of laps, and the median of all of them — the
- * Theil–Sen slope. The line the middle pair draws, not the line the average pair draws.
+ * When in the run each lap happened: minutes of track time at the middle of the lap, on a
+ * clock built by adding up EVERY lap that was driven — crashed, excluded or not — in lap
+ * order.
+ *
+ * Fade is read against this clock, not against the lap count (2026-09-14). The things that
+ * make a car go away — tyre heat and wear, the pack sagging, the driver tiring — run on
+ * time, and a lap on a 12-second track is not the same amount of it as a lap on a
+ * 35-second one: the same seconds-per-lap on those two tracks is a car going off two and a
+ * half times faster on the short one. A crash lap is one step on a lap axis; on this clock
+ * it takes the 40 seconds it took.
+ *
+ * A lap the data is missing altogether (a gap in the numbering) is assumed to have taken
+ * the median lap time, so the clock keeps running through it.
  */
-function medianPairwiseSlope(laps: LapRow[]): number {
-  const slopes: number[] = [];
-  for (let i = 0; i < laps.length; i++) {
-    for (let j = i + 1; j < laps.length; j++) {
-      const dx = laps[j]!.lapNumber - laps[i]!.lapNumber;
-      if (dx > 0) slopes.push((laps[j]!.lapTimeSeconds - laps[i]!.lapTimeSeconds) / dx);
-    }
+function lapClockMinutes(laps: LapRow[]): Map<number, number> {
+  const driven = laps
+    .filter((l) => Number.isFinite(l.lapTimeSeconds) && l.lapTimeSeconds > 0)
+    .sort((a, b) => a.lapNumber - b.lapNumber);
+  const clock = new Map<number, number>();
+  if (driven.length === 0) return clock;
+  const typical = median(driven.map((l) => l.lapTimeSeconds));
+  let elapsed = 0;
+  let previous: number | null = null;
+  for (const lap of driven) {
+    if (previous != null) elapsed += Math.max(0, lap.lapNumber - previous - 1) * typical;
+    clock.set(lap.lapNumber, (elapsed + lap.lapTimeSeconds / 2) / 60);
+    elapsed += lap.lapTimeSeconds;
+    previous = lap.lapNumber;
   }
-  return median(slopes);
+  return clock;
+}
+
+/** The laps fade is read over (`getFadeLapsInOrder`), each stamped with its place on the clock. */
+export function getTimedFadeLaps(laps: LapRow[]): TimedLap[] {
+  const clock = lapClockMinutes(laps);
+  return getFadeLapsInOrder(laps).map((l) => ({ ...l, atMinutes: clock.get(l.lapNumber)! }));
 }
 
 /**
- * How many seconds per lap the run drifted, over the whole run.
+ * How fast a lap's vote falls off as it sits above the ceiling line: a lap this fraction of
+ * its own time above the line keeps 1/e of a vote — about half a vote at 2% off, a sliver
+ * at 8%. Nothing reaches zero: a slow lap can still argue, it just argues quietly.
+ */
+export const FADE_VOTE_SCALE = 0.03;
+
+/** Reweighting passes in `ceilingSlope`. Fixed, so the same laps always give the same figure. */
+export const FADE_CEILING_PASSES = 3;
+
+/**
+ * Median of `values` where each carries a vote. Ties at the half-way mark average the two
+ * neighbours, so equal votes give the plain median back exactly.
+ */
+function weightedMedian(values: number[], weights: number[]): number {
+  const order = values.map((_, i) => i).sort((a, b) => values[a]! - values[b]!);
+  const total = weights.reduce((a, b) => a + b, 0);
+  if (!(total > 0)) return median(values);
+  let acc = 0;
+  for (let k = 0; k < order.length; k++) {
+    const i = order[k]!;
+    acc += weights[i]!;
+    if (Math.abs(acc - total / 2) < 1e-12 && k + 1 < order.length) {
+      return (values[i]! + values[order[k + 1]!]!) / 2;
+    }
+    if (acc > total / 2) return values[i]!;
+  }
+  return values[order[order.length - 1]!]!;
+}
+
+/**
+ * The slope of the run's CEILING, in seconds per minute: the line under the laps, not the
+ * line through their middle.
+ *
+ * Starts as the Theil–Sen line — the median of every pairwise "seconds per minute" between
+ * two laps, the line the middle pair draws rather than the line the average pair draws.
+ * Then it is redrawn `FADE_CEILING_PASSES` times with each lap's vote scaled by how far it
+ * sits ABOVE the current line (`FADE_VOTE_SCALE`); a lap on or under the line keeps a full
+ * vote, and a pair's vote is the product of its two laps'. Each pass the line settles
+ * lower, onto the laps the car was actually capable of.
+ *
+ * Why (founder, 2026-09-14): fade is meant to say what happened to the car's peak, not to
+ * the average lap — the average is pulled by traffic, marshal calls and driver errors,
+ * none of which a setup change fixes. Eight laps stuck behind someone and then one clean
+ * lap that matches the start: that clean lap is the strongest evidence in the run that the
+ * car hasn't gone off, and it should carry the most weight, not one vote in sixteen. But
+ * not ALL the weight — it might have been a tow lap — so the slow laps keep a quiet say
+ * and the figure lands between "no fade" and "the traffic reading", leaning to the clean
+ * lap. In a run that truly faded, the late laps are slow but they ARE the ceiling, so they
+ * sit on the line, keep their votes, and the fade reads in full. That is the difference a
+ * fixed cut-off can't draw: the line itself is the reference, and it is allowed to slope.
+ */
+function ceilingSlope(laps: TimedLap[]): number {
+  const pairs: Array<{ slope: number; i: number; j: number }> = [];
+  for (let i = 0; i < laps.length; i++) {
+    for (let j = i + 1; j < laps.length; j++) {
+      const dx = laps[j]!.atMinutes - laps[i]!.atMinutes;
+      if (dx > 0) pairs.push({ slope: (laps[j]!.lapTimeSeconds - laps[i]!.lapTimeSeconds) / dx, i, j });
+    }
+  }
+  if (pairs.length === 0) return 0;
+  const slopes = pairs.map((p) => p.slope);
+  let votes = laps.map(() => 1);
+  let slope = 0;
+  for (let pass = 0; ; pass++) {
+    slope = weightedMedian(slopes, pairs.map((p) => votes[p.i]! * votes[p.j]!));
+    if (pass === FADE_CEILING_PASSES) return slope;
+    const intercept = weightedMedian(laps.map((l) => l.lapTimeSeconds - slope * l.atMinutes), votes);
+    votes = laps.map((l) => {
+      const line = intercept + slope * l.atMinutes;
+      const above = (l.lapTimeSeconds - line) / line;
+      return above <= 0 ? 1 : Math.exp(-above / FADE_VOTE_SCALE);
+    });
+  }
+}
+
+/**
+ * How many seconds per MINUTE of track time the car's CEILING drifted, over the whole run.
  *
  * Positive = the run got slower, which is the tyre going away, the pack sagging, or the
  * driver tiring — three things a race engineer treats very differently but all of which
  * start as this one number being positive. Negative = came to the driver.
  *
- * Measured as the median of every pairwise "seconds per lap" between two laps of the run
- * (Theil–Sen). Chosen over the first-third/last-third difference it replaced (2026-08-27)
- * after both were run over 292 real runs: they agreed on 248, and on every disagreement
- * read by eye the thirds figure was the one that was wrong — a flat run with four scrappy
- * laps that happened to land in its closing third read as +0.87s of fade. A median of
- * pairs can't be pulled by a few bad laps, it uses every lap rather than two ends, and it
- * is a RATE, so a 12-lap heat and a 30-lap main read on one scale. Multiply by the laps
- * to get the felt number: `fadeOverRunSeconds`.
+ * Measured as the slope of the line UNDER the laps (`ceilingSlope`: Theil–Sen, redrawn
+ * with laps above the line losing their vote), each lap placed on the run's clock by
+ * `lapClockMinutes`. The median-of-pairs core was chosen over
+ * the first-third/last-third difference it replaced (2026-08-27) after both were run over
+ * 292 real runs: they agreed on 248, and on every disagreement read by eye the thirds
+ * figure was the one that was wrong — a flat run with four scrappy laps that happened to
+ * land in its closing third read as +0.87s of fade. A median of pairs can't be pulled by
+ * a few bad laps, it uses every lap rather than two ends, and it is a RATE, so a 12-lap
+ * heat and a 30-lap main read on one scale. Per minute rather than per lap (2026-09-14)
+ * so that scale also holds across tracks: what wears the car runs on time, not laps.
+ * The ceiling rather than the middle (2026-09-14) so traffic and errors don't read as the
+ * tyre going — see `ceilingSlope`. Multiply by the minutes to get the felt number:
+ * `fadeOverRunSeconds`.
  *
  * The "best three of each half" idea was rejected first: the laps a driver is best at are
  * exactly the laps that don't show wear.
  */
-export function getFadePerLap(laps: LapRow[]): number | null {
-  const fadeLaps = getFadeLapsInOrder(laps);
+export function getFadePerMinute(laps: LapRow[]): number | null {
+  const fadeLaps = getTimedFadeLaps(laps);
   if (fadeLaps.length < MIN_LAPS_FOR_FADE) return null;
-  return medianPairwiseSlope(fadeLaps);
+  return ceilingSlope(fadeLaps);
 }
 
 export type FadeProfilePoint = {
   /** First and last lap number of the window the rate was read over. */
   fromLap: number;
   toLap: number;
-  /** Seconds per lap across that window, signed like `getFadePerLap`. */
-  ratePerLap: number;
+  /** Seconds per minute across that window, signed like `getFadePerMinute`. */
+  ratePerMinute: number;
 };
 
 /**
@@ -216,7 +326,7 @@ export type FadeProfilePoint = {
  * built and draws the conclusion themselves. Empty under `MIN_LAPS_FOR_FADE_PROFILE`.
  */
 export function getFadeProfile(laps: LapRow[]): FadeProfilePoint[] {
-  const fadeLaps = getFadeLapsInOrder(laps);
+  const fadeLaps = getTimedFadeLaps(laps);
   if (fadeLaps.length < MIN_LAPS_FOR_FADE_PROFILE) return [];
   const out: FadeProfilePoint[] = [];
   for (let i = 0; i + FADE_PROFILE_WINDOW <= fadeLaps.length; i++) {
@@ -224,25 +334,25 @@ export function getFadeProfile(laps: LapRow[]): FadeProfilePoint[] {
     out.push({
       fromLap: window[0]!.lapNumber,
       toLap: window[window.length - 1]!.lapNumber,
-      ratePerLap: medianPairwiseSlope(window),
+      ratePerMinute: ceilingSlope(window),
     });
   }
   return out;
 }
 
-/** The rate spread back over the laps it was read on: "≈ +0.6 s over the run". */
+/** The rate spread back over the minutes it was read on: "≈ +0.6 s over the run". */
 export function fadeOverRunSeconds(laps: LapRow[]): number | null {
-  const rate = getFadePerLap(laps);
-  if (rate == null) return null;
-  const fadeLaps = getFadeLapsInOrder(laps);
-  return rate * (fadeLaps[fadeLaps.length - 1]!.lapNumber - fadeLaps[0]!.lapNumber);
+  const fadeLaps = getTimedFadeLaps(laps);
+  if (fadeLaps.length < MIN_LAPS_FOR_FADE) return null;
+  const rate = ceilingSlope(fadeLaps);
+  return rate * (fadeLaps[fadeLaps.length - 1]!.atMinutes - fadeLaps[0]!.atMinutes);
 }
 
-/** "+0.04 s/lap" — two places, signed, the unit on it. Null reads "—". */
-export function formatFadePerLap(rate: number | null): string {
+/** "+0.16 s/min" — two places, signed, the unit on it. Null reads "—". */
+export function formatFadePerMinute(rate: number | null): string {
   if (rate == null || !Number.isFinite(rate)) return "—";
   const rounded = Math.abs(rate) < 0.005 ? 0 : rate;
-  return `${rounded > 0 ? "+" : rounded < 0 ? "−" : ""}${Math.abs(rounded).toFixed(2)} s/lap`;
+  return `${rounded > 0 ? "+" : rounded < 0 ? "−" : ""}${Math.abs(rounded).toFixed(2)} s/min`;
 }
 
 /** The hover line under a fade figure: "≈ +0.6 s over the run". */
@@ -268,7 +378,7 @@ export function buildComparisonSeries(
     avgTop5: getAverageTopN(laps, 5),
     avgTop10: getAverageTopN(laps, 10),
     consistencyStdDev: analyzeLapRows(laps).consistencyStdDev,
-    fadePerLap: getFadePerLap(laps),
+    fadePerMinute: getFadePerMinute(laps),
     fiveMinStartLap: opts?.fiveMinStartLap ?? null,
   };
 }
@@ -352,8 +462,8 @@ export type SummaryMetricDeltas = {
   avgTop10Delta: number | null;
   /** Seconds, signed like the lap rows: positive = this column wandered more. */
   consistencyDelta: number | null;
-  /** Seconds per lap, signed like the lap rows: positive = this column faded harder. */
-  fadePerLapDelta: number | null;
+  /** Seconds per minute, signed like the lap rows: positive = this column faded harder. */
+  fadePerMinuteDelta: number | null;
 };
 
 /** Summary deltas for comparison column headers (comparison − target). */
@@ -378,9 +488,9 @@ export function computeSummaryDeltas(
       target.consistencyStdDev != null && comparison.consistencyStdDev != null
         ? comparison.consistencyStdDev - target.consistencyStdDev
         : null,
-    fadePerLapDelta:
-      target.fadePerLap != null && comparison.fadePerLap != null
-        ? comparison.fadePerLap - target.fadePerLap
+    fadePerMinuteDelta:
+      target.fadePerMinute != null && comparison.fadePerMinute != null
+        ? comparison.fadePerMinute - target.fadePerMinute
         : null,
   };
 }
@@ -978,8 +1088,8 @@ export type FieldSheetRow = {
   consistencyScore: number | null;
   /** Null when the driver has too few laps for the mistake rule (`MIN_LAPS_FOR_MISTAKES`). */
   mistakeCount: number | null;
-  /** Seconds per lap the driver drifted (`getFadePerLap`); null under `MIN_LAPS_FOR_FADE`. */
-  fadePerLap: number | null;
+  /** Seconds per minute the driver drifted (`getFadePerMinute`); null under `MIN_LAPS_FOR_FADE`. */
+  fadePerMinute: number | null;
   /** Competition ranks (ties share a rank); null while `eligible` is false. */
   rankByBest: number | null;
   rankByPace: number | null;
@@ -1008,7 +1118,7 @@ export type FieldAverages = {
   median: number | null;
   consistencyScore: number | null;
   mistakeCount: number | null;
-  fadePerLap: number | null;
+  fadePerMinute: number | null;
 };
 
 export type FieldSheet = {
@@ -1098,7 +1208,7 @@ export function computeFieldSheet(drivers: FieldSheetDriverInput[]): FieldSheet 
       median: b.dash.median,
       consistencyScore: b.dash.consistencyScore,
       mistakeCount: b.mistakes.eligible ? b.mistakes.mistakeCount : null,
-      fadePerLap: getFadePerLap(b.input.rows),
+      fadePerMinute: getFadePerMinute(b.input.rows),
       rankByBest: bestRanks.get(b.input.id) ?? null,
       rankByPace: paceRanks.get(b.input.id) ?? null,
       rankByConsistency: consistencyRanks.get(b.input.id) ?? null,
@@ -1141,7 +1251,7 @@ export function computeFieldSheet(drivers: FieldSheetDriverInput[]): FieldSheet 
     median: meanOf((r) => r.median),
     consistencyScore: meanOf((r) => r.consistencyScore),
     mistakeCount: meanOf((r) => r.mistakeCount),
-    fadePerLap: meanOf((r) => r.fadePerLap),
+    fadePerMinute: meanOf((r) => r.fadePerMinute),
   };
 
   return {

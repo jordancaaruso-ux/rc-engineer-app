@@ -68,8 +68,8 @@ export function SettingsNavSection({ isAdmin = false }: { isAdmin?: boolean }) {
   return (
     <CardPanel contentClassName="p-0">
       {/* Heading in the card (2026-08-18) — see the note in YouSection. */}
-      <div className="px-4 pt-3.5">
-        <Eyebrow>Browse</Eyebrow>
+      <div className="eyebrow-band px-4">
+        <Eyebrow className="mb-0">Browse</Eyebrow>
       </div>
       <ul className="flex flex-col pb-1">
         <NavRow

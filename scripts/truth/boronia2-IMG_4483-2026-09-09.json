@@ -1,0 +1,15 @@
+{
+  "_note": "Ground truth by eye from IMG_4483.MOV (2606x1074) fine contact sheets made with scripts/tmp/truth-sheets-any.mjs, 2026-09-09. Each pick is the frame where the car's centre passes the drawn line (or its extension, see lines_note), ±1 frame (33ms). Sheets were centred on the WALK (anchor + lap times + the 08-29 job's usual offset), never on a scan's answer. Jordan = PINK car, Justin = WHITE, Sandy = RED. Lap starts are the walk from each driver's own sf_finish anchor on job cmtdr88rq01fuvlgsk9udlgy0. The laps chosen are the ones today's scan (2026-09-09 baseline) holds, misses or gets wrong; the 08-29 scan's marks are quoted for comparison.",
+  "lines_note": "s1 is an 89px line from the inside kerb; the pink car hugs that kerb and passes at the line's upper end, a little beyond it. s3 and s4 are 24px ticks at the edge of the far island; the cars pass about 40px (a car length and a half) below the tick's lower end, so a pick there is where the car's centre crosses the tick's extension.",
+  "picks": [
+    { "role": "me", "lap": 4, "line": "s3", "t": 115.60, "due": 115.52, "confidence": "±1 frame; pink car at the tick 115.578–115.612, past by 115.645. 08-29 wrote 115.63. Today's scan wrote 115.27 as confirmed — the car was not yet in the crop." },
+    { "role": "me", "lap": 9, "line": "s1", "t": 201.77, "due": 201.72, "confidence": "±1 frame; pink car at the line's upper end 201.752–201.785. 08-29 wrote 201.72. Today held (only Justin's crossing 1.85s earlier on offer)." },
+    { "role": "me", "lap": 10, "line": "s1", "t": 219.49, "due": 219.45, "confidence": "±1 frame; at the upper end 219.453–219.520. 08-29 wrote 219.41. Today held." },
+    { "role": "me", "lap": 11, "line": "s1", "t": 236.84, "due": 236.85, "confidence": "±1 frame; at the upper end 236.822–236.855. 08-29 wrote 236.85. Today held." },
+    { "role": "me", "lap": 14, "line": "s1", "t": 289.69, "due": 289.72, "confidence": "±1 frame; at the upper end 289.660–289.693. 08-29 wrote 289.73. Today held." },
+    { "role": "competitor", "lap": 3, "line": "s4", "t": 98.00, "due": 97.79, "confidence": "±1 frame; red car passes the tick's x at 97.977–98.010, ~40px below it. 08-29 wrote 98.03. Today missing." },
+    { "role": "competitor", "lap": 4, "line": "s4", "t": 114.62, "due": 114.74, "confidence": "±1 frame; passes the tick's x at 114.610. 08-29 wrote 114.63. Today missing." },
+    { "role": "competitor", "lap": 5, "line": "s4", "t": 131.14, "due": 131.26, "confidence": "±1 frame; passes the tick's x at 131.145. 08-29 wrote 131.11. Today held a car 2s later (correctly held)." },
+    { "role": "competitor", "lap": 7, "line": "s4", "t": 164.50, "due": 164.64, "confidence": "±1 frame; passes the tick's x between 164.482 and 164.515. 08-29 wrote 164.47. Today held a car 3.7s later as Chris's (correctly held)." }
+  ]
+}

@@ -16,12 +16,12 @@ two_answers: true
 more:
   reviewed: false
   confidence: majority
-  before_settled: "the front bites sooner — a little more initial steering, and it comes in more abruptly"
+  before_settled: "the front grips up sooner as you turn in — a little more initial steering, and it comes in more abruptly"
   once_settled: "less front grip through the middle — the tyre gives before the front does — and less forgiving over bumps at that end"
 less:
   reviewed: true
   confidence: majority
-  before_settled: "the front bites later, so a little less initial steering, and it comes in more gently"
+  before_settled: "the front grips up later as you turn in, so a little less initial steering, and it comes in more gently"
   once_settled: "more front grip through the middle — the front gives before the tyre does — and more forgiving over bumps at that end"
 physics:
   - flex-chassis.md

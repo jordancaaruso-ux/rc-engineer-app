@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { SetupAggregationScopeType, SetupAggregationValueType } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { prisma, runsIncludingHidden } from "@/lib/prisma";
 import { encodeTrackConditionSignature, withTemperatureBand } from "@/lib/trackConditionSignature";
 import { temperatureBand } from "@/lib/weather/temperatureBands";
 import type { SetupSnapshotValue } from "@/lib/runSetup";
@@ -64,11 +64,16 @@ async function buildCarParameterConditionRowsFromRuns(
 ): Promise<Prisma.SetupParameterAggregationCreateManyInput[]> {
   if (carIds.length === 0) return [];
 
-  const runs = await prisma.run.findMany({
+  // Through the unwindowed delegate on purpose: these numbers feed the shared pool, and a Starter
+  // member's plan-hidden runs still happened (docs/STARTER_TIER_PLAN.md).
+  const runs = await runsIncludingHidden.findMany({
     where: {
       userId,
       carId: { in: carIds },
       track: { isNot: null },
+      // A run the app backfilled from the timing sheet holds a COPY of the previous run's sheet.
+      // Counting it would feed the same setup into the shared pool twice, unvouched.
+      unconfirmedAt: null,
     },
     select: {
       carId: true,

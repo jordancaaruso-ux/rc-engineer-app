@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Plus, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { chipToggleClass } from "@/components/ui/chipToggle";
 import { useEnterExit } from "@/components/ui/Collapse";
 import {
   countOptions,
@@ -124,6 +125,7 @@ export function PickerSheet<T extends SearchableOption>({
   value,
   onSelect,
   sections,
+  sectionFilter = false,
   searchPlaceholder = "Search…",
   clearRow = null,
   footer = null,
@@ -150,6 +152,12 @@ export function PickerSheet<T extends SearchableOption>({
   multiple?: { values: string[]; doneLabel?: string } | null;
   /** Unfiltered and pre-grouped; the sheet does the searching. */
   sections: OptionSection<T>[];
+  /**
+   * Turn the section headings into a rail of chips that narrow the list to one of them, "All"
+   * first. Worth it once the sections are the fastest way in — a chassis catalog spanning
+   * touring, buggy and pan car — and pointless on a picker whose sections are already on screen.
+   */
+  sectionFilter?: boolean;
   searchPlaceholder?: string;
   /** A row above the list that clears the field ("None", "No layout"). */
   clearRow?: { label: string } | null;
@@ -187,13 +195,54 @@ export function PickerSheet<T extends SearchableOption>({
   const selectedRowRef = useRef<HTMLButtonElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
 
-  // Every open starts from a clean search — a stale query from last time reads
-  // as an empty catalog.
+  /*
+   * Narrowed to one section by the chip rail, or null for all of them.
+   *
+   * The rail is the browse path for a list too long to scroll: the chassis catalog crossed 200
+   * rows when the Petit RC sheets landed, and "1/10 Touring" is a tap where scrolling to the T's
+   * is not. Search still runs across whatever the chip leaves, so a scope narrows typing too.
+   */
+  const [scope, setScope] = useState<string | null>(null);
+
+  // Every open starts from a clean search and the whole list — a stale query or a chip left on
+  // from last time reads as an empty catalog.
   useEffect(() => {
-    if (open) setQuery("");
+    if (open) {
+      setQuery("");
+      setScope(null);
+    }
   }, [open]);
 
-  const visible = useMemo(() => filterOptionSections(query, sections), [query, sections]);
+  const scopedSections = useMemo(
+    () => (scope ? sections.filter((s) => (s.filterKey ?? s.key) === scope) : sections),
+    [sections, scope]
+  );
+  // A chip for a section that no longer exists would filter to nothing and look broken.
+  useEffect(() => {
+    if (scope && !sections.some((s) => (s.filterKey ?? s.key) === scope)) setScope(null);
+  }, [scope, sections]);
+
+  /** One chip per `filterKey`, so several headings can share a chip, carrying their total. */
+  const chips = useMemo(() => {
+    const byKey = new Map<string, { key: string; label: string; count: number }>();
+    for (const s of sections) {
+      const key = s.filterKey ?? s.key;
+      const found = byKey.get(key);
+      if (found) found.count += s.options.length;
+      else
+        byKey.set(key, {
+          key,
+          label: s.filterLabel ?? s.label ?? title,
+          count: s.options.length,
+        });
+    }
+    return [...byKey.values()];
+  }, [sections, title]);
+
+  const visible = useMemo(
+    () => filterOptionSections(query, scopedSections),
+    [query, scopedSections]
+  );
   const resultCount = countOptions(visible);
   const trimmedQuery = query.trim();
   const showingPanel = panel != null;
@@ -280,7 +329,7 @@ export function PickerSheet<T extends SearchableOption>({
         {selected ? <Check className="size-3" strokeWidth={3} /> : null}
       </span>
     ) : selected ? (
-      <Check className="size-4 shrink-0 text-primary-ink" strokeWidth={2.5} aria-hidden />
+      <Check className="size-4 shrink-0 text-foreground" strokeWidth={2.5} aria-hidden />
     ) : null;
 
   const rowClass = (selected: boolean, disabled: boolean) =>
@@ -288,7 +337,9 @@ export function PickerSheet<T extends SearchableOption>({
       "tap-active flex w-full items-center gap-2 rounded-lg px-3 py-3 text-left text-sm transition-colors",
       mono && "tabular-nums text-[13px]",
       disabled && "pointer-events-none opacity-40",
-      selected ? "bg-primary/10 font-semibold text-foreground" : "text-foreground hover:bg-muted/60"
+      // Ink, not yellow (founder call 2026-09-08). Yellow is the app's action colour; the row you
+      // are already on is a state, and wearing the action colour made it read as the thing to tap.
+      selected ? "bg-muted font-semibold text-foreground" : "text-foreground hover:bg-muted/60"
     );
 
   // Portaled to <body>: these pickers sit inside cards, and any transformed or
@@ -397,6 +448,44 @@ export function PickerSheet<T extends SearchableOption>({
                 ) : null}
               </div>
             </div>
+            ) : null}
+
+            {/* Wrapped, not a sideways rail (founder call 2026-09-08): a rail showed three chips
+                and hid fourteen, and a filter you cannot see is one nobody uses. Every chip is on
+                screen before the list is touched. */}
+            {sectionFilter && chips.length > 1 ? (
+              <div
+                className="flex flex-wrap gap-1.5 px-3 pb-1 pt-0.5"
+                role="group"
+                aria-label="Narrow by class"
+              >
+                <button
+                  type="button"
+                  onClick={() => setScope(null)}
+                  aria-pressed={scope === null}
+                  className={cn(
+                    chipToggleClass(scope === null),
+                    "tap-active whitespace-nowrap px-2.5 py-1 text-[11px]"
+                  )}
+                >
+                  All
+                </button>
+                {chips.map((c) => (
+                  <button
+                    key={c.key}
+                    type="button"
+                    onClick={() => setScope(scope === c.key ? null : c.key)}
+                    aria-pressed={scope === c.key}
+                    className={cn(
+                      chipToggleClass(scope === c.key),
+                      "tap-active whitespace-nowrap px-2.5 py-1 text-[11px]"
+                    )}
+                  >
+                    {c.label}
+                    <span className="ml-1.5 tabular-nums opacity-60">{c.count}</span>
+                  </button>
+                ))}
+              </div>
             ) : null}
 
             <div className="sr-only" role="status" aria-live="polite">

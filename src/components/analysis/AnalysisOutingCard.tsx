@@ -4,11 +4,11 @@ import { useCallback, useState } from "react";
 import { History } from "lucide-react";
 import type { Run } from "@/components/runs/RunDetailPanel";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
-import type { WorkbenchRunRow } from "@/lib/runs/sessionWorkbenchModel";
+import { sectionRowsByDay, type WorkbenchRunRow } from "@/lib/runs/sessionWorkbenchModel";
 import type { AnalysisTrendModel } from "@/lib/analysis/analysisHomeModel";
 import { SessionTrendCard } from "@/components/analysis/SessionTrendCardLazy";
 import { RunFaces } from "@/components/runs/RunFaces";
-import { RunListRow, MoreRunsSeam } from "@/components/runs/RunListRow";
+import { RunListRow, MoreRunsSeam, RunDayDivider } from "@/components/runs/RunListRow";
 import { requestRunSetupExit } from "@/components/runs/runSetupEditGuard";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { BandFoot } from "@/components/paddock/BandFoot";
@@ -176,6 +176,11 @@ export function AnalysisOutingCard({
 
   const visible = showAll ? rows : rows.slice(0, ROWS_SHOWN);
   const hidden = rows.length - visible.length;
+  // A meeting's rows under their days (2026-09-14) — the divider only appears when the
+  // WHOLE outing has a second day, so the three rows above the seam still say which day
+  // they are when the seam is hiding the day before.
+  const multiDay = new Set(rows.map((row) => row.dayKey)).size > 1;
+  const sections = sectionRowsByDay(visible);
 
   return (
     /*
@@ -202,7 +207,7 @@ export function AnalysisOutingCard({
       */}
       {trend ? (
         <CardPanel contentClassName="flex flex-col gap-0 p-0">
-          <OutingHeading title={title} where={where} className="mx-4 mb-1.5 mt-3" />
+          <OutingHeading title={title} where={where} className="mb-1.5 px-4" />
           <SessionTrendCard
             trend={trend}
             compact
@@ -217,7 +222,7 @@ export function AnalysisOutingCard({
       <CardPanel contentClassName="flex flex-col gap-0 p-0">
         {/* A day whose runs carry no lap times draws no chart, so the heading has
             nowhere else to live and takes the top of this card instead. */}
-        {trend ? null : <OutingHeading title={title} where={where} className="mx-4 mb-1.5 mt-3" />}
+        {trend ? null : <OutingHeading title={title} where={where} className="mb-1.5 px-4" />}
 
         {/*
           No column strip over these rows since 2026-08-26. It named "Run / Best /
@@ -226,7 +231,10 @@ export function AnalysisOutingCard({
           what the row below it already says. The list opens straight onto a run.
         */}
         <div>
-          {visible.map((row) => {
+          {sections.map((section) => (
+            <div key={section.dayKey}>
+              {multiDay ? <RunDayDivider label={section.dayLabel} /> : null}
+              {section.rows.map((row) => {
             const record = runsById.get(row.id) ?? null;
             const open = openRunIds.has(row.id);
             return (
@@ -261,6 +269,8 @@ export function AnalysisOutingCard({
               </RunListRow>
             );
           })}
+            </div>
+          ))}
         </div>
 
         {/*

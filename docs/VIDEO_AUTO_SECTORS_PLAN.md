@@ -267,9 +267,12 @@ Pure rendering over steps 1/3 data.
 
 ### 5 — Line overlay ("Trace lap")
 
-Tracker v2 port (multi-track + waypoint selection + refuse-to-draw gate). Per-lap opt-in, desktop
-lane, minutes per lap. Reference implementation was in a July session scratchpad — design survives
-in the spec + memory `sector-compare-workflows`.
+🟢 **Built 2026-09-06, not the July port.** "Trace L7" on the compare step: a moving window
+follows the car through the lap, every moving thing it sees is kept, and the path is the
+cheapest chain of blobs pinned to the scan's crossings at both ends (`src/lib/videoAnalysis/trace/`).
+Seconds per lap in the browser, not minutes. The line is drawn on the player (solid + dashed
+ghost), and the **delta line** between two traced laps sits under it as a chart — the July
+"path only" ruling holds on the line itself. Numbers in the changelog (2026-09-06).
 
 ### Later — the telemetry layer (separate track, own gates)
 
@@ -289,6 +292,215 @@ sector deltas already deliver most of a speed trace's value). Then **Engineer in
 - No server-side worker until the pipeline earns it; the Python worker stays an import lane.
 
 **Changelog:**
+- 2026-09-09 (the scorecard) — **The scorecard, and the goal it measures: trusted lap rows
+  36/89 → 72/89 in one day, on six videos, with two real wrong marks left.** Jordan asked for
+  a quantified goal the scan could be iterated against on real data alone ("don't bias towards
+  improvement when it's not actually better"). The goal: **trusted lap rows** — of every lap the
+  scan is asked for (each seated driver's quickest ten), the share where every sector is
+  written, the start line was SEEN at both ends, and the lap's length matches the transponder
+  within a frame. Target 95 %. Guard rails: 0 marks > 100 ms from eye truth after each line's
+  fixed offset; lap lengths within a frame of the transponder on 95 % (2 frames on all) — seen
+  ends only, since a walked start agrees by construction; lap-to-lap scatter (informational:
+  on practice footage it measures the driver — 4523's 18 eye picks are 18/18 within a frame
+  while its scatter reads 50–109 ms); scan ≤ ⅓ of the footage; same file → same answer.
+  `scripts/video-score.mts` resets seven grading CLONES (`scripts/video-grading-set.json`),
+  presses the scan headless in real Chrome, grades, and diffs against an earlier run
+  (`--vs`): which rows moved, appeared, vanished. Every change below was kept or reverted on
+  that table.
+
+  | run | trusted | 4480 | 4483 | 4522 | 4523 | 4044 J | 4044 C | transponder ≤1f |
+  |---|---|---|---|---|---|---|---|---|
+  | baseline | 36/89 (40 %) | 13/20 | 5/20 | 10/19 | 6/10 | 0/10 | 2/10 | 47/58 |
+  | + end-of-lap starts | 56/89 (63 %) | 18 | 9 | 16 | 7 | 1 | 5 | 76/93 |
+  | + wide second look | 61/89 (69 %) | 18 | 12 | 18 | 7 | 1 | 5 | 76/93 |
+  | + wide start line, every held row | **72/89 (81 %)** | 18 | 14 | 18 | 8 | 7 | 7 | 84/97 |
+
+  **What each change is, and the measurement behind it:**
+  1. **A lap's END is searched for even when the next lap is not asked for** (`buildTargets`).
+     The quickest ten laps are rarely consecutive, so the last sector of most laps ran to a
+     walked clock: only 58 of 89 laps had both ends seen. Now 88 of 89. Pure gain, no row moved.
+  2. **The second look reads with a wider zone, for the rows the tight pass left empty.** The
+     drivers draw ticks at far corners (4483 s3/s4 24 px, 4480 s2/s3 16–18 px, Bendigo s1/s2/s5
+     8–9 px); the segment recipe's 20 px floor and half-band landing slack refused a car passing
+     a car length beyond a tick's end — against the 08-29 scans of the same footage today's
+     code had lost 12 Boronia crossings and gained none, and written one wrong (4483 me L4 s3,
+     −328 ms, the car not yet in the crop). A wider zone on EVERY window (`far-cap2`) was tried
+     first and was worse: 4480 ready 98 → 91, 8 rows held as odd, 2 wrong marks. So the reach
+     (`SECOND_LOOK_REACH`, two line-scaled bands) is confined to the bracket pass, which now
+     re-searches every held row (rival's, odd, unconfirmed), not only the missing ones. Nine
+     rows recovered on 4483/4522, each within a frame or two of the eye picks; nothing lost.
+  3. **The start line is read with the same wider reach** (both scans, split from the corners).
+     On the 4K heat the car crosses a 630 px start line at its far end; measured starts sat
+     ±70–200 ms from the eye and the transponder (L8 −200 ms: the crossing was never a
+     candidate, only an earlier skim of the line). Start-line clock median 132 → 12 ms on
+     Jordan's heat, 30 → 13 ms on Cooper's; both 4K clips 7/10 trusted. On Bendigo 4522 three
+     S1 rows moved (−35, +131, +36 ms) with no truth to judge them — noted, not hidden.
+  4. **Eye truth was checked, not trusted.** Two of the four "wrong marks" were wrong HAND
+     marks: 4044 lap 10 s2/s5 sat 0.3–0.6 s before the car reached the line; corrected in
+     `data/crossing-truth/cmt9gwctq….json` with the frames quoted. New truth for the second
+     Boronia clip: `scripts/truth/boronia2-IMG_4483-2026-09-09.json` (9 picks on the laps the
+     scan failed). Left standing, both real: 4480 me L7 s5 (the green car written, −311 ms) and
+     4483 me L4 s3 (−328 ms). Plus one judgement call: 4480 me L12 s1, a car passing above a
+     50 px segment, written as a crossing.
+
+  **Rig lessons:** the picker ("which car is yours?") waits for a tap forever when unattended —
+  `dev-drive-scan.mts --auto-pick` taps the picture nearest the driver's usual seconds-into-lap
+  (`--pick-offsets`, computed from the source job's marks) and counts the ask; pictures carry
+  `data-line`/`data-offset` for it. `--recipe NAME` reads with a `RECIPE_VARIANTS` entry via
+  `localStorage.rc_recipe` (`scanRecipe()`), so recipes are compared without editing code.
+  Headless real Chrome decodes HEVC fine. The scan logs `[review] start/sf` and `[scan]
+  learned/aiming` lines so a driven scan can be graded on where it aimed and what the start
+  line saw. Still open: 4521 (29 min 4K, four drivers) takes over 25 minutes — the speed guard
+  fails there; the remaining clock misses are single start-line crossings 2–3 frames out
+  (4483 L13, 4523 L8, 4044 L17/L14); and the incident laps (4044 L4, 4480 L2) stay held.
+  **Final, all seven jobs: 88/125 (70 %)** — the four-driver 4K practice (4521) adds 16/36 (201 of
+  216 rows written, 14 held, start line within a frame on 25 of 37 laps; 5.6 min to scan — the
+  earlier "over 25 minutes" was the picker waiting unanswered). Rerun: the six fast clips came
+  back row for row identical. Transponder 109/134 within a frame, 125/134 within two. Gates:
+  tsc (src clean), eslint, the six video suites, `next build`.
+- 2026-09-10 — **Your car is a colour on each line, and a direction the line itself contradicts
+  is discarded: Jordan's S3 at Bendigo goes from three wrong sector times in five to none, the
+  board otherwise unchanged (92/125).** Jordan's sector clips on the 4K practice (IMG_4521)
+  opened with the car nowhere near S3 on laps 2, 5 and 6 — the marks sat 0.3 s off the car, on
+  a grey-blue flicker at the line's kerb end. Two causes, both measured before anything was built.
+  (a) **Colour was learnt in the wrong place.** The start-line reference is the car mixed with
+  tarmac at one distance from the camera; pooled across the corners the same pink car reads
+  0.40/0.32 with a scatter of 0.029, useless. On S3 alone it reads 0.451/0.317 with a scatter of
+  0.002 over six laps, and the kerb flicker sits 0.15 away — six times what the car ever measures
+  there. So `ownColour.ts` learns a reference **per driver per line**, from the tracked, confirmed
+  crossings where that driver was alone in the window (three laps and a colour that is not the
+  tarmac's grey are the bar); the review then swaps a pick that is far from it for the matching
+  candidate nearest the prediction, holds it when nothing matches, and between "far" and "the
+  car" takes a matching candidate only within 0.35 s (the tiebreak that put lap 14 back on the
+  car). Dry run on the seven clips' saved rows first: 267 picks on 29 usable driver-lines, seven
+  touched — the three S3 rows the eye truth calls wrong and none it calls right. (b) **The
+  direction rule was turning the car away.** The picker's tap read S3's direction as "−"; the
+  cars cross that line at its very end and the same crossing reads either way lap to lap, so held
+  to "−" the review turned 12 of the driver's S3 picks onto the nearest "−" candidate — the kerb
+  flicker — and emptied 18 more; 30 of 36 rows contradicted the tap, against at most one in
+  thirty on any other line of any clip. `unreliableDirections`: a direction that EMPTIES a
+  quarter of a line's rows is noise (turning is what a hairpin does — the S5 test still holds
+  five turned rows to their leg); the line goes direction-blind and the review says so
+  (`from: "unreliable"`). This also fixed the other drivers: five of their moved S3 rows were
+  eye-checked and every one moved onto the car (Cooper 0.28–0.44 s late before, Sandy 0.15–0.42 s
+  early). The colour reference is learnt from the rows as scanned, before direction is applied —
+  the first live run learnt nothing on S3 because the rule had already emptied the rows that
+  teach it. The picker is wired to take the learning pass's per-line colours before its own, but
+  both read WHOLE laps, where a driver in traffic is never alone on a line — so on this footage
+  the picker still hints from the start line, and the S3 marshal pictures still say "looks like
+  yours" (folded by dwell, not dropped). A per-line colour for the picker needs narrow windows
+  before the picker opens, which the flow does not have; noted, not built. The header now counts
+  unfolded pictures ("1 car", not "3 cars"), and eye truth for ten S3 crossings — Jordan's five
+  on fine sheets, five other drivers' on wide ones — joins the grading set as
+  `scripts/truth/bendigo-IMG_4521-2026-09-10.json`.
+  Measured, closing → today: 4521 eye truth 10 picks, WRONG 0 (the same rows were 8 of 10 wrong
+  before); trusted 20/36 (=), ready 210 (=), held 4→5 (me L14 S4 held by colour: blue kerb paint,
+  the car not on offer), missing 2→1; 20 cells moved, all S3 or the colour swaps. 4480, 4483,
+  4522, 4523, 4044 J/C cell-identical. Headline 92/125 (74 %) unchanged. Gates: tsc,
+  `test:find-crossings` (+ `ownColour.test.ts`, the direction case), `next build`.
+- 2026-09-09, afternoon — **The picker stops offering a marshal, a lone picture comes
+  pre-ticked, and a quiet flicker at the driver's rhythm is a crossing: 4521 16 → 20/36, the six
+  other boards row for row unchanged.** Jordan scanned the four-driver Bendigo practice himself
+  and raised three things. (a) The picker showed ONE picture on S1 and S2 and still asked for a
+  tap — the "only one left is not evidence" rule, written for Boronia, has no field window to
+  lean on in a solo practice. Now a lone picture is pre-ticked when the colour calls it the
+  driver's, the field window holds it, or the learning pass settled that line on the same rhythm
+  (`defaultPicks(lines, prior)`). (b) S3 offered four pictures, three of them a marshal standing
+  on the lower end of the S3 line (the cars cross its upper end by the kerb — frame sheets, not
+  a description). Nothing told them from the car: the tracker had followed the person, the
+  far-side start-line colour reference called grey "yours", there was no field window, and the
+  crossings were on the line and in order. **Speed was tried first and rejected on the data**:
+  the marshal's "track" hops arms → legs → shadow and read 386–537 px/s against the car's 497.
+  What a person cannot fake is time: `dwell` — the share of the window's frames with something
+  moving at the crossing's place (2 % of frame width, the picker's own same-place radius) — reads
+  87–92 % for the marshal and 0 % for the car. On a 30 px far-side tick every crossing reads
+  100 % (grain fills a crop smaller than "the same place"), so the fold is relative: `lingers`
+  only above 25 % AND three times the quietest crossing on the same line; a lone picture is
+  never folded by it. S3 now shows the car alone, the marshal's pictures under "stands on the
+  line". Both `speedPxPerSec` (record only) and `dwell` are persisted on every candidate and
+  picker option. (c) Sandy had no S2 on laps 1/2/3/8/10 "and before he did, and they were
+  accurate" — true, and older than this week: the 3 Sep board carried all six (offsets
+  3.69–3.88 s, a tight rhythm), and every board since 8 Sep held five as "unconfirmed" — a
+  30 px tick on the far side, the car too small to track, one bare flip per window at the right
+  time — because `vouchedUnconfirmed` let only TRACKED crossings vouch. Now quiet flickers vouch
+  for each other: at most two candidates in the window, three or more laps within 0.35 s of
+  their common offset. Laps 1, 2 and 8 are written; lap 3 is a busy window (a right hold); lap
+  10's flip is not detected by today's first pass at all. Alongside: the second look may no
+  longer replace a held row with an untracked answer (it had swapped a held single flicker for a
+  stray one). Measured: 4521 trusted 16 → 20/36, ready 201 → 210, held 14 → 4; thirteen S3
+  rows moved 0.2–1.4 s onto the car (two eye-checked), eleven newly written against the
+  morning's run (Sandy's three S2 rows among them), two lost (me L7 S1 held as odd; Sandy L11 S3
+  a cross-driver duplicate after the seed moved). Same board on two consecutive runs. Closing
+  run, all seven: **92/125 (74 %)**; 4480, 4483, 4522, 4523, 4044 J/C identical cells to the
+  morning's 88/125. A same-place candidate
+  count as the person test was also tried on saved rows and rejected — it flags 18 of 60 real
+  car crossings, because cars flicker across a line too and in a race every car crosses at the
+  same spot. Gates: tsc, `test:find-crossings` (new cases for the vouch, the fold, the
+  pre-tick), `next build`.
+- 2026-09-09 — **The scan's ship bar is lap-to-lap consistency, and it meets it; half speed
+  and restart on the sector player; a saved scan is offered again.** Measured on the Boronia
+  race (six cars, 259 s), the 08-29 job's 100 marks against the walked lap starts:
+
+  | line | you: median dev · lap-normalised | rival: median dev · lap-normalised |
+  |---|---|---|
+  | S1 | 28 ms · 14 ms | 32 ms · 27 ms |
+  | S2 | 17 ms · 29 ms | 21 ms · 21 ms |
+  | S3 | 55 ms · 56 ms | 16 ms · 30 ms |
+  | S4 | 86 ms · 37 ms | 41 ms · 34 ms |
+  | S5 | 132 ms · 33 ms | 129 ms · 19 ms |
+
+  "Median dev" is how far a lap's crossing sits from that line's usual offset after the start
+  line, over ten laps; it carries the driver's own lap-to-lap variation, which is why the second
+  half of the lap (the hairpin) reads wider. Normalised by each lap's own length the scan's own
+  scatter is **14–56 ms on every line for both drivers** — a frame or so. Agreement with a
+  reviewer's eye is a different question (median −73 ms, per line, cancels in every
+  comparison — see `VIDEO_RACE_PASS_PLAN.md` 2026-09-09) and is no longer the bar. A fresh
+  end-to-end scan on a cleared clone reproduced the 08-29 marks to the millisecond.
+
+  Shipped (uncommitted): `SectorClipPlayer` gains **restart** and **½ speed** (both clips at
+  once; a clip under two seconds opens at half, a whole lap at full) — the controls the north
+  star lists. The **Scan step offers the last scan's found crossings** (`Add 98 from the last
+  scan`) when none of them became marks: the scan was already saved before the driver decided
+  anything, but the panel that offered it lived in component state, so leaving the tab meant
+  re-reading the race. Pressed for real: 98 marks with source, direction and candidates.
+  Verified: tsc, lint, the six video suites, `next build`, and screenshots at 1440 and 390.
+  Seen and not fixed: at 390 the two labels over the picture wrap and cover its top edge
+  (`You L9 · 17.381` / `Sandy Iavazzo L4 · 16.972 · GHOST`).
+- 2026-09-07 (third pass) — **The tracer learns the track from laps already traced, and the delta
+  is pinned to the crossings rather than guessing at them.** Readings lost at the sector lines
+  22.6 → 6.4 %, the drawn-and-checkable share of the lap 55.4 → 71.6 %, holes 13 → 2. The check
+  that made those numbers honest is withholding each crossing from the projection in turn — held
+  out, the old line was 289 ms out on average where the un-held-out check reported 13 ms. Numbers
+  and reasoning in `VIDEO_TRACE_NORTH_STAR.md`'s changelog of the same date.
+- 2026-09-07 (later) — **The car is found against a still picture of the empty track, and the delta
+  line refuses to draw the impossible.** Camera drift measured at 0.00–0.01 px between frames on all
+  four clips, which is what makes a still picture valid. Coverage 87.5 → 90.3 %, readings lost at
+  the sector lines 35.3 → 23.0 %, and the share of the drawn line that implies a pace ratio no two
+  cars could have 14.7 → 0.2 %. Numbers and reasoning in `VIDEO_TRACE_NORTH_STAR.md`'s changelog of
+  the same date.
+- 2026-09-07 — **The tracer measured, then fixed: 82 → 88 % sector coverage and one disagreement
+  in 34 pairs.** Four changes (measured car size into the chain, a shake test that asks whether
+  anything owns the movement, a 0.55 coverage floor, no reading at an unlocated line). Numbers and
+  reasoning in `VIDEO_TRACE_NORTH_STAR.md`'s changelog of the same date. Same three jobs.
+- 2026-09-06 (driven) — **Twelve laps over three videos and two drivers; 31 of 34 delta pairs
+  clean.** Numbers and the four fixes the driving found are in `VIDEO_TRACE_NORTH_STAR.md`'s
+  changelog of the same date. Jobs: `cmtk3ur9w00y7vlj4t1036ro6` (IMG_4522, 8 traces),
+  `cmtiox2nx02etvlbsnyhnigeq` (IMG_4523, 4), `cmt9gwctq017evl34ko2y986b` (IMG_4044 4K, 3).
+  IMG_4521 — the four-driver practice — is not on this machine and stays untraced.
+- 2026-09-06 (trace) — **Step 5 built, and the delta line with it.** See
+  `VIDEO_TRACE_NORTH_STAR.md` changelog of the same date for the design and the founder ruling.
+  Measured on IMG_4522 job `cmtk3ur9w00y7vlj4t1036ro6`, the app's own chips in real Chrome:
+  Jordan L8 coverage 86 %, 8/8 crossings within ~1.5 car lengths, 0 holes, ~4 s; L5 82 %, 8/8,
+  three ambiguous holes at S1–S2 (a car beside him; drawn as breaks); Justin L16 69 %, 7/8.
+  Delta line vs the sector board at every line: 0 disagree beyond 0.08 s, S3–S6 within 7 ms.
+  Five findings on the way, each a rule now: the compare step has no player of the flow's own
+  (frame size comes off the file); a fisheye's short far lines make a 6 px car of a 30 px one
+  (size is measured from the blobs); a lost window may grow to half the frame (buffers sized
+  for it — the first run died with `offset is out of bounds` and no done line); an unbounded
+  chain over thousands of blobs ran ten minutes (2 s lookback, 8 blobs a frame); one calibration
+  at the start line blinded the far end (per line, like the scan; each stretch at the gentler
+  gate). Rigs: `dev-trace-lap.mts` presses the chips and streams `[trace]`,
+  `dev-grade-trace.mts` prints the per-sector table and the delta-vs-board check.
 - 2026-09-03 (two clocks) — **A practice driver is placed on the video with no tap, and a lap is
   fitted whole.** From the four-driver Bendigo practice (IMG_4521, job `cmtkvgho2…`), where
   "Cooper has no sectors": his sync tap sat 35s before his session had begun. Three findings,

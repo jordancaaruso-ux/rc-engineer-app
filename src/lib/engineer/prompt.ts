@@ -26,7 +26,7 @@ What the driver states is fact; never re-suspect it. Turn their words into the p
 Never invent a number: use only numbers from the driver, the knowledge base, or this request's DRIVER DATA block — the only logged data you can see. Anything beyond that, say you can't see it, then answer what the physics alone can.
 
 Talk like a driver at the pit table, not an engineering report: plain words, each thing once, the specific thing not its category. A change is what the driver will feel and where on the corner — the nets' register — not what moves inside the car. Shape the answer to the question:
-- A problem: the change and how far, one line, no preamble; then two or three other levers, a line each — move, size, what sets it apart.
+- A problem: the change and how far, one line, no preamble; where that change costs a part of the corner, the change that gets it back without touching the gain, one clause; then two or three other levers, a line each — move, size, what sets it apart.
 - What a change does: the feel and where on the corner; other levers only if you would truly reach for them, at most two.
 - Why or how: the mechanism, plainly.
 A reason only when it changes what the driver does, and only a clause. They will ask if they want more.
@@ -140,9 +140,27 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * KB already carried inside its argument (thicker = both rear tyres put the power down): it was a
  * rotation-only entry, so "more drive off the corner" was unreachable and the model reached for
  * thinner. Gearing, motor and line still have no KB page — the founder's to write, not invented here.
+ * 2026-09-09-paired-changes starts another (founder call, from round 01 of the launch review). A
+ * change can need a second change to show its worth — softer front bar for the middle of a hairpin
+ * costs the first input, and thinner front oil gets it back without touching the middle. The physics
+ * for that pair was put on corner-regime.md first (founder's option 1) and moved nothing across six
+ * re-asked conversations: every cost was named, no second change offered. Second time today a true
+ * premise changed no answer because the answer SHAPE had no slot for it (fact 1 on "loose" was the
+ * first). So the shape gains the slot: where the lead change costs a part of the corner, the change
+ * that gets it back, one clause — conditional on there being a cost, so a camber or toe answer does
+ * not grow a rider. The founder chose this over a nets-header sentence ("B makes by far the most
+ * sense").
+ * 2026-09-15-group-move starts another (founder call, round 03 of the launch review). "The front feels
+ * lazy going into the fast stuff" got toe, oil and a roll-centre shim; the front spring and bar never
+ * appeared, and the founder would have said "more front roll stiffness — spring or bar". The nets header
+ * said "name the group and the end, pick the knob", which forces one knob even when nothing the driver
+ * said separates them. It now says: where nothing does, give the group move with a step on each knob
+ * and say which to try first for the least cost. No rule about which family a complaint belongs to —
+ * the founder refused one ("I don't want to introduce a static rule"). Prompt text unchanged; the
+ * label moves because the nets header is on the wire.
  * Scores are not comparable across labels.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-09-03-no-change-is-an-answer";
+export const ENGINEER_PROMPT_LABEL = "2026-09-15-group-move";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);

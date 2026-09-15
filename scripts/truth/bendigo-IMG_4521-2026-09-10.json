@@ -1,0 +1,76 @@
+{
+  "_note": "Eye truth for S3 crossings on the Bendigo 4K practice (IMG_4521; grading job cmtsp21030001vlckd1795kcn, S3 as drawn there). Jordan (me, pink) read off fine contact sheets (scripts/tmp/sheet-any.mjs --fine, 16 frames at 29.97fps) on 2026-09-10: t is the frame the car’s centre sits on the yellow line, ±1 frame. Written because the closing run of 2026-09-09 picked a grey-blue flicker at the line’s kerb end on laps 2, 5 and 6 — the car itself was a third of a second away — and the sector clips opened with the car nowhere near the line. The other drivers’ picks (Cooper r3 white, Justin competitor white, Sandy r4 red) were read off WIDE sheets (48 frames over 1.6s) the same day, ±2 frames, for the rows the direction change of 2026-09-10 moved.",
+  "lines_note": "S3 only. The line’s upper end is where every car crosses; its lower end stops at the kerb, where a marshal stands during laps 9–11. The picker’s tap read this line’s direction as − and 30 of 36 crossings contradicted it — the review of 2026-09-10 discards such a direction (`unreliableDirections`).",
+  "picks": [
+    {
+      "role": "me",
+      "lap": 2,
+      "line": "s3",
+      "t": 1312.86,
+      "confidence": "±1 frame; pink car touches the line at 1312.822, centred on it at 1312.855, past by 1312.888. Closing run (09-09) wrote 1312.565 confirmed — a grey-blue flicker at the kerb end, 290ms early."
+    },
+    {
+      "role": "me",
+      "lap": 5,
+      "line": "s3",
+      "t": 1358.48,
+      "confidence": "±1 frame; pink car just short at 1358.443, on the line at 1358.477, past by 1358.510. Closing run wrote 1358.770 — a grey flicker 290ms late; the car's own crossing was never a candidate."
+    },
+    {
+      "role": "me",
+      "lap": 6,
+      "line": "s3",
+      "t": 1373.64,
+      "confidence": "±1 frame; pink car touches the line at 1373.617, centred at 1373.650, past by 1373.683. Closing run wrote 1373.333 — a grey-blue flicker 310ms early; the pink candidate at 1373.66 was on the list and lost the pick."
+    },
+    {
+      "role": "me",
+      "lap": 10,
+      "line": "s3",
+      "t": 1433.98,
+      "confidence": "±1 frame; pink car on the line 1433.962–1433.995. A marshal stands at the lower end of the line through this window. Closing run wrote 1433.947 — right."
+    },
+    {
+      "role": "me",
+      "lap": 14,
+      "line": "s3",
+      "t": 1587.85,
+      "confidence": "±1 frame; pink car on the line at 1587.848, past by 1587.882. Closing run wrote 1587.819 — right."
+    },
+    {
+      "role": "r3",
+      "lap": 1,
+      "line": "s3",
+      "t": 56.76,
+      "confidence": "±2 frames (wide sheet); white car at the line’s upper end 56.743–56.777, past by 56.843. Closing run wrote 57.176 (held to the tap’s direction, 0.44s late); the direction-blind review wrote 56.737."
+    },
+    {
+      "role": "r3",
+      "lap": 4,
+      "line": "s3",
+      "t": 103.48,
+      "confidence": "±2 frames (wide sheet); white car on the line 103.465–103.498, past by 103.565. Closing run wrote 103.750 (0.28s late); direction-blind review 103.470."
+    },
+    {
+      "role": "competitor",
+      "lap": 8,
+      "line": "s3",
+      "t": 874.59,
+      "confidence": "±2 frames (wide sheet); white car on the line 874.553–874.620, past by 874.687. Closing run wrote 874.864 (0.28s late); direction-blind review 874.582."
+    },
+    {
+      "role": "r4",
+      "lap": 2,
+      "line": "s3",
+      "t": 1583.23,
+      "confidence": "±2 frames (wide sheet); red car on the line 1583.180–1583.280, past by 1583.347. Closing run wrote 1583.084 (0.15s early); direction-blind review 1583.275."
+    },
+    {
+      "role": "r4",
+      "lap": 10,
+      "line": "s3",
+      "t": 1707.05,
+      "confidence": "±2 frames (wide sheet); red car on the line 1707.020–1707.087, past by 1707.153. Closing run wrote 1706.634 (0.42s early); direction-blind review 1707.123."
+    }
+  ]
+}

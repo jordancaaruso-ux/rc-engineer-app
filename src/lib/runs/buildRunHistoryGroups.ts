@@ -79,7 +79,7 @@ function dateKey(d: Date, timeZone?: string | null): string {
  * null `trackId`, so id-keying would split the same venue (e.g. one "TFTR" day)
  * into two groups. Same-named tracks are the same session location here.
  */
-function trackKey(run: RunForHistoryGroup): string {
+export function trackKey(run: RunForHistoryGroup): string {
   const name = (run.track?.name ?? run.trackNameSnapshot ?? "").trim().toLowerCase();
   return name ? `name:${name}` : "no-track";
 }
@@ -210,22 +210,182 @@ export function runLocalDayKey(
   return dateKey(instant, resolveRunLocalTimeZone(run, zones));
 }
 
+/**
+ * "Fri 26 Jun" from a YYYY-MM-DD day key. The key is already in the driver's zone, so it
+ * is formatted at UTC noon — anything else re-applies a zone shift to a date that has
+ * already had one and can slide the label to the wrong day. One formatter for every
+ * surface that names a day inside a meeting (the team chart's bands, the day bands on the
+ * pace chart, the day dividers in a run list), so they cannot spell one Saturday two ways.
+ */
+export function formatRunDayLabel(dayKey: string): string {
+  const date = new Date(`${dayKey}T12:00:00Z`);
+  if (Number.isNaN(date.getTime())) return dayKey;
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "UTC",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(date);
+}
+
+/** Whole calendar days between two YYYY-MM-DD keys; 1 means they touch. */
+export function dayKeyDistance(a: string, b: string): number {
+  const ms = Math.abs(Date.parse(`${a}T12:00:00Z`) - Date.parse(`${b}T12:00:00Z`));
+  return Number.isNaN(ms) ? Number.POSITIVE_INFINITY : Math.round(ms / 86_400_000);
+}
+
+/** Longest declared event a fold will walk day by day; anything longer is a data error. */
+const MAX_EVENT_FOLD_DAYS = 14;
+
+/** Every calendar day (YYYY-MM-DD) an event declares, first to last. */
+function eventDeclaredDays(event: RunForHistoryGroup["event"]): string[] {
+  if (!event?.startDate || !event.endDate) return [];
+  const start = new Date(event.startDate);
+  const end = new Date(event.endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
+  const days: string[] = [];
+  for (let i = 0; i < MAX_EVENT_FOLD_DAYS; i += 1) {
+    const d = new Date(
+      Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + i, 12)
+    );
+    if (d.getTime() > end.getTime() + 12 * 60 * 60 * 1000) break;
+    days.push(d.toISOString().slice(0, 10));
+  }
+  return days;
+}
+
+/**
+ * The session key of every run in a list, with eventless runs folded into the meeting they
+ * were obviously at.
+ *
+ * Founder ruling (2026-09-06): *"even if a user logs runs separately not under an event, but
+ * they're at the same track, it should appear under the same results as someone on an event
+ * at the same day — it'll obviously be the same meeting."* Before this, a teammate who tapped
+ * "Not now" on the join prompt sat in a second "Test day" group beside the event, and the
+ * team day view split the one meeting in two.
+ *
+ * The rule: a run with no event, at the same track (by name, as `trackKey` does), on a day the
+ * event covers — any day the event declares, or any day one of its runs actually landed on —
+ * takes the event's key. Runs on a *different* event never fold: that is someone's own booking
+ * with its own name, and merging two named meetings is a dedupe question, not a grouping one.
+ * When two events at one track claim the same day, the one with more runs on it wins, and the
+ * first seen on a tie, so the answer is stable across reads.
+ *
+ * ## Touching days fold too (founder ruling, 2026-09-14)
+ *
+ * A meeting is the run of consecutive days at the track, not only the dates on the entry form.
+ * The Friday practice before a Saturday–Sunday title, logged without joining the event, is
+ * part of that weekend to the driver — *"yes, fold it in."* So an eventless day at the event's
+ * track that TOUCHES a day already in the meeting joins it, and the day it brings can be
+ * touched in turn: Thursday reaches a Saturday event through Friday. A gap day breaks the
+ * chain — Saturday and Monday are two outings. Capped at `MAX_EVENT_FOLD_DAYS` either way,
+ * as the declared range is, so a data error cannot swallow a season.
+ *
+ * `sessionGroupKey` on its own still gives the unfolded key; this is the one the list and the
+ * workbench's "2 of 8" count must both use, or they count different sessions.
+ */
+export function resolveSessionGroupKeys<T extends RunForHistoryGroup>(
+  runs: readonly T[],
+  zones?: RunGroupZoneOptions
+): Map<string, string> {
+  const keyByRunId = new Map<string, string>();
+  const eventScopes = new Map<string, { tracks: Set<string>; days: Set<string>; count: number }>();
+  for (const run of runs) {
+    const key = sessionGroupKey(run, zones);
+    keyByRunId.set(run.id, key);
+    if (!run.eventId) continue;
+    let scope = eventScopes.get(key);
+    if (!scope) {
+      scope = { tracks: new Set(), days: new Set(), count: 0 };
+      eventScopes.set(key, scope);
+    }
+    scope.count += 1;
+    const own = trackKey(run);
+    if (own !== "no-track") scope.tracks.add(own);
+    const eventTrack = (run.event?.track?.name ?? run.event?.trackNameSnapshot ?? "")
+      .trim()
+      .toLowerCase();
+    if (eventTrack) scope.tracks.add(`name:${eventTrack}`);
+    scope.days.add(runLocalDayKey(run, zones));
+    for (const day of eventDeclaredDays(run.event)) scope.days.add(day);
+  }
+  if (eventScopes.size === 0) return keyByRunId;
+
+  // Touching days: an eventless day at one of the meeting's tracks that sits next to a day
+  // the meeting already holds joins it, and the chain walks on from there.
+  const looseDaysByTrack = new Map<string, Set<string>>();
+  for (const run of runs) {
+    if (run.eventId) continue;
+    const track = trackKey(run);
+    if (track === "no-track") continue;
+    const set = looseDaysByTrack.get(track) ?? new Set<string>();
+    set.add(runLocalDayKey(run, zones));
+    looseDaysByTrack.set(track, set);
+  }
+  for (const scope of eventScopes.values()) {
+    const candidates = new Set<string>();
+    for (const track of scope.tracks) {
+      for (const day of looseDaysByTrack.get(track) ?? []) candidates.add(day);
+    }
+    for (let step = 0; step < MAX_EVENT_FOLD_DAYS; step += 1) {
+      let grew = false;
+      for (const day of candidates) {
+        if (scope.days.has(day)) continue;
+        let touches = false;
+        for (const held of scope.days) {
+          if (dayKeyDistance(day, held) === 1) {
+            touches = true;
+            break;
+          }
+        }
+        if (touches) {
+          scope.days.add(day);
+          grew = true;
+        }
+      }
+      if (!grew) break;
+    }
+  }
+
+  const claim = new Map<string, { key: string; count: number }>();
+  for (const [key, scope] of eventScopes) {
+    for (const track of scope.tracks) {
+      for (const day of scope.days) {
+        const at = `${day}|${track}`;
+        const current = claim.get(at);
+        if (!current || scope.count > current.count) claim.set(at, { key, count: scope.count });
+      }
+    }
+  }
+  for (const run of runs) {
+    if (run.eventId) continue;
+    const track = trackKey(run);
+    if (track === "no-track") continue;
+    const hit = claim.get(`${runLocalDayKey(run, zones)}|${track}`);
+    if (hit) keyByRunId.set(run.id, hit.key);
+  }
+  return keyByRunId;
+}
+
 export function buildRunHistoryGroups<T extends RunForHistoryGroup>(
   runs: T[],
   timeZone?: string | null,
   opts?: Pick<RunGroupZoneOptions, "ownerTimeZoneByUserId">
 ): RunHistoryGroup<T>[] {
   const zones: RunGroupZoneOptions = { ...opts, viewerTimeZone: timeZone };
+  const keyByRunId = resolveSessionGroupKeys(runs, zones);
   const byKey = new Map<string, T[]>();
   for (const run of runs) {
-    const key = sessionGroupKey(run, zones);
+    const key = keyByRunId.get(run.id) ?? sessionGroupKey(run, zones);
     const list = byKey.get(key) ?? [];
     list.push(run);
     byKey.set(key, list);
   }
   const groups: RunHistoryGroup<T>[] = [];
   for (const [groupKey, groupRuns] of byKey) {
-    const run = groupRuns[0]!;
+    // A folded group holds eventless runs too; the header must read off one that carries the
+    // event, whichever came first in the list.
+    const run = groupRuns.find((r) => r.eventId && r.event) ?? groupRuns[0]!;
     const runZone = resolveRunLocalTimeZone(run, zones);
     const isEvent = !!run.eventId && run.event;
     const title = isEvent && run.event
@@ -237,8 +397,13 @@ export function buildRunHistoryGroups<T extends RunForHistoryGroup>(
       : (run.track?.name ?? run.trackNameSnapshot ?? "—");
     const dateLabel = isEvent && run.event
       ? (() => {
-          const start = run.event.startDate ? new Date(run.event.startDate) : runSessionSortInstant(run);
-          const end = run.event.endDate ? new Date(run.event.endDate) : runSessionSortInstant(run);
+          // The declared range, widened to any day a run in the group actually landed on:
+          // a folded Friday practice makes a "13 – 14 Sep" meeting a "12 – 14 Sep" one.
+          const instants = groupRuns.map((r) => runSessionSortInstant(r).getTime());
+          const declaredStart = run.event.startDate ? new Date(run.event.startDate).getTime() : Number.NaN;
+          const declaredEnd = run.event.endDate ? new Date(run.event.endDate).getTime() : Number.NaN;
+          const start = new Date(Math.min(...instants, ...(Number.isNaN(declaredStart) ? [] : [declaredStart])));
+          const end = new Date(Math.max(...instants, ...(Number.isNaN(declaredEnd) ? [] : [declaredEnd])));
           if (dateKey(start) === dateKey(end)) return formatGroupDate(start);
           // Compact shared segments so multi-day ranges stay on one line:
           // "26 – 28 Jun 2026" / "28 Jun – 1 Jul 2026".

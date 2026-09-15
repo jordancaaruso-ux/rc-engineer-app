@@ -4,10 +4,12 @@ import type {
   DriverRole,
   ManualCompareState,
   ManualDriver,
+  ManualLapTrace,
   ManualSyncAnchor,
   ManualTimingSession,
   ManualVideoSessionV2,
 } from "./types";
+import { traceKey } from "./types";
 import {
   anchorForRole,
   predictSfEndTime,
@@ -222,7 +224,37 @@ export function swapDriverRoles(
     ...(session.lastIdentify
       ? { lastIdentify: { ...session.lastIdentify, driverRole: swap(session.lastIdentify.driverRole) } }
       : {}),
+    ...(session.traces ? { traces: swapTraceRoles(session.traces, swap) } : {}),
   };
+}
+
+/** Traced laps are filed by seat too — `role:lap` keys and the role inside each. */
+function swapTraceRoles(
+  traces: Record<string, ManualLapTrace>,
+  swap: <T extends string>(r: T) => T
+): Record<string, ManualLapTrace> {
+  const out: Record<string, ManualLapTrace> = {};
+  for (const trace of Object.values(traces)) {
+    const driverRole = swap(trace.driverRole);
+    out[traceKey(driverRole, trace.lapNumber)] = { ...trace, driverRole };
+  }
+  return out;
+}
+
+/** The traces that are not this driver's; undefined when none are left. */
+export function withoutRoleTraces(
+  traces: Record<string, ManualLapTrace> | undefined,
+  role: DriverRole
+): Record<string, ManualLapTrace> | undefined {
+  if (!traces) return undefined;
+  const out: Record<string, ManualLapTrace> = {};
+  let n = 0;
+  for (const [key, trace] of Object.entries(traces)) {
+    if (trace.driverRole === role) continue;
+    out[key] = trace;
+    n++;
+  }
+  return n ? out : undefined;
 }
 
 export function legacyFlatDrivers(session: ManualVideoSessionV2): ManualDriver[] {
@@ -360,9 +392,12 @@ export function setParticipantAnchor(
   const marks = replaced
     ? session.marks.filter((m) => !(m.driverRole === role && m.sessionId === ts.sessionId && m.source))
     : session.marks;
+  // A traced lap was pinned to crossings found around the old placement; it goes the same way.
+  const traces = replaced ? withoutRoleTraces(session.traces, role) : session.traces;
   return {
     ...session,
     marks,
+    ...(traces !== session.traces ? { traces } : {}),
     timingSessions: session.timingSessions.map((s) =>
       s.sessionId !== ts.sessionId
         ? s
@@ -424,6 +459,7 @@ export function removeParticipant(
     lastScan: session.lastScan
       ? { ...session.lastScan, rows: session.lastScan.rows.filter((r) => r.driverRole !== role) }
       : undefined,
+    ...(session.traces ? { traces: withoutRoleTraces(session.traces, role) } : {}),
   };
 }
 

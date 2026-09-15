@@ -31,8 +31,10 @@ import {
   type BootstrapLap,
   type BootstrapResult,
 } from "./bootstrap";
-import { findCrossingsInBrowser, type ScanProgress } from "./browserScan";
+import { findCrossingsInBrowser, scanRecipe, type ScanProgress } from "./browserScan";
+import { SECOND_LOOK_REACH } from "./types";
 import type { CarColour } from "./carColour";
+import { learnOwnColours, type OwnColours } from "./ownColour";
 import {
   bracketTargets,
   buildTargets,
@@ -48,6 +50,7 @@ import {
   type SessionLine,
   type SessionMark,
   type SessionRole,
+  type SessionTarget,
 } from "./fromSession";
 import type { TrackedResult } from "./detector";
 import type { LineCalibration } from "./calibrate";
@@ -83,6 +86,12 @@ export type LearnResult = BootstrapResult & {
    * bootstrap; these are what the scan and the field matching use.
    */
   cars: CarColours;
+  /**
+   * Each driver's colour on each line, learnt from the quickest laps' windows where they crossed
+   * it alone — `ownColour.ts`. The picker reads whole laps, where "alone" is rare, so it takes
+   * these first and its own only where it has them.
+   */
+  ownColours: OwnColours;
   starvedSegments: number;
   /**
    * What the learning pass actually read. Zero laps and zero frames are completely different
@@ -149,6 +158,11 @@ export async function learnTheLap(ctx: RunContext): Promise<LearnResult> {
     frameH,
     lines,
     targets: sfTargets,
+    // The start line is read with the wider reach: on the 4K heat the car crosses a long start
+    // line at its far end, and the tight zone either refused the crossing or caught an earlier
+    // skim of the line (2026-09-09: measured starts ±70–200 ms from the eye). The transponder
+    // still chooses among what is admitted (`sfStartFor`).
+    recipe: { ...scanRecipe(), ...SECOND_LOOK_REACH },
     onProgress: scaled(ctx.onProgress, 0, haveAll ? 0.9 : 0.25, "Checking the start line — "),
     signal,
   });
@@ -180,6 +194,7 @@ export async function learnTheLap(ctx: RunContext): Promise<LearnResult> {
       diagnostics: [],
       car,
       cars,
+      ownColours: new Map(),
       calibrations: sfScan.calibrations,
       lapStartError,
       from: "marks",
@@ -215,6 +230,7 @@ export async function learnTheLap(ctx: RunContext): Promise<LearnResult> {
   return {
     ...resolved,
     cars,
+    ownColours: learnOwnColours(scan.results, SF_LINE_KEY, (id) => id.split(":")[0] ?? ""),
     calibrations: { ...sfScan.calibrations, ...scan.calibrations },
     lapStartError,
     from: "footage",
@@ -422,18 +438,43 @@ export async function findEveryCrossing(
     seedsByRole: opts.seedsByRole,
   });
 
-  const main = await findCrossingsInBrowser({
+  // Corners with the tight zone; the start line with the wider reach (see `learnTheLap`) — two
+  // reads, because a recipe is per read and a lap's start is the one crossing every sector time
+  // hangs off.
+  const cornerTargets = built.targets.filter((t) => t.lineKey !== SF_LINE_KEY);
+  const sfTargets = built.targets.filter((t) => t.lineKey === SF_LINE_KEY);
+  const corners = await findCrossingsInBrowser({
     video,
     file: ctx.file,
     frameW,
     frameH,
     lines,
-    targets: built.targets,
+    targets: cornerTargets,
     car: opts.car,
     cars: opts.cars,
-    onProgress: scaled(ctx.onProgress, 0, 0.85, ""),
+    onProgress: scaled(ctx.onProgress, 0, 0.75, ""),
     signal,
   });
+  const starts = sfTargets.length
+    ? await findCrossingsInBrowser({
+        video,
+        file: ctx.file,
+        frameW,
+        frameH,
+        lines,
+        targets: sfTargets,
+        car: opts.car,
+        cars: opts.cars,
+        recipe: { ...scanRecipe(), ...SECOND_LOOK_REACH },
+        onProgress: scaled(ctx.onProgress, 0.75, 0.85, "Start line — "),
+        signal,
+      })
+    : null;
+  const main = {
+    results: [...corners.results, ...(starts?.results ?? [])],
+    calibrations: { ...(starts?.calibrations ?? {}), ...corners.calibrations },
+    starvedSegments: corners.starvedSegments + (starts?.starvedSegments ?? 0),
+  };
 
   // Colour in the review is learnt per line, from what the timing pass hands each driver there —
   // see `field.ts`. The start-line reference (`opts.cars`) only serves the detector's own tiebreak.
@@ -445,12 +486,22 @@ export async function findEveryCrossing(
     laps,
     field: ctx.field,
     lineDirections: opts.lineDirections,
+    frameW,
   });
 
-  // Second pass: whatever is still missing, searched for between the corners either side of it.
+  // Second pass: whatever is still missing, searched for between the corners either side of it —
+  // and whatever the field handed to a rival, because that slot is just as empty: the window saw
+  // the other car and offered nothing for this one (IMG_4483, 2026-09-09: four of Jordan's S1
+  // crossings held with only Justin's car on offer, his own a car length past the line's end).
   let bracketFilled = 0;
   let results: TrackedResult[] = main.results;
-  if (review.missing.length) {
+  // Every held row, not only the ones handed to a rival: a row held as odd or unconfirmed is a
+  // time the review would not write, and a wider look between its neighbours costs a second.
+  const targetById = new Map(built.targets.map((t) => [t.id, t]));
+  const claimedAway = review.suspect
+    .map((r) => targetById.get(r.id))
+    .filter((t): t is SessionTarget => t != null);
+  if (review.missing.length || claimedAway.length) {
     const known = [
       ...built.lapStarts.map((l) => ({ ...l, lineKey: SF_LINE_KEY })),
       ...marks.map((m) => ({
@@ -467,7 +518,7 @@ export async function findEveryCrossing(
       })),
     ];
     const brackets = bracketTargets({
-      missing: review.missing,
+      missing: [...review.missing, ...claimedAway],
       known,
       order: review.order,
       seeds: opts.seeds,
@@ -484,18 +535,32 @@ export async function findEveryCrossing(
         targets: brackets,
         car: opts.car,
         cars: opts.cars,
+        // Wider past the lines' ends than the first pass: these windows found nothing for this
+        // driver with the tight zone, so a car passing beside a short line is what is left to find.
+        recipe: { ...scanRecipe(), ...SECOND_LOOK_REACH },
         onProgress: scaled(ctx.onProgress, 0.85, 1, "Filling the gaps — "),
         signal,
       });
-      // The re-scan replaces the first pass's answer for those targets only.
+      // The re-scan replaces the first pass's answer for those targets only — and where the first
+      // pass HAD an answer (a held row, not a missing one), only with a tracked one. The wide look
+      // reads a different stretch through a different gate, and on the Bendigo 4K practice
+      // (2026-09-09) it swapped a held single flicker at the driver's usual offset for a stray one:
+      // a row the timing would have vouched for became a hole.
       const redone = new Map(second.results.map((r) => [r.id, r]));
-      results = main.results.map((r) => redone.get(r.id) ?? r);
+      const heldIds = new Set(review.suspect.map((r) => r.id));
+      results = main.results.map((r) => {
+        const again = redone.get(r.id);
+        if (!again) return r;
+        if (heldIds.has(r.id) && !(again.detectedSec != null && again.source !== "unconfirmed")) return r;
+        return again;
+      });
       const before = review.missing.length;
       review = reviewResults({
         results,
         targets: built.targets,
         marks,
         lineDirections: opts.lineDirections,
+        frameW,
         lapStarts: built.lapStarts,
         laps,
         field: ctx.field,

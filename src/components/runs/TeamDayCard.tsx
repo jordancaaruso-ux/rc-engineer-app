@@ -538,14 +538,13 @@ export function TeamDayCard({
 
   return (
     <SurfaceCard variant="panel" contentClassName="p-0">
-      <div className="flex items-center gap-3 border-b border-border px-3 py-2.5 sm:px-4">
+      <div className="eyebrow-band flex items-center gap-3 px-3 sm:px-4">
         <div className="min-w-0 flex-1">
-          {/* No rule of its own. `Eyebrow` draws one by default, but this header
-              already ends in a hairline 30px below — and that one runs the full
-              width of the card while the eyebrow's stops where the Best/Top 5
-              pill begins. Two lines, different lengths, one job between them:
-              the date ended up boxed in a band that read as a table row. */}
-          <Eyebrow className="mb-0 border-b-0 pb-0">Pace overview</Eyebrow>
+          {/* The row is the card's band; its one full-bleed hairline is the only rule
+              here. (Until 2026-09-15 `Eyebrow` drew its own under the words — stopping
+              where the Best/Top 5 pill began, a second line of a different length —
+              and the `border-b-0` meant to remove it never beat the unlayered CSS.) */}
+          <Eyebrow className="mb-0">Pace overview</Eyebrow>
           {/* Phone hides it: the pushed screen's own header two rows above already
               says "Test day · 19 Jul 2026 · TFTR", and saying it twice in 40px is
               how a 390px screen runs out of room. Desktop keeps it — there the
@@ -930,14 +929,12 @@ export function TeamDayCard({
         </p>
       )}
 
-      <div className="flex items-baseline gap-2 border-t border-border px-4 py-2">
-        {/* Rule off, same reason as "Pace overview" above: `Eyebrow` draws its own
-            hairline, but that one stops where the word stops while the count sits
-            beside it, and the column-header row already rules the full card width
-            8px below. Two near-parallel lines of different lengths read as a
-            misdrawn table, not as a heading. */}
-        <Eyebrow className="mb-0 border-b-0 pb-0">Drivers</Eyebrow>
-        <span className="ml-auto text-[11px] text-muted-foreground">
+      <div className="flex items-center gap-2 border-t border-border bg-[var(--band-fill)] px-4 py-[7px]">
+        {/* A band in the middle of the card: the band's tint, ruled above by this row
+            and below by the column-header row (or the list, on a phone) — so it draws
+            no hairline of its own, and `Eyebrow` draws none anywhere but a band. */}
+        <Eyebrow className="mb-0">Drivers</Eyebrow>
+        <span className="ml-auto text-[11px] leading-[1.25] text-muted-foreground">
           {day.drivers.length} driver{day.drivers.length === 1 ? "" : "s"} · {day.totalRuns} run
           {day.totalRuns === 1 ? "" : "s"}
         </span>

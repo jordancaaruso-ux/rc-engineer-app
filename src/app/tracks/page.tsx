@@ -85,7 +85,11 @@ export default async function TracksPage({
   const ownTracks = await prisma.track.findMany({
     where: {
       ...scope,
-      OR: [{ favouriteTracks: { some: { userId: user.id } } }, { runs: { some: { userId: user.id } } }],
+      OR: [
+        { favouriteTracks: { some: { userId: user.id } } },
+        // Relation reads bypass the run window's query gate (docs/STARTER_TIER_PLAN.md).
+        { runs: { some: { userId: user.id, hiddenByPlanAt: null } } },
+      ],
     },
     select: { countryCode: true },
   });

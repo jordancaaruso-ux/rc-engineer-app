@@ -1,9 +1,9 @@
 import "server-only";
 
 import { timingUserAgent } from "@/lib/http/timingUserAgent";
+import { fetchTimingJson } from "@/lib/speedhive/speedhiveClient";
 
 const PRACTICE_API_BASE = "https://practice-api.speedhive.com";
-const DEFAULT_TIMEOUT_MS = 18_000;
 
 export type SpeedhivePracticeLocation = {
   id: number;
@@ -48,24 +48,16 @@ async function practiceFetchJson<T>(path: string, query?: Record<string, string>
       u.searchParams.set(k, v);
     }
   }
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
-  try {
-    const res = await fetch(u.toString(), {
-      signal: controller.signal,
-      headers: {
-        Accept: "application/json",
-        Origin: "https://sporthive.com",
-        "User-Agent": timingUserAgent(),
-      },
-    });
-    if (!res.ok) {
-      throw new Error(`Speedhive practice API HTTP ${res.status}`);
-    }
-    return (await res.json()) as T;
-  } finally {
-    clearTimeout(t);
-  }
+  // Same one-retry rule as the results API — see `fetchTimingJson`.
+  return fetchTimingJson<T>(
+    u.toString(),
+    {
+      Accept: "application/json",
+      Origin: "https://sporthive.com",
+      "User-Agent": timingUserAgent(),
+    },
+    "Speedhive practice API"
+  );
 }
 
 /** Practice API timestamps are often nanoseconds since Unix epoch. */

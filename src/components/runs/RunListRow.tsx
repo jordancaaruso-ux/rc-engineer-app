@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ChevronRight, TriangleAlert, Wrench } from "lucide-react";
+import { ChevronRight, CircleDashed, TriangleAlert, Wrench } from "lucide-react";
 import type { WorkbenchRunRow } from "@/lib/runs/sessionWorkbenchModel";
 import { formatLap } from "@/lib/runLaps";
 import { cn } from "@/lib/utils";
@@ -80,7 +80,9 @@ export function RunListRow({
       id={domId}
       data-run-row={row.id}
       className={cn(
-        "scroll-mt-16 border-b border-l-2 border-border last:border-b-0",
+        // A container, so the UNCONFIRMED mark below can pick word or glyph by the row's
+        // own width rather than the viewport's.
+        "@container scroll-mt-16 border-b border-l-2 border-border last:border-b-0",
         // Hover belongs to the whole row, not to whichever of its three controls the
         // pointer is over — painted per button, the fill stopped at the wrench and one
         // row read as two.
@@ -123,6 +125,32 @@ export function RunListRow({
               {row.isGroupBest ? (
                 <span className="shrink-0 rounded-full bg-gain/12 px-2 py-[2px] text-[9px] font-bold uppercase tracking-[0.07em] text-gain">
                   Best
+                </span>
+              ) : null}
+              {/*
+                Same recipe as BEST, warning tone: the app filed this run from the timing
+                sheet and the driver hasn't vouched for it. The laps are theirs; the setup and
+                tyres are a carry. It comes off on Confirm or a wizard save, never on a look.
+
+                The WORD only where the row can afford it. A row's text column is ~180px on a
+                390px phone, and an 11-letter pill there cost the run its name ("Tes…", seen
+                on a real drive) — it truncated the title, and moved to the second line it
+                truncated the time instead, which is worse. So below 480px of row the pill is
+                a dashed ring, the same glyph the pinned dial already uses for "Unrated": a
+                circle that hasn't been filled in. Container query, not viewport: the row is
+                drawn at pane width on the desktop Sessions browser too.
+              */}
+              {row.unconfirmed ? (
+                // The bare ring at phone width — no tinted disc around it. A 14px box is what
+                // lets "Testing · A800RR" + BEST + this still fit the ~190px a row's title
+                // gets at 390px; the disc's 4px of margin was the difference (measured).
+                <span
+                  className="inline-flex shrink-0 items-center text-warning @[480px]:rounded-full @[480px]:bg-warning/12 @[480px]:px-2 @[480px]:py-[2px] @[480px]:text-[9px] @[480px]:font-bold @[480px]:uppercase @[480px]:tracking-[0.07em]"
+                  title="Unconfirmed — filed from the timing sheet, not yet checked"
+                  aria-label="Unconfirmed"
+                >
+                  <CircleDashed className="h-3.5 w-3.5 @[480px]:hidden" strokeWidth={2.5} aria-hidden />
+                  <span className="hidden @[480px]:inline">Unconfirmed</span>
                 </span>
               ) : null}
             </span>
@@ -212,6 +240,29 @@ export function RunListRow({
         </button>
       </div>
       {children}
+    </div>
+  );
+}
+
+/**
+ * The day a run of rows belongs to, on a list that holds more than one (2026-09-14).
+ *
+ * A meeting spans days now — the block on `/analysis` and the Sessions pane both list
+ * the whole thing — and twenty rows with a clock each do not say where Saturday ended.
+ * This is the list's half of the chart's day band: same key, same words, so a run is
+ * under "Sat 13 Sep" on both. One day draws none of these; the caller decides.
+ *
+ * The seam's type, without its button: a caps label on the hairline, flush left where
+ * the row's own first line starts, so it reads as a heading over the rows and not as
+ * another row among them.
+ */
+export function RunDayDivider({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 px-4 pb-1 pt-3" role="separator" aria-label={label}>
+      <span className="shrink-0 text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+        {label}
+      </span>
+      <span className="block h-px flex-1 bg-border" aria-hidden />
     </div>
   );
 }

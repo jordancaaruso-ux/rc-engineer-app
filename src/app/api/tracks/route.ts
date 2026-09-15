@@ -13,6 +13,7 @@ import {
 } from "@/lib/tracks/trackCatalogDominance";
 import { notifyAdminsOfUnverifiedAsset } from "@/lib/assets/notifyAdminReview";
 import { parseCoordinates } from "@/lib/location/coordinates";
+import { timeZoneForCoordinates } from "@/lib/tracks/trackTimeZone";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -192,6 +193,7 @@ export async function POST(request: Request) {
               longitude: coordinates.longitude,
               locationSource: coordinates.locationSource,
               locationMarkedAt: new Date(),
+              timeZone: timeZoneForCoordinates(coordinates.latitude, coordinates.longitude),
             }
           : {}),
       },

@@ -15,19 +15,22 @@ import { SessionTrendCard } from "@/components/analysis/SessionTrendCardLazy";
 import { TeamDayCard } from "@/components/runs/TeamDayCard";
 import { RunPageClient } from "@/components/runs/RunPageClient";
 import { RunFaces } from "@/components/runs/RunFaces";
-import { RunListRow } from "@/components/runs/RunListRow";
+import { RunListRow, RunDayDivider } from "@/components/runs/RunListRow";
 import { requestRunSetupExit } from "@/components/runs/runSetupEditGuard";
 import { OutingHeading } from "@/components/runs/OutingHeading";
 import { resolveOutingHeading, type OutingHeadingParts } from "@/lib/runs/outingHeading";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/runs/RunHistoryModalsLazy";
+import { DebriefCard } from "@/components/debrief/DebriefCard";
 import type { Run } from "@/components/runs/RunDetailPanel";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import type { AnalysisTrendModel } from "@/lib/analysis/analysisHomeModel";
-import type {
-  WorkbenchDriver,
-  WorkbenchGroup,
-  WorkbenchRunRow,
+import {
+  sectionRowsByDay,
+  type WorkbenchDebrief,
+  type WorkbenchDriver,
+  type WorkbenchGroup,
+  type WorkbenchRunRow,
 } from "@/lib/runs/sessionWorkbenchModel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
@@ -543,6 +546,7 @@ export function SessionsBrowser({
             onFocusRun={setFocusedRunId}
             onOpenRun={openRun}
             heading={headingFor(paneGroup)}
+            debrief={paneGroup.debrief}
             displayTimeZone={displayTimeZone}
             pickerRuns={pickerRuns}
             runListSource={runListSource}
@@ -611,6 +615,7 @@ function OneSession({
   onFocusRun,
   onOpenRun,
   heading,
+  debrief,
   displayTimeZone,
   pickerRuns,
   runListSource,
@@ -628,6 +633,8 @@ function OneSession({
   onOpenRun: (runId: string) => void;
   /** The session this is — drawn over the phone's chart, as on `/analysis`. */
   heading?: OutingHeadingParts | null;
+  /** Your own note on this meeting, solo scope only — sits between the chart and the runs. */
+  debrief?: WorkbenchDebrief | null;
   /** All four are for the open run — `RunFaces` is the run page, folded. */
   displayTimeZone: string | null;
   pickerRuns: CompareRunShape[];
@@ -769,6 +776,15 @@ function OneSession({
           the day.
         </SurfaceCard>
       )}
+      {/*
+        The debrief, between the chart and the runs — the one place it lives (founder call,
+        2026-09-14). The chart says what the day did; this is where you say what it meant,
+        with the figures the headline doesn't carry alongside. Both layouts: on the desktop
+        pane the runs are the rail, so here it simply follows the chart.
+      */}
+      {debrief ? (
+        <DebriefCard debrief={debrief} displayTimeZone={displayTimeZone} onOpenRun={openFromChart} />
+      ) : null}
       {/* Phone only — on the split layout these rows are the rail. */}
       <div className="lg:hidden">
         {/*
@@ -807,10 +823,12 @@ function OneSession({
             it on the page ground until then, which read as a label for the gap
             between two cards rather than for the list — and left the card itself
             opening on a row of column codes with nothing saying what they counted.
+            Since 2026-09-15 it is the card's band, and the band's hairline is the only
+            rule under it — the list below used to draw a second one 6px lower.
           */}
-          <div className="flex items-baseline gap-2 px-3 pb-1.5 pt-2.5">
+          <div className="eyebrow-band flex items-center gap-2 px-3">
             <Eyebrow className="mb-0">Runs</Eyebrow>
-            <span className="ml-auto text-[11px] text-muted-foreground">
+            <span className="ml-auto text-[11px] leading-[1.25] text-muted-foreground">
               {rows.length} · newest first
             </span>
           </div>
@@ -821,8 +839,13 @@ function OneSession({
             saying what the row below it already says, and it was the band that made
             this card read as a spreadsheet rather than as a day.
           */}
-          <div className="border-t border-border">
-            {rows.map((run) => {
+          <div>
+            {/* A meeting's rows under their days (2026-09-14) — the same cut the chart
+                above draws as bands. One day, no dividers. */}
+            {sectionRowsByDay(rows).map((section, _i, sections) => (
+              <div key={section.dayKey}>
+                {sections.length > 1 ? <RunDayDivider label={section.dayLabel} /> : null}
+                {section.rows.map((run) => {
               const record = runsById.get(run.id) ?? null;
               const open = openRunIds.has(run.id);
               return (
@@ -871,6 +894,8 @@ function OneSession({
                 </RunListRow>
               );
             })}
+              </div>
+            ))}
           </div>
         </SurfaceCard>
       </div>

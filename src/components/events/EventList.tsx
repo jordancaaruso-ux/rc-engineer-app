@@ -103,8 +103,8 @@ function EventSectionRows({
 }) {
   return (
     <>
-      <li className="bg-muted/20 px-4 pb-1.5 pt-3">
-        <Eyebrow>{title}</Eyebrow>
+      <li className="bg-[var(--band-fill)] px-4 py-[7px]">
+        <Eyebrow className="mb-0">{title}</Eyebrow>
         {subtitle ? <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p> : null}
       </li>
       {events.length === 0 ? (

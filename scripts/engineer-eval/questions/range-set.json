@@ -1,0 +1,90 @@
+{
+ "_readme": "Range set, 2026-09-14: the questions a driver asks of a SPAN of runs — a track, a set of dates — rather than one run. The first case is the founder's question that opened the subject. Runs against a range fixture captured by capture-range-fixture.ts (fixtures/<context>.txt). Grade the same way as the launch set: ABSOLUTE ship/not, zero apologise-class — here an invented number means any figure not in the block, and a delta the block did not print.",
+ "contexts": [
+  "range-tftr"
+ ],
+ "cases": [
+  {
+   "id": "r-01",
+   "shape": "range-tyres",
+   "source": "founder",
+   "turns": [
+    "What's the delta in lap time from new tyres to the second run to the third run?"
+   ]
+  },
+  {
+   "id": "r-02",
+   "shape": "range-tyres",
+   "source": "founder",
+   "turns": [
+    "Across these runs, how does my pace move from the first run on a set of tyres to the second and third? Use the tyre deltas, and say whether that looks like wear or the track.",
+    "So should I qualify on run 2 tyres or new ones?"
+   ]
+  },
+  {
+   "id": "r-03",
+   "shape": "range-best",
+   "source": "starter",
+   "turns": [
+    "Which run in this range was my best, what was on the car and what were the conditions — and what was different on the days I was slower?"
+   ]
+  },
+  {
+   "id": "r-04",
+   "shape": "range-trend",
+   "source": "starter",
+   "turns": [
+    "Am I getting faster here, or is it the track and the weather?"
+   ]
+  },
+  {
+   "id": "r-05",
+   "shape": "range-changes",
+   "source": "starter",
+   "turns": [
+    "Which setup changes across these runs lined up with faster laps, and which didn't? Say where two things moved together so you can't tell them apart.",
+    "Give me the one change you'd carry into the next meeting there."
+   ]
+  },
+  {
+   "id": "r-06",
+   "shape": "range-day",
+   "source": "starter",
+   "turns": [
+    "How does my pace move through a day here, first run to last? What does that say about how to set the car up for the first run?"
+   ]
+  },
+  {
+   "id": "r-07",
+   "shape": "range-air",
+   "source": "starter",
+   "turns": [
+    "How does air temperature line up with my pace across these runs?"
+   ]
+  },
+  {
+   "id": "r-08",
+   "shape": "range-outside",
+   "source": "trap",
+   "turns": [
+    "How did I go at the nationals last year?"
+   ]
+  },
+  {
+   "id": "r-09",
+   "shape": "range-outside",
+   "source": "trap",
+   "turns": [
+    "What was my best ever lap at this track?"
+   ]
+  },
+  {
+   "id": "r-10",
+   "shape": "range-problem",
+   "source": "founder",
+   "turns": [
+    "The car goes off late in the run on the second and third run tyres — loose on exit. What do I change?"
+   ]
+  }
+ ]
+}

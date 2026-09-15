@@ -46,6 +46,15 @@ export function SurfaceCard({
 }) {
   const isHero = variant === "hero";
   const radiusClass = isHero ? "rounded-2xl" : "rounded-xl";
+  // How a band at the top of this card reaches its edges (`.eyebrow-band` in globals.css): a
+  // clipping body lets the band overrun and cuts it, exact at any padding; an open body at the
+  // default 12px gets an exact reach instead; an open body with padding of its own gets neither,
+  // and a band in it stays inside its own box.
+  const cardBody = overflowHidden
+    ? "clip"
+    : /(^|\s)(?:[a-z0-9]+:)*p[xytrbl]?-/.test(contentClassName ?? "")
+      ? undefined
+      : "open";
 
   if (bare) {
     return (
@@ -67,6 +76,7 @@ export function SurfaceCard({
       )}
     >
       <div
+        data-card-body={cardBody}
         className={cn(
           "relative",
           radiusClass,
