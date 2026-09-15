@@ -39,6 +39,11 @@ npx next build            # LOCAL production build
   `cap:open:android` (`android/` generated 2026-09-14; needs `google-services.json` for push).
 - Timing sweep crons (`/api/cron/timing-sweep`, `timing-sweep-plan`) are Bearer `CRON_SECRET`;
   the sweep is dark on production until `TIMING_SWEEP_ENABLED=1` and always live on a dev server.
+- **Two Vercel projects, one database.** `rc-engineer-app` deploys `main` to jrcdynamics.com;
+  `rc-engineer-beta` (created 2026-09-15) deploys the `beta` branch to beta.jrcdynamics.com with
+  `AUTH_ONLY_EMAILS` + `SWEEP_LISTENER_EMAILS` as its doors. Pushing `beta` migrates the
+  production database (`vercel-build.cjs`), so migrations must stay additive. Never promote a
+  beta deployment inside the main project.
 
 Verification order before calling something done: `npx tsc --noEmit` → the matching `test:*` →
 `npx next build`. There is no CI — nothing else will catch it.

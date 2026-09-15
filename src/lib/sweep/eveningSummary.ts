@@ -32,8 +32,17 @@ function sessionWord(n: number): string {
   return `${n} session${n === 1 ? "" : "s"}`;
 }
 
+/**
+ * Links in the email open the site that sent it: `NEXT_PUBLIC_APP_URL` on a deployment that is
+ * not the main site (beta.jrcdynamics.com shares the database but not the pages), else www.
+ */
+function appOrigin(): string {
+  const raw = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/+$/, "");
+  return raw && /^https?:\/\//.test(raw) ? raw : `https://www.${BRAND_DOMAIN}`;
+}
+
 function absoluteUrl(path: string): string {
-  return `https://www.${BRAND_DOMAIN}${path.startsWith("/") ? path : `/${path}`}`;
+  return `${appOrigin()}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 function escapeHtml(s: string): string {

@@ -86,6 +86,15 @@ for failure reports, `FCM_SERVICE_ACCOUNT_JSON` for Android push. Dev drive: the
 (`DEMO_TIMING_SITE=1`, `npm run demo:timing:setup -- --email=<throwaway>`) and
 `GET /api/cron/timing-sweep?evening=<trackId>` forces one track's evening pass.
 
+## The beta site
+
+`beta.jrcdynamics.com` is a second Vercel project (`rc-engineer-beta`, production branch `beta`)
+on the same repo, sharing production's database, Blob store and secrets. It differs by env only:
+`AUTH_ONLY_EMAILS` (who may sign in there), `SWEEP_LISTENER_EMAILS`, `TIMING_SWEEP_ENABLED=1`,
+`SWEEP_BLOB_PREFIX=beta`, `NEXT_PUBLIC_APP_URL` / `AUTH_URL` = the beta origin. Its first deploy
+runs the pending migrations on production, so every migration must stay additive: the main site
+keeps serving the old code against the new columns until `main` catches up.
+
 ## Not built / owed
 
 - Speedhive **race results** are read only in the evening pass (per-session classification

@@ -8,7 +8,17 @@ export function parseEnvAuthAllowlist(): Set<string> {
 }
 
 /**
+ * A hard door for a deployment that is not the main site: when `AUTH_ONLY_EMAILS` is set, only
+ * those addresses may sign in here, whatever the rules below say. beta.jrcdynamics.com shares
+ * production's database, so without this every customer could sign in to the beta.
+ */
+export function parseAuthOnlyEmails(): Set<string> {
+  return parseEmailSetFromEnv(process.env.AUTH_ONLY_EMAILS);
+}
+
+/**
  * Who may request or complete magic-link sign-in.
+ * - `AUTH_ONLY_EMAILS` (when set) is the door to THIS deployment — checked before everything.
  * - `AUTH_OPEN_SIGNUP=1` allows any well-formed address (open public signup — see below).
  * - `AUTH_DEV_ALLOW_ANY_EMAIL=1` in non-production allows any address (local dev only).
  * - `AUTH_ALLOWED_EMAILS` env list (comma-separated).
@@ -18,6 +28,8 @@ export function parseEnvAuthAllowlist(): Set<string> {
 export async function isEmailAuthAllowed(email: string): Promise<boolean> {
   const normalized = email.trim().toLowerCase();
   if (!normalized) return false;
+  const only = parseAuthOnlyEmails();
+  if (only.size > 0 && !only.has(normalized)) return false;
   // Open public signup: any well-formed address is allowed, so the PrismaAdapter creates the
   // account on first sign-in. This is the single pivot — both gates in `auth.ts`
   // (`sendVerificationRequest` + the `signIn` callback) call this one function. Unset = the
