@@ -48,8 +48,8 @@ export async function getEntitledApiUser(): Promise<{ user: User; entitlement: E
  * Segment layouts / server pages — is this paid feature LOCKED for the current viewer?
  * `requireCurrentUser` inside already bounces unauthenticated → /login and unpaid → /billing, so
  * "locked" here means exactly one thing: a paying subscriber whose tier is short of the feature
- * (Notebook at the Geometry Lab, Starter at the Engineer) — the visible-but-locked upsell state
- * (`ProLockedPanel`), never a redirect.
+ * (Notebook at the Geometry Lab, Starter at the Engineer and at lap time analysis) — the
+ * visible-but-locked upsell state (`ProLockedPanel`), never a redirect.
  */
 export async function isFeatureLockedForCurrentUser(feature: Feature): Promise<boolean> {
   const user = await requireCurrentUser();
@@ -58,10 +58,10 @@ export async function isFeatureLockedForCurrentUser(feature: Feature): Promise<b
 }
 
 /**
- * Route Handlers — one-line feature guard for the paid-tier APIs (video, and the Engineer for
- * Starter). Returns the user, or a ready-to-return 401/402 response. 402 (not 403) so clients can
- * distinguish "pay for this" from "not yours". The message names the cheapest tier that has the
- * feature, which is the one the member is being sold.
+ * Route Handlers — one-line feature guard for the paid-tier APIs (video; the Engineer and the
+ * competitor practice pull for Starter). Returns the user, or a ready-to-return 401/402 response.
+ * 402 (not 403) so clients can distinguish "pay for this" from "not yours". The message names the
+ * tier the member is being sold (`upgradeTierFor`).
  */
 export async function requireApiFeature(
   feature: Feature,

@@ -78,12 +78,17 @@ function lapsEqual(a: number[], b: number[]): boolean {
  * against the run's own laps, then the parser convention that the primary driver is stored
  * first (the same three steps the race-field view uses) — and measure the gaps.
  * Null when the session has fewer than two timed entrants.
+ *
+ * `guessFirstDriver: false` drops the third step: no name or lap match, no field. The debrief
+ * reads it that way because on the founder's own sheets the first stored driver was the heat
+ * winner, not him, on 6 of 51 heats (probe 2026-09-15). The Engineer keeps the guess.
  */
 export function fieldPaceFromStats(
   stats: ImportedSessionFieldStatsV1,
   primaryNorms: readonly string[],
   runLaps: readonly number[],
-  lapsByDriverId?: ReadonlyMap<string, number[]>
+  lapsByDriverId?: ReadonlyMap<string, number[]>,
+  opts?: { guessFirstDriver?: boolean }
 ): FieldPace | null {
   const drivers = stats.drivers.filter(believableBest);
   if (drivers.length < 2) return null;
@@ -97,7 +102,9 @@ export function fieldPaceFromStats(
   if (!mine && lapsByDriverId && runLaps.length > 0) {
     mine = drivers.find((d) => lapsEqual(lapsByDriverId.get(d.driverId) ?? [], runLaps as number[]));
   }
-  if (!mine) mine = stats.drivers[0] && believableBest(stats.drivers[0]) ? stats.drivers[0] : undefined;
+  if (!mine && opts?.guessFirstDriver !== false) {
+    mine = stats.drivers[0] && believableBest(stats.drivers[0]) ? stats.drivers[0] : undefined;
+  }
   if (!mine) return null;
 
   const bests = drivers.map((d) => d.bestLapSeconds as number);

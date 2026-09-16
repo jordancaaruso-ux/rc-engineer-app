@@ -516,6 +516,29 @@ test("sortRunsForHistory defaults to completed_desc", () => {
   assert.equal(sorted[0], newer);
 });
 
+test("sortRunsForHistory ranks by handling rating, unrated last", () => {
+  const good = makeRun({ id: "good", carRating: 8, createdAt: new Date("2025-01-01T12:00:00Z") });
+  const bad = makeRun({ id: "bad", carRating: 3, createdAt: new Date("2025-01-02T12:00:00Z") });
+  const unrated = makeRun({ id: "unrated", carRating: null, createdAt: new Date("2025-01-03T12:00:00Z") });
+  const olderGood = makeRun({ id: "olderGood", carRating: 8, createdAt: new Date("2024-12-01T12:00:00Z") });
+
+  const best = sortRunsForHistory([unrated, bad, olderGood, good], "rating_desc");
+  assert.deepEqual(best.map((r) => r.id), ["good", "olderGood", "bad", "unrated"]);
+
+  const worst = sortRunsForHistory([unrated, good, bad], "rating_asc");
+  assert.deepEqual(worst.map((r) => r.id), ["bad", "good", "unrated"]);
+});
+
+test("parseRunHistoryFilters keeps a rating sort and drops an unknown one", () => {
+  assert.equal(parseRunHistoryFilters({ sort: "rating_desc" }).sort, "rating_desc");
+  assert.equal(parseRunHistoryFilters({ sort: "rating_asc" }).sort, "rating_asc");
+  assert.equal(parseRunHistoryFilters({ sort: "nonsense" }).sort, "completed_desc");
+  assert.equal(
+    filtersToSearchParams(parseRunHistoryFilters({ sort: "rating_desc" })).get("sort"),
+    "rating_desc"
+  );
+});
+
 test("describeRunHistoryFilters names the filters in play", () => {
   const none = parseRunHistoryFilters({});
   assert.deepEqual(describeRunHistoryFilters(none), []);

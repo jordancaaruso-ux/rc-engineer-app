@@ -136,6 +136,79 @@ test("a day with no laps still returns a recap with nothing to say", () => {
   assert.equal(recap.best, null);
   assert.equal(recap.top5, null);
   assert.equal(recap.fiveMin, null);
+  assert.equal(recap.field, null);
   assert.equal(recap.rating, null);
   assert.deepEqual(recap.tyres, []);
+});
+
+const sweep = { id: "t1", displayName: "Sweep 32" };
+
+test("from new: each later run on a set fitted new here, against its run 1, averaged over the sets", () => {
+  // laps(n, base) has a top 5 of base + 0.2, so the deltas below are the bases' differences.
+  const recap = buildDebriefRecap(
+    group([
+      run("a1", "2026-08-19T00:00:00Z", laps(8, 16.0), { tireType: sweep, tireStintId: "A", tireRunNumber: 1 }),
+      run("a2", "2026-08-19T01:00:00Z", laps(8, 16.3), { tireType: sweep, tireStintId: "A", tireRunNumber: 2 }),
+      run("a3", "2026-08-19T02:00:00Z", laps(8, 16.4), { tireType: sweep, tireStintId: "A", tireRunNumber: 3 }),
+      run("b1", "2026-08-19T03:00:00Z", laps(8, 15.9), { tireType: sweep, tireStintId: "B", tireRunNumber: 1 }),
+      run("b2", "2026-08-19T04:00:00Z", laps(8, 16.0), { tireType: sweep, tireStintId: "B", tireRunNumber: 2 }),
+      // Arrived used: no run 1 at this meeting, so nothing to measure from.
+      run("c4", "2026-08-19T05:00:00Z", laps(8, 15.0), { tireType: sweep, tireStintId: "C", tireRunNumber: 4 }),
+      run("c5", "2026-08-19T06:00:00Z", laps(8, 17.0), { tireType: sweep, tireStintId: "C", tireRunNumber: 5 }),
+    ])
+  );
+  assert.deepEqual(
+    recap?.tyres[0]?.fromNew.map((step) => [step.tyreRun, step.seconds.toFixed(2), step.sets]),
+    [
+      [2, "0.20", 2], // A +0.3, B +0.1
+      [3, "0.40", 1], // A only
+    ]
+  );
+});
+
+test("from new leaves out a set whose age was a guess, and stops at run 5", () => {
+  const recap = buildDebriefRecap(
+    group([
+      run("u1", "2026-08-19T00:00:00Z", laps(8, 16.0), {
+        tireType: sweep,
+        tireStintId: "U",
+        tireRunNumber: 1,
+        tireAgeKnown: false,
+      }),
+      run("u2", "2026-08-19T01:00:00Z", laps(8, 16.5), {
+        tireType: sweep,
+        tireStintId: "U",
+        tireRunNumber: 2,
+        tireAgeKnown: false,
+      }),
+      run("n1", "2026-08-19T02:00:00Z", laps(8, 16.0), { tireType: sweep, tireStintId: "N", tireRunNumber: 1 }),
+      run("n6", "2026-08-19T03:00:00Z", laps(8, 16.9), { tireType: sweep, tireStintId: "N", tireRunNumber: 6 }),
+    ])
+  );
+  assert.deepEqual(recap?.tyres[0]?.fromNew, []);
+});
+
+test("vs field averages the runs whose sheet named you, and the best names its run and day", () => {
+  const recap = buildDebriefRecap(
+    group([
+      run("r1", "2026-06-27T00:00:00Z", laps(8, 16.0)),
+      run("r2", "2026-06-27T01:00:00Z", laps(8, 15.9)),
+      // No sheet named you on this one: it counts for the meeting, never for the field line.
+      run("r3", "2026-06-28T00:00:00Z", laps(8, 15.8)),
+    ]),
+    { fieldGapByRunId: new Map([["r1", -0.1], ["r2", -0.5]]) }
+  );
+  assert.ok(recap?.field);
+  assert.equal(recap.field.avg.toFixed(2), "-0.30");
+  assert.equal(recap.field.best, -0.5);
+  assert.equal(recap.field.runId, "r2");
+  assert.equal(recap.field.runCount, 2);
+  assert.equal(recap.field.dayLabel, "Sat 27 Jun");
+});
+
+test("no run with a field, no vs field line", () => {
+  const recap = buildDebriefRecap(group([run("r1", "2026-08-19T00:00:00Z", laps(8, 16.0))]), {
+    fieldGapByRunId: new Map(),
+  });
+  assert.equal(recap?.field, null);
 });

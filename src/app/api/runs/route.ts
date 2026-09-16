@@ -1,9 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import { revalidateAfterRunMutation } from "@/lib/revalidateUser";
 import { applyRunWindow } from "@/lib/runs/runWindow";
-import { armAndPollTrackNow } from "@/lib/sweep/runSweepTick";
-import { reportSweepFailure } from "@/lib/observability/reportSweep";
 import { Prisma } from "@prisma/client";
 import type { Prisma as PrismaTypes } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -803,25 +801,8 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
 
   revalidateAfterRunMutation(params.userId);
 
-  // A run at a track today — draft or saved — arms the timing sweep for that track and has it
-  // look once now, after the response: a draft is "I'm about to go out", a saved run without
-  // laps may already have its session waiting on the timing site.
-  if (body.trackId) {
-    const armTrackId = body.trackId;
-    const armedBy = loggingComplete ? "run" : "draft";
-    after(async () => {
-      try {
-        await armAndPollTrackNow({
-          trackId: armTrackId,
-          userId: params.userId,
-          armedBy,
-          poll: loggingComplete,
-        });
-      } catch (err) {
-        reportSweepFailure(err, { stage: "arm", trackId: armTrackId, userId: params.userId });
-      }
-    });
-  }
+  // No daytime arming of the timing sweep (founder ruling 2026-09-15): the day is filed once,
+  // at 8 pm track time. A draft saved here still claims its session then (`fileDay.ts`).
 
   const newlyCompleted =
     loggingComplete &&

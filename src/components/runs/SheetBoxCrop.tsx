@@ -28,8 +28,14 @@ import type { ChangedBoxCrop } from "@/lib/setupCompare/changedBoxRegion";
  * already showing it, in type big enough to read.
  */
 
-/** How tall a crop is drawn. Its width follows the crop's own shape, so the sheet is never stretched. */
-const CROP_HEIGHT_PX = 40;
+/**
+ * How tall a crop is drawn. Its width follows the crop's own shape, so the sheet is never stretched.
+ *
+ * 58px, not the 40 it shipped at: the crop now carries the printed caption, and 40px was too short
+ * to read it. It is still under a third of the list's own 192px window, so opening a row leaves
+ * the other changes on screen.
+ */
+const CROP_HEIGHT_PX = 58;
 
 /** Held until the page picture arrives and its real shape is known. */
 const PLACEHOLDER_ASPECT = 2.4;
@@ -183,18 +189,22 @@ export function SheetBoxCrop({
             {/*
               The ring is drawn OUTSIDE the box, because a setup-sheet box is a few pixels tall even
               on a crop and a border inside it would swallow the value.
+
+              Thin, and thinner than it was: the crop shows more of the sheet than it used to, so
+              the box occupies fewer pixels inside the frame, and a ring in fixed pixels grows
+              relative to what it is marking. At 1.5px + 4px the marker had started to eat the box.
             */}
             <div
               className="absolute inset-0 rounded-[2px]"
               style={{
-                boxShadow: "0 0 0 1.5px rgba(255, 214, 10, 0.95), 0 0 0 4px rgba(255, 214, 10, 0.22)",
+                boxShadow: "0 0 0 1px rgba(255, 214, 10, 0.95), 0 0 0 2.7px rgba(255, 214, 10, 0.22)",
                 background: "rgba(255, 214, 10, 0.18)",
               }}
             />
             {value ? (
               <span
                 className="absolute inset-0 flex items-center justify-center overflow-hidden whitespace-nowrap px-[1px] font-semibold leading-none text-black"
-                style={{ fontSize: "75cqh" }}
+                style={{ fontSize: "70cqh" }}
               >
                 {value}
               </span>

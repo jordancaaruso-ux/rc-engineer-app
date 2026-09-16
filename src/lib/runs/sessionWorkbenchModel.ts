@@ -504,6 +504,11 @@ export type WorkbenchDebrief = {
   text: string;
   updatedAtIso: string | null;
   recap: DebriefRecap | null;
+  /**
+   * Has the meeting finished? Drives the card's one word: an **Overview** while you are still
+   * at the track, a **Debrief** afterwards (`meetingIsOver`, founder call 2026-09-16).
+   */
+  isOver: boolean;
 };
 
 export type WorkbenchGroup = {

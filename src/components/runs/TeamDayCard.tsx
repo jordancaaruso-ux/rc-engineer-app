@@ -19,14 +19,17 @@ import { cn } from "@/lib/utils";
  * most setups do. So this one is plotted against **time of day**, and the runs
  * line up under each other only when they actually happened together.
  *
- * ## Quiet by default
+ * ## The field is lit on arrival
  *
- * Five drivers is five lines, and five colours would be a chart nobody can read
- * on a phone at a race track. So the default state has exactly one voice: the
- * anchor line in full ink, everyone else a hairline in muted ink. You can
- * already see the shape of the field and where you sit in it. Colour is opt-in —
- * tick up to three drivers in the list below and they light up in the
- * categorical hues, in fixed slot order.
+ * Four lines is the most this chart can hold and stay readable on a phone, so it
+ * opens with four: the anchor in full ink, plus the three quickest teammates in the
+ * categorical hues, in fixed slot order. Anyone past that is a hairline in muted ink,
+ * which still shows the shape of the field without spending a colour on it.
+ *
+ * It used to open with the anchor alone and nothing else coloured. That is a quieter
+ * chart, but comparing is the only reason to be on a team page at all, and it put the
+ * comparison three taps away every single time. Unticking is now the gesture that
+ * quietens it, rather than ticking being the gesture that makes it useful.
  *
  * The anchor is you whenever you drove the day, and the fastest driver whenever
  * you didn't — there is ALWAYS one. Lighting nobody isn't a quieter chart, it is
@@ -273,7 +276,16 @@ export function TeamDayCard({
   viewerUserId: string | null;
 }) {
   const [metric, setMetric] = useState<Metric>("best");
-  const [compare, setCompare] = useState<string[]>([]);
+  /**
+   * The ticks the READER made, or null while the default stands.
+   *
+   * Null is not the same as "nobody ticked": the default lights the field (see
+   * `compare` below), and an empty `ids` array is a driver who deliberately untucked
+   * everyone, which has to survive a re-render. The `key` is the day's driver list,
+   * so switching sessions in the pane drops back to that session's own default
+   * instead of carrying over ticks belonging to people who aren't in it.
+   */
+  const [comparePicked, setComparePicked] = useState<{ key: string; ids: string[] } | null>(null);
   const [hover, setHover] = useState<{ driverId: string; index: number } | null>(null);
 
   /**
@@ -326,15 +338,6 @@ export function TeamDayCard({
   const showLabels = chartWidth >= LABELS_FIT_AT;
   const padRight = showLabels ? 76 : 12;
 
-  const toggleCompare = useCallback((userId: string) => {
-    setCompare((current) => {
-      const at = current.indexOf(userId);
-      if (at >= 0) return current.filter((id) => id !== userId);
-      if (current.length >= MAX_COMPARE_DRIVERS) return current;
-      return [...current, userId];
-    });
-  }, []);
-
   /**
    * The line everything else is read against — full ink, dotted, scrubbable.
    *
@@ -353,6 +356,53 @@ export function TeamDayCard({
     if (viewerUserId && day.drivers.some((d) => d.userId === viewerUserId)) return viewerUserId;
     return (day.drivers.find((d) => d.best != null) ?? day.drivers[0])?.userId ?? null;
   }, [day.drivers, viewerUserId]);
+
+  /** The day's roster, as an identity — a different session is a different default. */
+  const driversKey = useMemo(() => day.drivers.map((d) => d.userId).join("|"), [day.drivers]);
+
+  /**
+   * The teammates lit before anyone touches anything.
+   *
+   * The card opened with one line in ink and everyone else a grey hairline, on the
+   * theory that five colours at once is unreadable on a phone. It is — but the cost
+   * was that the comparison the card exists to make took three taps to reach, and
+   * on a team page you are always there to compare. So the fastest teammates come up
+   * already ticked, up to the same three slots a reader can tick by hand, and the
+   * hairline treatment is what you fall back to by unticking rather than what you
+   * start from.
+   *
+   * Ranked order, which `day.drivers` already is, so slot 1 is the quickest teammate
+   * and the hues stay stable. Drivers with no timed lap aren't lit: their line has
+   * nothing on it, and lighting it spends a colour slot on an empty stretch.
+   */
+  const defaultCompare = useMemo(
+    () =>
+      day.drivers
+        .filter((d) => d.userId !== anchorId && d.best != null)
+        .slice(0, MAX_COMPARE_DRIVERS)
+        .map((d) => d.userId),
+    [anchorId, day.drivers]
+  );
+
+  const readerPicked = comparePicked?.key === driversKey;
+
+  const compare = useMemo(
+    () => (comparePicked && comparePicked.key === driversKey ? comparePicked.ids : defaultCompare),
+    [comparePicked, defaultCompare, driversKey]
+  );
+
+  const toggleCompare = useCallback(
+    (userId: string) => {
+      setComparePicked((current) => {
+        const base = current && current.key === driversKey ? current.ids : defaultCompare;
+        const at = base.indexOf(userId);
+        if (at >= 0) return { key: driversKey, ids: base.filter((id) => id !== userId) };
+        if (base.length >= MAX_COMPARE_DRIVERS) return { key: driversKey, ids: base };
+        return { key: driversKey, ids: [...base, userId] };
+      });
+    },
+    [defaultCompare, driversKey]
+  );
 
   const colorFor = useCallback(
     (driver: TeamDayDriver): string => {
@@ -916,8 +966,12 @@ export function TeamDayCard({
             </div>
           ) : null}
           {/* The swatch refused a 4th tick in silence. A chip row has the width
-              to say why, so the dead press stops being a mystery. */}
-          {compare.length >= MAX_COMPARE_DRIVERS ? (
+              to say why, so the dead press stops being a mystery.
+
+              Only after the reader has ticked something, though: the default now
+              fills all three slots, and printing the rule on arrival turns the answer
+              to a dead press into a paragraph nobody asked for. */}
+          {readerPicked && compare.length >= MAX_COMPARE_DRIVERS ? (
             <p className="px-1.5 pb-2 text-[11px] text-faint">
               Three drivers at a time — untick one to swap.
             </p>

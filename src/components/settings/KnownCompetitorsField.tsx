@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { postSetting, SaveNote, type SaveState } from "@/components/settings/saveState";
 import {
@@ -25,6 +25,16 @@ export function KnownCompetitorsField({ initial }: { initial: KnownCompetitor[] 
   const [name, setName] = useState("");
   const [chip, setChip] = useState("");
   const [state, setState] = useState<SaveState>({ kind: "idle" });
+
+  /*
+   * "Add a competitor" on the lap-analysis page links here by hash. Settings streams its
+   * loading skeleton first, so the browser's own jump fires before this box exists and lands
+   * the driver at the top of the page. Once we are actually on screen, do the jump ourselves.
+   */
+  useEffect(() => {
+    if (window.location.hash !== "#drivers-you-know") return;
+    document.getElementById("drivers-you-know")?.scrollIntoView({ block: "start" });
+  }, []);
   const [hint, setHint] = useState<string | null>(null);
 
   async function save(next: KnownCompetitor[]) {
@@ -59,7 +69,7 @@ export function KnownCompetitorsField({ initial }: { initial: KnownCompetitor[] 
   }
 
   return (
-    <div className="space-y-2">
+    <div id="drivers-you-know" className="scroll-mt-24 space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-2">
         <span className="ui-label text-[13px] font-medium text-foreground">Drivers you know</span>
         <SaveNote state={state} />

@@ -11,7 +11,7 @@
 //
 // Run:  node scripts/generate-app-icons.mjs
 import sharp from "sharp";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -70,9 +70,24 @@ function iconSvg({ markPct = MARK_PCT, rounded = false } = {}) {
 </svg>`;
 }
 
+// Android adaptive icons: the launcher masks a 108dp canvas down to anything inside a
+// 66dp circle (61%). The 731x241 glyph's corners touch that circle at ~58% width, so 50%
+// leaves the J and C tips some air on a round launcher.
+const ADAPTIVE_PCT = 50;
+
 const SQUARE = Buffer.from(iconSvg());
 const ROUNDED = Buffer.from(iconSvg({ rounded: true }));
 const MASKABLE = Buffer.from(iconSvg({ markPct: MASKABLE_PCT }));
+const ADAPTIVE = Buffer.from(iconSvg({ markPct: ADAPTIVE_PCT }));
+const CIRCLE = Buffer.from(
+  iconSvg().replace(
+    /<defs>/,
+    `<defs><clipPath id="disc"><circle cx="${SIZE / 2}" cy="${SIZE / 2}" r="${SIZE / 2}"/></clipPath>`,
+  ).replace(/<g>/, '<g clip-path="url(#disc)">'),
+);
+
+const ANDROID_RES = "android/app/src/main/res";
+const ANDROID_DENSITIES = { mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 };
 
 const targets = [
   // Master / store art — full-bleed square.
@@ -86,13 +101,28 @@ const targets = [
   { file: "src/app/icon.png", size: 512, src: ROUNDED },
   // iOS applies its own squircle to the home-screen tile, so this stays square.
   { file: "src/app/apple-icon.png", size: 180, src: SQUARE },
+  // Native iOS shell. App Store Connect rejects an icon with an alpha channel.
+  { file: "ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png", size: 1024, src: SQUARE, opaque: true },
+  // Native Android shell: legacy square + round launchers, and the adaptive foreground
+  // (108dp canvas = 2.25x the 48dp launcher) that sits on the yellow background colour.
+  ...Object.entries(ANDROID_DENSITIES).flatMap(([d, px]) => [
+    { file: `${ANDROID_RES}/mipmap-${d}/ic_launcher.png`, size: px, src: ROUNDED },
+    { file: `${ANDROID_RES}/mipmap-${d}/ic_launcher_round.png`, size: px, src: CIRCLE },
+    { file: `${ANDROID_RES}/mipmap-${d}/ic_launcher_foreground.png`, size: px * 2.25, src: ADAPTIVE },
+  ]),
 ];
 
 for (const t of targets) {
-  await sharp(t.src, { density: 384 })
-    .resize(t.size, t.size)
-    .png({ compressionLevel: 9 })
-    .toFile(join(ROOT, t.file));
+  let img = sharp(t.src, { density: 384 }).resize(t.size, t.size);
+  if (t.opaque) img = img.flatten({ background: "#FFD60A" }).removeAlpha();
+  const png = await img.png({ compressionLevel: 9 }).toBuffer();
+  const out = join(ROOT, t.file);
+  // Unchanged bytes are left alone so a running dev server isn't poked into a reload.
+  if (existsSync(out) && readFileSync(out).equals(png)) {
+    console.log(`-- ${t.file}  (unchanged)`);
+    continue;
+  }
+  writeFileSync(out, png);
   console.log(`OK ${t.file}  (${t.size}px)`);
 }
 // The magic-link email's header logo. Email clients don't render SVG, so the mark ships

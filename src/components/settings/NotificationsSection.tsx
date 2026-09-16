@@ -169,7 +169,7 @@ export function NotificationsSection() {
     <CardPanel className="mt-10">
       <h2 className="text-sm font-semibold text-foreground">Notifications</h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        &ldquo;Run 3 is in&rdquo; at the track, your day at 8 pm. Per device.
+        Your day, at 8 pm. Per device.
       </p>
 
       {supported === false ? (

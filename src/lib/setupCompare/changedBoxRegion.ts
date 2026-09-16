@@ -11,8 +11,9 @@
  * ============================== WHY ONE CROP PER BOX ==============================
  *
  * The list is what a driver reads. The picture is what they open when the list is not enough — one
- * row at a time, from that row. So a crop answers one question: where is THIS on my sheet. It is
- * cut tight, because a crop that carries half a page has to be drawn big to stay readable, and a
+ * row at a time, from that row. So a crop answers one question: where is THIS on my sheet, and
+ * what does the sheet call it. It carries the printed caption and the boxes either side of it, and
+ * stops there: a crop that ran to half a page would have to be drawn big to stay readable, and a
  * stack of big pictures buried the list they were supposed to be helping.
  *
  * ============================== WHY IT IS ONLY ARITHMETIC ==============================
@@ -47,15 +48,20 @@ export type ChangedBoxCrop = {
 /**
  * Room left around the changed box.
  *
- * Small on every side. The driver opened this crop from the row that names the parameter, so the
- * crop does not have to identify anything — it only has to show the spot. Extra room is not free:
- * a wider crop has to be drawn wider to stay readable, and the picture is meant to sit inside a
- * list without pushing it off the screen.
+ * Wide across, narrow down — because that is how a setup sheet is printed. A box's caption sits
+ * BESIDE it ("CAMBER ANGLE / °", "LOWER ARM EXTENSION / MM"), and the row above and below belongs
+ * to a different parameter. So room to the sides buys the words that say what the box is; room
+ * above and below buys nothing but a smaller picture.
+ *
+ * 0.15 of the page each side is about 31 mm of A4 — the caption, and enough of its neighbours to
+ * place the row on the sheet. Cut tighter than this (it was 0.02 until 2026-09-16) the picture
+ * showed the box and two letters, which told a driver where the box was without telling them what
+ * it was, and the row they opened it from had already said that much.
  */
-const PAD_LEFT = 0.02;
-const PAD_RIGHT = 0.02;
-const PAD_TOP = 0.012;
-const PAD_BOTTOM = 0.012;
+const PAD_LEFT = 0.15;
+const PAD_RIGHT = 0.15;
+const PAD_TOP = 0.026;
+const PAD_BOTTOM = 0.026;
 
 /**
  * A crop never gets smaller than this, whatever the box measures.
@@ -64,7 +70,7 @@ const PAD_BOTTOM = 0.012;
  * those come out as a grey square with nothing around it, which reads as a broken image rather than
  * as a place on a sheet.
  */
-const MIN_WIDTH = 0.06;
+const MIN_WIDTH = 0.1;
 const MIN_HEIGHT = 0.03;
 
 function clamp01(v: number): number {

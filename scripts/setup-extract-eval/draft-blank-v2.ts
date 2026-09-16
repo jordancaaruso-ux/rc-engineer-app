@@ -39,7 +39,7 @@ function arg(name: string): string | undefined {
 
 // ---------- crops ----------
 
-type Crop = { tight: string; wide: string; page: string };
+type Crop = { tight: string; wide: string; page: string; box?: string };
 
 /** Some PDFs store a widget rect with a negative height (y1 < y0). Normalise so every region has w,h > 0. */
 function normRegion(r: ImageRegion): ImageRegion {
@@ -89,7 +89,71 @@ async function cropWithMarks(page: Buffer, W: number, H: number, window: ImageRe
     .toBuffer();
 }
 
-async function buildCrops(page: Buffer, W: number, H: number, f: BlankFieldGeometry, cropsDir?: string): Promise<Crop> {
+/**
+ * One picture per box instead of three: close-up over wider view over whole page, each captioned.
+ *
+ * A naming helper opens the pictures one at a time and every new picture re-reads everything it has
+ * already opened, so the bill grows with the SQUARE of how many pictures are in a batch. Three
+ * pictures per box was costing ~160k tokens per box per pass, ~58% of it re-reads. Stacking them
+ * into one keeps every pixel that made naming work and cuts the reads per batch threefold.
+ */
+async function buildComposite(tight: Buffer, wide: Buffer, pageThumb: Buffer): Promise<Buffer> {
+  // A reader shrinks any picture whose long edge passes ~1568px, so a stack that runs off the
+  // bottom costs detail in the close-up — the one panel the name is actually read from. Stack the
+  // three panels while they fit; on a portrait sheet, put the page beside them instead.
+  const MAX = 1500, GAP = 8, CAPH = 18;
+  const CAP1 = "1. CLOSE-UP (this box is outlined in pink)";
+  const CAP2 = "2. WIDER VIEW (same box, more of the sheet)";
+  const CAP3 = "3. WHOLE PAGE (pink marker + crosshair = this box)";
+  const fit = async (buf: Buffer, opts: { width?: number; height?: number }) => {
+    const out = await sharp(buf).resize({ ...opts, withoutEnlargement: true }).toBuffer();
+    const m = await sharp(out).metadata();
+    return { buf: out, w: m.width ?? 1, h: m.height ?? 1 };
+  };
+
+  type Placed = { buf: Buffer; w: number; h: number; x: number; y: number; label: string };
+  const t = await fit(tight, { width: 900 });
+  const w = await fit(wide, { width: 1100 });
+  const p = await fit(pageThumb, { width: 700 });
+
+  let placed: Placed[];
+  const stackW = Math.max(t.w, w.w, p.w);
+  const stackH = 3 * CAPH + t.h + w.h + p.h + 2 * GAP;
+  if (stackW <= MAX && stackH <= MAX) {
+    let y = 0;
+    placed = [{ ...t, label: CAP1 }, { ...w, label: CAP2 }, { ...p, label: CAP3 }].map((panel) => {
+      const row = { ...panel, x: Math.round((stackW - panel.w) / 2), y: y + CAPH };
+      y += CAPH + panel.h + GAP;
+      return row;
+    });
+  } else {
+    // Close-up over wider view on the left, whole page on the right.
+    const leftW = Math.min(900, MAX - 500 - GAP);
+    const lt = await fit(tight, { width: leftW });
+    const lw = await fit(wide, { width: leftW });
+    const leftH = 2 * CAPH + lt.h + lw.h + GAP;
+    const rp = await fit(pageThumb, { width: MAX - leftW - GAP, height: Math.min(leftH - CAPH, MAX - CAPH) });
+    placed = [
+      { ...lt, label: CAP1, x: 0, y: CAPH },
+      { ...lw, label: CAP2, x: 0, y: 2 * CAPH + lt.h + GAP },
+      { ...rp, label: CAP3, x: leftW + GAP, y: CAPH },
+    ];
+  }
+
+  const W = Math.max(...placed.map((x) => x.x + x.w));
+  const H = Math.max(...placed.map((x) => x.y + x.h));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">`
+    + placed.map((x) => `<text x="${x.x + 4}" y="${x.y - 5}" font-family="Arial" font-size="13" font-weight="bold" fill="#0a7">${x.label}</text>`).join("")
+    + `</svg>`;
+  const out = await sharp({ create: { width: W, height: H, channels: 3, background: "#ffffff" } })
+    .composite([...placed.map((x) => ({ input: x.buf, top: x.y, left: x.x })), { input: Buffer.from(svg), top: 0, left: 0 }])
+    .jpeg({ quality: 88 })
+    .toBuffer();
+  if (Math.max(W, H) <= MAX) return out;
+  return sharp(out).resize(W >= H ? { width: MAX } : { height: MAX }).jpeg({ quality: 88 }).toBuffer();
+}
+
+async function buildCrops(page: Buffer, W: number, H: number, f: BlankFieldGeometry, cropsDir?: string, composite = false): Promise<Crop> {
   const u = unionRegion(f);
   // Tight: the box plus roughly one column of neighbours each way — enough to read the printed
   // label and see the row/column it sits in. Wide: about a quarter page, for the section heading
@@ -101,13 +165,22 @@ async function buildCrops(page: Buffer, W: number, H: number, f: BlankFieldGeome
   // Whole page with the box marked heavily: the one picture that says FRONT block or REAR block,
   // left column or right — the axle mistakes v2.0 made came from never seeing the whole sheet.
   const pageThumb = await pageWithMarker(page, W, H, u);
+  const box = composite ? await buildComposite(tight, wide, pageThumb) : undefined;
   if (cropsDir) {
     const safe = f.name.replace(/[^a-z0-9]+/gi, "_");
-    writeFileSync(join(cropsDir, `${safe}-tight.jpg`), tight);
-    writeFileSync(join(cropsDir, `${safe}-wide.jpg`), wide);
-    writeFileSync(join(cropsDir, `${safe}-page.jpg`), pageThumb);
+    if (box) writeFileSync(join(cropsDir, `${safe}-box.jpg`), box);
+    else {
+      writeFileSync(join(cropsDir, `${safe}-tight.jpg`), tight);
+      writeFileSync(join(cropsDir, `${safe}-wide.jpg`), wide);
+      writeFileSync(join(cropsDir, `${safe}-page.jpg`), pageThumb);
+    }
   }
-  return { tight: `data:image/jpeg;base64,${tight.toString("base64")}`, wide: `data:image/jpeg;base64,${wide.toString("base64")}`, page: `data:image/jpeg;base64,${pageThumb.toString("base64")}` };
+  return {
+    tight: `data:image/jpeg;base64,${tight.toString("base64")}`,
+    wide: `data:image/jpeg;base64,${wide.toString("base64")}`,
+    page: `data:image/jpeg;base64,${pageThumb.toString("base64")}`,
+    ...(box ? { box: `data:image/jpeg;base64,${box.toString("base64")}` } : {}),
+  };
 }
 
 async function pageWithMarker(page: Buffer, W: number, H: number, u: ImageRegion): Promise<Buffer> {
@@ -132,10 +205,13 @@ export type LayoutBlock = { label: string; axle: "front" | "rear" | "both" | "no
  * lies in instead of being trusted to work it out — v2.1 on the MTC3 still named rear-half boxes
  * "front" because a rear upright drawing looks like a front one up close.
  */
-async function detectLayout(input: { apiKey: string; model: string; page: Buffer; W: number; H: number; carName: string; timeoutMs: number }): Promise<LayoutBlock[]> {
-  // A labelled 0.1 grid: without it the model's fractions drift (the Mi10's FRONT block came back
-  // 0.14 of the page too low, so every rear box was told it was front). With it, it reads them off.
-  const gw = 1600, gs = gw / input.W, gh = Math.round(input.H * gs);
+/**
+ * The whole page with a labelled 0.1 grid drawn over it. Without the grid the reader's fractions
+ * drift (the Mi10's FRONT block came back 0.14 of the page too low, so every rear box was told it
+ * was front). With it, the coordinates get read off rather than guessed.
+ */
+export async function gridOverlayJpeg(page: Buffer, W: number, H: number, gw = 1600): Promise<Buffer> {
+  const gs = gw / W, gh = Math.round(H * gs);
   let grid = `<svg xmlns="http://www.w3.org/2000/svg" width="${gw}" height="${gh}">`;
   for (let i = 1; i < 10; i++) {
     const x = (i / 10) * gw, y = (i / 10) * gh;
@@ -145,7 +221,11 @@ async function detectLayout(input: { apiKey: string; model: string; page: Buffer
     for (const xx of [4, gw - 80]) grid += `<text x="${xx}" y="${y - 6}" font-family="Arial" font-size="22" font-weight="bold" fill="#0060c0">y=0.${i}</text>`;
   }
   grid += `</svg>`;
-  const img = await sharp(input.page).resize({ width: gw, withoutEnlargement: true }).composite([{ input: Buffer.from(grid), top: 0, left: 0 }]).jpeg({ quality: 85 }).toBuffer();
+  return sharp(page).resize({ width: gw, withoutEnlargement: true }).composite([{ input: Buffer.from(grid), top: 0, left: 0 }]).jpeg({ quality: 85 }).toBuffer();
+}
+
+async function detectLayout(input: { apiKey: string; model: string; page: Buffer; W: number; H: number; carName: string; timeoutMs: number }): Promise<LayoutBlock[]> {
+  const img = await gridOverlayJpeg(input.page, input.W, input.H);
   const isReasoning = /^gpt-5|^o[0-9]/.test(input.model);
   // Reasoning tokens count against max_completion_tokens: 6000 at medium effort came back as an
   // empty body ("Unexpected end of JSON input") on both test sheets.
@@ -454,6 +534,8 @@ function assemble(input: { geometry: BlankAcroFormGeometry; labeled: Map<string,
 
 export async function draftBlankV2(input: {
   pdfBytes: Buffer; carName: string; apiKey: string; model: string; perCall: number; concurrency: number; scale: number; cropsDir?: string; limit?: number; log?: (s: string) => void;
+  /** Stack each box's three pictures into one, so a helper opens one picture per box, not three. */
+  composite?: boolean;
   /** Stop after the crops and write a manifest (field list + crop paths) for a human or another model to name. Returns null. */
   manifestPath?: string;
   /** Skip the model: read a Labeled[] JSON produced from the manifest and assemble the result. */
@@ -506,7 +588,7 @@ export async function draftBlankV2(input: {
     log(`layout failed: ${(e as Error).message.slice(0, 200)}`);
   }
   const crops: BatchItem[] = [];
-  for (const f of fields) crops.push({ f, crop: await buildCrops(page, W, H, f, input.cropsDir), hint: layoutHint(layout, f) });
+  for (const f of fields) crops.push({ f, crop: await buildCrops(page, W, H, f, input.cropsDir, input.composite), hint: layoutHint(layout, f) });
   log(`crops built in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 
   if (input.manifestPath) {
@@ -520,7 +602,9 @@ export async function draftBlankV2(input: {
         return {
           name: f.name, kind: f.kind, widgets: f.widgets.length, where: where(u), nameSaysAxle: axleFromFieldName(f.name),
           region: { x: +u.xPct.toFixed(3), y: +u.yPct.toFixed(3), w: +u.wPct.toFixed(3), h: +u.hPct.toFixed(3) },
-          tight: join(input.cropsDir!, `${safe(f.name)}-tight.jpg`), wide: join(input.cropsDir!, `${safe(f.name)}-wide.jpg`), page: join(input.cropsDir!, `${safe(f.name)}-page.jpg`),
+          ...(input.composite
+            ? { box: join(input.cropsDir!, `${safe(f.name)}-box.jpg`) }
+            : { tight: join(input.cropsDir!, `${safe(f.name)}-tight.jpg`), wide: join(input.cropsDir!, `${safe(f.name)}-wide.jpg`), page: join(input.cropsDir!, `${safe(f.name)}-page.jpg`) }),
         };
       }),
     };
@@ -597,6 +681,7 @@ async function main() {
     model: arg("model") ?? (labelsPath ? "claude-fable-5-1 (session)" : "gpt-5"),
     perCall: Number(arg("per-call") ?? 6), concurrency: Number(arg("concurrency") ?? 4), scale: Number(arg("scale") ?? 3),
     cropsDir, limit: arg("limit") ? Number(arg("limit")) : undefined,
+    composite: process.argv.includes("--no-composite") ? false : Boolean(arg("manifest")),
     manifestPath, labelsPath,
     only: arg("only-file") ? (JSON.parse(readFileSync(arg("only-file")!, "utf8")) as string[]) : undefined,
     log: (s) => console.log(s),

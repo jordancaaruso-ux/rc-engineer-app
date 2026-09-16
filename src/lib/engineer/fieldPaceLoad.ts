@@ -33,7 +33,9 @@ export const FIELD_RUN_SELECT = {
 
 export async function loadFieldPaceForRuns(
   userId: string,
-  runs: ReadonlyArray<FieldRunInput>
+  runs: ReadonlyArray<FieldRunInput>,
+  /** Passed straight to `fieldPaceFromStats` — the debrief turns the first-driver guess off. */
+  opts?: { guessFirstDriver?: boolean }
 ): Promise<Map<string, FieldPace>> {
   const out = new Map<string, FieldPace>();
   if (runs.length === 0) return out;
@@ -60,7 +62,7 @@ export async function loadFieldPaceForRuns(
     for (const raw of candidates) {
       const stats = importedSessionFieldStatsV1FromJson(raw);
       if (!stats) continue;
-      const pace = fieldPaceFromStats(stats, norms, laps);
+      const pace = fieldPaceFromStats(stats, norms, laps, undefined, opts);
       if (pace) {
         out.set(run.id, pace);
         break;

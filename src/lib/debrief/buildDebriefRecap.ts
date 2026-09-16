@@ -26,6 +26,16 @@ import { formatFiveMinuteStint } from "@/lib/runLaps";
  * visit"). Then how the car felt across the meeting, the tyres — the same three figures per
  * tyre when more than one was run, so you can read which compound the day belonged to — and
  * the air.
+ *
+ * 2026-09-15, two more figures, one row each. The debrief is "a short summary … vertically short
+ * so it doesn't detract from the actual runs below it": a heat-by-heat race table and per-set
+ * tyre tables were mocked up first with his real numbers and rejected as far too long.
+ * - `field` — your top 5 against the middle of the field, averaged over every run whose timing
+ *   sheet had other drivers on it and named you, then your best run. The page loads the sheet
+ *   figures (`loadDebriefFieldGaps`) and hands them in, so this file stays pure.
+ * - `tyres[].fromNew` — how much slower runs 2 to 5 on a set were than its run 1, for sets
+ *   fitted new at this meeting. The number moves with the track and the driver as well as the
+ *   tyre; he saw that on his own days and wants the plain number anyway.
  */
 
 /** A Sessions run row plus the clock fields grouping reads — `sortAt` is the ordering axis. */
@@ -45,6 +55,15 @@ export type DebriefRunRef = {
   dayLabel: string | null;
 };
 
+/** One step of a set's life from new: its run N against that set's run 1. */
+export type DebriefFromNew = {
+  /** Which run on the set — 2 to 5. */
+  tyreRun: number;
+  /** Top 5 minus the set's run-1 top 5, seconds; positive = slower. Averaged over `sets`. */
+  seconds: number;
+  sets: number;
+};
+
 export type DebriefTyre = {
   name: string;
   runCount: number;
@@ -52,6 +71,13 @@ export type DebriefTyre = {
   top5: number | null;
   /** "19/5:00.1" */
   fiveMin: string | null;
+  /**
+   * Founder call 2026-09-15: "how much slower is run two, three, four, five from a new tyre — I
+   * just want a number". Only sets fitted new at this meeting count: a set that arrives used has
+   * no run 1 here to measure from (12 of his 14 practice sets did), and an age the driver wasn't
+   * sure of is not "new". Empty when no set of this compound started new here.
+   */
+  fromNew: DebriefFromNew[];
 };
 
 export type DebriefRecap = {
@@ -65,6 +91,12 @@ export type DebriefRecap = {
   top5: ({ seconds: number } & DebriefRunRef) | null;
   /** The meeting's best five-minute stint — most laps, then the sooner clock. */
   fiveMin: ({ label: string; lapCount: number; seconds: number } & DebriefRunRef) | null;
+  /**
+   * Your top 5 against the field's median top 5 — negative is quicker than the middle — over
+   * every run whose timing sheet had other drivers and named you: the meeting's average, and the
+   * best run (the ref). Null when no run had a field.
+   */
+  field: ({ avg: number; best: number; runCount: number } & DebriefRunRef) | null;
   /** The driver's own ratings across the meeting, and which way they went. */
   rating: {
     arc: number[];
@@ -76,6 +108,11 @@ export type DebriefRecap = {
 };
 
 type Stint = { lapCount: number; seconds: number };
+
+/** Runs 2 to 5 on a set: his words were "run two, three, four, five". */
+const FROM_NEW_LAST_RUN = 5;
+
+const mean = (xs: readonly number[]) => xs.reduce((sum, x) => sum + x, 0) / xs.length;
 
 /** A rating the recap will print: a whole number inside the 1–10 scale. Same rule as the strip. */
 function normalizeCarRating(value: number | null | undefined): number | null {
@@ -104,9 +141,51 @@ function marksOf(pairs: Pair[]): { best: Pair | null; top5: Pair | null; fiveMin
   return { best, top5, fiveMin };
 }
 
+/**
+ * Each later run on a set fitted new here, against that set's run 1, one compound at a time.
+ * A run number logged twice on one set is one step of that set, not two sets; the steps are
+ * then averaged across the sets that reached them.
+ */
+function fromNewOf(pairs: Pair[]): DebriefFromNew[] {
+  const bySet = new Map<string, Pair[]>();
+  for (const pair of pairs) {
+    const setId = pair.run.tireStintId;
+    // "Not sure how many runs" counts from when he got them, not from new.
+    if (!setId || pair.run.tireAgeKnown === false) continue;
+    const list = bySet.get(setId) ?? [];
+    list.push(pair);
+    bySet.set(setId, list);
+  }
+  const stepDeltas = new Map<number, number[]>();
+  for (const setPairs of bySet.values()) {
+    const base = setPairs.find((p) => p.run.tireRunNumber === 1 && p.row.avgTop5 != null)?.row.avgTop5;
+    if (base == null) continue;
+    const byRun = new Map<number, number[]>();
+    for (const p of setPairs) {
+      const n = p.run.tireRunNumber;
+      if (n == null || n < 2 || n > FROM_NEW_LAST_RUN || p.row.avgTop5 == null) continue;
+      const list = byRun.get(n) ?? [];
+      list.push(p.row.avgTop5 - base);
+      byRun.set(n, list);
+    }
+    for (const [n, deltas] of byRun) {
+      const list = stepDeltas.get(n) ?? [];
+      list.push(mean(deltas));
+      stepDeltas.set(n, list);
+    }
+  }
+  return [...stepDeltas.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([tyreRun, deltas]) => ({ tyreRun, seconds: mean(deltas), sets: deltas.length }));
+}
+
 export function buildDebriefRecap(
   group: DebriefGroupSource,
-  opts?: { zones?: RunGroupZoneOptions }
+  opts?: {
+    zones?: RunGroupZoneOptions;
+    /** Top 5 minus the field's median top 5 per run, from `loadDebriefFieldGaps`. */
+    fieldGapByRunId?: ReadonlyMap<string, number>;
+  }
 ): DebriefRecap | null {
   if (group.runs.length === 0) return null;
   const rows = buildGroupRunRows(group, opts?.zones);
@@ -132,6 +211,21 @@ export function buildDebriefRecap(
   });
 
   const marks = marksOf(chronological);
+
+  // The meeting's average against the field, and its best run; the earlier run wins a tie.
+  const gaps = opts?.fieldGapByRunId;
+  const fielded = gaps ? chronological.filter((pair) => gaps.has(pair.row.id)) : [];
+  let field: DebriefRecap["field"] = null;
+  if (gaps && fielded.length > 0) {
+    const gapOf = (pair: Pair) => gaps.get(pair.row.id) as number;
+    const bestPair = fielded.reduce((a, b) => (gapOf(b) < gapOf(a) ? b : a));
+    field = {
+      avg: mean(fielded.map(gapOf)),
+      best: gapOf(bestPair),
+      runCount: fielded.length,
+      ...ref(bestPair),
+    };
+  }
 
   // Only the ratings are asked of the verdict maths — its arc rules (a two-run day has no
   // direction; "flat" means every run rated the same) are the dashboard's, and the two
@@ -162,6 +256,7 @@ export function buildDebriefRecap(
       best: tyreMarks.best?.row.best ?? null,
       top5: tyreMarks.top5?.row.avgTop5 ?? null,
       fiveMin: tyreMarks.fiveMin?.stint ? formatFiveMinuteStint(tyreMarks.fiveMin.stint, 1) : null,
+      fromNew: fromNewOf(pairs),
     });
   }
 
@@ -184,6 +279,7 @@ export function buildDebriefRecap(
             ...ref(marks.fiveMin),
           }
         : null,
+    field,
     rating: handling ? { arc: handling.arc, direction: handling.direction } : null,
     tyres,
     airTempC: temps.length ? { min: Math.min(...temps), max: Math.max(...temps) } : null,

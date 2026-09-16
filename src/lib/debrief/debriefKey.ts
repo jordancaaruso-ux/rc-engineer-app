@@ -1,10 +1,12 @@
 import {
+  resolveRunLocalTimeZone,
   runLocalDayKey,
   runSessionSortInstant,
   trackKey,
   type RunForHistoryGroup,
   type RunGroupZoneOptions,
 } from "@/lib/runs/buildRunHistoryGroups";
+import { formatLocalCalendarDate } from "@/lib/runs/localCalendarInTimeZone";
 
 /**
  * What a debrief hangs off: the meeting, as the Sessions list already defines it.
@@ -71,6 +73,45 @@ export function debriefIdentityForGroup(
     localDayKey: runLocalDayKey(earliest, zones),
     trackKey: trackKey(earliest),
   };
+}
+
+/**
+ * Is this meeting finished?
+ *
+ * Founder call 2026-09-16: the card between the chart and the runs is an **Overview** while you
+ * are still at the track and a **Debrief** once you are not — "overview until either the next
+ * day if it's a practice day, or the event is over". So:
+ *   - a test day is finished the moment the calendar turns over;
+ *   - an event is finished once its last day has passed.
+ *
+ * The event's last day is its declared `endDate`, widened to the latest day a run actually
+ * landed on — the same widening the group's date label does, so a meeting that ran a day longer
+ * than it declared is not called over while its own runs are still arriving.
+ *
+ * Judged on the DRIVER's calendar (`resolveRunLocalTimeZone`), never the reader's: a Sydney
+ * Saturday read from London must not become a finished meeting an evening early. A group with
+ * no runs has nothing live about it and counts as over.
+ */
+export function meetingIsOver(
+  group: { runs: readonly RunForHistoryGroup[] },
+  opts?: { now?: Date; zones?: RunGroupZoneOptions }
+): boolean {
+  if (group.runs.length === 0) return true;
+  const withEvent = group.runs.find((run) => run.eventId && run.event);
+  const representative = withEvent ?? group.runs[0]!;
+  const zone = resolveRunLocalTimeZone(representative, opts?.zones) ?? "UTC";
+  const today = formatLocalCalendarDate(opts?.now ?? new Date(), zone);
+
+  let lastDay = group.runs
+    .map((run) => runLocalDayKey(run, opts?.zones))
+    .reduce((a, b) => (b > a ? b : a));
+  // Event dates are stored as plain calendar days at UTC, the way `eventDeclaredDays` reads them.
+  const declaredEnd = withEvent?.event?.endDate ? new Date(withEvent.event.endDate) : null;
+  if (declaredEnd && !Number.isNaN(declaredEnd.getTime())) {
+    const declaredEndDay = declaredEnd.toISOString().slice(0, 10);
+    if (declaredEndDay > lastDay) lastDay = declaredEndDay;
+  }
+  return today > lastDay;
 }
 
 /**

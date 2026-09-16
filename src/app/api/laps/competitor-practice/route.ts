@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUserId } from "@/lib/currentUser";
+import { requireApiFeature } from "@/lib/entitlementGuards";
 import { prisma } from "@/lib/prisma";
 import { discoverSpeedhivePracticeSessionsForChip } from "@/lib/speedhive/discoverSpeedhivePracticeSessionsForChip";
 
@@ -15,8 +15,11 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const userId = await getAuthenticatedApiUserId();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // The pull feeds lap time analysis, which is Notebook's (founder call 2026-09-15): Starter
+  // gets the 402 before anything reaches out to MYLAPS.
+  const gate = await requireApiFeature("lap-analysis");
+  if (gate.response) return gate.response;
+  const userId = gate.user.id;
 
   const body = (await request.json().catch(() => null)) as {
     transponder?: string;

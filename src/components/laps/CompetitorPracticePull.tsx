@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
@@ -19,9 +20,9 @@ type PulledSession = {
 /**
  * Pull a saved driver's practice at a track, on a button.
  *
- * The card only exists when there is something to pull WITH — a saved competitor and a track
- * whose MYLAPS practice page we know. Rendering it empty with two disabled dropdowns would be
- * a lesson about MYLAPS on a page nobody came to read one.
+ * With no saved competitor the card stays on the page and points at Settings. It used to
+ * vanish entirely, which made it a door nobody could find (founder call, 2026-09-16). It still
+ * needs a track whose MYLAPS practice page we know — without one nothing here can work.
  *
  * Nothing here fetches until asked, and asking is the whole interaction: pick who, pick where,
  * press. Their session then imports like any other and opens on the sheet, where it can be
@@ -43,7 +44,7 @@ export function CompetitorPracticePull({
   const [sessions, setSessions] = useState<PulledSession[] | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
-  if (competitors.length === 0 || tracks.length === 0) return null;
+  if (tracks.length === 0) return null;
 
   async function pull() {
     setBusy(true);
@@ -106,9 +107,14 @@ export function CompetitorPracticePull({
   return (
     <CardPanel contentClassName="space-y-3">
       <Eyebrow>Someone else&apos;s practice</Eyebrow>
-      <p className="text-[12px] leading-snug text-muted-foreground">
-        A driver you saved in Settings, at a MYLAPS track. Nothing is fetched until you ask.
-      </p>
+      {competitors.length === 0 ? (
+        <Link
+          href="/settings#drivers-you-know"
+          className="btn-surface inline-flex px-3 py-2 text-[13px] font-medium"
+        >
+          Add a competitor
+        </Link>
+      ) : (
       <div className="flex flex-wrap gap-2">
         <select
           value={transponder}
@@ -143,6 +149,7 @@ export function CompetitorPracticePull({
           {busy ? "Looking…" : "Look"}
         </button>
       </div>
+      )}
 
       {note ? <p className="text-[11px] text-muted-foreground">{note}</p> : null}
 

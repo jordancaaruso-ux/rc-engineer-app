@@ -42,7 +42,8 @@ import { showGetSetUpCard } from "@/lib/onboarding/visibility";
  * Two things came off the page in the same pass, both founder calls:
  *   · Notifications — nothing was wired to send one (the cron was dropped in f1991af and never
  *     fired in production), so the section offered a switch attached to nothing. Back since
- *     2026-09-14: the timing sweep sends "Run N is in" and the evening summary through it.
+ *     2026-09-14: the timing sweep sends the evening summary through it (the mid-day "Run N is
+ *     in" push went with daytime polling, 2026-09-15).
  *     `NotificationsSection` is unmounted, not deleted: re-add the one line when push is real.
  *   · The loaner / club-chip declaration — see `TimingIdentitySection`.
  *
@@ -137,8 +138,8 @@ export default async function SettingsPage() {
             }}
           />
 
-          {/* Remounted 2026-09-14 with the timing sweep: "Run 3 is in" and the evening summary
-              go by push to anyone who has said yes here, by email to everyone else. */}
+          {/* Remounted 2026-09-14 with the timing sweep: the evening summary goes by push to
+              anyone who has said yes here, by email to everyone else. */}
           <NotificationsSection />
 
           <SettingsNavSection isAdmin={isAdmin} />

@@ -15,7 +15,27 @@ import {
   runRatingBandLabel,
 } from "@/lib/runHandlingAssessment";
 
-export type RunHistorySort = "completed_desc" | "completed_asc" | "best_lap_asc" | "best_lap_desc";
+export type RunHistorySort =
+  | "completed_desc"
+  | "completed_asc"
+  | "best_lap_asc"
+  | "best_lap_desc"
+  | "rating_desc"
+  | "rating_asc";
+
+/**
+ * The Sessions "Sort" menu, in menu order. Kept here so the option list, the URL
+ * parser and the comparator can't drift apart. Runs with nothing to sort on (no
+ * lap time, no handling rating) always fall to the bottom, whichever way it reads.
+ */
+export const RUN_HISTORY_SORT_OPTIONS: readonly { value: RunHistorySort; label: string }[] = [
+  { value: "completed_desc", label: "Newest first" },
+  { value: "completed_asc", label: "Oldest first" },
+  { value: "best_lap_asc", label: "Fastest lap" },
+  { value: "best_lap_desc", label: "Slowest lap" },
+  { value: "rating_desc", label: "Best rated" },
+  { value: "rating_asc", label: "Worst rated" },
+];
 export type RunHistoryLayout = "grouped" | "flat";
 export type RunHistoryStatus = "all" | "draft" | "complete" | "unconfirmed";
 /** Setup-value comparison. `eq` is contains-text; the rest compare parsed numbers. */
@@ -114,11 +134,10 @@ function parseSessionType(raw: string): RunHistoryFilters["sessionType"] {
   return null;
 }
 
-function parseSort(raw: string): RunHistorySort {
-  if (raw === "completed_asc") return "completed_asc";
-  if (raw === "best_lap_asc") return "best_lap_asc";
-  if (raw === "best_lap_desc") return "best_lap_desc";
-  return "completed_desc";
+/** Any string → a sort the list understands; anything unknown means newest first. */
+export function parseRunHistorySort(raw: string | null | undefined): RunHistorySort {
+  const hit = RUN_HISTORY_SORT_OPTIONS.find((o) => o.value === raw);
+  return hit ? hit.value : "completed_desc";
 }
 
 function parseStatus(raw: string): RunHistoryStatus {
@@ -186,7 +205,7 @@ export function parseRunHistoryFilters(
   const setupChangedField = firstParam(searchParams.setupChangedField) || null;
   const setupChangedDir = parseSetupChangedDir(firstParam(searchParams.setupChangedDir));
   const status = parseStatus(firstParam(searchParams.status));
-  const sort = parseSort(firstParam(searchParams.sort));
+  const sort = parseRunHistorySort(firstParam(searchParams.sort));
   const layout = parseLayout(firstParam(searchParams.layout));
 
   return {
@@ -473,6 +492,8 @@ export type RunForHistoryFilter = {
   loggingCompletedAt: Date | null;
   sortAt: Date | null;
   bestLapSeconds: number | null;
+  /** Driver's 1–10 handling rating for the run; null when it was never rated. */
+  carRating?: number | null;
   lapTimes: unknown;
   lapSession?: unknown;
   sessionLabel: string | null;
@@ -532,6 +553,10 @@ export type RunHistoryMatchOptions = {
    */
   memberLabelByUserId?: Record<string, string>;
 };
+
+function runHandlingRating(run: RunForHistoryFilter): number | null {
+  return run.carRating != null && Number.isFinite(run.carRating) ? run.carRating : null;
+}
 
 function runBestLapSeconds(run: RunForHistoryFilter): number | null {
   if (run.bestLapSeconds != null && Number.isFinite(run.bestLapSeconds)) return run.bestLapSeconds;
@@ -1021,6 +1046,20 @@ export function sortRunsForHistory<T extends RunForHistoryFilter>(
       if (la == null) return 1;
       if (lb == null) return -1;
       return lb - la;
+    });
+    return out;
+  }
+  if (sort === "rating_desc" || sort === "rating_asc") {
+    out.sort((a, b) => {
+      const ra = runHandlingRating(a);
+      const rb = runHandlingRating(b);
+      // Unrated runs sit at the bottom of both directions, like a missing lap time.
+      if (ra == null && rb == null) return 0;
+      if (ra == null) return 1;
+      if (rb == null) return -1;
+      if (ra !== rb) return sort === "rating_desc" ? rb - ra : ra - rb;
+      // Same rating: newest first, so one band reads as a normal list.
+      return resolveRunDisplayInstant(b).getTime() - resolveRunDisplayInstant(a).getTime();
     });
     return out;
   }

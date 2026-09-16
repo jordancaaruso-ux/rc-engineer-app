@@ -15,6 +15,9 @@ import Link from "next/link";
  * Geometry Lab (the default) and the Engineer. Notebook's one Engineer question a day is a taste,
  * not the feature, so Starter's locked Engineer points past it (founder call 2026-09-15).
  *
+ * The door carries `?plan=`, so the Subscription page opens with the plan it names already
+ * picked (the phone preselects one plan; without this a Notebook door landed on Race Engineer).
+ *
  * Component name kept as-is: "pro" is still the internal tier id, and renaming the file would
  * churn every import for a string that is now read from `TIER_LABELS`.
  */
@@ -37,7 +40,7 @@ export function ProLockedPanel({
         <h2 className="mt-2 text-lg font-semibold">{title}</h2>
         <p className="mt-2 text-sm text-muted-foreground">{blurb}</p>
         <div className="mt-5">
-          <Link href="/billing" className={buttonLinkClassName("primary")}>
+          <Link href={`/billing?plan=${includedIn}`} className={buttonLinkClassName("primary")}>
             Upgrade to {label}
           </Link>
         </div>

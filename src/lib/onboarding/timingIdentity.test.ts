@@ -3,7 +3,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { hasTimingIdentity } from "@/lib/onboarding/timingIdentity";
+import { canLookUpTimingSessions, hasTimingIdentity } from "@/lib/onboarding/timingIdentity";
 
 test("club/loaner chip satisfies the transponder half of the identity", () => {
   assert.equal(
@@ -32,6 +32,28 @@ test("needs a printed name AND (a number OR the loaner chip)", () => {
 test("whitespace-only timing name does not count", () => {
   assert.equal(
     hasTimingIdentity({ timingName: "   ", transponderCount: 1, transponderLoaner: false }),
+    false
+  );
+});
+
+test("Get my day may look a driver up by a printed name OR their own chip", () => {
+  assert.equal(
+    canLookUpTimingSessions({ timingName: "Jordan", transponderCount: 0, transponderLoaner: false }),
+    true,
+    "a LiveRC name alone is enough to look"
+  );
+  assert.equal(
+    canLookUpTimingSessions({ timingName: null, transponderCount: 2, transponderLoaner: false }),
+    true,
+    "their own chip alone is enough to look"
+  );
+  assert.equal(
+    canLookUpTimingSessions({ timingName: null, transponderCount: 1, transponderLoaner: true }),
+    false,
+    "a loaner chip finds other people too"
+  );
+  assert.equal(
+    canLookUpTimingSessions({ timingName: "  ", transponderCount: 0, transponderLoaner: false }),
     false
   );
 });

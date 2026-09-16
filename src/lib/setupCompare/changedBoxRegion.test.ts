@@ -24,12 +24,16 @@ const inside = (v: number) => v >= 0 && v <= 1;
   assert.deepEqual(crops.map((c) => c.pageNumber), [2, 1, 1]);
 }
 
-// --- The crop stays tight: a change is a picture of a box, not of a page ------------------------
+// --- Wide enough to carry the caption, never so wide it is the page ----------------------------
+// A setup sheet prints a box's caption BESIDE it and a different parameter above and below, so the
+// crop is deliberately lopsided: room across for the words, little down.
 {
   const [c] = changedBoxCrops([box({ key: "a", x: 0.5, y: 0.5 })], ["a"]);
   assert.ok(c);
-  assert.ok(c.crop.width <= 0.09, `too much page across: ${c.crop.width}`);
-  assert.ok(c.crop.height <= 0.06, `too much page down: ${c.crop.height}`);
+  assert.ok(c.crop.width >= 0.25, `too tight to reach the caption: ${c.crop.width}`);
+  assert.ok(c.crop.width <= 0.45, `too much page across: ${c.crop.width}`);
+  assert.ok(c.crop.height <= 0.1, `too much page down: ${c.crop.height}`);
+  assert.ok(c.crop.width > c.crop.height * 2, "the crop has to be wider than it is tall");
 }
 
 // --- A crop never leaves the page --------------------------------------------------------------
@@ -46,7 +50,7 @@ const inside = (v: number) => v >= 0 && v <= 1;
 // --- A tick-box gets a minimum crop, so it does not read as a broken image ----------------------
 {
   const [c] = changedBoxCrops([box({ key: "a", x: 0.5, y: 0.5, width: 0.004, height: 0.004 })], ["a"]);
-  assert.ok(c!.crop.width >= 0.06 - 1e-9, "a tiny box must not get a sliver of a crop");
+  assert.ok(c!.crop.width >= 0.1 - 1e-9, "a tiny box must not get a sliver of a crop");
   assert.ok(c!.crop.height >= 0.03 - 1e-9);
 }
 

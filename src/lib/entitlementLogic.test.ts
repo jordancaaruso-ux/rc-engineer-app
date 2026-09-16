@@ -24,6 +24,7 @@ test("Starter is the notebook without the Engineer (docs/STARTER_TIER_PLAN.md)",
   assert.equal(isFeatureEntitled("starter", "logging"), true);
   assert.equal(isFeatureEntitled("starter", "review"), true);
   assert.equal(isFeatureEntitled("starter", "compare"), true);
+  assert.equal(isFeatureEntitled("starter", "lap-analysis"), false);
   assert.equal(isFeatureEntitled("starter", "engineer"), false);
   assert.equal(isFeatureEntitled("starter", "video"), false);
   assert.equal(isFeatureEntitled("starter", "roll-center"), false);
@@ -32,6 +33,7 @@ test("Starter is the notebook without the Engineer (docs/STARTER_TIER_PLAN.md)",
 test("the cheapest tier that has each feature", () => {
   assert.equal(lowestTierWithFeature("logging"), "starter");
   assert.equal(lowestTierWithFeature("engineer"), "standard");
+  assert.equal(lowestTierWithFeature("lap-analysis"), "standard");
   assert.equal(lowestTierWithFeature("video"), "pro");
   assert.equal(lowestTierWithFeature("roll-center"), "pro");
 });
@@ -43,6 +45,14 @@ test("a locked door sells Race Engineer for the Engineer, not Notebook's one-a-d
   assert.equal(upgradeTierFor("logging"), "starter");
 });
 
+test("lap time analysis is Notebook's: Starter's locked bench sells Notebook, the Lab Race Engineer", () => {
+  assert.equal(isFeatureEntitled("starter", "lap-analysis"), false);
+  assert.equal(isFeatureEntitled("standard", "lap-analysis"), true);
+  assert.equal(isFeatureEntitled("pro", "lap-analysis"), true);
+  assert.equal(upgradeTierFor("lap-analysis"), "standard");
+  assert.equal(upgradeTierFor("roll-center"), "pro");
+});
+
 test("a Starter member keeps their last fifteen runs", () => {
   assert.equal(STARTER_RUN_WINDOW, 15);
 });
@@ -51,13 +61,14 @@ test("Standard unlocks the notebook features but not the premium ones", () => {
   assert.equal(isFeatureEntitled("standard", "logging"), true);
   assert.equal(isFeatureEntitled("standard", "review"), true);
   assert.equal(isFeatureEntitled("standard", "compare"), true);
+  assert.equal(isFeatureEntitled("standard", "lap-analysis"), true);
   assert.equal(isFeatureEntitled("standard", "engineer"), true);
   assert.equal(isFeatureEntitled("standard", "video"), false);
   assert.equal(isFeatureEntitled("standard", "roll-center"), false);
 });
 
 test("Pro unlocks everything", () => {
-  for (const f of ["logging", "review", "compare", "engineer", "video", "roll-center"] as const) {
+  for (const f of ["logging", "review", "compare", "lap-analysis", "engineer", "video", "roll-center"] as const) {
     assert.equal(isFeatureEntitled("pro", f), true);
   }
 });

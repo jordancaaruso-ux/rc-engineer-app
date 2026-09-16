@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
@@ -87,10 +87,17 @@ type ImportResultRow =
 export function LapAnalysisLibrary({
   eventId,
   viewerNames = [],
+  importSlot = null,
 }: {
   eventId?: string | null;
   /** Every spelling timing prints the viewer under — see `sessionHasDriver`. */
   viewerNames?: string[];
+  /**
+   * Rendered in the import column, under the two upload doors. It is another way to bring a
+   * session in, so it belongs beside them — below the sessions list a driver with a hundred
+   * rows never scrolls to it (founder call, 2026-09-16).
+   */
+  importSlot?: ReactNode;
 }) {
   const router = useRouter();
   const [scope, setScope] = useState<"mine" | "all">("mine");
@@ -314,10 +321,6 @@ export function LapAnalysisLibrary({
             </button>
             {hint ? <span className="text-[11px] text-muted-foreground">{hint}</span> : null}
           </div>
-          <p className="text-[11px] leading-snug text-muted-foreground">
-            One per line. It does not have to be a race you were in.
-          </p>
-
           {lastResults.some((r) => !r.success) ? (
             <ul className="space-y-1 border-t border-border pt-2.5 text-[11px]">
               {lastResults
@@ -348,6 +351,8 @@ export function LapAnalysisLibrary({
             router.push(`/laps/analysis?session=${encodeURIComponent(res.importedSessionId)}`);
           }}
         />
+
+        {importSlot}
       </div>
 
       <div className="mt-4 space-y-2.5 lg:mt-0">
@@ -363,8 +368,8 @@ export function LapAnalysisLibrary({
             <div className="flex shrink-0 items-center gap-1 text-[11px]">
               {(
                 [
-                  // "Mine": you were in it, or you uploaded it yourself.
-                  ["mine", `Mine (${mineCount})`],
+                  // "My runs": you were in it, or you uploaded it yourself.
+                  ["mine", `My runs (${mineCount})`],
                   // "200 of 648": the list is the newest imports, not all of them.
                   [
                     "all",

@@ -327,10 +327,11 @@ export default async function LapAnalysisPage(props: {
       subtitle="Read any timing sheet — a race you drove, a teammate's practice, a meeting on the other side of the world."
       backHref="/tools"
     >
-      <div className="space-y-4">
-        <LapAnalysisLibrary eventId={eventId} viewerNames={libraryViewerNames} />
-        <CompetitorPracticePull competitors={competitors} tracks={speedhiveTracks} />
-      </div>
+      <LapAnalysisLibrary
+        eventId={eventId}
+        viewerNames={libraryViewerNames}
+        importSlot={<CompetitorPracticePull competitors={competitors} tracks={speedhiveTracks} />}
+      />
     </Shell>
   );
 }

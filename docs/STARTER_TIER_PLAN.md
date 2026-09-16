@@ -30,6 +30,31 @@ where the build departed from the plan and why.
   Upgrade to Race Engineer", and both 402 refusals (chat, run candidates) name Race Engineer, via
   `upgradeTierFor`. Gating is unchanged: Notebook still unlocks the Engineer at one a day, so
   `lowestTierWithFeature("engineer")` is still "standard".
+- **The Subscription page is rebuilt** (founder, later 09-15: "looks very unfinished"; he
+  wanted the website's plan information on it). Top: the member's plan with what THEY pay (their
+  own price, so the $14.99 family members never see $9.99 marked as theirs), the renewal date in
+  their timezone, and Manage subscription. Below: the same three cards as /join, worded from ONE
+  file, `src/components/billing/planCopy.tsx`, which /join now reads too (the landing page is
+  static HTML and still carries its own copy). "Your plan" is marked; every other plan's button
+  opens Stripe's confirm screen for exactly that price (`subscription_update_confirm`), falling
+  back to the plan switcher, then the portal home. The phone folds into the /join rows and one
+  button. A past-due member gets no plan buttons, only Manage subscription, so nobody can stack
+  a second subscription. Back from Stripe, `?changed=1` refreshes the page twice while the
+  webhook lands.
+- **Tools are not in Starter; lap time analysis is Notebook's** (founder call, later 09-15, after
+  driving Starter: Tools offered "Log a run · Open the lab" and the Lab then said "not
+  available"). New feature `lap-analysis` = the `/laps/analysis` room (any timing sheet, any
+  driver), in Notebook and Race Engineer; the Geometry Lab stays Race Engineer's. Tools draws
+  each bench locked in its own place (`LockedBench`: "Included in X", one line, "Upgrade to
+  X"), open benches first: Race Engineer sees the page as before, Notebook sees Laptime Analysis
+  then the Lab locked (its car's roll-centre drawing is no longer shown free), Starter sees two
+  locked benches, Notebook's first. `/laps/analysis` has a locked twin (segment layout, which
+  also covers `/laps/import`), and the competitor practice pull answers 402. Session review is
+  untouched: a run's own lap sheet (the pop-up) stays on every plan; its "Detailed analysis"
+  door opens the locked page on Starter. Plan cards (`planCopy.tsx`, the landing page) cross
+  Laptime Analysis out on Starter and list it on Notebook; the compare table splits "Session
+  review" from "Laptime Analysis". Every locked door links `/billing?plan=<tier>`, so the phone
+  opens with that plan picked.
 
 ## The rulings (2026-09-09)
 

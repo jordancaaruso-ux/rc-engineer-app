@@ -88,3 +88,11 @@ test("with no name saved, the parser's first driver is you; a one-driver sheet i
   assert.equal(fieldPaceFromStats(sheet([["Someone", 17.0, 17.2]]), [], []), null);
   assert.equal(fieldPaceFromStats(sheet([["A", 17.0, null], ["B", null, null]]), [], []), null, "one timed entrant");
 });
+
+test("guessFirstDriver: false — no name to go on means no field, never the first driver's", () => {
+  // The first stored driver is often the heat winner, not you (6 of 51 of the founder's heats).
+  const s = sheet([["Heat Winner", 17.0, 17.2], ["Other", 17.4, 17.6]]);
+  assert.equal(fieldPaceFromStats(s, [], [], undefined, { guessFirstDriver: false }), null);
+  assert.equal(fieldPaceFromStats(s, ["nobody here"], [], undefined, { guessFirstDriver: false }), null);
+  assert.equal(fieldPaceFromStats(s, ["other"], [], undefined, { guessFirstDriver: false })?.rank, 2);
+});

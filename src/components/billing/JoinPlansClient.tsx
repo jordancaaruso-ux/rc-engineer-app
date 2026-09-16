@@ -3,12 +3,17 @@
 import { useState } from "react";
 import { outlineButtonClassName, primaryButtonClassName } from "@/components/ui/ButtonLink";
 import { TIER_LABELS } from "@/lib/brand/brandNames";
-import { STARTER_RUN_WINDOW, type PaidTier } from "@/lib/entitlementLogic";
+import type { PaidTier } from "@/lib/entitlementLogic";
 import { cn } from "@/lib/utils";
 import {
-  PRO_ENGINEER_MONTHLY_QUESTIONS,
-  STANDARD_ENGINEER_DAILY_QUESTIONS,
-} from "@/lib/aiUsage/budgets";
+  COMPARE_ROWS,
+  INTERVAL_SUFFIX,
+  PLAN_BULLETS,
+  PLAN_STAT,
+  PLAN_TAGLINE,
+  PlanHook,
+  type PlanBullet,
+} from "@/components/billing/planCopy";
 
 export type JoinPlan = {
   tier: PaidTier;
@@ -18,36 +23,14 @@ export type JoinPlan = {
   amount: string | null;
 };
 
-/** The window as a word, so the card reads as a sentence; digits if it ever moves off one. */
-const WINDOW_WORDS: Record<number, string> = { 10: "ten", 15: "fifteen", 20: "twenty" };
-const WINDOW_WORD = WINDOW_WORDS[STARTER_RUN_WINDOW] ?? String(STARTER_RUN_WINDOW);
-
 /**
- * Feature truth mirrors entitlementLogic.ts, and the Engineer numbers read from `budgets.ts`
- * rather than repeating them: this surface is the promise, `applyEngineerTierBudget` is the
- * enforcement, and the two drifting apart is how a member gets sold one number and refused at
- * another. The Starter column reads `STARTER_RUN_WINDOW` for the same reason.
+ * Every word on these cards comes from `planCopy.tsx`, shared with the in-app Subscription page
+ * (2026-09-15) so the two can never sell different products; the notes on feature truth, the
+ * Engineer taste and video live there. What stays here is how the signed-out door draws them.
  *
  * The same truth renders twice (2026-08-15 redesign): as prose bullets on the desktop cards,
- * and as the fold-out comparison table on the phone. Change a feature in BOTH lists or the
- * two widths sell different products.
- *
- * Video is on no surface at all (founder call 2026-09-15): not as a feature, not as "soon".
+ * and as the fold-out comparison table on the phone. Both read from planCopy.
  */
-const COMPARE_ROWS: Array<{ label: string; starter: string; standard: string; pro: string }> = [
-  { label: "Runs kept", starter: `Last ${STARTER_RUN_WINDOW}`, standard: "All", pro: "All" },
-  { label: "Run logging (LiveRC · Speedhive)", starter: "✓", standard: "✓", pro: "✓" },
-  { label: "Session review & lap analysis", starter: "✓", standard: "✓", pro: "✓" },
-  { label: "Compare runs & setups", starter: "✓", standard: "✓", pro: "✓" },
-  {
-    label: "The Engineer",
-    starter: "—",
-    standard: `Taste · ${STANDARD_ENGINEER_DAILY_QUESTIONS} a day`,
-    pro: `${PRO_ENGINEER_MONTHLY_QUESTIONS} a month`,
-  },
-  { label: "Ask a weekend's worth in one day", starter: "—", standard: "—", pro: "✓" },
-  { label: "Roll-centre tools", starter: "—", standard: "—", pro: "✓" },
-];
 
 /**
  * Both plan buttons are the same box and the same voice — only the fill does the
@@ -59,49 +42,7 @@ const COMPARE_ROWS: Array<{ label: string; starter: string; standard: string; pr
 const PLAN_BUTTON_BOX =
   "mt-auto min-h-[46px] w-full px-4 py-3 text-sm font-semibold normal-case tracking-normal disabled:cursor-not-allowed disabled:opacity-60";
 
-type Bullet = { text: string; off?: boolean };
-
-/** Starter (docs/STARTER_TIER_PLAN.md): the notebook for the last fifteen runs, no Engineer. */
-const STARTER_BULLETS: Bullet[] = [
-  { text: `Your last ${WINDOW_WORD} runs` },
-  { text: "Session review: pace, consistency, mistakes" },
-  { text: "Compare runs and setups" },
-  { text: "Laps from LiveRC and Speedhive" },
-  { text: "The Engineer", off: true },
-  { text: "Roll-centre and geometry", off: true },
-];
-
-/**
- * Notebook is the notebook with every run kept. Its one Engineer question a day is a taste,
- * not a feature: the Engineer is what Race Engineer is FOR, and it must not read as something
- * Notebook has (founder call 2026-09-15). So the taste sits last, worded as a taste.
- */
-const STANDARD_BULLETS: Bullet[] = [
-  { text: "Unlimited run logging" },
-  { text: "Session review: pace, consistency, mistakes" },
-  { text: "Compare runs and setups" },
-  { text: "Laps from LiveRC and Speedhive" },
-  {
-    text: `A taste of the Engineer: ${
-      STANDARD_ENGINEER_DAILY_QUESTIONS === 1
-        ? "one question"
-        : `${STANDARD_ENGINEER_DAILY_QUESTIONS} questions`
-    } a day`,
-  },
-  { text: "Roll-centre and geometry", off: true },
-];
-
-const PRO_BULLETS: Bullet[] = [
-  { text: "The Engineer" },
-  { text: `Everything in ${TIER_LABELS.standard}` },
-  { text: "A whole race weekend's questions in one day" },
-  { text: "Roll-centre and geometry tools" },
-  { text: "Remaining-this-month meter" },
-];
-
-const INTERVAL_SUFFIX = { month: "AUD / month", year: "AUD / year" } as const;
-
-function PlanBullets({ items }: { items: Bullet[] }) {
+function PlanBullets({ items }: { items: PlanBullet[] }) {
   return (
     <ul className="mt-1 flex flex-col gap-2 text-[13px] leading-snug">
       {items.map((b) => (
@@ -225,10 +166,6 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
   const pro = plan("pro");
   const selected = plan(selectedTier);
   const suffix = INTERVAL_SUFFIX[interval];
-  const stdDaily =
-    STANDARD_ENGINEER_DAILY_QUESTIONS === 1
-      ? "once a day"
-      : `${STANDARD_ENGINEER_DAILY_QUESTIONS} times a day`;
   const tierColumns: PaidTier[] = hasStarter ? ["starter", "standard", "pro"] : ["standard", "pro"];
 
   return (
@@ -292,9 +229,7 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
         {hasStarter ? (
           <section className="door-sheet flex flex-col gap-3 p-6" aria-label={TIER_LABELS.starter}>
             <p className="micro-caps tracking-[0.18em] text-faint">{TIER_LABELS.starter}</p>
-            <h2 className="text-[15px] font-semibold leading-snug">
-              Your last {WINDOW_WORD} runs.
-            </h2>
+            <h2 className="text-[15px] font-semibold leading-snug">{PLAN_TAGLINE.starter}</h2>
             <p className="door-price">
               {starter?.amount ?? "—"}
               <span className="ml-1.5 font-sans text-[12px] font-normal tracking-normal text-faint">
@@ -302,12 +237,12 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
               </span>
             </p>
             <div className="flex items-baseline justify-between gap-3 rounded-lg border border-elevate/10 bg-elevate/[0.04] px-3 py-2">
-              <span className="micro-caps text-faint">Runs kept</span>
+              <span className="micro-caps text-faint">{PLAN_STAT.starter.label}</span>
               <span className="fig-stat font-semibold text-foreground">
-                Last {STARTER_RUN_WINDOW}
+                {PLAN_STAT.starter.value}
               </span>
             </div>
-            <PlanBullets items={STARTER_BULLETS} />
+            <PlanBullets items={PLAN_BULLETS.starter} />
             <button
               type="button"
               disabled={busy !== null || !starter}
@@ -323,7 +258,7 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
 
         <section className="door-sheet flex flex-col gap-3 p-6" aria-label={TIER_LABELS.standard}>
           <p className="micro-caps tracking-[0.18em] text-faint">{TIER_LABELS.standard}</p>
-          <h2 className="text-[15px] font-semibold leading-snug">The smart race notebook.</h2>
+          <h2 className="text-[15px] font-semibold leading-snug">{PLAN_TAGLINE.standard}</h2>
           <p className="door-price">
             {standard?.amount ?? "—"}
             <span className="ml-1.5 font-sans text-[12px] font-normal tracking-normal text-faint">
@@ -331,10 +266,10 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
             </span>
           </p>
           <div className="flex items-baseline justify-between gap-3 rounded-lg border border-elevate/10 bg-elevate/[0.04] px-3 py-2">
-            <span className="micro-caps text-faint">Runs kept</span>
-            <span className="fig-stat font-semibold text-foreground">All</span>
+            <span className="micro-caps text-faint">{PLAN_STAT.standard.label}</span>
+            <span className="fig-stat font-semibold text-foreground">{PLAN_STAT.standard.value}</span>
           </div>
-          <PlanBullets items={STANDARD_BULLETS} />
+          <PlanBullets items={PLAN_BULLETS.standard} />
           <button
             type="button"
             disabled={busy !== null || !standard}
@@ -352,7 +287,7 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
           aria-label={TIER_LABELS.pro}
         >
           <p className="micro-caps tracking-[0.18em] text-primary-ink">{TIER_LABELS.pro}</p>
-          <h2 className="text-[15px] font-semibold leading-snug">The full race engineer.</h2>
+          <h2 className="text-[15px] font-semibold leading-snug">{PLAN_TAGLINE.pro}</h2>
           <p className="door-price">
             {pro?.amount ?? "—"}
             <span className="ml-1.5 font-sans text-[12px] font-normal tracking-normal text-faint">
@@ -360,12 +295,10 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
             </span>
           </p>
           <div className="flex items-baseline justify-between gap-3 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2">
-            <span className="micro-caps text-faint">Engineer questions</span>
-            <span className="fig-stat font-semibold text-primary-ink">
-              {PRO_ENGINEER_MONTHLY_QUESTIONS} a month
-            </span>
+            <span className="micro-caps text-faint">{PLAN_STAT.pro.label}</span>
+            <span className="fig-stat font-semibold text-primary-ink">{PLAN_STAT.pro.value}</span>
           </div>
-          <PlanBullets items={PRO_BULLETS} />
+          <PlanBullets items={PLAN_BULLETS.pro} />
           <button
             type="button"
             disabled={busy !== null || !pro}
@@ -389,13 +322,7 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
             amount={starter?.amount ?? null}
             selected={selectedTier === "starter"}
             onSelect={() => setSelectedTier("starter")}
-            hook={
-              <>
-                Your last{" "}
-                <span className="font-semibold text-primary-ink">{WINDOW_WORD} runs</span> · no
-                Engineer
-              </>
-            }
+            hook={<PlanHook tier="starter" />}
           />
         ) : null}
 
@@ -404,12 +331,7 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
           amount={standard?.amount ?? null}
           selected={selectedTier === "standard"}
           onSelect={() => setSelectedTier("standard")}
-          hook={
-            <>
-              <span className="font-semibold text-primary-ink">Every run kept</span> · a taste of
-              the Engineer, {stdDaily}
-            </>
-          }
+          hook={<PlanHook tier="standard" />}
         />
 
         <PlanRow
@@ -417,12 +339,7 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
           amount={pro?.amount ?? null}
           selected={selectedTier === "pro"}
           onSelect={() => setSelectedTier("pro")}
-          hook={
-            <>
-              <span className="font-semibold text-primary-ink">The Engineer</span>,{" "}
-              {PRO_ENGINEER_MONTHLY_QUESTIONS} questions a month · roll centre, geometry, the lot
-            </>
-          }
+          hook={<PlanHook tier="pro" />}
         />
       </div>
 

@@ -13,8 +13,10 @@ import { Check, ChevronDown, Loader2, Search, User, Users, X } from "lucide-reac
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   DEFAULT_RUN_HISTORY_FILTERS,
+  RUN_HISTORY_SORT_OPTIONS,
   describeRunHistoryStatus,
   filtersToSearchParams,
+  parseRunHistorySort,
   parseRunHistoryFilters,
   runHistoryFiltersActive,
   type RunHistoryFilters,
@@ -1000,21 +1002,13 @@ export function SessionsFilterBar({
                   id="sessions-sort"
                   className={POP_CONTROL}
                   value={filters.sort}
-                  onChange={(e) =>
-                    patch({
-                      sort:
-                        e.target.value === "completed_asc" ||
-                        e.target.value === "best_lap_asc" ||
-                        e.target.value === "best_lap_desc"
-                          ? e.target.value
-                          : "completed_desc",
-                    })
-                  }
+                  onChange={(e) => patch({ sort: parseRunHistorySort(e.target.value) })}
                 >
-                  <option value="completed_desc">Newest first</option>
-                  <option value="completed_asc">Oldest first</option>
-                  <option value="best_lap_asc">Fastest lap</option>
-                  <option value="best_lap_desc">Slowest lap</option>
+                  {RUN_HISTORY_SORT_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
                 </select>
               </PopRow>
               <PopRow label="Layout" htmlFor="sessions-layout">

@@ -193,10 +193,11 @@ Completing a run still wants one value on the sheet, and that stays: it is what 
 comparing. But the refusal now carries its own way out. After a Run-complete attempt is refused on
 the setup, the Setup card shows:
 
-> Put one value on the sheet — a tyre compound counts — and this run can be completed.
-> **This run doesn't have a setup — log it anyway**
-> Laps, tyres and how it felt are all still recorded. The Engineer just won't have a setup to
-> suggest changes from.
+> You haven't added a setup.
+> **Complete the run without a setup**
+
+(Trimmed 2026-09-15: the old "put one value on the sheet" line told the driver they were blocked
+while the button right under it let them through, and the trailing explainer was a blurb.)
 
 - It appears **only after a refusal**, so nobody who was going to fill the sheet in ever meets it.
 - It sits in the **Setup card**, not with the other validation copy in Feedback — a setup-only

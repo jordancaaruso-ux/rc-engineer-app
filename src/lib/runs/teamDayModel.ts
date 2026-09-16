@@ -4,11 +4,10 @@ import {
 } from "@/lib/analysis/analysisHomeModel";
 import {
   resolveRunLocalTimeZone,
-  runLocalDayKey,
   formatRunDayLabel,
-  runSessionSortInstant,
   type RunGroupZoneOptions,
 } from "@/lib/runs/buildRunHistoryGroups";
+import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 
 /**
  * The team day — everyone who ran this session, on one clock.
@@ -31,7 +30,10 @@ export type TeamDayPoint = {
   label: string;
   /** Which day's band this point sits in (YYYY-MM-DD, the driver's zone). */
   dayKey: string;
-  /** Minutes past local midnight, in the day's own zone. The x-axis. */
+  /**
+   * Minutes past local midnight, in the day's own zone. The x-axis. Taken from the
+   * run's ON-TRACK instant (`trackInstant`), never from when the log was saved.
+   */
   minute: number;
   /** "10:42" — the axis is minutes, but the tooltip must read like a clock. */
   clock: string;
@@ -94,6 +96,15 @@ export type TeamDayRunSource = {
   car?: { name: string } | null;
   createdAt: Date | string;
   sortAt?: Date | string | null;
+  /**
+   * The stamps that say when the car was actually ON TRACK. The x-axis here is time
+   * of day, so it reads `resolveRunDisplayInstant` — the same instant every list,
+   * header and lap sheet prints — and never `sortAt`/`createdAt`, which are when the
+   * log was written. A heat run at 10:40 that was saved at 6pm belongs at 10:40.
+   */
+  sessionCompletedAt?: Date | string | null;
+  loggingCompletedAt?: Date | string | null;
+  unconfirmedAt?: Date | string | null;
   localTimeZone?: string | null;
   lapTimes: unknown;
   lapSession?: unknown;
@@ -104,16 +115,35 @@ export type TeamDayRunSource = {
 };
 
 /**
+ * WHEN THE CAR WAS ON TRACK — the instant this whole chart is plotted against.
+ *
+ * `resolveRunDisplayInstant` is the app's one answer to "what time was this run",
+ * and it is the answer every list row, run header and lap sheet already prints. This
+ * chart used to plot `sortAt` instead, which is when the LOG was written: a driver
+ * who logs their morning heats over lunch had all of them stacked at 1pm, and two
+ * teammates who ran the same heat sat an hour apart because one of them typed it up
+ * later. On an axis whose entire purpose is "were these two runs the same twenty
+ * minutes", that is the one stamp that must not be read.
+ *
+ * `sortAt` still orders the runs list — a drag moves a row without moving its clock.
+ */
+function trackInstant(run: TeamDayRunSource): Date {
+  return resolveRunDisplayInstant({
+    createdAt: new Date(run.createdAt),
+    sessionCompletedAt: run.sessionCompletedAt ?? null,
+    sortAt: run.sortAt ?? null,
+    loggingCompletedAt: run.loggingCompletedAt ?? null,
+    unconfirmedAt: run.unconfirmedAt ?? null,
+  });
+}
+
+/**
  * Minutes past midnight, resolved in the DRIVER's zone — the same rule that
  * decides which day a run belongs to (`resolveRunLocalTimeZone`). Reading a
  * teammate's Sydney test day from Auckland must not slide their runs two hours
  * along the axis; the clock that matters is the one at the track.
  */
-function minutesOfDay(run: TeamDayRunSource, zones: RunGroupZoneOptions): number {
-  const instant = runSessionSortInstant({
-    createdAt: new Date(run.createdAt),
-    sortAt: run.sortAt ? new Date(run.sortAt) : null,
-  });
+function minutesOfDay(instant: Date, run: TeamDayRunSource, zones: RunGroupZoneOptions): number {
   const zone = resolveRunLocalTimeZone(run, zones);
   const parts = new Intl.DateTimeFormat("en-GB", {
     ...(zone ? { timeZone: zone } : {}),
@@ -126,6 +156,24 @@ function minutesOfDay(run: TeamDayRunSource, zones: RunGroupZoneOptions): number
   // `en-GB` renders midnight as "24" in some ICU versions — fold it back to 0
   // rather than letting one run sit an entire day off the right of the chart.
   return ((hour % 24) * 60 + minute) % (24 * 60);
+}
+
+/**
+ * Which band a point sits in, from the SAME instant that placed it on the clock.
+ *
+ * Deliberately not `runLocalDayKey`, which reads `sortAt`: a Sunday main typed up on
+ * Monday would be filed in a Monday band and drawn at Sunday's 2pm, which is a point
+ * in a day nobody drove. The band and the x position have to come from one instant.
+ */
+function dayKeyOf(instant: Date, run: TeamDayRunSource, zones: RunGroupZoneOptions): string {
+  const zone = resolveRunLocalTimeZone(run, zones);
+  if (!zone) return instant.toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: zone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(instant);
 }
 
 
@@ -173,26 +221,21 @@ export function buildTeamDayModel(
 
   const drivers: TeamDayDriver[] = [];
   for (const [userId, driverRuns] of byUser) {
-    // Chronological — the line is drawn left to right, and the R1..Rn fallback
-    // labels only make sense counted forwards.
+    // Chronological by the ON-TRACK instant, not by when the log was written — the
+    // line is drawn in array order, so ordering it any other way makes it double back
+    // on itself the moment somebody logs their runs out of order. The R1..Rn fallback
+    // labels count forwards along the same order.
     const chronological = [...driverRuns].sort(
-      (a, b) =>
-        runSessionSortInstant({
-          createdAt: new Date(a.createdAt),
-          sortAt: a.sortAt ? new Date(a.sortAt) : null,
-        }).getTime() -
-        runSessionSortInstant({
-          createdAt: new Date(b.createdAt),
-          sortAt: b.sortAt ? new Date(b.sortAt) : null,
-        }).getTime()
+      (a, b) => trackInstant(a).getTime() - trackInstant(b).getTime()
     );
     const points: TeamDayPoint[] = chronological.map((run, index) => {
       const metrics = computeAnalysisRunMetrics(run);
-      const minute = minutesOfDay(run, opts.zones);
+      const instant = trackInstant(run);
+      const minute = minutesOfDay(instant, run, opts.zones);
       return {
         runId: run.id,
         label: shortRunLabel(run, index),
-        dayKey: runLocalDayKey(run, opts.zones),
+        dayKey: dayKeyOf(instant, run, opts.zones),
         minute,
         clock: formatClock(minute),
         best: metrics.best,

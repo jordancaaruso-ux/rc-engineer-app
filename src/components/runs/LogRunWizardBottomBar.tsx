@@ -6,7 +6,6 @@ import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import {
   ArrowRight,
   Check,
-  Drop,
   Flag,
   FloppyDisk,
   Gauge,
@@ -34,12 +33,12 @@ import {
  *   sheet (founder: "map ▴" alone was undiscoverable). Tapping it (or the
  *   step name) opens the sheet.
  * - **Row 1:** ‹ previous step (on Session it opens the exit prompt) · the
- *   step name + "n of 6" button (opens the map sheet) · the step's primary
+ *   step name + "n of 5" button (opens the map sheet) · the step's primary
  *   action ("Tires" … "Laps" mid-flow, "Complete" on Feedback, "Save edits"
  *   when editing a completed run) — styled per the C3 decision: −21° dark
  *   notch + top-light yellow gradient + real arrow/flag icons (no "→"/🏁
  *   text glyphs).
- * - **Row 2:** six one-tap step ticks (icons always visible — founder:
+ * - **Row 2:** five one-tap step ticks (icons always visible — founder:
  *   "don't remove the icon of what's completed"; amber dot = required
  *   missing).
  * - **Row 3:** the progression track — ONE continuous bar split evenly per
@@ -47,7 +46,7 @@ import {
  *   picked in-place over left-to-right count fill and over the per-tick
  *   underlines he found confusing). Polish round P2: the internal seams are
  *   −21° angled cuts (the JRC glyph angle) instead of vertical hairlines.
- * - **Map sheet** (tap the step name): six labeled rows with live values +
+ * - **Map sheet** (tap the step name): five labeled rows with live values +
  *   "prefilled" chips, plus Save draft / Mark run complete — the old summary
  *   card's content, moved into the thumb zone.
  * - **"← Exit"** top-left (was "Save & exit"): with nothing entered it just
@@ -58,11 +57,11 @@ import {
  * - The Setup→Laps seam is visible: a dashed −21° divider in the ticks row and
  *   a matching gap in the progression track. (The BEFORE / AFTER text labels
  *   under the track were dropped — founder: irrelevant.)
- * - The subtitle is phase-aware ("n of 6" retired): "Before the run · n of 4"
- *   on pre steps, "After the run · n of 2" on post steps. When all four
+ * - The subtitle is phase-aware ("n of 5" retired): "Before the run · n of 3"
+ *   on pre steps, "After the run · n of 2" on post steps. When all three
  *   pre-run steps are in, the line goes green: "Pre-run logged ✓ — you're
- *   ready to run".
- * - **Pre-run-complete cue:** the instant all four pre-run steps' data is in,
+ *   ready to run". (Counts are read off WIZARD_STEPS, never hardcoded.)
+ * - **Pre-run-complete cue:** the instant all three pre-run steps' data is in,
  *   the row-1 save button takes the same yellow fill as the primary CTA pill
  *   (shared YELLOW_FILL) — an always-there "you can bank this now" affordance.
  *   This replaced the earlier one-time toast.
@@ -85,8 +84,9 @@ import {
 
 const STEP_ICONS: Record<WizardStepId, PhosphorIcon> = {
   session: Flag,
+  // Tires carries prep too since the 2026-09-16 merge — the tire keeps the
+  // tick; the additive drop that had its own step is inside that page now.
   equipment: Tire,
-  prep: Drop,
   setup: Wrench,
   laps: Timer,
   feel: Gauge,

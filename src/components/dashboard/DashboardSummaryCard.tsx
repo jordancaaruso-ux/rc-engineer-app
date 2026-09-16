@@ -19,7 +19,8 @@ import { DashboardMetricTile } from "@/components/dashboard/DashboardMetricTile"
 import { PaceSparkline } from "@/components/dashboard/PaceSparkline";
 
 /**
- * "How you're going" — the reflective dashboard card, an Apple-widget-style paged card.
+ * "Last 30 days" (titled "How you're going" until 2026-09-15) — the reflective dashboard
+ * card, an Apple-widget-style paged card.
  *
  * ── The tracks face, 2026-08-20 (founder call) ───────────────────────────────
  * Face 1 is now **a little session trend per track visited in the last 30 days**, and it is
@@ -64,15 +65,15 @@ export function DashboardSummaryCard({
 
   return (
     <SurfaceCard variant="hero">
-      <Eyebrow>How you&rsquo;re going</Eyebrow>
+      {/* The window is the heading (founder call 2026-09-15, replacing "How you're going");
+          the totals sit under it so the headline figures need no swipe. The Overview face
+          still carries them with their deltas vs the previous 30 days. */}
+      <Eyebrow>Last {summary.windowDays} days</Eyebrow>
 
-      {/* The window and its totals in one line, so the headline figures need no swipe. The
-          Overview face still carries them with their deltas vs the previous 30 days. */}
       {hasData ? (
         <p className="-mt-1 text-[11px] tabular-nums text-muted-foreground">
-          Last {summary.windowDays} days · {summary.runs.current}{" "}
-          {summary.runs.current === 1 ? "run" : "runs"} · {summary.laps.current} laps ·{" "}
-          {formatDrivingDuration(summary.drivingSeconds.current)}
+          {summary.runs.current} {summary.runs.current === 1 ? "run" : "runs"} ·{" "}
+          {summary.laps.current} laps · {formatDrivingDuration(summary.drivingSeconds.current)}
         </p>
       ) : null}
 
@@ -104,8 +105,7 @@ export function DashboardSummaryCard({
            polished thing in the app — see the note on `hasEverLogged`. */
         <>
           <p className="-mt-1 text-[11px] text-muted-foreground">
-            No runs in the last {summary.windowDays} days
-            {summary.lastRunLabel ? ` · last out ${summary.lastRunLabel}` : ""}
+            No runs{summary.lastRunLabel ? ` · last out ${summary.lastRunLabel}` : ""}
           </p>
           <RecordsFace records={records} />
         </>

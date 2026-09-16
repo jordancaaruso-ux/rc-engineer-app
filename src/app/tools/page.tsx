@@ -2,12 +2,15 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
+import { getEntitlement } from "@/lib/entitlement";
+import { isFeatureEntitled, upgradeTierFor } from "@/lib/entitlementLogic";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { getCachedToolsModel } from "@/lib/cachedReads";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { GeometryBench } from "@/components/tools/GeometryBench";
 import { LapImportBench } from "@/components/tools/LapImportBench";
+import { LockedBench } from "@/components/tools/LockedBench";
 
 /**
  * Tools — the benches, in the dock cell the 2026-08-18 restructure freed and then spent on padding.
@@ -42,6 +45,15 @@ import { LapImportBench } from "@/components/tools/LapImportBench";
  * video is on no surface at all for now, in the app or on the site — not even as "soon". The
  * component, the model's `video` list and the `/videos` pages are all still in the tree; putting
  * it back is the import and one line of JSX.
+ *
+ * Each plan sees its own benches (founder call, later 2026-09-15). Lap time analysis is
+ * Notebook's and the Geometry Lab is Race Engineer's, and the page says so on the bench itself
+ * (`LockedBench`) rather than one tap behind it: a Starter member was offered "Open the lab" here
+ * and met "not available" on the other side. What the plan includes leads and a locked bench
+ * follows, the cheaper upgrade first: Race Engineer sees the page as it was, Notebook sees
+ * Laptime Analysis and then the Lab locked, Starter sees two locked benches with Notebook's
+ * first. Notebook no longer gets its car's roll centres drawn here either — those numbers are
+ * the Lab's answer, and the Lab is the thing it is being sold.
  */
 export const metadata: Metadata = {
   title: "Tools",
@@ -70,7 +82,64 @@ export default async function ToolsPage(): Promise<ReactNode> {
     requireCurrentUser(),
     getExplicitTimeZoneForRunFormatting(),
   ]);
-  const model = await getCachedToolsModel(user.id, timeZone);
+  const { tier } = await getEntitlement(user);
+  const labOpen = isFeatureEntitled(tier, "roll-center");
+  const lapsOpen = isFeatureEntitled(tier, "lap-analysis");
+  // Starter holds neither bench, so there is nothing of theirs to read.
+  const model = labOpen || lapsOpen ? await getCachedToolsModel(user.id, timeZone) : null;
+
+  // Each band carries its own heading, as the top row of its own card (founder pin,
+  // 2026-08-19) — see `BandHeader`. Video's band is off (header).
+  const geometryBench = !labOpen ? (
+    <LockedBench
+      label="Geometry Lab"
+      includedIn={upgradeTierFor("roll-center")}
+      line="Move a shim, watch the roll centre move."
+    />
+  ) : model?.geometry ? (
+    <GeometryBench geometry={model.geometry} />
+  ) : (
+    /*
+      No car, or no run on one yet.
+
+      Every band on this page is seeded from a logged run, so on a fresh account the
+      page would otherwise be empty cards — which reads as broken rather than as new.
+      One card says what fills them, and the Lab still opens, because it is the one
+      bench that genuinely works with nothing. Only a plan with the Lab gets this card,
+      so "Open the lab" always opens it.
+    */
+    <CardPanel className="h-full" contentClassName="space-y-3">
+      <div>
+        <p className="hub-row-title">The benches fill in from your runs</p>
+        <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+          Log one and this page arrives set up with your car&apos;s own geometry.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <ButtonLink href="/runs/new">Log a run</ButtonLink>
+        <ButtonLink href="/analysis/roll-center" variant="outline">
+          Open the lab
+        </ButtonLink>
+      </div>
+    </CardPanel>
+  );
+
+  /*
+    Laptime Analysis, back on the page (founder call 2026-08-27) with a different job from the
+    one it came off for. It was a filing tray — imports "waiting" to be attached to a
+    run — and a filing tray earns no space. It is the front door to lap analysis now:
+    these sessions OPEN, and reading one no longer requires having driven it.
+  */
+  const lapBench =
+    lapsOpen && model ? (
+      <LapImportBench sessions={model.unlinkedLaps} total={model.unlinkedLapTotal} />
+    ) : (
+      <LockedBench
+        label="Laptime Analysis"
+        includedIn={upgradeTierFor("lap-analysis")}
+        line="Any timing sheet, any driver, lap by lap."
+      />
+    );
 
   return (
     <>
@@ -106,43 +175,11 @@ export default async function ToolsPage(): Promise<ReactNode> {
           list grows, and its door is pinned to the foot.
         */}
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-          {model.geometry ? (
-            <GeometryBench geometry={model.geometry} />
-          ) : (
-            /*
-              No car, or no run on one yet.
-
-              Every band on this page is seeded from a logged run, so on a fresh account the
-              page would otherwise be empty cards — which reads as broken rather than as new.
-              One card says what fills them, and the Lab still opens, because it is the one
-              bench that genuinely works with nothing.
-            */
-            <CardPanel className="h-full" contentClassName="space-y-3">
-              <div>
-                <p className="hub-row-title">The benches fill in from your runs</p>
-                <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-                  Log one and this page arrives set up with your car&apos;s own geometry.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <ButtonLink href="/runs/new">Log a run</ButtonLink>
-                <ButtonLink href="/analysis/roll-center" variant="outline">
-                  Open the lab
-                </ButtonLink>
-              </div>
-            </CardPanel>
-          )}
-
-          {/* Each band carries its own heading, as the top row of its own card
-              (founder pin, 2026-08-19) — see `BandHeader`. Video's band is off (header). */}
-
-          {/*
-            Laptime Analysis, back on the page (founder call 2026-08-27) with a different job from the
-            one it came off for. It was a filing tray — imports "waiting" to be attached to a
-            run — and a filing tray earns no space. It is the front door to lap analysis now:
-            these sessions OPEN, and reading one no longer requires having driven it.
-          */}
-          <LapImportBench sessions={model.unlinkedLaps} total={model.unlinkedLapTotal} />
+          {/* What the plan includes leads; a locked bench follows (header). Laptime Analysis
+              needs the cheaper plan, so whenever the Lab is shut it goes first: open before
+              locked on Notebook, Notebook's lock before Race Engineer's on Starter. */}
+          {labOpen ? geometryBench : lapBench}
+          {labOpen ? lapBench : geometryBench}
         </div>
       </section>
     </>

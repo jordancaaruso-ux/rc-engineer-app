@@ -41,7 +41,7 @@ async function shoot(page: Page, group: string, tag: string) {
     waitUntil: "networkidle",
   });
   await page.waitForTimeout(1200);
-  const box = page.getByRole("textbox", { name: /debrief/i });
+  const box = page.getByRole("textbox", { name: /overview|debrief/i });
   console.log(`[${tag}] debrief boxes:`, await box.count());
   const card = page.locator("text=Debrief").first();
   if ((await card.count()) > 0) await card.scrollIntoViewIfNeeded();
@@ -61,7 +61,7 @@ async function shoot(page: Page, group: string, tag: string) {
 
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(1200);
-  const after = await page.getByRole("textbox", { name: /debrief/i }).first().inputValue();
+  const after = await page.getByRole("textbox", { name: /overview|debrief/i }).first().inputValue();
   console.log(`[${tag}] survives reload:`, after === note);
   await page.screenshot({ path: `${OUT}/${tag}-03-reloaded.png`, fullPage: true });
 
@@ -109,7 +109,7 @@ async function main() {
   await dpage.waitForTimeout(1000);
   await dpage.goto(`${BASE}/runs/history?g=${encodeURIComponent(DAY_GROUP)}`, { waitUntil: "networkidle" });
   await dpage.waitForTimeout(1200);
-  console.log("[desktop] debrief boxes:", await dpage.getByRole("textbox", { name: /debrief/i }).count());
+  console.log("[desktop] debrief boxes:", await dpage.getByRole("textbox", { name: /overview|debrief/i }).count());
   await dpage.screenshot({ path: `${OUT}/desktop-01-day.png` });
 
   // Team scope must show no card.
@@ -117,7 +117,7 @@ async function main() {
   if (team) {
     await dpage.goto(`${BASE}/runs/history?teamId=${team.teamId}`, { waitUntil: "networkidle" });
     await dpage.waitForTimeout(1200);
-    console.log("[team] debrief boxes (expect 0):", await dpage.getByRole("textbox", { name: /debrief/i }).count());
+    console.log("[team] debrief boxes (expect 0):", await dpage.getByRole("textbox", { name: /overview|debrief/i }).count());
   }
 
   await browser.close();

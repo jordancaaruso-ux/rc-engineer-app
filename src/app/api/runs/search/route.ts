@@ -68,6 +68,7 @@ export async function GET(request: Request) {
       trackNameSnapshot: true,
       raceClass: true,
       bestLapSeconds: true,
+      carRating: true,
       lapTimes: true,
       lapSession: true,
       notes: true,

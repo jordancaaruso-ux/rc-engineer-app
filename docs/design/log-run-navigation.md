@@ -10,6 +10,19 @@
 - **Primary CTA = C3/B1 pill:** −21° dark notch leading the label + top-light yellow gradient (`#FFDF3D→#FFD60A→#F1C700`) + real Phosphor icons (ArrowRight mid-flow, Flag-fill on Complete) replacing the "→" text glyph and 🏁 emoji. Shape experiments (right shear, left shear ×3, parallelogram, chamfer, squared) all rejected across rounds 2–3 — founder committed to the pill. `PILL_PRIMARY` (sheet + exit pills) shares the gradient finish.
 - CDP-verified at 390px 2026-07-18: grabber opens sheet, in-place angled fill, CTA renders in both lives.
 
+**Amendment 2026-09-16 — FIVE steps, not six.** Prep merged into Tires (founder: "everything
+that is currently in prep needs to be in tires"). Nothing was dropped: the additive picker and the
+applications list now render beneath the compound on the Tires page, which is the stack the classic
+(non-wizard) Tires face always used — the wizard was the only place that held prep back for a page
+of its own. The walk is **Session · Tires · Setup · Laps · Feedback** (3 pre-run, 2 post-run), so
+every count below that reads "6" is now 5 and "4 pre-run" is 3; all of them are derived from
+`WIZARD_STEPS` rather than hardcoded, so the chrome followed the list. The map sheet's Tires row
+carries both halves on one line ("Vaulk 36SK · run 1 · 20m warmers 70°C"). The merge also retired a
+trap: Prep counted as done only when warmers or an additive were logged, so a driver who ran neither
+had a step that never ticked — and because a draft reopens on the first unfinished step, it reopened
+on that empty page every time. The compound alone now ticks the step. Driven at 390px 2026-09-16:
+five ticks, five sheet rows, Session→Tires→Setup walk and back, classic form unchanged, no page errors.
+
 **Artifact (original F2 rounds, all variants + progression toggle):** https://claude.ai/code/artifact/3b9312c3-6d97-4780-b9d7-a9e789aa3859
 **Implementation:** uncommitted 2026-07-18 — `LogRunWizardBottomBar.tsx` (rewritten), `NewRunForm.tsx`, `wizardWalk.ts` (gained `WizardStepStatus`), `LogRunWizardRail.tsx` deleted. Build green; CDP-verified at 390px + desktop (steps-as-history back, exit prompt on back-from-Session, map sheet, in-place sector fill). Not yet verified: real saves, iOS PWA edge-swipe history (§6 falsifier #4).
 
@@ -17,7 +30,7 @@
 
 ## 1. What's actually there
 
-- **6 steps, not 7** — `WIZARD_STEPS` (`src/lib/runs/wizardWalk.ts:24-35`): Session · Tires · Prep · Setup · Laps · Feedback. The "7" comes from elsewhere (next point).
+- **6 steps, not 7** — `WIZARD_STEPS` (`src/lib/runs/wizardWalk.ts:24-35`): Session · Tires · Prep · Setup · Laps · Feedback. The "7" comes from elsewhere (next point). *(Five since the 2026-09-16 amendment above — Prep folded into Tires.)*
 - **Three state vocabularies rendered at once** in `NewRunForm.tsx`:
   - Tab ✓/amber: `wizardStepStatus` (6 steps; Feedback ✓ = rating only) — `:3425-3441`.
   - Meter: `wizardSummaryParts` (**7 sectors** — Feedback split into rating-or-notes + handling) — `:3615-3623`.

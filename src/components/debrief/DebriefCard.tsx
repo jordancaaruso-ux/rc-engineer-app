@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { AutoGrowTextarea } from "@/components/ui/AutoGrowTextarea";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow, StatStrip } from "@/components/ui/panel";
-import type { DebriefRecap } from "@/lib/debrief/buildDebriefRecap";
+import type { DebriefFromNew, DebriefRecap } from "@/lib/debrief/buildDebriefRecap";
 import type { WorkbenchDebrief } from "@/lib/runs/sessionWorkbenchModel";
 import { formatRunDateShort } from "@/lib/formatDate";
 import { formatLap } from "@/lib/runLaps";
@@ -24,6 +24,12 @@ import { cn } from "@/lib/utils";
  * the car felt across the meeting, the tyres (their own three figures each when more than one
  * was run), and the air. No direction words, no comparisons: the first version led with
  * "quicker than earlier" and "it doesn't mean anything" at the end of a day.
+ *
+ * 2026-09-15: two one-row additions, and nothing else moves — the card must stay short enough
+ * not to push the runs down. "vs field" under the marks: your pace against the middle of the
+ * field, the meeting's average then your best run ("vs median" read as unclear, his call). And
+ * a From new row inside the tyre that was fitted new, never a line of its own — "From new by
+ * itself doesn't make sense".
  *
  * Saves on blur like every other inline correction (run notes, `RunDetailPanel`): no button
  * to hunt for, nothing lost by tapping away.
@@ -54,12 +60,69 @@ function ratingFigures(arc: number[]): string {
   return low === high ? `${low} every run` : `low ${low}, high ${high}`;
 }
 
+/** Seconds on the app's lap-delta sign — + slower, a real minus quicker — to two places. */
+function formatGap(seconds: number): string {
+  const abs = Math.abs(seconds).toFixed(2);
+  if (Number(abs) === 0) return "0.00";
+  return `${seconds < 0 ? "−" : "+"}${abs}`;
+}
+
+/** Green quicker, red slower: pace deltas are the one place those two colours live. */
+function gapTone(seconds: number): string | undefined {
+  if (Math.abs(seconds) < 0.005) return undefined;
+  return seconds < 0 ? "text-gain" : "text-destructive";
+}
+
 function Line({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex gap-3 border-b border-border/70 py-1.5 last:border-b-0">
       <span className="type-data-label w-[64px] flex-none pt-0.5">{label}</span>
-      <span className="min-w-0 text-[13px] leading-snug text-foreground">{children}</span>
+      <div className="min-w-0 text-[13px] leading-snug text-foreground">{children}</div>
     </div>
+  );
+}
+
+/**
+ * Runs 2–5 on a set fitted new at this meeting, each against that set's run 1 on top 5. Plain
+ * ink, not green or red: a tyre going off is the expected direction, not a verdict.
+ */
+function FromNewRow({ steps }: { steps: DebriefFromNew[] }) {
+  if (steps.length === 0) return null;
+  return (
+    <table className="mt-1 border-collapse tabular-nums">
+      <thead>
+        <tr>
+          <td className="p-0" />
+          {steps.map((step) => (
+            <th
+              key={step.tyreRun}
+              scope="col"
+              className="whitespace-nowrap pl-3 text-right text-[11px] font-normal leading-[1.3] text-faint"
+            >
+              run {step.tyreRun}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th
+            scope="row"
+            className="whitespace-nowrap p-0 text-left text-[11px] font-semibold leading-[1.35] text-muted-foreground"
+          >
+            From new
+          </th>
+          {steps.map((step) => (
+            <td
+              key={step.tyreRun}
+              className="whitespace-nowrap pl-3 text-right text-[12px] font-semibold leading-[1.35] text-foreground"
+            >
+              {formatGap(step.seconds)}
+            </td>
+          ))}
+        </tr>
+      </tbody>
+    </table>
   );
 }
 
@@ -109,6 +172,27 @@ function RecapLines({
     );
   }
 
+  // Pace against the middle of the field: the meeting's average, then the best run — one row,
+  // and the run name opens that run like the marks above do.
+  if (recap.field) {
+    const field = recap.field;
+    lines.push(
+      <Line key="field" label="vs field">
+        <span className={cn("font-semibold tabular-nums", gapTone(field.avg))}>{formatGap(field.avg)}</span>
+        <span className="text-faint"> avg · </span>
+        <span className={cn("font-semibold tabular-nums", gapTone(field.best))}>{formatGap(field.best)}</span>
+        <span className="text-faint"> best </span>
+        <button
+          type="button"
+          onClick={() => onOpenRun(field.runId)}
+          className="tap-active text-[12px] text-faint underline decoration-border underline-offset-2 hover:text-foreground"
+        >
+          {field.runLabel}
+        </button>
+      </Line>
+    );
+  }
+
   if (recap.rating) {
     const words = ratingWords(recap.rating.direction);
     lines.push(
@@ -136,6 +220,7 @@ function RecapLines({
           {tyre.runCount} {tyre.runCount === 1 ? "run" : "runs"}
           {air ? ` · ${air}` : ""}
         </span>
+        <FromNewRow steps={tyre.fromNew} />
       </Line>
     );
   } else if (recap.tyres.length > 1) {
@@ -159,6 +244,7 @@ function RecapLines({
           {figures.length ? (
             <span className="block text-[12px] tabular-nums text-faint">{figures.join(" · ")}</span>
           ) : null}
+          <FromNewRow steps={tyre.fromNew} />
         </Line>
       );
     });
@@ -191,6 +277,14 @@ export function DebriefCard({
   const [updatedAtIso, setUpdatedAtIso] = useState(debrief.updatedAtIso);
   const [status, setStatus] = useState<"idle" | "saving" | "error">("idle");
   const weekend = (debrief.recap?.dayCount ?? 1) > 1;
+  /*
+   * One word, and it is the whole state of the card. While the day or the event is still
+   * running this is an Overview — what has happened so far — and only once the meeting is
+   * finished is it a Debrief. Founder call 2026-09-16. The prompt inside the empty box does
+   * NOT follow it: "What did you learn today / this weekend?" reads the same either way, and
+   * a second moving part here buys nothing.
+   */
+  const title = debrief.isOver ? "Debrief" : "Overview";
 
   const save = async (raw: string) => {
     const next = raw.trim();
@@ -231,7 +325,7 @@ export function DebriefCard({
   return (
     <CardPanel contentClassName="px-3 pb-3 pt-2.5">
       <div className="eyebrow-band mb-1.5 flex items-center gap-2">
-        <Eyebrow className="mb-0">Debrief</Eyebrow>
+        <Eyebrow className="mb-0">{title}</Eyebrow>
         {meta ? (
           <span
             className={cn(
@@ -247,8 +341,14 @@ export function DebriefCard({
         {debrief.recap ? <RecapLines recap={debrief.recap} onOpenRun={onOpenRun} /> : null}
         <AutoGrowTextarea
           minRows={2}
+          /*
+           * Grows with what you write, then scrolls — the card sits between the day's chart and
+           * its runs, so a weekend's worth of thoughts must not push the runs off the screen.
+           * Founder call 2026-09-16.
+           */
+          maxRows={10}
           defaultValue={debrief.text}
-          aria-label={weekend ? "Weekend debrief" : "Day debrief"}
+          aria-label={weekend ? `Weekend ${title.toLowerCase()}` : `Day ${title.toLowerCase()}`}
           placeholder={weekend ? "What did you learn this weekend?" : "What did you learn today?"}
           onBlur={(e) => void save(e.currentTarget.value)}
           className="w-full rounded-md border border-ring/40 bg-background px-2.5 py-1.5 text-[13px] leading-relaxed text-foreground outline-none focus:border-ring"

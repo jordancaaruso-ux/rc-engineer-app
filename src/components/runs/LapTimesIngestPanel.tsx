@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   chosenBackfillSessions,
+  groupBackfillCandidates,
   selectBackfillCandidates,
   type BackfillCandidate,
   type BackfillOffer,
@@ -1228,37 +1229,76 @@ export function LapTimesIngestPanel({
     setBackfillPromptOpen(true);
   }, [attachedBlocks.length, backfillOffer, stepVisible]);
 
-  /** The offer's rows as the sheet lists them: the picker's own time label and best lap per session. */
-  const backfillPromptRows = useMemo<BackfillOfferSheetSession[]>(() => {
-    const sessions = backfillOffer?.sessions ?? [];
-    if (sessions.length === 0) return [];
+  const pickerRowByUrl = useMemo(() => {
     const byUrl = new Map<string, ImportPickerCandidate>();
     for (const row of [...mergedImportCandidates, ...olderPickerRows]) byUrl.set(row.sessionUrl.trim(), row);
-    return sessions.map((s) => {
-      const row = byUrl.get(s.sessionUrl.trim());
+    return byUrl;
+  }, [mergedImportCandidates, olderPickerRows]);
+  const backfillMetaFor = useCallback(
+    (url: string) => {
+      const row = pickerRowByUrl.get(url.trim());
+      return row ? { lapCount: row.lapCount, bestLapSeconds: row.bestLapSeconds } : null;
+    },
+    [pickerRowByUrl]
+  );
+  const deviceTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+
+  /**
+   * The offer as OUTINGS — one row per time on track, however many sessions the timing sites
+   * posted for it (the same heat on two sites, a practice run split at a pit stop). The save
+   * links the extras to the run it makes; here they only fold the count.
+   */
+  const backfillOutings = useMemo(
+    () => groupBackfillCandidates(backfillOffer?.sessions ?? [], backfillMetaFor, deviceTimeZone),
+    [backfillOffer, backfillMetaFor, deviceTimeZone]
+  );
+  const backfillChosenOutingCount = useMemo(
+    () => groupBackfillCandidates(backfillChosen, backfillMetaFor, deviceTimeZone).length,
+    [backfillChosen, backfillMetaFor, deviceTimeZone]
+  );
+
+  /** The offer's rows as the sheet lists them: the picker's own time label and best lap per outing. */
+  const backfillPromptRows = useMemo<BackfillOfferSheetSession[]>(() => {
+    if (backfillOutings.length === 0) return [];
+    const sessionByUrl = new Map((backfillOffer?.sessions ?? []).map((s) => [s.sessionUrl.trim(), s]));
+    return backfillOutings.map((o) => {
+      const primary = sessionByUrl.get(o.primaryUrl.trim());
+      const row = pickerRowByUrl.get(o.primaryUrl.trim());
+      let best: number | null = null;
+      for (const url of o.sessionUrls) {
+        const b = pickerRowByUrl.get(url.trim())?.bestLapSeconds ?? null;
+        if (b != null && (best == null || b < best)) best = b;
+      }
       return {
-        sessionUrl: s.sessionUrl,
-        when: row?.when ?? formatSessionWhen(s.sessionCompletedAtIso, null, s.timingSource),
+        sessionUrl: o.primaryUrl,
+        when:
+          row?.when ??
+          (primary ? formatSessionWhen(primary.sessionCompletedAtIso, null, primary.timingSource) : null),
         lapCount: row?.lapCount ?? null,
-        bestLapSeconds: row?.bestLapSeconds ?? null,
+        bestLapSeconds: best,
       };
     });
-  }, [backfillOffer, mergedImportCandidates, olderPickerRows]);
+  }, [backfillOutings, backfillOffer, pickerRowByUrl]);
 
-  /** "Log them": tick the line for the sessions left ticked in the sheet; the rest are remembered as unticked. */
+  /** "Log them": tick the line for the outings left ticked in the sheet; the rest are remembered as unticked. */
   const acceptBackfillPrompt = useCallback(
     (selectedUrls: readonly string[]) => {
       setBackfillPromptOpen(false);
       const current = latestValueRef.current;
       const sessions = current.backfill?.sessions ?? backfillOffer?.sessions ?? [];
       if (sessions.length === 0) return;
-      const chosen = new Set(selectedUrls.map((u) => u.trim()));
+      const chosenPrimaries = new Set(selectedUrls.map((u) => u.trim()));
+      const chosen = new Set<string>();
+      for (const o of backfillOutings) {
+        if (!chosenPrimaries.has(o.primaryUrl.trim())) continue;
+        for (const u of o.sessionUrls) chosen.add(u.trim());
+      }
       const excludedUrls = sessions.map((s) => s.sessionUrl.trim()).filter((u) => !chosen.has(u));
       if (excludedUrls.length === sessions.length) return;
       latestOnChangeRef.current({ ...current, backfill: { ticked: true, sessions, excludedUrls } });
       haptic("light");
     },
-    [backfillOffer]
+    [backfillOffer, backfillOutings]
   );
   const declineBackfillPrompt = useCallback(() => {
     setBackfillPromptOpen(false);
@@ -2018,7 +2058,7 @@ export function LapTimesIngestPanel({
                 }
               />
               <span>
-                Add {backfillChosen.length} other {backfillChosen.length === 1 ? "run" : "runs"} from{" "}
+                Add {backfillChosenOutingCount} other {backfillChosenOutingCount === 1 ? "run" : "runs"} from{" "}
                 {backfillDayWord}
               </span>
             </label>

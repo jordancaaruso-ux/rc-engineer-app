@@ -8,15 +8,9 @@ import {
   walkStepIds,
 } from "./wizardWalk";
 
-test("every run walks all six steps in order (session first, laps before feel)", () => {
-  assert.deepEqual(walkStepIds(), [
-    "session",
-    "equipment",
-    "prep",
-    "setup",
-    "laps",
-    "feel",
-  ]);
+test("every run walks all five steps in order (session first, laps before feel)", () => {
+  // Prep merged into Tires 2026-09-16 — one page, compound then prep.
+  assert.deepEqual(walkStepIds(), ["session", "equipment", "setup", "laps", "feel"]);
 });
 
 test("nextWalkStep advances along the walk and returns null at the end", () => {
@@ -28,13 +22,13 @@ test("nextWalkStep advances along the walk and returns null at the end", () => {
 
 test("the pre-run boundary (bar divider) sits between setup and laps", () => {
   const preRun = WIZARD_STEPS.filter((s) => s.preRun).map((s) => s.id);
-  assert.deepEqual(preRun, ["session", "equipment", "prep", "setup"]);
+  assert.deepEqual(preRun, ["session", "equipment", "setup"]);
 });
 
 test("draft resume lands on the first unfinished step", () => {
   // Typical pre-run draft: everything before the seam saved, laps + rating open.
   assert.equal(
-    firstUnfinishedStep({ session: true, equipment: true, prep: true, setup: true }),
+    firstUnfinishedStep({ session: true, equipment: true, setup: true }),
     "laps"
   );
   // Laps imported, rating still missing → Feedback.
@@ -42,7 +36,6 @@ test("draft resume lands on the first unfinished step", () => {
     firstUnfinishedStep({
       session: true,
       equipment: true,
-      prep: true,
       setup: true,
       laps: true,
     }),
@@ -57,7 +50,6 @@ test("a fully-logged run (editing a completed one) lands back on Session", () =>
     firstUnfinishedStep({
       session: true,
       equipment: true,
-      prep: true,
       setup: true,
       laps: true,
       feel: true,
