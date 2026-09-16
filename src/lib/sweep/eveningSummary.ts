@@ -16,12 +16,15 @@ export type EveningSummaryInput = {
   runCount: number;
   /** Runs the app filed that the driver has not confirmed. */
   unconfirmedCount: number;
-  /** Sessions imported but on no run because the car is unknown. */
+  /**
+   * Sessions imported but on no run because the car is unknown. Counted, never ASKED about here:
+   * founder ruling 2026-09-16 — the notification announces the day like any other, and the app
+   * asks which car in a sheet when the driver arrives. It only shapes the words on a day where
+   * nothing could be filed, because then there are no figures to give.
+   */
   looseCount: number;
-  /** App-relative path that opens the day. */
+  /** App-relative path that opens the day — and carries the sheet's flag when one is waiting. */
   openPath: string;
-  /** App-relative path that files the loose sessions once a car is chosen. Null when none. */
-  whichCarPath: string | null;
 };
 
 function runWord(n: number): string {
@@ -77,8 +80,11 @@ export function eveningSummaryLines(input: EveningSummaryInput): string[] {
   if (input.unconfirmedCount > 0) {
     lines.push(`${runWord(input.unconfirmedCount)} filed from the timing sheet — check and confirm.`);
   }
-  if (input.looseCount > 0) {
-    lines.push(`${sessionWord(input.looseCount)} waiting — which car were you in?`);
+  // Nothing could be filed (every session still needs a car): say what is waiting, since there are
+  // no figures yet. On a day that DID file runs the loose ones are never mentioned — the sheet
+  // asks in the app.
+  if (input.runCount === 0 && input.looseCount > 0) {
+    lines.push(`${sessionWord(input.looseCount)} from today are ready`);
   }
   return lines;
 }
@@ -91,18 +97,13 @@ export function renderEveningSummaryPush(input: EveningSummaryInput): {
 } {
   const title = `Your day at ${input.trackName}`;
   if (input.runCount === 0 && input.looseCount > 0) {
-    return {
-      title,
-      body: `${sessionWord(input.looseCount)} found — which car were you in?`,
-      url: input.whichCarPath ?? input.openPath,
-    };
+    return { title, body: `${sessionWord(input.looseCount)} from today are ready`, url: input.openPath };
   }
   const r = input.recap;
   const parts: string[] = [runWord(input.runCount)];
   if (r?.best) parts.push(`best ${formatBestLap(r.best.seconds)} (${r.best.runLabel})`);
   if (r?.top5) parts.push(`top 5 ${formatBestLap(r.top5.seconds)}`);
-  if (input.looseCount > 0) parts.push(`${sessionWord(input.looseCount)} need a car`);
-  else if (input.unconfirmedCount > 0) parts.push(`${input.unconfirmedCount} to confirm`);
+  if (input.unconfirmedCount > 0) parts.push(`${input.unconfirmedCount} to confirm`);
   return { title, body: parts.join(" · "), url: input.openPath };
 }
 
@@ -117,10 +118,9 @@ export function renderEveningSummaryEmail(input: EveningSummaryInput): {
   const subject =
     input.runCount > 0
       ? `${input.trackName}, ${input.dateLabel}: ${runWord(input.runCount)}${best ? `, best ${best}` : ""}`
-      : `${input.trackName}, ${input.dateLabel}: ${sessionWord(input.looseCount)} found`;
+      : `${input.trackName}, ${input.dateLabel}: ${sessionWord(input.looseCount)} ready`;
 
   const openUrl = absoluteUrl(input.openPath);
-  const whichCarUrl = input.whichCarPath ? absoluteUrl(input.whichCarPath) : null;
 
   const text = [
     PRODUCT_NAME,
@@ -130,7 +130,6 @@ export function renderEveningSummaryEmail(input: EveningSummaryInput): {
     ...lines,
     "",
     `Open your day: ${openUrl}`,
-    ...(whichCarUrl ? [`Say which car: ${whichCarUrl}`] : []),
     "",
     `${PRODUCT_NAME} · ${BRAND_DOMAIN}`,
   ].join("\n");
@@ -166,9 +165,9 @@ ${lineRows}
         </table>
       </td></tr>
       <tr><td style="padding:0 4px 12px;">
-        ${button(openUrl, "Open your day", !whichCarUrl)}
+        ${button(openUrl, "Open your day", true)}
       </td></tr>
-      ${whichCarUrl ? `<tr><td style="padding:0 4px 30px;">${button(whichCarUrl, "Say which car", true)}</td></tr>` : `<tr><td style="padding:0 4px 18px;"></td></tr>`}
+      <tr><td style="padding:0 4px 18px;"></td></tr>
       <tr><td style="padding:14px 4px 0;border-top:1px solid #2B2A27;">
         <p style="margin:0;font-size:11.5px;line-height:1.7;color:#7D786E;">Sent because your transponder or name was on the timing sheet today.<br>${PRODUCT_NAME} &middot; ${BRAND_DOMAIN}</p>
       </td></tr>

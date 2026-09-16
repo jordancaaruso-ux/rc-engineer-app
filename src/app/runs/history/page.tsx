@@ -11,6 +11,7 @@ import { loadTeamMemberDisplays, memberDisplayLabelRecord } from "@/lib/teams/te
 import { RunHistoryTable } from "@/components/runs/RunHistoryTable";
 import { RunHistoryColGroup, RunHistoryMobileHeaderRow, RUN_HISTORY_ACTION_CELL_CLASS, computeRunHistoryColSpan } from "@/components/runs/runHistoryTableColumns";
 import { SessionsFocusScroll } from "@/components/runs/SessionsFocusScroll";
+import { WhichCarSheet } from "@/components/dashboard/GetMyDay";
 import { SessionsBrowser } from "@/components/runs/SessionsBrowser";
 import {
   buildGroupDrivers,
@@ -20,9 +21,10 @@ import {
   type WorkbenchDebrief,
   type WorkbenchGroup,
 } from "@/lib/runs/sessionWorkbenchModel";
-import { debriefIdentityForGroup } from "@/lib/debrief/debriefKey";
+import { debriefIdentityForGroup, meetingIsOver } from "@/lib/debrief/debriefKey";
 import { buildDebriefRecap } from "@/lib/debrief/buildDebriefRecap";
 import { loadDebriefsForIdentities } from "@/lib/debrief/loadDebrief";
+import { loadDebriefFieldGaps } from "@/lib/debrief/loadDebriefField";
 import { buildTeamDayModel } from "@/lib/runs/teamDayModel";
 import { RunHistoryViewMore } from "@/components/runs/RunHistoryViewMore";
 import { OPEN_GROUP_PARAM } from "@/lib/runs/sessionsReturn";
@@ -390,6 +392,13 @@ export default async function RunHistoryPage({
   const openGroupRaw = Array.isArray(rawOpenGroup) ? rawOpenGroup[0] : rawOpenGroup;
   const openGroupParam =
     typeof openGroupRaw === "string" && openGroupRaw.trim() ? openGroupRaw.trim() : null;
+  /** `?whichCar=<trackId>&ymd=<ymd>` — the 8 pm notification's landing (see `WhichCarSheet`). */
+  const whichCarRaw = resolvedSearch.whichCar;
+  const whichCarTrackId =
+    typeof whichCarRaw === "string" && whichCarRaw.trim() ? whichCarRaw.trim() : null;
+  const whichCarYmdRaw = resolvedSearch.ymd;
+  const whichCarYmd =
+    typeof whichCarYmdRaw === "string" && whichCarYmdRaw.trim() ? whichCarYmdRaw.trim() : null;
   /*
    * `level=day` stops the `openGroup` trip at the day's list instead of on the run itself.
    * Confirming a run the app filed lands here (`confirmRunReturnHref`): the driver came to
@@ -664,10 +673,17 @@ export default async function RunHistoryPage({
     const identityByGroupId = new Map(
       groups.map((group) => [group.id, debriefIdentityForGroup(group, groupZones)] as const)
     );
-    const stored = await loadDebriefsForIdentities(
-      user.id,
-      [...identityByGroupId.values()].filter((identity) => identity != null)
-    );
+    // The "vs field" figures ride alongside: one read, and only runs with a timing sheet return.
+    const [stored, fieldGapByRunId] = await Promise.all([
+      loadDebriefsForIdentities(
+        user.id,
+        [...identityByGroupId.values()].filter((identity) => identity != null)
+      ),
+      loadDebriefFieldGaps(
+        user.id,
+        groups.flatMap((group) => group.runs)
+      ),
+    ]);
     for (const group of groups) {
       const identity = identityByGroupId.get(group.id);
       if (!identity) continue;
@@ -676,7 +692,8 @@ export default async function RunHistoryPage({
         identity,
         text: row?.text ?? "",
         updatedAtIso: row?.updatedAtIso ?? null,
-        recap: buildDebriefRecap(group, { zones: groupZones }),
+        recap: buildDebriefRecap(group, { zones: groupZones, fieldGapByRunId }),
+        isOver: meetingIsOver(group, { zones: groupZones }),
       });
     }
   }
@@ -862,6 +879,11 @@ export default async function RunHistoryPage({
 
   return (
     <>
+      {/* Arrived from the 8 pm notification with sessions still waiting on a car: the day is
+          behind it, the sheet asks the one question. */}
+      {whichCarTrackId && whichCarYmd ? (
+        <WhichCarSheet trackId={whichCarTrackId} ymd={whichCarYmd} />
+      ) : null}
       {/* `sessions-chrome` — this header names the LIST, so on a phone it folds
           away once you push into a day (globals.css, keyed off `data-sessions-depth`). */}
       <header className="page-header is-echo sessions-chrome">

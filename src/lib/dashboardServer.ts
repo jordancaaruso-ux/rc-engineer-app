@@ -207,6 +207,7 @@ export async function getDashboardNewRunPrefill(
           createdAt: true,
           eventDetectionSource: true,
           linkedEventId: true,
+          trackId: true,
         },
       }),
       getLiveRcDriverNameSetting(userId),
@@ -226,6 +227,7 @@ export async function getDashboardNewRunPrefill(
         createdAt: sess.createdAt.toISOString(),
         eventDetectionSource,
         linkedEventId: sess.linkedEventId,
+        trackId: sess.trackId,
         liveRcDriverName,
         liveRcDriverId,
       },
@@ -340,8 +342,6 @@ export type DashboardHomeModel = {
    * fill in, else sessions waiting for a car. The second door beside "Start a run".
    */
   pendingSweep: DashboardPendingSweep | null;
-  /** Today's track, for the app-open arming beacon: latest run today, else the day's loose imports. */
-  todayTrackId: string | null;
   /** Per-run setup changes made today, chronological (first-of-day uses yesterday's last run as baseline). */
   todaysChanges: Array<{
     runId: string;
@@ -1346,11 +1346,18 @@ export async function loadDashboardHomeModel(
       if (idx >= 0) return { kind: "placeholder" as const, runId: todaysRuns[idx]!.id, position: idx + 1 };
       const loose = looseImportsToday[0];
       if (loose) {
-        return { kind: "loose" as const, importedLapTimeSessionId: loose.id, count: looseImportsToday.length };
+        return {
+          kind: "loose" as const,
+          importedLapTimeSessionId: loose.id,
+          count: looseImportsToday.length,
+          // What the "Which car?" sheet needs to ask about them (`pendingSweepHref`). Null track
+          // can't be asked about, so the row falls back to the old attach-by-hand route.
+          trackId: loose.trackId,
+          ymd: calendarYmdInTimeZone(new Date(), timeZone),
+        };
       }
       return null;
     })(),
-    todayTrackId: todaysRuns[todaysRuns.length - 1]?.track?.id ?? looseImportsToday[0]?.trackId ?? null,
     todaysChanges,
     todayStrip,
     todayContext,

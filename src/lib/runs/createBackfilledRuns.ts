@@ -9,6 +9,9 @@ import { withTireRunNumberInSnapshot } from "@/lib/tires/cascadeTireRunNumber";
 import { importedSessionInstantToReal } from "@/lib/runSessionCompletedAt";
 import { runLocalDayKey } from "@/lib/runs/buildRunHistoryGroups";
 import { planBackfilledRuns, type BackfillPlanRun } from "@/lib/runs/planBackfilledRuns";
+import { groupOutings, type Outing } from "@/lib/runs/groupOutings";
+import { spansOverlap, type Span } from "@/lib/runs/outingSpan";
+import { outingSessionFromImportedRow, spanForExistingRun } from "@/lib/runs/outingsFromImportedSessions";
 import { buildRunLapMaterial } from "@/lib/runs/importedSessionLapMaterial";
 import { writeRunImportedLapSets } from "@/lib/runs/writeRunImportedLapSets";
 import { backfillRunConditionsFromTrack } from "@/lib/weather/backfillRunConditionsFromTrack";
@@ -17,7 +20,13 @@ import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 /** Matches the import endpoint's cap; nobody logs more heats than this in a day. */
 const MAX_BACKFILL_SESSIONS = 20;
 
-export type BackfillSkipReason = "not_found" | "already_linked" | "no_time" | "no_laps";
+export type BackfillSkipReason =
+  | "not_found"
+  | "already_linked"
+  | "no_time"
+  | "no_laps"
+  /** Same time on track as a run that exists (or one made here): linked to it, not a run of its own. */
+  | "same_outing";
 
 export type CreateBackfilledRunsResult = {
   created: Array<{ runId: string; importedLapTimeSessionId: string }>;
@@ -271,6 +280,73 @@ export async function createBackfilledRuns(params: {
     return result;
   }
 
+  // One run per time on track (founder ruling 2026-09-15). The same heat from two timing sites,
+  // or a practice run the feed split at a pit stop, is ONE outing: windows that overlap group,
+  // the official record leads, the rest ride along as linked sources (`groupOutings`).
+  const plannableById = new Map(plannable.map((p) => [p.id, p]));
+  const outings = groupOutings(
+    plannable.map(
+      (p) =>
+        outingSessionFromImportedRow(p.session, zone) ?? {
+          id: p.id,
+          kind: "practice" as const,
+          start: p.instant,
+          end: p.instant,
+          driverCount: 0,
+          lapCount: 0,
+        }
+    )
+  );
+
+  // An outing that overlaps a run the driver already has today at this track — the parent being
+  // saved included — joins that run instead of opening a second one.
+  const existingSpans: Array<{ id: string; span: Span }> = [];
+  if (ctx.trackId) {
+    const existing = await prisma.run.findMany({
+      where: {
+        userId: params.userId,
+        trackId: ctx.trackId,
+        sortAt: {
+          gte: new Date(centreInstant.getTime() - windowMs),
+          lte: new Date(centreInstant.getTime() + windowMs),
+        },
+      },
+      select: {
+        id: true,
+        sortAt: true,
+        sessionCompletedAt: true,
+        lapTimes: true,
+        localTimeZone: true,
+        detectedImportedLapSession: {
+          select: { id: true, sourceUrl: true, parserId: true, parsedPayload: true, sessionCompletedAt: true },
+        },
+      },
+    });
+    for (const r of existing) {
+      const span = spanForExistingRun(r, zone);
+      if (span) existingSpans.push({ id: r.id, span });
+    }
+  }
+  const standalone: Outing[] = [];
+  for (const outing of outings) {
+    const host = existingSpans.find((r) => spansOverlap(r.span, outing));
+    if (!host) {
+      standalone.push(outing);
+      continue;
+    }
+    await prisma.importedLapTimeSession.updateMany({
+      where: { id: { in: outing.sessionIds }, userId: params.userId, linkedRunId: null },
+      data: { linkedRunId: host.id },
+    });
+    for (const id of outing.sessionIds) {
+      result.skipped.push({ importedLapTimeSessionId: id, reason: "same_outing" });
+    }
+  }
+  if (standalone.length === 0) return result;
+  const secondariesByPrimary = new Map(
+    standalone.map((o) => [o.primaryId, o.sessionIds.filter((id) => id !== o.primaryId)])
+  );
+
   const toPlanRun = (r: (typeof dayRuns)[number]): BackfillPlanRun => ({
     id: r.id,
     instant: r.sessionCompletedAt ?? r.sortAt,
@@ -288,7 +364,7 @@ export async function createBackfilledRuns(params: {
   const plan = planBackfilledRuns({
     parent: planParent,
     confirmedDayRuns: dayRuns.map(toPlanRun),
-    sessions: plannable.map((p) => ({ id: p.id, instant: p.instant })),
+    sessions: standalone.map((o) => ({ id: o.primaryId, instant: plannableById.get(o.primaryId)!.instant })),
   });
 
   const [liveRcDriverName, liveRcDriverId] = await Promise.all([
@@ -407,9 +483,20 @@ export async function createBackfilledRuns(params: {
           throw new SessionAlreadyClaimed();
         }
         await writeRunImportedLapSets(tx, run.id, lapSets);
+        // The outing's other sources ride along; the run's laps stay the primary's.
+        const secondaries = secondariesByPrimary.get(session.id) ?? [];
+        if (secondaries.length > 0) {
+          await tx.importedLapTimeSession.updateMany({
+            where: { id: { in: secondaries }, userId: params.userId, linkedRunId: null },
+            data: { linkedRunId: run.id },
+          });
+        }
         return run.id;
       });
       result.created.push({ runId, importedLapTimeSessionId: session.id });
+      for (const id of secondariesByPrimary.get(session.id) ?? []) {
+        result.skipped.push({ importedLapTimeSessionId: id, reason: "same_outing" });
+      }
     } catch (err) {
       const unique =
         err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";

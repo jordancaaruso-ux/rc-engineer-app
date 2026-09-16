@@ -16,8 +16,10 @@ export type SweepStage =
   | "claim"
   | "file"
   | "evening"
+  | "dispatch"
   | "notify"
-  | "store";
+  | "store"
+  | "day";
 
 export type SweepFailureContext = {
   stage: SweepStage;

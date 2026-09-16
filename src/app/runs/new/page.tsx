@@ -104,7 +104,9 @@ export default async function NewRunPage({
     copyPreviewRun,
   ] = await Promise.all([
     getDashboardNewRunPrefill(user.id, sp),
-    importedLapTimeSessionIdRaw.length > 0
+    // Only the classic form renders the attach-to-an-existing-run chooser, so the wizard path
+    // (a "which car were you in?" tap) must not pay for the query.
+    importedLapTimeSessionIdRaw.length > 0 && !wizardEnabled
       ? loadIncompleteRunsForImportChooser(user.id, initialEventId)
       : Promise.resolve([]),
     // One fetch for both consumers: the resume-draft banner and the wizard host.

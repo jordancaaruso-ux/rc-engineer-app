@@ -1,17 +1,19 @@
 import { calendarYmdInTimeZone } from "@/lib/formatDate";
-import { todayBoundsInTimeZone } from "@/lib/eventActive";
 
 /**
  * The timing sweep's schedule, kept OUTSIDE Postgres so a quiet five-minute tick never wakes the
- * database. Two documents live in Blob storage (`blobStore.ts`):
+ * database. Documents live in Blob storage (`blobStore.ts`):
  *
  *   plan.json          — rebuilt nightly: who is listening (paid, with a chip or a LiveRC name),
  *                        which tracks they race, each track's timing URLs and clock.
- *   armed/<trackId>    — a track someone is at TODAY: who armed it and how, what the poller has
- *                        already seen there, when it last looked, and any back-off.
+ *   evening/<track>.json — one per track: which day it last looked at and how far that look got
+ *                        (`SweepTrackDayDoc`). Written by the tick when it hands a track off and
+ *                        by the worker when it finishes, so two workers never share a document.
  *
- * Everything in this file is pure so the rules are unit-tested; the DB is the truth for runs and
- * claims, these documents are only a schedule and may be lost without harm.
+ * There is no daytime polling (founder ruling 2026-09-15: "your day arrived tonight" is the
+ * product; no mid-day calls). The `armed/` documents and the 5/10-minute pollers that used them
+ * were deleted with that ruling. Everything here is pure so the rules are unit-tested; the DB is
+ * the truth for runs and claims, these documents are only a schedule and may be lost without harm.
  */
 
 export const SWEEP_DOC_VERSION = 1 as const;
@@ -46,122 +48,62 @@ export type SweepPlanDoc = {
   /** chip code → user ids (a club chip may be saved by more than one driver). */
   chips: Record<string, string[]>;
   tracks: Record<string, SweepPlanTrack>;
-  /** Evening pass bookkeeping: track id → the track-local day it last ran for. */
-  evening: Record<string, { doneYmd: string }>;
 };
 
-export type ArmedBy = "draft" | "run" | "app_open" | "chip";
+/** Which look of the day a track job is: the 8 pm one, or the 8 am one that a late night owes. */
+export type SweepSlot = "evening" | "morning";
+
+/** One unit of work: one track, one track-local day, one look. What the tick hands a worker. */
+export type SweepTrackJob = { trackId: string; ymd: string; slot: SweepSlot };
 
 /**
- * Who armed the track and how — with enough identity to poll for them even when the nightly
- * plan does not list them yet (a chip saved this afternoon, a first visit to a track).
+ * A track's bookkeeping for its most recent day (`evening/<trackId>.json`):
+ *
+ *   evening-claimed → the tick handed the 8 pm look to a worker (written BEFORE the work, so a
+ *                     tick that overlaps or a worker that dies can never send a day twice);
+ *   done            → the day is finished; nothing more happens for it;
+ *   morning-owed    → the 8 pm look found the track still racing (a session at or after 7:30 pm),
+ *                     so the drivers it held back get their summary at 8 am the next day;
+ *   morning-claimed → the tick handed that 8 am look to a worker.
  */
-export type ArmedTrackUser = {
-  armedBy: ArmedBy;
-  armedAtIso: string;
-  chips: string[];
-  liveRcName: string | null;
-};
+export type SweepTrackDayState = "evening-claimed" | "done" | "morning-owed" | "morning-claimed";
 
-/** The track facts a tick needs when the plan does not know the track (timing URL added today). */
-export type ArmedTrackFacts = {
-  name: string;
-  speedhiveUrl: string | null;
-  liveRcUrl: string | null;
-  timeZone: string;
-};
-
-export type ArmedTrackDoc = {
+export type SweepTrackDayDoc = {
   v: typeof SWEEP_DOC_VERSION;
-  trackId: string;
-  track: ArmedTrackFacts;
-  /** Track-local midnight after the day it was armed; the doc is dead past this. */
-  armedUntilIso: string;
-  users: Record<string, ArmedTrackUser>;
-  lastPolledIso: Record<SweepSource, string | null>;
-  /** Session keys already handled (`user:activity:block`, `user:url`). Capped; oldest drop first. */
-  seen: string[];
-  backoff: { fails: number; nextTryIso: string | null };
-  /** Track-local day a parser-suspect warning was already raised for. */
-  parserSuspectYmd: string | null;
+  ymd: string;
+  state: SweepTrackDayState;
+  claimedIso: string;
+  /** Drivers already handed this day's summary, so the 8 am look does not send it again. */
+  notifiedUserIds: string[];
 };
 
-export const SPEEDHIVE_POLL_MS = 5 * 60 * 1000;
-export const LIVERC_POLL_MS = 10 * 60 * 1000;
-/** A cron that fires at :05 and :10 measures 4m59s between them; don't skip a tick over seconds. */
-const DUE_SLACK_MS = 30 * 1000;
-export const SEEN_CAP = 300;
-export const EVENING_HOUR = 20;
-export const EVENING_WINDOW_MINUTES = 10;
-
-export function pollIntervalMs(source: SweepSource): number {
-  return source === "speedhive" ? SPEEDHIVE_POLL_MS : LIVERC_POLL_MS;
+export function trackDayDocKey(trackId: string): string {
+  return `evening/${trackId}.json`;
 }
+
+export const EVENING_HOUR = 20;
+export const MORNING_HOUR = 8;
+/**
+ * A look is due for the first thirty minutes after its hour. A five-minute cron lands inside that
+ * six times, and the tick hands off a bounded number of tracks per landing (`runSweepTick`), so a
+ * zone with more tracks than one tick takes still gets every one of them that half hour.
+ */
+export const SLOT_WINDOW_MINUTES = 30;
+/**
+ * Founder ruling 2026-09-16: 8 pm is the summary only if the driver has been off the track for
+ * this long. A session at or after 7:30 pm means they are still racing — file it quietly, hold the
+ * summary, and send the whole night at 8 am.
+ */
+export const QUIET_MINUTES = 30;
 
 export function trackLocalYmd(timeZone: string, now: Date): string {
   return calendarYmdInTimeZone(now, timeZone);
 }
 
-/** Track-local midnight at the end of the day `now` falls in. */
-export function armedUntilForDay(timeZone: string, now: Date): Date {
-  return todayBoundsInTimeZone(timeZone, now).end;
-}
-
-export function newArmedTrackDoc(track: { id: string } & ArmedTrackFacts, now: Date): ArmedTrackDoc {
-  return {
-    v: SWEEP_DOC_VERSION,
-    trackId: track.id,
-    track: {
-      name: track.name,
-      speedhiveUrl: track.speedhiveUrl,
-      liveRcUrl: track.liveRcUrl,
-      timeZone: track.timeZone,
-    },
-    armedUntilIso: armedUntilForDay(track.timeZone, now).toISOString(),
-    users: {},
-    lastPolledIso: { speedhive: null, liverc: null },
-    seen: [],
-    backoff: { fails: 0, nextTryIso: null },
-    parserSuspectYmd: null,
-  };
-}
-
-export function isArmedDocExpired(doc: Pick<ArmedTrackDoc, "armedUntilIso">, now: Date): boolean {
-  const until = new Date(doc.armedUntilIso).getTime();
-  return Number.isNaN(until) || until <= now.getTime();
-}
-
-export function isSourceDue(
-  doc: Pick<ArmedTrackDoc, "armedUntilIso" | "lastPolledIso" | "backoff">,
-  source: SweepSource,
-  now: Date,
-): boolean {
-  if (isArmedDocExpired(doc, now)) return false;
-  if (doc.backoff.nextTryIso && new Date(doc.backoff.nextTryIso).getTime() > now.getTime()) {
-    return false;
-  }
-  const last = doc.lastPolledIso[source];
-  if (!last) return true;
-  const lastT = new Date(last).getTime();
-  if (Number.isNaN(lastT)) return true;
-  return now.getTime() - lastT >= pollIntervalMs(source) - DUE_SLACK_MS;
-}
-
-/** 5, 10, 20, 40, then 60 minutes — a rate-limited site is left alone, not hammered. */
-export function backoffAfterFailure(
-  prev: Pick<ArmedTrackDoc["backoff"], "fails">,
-  now: Date,
-): ArmedTrackDoc["backoff"] {
-  const minutes = Math.min(60, 5 * 2 ** prev.fails);
-  return { fails: prev.fails + 1, nextTryIso: new Date(now.getTime() + minutes * 60 * 1000).toISOString() };
-}
-
-export const NO_BACKOFF: ArmedTrackDoc["backoff"] = { fails: 0, nextTryIso: null };
-
-export function rememberSeen(seen: string[], key: string): string[] {
-  if (seen.includes(key)) return seen;
-  const next = [...seen, key];
-  return next.length > SEEN_CAP ? next.slice(next.length - SEEN_CAP) : next;
+/** The track-local day before the one `now` falls in. */
+export function previousLocalYmd(timeZone: string, now: Date): string {
+  const [y, m, d] = trackLocalYmd(timeZone, now).split("-").map(Number);
+  return new Date(Date.UTC(y!, m! - 1, d! - 1, 12)).toISOString().slice(0, 10);
 }
 
 /** Local hour and minute in a zone, on a 24-hour clock. */
@@ -177,44 +119,29 @@ export function localHourMinute(timeZone: string, now: Date): { hour: number; mi
   return { hour: Number.isFinite(hour) ? hour : 0, minute: Number.isFinite(minute) ? minute : 0 };
 }
 
-/**
- * The evening pass runs once per track per day, in the first ten minutes after 8 pm track time.
- * A five-minute cron lands inside that window at least once; `plan.evening` stops a second run.
- */
+function slotWindowOpen(timeZone: string, now: Date, hour: number): boolean {
+  const local = localHourMinute(timeZone, now);
+  return local.hour === hour && local.minute < SLOT_WINDOW_MINUTES;
+}
+
+/** 20:00–20:29 track time: the 8 pm look is due. */
 export function eveningWindowOpen(timeZone: string, now: Date): boolean {
-  const { hour, minute } = localHourMinute(timeZone, now);
-  return hour === EVENING_HOUR && minute < EVENING_WINDOW_MINUTES;
+  return slotWindowOpen(timeZone, now, EVENING_HOUR);
+}
+
+/** 08:00–08:29 track time: the 8 am look is due for a track that owes one. */
+export function morningWindowOpen(timeZone: string, now: Date): boolean {
+  return slotWindowOpen(timeZone, now, MORNING_HOUR);
 }
 
 /**
- * The plan as a tick should see it for one armed track: the nightly plan plus whoever armed the
- * doc since, and the track's own facts when the plan has none. Pure.
+ * Was the driver still on track into the evening? True when their latest session of `ymd` (the
+ * instant the timing site gave it) falls at or after 7:30 pm track time on that day. Null (no
+ * session found) is "not racing".
  */
-export function planViewForArmedDoc(
-  plan: SweepPlanDoc,
-  doc: ArmedTrackDoc,
-): { users: Record<string, SweepPlanUser>; chips: Record<string, string[]>; track: SweepPlanTrack } {
-  const users: Record<string, SweepPlanUser> = { ...plan.users };
-  const chips: Record<string, string[]> = {};
-  for (const [chip, ids] of Object.entries(plan.chips)) chips[chip] = [...ids];
-  for (const [id, u] of Object.entries(doc.users)) {
-    if (!users[id]) {
-      users[id] = { id, email: null, timeZone: null, chips: u.chips, liveRcName: u.liveRcName, tier: "unknown" };
-    }
-    for (const chip of u.chips) {
-      const ids = chips[chip] ?? [];
-      if (!ids.includes(id)) ids.push(id);
-      chips[chip] = ids;
-    }
-  }
-  const planned = plan.tracks[doc.trackId];
-  const track: SweepPlanTrack = planned ?? {
-    id: doc.trackId,
-    name: doc.track.name,
-    speedhiveUrl: doc.track.speedhiveUrl,
-    liveRcUrl: doc.track.liveRcUrl,
-    timeZone: doc.track.timeZone,
-    userIds: Object.keys(doc.users),
-  };
-  return { users, chips, track };
+export function racedIntoTheEvening(latest: Date | null, timeZone: string, ymd: string): boolean {
+  if (!latest) return false;
+  if (trackLocalYmd(timeZone, latest) !== ymd) return false;
+  const { hour, minute } = localHourMinute(timeZone, latest);
+  return hour * 60 + minute >= EVENING_HOUR * 60 - QUIET_MINUTES;
 }

@@ -749,7 +749,9 @@ export function NewRunForm(props: {
   const [feedbackFace, setFeedbackFace] = useState<"feedback" | "handling">("feedback");
   /** Required 1-10 overall car rating; null until the driver sets one. Server enforces presence at "Run complete". */
   const [carRating, setCarRating] = useState<number | null>(null);
-  type RunDetailsTab = "car" | "tires" | "conditions" | "track" | "prep";
+  // "prep" was a wizard-only face until 2026-09-16; the prep panel now renders
+  // under the compound on the Tires face in BOTH modes.
+  type RunDetailsTab = "car" | "tires" | "conditions" | "track";
   const [runDetailsTab, setRunDetailsTab] = useState<RunDetailsTab>("car");
 
   // ---- Log-run wizard chrome (only when props.wizard is set) ----
@@ -770,11 +772,12 @@ export function NewRunForm(props: {
         : 0;
     return firstUnfinishedStep({
       session: Boolean(r.trackId ?? r.track?.id ?? r.event?.trackId),
+      // Prep (additive + applications) lives on this step since 2026-09-16 and
+      // is optional, so the compound alone decides whether the step is done.
+      // That also kills the old trap: a driver who ran no warmers and no
+      // additive had a Prep step that never ticked, so every draft reopened on
+      // an empty page.
       equipment: Boolean(r.tireTypeId ?? r.tireType?.id),
-      prep:
-        (Array.isArray(r.tirePrep) && r.tirePrep.length > 0) ||
-        Boolean(r.additiveTypeId ?? r.additiveType?.id) ||
-        r.warmerTimingMinutes != null,
       setup: setupKeyCount > 0,
       // Shared with the Sessions row warning so "this run needs laps" and "the
       // wizard lands on Laps" can never disagree.
@@ -783,19 +786,18 @@ export function NewRunForm(props: {
     });
   });
   // Keep the details-tab state in sync with the wizard step: Session shows the
-  // Car face (+ Track), Equipment the Tires face, Prep its own face. (The
-  // wizard reuses the details PagedCard with per-step face filtering.)
+  // Car face (+ Track), Equipment the Tires face (compound, age, additive and
+  // applications all on it). (The wizard reuses the details PagedCard with
+  // per-step face filtering.)
   useEffect(() => {
     if (!wizardActive) return;
     if (wizardStep === "equipment") setRunDetailsTab("tires");
-    else if (wizardStep === "prep") setRunDetailsTab("prep");
   }, [wizardActive, wizardStep]);
   /** Which Run-details faces each wizard step shows. The Session step shows
    *  NO details card (v6): Car and Track render inside the unified Session
    *  card (trackPanelJsx is shared with the classic "Track" face). */
   const wizardDetailFaceIds: Partial<Record<WizardStepId, RunDetailsTab[]>> = {
     equipment: ["tires"],
-    prep: ["prep"],
   };
   const wizardShowsDetails =
     !wizardActive || wizardDetailFaceIds[wizardStep] !== undefined;
@@ -1351,6 +1353,9 @@ export function NewRunForm(props: {
 
     if (p.mode === "imported_lap_session") {
       const sess = p.importedLapTimeSession;
+      // The sweep recorded where it found this session — never make the driver name the track
+      // again (it also gates the conditions auto-fill).
+      if (sess.trackId && tracks.some((t) => t.id === sess.trackId)) setTrackId(sess.trackId);
       const ingestMode =
         sess.eventDetectionSource === "practice"
           ? "practice_user_only"
@@ -1500,7 +1505,7 @@ export function NewRunForm(props: {
     setNotes("");
     setLapIngest(defaultLapIngestValue());
     setReplicateLast(false);
-  }, [dashboardPrefill, carsList, applyTireStint]);
+  }, [dashboardPrefill, carsList, applyTireStint, tracks]);
 
   /**
    * Geometry Lab export: merge the Lab's geometry field values over whatever
@@ -3709,16 +3714,9 @@ export function NewRunForm(props: {
            * that is what it now asks for. Landing on a blank sheet is NOT enough on its own —
            * an untouched blank normalizes back to nothing.
            */
-          const alternatives = [
-            pickerRuns.length ? "copy a past run" : null,
-            downloadedSetups.length ? "load a saved setup" : null,
-            supportsSheetUpload ? "upload your sheet" : null,
-          ].filter((w): w is string => w !== null);
-          parts.push(
-            `attach a setup — put one value on the sheet${
-              alternatives.length ? `, or ${alternatives.join(", or ")}` : ""
-            }`
-          );
+          // Short on purpose (founder 2026-09-15): the Setup card carries the "Complete the run
+          // without a setup" exit, so this line only names what's missing.
+          parts.push("add a setup");
         }
         setCompleteValidation({
           show: true,
@@ -4205,8 +4203,10 @@ export function NewRunForm(props: {
     );
   }
 
-  // Tire-prep panel — shared by the classic Tires face and the wizard's own
-  // Prep step (declared once so both render identical wiring).
+  // Tire-prep panel — additive picker + the applications list. Lifted out of
+  // the faces array so the wiring is declared once; it renders beneath the
+  // compound on the Tires face (founder 2026-09-16: Prep merged into Tires,
+  // nothing dropped).
   const prepPanelJsx = (
     <RunAdditiveTimingPanel
       additiveTypeId={additiveTypeId}
@@ -4241,8 +4241,9 @@ export function NewRunForm(props: {
       done: Boolean(carId && trackId),
       attention: trackSaveWarning && !trackId,
     },
+    // Prep rides on this step now, and it is optional — the compound is what
+    // ticks it (see the draft-resume note above).
     equipment: { done: Boolean(tireTypeId) },
-    prep: { done: wizardPrepIn },
     setup: {
       done: setupBaselineData != null || filledSetupValueCount(setupData) > 0,
       attention: completeValidation.setup,
@@ -4454,8 +4455,17 @@ export function NewRunForm(props: {
       car: carId === wizardAppliedPlan.carId,
       tires:
         Boolean(tireTypeId) && tireStintId != null && tireStintId === (lastRun?.tireStintId ?? null),
+      /*
+       * Prep is one page with tires now, but it keeps its own flag because the
+       * prefill manifest card still lists it as its own promise.
+       *
+       * The old version required `wizardPrepIn` — some prep actually logged —
+       * before it would call prep unchanged. On the merged row that would have
+       * dropped the chip for every driver who runs no warmers and no additive,
+       * even though nothing about their prefill changed. Matching an empty last
+       * run with an empty this-run IS unchanged, so the guard is gone.
+       */
       prep:
-        wizardPrepIn &&
         lastRun != null &&
         additiveTypeId === (lastRun.additiveTypeId ?? "") &&
         JSON.stringify(tirePrep) ===
@@ -4498,23 +4508,26 @@ export function NewRunForm(props: {
         {
           key: "tires",
           label: "Tires",
-          value: tireSummaryLine || "not set",
+          /*
+           * One row for one step (2026-09-16). Compound and age lead — they are
+           * what the step is called — and any prep follows after a dot, the same
+           * shape the draft summary above already uses. No prep at all simply
+           * says nothing rather than adding a "none" that reads as missing data:
+           * prep is optional and never gated completing a run.
+           */
+          value: (() => {
+            const base = tireSummaryLine || "not set";
+            const prep = wizardPrepIn
+              ? formatTirePrepLine(
+                  tirePrep,
+                  additiveTypeId ? additiveTypesById[additiveTypeId]?.displayName ?? null : null
+                ) || "prep logged"
+              : null;
+            return prep ? `${base} · ${prep}` : base;
+          })(),
           state: tireTypeId ? "ok" : "miss",
-          prefilled: wizardPrefilled.tires,
+          prefilled: wizardPrefilled.tires && wizardPrefilled.prep,
           go: "equipment",
-        },
-        {
-          key: "prep",
-          label: "Prep",
-          value: wizardPrepIn
-            ? formatTirePrepLine(
-                tirePrep,
-                additiveTypeId ? additiveTypesById[additiveTypeId]?.displayName ?? null : null
-              ) || "logged"
-            : "none",
-          state: wizardPrepIn ? "ok" : "miss",
-          prefilled: wizardPrefilled.prep,
-          go: "prep",
         },
         {
           key: "setup",
@@ -4602,8 +4615,15 @@ export function NewRunForm(props: {
           {
             key: "prep",
             label: "Prep",
-            value: wizardSummaryRows.find((r) => r.key === "prep")?.value ?? "—",
-            jump: "prep",
+            // Its own promise row still (the card lists what a tap carries in,
+            // not what the steps are), read straight off live state now that
+            // the summary rows fold prep into the Tires line.
+            value:
+              formatTirePrepLine(
+                tirePrep,
+                additiveTypeId ? additiveTypesById[additiveTypeId]?.displayName ?? null : null
+              ) ?? "none",
+            jump: "equipment",
           },
           {
             key: "setup",
@@ -5627,7 +5647,9 @@ export function NewRunForm(props: {
               copyTireWarning={copyTireWarning}
               prefillFieldClass={prefillFieldClass(Boolean(prefillHighlights?.tires))}
             />
-            {wizardActive ? null : prepPanelJsx}
+            {/* Prep under the compound in BOTH modes since 2026-09-16 — the
+                wizard used to hold this back for a Prep step of its own. */}
+            {prepPanelJsx}
           </div>
               ),
             },
@@ -5655,17 +5677,6 @@ export function NewRunForm(props: {
               content: trackPanelJsx,
             },
           ] as PagedCardFace[])
-            .concat(
-              wizardActive
-                ? [
-                    {
-                      id: "prep",
-                      label: "Prep",
-                      content: <div className="space-y-3 pt-1">{prepPanelJsx}</div>,
-                    },
-                  ]
-                : []
-            )
             .filter(
               (f) =>
                 !wizardActive ||
@@ -5734,9 +5745,7 @@ export function NewRunForm(props: {
             role="alert"
             className="rounded-md border border-amber-500/50 bg-amber-500/15 px-2.5 py-2 text-[11px] leading-snug text-amber-950 dark:text-amber-100"
           >
-            <p>
-              Put one value on the sheet — a tyre compound counts — and this run can be completed.
-            </p>
+            <p>You haven’t added a setup.</p>
             <button
               type="button"
               disabled={saving}
@@ -5747,10 +5756,6 @@ export function NewRunForm(props: {
                   save, which surprised a driver on a real walk (2026-09-14). */}
               Complete the run without a setup
             </button>
-            <p className="mt-1 opacity-80">
-              Laps, tyres and how it felt are all still recorded. The Engineer just won’t have a
-              setup to suggest changes from.
-            </p>
           </div>
         ) : null}
         {!setupSectionExpanded ? (

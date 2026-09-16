@@ -25,7 +25,6 @@ export async function buildSweepPlan(now = new Date()): Promise<{
   users: number;
   tracks: number;
 }> {
-  const previous = await readDoc<SweepPlanDoc>(PLAN_DOC_KEY);
   const allUsers = await prisma.user.findMany({ select: { id: true, email: true, timeZone: true } });
 
   const users: Record<string, SweepPlanUser> = {};
@@ -44,20 +43,14 @@ export async function buildSweepPlan(now = new Date()): Promise<{
 
   const tracks = await planTracksForUsers(userIds, now);
 
-  const todayIso = now.toISOString().slice(0, 10);
-  const evening: SweepPlanDoc["evening"] = {};
-  for (const [trackId, e] of Object.entries(previous?.evening ?? {})) {
-    // Keep only recent bookkeeping so the doc cannot grow without bound.
-    if (e.doneYmd >= addDays(todayIso, -2)) evening[trackId] = e;
-  }
-
+  // Per-track bookkeeping lives in its own document (`evening/<trackId>.json`), so the plan is
+  // rebuilt from scratch and carries nothing over.
   const doc: SweepPlanDoc = {
     v: SWEEP_DOC_VERSION,
     builtIso: now.toISOString(),
     users,
     chips,
     tracks,
-    evening,
   };
   await writeDoc(PLAN_DOC_KEY, doc);
   return { users: userIds.length, tracks: Object.keys(tracks).length };
@@ -166,49 +159,3 @@ async function planTracksForUsers(userIds: string[], now: Date): Promise<Record<
   return out;
 }
 
-/**
- * A one-user, one-track view for the arm-and-poll path when the nightly plan does not know the
- * track yet (a timing URL added today). The request that arms is already on the DB.
- */
-export async function planViewForUserTrack(userId: string, trackId: string): Promise<{
-  user: SweepPlanUser;
-  track: SweepPlanTrack;
-} | null> {
-  const [u, t] = await Promise.all([
-    prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, timeZone: true } }),
-    prisma.track.findUnique({
-      where: { id: trackId },
-      select: {
-        id: true,
-        name: true,
-        speedhiveUrl: true,
-        liveRcUrl: true,
-        timeZone: true,
-        latitude: true,
-        longitude: true,
-        user: { select: { timeZone: true } },
-      },
-    }),
-  ]);
-  if (!u || !t) return null;
-  if (!t.speedhiveUrl && !t.liveRcUrl) return null;
-  const user = await planUserEntry(u);
-  if (!user) return null;
-  return {
-    user,
-    track: {
-      id: t.id,
-      name: t.name,
-      speedhiveUrl: t.speedhiveUrl,
-      liveRcUrl: t.liveRcUrl,
-      timeZone: resolveTrackTimeZone(t, t.user),
-      userIds: [u.id],
-    },
-  };
-}
-
-function addDays(ymd: string, days: number): string {
-  const d = new Date(`${ymd}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}

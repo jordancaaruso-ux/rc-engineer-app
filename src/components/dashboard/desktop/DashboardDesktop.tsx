@@ -63,9 +63,12 @@ export function DashboardDesktop({
   model,
   isTrackDay,
   dayStamp,
+  showGetMyDay = false,
 }: {
   model: DashboardHomeModel;
   isTrackDay: boolean;
+  /** The "Get my day" row under the CTA — same rule as the phone. */
+  showGetMyDay?: boolean;
   /**
    * "FRI 07 AUG", or "FRI 07 AUG · Off day". Built in `DashboardHome` and shown on
    * whichever card takes the hero slot — it used to sit beside the page title,
@@ -149,6 +152,7 @@ export function DashboardDesktop({
           serverDraftEventName={draftEventName}
           serverDraftIsForToday={draftIsForToday}
           pendingSweep={model.pendingSweep}
+          getMyDay={showGetMyDay}
           footer={ctaFooter}
         />
 

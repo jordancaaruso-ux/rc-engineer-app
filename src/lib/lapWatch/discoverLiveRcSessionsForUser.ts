@@ -2,7 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
-import { fetchUrlText } from "@/lib/lapUrlParsers/fetchText";
+import { fetchUrlText, type FetchTextResult } from "@/lib/lapUrlParsers/fetchText";
 import {
   extractPracticeSessions,
   extractRaceSessions,
@@ -17,7 +17,9 @@ import {
 import {
   resolveMostRecentPracticeListUrl,
   resolveRaceEventHubUrl,
+  type ResolveLiveRcIndexResult,
 } from "@/lib/lapWatch/resolveLiveRcIndexUrl";
+import { buildPracticeSessionListUrl } from "@/lib/lapWatch/liveRcIndexHtmlParse";
 import { normalizeLiveRcTrackOrigin } from "@/lib/lapWatch/liveRcTrackUrl";
 import {
   parseLiveRcRaceResultTableRows,
@@ -242,8 +244,27 @@ export async function discoverLiveRcSessionsForUser(input: {
   onlyNewSince?: Date | null;
   eventRaceClass?: string | null;
   referenceDate?: Date;
+  /**
+   * "Get my day": read this practice day's list (YYYY-MM-DD, the track's own date) instead of the
+   * newest one the track posted.
+   */
+  practiceDayYmd?: string | null;
+  /**
+   * Pages already fetched, by URL. The timing sweep looks for every listening driver at a track
+   * in one go and the pages are the same for all of them, so it shares one cache across the
+   * drivers; the second crawl of a hub is then all memory and no network.
+   */
+  pageCache?: Map<string, FetchTextResult> | null;
 }): Promise<DiscoverLiveRcSessionsResult> {
   const origin = normalizeLiveRcTrackOrigin(input.trackLiveRcUrl);
+  const cache = input.pageCache ?? null;
+  const fetchPage = async (url: string, options?: { timeoutMs?: number }): Promise<FetchTextResult> => {
+    const hit = cache?.get(url);
+    if (hit) return hit;
+    const fetched = await fetchUrlText(url, options);
+    if (cache && fetched.ok) cache.set(url, fetched);
+    return fetched;
+  };
   const emptyMeeting = { detected: false, eventHubUrl: null, eventLabel: null };
 
   const liveName = (await getLiveRcDriverNameSetting(input.userId).catch(() => null))?.trim() ?? "";
@@ -269,8 +290,16 @@ export async function discoverLiveRcSessionsForUser(input: {
     };
   }
 
+  const practiceDay = input.practiceDayYmd?.trim() || null;
   const [practiceResolved, raceResolved, activeRaceMeeting] = await Promise.all([
-    resolveMostRecentPracticeListUrl(origin),
+    practiceDay
+      ? Promise.resolve<ResolveLiveRcIndexResult>({
+          ok: true,
+          indexUrl: buildPracticeSessionListUrl(origin, practiceDay),
+          kind: "practice",
+          activityDate: practiceDay,
+        })
+      : resolveMostRecentPracticeListUrl(origin),
     resolveRaceEventHubUrl(origin),
     detectActiveRaceMeetingAtTrack({
       trackLiveRcUrl: origin,
@@ -299,7 +328,7 @@ export async function discoverLiveRcSessionsForUser(input: {
   const sessionsToday: LapDiscoverySessionRow[] = [];
 
   if (practiceResolved.ok) {
-    const fetched = await fetchUrlText(practiceResolved.indexUrl);
+    const fetched = await fetchPage(practiceResolved.indexUrl);
     if (!fetched.ok) {
       debug.practice.fetchError = fetched.error;
     } else {
@@ -338,7 +367,7 @@ export async function discoverLiveRcSessionsForUser(input: {
   }
 
   if (raceResolved.ok && driverNorm) {
-    const hubFetch = await fetchUrlText(raceResolved.indexUrl);
+    const hubFetch = await fetchPage(raceResolved.indexUrl);
     if (!hubFetch.ok) {
       debug.race.resolveError = debug.race.resolveError ?? hubFetch.error;
     } else {
@@ -374,7 +403,7 @@ export async function discoverLiveRcSessionsForUser(input: {
           return;
         }
         const fetchStart = Date.now();
-        const fetched = await fetchUrlText(sessionUrl, { timeoutMs: RACE_FETCH_TIMEOUT_MS });
+        const fetched = await fetchPage(sessionUrl, { timeoutMs: RACE_FETCH_TIMEOUT_MS });
         const fetchMs = Date.now() - fetchStart;
         if (fetchMs > slowestFetchMs) slowestFetchMs = fetchMs;
         pagesFetched++;

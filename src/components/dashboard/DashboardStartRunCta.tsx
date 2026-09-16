@@ -8,6 +8,7 @@ import { useDraftRun } from "@/components/layout/DraftRunProvider";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { formatAppTimestampUtc } from "@/lib/formatDate";
 import { warmNewRunForm } from "@/lib/runs/warmNewRunForm";
+import { GetMyDayRow } from "@/components/dashboard/GetMyDay";
 import {
   pendingSweepHref,
   pendingSweepLabel,
@@ -49,6 +50,7 @@ export function DashboardStartRunCta({
   serverDraftEventName,
   serverDraftIsForToday,
   pendingSweep = null,
+  getMyDay = false,
   footer,
 }: {
   serverDraftRunId: string | null;
@@ -58,6 +60,11 @@ export function DashboardStartRunCta({
    * still need a car. One quiet row under the bar — the same shape as "Start a new run instead".
    */
   pendingSweep?: DashboardPendingSweep | null;
+  /**
+   * "Get my day": pick a track and a day, and the app reads the timing sites once and files every
+   * session as a run. Members on a plan with a LiveRC name or their own transponder (`src/app/page.tsx`).
+   */
+  getMyDay?: boolean;
   serverDraftEventName?: string | null;
   /**
    * Whether that draft is for TODAY. The bar only takes itself over for one that is — a draft
@@ -187,6 +194,8 @@ export function DashboardStartRunCta({
           Start a new run instead
         </Link>
       ) : null}
+
+      {getMyDay ? <GetMyDayRow /> : null}
     </div>
   );
 }

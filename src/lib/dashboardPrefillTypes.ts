@@ -54,6 +54,13 @@ export type DashboardNewRunPrefill =
         createdAt: string;
         eventDetectionSource: "practice" | "race" | null;
         linkedEventId: string | null;
+        /**
+         * Where the sweep found this session. A loose import knows its track (schema: "a loose
+         * import must still know where it was"), so the form must not ask again — without it the
+         * "which car were you in?" landing opened on "Select track…" and could not pull the day's
+         * conditions (found driving it, 2026-09-16).
+         */
+        trackId: string | null;
         liveRcDriverName: string | null;
         liveRcDriverId: string | null;
       };

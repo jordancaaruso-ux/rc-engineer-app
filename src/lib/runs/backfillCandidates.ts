@@ -1,5 +1,8 @@
 import { calendarYmdInTimeZone } from "@/lib/formatDate";
+import { wallClockAsUtcToInstant } from "@/lib/eventActive";
 import { isWallClockAsUtcTimingSource, type LapTimingSource } from "@/lib/lapImport/labels";
+import { groupOutings, type OutingSession } from "@/lib/runs/groupOutings";
+import { estimateDurationSeconds, outingKindFor, spanFrom, timeAnchorFor } from "@/lib/runs/outingSpan";
 
 /**
  * One of the day's other timing sessions the driver can have filed as a run beside the one they
@@ -33,6 +36,44 @@ export function chosenBackfillSessions<T extends { sessionUrl: string }>(
   const excluded = new Set((offer.excludedUrls ?? []).map((u) => u.trim()));
   if (excluded.size === 0) return [...offer.sessions];
   return offer.sessions.filter((s) => !excluded.has(s.sessionUrl.trim()));
+}
+
+/** What the picker already knows about a session before it is imported. */
+export type BackfillCandidateMeta = { lapCount: number | null; bestLapSeconds: number | null };
+
+/** One row of the offer sheet: one time on track, however many timing sessions posted it. */
+export type BackfillOuting = { primaryUrl: string; sessionUrls: string[] };
+
+/**
+ * The offer as outings, so the sheet and its count say "3 other runs" when the timing sites
+ * posted five sessions for three times on track (founder ruling 2026-09-15, one run per time on
+ * track). Same rule the save applies with the real payloads (`createBackfilledRuns`); here the
+ * window is estimated from lap count × best lap, and a session the scan knows nothing about is a
+ * point in time. The offer's `sessions` stay the raw list — the save needs every id to link the
+ * extras to the run it makes.
+ */
+export function groupBackfillCandidates(
+  sessions: readonly BackfillCandidate[],
+  metaFor: (sessionUrl: string) => BackfillCandidateMeta | null,
+  timeZone: string | null
+): BackfillOuting[] {
+  const outingSessions: OutingSession[] = [];
+  for (const s of sessions) {
+    const raw = new Date(s.sessionCompletedAtIso);
+    if (Number.isNaN(raw.getTime())) continue;
+    const instant =
+      isWallClockAsUtcTimingSource(s.timingSource) && timeZone ? wallClockAsUtcToInstant(raw, timeZone) : raw;
+    const meta = metaFor(s.sessionUrl);
+    const duration = estimateDurationSeconds(meta?.lapCount, meta?.bestLapSeconds) ?? 0;
+    outingSessions.push({
+      id: s.sessionUrl,
+      kind: outingKindFor(null, s.sessionUrl),
+      ...spanFrom(instant, duration, timeAnchorFor(null, s.sessionUrl)),
+      driverCount: 0,
+      lapCount: meta?.lapCount ?? 0,
+    });
+  }
+  return groupOutings(outingSessions).map((o) => ({ primaryUrl: o.primaryId, sessionUrls: o.sessionIds }));
 }
 
 export type BackfillCandidateRow = {

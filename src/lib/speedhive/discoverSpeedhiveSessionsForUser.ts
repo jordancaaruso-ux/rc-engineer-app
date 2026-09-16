@@ -31,6 +31,8 @@ const MAX_SESSIONS_PER_EVENT = 40;
 
 export type SpeedhiveDiscoveredSession = {
   sessionUrl: string;
+  /** Practice runs only: the driver's own chip the run was found by. */
+  chipCode?: string | null;
   sessionId: string;
   sessionCompletedAtIso: string | null;
   sourceKind: "practice" | "race";
@@ -65,12 +67,15 @@ export async function discoverSpeedhiveSessionsForUser(input: {
   userId: string;
   trackSpeedhiveUrl: string;
   eventRaceClass?: string | null;
+  /** "Get my day": practice discovery reads this whole window instead of the ten newest runs. */
+  day?: { start: Date; end: Date } | null;
 }): Promise<DiscoverSpeedhiveSessionsResult> {
   const practiceLocationId = practiceLocationIdFromTrackUrl(input.trackSpeedhiveUrl);
   if (practiceLocationId) {
     const practice = await discoverSpeedhivePracticeSessionsForUser({
       userId: input.userId,
       trackSpeedhiveUrl: input.trackSpeedhiveUrl,
+      day: input.day ?? null,
     });
     return {
       candidates: practice.candidates,

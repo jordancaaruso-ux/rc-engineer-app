@@ -29,6 +29,34 @@ import {
 
 const MAX_ACTIVITIES_TO_EXPAND = 15;
 const MAX_DISCOVERY_RUNS = 10;
+/** "Get my day" reads a whole day: every visit that overlaps it, and every run inside it. */
+const MAX_DAY_ACTIVITIES = 20;
+const MAX_DAY_RUNS = 40;
+
+type DayWindow = { start: Date; end: Date };
+
+function msOf(iso: string | null | undefined): number | null {
+  if (!iso?.trim()) return null;
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? null : t;
+}
+
+/** A visit that started before the day ended and ended after it began. */
+function rangeOverlapsDay(
+  startIso: string | null | undefined,
+  endIso: string | null | undefined,
+  day: DayWindow
+): boolean {
+  const s = msOf(startIso) ?? msOf(endIso);
+  const e = msOf(endIso) ?? msOf(startIso);
+  if (s == null || e == null) return false;
+  return s < day.end.getTime() && e >= day.start.getTime();
+}
+
+function isoWithinDay(iso: string | null | undefined, day: DayWindow): boolean {
+  const t = msOf(iso);
+  return t != null && t >= day.start.getTime() && t < day.end.getTime();
+}
 
 function sessionSortKey(iso: string | null): number {
   if (!iso?.trim()) return 0;
@@ -120,6 +148,11 @@ async function runsFromActivity(
 export async function discoverSpeedhivePracticeSessionsForUser(input: {
   userId: string;
   trackSpeedhiveUrl: string;
+  /**
+   * "Get my day": this window, and all of it. Without it the scan keeps the driver's ten most
+   * recent runs, which cuts the start of a big practice day and misses a past day entirely.
+   */
+  day?: DayWindow | null;
 }): Promise<{
   candidates: SpeedhiveDiscoveredSession[];
   unimportedCandidates: SpeedhiveDiscoveredSession[];
@@ -164,6 +197,9 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
   }
 
   const activityIds = new Map<number, string | null>();
+  const day = input.day ?? null;
+  /** Which of the driver's chips each visit was found by — the sweep binds a chip to a car. */
+  const chipByActivity = new Map<number, string>();
   let discovered: SpeedhiveDiscoveredSession[] = [];
   let location: Awaited<ReturnType<typeof fetchPracticeLocation>> = null;
 
@@ -181,24 +217,37 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
             sessionSortKey(practiceTimestampToIso(b.endtimeutc ?? b.starttimeutc)) -
             sessionSortKey(practiceTimestampToIso(a.endtimeutc ?? a.starttimeutc))
         );
-        for (const sess of sorted.slice(0, MAX_ACTIVITIES_TO_EXPAND)) {
+        const visits = day
+          ? sorted
+              .filter((s) =>
+                rangeOverlapsDay(
+                  practiceTimestampToIso(s.starttimeutc),
+                  practiceTimestampToIso(s.endtimeutc),
+                  day
+                )
+              )
+              .slice(0, MAX_DAY_ACTIVITIES)
+          : sorted.slice(0, MAX_ACTIVITIES_TO_EXPAND);
+        for (const sess of visits) {
           if (!sess.id || activityIds.has(sess.id)) continue;
           activityIds.set(
             sess.id,
             practiceTimestampToIso(sess.endtimeutc) ??
               practiceTimestampToIso(sess.starttimeutc)
           );
+          chipByActivity.set(sess.id, chipCode);
         }
       }
     }
 
     if (activityIds.size === 0 && driverNorms.length > 0) {
       const activities = await fetchPracticeLocationActivities(locationId, {
-        count: MAX_ACTIVITIES_TO_EXPAND,
+        count: day ? MAX_DAY_ACTIVITIES : MAX_ACTIVITIES_TO_EXPAND,
         sport: location?.sport ?? "RC",
       });
       for (const act of activities) {
         if (!act.id) continue;
+        if (day && !rangeOverlapsDay(act.startTime, act.endTime, day)) continue;
         const label = act.chipLabel?.trim();
         if (!label || !speedhiveDriverNameMatchesAny(label, driverNorms)) continue;
         if (chipCodes.length > 0 && act.chipCode) {
@@ -216,6 +265,8 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
 
     for (const [activityId, activityIso] of activityIds) {
       const runs = await runsFromActivity(locationId, locationLabel, activityId, activityIso);
+      const chip = chipByActivity.get(activityId) ?? null;
+      for (const run of runs) run.chipCode = chip;
       discovered.push(...runs);
     }
   } catch (e) {
@@ -238,7 +289,9 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
   const sorted = [...discovered].sort(
     (a, b) => sessionSortKey(b.sessionCompletedAtIso) - sessionSortKey(a.sessionCompletedAtIso)
   );
-  const capped = sorted.slice(0, MAX_DISCOVERY_RUNS);
+  const capped = day
+    ? sorted.filter((d) => isoWithinDay(d.sessionCompletedAtIso, day)).slice(0, MAX_DAY_RUNS)
+    : sorted.slice(0, MAX_DISCOVERY_RUNS);
 
   const urls = capped.map((d) => d.sessionUrl);
   const imports =
