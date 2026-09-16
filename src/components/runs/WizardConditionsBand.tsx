@@ -210,7 +210,9 @@ export function WizardConditionsBand({
       ) : (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">
-            {track.name} has no location saved, so the weather can&rsquo;t be looked up.
+            {/* Literal ’ rather than &rsquo;: an HTML entity in this text node makes the build drop
+                the space after {track.name} ("Kilsythhas no location saved"). Measured 2026-09-16. */}
+            {track.name} has no location saved, so the weather can’t be looked up.
           </p>
           <button
             type="button"

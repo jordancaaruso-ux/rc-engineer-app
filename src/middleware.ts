@@ -142,6 +142,10 @@ export const config = {
   matcher: [
     "/",
     // Exclude /api/auth so Auth.js route handlers (session, callbacks) return JSON — not page 404 HTML.
-    "/((?!api/auth|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // `.webmanifest` is in the extension list because a browser fetches the PWA manifest WITHOUT
+    // credentials — gated, it answered the login redirect's HTML and every browser read it as a
+    // syntax error, so the app was not installable anywhere (measured on production, 2026-09-16).
+    // It carries brand metadata only (see `src/app/manifest.ts`), nothing of the driver's.
+    "/((?!api/auth|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|webmanifest)$).*)",
   ],
 };

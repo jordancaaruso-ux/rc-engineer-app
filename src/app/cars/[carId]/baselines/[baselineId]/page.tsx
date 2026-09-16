@@ -114,8 +114,10 @@ export default async function CarBaselineViewPage(props: {
         ) : null}
 
         <p className="ui-caption px-1">
-          Published for every {template.label} driver, so it can&apos;t be changed here. Save a copy
-          and it&apos;s yours to edit.
+          {/* Literal ’ rather than &apos;: an HTML entity in this text node makes the build drop
+              the space after {template.label} ("every A800RRdriver"). Measured 2026-09-16. */}
+          Published for every {template.label} driver, so it can’t be changed here. Save a copy
+          and it’s yours to edit.
         </p>
 
         {baseline.notes ? (
