@@ -60,9 +60,11 @@ export const InlineNewTrackRow = forwardRef<
   {
     /** Hand back the new track so the caller can add it to its list and select it. */
     onCreated: (track: InlineCreatedTrack) => void;
+    /** Cancel or Escape — for a caller that opened the form itself and wants its own view back. */
+    onCancel?: () => void;
     className?: string;
   }
->(function InlineNewTrackRow({ onCreated, className }, ref) {
+>(function InlineNewTrackRow({ onCreated, onCancel, className }, ref) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
@@ -198,7 +200,12 @@ export const InlineNewTrackRow = forwardRef<
             e.preventDefault();
             void create();
           }
-          if (e.key === "Escape") reset();
+          if (e.key === "Escape") {
+            // Handled here: a form inside a sheet must not also close the sheet.
+            e.stopPropagation();
+            reset();
+            onCancel?.();
+          }
         }}
       />
       <input
@@ -222,6 +229,7 @@ export const InlineNewTrackRow = forwardRef<
         value={timingUrls}
         onChange={setTimingUrls}
         onError={setError}
+        speedhiveLookup={{ name, location, onNameChange: setName }}
         labelClassName="block text-[11px] font-semibold text-muted-foreground"
         inputClassName="ui-control w-full rounded-lg border border-border bg-input px-2.5 py-2 text-sm text-foreground"
       />
@@ -241,7 +249,10 @@ export const InlineNewTrackRow = forwardRef<
         </button>
         <button
           type="button"
-          onClick={reset}
+          onClick={() => {
+            reset();
+            onCancel?.();
+          }}
           className="px-2 py-1.5 text-[11.5px] font-semibold text-muted-foreground transition hover:text-foreground"
         >
           Cancel

@@ -216,9 +216,7 @@ export function DashboardGetSetUpCard({ hasCar, hasTimingIdentity, hasSetup, set
             Add your setup sheet
           </h2>
           <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-            {canUpload
-              ? "This is what lets the Engineer talk about your actual car — your springs, droop and camber — instead of answering in general."
-              : "Your chassis has no readable sheet yet, so this one gets built in the app. It is what lets the Engineer talk about your actual car instead of answering in general."}
+            Your current setup, so every run records what you ran.
           </p>
           <div className="mt-3">
             {setupCars.length > 0 ? <UploadSetupSheetBar cars={setupCars} /> : null}
@@ -249,8 +247,7 @@ export function DashboardGetSetUpCard({ hasCar, hasTimingIdentity, hasSetup, set
             Add your timing details
           </h2>
           <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-            Your name and transponder, so lap times attach to you on their own instead of being
-            typed in by hand.
+            To get your lap times automatically, add your transponder number and name.
           </p>
           <ButtonLink href="/settings" className="mt-3 w-full gap-1.5 px-4 py-3 text-sm">
             Continue setting up
@@ -270,8 +267,7 @@ export function DashboardGetSetUpCard({ hasCar, hasTimingIdentity, hasSetup, set
             Add your car to log your first run
           </h2>
           <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-            Runs attach to a car — it’s the one thing we can’t guess. Then your timing details and
-            your setup sheet, and the app knows what it’s looking at.
+            A car is required to log your first run.
           </p>
           <div className="mt-3 flex flex-col gap-2">
             <LinkRow

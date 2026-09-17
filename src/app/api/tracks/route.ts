@@ -6,7 +6,8 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { getFavouriteTrackIdsForUser, addTrackToFavourites } from "@/lib/track-favourites";
 import { validateLiveRcTrackUrl } from "@/lib/lapWatch/liveRcTrackUrl";
 import { validateSpeedhiveTrackUrl } from "@/lib/speedhive/speedhiveUrl";
-import { communityTrackListWhere } from "@/lib/tracks/communityTrackAccess";
+import type { Prisma } from "@prisma/client";
+import { communityTrackListWhere, trackCatalogScopeWhere } from "@/lib/tracks/communityTrackAccess";
 import {
   DOMINANT_TRACK_ORDER_BY,
   dominantTrackByNameWhere,
@@ -50,13 +51,16 @@ export async function GET(request: Request) {
           : favouritesOnly
             ? { ...whereBase, id: { in: [] } }
             : whereBase,
-      // A search sorts by name: "newest first" is meaningless once the catalog is mostly seeded
-      // rows written in one batch, and a driver scanning results expects alphabetical.
-      orderBy: q ? { name: "asc" } : { createdAt: "desc" },
+      // A search sorts busiest first, then by name: "newest first" is meaningless once the catalog
+      // is mostly seeded rows written in one batch. Same order as the Tracks page's first screen.
+      orderBy: q
+        ? [{ catalogEventCount: { sort: "desc", nulls: "last" } }, { name: "asc" }]
+        : { createdAt: "desc" },
       ...(limit ? { take: limit } : {}),
       select: {
         id: true,
         name: true,
+        userId: true,
         location: true,
         countryCode: true,
         region: true,
@@ -154,8 +158,35 @@ export async function POST(request: Request) {
       };
     }
 
+    // The same track is the same name — or, since LiveRC-linked tracks carry LiveRC's full name
+    // (2026-09-16), the same LiveRC link, or a name that IS the club's LiveRC short name
+    // ("SERCCC" → serccc.liverc.com), or the same Speedhive practice track, now that the add forms
+    // pick it from Speedhive's list. All exact; a looser match would silently hand a driver someone
+    // else's venue, because the run form selects whatever this returns. A Speedhive ORGANISATION
+    // page is not a signal: one club can run several tracks under it.
+    const liveRcShort = /^[a-z0-9-]{3,40}$/i.test(name) ? name.toLowerCase() : null;
+    const speedhivePractice =
+      speedhiveUrl && /\/practice\/\d+$/.test(speedhiveUrl) ? speedhiveUrl : null;
+    const sameTrackSignals: Prisma.TrackWhereInput[] = [
+      ...(liveRcUrl ? [{ liveRcUrl: { equals: liveRcUrl, mode: "insensitive" as const } }] : []),
+      ...(liveRcShort
+        ? [{ liveRcUrl: { equals: `https://${liveRcShort}.liverc.com`, mode: "insensitive" as const } }]
+        : []),
+      ...(speedhivePractice
+        ? [{ speedhiveUrl: { equals: speedhivePractice, mode: "insensitive" as const } }]
+        : []),
+    ];
+    const byName = dominantTrackByNameWhere(name, user);
     const existing = await prisma.track.findFirst({
-      where: dominantTrackByNameWhere(name, user),
+      where:
+        sameTrackSignals.length > 0
+          ? {
+              AND: [
+                trackCatalogScopeWhere(user),
+                { OR: [{ name: byName.name }, ...sameTrackSignals] },
+              ],
+            }
+          : byName,
       orderBy: DOMINANT_TRACK_ORDER_BY,
       select: {
         id: true,
@@ -172,7 +203,7 @@ export async function POST(request: Request) {
     if (existing) {
       return NextResponse.json(
         {
-          error: "A track with this name already exists in the community catalog.",
+          error: "This track is already in the catalog.",
           existingTrackId: existing.id,
           track: existing,
         },

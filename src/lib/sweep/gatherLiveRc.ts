@@ -50,7 +50,12 @@ export async function gatherLiveRc(params: {
       .sort((a, b) => (a.sessionCompletedAtIso ?? "").localeCompare(b.sessionCompletedAtIso ?? ""));
 
     for (const c of todays) {
-      pushCandidate(result, userId, { sessionUrl: c.sessionUrl, source: "liverc", sourceKind: c.sourceKind });
+      pushCandidate(result, userId, {
+        sessionUrl: c.sessionUrl,
+        source: "liverc",
+        sourceKind: c.sourceKind,
+        listedAtIso: c.sessionCompletedAtIso,
+      });
     }
   }
   return result;

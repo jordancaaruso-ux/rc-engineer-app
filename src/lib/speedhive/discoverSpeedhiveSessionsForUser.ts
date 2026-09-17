@@ -5,9 +5,17 @@ import {
   buildSessionPageUrl,
   fetchEventSessions,
   fetchOrganizationEvents,
+  fetchOrganizationEventsSince,
   fetchSessionClassification,
   parseSpeedhiveLapTimeSeconds,
+  type SpeedhiveEventRow,
 } from "@/lib/speedhive/speedhiveClient";
+import {
+  SPEEDHIVE_EVENT_LOOKBACK_DAYS,
+  speedhiveSessionInstant,
+  speedhiveSessionLocalYmd,
+  ymdShift,
+} from "@/lib/speedhive/speedhiveSessionTime";
 import {
   classificationRowMatchesUser,
   sessionClassificationHasTransponderFields,
@@ -54,6 +62,8 @@ export type DiscoverSpeedhiveSessionsResult = {
   practiceLocationId: number | null;
   hint: string | null;
   status: LapDiscoveryStatus | null;
+  /** A named day could not be read in full; what was found is real, the list may be short. */
+  incomplete?: boolean;
 };
 
 function sessionSortKey(iso: string | null, startTime?: string | null): number {
@@ -67,8 +77,14 @@ export async function discoverSpeedhiveSessionsForUser(input: {
   userId: string;
   trackSpeedhiveUrl: string;
   eventRaceClass?: string | null;
-  /** "Get my day": practice discovery reads this whole window instead of the ten newest runs. */
+  /** "Import your last runs": practice discovery reads this whole window instead of the ten newest runs. */
   day?: { start: Date; end: Date } | null;
+  /**
+   * The same day as the track's date, and the track's zone — race results are read by date: every
+   * meeting that could hold the day, every session in it, and wall-clock times read at the track.
+   */
+  dayYmd?: string | null;
+  timeZone?: string | null;
 }): Promise<DiscoverSpeedhiveSessionsResult> {
   const practiceLocationId = practiceLocationIdFromTrackUrl(input.trackSpeedhiveUrl);
   if (practiceLocationId) {
@@ -85,16 +101,43 @@ export async function discoverSpeedhiveSessionsForUser(input: {
       practiceLocationId: practice.practiceLocationId,
       hint: practice.hint,
       status: practice.status,
+      incomplete: practice.incomplete ?? false,
     };
   }
 
   return discoverSpeedhiveOrganizationSessionsForUser(input);
 }
 
+/** The events a named day reads — every one that could hold it — and whether the walk finished. */
+async function eventsForDiscovery(
+  organizationId: number,
+  dayYmd: string | null,
+): Promise<{ events: SpeedhiveEventRow[]; complete: boolean }> {
+  if (!dayYmd) {
+    const events = await fetchOrganizationEvents(organizationId, MAX_EVENTS);
+    const sorted = [...events].sort(
+      (a, b) =>
+        sessionSortKey(b.updatedAt ?? null, b.startDate ?? null) -
+        sessionSortKey(a.updatedAt ?? null, a.startDate ?? null)
+    );
+    return { events: sorted, complete: true };
+  }
+  const walked = await fetchOrganizationEventsSince(
+    organizationId,
+    ymdShift(dayYmd, -SPEEDHIVE_EVENT_LOOKBACK_DAYS)
+  );
+  return {
+    events: walked.events.filter((e) => !e.startDate || e.startDate.slice(0, 10) <= dayYmd),
+    complete: walked.complete,
+  };
+}
+
 async function discoverSpeedhiveOrganizationSessionsForUser(input: {
   userId: string;
   trackSpeedhiveUrl: string;
   eventRaceClass?: string | null;
+  dayYmd?: string | null;
+  timeZone?: string | null;
 }): Promise<DiscoverSpeedhiveSessionsResult> {
   const organizationId = organizationIdFromTrackUrl(input.trackSpeedhiveUrl);
   if (!organizationId) {
@@ -134,18 +177,22 @@ async function discoverSpeedhiveOrganizationSessionsForUser(input: {
   const raceClassFilter = input.eventRaceClass?.trim().toLowerCase() ?? null;
   const discovered: SpeedhiveDiscoveredSession[] = [];
   let sawTransponderFields = false;
+  // A named day needs the track's zone to read Speedhive's wall-clock session times.
+  const dayYmd = input.dayYmd?.trim() && input.timeZone ? input.dayYmd.trim() : null;
+  const zone = input.timeZone ?? "UTC";
+  let incomplete = false;
 
   try {
-    const events = await fetchOrganizationEvents(organizationId, MAX_EVENTS);
-    const sortedEvents = [...events].sort(
-      (a, b) =>
-        sessionSortKey(b.updatedAt ?? null, b.startDate ?? null) -
-        sessionSortKey(a.updatedAt ?? null, a.startDate ?? null)
-    );
+    const { events: sortedEvents, complete } = await eventsForDiscovery(organizationId, dayYmd);
+    if (!complete) incomplete = true;
 
     for (const event of sortedEvents) {
       if (!event.id) continue;
-      const sessions = (await fetchEventSessions(event.id)).slice(0, MAX_SESSIONS_PER_EVENT);
+      const eventSessions = await fetchEventSessions(event.id);
+      const eventYmd = event.startDate?.slice(0, 10) ?? null;
+      const sessions = dayYmd
+        ? eventSessions.filter((s) => (speedhiveSessionLocalYmd(s.startTime, zone) ?? eventYmd) === dayYmd)
+        : eventSessions.slice(0, MAX_SESSIONS_PER_EVENT);
 
       for (const sess of sessions) {
         if (!sess.id) continue;
@@ -153,6 +200,8 @@ async function discoverSpeedhiveOrganizationSessionsForUser(input: {
         try {
           classification = await fetchSessionClassification(sess.id);
         } catch {
+          // Unread, not a race the driver was absent from.
+          if (dayYmd) incomplete = true;
           continue;
         }
 
@@ -171,11 +220,14 @@ async function discoverSpeedhiveOrganizationSessionsForUser(input: {
 
         if (!match) continue;
 
-        const completedIso = sess.startTime
-          ? new Date(sess.startTime).toISOString()
-          : event.startDate
-            ? new Date(`${event.startDate}T12:00:00Z`).toISOString()
-            : null;
+        const completedIso = dayYmd
+          ? (speedhiveSessionInstant(sess.startTime, zone) ??
+              speedhiveSessionInstant(`${eventYmd ?? dayYmd}T12:00:00`, zone))?.toISOString() ?? null
+          : sess.startTime
+            ? new Date(sess.startTime).toISOString()
+            : event.startDate
+              ? new Date(`${event.startDate}T12:00:00Z`).toISOString()
+              : null;
 
         const kind: "practice" | "race" =
           sess.type?.toLowerCase() === "practice" ? "practice" : "race";
@@ -273,6 +325,7 @@ async function discoverSpeedhiveOrganizationSessionsForUser(input: {
           ? "All matching Speedhive sessions are already imported."
           : noMatchHint,
     status,
+    incomplete,
   };
 }
 

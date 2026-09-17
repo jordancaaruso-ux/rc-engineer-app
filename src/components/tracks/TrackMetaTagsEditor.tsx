@@ -82,20 +82,13 @@ export function TrackMetaTagsEditor({
 
   if (compact) {
     return (
-      <div className="space-y-2">
-        <div className="text-[11px] font-medium text-muted-foreground">Grip &amp; layout</div>
-        {chipGroups}
-      </div>
+      <div className="space-y-2">{chipGroups}</div>
     );
   }
 
   return (
     <CardPanel contentClassName="text-sm space-y-2">
       <div className="text-sm font-medium text-foreground">Grip &amp; layout</div>
-      <p className="text-[11px] text-muted-foreground leading-snug">
-        Tap chips to describe this venue. Multi-select is allowed (e.g. medium + high grip). Saved on the track
-        for everyone in the catalog.
-      </p>
       {chipGroups}
     </CardPanel>
   );

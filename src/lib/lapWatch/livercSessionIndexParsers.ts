@@ -184,6 +184,9 @@ export function isLiveRcEventHubUrl(urlStr: string): boolean {
   }
 }
 
+/** Links read off one LiveRC list page — far past any real day, so it only stops a runaway page. */
+const LIST_ANCHOR_GUARD = 5000;
+
 export type ExtractedPracticeSession = {
   driverName: string;
   /** Visible `<a>` text on the practice list (usually the driver name). */
@@ -220,7 +223,9 @@ export function extractPracticeSessions(html: string, pageUrl: string): Extracte
   const $ = load(html);
   const out: ExtractedPracticeSession[] = [];
 
-  const anchors = $("a[href*='p=view_session'][href*='id=']").toArray().slice(0, 300);
+  // A guard against a runaway page, not a budget: a state titles Friday posted 323 sessions, and a
+  // cap of 300 cut the morning off the list (newest first) — runs that could never be imported.
+  const anchors = $("a[href*='p=view_session'][href*='id=']").toArray().slice(0, LIST_ANCHOR_GUARD);
   for (const a of anchors) {
     const href = $(a).attr("href") ?? "";
     const sessionUrl = absoluteUrl(pageUrl, href);
@@ -298,7 +303,7 @@ export function extractRaceSessions(html: string, pageUrl: string): ExtractedRac
   const $ = load(html);
   const out: ExtractedRaceSession[] = [];
 
-  const anchors = $("a[href*='p=view_race_result'][href*='id=']").toArray().slice(0, 400);
+  const anchors = $("a[href*='p=view_race_result'][href*='id=']").toArray().slice(0, LIST_ANCHOR_GUARD);
   for (const a of anchors) {
     const href = $(a).attr("href") ?? "";
     const sessionUrl = absoluteUrl(pageUrl, href);

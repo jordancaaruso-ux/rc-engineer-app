@@ -43,10 +43,6 @@ export function TrackLiveRcUrlEditor(props: {
   return (
     <CardPanel contentClassName="text-sm space-y-2">
       <div className="text-sm font-medium text-foreground">LiveRC track URL</div>
-      <p className="text-[11px] text-muted-foreground leading-snug">
-        Paste the track home page (e.g. https://tftr.liverc.com/). Lap times discovery uses this to find your most
-        recent sessions without a daily URL.
-      </p>
       <input
         className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
         value={liveRcUrl}

@@ -11,8 +11,9 @@ import {
   listGetMyDayTracks,
   loadGetMyDayTrack,
   pendingCarQuestion,
+  searchGetMyDayTracks,
 } from "@/lib/sweep/getMyDay";
-import { GET_MY_DAY_DAYS, daysFromToday } from "@/lib/sweep/getMyDayDays";
+import { GET_MY_DAY_REACH_DAYS, daysFromToday } from "@/lib/sweep/getMyDayDays";
 
 export const dynamic = "force-dynamic";
 /** LiveRC's race crawl alone can take 35 s; Speedhive and LiveRC are read side by side. */
@@ -48,6 +49,12 @@ export async function GET(req: Request): Promise<Response> {
     return NextResponse.json({ ok: true, ...pending, trackName: track.name, cars });
   }
 
+  // `?q=` — the sheet's search box: any catalog track with a timing link, not just the driver's.
+  const q = url.searchParams.get("q")?.trim();
+  if (q) {
+    return NextResponse.json({ q, tracks: await searchGetMyDayTracks(user, q) });
+  }
+
   const tracks = await listGetMyDayTracks(user.id);
   return NextResponse.json({ tracks, defaultTrackId: tracks[0]?.id ?? null });
 }
@@ -79,11 +86,12 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const now = new Date();
-  // The sheet offers the last few days in the phone's calendar; a day either side of the track's
-  // covers a driver whose phone and track sit in different zones.
+  // The calendar reaches back a fortnight in the phone's calendar; a day either side of the
+  // track's covers a driver whose phone and track sit in different zones. A range is read one
+  // day per request (the sheet's loop), so this stays a single-day check.
   const offset = daysFromToday(ymd, now, track.timeZone);
-  if (offset == null || offset > 1 || offset < -GET_MY_DAY_DAYS) {
-    return NextResponse.json({ error: "Pick a day from the last few" }, { status: 400 });
+  if (offset == null || offset > 1 || offset < -GET_MY_DAY_REACH_DAYS) {
+    return NextResponse.json({ error: "Pick a day from the last fortnight" }, { status: 400 });
   }
 
   try {

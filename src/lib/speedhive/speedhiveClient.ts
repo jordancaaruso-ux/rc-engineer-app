@@ -111,9 +111,45 @@ export async function fetchOrganizationEvents(
   return Array.isArray(data) ? data : [];
 }
 
+/** Events page size when walking an organisation back through its history. */
+const EVENT_PAGE_SIZE = 50;
+/** 2,000 events — years of any club. Only a feed that never ends reaches it. */
+const EVENT_PAGE_GUARD = 40;
+
+/**
+ * Every event an organisation posted that started on or after `earliestYmd`, newest first, walked
+ * page by page. Only the newest twelve were read before, so a meeting older than a busy club's
+ * last twelve could never be imported. `complete` is false only when the guard stopped the walk.
+ */
+export async function fetchOrganizationEventsSince(
+  organizationId: number,
+  earliestYmd: string
+): Promise<{ events: SpeedhiveEventRow[]; complete: boolean }> {
+  const events: SpeedhiveEventRow[] = [];
+  for (let page = 0; page < EVENT_PAGE_GUARD; page++) {
+    const data = await speedhiveFetchJson<SpeedhiveEventRow[]>(
+      `/organizations/${organizationId}/events`,
+      { count: String(EVENT_PAGE_SIZE), offset: String(page * EVENT_PAGE_SIZE) }
+    );
+    const rows = Array.isArray(data) ? data : [];
+    let reachedOlder = false;
+    for (const e of rows) {
+      const ymd = e.startDate?.slice(0, 10) ?? null;
+      if (ymd && ymd < earliestYmd) {
+        reachedOlder = true;
+        continue;
+      }
+      events.push(e);
+    }
+    if (reachedOlder || rows.length < EVENT_PAGE_SIZE) return { events, complete: true };
+  }
+  return { events, complete: false };
+}
+
+type SessionGroup = { sessions?: SpeedhiveSessionRow[]; subGroups?: SessionGroup[] };
 type SessionsPayload = {
   sessions?: SpeedhiveSessionRow[];
-  groups?: Array<{ sessions?: SpeedhiveSessionRow[] }>;
+  groups?: SessionGroup[];
 };
 
 export async function fetchEventSessions(eventId: number): Promise<SpeedhiveSessionRow[]> {
@@ -122,13 +158,22 @@ export async function fetchEventSessions(eventId: number): Promise<SpeedhiveSess
   if (Array.isArray(data.sessions)) {
     for (const s of data.sessions) out.push({ ...s, eventId });
   }
-  if (Array.isArray(data.groups)) {
-    for (const g of data.groups) {
-      if (!Array.isArray(g.sessions)) continue;
-      for (const s of g.sessions) out.push({ ...s, eventId });
+  // RC meetings nest class → qualifying → heat → round, and the sessions sit in `subGroups`
+  // leaves. Reading only the top level found none of a real meeting's 19 sessions (2026-09-17).
+  const walk = (groups: SessionGroup[] | undefined, depth: number) => {
+    if (!Array.isArray(groups) || depth > 8) return;
+    for (const g of groups) {
+      if (Array.isArray(g.sessions)) for (const s of g.sessions) out.push({ ...s, eventId });
+      walk(g.subGroups, depth + 1);
     }
-  }
-  return out;
+  };
+  walk(data.groups, 0);
+  const seen = new Set<number>();
+  return out.filter((s) => {
+    if (seen.has(s.id)) return false;
+    seen.add(s.id);
+    return true;
+  });
 }
 
 type ClassificationPayload = {

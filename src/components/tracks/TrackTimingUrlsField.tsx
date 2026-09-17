@@ -8,6 +8,8 @@ import {
   classifyTrackTimingUrl,
   type TrackTimingUrls,
 } from "@/lib/tracks/trackTimingUrl";
+import { SpeedhiveTrackFinder } from "@/components/tracks/SpeedhiveTrackFinder";
+import { tidyName } from "@/lib/tracks/tidyTrackName";
 
 /**
  * Collects a track's timing pages — plural, because a track holds one LiveRC slot and one
@@ -59,12 +61,32 @@ export const TrackTimingUrlsField = forwardRef<
     inputClassName: string;
     labelClassName?: string;
     className?: string;
+    /**
+     * The name and town typed into the add-track form. Given, the field offers "Find on Speedhive"
+     * for the track being added — so the Speedhive link goes in with the track, instead of saving
+     * the track, opening it and finding the link there (founder 2026-09-16).
+     *
+     * Picking a club also hands its Speedhive name back to replace what was typed: the timing
+     * site's name is the track's name, same rule as LiveRC's (founder 2026-09-16).
+     */
+    speedhiveLookup?: {
+      name: string;
+      location: string | null;
+      onNameChange: (name: string) => void;
+    };
   }
 >(function TrackTimingUrlsField(
-  { value, onChange, onError, inputClassName, labelClassName, className },
+  { value, onChange, onError, inputClassName, labelClassName, className, speedhiveLookup },
   ref
 ) {
   const [draft, setDraft] = useState("");
+  /** Practice-page URL → the Speedhive name picked for it, so its chip names the club, not an id. */
+  const [pickedNames, setPickedNames] = useState<Record<string, string>>({});
+  /**
+   * The name as typed before a pick renamed it. Taking the Speedhive link back off (the wrong club)
+   * puts the typed name back too — unless the driver has since edited the name themselves.
+   */
+  const [renamedFrom, setRenamedFrom] = useState<{ typed: string; picked: string } | null>(null);
   const fieldId = useId();
 
   const filled = (Object.keys(PROVIDER_LABEL) as (keyof TrackTimingUrls)[]).filter(
@@ -111,13 +133,23 @@ export const TrackTimingUrlsField = forwardRef<
                 {PROVIDER_LABEL[field]}
               </span>
               <span className="min-w-0 break-all text-[11px] text-muted-foreground">
-                {displayUrl(field, value[field] ?? "")}
+                {(field === "speedhiveUrl" && pickedNames[value[field] ?? ""]) ||
+                  displayUrl(field, value[field] ?? "")}
               </span>
               <button
                 type="button"
                 aria-label={`Remove the ${PROVIDER_LABEL[field]} page`}
                 onClick={() => {
                   onChange({ ...value, [field]: null });
+                  if (
+                    field === "speedhiveUrl" &&
+                    speedhiveLookup &&
+                    renamedFrom &&
+                    speedhiveLookup.name === renamedFrom.picked
+                  ) {
+                    speedhiveLookup.onNameChange(renamedFrom.typed);
+                  }
+                  if (field === "speedhiveUrl") setRenamedFrom(null);
                   onError(null);
                 }}
                 className="shrink-0 rounded text-muted-foreground transition hover:text-foreground"
@@ -184,17 +216,31 @@ export const TrackTimingUrlsField = forwardRef<
         </div>
       )}
 
-      {/* Says what filling this in buys you, because the label names the thing and the
-          placeholder names the shape — neither said why a driver should bother, which read as
-          homework. Tracks are a shared catalog and discovery matches each driver by their own
-          transponder, so one paste finds laps for everyone who races there, not just whoever
-          typed it. Gone once a page is in: by then it's been bothered with. */}
+      {/* The example is the whole hint — the "your sessions then turn up here" sentence came off
+          with the other track-form blurbs (founder 2026-09-16). */}
       {filled.length > 0 ? null : (
-        <p className="break-words text-[11px] leading-snug text-muted-foreground">
-          Your sessions then turn up here on their own, for everyone racing here.
-          <span className="block opacity-75">{TRACK_TIMING_PASTE_EXAMPLE_SHORT}</span>
+        <p className="break-words text-[11px] leading-snug text-muted-foreground opacity-75">
+          {TRACK_TIMING_PASTE_EXAMPLE_SHORT}
         </p>
       )}
+
+      {speedhiveLookup && !value.speedhiveUrl ? (
+        <SpeedhiveTrackFinder
+          source={{ name: speedhiveLookup.name, location: speedhiveLookup.location }}
+          onPick={async (speedhiveUrl, pickedName) => {
+            // "PEAKHURST PARKWAY" goes in as "Peakhurst Parkway" — the same tidy LiveRC names get.
+            const name = tidyName(pickedName);
+            setPickedNames((cur) => ({ ...cur, [speedhiveUrl]: name }));
+            onChange({ ...value, speedhiveUrl });
+            if (name && name !== speedhiveLookup.name) {
+              setRenamedFrom({ typed: speedhiveLookup.name, picked: name });
+              speedhiveLookup.onNameChange(name);
+            }
+            onError(null);
+            return null;
+          }}
+        />
+      ) : null}
     </div>
   );
 });

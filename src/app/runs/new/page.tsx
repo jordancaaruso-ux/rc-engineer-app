@@ -143,6 +143,8 @@ export default async function NewRunPage({
         longitude: true,
         gripTags: true,
         layoutTags: true,
+        // The picker searches the LiveRC short name ("serccc") — see TrackCombobox.
+        liveRcUrl: true,
       },
     }),
     getFavouriteTrackIdsForUser(user.id),

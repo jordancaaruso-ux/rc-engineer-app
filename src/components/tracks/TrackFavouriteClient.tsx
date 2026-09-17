@@ -46,9 +46,6 @@ export function TrackFavouriteClient(props: {
   return (
     <CardPanel contentClassName="space-y-2">
       <Eyebrow>Favourites</Eyebrow>
-      <p className="text-sm text-muted-foreground">
-        Tracks are shared reference data. Adding or removing from favourites only changes your quick-access list; it does not affect run history.
-      </p>
       {isFavourite ? (
         <button
           type="button"

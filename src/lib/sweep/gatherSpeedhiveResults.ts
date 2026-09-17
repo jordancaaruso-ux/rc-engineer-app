@@ -3,10 +3,16 @@ import "server-only";
 import {
   buildSessionPageUrl,
   fetchEventSessions,
-  fetchOrganizationEvents,
+  fetchOrganizationEventsSince,
   fetchSessionClassification,
   type SpeedhiveClassificationRow,
 } from "@/lib/speedhive/speedhiveClient";
+import {
+  SPEEDHIVE_EVENT_LOOKBACK_DAYS,
+  speedhiveSessionInstant,
+  speedhiveSessionLocalYmd,
+  ymdShift,
+} from "@/lib/speedhive/speedhiveSessionTime";
 import { classificationRowMatchesUser } from "@/lib/speedhive/speedhiveClassificationMatch";
 import {
   getSpeedhiveDriverNamesForUser,
@@ -16,24 +22,12 @@ import { normalizeSpeedhiveDriverNamesForMatch } from "@/lib/speedhive/speedhive
 import { organizationIdFromTrackUrl } from "@/lib/speedhive/speedhiveUrl";
 import { emptyGather, pushCandidate, type GatherResult } from "@/lib/sweep/gatherSpeedhivePractice";
 import { reportSweepFailure } from "@/lib/observability/reportSweep";
-import { trackLocalYmd, type SweepPlanDoc, type SweepPlanTrack } from "@/lib/sweep/sweepDocs";
-
-/** Newest events on the organisation page; a club posts one or two a weekend. */
-const MAX_EVENTS = 12;
-/** A multi-day meeting's Sunday sessions sit under an event that started on the Friday. */
-const EVENT_LOOKBACK_DAYS = 3;
-const MAX_SESSIONS_PER_EVENT = 40;
+import type { SweepPlanDoc, SweepPlanTrack } from "@/lib/sweep/sweepDocs";
 
 type Identity = { userId: string; transponders: number[]; driverNorms: string[] };
 
 function isRateLimit(err: unknown): boolean {
   return err instanceof Error && /HTTP 429$/.test(err.message);
-}
-
-function ymdShift(ymd: string, days: number): string {
-  const d = new Date(`${ymd}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
 }
 
 /**
@@ -72,21 +66,25 @@ export async function gatherSpeedhiveResults(params: {
   ).filter((i): i is Identity => i !== null);
   if (identities.length === 0) return result;
 
-  const earliestEventYmd = ymdShift(ymd, -EVENT_LOOKBACK_DAYS);
   try {
-    const events = await fetchOrganizationEvents(organizationId, MAX_EVENTS);
-    for (const event of events) {
+    // Every event that could hold the day, walked back through the organisation's history — the
+    // newest twelve were read before, and each capped at forty sessions (2026-09-17).
+    const walked = await fetchOrganizationEventsSince(
+      organizationId,
+      ymdShift(ymd, -SPEEDHIVE_EVENT_LOOKBACK_DAYS),
+    );
+    if (!walked.complete) result.failed = true;
+    for (const event of walked.events) {
       if (!event.id) continue;
       const eventYmd = event.startDate?.slice(0, 10) ?? null;
-      // An event that starts after the day, or ended well before it, cannot hold its sessions.
-      if (eventYmd && (eventYmd > ymd || eventYmd < earliestEventYmd)) continue;
+      // An event that starts after the day cannot hold its sessions.
+      if (eventYmd && eventYmd > ymd) continue;
 
-      const sessions = (await fetchEventSessions(event.id)).slice(0, MAX_SESSIONS_PER_EVENT);
+      const sessions = await fetchEventSessions(event.id);
       for (const sess of sessions) {
         if (!sess.id) continue;
-        const startIso = sess.startTime ? new Date(sess.startTime) : null;
-        const sessionYmd =
-          startIso && !Number.isNaN(startIso.getTime()) ? trackLocalYmd(track.timeZone, startIso) : eventYmd;
+        // Speedhive's session time is the track's wall clock with no zone: its date IS the day.
+        const sessionYmd = speedhiveSessionLocalYmd(sess.startTime, track.timeZone) ?? eventYmd;
         if (sessionYmd !== ymd) continue;
 
         let classification: SpeedhiveClassificationRow[];
@@ -110,7 +108,15 @@ export async function gatherSpeedhiveResults(params: {
               raceClassFilter: null,
             }),
           );
-          if (hit) pushCandidate(result, who.userId, { sessionUrl, source: "speedhive", sourceKind });
+          if (hit) {
+            pushCandidate(result, who.userId, {
+              sessionUrl,
+              source: "speedhive",
+              sourceKind,
+              // The session page carries no time of its own; without this the run had none.
+              listedAtIso: speedhiveSessionInstant(sess.startTime, track.timeZone)?.toISOString() ?? null,
+            });
+          }
         }
       }
     }

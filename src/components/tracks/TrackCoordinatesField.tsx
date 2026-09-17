@@ -166,13 +166,6 @@ export const TrackCoordinatesField = forwardRef<
           </button>
         </div>
       )}
-
-      {value ? null : (
-        <p className="break-words text-[11px] leading-snug text-muted-foreground">
-          Puts the track on “near you” for every driver. Tap the pin if you’re here, or paste from
-          Google Maps.
-        </p>
-      )}
     </div>
   );
 });

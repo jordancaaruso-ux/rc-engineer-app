@@ -139,3 +139,6 @@ marketing-reel/
 # Session scratch scripts and walk screenshots taken on production accounts — never committed
 scripts/tmp/
 onboarding-friction-prod/
+
+# "Import your last runs" range drive (regenerate with scripts/dev-import-range-shots.ts)
+import-range-shots/

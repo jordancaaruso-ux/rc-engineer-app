@@ -46,12 +46,6 @@ export function TrackSpeedhiveUrlEditor(props: {
   return (
     <CardPanel contentClassName="text-sm space-y-2">
       <div className="text-sm font-medium text-foreground">Speedhive track URL</div>
-      <p className="text-[11px] text-muted-foreground leading-snug">
-        Paste the track&apos;s Speedhive practice page (e.g.{" "}
-        <span className="tabular-nums text-foreground/90">speedhive.mylaps.com/practice/4591</span>
-        ). We use your MYLAPS transponder from Settings to find your practice sessions at that
-        track. Organization URLs (…/organizations/…) still work for race day results.
-      </p>
       <input
         className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs outline-none"
         value={speedhiveUrl}

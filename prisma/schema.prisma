@@ -705,6 +705,11 @@ model Track {
    * what makes re-running the import an update rather than a second copy of the catalog.
    */
   catalogSourceRef String?
+  /**
+   * How many events the source listed for this track when it was imported (LiveRC's event archive).
+   * Orders the Tracks page busiest-first. Null for user-created tracks. A snapshot, not live.
+   */
+  catalogEventCount Int?
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String

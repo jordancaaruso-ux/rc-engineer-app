@@ -84,8 +84,7 @@ export function LogRunWizardHost({
       <CardPanel className="text-center" contentClassName="px-5 py-8">
         <h2 className="text-[17px] font-bold tracking-[-0.01em] text-foreground">Add a car first</h2>
         <p className="mx-auto mt-2 max-w-[34ch] text-[13px] leading-relaxed text-muted-foreground">
-          Runs attach to a car — it’s the one thing we can’t guess for you. Takes about twenty
-          seconds, then you’re logging.
+          A car is required to log your first run.
         </p>
         <ButtonLink href="/cars" className="mt-5 gap-1.5 px-4 py-2.5 text-sm">
           Add your car

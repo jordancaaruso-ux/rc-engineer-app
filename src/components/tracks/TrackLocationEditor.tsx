@@ -107,12 +107,7 @@ export function TrackLocationEditor({
             <span className="text-[10px] ml-1">({saved.locationSource})</span>
           ) : null}
         </p>
-      ) : (
-        <p className="text-muted-foreground leading-snug">
-          In Google Maps, find the track, right-click the pin, and copy the coordinates. Paste them below
-          (e.g. -37.75, 145.13). You can set this before you visit.
-        </p>
-      )}
+      ) : null}
 
       <div className="space-y-1">
         <label className="block text-[11px] text-muted-foreground">Coordinates (latitude, longitude)</label>

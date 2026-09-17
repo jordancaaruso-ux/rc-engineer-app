@@ -183,13 +183,18 @@ async function main() {
   console.log(`  ${repaired} tyre delta(s) repaired; demo time zone = ${TIME_ZONE}`);
 
   // ── 4. Rival names ────────────────────────────────────────────────────────────
-  const scrub = buildScrubber(RIVAL_NAMES.map(([from, to]) => ({ from, to })), { transponders: false });
-  const scrubJson = <T,>(v: T): T => (v == null ? v : deepScrub(v, scrub));
-  let touched = 0;
+  // The founder's own name goes with them. It is not modesty: the imported field payloads name
+  // every driver in the heat including him, and `RunImportedLapSet` has already been rewritten to
+  // "Nic Swole", so leaving the payload as "JORDAN CARUSO" both puts his name on the website
+  // (found 2026-09-16 in 51 sessions' fieldStatsJson) and breaks the match between the field table
+  // and the driver the app calls "you".
   const founderScrub = buildScrubber(
     [{ from: "Jordan Caruso", to: "Nic Swole" }, { from: "jordan caruso", to: "nic swole" }, { from: "Caruso", to: "Swole" }, { from: "Jordan", to: "Nic" }, ...RIVAL_NAMES.map(([from, to]) => ({ from, to }))],
     { transponders: false },
   );
+  const scrub = founderScrub;
+  const scrubJson = <T,>(v: T): T => (v == null ? v : deepScrub(v, scrub));
+  let touched = 0;
   const sessions = await prisma.importedLapTimeSession.findMany({ where: { userId: DEMO }, select: { id: true, parsedPayload: true, fieldStatsJson: true, eventDetectionSessionLabel: true } });
   for (const s of sessions) {
     const parsedPayload = scrubJson(s.parsedPayload);

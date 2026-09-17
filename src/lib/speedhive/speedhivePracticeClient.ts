@@ -96,6 +96,52 @@ export async function fetchPracticeLocationActivities(
   return Array.isArray(data.activities) ? data.activities : [];
 }
 
+/** Activities per page when walking a location back to a day. */
+const ACTIVITY_PAGE_SIZE = 100;
+/** 10,000 activities — far past a fortnight at the busiest track seen. Only a runaway feed reaches it. */
+const ACTIVITY_PAGE_GUARD = 100;
+/** No practice visit runs longer than this; once a page starts this far before the window, stop. */
+const ACTIVITY_MAX_SPAN_MS = 36 * 60 * 60 * 1000;
+
+/**
+ * Every activity at a location that overlaps the window, walked back page by page (newest first).
+ * Only the newest twenty or forty were read before, so at a busy track a day more than a few hours
+ * old was already off the list. `complete` is false only when the guard stopped the walk.
+ */
+export async function fetchPracticeLocationActivitiesInWindow(
+  locationId: number,
+  window: { start: Date; end: Date },
+  opts?: { sport?: string }
+): Promise<{ activities: SpeedhivePracticeActivityRow[]; complete: boolean }> {
+  const startMs = window.start.getTime();
+  const endMs = window.end.getTime();
+  const activities: SpeedhivePracticeActivityRow[] = [];
+  for (let page = 0; page < ACTIVITY_PAGE_GUARD; page++) {
+    const data = await practiceFetchJson<{ activities?: SpeedhivePracticeActivityRow[] }>(
+      `/api/v1/locations/${locationId}/activities`,
+      {
+        count: String(ACTIVITY_PAGE_SIZE),
+        offset: String(page * ACTIVITY_PAGE_SIZE),
+        order: "desc",
+        sport: opts?.sport ?? "RC",
+      }
+    );
+    const rows = Array.isArray(data.activities) ? data.activities : [];
+    let oldestStart = Number.POSITIVE_INFINITY;
+    for (const a of rows) {
+      const s = a.startTime ? Date.parse(a.startTime) : Number.NaN;
+      if (!Number.isFinite(s)) continue;
+      oldestStart = Math.min(oldestStart, s);
+      const e = a.endTime ? Date.parse(a.endTime) : Number.NaN;
+      if (s < endMs && (Number.isFinite(e) ? e : s) >= startMs) activities.push(a);
+    }
+    if (rows.length < ACTIVITY_PAGE_SIZE || oldestStart < startMs - ACTIVITY_MAX_SPAN_MS) {
+      return { activities, complete: true };
+    }
+  }
+  return { activities, complete: false };
+}
+
 export async function fetchPracticeSessionsForChipAtLocation(
   locationId: number,
   chipCode: string

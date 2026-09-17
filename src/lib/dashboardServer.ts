@@ -54,7 +54,9 @@ import {
 } from "@/lib/dashboardVerdict";
 import { pickHeroSeries } from "@/lib/dashboardHeroSeries";
 import { perfSpan } from "@/lib/perfLog";
-import type { DashboardPendingSweep } from "@/lib/sweep/pendingSweep";
+import { pendingLooseFromImports, type DashboardPendingSweep } from "@/lib/sweep/pendingSweep";
+import { importedSessionInstantToReal } from "@/lib/runSessionCompletedAt";
+import { resolveTrackTimeZone } from "@/lib/tracks/trackTimeZone";
 
 export type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
 export type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
@@ -788,7 +790,15 @@ export async function loadDashboardHomeModel(
     prisma.importedLapTimeSession.findMany({
       where: { userId, linkedRunId: null, sweepFiledAt: { gte: todayStart } },
       orderBy: { sessionCompletedAt: "asc" },
-      select: { id: true, trackId: true },
+      select: {
+        id: true,
+        trackId: true,
+        sourceUrl: true,
+        sessionCompletedAt: true,
+        track: {
+          select: { timeZone: true, latitude: true, longitude: true, user: { select: { timeZone: true } } },
+        },
+      },
     }),
     actionItemRowsPromise,
   ]);
@@ -1344,19 +1354,16 @@ export async function loadDashboardHomeModel(
     pendingSweep: (() => {
       const idx = todaysRuns.findIndex((r) => r.unconfirmedAt != null);
       if (idx >= 0) return { kind: "placeholder" as const, runId: todaysRuns[idx]!.id, position: idx + 1 };
-      const loose = looseImportsToday[0];
-      if (loose) {
-        return {
-          kind: "loose" as const,
-          importedLapTimeSessionId: loose.id,
-          count: looseImportsToday.length,
-          // What the "Which car?" sheet needs to ask about them (`pendingSweepHref`). Null track
-          // can't be asked about, so the row falls back to the old attach-by-hand route.
-          trackId: loose.trackId,
-          ymd: calendarYmdInTimeZone(new Date(), timeZone),
-        };
-      }
-      return null;
+      // The day each session RAN at its track — what the "Which car?" sheet asks about
+      // (`pendingSweepHref`). No track or no time can't be asked about: the old by-hand route.
+      return pendingLooseFromImports(
+        looseImportsToday.map((r) => {
+          if (!r.trackId || !r.track || !r.sessionCompletedAt) return { id: r.id, trackId: r.trackId, ymd: null };
+          const zone = resolveTrackTimeZone(r.track, r.track.user);
+          const instant = importedSessionInstantToReal(r.sessionCompletedAt, r.sourceUrl, zone);
+          return { id: r.id, trackId: r.trackId, ymd: calendarYmdInTimeZone(instant, zone) };
+        }),
+      );
     })(),
     todaysChanges,
     todayStrip,

@@ -102,8 +102,26 @@ export function extractLiveRcRaceSessionWhenRaw(html: string): string | null {
   return null;
 }
 
+/** A zone written into the string itself ("GMT", "UTC", "Z", "+09:30") — then it is a real instant. */
+const EXPLICIT_ZONE_RE = /(?:\b(?:UTC|GMT)\b|\dZ\b|[+-]\d{2}:?\d{2}\s*$)/i;
+
 /**
- * Parse LiveRC display string to UTC ISO. Uses `Date.parse` plus a few normalizations for LiveRC variants.
+ * `Date.parse` reads a zone-less string in the SERVER's zone. The stored convention is the track's
+ * wall clock written as UTC — which is what a UTC server (Vercel) produces — so the server's own
+ * offset is taken back out. On a dev box at UTC+9:30 or +10 every LiveRC time otherwise landed that
+ * many hours early: runs showed at 1 am and a 9:48 am race slid into the previous day and was
+ * never imported (SA State Titles, 2026-09-16).
+ */
+function parseAsWallClockUtc(v: string): string | null {
+  const ms = Date.parse(v);
+  if (Number.isNaN(ms)) return null;
+  if (EXPLICIT_ZONE_RE.test(v)) return new Date(ms).toISOString();
+  return new Date(ms - new Date(ms).getTimezoneOffset() * 60_000).toISOString();
+}
+
+/**
+ * Parse LiveRC display string to UTC ISO — the track's wall clock written as UTC, whatever zone the
+ * server runs in. Uses `Date.parse` plus a few normalizations for LiveRC variants.
  */
 export function parseLiveRcSessionDisplayTimeToUtcIso(raw: string): string | null {
   let s = normalizeWhitespace(raw).replace(/[\u2013\u2014\u2212]/g, "-");
@@ -117,11 +135,7 @@ export function parseLiveRcSessionDisplayTimeToUtcIso(raw: string): string | nul
     return `${h}${mid} ${suf}`;
   });
 
-  const tryParse = (v: string): string | null => {
-    const ms = Date.parse(v);
-    if (!Number.isNaN(ms)) return new Date(ms).toISOString();
-    return null;
-  };
+  const tryParse = parseAsWallClockUtc;
 
   let out = tryParse(s);
   if (out) return out;
@@ -144,10 +158,10 @@ export function parseLiveRcSessionDisplayTimeToUtcIso(raw: string): string | nul
         const min = Number(mm);
         if (ap?.toUpperCase() === "PM" && h24 < 12) h24 += 12;
         if (ap?.toUpperCase() === "AM" && h24 === 12) h24 = 0;
-        const dt = new Date(y, m - 1, d, h24, min, 0, 0);
+        const dt = new Date(Date.UTC(y, m - 1, d, h24, min, 0, 0));
         if (!Number.isNaN(dt.getTime())) return dt.toISOString();
       } else {
-        const dt = new Date(y, m - 1, d, 12, 0, 0, 0);
+        const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0, 0));
         if (!Number.isNaN(dt.getTime())) return dt.toISOString();
       }
     }

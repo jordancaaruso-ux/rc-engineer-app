@@ -61,6 +61,11 @@ export function communityTrackListWhere(
       // location reliably carries the state. `countryCode` is deliberately absent — it is a two-letter
       // code nobody types, and country is a browse axis on the tracks page rather than a search term.
       { region: { contains: q, mode: "insensitive" } },
+      // The LiveRC host is usually the club's own short name ("serccc", "grccc", "tftr"), which is
+      // what drivers type — and since 2026-09-16 LiveRC-linked tracks carry LiveRC's full name
+      // ("South Eastern Radio Controlled Car Club"). "//" anchors to the start of the host, so a
+      // search for "live" or "com" doesn't match every LiveRC track.
+      { liveRcUrl: { contains: `//${q}`, mode: "insensitive" } },
     ],
   };
 }

@@ -10,7 +10,22 @@ export type TrackOption = {
   location?: string | null;
   gripTags?: string[];
   layoutTags?: string[];
+  liveRcUrl?: string | null;
 };
+
+/**
+ * "serccc" from https://serccc.liverc.com — the club's short name, which is what drivers type.
+ * LiveRC-linked tracks carry LiveRC's full name since 2026-09-16, so without this "SERCCC" would
+ * find nothing.
+ */
+function liveRcShortName(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).host.split(".")[0] || null;
+  } catch {
+    return null;
+  }
+}
 
 function trackLabel(t: TrackOption): string {
   return t.location ? `${t.name} (${t.location})` : t.name;
@@ -81,7 +96,10 @@ export function TrackCombobox({
       value: t.id,
       label: t.name,
       detail: t.location ?? null,
-      keywords: [...(t.gripTags ?? []), ...(t.layoutTags ?? [])].join(" ") || null,
+      keywords:
+        [...(t.gripTags ?? []), ...(t.layoutTags ?? []), liveRcShortName(t.liveRcUrl)]
+          .filter(Boolean)
+          .join(" ") || null,
     });
     return [
       {

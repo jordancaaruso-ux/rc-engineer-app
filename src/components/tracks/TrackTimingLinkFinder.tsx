@@ -11,6 +11,7 @@ import {
   type TrackTimingUrlsFieldHandle,
 } from "@/components/tracks/TrackTimingUrlsField";
 import type { TrackTimingUrls } from "@/lib/tracks/trackTimingUrl";
+import { SpeedhiveTrackFinder } from "@/components/tracks/SpeedhiveTrackFinder";
 
 /**
  * Shown on a track that has no timing link at all — which, after the catalog seed, is most of
@@ -23,11 +24,9 @@ import type { TrackTimingUrls } from "@/lib/tracks/trackTimingUrl";
  * driver (see the PATCH route: "GPS + track URLs are contributions any driver may add"), so this
  * needs no new permission and no new endpoint.
  *
- * The "look it up" buttons run a plain web search rather than deep-linking into a provider's own
- * search. Speedhive is a single-page app that serves an identical 3KB shell for every URL, so a
- * `?q=` deep link cannot be verified to actually search anything — a link that silently does
- * nothing is worse than one that plainly works. Replace this if a real search URL is ever
- * confirmed in a browser.
+ * Speedhive is searched in place (`SpeedhiveTrackFinder`): tap a match and it is saved. LiveRC
+ * still runs a plain web search — most LiveRC tracks arrive with their link from the catalog, and
+ * LiveRC has no directory to ask.
  */
 export function TrackTimingLinkFinder(props: { trackId: string; trackName: string }) {
   const router = useRouter();
@@ -36,8 +35,22 @@ export function TrackTimingLinkFinder(props: { trackId: string; trackName: strin
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  function lookupHref(provider: "speedhive.mylaps.com" | "liverc.com"): string {
+  function lookupHref(provider: "liverc.com"): string {
     return `https://duckduckgo.com/?q=${encodeURIComponent(`${props.trackName} site:${provider}`)}`;
+  }
+
+  async function saveSpeedhive(speedhiveUrl: string): Promise<string | null> {
+    const res = await fetch(`/api/tracks/${props.trackId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ speedhiveUrl }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      return body?.error ?? "Could not save that link. Try again.";
+    }
+    router.refresh();
+    return null;
   }
 
   async function save() {
@@ -77,24 +90,10 @@ export function TrackTimingLinkFinder(props: { trackId: string; trackName: strin
   return (
     <CardPanel contentClassName="text-sm space-y-3">
       <Eyebrow>Timing</Eyebrow>
-      <div>
-        <p className="font-medium text-foreground">No timing link yet</p>
-        <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
-          Add where this track posts its results and your sessions import themselves — for everyone
-          who races here, not just you.
-        </p>
-      </div>
+      <p className="font-medium text-foreground">No timing link yet</p>
 
       <div className="flex flex-wrap gap-2">
-        <a
-          href={lookupHref("speedhive.mylaps.com")}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-[13px] transition-colors hover:bg-muted"
-        >
-          Look up on Speedhive
-          <ExternalLink aria-hidden className="size-3.5" />
-        </a>
+        <SpeedhiveTrackFinder source={{ trackId: props.trackId }} onPick={saveSpeedhive} />
         <a
           href={lookupHref("liverc.com")}
           target="_blank"

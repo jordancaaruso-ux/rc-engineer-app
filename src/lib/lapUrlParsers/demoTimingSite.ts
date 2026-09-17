@@ -110,6 +110,114 @@ const RACES: DemoRace[] = [
 
 const RACE_LAP_COUNT = 17;
 
+// ── Practice days ─────────────────────────────────────────────────────────────
+// The race meeting above is always "today", which is all a log-a-run demo needs. "Import your
+// last runs" reads a stretch of days, so the site also serves practice days behind today
+// (2026-09-16): a club night yesterday, a longer day before it, and a weekend a week back, with
+// quiet days in between so an empty day is part of the test rather than a failure.
+
+type DemoPracticeSession = {
+  sessionId: string;
+  driverName: string;
+  /** Local clock at the track when the session ended. */
+  hour: number;
+  minute: number;
+  /** Seconds the driver runs on this day; the laps are generated around it. */
+  basePace: number;
+  lapCount: number;
+  mistakeLap: number | null;
+};
+
+type DemoPracticeDay = { daysAgo: number; sessions: DemoPracticeSession[] };
+
+/**
+ * Every session sits at 11:00 local or later. That was load-bearing on a dev box until
+ * `parseLiveRcSessionDisplayTimeToUtcIso` stopped reading LiveRC's zone-less wall clock in the
+ * SERVER's zone (2026-09-16): at UTC+10 an early-morning session parsed back to the previous UTC
+ * day and imported nowhere — a 9:41 am demo session vanished that way. Kept as it is so the demo
+ * days read the same as before.
+ */
+
+const PRACTICE_DAYS: DemoPracticeDay[] = [
+  {
+    // Yesterday: a club practice night, three runs of the driver's own plus two other drivers.
+    daysAgo: 1,
+    sessions: [
+      { sessionId: "770101", driverName: DEMO_DRIVER_NAME, hour: 18, minute: 12, basePace: 18.21, lapCount: 14, mistakeLap: 6 },
+      { sessionId: "770102", driverName: "Marcus Delaney", hour: 18, minute: 31, basePace: 17.94, lapCount: 14, mistakeLap: null },
+      { sessionId: "770103", driverName: DEMO_DRIVER_NAME, hour: 19, minute: 4, basePace: 17.98, lapCount: 15, mistakeLap: null },
+      { sessionId: "770104", driverName: "Priya Raman", hour: 19, minute: 22, basePace: 18.55, lapCount: 14, mistakeLap: 9 },
+      { sessionId: "770105", driverName: DEMO_DRIVER_NAME, hour: 19, minute: 48, basePace: 17.84, lapCount: 15, mistakeLap: null },
+    ],
+  },
+  {
+    // The day before: two runs, the second quicker.
+    daysAgo: 2,
+    sessions: [
+      { sessionId: "770201", driverName: DEMO_DRIVER_NAME, hour: 11, minute: 26, basePace: 18.44, lapCount: 13, mistakeLap: 3 },
+      { sessionId: "770202", driverName: "Tomas Brandt", hour: 11, minute: 52, basePace: 18.12, lapCount: 14, mistakeLap: null },
+      { sessionId: "770203", driverName: DEMO_DRIVER_NAME, hour: 12, minute: 35, basePace: 18.09, lapCount: 15, mistakeLap: null },
+    ],
+  },
+  // Days 3 and 4 back are deliberately quiet — nobody at the track, nothing to import.
+  {
+    // A weekend a week back: Saturday practice before the Sunday meeting.
+    daysAgo: 6,
+    sessions: [
+      { sessionId: "770601", driverName: DEMO_DRIVER_NAME, hour: 11, minute: 41, basePace: 18.62, lapCount: 12, mistakeLap: null },
+      { sessionId: "770602", driverName: DEMO_DRIVER_NAME, hour: 13, minute: 18, basePace: 18.33, lapCount: 14, mistakeLap: 11 },
+    ],
+  },
+  {
+    daysAgo: 7,
+    sessions: [
+      { sessionId: "770701", driverName: DEMO_DRIVER_NAME, hour: 15, minute: 7, basePace: 18.77, lapCount: 12, mistakeLap: 4 },
+    ],
+  },
+];
+
+/** Local midnight `daysAgo` before `now`, then the session's clock on top — never UTC maths. */
+function practiceSessionAt(session: DemoPracticeSession, daysAgo: number, now: Date): Date {
+  const d = new Date(now);
+  d.setDate(d.getDate() - daysAgo);
+  d.setHours(session.hour, session.minute, 0, 0);
+  return d;
+}
+
+function localYmd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function practiceDayYmd(daysAgo: number, now: Date): string {
+  const d = new Date(now);
+  d.setDate(d.getDate() - daysAgo);
+  return localYmd(d);
+}
+
+function findPracticeSession(sessionId: string): { day: DemoPracticeDay; session: DemoPracticeSession } | null {
+  for (const day of PRACTICE_DAYS) {
+    const session = day.sessions.find((s) => s.sessionId === sessionId);
+    if (session) return { day, session };
+  }
+  return null;
+}
+
+/** Laps for one practice run: slow opening lap, an optional marshal, tightening late. */
+function practiceLaps(session: DemoPracticeSession): number[] {
+  const rand = seededRandom(Number.parseInt(session.sessionId, 10));
+  const laps: number[] = [];
+  for (let lapNum = 1; lapNum <= session.lapCount; lapNum++) {
+    if (lapNum === session.mistakeLap) {
+      laps.push(round3(session.basePace + 3.8 + rand() * 1.4));
+      continue;
+    }
+    const settling = Math.min(1, (lapNum - 1) / 5);
+    const opening = lapNum === 1 ? 1.9 : 0;
+    laps.push(round3(session.basePace + opening - 0.14 * settling + rand() * (0.58 - 0.28 * settling)));
+  }
+  return laps;
+}
+
 // ── Lap generation ────────────────────────────────────────────────────────────
 // Seeded from the driver id, never Math.random: the same driver produces the same race
 // every time, so a re-shoot matches the take before it.
@@ -220,14 +328,77 @@ function dashboardPage(): string {
 </html>`;
 }
 
-/** Deliberately empty: the demo shows one race session, so practice discovery finds nothing. */
-function practiceCalendarPage(): string {
+/** The days that have practice on them, newest first — LiveRC's `?p=session_list&d=` links. */
+function practiceCalendarPage(now: Date): string {
+  const rows = PRACTICE_DAYS.map((day) => {
+    const ymd = practiceDayYmd(day.daysAgo, now);
+    return `      <li><a href="/practice/?p=session_list&amp;d=${ymd}">${ymd}</a> — ${day.sessions.length} sessions</li>`;
+  }).join("\n");
+
   return `<!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>Practice :: ${escapeHtml(DEMO_TRACK_NAME)} :: LiveRC</title></head>
 <body>
   <h1>Practice Sessions</h1>
-  <p>No practice sessions have been posted.</p>
+  <ul class="practice_days">
+${rows}
+  </ul>
+</body>
+</html>`;
+}
+
+/** One day's practice list. A day nobody ran is a real, empty page — not a 404. */
+function practiceSessionListPage(ymd: string, now: Date): string {
+  const day = PRACTICE_DAYS.find((d) => practiceDayYmd(d.daysAgo, now) === ymd);
+  const rows = (day?.sessions ?? [])
+    .map((session) => {
+      const when = practiceSessionAt(session, day!.daysAgo, now);
+      return `      <tr>
+        <td><a href="/practice/?p=view_session&amp;id=${session.sessionId}">Practice</a></td>
+        <td class="driver_name">${escapeHtml(session.driverName)}</td>
+        <td class="session_time">${escapeHtml(listDate(when))}</td>
+        <td>${session.lapCount} laps</td>
+      </tr>`;
+    })
+    .join("\n");
+
+  return `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Practice ${ymd} :: ${escapeHtml(DEMO_TRACK_NAME)} :: LiveRC</title></head>
+<body>
+  <h1>Practice Sessions — ${ymd}</h1>
+  <table class="practice_sessions">
+    <thead><tr><th></th><th>Driver</th><th>Time</th><th>Laps</th></tr></thead>
+    <tbody>
+${rows}
+    </tbody>
+  </table>
+</body>
+</html>`;
+}
+
+/** One practice run: the title carries the driver and the wall clock, the body the lap lines. */
+function practiceSessionPage(session: DemoPracticeSession, daysAgo: number, now: Date): string {
+  const when = practiceSessionAt(session, daysAgo, now);
+  const laps = practiceLaps(session);
+  const lines = laps.map((t, i) => `    <div class="lap">Lap ${i + 1}: ${t.toFixed(3)}</div>`).join("\n");
+  const fastest = Math.min(...laps);
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Practice Session for ${escapeHtml(session.driverName)} on ${escapeHtml(titleDate(when))} :: ${escapeHtml(DEMO_TRACK_NAME)} :: LiveRC</title>
+</head>
+<body>
+  <h1>Practice Session for ${escapeHtml(session.driverName)}</h1>
+  <p>Class | 2WD Modified Buggy | Transponder ${session.sessionId}</p>
+  <h2>Lap Times</h2>
+  <div class="lap_times">
+${lines}
+  </div>
+  <p>Fastest Lap: ${fastest.toFixed(3)}</p>
+  <p>* indicates an invalid lap</p>
 </body>
 </html>`;
 }
@@ -342,7 +513,19 @@ export function serveDemoTimingPage(url: string, now: Date = new Date()): DemoTi
   const id = parsed.searchParams.get("id")?.trim() ?? "";
 
   if (path === "" || path === "/index.php") return page(dashboardPage());
-  if (path === "/practice") return page(practiceCalendarPage());
+  if (path === "/practice") {
+    if (p === "view_session") {
+      const found = findPracticeSession(id);
+      // An unknown session id is a real 404 on LiveRC too — say so rather than inventing a run.
+      return found ? page(practiceSessionPage(found.session, found.day.daysAgo, now)) : null;
+    }
+    if (p === "session_list") {
+      const d = parsed.searchParams.get("d")?.trim() ?? "";
+      // A day with nobody on track is an empty list, not a missing page.
+      return /^\d{4}-\d{2}-\d{2}$/.test(d) ? page(practiceSessionListPage(d, now)) : page(practiceCalendarPage(now));
+    }
+    return page(practiceCalendarPage(now));
+  }
 
   if (path === "/results") {
     if (p === "view_race_result") {

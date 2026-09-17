@@ -54,6 +54,7 @@ export default async function TracksPage({
   const TRACK_FIELDS = {
     id: true,
     name: true,
+    userId: true,
     location: true,
     countryCode: true,
     region: true,
@@ -108,7 +109,9 @@ export default async function TracksPage({
       : Promise.resolve([]),
     prisma.track.findMany({
       where: homeCountries.length > 0 ? { ...scope, countryCode: { in: homeCountries } } : scope,
-      orderBy: { name: "asc" },
+      // Busiest first: LiveRC's event count for catalog rows (founder 2026-09-16). Tracks drivers
+      // added themselves have no count and follow, alphabetically.
+      orderBy: [{ catalogEventCount: { sort: "desc", nulls: "last" } }, { name: "asc" }],
       take: BROWSE_LIMIT,
       select: TRACK_FIELDS,
     }),
@@ -144,6 +147,7 @@ export default async function TracksPage({
             favouriteTrackIds={favouriteTrackIds}
             focusTrackId={focusTrackId}
             catalogCount={catalogCount}
+            currentUserId={user.id}
           />
         </div>
       </section>

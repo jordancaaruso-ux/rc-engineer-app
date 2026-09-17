@@ -7,6 +7,7 @@ import { discoverLiveRcSessionsForUser } from "@/lib/lapWatch/discoverLiveRcSess
 import { discoverSpeedhiveSessionsForUser } from "@/lib/speedhive/discoverSpeedhiveSessionsForUser";
 import { resolveTrackTimeZone } from "@/lib/tracks/trackTimeZone";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
+import { communityTrackListWhere, type TrackCatalogViewer } from "@/lib/tracks/communityTrackAccess";
 import { confirmRunReturnHref } from "@/lib/runs/confirmRunHref";
 import { outingKindFor } from "@/lib/runs/outingSpan";
 import { outingSessionFromImportedRow } from "@/lib/runs/outingsFromImportedSessions";
@@ -31,6 +32,13 @@ import type { SweepSource } from "@/lib/sweep/sweepDocs";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TRACK_LOOKBACK_DAYS = 180;
 const TRACK_LIST_MAX = 10;
+const TRACK_SEARCH_MAX = 12;
+/**
+ * The race crawl's ceiling for a day asked for by hand. The route has 120 s; a live look keeps 35 s
+ * so a trackside tap stays quick, but a day read after the fact would rather wait than come back
+ * short. What it still cannot finish is reported, never dropped (`incomplete`).
+ */
+const DAY_RACE_CRAWL_BUDGET_MS = 75_000;
 /** A day's loose sessions are looked up by stored time; wall-clock sources sit up to a day off. */
 const LOOSE_WINDOW_SLACK_MS = 36 * 60 * 60 * 1000;
 
@@ -109,6 +117,34 @@ export async function listGetMyDayTracks(userId: string): Promise<Array<{ id: st
   return out;
 }
 
+/**
+ * Every track in the catalog with a timing link, by name, town, state or LiveRC host — busiest
+ * first. How a driver with no tracks of their own (a new account, a new venue) reaches the import
+ * at all; the list above only knows where they have already been.
+ */
+export async function searchGetMyDayTracks(
+  viewer: TrackCatalogViewer,
+  query: string,
+): Promise<Array<{ id: string; name: string; location: string | null }>> {
+  const q = query.trim();
+  if (!q) return [];
+  const rows = await prisma.track.findMany({
+    // Nested under AND: the search is a top-level OR, and a second one would overwrite it.
+    where: {
+      AND: [
+        communityTrackListWhere(viewer, q),
+        { OR: [{ liveRcUrl: { not: null } }, { speedhiveUrl: { not: null } }] },
+      ],
+    },
+    orderBy: [{ catalogEventCount: { sort: "desc", nulls: "last" } }, { name: "asc" }],
+    take: TRACK_SEARCH_MAX,
+    select: { id: true, name: true, location: true, liveRcUrl: true, speedhiveUrl: true },
+  });
+  return rows
+    .filter((t) => t.liveRcUrl?.trim() || t.speedhiveUrl?.trim())
+    .map((t) => ({ id: t.id, name: t.name, location: t.location }));
+}
+
 export async function loadGetMyDayTrack(trackId: string): Promise<GetMyDayTrack | null> {
   const t = await prisma.track.findUnique({
     where: { id: trackId },
@@ -154,12 +190,16 @@ export async function getMyDay(params: {
 
   const [speedhive, liveRc] = await Promise.all([
     track.speedhiveUrl
-      ? discoverSpeedhiveSessionsForUser({ userId, trackSpeedhiveUrl: track.speedhiveUrl, day }).catch(
-          (err: unknown) => {
-            reportSweepFailure(err, { stage: "day", source: "speedhive", trackId: track.id, userId });
-            return null;
-          },
-        )
+      ? discoverSpeedhiveSessionsForUser({
+          userId,
+          trackSpeedhiveUrl: track.speedhiveUrl,
+          day,
+          dayYmd: ymd,
+          timeZone: zone,
+        }).catch((err: unknown) => {
+          reportSweepFailure(err, { stage: "day", source: "speedhive", trackId: track.id, userId });
+          return null;
+        })
       : Promise.resolve(null),
     readLiveRc
       ? discoverLiveRcSessionsForUser({
@@ -167,6 +207,7 @@ export async function getMyDay(params: {
           trackLiveRcUrl: track.liveRcUrl!,
           referenceDate: noon,
           practiceDayYmd: ymd,
+          raceCrawlBudgetMs: DAY_RACE_CRAWL_BUDGET_MS,
         }).catch((err: unknown) => {
           reportSweepFailure(err, { stage: "day", source: "liverc", trackId: track.id, userId });
           return null;
@@ -174,11 +215,15 @@ export async function getMyDay(params: {
       : Promise.resolve(null),
   ]);
 
+  // A source that could not be read IN FULL counts as failed, not just one that could not be
+  // reached: every run in the day is the promise, and a short list must not pass for a whole one.
   const failedSources: SweepSource[] = [];
-  if (track.speedhiveUrl && (!speedhive || speedhive.status?.code === "unreachable")) {
+  if (track.speedhiveUrl && (!speedhive || speedhive.status?.code === "unreachable" || speedhive.incomplete)) {
     failedSources.push("speedhive");
   }
-  if (readLiveRc && (!liveRc || liveRc.status?.code === "unreachable")) failedSources.push("liverc");
+  if (readLiveRc && (!liveRc || liveRc.status?.code === "unreachable" || liveRc.incomplete)) {
+    failedSources.push("liverc");
+  }
 
   const sh = splitDayCandidates(speedhive?.candidates ?? [], ymd, "speedhive", zone);
   const lr = splitDayCandidates(liveRc?.candidates ?? [], ymd, "liverc", zone);
@@ -188,8 +233,15 @@ export async function getMyDay(params: {
       source: "speedhive" as const,
       sourceKind: c.sourceKind,
       chipCode: c.chipCode ?? null,
+      // A Speedhive race page carries no time of its own; the event listing does.
+      listedAtIso: c.sessionCompletedAtIso,
     })),
-    ...lr.toFile.map((c) => ({ sessionUrl: c.sessionUrl, source: "liverc" as const, sourceKind: c.sourceKind })),
+    ...lr.toFile.map((c) => ({
+      sessionUrl: c.sessionUrl,
+      source: "liverc" as const,
+      sourceKind: c.sourceKind,
+      listedAtIso: c.sessionCompletedAtIso,
+    })),
   ];
 
   const outcomes = await fileDayForUser({

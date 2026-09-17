@@ -110,7 +110,6 @@ export default async function TrackDetailPage(props: {
               {track.name}
               {!track.verifiedAt ? <UnverifiedBadge /> : null}
             </h1>
-            <p className="page-subtitle">Track details. Add or remove from your favourites.</p>
           </div>
         </div>
       </header>
@@ -125,13 +124,6 @@ export default async function TrackDetailPage(props: {
               ) : null}
             </div>
           </CardPanel>
-
-          {!canManage ? (
-            <p className="text-xs text-muted-foreground leading-snug">
-              This track&rsquo;s grip/layout tags are managed by the driver who added it (or an admin).
-              Your runs at this venue: {runCount}.
-            </p>
-          ) : null}
 
           {/* Admin verify toggle. Was an in-flow sibling of the `<h1>` in the header,
               which centres the title and the button as a PAIR — so the track name sat
@@ -188,11 +180,7 @@ export default async function TrackDetailPage(props: {
 
               <TrackSpeedhiveUrlEditor trackId={track.id} initialSpeedhiveUrl={track.speedhiveUrl} />
             </>
-          ) : (
-            <CardPanel contentClassName="text-sm text-muted-foreground">
-              GPS and grip/layout tags are managed by the user who added this track.
-            </CardPanel>
-          )}
+          ) : null}
 
           <TrackFavouriteClient trackId={track.id} trackName={track.name} isFavourite={isFavourite} />
 

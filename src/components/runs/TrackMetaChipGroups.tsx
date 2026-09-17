@@ -38,7 +38,7 @@ export function TrackMetaChipGroups({
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <div className="text-muted-foreground text-[11px]">Grip (multi-select, e.g. medium + high)</div>
+        <div className="text-muted-foreground text-[11px]">Grip</div>
         <div className="flex flex-wrap gap-1.5">
           {TRACK_GRIP_TAG_IDS.map((id) => {
             const on = g.includes(id);
@@ -63,7 +63,7 @@ export function TrackMetaChipGroups({
         </div>
       </div>
       <div className="space-y-1.5">
-        <div className="text-muted-foreground text-[11px]">Layout (multi-select)</div>
+        <div className="text-muted-foreground text-[11px]">Layout</div>
         <div className="flex flex-wrap gap-1.5">
           {TRACK_LAYOUT_TAG_IDS.map((id) => {
             const on = l.includes(id);

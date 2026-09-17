@@ -17,6 +17,7 @@ import {
 import {
   resolveMostRecentPracticeListUrl,
   resolveRaceEventHubUrl,
+  resolveRaceEventHubsForDay,
   type ResolveLiveRcIndexResult,
 } from "@/lib/lapWatch/resolveLiveRcIndexUrl";
 import { buildPracticeSessionListUrl } from "@/lib/lapWatch/liveRcIndexHtmlParse";
@@ -40,6 +41,13 @@ import {
 const SESSIONS_TODAY_CAP = 60;
 
 const RACE_HUB_ROW_CAP = 40;
+/**
+ * One day's races only (the sweep and "Import your last runs"), across every meeting that could
+ * hold them. Not a budget — every race that day is opened (founder 2026-09-17: "always search for
+ * every run within the date period"); only a runaway page could reach it. The crawl's wall-clock
+ * budget still bounds the time, and a crawl it cuts short says so (`incomplete`).
+ */
+const RACE_HUB_DAY_ROW_CAP = 400;
 const RACE_FETCH_CONCURRENCY = 5;
 /** Per-page timeout for the membership crawl — short, so one stuck LiveRC page can't eat the budget. */
 const RACE_FETCH_TIMEOUT_MS = 9_000;
@@ -50,6 +58,9 @@ const RACE_FETCH_TIMEOUT_MS = 9_000;
  * serverless function timeout and returning nothing — the failure seen trackside under load.
  */
 const RACE_CRAWL_BUDGET_MS = 35_000;
+
+/** The meeting hubs a look reads, and whether finding them fell short. */
+type RaceHubs = { hubUrls: string[]; eventListFailed: boolean; error: string | null };
 
 export type DiscoveredSession = {
   sessionUrl: string;
@@ -78,11 +89,18 @@ export type LiveRcTrackDiscoveryDebug = {
   race: {
     resolveError: string | null;
     hubUrl: string | null;
+    /** Every meeting hub read — one for a live look, all that could hold a named day. */
+    hubUrls: string[];
+    /** The track's events page could not be read, so a named day may be missing a meeting. */
+    eventListFailed: boolean;
+    hubsFailed: number;
     hubRows: number;
     hubRowsAfterClassFilter: number;
     resultPagesFetched: number;
     /** Pages left unfetched because the crawl wall-clock budget was hit (newest-first, so these are the oldest). */
     resultPagesSkippedForBudget: number;
+    /** Race pages that did not load — unread, not races the driver was absent from. */
+    resultPagesFailed: number;
     /** Total wall-clock spent on the race-page membership crawl. */
     crawlMs: number;
     canonicalDriverId: string | null;
@@ -111,6 +129,12 @@ export type DiscoverLiveRcSessionsResult = {
     eventHubUrl: string | null;
     eventLabel: string | null;
   };
+  /**
+   * Something that should have been read was not — the practice list, the events page, a meeting
+   * hub, or race pages the crawl could not open or ran out of time for. The sessions found are
+   * real; the list may be short.
+   */
+  incomplete: boolean;
   debug: LiveRcTrackDiscoveryDebug;
 };
 
@@ -170,10 +194,14 @@ function emptyDebug(partial?: Partial<LiveRcTrackDiscoveryDebug>): LiveRcTrackDi
     race: {
       resolveError: null,
       hubUrl: null,
+      hubUrls: [],
+      eventListFailed: false,
+      hubsFailed: 0,
       hubRows: 0,
       hubRowsAfterClassFilter: 0,
       resultPagesFetched: 0,
       resultPagesSkippedForBudget: 0,
+      resultPagesFailed: 0,
       crawlMs: 0,
       canonicalDriverId: null,
       sessionsWithDriverId: 0,
@@ -249,6 +277,8 @@ export async function discoverLiveRcSessionsForUser(input: {
    * newest one the track posted.
    */
   practiceDayYmd?: string | null;
+  /** Wall-clock ceiling for the race-page crawl; defaults to the live look's 35 s. */
+  raceCrawlBudgetMs?: number;
   /**
    * Pages already fetched, by URL. The timing sweep looks for every listening driver at a track
    * in one go and the pages are the same for all of them, so it shares one cache across the
@@ -286,12 +316,14 @@ export async function discoverLiveRcSessionsForUser(input: {
       hint: "Invalid LiveRC track URL.",
       status: emptyLapDiscoveryStatus("invalid_url", "liverc"),
       activeRaceMeeting: emptyMeeting,
+      incomplete: true,
       debug,
     };
   }
 
   const practiceDay = input.practiceDayYmd?.trim() || null;
-  const [practiceResolved, raceResolved, activeRaceMeeting] = await Promise.all([
+  const crawlBudgetMs = input.raceCrawlBudgetMs ?? RACE_CRAWL_BUDGET_MS;
+  const [practiceResolved, raceHubs, activeRaceMeeting] = await Promise.all([
     practiceDay
       ? Promise.resolve<ResolveLiveRcIndexResult>({
           ok: true,
@@ -300,7 +332,15 @@ export async function discoverLiveRcSessionsForUser(input: {
           activityDate: practiceDay,
         })
       : resolveMostRecentPracticeListUrl(origin),
-    resolveRaceEventHubUrl(origin),
+    // A named day reads every meeting that could hold it; otherwise the current meeting only.
+    practiceDay
+      ? resolveRaceEventHubsForDay(origin, practiceDay).then((r): RaceHubs => ({ ...r, error: null }))
+      : resolveRaceEventHubUrl(origin).then(
+          (r): RaceHubs =>
+            r.ok
+              ? { hubUrls: [r.indexUrl], eventListFailed: false, error: null }
+              : { hubUrls: [], eventListFailed: false, error: r.error },
+        ),
     detectActiveRaceMeetingAtTrack({
       trackLiveRcUrl: origin,
       referenceDate: input.referenceDate,
@@ -313,10 +353,12 @@ export async function discoverLiveRcSessionsForUser(input: {
     debug.practice.indexUrl = practiceResolved.indexUrl;
     debug.practice.activityDate = practiceResolved.activityDate;
   }
-  if (!raceResolved.ok) {
-    debug.race.resolveError = raceResolved.error;
-  } else {
-    debug.race.hubUrl = raceResolved.indexUrl;
+  debug.race.hubUrls = raceHubs.hubUrls;
+  debug.race.hubUrl = raceHubs.hubUrls[0] ?? null;
+  debug.race.eventListFailed = raceHubs.eventListFailed;
+  if (raceHubs.hubUrls.length === 0) {
+    debug.race.resolveError =
+      raceHubs.error ?? (raceHubs.eventListFailed ? "LiveRC events page could not be read." : null);
   }
 
   const discovered: DiscoveredSession[] = [];
@@ -366,14 +408,35 @@ export async function discoverLiveRcSessionsForUser(input: {
     }
   }
 
-  if (raceResolved.ok && driverNorm) {
-    const hubFetch = await fetchPage(raceResolved.indexUrl);
-    if (!hubFetch.ok) {
-      debug.race.resolveError = debug.race.resolveError ?? hubFetch.error;
-    } else {
-      const hubRowsRaw = extractRaceSessions(hubFetch.text, raceResolved.indexUrl);
+  if (raceHubs.hubUrls.length > 0 && driverNorm) {
+    const hubFetches = await Promise.all(
+      raceHubs.hubUrls.map(async (hubUrl) => ({ hubUrl, fetched: await fetchPage(hubUrl) })),
+    );
+    const hubRowsRaw: ReturnType<typeof extractRaceSessions> = [];
+    const seenRaceUrls = new Set<string>();
+    for (const { hubUrl, fetched } of hubFetches) {
+      if (!fetched.ok) {
+        debug.race.hubsFailed++;
+        debug.race.resolveError = debug.race.resolveError ?? fetched.error;
+        continue;
+      }
+      for (const row of extractRaceSessions(fetched.text, hubUrl)) {
+        const key = row.sessionUrl.trim();
+        if (seenRaceUrls.has(key)) continue;
+        seenRaceUrls.add(key);
+        hubRowsRaw.push(row);
+      }
+    }
+    if (debug.race.hubsFailed < hubFetches.length) {
       debug.race.hubRows = hubRowsRaw.length;
-      let raceRows = hubRowsRaw.slice(0, RACE_HUB_ROW_CAP);
+      // A day asked for by name narrows the hubs to that day's races BEFORE the cap. A meeting hub
+      // lists every round, newest first; at a state titles eight races a round, five qualifiers
+      // filled all 40 slots and the practice and seeding rounds were never opened. LiveRC times
+      // are the track's wall clock stored as UTC, so the ISO date is the track's date.
+      const dayRows = practiceDay
+        ? hubRowsRaw.filter((r) => r.sessionCompletedAtIso?.slice(0, 10) === practiceDay)
+        : hubRowsRaw;
+      let raceRows = dayRows.slice(0, practiceDay ? RACE_HUB_DAY_ROW_CAP : RACE_HUB_ROW_CAP);
       const rc = input.eventRaceClass?.trim();
       if (rc) {
         const narrowed = raceRows.filter((r) => raceListRowMatchesAnyConfiguredClass(r, rc));
@@ -396,8 +459,9 @@ export async function discoverLiveRcSessionsForUser(input: {
       let pagesSkippedForBudget = 0;
       let slowestFetchMs = 0;
 
+      let pagesFailed = 0;
       await mapPool(urlsToCheck, RACE_FETCH_CONCURRENCY, async (sessionUrl) => {
-        if (Date.now() - crawlStart > RACE_CRAWL_BUDGET_MS) {
+        if (Date.now() - crawlStart > crawlBudgetMs) {
           pagesSkippedForBudget++;
           pageRowsByUrl.set(sessionUrl, []);
           return;
@@ -407,24 +471,27 @@ export async function discoverLiveRcSessionsForUser(input: {
         const fetchMs = Date.now() - fetchStart;
         if (fetchMs > slowestFetchMs) slowestFetchMs = fetchMs;
         pagesFetched++;
+        // A page that did not load is not a race the driver was absent from — it is unread.
+        if (!fetched.ok) pagesFailed++;
         pageRowsByUrl.set(sessionUrl, fetched.ok ? parseLiveRcRaceResultTableRows(fetched.text) : []);
       });
 
       const crawlMs = Date.now() - crawlStart;
       debug.race.resultPagesFetched = pagesFetched;
       debug.race.resultPagesSkippedForBudget = pagesSkippedForBudget;
+      debug.race.resultPagesFailed = pagesFailed;
       debug.race.crawlMs = crawlMs;
       if (pagesSkippedForBudget > 0) {
         console.warn(
           "[liverc-discovery] race crawl budget exhausted",
           JSON.stringify({
             userId: input.userId,
-            hubUrl: raceResolved.indexUrl,
+            hubUrls: raceHubs.hubUrls,
             pagesFetched,
             pagesSkippedForBudget,
             crawlMs,
             slowestFetchMs,
-            budgetMs: RACE_CRAWL_BUDGET_MS,
+            budgetMs: crawlBudgetMs,
           })
         );
       }
@@ -521,10 +588,18 @@ export async function discoverLiveRcSessionsForUser(input: {
     candidates,
     unimportedCandidates,
     practiceIndexUrl: practiceResolved.ok ? practiceResolved.indexUrl : null,
-    raceHubUrl: raceResolved.ok ? raceResolved.indexUrl : null,
+    raceHubUrl: raceHubs.hubUrls[0] ?? null,
     hint: status ? lapDiscoveryStatusMessage(status) : null,
     status,
     activeRaceMeeting,
+    incomplete:
+      Boolean(practiceResolved.ok && debug.practice.fetchError) ||
+      (Boolean(driverNorm) &&
+        (raceHubs.eventListFailed ||
+          raceHubs.hubUrls.length === 0 ||
+          debug.race.hubsFailed > 0 ||
+          debug.race.resultPagesFailed > 0 ||
+          debug.race.resultPagesSkippedForBudget > 0)),
     debug,
   };
 }

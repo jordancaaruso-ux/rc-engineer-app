@@ -7,9 +7,12 @@ import {
 } from "@/lib/lapWatch/livercSessionIndexParsers";
 import { normalizeLiveRcTrackOrigin } from "@/lib/lapWatch/liveRcTrackUrl";
 import {
+  liveRcEventsThatMayHoldDay,
   parseLiveRcDashboardHtml,
+  parseLiveRcEventListHtml,
   parsePracticeSessionListDatesFromHtml,
   buildPracticeSessionListUrl,
+  type LiveRcEventListRow,
   type ParsedLiveRcDashboard,
 } from "@/lib/lapWatch/liveRcIndexHtmlParse";
 
@@ -131,6 +134,57 @@ export async function resolveRaceEventHubUrl(origin: string): Promise<ResolveLiv
   };
   cacheSet(cacheKey, result);
   return result;
+}
+
+/**
+ * Every LiveRC meeting that could hold races on `ymd` (the track's date) — never just the one the
+ * dashboard calls current. A driver importing last weekend at a club that has raced since used to
+ * get nothing, because only the newest meeting was ever opened. The current meeting is always
+ * included too, so a meeting not yet on the events page is still read. `eventListFailed` means the
+ * list could not be read, and so the day may be incomplete.
+ */
+export async function resolveRaceEventHubsForDay(
+  origin: string,
+  ymd: string,
+): Promise<{ hubUrls: string[]; eventListFailed: boolean }> {
+  const cacheKey = `events:${origin}`;
+  let events = cacheGet<LiveRcEventListRow[]>(cacheKey);
+  let eventListFailed = false;
+  const [current] = await Promise.all([
+    resolveRaceEventHubUrl(origin),
+    events
+      ? Promise.resolve()
+      : fetchUrlText(`${origin}/events/`).then((fetched) => {
+          if (!fetched.ok) {
+            eventListFailed = true;
+            return;
+          }
+          events = parseLiveRcEventListHtml(fetched.text, fetched.finalUrl ?? `${origin}/events/`);
+          // An empty parse of a page that loaded is a layout change, not a club with no meetings.
+          if (events.length === 0) eventListFailed = true;
+          else cacheSet(cacheKey, events);
+        }),
+  ]);
+
+  const hubUrls: string[] = [];
+  const add = (url: string) => {
+    if (!hubUrls.includes(url)) hubUrls.push(url);
+  };
+  for (const e of liveRcEventsThatMayHoldDay(events ?? [], ymd)) add(e.eventHubUrl);
+  if (current.ok) {
+    // The dashboard's link and the events page's link to one meeting can differ only in form.
+    const currentId = eventIdFromHubUrl(current.indexUrl);
+    if (!currentId || !hubUrls.some((u) => eventIdFromHubUrl(u) === currentId)) add(current.indexUrl);
+  }
+  return { hubUrls, eventListFailed };
+}
+
+function eventIdFromHubUrl(url: string): string | null {
+  try {
+    return new URL(url).searchParams.get("id")?.trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 export function isLiveRcResolvableUrl(urlStr: string): boolean {

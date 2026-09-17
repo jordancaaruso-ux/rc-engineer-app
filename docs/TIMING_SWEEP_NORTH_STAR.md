@@ -142,24 +142,59 @@ Founder call 2026-09-15: a quiet row under the Start-run bar, **Import your last
 "Get my day" until 2026-09-16; the code keeps the old name), for members on a
 plan who have a LiveRC name or their own transponder (`canLookUpTimingSessions`, the sweep's
 rule, looser than the Get-set-up card's), and not on the read-only demo. Pick a track (the last one raced at is
-preselected; only tracks with a LiveRC or Speedhive link are listed) and a day (today and the four
-before it). The app reads the timing sites once, for that driver, and files the day as outings
+preselected; only tracks with a LiveRC or Speedhive link are listed) and a day — or a stretch of
+days. The app reads the timing sites once per day, for that driver, and files each day as outings
 through the same code as the evening pass (`getMyDay.ts` → `fileDayForUser`, trigger `driver`),
-then opens the day in Sessions, where the Debrief lives. `/api/sweep/day`, `GetMyDay.tsx`.
+then lands on what came in. `/api/sweep/day`, `GetMyDay.tsx`.
 
+- **The day is a calendar, not a short list** (founder 2026-09-16, replacing five pills). **Today**
+  and **Yesterday** stay as pills — last night's racing must be one tap — and under them sits the
+  shared `DayRangeCalendar`: one tap is a day, a second tap is a range, and it reaches back
+  `GET_MY_DAY_REACH_DAYS` = 14 days counting today. Older days are greyed, not hidden. The same
+  grid draws the meeting-dates field, so the two calendars cannot drift.
+- **A range is one request per day, newest first** (`daysInRange`). Not one request for the
+  stretch: a fortnight cannot be read inside a route's two minutes. The button carries the
+  progress — "Day 3 of 7 · 9 runs" — and closing the sheet stops it after the day in flight,
+  keeping everything already filed. The route still validates one day at a time.
+- **A day nobody raced is cheap.** The 35 s crawl only happens where LiveRC has a meeting that
+  day; an empty day costs a second or two, which is what makes a fortnight a real option.
+- **Where it lands.** One day opens that day in Sessions, where the Debrief lives. A range opens
+  Sessions narrowed to that track and those dates (`?trackId=&dateFrom=&dateTo=`) — the runs that
+  just came in. Nothing found says so and stays put.
 - **One look per tap, no background scanning.** It is the driver asking, so the no-mid-day-calls
-  ruling does not apply. Speedhive and LiveRC are read side by side; LiveRC's race crawl can take
-  35 s, so the sheet shows a busy state.
+  ruling does not apply. Speedhive and LiveRC are read side by side within each day.
 - **Safe to press again.** Sessions already on a run are skipped, and a session that overlaps an
   existing run joins it, so a second press after Speedhive catches up only adds what was missing.
-- **The car is asked only when the app cannot tell** (never-guess rule). The sheet then lists the
-  cars and files that day's loose sessions with the one picked, without reading the sites again
-  (`fileImportedRowsForUser`).
-- **Past days.** Speedhive practice is read per transponder and filtered to the day with no
-  ten-run cap (the `day` option on `discoverSpeedhivePracticeSessionsForUser`); LiveRC practice
-  opens that day's list (`practiceDayYmd`); race results are read from the most recent events and
-  filtered to the day. LiveRC is only read when the driver has a LiveRC name: its practice page
-  lists every driver, and with nothing to match every one of them would be filed.
+- **The car is asked only when the app cannot tell** (never-guess rule), and **once for the whole
+  stretch** (founder 2026-09-16) — asked after every day is read, with its reach named on the
+  question ("14 runs across 3 days") so a wide answer looks wide. The sheet lists the cars and
+  files each day's loose sessions with the one picked, without reading the sites again
+  (`fileImportedRowsForUser`). Imported runs land unconfirmed, so a car answered too broadly is
+  fixed on the run, not re-imported.
+- **Every run in the dates, never the newest few** (founder 2026-09-17: "it should always search
+  for every run within the date period the user provides"). A day is a filter over the whole
+  history, not a count:
+  - **LiveRC races:** every meeting on the track's `/events/` page that could hold the day — listed
+    as spanning it, or starting up to 7 days before (or the day after), because club-typed dates
+    are not boundaries (SA State Titles 2026 was listed "Sep 11" and ran its qualifiers on the
+    12th) — plus the dashboard's current meeting. All of that day's races are opened
+    (`resolveRaceEventHubsForDay`, `liveRcEventsThatMayHoldDay`). It used to read only the current
+    meeting, so a club that had raced since made last weekend unimportable.
+  - **LiveRC practice:** that day's list (`practiceDayYmd`), every row — a titles Friday posted
+    323 and a 300-link cap cut the morning.
+  - **Speedhive practice:** per transponder over the chip's whole history, or by name walking the
+    location's activity list back page by page to the day (`fetchPracticeLocationActivitiesInWindow`)
+    — it used to read the newest 20, so at a busy track any day but today was already gone.
+  - **Speedhive race results:** every organisation event since 7 days before the day
+    (`fetchOrganizationEventsSince`), every session in it — including those nested in
+    `subGroups`, which were never read — dated by the track's wall clock
+    (`speedhiveSessionTime.ts`).
+  - LiveRC is only read when the driver has a LiveRC name: its practice page lists every driver,
+    and with nothing to match every one of them would be filed.
+- **A short read is said, never passed off as the whole day.** A page, meeting or events list that
+  would not load, or race pages the crawl ran out of time for (75 s for a day asked by hand), mark
+  that site `incomplete`: the sheet reads "7 runs in · couldn't read all of LiveRC" and stays open
+  so the driver can press again, instead of landing on a list that may be short.
 - The listener allowlist does not apply (the driver is acting for themselves); entitlement does.
   The 8 pm summary still goes out for the day.
 

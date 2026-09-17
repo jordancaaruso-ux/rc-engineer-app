@@ -178,11 +178,19 @@
       </div>
 
       <div id="jrcHeroPhone" style="position:relative;z-index:2;width:296px;flex:none;margin-top:clamp(2.25rem,4.5vw,3.5rem);margin-bottom:clamp(-330px,-26svh,-215px);text-align:left;animation:jrcSettle 1.05s cubic-bezier(.2,.7,.2,1) .18s both">
-        <div style="border-radius:40px;padding:9px;background:linear-gradient(158deg,#585752 0%,#282725 40%,#141312 100%);box-shadow:0 -10px 120px -20px rgba(0,0,0,0.9),0 0 0 1px rgba(255,255,255,0.09)">
-          <div style="border-radius:32px;overflow:hidden;background:#141312">
-            <img src="/landing/assets/app-phone-dashboard.webp" alt="The Dashboard on race day: nine runs logged, best lap, last setup change and how the car felt" width="900" height="1951" style="display:block;width:100%;height:auto" />
-            </div>
-          </div>
+        <!--
+          The phone is a 3D render of an iPhone 15 Pro with the real Dashboard inside the glass,
+          not a CSS drawing of a body around a flat capture (which is what stood here until
+          2026-09-16). It is the same device the launch film uses, re-lit for a dark page so the
+          titanium rail actually catches light — on the old bench lighting it vanished into the
+          background and the phone read as a floating screen.
+
+          The file is 1.269x the body wide because the shadow lives inside it, so `width:126.9%`
+          with `margin:-13.45%` keeps the BODY on the slot's 296px and hangs the shadow outside
+          the layout, exactly where the old gradient pad used to sit.
+          Rebuild: node marketing-reel/site-assets.cjs
+        -->
+        <img src="/landing/assets/hero-phone-dashboard.webp" alt="The Dashboard on race day: nine runs logged, best lap, last setup change and how the car felt" width="1142" height="2110" style="display:block;width:126.9%;max-width:none;margin:-13.45%;height:auto" />
         </div>
       </div>
     </div>
@@ -523,35 +531,56 @@
           <a href="/demo" style="display:inline-flex;align-items:center;gap:0.5rem;font-weight:600;font-size:15px;padding:0.95rem 1.7rem;border-radius:9px;border:1px solid rgba(255,214,10,0.45);background:rgba(255,214,10,0.07);color:#FFD60A;transition:background .3s ease,border-color .3s ease" style-hover="background:rgba(255,214,10,0.14);border-color:#FFD60A"><span style="width:6px;height:6px;border-radius:50%;background:#FFD60A;animation:jrcPulse 2.2s ease-in-out infinite"></span>Open the demo</a>
         </div>
       </div>
-      <div data-rv data-rv-delay="80" id="jrcShots" style="width:100%;position:relative;z-index:0;isolation:isolate;height:calc(clamp(160px,24vw,290px) * 2.1641 + 118px);opacity:0;transform:translateY(22px);transition:opacity .8s cubic-bezier(.2,.6,.2,1),transform .8s cubic-bezier(.2,.6,.2,1)">
-        <div data-shot="0" style="position:absolute;top:50%;left:50%;width:clamp(160px,24vw,290px);transform-origin:50% 128%;backface-visibility:hidden;will-change:transform;cursor:pointer;transition:transform 1.05s cubic-bezier(.16,1,.3,1),box-shadow .9s ease;border-radius:36px;padding:8px;background:linear-gradient(160deg,#2C2B29 0%,#151413 46%,#232220 100%);transform:translate(-50%,-54%) rotate(0deg) scale(1.02);z-index:60;box-shadow:0 54px 96px -28px rgba(0,0,0,0.95)">
-          <div style="position:relative;aspect-ratio:1170/2532;border-radius:29px;overflow:hidden;background:#0F0E0D">
-            <img src="/landing/assets/app-phone-dashboard.webp" alt="Dashboard on race day" style="display:block;width:100%;height:100%;object-fit:cover" />
-            <span data-veil="" style="position:absolute;inset:0;background:#100F0E;opacity:0;transition:opacity .9s ease;pointer-events:none"></span>
+      <div data-rv data-rv-delay="80" id="jrcShots" style="width:100%;position:relative;z-index:0;isolation:isolate;height:calc(clamp(160px,24vw,290px) * 2.0758 + 118px);opacity:0;transform:translateY(22px);transition:opacity .8s cubic-bezier(.2,.6,.2,1),transform .8s cubic-bezier(.2,.6,.2,1)">
+        <!--
+          Seven screens, each a 3D render of the phone with a real capture in the glass. A cut-out
+          breaks the three things the old CSS card did, so all three moved: the body is the render
+          (no gradient pad), the dimming veil is MASKED to the phone's own silhouette instead of
+          being a rectangle over it, and the depth shadow is a `drop-shadow` filter — which
+          follows alpha — instead of `box-shadow`, which does not. initShots sets that filter on
+          every tick; it must not go back to box-shadow.
+          Screens are the founder's picks, 2026-09-16. Rebuild: node marketing-reel/site-assets.cjs
+        -->
+        <div data-shot="0" style="position:absolute;top:50%;left:50%;width:clamp(160px,24vw,290px);transform-origin:50% 128%;backface-visibility:hidden;will-change:transform;cursor:pointer;transition:transform 1.05s cubic-bezier(.16,1,.3,1),filter .9s ease;transform:translate(-50%,-54%) rotate(0deg) scale(1.02);z-index:60;filter:drop-shadow(0 46px 44px rgba(0,0,0,0.92))">
+          <div style="position:relative">
+            <img src="/landing/assets/fan-run-expanded-rival.webp" alt="A run opened on the day, your laps against a rival's" style="display:block;width:100%;height:auto" />
+            <span data-veil="" style="position:absolute;inset:0;background:#100F0E;opacity:0;transition:opacity .9s ease;pointer-events:none;-webkit-mask-image:url(/landing/assets/fan-run-expanded-rival.webp);mask-image:url(/landing/assets/fan-run-expanded-rival.webp);-webkit-mask-size:100% 100%;mask-size:100% 100%"></span>
           </div>
         </div>
-        <div data-shot="1" style="position:absolute;top:50%;left:50%;width:clamp(160px,24vw,290px);transform-origin:50% 128%;backface-visibility:hidden;will-change:transform;cursor:pointer;transition:transform 1.05s cubic-bezier(.16,1,.3,1),box-shadow .9s ease;border-radius:36px;padding:8px;background:linear-gradient(160deg,#2C2B29 0%,#151413 46%,#232220 100%);transform:translate(-115.0%,-50%) rotate(-9.00deg) scale(0.9);z-index:11;box-shadow:0 34px 64px -30px rgba(0,0,0,0.8)">
-          <div style="position:relative;aspect-ratio:1170/2532;border-radius:29px;overflow:hidden;background:#0F0E0D">
-            <img src="/landing/assets/app-phone-analysis.webp" alt="Session analysis" style="display:block;width:100%;height:100%;object-fit:cover" />
-            <span data-veil="" style="position:absolute;inset:0;background:#100F0E;opacity:0.66;transition:opacity .9s ease;pointer-events:none"></span>
+        <div data-shot="1" style="position:absolute;top:50%;left:50%;width:clamp(160px,24vw,290px);transform-origin:50% 128%;backface-visibility:hidden;will-change:transform;cursor:pointer;transition:transform 1.05s cubic-bezier(.16,1,.3,1),filter .9s ease;transform:translate(-115.0%,-50%) rotate(-9.00deg) scale(0.9);z-index:11;filter:drop-shadow(0 30px 30px rgba(0,0,0,0.78))">
+          <div style="position:relative">
+            <img src="/landing/assets/fan-event.webp" alt="The meeting: every run, every day" style="display:block;width:100%;height:auto" />
+            <span data-veil="" style="position:absolute;inset:0;background:#100F0E;opacity:0.66;transition:opacity .9s ease;pointer-events:none;-webkit-mask-image:url(/landing/assets/fan-event.webp);mask-image:url(/landing/assets/fan-event.webp);-webkit-mask-size:100% 100%;mask-size:100% 100%"></span>
           </div>
         </div>
-        <div data-shot="2" style="position:absolute;top:50%;left:50%;width:clamp(160px,24vw,290px);transform-origin:50% 128%;backface-visibility:hidden;will-change:transform;cursor:pointer;transition:transform 1.05s cubic-bezier(.16,1,.3,1),box-shadow .9s ease;border-radius:36px;padding:8px;background:linear-gradient(160deg,#2C2B29 0%,#151413 46%,#232220 100%);transform:translate(-71.7%,-50%) rotate(-3.00deg) scale(0.9);z-index:12;box-shadow:0 34px 64px -30px rgba(0,0,0,0.8)">
-          <div style="position:relative;aspect-ratio:1170/2532;border-radius:29px;overflow:hidden;background:#0F0E0D">
-            <img src="/landing/assets/app-phone-lab.webp" alt="Geometry Lab" style="display:block;width:100%;height:100%;object-fit:cover" />
-            <span data-veil="" style="position:absolute;inset:0;background:#100F0E;opacity:0.66;transition:opacity .9s ease;pointer-events:none"></span>
+        <div data-shot="2" style="position:absolute;top:50%;left:50%;width:clamp(160px,24vw,290px);transform-origin:50% 128%;backface-visibility:hidden;will-change:transform;cursor:pointer;transition:transform 1.05s cubic-bezier(.16,1,.3,1),filter .9s ease;transform:translate(-89.0%,-50%) rotate(-5.40deg) scale(0.9);z-index:12;filter:drop-shadow(0 30px 30px rgba(0,0,0,0.78))">
+          <div style="position:relative">
+            <img src="/landing/assets/fan-sessions.webp" alt="Every session you have logged" style="display:block;width:100%;height:auto" />
+            <span data-veil="" style="position:absolute;inset:0;background:#100F0E;opacity:0.66;transition:opacity .9s ease;pointer-events:none;-webkit-mask-image:url(/landing/assets/fan-sessions.webp);mask-image:url(/landing/assets/fan-sessions.webp);-webkit-mask-size:100% 100%;mask-size:100% 100%"></span>
           </div>
         </div>
-        <div data-shot="3" style="position:absolute;top:50%;left:50%;width:clamp(160px,24vw,290px);transform-origin:50% 128%;backface-visibility:hidden;will-change:transform;cursor:pointer;transition:transform 1.05s cubic-bezier(.16,1,.3,1),box-shadow .9s ease;border-radius:36px;padding:8px;background:linear-gradient(160deg,#2C2B29 0%,#151413 46%,#232220 100%);transform:translate(-28.3%,-50%) rotate(3.00deg) scale(0.9);z-index:13;box-shadow:0 34px 64px -30px rgba(0,0,0,0.8)">
-          <div style="position:relative;aspect-ratio:1170/2532;border-radius:29px;overflow:hidden;background:#0F0E0D">
-            <img src="/landing/assets/app-phone-field.webp" alt="Field standings" style="display:block;width:100%;height:100%;object-fit:cover" />
-            <span data-veil="" style="position:absolute;inset:0;background:#100F0E;opacity:0.66;transition:opacity .9s ease;pointer-events:none"></span>
+        <div data-shot="3" style="position:absolute;top:50%;left:50%;width:clamp(160px,24vw,290px);transform-origin:50% 128%;backface-visibility:hidden;will-change:transform;cursor:pointer;transition:transform 1.05s cubic-bezier(.16,1,.3,1),filter .9s ease;transform:translate(-63.0%,-50%) rotate(-1.80deg) scale(0.9);z-index:13;filter:drop-shadow(0 30px 30px rgba(0,0,0,0.78))">
+          <div style="position:relative">
+            <img src="/landing/assets/fan-analysis.webp" alt="The season, meeting by meeting" style="display:block;width:100%;height:auto" />
+            <span data-veil="" style="position:absolute;inset:0;background:#100F0E;opacity:0.66;transition:opacity .9s ease;pointer-events:none;-webkit-mask-image:url(/landing/assets/fan-analysis.webp);mask-image:url(/landing/assets/fan-analysis.webp);-webkit-mask-size:100% 100%;mask-size:100% 100%"></span>
           </div>
         </div>
-        <div data-shot="4" style="position:absolute;top:50%;left:50%;width:clamp(160px,24vw,290px);transform-origin:50% 128%;backface-visibility:hidden;will-change:transform;cursor:pointer;transition:transform 1.05s cubic-bezier(.16,1,.3,1),box-shadow .9s ease;border-radius:36px;padding:8px;background:linear-gradient(160deg,#2C2B29 0%,#151413 46%,#232220 100%);transform:translate(15.0%,-50%) rotate(9.00deg) scale(0.9);z-index:14;box-shadow:0 34px 64px -30px rgba(0,0,0,0.8)">
-          <div style="position:relative;aspect-ratio:1170/2532;border-radius:29px;overflow:hidden;background:#0F0E0D">
-            <img src="/landing/assets/app-phone-engineer.webp" alt="Engineer" style="display:block;width:100%;height:100%;object-fit:cover" />
-            <span data-veil="" style="position:absolute;inset:0;background:#100F0E;opacity:0.66;transition:opacity .9s ease;pointer-events:none"></span>
+        <div data-shot="4" style="position:absolute;top:50%;left:50%;width:clamp(160px,24vw,290px);transform-origin:50% 128%;backface-visibility:hidden;will-change:transform;cursor:pointer;transition:transform 1.05s cubic-bezier(.16,1,.3,1),filter .9s ease;transform:translate(-37.0%,-50%) rotate(1.80deg) scale(0.9);z-index:14;filter:drop-shadow(0 30px 30px rgba(0,0,0,0.78))">
+          <div style="position:relative">
+            <img src="/landing/assets/fan-run-setup.webp" alt="The setup sheet behind a run" style="display:block;width:100%;height:auto" />
+            <span data-veil="" style="position:absolute;inset:0;background:#100F0E;opacity:0.66;transition:opacity .9s ease;pointer-events:none;-webkit-mask-image:url(/landing/assets/fan-run-setup.webp);mask-image:url(/landing/assets/fan-run-setup.webp);-webkit-mask-size:100% 100%;mask-size:100% 100%"></span>
+          </div>
+        </div>
+        <div data-shot="5" style="position:absolute;top:50%;left:50%;width:clamp(160px,24vw,290px);transform-origin:50% 128%;backface-visibility:hidden;will-change:transform;cursor:pointer;transition:transform 1.05s cubic-bezier(.16,1,.3,1),filter .9s ease;transform:translate(-11.0%,-50%) rotate(5.40deg) scale(0.9);z-index:15;filter:drop-shadow(0 30px 30px rgba(0,0,0,0.78))">
+          <div style="position:relative">
+            <img src="/landing/assets/fan-lab.webp" alt="Geometry Lab" style="display:block;width:100%;height:auto" />
+            <span data-veil="" style="position:absolute;inset:0;background:#100F0E;opacity:0.66;transition:opacity .9s ease;pointer-events:none;-webkit-mask-image:url(/landing/assets/fan-lab.webp);mask-image:url(/landing/assets/fan-lab.webp);-webkit-mask-size:100% 100%;mask-size:100% 100%"></span>
+          </div>
+        </div>
+        <div data-shot="6" style="position:absolute;top:50%;left:50%;width:clamp(160px,24vw,290px);transform-origin:50% 128%;backface-visibility:hidden;will-change:transform;cursor:pointer;transition:transform 1.05s cubic-bezier(.16,1,.3,1),filter .9s ease;transform:translate(15.0%,-50%) rotate(9.00deg) scale(0.9);z-index:16;filter:drop-shadow(0 30px 30px rgba(0,0,0,0.78))">
+          <div style="position:relative">
+            <img src="/landing/assets/fan-engineer.webp" alt="The Engineer answering" style="display:block;width:100%;height:auto" />
+            <span data-veil="" style="position:absolute;inset:0;background:#100F0E;opacity:0.66;transition:opacity .9s ease;pointer-events:none;-webkit-mask-image:url(/landing/assets/fan-engineer.webp);mask-image:url(/landing/assets/fan-engineer.webp);-webkit-mask-size:100% 100%;mask-size:100% 100%"></span>
           </div>
         </div>
       </div>
@@ -1278,8 +1307,8 @@ class Component extends DCLogic {
         s.style.transform = on ? "translate(-50%,-54%) rotate(0deg) scale(1.02)"
                                : slot(k > n ? k - 1 : k);
         s.style.zIndex = on ? "60" : String(10 + k);
-        s.style.boxShadow = on ? "0 54px 96px -28px rgba(0,0,0,0.95)"
-                               : "0 34px 64px -30px rgba(0,0,0,0.8)";
+        s.style.filter = on ? "drop-shadow(0 46px 44px rgba(0,0,0,0.92))"
+                            : "drop-shadow(0 30px 30px rgba(0,0,0,0.78))";
         if (veils[k]) veils[k].style.opacity = on ? "0" : "0.66";
       });
     };

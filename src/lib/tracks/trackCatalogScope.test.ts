@@ -92,12 +92,15 @@ test("search keeps the scope alongside the name/location/region OR", () => {
   assert.deepEqual(where.userId, { not: DEMO_USER_ID_FALLBACK });
   // name, location, region. Region joined with the pre-seeded catalog: at ~1,500 tracks "NSW" or
   // "OR" is how a driver narrows to their own patch, and neither the name nor the free-text
-  // location reliably carries the state.
-  assert.equal(where.OR?.length, 3);
+  // location reliably carries the state. The LiveRC host joined 2026-09-16 so "SERCCC" still finds
+  // a track renamed to LiveRC's full name.
+  assert.equal(where.OR?.length, 4);
   assert.deepEqual(
     where.OR?.map((clause) => Object.keys(clause)[0]),
-    ["name", "location", "region"]
+    ["name", "location", "region", "liveRcUrl"]
   );
+  // Anchored to the start of the host, so "live" can't match every LiveRC track.
+  assert.deepEqual(where.OR?.[3], { liveRcUrl: { contains: "//boronia", mode: "insensitive" } });
   // The search OR must not have displaced the throwaway exclusion — that is why it is nested.
   assert.deepEqual(where.AND, [excludesThrowaway(real.id)]);
 });

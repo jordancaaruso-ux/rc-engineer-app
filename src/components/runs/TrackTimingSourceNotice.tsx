@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { SpeedhiveTrackFinder } from "@/components/tracks/SpeedhiveTrackFinder";
 import {
   TRACK_TIMING_PASTE_EXAMPLES as PASTE_EXAMPLES,
   classifyTrackTimingUrl,
@@ -56,6 +57,29 @@ export function TrackTimingSourceNotice({
   const speedhive = speedhiveUrl?.trim() || null;
   const track = trackName?.trim() || null;
 
+  /** PATCH one timing link onto the track. Resolves to an error message, or null when saved. */
+  async function patchTrack(body: Partial<TrackTimingUrls>): Promise<string | null> {
+    try {
+      const res = await fetch(`/api/tracks/${encodeURIComponent(trackId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        track?: { liveRcUrl?: string | null; speedhiveUrl?: string | null };
+      };
+      if (!res.ok || !data.track) return data.error ?? "Could not save that URL.";
+      onSaved({
+        liveRcUrl: data.track.liveRcUrl ?? null,
+        speedhiveUrl: data.track.speedhiveUrl ?? null,
+      });
+      return null;
+    } catch {
+      return "Could not save that URL.";
+    }
+  }
+
   async function save() {
     if (saving) return;
     const parsed = classifyTrackTimingUrl(url);
@@ -65,30 +89,10 @@ export function TrackTimingSourceNotice({
     }
     setSaving(true);
     setError(null);
-    try {
-      const res = await fetch(`/api/tracks/${encodeURIComponent(trackId)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [parsed.field]: parsed.url }),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        track?: { liveRcUrl?: string | null; speedhiveUrl?: string | null };
-      };
-      if (!res.ok || !data.track) {
-        setError(data.error ?? "Could not save that URL.");
-        return;
-      }
-      setUrl("");
-      onSaved({
-        liveRcUrl: data.track.liveRcUrl ?? null,
-        speedhiveUrl: data.track.speedhiveUrl ?? null,
-      });
-    } catch {
-      setError("Could not save that URL.");
-    } finally {
-      setSaving(false);
-    }
+    const failed = await patchTrack({ [parsed.field]: parsed.url });
+    setSaving(false);
+    if (failed) setError(failed);
+    else setUrl("");
   }
 
   if (liveRc || speedhive) {
@@ -153,6 +157,13 @@ export function TrackTimingSourceNotice({
            on the lap step, and this card now also stands on the run form's event step. */
         <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">{PASTE_EXAMPLES}</p>
       )}
+      <div className="mt-2 flex flex-wrap">
+        <SpeedhiveTrackFinder
+          source={{ trackId }}
+          size="sm"
+          onPick={(speedhiveUrl) => patchTrack({ speedhiveUrl })}
+        />
+      </div>
     </div>
   );
 }

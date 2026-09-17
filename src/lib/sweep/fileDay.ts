@@ -37,7 +37,27 @@ export type GatheredCandidate = {
   sourceKind: "practice" | "race";
   /** The chip the session was matched by, when it was (Speedhive); drives the chip→car binding. */
   chipCode?: string | null;
+  /**
+   * When the timing site's own list says the session ran (LiveRC's race list: "Sep 12, 2026 at
+   * 11:38am"), in the parser's stored convention. A LiveRC race result page prints only the
+   * MEETING's date, so without this every race imported with no time, could not be placed on a
+   * day, and sat loose under "which car?" for a driver with one car (SA State Titles, 2026-09-16).
+   */
+  listedAtIso?: string | null;
 };
+
+/** The list's time, when the imported page gave none — or only a bare date (midnight). */
+function listedTimeToStamp(pageTime: Date | null, listedAtIso: string | null | undefined): Date | null {
+  const listed = listedAtIso?.trim() ? new Date(listedAtIso) : null;
+  if (!listed || Number.isNaN(listed.getTime())) return null;
+  if (!pageTime) return listed;
+  const dateOnly =
+    pageTime.getUTCHours() === 0 &&
+    pageTime.getUTCMinutes() === 0 &&
+    pageTime.getUTCSeconds() === 0 &&
+    pageTime.getUTCMilliseconds() === 0;
+  return dateOnly && pageTime.getTime() !== listed.getTime() ? listed : null;
+}
 
 export type FileOutcome =
   | { kind: "attached"; runId: string; instant: Date; bestLapSeconds: number | null }
@@ -199,10 +219,15 @@ async function importCandidates(
         outcomes.push({ kind: "skipped", reason: "import row missing" });
         return;
       }
-      if (!row.sweepFiledAt || row.trackId !== track.id) {
+      const listedTime = listedTimeToStamp(row.sessionCompletedAt, c.listedAtIso);
+      if (!row.sweepFiledAt || row.trackId !== track.id || listedTime) {
         await prisma.importedLapTimeSession.update({
           where: { id: row.id },
-          data: { sweepFiledAt: row.sweepFiledAt ?? now, trackId: track.id },
+          data: {
+            sweepFiledAt: row.sweepFiledAt ?? now,
+            trackId: track.id,
+            ...(listedTime ? { sessionCompletedAt: listedTime } : {}),
+          },
         });
       }
       if (row.linkedRunId) {
@@ -214,7 +239,7 @@ async function importCandidates(
         sourceUrl: row.sourceUrl,
         parserId: row.parserId,
         parsedPayload: row.parsedPayload,
-        sessionCompletedAt: row.sessionCompletedAt,
+        sessionCompletedAt: listedTime ?? row.sessionCompletedAt,
         chipCode: c.chipCode ?? null,
         sourceKind: c.sourceKind,
       });

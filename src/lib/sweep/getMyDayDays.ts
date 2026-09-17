@@ -4,12 +4,23 @@ import type { LapTimingSource } from "@/lib/lapImport/labels";
 import { timingSessionDayKey } from "@/lib/runs/backfillCandidates";
 
 /**
- * "Get my day" day rules (founder call 2026-09-15). Pure, and shared by the sheet (which days to
- * offer) and the route (which day was asked for, and which sessions belong to it).
+ * "Import your last runs" day rules (founder call 2026-09-15, widened 2026-09-16). Pure, and
+ * shared by the sheet (which days it offers) and the route (which day was asked for, and which
+ * sessions belong to it).
  */
 
-/** Today and the four days before it: the morning after a meeting, and the weekend from midweek. */
-export const GET_MY_DAY_DAYS = 5;
+/**
+ * The pills above the calendar. Last night's racing is the overwhelming case and must stay one
+ * tap; every other day is on the calendar, so the two controls never offer the same day twice.
+ */
+export const GET_MY_DAY_PILL_DAYS = 2;
+
+/**
+ * How far back the calendar reaches, counting today (founder 2026-09-16: "a couple of weeks").
+ * A day nobody raced costs a second — the 35 s crawl only happens where there was a meeting —
+ * so a fortnight is a real option, not a trap.
+ */
+export const GET_MY_DAY_REACH_DAYS = 14;
 
 export type DayChoice = { ymd: string; label: string };
 
@@ -27,7 +38,7 @@ export function isValidYmd(value: unknown): value is string {
 export function recentDayChoices(
   now: Date,
   timeZone: string,
-  count: number = GET_MY_DAY_DAYS,
+  count: number = GET_MY_DAY_PILL_DAYS,
 ): DayChoice[] {
   const [y, m, d] = calendarYmdInTimeZone(now, timeZone).split("-").map(Number);
   const weekday = new Intl.DateTimeFormat("en-AU", { weekday: "short", timeZone: "UTC" });
@@ -38,6 +49,33 @@ export function recentDayChoices(
       ymd: noon.toISOString().slice(0, 10),
       label: i === 0 ? "Today" : i === 1 ? "Yesterday" : weekday.format(noon),
     });
+  }
+  return out;
+}
+
+/** The oldest day the calendar offers: today, and the thirteen before it, in `timeZone`. */
+export function earliestReachableYmd(now: Date, timeZone: string): string {
+  const [y, m, d] = calendarYmdInTimeZone(now, timeZone).split("-").map(Number);
+  const noon = new Date(Date.UTC(y!, m! - 1, d! - (GET_MY_DAY_REACH_DAYS - 1), 12));
+  return noon.toISOString().slice(0, 10);
+}
+
+/**
+ * Every calendar day from `startYmd` to `endYmd` inclusive, newest first — the order the sheet
+ * reads them in, so the day most likely to be the one the driver wants lands first. A range
+ * given back to front is read either way round; an unreadable date gives nothing.
+ */
+export function daysInRange(startYmd: string, endYmd: string): string[] {
+  if (!isValidYmd(startYmd) || !isValidYmd(endYmd)) return [];
+  const [from, to] = startYmd <= endYmd ? [startYmd, endYmd] : [endYmd, startYmd];
+  const out: string[] = [];
+  const cursor = new Date(`${to}T12:00:00.000Z`);
+  const floor = Date.parse(`${from}T12:00:00.000Z`);
+  // Guard against a range so wide a typo could spin: the calendar can't offer one, but the
+  // component's state is client-side and the loop below writes to the timing sites.
+  while (cursor.getTime() >= floor && out.length < 60) {
+    out.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
   }
   return out;
 }

@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   dayBoundsForYmd,
   daysFromToday,
+  daysInRange,
+  earliestReachableYmd,
   isValidYmd,
   recentDayChoices,
   splitDayCandidates,
@@ -10,20 +12,48 @@ import {
 
 const SYD = "Australia/Sydney";
 
-test("the sheet offers today, yesterday and three named days, in the zone's calendar", () => {
+test("the pills are today and yesterday, in the zone's calendar", () => {
   const noonTuesdaySydney = new Date("2026-09-15T02:00:00Z");
   assert.deepEqual(recentDayChoices(noonTuesdaySydney, SYD), [
     { ymd: "2026-09-15", label: "Today" },
     { ymd: "2026-09-14", label: "Yesterday" },
-    { ymd: "2026-09-13", label: "Sun" },
-    { ymd: "2026-09-12", label: "Sat" },
-    { ymd: "2026-09-11", label: "Fri" },
   ]);
 });
 
 test("the days roll back across a month end", () => {
-  const out = recentDayChoices(new Date("2026-10-02T02:00:00Z"), SYD).map((d) => d.ymd);
+  const out = recentDayChoices(new Date("2026-10-02T02:00:00Z"), SYD, 5).map((d) => d.ymd);
   assert.deepEqual(out, ["2026-10-02", "2026-10-01", "2026-09-30", "2026-09-29", "2026-09-28"]);
+});
+
+test("the calendar reaches back a fortnight, counting today, and rolls across a month end", () => {
+  assert.equal(earliestReachableYmd(new Date("2026-09-15T02:00:00Z"), SYD), "2026-09-02");
+  assert.equal(earliestReachableYmd(new Date("2026-10-02T02:00:00Z"), SYD), "2026-09-19");
+  // The zone decides which day "today" is before the counting starts.
+  assert.equal(earliestReachableYmd(new Date("2026-09-14T15:00:00Z"), SYD), "2026-09-02");
+  assert.equal(earliestReachableYmd(new Date("2026-09-14T15:00:00Z"), "Europe/London"), "2026-09-01");
+});
+
+test("a range reads newest day first, and one day is one day", () => {
+  assert.deepEqual(daysInRange("2026-09-12", "2026-09-15"), [
+    "2026-09-15",
+    "2026-09-14",
+    "2026-09-13",
+    "2026-09-12",
+  ]);
+  assert.deepEqual(daysInRange("2026-09-15", "2026-09-15"), ["2026-09-15"]);
+});
+
+test("a range spans a month end, reads the same back to front, and refuses a non-date", () => {
+  assert.deepEqual(daysInRange("2026-09-29", "2026-10-01"), ["2026-10-01", "2026-09-30", "2026-09-29"]);
+  assert.deepEqual(daysInRange("2026-09-15", "2026-09-12"), daysInRange("2026-09-12", "2026-09-15"));
+  assert.deepEqual(daysInRange("not-a-day", "2026-09-15"), []);
+  // A range the calendar cannot offer must not spin the sheet for ever.
+  assert.equal(daysInRange("2020-01-01", "2026-09-15").length, 60);
+});
+
+test("a range across a daylight-saving change keeps one entry per calendar day", () => {
+  // Sydney's clocks go forward on 4 October 2026; the 4th is a 23-hour day.
+  assert.deepEqual(daysInRange("2026-10-03", "2026-10-05"), ["2026-10-05", "2026-10-04", "2026-10-03"]);
 });
 
 test("'today' is the zone's today, not the server's", () => {

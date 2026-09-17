@@ -38,6 +38,8 @@ type Track = {
   layoutTags?: string[];
   latitude?: number | null;
   longitude?: number | null;
+  /** Who added it — decides "Edit details" vs "View details" on the row. */
+  userId?: string;
 };
 
 async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -54,7 +56,9 @@ export function TrackList({
   favouriteTrackIds = [],
   focusTrackId = null,
   catalogCount = 0,
+  currentUserId = null,
 }: {
+  currentUserId?: string | null;
   initialTracks: Track[];
   favouriteTrackIds?: string[];
   /** From `/tracks?trackId=…` — the row the Paddock band sent us to. */
@@ -177,12 +181,17 @@ export function TrackList({
    * for one letter would return a hundred rows nobody wanted.
    */
   const [remoteTracks, setRemoteTracks] = useState<Track[] | null>(null);
+  /** The exact query `remoteTracks` answers — so "no results" is never read off a stale answer. */
+  const [remoteFor, setRemoteFor] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     const q = search.trim();
-    if (q.length < 2) {
+    // Even one letter goes to the server: the page holds only a first screen of the catalog, so a
+    // local filter on "q" answers "nothing" for a letter a hundred tracks start with.
+    if (q.length < 1) {
       setRemoteTracks(null);
+      setRemoteFor(null);
       setSearching(false);
       return;
     }
@@ -194,8 +203,10 @@ export function TrackList({
             `/api/tracks?limit=50&q=${encodeURIComponent(q)}`
           );
           setRemoteTracks(data.tracks);
+          setRemoteFor(q);
         } catch {
           setRemoteTracks([]);
+          setRemoteFor(q);
         } finally {
           setSearching(false);
         }
@@ -215,22 +226,13 @@ export function TrackList({
     );
   }, [tracks, search, remoteTracks]);
 
-  const searchLooksUnmatched =
-    search.trim().length > 0 &&
-    // Never while a lookup is in flight: the list is momentarily empty during the debounce, and
-    // auto-opening the add form there would have a driver typing a name the catalog already has.
-    !searching &&
-    filteredTracks.length === 0 &&
-    !tracks.some((t) => t.name.toLowerCase() === search.trim().toLowerCase());
-
-  // A search that matches nothing auto-opens the add-track row and prefills the name.
-  useEffect(() => {
-    if (searchLooksUnmatched) {
-      setShowAddForm(true);
-      setName((cur) => (cur.trim() ? cur : search.trim()));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchLooksUnmatched]);
+  /*
+   * A search that finds nothing SAYS so and offers the add form — it never opens it (founder
+   * 2026-09-16). Auto-opening read as the app deciding the track didn't exist, and it fired on
+   * half-typed names before the server had answered. "No match" waits for the server's answer to
+   * this exact query, so it can't flash up between keystrokes either.
+   */
+  const searchAnswered = remoteFor === search.trim() && !searching;
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -413,6 +415,7 @@ export function TrackList({
                 value={timingUrls}
                 onChange={setTimingUrls}
                 onError={setMessage}
+                speedhiveLookup={{ name, location, onNameChange: setName }}
                 labelClassName="block text-[11px] text-muted-foreground"
                 inputClassName="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
               />
@@ -445,12 +448,25 @@ export function TrackList({
           </CollapsibleAddRow>
 
           {filteredTracks.length === 0 ? (
-            <li className="px-4 py-4 text-sm text-muted-foreground">
-              {searching
-                ? "Searching…"
-                : search.trim()
-                  ? "No tracks match your search."
-                  : "No tracks yet. Add one above or from Log your run."}
+            <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-4 text-sm text-muted-foreground">
+              {!search.trim() ? (
+                "No tracks yet"
+              ) : !searchAnswered ? (
+                "Searching…"
+              ) : (
+                <>
+                  <span>No tracks match</span>
+                  {!showAddForm ? (
+                    <button
+                      type="button"
+                      onClick={openAddForm}
+                      className="tap-active font-semibold text-primary-ink hover:underline"
+                    >
+                      Add one?
+                    </button>
+                  ) : null}
+                </>
+              )}
             </li>
           ) : (
             filteredTracks.map((t) => {
@@ -556,7 +572,7 @@ export function TrackList({
                         prefetch
                         className="tap-active block text-xs text-muted-foreground hover:text-foreground"
                       >
-                        Open track →
+                        {currentUserId && t.userId === currentUserId ? "Edit details" : "View details"} →
                       </Link>
                     </div>
                   </Collapse>

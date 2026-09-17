@@ -501,7 +501,9 @@ export default async function RunHistoryPage({
         select: { id: true, name: true },
       }),
       prisma.track.findMany({
-        where: trackCatalogScopeWhere(user),
+        // A filter only needs tracks somebody has run at — the pre-seeded catalog would otherwise
+        // bury the driver's handful of venues under a thousand they have never been to.
+        where: { ...trackCatalogScopeWhere(user), runs: { some: {} } },
         orderBy: { name: "asc" },
         select: { id: true, name: true },
       }),

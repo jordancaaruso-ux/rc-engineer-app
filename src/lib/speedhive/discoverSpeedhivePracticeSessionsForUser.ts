@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import {
   fetchPracticeLocation,
   fetchPracticeLocationActivities,
+  fetchPracticeLocationActivitiesInWindow,
   fetchPracticeSessionsForChipAtLocation,
   fetchPracticeTrainingSessions,
   practiceTimestampToIso,
@@ -29,9 +30,11 @@ import {
 
 const MAX_ACTIVITIES_TO_EXPAND = 15;
 const MAX_DISCOVERY_RUNS = 10;
-/** "Get my day" reads a whole day: every visit that overlaps it, and every run inside it. */
-const MAX_DAY_ACTIVITIES = 20;
-const MAX_DAY_RUNS = 40;
+/*
+ * "Import your last runs" reads a whole day: every visit that overlaps it, and every run inside it
+ * — no count (founder 2026-09-17: "always search for every run within the date period"). The
+ * twenty-visit and forty-run caps that stood here are gone.
+ */
 
 type DayWindow = { start: Date; end: Date };
 
@@ -160,6 +163,8 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
   practiceLocationId: number | null;
   hint: string | null;
   status: LapDiscoveryStatus | null;
+  /** The day could not be read to its start; what was found is real, the list may be short. */
+  incomplete?: boolean;
 }> {
   const locationId = practiceLocationIdFromTrackUrl(input.trackSpeedhiveUrl);
   if (!locationId) {
@@ -198,6 +203,8 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
 
   const activityIds = new Map<number, string | null>();
   const day = input.day ?? null;
+  /** A walk back through the location's list that stopped at its guard before reaching the day. */
+  let incomplete = false;
   /** Which of the driver's chips each visit was found by — the sweep binds a chip to a car. */
   const chipByActivity = new Map<number, string>();
   let discovered: SpeedhiveDiscoveredSession[] = [];
@@ -217,16 +224,16 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
             sessionSortKey(practiceTimestampToIso(b.endtimeutc ?? b.starttimeutc)) -
             sessionSortKey(practiceTimestampToIso(a.endtimeutc ?? a.starttimeutc))
         );
+        // The chip's list is its whole history at the track (a year back, measured), so a day is
+        // a filter over it, never a count.
         const visits = day
-          ? sorted
-              .filter((s) =>
-                rangeOverlapsDay(
-                  practiceTimestampToIso(s.starttimeutc),
-                  practiceTimestampToIso(s.endtimeutc),
-                  day
-                )
+          ? sorted.filter((s) =>
+              rangeOverlapsDay(
+                practiceTimestampToIso(s.starttimeutc),
+                practiceTimestampToIso(s.endtimeutc),
+                day
               )
-              .slice(0, MAX_DAY_ACTIVITIES)
+            )
           : sorted.slice(0, MAX_ACTIVITIES_TO_EXPAND);
         for (const sess of visits) {
           if (!sess.id || activityIds.has(sess.id)) continue;
@@ -241,10 +248,21 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
     }
 
     if (activityIds.size === 0 && driverNorms.length > 0) {
-      const activities = await fetchPracticeLocationActivities(locationId, {
-        count: day ? MAX_DAY_ACTIVITIES : MAX_ACTIVITIES_TO_EXPAND,
-        sport: location?.sport ?? "RC",
-      });
+      // The location's list is newest first and a busy track posts dozens a day: a named day walks
+      // back to it rather than reading the newest few and finding the day already gone.
+      let activities: Awaited<ReturnType<typeof fetchPracticeLocationActivities>>;
+      if (day) {
+        const walked = await fetchPracticeLocationActivitiesInWindow(locationId, day, {
+          sport: location?.sport ?? "RC",
+        });
+        activities = walked.activities;
+        if (!walked.complete) incomplete = true;
+      } else {
+        activities = await fetchPracticeLocationActivities(locationId, {
+          count: MAX_ACTIVITIES_TO_EXPAND,
+          sport: location?.sport ?? "RC",
+        });
+      }
       for (const act of activities) {
         if (!act.id) continue;
         if (day && !rangeOverlapsDay(act.startTime, act.endTime, day)) continue;
@@ -290,7 +308,7 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
     (a, b) => sessionSortKey(b.sessionCompletedAtIso) - sessionSortKey(a.sessionCompletedAtIso)
   );
   const capped = day
-    ? sorted.filter((d) => isoWithinDay(d.sessionCompletedAtIso, day)).slice(0, MAX_DAY_RUNS)
+    ? sorted.filter((d) => isoWithinDay(d.sessionCompletedAtIso, day))
     : sorted.slice(0, MAX_DISCOVERY_RUNS);
 
   const urls = capped.map((d) => d.sessionUrl);
@@ -327,6 +345,7 @@ export async function discoverSpeedhivePracticeSessionsForUser(input: {
     practiceLocationId: locationId,
     hint: status ? lapDiscoveryStatusMessage(status) : null,
     status,
+    incomplete,
   };
 }
 

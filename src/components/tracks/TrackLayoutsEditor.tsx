@@ -97,13 +97,8 @@ export function TrackLayoutsEditor({
   return (
     <CardPanel contentClassName="text-sm space-y-3">
       <div className="text-sm font-medium text-foreground">Layouts</div>
-      <p className="text-[11px] text-muted-foreground leading-snug">
-        Name the physical layouts this venue runs (e.g. &ldquo;Club layout&rdquo;, &ldquo;Nats config&rdquo;).
-        You pick a layout &mdash; and optionally a direction (CW/CCW) &mdash; when logging a run or setting up an event.
-      </p>
-
       {rows.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No layouts yet. Add one below.</p>
+        <p className="text-xs text-muted-foreground">No layouts yet</p>
       ) : (
         <ul className="space-y-2">
           {rows.map((row, index) => (

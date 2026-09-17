@@ -37,6 +37,8 @@ const OUT = "marketing-shots";
 /** Everything a viewer should never see in a marketing shot. */
 const HIDE_CSS = `
   [data-demo-banner], nextjs-portal { display: none !important; }
+  /* The ideas tab hangs half off the left edge — a hover affordance mid-animation in a still. */
+  .ideas-edge-tab { display: none !important; }
   *::-webkit-scrollbar { display: none !important; }
   * { scrollbar-width: none !important; caret-color: transparent !important; }
   *:focus, *:focus-visible { outline: none !important; box-shadow: none !important; }
@@ -83,10 +85,18 @@ async function shotList(): Promise<Shot[]> {
         await page.evaluate(() => window.scrollBy(0, -20));
         // Mid-scroll the condensed title floats over the content with no ground under it (a real
         // phone blurs it). For this one shot the top chrome goes; the content starts at the top.
-        await page.addStyleTag({ content: ".mobile-brand-mark,.title-condenser,.fixed.right-4.z-40{display:none!important}" });
+        await page.addStyleTag({ content: ".mobile-brand-mark,.title-condenser,[aria-label='Account and settings']{display:none!important}" });
         await page.waitForTimeout(300);
-        await page.locator('[role="tab"]', { hasText: /^field$/i }).first().click({ timeout: 5000, force: true }).catch(() => {});
+        // The chips are role=tab on a rail under a sticky header, so a real Playwright click lands
+        // on the header instead — dispatch the click on the element itself.
+        await page.locator('[role="tab"]', { hasText: /^field$/i }).first()
+          .evaluate((el: HTMLElement) => el.click()).catch(() => {});
         await page.waitForTimeout(600);
+        // FIELD alone is the driver table and no chart. Picking a RIVAL adds the Laps/Gap sub-tabs
+        // and draws the two-line you-vs-them chart, which is the view worth showing.
+        const rival = page.locator('[role="tab"]').filter({ hasNotText: /^(field|you)$/i }).first();
+        await rival.evaluate((el: HTMLElement) => el.click()).catch(() => {});
+        await page.waitForTimeout(900);
       },
     },
     {
@@ -111,6 +121,52 @@ async function shotList(): Promise<Shot[]> {
     },
     { name: "analysis", path: "/analysis", full: true },
     { name: "sessions", path: "/runs/history" },
+    {
+      // The debrief. It lives in ONE place — the Sessions day, between the chart and the runs —
+      // and its one word is `Debrief` only once the meeting is OVER; while you are still at the
+      // track it reads `Overview` (meetingIsOver, founder call 2026-09-16). Today's meeting is
+      // day 3 of 3, so this opens the meeting BELOW it, which has finished.
+      name: "debrief",
+      path: "/runs/history",
+      act: async (page) => { await openDay(page, 1); await scrollTo(page, /^(Debrief|Overview)$/); },
+      full: true,
+    },
+    {
+      // A run opened IN PLACE on the day, which is how a driver actually reads one — not the
+      // /runs/<id> page.
+      name: "run-expanded",
+      path: "/runs/history",
+      act: async (page) => { await openRunInPlace(page); },
+      full: true,
+    },
+    {
+      // The same opened run, with a RIVAL picked: the lap chart draws both drivers' lines over
+      // each other, lap by lap. The chips are role=tab, and a real click lands on the sticky
+      // header above them, so they are clicked on the element itself.
+      name: "run-expanded-rival",
+      path: "/runs/history",
+      act: async (page) => {
+        const row = await openRunInPlace(page);
+        await pickRival(page, row, 0);
+        await scrollToChart(page, row);
+      },
+      full: true,
+    },
+    {
+      // And with GAP picked against a different rival: the same pair of drivers read as the gap
+      // opening and closing between them instead of as two lap traces.
+      name: "run-expanded-gap",
+      path: "/runs/history",
+      act: async (page) => {
+        const row = await openRunInPlace(page);
+        await pickRival(page, row, 1);
+        await row.locator('[role="tab"]', { hasText: /^gap$/i }).first()
+          .evaluate((el: HTMLElement) => el.click()).catch(() => {});
+        await page.waitForTimeout(900);
+        await scrollToChart(page, row);
+      },
+      full: true,
+    },
     { name: "setup-sheet", path: `/cars/${s.carId}/setups/${s.best.setupSnapshotId}`, full: true },
     { name: "garage-car", path: `/cars/${s.carId}` },
     {
@@ -128,11 +184,82 @@ async function shotList(): Promise<Shot[]> {
   ];
 }
 
+/** Open the Nth meeting on the Sessions list. The rows are `button[role=option]`. */
+async function openDay(page: Page, index: number) {
+  const row = page.locator('button[role="option"]').nth(index);
+  await row.click({ timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(1400);
+}
+
+/**
+ * Open the day's first run IN PLACE and return its row. The rows in the list beside the pane
+ * (`[data-run-id]`) navigate to `/runs/<id>` instead; the pane's own rows carry
+ * `id="session-run-<id>"` and fold the whole run open where it sits, which is how a driver reads
+ * it (founder call 2026-08-25).
+ */
+async function openRunInPlace(page: Page) {
+  await openDay(page, 0);
+  const row = page.locator('[id^="session-run-"]').first();
+  await row.locator("button").first().click({ timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(1600);
+  await row.scrollIntoViewIfNeeded({ timeout: 6000 }).catch(() => {});
+  // Mid-pane the condensed title floats over the content with nothing under it (a real phone
+  // blurs what is behind it; a still cannot), so it lands on top of the RUNS heading.
+  await page.addStyleTag({ content: ".mobile-brand-mark,.title-condenser,[aria-label='Account and settings']{display:none!important}" });
+  await page.waitForTimeout(600);
+  return row;
+}
+
+/**
+ * Pick the Nth rival chip inside an opened run. The chips are three-letter driver abbreviations
+ * beside FIELD and YOU; picking one draws the two-line chart and adds the Laps/Gap sub-tabs.
+ */
+async function pickRival(page: Page, row: ReturnType<Page["locator"]>, index: number) {
+  const chips = row.locator('[role="tab"]');
+  const labels = (await chips.allInnerTexts()).map((t) => t.trim());
+  const rivals = labels.filter((t) => /^[A-Z]{2,4}$/.test(t) && t !== "YOU");
+  const want = rivals[index];
+  if (!want) return null;
+  await chips.filter({ hasText: new RegExp(`^${want}$`) }).first()
+    .evaluate((el: HTMLElement) => el.click()).catch(() => {});
+  await page.waitForTimeout(1100);
+  return want;
+}
+
+/**
+ * Put the you-vs-rival chart in the frame. Scrolling to a heading called "Laps" is not enough —
+ * the run's own face switcher is also called Laps, and it sits a screen higher. The Laps/Gap pair
+ * under the lap grid is the only place the word "Gap" appears, so that row is the anchor: park it
+ * near the top and the chart fills everything below it.
+ */
+async function scrollToChart(page: Page, row: ReturnType<Page["locator"]>) {
+  const gap = row.locator('[role="tab"]', { hasText: /^gap$/i }).first();
+  await gap.evaluate((el: HTMLElement) => el.scrollIntoView({ block: "start" })).catch(() => {});
+  // …then back off, so the frame holds the lap grid above the chart and the run's own actions
+  // below it, instead of running on into the next runs in the day.
+  await page.evaluate(() => window.scrollBy(0, -380));
+  await page.waitForTimeout(600);
+}
+
+/** Put a heading at the top of the frame — the pane scrolls, so scrollIntoView, not window. */
+async function scrollTo(page: Page, text: RegExp) {
+  const target = page.getByText(text).first();
+  await target.scrollIntoViewIfNeeded({ timeout: 6000 }).catch(() => {});
+  await page.waitForTimeout(500);
+}
+
 async function settle(page: Page) {
   await page.waitForLoadState("networkidle").catch(() => {});
   await page.evaluate(() => (document as Document & { fonts: FontFaceSet }).fonts.ready);
   // A sheet page paints its picture after load; wait for the spinner to go, not just the network.
   await page.getByText("Drawing your sheet").waitFor({ state: "hidden", timeout: 20000 }).catch(() => {});
+  // The setup popup says "Opening the sheet…" while it fetches; without this the shot catches a
+  // blank white panel (it did, on 2026-09-16). Waiting only for "hidden" is not enough — the
+  // message has not been attached yet when settle starts, and a wait for a missing element passes
+  // straight away. Wait for it to TURN UP first, and only then for it to leave.
+  const opening = page.getByText("Opening the sheet");
+  await opening.waitFor({ state: "visible", timeout: 4000 }).catch(() => {});
+  await opening.waitFor({ state: "hidden", timeout: 40000 }).catch(() => {});
   await page.waitForTimeout(1200);
 }
 

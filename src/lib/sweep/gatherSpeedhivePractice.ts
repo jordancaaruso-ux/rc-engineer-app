@@ -1,7 +1,8 @@
 import "server-only";
 
+import { dayBoundsForYmd } from "@/lib/sweep/getMyDayDays";
 import {
-  fetchPracticeLocationActivities,
+  fetchPracticeLocationActivitiesInWindow,
   fetchPracticeTrainingSessions,
   type SpeedhivePracticeActivityRow,
   type SpeedhivePracticeTrainingSession,
@@ -12,9 +13,6 @@ import type { GatheredCandidate } from "@/lib/sweep/fileDay";
 import { sessionBlockIsClosed } from "@/lib/sweep/placeholderRules";
 import { reportSweepFailure } from "@/lib/observability/reportSweep";
 import { trackLocalYmd, type SweepPlanDoc, type SweepPlanTrack } from "@/lib/sweep/sweepDocs";
-
-/** Enough for a club day: one listing call covers every chip at the track. */
-const LISTING_COUNT = 40;
 
 export type GatherResult = {
   /** Today's sessions per listening user — gathered, not yet filed. */
@@ -86,7 +84,14 @@ export async function gatherSpeedhivePractice(params: {
 
   let activities: SpeedhivePracticeActivityRow[];
   try {
-    activities = await fetchPracticeLocationActivities(locationId, { count: LISTING_COUNT });
+    // The whole day, walked back page by page. The newest forty were read before: at a busy track
+    // the 8 am look at yesterday found the evening and lost the morning (2026-09-17).
+    const walked = await fetchPracticeLocationActivitiesInWindow(
+      locationId,
+      dayBoundsForYmd(params.ymd, track.timeZone),
+    );
+    activities = walked.activities;
+    if (!walked.complete) result.failed = true;
   } catch (err) {
     if (isRateLimit(err)) {
       result.rateLimited = true;
