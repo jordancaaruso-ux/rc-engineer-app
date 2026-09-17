@@ -29,7 +29,8 @@ The seed script creates **one** team with that name and a `TeamMembership` for e
    Use `list_linked_teammates` and `search_runs` with `owner_scope: "teammate"` against a team peer. Confirm `apply_engineer_focus` works when the compare run is on the **same track** as the primary.
 
 4. **Teams tab — invite handshake**  
-   Open `/teams` (sidebar **Teams**): create a team, **send an invite** to another allowlisted user by email. Confirm they do **not** appear under members, only under **Invited — awaiting response**, and that the second account gets a push plus a card on `/teams` and the dashboard. Accept from the second account, then confirm membership on both sides and **View team sessions** (`/runs/history?teamId=…`). Also check **decline**, **Withdraw** (admin), and re-inviting after a decline.
+   Open `/teams`: create a team, then **Manage** → **Invite** another allowlisted user by email. Confirm they do **not** appear under **Members**, only under **Invited**, and that the second account gets a push plus a dashboard card whose **Review** opens `/teams`, where the invite is answered. Accept from the second account (it lands on the team's feed), then confirm membership on both sides and **Team sessions** (`/runs/history?teamId=…`). Also check **Decline**, **Withdraw** (admin), re-inviting after a decline, and that a driver already on one team still sees a new invite on `/teams` rather than being sent straight to their team.
+   (The accept/decline card was lost in the 2026-07-27 merge that brought invites in on top of the Teams feed rework, and restored 2026-09-17 — `src/components/teams/TeamInvitesCard.tsx`.)
 
 5. **Run-level team sharing**  
    On **Log your run** / **Edit run**, toggle **Share this run with my teams**. When off, that run is hidden from every team surface (Team Sessions, Engineer peer runs, setup compare pickers) with no exceptions.

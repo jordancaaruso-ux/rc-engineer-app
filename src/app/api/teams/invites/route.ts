@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
+import { listPendingInvitesForUser } from "@/lib/teams/pendingInvites";
 
 export const dynamic = "force-dynamic";
 
 /**
- * The caller's own pending team invites, for the `/teams` card and the dashboard card.
+ * The caller's own pending team invites, for the dashboard card.
  *
  * Scoped to `invitedUserId = caller` — this is the invitee's inbox, not an admin view. Admins see
- * outstanding invites for their team on `GET /api/teams/[teamId]` instead.
+ * outstanding invites for their team on `GET /api/teams/[teamId]` instead. The `/teams` page reads
+ * the same loader server-side, so the card and the page always agree on what is waiting.
  */
 export async function GET() {
   if (!hasDatabaseUrl()) {
@@ -18,24 +19,5 @@ export async function GET() {
   const userId = await getAuthenticatedApiUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const invites = await prisma.teamInvite.findMany({
-    where: { invitedUserId: userId, status: "pending" },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      createdAt: true,
-      team: { select: { id: true, name: true } },
-      invitedBy: { select: { name: true, email: true } },
-    },
-  });
-
-  return NextResponse.json({
-    invites: invites.map((i) => ({
-      id: i.id,
-      teamId: i.team.id,
-      teamName: i.team.name,
-      invitedByLabel: i.invitedBy?.name?.trim() || i.invitedBy?.email?.trim() || null,
-      createdAt: i.createdAt.toISOString(),
-    })),
-  });
+  return NextResponse.json({ invites: await listPendingInvitesForUser(userId) });
 }

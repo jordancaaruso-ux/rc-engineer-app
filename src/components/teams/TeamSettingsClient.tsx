@@ -5,11 +5,20 @@ import { useRouter } from "next/navigation";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Button } from "@/components/ui/Button";
 import { Eyebrow } from "@/components/ui/panel";
+import { RelativeTime } from "@/components/ui/RelativeTime";
 
 type MemberRow = {
   userId: string;
   role: string;
   joinedAt: string;
+  name: string | null;
+  email: string | null;
+};
+
+/** Invited, not yet answered — not a member, so nothing is shared with them yet. */
+type PendingInviteRow = {
+  id: string;
+  createdAt: string;
   name: string | null;
   email: string | null;
 };
@@ -21,6 +30,7 @@ type TeamDetail = {
   viewerUserId: string;
   viewerRole: string;
   members: MemberRow[];
+  pendingInvites: PendingInviteRow[];
 };
 
 async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -39,6 +49,10 @@ const inputClass =
  * Confirmations are inline two-step buttons rather than `window.confirm` — native dialogs
  * look broken inside the Capacitor iOS shell, and an in-page confirm can say exactly what
  * is about to happen.
+ *
+ * Inviting does NOT add anyone: it sends an invite the other driver answers on `/teams`. So the
+ * person lands in "Invited", not "Members", and stays there until they accept — without that card
+ * an invite looked like a form that cleared itself and did nothing.
  */
 export function TeamSettingsClient({ teamId }: { teamId: string }) {
   const router = useRouter();
@@ -50,9 +64,12 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
   const [renameBusy, setRenameBusy] = useState(false);
   const [renameErr, setRenameErr] = useState<string | null>(null);
 
-  const [addEmail, setAddEmail] = useState("");
-  const [addBusy, setAddBusy] = useState(false);
-  const [addErr, setAddErr] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteErr, setInviteErr] = useState<string | null>(null);
+
+  const [pendingWithdraw, setPendingWithdraw] = useState<string | null>(null);
+  const [withdrawErr, setWithdrawErr] = useState<string | null>(null);
 
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
   const [pendingLeave, setPendingLeave] = useState(false);
@@ -97,24 +114,39 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
     }
   }
 
-  async function handleAddMember(e: React.FormEvent) {
+  async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
-    const email = addEmail.trim().toLowerCase();
-    if (!email || addBusy) return;
-    setAddErr(null);
-    setAddBusy(true);
+    const email = inviteEmail.trim().toLowerCase();
+    if (!email || inviteBusy) return;
+    setInviteErr(null);
+    setInviteBusy(true);
     try {
+      // Creates a pending invite and pushes it; the membership only exists once they accept.
       await jsonFetch(`/api/teams/${encodeURIComponent(teamId)}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      setAddEmail("");
+      setInviteEmail("");
       await load();
     } catch (err) {
-      setAddErr(err instanceof Error ? err.message : "Could not add member");
+      setInviteErr(err instanceof Error ? err.message : "Could not send invite");
     } finally {
-      setAddBusy(false);
+      setInviteBusy(false);
+    }
+  }
+
+  async function withdrawInvite(inviteId: string) {
+    setWithdrawErr(null);
+    try {
+      await jsonFetch(
+        `/api/teams/${encodeURIComponent(teamId)}/invites/${encodeURIComponent(inviteId)}`,
+        { method: "DELETE" }
+      );
+      setPendingWithdraw(null);
+      await load();
+    } catch (err) {
+      setWithdrawErr(err instanceof Error ? err.message : "Could not withdraw invite");
     }
   }
 
@@ -152,6 +184,7 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
   }
 
   const isAdmin = detail.viewerRole === "admin";
+  const pendingInvites = detail.pendingInvites;
 
   return (
     <div className="space-y-4">
@@ -180,30 +213,83 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
 
       {isAdmin ? (
         <CardPanel contentClassName="space-y-2.5">
-          <Eyebrow>Add member</Eyebrow>
-          <p className="text-[13px] text-muted-foreground">
-            They need an existing account on the sign-in allowlist. Invites for new people
-            aren&apos;t built yet.
-          </p>
-          <form onSubmit={handleAddMember} className="flex flex-wrap items-end gap-2">
+          <Eyebrow>Invite</Eyebrow>
+          <form onSubmit={handleInvite} className="flex flex-wrap items-end gap-2">
             <div className="min-w-[200px] flex-1">
-              <label htmlFor="add-member" className="sr-only">
-                Member email
+              <label htmlFor="invite-member" className="sr-only">
+                Email
               </label>
               <input
-                id="add-member"
+                id="invite-member"
                 className={inputClass}
                 type="email"
-                value={addEmail}
-                onChange={(e) => setAddEmail(e.target.value)}
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="teammate@example.com"
               />
             </div>
-            <Button type="submit" disabled={addBusy || !addEmail.trim()}>
-              {addBusy ? "Adding…" : "Add"}
+            <Button type="submit" disabled={inviteBusy || !inviteEmail.trim()}>
+              {inviteBusy ? "Sending…" : "Invite"}
             </Button>
           </form>
-          {addErr ? <p className="text-[12px] text-destructive">{addErr}</p> : null}
+          {inviteErr ? <p className="text-[12px] text-destructive">{inviteErr}</p> : null}
+        </CardPanel>
+      ) : null}
+
+      {pendingInvites.length > 0 ? (
+        <CardPanel contentClassName="p-0">
+          <div className="eyebrow-band px-4">
+            <Eyebrow className="mb-0">Invited</Eyebrow>
+          </div>
+          <ul className="divide-y divide-border/40">
+            {pendingInvites.map((invite) => (
+              <li key={invite.id} className="px-4 py-2.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="ui-title truncate text-[13px] font-semibold text-foreground">
+                      {invite.name ?? invite.email ?? "—"}
+                    </p>
+                    <p className="type-timestamp truncate">
+                      {invite.email ? `${invite.email} · ` : ""}sent{" "}
+                      <RelativeTime iso={invite.createdAt} fallback="recently" />
+                    </p>
+                  </div>
+                  {isAdmin ? (
+                    pendingWithdraw === invite.id ? (
+                      <div className="flex shrink-0 gap-2">
+                        <Button variant="outline" onClick={() => void withdrawInvite(invite.id)}>
+                          Confirm
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setPendingWithdraw(null);
+                            setWithdrawErr(null);
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="type-timestamp shrink-0 hover:text-destructive"
+                        onClick={() => {
+                          setPendingWithdraw(invite.id);
+                          setWithdrawErr(null);
+                        }}
+                      >
+                        Withdraw
+                      </button>
+                    )
+                  ) : null}
+                </div>
+                {pendingWithdraw === invite.id && withdrawErr ? (
+                  <p className="mt-1.5 text-[12px] text-destructive">{withdrawErr}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
         </CardPanel>
       ) : null}
 

@@ -7,13 +7,19 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { listTeamsWithActivity } from "@/lib/teams/loadTeamFeed";
+import { listPendingInvitesForUser } from "@/lib/teams/pendingInvites";
 import { CreateTeamForm } from "@/components/teams/CreateTeamForm";
+import { TeamInvitesCard } from "@/components/teams/TeamInvitesCard";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Team index. With one team there is nothing to choose, so go straight to it; the picker
- * only earns its place when there is more than one.
+ * Team index, and the one place a team invite is answered — the invite push and the dashboard's
+ * Review button both land here.
+ *
+ * With one team there is nothing to choose, so go straight to it; the picker only earns its place
+ * when there is more than one. An unanswered invite overrides that: redirecting a driver who is
+ * already on one team would carry them straight past the invite they came to answer.
  */
 export default async function TeamsPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
@@ -28,9 +34,12 @@ export default async function TeamsPage(): Promise<ReactNode> {
   }
 
   const user = await requireCurrentUser();
-  const teams = await listTeamsWithActivity(user.id);
+  const [teams, invites] = await Promise.all([
+    listTeamsWithActivity(user.id),
+    listPendingInvitesForUser(user.id),
+  ]);
 
-  if (teams.length === 1) redirect(`/teams/${teams[0].id}`);
+  if (teams.length === 1 && invites.length === 0) redirect(`/teams/${teams[0].id}`);
 
   return (
     <>
@@ -46,6 +55,8 @@ export default async function TeamsPage(): Promise<ReactNode> {
       </header>
 
       <section className="page-body max-w-2xl space-y-4">
+        {invites.length > 0 ? <TeamInvitesCard invites={invites} /> : null}
+
         {teams.length > 0 ? (
           <CardPanel contentClassName="p-0">
             <ul className="divide-y divide-border/40">
