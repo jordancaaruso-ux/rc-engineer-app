@@ -3,7 +3,10 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { computeImportedSessionFieldStatsFromPayload } from "@/lib/lapImport/computeImportedSessionFieldStats";
-import { sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import {
+  sessionCompletedAtIsoFromImportedPayload,
+  sessionUtcOffsetMinutesFromImportedPayload,
+} from "@/lib/lapImport/fromPayload";
 
 export async function GET(_request: Request, ctx: { params: Promise<{ id: string }> }) {
   if (!hasDatabaseUrl()) {
@@ -53,6 +56,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
         sessionCompletedAtIsoFromImportedPayload(row.parsedPayload) ??
         (row.sessionCompletedAt ? row.sessionCompletedAt.toISOString() : null),
       sessionCompletedAtDbIso: row.sessionCompletedAt ? row.sessionCompletedAt.toISOString() : null,
+      sessionUtcOffsetMinutes: sessionUtcOffsetMinutesFromImportedPayload(row.parsedPayload),
       parserId: row.parserId,
       ...storedParseFields(row.parsedPayload),
     },

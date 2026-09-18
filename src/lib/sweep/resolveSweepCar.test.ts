@@ -4,7 +4,7 @@ import { resolveSweepCar } from "./resolveSweepCar";
 
 const at = (hhmm: string) => new Date(`2026-09-19T${hhmm}:00.000Z`);
 
-test("the nearest earlier run today at the track wins", () => {
+test("no paired chip: the nearest earlier run today at the track wins", () => {
   const r = resolveSweepCar({
     instant: at("12:00"),
     dayRunsAtTrack: [
@@ -12,10 +12,30 @@ test("the nearest earlier run today at the track wins", () => {
       { carId: "car-b", instant: at("11:00") },
       { carId: "car-a", instant: at("13:00") },
     ],
-    chipCarId: "car-c",
+    chipCarId: null,
     userCarIds: ["car-a", "car-b", "car-c"],
   });
   assert.deepEqual(r, { carId: "car-b", source: "earlier_run" });
+});
+
+test("two classes, two paired chips: the second car's heat is not carried into the first car", () => {
+  const r = resolveSweepCar({
+    instant: at("11:00"),
+    dayRunsAtTrack: [{ carId: "car-a", instant: at("10:00") }],
+    chipCarId: "car-b",
+    userCarIds: ["car-a", "car-b"],
+  });
+  assert.deepEqual(r, { carId: "car-b", source: "chip" });
+});
+
+test("a chip paired with a gone car falls through to the earlier run", () => {
+  const r = resolveSweepCar({
+    instant: at("11:00"),
+    dayRunsAtTrack: [{ carId: "car-a", instant: at("10:00") }],
+    chipCarId: "car-gone",
+    userCarIds: ["car-a", "car-b"],
+  });
+  assert.deepEqual(r, { carId: "car-a", source: "earlier_run" });
 });
 
 test("no earlier run: the chip's bound car is used", () => {

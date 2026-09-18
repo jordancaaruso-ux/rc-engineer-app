@@ -6,11 +6,26 @@ const nextConfig = require("eslint-config-next");
 
 const config = [
   {
-    // The landing page is a built artifact served verbatim from `public/landing/` (see the
-    // `/welcome` rewrite in next.config.mjs) — bundled React output, not source we author.
-    // Linting it reports on its bundler's choices (`ReactDOM.render`, a `module` assignment),
-    // none of which we can act on without hand-editing a generated file.
-    ignores: ["public/landing/**"],
+    /*
+     * Generated output and other checkouts — never source we author.
+     *
+     * `public/landing/**` is the landing page, a built artifact served verbatim (see the
+     * `/welcome` rewrite in next.config.mjs). Linting it reports on its bundler's choices
+     * (`ReactDOM.render`, a `module` assignment), none of which we can act on without
+     * hand-editing a generated file.
+     *
+     * `.next/**` and `.claude/worktrees/**` are the reason `npm run lint` took minutes and
+     * reported 1627 errors while `src/` had 23 (2026-09-18). ESLint lints the whole folder and
+     * does NOT read `.gitignore`, so every parallel session's worktree build was being linted
+     * as hand-written code — 14 GB of compiled bundles across three of them. A lint that cannot
+     * usefully fail is worse than no lint.
+     */
+    ignores: [
+      "public/landing/**",
+      "**/.next/**",
+      ".claude/worktrees/**",
+      "**/node_modules/**",
+    ],
   },
   ...nextConfig,
   {

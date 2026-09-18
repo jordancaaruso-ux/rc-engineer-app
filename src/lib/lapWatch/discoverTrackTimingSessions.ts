@@ -13,6 +13,8 @@ export type TrackTimingDiscoveredSession = {
   sessionId: string;
   sessionUrl: string;
   sessionCompletedAtIso: string | null;
+  /** Speedhive practice runs: the track's offset from UTC (see `SpeedhiveDiscoveredSession`). */
+  sessionUtcOffsetMinutes?: number | null;
   label: string;
   bestLapSeconds?: number | null;
   /** Timed laps, when the discovery page carries them (Speedhive practice runs). */

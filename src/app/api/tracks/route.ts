@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { revalidateAfterTrackMutation } from "@/lib/revalidateUser";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -15,6 +15,7 @@ import {
 import { notifyAdminsOfUnverifiedAsset } from "@/lib/assets/notifyAdminReview";
 import { parseCoordinates } from "@/lib/location/coordinates";
 import { timeZoneForCoordinates } from "@/lib/tracks/trackTimeZone";
+import { fillTrackLocation } from "@/lib/tracks/trackLocationFill";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -201,6 +202,8 @@ export async function POST(request: Request) {
       },
     });
     if (existing) {
+      // Somebody else's row, but a pin from its timing site or town helps everyone racing there.
+      if (existing.latitude == null) after(() => fillTrackLocation(existing.id).then(() => undefined));
       return NextResponse.json(
         {
           error: "This track is already in the catalog.",
@@ -243,6 +246,9 @@ export async function POST(request: Request) {
     if (body.addToFavourites) {
       await addTrackToFavourites(user.id, track.id);
     }
+    // The pin fills itself from the LiveRC address or the typed town, after the response —
+    // a geocode takes seconds and the driver is mid-run (founder 2026-09-17).
+    if (!coordinates) after(() => fillTrackLocation(track.id).then(() => undefined));
     revalidateAfterTrackMutation(user.id);
     await notifyAdminsOfUnverifiedAsset({
       kind: "Track",

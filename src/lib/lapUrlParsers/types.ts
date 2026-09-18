@@ -48,6 +48,13 @@ export interface LapUrlParseResult {
    * (e.g. LiveRC page title/body). Not the same as when the user imported the URL.
    */
   sessionCompletedAtIso?: string | null;
+  /**
+   * Speedhive practice only: the track's offset from UTC when the session ran (+02:00 → 120), read
+   * off the loop's own timestamps. The one source that sends a real instant also says what the
+   * track's clock showed, which is what lets two sites' copies of a race be matched on the track's
+   * time wherever the driver is (`lapImport/trackClock.ts`).
+   */
+  sessionUtcOffsetMinutes?: number | null;
   message?: string | null;
   /** Machine-readable failure (e.g. driver_not_found). */
   errorCode?: string;

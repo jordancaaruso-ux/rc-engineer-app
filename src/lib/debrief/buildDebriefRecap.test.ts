@@ -212,3 +212,131 @@ test("no run with a field, no vs field line", () => {
   });
   assert.equal(recap?.field, null);
 });
+
+/*
+ * The setup line: each car's first run against its last. What would mislead here: a tyre or
+ * additive pick counted as a setup change, a car that came home where it started reading the
+ * same as one nobody touched, a missing sheet reading as "every box changed".
+ */
+
+const sheet = (camber: string, rideHeight: string, extra?: Record<string, string>) => ({
+  camber_front: camber,
+  ride_height_front: rideHeight,
+  ...extra,
+});
+
+test("setup is the first run against the last, and counts every change made on the way", () => {
+  const recap = buildDebriefRecap(
+    group([
+      run("r1", "2026-08-19T00:00:00Z", laps(8, 16.0)),
+      run("r2", "2026-08-19T01:00:00Z", laps(8, 16.0)),
+      run("r3", "2026-08-19T02:00:00Z", laps(8, 16.0)),
+    ]),
+    {
+      setupDataByRunId: new Map<string, unknown>([
+        ["r1", sheet("-1", "5", { tires: "Ride 28", additive: "SXT" })],
+        ["r2", sheet("-1.5", "5", { tires: "Ride 32" })],
+        ["r3", sheet("-2", "5.5", { tires: "Ride 32", additive: "Jack" })],
+      ]),
+    }
+  );
+  assert.ok(recap);
+  assert.equal(recap.setup.length, 1);
+  const setup = recap.setup[0]!;
+  assert.equal(setup.startRunId, "r1");
+  assert.equal(setup.endRunId, "r3");
+  // One car: no name needed.
+  assert.equal(setup.carName, null);
+  assert.deepEqual(
+    setup.rows.map((row) => [row.key, row.previousValue, row.value]),
+    [
+      ["camber_front", "-1", "-2"],
+      ["ride_height_front", "5", "5.5"],
+    ]
+  );
+  // r1→r2 moved camber; r2→r3 moved camber and ride height. Tyres and additive never count.
+  assert.equal(setup.made, 3);
+});
+
+test("a car that came home where it started says how many changes it took", () => {
+  const recap = buildDebriefRecap(
+    group([
+      run("r1", "2026-08-19T00:00:00Z", laps(8, 16.0)),
+      run("r2", "2026-08-19T01:00:00Z", laps(8, 16.0)),
+      run("r3", "2026-08-19T02:00:00Z", laps(8, 16.0)),
+    ]),
+    {
+      setupDataByRunId: new Map<string, unknown>([
+        ["r1", sheet("-1", "5")],
+        ["r2", sheet("-2", "5")],
+        ["r3", sheet("-1.0", "5.0")],
+      ]),
+    }
+  );
+  assert.deepEqual(recap?.setup[0]?.rows, []);
+  assert.equal(recap?.setup[0]?.made, 2);
+});
+
+test("a car nobody touched is unchanged with nothing made", () => {
+  const recap = buildDebriefRecap(
+    group([
+      run("r1", "2026-08-19T00:00:00Z", laps(8, 16.0)),
+      run("r2", "2026-08-19T01:00:00Z", laps(8, 16.0)),
+    ]),
+    {
+      setupDataByRunId: new Map<string, unknown>([
+        ["r1", sheet("-1", "5", { tires: "Ride 28" })],
+        ["r2", sheet("-1", "5", { tires: "Ride 32" })],
+      ]),
+    }
+  );
+  assert.deepEqual(recap?.setup[0]?.rows, []);
+  assert.equal(recap?.setup[0]?.made, 0);
+});
+
+test("two cars get a line each, named; a car that ran once has nothing to compare", () => {
+  const recap = buildDebriefRecap(
+    group([
+      run("a1", "2026-08-19T00:00:00Z", laps(8, 16.0), { carId: "car_a", car: { name: "A800RR" } }),
+      run("b1", "2026-08-19T01:00:00Z", laps(8, 16.0), { carId: "car_b", car: { name: "X4" } }),
+      run("a2", "2026-08-19T02:00:00Z", laps(8, 16.0), { carId: "car_a", car: { name: "A800RR" } }),
+      run("c1", "2026-08-19T03:00:00Z", laps(8, 16.0), { carId: "car_c", car: { name: "Once" } }),
+      run("b2", "2026-08-19T04:00:00Z", laps(8, 16.0), { carId: "car_b", car: { name: "X4" } }),
+    ]),
+    {
+      setupDataByRunId: new Map<string, unknown>([
+        ["a1", sheet("-1", "5")],
+        ["a2", sheet("-2", "5")],
+        ["b1", sheet("-1", "5")],
+        ["b2", sheet("-1", "5")],
+        ["c1", sheet("-1", "5")],
+      ]),
+    }
+  );
+  assert.deepEqual(
+    recap?.setup.map((s) => [s.carId, s.carName, s.rows.length, s.made]),
+    [
+      ["car_a", "A800RR", 1, 1],
+      ["car_b", "X4", 0, 0],
+    ]
+  );
+});
+
+test("no sheets loaded, no setup line; a run whose sheet is missing is skipped, not blank", () => {
+  const runs = [
+    run("r1", "2026-08-19T00:00:00Z", laps(8, 16.0)),
+    run("r2", "2026-08-19T01:00:00Z", laps(8, 16.0)),
+    run("r3", "2026-08-19T02:00:00Z", laps(8, 16.0)),
+  ];
+  assert.deepEqual(buildDebriefRecap(group(runs))?.setup, []);
+  const recap = buildDebriefRecap(group(runs), {
+    setupDataByRunId: new Map<string, unknown>([
+      ["r1", sheet("-1", "5")],
+      ["r3", sheet("-2", "5")],
+    ]),
+  });
+  assert.equal(recap?.setup[0]?.startRunId, "r1");
+  assert.equal(recap?.setup[0]?.endRunId, "r3");
+  assert.equal(recap?.setup[0]?.rows.length, 1);
+  assert.equal(recap?.setup[0]?.made, 1);
+});

@@ -25,7 +25,7 @@ import {
   DEMO_TRACK_NAME,
   isDemoTimingSiteEnabled,
 } from "@/lib/lapUrlParsers/demoTimingSite";
-import { getMyDay, loadGetMyDayTrack, fileDayLooseWithCar } from "@/lib/sweep/getMyDay";
+import { getMyDay, loadGetMyDayTrack, logChosenForDay } from "@/lib/sweep/getMyDay";
 
 const args = process.argv.slice(2);
 const argValue = (name: string) =>
@@ -132,11 +132,19 @@ async function main() {
     if (!loaded) throw new Error("track vanished");
     const first = await getMyDay({ userId: user.id, track: loaded, ymd });
     console.log(
-      `Seeded ${ymd}: found ${first.found}, added ${first.added}, joined ${first.joined}, needs car ${first.needsCar}`,
+      `Seeded ${ymd}: found ${first.found}, joined ${first.joined}, not logged ${first.pending.length}, needs car ${first.needsCar}`,
     );
-    if (first.needsCar > 0) {
-      const after = await fileDayLooseWithCar({ userId: user.id, track: loaded, ymd, carId: car.id });
-      console.log(`  filed with ${car.name}: added ${after.added}, still loose ${after.needsCar}`);
+    // The demo account ticks everything, the way a driver logging the whole day would.
+    if (first.pending.length > 0) {
+      const after = await logChosenForDay({
+        userId: user.id,
+        track: loaded,
+        ymd,
+        keep: first.pending.map((r) => r.id),
+        decline: [],
+        carId: car.id,
+      });
+      console.log(`  logged with ${car.name}: ${after.logged}, still not logged ${after.pending.length}`);
     }
   }
 

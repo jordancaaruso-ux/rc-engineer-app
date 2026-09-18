@@ -813,6 +813,7 @@ export function LapComparisonColumnGrid({
       setupRun: compareAnchorRun,
       selectLabel: formatDriverSessionLabel(primaryRunLabel, meSortIso, {
         timingSource: timingSourceFromSourceUrl(primaryImport?.sourceUrl),
+        sourceUrl: primaryImport?.sourceUrl,
         isWallClockTime: primaryImport?.sessionCompletedAt != null,
       }),
       // Ordered by the same axis as its day-mates; PRINTED with its on-track clock.
@@ -881,6 +882,7 @@ export function LapComparisonColumnGrid({
         setupRun: null,
         selectLabel: formatDriverSessionLabel(label, whenIso, {
           timingSource: timingSourceFromSourceUrl(s.sourceUrl),
+          sourceUrl: s.sourceUrl,
           isWallClockTime: s.sessionCompletedAt != null,
         }),
         sortIso: whenIso,

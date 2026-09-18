@@ -14,25 +14,21 @@ export type EveningSummaryInput = {
   dateLabel: string;
   recap: DebriefRecap | null;
   runCount: number;
-  /** Runs the app filed that the driver has not confirmed. */
+  /** Runs made from the timing sheet at the driver's tick that they have not confirmed. */
   unconfirmedCount: number;
   /**
-   * Sessions imported but on no run because the car is unknown. Counted, never ASKED about here:
-   * founder ruling 2026-09-16 — the notification announces the day like any other, and the app
-   * asks which car in a sheet when the driver arrives. It only shapes the words on a day where
-   * nothing could be filed, because then there are no figures to give.
+   * Times on track the timing sheet holds that the driver did not log — imported, kept, on no
+   * run. Nothing files itself (founder ruling 2026-09-18): the notification says how many, and the
+   * sheet lists them when the driver arrives, every row ticked, for them to keep or not. Never a
+   * question in the notification itself (2026-09-16).
    */
-  looseCount: number;
+  unloggedCount: number;
   /** App-relative path that opens the day — and carries the sheet's flag when one is waiting. */
   openPath: string;
 };
 
 function runWord(n: number): string {
   return `${n} run${n === 1 ? "" : "s"}`;
-}
-
-function sessionWord(n: number): string {
-  return `${n} session${n === 1 ? "" : "s"}`;
 }
 
 /**
@@ -78,13 +74,10 @@ export function eveningSummaryLines(input: EveningSummaryInput): string[] {
     lines.push(runWord(input.runCount));
   }
   if (input.unconfirmedCount > 0) {
-    lines.push(`${runWord(input.unconfirmedCount)} filed from the timing sheet — check and confirm.`);
+    lines.push(`${runWord(input.unconfirmedCount)} to confirm.`);
   }
-  // Nothing could be filed (every session still needs a car): say what is waiting, since there are
-  // no figures yet. On a day that DID file runs the loose ones are never mentioned — the sheet
-  // asks in the app.
-  if (input.runCount === 0 && input.looseCount > 0) {
-    lines.push(`${sessionWord(input.looseCount)} from today are ready`);
+  if (input.unloggedCount > 0) {
+    lines.push(`${runWord(input.unloggedCount)} on the timing sheet you didn't log — open the day to keep the ones you want.`);
   }
   return lines;
 }
@@ -96,14 +89,15 @@ export function renderEveningSummaryPush(input: EveningSummaryInput): {
   url: string;
 } {
   const title = `Your day at ${input.trackName}`;
-  if (input.runCount === 0 && input.looseCount > 0) {
-    return { title, body: `${sessionWord(input.looseCount)} from today are ready`, url: input.openPath };
+  if (input.runCount === 0) {
+    return { title, body: `${runWord(input.unloggedCount)} on the timing sheet you didn't log`, url: input.openPath };
   }
   const r = input.recap;
   const parts: string[] = [runWord(input.runCount)];
   if (r?.best) parts.push(`best ${formatBestLap(r.best.seconds)} (${r.best.runLabel})`);
   if (r?.top5) parts.push(`top 5 ${formatBestLap(r.top5.seconds)}`);
   if (input.unconfirmedCount > 0) parts.push(`${input.unconfirmedCount} to confirm`);
+  if (input.unloggedCount > 0) parts.push(`${input.unloggedCount} not logged`);
   return { title, body: parts.join(" · "), url: input.openPath };
 }
 
@@ -118,7 +112,7 @@ export function renderEveningSummaryEmail(input: EveningSummaryInput): {
   const subject =
     input.runCount > 0
       ? `${input.trackName}, ${input.dateLabel}: ${runWord(input.runCount)}${best ? `, best ${best}` : ""}`
-      : `${input.trackName}, ${input.dateLabel}: ${sessionWord(input.looseCount)} ready`;
+      : `${input.trackName}, ${input.dateLabel}: ${runWord(input.unloggedCount)} you didn't log`;
 
   const openUrl = absoluteUrl(input.openPath);
 

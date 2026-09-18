@@ -64,6 +64,8 @@ export function useImportedLapLibrary(enabled = true): ImportedLibrarySession[] 
               selectLabel: formatDriverSessionLabel(parsed.driverName, whenIso, {
                 timingSource:
                   timingSourceFromParserId(s.parserId) ?? timingSourceFromSourceUrl(s.sourceUrl),
+                parserId: s.parserId,
+                sourceUrl: s.sourceUrl,
                 isWallClockTime: resolveImportedSessionHasWallClockTime({
                   sessionCompletedAt: s.sessionCompletedAt ?? null,
                   parsedPayload: s.parsedPayload,

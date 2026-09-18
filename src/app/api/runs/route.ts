@@ -28,7 +28,6 @@ import { linkImportedSessionsToRun } from "@/lib/lapImport/service";
 import { resolveRunSessionCompletedAtFromUpsertBody } from "@/lib/runSessionCompletedAt";
 import { getTimeZoneFromCookies } from "@/lib/requestTimeZone";
 import { parseHandlingAssessmentJson } from "@/lib/runHandlingAssessment";
-import { buildPromptMarkTrackLocation } from "@/lib/trackLocationPrompt";
 import { communityTrackByIdWhere } from "@/lib/tracks/communityTrackAccess";
 import { ensureEventParticipation, userMayJoinEvent } from "@/lib/events/eventParticipation";
 import {
@@ -40,6 +39,7 @@ import { backfillRunConditionsFromTrack } from "@/lib/weather/backfillRunConditi
 import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 import { writeRunImportedLapSets, type ImportedLapSetInput } from "@/lib/runs/writeRunImportedLapSets";
 import { createBackfilledRuns } from "@/lib/runs/createBackfilledRuns";
+import { absorbSameOutingRuns } from "@/lib/runs/absorbSameOutingRuns";
 
 type RunUpsertBody = {
   runId?: string;
@@ -101,6 +101,11 @@ type RunUpsertBody = {
   importedLapSets?: ImportedLapSetInput[];
   /** Optional: link persisted ImportedLapTimeSession rows from URL import(s) to this run. */
   importedLapTimeSessionIds?: string[];
+  /**
+   * Other timing sites' copies of those same races (the lap step's linked sources): linked to the
+   * run so the day never files them as runs of their own, never its laps or primary session.
+   */
+  sameOutingImportedLapTimeSessionIds?: string[];
   /**
    * The day's OTHER timing sessions, to become runs beside this one ("Add N other runs from
    * today" on the lap step). Each is an `ImportedLapTimeSession` id the client imported first.
@@ -198,6 +203,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         tireTypeId: true,
         tireStintId: true,
         sortAt: true,
+        importedLapTimeSessionId: true,
       },
     });
     if (!ex) {
@@ -764,11 +770,28 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     const lapImportIds = body.importedLapTimeSessionIds.filter(
       (id): id is string => typeof id === "string" && id.trim().length > 0
     );
+    const sameOutingIds = Array.isArray(body.sameOutingImportedLapTimeSessionIds)
+      ? body.sameOutingImportedLapTimeSessionIds.filter(
+          (id): id is string => typeof id === "string" && id.trim().length > 0
+        )
+      : [];
     await linkImportedSessionsToRun({
       userId: params.userId,
       importedLapTimeSessionIds: lapImportIds,
+      sameOutingImportedLapTimeSessionIds: sameOutingIds,
       runId: run.id,
     });
+    // One run per time on track, whichever came first: a run the app filed over the same race (the
+    // evening pass read Speedhive; the driver logged the MyRCM PDF after) folds into this one.
+    // Before the backfill below, so the day's other runs are grouped against what is left. Tidying,
+    // never the reason a save fails.
+    if (lapImportIds.length > 0) {
+      try {
+        await absorbSameOutingRuns({ userId: params.userId, runId: run.id });
+      } catch (err) {
+        console.warn("[runs] same-outing fold failed", err instanceof Error ? err.message : err);
+      }
+    }
   }
 
   // After this run's own sessions are linked, so its session is skipped as "already on a run"
@@ -804,38 +827,12 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   // No daytime arming of the timing sweep (founder ruling 2026-09-15): the day is filed once,
   // at 8 pm track time. A draft saved here still claims its session then (`fileDay.ts`).
 
-  const newlyCompleted =
-    loggingComplete &&
-    (params.mode === "create" || existingUpdate?.loggingComplete === false);
-
-  const promptMarkTrackLocation = await buildPromptMarkTrackLocation({
-    userId: params.userId,
-    trackId: body.trackId,
-    loggingComplete,
-    newlyCompleted,
-    hasDismissedRunLocationPrompt: async (userId, trackId) => {
-      const row = await prisma.trackLocationRunPromptDismissal.findUnique({
-        where: { userId_trackId: { userId, trackId } },
-      });
-      return row != null;
-    },
-    findTrack: (trackId) =>
-      prisma.track.findFirst({
-        where: communityTrackByIdWhere(trackId),
-        select: {
-          id: true,
-          name: true,
-          latitude: true,
-          longitude: true,
-        },
-      }),
-  });
-
+  // No "mark this track's location" ask after a save (founder 2026-09-17): the pin fills itself
+  // from the timing site and drivers' phones (`trackLocationFill.ts`).
   return NextResponse.json(
     {
       run,
       tireStintId,
-      promptMarkTrackLocation,
       tireRunNumberCascade,
       /** Present when the save also filed the day's other sessions as runs. */
       backfilled: backfilled

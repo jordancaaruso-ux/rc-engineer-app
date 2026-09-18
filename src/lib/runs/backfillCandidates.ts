@@ -1,8 +1,15 @@
 import { calendarYmdInTimeZone } from "@/lib/formatDate";
-import { wallClockAsUtcToInstant } from "@/lib/eventActive";
 import { isWallClockAsUtcTimingSource, type LapTimingSource } from "@/lib/lapImport/labels";
+import { isUtcOffsetMinutes, trackClockTime } from "@/lib/lapImport/trackClock";
 import { groupOutings, type OutingSession } from "@/lib/runs/groupOutings";
-import { estimateDurationSeconds, outingKindFor, spanFrom, timeAnchorFor } from "@/lib/runs/outingSpan";
+import {
+  estimateDurationSeconds,
+  outingKindFor,
+  sameTimeOnTrack,
+  spanFrom,
+  timeAnchorFor,
+  type Span,
+} from "@/lib/runs/outingSpan";
 
 /**
  * One of the day's other timing sessions the driver can have filed as a run beside the one they
@@ -14,6 +21,8 @@ export type BackfillCandidate = {
   importedSessionId: string | null;
   sessionCompletedAtIso: string;
   timingSource: LapTimingSource | null;
+  /** Speedhive practice: the track's offset from UTC, so the session reads on the track's clock. */
+  sessionUtcOffsetMinutes?: number | null;
 };
 
 /**
@@ -51,24 +60,24 @@ export type BackfillOuting = { primaryUrl: string; sessionUrls: string[] };
  * window is estimated from lap count × best lap, and a session the scan knows nothing about is a
  * point in time. The offer's `sessions` stay the raw list — the save needs every id to link the
  * extras to the run it makes.
+ *
+ * Judged on the track's clock (`lapImport/trackClock.ts`), so where the phone is does not matter.
+ * `fallbackTimeZone` only reads a practice session that came without the track's offset.
  */
 export function groupBackfillCandidates(
   sessions: readonly BackfillCandidate[],
   metaFor: (sessionUrl: string) => BackfillCandidateMeta | null,
-  timeZone: string | null
+  fallbackTimeZone: string | null
 ): BackfillOuting[] {
   const outingSessions: OutingSession[] = [];
   for (const s of sessions) {
-    const raw = new Date(s.sessionCompletedAtIso);
-    if (Number.isNaN(raw.getTime())) continue;
-    const instant =
-      isWallClockAsUtcTimingSource(s.timingSource) && timeZone ? wallClockAsUtcToInstant(raw, timeZone) : raw;
     const meta = metaFor(s.sessionUrl);
-    const duration = estimateDurationSeconds(meta?.lapCount, meta?.bestLapSeconds) ?? 0;
+    const span = backfillCandidateSpan(s, meta, fallbackTimeZone);
+    if (!span) continue;
     outingSessions.push({
       id: s.sessionUrl,
       kind: outingKindFor(null, s.sessionUrl),
-      ...spanFrom(instant, duration, timeAnchorFor(null, s.sessionUrl)),
+      ...span,
       driverCount: 0,
       lapCount: meta?.lapCount ?? 0,
     });
@@ -76,10 +85,53 @@ export function groupBackfillCandidates(
   return groupOutings(outingSessions).map((o) => ({ primaryUrl: o.primaryId, sessionUrls: o.sessionIds }));
 }
 
+/**
+ * A scanned session's window on the track's clock, as the sheet can estimate it before import:
+ * lap count × best lap, else a point in time. Null when the scan gave no usable time.
+ */
+export function backfillCandidateSpan(
+  s: BackfillCandidate,
+  meta: BackfillCandidateMeta | null,
+  fallbackTimeZone: string | null
+): Span | null {
+  const onTrack = trackClockTime({
+    iso: s.sessionCompletedAtIso,
+    timingSource: s.timingSource,
+    sourceUrl: s.sessionUrl,
+    utcOffsetMinutes: s.sessionUtcOffsetMinutes,
+    fallbackTimeZone,
+  });
+  if (!onTrack) return null;
+  const duration = estimateDurationSeconds(meta?.lapCount, meta?.bestLapSeconds) ?? 0;
+  return spanFrom(onTrack, duration, timeAnchorFor(null, s.sessionUrl));
+}
+
+/**
+ * The offer without the sessions that ARE the run being logged: the same race posted by a second
+ * timing site is not another run from the day. Offered, it made the sheet say "Log them as 3 runs"
+ * and the save make 2 (the server links it onto this run instead). Only a window the scan can
+ * measure is judged — a session with no known laps stays in, and the save still links it if it
+ * turns out to be the same race. `runSpans` are on the track's clock (`blockOutingSpan`).
+ */
+export function withoutRunsOwnOutings(
+  sessions: readonly BackfillCandidate[],
+  metaFor: (sessionUrl: string) => BackfillCandidateMeta | null,
+  fallbackTimeZone: string | null,
+  runSpans: readonly Span[]
+): BackfillCandidate[] {
+  if (runSpans.length === 0) return [...sessions];
+  return sessions.filter((s) => {
+    const span = backfillCandidateSpan(s, metaFor(s.sessionUrl), fallbackTimeZone);
+    return !span || !runSpans.some((own) => sameTimeOnTrack(own, span));
+  });
+}
+
 export type BackfillCandidateRow = {
   sessionUrl: string;
   sessionCompletedAtIso: string | null;
   timingSource?: LapTimingSource | null;
+  /** Speedhive practice: the track's offset from UTC (see `BackfillCandidate`). */
+  sessionUtcOffsetMinutes?: number | null;
   /** Set when this account already holds the parse (the "already imported" list). */
   importedSessionId?: string | null;
   /** A session already filed under a run is never offered — it has one. */
@@ -91,20 +143,26 @@ function pad2(n: number): string {
 }
 
 /**
- * The calendar day a timing session belongs to, as YYYY-MM-DD.
+ * The calendar day a timing session belongs to at the track, as YYYY-MM-DD.
  *
- * Two clocks, on purpose: LiveRC and MyRCM publish the track's wall clock and the parsers store
- * it as-if-UTC, so its UTC date IS the track's date. Speedhive publishes real instants, which
- * only become a date in a zone — the driver's, or the device's when none is known.
+ * LiveRC, MyRCM and Speedhive's race results publish the track's wall clock and the parsers store
+ * it as-if-UTC, so its UTC date IS the track's date. Speedhive's practice loop publishes real
+ * instants with the track's offset beside them, which date exactly. Only a real instant that came
+ * without its offset needs a zone — the driver's, or the device's when none is known.
  */
 export function timingSessionDayKey(
   iso: string,
   source: LapTimingSource | null | undefined,
-  timeZone: string | null
+  timeZone: string | null,
+  session?: { sessionUrl?: string | null; sessionUtcOffsetMinutes?: number | null } | null
 ): string | null {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  if (isWallClockAsUtcTimingSource(source)) return d.toISOString().slice(0, 10);
+  if (isWallClockAsUtcTimingSource(source, { sourceUrl: session?.sessionUrl })) {
+    return d.toISOString().slice(0, 10);
+  }
+  const offset = session?.sessionUtcOffsetMinutes;
+  if (isUtcOffsetMinutes(offset)) return new Date(d.getTime() + offset * 60_000).toISOString().slice(0, 10);
   if (timeZone) return calendarYmdInTimeZone(d, timeZone);
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
@@ -112,15 +170,17 @@ export function timingSessionDayKey(
 /**
  * Which of the scanned sessions can be filed beside the picked one.
  *
- * Same day as the picked session (earlier AND later — logging run 4 late still fills in 5 and 6),
- * not already on this run, not already on any run, and each URL once, preferring the copy that
- * carries an import id. Sorted earliest first so the count reads in the day's order.
+ * Same day at the track as the picked session (earlier AND later — logging run 4 late still fills
+ * in 5 and 6), not already on this run, not already on any run, and each URL once, preferring the
+ * copy that carries an import id. Sorted earliest first on the track's clock so the count reads in
+ * the day's order. `timeZone` only dates a real instant that came without the track's offset.
  */
 export function selectBackfillCandidates(input: {
   picked: {
     sessionUrl: string;
     sessionCompletedAtIso: string | null;
     timingSource: LapTimingSource | null;
+    sessionUtcOffsetMinutes?: number | null;
   } | null;
   rows: readonly BackfillCandidateRow[];
   attachedUrls: ReadonlySet<string>;
@@ -128,7 +188,7 @@ export function selectBackfillCandidates(input: {
 }): { dayKey: string; sessions: BackfillCandidate[] } | null {
   const picked = input.picked;
   if (!picked || !picked.sessionCompletedAtIso) return null;
-  const dayKey = timingSessionDayKey(picked.sessionCompletedAtIso, picked.timingSource, input.timeZone);
+  const dayKey = timingSessionDayKey(picked.sessionCompletedAtIso, picked.timingSource, input.timeZone, picked);
   if (!dayKey) return null;
   const pickedUrl = picked.sessionUrl.trim();
 
@@ -140,15 +200,29 @@ export function selectBackfillCandidates(input: {
     const iso = row.sessionCompletedAtIso?.trim();
     if (!iso) continue;
     const source = row.timingSource ?? null;
-    if (timingSessionDayKey(iso, source, input.timeZone) !== dayKey) continue;
+    if (timingSessionDayKey(iso, source, input.timeZone, row) !== dayKey) continue;
     const importedSessionId = row.importedSessionId?.trim() || null;
     const existing = byUrl.get(url);
     if (existing && (existing.importedSessionId || !importedSessionId)) continue;
-    byUrl.set(url, { sessionUrl: url, importedSessionId, sessionCompletedAtIso: iso, timingSource: source });
+    byUrl.set(url, {
+      sessionUrl: url,
+      importedSessionId,
+      sessionCompletedAtIso: iso,
+      timingSource: source,
+      sessionUtcOffsetMinutes: row.sessionUtcOffsetMinutes ?? null,
+    });
   }
 
-  const sessions = [...byUrl.values()].sort(
-    (a, b) => new Date(a.sessionCompletedAtIso).getTime() - new Date(b.sessionCompletedAtIso).getTime()
-  );
+  const onTrackMs = (s: BackfillCandidate) =>
+    (
+      trackClockTime({
+        iso: s.sessionCompletedAtIso,
+        timingSource: s.timingSource,
+        sourceUrl: s.sessionUrl,
+        utcOffsetMinutes: s.sessionUtcOffsetMinutes,
+        fallbackTimeZone: input.timeZone,
+      }) ?? new Date(s.sessionCompletedAtIso)
+    ).getTime();
+  const sessions = [...byUrl.values()].sort((a, b) => onTrackMs(a) - onTrackMs(b));
   return { dayKey, sessions };
 }

@@ -61,5 +61,10 @@ export async function PUT(request: Request) {
 
   const saved = await saveDebrief(userId, identity, normalizeDebriefText(body.text));
   revalidateAfterDebriefMutation();
-  return NextResponse.json({ debrief: saved });
+  // The server's clock on this write, so the card can tell it from an older copy of the page
+  // (`debriefNotesThisTab`). A cleared note has no row to carry a time: the moment it was cleared.
+  return NextResponse.json({
+    debrief: saved,
+    savedAtIso: saved?.updatedAtIso ?? new Date().toISOString(),
+  });
 }

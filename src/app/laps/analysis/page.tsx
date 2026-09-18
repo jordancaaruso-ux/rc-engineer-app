@@ -42,6 +42,7 @@ const analysisRunSelect = {
   userId: true,
   createdAt: true,
   sortAt: true,
+  importedLapTimeSessionId: true,
   sessionCompletedAt: true,
   loggingCompletedAt: true,
   sessionType: true,

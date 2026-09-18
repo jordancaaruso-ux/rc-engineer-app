@@ -13,6 +13,11 @@ import {
   applyDerivedSheetBoxes,
   derivedBoxKeysOnSheet,
 } from "@/lib/setupSheetModels/sheetDerivedBoxes";
+import {
+  boxWrapsText,
+  NOTE_LINE_HEIGHT,
+  NOTE_SIZE_PAGE_FRAC,
+} from "@/lib/setupSheetModels/sheetTextWrap";
 import { ZAPF_MARKS, type ZapfMarkPlacement } from "@/lib/setupDocuments/zapfDingbatMarks";
 
 /**
@@ -215,21 +220,18 @@ const FOCUS_HALO = "0 0 0 1px rgba(255, 214, 10, 0.95), 0 0 0 3px rgba(255, 214,
 const AUTO_TEXT_HEIGHT_RATIO = 0.73;
 const AUTO_MARK_HEIGHT_RATIO = 0.78;
 
-/**
- * A note box is not sized to its height — it wraps.
- *
- * The same sheet's comments box is 78.6pt tall and its viewer drew 11pt in it, a ratio of 0.14: a
- * multiline field gets a comfortable reading size and as many lines as it needs, not one enormous
- * line. Applying the height ratio there produced text five times too big, and capping it by width on
- * one imaginary line produced text half the size it should be, which is what actually shipped.
- *
- * So a multiline box is capped at a share of the PAGE height rather than its own — 11pt on this
- * sheet's 842pt page is 0.0131, and the cap sits just above it. Fitted to one real sample, which is
- * one more than the old number had; Acrobat's multiline rule is not published.
- */
-const AUTO_MULTILINE_MAX_PAGE_FRAC = 0.0143;
-/** Line box as a share of font size — ordinary text leading, used when wrapping. */
-const AUTO_LINE_HEIGHT = 1.15;
+/** Prose sizing and the "is this a notes box" rule, shared with the crop and the export. */
+const AUTO_MULTILINE_MAX_PAGE_FRAC = NOTE_SIZE_PAGE_FRAC;
+const AUTO_LINE_HEIGHT = NOTE_LINE_HEIGHT;
+
+/** {@link boxWrapsText}, asked the way this file has a box to hand. */
+function boxWraps(
+  style: SheetFillBoxStyle | undefined,
+  heightFrac: number,
+  isTick: boolean
+): boolean {
+  return boxWrapsText({ heightFracOfPage: heightFrac, multiline: style?.multiline, isTick });
+}
 
 const DEFAULT_BOX_STYLE: SheetFillBoxStyle = {
   fontFamily: "Helvetica, Arial, sans-serif",
@@ -283,13 +285,17 @@ function autoFontSize(input: {
   }
 
   const cap = input.pageHeight ? input.pageHeight * AUTO_MULTILINE_MAX_PAGE_FRAC : byHeight;
+  // A line the driver ended themselves ends there, so the count is per paragraph rather than over
+  // the whole string — three short lines are three lines, not one that happens to be 40 long.
+  const paragraphs = text.split("\n");
   // Largest size at which the wrapped text still fits the box's height. Solved by walking down from
   // the cap rather than in closed form, because the line count is a ceiling and the closed form
   // rounds the wrong way — it returned a size whose fourth line fell off the bottom of the box.
   let size = Math.min(cap, byHeight);
   while (size > 3) {
     const perLine = Math.max(Math.floor(inner / (size * AVERAGE_ADVANCE)), 1);
-    if (Math.ceil(chars / perLine) * size * AUTO_LINE_HEIGHT <= boxHeight) break;
+    const lines = paragraphs.reduce((n, p) => n + Math.max(Math.ceil(p.length / perLine), 1), 0);
+    if (lines * size * AUTO_LINE_HEIGHT <= boxHeight) break;
     size -= 0.5;
   }
   return Math.max(size, 3);
@@ -484,7 +490,16 @@ export function SheetFillSurface({
 
   const [stage, setStage] = useState({ width: 0, height: 0 });
   const stageElRef = useRef<HTMLDivElement | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  /**
+   * Whatever is holding the keyboard right now.
+   *
+   * A notes box is typed into a `textarea` and every other box into an `input`, so this holds
+   * either; a callback ref takes both without the cast a typed ref object would need.
+   */
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const setEditorRef = useCallback((el: HTMLInputElement | HTMLTextAreaElement | null) => {
+    inputRef.current = el;
+  }, []);
 
   /**
    * The page as drawn, in CSS pixels.
@@ -555,6 +570,10 @@ export function SheetFillSurface({
   const fullscreenFocus = isFocusMode && !finePointer;
   /** True when this box is typed into. A tick box and a choice row are tapped, not typed. */
   const typesValues = focused ? focused.uiType !== "checkbox" && !focused.options?.length : false;
+  /** The focused box holds prose — see {@link boxWraps}. */
+  const focusedWraps = focusedBox ? boxWraps(focusedBox.style, focusedBox.height, false) : false;
+  /** …and is actually being written into, so the value bar is a note pad rather than a field. */
+  const barWraps = focusedWraps && typesValues;
   /**
    * Desktop: the caret goes in the box on the sheet, and there is no bar underneath at all.
    *
@@ -1222,8 +1241,14 @@ export function SheetFillSurface({
     if (!el) return;
     if (document.activeElement !== el) el.focus({ preventScroll: true });
     // Land on a filled box and the existing value is selected, so typing replaces it.
-    if (typesValues && el.value) el.select();
-  }, [focusIndex, typesValues]);
+    //
+    // A NOTE is added to rather than replaced — it is a paragraph someone wrote, and selecting it
+    // all would put it one keystroke from gone — so landing on one parks the caret at its end.
+    if (typesValues && el.value) {
+      if (focusedWraps) el.setSelectionRange(el.value.length, el.value.length);
+      else el.select();
+    }
+  }, [focusIndex, typesValues, focusedWraps]);
 
   const exitFocus = useCallback(() => {
     setFocusIndex(null);
@@ -1367,6 +1392,7 @@ export function SheetFillSurface({
               const s = b.style ?? DEFAULT_BOX_STYLE;
               const boxHeight = Math.max(b.height * fitted.height, 5);
               const boxWidth = Math.max(b.width * fitted.width, 5);
+              const wraps = boxWraps(s, b.height, isTick);
               const fontSize = s.fontSizeFrac
                 ? Math.max(s.fontSizeFrac * fitted.height, 3)
                 : autoFontSize({
@@ -1374,7 +1400,7 @@ export function SheetFillSurface({
                     boxWidth,
                     boxHeight,
                     isTick,
-                    multiline: s.multiline,
+                    multiline: wraps,
                     pageHeight: fitted.height,
                   });
               const editingHere = desktopEditing && isFocused;
@@ -1408,7 +1434,10 @@ export function SheetFillSurface({
                   onMouseEnter={finePointer ? () => setHoverKey(b.key) : undefined}
                   onMouseLeave={finePointer ? () => setHoverKey((k) => (k === b.key ? null : k)) : undefined}
                   className={cn(
-                    "absolute box-border flex items-center overflow-hidden rounded-[1px]",
+                    "absolute box-border flex overflow-hidden rounded-[1px]",
+                    // Prose starts at the top of its box, the way a PDF reader lays a notes box
+                    // out; a single value sits on the box's middle line.
+                    wraps ? "items-start" : "items-center",
                     !readOnly && !isDerived && "border",
                     isFocused && !readOnly ? "z-20 border-primary-ink" : "z-0",
                     isDerived && "cursor-default"
@@ -1449,9 +1478,26 @@ export function SheetFillSurface({
                       />
                     ) : (
                       <span
-                        className="pointer-events-none block max-w-full overflow-hidden whitespace-nowrap px-[1px] leading-none"
+                        className={cn(
+                          "pointer-events-none block overflow-hidden px-[1px]",
+                          /*
+                           * A notes box FILLS, the way it does in the reader the sheet was drawn
+                           * for: lines break at the box's edge, a line the driver ended themselves
+                           * is kept, and a word too long to break mid-air is broken rather than
+                           * pushed out of sight. `autoFontSize` has already picked a size that
+                           * makes those lines fit the box's height.
+                           *
+                           * Every other box is one value on one line, and an overlong one is cut
+                           * off exactly as the paper cuts it off.
+                           */
+                          wraps
+                            ? "w-full whitespace-pre-wrap break-words"
+                            : "max-w-full whitespace-nowrap leading-none"
+                        )}
                         style={{
                           fontSize,
+                          lineHeight: wraps ? AUTO_LINE_HEIGHT : undefined,
+                          textAlign: wraps ? s.alignment : undefined,
                           fontFamily: isTick ? undefined : s.fontFamily,
                           fontStyle: s.italic && !isTick ? "italic" : undefined,
                           fontWeight: s.bold && !isTick ? 700 : undefined,
@@ -1481,6 +1527,7 @@ export function SheetFillSurface({
               const value = values[focused.key] ?? "";
               const boxWidth = Math.max(focusedBox.width * fitted.width, 5);
               const boxHeight = Math.max(focusedBox.height * fitted.height, 5);
+              const wraps = focusedWraps;
               const fontSize = s.fontSizeFrac
                 ? Math.max(s.fontSizeFrac * fitted.height, 3)
                 : autoFontSize({
@@ -1488,67 +1535,93 @@ export function SheetFillSurface({
                     boxWidth,
                     boxHeight,
                     isTick: false,
-                    multiline: s.multiline,
+                    multiline: wraps,
                     pageHeight: fitted.height,
                   });
-              return (
+              const holderStyle: React.CSSProperties = {
+                left: focusedBox.x * fitted.width,
+                top: focusedBox.y * fitted.height,
+                width: boxWidth,
+                height: boxHeight,
+                paddingInline: 1,
+                fontSize,
+                lineHeight: wraps ? AUTO_LINE_HEIGHT : undefined,
+                fontFamily: s.fontFamily,
+                fontStyle: s.italic ? "italic" : undefined,
+                fontWeight: s.bold ? 700 : undefined,
+                color: s.color,
+                // A tick box draws its own mark underneath, so the holder shows nothing at all
+                // and lets the click through to the box it is sitting on.
+                caretColor: typesValues ? s.color : "transparent",
+                textAlign: s.alignment,
+                pointerEvents: typesValues ? undefined : "none",
+              };
+              /**
+               * Everything the two holders share. A notes box is typed into a `textarea` so the
+               * driver writes into the shape they are filling instead of a one-line ribbon; every
+               * other box keeps the `input`, whose single line is centred on the box exactly as a
+               * reader centres a value.
+               */
+              const common = {
+                // The wizard bottom bar hides while a text field has focus, but this holder
+                // HOLDS focus for the whole editing session by design — the attribute tells
+                // the bar to stay put on fine-pointer devices (LogRunWizardBottomBar).
+                "data-persistent-editor": "",
+                value: typesValues ? value : "",
+                readOnly: !typesValues,
+                onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+                  if (typesValues) setValue(focused.key, e.target.value);
+                },
+                onKeyDown: (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+                  // In a notes box Return is a new line, because that is what it is for there.
+                  // Everywhere else a box holds one value and Return means "done, next one".
+                  if (e.key === "Enter" && !(wraps && typesValues)) {
+                    e.preventDefault();
+                    step(1);
+                    return;
+                  }
+                  // Taken over, or the first Tab leaves the sheet entirely.
+                  if (e.key === "Tab") {
+                    e.preventDefault();
+                    step(e.shiftKey ? -1 : 1);
+                    return;
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    exitFocus();
+                    return;
+                  }
+                  // A box you tabbed onto rather than clicked is answered with the space bar.
+                  if (!typesValues && (e.key === " " || e.key === "Spacebar")) {
+                    e.preventDefault();
+                    answerWithoutTyping(focused);
+                  }
+                },
+                autoCapitalize: "off",
+                autoCorrect: "off",
+                spellCheck: false,
+                "aria-label": focused.label,
+                "aria-hidden": !typesValues,
+                style: holderStyle,
+              };
+              return wraps ? (
+                <textarea
+                  ref={setEditorRef}
+                  {...common}
+                  /*
+                   * No resize grip and no scrollbar: the grip would offer to change the size of a
+                   * box the manufacturer already sized, and a bar drawn down the paper is not on
+                   * the paper. `autoFontSize` shrinks the text as the note grows, so it is the
+                   * rare, very long note that overflows at all — and the browser keeps the caret
+                   * in view while it is being typed.
+                   */
+                  className="absolute z-30 block resize-none overflow-hidden border-0 bg-transparent p-0 outline-none"
+                />
+              ) : (
                 <input
-                  ref={inputRef}
-                  // The wizard bottom bar hides while a text field has focus, but this input
-                  // HOLDS focus for the whole editing session by design — the attribute tells
-                  // the bar to stay put on fine-pointer devices (LogRunWizardBottomBar).
-                  data-persistent-editor=""
-                  value={typesValues ? value : ""}
-                  readOnly={!typesValues}
-                  onChange={(e) => {
-                    if (typesValues) setValue(focused.key, e.target.value);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      step(1);
-                      return;
-                    }
-                    // Taken over, or the first Tab leaves the sheet entirely.
-                    if (e.key === "Tab") {
-                      e.preventDefault();
-                      step(e.shiftKey ? -1 : 1);
-                      return;
-                    }
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      exitFocus();
-                      return;
-                    }
-                    // A box you tabbed onto rather than clicked is answered with the space bar.
-                    if (!typesValues && (e.key === " " || e.key === "Spacebar")) {
-                      e.preventDefault();
-                      answerWithoutTyping(focused);
-                    }
-                  }}
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  aria-label={focused.label}
-                  aria-hidden={!typesValues}
+                  ref={setEditorRef}
+                  {...common}
                   className="absolute z-30 block border-0 bg-transparent p-0 leading-none outline-none"
-                  style={{
-                    left: focusedBox.x * fitted.width,
-                    top: focusedBox.y * fitted.height,
-                    width: boxWidth,
-                    height: boxHeight,
-                    paddingInline: 1,
-                    fontSize,
-                    fontFamily: s.fontFamily,
-                    fontStyle: s.italic ? "italic" : undefined,
-                    fontWeight: s.bold ? 700 : undefined,
-                    color: s.color,
-                    // A tick box draws its own mark underneath, so the holder shows nothing at all
-                    // and lets the click through to the box it is sitting on.
-                    caretColor: typesValues ? s.color : "transparent",
-                    textAlign: s.alignment,
-                    pointerEvents: typesValues ? undefined : "none",
-                  }}
                 />
               );
             })()
@@ -1735,31 +1808,44 @@ export function SheetFillSurface({
           resize the screen, which is the exact stutter this replaced.
         */}
         <div className="relative flex-1">
-          <input
-            ref={inputRef}
+          <textarea
+            ref={setEditorRef}
             // Same contract as the over-the-box render above: keep the wizard bar on
             // fine-pointer devices while this deliberately-never-blurred input has focus.
             data-persistent-editor=""
+            /*
+             * A `textarea` even for a one-value box, and `rows` is the only thing that changes.
+             *
+             * Swapping the element for a notes box would unmount this one, and unmounting it is
+             * exactly what the comment above forbids: focus goes, the keyboard closes, the screen
+             * resizes, and stepping along the sheet stutters. With `wrap="off"` a one-row textarea
+             * behaves as the input did — one line, scrolling sideways — so nothing else moves.
+             */
+            rows={barWraps ? 3 : 1}
+            wrap={barWraps ? "soft" : "off"}
             value={typesValues ? values[focused.key] ?? "" : ""}
             onChange={(e) => {
               if (typesValues) setValue(focused.key, e.target.value);
             }}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
+              // A notes box keeps Return for the new line it is for; every other box is one
+              // value, so Return means "done, next one".
+              if (e.key === "Enter" && !barWraps) {
                 e.preventDefault();
                 step(1);
               }
             }}
-            enterKeyHint="next"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
+            enterKeyHint={barWraps ? "enter" : "next"}
+            // Prose wants sentence capitals and a spell check; a damper setting wants neither.
+            autoCapitalize={barWraps ? "sentences" : "off"}
+            autoCorrect={barWraps ? "on" : "off"}
+            spellCheck={barWraps}
             placeholder="—"
             aria-label={focused.label}
             aria-hidden={!typesValues}
             tabIndex={typesValues ? undefined : -1}
             className={cn(
-              "w-full rounded-md border border-primary-ink bg-background px-3 py-2.5 text-[17px] outline-none ring-[3px] ring-primary-ink/10",
+              "block w-full resize-none rounded-md border border-primary-ink bg-background px-3 py-2.5 text-[17px] outline-none ring-[3px] ring-primary-ink/10",
               !typesValues && "pointer-events-none opacity-0"
             )}
           />

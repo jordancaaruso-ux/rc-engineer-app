@@ -84,8 +84,9 @@ export async function importSpeedhiveSession(
 
     const sessionDrivers: LapUrlSessionDriver[] = [];
     // Latest transponder crossing across the field = when the session actually finished.
-    // `timeOfDay` is epoch millis (a true instant); the session's `startTime` is a zoneless
-    // track-local schedule and often doesn't match when the session really ran.
+    // `timeOfDay` is the track's clock as epoch millis — stored as-if-UTC like LiveRC's times
+    // (`lapImport/labels.ts`); the session's `startTime` is the same clock, but a schedule that
+    // often doesn't match when the session really ran.
     let lastCrossingMs = 0;
 
     for (const block of lapBlocks) {

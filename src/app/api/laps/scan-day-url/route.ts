@@ -16,7 +16,10 @@ import {
 } from "@/lib/lapWatch/liveRcNameNormalize";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { discoverTrackTimingSessions } from "@/lib/lapWatch/discoverTrackTimingSessions";
-import { sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import {
+  sessionCompletedAtIsoFromImportedPayload,
+  sessionUtcOffsetMinutesFromImportedPayload,
+} from "@/lib/lapImport/fromPayload";
 import { rawSessionDriversFromImportedPayload } from "@/lib/lapImport/importedIngestPlan";
 import { hasSpeedhiveIdentityForUser } from "@/lib/speedhive/speedhiveDriverSettings";
 import { formatRunSessionDisplay } from "@/lib/runSession";
@@ -36,6 +39,8 @@ export type ScanDayUrlCandidateRow = {
   /** Wall clock from the list page (e.g. "2:05 PM"), when available. */
   sessionTime: string | null;
   sessionCompletedAtIso: string | null;
+  /** Speedhive practice: the track's offset from UTC, so the day and the race read on its clock. */
+  sessionUtcOffsetMinutes?: number | null;
   /**
    * Practice: true when this row matches Settings → Name on LiveRC (exact normalized string,
    * or multi-token relaxed match — see route). Results list rows always null (no per-row driver).
@@ -120,6 +125,7 @@ async function linkedScanCandidatesForRun(
       driverName: primary?.driverName?.trim() || sess.sourceUrl,
       sessionTime: null,
       sessionCompletedAtIso,
+      sessionUtcOffsetMinutes: sessionUtcOffsetMinutesFromImportedPayload(sess.parsedPayload),
       matchesDriver: true,
       alreadyImported: true,
       linkedRunId: runId,
@@ -144,6 +150,7 @@ async function importedRowsForScan(
     sessionUrl: string;
     label: string;
     sessionCompletedAtIso: string | null;
+    sessionUtcOffsetMinutes?: number | null;
     bestLapSeconds?: number | null;
     lapCount?: number | null;
     timingSource?: "liverc" | "speedhive" | "myrcm";
@@ -199,6 +206,7 @@ async function importedRowsForScan(
       driverName: c.label,
       sessionTime: null,
       sessionCompletedAtIso: c.sessionCompletedAtIso,
+      sessionUtcOffsetMinutes: c.sessionUtcOffsetMinutes ?? null,
       matchesDriver: true,
       alreadyImported: true,
       linkedRunId: imp.linkedRunId,
@@ -377,6 +385,7 @@ export async function POST(request: Request) {
       driverName: c.label,
       sessionTime: null,
       sessionCompletedAtIso: c.sessionCompletedAtIso,
+      sessionUtcOffsetMinutes: c.sessionUtcOffsetMinutes ?? null,
       matchesDriver: true,
       alreadyImported: c.alreadyImported,
       linkedRunId: c.linkedRunId,

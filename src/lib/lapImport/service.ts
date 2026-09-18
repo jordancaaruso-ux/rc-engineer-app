@@ -41,6 +41,7 @@ export function serializeParsePayload(parsed: LapUrlParseResult): Record<string,
     sessionDrivers: parsed.sessionDrivers ?? [],
     sessionHint: parsed.sessionHint ?? null,
     sessionCompletedAtIso: parsed.sessionCompletedAtIso ?? null,
+    sessionUtcOffsetMinutes: parsed.sessionUtcOffsetMinutes ?? null,
     discoveredRaceUrls: parsed.discoveredRaceUrls ?? null,
     discoveredSessions: parsed.discoveredSessions ?? null,
     message: parsed.message ?? null,
@@ -64,6 +65,8 @@ export type ImportOneUrlSuccess = {
   sessionCompletedAtIso: string | null;
   /** DB `ImportedLapTimeSession.sessionCompletedAt` after persist (same instant as above when parser supplied a time). */
   sessionCompletedAtDbIso: string | null;
+  /** Speedhive practice: the track's offset from UTC when the session ran (see `LapUrlParseResult`). */
+  sessionUtcOffsetMinutes: number | null;
   parserId: string;
   laps: number[];
   lapRows: LapUrlParseResult["lapRows"];
@@ -176,6 +179,7 @@ export async function importOneTimingUrl(
     recordedAt: row.createdAt.toISOString(),
     sessionCompletedAtIso: sessionCompletedAt ? sessionCompletedAt.toISOString() : null,
     sessionCompletedAtDbIso: row.sessionCompletedAt ? row.sessionCompletedAt.toISOString() : null,
+    sessionUtcOffsetMinutes: parsed.sessionUtcOffsetMinutes ?? null,
     parserId: parsed.parserId,
     laps: parsed.laps,
     lapRows: parsed.lapRows,
@@ -201,13 +205,31 @@ export async function importOneTimingUrl(
  * the run — harmless when only one could ever be attached, wrong the moment
  * "remove just this one" exists. An empty list is therefore a real instruction
  * (detach everything), not a no-op.
+ *
+ * `sameOutingImportedLapTimeSessionIds` are other timing sites' copies of those
+ * races (the lap step's linked sources, `lapImport/sameOutingBlocks.ts`): linked
+ * to the run like the rest, so the day never files them as runs of their own,
+ * but never its primary — the run's session time and field come from its laps.
+ * They only ride along with laps: with no sessions attached they detach too.
  */
 export async function linkImportedSessionsToRun(params: {
   userId: string;
   importedLapTimeSessionIds: string[];
+  sameOutingImportedLapTimeSessionIds?: string[];
   runId: string;
 }): Promise<void> {
   const ids = [...new Set(params.importedLapTimeSessionIds.map((id) => id.trim()).filter(Boolean))];
+  const copyIds =
+    ids.length === 0
+      ? []
+      : [
+          ...new Set(
+            (params.sameOutingImportedLapTimeSessionIds ?? [])
+              .map((id) => id.trim())
+              .filter((id) => id.length > 0 && !ids.includes(id))
+          ),
+        ];
+  const allIds = [...ids, ...copyIds];
 
   await prisma.$transaction(async (tx) => {
     // Detach first: a session dropped from this run must let go before we choose
@@ -216,7 +238,7 @@ export async function linkImportedSessionsToRun(params: {
       where: {
         userId: params.userId,
         linkedRunId: params.runId,
-        ...(ids.length > 0 ? { id: { notIn: ids } } : {}),
+        ...(allIds.length > 0 ? { id: { notIn: allIds } } : {}),
       },
       data: { linkedRunId: null },
     });
@@ -236,7 +258,7 @@ export async function linkImportedSessionsToRun(params: {
     const placeholders = await tx.run.findMany({
       where: {
         userId: params.userId,
-        importedLapTimeSessionId: { in: ids },
+        importedLapTimeSessionId: { in: allIds },
         id: { not: params.runId },
         unconfirmedAt: { not: null },
       },
@@ -246,7 +268,7 @@ export async function linkImportedSessionsToRun(params: {
       await tx.run.deleteMany({ where: { id: { in: placeholders.map((p) => p.id) } } });
     }
 
-    for (const id of ids) {
+    for (const id of allIds) {
       await tx.run.updateMany({
         where: {
           userId: params.userId,
@@ -257,19 +279,21 @@ export async function linkImportedSessionsToRun(params: {
       });
     }
 
-    const owned = await tx.importedLapTimeSession.findMany({
-      where: { id: { in: ids }, userId: params.userId },
+    const ownedAll = await tx.importedLapTimeSession.findMany({
+      where: { id: { in: allIds }, userId: params.userId },
       select: { id: true, sessionCompletedAt: true, createdAt: true },
     });
+    const owned = ownedAll.filter((s) => ids.includes(s.id));
     if (owned.length === 0) return;
 
     await tx.importedLapTimeSession.updateMany({
-      where: { id: { in: owned.map((s) => s.id) }, userId: params.userId },
+      where: { id: { in: ownedAll.map((s) => s.id) }, userId: params.userId },
       data: { linkedRunId: params.runId },
     });
 
     // Earliest on track wins the primary pointer, so the run's session time and
     // field stats come from the first half however the client ordered the list.
+    // Copies never do: they are the same race, and the laps are not theirs.
     const primaryIdForRun = [...owned].sort(
       (a, b) =>
         (a.sessionCompletedAt ?? a.createdAt).getTime() -

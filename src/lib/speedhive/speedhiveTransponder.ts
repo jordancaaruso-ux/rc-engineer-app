@@ -102,3 +102,13 @@ export function classificationRowMatchesTransponder(
   if (!Number.isFinite(rowNum)) return false;
   return userTransponders.some((n) => n === rowNum || normalizeSpeedhiveTransponderNumber(n) === rowNorm);
 }
+
+/** The driver's own chip on this row, normalised — null when the row carries none or someone else's. */
+export function userChipOnClassificationRow(
+  row: SpeedhiveClassificationRow,
+  userTransponders: number[]
+): string | null {
+  return classificationRowMatchesTransponder(row, userTransponders)
+    ? transponderNumberFromClassificationRow(row)
+    : null;
+}

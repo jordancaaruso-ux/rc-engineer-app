@@ -9,22 +9,22 @@ import { loadOnboardingView } from "@/lib/onboarding/server";
 import { canLookUpTimingSessionsForUser } from "@/lib/onboarding/timingIdentity";
 import { loadDashboardSetups } from "@/lib/setup/getDashboardSetups";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
-import { WhichCarSheet } from "@/components/dashboard/GetMyDay";
+import { UnloggedRunsSheet } from "@/components/dashboard/GetMyDay";
 import { CardPanel } from "@/components/ui/CardPanel";
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  /** `?whichCar=<trackId>&ymd=<ymd>` — the 8 pm notification's landing when the pass filed no run
-   *  to open (every session needed a car). The sheet asks here, then lands on the day it makes. */
+  /** `?unlogged=<trackId>&ymd=<ymd>` — the 8 pm notification's landing when the driver has no run
+   *  that day to open. The sheet lists the runs they didn't log here, then lands on the day it makes. */
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<ReactNode> {
   const sp = (await searchParams) ?? {};
-  const whichCarRaw = sp.whichCar;
-  const whichCarTrackId =
-    typeof whichCarRaw === "string" && whichCarRaw.trim() ? whichCarRaw.trim() : null;
+  const unloggedRaw = sp.unlogged;
+  const unloggedTrackId =
+    typeof unloggedRaw === "string" && unloggedRaw.trim() ? unloggedRaw.trim() : null;
   const ymdRaw = sp.ymd;
-  const whichCarYmd = typeof ymdRaw === "string" && ymdRaw.trim() ? ymdRaw.trim() : null;
+  const unloggedYmd = typeof ymdRaw === "string" && ymdRaw.trim() ? ymdRaw.trim() : null;
 
   if (!hasDatabaseUrl()) {
     return (
@@ -71,8 +71,8 @@ export default async function DashboardPage({
 
   return (
     <>
-      {whichCarTrackId && whichCarYmd ? (
-        <WhichCarSheet trackId={whichCarTrackId} ymd={whichCarYmd} />
+      {unloggedTrackId && unloggedYmd ? (
+        <UnloggedRunsSheet trackId={unloggedTrackId} ymd={unloggedYmd} />
       ) : null}
       <DashboardHome
         model={model}

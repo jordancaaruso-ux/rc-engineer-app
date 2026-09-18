@@ -77,6 +77,8 @@ export type CompareRunShape = {
   loggingCompletedAt?: Date | string | null;
   /** Stable ordering axis; present on rows loaded post-migration. */
   sortAt?: Date | string | null;
+  /** The import this run was stamped from; see resolveRunDisplayInstant. */
+  importedLapTimeSessionId?: string | null;
 };
 
 type CompareMode = "current_setup" | "choose_run";

@@ -135,6 +135,7 @@ export function PickerSheet<T extends SearchableOption>({
   searchAction,
   mono = false,
   searchable,
+  initialVisible,
   multiple = null,
 }: {
   open: boolean;
@@ -186,8 +187,20 @@ export function PickerSheet<T extends SearchableOption>({
   mono?: boolean;
   /** Force the search field on or off. Unset = decided by list length. */
   searchable?: boolean;
+  /**
+   * Show only this many rows per section to begin with, the rest behind a "View more" that
+   * reveals another batch of the same size. Unset = render everything, which is right for a
+   * list you can take in at a glance and wrong for a catalog: 739 tire compounds opened as a
+   * wall of names with no sense of where it ended (founder call 2026-09-18).
+   *
+   * Searching re-collapses, because a new query is a new list. A section shorter than this
+   * shows no button at all, which is why "Recently used" is unaffected.
+   */
+  initialVisible?: number;
 }) {
   const [query, setQuery] = useState("");
+  /** Extra rows revealed per section key, on top of `initialVisible`. */
+  const [revealed, setRevealed] = useState<Record<string, number>>({});
   // Keeps the sheet mounted through its slide-down close so the exit animates.
   const sheet = useEnterExit(open, 300);
   const viewportBox = useVisualViewportBox(sheet.mounted);
@@ -210,8 +223,15 @@ export function PickerSheet<T extends SearchableOption>({
     if (open) {
       setQuery("");
       setScope(null);
+      setRevealed({});
     }
   }, [open]);
+
+  // A new query or a new chip is a new list, so it starts collapsed again — otherwise one
+  // "View more" tap leaves every later search fully expanded, which is the wall we removed.
+  useEffect(() => {
+    setRevealed({});
+  }, [query, scope]);
 
   const scopedSections = useMemo(
     () => (scope ? sections.filter((s) => (s.filterKey ?? s.key) === scope) : sections),
@@ -529,14 +549,38 @@ export function PickerSheet<T extends SearchableOption>({
                   {emptyAction ? <div className="mt-3">{emptyAction(trimmedQuery)}</div> : null}
                 </div>
               ) : (
-                visible.map((section) => (
+                visible.map((section) => {
+                  /*
+                   * How much of this section is on screen: `initialVisible` plus whatever
+                   * "View more" has revealed.
+                   *
+                   * What is already chosen is lifted to the top of its section rather than
+                   * rendered in place. The sheet opens centred on your current pick (see the
+                   * scroll effect above), and alphabetically that pick is usually far past the
+                   * cut — so leaving it in place means either opening with no tick anywhere,
+                   * reading as though nothing were selected, or rendering the 600 rows above it
+                   * and restoring the wall this cap exists to remove. One row, at the top, ticked.
+                   */
+                  const cap = initialVisible && initialVisible > 0 ? initialVisible : 0;
+                  let shown = section.options;
+                  let pinned: typeof section.options = [];
+                  let hiddenCount = 0;
+                  if (cap > 0 && section.options.length > cap) {
+                    shown = section.options.slice(0, cap + (revealed[section.key] ?? 0));
+                    const onScreen = new Set(shown.map((o) => o.value));
+                    pinned = section.options.filter(
+                      (o) => isSelected(o.value) && !onScreen.has(o.value)
+                    );
+                    hiddenCount = section.options.length - shown.length - pinned.length;
+                  }
+                  return (
                   <div key={section.key} role="group" aria-label={section.label ?? title}>
                     {section.label ? (
                       <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                         {section.label}
                       </div>
                     ) : null}
-                    {section.options.map((o) => {
+                    {[...pinned, ...shown].map((o) => {
                       const selected = isSelected(o.value);
                       return (
                         <button
@@ -561,8 +605,24 @@ export function PickerSheet<T extends SearchableOption>({
                         </button>
                       );
                     })}
+                    {hiddenCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRevealed((prev) => ({
+                            ...prev,
+                            [section.key]: (prev[section.key] ?? 0) + cap,
+                          }))
+                        }
+                        className="tap-active flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                      >
+                        View more
+                        <span className="tabular-nums opacity-60">{hiddenCount}</span>
+                      </button>
+                    ) : null}
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
 

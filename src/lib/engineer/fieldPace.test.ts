@@ -52,8 +52,8 @@ test("rank and gaps are measured against the fastest driver and the field median
   assert.equal(p.gapBestToP1?.toFixed(2), "0.30");
   assert.equal(p.gapTop5ToP1?.toFixed(2), "0.30");
   // median best of 17.2, 17.5, 17.8, 18.3 = 17.65 → -0.15; median top5 of 17.4, 17.7, 18.0 = 17.70 → 0.00
-  assert.equal(p.gapBestToMean?.toFixed(2), "-0.15");
-  assert.equal(p.gapTop5ToMean?.toFixed(2), "0.00");
+  assert.equal(p.gapBestToMedian?.toFixed(2), "-0.15");
+  assert.equal(p.gapTop5ToMedian?.toFixed(2), "0.00");
 });
 
 test("a cut lap is not P1, and a one-lap straggler cannot drag the middle of the field", () => {
@@ -68,7 +68,7 @@ test("a cut lap is not P1, and a one-lap straggler cannot drag the middle of the
   assert.equal(p.n, 3, "the cutter's best is dropped");
   assert.equal(p.rank, 2);
   assert.equal(p.gapBestToP1?.toFixed(2), "0.07");
-  assert.equal(p.gapBestToMean?.toFixed(2), "0.00", "median of 15.79, 15.86, 61.0 is 15.86");
+  assert.equal(p.gapBestToMedian?.toFixed(2), "0.00", "median of 15.79, 15.86, 61.0 is 15.86");
   assert.deepEqual(
     p.entrants.map((e) => [e.name, e.isMe, e.cut]),
     [["Me", true, false], ["Cutter", false, true], ["Other", false, false], ["Straggler", false, false]],

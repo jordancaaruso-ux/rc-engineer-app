@@ -109,10 +109,10 @@ async function preview(userId: string, trackId: string, trackName: string) {
     recap,
     runCount: runs.length,
     unconfirmedCount: runs.filter((r) => r.unconfirmedAt != null).length,
-    looseCount: loose.length,
+    unloggedCount: loose.length,
     openPath:
       loose.length > 0
-        ? `${base}${base.includes("?") ? "&" : "?"}whichCar=${encodeURIComponent(trackId)}&ymd=${ymd}`
+        ? `${base}${base.includes("?") ? "&" : "?"}unlogged=${encodeURIComponent(trackId)}&ymd=${ymd}`
         : base,
   };
 

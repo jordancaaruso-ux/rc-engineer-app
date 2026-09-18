@@ -96,14 +96,26 @@ test("LiveRC sessions sit on their own date, and already-logged ones are counted
   assert.equal(out.alreadyOnRuns, 1);
 });
 
-test("Speedhive sessions are placed on the day in the track's zone, not by their UTC date", () => {
+test("Speedhive practice runs are placed on the day in the track's zone, not by their UTC date", () => {
+  const loop = (id: string) => `https://speedhive.mylaps.com/practice/4591/activities/${id}`;
   const rows = [
     // 08:30 on the 13th in Sydney.
-    { sessionUrl: "https://speedhive/x", sessionCompletedAtIso: "2026-09-12T22:30:00.000Z", linkedRunId: null },
+    { sessionUrl: loop("8"), sessionCompletedAtIso: "2026-09-12T22:30:00.000Z", linkedRunId: null },
     // 00:30 on the 14th in Sydney, whatever its UTC date says.
-    { sessionUrl: "https://speedhive/y", sessionCompletedAtIso: "2026-09-13T14:30:00.000Z", linkedRunId: null },
+    { sessionUrl: loop("9"), sessionCompletedAtIso: "2026-09-13T14:30:00.000Z", linkedRunId: null },
   ];
   const out = splitDayCandidates(rows, "2026-09-13", "speedhive", SYD);
-  assert.deepEqual(out.toFile.map((c) => c.sessionUrl), ["https://speedhive/x"]);
+  assert.deepEqual(out.toFile.map((c) => c.sessionUrl), [loop("8")]);
   assert.equal(out.alreadyOnRuns, 0);
+});
+
+test("Speedhive race results are the track's clock: their UTC date is the day", () => {
+  const race = (id: string) => `https://speedhive.mylaps.com/events/3706689/sessions/${id}`;
+  const rows = [
+    // A 2 PM heat in Tokyo, as the results list prints it.
+    { sessionUrl: race("1"), sessionCompletedAtIso: "2026-09-13T14:00:00.000Z", linkedRunId: null },
+    { sessionUrl: race("2"), sessionCompletedAtIso: "2026-09-12T23:30:00.000Z", linkedRunId: null },
+  ];
+  const out = splitDayCandidates(rows, "2026-09-13", "speedhive", "Asia/Tokyo");
+  assert.deepEqual(out.toFile.map((c) => c.sessionUrl), [race("1")]);
 });

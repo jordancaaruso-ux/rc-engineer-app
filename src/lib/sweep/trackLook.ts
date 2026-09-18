@@ -6,6 +6,7 @@ import { sendPushToUser } from "@/lib/webPush/server";
 import { sendTransactionalEmail } from "@/lib/email/sendTransactionalEmail";
 import { confirmRunReturnHref } from "@/lib/runs/confirmRunHref";
 import { outingSessionFromImportedRow, spanForExistingRun } from "@/lib/runs/outingsFromImportedSessions";
+import { countPendingForDay } from "@/lib/sweep/getMyDay";
 import { organizationIdFromTrackUrl } from "@/lib/speedhive/speedhiveUrl";
 import { practiceLocationIdFromTrackUrl } from "@/lib/speedhive/speedhivePracticeUrl";
 import { readDoc, writeDoc } from "@/lib/sweep/blobStore";
@@ -38,8 +39,10 @@ export type TrackLookReport = {
 
 /**
  * One track, one day, one look — the worker's whole job. Gather every listening driver's sessions
- * from every source the track has, THEN file each driver's day once as outings (`fileDay.ts`),
- * then hand each of them their day — by push when they have a device, by email otherwise.
+ * from every source the track has, THEN place each driver's day once as outings (`fileDay.ts`:
+ * laps onto a run they opened, sources onto a run they logged, the rest kept as a list — nothing
+ * becomes a run without their tick, founder ruling 2026-09-18), then hand each of them their day —
+ * by push when they have a device, by email otherwise.
  *
  * Two looks exist (founder ruling 2026-09-16). The 8 pm look is the day's summary for a driver who
  * has been off the track since 7:30; a driver with a session at or after 7:30 pm is still racing,
@@ -217,32 +220,17 @@ async function deliverDaySummary(params: {
 }): Promise<boolean> {
   const { userId, track, ymd, day } = params;
 
-  const [runs, looseRows] = await Promise.all([
+  const [runs, unlogged] = await Promise.all([
     prisma.run.findMany({
       where: { userId, trackId: track.id, sortAt: { gte: day.start, lt: day.end } },
       orderBy: [{ sortAt: "desc" }, { createdAt: "desc" }],
       select: SUMMARY_RUN_SELECT,
     }),
-    prisma.importedLapTimeSession.findMany({
-      where: {
-        userId,
-        trackId: track.id,
-        linkedRunId: null,
-        sweepFiledAt: { not: null },
-        sessionCompletedAt: {
-          gte: new Date(day.start.getTime() - DAY_SLACK_MS),
-          lt: new Date(day.end.getTime() + DAY_SLACK_MS),
-        },
-      },
-      select: { id: true, sourceUrl: true, parserId: true, parsedPayload: true, sessionCompletedAt: true },
-      take: 60,
-    }),
+    // Times on track the sheet would list — imported and waiting on the driver's tick.
+    countPendingForDay({ userId, track: { ...track, timeZone: track.timeZone }, day }),
   ]);
-  const loose = looseRows.filter((r) => {
-    const s = outingSessionFromImportedRow(r, track.timeZone);
-    return !!s && s.start >= day.start && s.start < day.end;
-  });
-  if (runs.length === 0 && loose.length === 0) return false;
+  if (runs.length === 0 && unlogged === 0) return false;
+
 
   const dateLabel = new Intl.DateTimeFormat("en-AU", {
     timeZone: "UTC",
@@ -267,16 +255,16 @@ async function deliverDaySummary(params: {
 
   const anchorRunId = recap?.best?.runId ?? runs[0]?.id ?? null;
   /*
-   * Where the notification lands (founder ruling 2026-09-16). The day when the look filed a run to
+   * Where the notification lands (founder ruling 2026-09-16). The day when the driver has a run to
    * open it by — a day is addressed by a run — else the dashboard, because a day with nothing on it
-   * has no address yet. When sessions are still waiting on a car, the landing carries the flag that
-   * opens the "Which car?" sheet over whatever it lands on; answering it files the runs and the
-   * sheet lands on the day it just made.
+   * has no address yet. When the timing sheet holds runs they did not log, the landing carries the
+   * flag that opens the sheet listing them over whatever it lands on (founder 2026-09-18: nothing
+   * files itself); ticking makes the runs and lands on the day.
    */
   const base = anchorRunId ? confirmRunReturnHref(anchorRunId) : "/";
   const openPath =
-    loose.length > 0
-      ? `${base}${base.includes("?") ? "&" : "?"}whichCar=${encodeURIComponent(track.id)}&ymd=${ymd}`
+    unlogged > 0
+      ? `${base}${base.includes("?") ? "&" : "?"}unlogged=${encodeURIComponent(track.id)}&ymd=${ymd}`
       : base;
   const summary = {
     trackName: track.name,
@@ -284,7 +272,7 @@ async function deliverDaySummary(params: {
     recap,
     runCount: runs.length,
     unconfirmedCount: runs.filter((r) => r.unconfirmedAt != null).length,
-    looseCount: loose.length,
+    unloggedCount: unlogged,
     openPath,
   };
 

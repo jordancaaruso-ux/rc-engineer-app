@@ -11,7 +11,6 @@ import { PageBackLink } from "@/components/ui/PageBackLink";
 import { TrackFavouriteClient } from "@/components/tracks/TrackFavouriteClient";
 import { TrackLiveRcUrlEditor } from "@/components/tracks/TrackLiveRcUrlEditor";
 import { TrackSpeedhiveUrlEditor } from "@/components/tracks/TrackSpeedhiveUrlEditor";
-import { TrackLocationNotSetBanner } from "@/components/tracks/TrackLocationNotSetBanner";
 import { TrackLocationEditor } from "@/components/tracks/TrackLocationEditor";
 import { TrackDeleteClient } from "@/components/tracks/TrackDeleteClient";
 import { TrackMetaTagsEditor } from "@/components/tracks/TrackMetaTagsEditor";
@@ -64,6 +63,7 @@ export default async function TrackDetailPage(props: {
       latitude: true,
       longitude: true,
       locationSource: true,
+      catalogSource: true,
       userId: true,
       verifiedAt: true,
     },
@@ -99,6 +99,14 @@ export default async function TrackDetailPage(props: {
   const canManage = canManageCommunityTrack(user, track);
   const deleteAsAdmin = canManage && track.userId !== user.id;
   const isAdmin = isAuthAdminEmail(user.email);
+  /**
+   * A LiveRC catalog row is defined by its URL, so that field states itself and offers nothing.
+   * And where the pin came from LiveRC's published address there is nothing to set either — the
+   * GPS card is one line. Both founder calls, 2026-09-18. A track a user added keeps every
+   * control, whatever its timing links are: only a catalog row carries identity.
+   */
+  const liveRcIsIdentity = track.catalogSource === "liverc";
+  const pinFromLiveRc = track.locationSource === "liverc_address";
 
   return (
     <>
@@ -137,6 +145,25 @@ export default async function TrackDetailPage(props: {
             </div>
           ) : null}
 
+          {/* Card order is the founder's, 2026-09-18: what the track IS first (grip and layout,
+              then its layouts), then where its lap times come from (the timing links and the two
+              URLs behind them), then the pin. Cards a driver may not edit are no longer grouped
+              together, so each one carries its own `canManage` rather than sharing a block.
+
+              Open to any driver (same call): tags, the Speedhive link and the pin are
+              contributions, not identity — one driver's serves everyone racing here, and a
+              contribution nobody but an admin can correct is a worse flaw than one anybody can
+              change. That whole group used to sit behind `canManage`, which on a seeded catalog
+              row means admin only, so nobody could fill in the 1,045 imported tracks. */}
+          <TrackMetaTagsEditor
+            trackId={track.id}
+            initialGripTags={track.gripTags}
+            initialLayoutTags={track.layoutTags}
+          />
+
+          {/* This track's own named layouts — still the creator's or an admin's list. */}
+          {canManage ? <TrackLayoutsEditor trackId={track.id} initialLayouts={layouts} /> : null}
+
           {/* A track with neither link searches nothing and looks like a scan that found nothing.
               After the catalog seed that is most of the European rows, so the gap gets an ask
               rather than silence — any driver may donate the link, and one paste serves everyone
@@ -147,40 +174,29 @@ export default async function TrackDetailPage(props: {
             <TrackTimingLinks liveRcUrl={track.liveRcUrl} speedhiveUrl={track.speedhiveUrl} />
           )}
 
+          {/* Editable only where the address is not identity — `canEditLiveRcUrl` refuses the rest
+              at the API, admins included, and `locked` says so on screen. */}
           {canManage ? (
-            <>
-              <TrackLocationNotSetBanner
-                trackId={track.id}
-                trackName={track.name}
-                location={track.location}
-                initial={{ latitude: track.latitude, longitude: track.longitude, locationSource: track.locationSource }}
-                showCurrentLocation
-              />
-
-              <CardPanel contentClassName="text-sm">
-                <Eyebrow className="mb-2">GPS location</Eyebrow>
-                <TrackLocationEditor
-                  trackId={track.id}
-                  trackName={track.name}
-                  location={track.location}
-                  initial={{ latitude: track.latitude, longitude: track.longitude, locationSource: track.locationSource }}
-                  showCurrentLocation
-                />
-              </CardPanel>
-
-              <TrackMetaTagsEditor
-                trackId={track.id}
-                initialGripTags={track.gripTags}
-                initialLayoutTags={track.layoutTags}
-              />
-
-              <TrackLayoutsEditor trackId={track.id} initialLayouts={layouts} />
-
-              <TrackLiveRcUrlEditor trackId={track.id} initialLiveRcUrl={track.liveRcUrl} />
-
-              <TrackSpeedhiveUrlEditor trackId={track.id} initialSpeedhiveUrl={track.speedhiveUrl} />
-            </>
+            <TrackLiveRcUrlEditor
+              trackId={track.id}
+              initialLiveRcUrl={track.liveRcUrl}
+              locked={liveRcIsIdentity}
+            />
           ) : null}
+
+          <TrackSpeedhiveUrlEditor trackId={track.id} initialSpeedhiveUrl={track.speedhiveUrl} />
+
+          <CardPanel contentClassName="text-sm">
+            <Eyebrow className="mb-2">GPS location</Eyebrow>
+            <TrackLocationEditor
+              trackId={track.id}
+              trackName={track.name}
+              location={track.location}
+              initial={{ latitude: track.latitude, longitude: track.longitude, locationSource: track.locationSource }}
+              showCurrentLocation
+              readOnly={pinFromLiveRc}
+            />
+          </CardPanel>
 
           <TrackFavouriteClient trackId={track.id} trackName={track.name} isFavourite={isFavourite} />
 

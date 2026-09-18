@@ -96,14 +96,17 @@ export function dayBoundsForYmd(ymd: string, timeZone: string): { start: Date; e
 export type DayCandidate = {
   sessionUrl: string;
   sessionCompletedAtIso: string | null;
+  /** Speedhive practice runs: the track's offset from UTC. */
+  sessionUtcOffsetMinutes?: number | null;
   linkedRunId: string | null;
 };
 
 /**
  * One discovery's sessions for the day, split into what still needs filing and what is already on
- * a run. Speedhive's times are instants, read in the track's zone; LiveRC's are the track's wall
- * clock stored as UTC, so their UTC date IS the track's date (`timingSessionDayKey`). A session
- * with no time cannot be placed on a day and is left out; each URL counts once.
+ * a run. Speedhive's practice runs are instants, dated by the track's offset or zone; LiveRC's
+ * sessions and Speedhive's race results are the track's wall clock stored as UTC, so their UTC
+ * date IS the track's date (`timingSessionDayKey`). A session with no time cannot be placed on a
+ * day and is left out; each URL counts once.
  */
 export function splitDayCandidates<T extends DayCandidate>(
   candidates: readonly T[],
@@ -117,7 +120,7 @@ export function splitDayCandidates<T extends DayCandidate>(
   for (const c of candidates) {
     const url = c.sessionUrl.trim();
     if (!url || seen.has(url) || !c.sessionCompletedAtIso) continue;
-    if (timingSessionDayKey(c.sessionCompletedAtIso, source, timeZone) !== ymd) continue;
+    if (timingSessionDayKey(c.sessionCompletedAtIso, source, timeZone, c) !== ymd) continue;
     seen.add(url);
     if (c.linkedRunId) alreadyOnRuns += 1;
     else toFile.push(c);

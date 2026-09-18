@@ -1,16 +1,34 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { getLiveRcDriverNameSetting, getSpeedhiveTransponderCarsSetting } from "@/lib/appSettings";
+import {
+  getLiveRcDriverNameSetting,
+  getSpeedhiveTransponderCarsSetting,
+  getSpeedhiveTransponderMovedSetting,
+  setSpeedhiveTransponderCarsSetting,
+  setSpeedhiveTransponderMovedSetting,
+} from "@/lib/appSettings";
 import {
   getSpeedhiveDriverNamesForUser,
   getSpeedhiveTransponderNumbersForUser,
 } from "@/lib/speedhive/speedhiveDriverSettings";
-import { parseTransponderCarsSetting } from "@/lib/speedhive/transponderCars";
+import {
+  chipToPairWithNamedCar,
+  formatTransponderCarsSetting,
+  parseTransponderCarsSetting,
+  type TransponderCarMap,
+} from "@/lib/speedhive/transponderCars";
+import { normalizeSpeedhiveTransponderNumber } from "@/lib/speedhive/speedhiveTransponder";
+import {
+  chipOnHandLoggedRun,
+  formatChipMovedSetting,
+  parseChipMovedSetting,
+  type ChipMovedState,
+} from "@/lib/speedhive/transponderMoved";
 import { importOneTimingUrl } from "@/lib/lapImport/service";
 import { todayBoundsInTimeZone } from "@/lib/eventActive";
 import { createBackfilledRuns } from "@/lib/runs/createBackfilledRuns";
-import { groupOutings, type OutingSession } from "@/lib/runs/groupOutings";
+import { groupOutings, type Outing, type OutingSession } from "@/lib/runs/groupOutings";
 import { spansOverlap, type Span } from "@/lib/runs/outingSpan";
 import {
   outingSessionFromImportedRow,
@@ -22,6 +40,7 @@ import { revalidateAfterRunMutation } from "@/lib/revalidateUser";
 import { attachSessionToClaimant } from "@/lib/sweep/attachSessionToRun";
 import { planDraftClaims, type DraftClaimant } from "@/lib/sweep/planDraftClaims";
 import { resolveSweepCar } from "@/lib/sweep/resolveSweepCar";
+import type { PendingOuting } from "@/lib/sweep/pendingOutings";
 import type { SweepSource } from "@/lib/sweep/sweepDocs";
 import { isSweepListenerEmail, sweepListenerAllowlist } from "@/lib/sweep/sweepListeners";
 
@@ -60,10 +79,13 @@ function listedTimeToStamp(pageTime: Date | null, listedAtIso: string | null | u
 }
 
 export type FileOutcome =
+  /** Laps put on a run the driver had opened without any — a draft, or a run saved lap-less. */
   | { kind: "attached"; runId: string; instant: Date; bestLapSeconds: number | null }
-  | { kind: "placeholder"; runId: string; instant: Date; bestLapSeconds: number | null }
+  /** A run made from an outing the driver TICKED in the sheet. Never from the app's own initiative. */
+  | { kind: "logged"; runId: string; instant: Date; bestLapSeconds: number | null }
   /** The outing overlapped a run the driver already had that day: its sessions joined that run. */
   | { kind: "joined"; runId: string; importedSessionIds: string[] }
+  /** Imported and kept, on no run: the sheet offers it. */
   | { kind: "loose"; importedSessionId: string; instant: Date | null }
   | { kind: "skipped"; reason: string };
 
@@ -75,7 +97,7 @@ export type FilingRow = ImportedRowForOuting & {
 
 /**
  * Who is filing. `evening`: the 8 pm pass, acting for a driver who is not there, so the listener
- * allowlist applies. `driver`: the driver pressed "Get my day" and is acting for themselves.
+ * allowlist applies. `driver`: the driver pressed "Import your last runs" and is acting for themselves.
  */
 export type FileTrigger = "evening" | "driver";
 
@@ -92,6 +114,7 @@ const DAY_RUN_SELECT = {
   lapTimes: true,
   localTimeZone: true,
   importedLapTimeSessionId: true,
+  filedBySweepAt: true,
   detectedImportedLapSession: {
     select: { id: true, sourceUrl: true, parserId: true, parsedPayload: true, sessionCompletedAt: true },
   },
@@ -105,23 +128,27 @@ type KnownRun = {
   span: Span | null;
   /** Set while the run is a draft / lap-less logged run that may claim an outing forward. */
   claimant: DraftClaimant | null;
+  /** The driver made this run and picked its car — not one the app made from a tick. */
+  byHand: boolean;
 };
 
 /**
- * One driver's day at one track, filed once — the claiming rules end to end, on OUTINGS rather
- * than raw sessions (founder rulings 2026-09-14 and 2026-09-15):
+ * One driver's day at one track, read and placed — never filed (founder ruling 2026-09-18:
+ * "it shouldn't auto import anything"). On OUTINGS rather than raw sessions (2026-09-15):
  *
- *   1. import every session the gatherers found, from every source, before filing anything;
+ *   1. import every session the gatherers found, from every source, before placing anything;
  *   2. group them into outings — windows that overlap are one time on track, and the official
  *      record leads (`groupOutings.ts`);
- *   3. an outing that overlaps a run the driver already has that day joins it as a linked source;
- *   4. else an open draft / lap-less run of theirs at that track that day claims it forward;
- *   5. else a car the driver established (earlier run that day, chip binding, only car) makes a
- *      placeholder run;
- *   6. else the import stays LOOSE and the driver is asked which car.
+ *   3. an outing that overlaps a run the driver already has that day joins it as a linked source —
+ *      it is their run, the timing sheet only completes it;
+ *   4. else an open draft / lap-less run of theirs at that track that day claims it forward — the
+ *      driver opened that run, the sheet closes it;
+ *   5. else it stays LOOSE: imported and kept, on no run, until the driver ticks it in the sheet
+ *      (`logChosenOutingsForUser`) or unticks it. Nothing lands in the log that was not ticked.
  *
  * Every step is idempotent: a session already on a run is skipped, claims happen inside
- * transactions, and the import row is one-per-URL. Called by the 8 pm pass and by "Get my day".
+ * transactions, and the import row is one-per-URL. Called by the 8 pm pass and by "Import your
+ * last runs".
  */
 export async function fileDayForUser(input: {
   userId: string;
@@ -135,37 +162,17 @@ export async function fileDayForUser(input: {
   if (input.candidates.length === 0) return outcomes;
 
   // Belt and braces with the plan filter: the evening pass never writes for an account outside the
-  // listener list. A driver pressing "Get my day" is acting for themselves.
+  // listener list. A driver pressing "Import your last runs" is acting for themselves.
   if ((input.trigger ?? "evening") === "evening" && !(await isListener(input.userId))) {
     return [{ kind: "skipped", reason: "not a listener" }];
   }
 
   const rows = await importCandidates(input.userId, input.track, input.candidates, now, outcomes);
   if (rows.length === 0) return outcomes;
-  return fileRows({ userId: input.userId, track: input.track, rows, carId: null, outcomes });
+  return placeRows({ userId: input.userId, track: input.track, rows, outcomes });
 }
 
-/**
- * The second half of "Get my day": sessions it imported but could not give a car, filed with the
- * car the driver named. Nothing is read from the timing sites again.
- */
-export async function fileImportedRowsForUser(input: {
-  userId: string;
-  track: FilingTrack;
-  rows: readonly FilingRow[];
-  carId: string;
-}): Promise<FileOutcome[]> {
-  if (input.rows.length === 0) return [];
-  return fileRows({
-    userId: input.userId,
-    track: input.track,
-    rows: [...input.rows],
-    carId: input.carId,
-    outcomes: [],
-  });
-}
-
-/** Step 1: the whole day in hand before anything is filed. */
+/** Step 1: the whole day in hand before anything is placed. */
 async function importCandidates(
   userId: string,
   track: FilingTrack,
@@ -212,7 +219,9 @@ async function importCandidates(
           sessionCompletedAt: true,
           linkedRunId: true,
           sweepFiledAt: true,
+          sweepChipCode: true,
           trackId: true,
+          detectionPromptDismissedAt: true,
         },
       });
       if (!row) {
@@ -220,18 +229,27 @@ async function importCandidates(
         return;
       }
       const listedTime = listedTimeToStamp(row.sessionCompletedAt, c.listedAtIso);
-      if (!row.sweepFiledAt || row.trackId !== track.id || listedTime) {
+      const chip = c.chipCode ? normalizeSpeedhiveTransponderNumber(c.chipCode) : null;
+      const chipChanged = Boolean(chip) && row.sweepChipCode !== chip;
+      if (!row.sweepFiledAt || row.trackId !== track.id || listedTime || chipChanged) {
         await prisma.importedLapTimeSession.update({
           where: { id: row.id },
           data: {
             sweepFiledAt: row.sweepFiledAt ?? now,
             trackId: track.id,
             ...(listedTime ? { sessionCompletedAt: listedTime } : {}),
+            // Kept on the row: a loose session re-read for the sheet still knows its chip.
+            ...(chipChanged ? { sweepChipCode: chip } : {}),
           },
         });
       }
       if (row.linkedRunId) {
         outcomes.push({ kind: "skipped", reason: "already on a run" });
+        return;
+      }
+      // Unticked in the sheet before: stays out, and a second read does not offer it again.
+      if (row.detectionPromptDismissedAt) {
+        outcomes.push({ kind: "skipped", reason: "declined" });
         return;
       }
       rows.push({
@@ -240,7 +258,7 @@ async function importCandidates(
         parserId: row.parserId,
         parsedPayload: row.parsedPayload,
         sessionCompletedAt: listedTime ?? row.sessionCompletedAt,
-        chipCode: c.chipCode ?? null,
+        chipCode: chip ?? row.sweepChipCode ?? null,
         sourceKind: c.sourceKind,
       });
     } catch (err) {
@@ -250,81 +268,28 @@ async function importCandidates(
   return rows;
 }
 
-/** Steps 2–6: outings, then join / claim / placeholder / loose, one outing at a time. */
-async function fileRows(ctx: {
+/** Steps 2–5: outings, then join / claim / loose, one outing at a time. */
+async function placeRows(ctx: {
   userId: string;
   track: FilingTrack;
   rows: FilingRow[];
-  /** The car the driver named ("Get my day" → which car?). Null: resolve it, never guess. */
-  carId: string | null;
   outcomes: FileOutcome[];
 }): Promise<FileOutcome[]> {
   const { userId, track, rows, outcomes } = ctx;
   const zone = track.timeZone;
 
-  // 2. Windows on track, then outings.
-  const rowById = new Map(rows.map((r) => [r.id, r]));
-  const sessions: OutingSession[] = [];
-  for (const row of rows) {
-    const s = outingSessionFromImportedRow(row, zone);
-    if (!s) {
-      // No time on the page: nothing to place it by. Loose, and the driver is asked.
-      outcomes.push({ kind: "loose", importedSessionId: row.id, instant: null });
-      continue;
-    }
-    sessions.push(s);
-  }
-  if (sessions.length === 0) return outcomes;
-  const outings = groupOutings(sessions);
+  const { outings, rowById } = outingsFromRows(rows, zone, outcomes);
+  if (outings.length === 0) return outcomes;
 
-  // 3. The day as it stands: every run at this track that day, whatever its state.
   const earliest = outings.reduce((a, b) => (a.start < b.start ? a : b)).start;
   const day = todayBoundsInTimeZone(zone, earliest);
-  const [dayRuns, cars, filedCount, carsRaw] = await Promise.all([
-    prisma.run.findMany({
-      where: {
-        userId,
-        trackId: track.id,
-        OR: [
-          { createdAt: { gte: day.start, lt: day.end } },
-          { sortAt: { gte: day.start, lt: day.end } },
-        ],
-      },
-      select: DAY_RUN_SELECT,
-    }),
-    prisma.car.findMany({ where: { userId }, select: { id: true } }),
-    // Runs the app filed or filled for that DAY, by when they were on track — a press for last
-    // Saturday counts Saturday, not everything the app has written since.
-    prisma.run.count({
-      where: {
-        userId,
-        sortAt: { gte: day.start, lt: day.end },
-        OR: [{ filedBySweepAt: { not: null } }, { lapsAttachedBySweepAt: { not: null } }],
-      },
-    }),
-    getSpeedhiveTransponderCarsSetting(userId).catch(() => null),
-  ]);
-  const known: KnownRun[] = dayRuns.map((r) => {
-    const lapless = !Array.isArray(r.lapTimes) || r.lapTimes.length === 0;
-    const claimant: DraftClaimant | null =
-      lapless && !r.unconfirmedAt && !r.importedLapTimeSessionId
-        ? { id: r.id, anchor: r.loggingComplete ? r.sortAt : r.createdAt }
-        : null;
-    return {
-      id: r.id,
-      carId: r.carId,
-      instant: r.sessionCompletedAt ?? r.sortAt,
-      span: spanForExistingRun(r, zone),
-      claimant,
-    };
-  });
-  const userCarIds = cars.map((c) => c.id);
-  const chipCars = parseTransponderCarsSetting(carsRaw);
-  let filedToday = filedCount;
+  const known = await loadKnownRuns(userId, track.id, day, zone);
+  /** Chips found on runs the driver logged by hand, with that run's car — what they teach, after. */
+  const handLoggedChips: { chip: string; carId: string }[] = [];
 
   for (const outing of outings) {
-    const primaryRow = rowById.get(outing.primaryId)!;
     const secondaries = outing.sessionIds.filter((id) => id !== outing.primaryId);
+    const chip = chipOf(outing, rowById);
 
     // 3. Same time on track as a run the driver already has: join it, never open a second one.
     const host = known.find((k) => k.span && spansOverlap(k.span, outing));
@@ -334,12 +299,8 @@ async function fileRows(ctx: {
         start: host.span!.start < outing.start ? host.span!.start : outing.start,
         end: host.span!.end > outing.end ? host.span!.end : outing.end,
       };
+      if (chip && host.byHand && host.carId) handLoggedChips.push({ chip, carId: host.carId });
       outcomes.push({ kind: "joined", runId: host.id, importedSessionIds: outing.sessionIds });
-      continue;
-    }
-
-    if (filedToday >= MAX_FILINGS_PER_USER_PER_DAY) {
-      outcomes.push({ kind: "skipped", reason: "daily filing cap" });
       continue;
     }
 
@@ -364,8 +325,8 @@ async function fileRows(ctx: {
           k.span = { start: outing.start, end: outing.end };
           k.claimant = null;
           k.instant = outing.start;
+          if (chip && k.byHand && k.carId) handLoggedChips.push({ chip, carId: k.carId });
         }
-        filedToday += 1;
         await settle(userId);
         outcomes.push({
           kind: "attached",
@@ -379,26 +340,147 @@ async function fileRows(ctx: {
         outcomes.push({ kind: "skipped", reason: "already on a run" });
         continue;
       }
-      // Any other status (no laps, no time) falls through to the placeholder path, which will
-      // report the same condition through `createBackfilledRuns`' skip reasons.
+      // Any other status (no laps, no time): the outing stays loose and the sheet offers it.
     }
 
-    // 5. A car: the one the driver named, else one they established. Never a guess.
-    const chip =
-      outing.sessionIds.map((id) => rowById.get(id)?.chipCode ?? null).find((c) => !!c) ?? null;
-    const carId =
-      ctx.carId ??
-      resolveSweepCar({
-        instant: outing.start,
-        dayRunsAtTrack: known.map((k) => ({ carId: k.carId, instant: k.instant })),
-        chipCarId: chip ? (chipCars[chip] ?? null) : null,
-        userCarIds,
-      })?.carId ??
-      null;
-    if (!carId) {
-      outcomes.push({ kind: "loose", importedSessionId: outing.primaryId, instant: outing.start });
+    // 5. Loose. The sheet lists it; a tick makes it a run, an untick puts it away.
+    outcomes.push({ kind: "loose", importedSessionId: outing.primaryId, instant: outing.start });
+  }
+
+  const chipCars = parseTransponderCarsSetting(await getSpeedhiveTransponderCarsSetting(userId).catch(() => null));
+  const cars = await prisma.car.findMany({ where: { userId }, select: { id: true } });
+  await learnChipPairings({
+    userId,
+    namedCarId: null,
+    namedCarChips: [],
+    handLoggedChips,
+    chipCars,
+    userCarIds: cars.map((c) => c.id),
+  });
+
+  return outcomes;
+}
+
+/**
+ * The car each pending outing would be logged under, from facts the driver established
+ * (`resolveSweepCar`: the chip's bound car, an earlier run that day, one car all day, the only
+ * car). Null where the app cannot tell — the sheet then asks once, and the answer covers only
+ * those. Read alongside the pending list so the sheet can show the car on each row.
+ */
+export async function carsForPendingOutings(input: {
+  userId: string;
+  track: FilingTrack;
+  day: { start: Date; end: Date };
+  pending: readonly PendingOuting[];
+  rowById: ReadonlyMap<string, FilingRow>;
+}): Promise<Map<string, { carId: string; carName: string } | null>> {
+  const { userId, track, day, pending } = input;
+  const out = new Map<string, { carId: string; carName: string } | null>();
+  if (pending.length === 0) return out;
+  const [known, cars, carsRaw] = await Promise.all([
+    loadKnownRuns(userId, track.id, day, track.timeZone),
+    prisma.car.findMany({ where: { userId }, select: { id: true, name: true } }),
+    getSpeedhiveTransponderCarsSetting(userId).catch(() => null),
+  ]);
+  const chipCars = parseTransponderCarsSetting(carsRaw);
+  const nameById = new Map(cars.map((c) => [c.id, c.name]));
+  const userCarIds = cars.map((c) => c.id);
+  for (const o of pending) {
+    const chip = chipOf(o, input.rowById);
+    const resolved = resolveSweepCar({
+      instant: o.start,
+      dayRunsAtTrack: known.map((k) => ({ carId: k.carId, instant: k.instant })),
+      chipCarId: chip ? (chipCars[chip] ?? null) : null,
+      userCarIds,
+    });
+    out.set(o.id, resolved ? { carId: resolved.carId, carName: nameById.get(resolved.carId) ?? "" } : null);
+  }
+  return out;
+}
+
+/**
+ * The sheet answered: the outings the driver TICKED become runs, the ones they unticked are put
+ * away (`detectionPromptDismissedAt`) so no read offers them again. `carId` is the car the driver
+ * named for the outings the app could not place; an outing with a car of its own keeps it.
+ * Nothing is read from the timing sites.
+ */
+export async function logChosenOutingsForUser(input: {
+  userId: string;
+  track: FilingTrack;
+  day: { start: Date; end: Date };
+  keep: readonly PendingOuting[];
+  decline: readonly PendingOuting[];
+  rowById: ReadonlyMap<string, FilingRow>;
+  carId: string | null;
+  now?: Date;
+}): Promise<FileOutcome[]> {
+  const { userId, track, day, rowById } = input;
+  const zone = track.timeZone;
+  const now = input.now ?? new Date();
+  const outcomes: FileOutcome[] = [];
+
+  const declinedIds = input.decline.flatMap((o) => o.sessionIds);
+  if (declinedIds.length > 0) {
+    await prisma.importedLapTimeSession.updateMany({
+      where: { id: { in: declinedIds }, userId, linkedRunId: null },
+      data: { detectionPromptDismissedAt: now },
+    });
+  }
+  if (input.keep.length === 0) return outcomes;
+
+  const [known, cars, filedCount, carsRaw] = await Promise.all([
+    loadKnownRuns(userId, track.id, day, zone),
+    prisma.car.findMany({ where: { userId }, select: { id: true } }),
+    // Runs the app made for that DAY, by when they were on track — the cap is per day raced.
+    prisma.run.count({
+      where: {
+        userId,
+        sortAt: { gte: day.start, lt: day.end },
+        OR: [{ filedBySweepAt: { not: null } }, { lapsAttachedBySweepAt: { not: null } }],
+      },
+    }),
+    getSpeedhiveTransponderCarsSetting(userId).catch(() => null),
+  ]);
+  const userCarIds = cars.map((c) => c.id);
+  const chipCars = parseTransponderCarsSetting(carsRaw);
+  let filedToday = filedCount;
+  /** Chips of the outings the driver's named car just logged — see the pairing after the loop. */
+  const namedCarChips: (string | null)[] = [];
+
+  for (const outing of input.keep) {
+    const primaryRow = rowById.get(outing.id);
+    if (!primaryRow) {
+      outcomes.push({ kind: "skipped", reason: "not pending" });
       continue;
     }
+    const secondaries = outing.sessionIds.filter((id) => id !== outing.id);
+    const chip = chipOf(outing, rowById);
+
+    // A run the driver logged since the list was read covers this time: join it, never double up.
+    const host = known.find((k) => k.span && spansOverlap(k.span, outing));
+    if (host) {
+      await linkSessions(userId, host.id, outing.sessionIds);
+      outcomes.push({ kind: "joined", runId: host.id, importedSessionIds: outing.sessionIds });
+      continue;
+    }
+
+    if (filedToday >= MAX_FILINGS_PER_USER_PER_DAY) {
+      outcomes.push({ kind: "skipped", reason: "daily filing cap" });
+      continue;
+    }
+
+    const resolved = resolveSweepCar({
+      instant: outing.start,
+      dayRunsAtTrack: known.map((k) => ({ carId: k.carId, instant: k.instant })),
+      chipCarId: chip ? (chipCars[chip] ?? null) : null,
+      userCarIds,
+    });
+    const carId = resolved?.carId ?? input.carId;
+    if (!carId || !userCarIds.includes(carId)) {
+      outcomes.push({ kind: "loose", importedSessionId: outing.id, instant: outing.start });
+      continue;
+    }
+    const named = !resolved;
 
     const created = await createBackfilledRuns({
       userId,
@@ -410,35 +492,167 @@ async function fileRows(ctx: {
         sessionType: primaryRow.sourceKind === "race" ? "RACE_MEETING" : "TESTING",
         meetingSessionType: primaryRow.sourceKind === "race" ? "RACE" : null,
       },
-      importedLapTimeSessionIds: [outing.primaryId],
+      importedLapTimeSessionIds: [outing.id],
       deviceTimeZone: zone,
       filedBySweep: true,
     });
     const made = created.created[0];
     if (!made) {
       const reason = created.skipped[0]?.reason ?? "not created";
-      outcomes.push({ kind: "skipped", reason: `placeholder: ${reason}` });
+      outcomes.push({ kind: "skipped", reason: `log: ${reason}` });
       continue;
     }
     await linkSessions(userId, made.runId, secondaries);
+    if (named) namedCarChips.push(chip);
     known.push({
       id: made.runId,
       carId,
       instant: outing.start,
       span: { start: outing.start, end: outing.end },
       claimant: null,
+      byHand: false,
     });
     filedToday += 1;
     await settle(userId);
     outcomes.push({
-      kind: "placeholder",
+      kind: "logged",
       runId: made.runId,
       instant: outing.start,
       bestLapSeconds: await bestLapOf(made.runId),
     });
   }
 
+  await learnChipPairings({
+    userId,
+    namedCarId: input.carId,
+    namedCarChips,
+    handLoggedChips: [],
+    chipCars,
+    userCarIds,
+  });
   return outcomes;
+}
+
+/** Windows on track, then outings; a row with no time on the page is loose and reported so. */
+export function outingsFromRows(
+  rows: readonly FilingRow[],
+  zone: string,
+  outcomes?: FileOutcome[],
+): { outings: Outing[]; rowById: Map<string, FilingRow> } {
+  const rowById = new Map(rows.map((r) => [r.id, r]));
+  const sessions: OutingSession[] = [];
+  for (const row of rows) {
+    const s = outingSessionFromImportedRow(row, zone);
+    if (!s) {
+      // No time on the page: nothing to place it by.
+      outcomes?.push({ kind: "loose", importedSessionId: row.id, instant: null });
+      continue;
+    }
+    sessions.push(s);
+  }
+  return { outings: sessions.length > 0 ? groupOutings(sessions) : [], rowById };
+}
+
+function chipOf(outing: { sessionIds: readonly string[] }, rowById: ReadonlyMap<string, FilingRow>): string | null {
+  return outing.sessionIds.map((id) => rowById.get(id)?.chipCode ?? null).find((c) => !!c) ?? null;
+}
+
+/**
+ * The day as it stands: every run at this track that day, whatever its state. "That day"
+ * includes a run logged later about it — Saturday's heat entered on Sunday from the MyRCM PDF
+ * was written, and sorts, on Sunday; only its session time says Saturday. Missing it here filed
+ * the same heat again from Speedhive as a second run.
+ */
+async function loadKnownRuns(
+  userId: string,
+  trackId: string,
+  day: { start: Date; end: Date },
+  zone: string,
+): Promise<KnownRun[]> {
+  const dayRuns = await prisma.run.findMany({
+    where: {
+      userId,
+      trackId,
+      OR: [
+        { createdAt: { gte: day.start, lt: day.end } },
+        { sortAt: { gte: day.start, lt: day.end } },
+        { sessionCompletedAt: { gte: day.start, lt: day.end } },
+      ],
+    },
+    select: DAY_RUN_SELECT,
+  });
+  return dayRuns.map((r) => {
+    const lapless = !Array.isArray(r.lapTimes) || r.lapTimes.length === 0;
+    const claimant: DraftClaimant | null =
+      lapless && !r.unconfirmedAt && !r.importedLapTimeSessionId
+        ? { id: r.id, anchor: r.loggingComplete ? r.sortAt : r.createdAt }
+        : null;
+    return {
+      id: r.id,
+      carId: r.carId,
+      instant: r.sessionCompletedAt ?? r.sortAt,
+      span: spanForExistingRun(r, zone),
+      claimant,
+      byHand: r.filedBySweepAt === null,
+    };
+  });
+}
+
+/**
+ * What the driver's own choices said about their chips (founder call 2026-09-17), written once
+ * after a filing. "Which car?" answered for runs found by one chip pairs that chip with that car.
+ * A chip on a run they logged by hand pairs an unpaired chip, or — paired with a different car —
+ * leaves one "has it moved?" question for the next "Import your last runs". A chip seen in two
+ * cars in the same filing teaches nothing. Never fails the filing.
+ */
+async function learnChipPairings(input: {
+  userId: string;
+  namedCarId: string | null;
+  namedCarChips: readonly (string | null)[];
+  handLoggedChips: readonly { chip: string; carId: string }[];
+  chipCars: TransponderCarMap;
+  userCarIds: readonly string[];
+}): Promise<void> {
+  const { userId, userCarIds } = input;
+  const map: TransponderCarMap = { ...input.chipCars };
+  let mapChanged = false;
+
+  if (input.namedCarId) {
+    const pair = chipToPairWithNamedCar({ chips: input.namedCarChips, map, userCarIds });
+    if (pair) {
+      map[pair] = input.namedCarId;
+      mapChanged = true;
+    }
+  }
+
+  const carsByChip = new Map<string, Set<string>>();
+  for (const h of input.handLoggedChips) {
+    const set = carsByChip.get(h.chip) ?? new Set<string>();
+    set.add(h.carId);
+    carsByChip.set(h.chip, set);
+  }
+
+  try {
+    let moved: ChipMovedState | null = null;
+    for (const [chip, carIds] of carsByChip) {
+      if (carIds.size !== 1) continue;
+      const runCarId = [...carIds][0]!;
+      moved ??= parseChipMovedSetting(await getSpeedhiveTransponderMovedSetting(userId));
+      const verdict = chipOnHandLoggedRun({ chip, runCarId, map, userCarIds, declined: moved.declined });
+      if (verdict === "pair") {
+        map[chip] = runCarId;
+        mapChanged = true;
+      } else if (verdict === "ask") {
+        moved = { ...moved, pending: { chip, carId: runCarId } };
+        await setSpeedhiveTransponderMovedSetting(userId, formatChipMovedSetting(moved));
+      }
+    }
+    if (mapChanged) {
+      await setSpeedhiveTransponderCarsSetting(userId, formatTransponderCarsSetting(map));
+    }
+  } catch {
+    // A pairing not learned is asked again next time; the runs themselves are already filed.
+  }
 }
 
 async function isListener(userId: string): Promise<boolean> {

@@ -42,6 +42,7 @@ export function toCompareRunShape(run: {
   sessionCompletedAt?: Date | string | null;
   loggingCompletedAt?: Date | string | null;
   sortAt?: Date | string | null;
+  importedLapTimeSessionId?: string | null;
 }): CompareRunShape {
   return {
     id: run.id,
@@ -51,6 +52,7 @@ export function toCompareRunShape(run: {
     sessionCompletedAt: run.sessionCompletedAt ?? null,
     loggingCompletedAt: run.loggingCompletedAt ?? null,
     sortAt: run.sortAt ?? null,
+    importedLapTimeSessionId: run.importedLapTimeSessionId ?? null,
     sessionType: run.sessionType,
     meetingSessionType: run.meetingSessionType,
     meetingSessionCode: run.meetingSessionCode,

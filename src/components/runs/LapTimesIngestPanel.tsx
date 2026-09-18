@@ -6,6 +6,7 @@ import {
   chosenBackfillSessions,
   groupBackfillCandidates,
   selectBackfillCandidates,
+  withoutRunsOwnOutings,
   type BackfillCandidate,
   type BackfillOffer,
 } from "@/lib/runs/backfillCandidates";
@@ -56,6 +57,13 @@ import {
   orderBlocksByTrackTime,
   primaryRowsAcrossBlocks,
 } from "@/lib/lapImport/blockLapRows";
+import {
+  attachUnderSameOutingRule,
+  blockOutingSpan,
+  linkedSourcesAfterRemoving,
+  type LinkedOutingSource,
+  type SameOutingAttach,
+} from "@/lib/lapImport/sameOutingBlocks";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Eyebrow } from "@/components/ui/panel";
@@ -86,6 +94,8 @@ export type UrlImportBlock = {
   sessionCompletedAtDbIso?: string | null;
   /** UTC ISO from timing page when parsed. */
   sessionCompletedAtIso: string | null;
+  /** Speedhive practice: the track's offset from UTC, so the session reads on the track's clock. */
+  sessionUtcOffsetMinutes?: number | null;
   sessionDrivers: LapUrlSessionDriver[];
   selectedDriverIds: string[];
   driverLapRowsByDriverId: Record<string, LapRow[]>;
@@ -108,6 +118,12 @@ export type LapIngestFormValue = {
    * run's laps are these blocks joined in on-track order.
    */
   urlImportBlocks: UrlImportBlock[];
+  /**
+   * Other timing sites' copies of the races in `urlImportBlocks` — the same heat on Speedhive
+   * beside its MyRCM result. Saved with the run so the day never files them as runs of their own,
+   * and never joined into its laps (`lapImport/sameOutingBlocks.ts`).
+   */
+  linkedSources?: LinkedOutingSource[];
   /**
    * "Add N other runs from today": the day's other timing sessions with no run yet, whether the
    * driver said yes, and the ones they left unticked in the sheet. Recomputed from the scan while
@@ -181,10 +197,12 @@ function blockLabelTimeIso(block: UrlImportBlock): string {
   });
 }
 
-/** Display options for {@link blockLabelTimeIso} — freezes LiveRC/MyRCM wall clock, viewer zone otherwise. */
+/** Display options for {@link blockLabelTimeIso} — freezes a track wall clock, viewer zone otherwise. */
 function blockTimeFormatOpts(block: UrlImportBlock): ImportedSessionTimeFormatOptions {
   return {
     timingSource: timingSourceFromParserId(block.parserId),
+    parserId: block.parserId,
+    sourceUrl: block.sourceUrl,
     isWallClockTime: resolveImportedSessionHasWallClockTime({
       sessionCompletedAt: block.sessionCompletedAtDbIso ?? null,
       parsedPayload:
@@ -215,9 +233,11 @@ function sortSessionsNewestFirst<T>(items: T[], getIso: (item: T) => string | nu
 function formatSessionWhen(
   iso: string | null,
   sessionTime: string | null,
-  timingSource?: LapTimingSource | null
+  timingSource?: LapTimingSource | null,
+  /** The session's address: a Speedhive race result prints the track's clock, its practice loop does not. */
+  sourceUrl?: string | null
 ): string | null {
-  if (iso?.trim()) return formatImportedSessionTime(iso.trim(), { timingSource });
+  if (iso?.trim()) return formatImportedSessionTime(iso.trim(), { timingSource, sourceUrl });
   if (sessionTime?.trim()) return sessionTime.trim();
   return null;
 }
@@ -239,6 +259,8 @@ type ScanDayCandidate = {
   driverName: string;
   sessionTime: string | null;
   sessionCompletedAtIso: string | null;
+  /** Speedhive practice: the track's offset from UTC. */
+  sessionUtcOffsetMinutes?: number | null;
   matchesDriver: boolean | null;
   alreadyImported: boolean;
   linkedRunId: string | null;
@@ -259,6 +281,8 @@ type ImportResultRow = {
   recordedAt: string;
   sessionCompletedAtIso?: string | null;
   sessionCompletedAtDbIso?: string | null;
+  /** Speedhive practice: the track's offset from UTC when the session ran. */
+  sessionUtcOffsetMinutes?: number | null;
   parserId: string;
   message?: string | null;
   laps?: number[];
@@ -933,9 +957,17 @@ export function LapTimesIngestPanel({
     () => orderBlocksByTrackTime(value.urlImportBlocks),
     [value.urlImportBlocks]
   );
+  // Everything this run holds, copies included: a session linked as another site's copy of an
+  // attached race is on this run too, and offering it again as "Add laps" would be the doubling.
   const attachedUrls = useMemo(
-    () => new Set(attachedBlocks.map((b) => b.sourceUrl.trim()).filter(Boolean)),
-    [attachedBlocks]
+    () =>
+      new Set(
+        [
+          ...attachedBlocks.map((b) => b.sourceUrl.trim()),
+          ...(value.linkedSources ?? []).map((s) => s.sourceUrl.trim()),
+        ].filter(Boolean)
+      ),
+    [attachedBlocks, value.linkedSources]
   );
 
   // Which attached import the driver-picker and lap ticks below are editing.
@@ -952,6 +984,26 @@ export function LapTimesIngestPanel({
   }, [attachedBlocks, focusedBlockId]);
 
   const hasLinkedLapImport = attachedBlocks.length > 0;
+
+  /**
+   * Each attached import's source line, with the sites its linked copies came from: "MyRCM +
+   * Speedhive" says the race is on the run once, from two places, without a word of explanation.
+   */
+  const sourceLineByBlockId = useMemo(() => {
+    const byBlock = new Map<string, string | null>();
+    for (const block of attachedBlocks) {
+      const labels: string[] = [];
+      const own = timingSourceLabelFromParserId(block.parserId);
+      if (own) labels.push(own);
+      for (const s of value.linkedSources ?? []) {
+        if (s.leadBlockId !== block.blockId) continue;
+        const label = timingSourceLabelFromParserId(s.parserId);
+        if (label && !labels.includes(label)) labels.push(label);
+      }
+      byBlock.set(block.blockId, labels.length > 0 ? labels.join(" + ") : null);
+    }
+    return byBlock;
+  }, [attachedBlocks, value.linkedSources]);
 
   const sortedDayScanCandidates = useMemo(() => {
     if (!dayScanCandidates?.length) return [];
@@ -994,7 +1046,7 @@ export function LapTimesIngestPanel({
         key: `track:${c.sessionId}`,
         sessionUrl: c.sessionUrl,
         title: c.driverName?.trim() || "Run",
-        when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime, c.timingSource),
+        when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime, c.timingSource, c.sessionUrl),
         bestLapSeconds: c.bestLapSeconds ?? null,
         lapCount: c.lapCount ?? null,
         timingSource: c.timingSource,
@@ -1018,7 +1070,7 @@ export function LapTimesIngestPanel({
         key: `stored:${c.importedSessionId}`,
         sessionUrl: c.sessionUrl,
         title: c.driverName?.trim() || "Run",
-        when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime, c.timingSource),
+        when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime, c.timingSource, c.sessionUrl),
         bestLapSeconds: c.bestLapSeconds ?? null,
         lapCount: c.lapCount ?? null,
         timingSource: c.timingSource,
@@ -1046,7 +1098,7 @@ export function LapTimesIngestPanel({
       key: `older:${c.sessionId}`,
       sessionUrl: c.sessionUrl,
       title: c.driverName?.trim() || "Run",
-      when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime, c.timingSource),
+      when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime, c.timingSource, c.sessionUrl),
       bestLapSeconds: c.bestLapSeconds ?? null,
       lapCount: c.lapCount ?? null,
       timingSource: c.timingSource,
@@ -1141,6 +1193,22 @@ export function LapTimesIngestPanel({
    * the session attached first (earliest on track). Only rows the scan matched to THIS driver:
    * a results page with no name filter lists the whole field, and none of those are theirs.
    */
+  const pickerRowByUrl = useMemo(() => {
+    const byUrl = new Map<string, ImportPickerCandidate>();
+    for (const row of [...mergedImportCandidates, ...olderPickerRows]) byUrl.set(row.sessionUrl.trim(), row);
+    return byUrl;
+  }, [mergedImportCandidates, olderPickerRows]);
+  const backfillMetaFor = useCallback(
+    (url: string) => {
+      const row = pickerRowByUrl.get(url.trim());
+      return row ? { lapCount: row.lapCount, bestLapSeconds: row.bestLapSeconds } : null;
+    },
+    [pickerRowByUrl]
+  );
+  // Sessions are compared on the track's clock, which every timing site posts, so the phone's zone
+  // only reads a Speedhive practice import saved before the track's offset was kept.
+  const deviceTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+
   const backfillOffer = useMemo(() => {
     const picked = attachedBlocks[0];
     if (!picked) return null;
@@ -1157,17 +1225,36 @@ export function LapTimesIngestPanel({
       ...(dayScanCandidates ?? []).filter((c) => c.matchesDriver === true),
       ...(dayScanOlderCandidates ?? []).filter((c) => c.matchesDriver === true),
     ];
-    return selectBackfillCandidates({
+    const offer = selectBackfillCandidates({
       picked: {
         sessionUrl: picked.sourceUrl,
         sessionCompletedAtIso: pickedIso,
         timingSource: timingSourceFromParserId(picked.parserId),
+        sessionUtcOffsetMinutes: picked.sessionUtcOffsetMinutes ?? null,
       },
       rows,
       attachedUrls,
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
+      timeZone: deviceTimeZone,
     });
-  }, [attachedBlocks, attachedUrls, importedCandidates, eventRaceSessions, dayScanCandidates, dayScanOlderCandidates]);
+    if (!offer) return null;
+    // This run's own race, posted again by a second timing site, is not another run from the day.
+    const runSpans = attachedBlocks
+      .map((b) => blockOutingSpan(b, deviceTimeZone))
+      .filter((s): s is NonNullable<typeof s> => s !== null);
+    return {
+      ...offer,
+      sessions: withoutRunsOwnOutings(offer.sessions, backfillMetaFor, deviceTimeZone, runSpans),
+    };
+  }, [
+    attachedBlocks,
+    attachedUrls,
+    importedCandidates,
+    eventRaceSessions,
+    dayScanCandidates,
+    dayScanOlderCandidates,
+    backfillMetaFor,
+    deviceTimeZone,
+  ]);
 
   // Mirror the offer into the form value the save reads, without ever writing the same list
   // twice: the effect keys on the URLs, and `ticked` survives a rescan that changes nothing.
@@ -1229,20 +1316,6 @@ export function LapTimesIngestPanel({
     setBackfillPromptOpen(true);
   }, [attachedBlocks.length, backfillOffer, stepVisible]);
 
-  const pickerRowByUrl = useMemo(() => {
-    const byUrl = new Map<string, ImportPickerCandidate>();
-    for (const row of [...mergedImportCandidates, ...olderPickerRows]) byUrl.set(row.sessionUrl.trim(), row);
-    return byUrl;
-  }, [mergedImportCandidates, olderPickerRows]);
-  const backfillMetaFor = useCallback(
-    (url: string) => {
-      const row = pickerRowByUrl.get(url.trim());
-      return row ? { lapCount: row.lapCount, bestLapSeconds: row.bestLapSeconds } : null;
-    },
-    [pickerRowByUrl]
-  );
-  const deviceTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
-
   /**
    * The offer as OUTINGS — one row per time on track, however many sessions the timing sites
    * posted for it (the same heat on two sites, a practice run split at a pit stop). The save
@@ -1273,7 +1346,9 @@ export function LapTimesIngestPanel({
         sessionUrl: o.primaryUrl,
         when:
           row?.when ??
-          (primary ? formatSessionWhen(primary.sessionCompletedAtIso, null, primary.timingSource) : null),
+          (primary
+            ? formatSessionWhen(primary.sessionCompletedAtIso, null, primary.timingSource, primary.sessionUrl)
+            : null),
         lapCount: row?.lapCount ?? null,
         bestLapSeconds: best,
       };
@@ -1548,6 +1623,7 @@ export function LapTimesIngestPanel({
     onChange({
       ...value,
       urlImportBlocks: [],
+      linkedSources: [],
       sourceKind: "manual",
       sourceDetail: null,
       parserId: null,
@@ -1572,6 +1648,8 @@ export function LapTimesIngestPanel({
     onChange({
       ...value,
       urlImportBlocks: nextBlocks,
+      // Its copies from other timing sites go with it: they were that race, not this run's others.
+      linkedSources: linkedSourcesAfterRemoving(value.linkedSources, new Set([blockId])),
       manualText: primaryLapTextFromFirstBlock(nextBlocks),
       sourceDetail:
         ordered.length === 1 ? ordered[0]!.sourceUrl : `${ordered.length} timing sessions`,
@@ -1704,6 +1782,11 @@ export function LapTimesIngestPanel({
        * driver id and no transponder, so guessing a row would file someone else's laps as theirs.
        */
       primaryDriverId: string | null;
+      /**
+       * The driver brought this for the race on purpose (a MyRCM PDF): when it is the same race as
+       * an attached import, it takes the laps rather than riding along as a copy.
+       */
+      leadsSameOuting?: boolean;
     }
   ) {
     {
@@ -1756,6 +1839,8 @@ export function LapTimesIngestPanel({
         recordedAt,
         sessionCompletedAtDbIso,
         sessionCompletedAtIso,
+        sessionUtcOffsetMinutes:
+          typeof row.sessionUtcOffsetMinutes === "number" ? row.sessionUtcOffsetMinutes : null,
         sessionDrivers: sessionDrivers.length > 0 ? sessionDrivers : [],
         selectedDriverIds: autoSelectIds,
         driverLapRowsByDriverId: sessionDrivers.length > 0 ? initDriverLapRows(sessionDrivers) : {},
@@ -1770,44 +1855,80 @@ export function LapTimesIngestPanel({
       // through here — so the sheet can't open over a wizard nobody touched.
       if (value.urlImportBlocks.length === 0) backfillPromptArmedRef.current = true;
 
-      // Add, don't replace: a run split by a break holds both halves. Re-importing
-      // a session already attached refreshes it in place, so a driver correcting a
+      // Re-importing a session already attached refreshes it in place, so a driver correcting a
       // bad parse doesn't end up with the same laps counted twice.
       const existingIdx = value.urlImportBlocks.findIndex(
         (b) =>
           b.sourceUrl.trim() === newBlock.sourceUrl.trim() ||
           (b.importedSessionId && b.importedSessionId === newBlock.importedSessionId)
       );
-      const nextBlocks =
-        existingIdx >= 0
-          ? value.urlImportBlocks.map((b, i) => (i === existingIdx ? newBlock : b))
-          : [...value.urlImportBlocks, newBlock];
+      const refreshedId = existingIdx >= 0 ? value.urlImportBlocks[existingIdx]!.blockId : null;
+      // Anything else is added under one run per time on track. The next half of a run split by a
+      // break joins the laps. The same race from a second timing site does not — joined, every lap
+      // counted twice — it is linked to the run instead, and the official record takes the laps.
+      const attached = refreshedId
+        ? {
+            blocks: value.urlImportBlocks.map((b) => (b.blockId === refreshedId ? newBlock : b)),
+            linkedSources: (value.linkedSources ?? []).map((s) =>
+              s.leadBlockId === refreshedId ? { ...s, leadBlockId: newBlock.blockId } : s
+            ),
+            outcome: { kind: "separate" } as SameOutingAttach,
+          }
+        : attachUnderSameOutingRule({
+            blocks: value.urlImportBlocks,
+            linkedSources: value.linkedSources,
+            incoming: newBlock,
+            fallbackTimeZone: deviceTimeZone,
+            incomingLeads: opts?.leadsSameOuting,
+          });
+      const nextBlocks = attached.blocks;
       const ordered = orderBlocksByTrackTime(nextBlocks);
+      const leadBlockId = attached.outcome.kind === "linked" ? attached.outcome.leadBlockId : null;
+      // The import the run's laps now show: the new one, unless it only came on as a copy.
+      const shown = (leadBlockId ? nextBlocks.find((b) => b.blockId === leadBlockId) : null) ?? newBlock;
 
       onChange({
         ...value,
         manualText: primaryLapTextFromFirstBlock(nextBlocks),
         sourceKind: "url",
         sourceDetail:
-          ordered.length === 1 ? newBlock.sourceUrl : `${ordered.length} timing sessions`,
-        parserId: newBlock.parserId ?? "liverc_deterministic_v1",
+          ordered.length === 1 ? ordered[0]!.sourceUrl : `${ordered.length} timing sessions`,
+        parserId: shown.parserId ?? "liverc_deterministic_v1",
         // The form-level warnings array only makes sense for a single import;
         // with a split run each block carries its own and the save path reads those.
-        urlLapRows: ordered.length === 1 ? newBlock.urlLapRows ?? null : null,
+        urlLapRows: ordered.length === 1 ? ordered[0]!.urlLapRows ?? null : null,
         urlImportBlocks: nextBlocks,
+        linkedSources: attached.linkedSources,
       });
-      const pid = newBlock.selectedDriverIds?.[0];
+      const pid = shown.selectedDriverIds?.[0];
       if (pid) {
-        setActivePreviewKey(`${newBlock.blockId}:${pid}`);
+        setActivePreviewKey(`${shown.blockId}:${pid}`);
       }
-      setFocusedBlockId(newBlock.blockId);
-      if (sessionDrivers.length > 0) {
+      setFocusedBlockId(shown.blockId);
+      if (!leadBlockId && sessionDrivers.length > 0) {
         setLandedBlockId(newBlock.blockId);
+        haptic("light");
+      } else if (leadBlockId) {
         haptic("light");
       }
       setUrlInput("");
-      setUrlMessage(combinedMessage);
+      setUrlMessage(sameRaceMessage(attached.outcome, newBlock, shown) ?? combinedMessage);
     }
+  }
+
+  /** What a same-race attach did, in the words of the laps the driver is now looking at. */
+  function sameRaceMessage(
+    outcome: SameOutingAttach,
+    incoming: UrlImportBlock,
+    shown: UrlImportBlock
+  ): string | null {
+    if (outcome.kind === "separate") return null;
+    if (outcome.kind === "linked") {
+      const kept = timingSourceLabelFromParserId(shown.parserId);
+      return kept ? `Same race — kept the ${kept} laps.` : "Same race — laps not added twice.";
+    }
+    const now = timingSourceLabelFromParserId(incoming.parserId);
+    return now ? `Same race — now using the ${now} laps.` : "Same race — laps swapped, not added.";
   }
 
   /**
@@ -1829,7 +1950,8 @@ export function LapTimesIngestPanel({
         url: res.sourceUrl,
       },
       res.sourceUrl,
-      { primaryDriverId: res.matchedDriverId }
+      // Downloaded and handed over for this race: it takes the laps from any copy already on.
+      { primaryDriverId: res.matchedDriverId, leadsSameOuting: true }
     );
     setMyRcmPastedUrl(null);
   }
@@ -2028,7 +2150,7 @@ export function LapTimesIngestPanel({
                   lapCount={stats?.lapCount ?? 0}
                   bestLapSeconds={stats?.bestLap ?? null}
                   medianSeconds={stats?.median ?? null}
-                  sourceLabel={timingSourceLabelFromParserId(block.parserId)}
+                  sourceLabel={sourceLineByBlockId.get(block.blockId) ?? null}
                   isFocused={activeImportBlock?.blockId === block.blockId}
                   selectable={attachedBlocks.length > 1}
                   onFocus={() => setFocusedBlockId(block.blockId)}
@@ -2409,7 +2531,7 @@ export function LapTimesIngestPanel({
                             <SessionImportListRow
                               title={row.label}
                               when={[
-                                formatSessionWhen(row.sessionCompletedAtIso, null, row.source),
+                                formatSessionWhen(row.sessionCompletedAtIso, null, row.source, row.sessionUrl),
                                 row.detail,
                               ]
                                 .filter(Boolean)
@@ -2457,7 +2579,8 @@ export function LapTimesIngestPanel({
                             when={formatSessionWhen(
                               row.sessionCompletedAtIso,
                               row.sessionTime,
-                              row.timingSource
+                              row.timingSource,
+                              row.sessionUrl
                             )}
                             // The state leads for a carried run: as a suffix on the run's name it
                             // was the half that truncated at 390px ("On Run · Mon, 13 Oct · Unco…").

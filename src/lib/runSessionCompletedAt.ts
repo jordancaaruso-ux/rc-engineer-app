@@ -21,11 +21,11 @@ type BodyLike = {
 };
 
 /**
- * LiveRC/MyRCM session times are track wall clock stored as-if-UTC (see
- * `lapImport/labels.ts`). `Run.sessionCompletedAt` feeds real-instant consumers
+ * LiveRC/MyRCM/Speedhive-results session times are track wall clock stored as-if-UTC
+ * (see `lapImport/labels.ts`). `Run.sessionCompletedAt` feeds real-instant consumers
  * — run-row display in the viewer's zone, and the weather conditions backfill —
  * so before storing we reinterpret the wall clock in the user's timezone (the
- * track is virtually always in the driver's own zone). Speedhive times are
+ * track is virtually always in the driver's own zone). Speedhive practice times are
  * already real instants and pass through untouched, as does everything when the
  * timezone cookie is missing. Per-set `RunImportedLapSet.sessionCompletedAt`
  * deliberately stays wall-clock-as-UTC — its display sites freeze it in UTC.
@@ -37,7 +37,7 @@ export function importedSessionInstantToReal(
 ): Date {
   const tz = userTimeZone?.trim();
   if (!tz) return d;
-  if (!isWallClockAsUtcTimingSource(timingSourceFromSourceUrl(sourceUrl))) return d;
+  if (!isWallClockAsUtcTimingSource(timingSourceFromSourceUrl(sourceUrl), { sourceUrl })) return d;
   return wallClockAsUtcToInstant(d, tz);
 }
 

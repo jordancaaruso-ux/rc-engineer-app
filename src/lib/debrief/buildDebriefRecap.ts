@@ -12,6 +12,11 @@ import {
   readFiveMinStartLap,
 } from "@/lib/lapAnalysis";
 import { formatFiveMinuteStint } from "@/lib/runLaps";
+import {
+  setupChangedRowsSincePrevious,
+  type SetupChangedRow,
+} from "@/lib/setupCompare/changedSincePrevious";
+import { isRunToRunSetupNoiseKey } from "@/lib/setupCompare/setupChangeNoise";
 
 /**
  * The figures beside a debrief — the meeting's best marks and which run set each one,
@@ -36,6 +41,15 @@ import { formatFiveMinuteStint } from "@/lib/runLaps";
  * - `tyres[].fromNew` — how much slower runs 2 to 5 on a set were than its run 1, for sets
  *   fitted new at this meeting. The number moves with the track and the driver as well as the
  *   tyre; he saw that on his own days and wants the plain number anyway.
+ *
+ * 2026-09-18, the setup — START against END, per car. The runs list under the card already
+ * carries a wrench on every run that changed the car, so a run-by-run replay here would be the
+ * same list twice on one screen. What the list cannot say is the net of the meeting: what the
+ * car was on your first run against what it was on your last — the answer to "what do I bolt on
+ * next time". Founder call: start setup vs end setup; NO pace beside it (a net picture has no
+ * honest per-change number, and the card's "no comparison" rule stands); and a car that ended
+ * where it started must not read the same as a car nobody touched — so `made` counts every
+ * change along the way, and the card says "back where you started · 7 changes made".
  */
 
 /** A Sessions run row plus the clock fields grouping reads — `sortAt` is the ordering axis. */
@@ -80,6 +94,26 @@ export type DebriefTyre = {
   fromNew: DebriefFromNew[];
 };
 
+/** One car's setup across the meeting: its first run against its last. */
+export type DebriefSetup = {
+  carId: string;
+  /** Named only when the meeting ran more than one car. */
+  carName: string | null;
+  startRunId: string;
+  endRunId: string;
+  /**
+   * Boxes that differ between the first and last run, end value as `value`, start as
+   * `previousValue` — the shape the wrench's list draws. Tyres, additive and the sheet header
+   * never appear (`isRunToRunSetupNoiseKey`, the car page's "did this run change the car" rule).
+   */
+  rows: SetupChangedRow[];
+  /**
+   * Every box change between consecutive runs, summed over the meeting. Always ≥ `rows.length`;
+   * greater means changes were made and then unmade. Zero means nobody touched the car.
+   */
+  made: number;
+};
+
 export type DebriefRecap = {
   runCount: number;
   lapCount: number;
@@ -105,6 +139,8 @@ export type DebriefRecap = {
   /** Every tyre run, in the order first run, each with its own three marks. */
   tyres: DebriefTyre[];
   airTempC: { min: number; max: number } | null;
+  /** One entry per car that ran at least twice with a readable setup; empty without sheets. */
+  setup: DebriefSetup[];
 };
 
 type Stint = { lapCount: number; seconds: number };
@@ -179,12 +215,61 @@ function fromNewOf(pairs: Pair[]): DebriefFromNew[] {
     .map(([tyreRun, deltas]) => ({ tyreRun, seconds: mean(deltas), sets: deltas.length }));
 }
 
+/** The car's own settings that moved between two sheets — the run-context keys dropped. */
+function carChangesBetween(previous: unknown, current: unknown): SetupChangedRow[] {
+  return setupChangedRowsSincePrevious(current, previous).filter(
+    (row) => !isRunToRunSetupNoiseKey(row.key)
+  );
+}
+
+/**
+ * Each car's first run against its last, in the order the cars first went out. A run whose
+ * setup the caller didn't load is skipped, not treated as blank: a missing sheet would
+ * otherwise read as "every box changed". One run on a car has nothing to compare.
+ */
+function setupOf(
+  chronological: Pair[],
+  setupDataByRunId: ReadonlyMap<string, unknown> | undefined
+): DebriefSetup[] {
+  if (!setupDataByRunId) return [];
+  const byCar = new Map<string, Pair[]>();
+  for (const pair of chronological) {
+    const carId = pair.run.carId;
+    if (!carId || setupDataByRunId.get(pair.row.id) == null) continue;
+    const list = byCar.get(carId) ?? [];
+    list.push(pair);
+    byCar.set(carId, list);
+  }
+  const out: DebriefSetup[] = [];
+  for (const [carId, pairs] of byCar) {
+    if (pairs.length < 2) continue;
+    const dataOf = (pair: Pair) => setupDataByRunId.get(pair.row.id);
+    const first = pairs[0]!;
+    const last = pairs[pairs.length - 1]!;
+    let made = 0;
+    for (let i = 1; i < pairs.length; i++) {
+      made += carChangesBetween(dataOf(pairs[i - 1]!), dataOf(pairs[i]!)).length;
+    }
+    out.push({
+      carId,
+      carName: byCar.size > 1 ? (last.run.car?.name ?? last.run.carNameSnapshot ?? null) : null,
+      startRunId: first.row.id,
+      endRunId: last.row.id,
+      rows: carChangesBetween(dataOf(first), dataOf(last)),
+      made,
+    });
+  }
+  return out;
+}
+
 export function buildDebriefRecap(
   group: DebriefGroupSource,
   opts?: {
     zones?: RunGroupZoneOptions;
     /** Top 5 minus the field's median top 5 per run, from `loadDebriefFieldGaps`. */
     fieldGapByRunId?: ReadonlyMap<string, number>;
+    /** Each run's `SetupSnapshot.data`; without it the setup line is simply absent. */
+    setupDataByRunId?: ReadonlyMap<string, unknown>;
   }
 ): DebriefRecap | null {
   if (group.runs.length === 0) return null;
@@ -283,5 +368,6 @@ export function buildDebriefRecap(
     rating: handling ? { arc: handling.arc, direction: handling.direction } : null,
     tyres,
     airTempC: temps.length ? { min: Math.min(...temps), max: Math.max(...temps) } : null,
+    setup: setupOf(chronological, opts?.setupDataByRunId),
   };
 }

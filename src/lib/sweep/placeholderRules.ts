@@ -1,12 +1,12 @@
 /**
- * Small rules the sweep and the wizard share about placeholder runs and half-finished sessions.
+ * Small rules the sweep and the wizard share about app-made runs and half-finished sessions.
  */
 
 /** Four minutes of silence after the last lap: a practice block is over, not paused. */
 export const SESSION_QUIET_MS = 4 * 60 * 1000;
 
 /**
- * A placeholder is never precious. Only a run the app filed (unconfirmed) may be dissolved when a
+ * An app-made run is never precious. Only a run the app filed (unconfirmed) may be dissolved when a
  * human run claims its session; a run the driver confirmed keeps its laps whatever happens.
  */
 export function isDissolvable(run: { unconfirmedAt: Date | null }): boolean {

@@ -24,6 +24,7 @@ export function TrackLocationEditor({
   initial,
   compact = false,
   showCurrentLocation = true,
+  readOnly = false,
   onSaved,
 }: {
   trackId: string;
@@ -32,6 +33,12 @@ export function TrackLocationEditor({
   initial: TrackLocationFields;
   compact?: boolean;
   showCurrentLocation?: boolean;
+  /**
+   * The pin is LiveRC's own published address for the club, so there is nothing to set and
+   * nothing to search for — the card states it and stops (founder call 2026-09-18). The raw
+   * source tag goes with the controls: `liverc_address` is a column value, not a word.
+   */
+  readOnly?: boolean;
   onSaved?: (track: TrackLocationFields) => void;
 }) {
   const [coordsPaste, setCoordsPaste] = useState("");
@@ -93,6 +100,19 @@ export function TrackLocationEditor({
       if (e instanceof GeolocationRequestError) setError(e.message);
       else setError(e instanceof Error ? e.message : "Could not get location");
     }
+  }
+
+  // A pin that cannot be changed is one line, not a form. Guarded on `hasGps` so a read-only
+  // card with no coordinates never renders an empty box with nothing in it.
+  if (readOnly && hasGps) {
+    return (
+      <p className={cn("text-muted-foreground leading-snug", compact ? "text-xs" : "text-sm")}>
+        GPS set:{" "}
+        <span className="fig-stat text-foreground">
+          {saved.latitude!.toFixed(5)}, {saved.longitude!.toFixed(5)}
+        </span>
+      </p>
+    );
   }
 
   return (

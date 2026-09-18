@@ -51,6 +51,22 @@ export function wallClockAsUtcToInstant(wallClockAsUtc: Date, timeZone: string):
 }
 
 /**
+ * The other way round: what a clock in `timeZone` read at a real instant, stored as-if-UTC
+ * (real `06:36Z` + Australia/Sydney → `16:36Z`). Throws on a zone `Intl` does not know.
+ */
+export function instantToWallClockAsUtc(instant: Date, timeZone: string): Date {
+  return new Date(instant.getTime() + utcOffsetMinutesInZone(timeZone, instant) * 60_000);
+}
+
+/**
+ * Minutes `timeZone` sits east of UTC at instant `at` (AEST → 600). Rounded, because the clock
+ * parts carry no milliseconds. Throws on an unknown zone.
+ */
+export function utcOffsetMinutesInZone(timeZone: string, at: Date): number {
+  return Math.round(zoneOffsetMs(timeZone, at) / 60_000);
+}
+
+/**
  * UTC instant of midnight starting `now`'s calendar day in an IANA `timeZone`.
  * Servers run in UTC (Vercel), so `setHours(0,0,0,0)` puts the day boundary at
  * 10am for an AEST user — day-scoped queries must anchor to the USER's midnight.

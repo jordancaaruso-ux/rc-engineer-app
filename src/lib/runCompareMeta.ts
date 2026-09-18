@@ -58,6 +58,20 @@ function asValidDate(v: Date | string | null | undefined): Date | null {
  * into `sortAt` on legacy rows — checked on the scratch clone (559 runs): no such row
  * carries a fortnight-old stamp, so none of them moves.
  *
+ * ## …and for a run that is linked to the import it was stamped from (2026-09-18)
+ *
+ * A tester imported an event from a month earlier and every run came up dated the minute he
+ * imported it. The floor was guessing at provenance from AGE, and a race a fortnight old is
+ * not less real than one from yesterday — it is just older. Where the run names the import it
+ * came from (`importedLapTimeSessionId`), the provenance is not a guess: that stamp was read
+ * off a timing sheet, so the floor does not apply to it either.
+ *
+ * This does NOT reopen the dirty legacy stamps the floor was written beside. Both kinds sit
+ * ABOVE the row, not below it — an import-time stamp is ~`createdAt` and a wall clock stored
+ * as-if-UTC lands hours after the save — so the upper bound catches them, and it is untouched.
+ * Verified on the scratch clone: of the runs stamped more than a fortnight before their row,
+ * every one is a real old race and not a single one is garbage.
+ *
  * Otherwise deliberately **never** reads `sortAt` as a time to SHOW: that is the draggable
  * ordering axis.
  */
@@ -73,6 +87,15 @@ export function resolveRunDisplayInstant(run: {
    * the row was written. After confirm the `sortAt` agreement below carries the same trust.
    */
   unconfirmedAt?: Date | string | null;
+  /**
+   * The imported timing session this run was created from or linked to. Its presence is what
+   * says `sessionCompletedAt` was read off a timing sheet rather than guessed, so an old stamp
+   * on such a run is admitted — see the fortnight note above.
+   *
+   * Every list that shows a run time must select it, or two screens print two times for one
+   * run, which is the whole reason this function exists.
+   */
+  importedLapTimeSessionId?: string | null;
 }): Date {
   const created = asValidDate(run.createdAt) ?? new Date(NaN);
   const createdMs = created.getTime();
@@ -95,7 +118,9 @@ export function resolveRunDisplayInstant(run: {
     const t = session.getTime();
     const sortStamp = asValidDate(run.sortAt);
     const filedAtHeat = sortStamp != null && sortStamp.getTime() === t;
-    const lower = filedAtHeat ? Number.NEGATIVE_INFINITY : createdMs - 14 * DAY_MS;
+    const fromTimingSheet = run.importedLapTimeSessionId != null;
+    const lower =
+      filedAtHeat || fromTimingSheet ? Number.NEGATIVE_INFINITY : createdMs - 14 * DAY_MS;
     if (!Number.isFinite(createdMs) || (t >= lower && t <= upper)) return session;
   }
   if (loggedSameOuting) return logged!;

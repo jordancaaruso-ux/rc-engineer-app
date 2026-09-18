@@ -40,6 +40,7 @@ export async function GET() {
       sessionCompletedAt: true,
       loggingCompletedAt: true,
       sortAt: true,
+      importedLapTimeSessionId: true,
       sessionLabel: true,
       sessionType: true,
       meetingSessionType: true,

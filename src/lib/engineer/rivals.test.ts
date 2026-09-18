@@ -16,8 +16,8 @@ function sheet(rows: Array<[string, number | null, number | null, boolean?]>): F
     rank: 1,
     gapBestToP1: 0,
     gapTop5ToP1: 0,
-    gapBestToMean: 0,
-    gapTop5ToMean: 0,
+    gapBestToMedian: 0,
+    gapTop5ToMedian: 0,
     entrants: rows.map(([name, best, top5, cut]) => ({ name, isMe: name === "Me", best, top5, cut: cut ?? false })),
   };
 }

@@ -16,9 +16,7 @@ import { haversineMeters, sortNearbyTracks } from "@/lib/location/trackProximity
  * away everything outside a bounding box before it measures anything.
  *
  * The radius here is a BROWSE radius (tens of km: "what can I race at this weekend"), quite
- * separate from DEFAULT_TRACK_PROXIMITY_RADIUS_M (800m: "you are standing at this track, shall I
- * select it"). Keeping them apart matters — widening the auto-select radius would start attaching
- * runs to the wrong venue.
+ * separate from NEARBY_TRACK_RADIUS_M (the run form's picker order).
  */
 const DEFAULT_RADIUS_M = 50_000;
 const MAX_RADIUS_M = 500_000;

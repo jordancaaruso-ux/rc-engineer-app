@@ -54,8 +54,13 @@ import {
 } from "@/lib/dashboardVerdict";
 import { pickHeroSeries } from "@/lib/dashboardHeroSeries";
 import { perfSpan } from "@/lib/perfLog";
-import { pendingLooseFromImports, type DashboardPendingSweep } from "@/lib/sweep/pendingSweep";
-import { importedSessionInstantToReal } from "@/lib/runSessionCompletedAt";
+import {
+  pendingLooseFromImports,
+  type DashboardPendingSweep,
+  type LooseImportForPending,
+} from "@/lib/sweep/pendingSweep";
+import { groupOutings, type OutingSession } from "@/lib/runs/groupOutings";
+import { outingSessionFromImportedRow } from "@/lib/runs/outingsFromImportedSessions";
 import { resolveTrackTimeZone } from "@/lib/tracks/trackTimeZone";
 
 export type { DashboardNewRunPrefill, DashboardSerializedRun } from "@/lib/dashboardPrefillTypes";
@@ -340,8 +345,8 @@ export type DashboardHomeModel = {
   draftEventName: string | null;
   draftIsForToday: boolean;
   /**
-   * What the timing sweep left for the driver today, if anything: the first placeholder run to
-   * fill in, else sessions waiting for a car. The second door beside "Start a run".
+   * What a read of the timing sites left for the driver today, if anything: the runs on the
+   * sheet they did not log, waiting on their tick. The second door beside "Start a run".
    */
   pendingSweep: DashboardPendingSweep | null;
   /** Per-run setup changes made today, chronological (first-of-day uses yesterday's last run as baseline). */
@@ -496,6 +501,7 @@ const recentRunSelect = {
   loggingCompletedAt: true,
   loggingComplete: true,
   sortAt: true,
+  importedLapTimeSessionId: true,
   lapTimes: true,
   lapSession: true,
   sessionType: true,
@@ -516,6 +522,7 @@ const incompleteRunSelect = {
   createdAt: true,
   sessionCompletedAt: true,
   sortAt: true,
+  importedLapTimeSessionId: true,
   sessionType: true,
   meetingSessionType: true,
   meetingSessionCode: true,
@@ -720,6 +727,7 @@ export async function loadDashboardHomeModel(
         sessionCompletedAt: true,
         loggingCompletedAt: true,
         sortAt: true,
+        importedLapTimeSessionId: true,
         sessionType: true,
         meetingSessionType: true,
         meetingSessionCode: true,
@@ -776,6 +784,7 @@ export async function loadDashboardHomeModel(
         sessionCompletedAt: true,
         loggingCompletedAt: true,
         sortAt: true,
+        importedLapTimeSessionId: true,
         lapTimes: true,
         lapSession: true,
         bestLapSeconds: true,
@@ -785,15 +794,18 @@ export async function loadDashboardHomeModel(
         track: { select: { name: true } },
       },
     }),
-    // Sessions the timing sweep imported today that sit on no run: the app could not tell which
-    // car. Cheap (indexed on `[userId, sweepFiledAt]`), and empty for anyone the sweep never saw.
+    // Sessions a read of the timing sites brought in today that sit on no run — waiting on the
+    // driver's tick, minus the ones they unticked. Cheap (indexed on `[userId, sweepFiledAt]`),
+    // and empty for anyone the sweep never saw.
     prisma.importedLapTimeSession.findMany({
-      where: { userId, linkedRunId: null, sweepFiledAt: { gte: todayStart } },
+      where: { userId, linkedRunId: null, detectionPromptDismissedAt: null, sweepFiledAt: { gte: todayStart } },
       orderBy: { sessionCompletedAt: "asc" },
       select: {
         id: true,
         trackId: true,
         sourceUrl: true,
+        parserId: true,
+        parsedPayload: true,
         sessionCompletedAt: true,
         track: {
           select: { timeZone: true, latitude: true, longitude: true, user: { select: { timeZone: true } } },
@@ -818,6 +830,7 @@ export async function loadDashboardHomeModel(
         sessionCompletedAt: r.sessionCompletedAt,
         loggingCompletedAt: r.loggingCompletedAt,
         sortAt: r.sortAt,
+        importedLapTimeSessionId: r.importedLapTimeSessionId,
       }),
       lapCount: included.length,
       drivingSeconds,
@@ -838,6 +851,7 @@ export async function loadDashboardHomeModel(
       sessionCompletedAt: r.sessionCompletedAt,
       loggingCompletedAt: r.loggingCompletedAt,
       sortAt: r.sortAt,
+      importedLapTimeSessionId: r.importedLapTimeSessionId,
     }),
     trackId: r.trackId,
     trackName: r.track?.name ?? null,
@@ -1056,6 +1070,7 @@ export async function loadDashboardHomeModel(
               sessionCompletedAt: r.sessionCompletedAt,
               loggingCompletedAt: r.loggingCompletedAt,
               sortAt: r.sortAt,
+              importedLapTimeSessionId: r.importedLapTimeSessionId,
             }).toISOString(),
             runLabel: todayRunLabel(r),
             rows: diffRows.map((row) => ({
@@ -1094,6 +1109,7 @@ export async function loadDashboardHomeModel(
         sessionCompletedAt: r.sessionCompletedAt,
         loggingCompletedAt: r.loggingCompletedAt,
         sortAt: r.sortAt,
+        importedLapTimeSessionId: r.importedLapTimeSessionId,
       });
       const changedRows = changesByRunId.get(r.id) ?? [];
       todayStrip.push({
@@ -1311,6 +1327,7 @@ export async function loadDashboardHomeModel(
                   sessionCompletedAt: recentRun.sessionCompletedAt,
                   loggingCompletedAt: recentRun.loggingCompletedAt,
                   sortAt: recentRun.sortAt,
+                  importedLapTimeSessionId: recentRun.importedLapTimeSessionId,
                 })
               )
             : null,
@@ -1352,18 +1369,33 @@ export async function loadDashboardHomeModel(
     draftEventName: leadDraft?.eventName ?? null,
     draftIsForToday: leadDraft?.isForToday ?? false,
     pendingSweep: (() => {
-      const idx = todaysRuns.findIndex((r) => r.unconfirmedAt != null);
-      if (idx >= 0) return { kind: "placeholder" as const, runId: todaysRuns[idx]!.id, position: idx + 1 };
-      // The day each session RAN at its track — what the "Which car?" sheet asks about
-      // (`pendingSweepHref`). No track or no time can't be asked about: the old by-hand route.
-      return pendingLooseFromImports(
-        looseImportsToday.map((r) => {
-          if (!r.trackId || !r.track || !r.sessionCompletedAt) return { id: r.id, trackId: r.trackId, ymd: null };
-          const zone = resolveTrackTimeZone(r.track, r.track.user);
-          const instant = importedSessionInstantToReal(r.sessionCompletedAt, r.sourceUrl, zone);
-          return { id: r.id, trackId: r.trackId, ymd: calendarYmdInTimeZone(instant, zone) };
-        }),
-      );
+      // One row per time on track (the same heat from two sites is one), on the day each RAN at
+      // its track — what the sheet lists (`pendingSweepHref`). No track or no time can't be
+      // listed: the old by-hand route.
+      const byTrack = new Map<string, { zone: string; rows: typeof looseImportsToday }>();
+      const unplaceable: LooseImportForPending[] = [];
+      for (const r of looseImportsToday) {
+        if (!r.trackId || !r.track || !r.sessionCompletedAt) {
+          unplaceable.push({ id: r.id, trackId: r.trackId, ymd: null });
+          continue;
+        }
+        const zone = resolveTrackTimeZone(r.track, r.track.user);
+        (byTrack.get(r.trackId) ?? byTrack.set(r.trackId, { zone, rows: [] }).get(r.trackId)!).rows.push(r);
+      }
+      const outingRows: LooseImportForPending[] = [];
+      for (const [trackId, { zone, rows }] of byTrack) {
+        const sessions: OutingSession[] = [];
+        for (const r of rows) {
+          const s = outingSessionFromImportedRow(r, zone);
+          if (s) sessions.push(s);
+          else unplaceable.push({ id: r.id, trackId, ymd: null });
+        }
+        for (const o of groupOutings(sessions)) {
+          outingRows.push({ id: o.primaryId, trackId, ymd: calendarYmdInTimeZone(o.start, zone) });
+        }
+      }
+      outingRows.sort((x, y) => (x.ymd ?? "").localeCompare(y.ymd ?? ""));
+      return pendingLooseFromImports([...outingRows, ...unplaceable]);
     })(),
     todaysChanges,
     todayStrip,

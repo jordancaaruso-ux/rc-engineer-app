@@ -6,6 +6,16 @@ import { matchTireTypes, suggestModelCodeFromDisplayName } from "@/lib/tires/mat
 import { ensureSeedTireTypes } from "@/lib/tires/ensureSeedTireTypes";
 import { notifyAdminsOfUnverifiedAsset } from "@/lib/assets/notifyAdminReview";
 
+/**
+ * The picker downloads the catalog once and filters locally, so this is the ceiling on what is
+ * findable at all — a row past it is not merely last, it does not exist as far as the driver is
+ * concerned. 500 was written when the catalog was ~30 rows; the 1/10 off-road import took it to
+ * 739 and would have made 239 tires unreachable and unsearchable. Headroom, not a page size.
+ * The real answer at the next jump is filtering the list by what the car races, which keeps any
+ * one driver's list short no matter how big the catalog gets.
+ */
+const CATALOG_MAX = 2000;
+
 const TIRE_TYPE_SELECT = {
   id: true,
   displayName: true,
@@ -26,7 +36,7 @@ export async function GET(request: Request) {
   // was handed the whole catalog — a cap of 50 silently hid the tail and pushed
   // drivers into creating duplicates of types that already existed. Default stays
   // 50 for callers that just want a sample (admin merge, near-match suggestions).
-  const take = Math.min(500, Math.max(1, Number(searchParams.get("limit") ?? 50) || 50));
+  const take = Math.min(CATALOG_MAX, Math.max(1, Number(searchParams.get("limit") ?? 50) || 50));
 
   const count = await prisma.tireType.count();
   if (count === 0) {
@@ -37,7 +47,7 @@ export async function GET(request: Request) {
     const catalog = await prisma.tireType.findMany({
       select: TIRE_TYPE_SELECT,
       orderBy: [{ displayName: "asc" }],
-      take: 500,
+      take: CATALOG_MAX,
     });
     const matches = matchTireTypes(q, catalog, take);
     return NextResponse.json({
@@ -95,7 +105,7 @@ export async function POST(request: Request) {
 
     const catalog = await prisma.tireType.findMany({
       select: TIRE_TYPE_SELECT,
-      take: 200,
+      take: CATALOG_MAX,
       orderBy: { displayName: "asc" },
     });
     const nearMatches = matchTireTypes(displayName, catalog, 4).filter((m) => m.score >= 70);

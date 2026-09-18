@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
+import { getLiveRcDriverIdSetting, getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { wallClockAsUtcToInstant } from "@/lib/eventActive";
 import { discoverLiveRcSessionsForUser } from "@/lib/lapWatch/discoverLiveRcSessionsForUser";
 import { discoverSpeedhiveSessionsForUser } from "@/lib/speedhive/discoverSpeedhiveSessionsForUser";
@@ -12,21 +12,31 @@ import { confirmRunReturnHref } from "@/lib/runs/confirmRunHref";
 import { outingKindFor } from "@/lib/runs/outingSpan";
 import { outingSessionFromImportedRow } from "@/lib/runs/outingsFromImportedSessions";
 import {
+  rawSessionDriversFromImportedPayload,
+  sessionHintNameFromPayload,
+} from "@/lib/lapImport/importedIngestPlan";
+import { pickPrimarySessionDriver } from "@/lib/lapImport/pickPrimarySessionDriver";
+import {
+  carsForPendingOutings,
   fileDayForUser,
-  fileImportedRowsForUser,
+  logChosenOutingsForUser,
   type FileOutcome,
   type FilingRow,
   type GatheredCandidate,
 } from "@/lib/sweep/fileDay";
 import { dayBoundsForYmd, splitDayCandidates } from "@/lib/sweep/getMyDayDays";
+import { pendingOutingsFrom, splitChosen, type PendingOutingSource } from "@/lib/sweep/pendingOutings";
 import { reportSweepFailure } from "@/lib/observability/reportSweep";
 import type { SweepSource } from "@/lib/sweep/sweepDocs";
 
 /**
- * "Get my day" (founder call 2026-09-15): the driver names a track and a day, and the app reads
- * the timing sites ONCE, for that driver, and files the day through the same code as the 8 pm
- * pass. No background scanning — one look per tap. Pressing again is safe: sessions already on a
- * run are skipped, and a session that overlaps a run joins it (`fileDay.ts`).
+ * "Import your last runs" (founder call 2026-09-15, "Get my day" then): the driver names a track
+ * and a day, and the app reads the timing sites ONCE, for that driver, through the same code as
+ * the 8 pm pass. Since 2026-09-18 neither files a run on its own: what the sites hold that is not
+ * already on a run comes back as a PENDING list — one row per time on track — and the driver
+ * ticks the ones they want (`logChosenForDay`). No background scanning — one look per tap.
+ * Pressing again is safe: sessions already on a run are skipped, an outing that overlaps a run
+ * joins it, and a row the driver unticked stays put away (`fileDay.ts`).
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -50,25 +60,50 @@ export type GetMyDayTrack = {
   timeZone: string;
 };
 
-export type GetMyDayResult = {
-  /** Sessions the timing sites hold for the driver that day, however they were filed. */
+/** One row of the sheet: a time on track the driver did not log, as the timing sites hold it. */
+export type PendingOutingView = {
+  /** The primary session's id — sent back ticked or unticked. */
+  id: string;
+  kind: "race" | "practice";
+  startIso: string;
+  /** "10:42 am", on the track's clock. */
+  when: string;
+  lapCount: number | null;
+  bestLapSeconds: number | null;
+  /** The car the app can place it in from the driver's own facts; null → the sheet asks. */
+  carId: string | null;
+  carName: string | null;
+};
+
+export type PendingDay = {
+  pending: PendingOutingView[];
+  /** Rows the app cannot give a car — the sheet asks once, for these. */
+  needsCar: number;
+  /** The day in Sessions, where the Debrief lives. Null when the day has no runs there. */
+  dayHref: string | null;
+};
+
+export type GetMyDayResult = PendingDay & {
+  /** Sessions the timing sites hold for the driver that day, however they were placed. */
   found: number;
   /** Of those, already on a run before this press. */
   alreadyOnRuns: number;
-  /** New runs the app made (unconfirmed until the driver checks them). */
-  added: number;
   /** Laps put on a run the driver had opened — a draft, or a run saved without laps. */
   attached: number;
   /** Outings that joined a run the driver already had for that time on track. */
   joined: number;
-  /** Sessions that could not be filed (a page that would not import, the daily cap). */
+  /** Sessions that could not be placed (a page that would not import). */
   skipped: number;
-  /** Sessions the app could not give a car; the sheet asks which. */
-  needsCar: number;
   /** Timing sites that could not be read. */
   failedSources: SweepSource[];
-  /** The day in Sessions, where the Debrief lives. Null when the day has no runs there. */
-  dayHref: string | null;
+};
+
+export type LogChosenResult = PendingDay & {
+  /** Runs made from the ticked rows. */
+  logged: number;
+  /** Ticked rows that turned out to overlap a run logged since the list was read. */
+  joined: number;
+  skipped: number;
 };
 
 /**
@@ -252,74 +287,140 @@ export async function getMyDay(params: {
     trigger: "driver",
   });
   const alreadyOnRuns = sh.alreadyOnRuns + lr.alreadyOnRuns;
-  const loose = await looseRowsForDay(userId, track, day);
   return {
     found: candidates.length + alreadyOnRuns,
     alreadyOnRuns,
-    ...tally(outcomes),
-    needsCar: loose.length,
+    attached: outcomes.filter((o) => o.kind === "attached").length,
+    joined: outcomes.filter((o) => o.kind === "joined").length,
+    skipped: outcomes.filter((o) => o.kind === "skipped" && !NOT_A_FAILURE.has(o.reason)).length,
     failedSources,
+    ...(await pendingForDay({ userId, track, ymd })),
+  };
+}
+
+const NOT_A_FAILURE = new Set(["already on a run", "declined"]);
+
+/**
+ * The day's runs the driver did not log, without reading a timing site. The 8 pm pass has
+ * already imported them, so a driver arriving from the notification must not pay for another
+ * crawl (LiveRC alone can take 35 s) just to tick a list.
+ */
+export async function pendingForDay(params: {
+  userId: string;
+  track: GetMyDayTrack;
+  ymd: string;
+}): Promise<PendingDay> {
+  const { userId, track, ymd } = params;
+  const day = dayBoundsForYmd(ymd, track.timeZone);
+  const { pending, rowById } = await pendingOutingsForDay(userId, track, day);
+  const cars = await carsForPendingOutings({ userId, track, day, pending, rowById });
+  const clock = new Intl.DateTimeFormat("en-AU", { timeZone: track.timeZone, hour: "numeric", minute: "2-digit" });
+  const views: PendingOutingView[] = pending.map((o) => {
+    const car = cars.get(o.id) ?? null;
+    return {
+      id: o.id,
+      kind: o.kind === "official" ? "race" : "practice",
+      startIso: o.start.toISOString(),
+      when: clock.format(o.start),
+      lapCount: o.lapCount,
+      bestLapSeconds: o.bestLapSeconds,
+      carId: car?.carId ?? null,
+      carName: car?.carName ?? null,
+    };
+  });
+  return {
+    pending: views,
+    needsCar: views.filter((v) => !v.carId).length,
     dayHref: await dayHrefFor(userId, track.id, day),
   };
 }
 
 /**
- * How many of that day's sessions are still waiting on a car, without reading a timing site.
- * The 8 pm pass has already imported them, so a driver arriving from the notification must not
- * pay for another crawl (LiveRC alone can take 35 s) just to be asked one question.
+ * The sheet answered: `keep` are the rows the driver ticked, `decline` the ones they unticked,
+ * `carId` the car they named when asked. Runs are made from the ticked rows only.
  */
-export async function pendingCarQuestion(params: {
+export async function logChosenForDay(params: {
   userId: string;
   track: GetMyDayTrack;
   ymd: string;
-}): Promise<{ needsCar: number; dayHref: string | null }> {
-  const day = dayBoundsForYmd(params.ymd, params.track.timeZone);
-  const rows = await looseRowsForDay(params.userId, params.track, day);
-  return { needsCar: rows.length, dayHref: await dayHrefFor(params.userId, params.track.id, day) };
-}
-
-/** "Which car?" answered: the day's loose sessions at this track, filed with that car. */
-export async function fileDayLooseWithCar(params: {
-  userId: string;
-  track: GetMyDayTrack;
-  ymd: string;
-  carId: string;
-}): Promise<GetMyDayResult> {
+  keep: readonly string[];
+  decline: readonly string[];
+  carId: string | null;
+}): Promise<LogChosenResult> {
   const { userId, track, ymd, carId } = params;
   const day = dayBoundsForYmd(ymd, track.timeZone);
-  const rows = await looseRowsForDay(userId, track, day);
-  const outcomes = await fileImportedRowsForUser({
+  const { pending, rowById } = await pendingOutingsForDay(userId, track, day);
+  const chosen = splitChosen(pending, params.keep, params.decline);
+  const outcomes = await logChosenOutingsForUser({
     userId,
     track: { id: track.id, timeZone: track.timeZone },
-    rows,
+    day,
+    keep: chosen.keep,
+    decline: chosen.decline,
+    rowById,
     carId,
   });
-  const stillLoose = await looseRowsForDay(userId, track, day);
   return {
-    found: rows.length,
-    alreadyOnRuns: 0,
-    ...tally(outcomes),
-    needsCar: stillLoose.length,
-    failedSources: [],
-    dayHref: await dayHrefFor(userId, track.id, day),
+    logged: outcomes.filter((o) => o.kind === "logged").length,
+    joined: outcomes.filter((o) => o.kind === "joined").length,
+    skipped: outcomes.filter((o) => o.kind === "skipped").length,
+    ...(await pendingForDay({ userId, track, ymd })),
   };
 }
 
-function tally(outcomes: readonly FileOutcome[]): Pick<GetMyDayResult, "added" | "attached" | "joined" | "skipped"> {
-  let added = 0;
-  let attached = 0;
-  let joined = 0;
-  let skipped = 0;
-  for (const o of outcomes) {
-    if (o.kind === "placeholder") added += 1;
-    else if (o.kind === "attached") attached += 1;
-    else if (o.kind === "joined") joined += 1;
-    else if (o.kind === "skipped" && o.reason !== "already on a run") skipped += 1;
-  }
-  return { added, attached, joined, skipped };
+/** How many runs the sheet would list for that day — the notification's count. */
+export async function countPendingForDay(params: {
+  userId: string;
+  track: GetMyDayTrack;
+  day: { start: Date; end: Date };
+}): Promise<number> {
+  return (await pendingOutingsForDay(params.userId, params.track, params.day)).pending.length;
 }
 
-/** Sessions the app imported at this track for that day and could not put on a run. */
+/** The day's loose sessions at this track as outings, with the driver's own laps on each. */
+async function pendingOutingsForDay(
+  userId: string,
+  track: GetMyDayTrack,
+  day: { start: Date; end: Date },
+): Promise<{ pending: ReturnType<typeof pendingOutingsFrom>; rowById: Map<string, FilingRow> }> {
+  const rows = await looseRowsForDay(userId, track, day);
+  const rowById = new Map(rows.map((r) => [r.id, r]));
+  if (rows.length === 0) return { pending: [], rowById };
+  const [liveRcDriverId, liveRcDriverName] = await Promise.all([
+    getLiveRcDriverIdSetting(userId).catch(() => null),
+    getLiveRcDriverNameSetting(userId).catch(() => null),
+  ]);
+  const sources: PendingOutingSource[] = [];
+  for (const row of rows) {
+    const s = outingSessionFromImportedRow(row, track.timeZone);
+    if (!s) continue;
+    sources.push({ ...s, ...ownLaps(row, { liveRcDriverId, liveRcDriverName }) });
+  }
+  return { pending: pendingOutingsFrom(sources), rowById };
+}
+
+/** The driver's own row on the sheet — the same pick the run would make of it. */
+function ownLaps(
+  row: FilingRow,
+  opts: { liveRcDriverId: string | null; liveRcDriverName: string | null },
+): { ownLapCount: number | null; ownBestLapSeconds: number | null } {
+  const drivers = rawSessionDriversFromImportedPayload(row.parsedPayload);
+  if (!drivers || drivers.length === 0) return { ownLapCount: null, ownBestLapSeconds: null };
+  const mine = pickPrimarySessionDriver(drivers, {
+    ...opts,
+    sessionHintName: sessionHintNameFromPayload(row.parsedPayload),
+  });
+  const laps = mine.laps.filter((n) => Number.isFinite(n) && n > 0);
+  return {
+    ownLapCount: laps.length,
+    ownBestLapSeconds: laps.length > 0 ? Math.min(...laps) : null,
+  };
+}
+
+/**
+ * Sessions the app imported at this track for that day that are on no run and were not unticked
+ * (`detectionPromptDismissedAt` — the sheet's "not this one", kept so no read offers it again).
+ */
 async function looseRowsForDay(
   userId: string,
   track: GetMyDayTrack,
@@ -331,21 +432,29 @@ async function looseRowsForDay(
       trackId: track.id,
       linkedRunId: null,
       sweepFiledAt: { not: null },
+      detectionPromptDismissedAt: null,
       sessionCompletedAt: {
         gte: new Date(day.start.getTime() - LOOSE_WINDOW_SLACK_MS),
         lt: new Date(day.end.getTime() + LOOSE_WINDOW_SLACK_MS),
       },
     },
-    select: { id: true, sourceUrl: true, parserId: true, parsedPayload: true, sessionCompletedAt: true },
+    select: {
+      id: true,
+      sourceUrl: true,
+      parserId: true,
+      parsedPayload: true,
+      sessionCompletedAt: true,
+      sweepChipCode: true,
+    },
     take: 60,
   });
   const out: FilingRow[] = [];
-  for (const r of rows) {
+  for (const { sweepChipCode, ...r } of rows) {
     const s = outingSessionFromImportedRow(r, track.timeZone);
     if (!s || s.start < day.start || s.start >= day.end) continue;
     out.push({
       ...r,
-      chipCode: null,
+      chipCode: sweepChipCode,
       sourceKind: outingKindFor(r.parserId, r.sourceUrl) === "official" ? "race" : "practice",
     });
   }
@@ -368,3 +477,5 @@ async function dayHrefFor(
     (await prisma.run.findFirst({ where, orderBy: { sortAt: "asc" }, select: { id: true } }));
   return first ? confirmRunReturnHref(first.id) : null;
 }
+
+export type { FileOutcome };

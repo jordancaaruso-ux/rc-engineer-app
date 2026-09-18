@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
@@ -9,15 +9,24 @@ import { normalizeGripTags, normalizeLayoutTags } from "@/lib/trackMetaTags";
 import { validateLiveRcTrackUrl } from "@/lib/lapWatch/liveRcTrackUrl";
 import { validateSpeedhiveTrackUrl } from "@/lib/speedhive/speedhiveUrl";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
+import { canEditLiveRcUrl } from "@/lib/tracks/trackAccess";
 import { canManageCatalogRow } from "@/lib/assets/catalogAccessLogic";
 import { trackUsedByOthers } from "@/lib/assets/catalogUsage";
 import { archiveTrackLegacyDataBeforeDelete } from "@/lib/tracks/legacyTrackSnapshot";
 import { timeZoneForCoordinates } from "@/lib/tracks/trackTimeZone";
+import { fillTrackLocation } from "@/lib/tracks/trackLocationFill";
 
 /**
- * Unified catalog rule for aggregation-affecting track identity (grip/layout tags) and
- * deletion: admin always; else the creator only while the track is unverified AND unused
- * by others. Low-stakes contributions (GPS, LiveRC/Speedhive URLs) stay open to any driver.
+ * Unified catalog rule for DELETING a track: admin always; else the creator only while the
+ * track is unverified AND unused by others.
+ *
+ * Editing no longer passes through here. Grip/layout tags were locked by this rule until
+ * 2026-09-18 on the reasoning that they keyed community condition buckets — they no longer do
+ * (aggregations read grip off each setup document's own traction tags), and the lock had made
+ * the tags uneditable by ANYONE but an admin, because the catalog importer stamps every seeded
+ * row verified and owns it from a system account. Founder call: the tags are global, any driver
+ * may set or correct them. The single exception is a LiveRC catalog row's URL — see
+ * `canEditLiveRcUrl`, which is identity rather than contribution.
  */
 async function canManageTrackIdentity(
   user: { id: string; email: string | null },
@@ -103,24 +112,10 @@ export async function PATCH(
 
   const existing = await prisma.track.findFirst({
     where: communityTrackByIdWhere(trackId),
-    select: { id: true, userId: true, verifiedAt: true },
+    select: { id: true, userId: true, verifiedAt: true, catalogSource: true, liveRcUrl: true },
   });
   if (!existing) {
     return NextResponse.json({ error: "Track not found" }, { status: 404 });
-  }
-
-  // Grip/layout tags key the community condition buckets — protect them with the unified
-  // rule. GPS + track URLs are contributions any driver may add, so they stay open.
-  const touchesAggregationIdentity =
-    !!body && ("gripTags" in body || "layoutTags" in body);
-  if (touchesAggregationIdentity && !(await canManageTrackIdentity(user, existing))) {
-    return NextResponse.json(
-      {
-        error:
-          "This track's grip/layout tags are locked — only the creator (while unverified and unused) or an admin can change them.",
-      },
-      { status: 403 }
-    );
   }
 
   const data: {
@@ -153,6 +148,22 @@ export async function PATCH(
       if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
       data.liveRcUrl = v.normalized;
     }
+  }
+  // The one field that is identity rather than contribution. Compared against what is stored,
+  // so re-sending a catalog row's own URL (the link finder posts both) is never refused — only
+  // a real repoint is.
+  if (
+    "liveRcUrl" in data &&
+    data.liveRcUrl !== existing.liveRcUrl &&
+    !canEditLiveRcUrl(user, existing)
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "This track's LiveRC address is what identifies it in the catalog and can't be changed here.",
+      },
+      { status: 403 }
+    );
   }
   if (body && "speedhiveUrl" in body) {
     if (
@@ -205,6 +216,9 @@ export async function PATCH(
       layoutTags: true,
     },
   });
+
+  // A LiveRC link just added carries the club's address — a better pin than a typed town.
+  if (data.liveRcUrl) after(() => fillTrackLocation(track.id).then(() => undefined));
 
   revalidateAfterTrackMutation(user.id);
   return NextResponse.json({ track });

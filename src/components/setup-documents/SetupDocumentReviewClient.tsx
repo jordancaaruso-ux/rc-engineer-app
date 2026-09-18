@@ -86,7 +86,12 @@ type SetupDocumentDetail = {
   setupSheetTemplate?: string | null;
 };
 
-function useA800SheetPostProcess(doc: SetupDocumentDetail): boolean {
+/*
+ * Named `wants…`, not `use…`: this is a plain predicate over three fields, not a React hook.
+ * The `use` prefix had ESLint reading every call as a hook call — five "React Hook cannot be
+ * called inside a callback" errors on code that was never wrong (2026-09-18).
+ */
+function wantsA800SheetPostProcess(doc: SetupDocumentDetail): boolean {
   if (doc.setupSheetModelSlug === SETUP_SHEET_MODEL_SLUG_A800RR) return true;
   if (doc.setupSheetModelId) return false;
   return doc.setupSheetTemplate === SETUP_SHEET_MODEL_SLUG_A800RR;
@@ -115,7 +120,7 @@ export function SetupDocumentReviewClient({
   docCarName?: string | null;
   defaultCalibrationIdForDocModel?: string | null;
 }) {
-  const useA800 = useA800SheetPostProcess(doc);
+  const useA800 = wantsA800SheetPostProcess(doc);
   const [liveDoc, setLiveDoc] = useState<SetupDocumentDetail>(doc);
   const [setupData, setSetupData] = useState<SetupSnapshotData>(() =>
     postProcessImportedSetup(normalizeSetupData(doc.parsedDataJson), useA800)
@@ -188,7 +193,7 @@ export function SetupDocumentReviewClient({
                 ? "warnings"
                 : "processed";
   useEffect(() => {
-    setSetupData(postProcessImportedSetup(normalizeSetupData(liveDoc.parsedDataJson), useA800SheetPostProcess(liveDoc)));
+    setSetupData(postProcessImportedSetup(normalizeSetupData(liveDoc.parsedDataJson), wantsA800SheetPostProcess(liveDoc)));
   }, [liveDoc.id, liveDoc.updatedAt, liveDoc.parsedDataJson, liveDoc.setupSheetModelId, liveDoc.setupSheetModelSlug]);
 
   // Keep picker synced to the document's stored or auto-resolved calibration.
@@ -446,7 +451,7 @@ export function SetupDocumentReviewClient({
   /** Header [Cancel]: discard unsaved local edits and drop back to the read-only view. */
   function cancelEdits() {
     setSetupData(
-      postProcessImportedSetup(normalizeSetupData(liveDoc.parsedDataJson), useA800SheetPostProcess(liveDoc))
+      postProcessImportedSetup(normalizeSetupData(liveDoc.parsedDataJson), wantsA800SheetPostProcess(liveDoc))
     );
     setError(null);
     setMode("review");
@@ -628,7 +633,7 @@ export function SetupDocumentReviewClient({
         }
         const next = postProcessImportedSetup(
           normalizeSetupData(data.parsedData ?? {}),
-          useA800SheetPostProcess(liveDoc)
+          wantsA800SheetPostProcess(liveDoc)
         );
         const imported = new Set(data.importedKeys ?? []);
         setSetupData(next);
@@ -701,7 +706,7 @@ export function SetupDocumentReviewClient({
           appliedCount = count;
           const next = postProcessImportedSetup(
             normalizeSetupData(applyData.parsedData ?? {}),
-            useA800SheetPostProcess(liveDoc)
+            wantsA800SheetPostProcess(liveDoc)
           );
           setSetupData(next);
           setCalibrationHighlightKeys(imported);

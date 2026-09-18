@@ -21,6 +21,7 @@ const recap: DebriefRecap = {
     { name: "Ride 32", runCount: 2, best: 14.51, top5: 14.7, fiveMin: null, fromNew: [] },
   ],
   airTempC: { min: 18, max: 23 },
+  setup: [],
 };
 
 const base = {
@@ -29,7 +30,7 @@ const base = {
   recap,
   runCount: 5,
   unconfirmedCount: 2,
-  looseCount: 0,
+  unloggedCount: 0,
   openPath: "/runs/history?openGroup=r3&level=day",
 };
 
@@ -42,7 +43,7 @@ test("lines: figures in Debrief order, tyres only when more than one, then the a
     "Ride 28: 3 runs · best 14.213",
     "Ride 32: 2 runs · best 14.510",
     "Air 18–23°C",
-    "2 runs filed from the timing sheet — check and confirm.",
+    "2 runs to confirm.",
   ]);
 });
 
@@ -54,59 +55,35 @@ test("push: one line with the best mark and what is left to do", () => {
 });
 
 /*
- * Founder ruling 2026-09-16: the notification announces the day like any other and NEVER asks
- * which car — the app asks that in a sheet when the driver arrives. So a day that filed runs must
- * not mention the sessions still waiting, and a day that filed none says what is there instead.
+ * Founder rulings 2026-09-16 and 2026-09-18: the notification announces the day like any other
+ * and NEVER asks a question — nothing files itself, so the runs the driver did not log are a
+ * COUNT here, and the sheet lists them to keep or not when the driver arrives.
  */
-test("push: a day that filed runs never mentions the car question", () => {
-  const p = renderEveningSummaryPush({ ...base, looseCount: 2 });
-  assert.equal(p.body, "5 runs · best 14.213 (Run 3) · top 5 14.402 · 2 to confirm");
+test("push: a day with runs says how many on the timing sheet were not logged", () => {
+  const p = renderEveningSummaryPush({ ...base, unloggedCount: 2 });
+  assert.equal(p.body, "5 runs · best 14.213 (Run 3) · top 5 14.402 · 2 to confirm · 2 not logged");
   assert.ok(!/car/i.test(p.body));
   assert.equal(p.url, base.openPath);
 });
 
-test("push: a day where nothing could be filed says what is waiting, and still opens the app", () => {
+test("push: a day where the driver logged nothing counts the runs on the sheet, and opens the sheet", () => {
   const p = renderEveningSummaryPush({
     ...base,
     recap: null,
     runCount: 0,
     unconfirmedCount: 0,
-    looseCount: 3,
-    openPath: "/?whichCar=t1&ymd=2026-09-19",
+    unloggedCount: 3,
+    openPath: "/?unlogged=t1&ymd=2026-09-19",
   });
-  assert.equal(p.body, "3 sessions from today are ready");
+  assert.equal(p.body, "3 runs on the timing sheet you didn't log");
   assert.ok(!/car/i.test(p.body));
-  assert.equal(p.url, "/?whichCar=t1&ymd=2026-09-19");
+  assert.equal(p.url, "/?unlogged=t1&ymd=2026-09-19");
 });
 
-test("email: subject carries the day, text and html carry the lines and absolute links", () => {
-  const e = renderEveningSummaryEmail({ ...base, looseCount: 1 });
+test("email: the unlogged line says where to deal with them, and the subject carries the count", () => {
+  const e = renderEveningSummaryEmail({ ...base, unconfirmedCount: 0, unloggedCount: 1 });
+  assert.ok(e.text.includes("1 run on the timing sheet you didn't log — open the day to keep the ones you want."));
   assert.equal(e.subject, "MR33 Arena, Sat 19 Sep: 5 runs, best 14.213");
-  assert.ok(e.text.includes("Best 14.213 (Run 3)"));
-  assert.ok(e.text.includes("https://www."));
-  assert.ok(e.html.includes("Your day at MR33 Arena"));
-  assert.ok(e.html.includes("Open your day"));
-  // One button, and no car question anywhere in it.
-  assert.ok(!e.html.includes("Say which car"));
-  assert.ok(!/which car/i.test(e.text));
-  assert.ok(!e.html.includes("<script"));
-});
-
-test("email: a day that filed nothing is still worth sending", () => {
-  const e = renderEveningSummaryEmail({
-    ...base,
-    recap: null,
-    runCount: 0,
-    unconfirmedCount: 0,
-    looseCount: 2,
-    openPath: "/?whichCar=t1&ymd=2026-09-19",
-  });
-  assert.equal(e.subject, "MR33 Arena, Sat 19 Sep: 2 sessions ready");
-  assert.ok(e.text.includes("2 sessions from today are ready"));
-});
-
-test("a track name with markup is escaped in the email", () => {
-  const e = renderEveningSummaryEmail({ ...base, trackName: "<b>Bad</b>" });
-  assert.ok(e.html.includes("&lt;b&gt;Bad&lt;/b&gt;"));
-  assert.ok(!e.html.includes("<b>Bad</b>"));
+  const none = renderEveningSummaryEmail({ ...base, recap: null, runCount: 0, unconfirmedCount: 0, unloggedCount: 2 });
+  assert.equal(none.subject, "MR33 Arena, Sat 19 Sep: 2 runs you didn't log");
 });

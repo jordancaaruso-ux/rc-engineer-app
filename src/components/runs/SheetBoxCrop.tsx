@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import type { ChangedBoxCrop } from "@/lib/setupCompare/changedBoxRegion";
+import {
+  boxWrapsText,
+  NOTE_LINE_HEIGHT,
+  NOTE_SIZE_PAGE_FRAC,
+} from "@/lib/setupSheetModels/sheetTextWrap";
 
 /**
  * One changed box, shown where it sits on the driver's own setup sheet.
@@ -139,6 +145,28 @@ export function SheetBoxCrop({
     ? (crop.crop.width * pageSize.w) / (crop.crop.height * pageSize.h)
     : PLACEHOLDER_ASPECT;
 
+  /*
+   * A notes box is prose, and prose in here needs the other sizing rule.
+   *
+   * `crop.box` is fractions of the CROP and `crop.crop` is fractions of the page, so the box's own
+   * share of the page — the only thing {@link boxWrapsText} will answer to — is the two multiplied.
+   *
+   * Its text is then sized off the PAGE rather than the box, exactly as the sheet sizes it: a note
+   * is `NOTE_SIZE_PAGE_FRAC` of the page's height, and the box is `boxHeightOfPage` of it, so the
+   * note is that ratio of the box — which is what `cqh` measures, the box being the size container.
+   * A ratio rather than a pixel count on purpose: the frame gives up height rather than distorting
+   * the sheet when a wide crop meets a narrow phone, and a fixed size would then overflow it.
+   *
+   * It comes out small — about a seventh of an A800RR comments box. That is the honest answer: the
+   * crop says WHERE on the sheet a change is, and the row it opens from has already said what the
+   * value is in type big enough to read.
+   */
+  const boxHeightOfPage = crop.box.height * crop.crop.height;
+  const wraps = boxWrapsText({ heightFracOfPage: boxHeightOfPage });
+  // Capped at the single-line size, so a box only just over the threshold never draws BIGGER than
+  // an ordinary one, and floored so a very tall box does not vanish.
+  const noteCqh = Math.min(Math.max((NOTE_SIZE_PAGE_FRAC / boxHeightOfPage) * 100, 6), 70);
+
   return (
     <figure className="m-0 flex min-w-0 items-center gap-2">
       {/*
@@ -203,8 +231,18 @@ export function SheetBoxCrop({
             />
             {value ? (
               <span
-                className="absolute inset-0 flex items-center justify-center overflow-hidden whitespace-nowrap px-[1px] font-semibold leading-none text-black"
-                style={{ fontSize: "70cqh" }}
+                className={cn(
+                  "absolute inset-0 overflow-hidden px-[1px] font-semibold text-black",
+                  wraps
+                    ? "whitespace-pre-wrap break-words text-left"
+                    : "flex items-center justify-center whitespace-nowrap leading-none"
+                )}
+                style={
+                  wraps
+                    ? { fontSize: `${noteCqh}cqh`, lineHeight: NOTE_LINE_HEIGHT }
+                    : // Settled on a bench against real A800RR box shapes, 2026-09-16. Leave it.
+                      { fontSize: "70cqh" }
+                }
               >
                 {value}
               </span>

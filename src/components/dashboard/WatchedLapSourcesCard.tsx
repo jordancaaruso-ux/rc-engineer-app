@@ -289,6 +289,8 @@ export function WatchedLapSourcesCard() {
                   {r.sessionCompletedAtIso
                     ? formatImportedSessionTime(r.sessionCompletedAtIso, {
                         timingSource: timingSourceFromParserId(r.parserId) ?? timingSourceFromSourceUrl(r.sourceUrl),
+                        parserId: r.parserId,
+                        sourceUrl: r.sourceUrl,
                       })
                     : "—"}
                   {r.lapCount != null ? (
@@ -397,6 +399,7 @@ export function WatchedLapSourcesCard() {
                       {s.lastSeenSessionCompletedAt
                         ? formatImportedSessionTime(s.lastSeenSessionCompletedAt, {
                             timingSource: timingSourceFromSourceUrl(s.sourceUrl),
+                            sourceUrl: s.sourceUrl,
                           })
                         : "—"}{" "}
                       · Last checked:{" "}

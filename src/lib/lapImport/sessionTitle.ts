@@ -34,6 +34,23 @@ function usable(v: string | null | undefined): string | null {
   return isMachineMarker(t) ? null : t;
 }
 
+/**
+ * A date is not a session name either.
+ *
+ * Speedhive's practice loop names every session after its own start time — `12/10/2025,
+ * 01:03 pm` — so 10 of 13 practice rows in the library were TITLED with a date, sitting above a
+ * second, different date in the row beneath (the same instant on the viewer's clock). Worse,
+ * the feed is not consistent about order: most rows read day-first, at least one is month-first
+ * (`10/12/2025, 1:18:19 PM`), so the title cannot even be read with confidence.
+ *
+ * A name that is only a date tells the driver nothing the row does not already say, so it is
+ * refused and the caller falls through to "Practice"/"Race" — which is what the fallback below
+ * was written for, and could never reach while Speedhive was handing us a "name".
+ */
+function isOnlyADate(v: string): boolean {
+  return /^[\d/.\-: ,]+(?:\s*[ap]\.?m\.?)?$/i.test(v.trim());
+}
+
 export function importedSessionTitle(input: {
   eventDetectionSessionLabel?: string | null;
   eventRaceClass?: string | null;
@@ -43,6 +60,12 @@ export function importedSessionTitle(input: {
   driverName?: string | null;
   /** Entrants with laps. Above one, a driver's name can't be the title. */
   driverCount?: number;
+  /**
+   * The timing site's own number for this session within its day (Speedhive practice puts it in
+   * the URL). Turns six identical "Practice" rows into "Practice 1 … Practice 8", which is the
+   * only thing that tells one practice run of a day from another.
+   */
+  sessionNumber?: number | null;
 }): string {
   const label = usable(input.eventDetectionSessionLabel);
   if (label) return label;
@@ -56,20 +79,37 @@ export function importedSessionTitle(input: {
           | { name?: string | null; className?: string | null }
           | undefined)
       : undefined;
-  const hinted = usable(hint?.name) || usable(hint?.className);
+  const hintedRaw = usable(hint?.name) || usable(hint?.className);
+  const hinted = hintedRaw && !isOnlyADate(hintedRaw) ? hintedRaw : null;
   if (hinted) return hinted;
+
+  /*
+   * What KIND of session this is, and it has to be honest rather than tidy.
+   * `eventDetectionSource` is only set on sessions that arrived through event detection, so a
+   * pasted URL reaches here with nothing — and calling a three-car A-main "Practice" is worse
+   * than saying little. More than one entrant with laps is a race everywhere except a shared
+   * practice sheet, which every provider we read hands over one driver at a time.
+   */
+  const kind =
+    input.eventDetectionSource === "practice"
+      ? "Practice"
+      : input.eventDetectionSource === "race"
+        ? "Race"
+        : (input.driverCount ?? 1) > 1
+          ? "Race"
+          : "Practice";
+
+  /*
+   * A numbered session outranks the driver's name. On a practice sheet the driver IS the
+   * session, so their name is the right title — but not when the site has numbered the day's
+   * runs: eight rows reading your own name tell you no more than eight rows reading a date did.
+   * Only Speedhive's practice URLs carry a number, so nothing else changes.
+   */
+  const n = input.sessionNumber;
+  if (typeof n === "number" && Number.isInteger(n) && n > 0) return `${kind} ${n}`;
 
   const driver = usable(input.driverName);
   if (driver && (input.driverCount ?? 1) <= 1) return driver;
 
-  /*
-   * Last resort, and it has to be honest rather than tidy. `eventDetectionSource` is only
-   * set on sessions that arrived through event detection, so a pasted URL reaches here with
-   * nothing — and calling a three-car A-main "Practice" is worse than saying little. More
-   * than one entrant with laps is a race everywhere except a shared practice sheet, which
-   * every provider we read hands over one driver at a time.
-   */
-  if (input.eventDetectionSource === "practice") return "Practice";
-  if (input.eventDetectionSource === "race") return "Race";
-  return (input.driverCount ?? 1) > 1 ? "Race" : "Practice";
+  return kind;
 }

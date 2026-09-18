@@ -8,6 +8,7 @@ import {
   buildSpeedhivePracticeActivityUrl,
 } from "@/lib/speedhive/speedhivePracticeUrl";
 import { isSpeedhiveOrApiUrl } from "@/lib/speedhive/speedhiveUrl";
+import { speedhivePracticeUtcOffsetMinutes } from "@/lib/speedhive/speedhiveSessionTime";
 
 const PARSER_ID = "speedhive_practice_v1";
 
@@ -135,6 +136,7 @@ export async function importSpeedhivePracticeActivity(
       sessionDrivers,
       sessionHint: { name: primary.driverName },
       sessionCompletedAtIso,
+      sessionUtcOffsetMinutes: speedhivePracticeUtcOffsetMinutes(blocks),
       message: null,
     };
   } catch (e) {

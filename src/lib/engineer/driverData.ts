@@ -198,7 +198,7 @@ function buildSessionFactsBlock(
     push("place in the session by best lap", `P${field.rank} of ${field.n} timed drivers`);
     push("best lap vs the fastest driver's best (s, positive = slower; 0.00 = you were fastest)", fmtDelta(field.gapBestToP1));
     if (field.gapTop5ToP1 != null) push("average of best 5 vs the best top-5 in the field (s)", fmtDelta(field.gapTop5ToP1));
-    if (field.gapBestToMean != null) push("best lap vs the field's median best (s, negative = faster than the middle of the field)", fmtDelta(field.gapBestToMean));
+    if (field.gapBestToMedian != null) push("best lap vs the field's median best (s, negative = faster than the middle of the field)", fmtDelta(field.gapBestToMedian));
   }
   push("driver's rating of the car (1-10)", run.carRating);
   push("session date", fmtLocalDate(run, zone));

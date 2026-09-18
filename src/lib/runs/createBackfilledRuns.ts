@@ -11,7 +11,11 @@ import { runLocalDayKey } from "@/lib/runs/buildRunHistoryGroups";
 import { planBackfilledRuns, type BackfillPlanRun } from "@/lib/runs/planBackfilledRuns";
 import { groupOutings, type Outing } from "@/lib/runs/groupOutings";
 import { spansOverlap, type Span } from "@/lib/runs/outingSpan";
-import { outingSessionFromImportedRow, spanForExistingRun } from "@/lib/runs/outingsFromImportedSessions";
+import {
+  trackClockOutingFromImportedRow,
+  trackClockSpanForExistingRun,
+} from "@/lib/runs/outingsFromImportedSessions";
+import { isValidIanaTimeZone, timeZoneForCoordinates } from "@/lib/tracks/trackTimeZone";
 import { buildRunLapMaterial } from "@/lib/runs/importedSessionLapMaterial";
 import { writeRunImportedLapSets } from "@/lib/runs/writeRunImportedLapSets";
 import { backfillRunConditionsFromTrack } from "@/lib/weather/backfillRunConditionsFromTrack";
@@ -78,7 +82,7 @@ type ContextRecord = {
   createdAt: Date | null;
   sortAt: Date | null;
   sessionCompletedAt: Date | null;
-  track: { latitude: number | null; longitude: number | null } | null;
+  track: { latitude: number | null; longitude: number | null; timeZone: string | null } | null;
 };
 
 async function resolveContext(userId: string, context: BackfillContext): Promise<ContextRecord | null> {
@@ -104,7 +108,7 @@ async function resolveContext(userId: string, context: BackfillContext): Promise
         createdAt: true,
         sortAt: true,
         sessionCompletedAt: true,
-        track: { select: { latitude: true, longitude: true } },
+        track: { select: { latitude: true, longitude: true, timeZone: true } },
       },
     });
     if (!parent || !parent.carId) return null;
@@ -114,7 +118,7 @@ async function resolveContext(userId: string, context: BackfillContext): Promise
   const [track, car] = await Promise.all([
     prisma.track.findUnique({
       where: { id: context.trackId },
-      select: { id: true, name: true, latitude: true, longitude: true },
+      select: { id: true, name: true, latitude: true, longitude: true, timeZone: true },
     }),
     prisma.car.findFirst({ where: { id: context.carId, userId }, select: { id: true, name: true } }),
   ]);
@@ -138,7 +142,7 @@ async function resolveContext(userId: string, context: BackfillContext): Promise
     createdAt: null,
     sortAt: null,
     sessionCompletedAt: null,
-    track: { latitude: track.latitude, longitude: track.longitude },
+    track: { latitude: track.latitude, longitude: track.longitude, timeZone: track.timeZone },
   };
 }
 
@@ -148,12 +152,12 @@ const SYNTHETIC_SOURCE_ID = "__no_logged_run__";
 /**
  * Turn timing sessions into runs the driver did not log.
  *
- * The lap step's "Add N other runs from today" (founder ruling 2026-09-14) and the timing sweep's
- * placeholders (2026-09-14 pm) share this. Each session becomes a real run with its laps, filed at
+ * The lap step's "Add N other runs from today" (founder ruling 2026-09-14) and the runs the driver
+ * ticks in the "runs you didn't log" sheet (2026-09-18; the sweep filed them unasked before) share this. Each session becomes a real run with its laps, filed at
  * its own on-track instant so the day reads in order, and stamped `unconfirmedAt` so every list,
  * the Engineer and the setup stats know the driver did not log it. Setup and tyres come from the
  * nearest earlier logged run that day (see `planBackfilledRuns`), else from the parent, else — a
- * sweep placeholder on a day with nothing logged — from nothing at all. Idempotent: a session
+ * ticked run on a day with nothing logged — from nothing at all. Idempotent: a session
  * already on a run is skipped, and the claim on the session row is made inside the same
  * transaction as the run, so two callers racing for one session produce one run.
  */
@@ -283,11 +287,21 @@ export async function createBackfilledRuns(params: {
   // One run per time on track (founder ruling 2026-09-15). The same heat from two timing sites,
   // or a practice run the feed split at a pit stop, is ONE outing: windows that overlap group,
   // the official record leads, the rest ride along as linked sources (`groupOutings`).
+  //
+  // Judged on the track's own clock, which every timing site posts (`lapImport/trackClock.ts`):
+  // the driver saving this may be home from the meeting, and their phone's zone is not the track's.
+  // Only a practice import saved without the track's offset needs a zone, and the track's beats
+  // the one the day was logged in.
+  const trackZone = ctx.track?.timeZone;
+  const fallbackZone =
+    (isValidIanaTimeZone(trackZone) ? trackZone.trim() : null) ??
+    timeZoneForCoordinates(ctx.track?.latitude, ctx.track?.longitude) ??
+    zone;
   const plannableById = new Map(plannable.map((p) => [p.id, p]));
   const outings = groupOutings(
     plannable.map(
       (p) =>
-        outingSessionFromImportedRow(p.session, zone) ?? {
+        trackClockOutingFromImportedRow(p.session, fallbackZone) ?? {
           id: p.id,
           kind: "practice" as const,
           start: p.instant,
@@ -306,10 +320,22 @@ export async function createBackfilledRuns(params: {
       where: {
         userId: params.userId,
         trackId: ctx.trackId,
-        sortAt: {
-          gte: new Date(centreInstant.getTime() - windowMs),
-          lte: new Date(centreInstant.getTime() + windowMs),
-        },
+        // By when it was on track as well as where it sorts: a race logged days later from a
+        // results file sorts on the day it was logged, and must still host its own copies.
+        OR: [
+          {
+            sortAt: {
+              gte: new Date(centreInstant.getTime() - windowMs),
+              lte: new Date(centreInstant.getTime() + windowMs),
+            },
+          },
+          {
+            sessionCompletedAt: {
+              gte: new Date(centreInstant.getTime() - windowMs),
+              lte: new Date(centreInstant.getTime() + windowMs),
+            },
+          },
+        ],
       },
       select: {
         id: true,
@@ -323,7 +349,7 @@ export async function createBackfilledRuns(params: {
       },
     });
     for (const r of existing) {
-      const span = spanForExistingRun(r, zone);
+      const span = trackClockSpanForExistingRun(r, fallbackZone);
       if (span) existingSpans.push({ id: r.id, span });
     }
   }
@@ -391,7 +417,7 @@ export async function createBackfilledRuns(params: {
     const entry = plan[i]!;
     const planned = plannable.find((p) => p.id === entry.sessionId)!;
     const session = planned.session;
-    // Null only for a sweep placeholder on a day with nothing logged: no setup, no rubber.
+    // Null only for a ticked run on a day with nothing logged: no setup, no rubber.
     const source = sourceById.get(entry.setupSourceRunId) ?? parentSource ?? null;
 
     const material = buildRunLapMaterial(session, {

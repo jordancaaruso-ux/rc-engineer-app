@@ -189,42 +189,111 @@ export function parseDefaultAppearance(da: string | undefined | null): {
  * red, `0 g` fills black, `k` is CMYK, and the capitals (`RG`, `G`, `K`) set the STROKE colour for
  * outlined marks. Fill wins when both are present — a ZapfDingbats glyph is filled text.
  *
- * Returns undefined when the stream states no colour at all, which is a real answer: the mark then
- * inherits, and the field's own appearance is the right thing to fall back to.
+ * WHY THE LAST COLOUR THE PICTURE NAMES IS ALSO THE WRONG ANSWER. A picture paints the box before
+ * it paints the mark — background, then border, then the tick on top — and any of those steps may
+ * set a colour of its own inside a `q`/`Q` pair, which throws that colour away again on the way
+ * out. Keeping the last colour named anywhere in the stream therefore answers a different question.
+ * Measured on Schumacher's CAT PB blank (2026-09-18), whose 140 square boxes paint themselves white
+ * and then stamp a black ZapfDingbats square on top:
+ *
+ *     q 1 g 0 0 7.317 6.88 re f  0.5 0.5 6.317 5.88 re s  Q     ← white box, black border
+ *     q 1 1 5.317 4.88 re W n  BT /ZaDb 4 Tf … (n) Tj ET  Q     ← the mark
+ *
+ * The only colour it names is that `1 g`, and the `Q` pops it before the glyph is drawn. All 140
+ * read as white and were drawn in white ink on white paper — imported, stored, invisible, and the
+ * reason a driver reported "the square boxes aren't ticking". So the colour state is carried
+ * through `q`/`Q` and read at the moment the LAST thing in the picture is painted, which is the
+ * mark: nothing can be painted after it without covering it up.
+ *
+ * A mark painted with the state restored to its initial one is BLACK — that is the initial graphics
+ * state, not an absence of information. Absence is kept for a picture that names no colour at all,
+ * where the field's own appearance really is the honest fallback.
+ *
+ * Checked against every blank in the repo and every driver upload on disk — 14,790 tick boxes in 99
+ * files. 280 change, all of them CAT PB squares, every one white → black.
  */
 export function markColorFromAppearanceStream(stream: string | undefined | null): string | undefined {
   if (!stream) return undefined;
   const tokens = stream.split(/[\s\n\r]+/);
+
+  // The colour state as the picture builds it up. `undefined` is the initial state — black.
   let fill: string | undefined;
   let stroke: string | undefined;
+  const saved: { fill?: string; stroke?: string }[] = [];
+  // Whether the picture names a colour at all: the difference between "black" and "cannot say".
+  let named = false;
+  // The state in force at the last painting operation, and whether that operation only strokes.
+  let atMark: { fill?: string; stroke?: string; strokeOnly: boolean } | undefined;
 
   for (let i = 0; i < tokens.length; i++) {
     const op = tokens[i];
     const num = (offset: number) => Number(tokens[i - offset]);
+
+    if (op === "q") {
+      saved.push({ fill, stroke });
+      continue;
+    }
+    if (op === "Q") {
+      const restored = saved.pop();
+      fill = restored?.fill;
+      stroke = restored?.stroke;
+      continue;
+    }
+
     const isFill = op === "g" || op === "rg" || op === "k";
     const isStroke = op === "G" || op === "RG" || op === "K";
-    if (!isFill && !isStroke) continue;
-
-    let color: string | undefined;
-    const lower = op!.toLowerCase();
-    if (lower === "g" && i >= 1) {
-      const v = num(1);
-      if (Number.isFinite(v)) color = toHex(v, v, v);
-    } else if (lower === "rg" && i >= 3) {
-      const [r, g, b] = [num(3), num(2), num(1)];
-      if ([r, g, b].every(Number.isFinite)) color = toHex(r, g, b);
-    } else if (lower === "k" && i >= 4) {
-      const [c, m, y, kk] = [num(4), num(3), num(2), num(1)];
-      if ([c, m, y, kk].every(Number.isFinite)) {
-        color = toHex((1 - c) * (1 - kk), (1 - m) * (1 - kk), (1 - y) * (1 - kk));
+    if (isFill || isStroke) {
+      let color: string | undefined;
+      const lower = op!.toLowerCase();
+      if (lower === "g" && i >= 1) {
+        const v = num(1);
+        if (Number.isFinite(v)) color = toHex(v, v, v);
+      } else if (lower === "rg" && i >= 3) {
+        const [r, g, b] = [num(3), num(2), num(1)];
+        if ([r, g, b].every(Number.isFinite)) color = toHex(r, g, b);
+      } else if (lower === "k" && i >= 4) {
+        const [c, m, y, kk] = [num(4), num(3), num(2), num(1)];
+        if ([c, m, y, kk].every(Number.isFinite)) {
+          color = toHex((1 - c) * (1 - kk), (1 - m) * (1 - kk), (1 - y) * (1 - kk));
+        }
       }
+      if (!color) continue;
+      named = true;
+      if (isFill) fill = color;
+      else stroke = color;
+      continue;
     }
-    if (!color) continue;
-    if (isFill) fill = color;
-    else stroke = color;
+
+    /*
+     * What actually puts ink on the box.
+     *
+     * `n` is deliberately not here: `re W n` is the clip idiom every one of these pictures opens
+     * the mark with, and it paints nothing. Counting it would read the colour one step too early —
+     * which on the CAT PB is the difference between black and white.
+     */
+    const strokeOnly = op === "S" || op === "s";
+    const paints =
+      strokeOnly
+      || op === "f"
+      || op === "F"
+      || op === "f*"
+      || op === "B"
+      || op === "B*"
+      || op === "b"
+      || op === "b*"
+      || op === "Tj"
+      || op === "TJ"
+      || op === "'"
+      || op === '"';
+    if (paints) atMark = { fill, stroke, strokeOnly };
   }
 
-  return fill ?? stroke;
+  if (!named) return undefined;
+  // A picture that names a colour and then paints nothing is a shape this has never met; the old
+  // reading — whatever it named last — is as good an answer as there is.
+  if (!atMark) return fill ?? stroke;
+  const marked = atMark.strokeOnly ? atMark.stroke ?? atMark.fill : atMark.fill ?? atMark.stroke;
+  return marked ?? "#000000";
 }
 
 export function describePdfFieldAppearance(input: {

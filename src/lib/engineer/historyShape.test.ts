@@ -53,7 +53,7 @@ function run(over: Partial<HistoryRun>): HistoryRun {
 
 /** A field where you are `gap` behind P1 out of `n`, and `gap - 0.3` off the average. */
 function field(gap: number, n = 12, rank = 3) {
-  return { n, rank, gapBestToP1: gap, gapTop5ToP1: gap + 0.05, gapBestToMean: gap - 0.3, gapTop5ToMean: gap - 0.25, entrants: [] };
+  return { n, rank, gapBestToP1: gap, gapTop5ToP1: gap + 0.05, gapBestToMedian: gap - 0.3, gapTop5ToMedian: gap - 0.25, entrants: [] };
 }
 
 test("the field rides on the run line, the changed line, a tyre table and a ranking of its own", () => {

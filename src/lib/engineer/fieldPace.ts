@@ -7,8 +7,10 @@
  * The figures come from the timing sheet the run was imported from (`fieldStatsJson` on the
  * ImportedLapTimeSession — every entrant's best, top 5, top 10, written on import and by the
  * backfill script). Nothing is re-derived from the model's side: rank, gap to the fastest
- * driver, gap to the field average, all arithmetic done here. Sign convention is the app's:
- * positive = slower than the reference (you minus them).
+ * driver, gap to the field's MEDIAN, all arithmetic done here. Sign convention is the app's:
+ * positive = slower than the reference (you minus them). The middle of the field is a median,
+ * never a mean — one broken transponder would drag a mean across the whole session — and the
+ * fields have said so since 2026-09-18; they were named `…ToMean` while holding a median.
  *
  * The pure part (`fieldPaceFromStats`) has no server imports so the block builders' tests
  * can feed it hand-made sheets; the loader below is server-only.
@@ -25,9 +27,10 @@ export type FieldPace = {
   gapBestToP1: number | null;
   /** Your top-5 average minus the best top-5 average in the field. */
   gapTop5ToP1: number | null;
-  /** Your best lap minus the field's MEDIAN best lap; negative = faster than the middle of the field. */
-  gapBestToMean: number | null;
-  gapTop5ToMean: number | null;
+  /** Your best lap minus the field's median best lap; negative = faster than the middle of the field. */
+  gapBestToMedian: number | null;
+  /** Your top-5 average minus the field's median top-5 average; the debrief's "vs field median". */
+  gapTop5ToMedian: number | null;
   /**
    * Every entrant on the sheet, you included, so a named rival can be compared run by run
    * (rivals.ts). `cut` = a best lap implausibly under that driver's own top-5 (a cut or a
@@ -122,8 +125,8 @@ export function fieldPaceFromStats(
     rank: bests.filter((b) => b < myBest - 1e-9).length + 1,
     gapBestToP1: myBest - minBest,
     gapTop5ToP1: myTop5 != null && minTop5 != null ? myTop5 - minTop5 : null,
-    gapBestToMean: myBest - medBest,
-    gapTop5ToMean: myTop5 != null && medTop5 != null ? myTop5 - medTop5 : null,
+    gapBestToMedian: myBest - medBest,
+    gapTop5ToMedian: myTop5 != null && medTop5 != null ? myTop5 - medTop5 : null,
     entrants: stats.drivers
       .filter((d) => finite(d.bestLapSeconds) || finite(d.avgTop5Seconds))
       .map((d) => ({

@@ -93,11 +93,23 @@ function toOuting(cluster: OutingSession[]): Outing {
   };
 }
 
-/** Official before practice; then the fuller sheet; then the earlier one; then a stable id. */
-function comparePrimary(a: OutingSession, b: OutingSession): number {
+type OutingSheet = Pick<OutingSession, "kind" | "driverCount" | "lapCount">;
+
+/**
+ * Which of two records of one outing leads: official before practice, then the fuller sheet (more
+ * drivers, then more laps). 0 when neither does. The lap step's same-race rule
+ * (`lapImport/sameOutingBlocks.ts`) ranks by this too, so both doors pick the same record.
+ */
+export function compareOutingSheets(a: OutingSheet, b: OutingSheet): number {
   if (a.kind !== b.kind) return a.kind === "official" ? -1 : 1;
   if (a.driverCount !== b.driverCount) return b.driverCount - a.driverCount;
-  if (a.lapCount !== b.lapCount) return b.lapCount - a.lapCount;
+  return b.lapCount - a.lapCount;
+}
+
+/** Official before practice; then the fuller sheet; then the earlier one; then a stable id. */
+function comparePrimary(a: OutingSession, b: OutingSession): number {
+  const sheet = compareOutingSheets(a, b);
+  if (sheet !== 0) return sheet;
   const t = a.start.getTime() - b.start.getTime();
   if (t !== 0) return t;
   return a.id.localeCompare(b.id);

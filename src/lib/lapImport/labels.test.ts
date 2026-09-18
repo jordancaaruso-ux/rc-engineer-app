@@ -68,16 +68,38 @@ test("weather instant: LiveRC wall clock converts in the device zone", () => {
   assert.equal(iso, "2026-08-30T05:59:06.000Z");
 });
 
-test("weather instant: Speedhive instants pass through untouched", () => {
+test("weather instant: Speedhive practice instants pass through untouched", () => {
   const iso = importedSessionWeatherInstantIso(
     {
       sessionCompletedAt: "2026-08-30T05:59:06.000Z",
+      sessionCompletedAtIsWallClock: true,
+      sourceUrl: "https://speedhive.mylaps.com/practice/4591/activities/12",
+    },
+    "Australia/Melbourne"
+  );
+  assert.equal(iso, "2026-08-30T05:59:06.000Z");
+});
+
+test("weather instant: a Speedhive race result is the track's clock, converted like LiveRC", () => {
+  const iso = importedSessionWeatherInstantIso(
+    {
+      sessionCompletedAt: "2026-08-30T15:59:06.000Z",
       sessionCompletedAtIsWallClock: true,
       sourceUrl: "https://speedhive.mylaps.com/Sessions/123",
     },
     "Australia/Melbourne"
   );
   assert.equal(iso, "2026-08-30T05:59:06.000Z");
+});
+
+test("a Speedhive race result freezes on the timing screen's clock once its address is given", () => {
+  const label = formatImportedSessionTime(WALL_CLOCK_AS_UTC_ISO, {
+    timingSource: "speedhive",
+    sourceUrl: "https://speedhive.mylaps.com/events/3706689/sessions/5",
+    displayTimeZone: "Australia/Sydney",
+  });
+  assert.match(label, /04:36 PM/i);
+  assert.match(label, /19\/07\/2026/);
 });
 
 test("weather instant: import-createdAt fallback is already real, passes through", () => {

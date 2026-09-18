@@ -15,12 +15,16 @@ export type TireTypeOption = {
 
 /**
  * The whole catalog comes down in one request so filtering is local and lands on
- * the keystroke — no debounce, no spinner, no round trip per character. The
- * catalog is ~30 rows and every row is a real product, so the ceiling is
- * headroom rather than a page size; if it is ever genuinely approached the
- * picker needs server-backed search instead of raising this again.
+ * the keystroke — no debounce, no spinner, no round trip per character. Anything
+ * past this limit is not just missing from the list, it is unsearchable, because
+ * the search never leaves the browser. It must stay above the catalog size: the
+ * 1/10 off-road import (2026-09-18) took the catalog from 155 rows to 739.
+ *
+ * Raising it is the stopgap. The fix is to stop sending every tire to every
+ * driver and filter by what the car races — deferred, founder call 2026-09-18
+ * ("1/10 offroad is fine for now, they can search for stuff").
  */
-const CATALOG_LIMIT = 500;
+const CATALOG_LIMIT = 2000;
 
 /**
  * Tire type picker — a `PickerSheet`, because the compound list is long enough
@@ -340,6 +344,7 @@ export function TireTypeCombobox({
         onSelect={pick}
         sections={sections}
         searchPlaceholder="Search tire types…"
+        initialVisible={20}
         panel={showCreate && allowInlineCreate ? createPanel : null}
         panelTitle="New tire type"
         emptyAction={

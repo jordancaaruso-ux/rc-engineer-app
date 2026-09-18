@@ -25,6 +25,27 @@ export function parseTransponderCarsSetting(raw: string | null | undefined): Tra
   }
 }
 
+/**
+ * The chip to pair with the car the driver just named on "which car?", or null. Their answer is
+ * the fact: the runs it filed were found by this chip, so the chip is in that car and they are
+ * not asked again (founder call 2026-09-17). Only when the answer covered exactly one chip — two
+ * chips under one answer could be two cars — and never over a pairing to a car they still own.
+ */
+export function chipToPairWithNamedCar(input: {
+  chips: readonly (string | null | undefined)[];
+  map: TransponderCarMap;
+  userCarIds: readonly string[];
+}): string | null {
+  const distinct = new Set(
+    input.chips.map((c) => (c ? normalizeSpeedhiveTransponderNumber(c) : null)).filter((c): c is string => !!c),
+  );
+  if (distinct.size !== 1) return null;
+  const chip = [...distinct][0]!;
+  const paired = input.map[chip];
+  if (paired && input.userCarIds.includes(paired)) return null;
+  return chip;
+}
+
 export function formatTransponderCarsSetting(map: TransponderCarMap): string | null {
   const entries = Object.entries(map)
     .map(([k, v]) => [normalizeSpeedhiveTransponderNumber(k), v.trim()] as const)

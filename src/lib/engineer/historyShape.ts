@@ -354,7 +354,7 @@ export function renderBestFieldSection(runs: HistoryRun[]): string | null {
     "",
     ...ranked.map(
       (r, i) =>
-        `${i + 1}. ${fmtDelta(r.field!.gapBestToP1!)} to P1  P${r.field!.rank}/${r.field!.n}  ${fmtDay(r.dateYmd)}${r.clock ? ` ${r.clock}` : ""}${multiTrack ? `  ${r.trackName ?? "no track"}` : ""}  (best ${fmtSecs(r.best)} on tyre run ${r.tyreRun ?? "?"}${r.field!.gapBestToMean != null ? `, ${fmtDelta(r.field!.gapBestToMean)} vs field median` : ""})`
+        `${i + 1}. ${fmtDelta(r.field!.gapBestToP1!)} to P1  P${r.field!.rank}/${r.field!.n}  ${fmtDay(r.dateYmd)}${r.clock ? ` ${r.clock}` : ""}${multiTrack ? `  ${r.trackName ?? "no track"}` : ""}  (best ${fmtSecs(r.best)} on tyre run ${r.tyreRun ?? "?"}${r.field!.gapBestToMedian != null ? `, ${fmtDelta(r.field!.gapBestToMedian)} vs field median` : ""})`
     ),
   ].join("\n");
 }
@@ -444,7 +444,7 @@ export function renderRunLines(runs: HistoryRun[], adj: TyreAdjustments = new Ma
     const f = run.field;
     const field =
       f && f.gapBestToP1 != null
-        ? `vs field P${f.rank}/${f.n}, ${fmtDelta(f.gapBestToP1)} to P1${f.gapTop5ToP1 != null ? ` (top5 ${fmtDelta(f.gapTop5ToP1)})` : ""}${f.gapBestToMean != null ? `, ${fmtDelta(f.gapBestToMean)} vs median` : ""}`
+        ? `vs field P${f.rank}/${f.n}, ${fmtDelta(f.gapBestToP1)} to P1${f.gapTop5ToP1 != null ? ` (top5 ${fmtDelta(f.gapTop5ToP1)})` : ""}${f.gapBestToMedian != null ? `, ${fmtDelta(f.gapBestToMedian)} vs median` : ""}`
         : null;
     const bits = [
       fmtDay(run.dateYmd),

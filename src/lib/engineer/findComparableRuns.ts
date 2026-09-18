@@ -41,10 +41,15 @@ export type { ComparableRun };
 
 const MAX_CANDIDATES_SCANNED = 300;
 
-function sortMs(run: { createdAt: Date; sessionCompletedAt: Date | null }): number {
+function sortMs(run: {
+  createdAt: Date;
+  sessionCompletedAt: Date | null;
+  importedLapTimeSessionId: string | null;
+}): number {
   return resolveRunDisplayInstant({
     createdAt: run.createdAt,
     sessionCompletedAt: run.sessionCompletedAt,
+    importedLapTimeSessionId: run.importedLapTimeSessionId,
   }).getTime();
 }
 
@@ -78,6 +83,7 @@ export async function findComparableRunsForEngineer(
       carId: true,
       createdAt: true,
       sessionCompletedAt: true,
+      importedLapTimeSessionId: true,
       tireTypeId: true,
       gripLevel: true,
       track: { select: { gripTags: true, layoutTags: true } },
@@ -101,6 +107,7 @@ export async function findComparableRunsForEngineer(
       // Without this the display instant fell through to sessionCompletedAt, which on rows
       // stamped by the old wall-clock-as-UTC bug printed the run ten hours out (2026-09-02).
       loggingCompletedAt: true,
+      importedLapTimeSessionId: true,
       carRating: true,
       tireTypeId: true,
       gripLevel: true,
@@ -140,6 +147,7 @@ export async function findComparableRunsForEngineer(
         createdAt: peer.createdAt,
         sessionCompletedAt: peer.sessionCompletedAt,
         loggingCompletedAt: peer.loggingCompletedAt,
+        importedLapTimeSessionId: peer.importedLapTimeSessionId,
       }).toISOString(),
       trackName: peer.track?.name ?? null,
       carRating: peer.carRating,

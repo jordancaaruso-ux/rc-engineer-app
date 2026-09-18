@@ -4,6 +4,7 @@ import {
   durationFromDrivers,
   estimateDurationSeconds,
   outingKindFor,
+  sameTimeOnTrack,
   spanFrom,
   spansOverlap,
   timeAnchorFor,
@@ -58,4 +59,30 @@ test("overlap includes touching ends", () => {
   assert.equal(spansOverlap(a, { start: new Date(1000), end: new Date(2000) }), true);
   assert.equal(spansOverlap(a, { start: new Date(1001), end: new Date(2000) }), false);
   assert.equal(spansOverlap(a, { start: new Date(-500), end: new Date(-1) }), false);
+});
+
+test("the same time on track shares at least half of the shorter window", () => {
+  const s = (sec: number) => new Date(sec * 1000);
+  const heat = { start: s(0), end: s(631) };
+  // The practice loop's copy of the heat, three seconds off at each end.
+  assert.equal(sameTimeOnTrack(heat, { start: s(3), end: s(634) }), true);
+  // A loop block that caught only part of the heat still sat inside it.
+  assert.equal(sameTimeOnTrack(heat, { start: s(200), end: s(420) }), true);
+  // The next heat, touching at the changeover, is not the same race.
+  assert.equal(sameTimeOnTrack(heat, { start: s(600), end: s(1230) }), false);
+  assert.equal(sameTimeOnTrack(heat, { start: s(631), end: s(1260) }), false);
+});
+
+test("a split run's halves on a minutes-only site touch, but are not the same time on track", () => {
+  // LiveRC prints 10:00 and 10:04; the laps say each half ran about five minutes.
+  const first = { start: new Date("2026-09-12T00:00:00Z"), end: new Date("2026-09-12T00:05:00Z") };
+  const second = { start: new Date("2026-09-12T00:04:00Z"), end: new Date("2026-09-12T00:09:30Z") };
+  assert.equal(spansOverlap(first, second), true, "the evening pass's looser rule would group them");
+  assert.equal(sameTimeOnTrack(first, second), false);
+});
+
+test("a window with no length is never the same time on track", () => {
+  const point = { start: new Date(1000), end: new Date(1000) };
+  assert.equal(sameTimeOnTrack({ start: new Date(0), end: new Date(5000) }, point), false);
+  assert.equal(sameTimeOnTrack(point, point), false);
 });

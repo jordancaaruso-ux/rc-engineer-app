@@ -130,7 +130,6 @@ import { EventDateRangeField } from "@/components/events/EventDateRangeField";
 import { ImportedFieldSessionCard } from "@/components/runs/ImportedFieldSessionCard";
 import { HandlingAssessmentFields } from "@/components/runs/HandlingAssessmentFields";
 import { CarHandlingRatingQuickPick } from "@/components/runs/CarHandlingRatingQuickPick";
-import { TrackLocationMarkDialog } from "@/components/tracks/TrackLocationMarkDialog";
 import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 import { TrackNearbySuggestions } from "@/components/runs/TrackNearbySuggestions";
 import {
@@ -144,10 +143,8 @@ import { getCurrentPosition, GeolocationRequestError } from "@/lib/location/getC
 import { RunConditionsSection } from "@/components/runs/RunConditionsSection";
 import { WizardConditionsBand } from "@/components/runs/WizardConditionsBand";
 import { EMPTY_RUN_CONDITIONS, isConditionsEmpty, type RunConditions } from "@/lib/weather/conditions";
-import {
-  DEFAULT_TRACK_PROXIMITY_RADIUS_M,
-  pickTrackFromPosition,
-} from "@/lib/location/trackProximity";
+import { findTracksNearPosition } from "@/lib/location/trackProximity";
+import { sendTrackSighting } from "@/lib/location/sendTrackSighting";
 import {
   emptyHandlingAssessmentUiState,
   isHandlingAssessmentMeaningful,
@@ -1065,11 +1062,6 @@ export function NewRunForm(props: {
   /** After a successful "Run complete", block duplicate POST/PUT until navigation away. */
   const pendingCompleteNavigationRef = useRef(false);
   const pendingDraftNavigationRef = useRef(false);
-  const [trackLocationPrompt, setTrackLocationPrompt] = useState<{
-    trackId: string;
-    trackName: string;
-    runId: string;
-  } | null>(null);
   /**
    * Correcting how many runs are on a set moves every later run on that same
    * rubber (server side — see `lib/tires/cascadeTireRunNumber`). That is the
@@ -1082,18 +1074,16 @@ export function NewRunForm(props: {
     message: string;
     navigateToRunId: string | null;
   } | null>(null);
+  /**
+   * Tracks near the phone, nearest first. Orders the picker and offers the closest as chips —
+   * never selects one (founder 2026-09-17: a pin can be a few km out, and a wrong venue is
+   * silent). Kept after a pick so the picker still opens on them.
+   */
   const [nearbyTrackSuggestions, setNearbyTrackSuggestions] = useState<
-    { trackId: string; trackName: string; distanceM: number; isFavourite?: boolean }[]
+    { trackId: string; trackName: string; distanceM: number }[]
   >([]);
   const [trackAutoDetectMessage, setTrackAutoDetectMessage] = useState<string | null>(null);
   const [trackAutoDetectLoading, setTrackAutoDetectLoading] = useState(false);
-  /**
-   * Track the *auto* path filled in on mount, or null. Stored as an id (not a
-   * boolean) so the "Detected from location" caption and the Detect chip key on
-   * `trackId === autoDetectedTrackId` — any later change of selection restores the
-   * chip and drops the caption without extra bookkeeping.
-   */
-  const [autoDetectedTrackId, setAutoDetectedTrackId] = useState<string | null>(null);
   /** Once-per-mount latch for the permission-gated auto-detect effect. */
   const trackAutoDetectRanRef = useRef(false);
   const trackPickedManuallyRef = useRef(false);
@@ -1334,6 +1324,7 @@ export function NewRunForm(props: {
         lapSession: r.lapSession,
         importedLapSets: r.importedLapSets,
         linkedImportedSessions: r.linkedImportedSessions,
+        fallbackTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
       })
     );
 
@@ -2029,118 +2020,46 @@ export function NewRunForm(props: {
    * is never a blocker. Session + Event carry no gate, so they always read
    * complete — they stay in the rail as scroll anchors / a full map of the form.
    */
-  const tracksGpsFingerprint = useMemo(
-    () =>
-      tracksList
-        .filter((t) => trackHasMarkedLocation(t))
-        .map((t) => `${t.id}:${t.latitude!.toFixed(5)},${t.longitude!.toFixed(5)}`)
-        .sort()
-        .join("|"),
-    [tracksList]
-  );
 
   /**
    * `mode: "auto"` is the silent mount path (permission already granted) — it
-   * prefills the picker and says nothing on failure, so a bad GPS fix never
-   * shouts at a driver who didn't ask. `"manual"` is the Detect chip and keeps
-   * the full messaging, including the Track library hints.
+   * orders the picker and says nothing on failure, so a bad GPS fix never
+   * shouts at a driver who didn't ask. `"manual"` is the Near me chip.
    */
   const runTrackAutoDetect = useCallback(
     async (mode: "auto" | "manual" = "manual") => {
       const silent = mode === "auto";
-      if (isEditing || trackLockedToEvent || trackPickedManuallyRef.current) return;
-      if (tracksList.filter((t) => trackHasMarkedLocation(t)).length === 0) {
-        if (!silent) {
-          setTrackAutoDetectMessage(
-            "No tracks have GPS saved yet. Open Track library to paste coordinates from Google Maps, then try again."
-          );
-        }
-        return;
-      }
+      if (isEditing || trackLockedToEvent) return;
       setTrackAutoDetectLoading(true);
       setTrackAutoDetectMessage(null);
-      setNearbyTrackSuggestions([]);
       try {
         const position = await getCurrentPosition();
-        const pick = pickTrackFromPosition(tracksList, position, {
-          radiusMeters: DEFAULT_TRACK_PROXIMITY_RADIUS_M,
-          favouriteTrackIds,
-        });
-        if (pick.kind === "no_marked_tracks") {
-          if (!silent) {
-            setTrackAutoDetectMessage(
-              "No tracks have GPS saved yet. Open Track library to paste coordinates from Google Maps, then try again."
-            );
-          }
-          return;
-        }
-        if (pick.kind === "single") {
-          if (silent) {
-            // Re-check: a manual pick or event apply can land during the await.
-            if (trackPickedManuallyRef.current) return;
-            let applied = false;
-            setTrackId((prev) => {
-              if (prev.trim()) return prev;
-              applied = true;
-              return pick.track.id;
-            });
-            if (applied) {
-              setCopyTrackWarning(null);
-              setAutoDetectedTrackId(pick.track.id);
-            }
-            return;
-          }
-          setTrackId(pick.track.id);
-          setCopyTrackWarning(null);
-          setTrackAutoDetectMessage(`Detected ${pick.track.name} (${Math.round(pick.distanceM)} m away).`);
-          return;
-        }
-        if (pick.kind === "multiple") {
-          const favSet = new Set(favouriteTrackIds);
-          setNearbyTrackSuggestions(
-            pick.nearby.map((n) => ({
-              trackId: n.track.id,
-              trackName: n.track.name,
-              distanceM: n.distanceM,
-              isFavourite: favSet.has(n.track.id),
-            }))
-          );
-          // Auto path stays quiet — TrackNearbySuggestions labels itself.
-          if (!silent) {
-            setTrackAutoDetectMessage("Multiple tracks nearby — pick one below (favourites listed first).");
-          }
-          return;
-        }
-        if (!silent) {
-          setTrackAutoDetectMessage(
-            "No saved track is within 800 m. Select manually or set GPS on a track in Track library."
-          );
-        }
+        const near = findTracksNearPosition(tracksList, position);
+        setNearbyTrackSuggestions(
+          near.map((n) => ({ trackId: n.track.id, trackName: n.track.name, distanceM: n.distanceM }))
+        );
+        if (near.length === 0 && !silent) setTrackAutoDetectMessage("No tracks within 25 km.");
       } catch (e) {
         if (silent) return;
         if (e instanceof GeolocationRequestError) {
-          const hint =
-            e.code === "denied"
-              ? " Enable location in browser settings, then tap Detect from location."
-              : "";
-          setTrackAutoDetectMessage(e.message + hint);
+          setTrackAutoDetectMessage(e.message);
         } else {
           setTrackAutoDetectMessage(
-            e instanceof Error ? e.message : "Could not detect track from location."
+            e instanceof Error ? e.message : "Could not get your location."
           );
         }
       } finally {
         setTrackAutoDetectLoading(false);
       }
     },
-    [isEditing, trackLockedToEvent, tracksList, favouriteTrackIds]
+    [isEditing, trackLockedToEvent, tracksList]
   );
 
   /**
-   * Quiet prefill on mount (founder decision 2026-07-27): if location permission
-   * is *already* granted, detect the track silently so the common case — standing
-   * at the track you always run at — needs zero taps. Never prompts: an ungranted
-   * or unknown permission state leaves this inert and the Detect chip owns asking.
+   * Quiet nearby order on mount (founder decisions 2026-07-27, 2026-09-17): if location
+   * permission is *already* granted, put the closest tracks first — never select one.
+   * Never prompts: an ungranted or unknown permission state leaves this inert and the
+   * Near me chip owns asking.
    * Replaces the two older ungated effects (classic mount + Track-tab open), which
    * could throw the browser location prompt at a driver who never asked for it.
    * Runs in both wizard and classic mode. The 800 ms delay plus the full dep list
@@ -2170,7 +2089,7 @@ export function NewRunForm(props: {
         });
     }, 800);
     return () => window.clearTimeout(t);
-  }, [isEditing, trackLockedToEvent, trackId, tracksGpsFingerprint, runTrackAutoDetect]);
+  }, [isEditing, trackLockedToEvent, trackId, runTrackAutoDetect]);
 
   // Effortless capture: silently pull conditions for a pinned track as soon as
   // one is selected — no permission prompt, no need to open the Conditions tab.
@@ -2539,12 +2458,6 @@ export function NewRunForm(props: {
 
   useEffect(() => {
     trackIdRef.current = trackId;
-  }, [trackId]);
-
-  useEffect(() => {
-    if (trackId.trim()) {
-      setNearbyTrackSuggestions([]);
-    }
   }, [trackId]);
 
   useEffect(() => {
@@ -3116,64 +3029,9 @@ export function NewRunForm(props: {
     setTrackDirection((selectedEventForRun?.trackDirection as "" | "CW" | "CCW") ?? "");
   }, [wizardActive, needsEvent, selectedEventForRun, trackId]);
 
-  // ---- Wizard GPS at landing (v6): location resolves once, right after
-  // mount, and auto-picks the track on the blank landing. Prefilling later at
-  // a different venue keeps the detected track (applyWizardPrefill's venue
-  // check — the setup still carries, that's the value). Never fires over a
-  // URL-deep-linked event, an edit, or anything the driver touched by hand. ----
-  const wizardGpsRanRef = useRef(false);
-  const wizardGpsAppliedRef = useRef(false);
   /** Set by manual session/event/track edits — GPS never overrides a human. */
   const wizardCtxTouchedRef = useRef(false);
-  const [wizardDetection, setWizardDetection] = useState<{
-    trackId: string;
-    trackName: string;
-    distanceM: number;
-  } | null>(null);
   const [wizardVenueSwapNote, setWizardVenueSwapNote] = useState<string | null>(null);
-  useEffect(() => {
-    if (!wizardActive || isEditing || wizardGpsRanRef.current) return;
-    wizardGpsRanRef.current = true;
-    const t = window.setTimeout(async () => {
-      try {
-        if (tracksList.filter((tk) => trackHasMarkedLocation(tk)).length === 0) return;
-        const position = await getCurrentPosition();
-        const pick = pickTrackFromPosition(tracksList, position, {
-          radiusMeters: DEFAULT_TRACK_PROXIMITY_RADIUS_M,
-          favouriteTrackIds,
-        });
-        if (pick.kind === "single") {
-          setWizardDetection({
-            trackId: pick.track.id,
-            trackName: pick.track.name,
-            distanceM: pick.distanceM,
-          });
-        }
-      } catch {
-        /* location denied/unavailable — silent, the driver picks manually */
-      }
-    }, 500);
-    return () => window.clearTimeout(t);
-  }, [wizardActive, isEditing, tracksList, favouriteTrackIds]);
-  useEffect(() => {
-    if (!wizardActive || !wizard || !wizardDetection || wizardGpsAppliedRef.current) return;
-    if (wizardCtxTouchedRef.current) {
-      wizardGpsAppliedRef.current = true;
-      return;
-    }
-    // v6: the wizard always lands blank (prefill is a tap) — GPS just fills
-    // the venue when none is set. The carried-venue mismatch check moved to
-    // tap time, inside applyWizardPrefill.
-    wizardGpsAppliedRef.current = true;
-    if (!trackId && !eventId) {
-      trackPickedManuallyRef.current = true;
-      setTrackId(wizardDetection.trackId);
-      setTrackAutoDetectMessage(
-        `Detected ${wizardDetection.trackName} (${Math.round(wizardDetection.distanceM)} m away).`
-      );
-    }
-  }, [wizardActive, wizard, wizardDetection, trackId, eventId]);
-
   useEffect(() => {
     if (!needsEvent) return;
     let alive = true;
@@ -3861,14 +3719,12 @@ export function NewRunForm(props: {
       const {
         run,
         tireStintId: savedStintId,
-        promptMarkTrackLocation,
         tireRunNumberCascade,
         backfilled,
       } = await jsonFetch<{
         run: { id: string; createdAt: string };
         /** The stint the run landed on — freshly minted when the client sent null. */
         tireStintId?: string | null;
-        promptMarkTrackLocation?: { trackId: string; trackName: string } | null;
         /** Present when correcting this run's tire count also moved later runs on the set. */
         tireRunNumberCascade?: { updatedRuns: number; delta: number } | null;
         /** Present when the save also filed the day's other sessions as runs. */
@@ -3977,6 +3833,13 @@ export function NewRunForm(props: {
                   .map((b) => b.importedSessionId.trim())
                   .filter(Boolean)
               : [],
+          // The same races from other timing sites: linked to the run, never its laps or primary.
+          sameOutingImportedLapTimeSessionIds:
+            lapIngest.sourceKind === "url"
+              ? (lapIngest.linkedSources ?? [])
+                  .map((s) => s.importedSessionId.trim())
+                  .filter(Boolean)
+              : [],
           backfillImportedLapTimeSessionIds,
         })
       });
@@ -4010,17 +3873,9 @@ export function NewRunForm(props: {
           .filter(Boolean)
           .join(" ") || null;
 
-      if (intent === "completed" && promptMarkTrackLocation) {
-        setTrackLocationPrompt({
-          trackId: promptMarkTrackLocation.trackId,
-          trackName: promptMarkTrackLocation.trackName,
-          runId: run.id,
-        });
-        setSaveSuccess(true);
-        setStatus("Run saved.");
-        setSaving(false);
-        return;
-      }
+      // Where the phone was, if location is already allowed — two drivers agreeing pins the
+      // track (`recordTrackSighting`). Never asks, never waits, never says anything.
+      if (!isEditing && resolvedTrackId) void sendTrackSighting(resolvedTrackId);
 
       // Sessions the driver never opened just changed. Hold the departure until the
       // toast has said so, then leave exactly as this save would have.
@@ -4182,27 +4037,6 @@ export function NewRunForm(props: {
     const primary = sets.find((s) => s.isPrimaryUser) ?? sets[0];
     return importedSessionWeatherInstantIso(primary, Intl.DateTimeFormat().resolvedOptions().timeZone);
   })();
-  async function handleSaveTrackPin(coords: { latitude: number; longitude: number }) {
-    if (!conditionsTrack) return;
-    const res = await fetch(`/api/tracks/${conditionsTrack.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        locationSource: "device",
-      }),
-    });
-    if (!res.ok) throw new Error("Failed to save track location");
-    setTracksList((prev) =>
-      prev.map((t) =>
-        t.id === conditionsTrack.id
-          ? { ...t, latitude: coords.latitude, longitude: coords.longitude }
-          : t
-      )
-    );
-  }
-
   // Tire-prep panel — additive picker + the applications list. Lifted out of
   // the faces array so the wiring is declared once; it renders beneath the
   // compound on the Tires face (founder 2026-09-16: Prep merged into Tires,
@@ -4715,8 +4549,6 @@ export function NewRunForm(props: {
       (!replicateLoaded && props.wizardCandidate != null && props.wizardCandidate.carId === carId));
 
   /** True while the picker still holds what the silent auto-detect chose. */
-  const trackAutoDetected = autoDetectedTrackId !== null && trackId === autoDetectedTrackId;
-
   /** Track picker section — the classic Run-details "Track" face; the wizard
    *  renders it inside the unified Session card instead (v6). Lifted like
    *  prepPanelJsx so both modes share one source. */
@@ -4751,13 +4583,12 @@ export function NewRunForm(props: {
                       setTrackDirection("");
                       layoutPickedManuallyRef.current = false;
                       setCopyTrackWarning(null);
-                      setNearbyTrackSuggestions([]);
                       setTrackAutoDetectMessage(null);
-                      setAutoDetectedTrackId(null);
                     }}
                     lastRunTrackId={lastRun?.trackId ?? null}
                     favouriteTrackIds={favouriteTrackIds}
                     favouriteTracks={favouriteTracks}
+                    nearby={nearbyTrackSuggestions}
                     placeholder="Select track…"
                     aria-label="Track"
                     onCreateRequest={
@@ -4772,30 +4603,15 @@ export function NewRunForm(props: {
                   />
                   {!isEditing ? (
                     <div className="flex flex-wrap items-center gap-2">
-                      {/* Detect earned its keep by disappearing: on a granted-permission
-                          mount the auto path has already filled the picker, so the chip
-                          gives way to the caption. It comes back the moment the
-                          selection changes to anything the auto path didn't choose. */}
-                      {trackAutoDetected ? (
-                        <span className="flex min-h-8 items-center gap-1 text-[11px] text-muted-foreground">
-                          <Check
-                            aria-hidden
-                            className="size-3.5 text-gain"
-                            strokeWidth={2.5}
-                          />
-                          Detected from location
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          className="flex min-h-8 items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
-                          disabled={trackAutoDetectLoading}
-                          onClick={() => void runTrackAutoDetect("manual")}
-                        >
-                          <LocateFixed aria-hidden className="size-3.5" />
-                          {trackAutoDetectLoading ? "Detecting…" : "Detect from location"}
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className="flex min-h-8 items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-60"
+                        disabled={trackAutoDetectLoading}
+                        onClick={() => void runTrackAutoDetect("manual")}
+                      >
+                        <LocateFixed aria-hidden className="size-3.5" />
+                        {trackAutoDetectLoading ? "Locating…" : "Near me"}
+                      </button>
                       <InlineNewTrackRow
                         ref={newTrackRowRef}
                         onCreated={(t) => {
@@ -4813,10 +4629,8 @@ export function NewRunForm(props: {
                           setTrackDirection("");
                           layoutPickedManuallyRef.current = false;
                           setCopyTrackWarning(null);
-                          setNearbyTrackSuggestions([]);
-                          setTrackAutoDetectMessage(null);
-                          setAutoDetectedTrackId(null);
-                        }}
+                              setTrackAutoDetectMessage(null);
+                            }}
                       />
                       {trackAutoDetectMessage ? (
                         <span className="text-[11px] text-muted-foreground leading-snug">
@@ -4834,7 +4648,7 @@ export function NewRunForm(props: {
                     </div>
                   ) : null}
                   <TrackNearbySuggestions
-                    suggestions={nearbyTrackSuggestions}
+                    suggestions={trackId.trim() ? [] : nearbyTrackSuggestions.slice(0, 3)}
                     onSelect={(id) => {
                       trackPickedManuallyRef.current = true;
                       setTrackId(id);
@@ -4842,9 +4656,7 @@ export function NewRunForm(props: {
                       setTrackDirection("");
                       layoutPickedManuallyRef.current = false;
                       setCopyTrackWarning(null);
-                      setNearbyTrackSuggestions([]);
                       setTrackAutoDetectMessage(null);
-                      setAutoDetectedTrackId(null);
                     }}
                   />
                 </div>
@@ -4877,21 +4689,6 @@ export function NewRunForm(props: {
 
   return (
     <>
-    <TrackLocationMarkDialog
-      open={trackLocationPrompt != null}
-      trackId={trackLocationPrompt?.trackId ?? ""}
-      trackName={trackLocationPrompt?.trackName ?? ""}
-      onMarked={() => {
-        const runId = trackLocationPrompt?.runId;
-        setTrackLocationPrompt(null);
-        if (runId) navigateAfterRunComplete(runId);
-      }}
-      onSkip={() => {
-        const runId = trackLocationPrompt?.runId;
-        setTrackLocationPrompt(null);
-        if (runId) navigateAfterRunComplete(runId);
-      }}
-    />
     <ActionToast
       raised={wizardActive}
       message={tireCascadeNotice?.message ?? null}
@@ -5498,7 +5295,6 @@ export function NewRunForm(props: {
               setConditions((prev) => ({ ...prev, trackTempC: next }))
             }
             storedConditions={conditions.source != null ? conditions : null}
-            onSaveTrackPin={handleSaveTrackPin}
           />
         </div>
       ) : null}
@@ -5663,7 +5459,6 @@ export function NewRunForm(props: {
             onChange={setConditions}
             track={conditionsTrack}
             sessionAtIso={conditionsSessionAtIso}
-            onSaveTrackPin={handleSaveTrackPin}
           />
               ),
             },

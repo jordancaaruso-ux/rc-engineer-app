@@ -113,6 +113,12 @@ export type Run = {
    * lets the component compute drop-target neighbours without a round-trip.
    */
   sortAt?: Date | string | null;
+  /**
+   * The imported timing session this run was created from or linked to. Read only as the
+   * "this stamp came off a timing sheet" signal in `resolveRunDisplayInstant` — without it a
+   * race more than a fortnight before the log shows the time it was IMPORTED.
+   */
+  importedLapTimeSessionId?: string | null;
   /** False until user marks "Run completed" when saving. */
   loggingComplete?: boolean;
   /** Filed by the app from the timing sheet; cleared only by a wizard save. */

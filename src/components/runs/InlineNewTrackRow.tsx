@@ -8,11 +8,6 @@ import {
   TrackTimingUrlsField,
   type TrackTimingUrlsFieldHandle,
 } from "@/components/tracks/TrackTimingUrlsField";
-import {
-  TrackCoordinatesField,
-  type TrackCoordinatesFieldHandle,
-  type TrackCoordinatesValue,
-} from "@/components/tracks/TrackCoordinatesField";
 
 const NO_TIMING_URLS: TrackTimingUrls = { liveRcUrl: null, speedhiveUrl: null };
 
@@ -41,10 +36,8 @@ export type InlineCreatedTrack = {
  * TrackTimingSourceNotice further down the same form remains the second chance, and
  * the only prompt for tracks somebody else added.
  *
- * Asks for the GPS pin too (2026-08-25). Coordinates were only ever collectable on an
- * already-saved track's own page, so every track born here started invisible to "tracks near
- * you" — and the person filling this in is usually standing at the venue, which is the one
- * moment the pin costs nothing to collect.
+ * No GPS box (2026-09-17, reversing 2026-08-25): the pin fills itself from the LiveRC address or
+ * the town typed here, and later from drivers' phones (`trackLocationFill.ts`).
  */
 export type InlineNewTrackRowHandle = {
   /**
@@ -69,11 +62,9 @@ export const InlineNewTrackRow = forwardRef<
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [timingUrls, setTimingUrls] = useState<TrackTimingUrls>(NO_TIMING_URLS);
-  const [coordinates, setCoordinates] = useState<TrackCoordinatesValue | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timingFieldRef = useRef<TrackTimingUrlsFieldHandle>(null);
-  const coordsFieldRef = useRef<TrackCoordinatesFieldHandle>(null);
 
   useImperativeHandle(ref, () => ({
     openWith: (seedName: string) => {
@@ -99,20 +90,6 @@ export const InlineNewTrackRow = forwardRef<
       speedhiveUrl: committed.value.speedhiveUrl ?? undefined,
     };
 
-    // Same rule for a coordinates paste nobody pressed Enter on.
-    const committedCoords = coordsFieldRef.current?.commit() ?? { ok: true as const, value: coordinates };
-    if (!committedCoords.ok) {
-      setError(committedCoords.error);
-      return;
-    }
-    const coords = committedCoords.value
-      ? {
-          latitude: committedCoords.value.latitude,
-          longitude: committedCoords.value.longitude,
-          locationSource: committedCoords.value.locationSource,
-        }
-      : {};
-
     setBusy(true);
     setError(null);
     try {
@@ -123,7 +100,6 @@ export const InlineNewTrackRow = forwardRef<
           name: trimmed,
           location: location.trim() || null,
           ...timing,
-          ...coords,
           // It's where they're racing — favouriting it makes it lead the picker next time.
           addToFavourites: true,
         }),
@@ -164,7 +140,6 @@ export const InlineNewTrackRow = forwardRef<
     setName("");
     setLocation("");
     setTimingUrls(NO_TIMING_URLS);
-    setCoordinates(null);
     setError(null);
   }
 
@@ -213,15 +188,6 @@ export const InlineNewTrackRow = forwardRef<
         placeholder="Town or suburb — optional"
         value={location}
         onChange={(e) => setLocation(e.currentTarget.value)}
-      />
-      <TrackCoordinatesField
-        ref={coordsFieldRef}
-        className="pt-0.5"
-        value={coordinates}
-        onChange={setCoordinates}
-        onError={setError}
-        labelClassName="block text-[11px] font-semibold text-muted-foreground"
-        inputClassName="ui-control w-full rounded-lg border border-border bg-input px-2.5 py-2 text-sm text-foreground"
       />
       <TrackTimingUrlsField
         ref={timingFieldRef}

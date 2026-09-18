@@ -144,7 +144,17 @@ function runWhere(
   return where;
 }
 
-type DatedRow = Pick<Row, "createdAt" | "sortAt" | "localTimeZone" | "sessionCompletedAt" | "loggingCompletedAt" | "unconfirmedAt">;
+type DatedRow = Pick<
+  Row,
+  | "createdAt"
+  | "sortAt"
+  | "localTimeZone"
+  | "sessionCompletedAt"
+  | "loggingCompletedAt"
+  | "unconfirmedAt"
+  /* Says the session stamp came off a timing sheet, so an old race keeps its own date. */
+  | "importedLapTimeSessionId"
+>;
 
 export function localYmd(run: DatedRow, fallbackZone: string | null): string {
   return formatLocalCalendarDate(resolveRunDisplayInstant(run), run.localTimeZone ?? fallbackZone ?? "UTC");

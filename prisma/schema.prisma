@@ -46,6 +46,7 @@ model User {
   eventParticipations EventParticipation[]
   favouriteTracks FavouriteTrack[]
   trackLocationRunPromptDismissals TrackLocationRunPromptDismissal[]
+  trackLocationSightings TrackLocationSighting[]
   appSettings     AppSetting[]
   actionItems     ActionItem[]
   setupDocuments  SetupDocument[]
@@ -662,11 +663,17 @@ model Track {
   id        String   @id @default(cuid())
   name      String
   location  String?
-  /** GPS pin from â€œmark this locationâ€ when completing a run at the track. */
+  /**
+   * The track’s pin (`trackLocationFill.ts`, `trackSightings.ts`). Rough is fine: nothing selects a
+   * track from it, it only orders the picker, feeds weather and names the time zone.
+   */
   latitude  Float?
   longitude Float?
   locationMarkedAt DateTime?
-  /** How coordinates were set, e.g. `device`. */
+  /**
+   * How the pin was set. By hand: `device` | `manual_paste`. Automatic: `liverc_address` (LiveRC’s
+   * published address), `town` (the typed town), `drivers` (two drivers’ phones agreed).
+   */
   locationSource String?
   /**
    * IANA zone of the venue, derived from the pin (`trackTimeZone.ts`). The timing sweep runs on
@@ -722,6 +729,7 @@ model Track {
   videoAssets     VideoAsset[]
   videoAnalysisJobs VideoAnalysisJob[]
   locationRunPromptDismissals TrackLocationRunPromptDismissal[]
+  locationSightings TrackLocationSighting[]
   importedLapTimeSessions ImportedLapTimeSession[]
 
   @@unique([catalogSource, catalogSourceRef])
@@ -768,6 +776,25 @@ model TrackLocationRunPromptDismissal {
 
   @@id([userId, trackId])
   @@index([trackId])
+}
+
+/**
+ * Where a driver’s phone was when they logged a run at this track (`trackSightings.ts`). Never shown
+ * to anyone. Two different drivers within ~200 m of each other set the track’s pin to their
+ * midpoint, and the track’s spots are deleted. One row per driver per track: the latest.
+ */
+model TrackLocationSighting {
+  id        String   @id @default(cuid())
+  trackId   String
+  userId    String
+  latitude  Float
+  longitude Float
+  createdAt DateTime @default(now())
+
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([trackId, userId])
 }
 
 model FavouriteTrack {
@@ -1849,6 +1876,11 @@ model ImportedLapTimeSession {
    * no chip bound to a car, more than one car), so it waits for the driver to say.
    */
   sweepFiledAt DateTime?
+  /**
+   * The driver's own transponder the sweep found this session by, when it was. A loose import
+   * keeps it so the "which car?" answer can pair the chip with that car for next time.
+   */
+  sweepChipCode String?
   /** The track the sweep found this session at — a loose import must still know where it was. */
   track   Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
   trackId String?

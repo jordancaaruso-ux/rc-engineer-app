@@ -23,6 +23,11 @@ export const APP_SETTING_KEYS = {
    */
   speedhiveTransponderCarsJson: "speedhiveTransponderCarsJson",
   /**
+   * "Has this chip moved?" — the one pending question and the "still in" answers. JSON; see
+   * `lib/speedhive/transponderMoved.ts`.
+   */
+  speedhiveTransponderMovedJson: "speedhiveTransponderMovedJson",
+  /**
    * Other people's transponders you know — teammates, rivals. JSON array of
    * `{ name, transponder }`; see `lib/speedhive/knownCompetitors.ts`. Pulled only when
    * asked, never on a schedule.
@@ -209,6 +214,17 @@ export async function setSpeedhiveTransponderCarsSetting(
   value: string | null
 ): Promise<void> {
   await setUserSetting(userId, APP_SETTING_KEYS.speedhiveTransponderCarsJson, value);
+}
+
+export async function getSpeedhiveTransponderMovedSetting(userId: string): Promise<string | null> {
+  return getUserSetting(userId, APP_SETTING_KEYS.speedhiveTransponderMovedJson);
+}
+
+export async function setSpeedhiveTransponderMovedSetting(
+  userId: string,
+  value: string | null
+): Promise<void> {
+  await setUserSetting(userId, APP_SETTING_KEYS.speedhiveTransponderMovedJson, value);
 }
 
 export async function getKnownCompetitorsSetting(userId: string): Promise<string | null> {

@@ -13,6 +13,7 @@ import {
   StandardFonts,
 } from "pdf-lib";
 import { acroFieldTypeName, orderedFieldWidgets } from "@/lib/setupDocuments/pdfFormFields";
+import { boxWrapsText } from "@/lib/setupSheetModels/sheetTextWrap";
 import { bakeValueAppearances, nearestStandardFont } from "@/lib/setupDocuments/pdfValueAppearances";
 import { parseDefaultAppearance } from "@/lib/setupDocuments/pdfFieldAppearance";
 
@@ -94,6 +95,39 @@ async function bakeWrappingBoxes(
       }
     } catch {
       // A field pdf-lib cannot draw still carries its value; a viewer that redraws will show it.
+    }
+  }
+}
+
+/**
+ * A comments box the blank never admitted was one.
+ *
+ * The screen decides a box holds prose from the multiline flag OR, failing that, from its shape —
+ * see `sheetTextWrap`, where the threshold is measured. The export has to reach the same verdict or
+ * the two disagree on the one thing they are not allowed to disagree about: a note wrapped over six
+ * lines on the sheet would come out of an unflagged box as one line with its end off the paper.
+ *
+ * So a tall text field the driver actually wrote in is told what it is, once, before anything is
+ * drawn. After this `bakeValueAppearances` leaves it alone and pdf-lib's own generator wraps it,
+ * exactly as it already does for a box whose manufacturer set the flag. Empty fields are left
+ * untouched — the flag describes a box, but there is no reason to rewrite a blank one.
+ */
+function markTallTextFieldsMultiline(
+  pdfDoc: PDFDocument,
+  form: ReturnType<PDFDocument["getForm"]>
+): void {
+  for (const field of form.getFields()) {
+    if (!(field instanceof PDFTextField)) continue;
+    try {
+      if (!field.getText()) continue;
+      if (field.isMultiline()) continue;
+      let tallest = 0;
+      for (const { layout } of orderedFieldWidgets(pdfDoc, field)) {
+        if (layout.pageHeight > 0) tallest = Math.max(tallest, layout.height / layout.pageHeight);
+      }
+      if (boxWrapsText({ heightFracOfPage: tallest })) field.enableMultiline();
+    } catch {
+      // A field that will not answer keeps whatever it already was, and still carries its value.
     }
   }
 }
@@ -229,6 +263,9 @@ export async function fillPdfForm(input: {
    * cross, Mugen's bullet — because redrawing those would replace the sheet's own marks with plain
    * squares, and nothing is gained: flipping which appearance is showing is enough.
    */
+  // Before either drawing pass: settle which boxes wrap, so both of them agree with the screen.
+  markTallTextFieldsMultiline(pdfDoc, form);
+
   const formDa = formDefaultAppearance(form);
   /*
    * The sheet's OWN font first. Where the blank embeds the face its fields ask for — Verdana

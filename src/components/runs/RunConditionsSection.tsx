@@ -25,8 +25,6 @@ type RunConditionsSectionProps = {
   track: ConditionsTrack;
   /** Best-known session time (ISO) for historical weather; null = fetch "now". */
   sessionAtIso: string | null;
-  /** Persist device-resolved coordinates back onto the track's pin. */
-  onSaveTrackPin?: (coords: { latitude: number; longitude: number }) => Promise<void> | void;
 };
 
 /** Sky override chips → representative WMO weather codes. */
@@ -57,11 +55,9 @@ export function RunConditionsSection({
   onChange,
   track,
   sessionAtIso,
-  onSaveTrackPin,
 }: RunConditionsSectionProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pinSaved, setPinSaved] = useState(false);
   const [deviceCoords, setDeviceCoords] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const hasPin = trackHasMarkedLocation(track ?? {});
@@ -99,7 +95,12 @@ export function RunConditionsSection({
     [onChange, sessionAtIso, value.trackTempC]
   );
 
-  const useDeviceLocation = useCallback(async () => {
+  /*
+   * Named `fetchFrom…`, not `useDeviceLocation`: it is the "Use my location" button's handler,
+   * not a React hook. Under the `use` prefix ESLint read `useDeviceLocation()` inside `refetch`
+   * as a hook called from a callback and errored on it (2026-09-18).
+   */
+  const fetchFromDeviceLocation = useCallback(async () => {
     setError(null);
     setLoading(true);
     try {
@@ -119,23 +120,12 @@ export function RunConditionsSection({
     } else if (deviceCoords) {
       void fetchFor(deviceCoords);
     } else {
-      void useDeviceLocation();
+      void fetchFromDeviceLocation();
     }
-  }, [hasPin, track, deviceCoords, fetchFor, useDeviceLocation]);
-
-  const saveTrackPin = useCallback(async () => {
-    if (!deviceCoords || !onSaveTrackPin) return;
-    try {
-      await onSaveTrackPin(deviceCoords);
-      setPinSaved(true);
-    } catch {
-      setError("Couldn't save the track location.");
-    }
-  }, [deviceCoords, onSaveTrackPin]);
+  }, [hasPin, track, deviceCoords, fetchFor, fetchFromDeviceLocation]);
 
   const clearAll = useCallback(() => {
     setDeviceCoords(null);
-    setPinSaved(false);
     setError(null);
     onChange({ ...EMPTY_RUN_CONDITIONS });
   }, [onChange]);
@@ -173,23 +163,10 @@ export function RunConditionsSection({
             {value.airTempC != null ? "Refresh" : "Get conditions"}
           </Button>
         ) : (
-          <Button variant="outline" onClick={useDeviceLocation} disabled={loading} className="text-xs">
+          <Button variant="outline" onClick={fetchFromDeviceLocation} disabled={loading} className="text-xs">
             Use my location
           </Button>
         )}
-        {!hasPin && deviceCoords && onSaveTrackPin && track ? (
-          pinSaved ? (
-            <span className="type-data-label text-[var(--color-gain,#4FD089)]">Saved to {track.name}</span>
-          ) : (
-            <button
-              type="button"
-              onClick={saveTrackPin}
-              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-            >
-              Save as {track.name}&rsquo;s location
-            </button>
-          )
-        ) : null}
         {(value.airTempC != null || value.source) && (
           <button
             type="button"

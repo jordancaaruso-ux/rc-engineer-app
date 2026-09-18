@@ -9,11 +9,12 @@ import {
 } from "@/lib/speedhive/speedhiveClient";
 import {
   SPEEDHIVE_EVENT_LOOKBACK_DAYS,
-  speedhiveSessionInstant,
   speedhiveSessionLocalYmd,
+  speedhiveSessionWallClockIso,
   ymdShift,
 } from "@/lib/speedhive/speedhiveSessionTime";
 import { classificationRowMatchesUser } from "@/lib/speedhive/speedhiveClassificationMatch";
+import { userChipOnClassificationRow } from "@/lib/speedhive/speedhiveTransponder";
 import {
   getSpeedhiveDriverNamesForUser,
   getSpeedhiveTransponderNumbersForUser,
@@ -100,7 +101,7 @@ export async function gatherSpeedhiveResults(params: {
         const sourceKind: "practice" | "race" = sess.type?.toLowerCase() === "practice" ? "practice" : "race";
         const sessionUrl = buildSessionPageUrl(event.id, sess.id);
         for (const who of identities) {
-          const hit = classification.some((row) =>
+          const hit = classification.find((row) =>
             classificationRowMatchesUser({
               row,
               userTransponders: who.transponders,
@@ -113,8 +114,10 @@ export async function gatherSpeedhiveResults(params: {
               sessionUrl,
               source: "speedhive",
               sourceKind,
-              // The session page carries no time of its own; without this the run had none.
-              listedAtIso: speedhiveSessionInstant(sess.startTime, track.timeZone)?.toISOString() ?? null,
+              chipCode: userChipOnClassificationRow(hit, who.transponders),
+              // The session page carries no time of its own; without this the run had none. The
+              // track's clock as-if-UTC, the convention the imported result keeps.
+              listedAtIso: speedhiveSessionWallClockIso(sess.startTime),
             });
           }
         }

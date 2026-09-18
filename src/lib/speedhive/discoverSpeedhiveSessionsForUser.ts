@@ -12,8 +12,8 @@ import {
 } from "@/lib/speedhive/speedhiveClient";
 import {
   SPEEDHIVE_EVENT_LOOKBACK_DAYS,
-  speedhiveSessionInstant,
   speedhiveSessionLocalYmd,
+  speedhiveSessionWallClockIso,
   ymdShift,
 } from "@/lib/speedhive/speedhiveSessionTime";
 import {
@@ -25,6 +25,7 @@ import {
   getSpeedhiveTransponderNumbersForUser,
 } from "@/lib/speedhive/speedhiveDriverSettings";
 import { normalizeSpeedhiveDriverNamesForMatch } from "@/lib/speedhive/speedhiveDriverNames";
+import { userChipOnClassificationRow } from "@/lib/speedhive/speedhiveTransponder";
 import { discoverSpeedhivePracticeSessionsForUser } from "@/lib/speedhive/discoverSpeedhivePracticeSessionsForUser";
 import { practiceLocationIdFromTrackUrl } from "@/lib/speedhive/speedhivePracticeUrl";
 import {
@@ -39,10 +40,16 @@ const MAX_SESSIONS_PER_EVENT = 40;
 
 export type SpeedhiveDiscoveredSession = {
   sessionUrl: string;
-  /** Practice runs only: the driver's own chip the run was found by. */
+  /** The driver's own chip the session was found by — practice always, race when results list chips. */
   chipCode?: string | null;
   sessionId: string;
+  /**
+   * A race: the track's clock as-if-UTC, the way its imported result keeps it. A practice run: the
+   * loop's real instant, with the track's offset in `sessionUtcOffsetMinutes`.
+   */
   sessionCompletedAtIso: string | null;
+  /** Practice runs: the track's offset from UTC when the run started (+02:00 → 120). */
+  sessionUtcOffsetMinutes?: number | null;
   sourceKind: "practice" | "race";
   label: string;
   /** Fastest lap in seconds, when known at discovery time. */
@@ -220,20 +227,19 @@ async function discoverSpeedhiveOrganizationSessionsForUser(input: {
 
         if (!match) continue;
 
-        const completedIso = dayYmd
-          ? (speedhiveSessionInstant(sess.startTime, zone) ??
-              speedhiveSessionInstant(`${eventYmd ?? dayYmd}T12:00:00`, zone))?.toISOString() ?? null
-          : sess.startTime
-            ? new Date(sess.startTime).toISOString()
-            : event.startDate
-              ? new Date(`${event.startDate}T12:00:00Z`).toISOString()
-              : null;
+        // The track's clock as-if-UTC, the convention the imported result keeps (`labels.ts`); a
+        // session with no time of its own sits at midday on its meeting's date.
+        const meetingYmd = eventYmd ?? dayYmd;
+        const completedIso =
+          speedhiveSessionWallClockIso(sess.startTime) ??
+          (meetingYmd ? `${meetingYmd}T12:00:00.000Z` : null);
 
         const kind: "practice" | "race" =
           sess.type?.toLowerCase() === "practice" ? "practice" : "race";
 
         discovered.push({
           sessionUrl: buildSessionPageUrl(event.id, sess.id),
+          chipCode: userChipOnClassificationRow(match, userTransponders),
           sessionId: String(sess.id),
           sessionCompletedAtIso: completedIso,
           sourceKind: kind,

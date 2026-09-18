@@ -9,6 +9,13 @@ import { CardPanel } from "@/components/ui/CardPanel";
 export function TrackLiveRcUrlEditor(props: {
   trackId: string;
   initialLiveRcUrl: string | null;
+  /**
+   * A LiveRC catalog row IS its URL — the importer writes it alongside the row's source key and
+   * the pair is what makes a re-import an update rather than a second copy. It can't be changed
+   * and it can't be cleared, so the field shows what it is and offers nothing (founder call
+   * 2026-09-18). `canEditLiveRcUrl` refuses the same change at the API, for admins too here.
+   */
+  locked?: boolean;
 }) {
   const router = useRouter();
   const [liveRcUrl, setLiveRcUrl] = useState(props.initialLiveRcUrl ?? "");
@@ -38,6 +45,24 @@ export function TrackLiveRcUrlEditor(props: {
     } finally {
       setSaving(false);
     }
+  }
+
+  if (props.locked) {
+    return (
+      <CardPanel contentClassName="text-sm space-y-2">
+        <div className="text-sm font-medium text-foreground">LiveRC track URL</div>
+        <input
+          // Muted GROUND says "not yours to change"; the text stays foreground because it is a
+          // real value, and a muted one reads as the placeholder of an empty box — which is
+          // exactly what the Speedhive field above it looks like.
+          className="w-full rounded-md border border-border bg-muted/60 px-3 py-2 text-xs text-foreground outline-none"
+          value={liveRcUrl}
+          readOnly
+          disabled
+          aria-label="LiveRC track URL"
+        />
+      </CardPanel>
+    );
   }
 
   return (

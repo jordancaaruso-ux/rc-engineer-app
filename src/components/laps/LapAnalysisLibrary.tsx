@@ -7,12 +7,19 @@ import { ChevronRight } from "lucide-react";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { MyRcmPdfImportCard } from "@/components/runs/MyRcmPdfImportCard";
-import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import {
+  primaryLapRowsFromImportedPayload,
+  sessionUtcOffsetMinutesFromImportedPayload,
+} from "@/lib/lapImport/fromPayload";
 import { importedSessionTitle } from "@/lib/lapImport/sessionTitle";
 import { MYRCM_PDF_SOURCE_PREFIX } from "@/lib/lapUrlParsers/myRcmPdfSource";
 import { sameLocalCalendarDay } from "@/lib/lapCompareScope";
+import { parseSpeedhivePracticeActivityRef } from "@/lib/speedhive/speedhivePracticeUrl";
 import {
+  importedSessionTimeForDisplay,
+  importedSessionTimeIsTrackClock,
   resolveImportedSessionDisplayTimeIso,
+  resolveImportedSessionHasWallClockTime,
   timingSourceFromParserId,
   timingSourceFromSourceUrl,
 } from "@/lib/lapImport/labels";
@@ -137,9 +144,30 @@ export function LapAnalysisLibrary({
           ...s,
           driverName: parsed?.driverName ?? null,
           driverCount: drivers,
+          sessionNumber: parseSpeedhivePracticeActivityRef(s.sourceUrl)?.trainingSessionId ?? null,
         });
+        /*
+         * The session's time on the TRACK's clock; only "added" below stays on the viewer's
+         * (founder ruling 2026-09-18). This list was the last screen still printing an imported
+         * time in the viewer's zone — the pickers have used `formatImportedSessionTime` all
+         * along — so ~290 LiveRC rows were reading about ten hours late, a 9:25 am practice as
+         * 7:25 pm. A row with no on-track time at all is showing its import instant, which IS
+         * the viewer's event, so it stays on their clock and says nothing about a track.
+         */
+        const timeOpts = {
+          timingSource: source,
+          parserId: s.parserId,
+          sourceUrl: s.sourceUrl,
+          isWallClockTime: resolveImportedSessionHasWallClockTime({
+            sessionCompletedAt: s.sessionCompletedAt ?? null,
+            parsedPayload: s.parsedPayload,
+          }),
+          utcOffsetMinutes: sessionUtcOffsetMinutesFromImportedPayload(s.parsedPayload),
+        };
+        const shown = importedSessionTimeForDisplay(whenIso, timeOpts);
+        const whenText = formatRunDateTime(shown.iso, shown.timeZone);
         const detail = [
-          formatRunDateTime(whenIso),
+          importedSessionTimeIsTrackClock(timeOpts) ? `${whenText} at the track` : whenText,
           s.trackName,
           source,
           // The leading driver, once the title is the race rather than a person. On a field

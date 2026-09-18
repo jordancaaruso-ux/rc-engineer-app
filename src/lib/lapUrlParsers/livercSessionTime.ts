@@ -65,16 +65,68 @@ export function extractLiveRcPracticeSessionWhenFromHtml(html: string): string |
   return null;
 }
 
-function extractRaceWhenFromTitleLike(text: string): string | null {
+const MONTH_NAME = "(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*";
+
+/**
+ * A date as LiveRC writes one, in any of its layouts: `8 April 2025`, `Jul 15, 2026`,
+ * `4/8/2025`, `2026-09-12`. A month NAME is required rather than any word, so that
+ * "Round 3" and "Heat 1, 2026" cannot pass for a date.
+ */
+const DATE_LIKE_RE = new RegExp(
+  [
+    String.raw`\b\d{1,2}\s+${MONTH_NAME}\s+\d{4}\b`,
+    String.raw`\b${MONTH_NAME}\s+\d{1,2},?\s+\d{4}\b`,
+    String.raw`\b\d{1,2}/\d{1,2}/\d{2,4}\b`,
+    String.raw`\b\d{4}-\d{2}-\d{2}\b`,
+  ].join("|"),
+  "i"
+);
+
+/**
+ * A clock immediately after the date — "at 2:30 PM", "9:48am", "(Sunday) at 10:57:58am" — kept
+ * when the layout prints one. Anchored, so only a clock touching the date is taken.
+ */
+const TIME_AFTER_DATE_RE =
+  /^[\s,]*(?:\([A-Za-z]+\)\s*)?(?:at\s+)?(\d{1,2}:\d{2}(?::\d{2})?\s*[AaPp][Mm]?)/;
+
+/**
+ * The date (and clock, when the layout prints one) out of any LiveRC text.
+ *
+ * Returns the substring only when {@link parseLiveRcSessionDisplayTimeToUtcIso} can actually
+ * read it. That check is the whole point: the race extractor used to hand back everything after
+ * the first " on " in the page title, so "Bendigo **On** Road Radio Control Car Club" yielded
+ * "Road Radio Control Car Club" as the session's time (seen live, 2026-09-18). Nothing that
+ * cannot be parsed to an instant is a time.
+ */
+function extractDateTimeLike(text: string): string | null {
   const t = normalizeWhitespace(text);
-  const onTitle = t.match(/\bon\s+(.+)/i);
-  if (!onTitle?.[1]) return null;
-  const rest = stripTrailingTitleNoise(onTitle[1]);
-  return rest.length >= 6 ? rest : null;
+  const m = t.match(DATE_LIKE_RE);
+  if (!m || m.index == null) return null;
+  let candidate = m[0];
+  const after = t.slice(m.index + m[0].length);
+  const clock = after.match(TIME_AFTER_DATE_RE);
+  if (clock?.[1]) candidate = `${candidate} ${clock[1]}`;
+  return parseLiveRcSessionDisplayTimeToUtcIso(candidate) ? candidate : null;
 }
 
 /**
- * Race result page: try `<title>` / og:title segment after ` on `, else date-like lines in body text.
+ * Race result page: when the session was run.
+ *
+ * Read in the order the layouts are trustworthy:
+ *
+ *  1. `<title>` / og:title — the only source that carries a CLOCK as well as a date
+ *     ("… on Saturday, 8 April 2025 at 2:30 PM"). Most race pages have no date here at all.
+ *  2. The breadcrumb's calendar line — `<h5 class="page-header"><span class="fa fa-calendar">`
+ *     beside the club and meeting name. Every LiveRC race page prints it and it is the reason
+ *     194 of 217 race imports on file had no on-track date and showed their IMPORT time
+ *     instead (2026-09-18): the old body scan demanded a weekday in front of the date, and
+ *     LiveRC writes "Jul 15, 2026".
+ *  3. Anything date-shaped in the body, as a last resort.
+ *
+ * A multi-day meeting prints a RANGE here ("Sep 12, 2026 to Sep 13, 2026") and only its first
+ * day is taken — the page does not say which day this heat ran. That is a day-level answer for
+ * a heat on day two, and still nearer than the day it was imported. A session imported through
+ * meeting discovery never reaches this: it carries its own per-session clock.
  */
 export function extractLiveRcRaceSessionWhenRaw(html: string): string | null {
   const $ = load(html);
@@ -85,21 +137,19 @@ export function extractLiveRcRaceSessionWhenRaw(html: string): string | null {
   ].filter((s) => s.length > 0);
 
   for (const text of titleSources) {
-    const fromTitle = extractRaceWhenFromTitleLike(text);
+    const fromTitle = extractDateTimeLike(text);
     if (fromTitle) return fromTitle;
   }
 
-  const body = normalizeWhitespace($("body").text()).slice(0, 24000);
-  const datePatterns: RegExp[] = [
-    /\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*,?\s+\d{1,2}\s+[A-Za-z]{3,}\s+\d{4}(?:\s+at\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)?/i,
-    /\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*,?\s+[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4}(?:\s+at\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)?/i,
-    /\b\d{1,2}\/\d{1,2}\/\d{4}(?:\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?)?/i,
-  ];
-  for (const dateRe of datePatterns) {
-    const dm = body.match(dateRe);
-    if (dm?.[0]) return dm[0].trim();
-  }
-  return null;
+  const calendarLine = $(".page-breadcrumb")
+    .find(".fa-calendar")
+    .first()
+    .parent()
+    .text();
+  const fromCalendar = calendarLine ? extractDateTimeLike(calendarLine) : null;
+  if (fromCalendar) return fromCalendar;
+
+  return extractDateTimeLike(normalizeWhitespace($("body").text()).slice(0, 24000));
 }
 
 /** A zone written into the string itself ("GMT", "UTC", "Z", "+09:30") — then it is a real instant. */

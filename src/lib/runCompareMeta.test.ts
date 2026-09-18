@@ -70,9 +70,9 @@ test("the run saved beside a backfill is stamped the same way and shows its heat
   assert.equal(iso(shown), "2025-10-12T15:06:22.000Z");
 });
 
-test("a fortnight-old stamp with a DIFFERENT sortAt is still refused", () => {
-  // A month-old session attached by hand to a fresh run: sortAt is the create time, so the
-  // plausibility floor stands and the row shows when it was logged.
+test("a fortnight-old stamp with nothing to vouch for it is still refused", () => {
+  // Hand-typed on a fresh run: no import named, sortAt is the create time. Nothing says where
+  // the stamp came from, so the plausibility floor stands and the row shows when it was logged.
   const shown = resolveRunDisplayInstant({
     createdAt: "2026-08-27T04:40:47Z",
     loggingCompletedAt: "2026-08-27T04:41:00Z",
@@ -80,6 +80,32 @@ test("a fortnight-old stamp with a DIFFERENT sortAt is still refused", () => {
     sortAt: "2026-08-27T04:40:47Z",
   });
   assert.equal(iso(shown), "2026-08-27T04:41:00.000Z");
+});
+
+test("a month-old race keeps its own date when the run names the import it came from", () => {
+  // The tester's case (2026-09-18): an event from weeks back imported today. The run is linked
+  // to the timing session it was stamped from, so the fortnight floor does not apply and the
+  // row shows the race, not the minute it was imported.
+  const shown = resolveRunDisplayInstant({
+    createdAt: "2026-08-27T04:40:47Z",
+    loggingCompletedAt: "2026-08-27T04:41:00Z",
+    sessionCompletedAt: "2026-08-08T07:36:59Z",
+    sortAt: "2026-08-27T04:40:47Z",
+    importedLapTimeSessionId: "imp_1",
+  });
+  assert.equal(iso(shown), "2026-08-08T07:36:59.000Z");
+});
+
+test("a linked import does NOT let a stamp later than the log through", () => {
+  // The upper bound is what catches the dirty legacy stamps — an import-time stamp and a wall
+  // clock stored as-if-UTC both land AFTER the save — and naming the import must not lift it.
+  const shown = resolveRunDisplayInstant({
+    createdAt: "2026-06-27T23:10:00Z",
+    loggingCompletedAt: "2026-06-28T02:07:00Z",
+    sessionCompletedAt: "2026-06-28T09:25:51Z",
+    importedLapTimeSessionId: "imp_2",
+  });
+  assert.equal(iso(shown), "2026-06-28T02:07:00.000Z");
 });
 
 test("sortAt agreement never admits a stamp that lands AFTER the log", () => {

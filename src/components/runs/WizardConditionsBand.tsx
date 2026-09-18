@@ -23,8 +23,6 @@ type WizardConditionsBandProps = {
    * band shows it instead of fetching — never re-look-up a past session's weather.
    */
   storedConditions?: RunConditions | null;
-  /** Persist device-resolved coordinates onto the track's pin. */
-  onSaveTrackPin?: (coords: { latitude: number; longitude: number }) => Promise<void> | void;
 };
 
 type Phase = "idle" | "loading" | "ready" | "failed";
@@ -67,14 +65,12 @@ export function WizardConditionsBand({
   trackTempC,
   onTrackTempChange,
   storedConditions,
-  onSaveTrackPin,
 }: WizardConditionsBandProps) {
   const [preview, setPreview] = useState<RunConditions | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [deviceCoords, setDeviceCoords] = useState<{ latitude: number; longitude: number } | null>(
     null
   );
-  const [pinSaved, setPinSaved] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const fetchedKeyRef = useRef<string | null>(null);
 
@@ -146,16 +142,6 @@ export function WizardConditionsBand({
     }
   }, [track, hasPin, deviceCoords, fetchFor, requestDeviceLocation]);
 
-  const saveTrackPin = useCallback(async () => {
-    if (!deviceCoords || !onSaveTrackPin) return;
-    try {
-      await onSaveTrackPin(deviceCoords);
-      setPinSaved(true);
-    } catch {
-      setLocationError("Couldn't save the track location.");
-    }
-  }, [deviceCoords, onSaveTrackPin]);
-
   const previewLine = preview ? readoutLine(preview) : null;
   const line = storedLine ?? previewLine;
   const loading = phase === "loading";
@@ -223,20 +209,6 @@ export function WizardConditionsBand({
           </button>
         </div>
       )}
-
-      {deviceCoords && onSaveTrackPin && track && !hasPin ? (
-        pinSaved ? (
-          <p className="type-timestamp text-faint">Saved to {track.name}</p>
-        ) : (
-          <button
-            type="button"
-            onClick={saveTrackPin}
-            className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-          >
-            Save as {track.name}&rsquo;s location
-          </button>
-        )
-      ) : null}
 
       {locationError ? <p className="text-xs text-muted-foreground">{locationError}</p> : null}
 

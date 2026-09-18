@@ -85,3 +85,28 @@ export function estimateDurationSeconds(
 export function spansOverlap(a: Span, b: Span): boolean {
   return a.start.getTime() <= b.end.getTime() && b.start.getTime() <= a.end.getTime();
 }
+
+/** How much of the shorter window the two must share to be the same time on track. */
+export const SAME_TIME_ON_TRACK_SHARE = 0.5;
+
+/**
+ * The same time on track, judged strictly — for the places that act on one run a person is looking
+ * at, where a wrong yes costs laps: the lap step telling a second site's copy of a race from the
+ * next half of a run split by a break, and a save folding an app-made run into the driver's own.
+ *
+ * Two copies of one race cover nearly the same stretch. The halves of a split run only touch at
+ * the break, and a site that prints minutes rather than seconds (LiveRC) can make them touch by up
+ * to a minute. So the shared stretch must be at least half of the shorter window. A window with no
+ * length (laps unknown) never qualifies: there is nothing to measure. `spansOverlap` stays the
+ * evening pass's looser rule, where every session of the day is in hand at once.
+ */
+export function sameTimeOnTrack(a: Span, b: Span): boolean {
+  const shared =
+    Math.min(a.end.getTime(), b.end.getTime()) - Math.max(a.start.getTime(), b.start.getTime());
+  if (!(shared > 0)) return false;
+  const shorter = Math.min(
+    a.end.getTime() - a.start.getTime(),
+    b.end.getTime() - b.start.getTime(),
+  );
+  return shared >= shorter * SAME_TIME_ON_TRACK_SHARE;
+}

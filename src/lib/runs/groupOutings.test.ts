@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { groupOutings, PIT_STOP_GAP_MS, type OutingSession } from "@/lib/runs/groupOutings";
+import {
+  compareOutingSheets,
+  groupOutings,
+  PIT_STOP_GAP_MS,
+  type OutingSession,
+} from "@/lib/runs/groupOutings";
 
 const T0 = Date.parse("2026-09-19T00:00:00Z");
 const min = (m: number) => new Date(T0 + m * 60 * 1000);
@@ -66,4 +71,11 @@ test("a session with no known length is a point in time and still joins by the p
 
 test("an empty day is an empty list", () => {
   assert.deepEqual(groupOutings([]), []);
+});
+
+test("the sheet order: official, then more drivers, then more laps — and a tie is a tie", () => {
+  assert.ok(compareOutingSheets(heat("h", 0, 5, 2, 10), practice("p", 0, 5, 30)) < 0);
+  assert.ok(compareOutingSheets(heat("a", 0, 5, 10, 20), heat("b", 0, 5, 8, 25)) < 0);
+  assert.ok(compareOutingSheets(heat("a", 0, 5, 10, 21), heat("b", 0, 5, 10, 20)) < 0);
+  assert.equal(compareOutingSheets(heat("a", 0, 5, 10, 20), heat("b", 9, 14, 10, 20)), 0);
 });

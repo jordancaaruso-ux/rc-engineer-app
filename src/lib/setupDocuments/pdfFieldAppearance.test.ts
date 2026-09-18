@@ -97,13 +97,46 @@ import { ZAPF_MARK_BY_CHARACTER, ZAPF_MARKS } from "@/lib/setupDocuments/zapfDin
   assert.equal(markColorFromAppearanceStream("0 0 1 RG 1 0 0 rg (4) Tj"), "#ff0000");
   // Stroke alone is still an answer, for a mark drawn as an outline.
   assert.equal(markColorFromAppearanceStream("0 1 0 RG 2 w 0 0 m 5 5 l S"), "#00ff00");
-  // CMYK, and the last colour set is the one the mark ends up painted in.
+  // CMYK, and a later colour replaces an earlier one.
   assert.equal(markColorFromAppearanceStream("0 1 1 0 k (4) Tj"), "#ff0000");
   assert.equal(markColorFromAppearanceStream("1 0 0 rg 0 0 1 rg (4) Tj"), "#0000ff");
   // No colour stated is a real answer: the caller falls back to the field's own appearance.
   assert.equal(markColorFromAppearanceStream("BT /ZaDb 9 Tf (4) Tj ET"), undefined);
   assert.equal(markColorFromAppearanceStream(""), undefined);
   assert.equal(markColorFromAppearanceStream(undefined), undefined);
+}
+
+// --- The mark is the LAST thing the picture paints, and q/Q decide what colour is in force ---
+// Schumacher's CAT PB (measured 2026-09-18): every square box paints itself white inside a
+// save/restore pair and then stamps a black ZapfDingbats square on top. Keeping the last colour
+// NAMED read those 140 boxes as white, so the app drew their ticks in white ink on white paper —
+// imported, stored, invisible. The driver's words were "the square boxes it isn't liking".
+{
+  const catPbSquare =
+    "q 1 g 0 0 7.317 6.88 re f 0.5 0.5 6.317 5.88 re s Q "
+    + "q 1 1 5.317 4.88 re W n BT /ZaDb 4 Tf 2.1365 2.086 Td 3.852 TL 0 0 Td (n) Tj ET Q";
+  assert.equal(markColorFromAppearanceStream(catPbSquare), "#000000");
+
+  // The same sheet's round boxes never had the problem: they name black immediately before
+  // filling the dot, so last-named and in-force agree. They must keep agreeing.
+  const catPbCircle =
+    "1 g q 1 0 0 1 3.1678 2.9081 cm 2.9081 0 m 2.9081 1.6062 1.6062 2.9081 0 2.9081 c f Q "
+    + "0 g q 1 0 0 1 3.1678 2.9081 cm 0.9541 0 m 0.9541 0.5269 0.5269 0.9541 0 0.9541 c f Q";
+  assert.equal(markColorFromAppearanceStream(catPbCircle), "#000000");
+
+  // A colour set inside a save/restore pair is gone once it is popped: what paints after it is
+  // painted in the initial state, which is black.
+  assert.equal(markColorFromAppearanceStream("q 1 0 0 rg 0 0 5 5 re f Q (4) Tj"), "#000000");
+  // A colour set before the pair survives it.
+  assert.equal(markColorFromAppearanceStream("0 0 1 rg q 1 0 0 rg 0 0 5 5 re f Q (4) Tj"), "#0000ff");
+  // "re W n" is a clip window, not a mark. Counting it as paint would read the colour one step
+  // early — on the CAT PB, the difference between black and white.
+  assert.equal(
+    markColorFromAppearanceStream("1 g 0 0 5 5 re f 0 1 0 rg 1 1 3 3 re W n (4) Tj"),
+    "#00ff00"
+  );
+  // Box chrome painted in one colour does not speak for a mark painted in another.
+  assert.equal(markColorFromAppearanceStream("1 g 0 0 5 5 re f 1 0 0 rg (4) Tj"), "#ff0000");
 }
 
 // --- The mark's SHAPE also comes from the picture, not from the caption ---

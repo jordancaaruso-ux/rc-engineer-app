@@ -13,6 +13,7 @@ import {
 import {
   buildSpeedhivePracticeRunUrl,
 } from "@/lib/speedhive/speedhivePracticeUrl";
+import { speedhivePracticeUtcOffsetMinutes } from "@/lib/speedhive/speedhiveSessionTime";
 import type { SpeedhiveDiscoveredSession } from "@/lib/speedhive/discoverSpeedhiveSessionsForUser";
 import {
   getSpeedhiveDriverNamesForUser,
@@ -134,6 +135,7 @@ async function runsFromActivity(
       sessionUrl: buildSpeedhivePracticeRunUrl(locationId, activityId, block.id),
       sessionId: `${activityId}-${block.id}`,
       sessionCompletedAtIso: completedIso,
+      sessionUtcOffsetMinutes: speedhivePracticeUtcOffsetMinutes([block]),
       sourceKind: "practice",
       label: [locationLabel, `${lapCount} lap${lapCount === 1 ? "" : "s"}`]
         .filter(Boolean)

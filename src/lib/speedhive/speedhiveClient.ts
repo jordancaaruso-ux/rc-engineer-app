@@ -41,7 +41,11 @@ export type SpeedhiveLapRow = {
   lap: number;
   lapTime: string;
   inPit?: boolean;
-  /** Epoch millis of the transponder crossing — a true instant (unlike session `startTime`, which is zoneless track-local schedule). */
+  /**
+   * Epoch millis of the transponder crossing on the TRACK's clock — the wall clock as-if-UTC, not
+   * a real instant, the same clock as the session's zoneless `startTime` (checked live 2026-09-17:
+   * seven Japanese meetings crossed between 10:30 and 15:30 this way, 19:30–00:30 read as UTC).
+   */
   timeOfDay?: number;
 };
 

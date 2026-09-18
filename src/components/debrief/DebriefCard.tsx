@@ -1,10 +1,18 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 import { AutoGrowTextarea } from "@/components/ui/AutoGrowTextarea";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow, StatStrip } from "@/components/ui/panel";
-import type { DebriefFromNew, DebriefRecap } from "@/lib/debrief/buildDebriefRecap";
+import { SetupChangedSincePreviousList } from "@/components/runs/SetupChangedSincePreviousList";
+import type { DebriefFromNew, DebriefRecap, DebriefSetup } from "@/lib/debrief/buildDebriefRecap";
+import {
+  confirmDebriefSave,
+  openDebriefNote,
+  rememberDebriefDraft,
+  settleDebriefDraft,
+} from "@/lib/debrief/debriefNotesThisTab";
 import type { WorkbenchDebrief } from "@/lib/runs/sessionWorkbenchModel";
 import { formatRunDateShort } from "@/lib/formatDate";
 import { formatLap } from "@/lib/runLaps";
@@ -31,8 +39,22 @@ import { cn } from "@/lib/utils";
  * a From new row inside the tyre that was fitted new, never a line of its own — "From new by
  * itself doesn't make sense".
  *
+ * 2026-09-18, the same row again: "vs field median". A bare "median" had no subject and that
+ * is why it read as unclear in September; naming the field as well as the middle fixes the
+ * half that was missing, and leaves the row honest about what it measures.
+ *
+ * 2026-09-18: one more line, last — the setup, START against END. The runs below already wear
+ * a wrench per run that changed the car, so this is the net of the meeting, not a replay: "7
+ * changes", and the list opens on a tap in the same table the wrench uses. A car that ended
+ * where it started says so, with how many changes it took to get back — his call, so that
+ * "touched nothing" and "tried everything and came home" never read the same.
+ *
  * Saves on blur like every other inline correction (run notes, `RunDetailPanel`): no button
  * to hunt for, nothing lost by tapping away.
+ *
+ * The pane draws this card afresh every time it changes, from a page copy of the note loaded
+ * before any save — so it opens on this tab's memory of the meeting, not on that copy alone
+ * (`debriefNotesThisTab`, bug found 2026-09-17: a saved note came back as the old one).
  */
 
 function ratingWords(direction: NonNullable<DebriefRecap["rating"]>["direction"]): string | null {
@@ -76,7 +98,8 @@ function gapTone(seconds: number): string | undefined {
 function Line({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex gap-3 border-b border-border/70 py-1.5 last:border-b-0">
-      <span className="type-data-label w-[64px] flex-none pt-0.5">{label}</span>
+      {/* Tight leading so the one label that wraps ("vs field median") costs a few pixels, not a row. */}
+      <span className="type-data-label w-[64px] flex-none pt-0.5 leading-[1.25]">{label}</span>
       <div className="min-w-0 text-[13px] leading-snug text-foreground">{children}</div>
     </div>
   );
@@ -126,6 +149,65 @@ function FromNewRow({ steps }: { steps: DebriefFromNew[] }) {
   );
 }
 
+/**
+ * A car's setup over the meeting, first run against last. Three readings: nobody touched it;
+ * it came home where it started after `made` changes; or it ended `rows.length` boxes away
+ * (with `made` beside it when some of the way was undone). Only the last opens the list.
+ *
+ * The moved state is a sentence, not a subtotal (founder call 2026-09-18): "19 changes · 36
+ * made" read as a part and a whole, when the two numbers are a distance and a count. "Ended 19
+ * changes from where you started" says which is which in the driver's own words, and borrows
+ * the phrase the came-home state already uses so the three readings sound like one voice.
+ */
+function SetupSummary({
+  setup,
+  open,
+  onToggle,
+}: {
+  setup: DebriefSetup;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const net = setup.rows.length;
+  const car = setup.carName ? <span>{setup.carName} · </span> : null;
+  if (setup.made === 0) {
+    return (
+      <span className="block">
+        {car}Unchanged
+      </span>
+    );
+  }
+  if (net === 0) {
+    return (
+      <span className="block">
+        {car}Back where you started
+        <span className="text-faint">
+          {" · "}
+          {setup.made} {setup.made === 1 ? "change" : "changes"} made
+        </span>
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      className="tap-active flex items-center gap-1 text-left text-[13px] leading-snug text-foreground"
+    >
+      <span>
+        {car}Ended <span className="font-semibold tabular-nums">{net}</span>{" "}
+        {net === 1 ? "change" : "changes"} from where you started
+        {setup.made > net ? <span className="text-faint"> · {setup.made} made</span> : null}
+      </span>
+      <ChevronDown
+        className={cn("h-3.5 w-3.5 flex-none text-faint transition-transform", open && "rotate-180")}
+        aria-hidden
+      />
+    </button>
+  );
+}
+
 function RecapLines({
   recap,
   onOpenRun,
@@ -134,6 +216,7 @@ function RecapLines({
   onOpenRun: (runId: string) => void;
 }) {
   const lines: ReactNode[] = [];
+  const [openSetupCarId, setOpenSetupCarId] = useState<string | null>(null);
 
   /*
    * The three lap figures side by side under ONE word, "Best" — founder call 2026-09-14
@@ -172,16 +255,33 @@ function RecapLines({
     );
   }
 
-  // Pace against the middle of the field: the meeting's average, then the best run — one row,
-  // and the run name opens that run like the marks above do.
+  /*
+   * Pace against the middle of the field: the meeting's average, then the best run — one row,
+   * and the run name opens that run like the marks above do.
+   *
+   * 2026-09-18: the label names the statistic. "vs field" is not a figure anyone can define,
+   * and the number under it is your top 5 minus the MEDIAN of every driver's top 5 on that
+   * sheet, so the label says median. That also retired the word "avg" from the row: the two
+   * averages here mean opposite things — the field's middle, and the mean of your own runs —
+   * and one row could not carry both. "over 6 runs" says whose average it is. A meeting with
+   * a single fielded run shows that one figure, not the same number twice under two words.
+   */
   if (recap.field) {
     const field = recap.field;
     lines.push(
-      <Line key="field" label="vs field">
-        <span className={cn("font-semibold tabular-nums", gapTone(field.avg))}>{formatGap(field.avg)}</span>
-        <span className="text-faint"> avg · </span>
-        <span className={cn("font-semibold tabular-nums", gapTone(field.best))}>{formatGap(field.best)}</span>
-        <span className="text-faint"> best </span>
+      <Line key="field" label="vs field median">
+        {field.runCount > 1 ? (
+          <>
+            <span className={cn("font-semibold tabular-nums", gapTone(field.avg))}>{formatGap(field.avg)}</span>
+            <span className="text-faint"> over {field.runCount} runs · </span>
+            <span className={cn("font-semibold tabular-nums", gapTone(field.best))}>{formatGap(field.best)}</span>
+            <span className="text-faint"> best </span>
+          </>
+        ) : (
+          <>
+            <span className={cn("font-semibold tabular-nums", gapTone(field.best))}>{formatGap(field.best)}</span>{" "}
+          </>
+        )}
         <button
           type="button"
           onClick={() => onOpenRun(field.runId)}
@@ -258,6 +358,24 @@ function RecapLines({
     );
   }
 
+  // Last, so the list it opens lands directly above the runs it summarises, not between the
+  // marks and the tyres. One line per car; the label reads once, like the tyre lines.
+  recap.setup.forEach((setup, index) => {
+    const open = openSetupCarId === setup.carId;
+    lines.push(
+      <Line key={`setup-${setup.carId}`} label={index === 0 ? "Setup" : ""}>
+        <SetupSummary
+          setup={setup}
+          open={open}
+          onToggle={() => setOpenSetupCarId(open ? null : setup.carId)}
+        />
+        {open ? (
+          <SetupChangedSincePreviousList rows={setup.rows} runId={setup.endRunId} className="mt-1.5" />
+        ) : null}
+      </Line>
+    );
+  });
+
   if (lines.length === 0) return null;
   return <div className="mb-3">{lines}</div>;
 }
@@ -273,8 +391,14 @@ export function DebriefCard({
   /** Opens a run in the list below — the same door a point on the chart is. */
   onOpenRun: (runId: string) => void;
 }) {
-  const [savedText, setSavedText] = useState(debrief.text);
-  const [updatedAtIso, setUpdatedAtIso] = useState(debrief.updatedAtIso);
+  const { meetingKey, localDayKey, trackKey } = debrief.identity;
+  // Read once per mount — the box is uncontrolled, so this is the text it opens with.
+  const [opened] = useState(() =>
+    openDebriefNote(meetingKey, { text: debrief.text, updatedAtIso: debrief.updatedAtIso })
+  );
+  const savedTextRef = useRef(opened.saved.text);
+  const sendingTextRef = useRef<string | null>(null);
+  const [updatedAtIso, setUpdatedAtIso] = useState(opened.saved.updatedAtIso);
   const [status, setStatus] = useState<"idle" | "saving" | "error">("idle");
   const weekend = (debrief.recap?.dayCount ?? 1) > 1;
   /*
@@ -286,32 +410,54 @@ export function DebriefCard({
    */
   const title = debrief.isOver ? "Debrief" : "Overview";
 
-  const save = async (raw: string) => {
-    const next = raw.trim();
-    if (next === savedText) return;
-    setStatus("saving");
-    try {
-      const res = await fetch("/api/debriefs", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          meetingKey: debrief.identity.meetingKey,
-          localDayKey: debrief.identity.localDayKey,
-          trackKey: debrief.identity.trackKey,
-          text: next,
-        }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = (await res.json()) as {
-        debrief: { text: string; updatedAtIso: string } | null;
-      };
-      setSavedText(json.debrief?.text ?? "");
-      setUpdatedAtIso(json.debrief?.updatedAtIso ?? null);
-      setStatus("idle");
-    } catch {
-      setStatus("error");
-    }
-  };
+  const save = useCallback(
+    async (raw: string) => {
+      const next = raw.trim();
+      // Already on its way (a blur and the resend below can both ask for the same text).
+      if (next === sendingTextRef.current) return;
+      // Nothing to send — unless another text is still on its way and this one has to land after it.
+      if (next === savedTextRef.current && sendingTextRef.current == null) {
+        settleDebriefDraft(meetingKey, next);
+        return;
+      }
+      sendingTextRef.current = next;
+      setStatus("saving");
+      try {
+        const res = await fetch("/api/debriefs", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ meetingKey, localDayKey, trackKey, text: next }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = (await res.json()) as {
+          debrief: { text: string; updatedAtIso: string } | null;
+          savedAtIso: string;
+        };
+        const newest = confirmDebriefSave(meetingKey, {
+          text: json.debrief?.text ?? "",
+          updatedAtIso: json.debrief?.updatedAtIso ?? null,
+          savedAtIso: json.savedAtIso,
+        });
+        savedTextRef.current = newest.text;
+        setUpdatedAtIso(newest.updatedAtIso);
+        setStatus("idle");
+      } catch {
+        setStatus("error");
+      } finally {
+        if (sendingTextRef.current === next) sendingTextRef.current = null;
+      }
+    },
+    [meetingKey, localDayKey, trackKey]
+  );
+
+  /*
+   * The box can open holding text no save has confirmed: the save that left with it failed, or
+   * is still on its way on a slow signal. Send it again rather than let the box pass it off as
+   * saved — the server takes the same text twice without harm.
+   */
+  useEffect(() => {
+    if (opened.boxText !== opened.saved.text) void save(opened.boxText);
+  }, [opened, save]);
 
   const meta =
     status === "error"
@@ -347,9 +493,10 @@ export function DebriefCard({
            * Founder call 2026-09-16.
            */
           maxRows={10}
-          defaultValue={debrief.text}
+          defaultValue={opened.boxText}
           aria-label={weekend ? `Weekend ${title.toLowerCase()}` : `Day ${title.toLowerCase()}`}
           placeholder={weekend ? "What did you learn this weekend?" : "What did you learn today?"}
+          onInput={(e) => rememberDebriefDraft(meetingKey, e.currentTarget.value)}
           onBlur={(e) => void save(e.currentTarget.value)}
           className="w-full rounded-md border border-ring/40 bg-background px-2.5 py-1.5 text-[13px] leading-relaxed text-foreground outline-none focus:border-ring"
         />

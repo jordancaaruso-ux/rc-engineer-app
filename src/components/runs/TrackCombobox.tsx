@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { PickerSheet, PickerTrigger } from "@/components/ui/PickerSheet";
 import type { OptionSection } from "@/lib/search/optionSearch";
+import { formatDistanceMeters } from "@/lib/location/trackProximity";
 
 export type TrackOption = {
   id: string;
@@ -27,6 +28,18 @@ function liveRcShortName(url: string | null | undefined): string | null {
   }
 }
 
+function trackRow(t: TrackOption) {
+  return {
+    value: t.id,
+    label: t.name,
+    detail: t.location ?? null,
+    keywords:
+      [...(t.gripTags ?? []), ...(t.layoutTags ?? []), liveRcShortName(t.liveRcUrl)]
+        .filter(Boolean)
+        .join(" ") || null,
+  };
+}
+
 function trackLabel(t: TrackOption): string {
   return t.location ? `${t.name} (${t.location})` : t.name;
 }
@@ -44,6 +57,9 @@ function trackLabel(t: TrackOption): string {
  * The town is searchable in its own right — drivers reach for "Adelaide" as
  * often as for the club's name — and grip/layout tags match too, so "high grip"
  * or "carpet" narrows the list without any of that being on screen.
+ *
+ * `nearby` (the phone's position, measured by the caller) puts the closest tracks first. It only
+ * orders the list — nothing is ever selected from a location (founder 2026-09-17).
  */
 export function TrackCombobox({
   tracks,
@@ -51,6 +67,7 @@ export function TrackCombobox({
   onChange,
   favouriteTrackIds = [],
   favouriteTracks = [],
+  nearby = [],
   placeholder = "Select track…",
   "aria-label": ariaLabel = "Track",
   disabled,
@@ -62,6 +79,8 @@ export function TrackCombobox({
   lastRunTrackId?: string | null;
   favouriteTrackIds?: string[];
   favouriteTracks?: TrackOption[];
+  /** Tracks near the phone, nearest first. */
+  nearby?: { trackId: string; distanceM: number }[];
   placeholder?: string;
   "aria-label"?: string;
   disabled?: boolean;
@@ -91,29 +110,33 @@ export function TrackCombobox({
 
   const sections = useMemo<OptionSection[]>(() => {
     const favSet = new Set(favouriteTrackIds);
-    const byName = (a: TrackOption, b: TrackOption) => a.name.localeCompare(b.name);
-    const toRow = (t: TrackOption) => ({
-      value: t.id,
-      label: t.name,
-      detail: t.location ?? null,
-      keywords:
-        [...(t.gripTags ?? []), ...(t.layoutTags ?? []), liveRcShortName(t.liveRcUrl)]
-          .filter(Boolean)
-          .join(" ") || null,
+    const byId = new Map(all.map((t) => [t.id, t]));
+    const nearbyRows = nearby.flatMap((n) => {
+      const t = byId.get(n.trackId);
+      return t
+        ? [{ ...trackRow(t), detail: [formatDistanceMeters(n.distanceM), t.location].filter(Boolean).join(" · ") }]
+        : [];
     });
+    const nearSet = new Set(nearbyRows.map((r) => r.value));
+    const byName = (a: TrackOption, b: TrackOption) => a.name.localeCompare(b.name);
     return [
+      {
+        key: "nearby",
+        label: "Nearby",
+        options: nearbyRows,
+      },
       {
         key: "favourites",
         label: "Favourites",
-        options: all.filter((t) => favSet.has(t.id)).sort(byName).map(toRow),
+        options: all.filter((t) => favSet.has(t.id) && !nearSet.has(t.id)).sort(byName).map(trackRow),
       },
       {
         key: "all",
         label: "All tracks",
-        options: all.filter((t) => !favSet.has(t.id)).sort(byName).map(toRow),
+        options: all.filter((t) => !favSet.has(t.id) && !nearSet.has(t.id)).sort(byName).map(trackRow),
       },
     ];
-  }, [all, favouriteTrackIds]);
+  }, [all, favouriteTrackIds, nearby]);
 
   const selected = all.find((t) => t.id === value) ?? null;
 

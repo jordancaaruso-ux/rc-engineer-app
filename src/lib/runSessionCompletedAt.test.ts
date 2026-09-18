@@ -1,5 +1,5 @@
 /**
- * Run: `npx tsx src/lib/runSessionCompletedAt.test.ts`
+ * Run: `node --conditions=react-server --import tsx src/lib/runSessionCompletedAt.test.ts`
  * Covers the importedLapSets path only (no DB) — the ids fallback needs Prisma.
  */
 import assert from "node:assert/strict";
@@ -46,7 +46,7 @@ test("missing flag (older payloads) → no conversion", async () => {
   assert.equal(d?.toISOString(), FAKE_UTC_WALL_CLOCK);
 });
 
-test("Speedhive times are real instants — untouched even with the flag", async () => {
+test("Speedhive practice times are real instants — untouched even with the flag", async () => {
   const d = await resolveRunSessionCompletedAtFromUpsertBody(
     "u1",
     {
@@ -57,6 +57,19 @@ test("Speedhive times are real instants — untouched even with the flag", async
     { userTimeZone: SYDNEY }
   );
   assert.equal(d?.toISOString(), FAKE_UTC_WALL_CLOCK);
+});
+
+test("a Speedhive race result is the track's clock — converted like LiveRC", async () => {
+  const d = await resolveRunSessionCompletedAtFromUpsertBody(
+    "u1",
+    {
+      importedLapSets: [
+        liveRcSet({ sourceUrl: "https://speedhive.mylaps.com/events/3706689/sessions/5" }),
+      ],
+    },
+    { userTimeZone: SYDNEY }
+  );
+  assert.equal(d?.toISOString(), "2026-07-19T06:36:19.000Z");
 });
 
 test("no timezone cookie → no conversion (stable fallback)", async () => {

@@ -44,3 +44,13 @@ export function sessionCompletedAtIsoFromImportedPayload(parsed: unknown): strin
   const d = new Date(v.trim());
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
+
+/**
+ * The track's offset from UTC stored with a Speedhive practice parse (`sessionUtcOffsetMinutes`),
+ * or null — every other source, and practice imported before it was kept (2026-09-17).
+ */
+export function sessionUtcOffsetMinutesFromImportedPayload(parsed: unknown): number | null {
+  if (!parsed || typeof parsed !== "object") return null;
+  const v = (parsed as Record<string, unknown>).sessionUtcOffsetMinutes;
+  return typeof v === "number" && Number.isInteger(v) && Math.abs(v) <= 14 * 60 ? v : null;
+}

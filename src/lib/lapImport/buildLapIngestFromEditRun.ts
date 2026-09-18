@@ -6,10 +6,12 @@ import type { LapUrlSessionDriver } from "@/lib/lapUrlParsers/types";
 import {
   primaryLapRowsFromImportedPayload,
   sessionCompletedAtIsoFromImportedPayload,
+  sessionUtcOffsetMinutesFromImportedPayload,
 } from "@/lib/lapImport/fromPayload";
 import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
 import { rawSessionDriversFromImportedPayload } from "@/lib/lapImport/importedIngestPlan";
 import { primaryRowsAcrossBlocks } from "@/lib/lapImport/blockLapRows";
+import { reopenUnderSameOutingRule } from "@/lib/lapImport/sameOutingBlocks";
 import type { LapIngestFormValue, UrlImportBlock } from "@/components/runs/LapTimesIngestPanel";
 
 function defaultLapIngestValue(): LapIngestFormValue {
@@ -134,6 +136,7 @@ function blockFromLinkedSession(
       recordedAt: sess.createdAt,
       sessionCompletedAtDbIso: sess.sessionCompletedAt,
       sessionCompletedAtIso: sessionCompletedAtIsoFromImportedPayload(sess.parsedPayload),
+      sessionUtcOffsetMinutes: sessionUtcOffsetMinutesFromImportedPayload(sess.parsedPayload),
       sessionDrivers: [
         {
           id: driverId,
@@ -161,6 +164,7 @@ function blockFromLinkedSession(
     recordedAt: sess.createdAt,
     sessionCompletedAtDbIso: sess.sessionCompletedAt,
     sessionCompletedAtIso: sessionCompletedAtIsoFromImportedPayload(sess.parsedPayload),
+    sessionUtcOffsetMinutes: sessionUtcOffsetMinutesFromImportedPayload(sess.parsedPayload),
     sessionDrivers,
     selectedDriverIds: selectedDriverIdsForBlock(sessionDrivers, sets),
     driverLapRowsByDriverId: driverLapRowsForBlock(sessionDrivers, sets),
@@ -194,6 +198,11 @@ export function buildLapIngestFromEditRun(input: {
   lapSession: unknown;
   importedLapSets?: EditRunImportedLapSet[];
   linkedImportedSessions?: EditRunLinkedImportedSession[];
+  /**
+   * Telling a copy of a race from a split run's half is done on the track's clock; this zone only
+   * reads a Speedhive practice import saved before the track's offset was kept.
+   */
+  fallbackTimeZone?: string | null;
 }): LapIngestFormValue {
   const base = defaultLapIngestValue();
   const existingLapRows = primaryLapRowsFromRun({
@@ -205,11 +214,20 @@ export function buildLapIngestFromEditRun(input: {
   const importedLapSets = input.importedLapSets ?? [];
   const linkedSessions = dedupeLinkedSessions(input.linkedImportedSessions ?? []);
 
-  const blocks: UrlImportBlock[] = [];
+  const restored: UrlImportBlock[] = [];
   for (const sess of linkedSessions) {
     const block = blockFromLinkedSession(sess, importedLapSets);
-    if (block) blocks.push(block);
+    if (block) restored.push(block);
   }
+  // A linked session can be another timing site's copy of a race whose laps came from elsewhere.
+  // It comes back as a linked source, not as laps — reopened as laps, the next save doubled them.
+  const { blocks, linkedSources } = reopenUnderSameOutingRule({
+    blocks: restored,
+    lapSourceUrls: new Set(
+      importedLapSets.map((s) => s.sourceUrl?.trim() ?? "").filter((url) => url.length > 0)
+    ),
+    fallbackTimeZone: input.fallbackTimeZone ?? null,
+  });
 
   if (blocks.length > 0) {
     return {
@@ -222,6 +240,7 @@ export function buildLapIngestFromEditRun(input: {
       parserId: blocks[0]?.parserId ?? null,
       urlLapRows: null,
       urlImportBlocks: blocks,
+      linkedSources,
     };
   }
 

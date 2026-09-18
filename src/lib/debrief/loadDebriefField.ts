@@ -59,8 +59,8 @@ export async function loadDebriefFieldGaps(
 
   const paces = await loadFieldPaceForRuns(userId, inputs, { guessFirstDriver: false });
   for (const [runId, pace] of paces) {
-    if (pace.gapTop5ToMean != null && Number.isFinite(pace.gapTop5ToMean)) {
-      gaps.set(runId, pace.gapTop5ToMean);
+    if (pace.gapTop5ToMedian != null && Number.isFinite(pace.gapTop5ToMedian)) {
+      gaps.set(runId, pace.gapTop5ToMedian);
     }
   }
   return gaps;

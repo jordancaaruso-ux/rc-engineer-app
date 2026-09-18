@@ -991,6 +991,28 @@ function EditableSingle({
   onCommit: (key: string, raw: SetupSnapshotValue) => void;
   fieldChipOptionsByKey?: Record<string, SetupSheetFieldChipOptions> | null;
 }) {
+  /*
+   * Every hook this row uses is called HERE, above the tyre branch below, because React requires
+   * the same hooks in the same order on every render and that branch returns without reaching
+   * them. It was safe only by accident: both call sites key the row by the same `fieldKey` that
+   * picks the branch, so React rebuilds the row rather than reusing it and the hook count never
+   * changed mid-life. One future call site without that key and the row would have died with
+   * "rendered fewer hooks than expected" (2026-09-18).
+   *
+   * A tyre row now runs a `useState`/`useEffect` it does not read. That costs nothing and is the
+   * smaller change on a sheet paying drivers edit; the alternative was lifting ~110 lines of tyre
+   * markup out into a second component.
+   */
+  const { showDeltaSuffix } = useCompareUi();
+  const v = fieldDisplayValue(value, fieldKey, fieldChipOptionsByKey);
+  const [local, setLocal] = useState(v);
+  const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (!focused) setLocal(v);
+  }, [v, focused]);
+
   if (isTireFieldKey(fieldKey)) {
     const raw = value[fieldKey];
     const structured = normalizeTireSelectionFromUnknown(raw);
@@ -1072,7 +1094,6 @@ function EditableSingle({
   }
 
   const chipAccent: "sky" | "rose" = compareColumnRole === "b" ? "rose" : "sky";
-  const { showDeltaSuffix } = useCompareUi();
   const compareSuffix = showDeltaSuffix ? formatSetupCompareDeltaSuffix(fieldCompare) : null;
   const options = fieldOptionsForKey(fieldKey, fieldChipOptionsByKey);
   const presetWithOther = fieldUsesPresetWithOther(
@@ -1080,16 +1101,8 @@ function EditableSingle({
     modelOptionLabelsForKey(fieldKey, fieldChipOptionsByKey)
   );
   const vRaw = fieldValue(value, fieldKey);
-  const v = fieldDisplayValue(value, fieldKey, fieldChipOptionsByKey);
   const bRaw = baseline ? fieldValue(baseline, fieldKey) : "";
   const b = baseline ? fieldDisplayValue(baseline, fieldKey, fieldChipOptionsByKey) : "";
-  const [local, setLocal] = useState(v);
-  const [focused, setFocused] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    if (!focused) setLocal(v);
-  }, [v, focused]);
 
   const showCompareEdit = hasBaseline && !focused;
   const effectiveReadOnly = readOnly || isDerivedSetupKey(fieldKey);

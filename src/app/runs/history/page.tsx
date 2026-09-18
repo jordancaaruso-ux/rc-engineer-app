@@ -11,7 +11,7 @@ import { loadTeamMemberDisplays, memberDisplayLabelRecord } from "@/lib/teams/te
 import { RunHistoryTable } from "@/components/runs/RunHistoryTable";
 import { RunHistoryColGroup, RunHistoryMobileHeaderRow, RUN_HISTORY_ACTION_CELL_CLASS, computeRunHistoryColSpan } from "@/components/runs/runHistoryTableColumns";
 import { SessionsFocusScroll } from "@/components/runs/SessionsFocusScroll";
-import { WhichCarSheet } from "@/components/dashboard/GetMyDay";
+import { UnloggedRunsSheet } from "@/components/dashboard/GetMyDay";
 import { SessionsBrowser } from "@/components/runs/SessionsBrowser";
 import {
   buildGroupDrivers,
@@ -93,6 +93,7 @@ const runHistorySelect = {
   userId: true,
   createdAt: true,
   sortAt: true,
+  importedLapTimeSessionId: true,
   // Which day this run belongs to is decided in the DRIVER's zone, not the reader's
   // (buildRunHistoryGroups → resolveRunLocalTimeZone).
   localTimeZone: true,
@@ -289,6 +290,7 @@ async function loadSessionRunTotals(input: {
         eventId: true,
         createdAt: true,
         sortAt: true,
+        importedLapTimeSessionId: true,
         localTimeZone: true,
         trackNameSnapshot: true,
         track: { select: { name: true } },
@@ -392,13 +394,13 @@ export default async function RunHistoryPage({
   const openGroupRaw = Array.isArray(rawOpenGroup) ? rawOpenGroup[0] : rawOpenGroup;
   const openGroupParam =
     typeof openGroupRaw === "string" && openGroupRaw.trim() ? openGroupRaw.trim() : null;
-  /** `?whichCar=<trackId>&ymd=<ymd>` — the 8 pm notification's landing (see `WhichCarSheet`). */
-  const whichCarRaw = resolvedSearch.whichCar;
-  const whichCarTrackId =
-    typeof whichCarRaw === "string" && whichCarRaw.trim() ? whichCarRaw.trim() : null;
-  const whichCarYmdRaw = resolvedSearch.ymd;
-  const whichCarYmd =
-    typeof whichCarYmdRaw === "string" && whichCarYmdRaw.trim() ? whichCarYmdRaw.trim() : null;
+  /** `?unlogged=<trackId>&ymd=<ymd>` — the 8 pm notification's landing (see `UnloggedRunsSheet`). */
+  const unloggedRaw = resolvedSearch.unlogged;
+  const unloggedTrackId =
+    typeof unloggedRaw === "string" && unloggedRaw.trim() ? unloggedRaw.trim() : null;
+  const unloggedYmdRaw = resolvedSearch.ymd;
+  const unloggedYmd =
+    typeof unloggedYmdRaw === "string" && unloggedYmdRaw.trim() ? unloggedYmdRaw.trim() : null;
   /*
    * `level=day` stops the `openGroup` trip at the day's list instead of on the run itself.
    * Confirming a run the app filed lands here (`confirmRunReturnHref`): the driver came to
@@ -694,7 +696,7 @@ export default async function RunHistoryPage({
         identity,
         text: row?.text ?? "",
         updatedAtIso: row?.updatedAtIso ?? null,
-        recap: buildDebriefRecap(group, { zones: groupZones, fieldGapByRunId }),
+        recap: buildDebriefRecap(group, { zones: groupZones, fieldGapByRunId, setupDataByRunId }),
         isOver: meetingIsOver(group, { zones: groupZones }),
       });
     }
@@ -881,10 +883,10 @@ export default async function RunHistoryPage({
 
   return (
     <>
-      {/* Arrived from the 8 pm notification with sessions still waiting on a car: the day is
-          behind it, the sheet asks the one question. */}
-      {whichCarTrackId && whichCarYmd ? (
-        <WhichCarSheet trackId={whichCarTrackId} ymd={whichCarYmd} />
+      {/* Arrived from the 8 pm notification with runs on the timing sheet not logged: the day is
+          behind it, the sheet lists them to keep or not. */}
+      {unloggedTrackId && unloggedYmd ? (
+        <UnloggedRunsSheet trackId={unloggedTrackId} ymd={unloggedYmd} />
       ) : null}
       {/* `sessions-chrome` — this header names the LIST, so on a phone it folds
           away once you push into a day (globals.css, keyed off `data-sessions-depth`). */}

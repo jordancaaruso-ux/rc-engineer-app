@@ -1,7 +1,8 @@
 import type { GeoPosition } from "@/lib/location/coordinates";
 import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 
-export const DEFAULT_TRACK_PROXIMITY_RADIUS_M = 800;
+/** Rough pins (a geocoded address or town) can sit a few km out, so "near" is town-sized. */
+export const NEARBY_TRACK_RADIUS_M = 25_000;
 
 export type TrackWithCoordinates = {
   id: string;
@@ -36,7 +37,7 @@ export function haversineMeters(a: GeoPosition, b: GeoPosition): number {
 export function findTracksNearPosition(
   tracks: readonly TrackWithCoordinates[],
   position: GeoPosition,
-  radiusMeters: number = DEFAULT_TRACK_PROXIMITY_RADIUS_M
+  radiusMeters: number = NEARBY_TRACK_RADIUS_M
 ): TrackNearPosition[] {
   const withCoords = tracks.filter(trackHasMarkedLocation);
   const hits: TrackNearPosition[] = [];
@@ -64,49 +65,6 @@ export function sortNearbyTracks(
     if (aFav !== bFav) return aFav ? -1 : 1;
     return a.distanceM - b.distanceM;
   });
-}
-
-export type TrackPickFromPositionResult =
-  | { kind: "no_marked_tracks" }
-  | { kind: "none_nearby" }
-  | { kind: "single"; track: TrackWithCoordinates; distanceM: number }
-  | { kind: "multiple"; nearby: TrackNearPosition[] };
-
-/**
- * Decide how to set the track from device GPS: auto-select only when exactly one
- * track is within radius; otherwise return sorted nearby list for manual pick.
- */
-export function pickTrackFromPosition(
-  tracks: readonly TrackWithCoordinates[],
-  position: GeoPosition,
-  options?: {
-    radiusMeters?: number;
-    favouriteTrackIds?: readonly string[];
-  }
-): TrackPickFromPositionResult {
-  const marked = tracks.filter(trackHasMarkedLocation);
-  if (marked.length === 0) {
-    return { kind: "no_marked_tracks" };
-  }
-
-  const radiusMeters = options?.radiusMeters ?? DEFAULT_TRACK_PROXIMITY_RADIUS_M;
-  const favouriteTrackIds = options?.favouriteTrackIds ?? [];
-  const nearby = sortNearbyTracks(
-    findTracksNearPosition(tracks, position, radiusMeters),
-    favouriteTrackIds
-  );
-
-  if (nearby.length === 0) {
-    return { kind: "none_nearby" };
-  }
-  if (nearby.length === 1) {
-    return {
-      kind: "single",
-      track: nearby[0]!.track,
-      distanceM: nearby[0]!.distanceM,
-    };
-  }
-  return { kind: "multiple", nearby };
 }
 
 export function formatDistanceMeters(m: number): string {
