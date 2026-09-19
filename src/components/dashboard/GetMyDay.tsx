@@ -86,7 +86,7 @@ export function GetMyDayRow() {
           className="tap-active -mx-1.5 flex w-[calc(100%+0.75rem)] items-center gap-2 rounded-lg px-1.5 py-1 text-left text-[13px] font-semibold text-muted-foreground transition hover:text-foreground"
         >
           <Download aria-hidden className="size-[15px]" strokeWidth={2.2} />
-          Import your last runs
+          Import older runs
           <ChevronRight aria-hidden className="ml-auto size-4 text-faint" strokeWidth={2.2} />
         </button>
       </SurfaceCard>
@@ -595,7 +595,7 @@ function GetMyDaySheet({
       ? "Which car?"
       : list
         ? listTitle
-        : "Import your last runs";
+        : "Import older runs";
   const pickedPill = range.startYmd === range.endYmd ? range.startYmd : null;
   const logLabel =
     tickedCount === 0

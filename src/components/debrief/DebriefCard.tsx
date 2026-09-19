@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown } from "lucide-react";
+import { Children, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Check, ChevronDown } from "lucide-react";
 import { AutoGrowTextarea } from "@/components/ui/AutoGrowTextarea";
 import { CardPanel } from "@/components/ui/CardPanel";
-import { Eyebrow, StatStrip } from "@/components/ui/panel";
+import { Eyebrow } from "@/components/ui/panel";
 import { SetupChangedSincePreviousList } from "@/components/runs/SetupChangedSincePreviousList";
 import type { DebriefFromNew, DebriefRecap, DebriefSetup } from "@/lib/debrief/buildDebriefRecap";
+import { applyBulletEdit, BULLET, cleanBullets, withBullets } from "@/lib/debrief/debriefBullets";
 import {
   confirmDebriefSave,
   openDebriefNote,
@@ -49,8 +50,20 @@ import { cn } from "@/lib/utils";
  * where it started says so, with how many changes it took to get back — his call, so that
  * "touched nothing" and "tried everything and came home" never read the same.
  *
- * Saves on blur like every other inline correction (run notes, `RunDetailPanel`): no button
- * to hunt for, nothing lost by tapping away.
+ * 2026-09-19: the box writes dot points — a dot waiting on the tap, a new one on every Return
+ * (`debriefBullets`). Still one plain-text note underneath; "one empty notes thing looks a bit
+ * cheap" was the complaint, and short points read better than a blob.
+ *
+ * Saves on blur like every other inline correction (run notes, `RunDetailPanel`): nothing lost
+ * by tapping away.
+ *
+ * 2026-09-19: the save says so, under the box — "Saving…", then a tick and "Auto-saved". His
+ * complaint was "I'll leave the page, go back and then it's not there"; nothing had been lost
+ * (the page had drawn an old copy), but a save nobody can see is a save nobody trusts. A Save
+ * button was built first and he took it back out the same day: "doesn't look very clean… a
+ * subtle but clear auto saved would be the best". The box also saves a moment after the typing
+ * stops, when the app goes to the background, and when the card goes away, and the request is
+ * `keepalive` so closing the app doesn't cut it off.
  *
  * The pane draws this card afresh every time it changes, from a page copy of the note loaded
  * before any save — so it opens on this tab's memory of the meeting, not on that copy alone
@@ -95,13 +108,67 @@ function gapTone(seconds: number): string | undefined {
   return seconds < 0 ? "text-gain" : "text-destructive";
 }
 
-function Line({ label, children }: { label: string; children: ReactNode }) {
+/**
+ * One row of the card: label, value, and optionally something full-width underneath.
+ *
+ * Every row is a pair of cells in ONE grid (`RecapLines`), so the label column is exactly as wide
+ * as the longest label on this card and no label wraps. At a fixed 64px "vs field median" and
+ * "Handling rating" both broke in two, the rows came out at different heights, and that unevenness
+ * was most of why the card "didn't look clean" (founder, 2026-09-19).
+ */
+type Row = {
+  key: string;
+  label: string;
+  /** A second, quieter label on the row's LAST line — "From new", level with its figures. */
+  foot?: string;
+  value: ReactNode;
+  /** Opens under the row at the card's full width (the setup list needs the room). */
+  below?: ReactNode;
+};
+
+function RowCells({ row, last }: { row: Row; last: boolean }) {
+  const rule = last || row.below ? "" : "border-b border-border/70";
   return (
-    <div className="flex gap-3 border-b border-border/70 py-1.5 last:border-b-0">
-      {/* Tight leading so the one label that wraps ("vs field median") costs a few pixels, not a row. */}
-      <span className="type-data-label w-[64px] flex-none pt-0.5 leading-[1.25]">{label}</span>
-      <div className="min-w-0 text-[13px] leading-snug text-foreground">{children}</div>
-    </div>
+    <>
+      <div className={cn("flex flex-col justify-between whitespace-nowrap py-2 pr-4", rule)}>
+        <span className="type-data-label leading-[18px]">{row.label}</span>
+        {row.foot ? (
+          <span className="text-[11px] font-semibold leading-[1.35] text-muted-foreground">{row.foot}</span>
+        ) : null}
+      </div>
+      <div className={cn("min-w-0 py-2 text-[13px] leading-[18px] text-foreground", rule)}>{row.value}</div>
+      {row.below ? (
+        <div className={cn("col-span-2 min-w-0 pb-2", last ? "" : "border-b border-border/70")}>{row.below}</div>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Pieces joined by " · " that break BETWEEN pieces and never inside one — and a piece that lands
+ * on a new line loses its dot. Every piece carries its dot in front; the row is pulled left by
+ * one dot's width and the clip hides whichever dots end up at the start of a line.
+ *
+ * At 390px the value column is ~200px, and a sentence left to wrap where it liked gave "· 36 /
+ * made" and "· 4 / runs". The first piece alone may wrap inside (a long tyre name has to).
+ */
+function Dotted({ children }: { children: ReactNode }) {
+  return (
+    <span className="block overflow-hidden">
+      <span className="-ml-[12px] flex flex-wrap">
+        {Children.toArray(children).map((piece, index) => (
+          <span
+            key={index}
+            className={cn(
+              "min-w-0 before:inline-block before:w-[12px] before:text-center before:text-faint before:content-['·']",
+              index > 0 && "whitespace-nowrap"
+            )}
+          >
+            {piece}
+          </span>
+        ))}
+      </span>
+    </span>
   );
 }
 
@@ -112,7 +179,7 @@ function Line({ label, children }: { label: string; children: ReactNode }) {
 function FromNewRow({ steps }: { steps: DebriefFromNew[] }) {
   if (steps.length === 0) return null;
   return (
-    <table className="mt-1 border-collapse tabular-nums">
+    <table className="-ml-3 mt-1 border-collapse tabular-nums">
       <thead>
         <tr>
           <td className="p-0" />
@@ -131,7 +198,7 @@ function FromNewRow({ steps }: { steps: DebriefFromNew[] }) {
         <tr>
           <th
             scope="row"
-            className="whitespace-nowrap p-0 text-left text-[11px] font-semibold leading-[1.35] text-muted-foreground"
+            className="sr-only"
           >
             From new
           </th>
@@ -158,6 +225,10 @@ function FromNewRow({ steps }: { steps: DebriefFromNew[] }) {
  * made" read as a part and a whole, when the two numbers are a distance and a count. "Ended 19
  * changes from where you started" says which is which in the driver's own words, and borrows
  * the phrase the came-home state already uses so the three readings sound like one voice.
+ *
+ * 2026-09-19: the same sentence, cut to fit one line at 390px — "19 changes from start · 36
+ * made", and "Back at start · 7 changes made" beside it. "from start" is what keeps the first
+ * number a distance; the two states still share the phrase.
  */
 function SetupSummary({
   setup,
@@ -169,23 +240,24 @@ function SetupSummary({
   onToggle: () => void;
 }) {
   const net = setup.rows.length;
-  const car = setup.carName ? <span>{setup.carName} · </span> : null;
+  const car = setup.carName ? <span>{setup.carName}</span> : null;
   if (setup.made === 0) {
     return (
-      <span className="block">
-        {car}Unchanged
-      </span>
+      <Dotted>
+        {car}
+        <span>Unchanged</span>
+      </Dotted>
     );
   }
   if (net === 0) {
     return (
-      <span className="block">
-        {car}Back where you started
+      <Dotted>
+        {car}
+        <span>Back at start</span>
         <span className="text-faint">
-          {" · "}
           {setup.made} {setup.made === 1 ? "change" : "changes"} made
         </span>
-      </span>
+      </Dotted>
     );
   }
   return (
@@ -193,12 +265,16 @@ function SetupSummary({
       type="button"
       onClick={onToggle}
       aria-expanded={open}
-      className="tap-active flex items-center gap-1 text-left text-[13px] leading-snug text-foreground"
+      className="tap-active flex w-full items-center gap-1 text-left text-[13px] leading-[18px] text-foreground"
     >
-      <span>
-        {car}Ended <span className="font-semibold tabular-nums">{net}</span>{" "}
-        {net === 1 ? "change" : "changes"} from where you started
-        {setup.made > net ? <span className="text-faint"> · {setup.made} made</span> : null}
+      <span className="min-w-0 flex-1">
+        <Dotted>
+          {car}
+          <span>
+            <span className="font-semibold tabular-nums">{net}</span> {net === 1 ? "change" : "changes"} from start
+          </span>
+          {setup.made > net ? <span className="text-faint">{setup.made} made</span> : null}
+        </Dotted>
       </span>
       <ChevronDown
         className={cn("h-3.5 w-3.5 flex-none text-faint transition-transform", open && "rotate-180")}
@@ -215,7 +291,8 @@ function RecapLines({
   recap: DebriefRecap;
   onOpenRun: (runId: string) => void;
 }) {
-  const lines: ReactNode[] = [];
+  const rows: Row[] = [];
+  let best: ReactNode = null;
   const [openSetupCarId, setOpenSetupCarId] = useState<string | null>(null);
 
   /*
@@ -223,6 +300,10 @@ function RecapLines({
    * evening: stacked as three rows they "read as three different things" and cost the
    * card most of its height. A strip says they are one fact (the meeting's best) seen
    * three ways; the run under each figure is the door onto that run.
+   *
+   * 2026-09-19: the strip lost its box. A rounded, bordered well on top of a ruled list was two
+   * layouts in one card, and the well was the tallest thing in it. Now the three figures stand
+   * on the same hairline the rows use, split by the same hairline upright.
    */
   const marks = [
     recap.best ? { key: "lap", label: "Lap", value: formatLap(recap.best.seconds), run: recap.best } : null,
@@ -230,27 +311,33 @@ function RecapLines({
     recap.fiveMin ? { key: "stint", label: "5 min", value: recap.fiveMin.label, run: recap.fiveMin } : null,
   ].filter((m): m is NonNullable<typeof m> => m != null);
   if (marks.length > 0) {
-    lines.push(
-      <div key="best" className="pb-2">
-        <div className="type-data-label mb-1">Best</div>
-        <StatStrip gridClassName={marks.length === 3 ? "grid-cols-3" : marks.length === 2 ? "grid-cols-2" : "grid-cols-1"}>
-          {marks.map((mark) => (
-            <div key={mark.key} className="border-l border-t border-border px-2.5 py-2">
-              <div className="type-data-label">{mark.label}</div>
+    best = (
+      <div className="border-b border-border/70 pb-2.5 pt-1">
+        <div className="type-data-label mb-1.5">Best</div>
+        <div className={cn("grid sm:max-w-[540px]", marks.length === 3 ? "grid-cols-3" : marks.length === 2 ? "grid-cols-2" : "grid-cols-1")}>
+          {marks.map((mark, index) => (
+            <div key={mark.key} className={cn("min-w-0", index > 0 && "border-l border-border/70 pl-3")}>
+              <div className="text-[11px] leading-[1.3] text-muted-foreground">{mark.label}</div>
               <div className="mt-0.5 text-[15px] font-semibold tabular-nums leading-tight text-foreground">
                 {mark.value}
               </div>
+              {/*
+               * Run and day on ONE line (founder call 2026-09-19 — two lines made the strip the
+               * tallest thing in the card). A third of 390px can't hold "Run 12 · Sun 28 Jun", so
+               * the day is its weekday: inside one meeting that names the day, and the tap
+               * settles anything it doesn't.
+               */}
               <button
                 type="button"
                 onClick={() => onOpenRun(mark.run.runId)}
-                className="tap-active mt-0.5 text-left text-[11px] leading-snug text-faint underline decoration-border underline-offset-2 hover:text-foreground"
+                className="tap-active mt-0.5 block max-w-full truncate text-left text-[11px] leading-snug text-faint underline decoration-border underline-offset-2 hover:text-foreground"
               >
                 {mark.run.runLabel}
-                {mark.run.dayLabel ? <span className="block">{mark.run.dayLabel}</span> : null}
+                {mark.run.dayLabel ? ` · ${mark.run.dayLabel.split(" ")[0]}` : null}
               </button>
             </div>
           ))}
-        </StatStrip>
+        </div>
       </div>
     );
   }
@@ -268,39 +355,49 @@ function RecapLines({
    */
   if (recap.field) {
     const field = recap.field;
-    lines.push(
-      <Line key="field" label="vs field median">
-        {field.runCount > 1 ? (
-          <>
-            <span className={cn("font-semibold tabular-nums", gapTone(field.avg))}>{formatGap(field.avg)}</span>
-            <span className="text-faint"> over {field.runCount} runs · </span>
-            <span className={cn("font-semibold tabular-nums", gapTone(field.best))}>{formatGap(field.best)}</span>
-            <span className="text-faint"> best </span>
-          </>
-        ) : (
-          <>
-            <span className={cn("font-semibold tabular-nums", gapTone(field.best))}>{formatGap(field.best)}</span>{" "}
-          </>
-        )}
-        <button
-          type="button"
-          onClick={() => onOpenRun(field.runId)}
-          className="tap-active text-[12px] text-faint underline decoration-border underline-offset-2 hover:text-foreground"
-        >
-          {field.runLabel}
-        </button>
-      </Line>
+    const bestRun = (
+      <button
+        type="button"
+        onClick={() => onOpenRun(field.runId)}
+        className="tap-active text-[12px] text-faint underline decoration-border underline-offset-2 hover:text-foreground"
+      >
+        {field.runLabel}
+      </button>
     );
+    rows.push({
+      key: "field",
+      label: "vs field median",
+      // Two pieces: side by side where there is room, and on a phone one under the other with
+      // the two figures level — not a sentence that wraps where it likes.
+      value: (
+        <Dotted>
+          {field.runCount > 1 ? (
+            <span>
+              <span className={cn("font-semibold tabular-nums", gapTone(field.avg))}>{formatGap(field.avg)}</span>
+              <span className="text-faint"> over {field.runCount} runs</span>
+            </span>
+          ) : null}
+          <span>
+            <span className={cn("font-semibold tabular-nums", gapTone(field.best))}>{formatGap(field.best)}</span>
+            {field.runCount > 1 ? <span className="text-faint"> best</span> : null} {bestRun}
+          </span>
+        </Dotted>
+      ),
+    });
   }
 
   if (recap.rating) {
     const words = ratingWords(recap.rating.direction);
-    lines.push(
-      <Line key="rating" label="Felt">
-        <span className="tabular-nums">{ratingFigures(recap.rating.arc)}</span>
-        {words ? <span className="text-faint"> · {words}</span> : null}
-      </Line>
-    );
+    rows.push({
+      key: "rating",
+      label: "Handling rating",
+      value: (
+        <Dotted>
+          <span className="whitespace-nowrap tabular-nums">{ratingFigures(recap.rating.arc)}</span>
+          {words ? <span className="text-faint">{words}</span> : null}
+        </Dotted>
+      ),
+    });
   }
 
   const air = recap.airTempC
@@ -312,17 +409,23 @@ function RecapLines({
   if (recap.tyres.length === 1) {
     // One compound: the air rides on the same line rather than costing a row of its own.
     const tyre = recap.tyres[0]!;
-    lines.push(
-      <Line key="tyre" label="Tyres">
-        {tyre.name}
-        <span className="text-faint">
-          {" · "}
-          {tyre.runCount} {tyre.runCount === 1 ? "run" : "runs"}
-          {air ? ` · ${air}` : ""}
-        </span>
-        <FromNewRow steps={tyre.fromNew} />
-      </Line>
-    );
+    rows.push({
+      key: "tyre",
+      label: "Tyres",
+      foot: tyre.fromNew.length > 0 ? "From new" : undefined,
+      value: (
+        <>
+          <Dotted>
+            <span>{tyre.name}</span>
+            <span className="text-faint">
+              {tyre.runCount} {tyre.runCount === 1 ? "run" : "runs"}
+            </span>
+            {air ? <span className="text-faint">{air}</span> : null}
+          </Dotted>
+          <FromNewRow steps={tyre.fromNew} />
+        </>
+      ),
+    });
   } else if (recap.tyres.length > 1) {
     // More than one compound: each gets the meeting's three figures, so the line answers
     // "which tyre was the day on" without the driver working it out from the rows.
@@ -332,53 +435,73 @@ function RecapLines({
         tyre.top5 != null ? `top 5 ${formatLap(tyre.top5)}` : null,
         tyre.fiveMin,
       ].filter(Boolean);
-      lines.push(
-        <Line key={`tyre-${tyre.name}`} label={index === 0 ? "Tyres" : ""}>
-          <span className="block">
-            {tyre.name}
-            <span className="text-faint">
-              {" · "}
-              {tyre.runCount} {tyre.runCount === 1 ? "run" : "runs"}
-            </span>
-          </span>
-          {figures.length ? (
-            <span className="block text-[12px] tabular-nums text-faint">{figures.join(" · ")}</span>
-          ) : null}
-          <FromNewRow steps={tyre.fromNew} />
-        </Line>
-      );
+      rows.push({
+        key: `tyre-${tyre.name}`,
+        label: index === 0 ? "Tyres" : "",
+        foot: tyre.fromNew.length > 0 ? "From new" : undefined,
+        value: (
+          <>
+            <Dotted>
+              <span>{tyre.name}</span>
+              <span className="text-faint">
+                {tyre.runCount} {tyre.runCount === 1 ? "run" : "runs"}
+              </span>
+            </Dotted>
+            {figures.length ? (
+              <span className="block text-[12px] tabular-nums text-faint">
+                <Dotted>
+                  {figures.map((figure, figureIndex) => (
+                    <span key={figureIndex}>{figure}</span>
+                  ))}
+                </Dotted>
+              </span>
+            ) : null}
+            <FromNewRow steps={tyre.fromNew} />
+          </>
+        ),
+      });
     });
   }
 
   if (air && recap.tyres.length !== 1) {
-    lines.push(
-      <Line key="air" label="Air">
-        {air}
-      </Line>
-    );
+    rows.push({ key: "air", label: "Air", value: air });
   }
 
   // Last, so the list it opens lands directly above the runs it summarises, not between the
   // marks and the tyres. One line per car; the label reads once, like the tyre lines.
   recap.setup.forEach((setup, index) => {
     const open = openSetupCarId === setup.carId;
-    lines.push(
-      <Line key={`setup-${setup.carId}`} label={index === 0 ? "Setup" : ""}>
+    rows.push({
+      key: `setup-${setup.carId}`,
+      label: index === 0 ? "Setup" : "",
+      value: (
         <SetupSummary
           setup={setup}
           open={open}
           onToggle={() => setOpenSetupCarId(open ? null : setup.carId)}
         />
-        {open ? (
-          <SetupChangedSincePreviousList rows={setup.rows} runId={setup.endRunId} className="mt-1.5" />
-        ) : null}
-      </Line>
-    );
+      ),
+      below: open ? <SetupChangedSincePreviousList rows={setup.rows} runId={setup.endRunId} /> : undefined,
+    });
   });
 
-  if (lines.length === 0) return null;
-  return <div className="mb-3">{lines}</div>;
+  if (!best && rows.length === 0) return null;
+  return (
+    <div className="mb-3">
+      {best}
+      {rows.length > 0 ? (
+        <div className="grid grid-cols-[max-content_minmax(0,1fr)]">
+          {rows.map((row, index) => (
+            <RowCells key={row.key} row={row} last={index === rows.length - 1} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
+
+/** How long the typing has to stop before the box saves itself. */
+const SAVE_AFTER_PAUSE_MS = 1500;
 
 export function DebriefCard({
   debrief,
@@ -400,6 +523,10 @@ export function DebriefCard({
   const sendingTextRef = useRef<string | null>(null);
   const [updatedAtIso, setUpdatedAtIso] = useState(opened.saved.updatedAtIso);
   const [status, setStatus] = useState<"idle" | "saving" | "error">("idle");
+  /** The box holds something the server doesn't — the line under it reads "Saving…". */
+  const [dirty, setDirty] = useState(opened.boxText.trim() !== opened.saved.text);
+  const boxRef = useRef<HTMLTextAreaElement | null>(null);
+  const pauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const weekend = (debrief.recap?.dayCount ?? 1) > 1;
   /*
    * One word, and it is the whole state of the card. While the day or the event is still
@@ -409,6 +536,16 @@ export function DebriefCard({
    * a second moving part here buys nothing.
    */
   const title = debrief.isOver ? "Debrief" : "Overview";
+
+  /*
+   * What the box's text means as a note: the dots nobody wrote beside taken off — and an older,
+   * undotted note that was opened and left alone is still that same note, so tapping in and out
+   * of it saves nothing and moves no "updated" stamp.
+   */
+  const noteOf = useCallback((boxValue: string) => {
+    const note = cleanBullets(boxValue);
+    return note === withBullets(savedTextRef.current) ? savedTextRef.current : note;
+  }, []);
 
   const save = useCallback(
     async (raw: string) => {
@@ -425,6 +562,8 @@ export function DebriefCard({
       try {
         const res = await fetch("/api/debriefs", {
           method: "PUT",
+          // Outlives the page: the app closed or swiped away mid-save still lands it.
+          keepalive: true,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ meetingKey, localDayKey, trackKey, text: next }),
         });
@@ -441,13 +580,16 @@ export function DebriefCard({
         savedTextRef.current = newest.text;
         setUpdatedAtIso(newest.updatedAtIso);
         setStatus("idle");
+        // More may have been typed while this was on its way.
+        const box = boxRef.current;
+        setDirty(box != null && noteOf(box.value).trim() !== newest.text);
       } catch {
         setStatus("error");
       } finally {
         if (sendingTextRef.current === next) sendingTextRef.current = null;
       }
     },
-    [meetingKey, localDayKey, trackKey]
+    [meetingKey, localDayKey, trackKey, noteOf]
   );
 
   /*
@@ -459,28 +601,56 @@ export function DebriefCard({
     if (opened.boxText !== opened.saved.text) void save(opened.boxText);
   }, [opened, save]);
 
-  const meta =
-    status === "error"
-      ? "not saved"
-      : status === "saving"
-        ? "saving"
-        : updatedAtIso
-          ? `updated ${formatRunDateShort(updatedAtIso, displayTimeZone)}`
-          : null;
+  const saveBox = useCallback(() => {
+    if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
+    pauseTimerRef.current = null;
+    const box = boxRef.current;
+    if (box) void save(noteOf(box.value));
+  }, [save, noteOf]);
+
+  /*
+   * The doors that don't need a tap away: the app sent to the background (a phone gives no other
+   * warning before it may be closed), and the card going away — another day picked, another page.
+   */
+  useEffect(() => {
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") saveBox();
+    };
+    document.addEventListener("visibilitychange", onHidden);
+    window.addEventListener("pagehide", saveBox);
+    return () => {
+      document.removeEventListener("visibilitychange", onHidden);
+      window.removeEventListener("pagehide", saveBox);
+      saveBox();
+    };
+  }, [saveBox]);
+
+  /** Every point keeps its dot, whatever the keyboard just did (`debriefBullets`). */
+  const keepBullets = (el: HTMLTextAreaElement, inputType: string) => {
+    const edit = applyBulletEdit(el.value, el.selectionStart, inputType);
+    if (edit.value !== el.value) {
+      el.value = edit.value;
+      el.setSelectionRange(edit.caret, edit.caret);
+    }
+    boxRef.current = el;
+    const note = noteOf(el.value);
+    rememberDebriefDraft(meetingKey, note);
+    setDirty(note.trim() !== savedTextRef.current);
+    // A moment after the typing stops — short enough to beat a quick exit, long enough not to
+    // send a request per word.
+    if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
+    pauseTimerRef.current = setTimeout(saveBox, SAVE_AFTER_PAUSE_MS);
+  };
+
+  // The band carries the date alone; whether it is saved is said under the box, where the eyes are.
+  const meta = updatedAtIso ? `updated ${formatRunDateShort(updatedAtIso, displayTimeZone)}` : null;
 
   return (
     <CardPanel contentClassName="px-3 pb-3 pt-2.5">
       <div className="eyebrow-band mb-1.5 flex items-center gap-2">
         <Eyebrow className="mb-0">{title}</Eyebrow>
         {meta ? (
-          <span
-            className={cn(
-              "ml-auto text-[11px] leading-[1.25]",
-              status === "error" ? "text-destructive" : "text-muted-foreground"
-            )}
-          >
-            {meta}
-          </span>
+          <span className="ml-auto text-[11px] leading-[1.25] text-muted-foreground">{meta}</span>
         ) : null}
       </div>
       <div className="mt-1.5">
@@ -493,13 +663,55 @@ export function DebriefCard({
            * Founder call 2026-09-16.
            */
           maxRows={10}
-          defaultValue={opened.boxText}
+          defaultValue={withBullets(opened.boxText)}
           aria-label={weekend ? `Weekend ${title.toLowerCase()}` : `Day ${title.toLowerCase()}`}
-          placeholder={weekend ? "What did you learn this weekend?" : "What did you learn today?"}
-          onInput={(e) => rememberDebriefDraft(meetingKey, e.currentTarget.value)}
-          onBlur={(e) => void save(e.currentTarget.value)}
-          className="w-full rounded-md border border-ring/40 bg-background px-2.5 py-1.5 text-[13px] leading-relaxed text-foreground outline-none focus:border-ring"
+          placeholder={weekend ? "• What did you learn this weekend?" : "• What did you learn today?"}
+          onFocus={(e) => {
+            boxRef.current = e.currentTarget;
+            // The first dot is waiting. iOS places its own caret after the focus event, so the
+            // caret is set again on the next frame.
+            const el = e.currentTarget;
+            if (el.value !== "") return;
+            el.value = BULLET;
+            el.setSelectionRange(BULLET.length, BULLET.length);
+            requestAnimationFrame(() => {
+              if (el.value === BULLET) el.setSelectionRange(BULLET.length, BULLET.length);
+            });
+          }}
+          onInput={(e) => {
+            const native = e.nativeEvent as InputEvent;
+            // Mid-composition (an IME, some autocorrects) the text isn't settled — wait for its end.
+            if (native.isComposing) return;
+            keepBullets(e.currentTarget, native.inputType ?? "");
+          }}
+          onCompositionEnd={(e) => keepBullets(e.currentTarget, "")}
+          onBlur={(e) => {
+            const el = e.currentTarget;
+            // A dot with nothing beside it is an empty box — the prompt comes back.
+            if (cleanBullets(el.value) === "") el.value = "";
+            boxRef.current = el;
+            saveBox();
+          }}
+          className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-[13px] leading-relaxed text-foreground outline-none placeholder:text-faint focus:border-ring"
         />
+        {/* The line keeps its height when empty, so the runs below never jump as it comes and goes. */}
+        <div
+          aria-live="polite"
+          className="mt-1 flex min-h-[14px] items-center justify-end gap-1 text-[11px] leading-[14px] text-muted-foreground"
+        >
+          {status === "error" ? (
+            <button type="button" onClick={saveBox} className="text-destructive underline underline-offset-2">
+              Not saved · Retry
+            </button>
+          ) : status === "saving" || dirty ? (
+            "Saving…"
+          ) : updatedAtIso ? (
+            <>
+              <Check aria-hidden className="size-3" strokeWidth={2.5} />
+              Auto-saved
+            </>
+          ) : null}
+        </div>
       </div>
     </CardPanel>
   );

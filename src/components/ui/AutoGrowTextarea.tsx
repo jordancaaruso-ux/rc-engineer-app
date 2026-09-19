@@ -84,9 +84,11 @@ export function AutoGrowTextarea({
 
   // `input` rather than `change`: it covers typing, paste, cut, undo and
   // autofill, and it fires on an uncontrolled box where nothing re-renders.
+  // The caller goes first: the debrief box rewrites its own text here (dot points), and the
+  // measure has to be of what it left behind.
   const handleInput: NonNullable<TextareaHTMLAttributes<HTMLTextAreaElement>["onInput"]> = (e) => {
-    resize();
     onInput?.(e);
+    resize();
   };
 
   return (
