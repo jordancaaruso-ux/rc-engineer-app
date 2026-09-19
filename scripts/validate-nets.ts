@@ -4,7 +4,7 @@
  * Checks every entry under content/nets/ (reviewed tiers + drafts/):
  *   - schema completeness (shared with the runtime loader: src/lib/engineer/netsSchema.ts)
  *   - one entry per knob, both directions inside; the shape matches `two_answers` on each side
- *   - no line carries a banned coinage (bite-hold.md's closed-vocabulary rule)
+ *   - (no word list: since 2026-09-04 the only vocabulary rule is the reader — behaviour a driver can read off the car)
  *   - contested ⇒ both claims + discriminator present, per side (schema-level)
  *   - every `physics` file resolves in content/vehicle-dynamics/
  *   - the rendered entry stays under the size ceiling

@@ -24,20 +24,19 @@ with nothing on the car changed.
 
 **Per axle.** Front and rear each have their own bite/hold.
 
-## Feel vocabulary (the closed list)
+## Feel vocabulary
 
-These are the **only** words available for describing how a change feels. The list is closed:
-anything outside it is not a feel word that needs replacing with a better adjective, it is a sign
-the change has not been understood well enough to predict its feel — in which case say what the
-change does **mechanically**, or name **where in the corner** and **what the car does there**, and
-stop.
+These words carry one meaning each, here and in the nets; use them with that meaning. Anything
+else passes one test: would a driver say it about how the car behaves. Never describe a feel by
+what moves inside the car. (Founder, 2026-09-04 — replaces the closed list and its "say it
+mechanically" fallback, which was producing questions in the physics' words.)
 
 - **Grip arriving:** `bite`, `initial grip`, `overall grip`, `hold`
 - **Bite end of the window:** `precise`, `pointy`
 - **Hold end of the window:** `planted`, `forgiving`
 - **Too little bite:** `numb`, `unpredictable`, `imprecise`, `vague`, `floaty` (founder, 2026-08-28:
   floaty is vague, lacks precision, doesn't do what you want — this group, not a damping word)
-- **Roll-centre / link language:** `smoother`, `more rolled-in`, `on the track`, `in the track`
+- **Roll-centre / link language:** `smoother`, `on the track`, `in the track`
 - **Phase:** `entry`, `mid-corner`, `on power`
 - **Balance** (founder, 2026-08-27): `understeer`, `oversteer` — the overall balance · `steering` —
   balance owed to the front · `rotation` — balance owed to the rear · `forward traction` / `drive` —
@@ -47,11 +46,6 @@ stop.
   Response comes from several things — the angle the car gives the tyre ([[steering-response]]) as
   much as initial grip — and bite is one of them (founder, 2026-08-29). Never a word for a lower
   roll centre or a flatter upper link.
-
-Everything else is a coinage, however natural it sounds. `punchy`, `crisper`, `takes a set`,
-`lined up`, `skatey`, `on top of it`, `nervous-feeling`, `too immediate` are examples, not the
-boundary — the boundary is this list. A coinage carries no mechanism, cannot be checked on track,
-and leaves the driver asking what was meant.
 
 ## Reading a complaint (a method, not a dictionary)
 

@@ -25,8 +25,8 @@ What the driver states is fact; never re-suspect it. Turn their words into the p
 
 Never invent a number: use only numbers from the driver, the knowledge base, or this request's DRIVER DATA block — the only logged data you can see. Anything beyond that, say you can't see it, then answer what the physics alone can.
 
-Talk like a driver at the pit table, not an engineering report: plain words, each thing once, the specific thing not its category. A change is what the driver will feel and where on the corner — the nets' register — not what moves inside the car. Shape the answer to the question:
-- A problem: the change and how far, one line, no preamble; then two or three other levers, a line each — move, size, what sets it apart.
+Talk like a driver at the pit table, not an engineering report: plain words, each thing once, the specific thing not its category. A change, and a question, is what the driver will feel and where on the corner — the nets' register — not what moves inside the car. Shape the answer to the question:
+- A problem: the change and how far, one line, no preamble; then other levers that would also do it, at most three, a line each — move, size, what sets it apart.
 - What a change does: the feel and where on the corner; other levers only if you would truly reach for them, at most two.
 - Why or how: the mechanism, plainly.
 A reason only when it changes what the driver does, and only a clause. They will ask if they want more.
@@ -140,9 +140,23 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * KB already carried inside its argument (thicker = both rear tyres put the power down): it was a
  * rotation-only entry, so "more drive off the corner" was unreachable and the model reached for
  * thinner. Gearing, motor and line still have no KB page — the founder's to write, not invented here.
+ * 2026-09-04-driver-words starts another (founder call). Asked "My car is just slow" the Engineer
+ * asked back "does the grip never arrive, or does it come in once you're through the middle" —
+ * the knowledge base's timing split in the knowledge base's words ("arrive" is on bite-hold.md
+ * fifteen times). The pit-table rule covered a CHANGE but said nothing about a QUESTION, so
+ * questions came out in physics. Now "A change, and a question, is what the driver will feel and
+ * where on the corner". Same call retired the nets ban list entirely (netsSchema.ts): the driver's
+ * word for the opposite of responsive is "lazy", and the 08-27 list had banned it. Founder: "vocab
+ * should have no ban list — terms people use to describe general car behaviour rather than physics,
+ * things a driver can interpret from the handling, not assume based on physics." bite-hold.md's
+ * closed feel list became the same rule the same day: one meaning per word, anything else judged
+ * by whether a driver would say it, never a feel described by what moves inside the car.
+ * 2026-09-04-at-most-three starts another (founder call). "then two or three other levers" was a
+ * floor: with one honest lever it went looking for two more and found a bodyshell and a diff move
+ * behind "only if"s. Now "other levers that would also do it, at most three" — a ceiling, no floor.
  * Scores are not comparable across labels.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-09-03-no-change-is-an-answer";
+export const ENGINEER_PROMPT_LABEL = "2026-09-04-at-most-three";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);
