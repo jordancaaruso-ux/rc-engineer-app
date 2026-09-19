@@ -1,6 +1,8 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { isSplitTireRun } from "@/lib/tires/runTireEnds";
+import { normalizeTireFitment } from "@/lib/tires/tireFitment";
 import { normalizeSetupData } from "@/lib/runSetup";
 import { isTuningComparisonKey } from "@/lib/setupComparison/tuningComparisonKeys";
 import { diffTuning, fmtSetupValue as fmtValue, readableSetupKey as readableKey, tuningValues } from "@/lib/engineer/setupDiff";
@@ -143,6 +145,11 @@ async function loadRun(userId: string, runId: string | null) {
       track: { select: { name: true, gripTags: true, layoutTags: true } },
       trackLayout: { select: { name: true } },
       tireType: { select: { displayName: true, modelCode: true } },
+      // The front end of a front/rear car (off-road) and what each end is glued to.
+      frontTireRunNumber: true,
+      frontTireAgeKnown: true,
+      frontTireType: { select: { displayName: true, modelCode: true } },
+      tireFitment: true,
       additiveType: { select: { displayName: true } },
       lapTimes: true,
       lapSession: true,
@@ -156,6 +163,54 @@ type LoadedRun = NonNullable<Awaited<ReturnType<typeof loadRun>>>;
 function fmtDelta(v: number): string {
   const s = Math.abs(v).toFixed(2);
   return v > 0 ? `+${s}` : v < 0 ? `-${s}` : "0.00";
+}
+
+/**
+ * The tyres, as facts. A single-tyre run — every on-road run — writes the two lines it always
+ * has, byte for byte, so nothing the Engineer was calibrated on moves.
+ *
+ * A front/rear run (off-road, 2026-09-19; decided by the run's own data, `isSplitTireRun`) names
+ * each end with its own run count, because the two ends are separate sets that age apart, and
+ * says what each is mounted on. The driver's "modifications" note is quoted as they wrote it:
+ * it is free text by design (founder ruling — no vent-hole number fields), so there is nothing
+ * to normalise and any paraphrase here would be this file's invention, not a fact.
+ */
+function pushTyreFacts(
+  run: LoadedRun,
+  push: (label: string, value: string | number | null | undefined) => void
+): void {
+  const rearName = run.tireType?.displayName ?? run.tireType?.modelCode;
+  if (!isSplitTireRun(run)) {
+    push("tyre", rearName);
+    push("tyre run number", run.tireRunNumber);
+    return;
+  }
+  const fitment = normalizeTireFitment(run.tireFitment);
+  const ends = [
+    {
+      end: "front",
+      name: run.frontTireType?.displayName ?? run.frontTireType?.modelCode,
+      runNumber: run.frontTireType ? run.frontTireRunNumber : null,
+      ageKnown: run.frontTireAgeKnown,
+      fit: fitment?.front,
+    },
+    { end: "rear", name: rearName, runNumber: run.tireType ? run.tireRunNumber : null, ageKnown: true, fit: fitment?.rear },
+  ];
+  for (const e of ends) {
+    push(`${e.end} tyre`, e.name);
+    push(
+      `${e.end} tyre run number`,
+      e.runNumber != null && e.ageKnown === false
+        ? `${e.runNumber} (counted from when the driver got the set; its age before that is unknown)`
+        : e.runNumber
+    );
+    push(`${e.end} insert`, e.fit?.insert);
+    push(`${e.end} wheel`, e.fit?.wheel);
+    push(
+      `${e.end} modifications (the driver's own note)`,
+      e.fit?.mods ? `"${e.fit.mods}"` : null
+    );
+  }
 }
 
 function buildSessionFactsBlock(
@@ -180,8 +235,7 @@ function buildSessionFactsBlock(
     run.gripLevel ?? (run.track?.gripTags?.length ? run.track.gripTags.join(", ") : null)
   );
   push("layout style", run.track?.layoutTags?.length ? run.track.layoutTags.join(", ") : null);
-  push("tyre", run.tireType?.displayName ?? run.tireType?.modelCode);
-  push("tyre run number", run.tireRunNumber);
+  pushTyreFacts(run, push);
   push("additive", run.additiveType?.displayName);
   push("air temp °C", run.conditionsAirTempC);
   push("track temp °C", run.conditionsTrackTempC);
@@ -277,6 +331,9 @@ function loadRunsAround(userId: string, carIds: string[], centre: number) {
       carId: true,
       carRating: true,
       tireRunNumber: true,
+      // Front/rear cars: the front's own count. Null on every single-tyre run.
+      frontTireTypeId: true,
+      frontTireRunNumber: true,
       conditionsAirTempC: true,
       lapTimes: true,
       lapSession: true,
@@ -341,7 +398,13 @@ function buildDayBlock(
         ? `P${fieldByRun.get(run.id)!.rank}/${fieldByRun.get(run.id)!.n} ${fmtDelta(fieldByRun.get(run.id)!.gapBestToP1!)} to P1`
         : null,
       run.carRating != null ? `rated ${run.carRating}/10` : "not rated",
-      run.tireRunNumber != null ? `tyre run ${run.tireRunNumber}` : null,
+      // A front/rear run states both counts — the ends are separate sets. A single-tyre run's
+      // cell is unchanged.
+      run.frontTireTypeId != null && run.frontTireRunNumber != null
+        ? `tyre run front ${run.frontTireRunNumber} / rear ${run.tireRunNumber}`
+        : run.tireRunNumber != null
+          ? `tyre run ${run.tireRunNumber}`
+          : null,
       run.conditionsAirTempC != null ? `${run.conditionsAirTempC}°C` : null,
       run.unconfirmedAt != null ? "(unconfirmed — setup and tyres carried, not logged by the driver)" : null,
       run.id === anchor.id ? "(the session above)" : null,

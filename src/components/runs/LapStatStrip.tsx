@@ -122,6 +122,7 @@ export function StatWellCell({
   onToggle,
   valueClassName,
   alignValue = false,
+  wide = false,
 }: {
   label: string;
   value: ReactNode;
@@ -137,8 +138,16 @@ export function StatWellCell({
    * there, where the reserve would just add a gap).
    */
   alignValue?: boolean;
+  /**
+   * Take the whole row. For a value that is several lines, not a figure — a front/rear car's
+   * tires, each with what it is glued to — which half a phone-width grid breaks mid-word.
+   */
+  wide?: boolean;
 }) {
-  const base = "min-w-0 border-l border-t border-border px-3 py-2 text-left @[30rem]:py-[7px]";
+  const base = cn(
+    "min-w-0 border-l border-t border-border px-3 py-2 text-left @[30rem]:py-[7px]",
+    wide && "col-span-full"
+  );
   const labelNode = (
     <div
       className={cn(
@@ -157,7 +166,7 @@ export function StatWellCell({
     <div
       className={cn(
         "mt-1 fig-stat font-medium text-foreground",
-        "@[30rem]:mt-0 @[30rem]:min-w-0 @[30rem]:text-right",
+        !wide && "@[30rem]:mt-0 @[30rem]:min-w-0 @[30rem]:text-right",
         valueClassName
       )}
     >
@@ -172,7 +181,13 @@ export function StatWellCell({
    * dropping a single field.
    */
   const body = (
-    <div className="@[30rem]:flex @[30rem]:items-baseline @[30rem]:justify-between @[30rem]:gap-2.5">
+    <div
+      className={cn(
+        // A wide cell's value is a block of lines; it stays under its label at every width.
+        !wide &&
+          "@[30rem]:flex @[30rem]:items-baseline @[30rem]:justify-between @[30rem]:gap-2.5"
+      )}
+    >
       {labelNode}
       {valueNode}
     </div>

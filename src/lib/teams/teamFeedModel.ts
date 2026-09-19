@@ -42,6 +42,16 @@ export type TeamFeedRunInput = {
   /** False when the driver said "not sure how many runs" — the count is then relative. */
   tireAgeKnown: boolean;
 
+  /**
+   * The front end of a front/rear run (off-road, 2026-09-19); the five above are then the rear.
+   * Optional and all null on a single-tire run. Its own life of rubber and its own count.
+   */
+  frontTireStintId?: string | null;
+  frontTireTypeId?: string | null;
+  frontTireTypeLabel?: string | null;
+  frontTireRunNumber?: number | null;
+  frontTireAgeKnown?: boolean | null;
+
   trackLayoutId: string | null;
   trackDirection: string | null;
 };
@@ -199,40 +209,81 @@ export function computeAlsoMoved(
  * so on legacy rows "never answered" is indistinguishable from "brand new". We only
  * report a run-count step when both runs claim to know the age and the stint matches.
  */
-function describeTireChange(
-  run: TeamFeedRunInput,
-  baseline: TeamFeedRunInput
-): AlsoMovedRow | null {
+type TireEndState = {
+  typeId: string | null;
+  label: string | null;
+  stintId: string | null;
+  runNumber: number | null;
+  ageKnown: boolean;
+};
+
+/** What changed on ONE end between two runs, in words — or null when nothing worth a row did. */
+function describeTireEndChange(run: TireEndState, baseline: TireEndState): string | null {
   const compoundChanged =
-    run.tireTypeId != null && baseline.tireTypeId != null && run.tireTypeId !== baseline.tireTypeId;
+    run.typeId != null && baseline.typeId != null && run.typeId !== baseline.typeId;
 
   if (compoundChanged) {
-    const from = baseline.tireTypeLabel ?? "another compound";
-    const to = run.tireTypeLabel ?? "a different compound";
-    return { kind: "tires", label: "Tires", detail: `${from} → ${to}` };
+    const from = baseline.label ?? "another compound";
+    const to = run.label ?? "a different compound";
+    return `${from} → ${to}`;
   }
 
   const stintChanged =
-    run.tireStintId != null && baseline.tireStintId != null && run.tireStintId !== baseline.tireStintId;
+    run.stintId != null && baseline.stintId != null && run.stintId !== baseline.stintId;
 
-  if (stintChanged) {
-    return { kind: "tires", label: "Tires", detail: "New set" };
-  }
+  if (stintChanged) return "New set";
 
   const sameStint =
-    run.tireStintId != null && baseline.tireStintId != null && run.tireStintId === baseline.tireStintId;
+    run.stintId != null && baseline.stintId != null && run.stintId === baseline.stintId;
 
-  if (sameStint && run.tireAgeKnown && baseline.tireAgeKnown) {
-    if (run.tireRunNumber !== baseline.tireRunNumber) {
-      return {
-        kind: "tires",
-        label: "Tires",
-        detail: `Run ${baseline.tireRunNumber} → ${run.tireRunNumber}`,
-      };
+  if (sameStint && run.ageKnown && baseline.ageKnown) {
+    if (
+      run.runNumber != null &&
+      baseline.runNumber != null &&
+      run.runNumber !== baseline.runNumber
+    ) {
+      return `Run ${baseline.runNumber} → ${run.runNumber}`;
     }
   }
 
   return null;
+}
+
+const rearTireOf = (r: TeamFeedRunInput): TireEndState => ({
+  typeId: r.tireTypeId,
+  label: r.tireTypeLabel,
+  stintId: r.tireStintId,
+  runNumber: r.tireRunNumber,
+  ageKnown: r.tireAgeKnown,
+});
+
+const frontTireOf = (r: TeamFeedRunInput): TireEndState => ({
+  typeId: r.frontTireTypeId ?? null,
+  label: r.frontTireTypeLabel ?? null,
+  stintId: r.frontTireStintId ?? null,
+  runNumber: r.frontTireRunNumber ?? null,
+  ageKnown: r.frontTireAgeKnown !== false,
+});
+
+/**
+ * One "Tires" row for the run. A single-tire run reads exactly as it always has. A front/rear
+ * run (off-road) names which end moved — "Front: New set · Rear: Run 2 → 3" — because the two
+ * ends are separate lives of rubber and a teammate fitting new fronts only is worth knowing.
+ */
+function describeTireChange(
+  run: TeamFeedRunInput,
+  baseline: TeamFeedRunInput
+): AlsoMovedRow | null {
+  const rear = describeTireEndChange(rearTireOf(run), rearTireOf(baseline));
+  const frontLogged = run.frontTireTypeId != null || baseline.frontTireTypeId != null;
+  if (!frontLogged) {
+    return rear ? { kind: "tires", label: "Tires", detail: rear } : null;
+  }
+  const front = describeTireEndChange(frontTireOf(run), frontTireOf(baseline));
+  const parts = [front ? `Front: ${front}` : null, rear ? `Rear: ${rear}` : null].filter(
+    (p): p is string => p != null
+  );
+  return parts.length > 0 ? { kind: "tires", label: "Tires", detail: parts.join(" · ") } : null;
 }
 
 /** Signed lap delta in seconds. Negative = faster. Null unless both runs have a best lap. */

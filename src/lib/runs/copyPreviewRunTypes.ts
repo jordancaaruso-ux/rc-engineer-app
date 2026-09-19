@@ -27,6 +27,12 @@ export type CopyPreviewRunRecord = Prisma.RunGetPayload<{
     tireType: { select: { id: true; displayName: true } };
     tireStintId: true;
     tireAgeKnown: true;
+    frontTireTypeId: true;
+    frontTireRunNumber: true;
+    frontTireStintId: true;
+    frontTireAgeKnown: true;
+    frontTireType: { select: { id: true; displayName: true } };
+    tireFitment: true;
     additiveType: { select: { id: true; displayName: true; modelCode: true } };
     event: { select: { id: true; name: true } };
     setupSnapshot: { select: { id: true; data: true } };

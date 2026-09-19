@@ -66,6 +66,8 @@ import { runIsShareable } from "@/lib/share/shareCardModel";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { InlineValueEdit } from "@/components/runs/InlineValueEdit";
 import { InlinePickEdit, type InlinePickOption } from "@/components/runs/InlinePickEdit";
+import { RunTireEndsBlock } from "@/components/runs/RunTireEndsBlock";
+import { isSplitTireRun } from "@/lib/tires/runTireEnds";
 import { RunCarMoveSheet } from "@/components/runs/RunCarMoveSheet";
 import { TirePrepSheet } from "@/components/runs/TirePrepSheet";
 import { lapImportHref } from "@/lib/runs/lapImportHref";
@@ -158,6 +160,13 @@ export type Run = {
   tireType?: { id: string; displayName: string } | null;
   tireStintId?: string | null;
   tireAgeKnown?: boolean | null;
+  /** The front end of a front/rear run (off-road); the tire fields above are then the rear. */
+  frontTireType?: { id: string; displayName: string } | null;
+  frontTireRunNumber?: number | null;
+  frontTireStintId?: string | null;
+  frontTireAgeKnown?: boolean | null;
+  /** What each end is glued to — insert, wheel, modifications (src/lib/tires/tireFitment.ts). */
+  tireFitment?: unknown;
   additiveType?: { id: string; displayName: string } | null;
   warmerTimingMinutes?: number | null;
   tirePrep?: unknown;
@@ -1076,9 +1085,18 @@ export function RunDetailPanel({
             valueClassName="whitespace-normal break-words"
           />
           <StatWellCell
-            label="Tire set"
+            label={isSplitTireRun(run) ? "Tires" : "Tire set"}
+            wide={isSplitTireRun(run)}
             value={
-              canEdit ? (
+              isSplitTireRun(run) ? (
+                // A front/rear run: two ends, each corrected in place like the one below.
+                <RunTireEndsBlock
+                  run={run}
+                  canEdit={canEdit}
+                  loadTireOptions={async () => (await loadPickerOptions()).tireTypes}
+                  saveFields={corrections.saveFields}
+                />
+              ) : canEdit ? (
                 <span className="inline-flex flex-col items-start gap-0.5">
                   <InlinePickEdit
                     ariaLabel="Tire set"

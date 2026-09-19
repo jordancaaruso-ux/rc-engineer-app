@@ -206,6 +206,8 @@ const SUMMARY_RUN_SELECT = {
   tireRunNumber: true,
   tireAgeKnown: true,
   tireType: { select: { id: true, displayName: true } },
+  // So the evening summary names both ends of a front/rear car's tyres, as the debrief does.
+  frontTireType: { select: { id: true, displayName: true } },
   carRating: true,
   conditionsAirTempC: true,
 } as const;

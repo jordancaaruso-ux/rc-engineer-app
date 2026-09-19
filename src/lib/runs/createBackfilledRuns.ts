@@ -260,6 +260,12 @@ export async function createBackfilledRuns(params: {
       tireStintId: true,
       tireRunNumber: true,
       tireAgeKnown: true,
+      // A front/rear car's other end, and what both ends are glued to — copied like the rest.
+      frontTireTypeId: true,
+      frontTireStintId: true,
+      frontTireRunNumber: true,
+      frontTireAgeKnown: true,
+      tireFitment: true,
       additiveTypeId: true,
       warmerTimingMinutes: true,
       tirePrep: true,
@@ -378,6 +384,8 @@ export async function createBackfilledRuns(params: {
     instant: r.sessionCompletedAt ?? r.sortAt,
     tireStintId: r.tireStintId,
     tireRunNumber: r.tireRunNumber,
+    frontTireStintId: r.frontTireStintId,
+    frontTireRunNumber: r.frontTireRunNumber,
   });
   const planParent: BackfillPlanRun = parentSource
     ? toPlanRun(parentSource)
@@ -468,6 +476,13 @@ export async function createBackfilledRuns(params: {
             tireStintId: source?.tireStintId ?? null,
             tireAgeKnown: source?.tireAgeKnown ?? true,
             tireRunNumber: entry.tireRunNumber,
+            frontTireTypeId: source?.frontTireTypeId ?? null,
+            frontTireStintId: source?.frontTireTypeId ? (source.frontTireStintId ?? null) : null,
+            frontTireAgeKnown: source?.frontTireTypeId ? (source.frontTireAgeKnown ?? true) : null,
+            frontTireRunNumber: source?.frontTireTypeId ? (entry.frontTireRunNumber ?? 1) : null,
+            ...(source?.tireFitment != null
+              ? { tireFitment: source.tireFitment as PrismaTypes.InputJsonValue }
+              : {}),
             additiveTypeId: source?.additiveTypeId ?? null,
             warmerTimingMinutes: source?.warmerTimingMinutes ?? null,
             tirePrep: (source?.tirePrep ?? []) as PrismaTypes.InputJsonValue,

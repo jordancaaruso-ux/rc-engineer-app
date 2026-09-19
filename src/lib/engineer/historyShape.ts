@@ -45,6 +45,20 @@ export type HistoryRun = {
   /** False when the driver said "not sure how many runs" — the count is relative, not age. */
   tyreAgeKnown: boolean;
   tyreStintId: string | null;
+  /**
+   * The FRONT tyre of a front/rear run (off-road, 2026-09-19); the `tyre*` fields above are then
+   * the REAR. Absent on a single-tyre run — every on-road run — and a block with none of them
+   * renders byte for byte as it did before they existed. Its own set, its own count.
+   *
+   * The TYRES tables stay on the rear set: a second table for the front would be mostly the same
+   * rows twice (the ends usually age together) and neither could say which end a lap-time delta
+   * belongs to. So the front is STATED — named on the run line, flagged on the set line when it
+   * changed mid-set — and never averaged. A front table is a later call for the eval harness.
+   */
+  frontTyreName?: string | null;
+  frontTyreRun?: number | null;
+  frontTyreAgeKnown?: boolean;
+  frontTyreStintId?: string | null;
   airC: number | null;
   trackC: number | null;
   unconfirmed: boolean;
@@ -164,8 +178,17 @@ function tyreSetLine(set: TyreSet, index: number): string {
 
   const baseBest = first.best;
   const baseTop5 = first.top5;
-  const cells = set.runs.map((r) => {
+  const cells = set.runs.map((r, i) => {
     const bits = [`run ${r.tyreRun}`];
+    // Same rears, different fronts: the delta against run 1 is no longer the rear tyres alone.
+    const prev = i > 0 ? set.runs[i - 1] : null;
+    if (
+      prev &&
+      (r.frontTyreStintId ?? null) !== (prev.frontTyreStintId ?? null) &&
+      (r.frontTyreStintId != null || prev.frontTyreStintId != null)
+    ) {
+      bits.push("(front tyres changed)");
+    }
     if (r.best != null) {
       bits.push(`best ${fmtSecs(r.best)}`);
       if (r !== first && baseBest != null) bits.push(`(${fmtDelta(r.best - baseBest)})`);
@@ -459,8 +482,19 @@ export function renderRunLines(runs: HistoryRun[], adj: TyreAdjustments = new Ma
       run.fiveMin ? `5min ${run.fiveMin}` : null,
       run.lapCount > 0 ? `${run.lapCount} laps` : null,
       run.rating != null ? `rated ${run.rating}/10` : "not rated",
-      run.tyreRun != null ? `tyre run ${run.tyreRun}${run.tyreAgeKnown ? "" : "?"}` : null,
-      run.tyreName,
+      ...(run.frontTyreName
+        ? [
+            `front tyre run ${run.frontTyreRun ?? "?"}${run.frontTyreAgeKnown === false ? "?" : ""}`,
+            run.frontTyreName,
+            run.tyreRun != null
+              ? `rear tyre run ${run.tyreRun}${run.tyreAgeKnown ? "" : "?"}`
+              : null,
+            run.tyreName,
+          ]
+        : [
+            run.tyreRun != null ? `tyre run ${run.tyreRun}${run.tyreAgeKnown ? "" : "?"}` : null,
+            run.tyreName,
+          ]),
       run.airC != null ? `${run.airC}°C` : null,
       run.trackC != null ? `track ${run.trackC}°C` : null,
       run.unconfirmed ? "(unconfirmed — setup and tyres carried, not logged by the driver)" : null,
@@ -545,6 +579,12 @@ export function renderHistoryBlock(params: {
     [
       `DRIVER DATA — RUNS IN A RANGE. The driver chose this range: ${params.scopeLabel}. ${runs.length} run${runs.length === 1 ? "" : "s"} shown, earliest first.${omitted} Nothing outside this range is attached; the driver's other runs are not visible here.`,
       `"changed" is what moved on the setup sheet since that same ${multiCar ? "physical car's" : "car's"} previous run in this list. A run with no "changed" line has no readable sheet on one side: that is unknown, not unchanged. "tyre run N" is the Nth run on that set of rubber; a "?" means the driver was not sure how old the set was.`,
+      // Only when a front/rear run is in the range, so an on-road block is unchanged.
+      ...(runs.some((r) => r.frontTyreName)
+        ? [
+            `A run that names a "front tyre" and a "rear tyre" is a car that logs its two ends separately: they are different sets with their own run counts. The TYRES tables and every "new-tyre eq" figure follow the REAR set only; "(front tyres changed)" on a set line marks where different fronts went on during that rear set, so the delta there is not the rear tyres alone.`,
+          ]
+        : []),
       ...(adj.size > 0
         ? [
             `"new-tyre eq" is the best lap / top 5 with the average loss for that tyre run taken back out (the TYRES table's averages), so runs on different-age rubber can be compared; "≤" marks a run past the last averaged number, corrected by that last average. It is arithmetic on this driver's own pairs, not a tyre model.`,

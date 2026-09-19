@@ -95,6 +95,7 @@ const runPrefillInclude = (userId: string) =>
   trackLayout: { select: { id: true, name: true } },
   car: { select: { id: true, name: true } },
   tireType: { select: { id: true, displayName: true, modelCode: true } },
+  frontTireType: { select: { id: true, displayName: true } },
   event: {
     select: {
       id: true,
@@ -132,6 +133,12 @@ function serializeRunForPrefill(
     tireRunNumber: number;
     tireStintId: string | null;
     tireAgeKnown: boolean;
+    frontTireTypeId: string | null;
+    frontTireType: { id: string; displayName: string } | null;
+    frontTireRunNumber: number | null;
+    frontTireStintId: string | null;
+    frontTireAgeKnown: boolean | null;
+    tireFitment: unknown;
     setupSnapshot: { id: string; data: unknown };
     event: {
       id: string;
@@ -171,6 +178,12 @@ function serializeRunForPrefill(
     tireRunNumber: run.tireRunNumber,
     tireStintId: run.tireStintId,
     tireAgeKnown: run.tireAgeKnown,
+    frontTireTypeId: run.frontTireTypeId,
+    frontTireType: run.frontTireType,
+    frontTireRunNumber: run.frontTireRunNumber,
+    frontTireStintId: run.frontTireStintId,
+    frontTireAgeKnown: run.frontTireAgeKnown,
+    tireFitment: run.tireFitment,
     setupSnapshot: run.setupSnapshot,
     event: run.event
       ? {

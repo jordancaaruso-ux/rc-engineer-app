@@ -249,6 +249,14 @@ off it:
 - **Tires:** compound (`tireTypeId`), `tireRunNumber` (runs on this rubber), `tireStintId` (one
   continuous life of rubber), `tireAgeKnown`, additive, and `tirePrep` (an ordered sequence of
   applications: additive, minutes, warmers, towels, temperature).
+- **Front/rear tires (off-road, 2026-09-19):** a car whose class logs its ends apart
+  (`tireProfileForDiscipline`) also carries `frontTireTypeId` / `frontTireRunNumber` /
+  `frontTireStintId` / `frontTireAgeKnown` — the un-prefixed columns above are then the REAR, which
+  is what keeps every older reader working — plus `tireFitment` (JSON: insert, wheel and one
+  free-text `mods` per end; the driver's own remembered list, not a catalog). A run is front/rear
+  because it HAS a front, never because of what its car is classed as today. The tyre picker is cut
+  to the car's catalog slice (`TireType.discipline`: "touring" | "offroad-10th") and, on a
+  front/rear car, leads with that end's tyres (`TireType.position`, a sort, never a filter).
 - **Laps:** `lapTimes` (raw JSON array, self), `lapSession` (structured, multi-driver/field-ready),
   plus materialised `bestLapSeconds` / `avgTop5LapSeconds`.
 - **Feel:** `notes`, `handlingAssessmentJson` (structured tags/balance), `carRating` (required 1–10

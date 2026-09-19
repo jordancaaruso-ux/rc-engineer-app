@@ -35,6 +35,13 @@ export function toCompareRunShape(run: {
   tireStintId?: string | null;
   tireAgeKnown?: boolean | null;
   tireRunNumber: number;
+  /** The front end of a front/rear run (off-road); the tire fields above are then the rear. */
+  frontTireType?: { id: string; displayName: string } | null;
+  frontTireStintId?: string | null;
+  frontTireAgeKnown?: boolean | null;
+  frontTireRunNumber?: number | null;
+  /** What each end is glued to — see src/lib/tires/tireFitment.ts. */
+  tireFitment?: unknown;
   additiveType?: { id: string; displayName: string } | null;
   warmerTimingMinutes?: number | null;
   tirePrep?: unknown;
@@ -80,6 +87,11 @@ export function toCompareRunShape(run: {
     tireStintId: run.tireStintId ?? null,
     tireAgeKnown: run.tireAgeKnown ?? true,
     tireRunNumber: run.tireRunNumber,
+    frontTireType: run.frontTireType ?? null,
+    frontTireStintId: run.frontTireStintId ?? null,
+    frontTireAgeKnown: run.frontTireAgeKnown ?? null,
+    frontTireRunNumber: run.frontTireRunNumber ?? null,
+    tireFitment: run.tireFitment ?? null,
     additiveType: run.additiveType ?? null,
     warmerTimingMinutes: run.warmerTimingMinutes ?? null,
     tirePrep: run.tirePrep ?? null,

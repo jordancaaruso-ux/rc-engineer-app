@@ -12,8 +12,13 @@
  * race class — drivers find the rest by typing.
  *
  * One row = brand + tread + compound (founder call 2026-09-16), so that triple is the identity
- * and the modelCode. Fitment, size, softness, tread style and surfaces are carried in the seed
- * file but have no columns yet — they are the raw material for class-level filtering later.
+ * and the modelCode. Size, softness, tread style and surfaces are carried in the seed file but
+ * have no columns yet — they are the raw material for class-level filtering later.
+ *
+ * Fitment DOES land, since 2026-09-19: `fits[]` collapses to `TireType.position` ("front" |
+ * "rear" | "all") — the union across classes, see `positionFromFits` — so a buggy's front picker
+ * can lead with front tires. Re-running this over an already-imported catalog is how existing
+ * rows pick the tag up.
  *
  * Idempotent: upsert by modelCode, never touches verifiedAt or createdBy.
  *
@@ -24,6 +29,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { prisma } from "@/lib/prisma";
+import { positionFromFits } from "@/lib/tires/tireCatalogFilter";
 
 export const OFFROAD_10TH_DISCIPLINE = "offroad-10th";
 
@@ -36,6 +42,7 @@ type SeedRow = {
   tire_type?: string;
   source_url?: string | null;
   product_url?: string | null;
+  fits?: { class?: string; position?: string }[] | null;
 };
 
 function slug(s: string): string {
@@ -64,6 +71,7 @@ async function main(): Promise<void> {
   }
 
   const perBrand = new Map<string, number>();
+  const perPosition = new Map<string, number>();
   let created = 0;
   let updated = 0;
   let skipped = 0;
@@ -89,6 +97,7 @@ async function main(): Promise<void> {
       compound: compound || null,
       surface: row.surface?.trim() || "unknown",
       tireType: row.tire_type?.trim() || "rubber",
+      position: positionFromFits(row.fits),
       sourceUrl: row.source_url?.trim() || null,
       productUrl: row.product_url?.trim() || null,
     };
@@ -114,11 +123,14 @@ async function main(): Promise<void> {
       created++;
     }
     perBrand.set(brand, (perBrand.get(brand) ?? 0) + 1);
+    const pos = data.position ?? "untagged";
+    perPosition.set(pos, (perPosition.get(pos) ?? 0) + 1);
   }
 
   console.log(`\n1/10 off-road tire import${dry ? " (DRY RUN)" : ""}${brandArg ? ` brand=${brandArg}` : ""}:`);
   for (const [b, n] of [...perBrand.entries()].sort()) console.log(`  ${b} — ${n}`);
   console.log(`\ncreated ${created}, updated ${updated}, skipped ${skipped}`);
+  console.log(`fits: ${[...perPosition.entries()].sort().map(([p, n]) => `${p} ${n}`).join(", ")}`);
   if (clashes.length) console.log(`model-code clashes with another catalog (${clashes.length}):\n  ${clashes.join("\n  ")}`);
 
   if (!dry) {

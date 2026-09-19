@@ -15,6 +15,8 @@ import { RunRaceFieldSwitcher, RACE_IDENTITY } from "@/components/runs/RunRaceFi
 import { resolveTirePrepSteps } from "@/components/runs/TirePrepStepsList";
 import { InlineValueEdit } from "@/components/runs/InlineValueEdit";
 import { InlinePickEdit } from "@/components/runs/InlinePickEdit";
+import { RunTireEndsBlock } from "@/components/runs/RunTireEndsBlock";
+import { isSplitTireRun } from "@/lib/tires/runTireEnds";
 import { RunCarMoveSheet } from "@/components/runs/RunCarMoveSheet";
 import { TirePrepSheet } from "@/components/runs/TirePrepSheet";
 import { SetupCorrectionSheet } from "@/components/runs/SetupCorrectionSheet";
@@ -1020,7 +1022,9 @@ export function RunFaces({
           ) : (
             <span className="min-w-0 truncate font-semibold text-foreground">{carDisplay}</span>
           )}
-          {run.tireType || canEdit ? (
+          {/* A front/rear run names its ends on their own lines, just below — two tires and what
+              they are glued to do not fit beside the car's name on a phone. */}
+          {isSplitTireRun(run) ? null : run.tireType || canEdit ? (
             <>
               <span className="h-3 w-px shrink-0 bg-border" aria-hidden />
               {/*
@@ -1071,6 +1075,15 @@ export function RunFaces({
             </>
           ) : null}
         </div>
+
+        {isSplitTireRun(run) ? (
+          <RunTireEndsBlock
+            run={run}
+            canEdit={canEdit}
+            loadTireOptions={async () => (await loadPickerOptions()).tireTypes}
+            saveFields={corrections.saveFields}
+          />
+        ) : null}
 
         {canEdit ? (
           <div className="flex min-w-0 flex-wrap items-center gap-x-1.5">

@@ -84,6 +84,12 @@ const runDetailSelect = {
   track: { select: { id: true, name: true } },
   tireStintId: true,
   tireAgeKnown: true,
+  // The front end of a front/rear car, and what each end is glued to.
+  frontTireRunNumber: true,
+  frontTireStintId: true,
+  frontTireAgeKnown: true,
+  frontTireType: { select: { id: true, displayName: true } },
+  tireFitment: true,
   tireType: { select: { id: true, displayName: true } },
   additiveType: { select: { id: true, displayName: true } },
   event: {

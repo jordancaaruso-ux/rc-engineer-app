@@ -449,6 +449,9 @@ export function buildRunHistoryPrismaWhere(
     andClause(where, {
       OR: [
         { tireType: { displayName: { in: filters.tireTypes } } },
+        // A front/rear run matches on either end — a tire that is only ever somebody's front
+        // is still a tire they ran, and the filter list offers it (see the facet).
+        { frontTireType: { displayName: { in: filters.tireTypes } } },
         { tireSet: { tireType: { displayName: { in: filters.tireTypes } } } },
       ],
     });
@@ -510,6 +513,9 @@ export type RunForHistoryFilter = {
   tireType?: { displayName: string } | null;
   tireRunNumber?: number | null;
   tireAgeKnown?: boolean | null;
+  /** The front end of a front/rear run — searchable like the rear. */
+  frontTireType?: { displayName: string } | null;
+  frontTireRunNumber?: number | null;
   additiveType?: { displayName: string } | null;
   handlingAssessmentJson?: unknown;
   /** Setup parameters JSON; may be attached inline or supplied via `setupDataByRunId`. */
@@ -695,6 +701,13 @@ function runSearchFields(
   if (run.tireType) {
     const wear = run.tireRunNumber != null && run.tireRunNumber > 0 ? ` run ${run.tireRunNumber}` : "";
     pushField(fields, "tires", `${run.tireType.displayName}${wear}`);
+  }
+  if (run.frontTireType) {
+    const wear =
+      run.frontTireRunNumber != null && run.frontTireRunNumber > 0
+        ? ` run ${run.frontTireRunNumber}`
+        : "";
+    pushField(fields, "tires", `${run.frontTireType.displayName}${wear}`);
   }
   pushField(fields, "additive", run.additiveType?.displayName);
   for (const set of run.importedLapSets ?? []) {

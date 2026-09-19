@@ -940,6 +940,10 @@ model TireType {
    * Catalog attributes (AI pre-seed enrichment, TC touring first — see ASSET_ACCESS_NORTH_STAR.md).
    * All nullable: legacy/user-created and non-touring rows leave them empty.
    * surface = "asphalt" | "carpet" | "both" | "unknown"; tireType = "rubber" | "foam".
+   *
+   * `discipline` is the COARSE catalog slice a car's picker is limited to ("touring" |
+   * "offroad-10th" — `TIRE_BUCKETS` in src/lib/cars/tireProfile.ts), NOT an encoded car discipline.
+   * Driver-added rows are stamped with the bucket of the car they were added from.
    */
   discipline  String?
   brand       String?
@@ -947,6 +951,11 @@ model TireType {
   compound    String?
   surface     String?
   tireType    String?
+  /**
+   * Which end of the car it goes on: "front" | "rear" | "all". Null = nobody said (every touring
+   * row, every driver-added row). Only ever SORTS the picker — see src/lib/tires/tireCatalogFilter.ts.
+   */
+  position    String?
   /** Provenance for founder review of pre-seeded rows. */
   sourceUrl   String?
   productUrl  String?
@@ -955,7 +964,9 @@ model TireType {
   createdByUserId String?
 
   tireSets  TireSet[]
-  runs      Run[]
+  runs      Run[] @relation("RunTireType")
+  /** Runs carrying this as the FRONT tire — front/rear cars only. */
+  frontRuns Run[] @relation("RunFrontTireType")
   eventParticipations EventParticipation[]
 
   @@index([displayName])
@@ -1412,8 +1423,17 @@ model Run {
   tireSet   TireSet? @relation(fields: [tireSetId], references: [id])
   tireSetId String?
 
-  /** The compound on the car for this run — picked directly, no longer reached via a set. */
-  tireType   TireType? @relation(fields: [tireTypeId], references: [id], onDelete: SetNull)
+  /**
+   * The compound on the car for this run — picked directly, no longer reached via a set.
+   *
+   * On a car that logs front and rear apart (off-road, 2026-09-19) these four columns are the
+   * REAR — the driven end on most classes and the one replaced most often — and the `front*`
+   * columns below hold the other end. On every other car they are simply "the tire". Keeping the
+   * old columns as the primary end is what let every existing reader (wear chains, debrief,
+   * Sessions filters) carry on untouched. A run is front/rear when it HAS front data —
+   * `isSplitTireRun` — never by asking what its car races today.
+   */
+  tireType   TireType? @relation("RunTireType", fields: [tireTypeId], references: [id], onDelete: SetNull)
   tireTypeId String?
 
   /** Runs on the rubber currently fitted; 1 = first run on it. Carried forward from the car's last run. */
@@ -1450,6 +1470,26 @@ model Run {
    * `warmerTimingMinutes` on read).
    */
   tirePrep Json?
+
+  /**
+   * The FRONT tire on a front/rear car, with its own run count and its own life of rubber —
+   * fronts and rears wear at different rates and are replaced at different times (founder ruling
+   * 2026-09-19). All null on a single-tire run. Same meanings as the un-prefixed columns above.
+   */
+  frontTireType      TireType? @relation("RunFrontTireType", fields: [frontTireTypeId], references: [id], onDelete: SetNull)
+  frontTireTypeId    String?
+  frontTireRunNumber Int?
+  frontTireStintId   String?
+  frontTireAgeKnown  Boolean?
+
+  /**
+   * What the tire is glued to, per end — see `src/lib/tires/tireFitment.ts`:
+   * { front?: { insert, wheel, mods }, rear?: { insert, wheel, mods } }, every value free text.
+   * `mods` is ONE box on purpose (founder ruling 2026-09-19: "not too specific") — it holds insert
+   * modifications and wheel vent holes alike; there are no hole-size or hole-count fields.
+   * SQL NULL when nothing was entered, never JSON null — the "own list" scan filters on it.
+   */
+  tireFitment Json?
 
   battery   Battery? @relation(fields: [batteryId], references: [id])
   batteryId String?
@@ -1667,6 +1707,8 @@ model Run {
   @@index([tireSetId])
   @@index([userId, tireStintId])
   @@index([tireTypeId])
+  @@index([userId, frontTireStintId])
+  @@index([frontTireTypeId])
   @@index([additiveTypeId])
   @@index([batteryId])
   @@index([setupSnapshotId])

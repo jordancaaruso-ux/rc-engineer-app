@@ -14,6 +14,7 @@ import {
 } from "@/lib/activeSetupContext";
 import { displayRunNotes } from "@/lib/runNotes";
 import { Eyebrow } from "@/components/ui/panel";
+import { formatRunTiresOneLine } from "@/lib/tires/runTireEnds";
 import { formatRunTiresDetailLine } from "@/lib/runs/runTireContextDisplay";
 import { RollCenterCompareStrip } from "@/components/rollCenter/RollCenterGeometryBlock";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
@@ -67,6 +68,13 @@ export type CompareRunShape = {
   tireStintId?: string | null;
   tireAgeKnown?: boolean | null;
   tireRunNumber: number;
+  /** The front end of a front/rear run (off-road); the tire fields above are then the rear. */
+  frontTireType?: { id: string; displayName: string } | null;
+  frontTireStintId?: string | null;
+  frontTireAgeKnown?: boolean | null;
+  frontTireRunNumber?: number | null;
+  /** What each end is glued to — see src/lib/tires/tireFitment.ts. */
+  tireFitment?: unknown;
   additiveType?: { id: string; displayName: string } | null;
   warmerTimingMinutes?: number | null;
   tirePrep?: unknown;
@@ -194,12 +202,12 @@ export function RunComparePanel({
   const notesCompareRight =
     mode === "current_setup" ? null : baselineRun ? displayRunNotes(baselineRun) : null;
 
+  // Both ends, and what they are glued to, when the run it is compared against is a front/rear
+  // one — a buggy's tire story is half told by its rear alone.
   const tiresRight =
     mode === "current_setup"
       ? "—"
-      : baselineRun && baselineRun.tireType
-        ? `${baselineRun.tireType.displayName} · run ${baselineRun.tireRunNumber}`
-        : "—";
+      : (baselineRun ? formatRunTiresOneLine(baselineRun, { fitment: true }) : null) ?? "—";
 
   return (
     <div
@@ -317,6 +325,10 @@ export function RunComparePanel({
                   tireType: baseRun.tireType,
                   tireAgeKnown: baseRun.tireAgeKnown,
                   tireRunNumber: baseRun.tireRunNumber,
+                  frontTireType: baseRun.frontTireType,
+                  frontTireAgeKnown: baseRun.frontTireAgeKnown,
+                  frontTireRunNumber: baseRun.frontTireRunNumber,
+                  tireFitment: baseRun.tireFitment,
                   additiveType: baseRun.additiveType,
                   warmerTimingMinutes: baseRun.warmerTimingMinutes,
                   tirePrep: baseRun.tirePrep,

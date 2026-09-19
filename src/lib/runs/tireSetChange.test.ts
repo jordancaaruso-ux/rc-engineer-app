@@ -209,3 +209,48 @@ test("formatTireIdentityLine: compound + wear, never the changed-from prefix", (
     "Volante V5R · run 1 (new)"
   );
 });
+
+test("a front/rear run carries both ends, and new rubber on EITHER end is a change", () => {
+  const indicators = computeTireIndicatorsByRunId([
+    // newest: the same rears a run older, but new fronts went on
+    {
+      id: "r2", carId: "buggy", tireType: tt("Cactus Yellow"), tireStintId: "rear-a", tireRunNumber: 2,
+      frontTireType: tt("AKA Array Clay"), frontTireStintId: "front-b", frontTireRunNumber: 1,
+    },
+    {
+      id: "r1", carId: "buggy", tireType: tt("Cactus Yellow"), tireStintId: "rear-a", tireRunNumber: 1,
+      frontTireType: tt("Dirt Webs"), frontTireStintId: "front-a", frontTireRunNumber: 5,
+    },
+  ]);
+  const r2 = indicators.get("r2")!;
+  assert.equal(r2.changed, true, "new fronts light the row even though the rears carried");
+  assert.equal(r2.previousTireLabel, null, "…and the rear itself did not change");
+  assert.deepEqual(r2.front, {
+    tireLabel: "AKA Array Clay",
+    runNumber: 1,
+    ageKnown: true,
+    changed: true,
+    previousTireLabel: "Dirt Webs",
+  });
+  assert.equal(
+    formatTireIdentityLine(r2),
+    "F AKA Array Clay · run 1 (new) / R Cactus Yellow · run 2"
+  );
+  assert.equal(
+    formatTireIndicatorTitle(r2),
+    "Tires changed · Front Dirt Webs → AKA Array Clay · run 1 (new) / Rear Cactus Yellow · run 2"
+  );
+  assert.equal(indicators.get("r1")?.changed, false);
+});
+
+test("a single-tire run has no front, and a touring car never inherits a buggy's", () => {
+  const indicators = computeTireIndicatorsByRunId([
+    { id: "t1", carId: "touring", tireType: tt("Sweep D32"), tireStintId: "s1", tireRunNumber: 1 },
+    {
+      id: "b1", carId: "buggy", tireType: tt("Cactus Yellow"), tireStintId: "rear-a", tireRunNumber: 1,
+      frontTireType: tt("AKA Array Clay"), frontTireStintId: "front-a", frontTireRunNumber: 1,
+    },
+  ]);
+  assert.equal(indicators.get("t1")?.front, undefined);
+  assert.equal(formatTireIdentityLine(indicators.get("t1")!), "Sweep D32 · run 1 (new)");
+});

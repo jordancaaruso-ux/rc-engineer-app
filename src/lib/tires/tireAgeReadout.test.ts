@@ -8,6 +8,7 @@ import {
   expandedTireCountChips,
   tireAgeHint,
   tireAgeReadout,
+  tireAgeReadoutLine,
   TIRE_COUNT_CHIPS,
 } from "@/lib/tires/tireAgeReadout";
 import type { LastRunTires, TireStintValue } from "@/lib/tires/tireStintValue";
@@ -101,4 +102,25 @@ test("the lit chip follows the value, and nothing is lit before a compound", () 
   assert.equal(activeTireCountChip("manual", v(9)), "more", "collapsed: past 3 sits under 4+");
   assert.equal(activeTireCountChip("manual", v(9), true), "9", "expanded: lights its own number");
   assert.equal(activeTireCountChip("manual", v(0, false)), "unsure", "unknown age beats the count");
+});
+
+test("one end of a front/rear car reads on one line, and a carried count says so itself", () => {
+  const v = (runsCompleted: number, ageKnown = true) => ({ runsCompleted, ageKnown, stintId: null });
+  // Nothing picked: the dimmed chips already say that.
+  assert.equal(tireAgeReadoutLine(null, v(0)), null);
+  assert.equal(tireAgeReadoutLine("assumedFresh", v(0)), "New tires · this will be run 1");
+  // The compact end has no separate hint line, so "carried" rides in the line.
+  assert.equal(
+    tireAgeReadoutLine("carried", v(2)),
+    "Carried on · 2 runs on these · this will be run 3"
+  );
+  assert.equal(tireAgeReadoutLine("manual", v(1)), "1 run on these · this will be run 2");
+  assert.equal(
+    tireAgeReadoutLine("manual", v(0, false)),
+    "Age unknown · first run since you got them"
+  );
+  assert.equal(
+    tireAgeReadoutLine("carried", v(3, false)),
+    "Carried on · Age unknown · 3 runs since you got them"
+  );
 });

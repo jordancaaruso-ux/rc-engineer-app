@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Eyebrow } from "@/components/ui/panel";
 import { PickerSheet, PickerTrigger } from "@/components/ui/PickerSheet";
 import type { OptionSection } from "@/lib/search/optionSearch";
+import type { TireBucket } from "@/lib/cars/tireProfile";
+import { tireFitsEnd, type TireEnd } from "@/lib/tires/tireCatalogFilter";
 
 export type TireTypeOption = {
   id: string;
@@ -11,6 +13,10 @@ export type TireTypeOption = {
   modelCode: string;
   /** ISO string when founder-verified; null/absent = unverified (user-created, flagged). */
   verifiedAt?: string | null;
+  /** Catalog slice ("touring" | "offroad-10th"); never shown. */
+  discipline?: string | null;
+  /** "front" | "rear" | "all"; only sorts the list for a front/rear picker. */
+  position?: string | null;
 };
 
 /**
@@ -20,9 +26,9 @@ export type TireTypeOption = {
  * the search never leaves the browser. It must stay above the catalog size: the
  * 1/10 off-road import (2026-09-18) took the catalog from 155 rows to 739.
  *
- * Raising it is the stopgap. The fix is to stop sending every tire to every
- * driver and filter by what the car races — deferred, founder call 2026-09-18
- * ("1/10 offroad is fine for now, they can search for stuff").
+ * Raising it was the stopgap. Since 2026-09-19 the list is also cut to what the
+ * car races (`bucket`), so a touring driver downloads ~190 rows, not the lot —
+ * the limit is what a car nothing can place still needs.
  */
 const CATALOG_LIMIT = 2000;
 
@@ -44,6 +50,8 @@ export function TireTypeCombobox({
   className,
   allowInlineCreate = true,
   carId,
+  bucket = null,
+  end,
 }: {
   value: string;
   onChange: (tireTypeId: string) => void;
@@ -61,6 +69,17 @@ export function TireTypeCombobox({
    * guess for a new touring car than the last thing you bolted on a buggy.
    */
   carId?: string | null;
+  /**
+   * The slice of the catalog the car shops from (`tireProfileForDiscipline`). Null = the whole
+   * list, which is what every picker without a car (event spec tire, the garage) wants.
+   */
+  bucket?: TireBucket | null;
+  /**
+   * Set on a front/rear picker. That end's tires lead the list and the rest of the bucket
+   * follows under "Other" — sorted, never hidden, because the fitment tags are a sweep's guess
+   * and a tire that isn't sent can't be found by typing either.
+   */
+  end?: TireEnd;
 }) {
   const [options, setOptions] = useState<TireTypeOption[]>([]);
   const [recentOptions, setRecentOptions] = useState<TireTypeOption[]>([]);
@@ -89,26 +108,31 @@ export function TireTypeCombobox({
 
   const loadAll = useCallback(async () => {
     try {
-      const res = await fetch(`/api/tire-types?limit=${CATALOG_LIMIT}`, { cache: "no-store" });
+      const res = await fetch(
+        `/api/tire-types?limit=${CATALOG_LIMIT}${bucket ? `&bucket=${encodeURIComponent(bucket)}` : ""}`,
+        { cache: "no-store" }
+      );
       const data = (await res.json()) as { tireTypes?: TireTypeOption[] };
       setOptions(data.tireTypes ?? []);
     } catch {
       setOptions([]);
     }
-  }, []);
+  }, [bucket]);
 
   const loadRecent = useCallback(async () => {
     try {
-      const res = await fetch(
-        carId ? `/api/tire-types/recent?carId=${encodeURIComponent(carId)}` : "/api/tire-types/recent",
-        { cache: "no-store" }
-      );
+      // A front picker's "Recently used" is what this driver has run on the FRONT.
+      const query = new URLSearchParams();
+      if (carId) query.set("carId", carId);
+      if (end === "front") query.set("end", "front");
+      const qs = query.toString();
+      const res = await fetch(`/api/tire-types/recent${qs ? `?${qs}` : ""}`, { cache: "no-store" });
       const data = (await res.json()) as { tireTypes?: TireTypeOption[] };
       setRecentOptions(data.tireTypes ?? []);
     } catch {
       setRecentOptions([]);
     }
-  }, [carId]);
+  }, [carId, end]);
 
   useEffect(() => {
     void loadAll();
@@ -129,8 +153,10 @@ export function TireTypeCombobox({
       reportSelected(fromList);
       return;
     }
+    // Asked for by id, not fished out of the full catalog: a selection from outside this car's
+    // bucket (a copied run, an event's spec tire) isn't in any list this picker was sent.
     let cancelled = false;
-    fetch(`/api/tire-types?limit=${CATALOG_LIMIT}`, { cache: "no-store" })
+    fetch(`/api/tire-types?id=${encodeURIComponent(value)}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d: { tireTypes?: TireTypeOption[] }) => {
         if (cancelled) return;
@@ -191,11 +217,23 @@ export function TireTypeCombobox({
       label: o.displayName,
       keywords: o.modelCode,
     });
+    const recent = { key: "recent", label: "Recently used", options: recentOptions.map(toRow) };
+    const all = [...options, ...extra];
+    const fits = end ? all.filter((o) => tireFitsEnd(o.position, end)) : all;
+    // Nothing tagged for the other end (a touring list, an unimported scale): one plain list.
+    if (!end || fits.length === all.length) {
+      return [recent, { key: "all", label: "All types", options: all.map(toRow) }];
+    }
     return [
-      { key: "recent", label: "Recently used", options: recentOptions.map(toRow) },
-      { key: "all", label: "All types", options: [...options, ...extra].map(toRow) },
+      recent,
+      { key: "end", label: end === "front" ? "Front tires" : "Rear tires", options: fits.map(toRow) },
+      {
+        key: "other",
+        label: "Other",
+        options: all.filter((o) => !tireFitsEnd(o.position, end)).map(toRow),
+      },
     ];
-  }, [recentOptions, options, extra]);
+  }, [recentOptions, options, extra, end]);
 
   const closeSheet = useCallback(() => {
     setOpen(false);
@@ -235,7 +273,8 @@ export function TireTypeCombobox({
       const res = await fetch("/api/tire-types", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName }),
+        // Stamped with the car's slice so a tire added from a buggy stays out of touring lists.
+        body: JSON.stringify({ displayName, ...(bucket ? { discipline: bucket } : {}) }),
       });
       const data = (await res.json()) as {
         tireType?: TireTypeOption;

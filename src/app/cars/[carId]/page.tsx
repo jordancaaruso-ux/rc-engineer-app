@@ -109,13 +109,21 @@ export default async function CarDetailPage(props: {
       where: {
         userId: user.id,
         carId,
-        OR: [{ tireTypeId: { not: null } }, { tireSet: { tireTypeId: { not: null } } }],
+        OR: [
+          { tireTypeId: { not: null } },
+          { frontTireTypeId: { not: null } },
+          { tireSet: { tireTypeId: { not: null } } },
+        ],
       },
       orderBy: { createdAt: "desc" },
       select: {
         tireTypeId: true,
         tireRunNumber: true,
         tireType: { select: { displayName: true } },
+        // A front/rear car runs two tires at once; the front counts as a tire on this car too.
+        frontTireTypeId: true,
+        frontTireRunNumber: true,
+        frontTireType: { select: { displayName: true } },
         tireSet: { select: { tireTypeId: true, tireType: { select: { displayName: true } } } },
       },
     }),
@@ -180,15 +188,23 @@ export default async function CarDetailPage(props: {
   /** Highest run count reached on this compound — a rough "how far you've taken it". */
   const furthestRunByTire = new Map<string, number>();
   const tireSetsOnCar: Array<{ id: string; label: string }> = [];
-  for (const r of tireRunRows) {
-    const id = r.tireTypeId ?? r.tireSet?.tireTypeId;
-    if (!id) continue;
+  const countTireOnCar = (id: string | null | undefined, label: string, runNumber: number) => {
+    if (!id) return;
     runsOnCarByTire.set(id, (runsOnCarByTire.get(id) ?? 0) + 1);
-    furthestRunByTire.set(id, Math.max(furthestRunByTire.get(id) ?? 0, r.tireRunNumber));
-    if (!tireSetsOnCar.some((t) => t.id === id)) {
-      const label = r.tireType?.displayName ?? r.tireSet?.tireType?.displayName ?? "Tires";
-      tireSetsOnCar.push({ id, label });
-    }
+    furthestRunByTire.set(id, Math.max(furthestRunByTire.get(id) ?? 0, runNumber));
+    if (!tireSetsOnCar.some((t) => t.id === id)) tireSetsOnCar.push({ id, label });
+  };
+  for (const r of tireRunRows) {
+    countTireOnCar(
+      r.tireTypeId ?? r.tireSet?.tireTypeId,
+      r.tireType?.displayName ?? r.tireSet?.tireType?.displayName ?? "Tires",
+      r.tireRunNumber
+    );
+    countTireOnCar(
+      r.frontTireTypeId,
+      r.frontTireType?.displayName ?? "Tires",
+      r.frontTireRunNumber ?? 1
+    );
   }
   tireSetsOnCar.sort((a, b) => a.label.localeCompare(b.label));
 

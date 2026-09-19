@@ -1,3 +1,4 @@
+import { formatRunTiresOneLine } from "@/lib/tires/runTireEnds";
 import { getBoolFromSetupString } from "@/lib/a800rrSetupRead";
 import { CALIBRATION_PAIR_GROUPS } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import type { SetupSnapshotData } from "@/lib/runSetup";
@@ -53,6 +54,11 @@ export function formatRunTiresDetailLine(params: {
   tireType: { displayName: string } | null | undefined;
   tireAgeKnown?: boolean | null;
   tireRunNumber: number;
+  /** The front end of a front/rear run; the three above are then the rear. */
+  frontTireType?: { displayName: string } | null;
+  frontTireAgeKnown?: boolean | null;
+  frontTireRunNumber?: number | null;
+  tireFitment?: unknown;
   additiveType?: { displayName: string } | null;
   warmerTimingMinutes?: number | null;
   tirePrep?: unknown;
@@ -60,9 +66,9 @@ export function formatRunTiresDetailLine(params: {
 }): string {
   // Wear-first identity: the compound + which run this was on the set. Set numbers are
   // internal counters and anchors are retired — neither belongs in run detail lines.
-  const base = params.tireType
-    ? `${params.tireType.displayName} · run ${params.tireRunNumber}${params.tireAgeKnown === false ? " (age unknown)" : ""}`
-    : "—";
+  // A front/rear run names both ends and what they are glued to; a single-tire run reads exactly
+  // as it always has (`runTireEnds.ts` decides which a run is, from its own data).
+  const base = formatRunTiresOneLine(params, { fitment: true }) ?? "—";
   const extras: string[] = [];
   const additive = formatAdditiveTimingLine(
     params.additiveType,

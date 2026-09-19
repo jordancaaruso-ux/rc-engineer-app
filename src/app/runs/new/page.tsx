@@ -20,7 +20,7 @@ import { NewRunCopyLastRunSlot } from "@/components/runs/NewRunCopyLastRunSlot";
 import { decodeLabFields } from "@/lib/rollCenter/labState";
 import { LogRunWizardHost } from "@/components/runs/LogRunWizardHost";
 import { toEntryCandidate } from "@/lib/runs/entryCandidate";
-import { platformForChassisSlug } from "@/lib/cars/chassisPlatform";
+import { disciplineForCar } from "@/lib/cars/chassisPlatform";
 import { lastRunAtMsByCarId, orderCarsByRecentUse } from "@/lib/cars/orderCarsByRecentUse";
 
 export default async function NewRunPage({
@@ -122,9 +122,11 @@ export default async function NewRunPage({
         createdAt: true,
         setupSheetTemplate: true,
         setupSheetModelId: true,
-        // Chassis slug → platform for the car-swap tire rule (replaces the dropped
-        // `Car.carClass` picker; drivers never see it).
-        setupSheetModel: { select: { slug: true } },
+        // Everything `disciplineForCar` needs. The slug alone only ever placed the twelve curated
+        // touring chassis, so every off-road car reached the form as "unknown" — and the Tires
+        // step now reads differently depending on what the car races (2026-09-19).
+        carClass: true,
+        setupSheetModel: { select: { slug: true, discipline: true } },
       },
     }),
     prisma.run.groupBy({
@@ -156,10 +158,14 @@ export default async function NewRunPage({
   const cars = orderCarsByRecentUse(carsByCreated, lastRunAtMsByCarId(carLastRuns), (c) =>
     c.createdAt.getTime(),
   )
-    .map(({ setupSheetModel, ...c }) => ({
+    .map(({ setupSheetModel, carClass, ...c }) => ({
       ...c,
-      // Unknown chassis → null → treated as the same platform, so tires still carry.
-      platform: platformForChassisSlug(setupSheetModel?.slug),
+      // Nothing can place it → null → treated as the same platform, so tires still carry.
+      platform: disciplineForCar({
+        carClass,
+        setupSheetTemplate: c.setupSheetTemplate,
+        setupSheetModel,
+      }),
     }));
 
   const favSet = new Set(favouriteTrackIds);

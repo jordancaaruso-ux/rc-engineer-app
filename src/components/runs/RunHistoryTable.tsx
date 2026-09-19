@@ -341,6 +341,10 @@ export function RunHistoryTable({
           tireType: r.tireType ?? null,
           tireStintId: r.tireStintId ?? null,
           tireAgeKnown: r.tireAgeKnown ?? true,
+          frontTireRunNumber: r.frontTireRunNumber ?? null,
+          frontTireStintId: r.frontTireStintId ?? null,
+          frontTireAgeKnown: r.frontTireAgeKnown ?? null,
+          frontTireType: r.frontTireType ?? null,
         }))
       ),
     [allRunsDescending]

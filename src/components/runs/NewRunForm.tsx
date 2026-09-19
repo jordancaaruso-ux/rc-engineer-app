@@ -42,6 +42,13 @@ import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
 import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { RunTireSelectionPanel, type TireStintValue } from "@/components/runs/RunTireSelectionPanel";
+import { tireProfileForDiscipline } from "@/lib/cars/tireProfile";
+import { RunSplitTireSelectionPanel } from "@/components/runs/RunSplitTireSelectionPanel";
+import {
+  normalizeTireFitment,
+  tireFitmentHasContent,
+  type TireFitment,
+} from "@/lib/tires/tireFitment";
 import { RunAdditiveTimingPanel } from "@/components/runs/RunAdditiveTimingPanel";
 import { collectSetupSheetTemplateKeys } from "@/lib/setupSheetModels/collectTemplateKeys";
 import { applyRunContextToSetupSnapshot } from "@/lib/runs/applyRunContextToSetupSnapshot";
@@ -271,6 +278,14 @@ type LastRun = {
   tireAgeKnown?: boolean | null;
   tireTypeId?: string | null;
   tireType?: { id: string; displayName: string } | null;
+  /** The front end of a front/rear car; the un-prefixed tire fields above are then the rear. */
+  frontTireTypeId?: string | null;
+  frontTireType?: { id: string; displayName: string } | null;
+  frontTireRunNumber?: number | null;
+  frontTireStintId?: string | null;
+  frontTireAgeKnown?: boolean | null;
+  /** What each end is glued to — insert, wheel, modifications (src/lib/tires/tireFitment.ts). */
+  tireFitment?: unknown;
   additiveTypeId?: string | null;
   warmerTimingMinutes?: number | null;
   /** Ordered tire-prep applications (see src/lib/runs/tirePrep.ts); JSON on the run. */
@@ -416,6 +431,60 @@ function setupSnapshotWithDerived(raw: unknown): SetupSnapshotData {
  */
 const NEW_RUN_DRAFT_STORAGE_KEY = "rc-engineer-new-run-draft-v2";
 
+/**
+ * The FRONT tire of a car that logs front and rear apart (off-road, 2026-09-19). The rear — and
+ * every single-tire car's only tire — stays in the flat `tireTypeId` / `runsCompleted` / … state
+ * it has always had, so nothing about an on-road run's form moved; the front is the same five
+ * facts, kept together beside it.
+ */
+type TireEndState = {
+  typeId: string;
+  typeName: string;
+  /** Runs on this rubber BEFORE this run — saved as this + 1, exactly like `runsCompleted`. */
+  runsCompleted: number;
+  ageKnown: boolean;
+  /** Null means different rubber went on — the server mints a new stint on save. */
+  stintId: string | null;
+};
+
+const EMPTY_TIRE_END: TireEndState = {
+  typeId: "",
+  typeName: "",
+  runsCompleted: 0,
+  ageKnown: true,
+  stintId: null,
+};
+
+/**
+ * A run's front tire as form state. "carry" is the next run on the same rubber — that run's
+ * number is how many runs are now on it. "edit" is that run itself being re-saved, so one comes
+ * off: the save adds it back (the same off-by-one the rear's edit hydrate documents).
+ */
+function frontTireFromRun(
+  run:
+    | {
+        frontTireTypeId?: string | null;
+        frontTireType?: { id: string; displayName: string } | null;
+        frontTireRunNumber?: number | null;
+        frontTireStintId?: string | null;
+        frontTireAgeKnown?: boolean | null;
+      }
+    | null
+    | undefined,
+  mode: "carry" | "edit"
+): TireEndState {
+  const typeId = run?.frontTireTypeId ?? run?.frontTireType?.id ?? "";
+  if (!run || !typeId) return EMPTY_TIRE_END;
+  const stored = run.frontTireRunNumber ?? (mode === "edit" ? 1 : 0);
+  return {
+    typeId,
+    typeName: run.frontTireType?.displayName ?? "",
+    runsCompleted: Math.max(0, mode === "edit" ? stored - 1 : stored),
+    ageKnown: run.frontTireAgeKnown ?? true,
+    stintId: run.frontTireStintId ?? null,
+  };
+}
+
 /** Fields we silently persist so leaving and returning to `/runs/new` doesn't lose work. */
 type NewRunDraftSnapshot = {
   sessionType: "TESTING" | "RACE_MEETING";
@@ -432,6 +501,9 @@ type NewRunDraftSnapshot = {
   runsCompleted: number;
   additiveTypeId: string;
   tirePrep: TirePrepStep[];
+  /** Front/rear cars only. Optional: drafts saved before 2026-09-19 don't have them. */
+  frontTire?: TireEndState;
+  tireFitment?: TireFitment;
   setupData: SetupSnapshotData;
   setupBaselineSnapshotId: string | null;
   setupBaselineData: SetupSnapshotData | null;
@@ -461,6 +533,8 @@ function newRunDraftHasContent(s: NewRunDraftSnapshot): boolean {
     s.trackId ||
       s.eventId ||
       s.tireTypeId ||
+      s.frontTire?.typeId ||
+      tireFitmentHasContent(s.tireFitment) ||
       s.additiveTypeId ||
       (s.tirePrep && tirePrepHasContent(s.tirePrep)) ||
       s.notes.trim() ||
@@ -646,6 +720,10 @@ export function NewRunForm(props: {
     displayName: string;
   } | null>(null);
   const [runsCompleted, setRunsCompleted] = useState<number>(0);
+  /** Front/rear cars: the front tire. The flat tire state above is then the REAR. */
+  const [frontTire, setFrontTire] = useState<TireEndState>(EMPTY_TIRE_END);
+  /** Front/rear cars: what each end is glued to. Kept as typed; normalised on save. */
+  const [tireFitment, setTireFitment] = useState<TireFitment>({});
   const [additiveTypeId, setAdditiveTypeId] = useState<string>("");
   /** Ordered tire-prep applications toward the run (see src/lib/runs/tirePrep.ts).
    *  Starts empty — the driver adds applications on demand, and an added row is
@@ -964,14 +1042,23 @@ export function NewRunForm(props: {
 
   /** One-line tire identity for wizard summaries: compound plus how many runs are on it. */
   const tireSummaryLine = useMemo(() => {
-    if (!tireTypeId) return "";
-    return displayTireSelection({
-      tireTypeId,
-      displayName: tireTypeName,
-      tireRunNumber: Math.max(1, runsCompleted + 1),
-      tireAgeKnown,
+    const rear = tireTypeId
+      ? displayTireSelection({
+          tireTypeId,
+          displayName: tireTypeName,
+          tireRunNumber: Math.max(1, runsCompleted + 1),
+          tireAgeKnown,
+        })
+      : "";
+    if (!frontTire.typeId) return rear;
+    const front = displayTireSelection({
+      tireTypeId: frontTire.typeId,
+      displayName: frontTire.typeName,
+      tireRunNumber: Math.max(1, frontTire.runsCompleted + 1),
+      tireAgeKnown: frontTire.ageKnown,
     });
-  }, [tireTypeId, tireTypeName, runsCompleted, tireAgeKnown]);
+    return `F ${front} / R ${rear || "not set"}`;
+  }, [tireTypeId, tireTypeName, runsCompleted, tireAgeKnown, frontTire]);
 
   const tireTypeIdRef = useRef(tireTypeId);
   tireTypeIdRef.current = tireTypeId;
@@ -1013,6 +1100,11 @@ export function NewRunForm(props: {
         ageKnown: typeId ? (run?.tireAgeKnown ?? true) : true,
         stintId: typeId ? (run?.tireStintId ?? null) : null,
       });
+      // A front/rear car carries its front the same way, and the insert / wheel / modifications
+      // with it — the tire is glued to them. A run without any (every on-road run) clears both,
+      // which is what stops a buggy's front following the driver onto a touring car.
+      setFrontTire(frontTireFromRun(run, "carry"));
+      setTireFitment(normalizeTireFitment(run?.tireFitment) ?? {});
     },
     [applyTireStint]
   );
@@ -1034,6 +1126,18 @@ export function NewRunForm(props: {
       tireRunNumber: lastRun.tireRunNumber ?? 0,
       tireAgeKnown: lastRun.tireAgeKnown ?? true,
       tireStintId: lastRun.tireStintId ?? null,
+    };
+  }, [lastRun, replicateLoaded]);
+  /** The same, for the front end of a front/rear car — its own tire, count and stint. */
+  const lastRunFrontTires = useMemo<LastRunTires | null | undefined>(() => {
+    if (!replicateLoaded) return undefined;
+    const typeId = lastRun?.frontTireTypeId ?? lastRun?.frontTireType?.id ?? "";
+    if (!lastRun || !typeId) return null;
+    return {
+      tireTypeId: typeId,
+      tireRunNumber: lastRun.frontTireRunNumber ?? 0,
+      tireAgeKnown: lastRun.frontTireAgeKnown ?? true,
+      tireStintId: lastRun.frontTireStintId ?? null,
     };
   }, [lastRun, replicateLoaded]);
   /**
@@ -1277,6 +1381,8 @@ export function NewRunForm(props: {
       ageKnown: r.tireAgeKnown ?? true,
       stintId: r.tireStintId ?? null,
     });
+    setFrontTire(frontTireFromRun(r, "edit"));
+    setTireFitment(normalizeTireFitment(r.tireFitment) ?? {});
     setAdditiveTypeId(r.additiveTypeId ?? r.additiveType?.id ?? "");
     {
       const steps =
@@ -1486,6 +1592,8 @@ export function NewRunForm(props: {
       ageKnown: r.tireAgeKnown ?? true,
       stintId: r.tireStintId ?? null,
     });
+    setFrontTire(frontTireFromRun(r, "carry"));
+    setTireFitment(normalizeTireFitment(r.tireFitment) ?? {});
     if (typeof r.practiceDayUrl === "string") setPracticeDayUrl(r.practiceDayUrl);
 
     const nextSetup = setupSnapshotWithDerived(r.setupSnapshot?.data);
@@ -1556,6 +1664,10 @@ export function NewRunForm(props: {
           });
         }
         if (typeof s.additiveTypeId === "string") setAdditiveTypeId(s.additiveTypeId);
+        if (s.frontTire && typeof s.frontTire.typeId === "string") {
+          setFrontTire({ ...EMPTY_TIRE_END, ...s.frontTire });
+        }
+        if (s.tireFitment) setTireFitment(normalizeTireFitment(s.tireFitment) ?? {});
         if (Array.isArray(s.tirePrep)) {
           setTirePrep(normalizeTirePrep(s.tirePrep));
         }
@@ -1600,6 +1712,8 @@ export function NewRunForm(props: {
       runsCompleted,
       additiveTypeId,
       tirePrep,
+      frontTire,
+      tireFitment,
       setupData,
       setupBaselineSnapshotId,
       setupBaselineData,
@@ -1645,6 +1759,8 @@ export function NewRunForm(props: {
     runsCompleted,
     additiveTypeId,
     tirePrep,
+    frontTire,
+    tireFitment,
     setupData,
     setupBaselineSnapshotId,
     setupBaselineData,
@@ -1660,6 +1776,36 @@ export function NewRunForm(props: {
   ]);
 
   const selectedCar = useMemo(() => carsList.find((c) => c.id === carId) ?? null, [carsList, carId]);
+  /** What this car's discipline means for the Tires step: which tires it is offered, and how. */
+  const tireProfile = useMemo(
+    () => tireProfileForDiscipline(selectedCar?.platform),
+    [selectedCar?.platform]
+  );
+  /**
+   * Front and rear are asked for when the car's class logs them apart — OR when the form is
+   * already holding a front. Data wins over the class on purpose: a run saved as front/rear must
+   * reopen as front/rear even if its car has since been re-classed, or is one nothing can place.
+   */
+  const splitTiresActive =
+    tireProfile.split || Boolean(frontTire.typeId) || tireFitmentHasContent(tireFitment);
+  /**
+   * Picking a DIFFERENT car that is known to run one tire drops whatever front the form was
+   * holding — it belonged to the car just left. The wizard's cross-class swap already reloads
+   * tires from the new car's last run; this covers the doors that change the car without that
+   * plan (the classic form's car picker). Only on a change, never on first paint, so a hydrate
+   * that sets the car and its front together is left alone.
+   */
+  const carIdForTireResetRef = useRef(carId);
+  useEffect(() => {
+    if (carIdForTireResetRef.current === carId) return;
+    const hadCar = Boolean(carIdForTireResetRef.current);
+    carIdForTireResetRef.current = carId;
+    if (!hadCar || isEditing) return;
+    if (selectedCar?.platform && !tireProfile.split) {
+      setFrontTire(EMPTY_TIRE_END);
+      setTireFitment({});
+    }
+  }, [carId, isEditing, selectedCar?.platform, tireProfile.split]);
   const [modelTemplate, setModelTemplate] = useState<SetupSheetTemplate | null>(null);
   /**
    * Set when this car's chassis was derived from somebody's own PDF and fills in on a picture of
@@ -3753,6 +3899,13 @@ export function NewRunForm(props: {
           tireStintId: tireStintId,
           tireAgeKnown,
           tireRunNumber: Math.max(1, runsCompleted + 1),
+          // The front end of a front/rear car (the tire fields above are then the rear). Always
+          // sent, null included: to the server an ABSENT front means "an old client, leave it".
+          frontTireTypeId: frontTire.typeId || null,
+          frontTireStintId: frontTire.typeId ? frontTire.stintId : null,
+          frontTireAgeKnown: frontTire.ageKnown,
+          frontTireRunNumber: Math.max(1, frontTire.runsCompleted + 1),
+          tireFitment: normalizeTireFitment(tireFitment),
           additiveTypeId: additiveTypeId || null,
           tirePrep: pruneTirePrepForSave(tirePrep),
           setupData: applyDerivedFieldsToSnapshot(setupData),
@@ -4095,6 +4248,7 @@ export function NewRunForm(props: {
     Boolean(
       trackId ||
         tireTypeId ||
+        frontTire.typeId ||
         tirePrep.length > 0 ||
         additiveTypeId ||
         filledSetupValueCount(setupData) > 0 ||
@@ -4288,7 +4442,10 @@ export function NewRunForm(props: {
       session: sessionUnchanged,
       car: carId === wizardAppliedPlan.carId,
       tires:
-        Boolean(tireTypeId) && tireStintId != null && tireStintId === (lastRun?.tireStintId ?? null),
+        Boolean(tireTypeId) &&
+        tireStintId != null &&
+        tireStintId === (lastRun?.tireStintId ?? null) &&
+        (frontTire.stintId ?? null) === (lastRun?.frontTireStintId ?? null),
       /*
        * Prep is one page with tires now, but it keeps its own flag because the
        * prefill manifest card still lists it as its own promise.
@@ -4500,12 +4657,25 @@ export function NewRunForm(props: {
             label: "Tires",
             value: lastRun
               ? lastRun.tireTypeId || lastRun.tireType
-                ? displayTireSelection({
-                    tireTypeId: lastRun.tireTypeId ?? lastRun.tireType?.id ?? "",
-                    displayName: lastRun.tireType?.displayName,
-                    tireRunNumber: lastRun.tireRunNumber,
-                    tireAgeKnown: lastRun.tireAgeKnown ?? true,
-                  })
+                ? [
+                    // A front/rear car's promise names both ends, front first — as the step does.
+                    lastRun.frontTireTypeId || lastRun.frontTireType
+                      ? `F ${displayTireSelection({
+                          tireTypeId: lastRun.frontTireTypeId ?? lastRun.frontTireType?.id ?? "",
+                          displayName: lastRun.frontTireType?.displayName,
+                          tireRunNumber: lastRun.frontTireRunNumber ?? undefined,
+                          tireAgeKnown: lastRun.frontTireAgeKnown ?? true,
+                        })} / R`
+                      : null,
+                    displayTireSelection({
+                      tireTypeId: lastRun.tireTypeId ?? lastRun.tireType?.id ?? "",
+                      displayName: lastRun.tireType?.displayName,
+                      tireRunNumber: lastRun.tireRunNumber,
+                      tireAgeKnown: lastRun.tireAgeKnown ?? true,
+                    }),
+                  ]
+                    .filter(Boolean)
+                    .join(" ")
                 : "—"
               : "…",
           },
@@ -5418,6 +5588,54 @@ export function NewRunForm(props: {
               label: "Tires",
               content: (
           <div className="space-y-3 pt-1">
+            {splitTiresActive ? (
+              <RunSplitTireSelectionPanel
+                front={{
+                  tireTypeId: frontTire.typeId,
+                  value: {
+                    runsCompleted: frontTire.runsCompleted,
+                    ageKnown: frontTire.ageKnown,
+                    stintId: frontTire.stintId,
+                  },
+                  lastRunTires: lastRunFrontTires,
+                  onTireTypeChange: (nextId, displayName) => {
+                    setFrontTire((f) => ({
+                      ...f,
+                      typeId: nextId,
+                      typeName: displayName ?? (nextId === f.typeId ? f.typeName : ""),
+                    }));
+                    setCopyTireWarning(null);
+                  },
+                  onChange: (next) =>
+                    setFrontTire((f) => ({
+                      ...f,
+                      runsCompleted: Math.max(0, Math.floor(next.runsCompleted)),
+                      ageKnown: next.ageKnown,
+                      stintId: next.stintId,
+                    })),
+                }}
+                rear={{
+                  tireTypeId,
+                  value: { runsCompleted, ageKnown: tireAgeKnown, stintId: tireStintId },
+                  lastRunTires,
+                  onTireTypeChange: (nextId, displayName) => {
+                    setTireTypeId(nextId);
+                    if (displayName != null) setTireTypeName(displayName);
+                    setCopyTireWarning(null);
+                  },
+                  onChange: applyTireStint,
+                }}
+                fitment={tireFitment}
+                onFitmentChange={setTireFitment}
+                showExtras={tireProfile.extras || tireFitmentHasContent(tireFitment)}
+                carId={carId}
+                bucket={tireProfile.bucket}
+                resetSignal={carId}
+                onPrefillClear={() => setPrefillHighlights((h) => (h ? { ...h, tires: false } : h))}
+                copyTireWarning={copyTireWarning}
+                prefillFieldClass={prefillFieldClass(Boolean(prefillHighlights?.tires))}
+              />
+            ) : (
             <RunTireSelectionPanel
               tireTypeId={tireTypeId}
               onTireTypeChange={(nextId, displayName) => {
@@ -5433,6 +5651,7 @@ export function NewRunForm(props: {
               value={{ runsCompleted, ageKnown: tireAgeKnown, stintId: tireStintId }}
               onChange={applyTireStint}
               carId={carId}
+              bucket={tireProfile.bucket}
               // What a compound pick is measured against — same compound as the
               // last run means the same rubber, one run older.
               lastRunTires={lastRunTires}
@@ -5443,6 +5662,7 @@ export function NewRunForm(props: {
               copyTireWarning={copyTireWarning}
               prefillFieldClass={prefillFieldClass(Boolean(prefillHighlights?.tires))}
             />
+            )}
             {/* Prep under the compound in BOTH modes since 2026-09-16 — the
                 wizard used to hold this back for a Prep step of its own. */}
             {prepPanelJsx}

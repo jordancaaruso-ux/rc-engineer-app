@@ -71,6 +71,17 @@ function compareCandidates(a: ComparableRun, b: ComparableRun): number {
  * not have to thread tyre and track tags through every builder that sits between it and
  * here. One extra query, and the call site stays a single line.
  */
+/**
+ * What "same tyre" is compared on. A single-tyre run is its tyre. A front/rear run (off-road) is
+ * the PAIRING — same rears on different fronts is a different car to drive, so it must not score
+ * as "same tyre". The scorer only ever asks whether two of these are equal, so a composite string
+ * is all it needs; a front/rear run never equals a single-tyre one, which is also right.
+ */
+function tyreIdentity(run: { tireTypeId: string | null; frontTireTypeId: string | null }): string | null {
+  if (!run.tireTypeId) return null;
+  return run.frontTireTypeId ? `${run.frontTireTypeId}|${run.tireTypeId}` : run.tireTypeId;
+}
+
 export async function findComparableRunsForEngineer(
   userId: string,
   anchorRunId: string,
@@ -85,6 +96,7 @@ export async function findComparableRunsForEngineer(
       sessionCompletedAt: true,
       importedLapTimeSessionId: true,
       tireTypeId: true,
+      frontTireTypeId: true,
       gripLevel: true,
       track: { select: { gripTags: true, layoutTags: true } },
     },
@@ -110,6 +122,7 @@ export async function findComparableRunsForEngineer(
       importedLapTimeSessionId: true,
       carRating: true,
       tireTypeId: true,
+      frontTireTypeId: true,
       gripLevel: true,
       unconfirmedAt: true,
       track: { select: { name: true, gripTags: true, layoutTags: true } },
@@ -119,7 +132,7 @@ export async function findComparableRunsForEngineer(
   });
 
   const currentConditions: RunConditions = {
-    tireTypeId: current.tireTypeId,
+    tireTypeId: tyreIdentity(current),
     gripTags: resolveGripTags(current.gripLevel, current.track?.gripTags),
     layoutTags: current.track?.layoutTags ?? null,
   };
@@ -133,7 +146,7 @@ export async function findComparableRunsForEngineer(
     if (peer.unconfirmedAt != null) continue;
 
     const comparability = scoreComparability(currentConditions, {
-      tireTypeId: peer.tireTypeId,
+      tireTypeId: tyreIdentity(peer),
       gripTags: resolveGripTags(peer.gripLevel, peer.track?.gripTags),
       layoutTags: peer.track?.layoutTags ?? null,
     });

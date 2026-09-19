@@ -12,7 +12,12 @@ import { prisma } from "@/lib/prisma";
  * Every write runs in one transaction so a partial repoint can never orphan a row.
  */
 
-/** TireType is referenced by Run.tireTypeId, TireSet.tireTypeId (dormant) and EventParticipation.controlledTireTypeId. */
+/**
+ * TireType is referenced by Run.tireTypeId, Run.frontTireTypeId (front/rear cars),
+ * TireSet.tireTypeId (dormant) and EventParticipation.controlledTireTypeId. Every one must be
+ * repointed: the foreign keys are SET NULL, so a reference missed here is not an error on delete —
+ * it is a driver's tire silently disappearing from their run.
+ */
 export async function mergeTireTypes(input: {
   winnerId: string;
   loserId: string;
@@ -24,6 +29,10 @@ export async function mergeTireTypes(input: {
     await tx.run.updateMany({
       where: { tireTypeId: loserId },
       data: { tireTypeId: winnerId },
+    });
+    await tx.run.updateMany({
+      where: { frontTireTypeId: loserId },
+      data: { frontTireTypeId: winnerId },
     });
     await tx.tireSet.updateMany({
       where: { tireTypeId: loserId },
