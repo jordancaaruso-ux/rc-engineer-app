@@ -50,12 +50,8 @@ export default auth((req) => {
   if (pathname.startsWith("/api/health/")) {
     return NextResponse.next();
   }
-  // Build identity (env / branch / commit). Public because it exists to answer "which deployment
-  // am I actually on?", a question that usually comes up because auth sent you somewhere
-  // unexpected — gating it behind the very thing in doubt makes it useless. No secrets emitted.
-  if (pathname === "/api/_debug/version") {
-    return NextResponse.next();
-  }
+  // Build identity lives at /api/health/version (covered by the health exemption above). It used to
+  // be /api/_debug/version, which Next.js never served: an underscore folder is private to the router.
   // Stripe webhooks are server-to-server and unauthenticated — the route verifies the signature.
   if (pathname === "/api/stripe/webhook") {
     return NextResponse.next();

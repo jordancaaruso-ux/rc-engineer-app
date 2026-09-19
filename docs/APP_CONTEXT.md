@@ -168,7 +168,7 @@ Hard-denied outright: `npm run build`, `db:push`, `db:seed`, `db:migrate:deploy`
 
 **Edge → middleware.** `src/middleware.ts` runs on the edge using the Prisma-free
 `src/auth.config.ts`. It gates everything except: `/login/*`, `/privacy`, `/terms`,
-`/api/health/*`, `/api/_debug/version`, `/api/stripe/webhook`, `/join/*`,
+`/api/health/*` (incl. `/api/health/version`), `/api/stripe/webhook`, `/join/*`,
 `/api/billing/public-checkout`, `/welcome`, `/landing/*`, `/demo`. Unauthenticated APIs get
 **401 JSON**; unauthenticated pages redirect to `/login?from=…`, except `/` which redirects to
 `/welcome` (a stranger gets the pitch, not a sign-in form).

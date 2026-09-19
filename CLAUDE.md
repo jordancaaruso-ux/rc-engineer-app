@@ -48,6 +48,19 @@ npx next build            # LOCAL production build
 Verification order before calling something done: `npx tsc --noEmit` → the matching `test:*` →
 `npx next build`. There is no CI — nothing else will catch it.
 
+**Nothing gets lost (founder call, 2026-09-19).** A whole round of Engineer rulings (2026-09-04) was
+built in a side worktree, never committed, and was missing from production for two weeks. So:
+- **Engineer, KB and nets work happens in the main folder only.** Side worktrees are for risky UI or
+  video experiments. If you must build elsewhere, your last message says in plain words "this is NOT
+  in main", and the memory note says WHERE it lives, not just that it was built.
+- **Every session commits its own work under its own name the same day** (`git add <your files>`,
+  never a blanket sweep of other sessions' files). Catch-all commits are what hid the loss.
+- **Before any deploy:** `npm run engineer:rulings -- --ref origin/main` (or `origin/beta`) — one
+  key sentence per founder ruling, checked against the code that will ship. Add a line to
+  `scripts/engineer-eval/rulings.json` whenever a ruling lands.
+- **After any deploy:** open `/api/health/version` — commit + Engineer label of what is serving.
+- The founder's review of Engineer answers is logged in `docs/ENGINEER_REVIEW_LEDGER.md`.
+
 ## Guards you will meet
 
 Safety lives in `.claude/settings.json` + `.claude/hooks/`, not in prose. Hooks fire below the
@@ -75,7 +88,7 @@ nothing is clickable.
 ## Architecture
 
 **Request path.** `src/middleware.ts` (edge, uses the Prisma-free `src/auth.config.ts`) gates
-everything except `/login/*`, `/privacy`, `/terms`, `/api/health/*`, `/api/_debug/version` and
+everything except `/login/*`, `/privacy`, `/terms`, `/api/health/*` (incl. `/api/health/version`) and
 `/api/stripe/webhook` — unauthenticated APIs get 401 JSON, pages get redirected. `src/auth.ts` (Node)
 holds the real NextAuth v5 config: magic-link email + optional Google, with a sign-in allowlist
 (`AuthAllowedEmail` table + `AUTH_ALLOWED_EMAILS`). Pages call `requireCurrentUser()`, routes call

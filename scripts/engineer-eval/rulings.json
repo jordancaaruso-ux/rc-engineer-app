@@ -1,0 +1,38 @@
+{
+  "about": "One key sentence per founder ruling on the Engineer. `npm run engineer:rulings` checks each is on the wire — in the working tree by default, or in any saved commit with --ref (origin/main is what production builds, origin/beta is the beta site). Written 2026-09-19 after a whole round of rulings (2026-09-04) was found never to have reached main. Add a line whenever a ruling lands. `present` must appear in the file; `absent` must NOT. Whitespace and line wrapping are ignored.",
+  "rulings": [
+    { "date": "2026-08-28", "ruling": "Damper oil moves in 50 cSt steps", "file": "content/nets/touring/damper-oil-front.yaml", "present": "step: \"50 cSt\"" },
+    { "date": "2026-09-01", "ruling": "No net outranks another; choose by fit, never by wording", "file": "src/lib/engineer/nets.ts", "present": "Every entry carries the same weight" },
+    { "date": "2026-09-01", "ruling": "A roll-centre direction can never be stated backwards (code check on every reply)", "file": "src/lib/engineer/rcDirections.ts", "present": "export function rcGuardCorrections" },
+    { "date": "2026-09-03", "ruling": "One question per reply, not per conversation", "file": "src/lib/engineer/prompt.ts", "present": "never more than one in a reply" },
+    { "date": "2026-09-03", "ruling": "\"No change worth making\" is an allowed answer", "file": "src/lib/engineer/prompt.ts", "present": "or instead of it when there is no change worth making" },
+
+    { "date": "2026-09-04", "ruling": "Questions are asked in the driver's words too, not only changes", "file": "src/lib/engineer/prompt.ts", "present": "A change, and a question, is what the driver will feel and where on the corner" },
+    { "date": "2026-09-04", "ruling": "Other levers: at most three, no minimum", "file": "src/lib/engineer/prompt.ts", "present": "then other levers that would also do it, at most three" },
+    { "date": "2026-09-04", "ruling": "No banned-word list (it had banned \"lazy\")", "file": "src/lib/engineer/netsSchema.ts", "absent": "BANNED_FEEL_COINAGES" },
+    { "date": "2026-09-04", "ruling": "Feel words pass one test: would a driver say it", "file": "content/vehicle-dynamics/concepts/bite-hold.md", "present": "would a driver say it about how the car behaves" },
+    { "date": "2026-09-04", "ruling": "\"More rolled-in\" is not a driver's word", "file": "content/vehicle-dynamics/concepts/bite-hold.md", "absent": "more rolled-in" },
+
+    { "date": "2026-09-08", "ruling": "Corner places are entering / turning in, in the middle, exiting", "file": "content/vehicle-dynamics/concepts/bite-hold.md", "present": "`entering` / `turning in`, `in the middle`, `exiting`" },
+    { "date": "2026-09-08", "ruling": "\"Loose\" names a ratio: maybe the front is too aggressive", "file": "content/vehicle-dynamics/concepts/bite-hold.md", "present": "A balance word names a ratio, not an end" },
+    { "date": "2026-09-08", "ruling": "Levers are grouped into families (roll stiffness, roll centre, response)", "file": "src/lib/engineer/nets.ts", "present": "Entries under a GROUP line are versions of one change" },
+
+    { "date": "2026-09-09", "ruling": "A named corner gives the phase: a hairpin is mostly the middle", "file": "content/vehicle-dynamics/concepts/bite-hold.md", "present": "A corner named is a phase given" },
+    { "date": "2026-09-09", "ruling": "A change that made the car worse everywhere: try the same lever the other way first", "file": "content/vehicle-dynamics/concepts/bite-hold.md", "present": "is the strongest evidence on the sheet" },
+    { "date": "2026-09-09", "ruling": "Two changes can share one test (physics)", "file": "content/vehicle-dynamics/concepts/corner-regime.md", "present": "Two changes can share one test" },
+    { "date": "2026-09-09", "ruling": "Paired change: the answer names the change that gets a cost back", "file": "src/lib/engineer/prompt.ts", "present": "the change that gets it back without touching the gain" },
+    { "date": "2026-09-09", "ruling": "\"Contested\" never reaches a driver: it goes either way", "file": "src/lib/engineer/netsSchema.ts", "present": "IT GOES EITHER WAY" },
+    { "date": "2026-09-09", "ruling": "Stiffer rear often feels like MORE rear grip, even in the middle", "file": "content/nets/touring/arb-rear.yaml", "present": "often feels like more rear grip and less rotation, even in the middle of the corner" },
+    { "date": "2026-09-09", "ruling": "Whole-car moves exist as BOTH ENDS TOGETHER lines", "file": "src/lib/engineer/nets.ts", "present": "BOTH ENDS TOGETHER" },
+    { "date": "2026-09-09", "ruling": "Thinner oil both ends can feel like LESS overall grip", "file": "content/nets/touring/_whole-car.yaml", "present": "because it reacts so quickly it can feel like less overall grip" },
+
+    { "date": "2026-09-09", "ruling": "Exiting is always on power: never ask on/off on exit", "file": "content/vehicle-dynamics/concepts/bite-hold.md", "present": "Exiting is on power" },
+    { "date": "2026-09-09", "ruling": "A driver who named no problem is asked what problems they had, not where", "file": "content/vehicle-dynamics/concepts/bite-hold.md", "present": "is not asked where" },
+    { "date": "2026-09-09", "ruling": "\"Like ice\" is read as late grip, never asked about", "file": "content/vehicle-dynamics/concepts/bite-hold.md", "present": "is read from fact 5, never asked" },
+    { "date": "2026-09-09", "ruling": "Camber sits near 2 degrees and stays; reached for last", "file": "content/vehicle-dynamics/camber.md", "present": "Where the number sits" },
+    { "date": "2026-09-09", "ruling": "Lowering the rear body is not a traction-roll move", "file": "content/vehicle-dynamics/concepts/load-transfer.md", "present": "not a traction-roll move" },
+    { "date": "2026-09-09", "ruling": "Initial steering is the steering geometry first", "file": "content/vehicle-dynamics/concepts/steering-response.md", "present": "The first input is the geometry's before it is the grip's" },
+    { "date": "2026-09-14", "ruling": "Toe and bump steer before caster and Ackermann for a first-input complaint", "file": "content/vehicle-dynamics/concepts/steering-response.md", "present": "The four are not equals" },
+    { "date": "2026-09-15", "ruling": "Nothing separates a group's knobs: name the group move with a step on each", "file": "src/lib/engineer/nets.ts", "present": "give the group move with a step on each knob" }
+  ]
+}
