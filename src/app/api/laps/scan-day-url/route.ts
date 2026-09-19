@@ -11,7 +11,8 @@ import {
   raceListRowMatchesAnyConfiguredClass,
 } from "@/lib/lapWatch/livercSessionIndexParsers";
 import {
-  liveRcNameMatchesConfigured,
+  formatLiveRcDriverNamesForDisplay,
+  liveRcPracticeRowIsMine,
   normalizeLiveRcDriverNameForMatch,
 } from "@/lib/lapWatch/liveRcNameNormalize";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
@@ -21,7 +22,10 @@ import {
   sessionUtcOffsetMinutesFromImportedPayload,
 } from "@/lib/lapImport/fromPayload";
 import { rawSessionDriversFromImportedPayload } from "@/lib/lapImport/importedIngestPlan";
-import { hasSpeedhiveIdentityForUser } from "@/lib/speedhive/speedhiveDriverSettings";
+import {
+  getSpeedhiveTransponderNumbersForUser,
+  hasSpeedhiveIdentityForUser,
+} from "@/lib/speedhive/speedhiveDriverSettings";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { emptyLapDiscoveryStatus } from "@/lib/lapWatch/lapDiscoveryStatus";
 
@@ -503,9 +507,11 @@ export async function POST(request: Request) {
       importedMap.set(r.sourceUrl, r.linkedRunId);
     }
 
+    // A saved chip printed on the row is the driver's run whatever name the club typed.
+    const transponders = await getSpeedhiveTransponderNumbersForUser(userId).catch(() => [] as number[]);
     candidates = rows.map((r) => {
       const matchesDriver =
-        driverNorm.length === 0 ? null : liveRcNameMatchesConfigured(r.driverName, driverNorm);
+        driverNorm.length === 0 ? null : liveRcPracticeRowIsMine(r.driverName, driverNorm, transponders);
       const linkedRunId = importedMap.get(r.sessionUrl) ?? null;
       return {
         sessionId: r.sessionId,
@@ -592,7 +598,7 @@ export async function POST(request: Request) {
       matchedCount: 0,
       hasDriverNameSetting: true,
       driverFilterApplied: true,
-      scanMessage: `No practice sessions matched your name on LiveRC “${liveRcDriverName ?? ""}”. Check Settings → Name on LiveRC against how your name appears on LiveRC.${sampleHint}`,
+      scanMessage: `No practice sessions matched your name on LiveRC “${formatLiveRcDriverNamesForDisplay(liveRcDriverName)}”. Check Settings → Name on LiveRC against how your name appears on LiveRC.${sampleHint}`,
     });
   }
 

@@ -6,6 +6,7 @@ import {
 } from "@/lib/appSettings";
 import { parseSpeedhiveTransponderNumbersSetting } from "@/lib/speedhive/speedhiveTransponder";
 import { parseSpeedhiveDriverNamesSetting } from "@/lib/speedhive/speedhiveDriverNames";
+import { parseLiveRcDriverNamesSetting } from "@/lib/lapWatch/liveRcNameNormalize";
 
 export {
   getSpeedhiveDriverNameSetting,
@@ -31,8 +32,7 @@ export async function getSpeedhiveTransponderNumbersForUser(userId: string): Pro
 export async function getSpeedhiveDriverNamesForUser(userId: string): Promise<string[]> {
   const speedhive = parseSpeedhiveDriverNamesSetting(await getSpeedhiveDriverNameSetting(userId));
   if (speedhive.length > 0) return speedhive;
-  const liveRc = (await getLiveRcDriverNameSetting(userId))?.trim();
-  return liveRc ? [liveRc] : [];
+  return parseLiveRcDriverNamesSetting(await getLiveRcDriverNameSetting(userId));
 }
 
 export async function hasSpeedhiveIdentityForUser(userId: string): Promise<boolean> {

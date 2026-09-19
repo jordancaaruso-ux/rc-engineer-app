@@ -185,11 +185,17 @@ async function importCandidates(
     getSpeedhiveDriverNamesForUser(userId).catch(() => [] as string[]),
     getSpeedhiveTransponderNumbersForUser(userId).catch(() => [] as number[]),
   ]);
-  const driverName = (speedhiveNames[0] ?? liveName)?.trim() ?? "";
-  const importContext = {
-    ...(driverName ? { driverName } : {}),
+  // Each site is asked for the name it knows the driver by: a LiveRC page gets every LiveRC name
+  // (one per line — the matcher tries each), MYLAPS gets its own list below.
+  const liveRcNames = liveName?.trim() ?? "";
+  const speedhiveFirst = speedhiveNames[0]?.trim() ?? "";
+  const sharedContext = {
     ...(speedhiveNames.length > 0 ? { speedhiveDriverNames: speedhiveNames } : {}),
     ...(transponders.length > 0 ? { speedhiveTransponderNumbers: transponders } : {}),
+  };
+  const contextFor = (source: GatheredCandidate["source"]) => {
+    const driverName = source === "liverc" ? liveRcNames || speedhiveFirst : speedhiveFirst;
+    return { ...(driverName ? { driverName } : {}), ...sharedContext };
   };
 
   const unique: GatheredCandidate[] = [];
@@ -204,7 +210,7 @@ async function importCandidates(
   const rows: FilingRow[] = [];
   await forEachPooled(unique, IMPORT_CONCURRENCY, async (c) => {
     try {
-      const imported = await importOneTimingUrl(userId, c.sessionUrl, importContext);
+      const imported = await importOneTimingUrl(userId, c.sessionUrl, contextFor(c.source));
       if (!imported.success) {
         outcomes.push({ kind: "skipped", reason: `import: ${imported.error}` });
         return;

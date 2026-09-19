@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { parseLiveRcDriverNamesSetting } from "@/lib/lapWatch/liveRcNameNormalize";
+import { parseSpeedhiveDriverNamesSetting } from "@/lib/speedhive/speedhiveDriverNames";
 
 export const APP_SETTING_KEYS = {
   myName: "myName",
@@ -257,7 +259,8 @@ export async function setSpeedhiveTransponderLoanerSetting(
 export async function getSpeedhiveDriverNameForUser(userId: string): Promise<string | null> {
   const sh = (await getSpeedhiveDriverNameSetting(userId))?.trim();
   if (sh) return sh;
-  return (await getLiveRcDriverNameSetting(userId))?.trim() || null;
+  // The LiveRC setting can hold several names, one per line; this is a single-name answer.
+  return parseLiveRcDriverNamesSetting(await getLiveRcDriverNameSetting(userId))[0] ?? null;
 }
 
 /*
@@ -282,9 +285,13 @@ export async function getMyRcmDriverNamesForUser(userId: string): Promise<string
   const legacyMyRcm = legacyRow?.value ?? null;
 
   const names: string[] = [];
-  for (const name of [legacyMyRcm, speedhive, liveRc]) {
-    const trimmed = name?.trim();
-    if (trimmed && !names.includes(trimmed)) names.push(trimmed);
+  // Speedhive and LiveRC each hold one name per line.
+  for (const name of [
+    ...parseLiveRcDriverNamesSetting(legacyMyRcm),
+    ...parseSpeedhiveDriverNamesSetting(speedhive),
+    ...parseLiveRcDriverNamesSetting(liveRc),
+  ]) {
+    if (!names.includes(name)) names.push(name);
   }
   return names;
 }

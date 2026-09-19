@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { ChipListField } from "@/components/settings/ChipListField";
@@ -8,7 +8,7 @@ import { KnownCompetitorsField } from "@/components/settings/KnownCompetitorsFie
 import { TransponderCarsField } from "@/components/settings/TransponderCarsField";
 import type { KnownCompetitor } from "@/lib/speedhive/knownCompetitors";
 import type { TransponderCarMap } from "@/lib/speedhive/transponderCars";
-import { postSetting, SaveNote, type SaveState } from "@/components/settings/saveState";
+import { postSetting, type SaveState } from "@/components/settings/saveState";
 import {
   formatSpeedhiveTransponderNumbersForSetting,
   parseSpeedhiveTransponderNumbersSetting,
@@ -17,6 +17,10 @@ import {
   formatSpeedhiveDriverNamesForSetting,
   parseSpeedhiveDriverNamesSetting,
 } from "@/lib/speedhive/speedhiveDriverNames";
+import {
+  formatLiveRcDriverNamesForSetting,
+  parseLiveRcDriverNamesSetting,
+} from "@/lib/lapWatch/liveRcNameNormalize";
 
 /**
  * Timing & results — everything that lets a lap import find you, under one heading.
@@ -36,6 +40,7 @@ import {
  */
 
 type InitialTiming = {
+  /** Every name the driver appears under on LiveRC, one per line. */
   liveRcDriverName: string;
   /** LiveRC `data-driver-id` when known; disambiguates same name on A/B/C mains. */
   liveRcDriverId: string;
@@ -64,20 +69,6 @@ export function TimingIdentitySection({ initial }: { initial: InitialTiming }) {
   const [savingSpeedhiveTransponder, setSavingSpeedhiveTransponder] = useState<SaveState>({
     kind: "idle",
   });
-
-  // Last value committed to the server. Blur only writes when the trimmed value
-  // differs, so tabbing through an untouched field costs nothing.
-  const committedLiveRc = useRef(initial.liveRcDriverName);
-
-  async function commitLiveRcName() {
-    if (liveRcDriverName.trim() === committedLiveRc.current.trim()) return;
-    const ok = await postSetting(
-      "/api/settings/live-rc-driver",
-      { liveRcDriverName: liveRcDriverName.trim() || null },
-      setSavingDriver
-    );
-    if (ok) committedLiveRc.current = liveRcDriverName;
-  }
 
   return (
     <CardPanel contentClassName="p-0">
@@ -122,24 +113,31 @@ export function TimingIdentitySection({ initial }: { initial: InitialTiming }) {
       </div>
 
       <div className="space-y-1.5 border-t border-border px-4 py-3.5 text-sm">
-        <label htmlFor="liverc-driver-name" className="block text-sm font-medium text-foreground">
-          Name on LiveRC
-        </label>
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            id="liverc-driver-name"
-            type="text"
-            value={liveRcDriverName}
-            onChange={(e) => setLiveRcDriverName(e.target.value)}
-            onBlur={() => void commitLiveRcName()}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-            }}
-            placeholder="e.g. Jordan Smith"
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-primary-ink/50"
-          />
-          <SaveNote state={savingDriver} />
-        </div>
+        {/* A list since 2026-09-19, same as MYLAPS below: a nickname at one club and the full
+            name at another are both the driver, and one stored name silently missed the other. */}
+        <ChipListField<string>
+          id="liverc-driver-name"
+          label="Name on LiveRC"
+          initialText={liveRcDriverName}
+          parse={parseLiveRcDriverNamesSetting}
+          format={formatLiveRcDriverNamesForSetting}
+          state={savingDriver}
+          // Enter only: a name contains spaces, and sheets print "Caruso, Jordan".
+          commitKeys={["Enter"]}
+          placeholder="e.g. Jordan Smith"
+          addAnotherPlaceholder="Add another spelling…"
+          addLabel="Add driver name"
+          invalidHint="Type the name as the timing sheet prints it."
+          hint="Every spelling you appear under."
+          onSave={(text) => {
+            setLiveRcDriverName(text ?? "");
+            return postSetting(
+              "/api/settings/live-rc-driver",
+              { liveRcDriverName: text },
+              setSavingDriver
+            );
+          }}
+        />
         {/*
          * The ID is machine-assigned — LiveRC's own `data-driver-id`, learned the first time
          * an import matches you, never typed. It was a read-only text box with a Clear button
@@ -167,9 +165,7 @@ export function TimingIdentitySection({ initial }: { initial: InitialTiming }) {
               <span className="text-destructive">{savingDriverId.text}</span>
             ) : null}
           </p>
-        ) : (
-          <p className="ui-caption text-muted-foreground">Exactly as the timing sheet prints it.</p>
-        )}
+        ) : null}
       </div>
 
       {/* Not redundant with the chips above: a transponder only matches when MYLAPS actually

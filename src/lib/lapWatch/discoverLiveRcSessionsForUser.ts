@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { getLiveRcDriverNameSetting } from "@/lib/appSettings";
+import { getSpeedhiveTransponderNumbersForUser } from "@/lib/speedhive/speedhiveDriverSettings";
 import { fetchUrlText, type FetchTextResult } from "@/lib/lapUrlParsers/fetchText";
 import {
   extractPracticeSessions,
@@ -11,7 +12,8 @@ import {
   raceListRowMatchesAnyConfiguredClass,
 } from "@/lib/lapWatch/livercSessionIndexParsers";
 import {
-  liveRcNameMatchesConfigured,
+  liveRcPracticeRowIsMine,
+  liveRcPracticeRowTransponder,
   normalizeLiveRcDriverNameForMatch,
 } from "@/lib/lapWatch/liveRcNameNormalize";
 import {
@@ -147,8 +149,8 @@ export type DiscoverLiveRcSessionsResult = {
  * number, which is the other half of what the card asks them to check.
  */
 function transponderFromPracticeRowText(rowText: string | null | undefined): string | null {
-  const match = /\((\d{4,10})\)\s*$/.exec(rowText?.trim() ?? "");
-  return match ? `Transponder ${match[1]}` : null;
+  const chip = liveRcPracticeRowTransponder(rowText);
+  return chip != null ? `Transponder ${chip}` : null;
 }
 
 /** Newest first, and rows with no time last — the same order the picker draws matched sessions in. */
@@ -297,7 +299,13 @@ export async function discoverLiveRcSessionsForUser(input: {
   };
   const emptyMeeting = { detected: false, eventHubUrl: null, eventLabel: null };
 
-  const liveName = (await getLiveRcDriverNameSetting(input.userId).catch(() => null))?.trim() ?? "";
+  const [liveNameRaw, transponders] = await Promise.all([
+    getLiveRcDriverNameSetting(input.userId).catch(() => null),
+    // The driver's own chips — the same list MYLAPS is matched on. LiveRC prints the chip on a
+    // practice row, so a saved chip finds the run whatever the club typed as the name.
+    getSpeedhiveTransponderNumbersForUser(input.userId).catch(() => [] as number[]),
+  ]);
+  const liveName = liveNameRaw?.trim() ?? "";
   const driverNorm = liveName ? normalizeLiveRcDriverNameForMatch(liveName) : "";
 
   const debug = emptyDebug({
@@ -392,7 +400,12 @@ export async function discoverLiveRcSessionsForUser(input: {
             source: "liverc",
           });
         }
-        if (driverNorm && !liveRcNameMatchesConfigured(r.driverName, driverNorm)) continue;
+        if (
+          (driverNorm || transponders.length > 0) &&
+          !liveRcPracticeRowIsMine(r.driverName, driverNorm, transponders)
+        ) {
+          continue;
+        }
         practiceMatched++;
         discovered.push({
           sessionUrl: r.sessionUrl,

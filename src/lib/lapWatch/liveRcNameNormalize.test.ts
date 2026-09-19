@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { liveRcNameMatchesConfigured } from "./liveRcNameNormalize";
+import {
+  formatLiveRcDriverNamesForDisplay,
+  formatLiveRcDriverNamesForSetting,
+  liveRcNameMatchesConfigured,
+  liveRcPracticeRowIsMine,
+  liveRcPracticeRowTransponder,
+  normalizeLiveRcDriverNameForMatch,
+  parseLiveRcDriverNamesSetting,
+} from "./liveRcNameNormalize";
 
 test("exact match (normalized) still matches", () => {
   assert.equal(liveRcNameMatchesConfigured("Tim Boundy", "Tim Boundy"), true);
@@ -42,4 +50,56 @@ test("empty / missing names never match", () => {
 
 test("both words required — one present, one absent => no match", () => {
   assert.equal(liveRcNameMatchesConfigured("Tim Anderson M", "Tim Boundy"), false);
+});
+
+test("several configured names, one per line — any of them matches", () => {
+  const names = "Jordan Caruso\nJC Racing";
+  assert.equal(liveRcNameMatchesConfigured("Jordan Caruso M", names), true);
+  assert.equal(liveRcNameMatchesConfigured("JC Racing", names), true);
+  assert.equal(liveRcNameMatchesConfigured("Tim Boundy", names), false);
+  // The two names never fuse into one four-word name.
+  assert.equal(liveRcNameMatchesConfigured("Jordan Caruso JC Racing", names), true);
+  assert.equal(liveRcNameMatchesConfigured("Jordan Racing", names), false);
+});
+
+test("names survive being normalized before they reach the matcher (most callers do this)", () => {
+  const norm = normalizeLiveRcDriverNameForMatch("Jordan Caruso\r\n  JC Racing \n");
+  assert.equal(norm, "jordan caruso\njc racing");
+  assert.equal(normalizeLiveRcDriverNameForMatch(norm), norm);
+  assert.equal(liveRcNameMatchesConfigured("JC Racing", norm), true);
+  assert.equal(normalizeLiveRcDriverNameForMatch("Tim  Boundy."), "tim boundy");
+});
+
+test("a one-word nickname matches only a listing that is exactly that word", () => {
+  assert.equal(liveRcNameMatchesConfigured("Jordy", "Jordan Caruso\nJordy"), true);
+  assert.equal(liveRcNameMatchesConfigured("Jordy Smith", "Jordan Caruso\nJordy"), false);
+});
+
+test("the setting parses to a list, deduped, and round-trips", () => {
+  assert.deepEqual(parseLiveRcDriverNamesSetting("Jordan Caruso"), ["Jordan Caruso"]);
+  assert.deepEqual(parseLiveRcDriverNamesSetting("Jordan Caruso\njordan  caruso\n\nJC Racing"), [
+    "Jordan Caruso",
+    "JC Racing",
+  ]);
+  assert.deepEqual(parseLiveRcDriverNamesSetting(null), []);
+  assert.equal(formatLiveRcDriverNamesForSetting(["Jordan Caruso", " JC Racing "]), "Jordan Caruso\nJC Racing");
+  assert.equal(formatLiveRcDriverNamesForDisplay("Jordan Caruso\nJC Racing"), "Jordan Caruso / JC Racing");
+});
+
+test("practice row: the chip LiveRC prints is read off the trailing bracket", () => {
+  assert.equal(liveRcPracticeRowTransponder("Cooper DavisModified (4344915)"), 4344915);
+  assert.equal(liveRcPracticeRowTransponder("Cooper Davis Modified"), null);
+  assert.equal(liveRcPracticeRowTransponder("Tim Boundy (Jnr)"), null);
+});
+
+test("practice row: a saved chip is the driver's run whatever the name says", () => {
+  assert.equal(liveRcPracticeRowIsMine("Some NicknameModified (4344915)", "Jordan Caruso", [4344915]), true);
+  // No name saved at all — the chip alone is enough.
+  assert.equal(liveRcPracticeRowIsMine("Some NicknameModified (4344915)", "", [4344915]), true);
+});
+
+test("practice row: someone else's chip still falls back to the name (borrowed or new chip)", () => {
+  assert.equal(liveRcPracticeRowIsMine("Jordan CarusoModified (9999999)", "Jordan Caruso", [4344915]), true);
+  assert.equal(liveRcPracticeRowIsMine("Tim BoundyModified (9999999)", "Jordan Caruso", [4344915]), false);
+  assert.equal(liveRcPracticeRowIsMine("Tim BoundyModified", "", []), false);
 });
