@@ -10,19 +10,16 @@ import type { SectorLineInfo } from "@/lib/manualVideoAnalysis/sectors";
 import type { ManualVideoSessionV2 } from "@/lib/manualVideoAnalysis/types";
 import { cn } from "@/lib/utils";
 import {
-  baseLapTotal,
-  baseValues,
   bestLap,
   buildCompareDrivers,
-  ghostClip,
+  idealLap,
   lapRows,
   sectorLeaders,
   segmentDefs,
   segmentStats,
   TOP_N,
-  type BaseKind,
   type CompareDriver,
-  type GhostClip,
+  type LapRow,
   type SegmentDef,
   type SegmentStats,
   type SegmentTime,
@@ -31,46 +28,63 @@ import { SF_LINE_KEY } from "@/lib/videoAnalysis/findCrossings/fromSession";
 import { formatSignedDeltaSec, type SegmentWindow } from "@/lib/videoAnalysis/lapCompare";
 
 /**
- * The sector board (SECTOR_COMPARE_NORTH_STAR, reworked 2026-08-28 evening over five artifact
- * rounds): the video at the top, ONE table under it.
+ * The sector board (SECTOR_COMPARE_NORTH_STAR; reworked 2026-08-28, and again 2026-09-02).
  *
- * The table is the lap sheet's grammar. The BASE is you — your top-5 average, your best lap, or
- * your same lap number — and it never wears a colour. The OVERLAY is one driver, or nobody: their
- * laps fill the rows and every cell is tinted by its gap to the base. Never two drivers, never two
- * tables. Tap a sector cell to watch that sector, tap a lap time to watch the whole lap; the
- * overlay driver is solid and the base is the ghost, every time, so there is never a question of
- * which car is you. "Fastest" above the table is the leaderboard boiled down to one chip per
- * sector — tap it and that driver becomes the overlay with their best through it loaded.
+ * Rows are YOUR laps — every one the scan read. Above them sits the lap you are reading them
+ * against: one of a rival's laps (their best until you tap another, or their best through every
+ * sector stitched together), or, with nobody chosen, your own best lap. Every cell is tinted by
+ * its gap to that reference, from your side: positive is you slower, red.
+ *
+ * Tap any cell and the player shows it: what you tapped is solid, the reference through the
+ * same sector is the ghost, so a tap is always a real lap against a real lap. The top-5 average
+ * used to be the base and it cannot be a video ("the base, top five average, is impossible as a
+ * video" — the driver, 2026-09-02); it survives as one footer row of numbers.
+ *
+ * The player runs the whole width of the page, the sheet below it.
  */
 
-type Watch = {
-  driverKey: string;
-  /** A lap number, or the footer rows: the driver's best through the sector / their average pace. */
-  lap: number | "best" | "avg";
-  /** A segment index, or the whole lap. */
-  seg: number | "lap";
-};
+/** What the sheet is read against: one of the rival's laps, or their best through every sector. */
+type RefPick = number | "ideal";
+
+/** What plays: one of your laps, your best-sectors footer, or the reference itself. */
+type Watch = { row: number | "best" | "ref"; seg: number | "lap" };
 
 type Clip = { label: string; sec: number; window: SegmentWindow; lapNumber: number };
 
-const BASE_LABEL: Record<BaseKind, string> = {
-  top5: `your top-${TOP_N} average`,
-  best: "your best lap",
-  same: "your same lap",
+type Reference = {
+  /** Whose lap it is, for the clip labels. */
+  who: string;
+  label: string;
+  cells: Array<SegmentTime | null>;
+  /** The whole-lap figure; null for the stitched ideal with a sector missing. */
+  total: number | null;
+  /** The whole lap on the video clock; null for the stitched ideal, which never happened. */
+  window: SegmentWindow | null;
+  lapNumber: number | null;
+  mine: boolean;
 };
 
 function fmt(sec: number): string {
   return sec.toFixed(3);
 }
 
-/** The clean lap whose time through the segment is closest to the driver's top-5 average. */
-function closestToAverage(st: SegmentStats): SegmentTime | null {
-  if (st.top5 == null) return null;
-  let pick: SegmentTime | null = null;
-  for (const t of st.clean) {
-    if (pick == null || Math.abs(t.sec - st.top5) < Math.abs(pick.sec - st.top5)) pick = t;
+/** The quickest lap with anything on it — a fallback when no lap is clean. */
+function quickestWithAnything(rows: LapRow[]): LapRow | null {
+  return (
+    [...rows].filter((r) => r.cells.some(Boolean)).sort((a, b) => a.lapTimeSec - b.lapTimeSec)[0] ?? null
+  );
+}
+
+function clipOf(row: LapRow, seg: number | "lap", who: string): Clip | null {
+  if (seg === "lap") {
+    return { label: `${who} L${row.lapNumber}`, sec: row.lapTimeSec, window: row.window, lapNumber: row.lapNumber };
   }
-  return pick;
+  const c = row.cells[seg];
+  return c ? { label: `${who} L${c.lapNumber}`, sec: c.sec, window: c.window, lapNumber: c.lapNumber } : null;
+}
+
+function clipOfTime(t: SegmentTime | null, who: string): Clip | null {
+  return t ? { label: `${who} L${t.lapNumber}`, sec: t.sec, window: t.window, lapNumber: t.lapNumber } : null;
 }
 
 export function DriverComparePanel({
@@ -97,127 +111,161 @@ export function DriverComparePanel({
   const statFor = (d: CompareDriver, s: SegmentDef) => stats.get(`${d.key}|${s.key}`)!;
   const statsOf = (d: CompareDriver) => segments.map((s) => statFor(d, s));
 
-  const [base, setBase] = useState<BaseKind>("top5");
-  // The confirmed rival is the overlay from the start; "None" is your own laps, plain.
+  // The confirmed rival is the one you read against from the start; "None" is your own best lap.
   const [overlayKey, setOverlayKey] = useState<string | null>(
     () => (rivals.find((r) => r.trust === "confirmed") ?? rivals[0])?.key ?? null
   );
+  /** Which of their laps; null = their best lap. */
+  const [refPick, setRefPick] = useState<RefPick | null>(null);
   const [watch, setWatch] = useState<Watch | null>(null);
   const [swapped, setSwapped] = useState(false);
 
   const overlay = overlayKey ? (rivals.find((r) => r.key === overlayKey) ?? null) : null;
-  const shownDriver = overlay ?? me;
 
   const meStats = useMemo(() => (me ? segments.map((s) => stats.get(`${me.key}|${s.key}`)!) : []), [me, stats, segments]);
   const meRows = useMemo(() => (me ? lapRows(me, meStats) : []), [me, meStats]);
-  const shownStats = useMemo(
-    () => (shownDriver ? segments.map((s) => stats.get(`${shownDriver.key}|${s.key}`)!) : []),
-    [shownDriver, stats, segments]
-  );
-  const shownRows = useMemo(() => (shownDriver ? lapRows(shownDriver, shownStats) : []), [shownDriver, shownStats]);
-  const shownBest = useMemo(() => bestLap(shownRows), [shownRows]);
   const myBest = useMemo(() => bestLap(meRows), [meRows]);
+  const overlayStats = useMemo(
+    () => (overlay ? segments.map((s) => stats.get(`${overlay.key}|${s.key}`)!) : []),
+    [overlay, stats, segments]
+  );
+  const overlayRows = useMemo(() => (overlay ? lapRows(overlay, overlayStats) : []), [overlay, overlayStats]);
+  const overlayBest = useMemo(() => bestLap(overlayRows), [overlayRows]);
   const leaders = useMemo(
     () => sectorLeaders(drivers, segments, (d, s) => stats.get(`${d.key}|${s.key}`)!),
     [drivers, segments, stats]
   );
 
+  // ---- the reference -----------------------------------------------------------------------
+  const ref: Reference | null = (() => {
+    if (overlay) {
+      if (refPick === "ideal") {
+        const ideal = idealLap(overlayStats);
+        return {
+          who: overlay.name,
+          label: `${overlay.name} · best sectors`,
+          cells: ideal.cells,
+          total: ideal.total,
+          window: null,
+          lapNumber: null,
+          mine: false,
+        };
+      }
+      const row =
+        (typeof refPick === "number" ? overlayRows.find((r) => r.lapNumber === refPick) : null) ??
+        overlayBest ??
+        quickestWithAnything(overlayRows);
+      if (!row) return null;
+      return {
+        who: overlay.name,
+        label: `${overlay.name} L${row.lapNumber}`,
+        cells: row.cells,
+        total: row.lapTimeSec,
+        window: row.window,
+        lapNumber: row.lapNumber,
+        mine: false,
+      };
+    }
+    const row = myBest ?? quickestWithAnything(meRows);
+    if (!row) return null;
+    return {
+      who: "You",
+      label: `You L${row.lapNumber}`,
+      cells: row.cells,
+      total: row.lapTimeSec,
+      window: row.window,
+      lapNumber: row.lapNumber,
+      mine: true,
+    };
+  })();
+
   // The tint scale comes from the gaps actually on the sheet, as the lap sheet does it.
-  const tintRange = useMemo(() => {
-    if (!overlay) return 0;
+  const tintRange = (() => {
+    if (!ref) return 0;
     const deltas: number[] = [];
-    for (const row of shownRows) {
-      const b = baseValues(base, meStats, meRows, row.lapNumber);
+    for (const row of meRows) {
       row.cells.forEach((c, i) => {
-        const bv = b[i];
-        if (c && !c.suspect && bv != null) deltas.push(c.sec - bv);
+        const rv = ref.cells[i]?.sec ?? null;
+        if (c && !c.suspect && rv != null) deltas.push(c.sec - rv);
       });
     }
     return resolveDeltaTintRange(deltas);
-  }, [overlay, shownRows, base, meStats, meRows]);
+  })();
 
-  if (!me || !shownDriver || segments.length === 0) {
+  if (!me || segments.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-4">
         <span className="type-data-label">Sector board</span>
         <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
           {segments.length === 0
             ? "Draw at least one sector line besides the start line to compare sectors."
-            : "Your laps have no sector crossings yet — mark or scan them first."}
+            : "Your laps have no sector crossings yet — scan them first."}
         </p>
       </div>
     );
   }
 
   // ---- what plays ------------------------------------------------------------------------
-  // Nothing tapped yet: the overlay's best lap, whole. The player is the headline and never
-  // sits empty while there is a lap to show.
-  // No clean lap (a sector missing on every lap): the quickest lap with anything on it.
-  const defaultRow =
-    shownBest ??
-    [...shownRows].filter((r) => r.cells.some(Boolean)).sort((a, b) => a.lapTimeSec - b.lapTimeSec)[0] ??
-    shownRows[0] ??
-    null;
+  // Nothing tapped yet: your best lap, whole, against the reference. The player is the headline
+  // and never sits empty while there is a lap to show.
+  const defaultRow = myBest ?? quickestWithAnything(meRows);
   const shown: Watch | null =
-    watch && watch.driverKey === shownDriver.key
+    watch &&
+    (watch.row === "best" ||
+      (watch.row === "ref" && ref && (watch.seg !== "lap" || ref.window)) ||
+      (typeof watch.row === "number" && meRows.some((r) => r.lapNumber === watch.row)))
       ? watch
       : defaultRow
-        ? { driverKey: shownDriver.key, lap: defaultRow.lapNumber, seg: "lap" }
+        ? { row: defaultRow.lapNumber, seg: "lap" }
         : null;
 
-  const who = shownDriver.role === "me" ? "You" : shownDriver.name;
-
-  const solid: Clip | null = (() => {
-    if (!shown) return null;
-    if (shown.lap === "best" || shown.lap === "avg") {
-      if (shown.seg === "lap") return null;
-      const st = shownStats[shown.seg];
-      const t = shown.lap === "best" ? (st?.best ?? null) : st ? closestToAverage(st) : null;
-      return t ? { label: `${who} L${t.lapNumber}`, sec: t.sec, window: t.window, lapNumber: t.lapNumber } : null;
+  const refClip = (seg: number | "lap"): Clip | null => {
+    if (!ref) return null;
+    if (seg === "lap") {
+      return ref.window && ref.total != null && ref.lapNumber != null
+        ? { label: ref.label, sec: ref.total, window: ref.window, lapNumber: ref.lapNumber }
+        : null;
     }
-    const row = shownRows.find((r) => r.lapNumber === shown.lap);
-    if (!row) return null;
-    if (shown.seg === "lap") {
-      return { label: `${who} L${row.lapNumber}`, sec: row.lapTimeSec, window: row.window, lapNumber: row.lapNumber };
-    }
-    const c = row.cells[shown.seg];
-    return c ? { label: `${who} L${c.lapNumber}`, sec: c.sec, window: c.window, lapNumber: c.lapNumber } : null;
-  })();
+    return clipOfTime(ref.cells[seg] ?? null, ref.who);
+  };
 
-  // The ghost is the base, on the same terms as the cell: the footer rows compare best to best
-  // and average to average; a lap row compares to whatever the base chip says. Watching your own
-  // laps with no overlay, the ghost avoids being the same clip twice.
-  const ghost: { clip: GhostClip; label: string } | null = (() => {
-    if (!shown || !solid) return null;
+  // Your side and theirs, whichever was tapped. With nobody chosen both are yours, and the
+  // reference through the same sector is your best — never the same clip twice.
+  let mine: Clip | null = null;
+  let other: Clip | null = null;
+  if (shown) {
     const seg = shown.seg;
-    let g: GhostClip | null = null;
-    let label = BASE_LABEL[base];
-    if (shown.lap === "best" && seg !== "lap") {
-      const t = meStats[seg]?.best ?? null;
-      g = t ? { lapNumber: t.lapNumber, sec: t.sec, window: t.window } : null;
-      label = "your best through it";
-    } else if (shown.lap === "avg" && seg !== "lap") {
-      g = ghostClip("top5", meStats, meRows, seg, null);
-      label = BASE_LABEL.top5;
+    if (shown.row === "ref") {
+      other = refClip(seg);
+      mine = seg === "lap" ? (myBest ? clipOf(myBest, "lap", "You") : null) : clipOfTime(meStats[seg]?.best ?? null, "You");
+    } else if (shown.row === "best") {
+      mine = seg === "lap" ? (myBest ? clipOf(myBest, "lap", "You") : null) : clipOfTime(meStats[seg]?.best ?? null, "You");
+      other = refClip(seg);
     } else {
-      g = ghostClip(base, meStats, meRows, seg, typeof shown.lap === "number" ? shown.lap : null);
+      const row = meRows.find((r) => r.lapNumber === shown.row);
+      mine = row ? clipOf(row, seg, "You") : null;
+      other = refClip(seg);
     }
-    if (g && !overlay && g.lapNumber === solid.lapNumber) {
-      // Same lap both sides: take the next best of yours instead.
+    if (!overlay && mine && other && mine.lapNumber === other.lapNumber) {
       if (seg === "lap") {
         const alt = meRows
-          .filter((r) => r.clean && r.lapNumber !== solid.lapNumber)
+          .filter((r) => r.clean && r.lapNumber !== mine!.lapNumber)
           .sort((a, b) => a.lapTimeSec - b.lapTimeSec)[0];
-        g = alt ? { lapNumber: alt.lapNumber, sec: alt.lapTimeSec, window: alt.window } : null;
+        other = alt ? clipOf(alt, "lap", "You") : null;
       } else {
-        const alt = meStats[seg]?.clean.find((t) => t.lapNumber !== solid.lapNumber) ?? null;
-        g = alt ? { lapNumber: alt.lapNumber, sec: alt.sec, window: alt.window } : null;
+        other = clipOfTime(meStats[seg]?.clean.find((t) => t.lapNumber !== mine!.lapNumber) ?? null, "You");
       }
-      label = "your next best";
     }
-    return g ? { clip: g, label } : null;
-  })();
+  }
 
+  // What you tapped is solid; the reference is the ghost. Tapping the reference row makes THEIR
+  // lap solid and yours the ghost. Swap flips it.
+  const tappedTheirs = shown?.row === "ref";
+  const solid = (swapped ? !tappedTheirs : tappedTheirs) ? other : mine;
+  const ghost = solid === mine ? other : mine;
+
+  // The gap from your side, whatever is solid: you minus them. Positive = you are slower = red.
+  const gap = mine && other ? mine.sec - other.sec : null;
   const segName = shown && shown.seg !== "lap" ? (segments[shown.seg]?.name ?? "") : "whole lap";
 
   // The split, drawn on the picture. Every line stays on screen; the two that bound what is
@@ -227,39 +275,30 @@ export function DriverComparePanel({
   // segmentDefs names the lap start "start" and the lap end "end" — both are the S/F line.
   const boundKey = (key: string | undefined) =>
     key == null ? null : key === "start" || key === "end" ? SF_LINE_KEY : key;
-  // The gap from your side, whatever is solid: with an overlay it is you (the ghost) minus them;
-  // on your own laps it is this lap minus your base. Positive = you are slower = red.
-  const gap = solid && ghost ? (overlay ? ghost.clip.sec - solid.sec : solid.sec - ghost.clip.sec) : null;
-  const solidTicks =
-    shown && solid && shown.seg === "lap" && typeof shown.lap === "number"
-      ? shownRows
-          .find((r) => r.lapNumber === shown.lap)
-          ?.cells.slice(0, -1)
-          .flatMap((c) => (c ? [c.window.endSec - solid.window.startSec] : []))
-      : undefined;
-
-  const ghostAsClip: Clip | null = ghost
-    ? { label: `You L${ghost.clip.lapNumber}`, sec: ghost.clip.sec, window: ghost.clip.window, lapNumber: ghost.clip.lapNumber }
-    : null;
-  const aClip = swapped && ghostAsClip ? ghostAsClip : solid;
-  const bClip = swapped && ghostAsClip ? solid : ghostAsClip;
+  // Sector lines as ticks on a whole-lap clip, so the driver can see which corner the gap opened at.
+  const ticksFor = (clip: Clip | null): number[] | undefined => {
+    if (!clip || !shown || shown.seg !== "lap") return undefined;
+    const rows = clip === mine ? meRows : overlayRows;
+    const row = rows.find((r) => r.lapNumber === clip.lapNumber);
+    return row?.cells.slice(0, -1).flatMap((c) => (c ? [c.window.endSec - clip.window.startSec] : []));
+  };
 
   const player = (
     <div className="space-y-2 rounded-xl border border-border bg-card p-3 sm:p-4">
-      {aClip && videoUrl ? (
+      {solid && videoUrl ? (
         <SectorClipPlayer
           videoUrl={videoUrl}
-          aWindow={aClip.window}
-          bWindow={bClip?.window ?? aClip.window}
-          aLabel={`${aClip.label} · ${fmt(aClip.sec)}`}
-          bLabel={bClip ? `${bClip.label} · ${fmt(bClip.sec)}` : "—"}
+          aWindow={solid.window}
+          bWindow={ghost?.window ?? solid.window}
+          aLabel={`${solid.label} · ${fmt(solid.sec)}`}
+          bLabel={ghost ? `${ghost.label} · ${fmt(ghost.sec)}` : "—"}
           fit="window"
-          ticks={swapped ? undefined : solidTicks}
+          ticks={ticksFor(solid)}
           lines={mapLines}
           fromKey={boundKey(watchedSeg?.fromKey)}
           toKey={boundKey(watchedSeg?.toKey)}
         />
-      ) : aClip ? (
+      ) : solid ? (
         <p className="rounded-lg border border-dashed border-border px-3 py-2 text-[11.5px] text-muted-foreground">
           Attach the video to watch this.
         </p>
@@ -268,31 +307,29 @@ export function DriverComparePanel({
           Tap any time in the table to watch it.
         </p>
       )}
-      {aClip ? (
+      {solid ? (
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1.5">
           <div className="min-w-0 space-y-0.5 text-[12px] leading-snug">
             <p>
               <span className="micro-caps text-faint">Solid</span>{" "}
-              <span className="font-semibold text-foreground">{aClip.label}</span>
+              <span className="font-semibold text-foreground">{solid.label}</span>
               <span className="text-muted-foreground">
                 {" "}
-                · {segName} · {fmt(aClip.sec)}
+                · {segName} · {fmt(solid.sec)}
               </span>
             </p>
             <p>
               <span className="micro-caps text-faint">Ghost</span>{" "}
-              {bClip ? (
+              {ghost ? (
                 <>
-                  <span className="font-semibold text-foreground">
-                    {swapped ? bClip.label : `${ghost!.label} (L${bClip.lapNumber})`}
-                  </span>
-                  <span className="text-muted-foreground"> · {fmt(bClip.sec)}</span>
+                  <span className="font-semibold text-foreground">{ghost.label}</span>
+                  <span className="text-muted-foreground"> · {fmt(ghost.sec)}</span>
                 </>
               ) : (
-                <span className="text-muted-foreground">nothing of yours to ghost here</span>
+                <span className="text-muted-foreground">nothing to ghost here</span>
               )}
             </p>
-            {gap != null && solid ? (
+            {gap != null && mine && other ? (
               <p
                 className={cn(
                   "fig-stat tabular-nums",
@@ -302,8 +339,8 @@ export function DriverComparePanel({
                 {formatSignedDeltaSec(gap)}
                 <span className="ml-1 text-[11px] font-normal text-muted-foreground">
                   {overlay
-                    ? `you're ${gap > 0 ? "slower" : gap < 0 ? "faster" : "level"} than ${solid.label} here`
-                    : `${solid.label} is ${gap > 0 ? "slower" : gap < 0 ? "faster" : "level"} than ${ghost!.label}`}
+                    ? `you're ${gap > 0 ? "slower" : gap < 0 ? "faster" : "level"} than ${other.label} here`
+                    : `${mine.label} is ${gap > 0 ? "slower" : gap < 0 ? "faster" : "level"} than ${other.label}`}
                 </span>
               </p>
             ) : null}
@@ -324,27 +361,28 @@ export function DriverComparePanel({
   );
 
   // ---- the table ---------------------------------------------------------------------------
-  const isWatched = (lap: Watch["lap"], seg: Watch["seg"]) => shown != null && shown.lap === lap && shown.seg === seg;
+  const isWatched = (row: Watch["row"], seg: Watch["seg"]) => shown != null && shown.row === row && shown.seg === seg;
 
-  const tap = (lap: Watch["lap"], seg: Watch["seg"]) => {
+  const tap = (row: Watch["row"], seg: Watch["seg"]) => {
     setSwapped(false);
-    setWatch({ driverKey: shownDriver.key, lap, seg });
+    setWatch({ row, seg });
   };
 
-  /** One cell: the overlay's gap to the base, tinted; or your own plain time with no overlay. */
+  /** One of your cells: the time, tinted by its gap to the reference through the same sector. */
   const cell = (
     key: string,
     value: number | null,
-    baseValue: number | null,
-    lap: Watch["lap"],
+    refValue: number | null,
+    row: Watch["row"],
     seg: Watch["seg"],
-    opts: { suspect?: boolean; title?: string } = {}
+    opts: { suspect?: boolean; title?: string; canWatch?: boolean } = {}
   ) => {
-    // Read from YOUR side: base − theirs, so positive = you are slower here = red. ("Red should
-    // always be user is slower; green looked like I'm fast.")
-    const delta = overlay && value != null && baseValue != null ? baseValue - value : null;
+    // Read from YOUR side: you minus them, so positive = you are slower here = red. ("Red
+    // should always be user is slower; green looked like I'm fast.")
+    const delta = value != null && refValue != null ? value - refValue : null;
     const style = delta != null && !opts.suspect ? getDeltaStyle(delta, tintRange) : undefined;
-    const watched = isWatched(lap, seg);
+    const watched = isWatched(row, seg);
+    const canWatch = opts.canWatch ?? true;
     return (
       <td
         key={key}
@@ -353,34 +391,30 @@ export function DriverComparePanel({
       >
         <button
           type="button"
-          disabled={value == null}
-          onClick={() => tap(lap, seg)}
+          disabled={value == null || !canWatch}
+          onClick={() => tap(row, seg)}
           title={opts.title}
           className={cn(
             "flex h-11 w-full min-w-[5.25rem] flex-col items-end justify-center px-2.5 text-right tabular-nums leading-none transition-shadow disabled:cursor-default",
             watched
               ? "shadow-[inset_0_0_0_2px_var(--foreground)] font-semibold"
-              : value != null
+              : value != null && canWatch
                 ? "hover:shadow-[inset_0_0_0_2px_var(--foreground)]"
                 : ""
           )}
         >
           {value == null ? (
             <span className="text-faint">—</span>
-          ) : overlay && delta != null ? (
+          ) : delta != null ? (
             <>
               <span className={cn("text-[12.5px]", opts.suspect ? "text-muted-foreground" : "text-foreground")}>
                 {formatSignedDeltaSec(delta)}
               </span>
               <span className="mt-0.5 text-[10px] text-muted-foreground">{fmt(value)}</span>
             </>
-          ) : overlay ? (
-            // The base has nothing here to measure against: the time, quietly, no gap.
-            <span className="text-[12.5px] text-muted-foreground" title="Nothing of yours here to compare against">
-              {fmt(value)}
-            </span>
           ) : (
-            <span className={cn("text-[12.5px]", opts.suspect ? "text-muted-foreground" : "text-foreground")}>
+            // The reference has nothing here to measure against: the time, quietly, no gap.
+            <span className="text-[12.5px] text-muted-foreground" title="Nothing to compare against here">
               {fmt(value)}
             </span>
           )}
@@ -389,50 +423,68 @@ export function DriverComparePanel({
     );
   };
 
+  /** A reference cell: the plain time. Tapping it plays THEIR sector, with yours as the ghost. */
+  const refCell = (key: string, t: SegmentTime | null, seg: Watch["seg"], canWatch = true) => {
+    const watched = isWatched("ref", seg);
+    return (
+      <td key={key} className="border-b border-border p-0 align-middle">
+        <button
+          type="button"
+          disabled={t == null || !canWatch}
+          onClick={() => tap("ref", seg)}
+          className={cn(
+            "flex h-11 w-full min-w-[5.25rem] flex-col items-end justify-center px-2.5 text-right tabular-nums leading-none transition-shadow disabled:cursor-default",
+            watched
+              ? "shadow-[inset_0_0_0_2px_var(--foreground)] font-semibold"
+              : t != null && canWatch
+                ? "hover:shadow-[inset_0_0_0_2px_var(--foreground)]"
+                : ""
+          )}
+        >
+          {t == null ? (
+            <span className="text-faint">—</span>
+          ) : (
+            <>
+              <span className="text-[12.5px] text-foreground">{fmt(t.sec)}</span>
+              {ref && ref.lapNumber == null ? (
+                <span className="mt-0.5 text-[10px] text-muted-foreground">L{t.lapNumber}</span>
+              ) : null}
+            </>
+          )}
+        </button>
+      </td>
+    );
+  };
+
   const sumOf = (xs: Array<number | null>) =>
     xs.every((v): v is number => v != null) ? xs.reduce((s, v) => s + v, 0) : null;
-  const overlayBestSum = sumOf(shownStats.map((st) => st.best?.sec ?? null));
-  const overlayAvgSum = sumOf(shownStats.map((st) => st.top5));
-  const myBestSum = sumOf(meStats.map((st) => st.best?.sec ?? null));
-  const myAvgSum = baseLapTotal("top5", meStats, meRows, null);
+  const myIdeal = idealLap(meStats);
+  const myAvgSum = sumOf(meStats.map((st) => st.top5));
+  const overlayAvgSum = overlay ? sumOf(overlayStats.map((st) => st.top5)) : null;
 
-  const footer = (
-    label: string,
-    sub: string,
-    lap: "best" | "avg",
-    values: Array<number | null>,
-    mine: Array<number | null>,
-    sum: number | null,
-    mySum: number | null
-  ) => (
-    <tr className="bg-secondary/50">
-      <th
-        scope="row"
-        className="sticky left-0 z-[1] border-r border-border bg-secondary px-2.5 text-left align-middle"
-      >
-        <span className="block text-[12px] font-medium text-muted-foreground">{label}</span>
-        {overlay ? <span className="block text-[10px] text-faint">{sub}</span> : null}
-      </th>
-      {values.map((v, i) => cell(`f-${lap}-${i}`, v, mine[i] ?? null, lap, i))}
+  const lapTotalCell = (key: string, value: number | null, refValue: number | null, watched: boolean) => {
+    const delta = value != null && refValue != null ? value - refValue : null;
+    return (
       <td
-        className="p-0 align-middle"
-        style={overlay && sum != null && mySum != null ? getDeltaStyle(mySum - sum, tintRange) : undefined}
+        key={key}
+        className={cn("border-b border-border/60 p-0 align-middle", watched && "shadow-[inset_0_0_0_2px_var(--foreground)]")}
+        style={delta != null ? getDeltaStyle(delta, tintRange) : undefined}
       >
         <span className="flex h-11 min-w-[5.25rem] flex-col items-end justify-center px-2.5 text-right tabular-nums leading-none">
-          {sum == null ? (
+          {value == null ? (
             <span className="text-faint">—</span>
-          ) : overlay && mySum != null ? (
+          ) : delta != null ? (
             <>
-              <span className="text-[12.5px] text-foreground">{formatSignedDeltaSec(mySum - sum)}</span>
-              <span className="mt-0.5 text-[10px] text-muted-foreground">{fmt(sum)}</span>
+              <span className="text-[12.5px] text-foreground">{formatSignedDeltaSec(delta)}</span>
+              <span className="mt-0.5 text-[10px] text-muted-foreground">{fmt(value)}</span>
             </>
           ) : (
-            <span className="text-[12.5px] text-muted-foreground">{fmt(sum)}</span>
+            <span className="text-[12.5px] text-muted-foreground">{fmt(value)}</span>
           )}
         </span>
       </td>
-    </tr>
-  );
+    );
+  };
 
   const table = (
     <div className="overflow-x-auto rounded-lg border border-border bg-card">
@@ -440,7 +492,7 @@ export function DriverComparePanel({
         <thead>
           <tr className="bg-secondary/40">
             <th className="sticky left-0 z-[2] border-b border-r border-border bg-secondary px-2.5 py-2 text-left micro-caps text-faint">
-              {overlay ? `${overlay.name}'s laps` : "Your laps"}
+              Your laps
             </th>
             {segments.map((s) => (
               <th key={s.key} className="border-b border-border px-2.5 py-2 text-right micro-caps text-faint">
@@ -454,11 +506,50 @@ export function DriverComparePanel({
           </tr>
         </thead>
         <tbody>
-          {shownRows.map((row) => {
-            const b = baseValues(base, meStats, meRows, row.lapNumber);
-            const bl = baseLapTotal(base, meStats, meRows, row.lapNumber);
-            const isBest = shownBest?.lapNumber === row.lapNumber;
+          {/* The reference, pinned above your laps: the lap every cell below is read against. */}
+          {ref ? (
+            <tr className="bg-secondary/60">
+              <th
+                scope="row"
+                className="sticky left-0 z-[1] border-b border-r border-border bg-secondary p-0 text-left align-middle"
+              >
+                <button
+                  type="button"
+                  disabled={!ref.window}
+                  onClick={() => tap("ref", "lap")}
+                  className={cn(
+                    "flex h-11 w-full flex-col items-start justify-center px-2.5 text-left tabular-nums leading-none transition-shadow disabled:cursor-default",
+                    isWatched("ref", "lap")
+                      ? "shadow-[inset_0_0_0_2px_var(--foreground)]"
+                      : ref.window
+                        ? "hover:shadow-[inset_0_0_0_2px_var(--foreground)]"
+                        : ""
+                  )}
+                  title={ref.window ? "Watch the whole lap" : undefined}
+                >
+                  <span className="text-[12.5px] font-semibold text-foreground">{ref.label}</span>
+                  <span className="mt-0.5 text-[10px] text-muted-foreground">
+                    {ref.mine ? "your best lap · the reference" : "the reference"}
+                  </span>
+                </button>
+              </th>
+              {ref.cells.map((c, i) => refCell(`ref-${i}`, c, i))}
+              <td className="border-b border-border p-0 align-middle">
+                <span className="flex h-11 min-w-[5.25rem] flex-col items-end justify-center px-2.5 text-right tabular-nums leading-none">
+                  {ref.total == null ? (
+                    <span className="text-faint">—</span>
+                  ) : (
+                    <span className="text-[12.5px] font-semibold text-foreground">{fmt(ref.total)}</span>
+                  )}
+                </span>
+              </td>
+            </tr>
+          ) : null}
+          {meRows.map((row) => {
+            const isBest = myBest?.lapNumber === row.lapNumber;
             const lapWatched = isWatched(row.lapNumber, "lap");
+            // Your best lap IS the reference when nobody is chosen: it shows plain, no gap to itself.
+            const self = ref?.mine && ref.lapNumber === row.lapNumber;
             return (
               <tr key={row.lapNumber}>
                 <th
@@ -483,144 +574,184 @@ export function DriverComparePanel({
                   </button>
                 </th>
                 {row.cells.map((c, i) =>
-                  cell(`${row.lapNumber}-${i}`, c?.sec ?? null, b[i] ?? null, row.lapNumber, i, {
+                  cell(`${row.lapNumber}-${i}`, c?.sec ?? null, self ? null : (ref?.cells[i]?.sec ?? null), row.lapNumber, i, {
                     suspect: c?.suspect,
                     title: c?.suspect
-                      ? "A quarter off this driver's own median here — left out of the figures"
+                      ? "A quarter off your own median here — left out of the figures"
                       : undefined,
                   })
                 )}
-                {cell(`${row.lapNumber}-lap`, row.lapTimeSec, bl, row.lapNumber, "lap", {
-                  // A lap with a doubtful sector in it is a doubtful lap; a lap with a missing
-                  // crossing is just a lap with a hole.
-                  suspect: row.cells.some((c) => c?.suspect),
-                })}
+                {lapTotalCell(`${row.lapNumber}-lap`, row.lapTimeSec, self ? null : (ref?.total ?? null), lapWatched)}
               </tr>
             );
           })}
-          {footer(
-            "Best sectors",
-            "vs your best sectors",
-            "best",
-            shownStats.map((st) => st.best?.sec ?? null),
-            meStats.map((st) => st.best?.sec ?? null),
-            overlayBestSum,
-            myBestSum
-          )}
-          {footer(
-            `Top-${TOP_N} avg`,
-            `vs ${BASE_LABEL.top5}`,
-            "avg",
-            shownStats.map((st) => st.top5),
-            meStats.map((st) => st.top5),
-            overlayAvgSum,
-            myAvgSum
-          )}
+          {/* Your best through each sector — each one a real lap, so each one plays. */}
+          <tr className="bg-secondary/50">
+            <th
+              scope="row"
+              className="sticky left-0 z-[1] border-r border-border bg-secondary px-2.5 text-left align-middle"
+            >
+              <span className="block text-[12px] font-medium text-muted-foreground">Best sectors</span>
+              <span className="block text-[10px] text-faint">yours, any lap</span>
+            </th>
+            {myIdeal.cells.map((c, i) => cell(`best-${i}`, c?.sec ?? null, ref?.cells[i]?.sec ?? null, "best", i))}
+            {lapTotalCell("best-lap", myIdeal.total, ref?.total ?? null, false)}
+          </tr>
+          {/* Race pace, as numbers: your top-5 average against theirs. Nothing to watch here —
+              an average is not a lap. */}
+          <tr className="bg-secondary/50">
+            <th
+              scope="row"
+              className="sticky left-0 z-[1] border-r border-border bg-secondary px-2.5 text-left align-middle"
+            >
+              <span className="block text-[12px] font-medium text-muted-foreground">Top-{TOP_N} avg</span>
+              {overlay ? <span className="block text-[10px] text-faint">vs {overlay.name}&apos;s</span> : null}
+            </th>
+            {meStats.map((st, i) =>
+              cell(`avg-${i}`, st.top5, overlay ? (overlayStats[i]?.top5 ?? null) : null, "best", i, { canWatch: false })
+            )}
+            {lapTotalCell("avg-lap", myAvgSum, overlayAvgSum, false)}
+          </tr>
         </tbody>
       </table>
     </div>
   );
 
   // ---- controls ----------------------------------------------------------------------------
-  const baseChips: Array<{ kind: BaseKind; label: string }> = [
-    { kind: "top5", label: `You · top-${TOP_N} average` },
-    { kind: "best", label: myBest ? `You · best lap L${myBest.lapNumber}` : "You · best lap" },
-    { kind: "same", label: "You · same lap number" },
-  ];
+  // Their laps, quickest first, for the chip row. Only laps with a crossing on them.
+  const theirLapChips = overlay
+    ? [...overlayRows]
+        .filter((r) => r.cells.some(Boolean))
+        .sort((a, b) => a.lapTimeSec - b.lapTimeSec)
+        .slice(0, 12)
+    : [];
+  const activeRefLap = ref && !ref.mine ? ref.lapNumber : null;
 
-  return (
-    <div className="space-y-3">
-      {player}
-
-      <div className="space-y-2 rounded-xl border border-border bg-card p-3 sm:p-4">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-          <span className="w-16 shrink-0 micro-caps text-faint">Base</span>
-          {baseChips.map((c) => (
+  const controls = (
+    <div className="space-y-2 rounded-xl border border-border bg-card p-3 sm:p-4">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        <span className="w-16 shrink-0 micro-caps text-faint">Against</span>
+        <button
+          type="button"
+          onClick={() => {
+            setOverlayKey(null);
+            setRefPick(null);
+            setWatch(null);
+            setSwapped(false);
+          }}
+          className={cn(chipToggleClass(overlay == null), "px-2.5 py-1 text-[11px]")}
+        >
+          My best lap
+        </button>
+        {rivals.map((r) => {
+          const ideal = idealLap(statsOf(r)).total;
+          return (
             <button
-              key={c.kind}
+              key={r.key}
               type="button"
-              onClick={() => setBase(c.kind)}
-              className={cn(chipToggleClass(base === c.kind), "px-2.5 py-1 text-[11px]", !overlay && "opacity-60")}
-              title={!overlay ? "With no overlay the base only chooses the ghost" : undefined}
+              onClick={() => {
+                setOverlayKey(r.key);
+                setRefPick(null);
+                setWatch(null);
+                setSwapped(false);
+              }}
+              className={cn(chipToggleClass(overlayKey === r.key), "inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px]")}
             >
-              {c.label}
+              <span>{r.name}</span>
+              {r.trust === "assigned" ? (
+                <Flag className="h-3 w-3 text-faint" aria-label="not confirmed — placed by the field matching" />
+              ) : null}
+              {ideal != null ? <span className="text-[10px] text-faint">{fmt(ideal)} ideal</span> : null}
             </button>
-          ))}
-        </div>
+          );
+        })}
+        {rivals.length === 0 ? (
+          <span className="text-[11.5px] text-muted-foreground">Nobody else has sector crossings on this video yet.</span>
+        ) : null}
+      </div>
+      {overlay ? (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-          <span className="w-16 shrink-0 micro-caps text-faint">Overlay</span>
+          <span className="w-16 shrink-0 micro-caps text-faint">Their lap</span>
           <button
             type="button"
             onClick={() => {
-              setOverlayKey(null);
+              setRefPick("ideal");
               setWatch(null);
               setSwapped(false);
             }}
-            className={cn(chipToggleClass(overlay == null), "px-2.5 py-1 text-[11px]")}
+            className={cn(chipToggleClass(refPick === "ideal"), "px-2.5 py-1 text-[11px]")}
           >
-            None · just my laps
+            Best sectors
           </button>
-          {rivals.map((r) => {
-            const ideal = sumOf(statsOf(r).map((st) => st.best?.sec ?? null));
-            return (
-              <button
-                key={r.key}
-                type="button"
-                onClick={() => {
-                  setOverlayKey(r.key);
-                  setWatch(null);
-                  setSwapped(false);
-                }}
-                className={cn(chipToggleClass(overlayKey === r.key), "inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px]")}
-              >
-                <span>{r.name}</span>
-                {r.trust === "assigned" ? (
-                  <Flag className="h-3 w-3 text-faint" aria-label="not confirmed — placed by the field matching" />
-                ) : null}
-                {ideal != null ? <span className="text-[10px] text-faint">{fmt(ideal)} ideal</span> : null}
-              </button>
-            );
-          })}
-          {rivals.length === 0 ? (
-            <span className="text-[11.5px] text-muted-foreground">Nobody else has sector crossings on this video yet.</span>
-          ) : null}
+          {theirLapChips.map((r) => (
+            <button
+              key={r.lapNumber}
+              type="button"
+              onClick={() => {
+                setRefPick(r.lapNumber);
+                setWatch(null);
+                setSwapped(false);
+              }}
+              className={cn(
+                chipToggleClass(refPick !== "ideal" && activeRefLap === r.lapNumber),
+                "px-2.5 py-1 text-[11px] tabular-nums"
+              )}
+            >
+              L{r.lapNumber} · {fmt(r.lapTimeSec)}
+              {overlayBest?.lapNumber === r.lapNumber ? <span className="ml-1 text-[10px] text-faint">best</span> : null}
+            </button>
+          ))}
         </div>
-        {/* The leaderboard as a line: who holds each sector on the average. */}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-          <span className="w-16 shrink-0 micro-caps text-faint">Fastest</span>
-          {leaders.map((l, i) =>
-            l ? (
-              <button
-                key={segments[i]!.key}
-                type="button"
-                onClick={() => {
-                  setSwapped(false);
-                  setOverlayKey(l.driver.role === "me" ? null : l.driver.key);
-                  setWatch({ driverKey: l.driver.key, lap: "best", seg: i });
-                }}
-                className={cn(
-                  "inline-flex items-baseline gap-1.5 rounded-md border px-2 py-0.5 text-[11px] tabular-nums hover:shadow-[inset_0_0_0_1px_var(--foreground)]",
-                  l.driver.role === "me"
-                    ? "border-foreground/40 bg-muted text-foreground"
-                    : "border-border bg-secondary text-foreground"
-                )}
-              >
-                <span className="micro-caps text-faint">{segments[i]!.name}</span>
-                <span>{l.driver.role === "me" ? "You" : l.driver.name}</span>
-                <span className="text-muted-foreground">{fmt(l.sec)}</span>
-              </button>
-            ) : null
-          )}
-        </div>
+      ) : null}
+      {/* The leaderboard as a line: who holds each sector on the average. Tap one and that
+          driver's best through it is what plays, against your best through it. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        <span className="w-16 shrink-0 micro-caps text-faint">Fastest</span>
+        {leaders.map((l, i) =>
+          l ? (
+            <button
+              key={segments[i]!.key}
+              type="button"
+              onClick={() => {
+                setSwapped(false);
+                if (l.driver.role === "me") {
+                  setWatch({ row: "best", seg: i });
+                  return;
+                }
+                const best = statFor(l.driver, segments[i]!).best;
+                setOverlayKey(l.driver.key);
+                setRefPick(best?.lapNumber ?? null);
+                setWatch({ row: "ref", seg: i });
+              }}
+              className={cn(
+                "inline-flex items-baseline gap-1.5 rounded-md border px-2 py-0.5 text-[11px] tabular-nums hover:shadow-[inset_0_0_0_1px_var(--foreground)]",
+                l.driver.role === "me"
+                  ? "border-foreground/40 bg-muted text-foreground"
+                  : "border-border bg-secondary text-foreground"
+              )}
+            >
+              <span className="micro-caps text-faint">{segments[i]!.name}</span>
+              <span>{l.driver.role === "me" ? "You" : l.driver.name}</span>
+              <span className="text-muted-foreground">{fmt(l.sec)}</span>
+            </button>
+          ) : null
+        )}
       </div>
+    </div>
+  );
 
-      {shownRows.length ? (
+  return (
+    // The player across the whole page, the sheet under it (founder call 2026-09-02: "make the
+    // compare page video take up the whole width — put the table below"). The player is still
+    // capped by the window's height inside `SectorClipPlayer`, so the controls stay on screen.
+    <div className="space-y-3">
+      {player}
+      {controls}
+      {meRows.length ? (
         table
       ) : (
         <p className="rounded-lg border border-border bg-secondary/50 px-3 py-3 text-[12px] text-muted-foreground">
-          {overlay
-            ? `${overlay.name} has no sector crossings on this video yet.`
-            : "Your laps have no sector crossings yet."}
+          Your laps have no sector crossings yet.
         </p>
       )}
       {/* The explanatory caption under the board came off on 2026-08-29 (founder call): the

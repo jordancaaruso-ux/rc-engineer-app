@@ -64,7 +64,8 @@ export async function uploadBlankSheetForChassis(
   file: File,
   chassisName: string,
   /**
-   * A `ChassisPlatformId`. Required, and positional rather than an option, so a caller cannot
+   * An encoded discipline (`carClasses.ts`): class + power. Required, and positional rather than
+   * an option, so a caller cannot
    * forget it and get a chassis that never says what it races — the route refuses the derive
    * door without one anyway, and a 400 after the upload is a worse way to find out.
    */

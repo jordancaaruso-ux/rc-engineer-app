@@ -1,7 +1,6 @@
-import { isDemoTimingSiteEnabled, serveDemoTimingPage } from "./demoTimingSite";
+import { timingUserAgent } from "@/lib/http/timingUserAgent";
 
-const DEFAULT_UA =
-  "RC-Engineer/1.0 (+https://github.com) Lap timing import; contact app owner";
+import { isDemoTimingSiteEnabled, serveDemoTimingPage } from "./demoTimingSite";
 
 export type FetchTextResult =
   | { ok: true; text: string; contentType: string; finalUrl: string }
@@ -42,7 +41,7 @@ export async function fetchUrlText(
       redirect: "follow",
       signal: controller.signal,
       headers: {
-        "User-Agent": process.env.LAP_IMPORT_USER_AGENT?.trim() || DEFAULT_UA,
+        "User-Agent": timingUserAgent(),
         Accept: "text/html,application/json;q=0.9,text/plain;q=0.8,*/*;q=0.1",
       },
     });

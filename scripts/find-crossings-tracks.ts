@@ -13,7 +13,7 @@ import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 import { WindowScanner } from "../src/lib/videoAnalysis/findCrossings/detector";
-import { roiFor, bandMask } from "../src/lib/videoAnalysis/findCrossings/geometry";
+import { roiFor, bandMask, blurKernelForLine } from "../src/lib/videoAnalysis/findCrossings/geometry";
 import { spansFromMask } from "../src/lib/videoAnalysis/findCrossings/spans";
 import { bandFrameDiffs, calibrateFromDiffs } from "../src/lib/videoAnalysis/findCrossings/calibrate";
 import { buildTracks, trackCrossings } from "../src/lib/videoAnalysis/findCrossings/tracks";
@@ -97,18 +97,19 @@ async function main() {
   const spans = spansFromMask(bm, w, h);
   const cd: number[] = [];
   const ld: number[] = [];
+  const kernel = blurKernelForLine(line, W, H, RECIPE_B22_T14);
   for (const at of CAL_TIMES) {
     const [cf, lf] = await Promise.all([
       decode(probe.videoPath, w, h, roi.x0, roi.y0, at, CAL_SEC, false),
       decode(probe.videoPath, w, h, roi.x0, roi.y0, at, CAL_SEC, true),
     ]);
-    const a = bandFrameDiffs(cf, bm, spans);
-    const b = bandFrameDiffs(lf, bm, spans);
+    const a = bandFrameDiffs(cf, bm, spans, kernel);
+    const b = bandFrameDiffs(lf, bm, spans, kernel);
     const n = Math.min(a.length, b.length);
     cd.push(...a.slice(0, n));
     ld.push(...b.slice(0, n));
   }
-  const cal = calibrateFromDiffs(cd, ld);
+  const cal = calibrateFromDiffs(cd, ld, kernel);
   console.log(`${lineKey} @ ${center}s · ${cal.mode} @ ${cal.thresh} (${cal.reason})\n`);
 
   const scanner = new WindowScanner(line, roi, W, H, { ...RECIPE_B22_T14, thresh: cal.thresh }, 3);

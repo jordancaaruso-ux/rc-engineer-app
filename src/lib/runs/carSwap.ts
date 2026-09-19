@@ -18,7 +18,7 @@ import { isSamePlatform } from "@/lib/cars/carClasses";
  */
 
 export type CarSwapCar = {
-  /** `CHASSIS_PLATFORMS` id, resolved from the car's chassis. Null = unknown. */
+  /** Discipline (an encoded `carClasses.ts` value), resolved from the car's chassis. Null = unknown. */
   platform?: string | null;
   setupSheetModelId?: string | null;
   /** Legacy template id — the sheet identity fallback for pre-model cars. */

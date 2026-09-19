@@ -94,10 +94,35 @@ export function describeEventLapDetectionScopeForEvent(
 }
 
 /**
+ * Shortest gap between two rounds of timing-site reads for one driver.
+ *
+ * The dashboard fires this in the background on every load, so a driver leaning on refresh in
+ * the pits was firing a fresh set of LiveRC page reads each time — the one place in the app
+ * where our outbound traffic is not one-for-one with someone asking to import something.
+ * LiveRC publishes no rate limit and no terms (only a privacy policy), so the ceiling is ours to
+ * set: 90 seconds is far below how often a race result actually appears, and it turns a refresh
+ * storm into one read. Per lambda instance and deliberately not in the database — this is
+ * politeness, not correctness, and a missed round costs nothing because the next load syncs.
+ */
+const SYNC_COOLDOWN_MS = 90_000;
+const lastSyncAtByUser = new Map<string, number>();
+
+/**
  * Import new LiveRC sessions for events that configure practice/results URLs.
  * Scoped to calendar-active events, else the single most recent event.
  */
 export async function syncRecentEventLapSources(userId: string): Promise<void> {
+  const now = Date.now();
+  const lastAt = lastSyncAtByUser.get(userId) ?? 0;
+  if (now - lastAt < SYNC_COOLDOWN_MS) return;
+  // Prune before writing so a long-lived instance cannot grow a map per user it has ever served.
+  if (lastSyncAtByUser.size > 500) {
+    for (const [id, at] of lastSyncAtByUser) {
+      if (now - at >= SYNC_COOLDOWN_MS) lastSyncAtByUser.delete(id);
+    }
+  }
+  lastSyncAtByUser.set(userId, now);
+
   const liveName = (await getLiveRcDriverNameSetting(userId).catch(() => null))?.trim() ?? "";
   const liveNorm = liveName ? normalizeLiveRcDriverNameForMatch(liveName) : "";
 

@@ -1,10 +1,14 @@
 "use client";
 
 /**
- * Mobile-first analyze flow (VIDEO_ANALYSIS_REWORK Phase B, prototype-approved
- * 2026-07-11): Video → Timing → Sync → Mark → Done as a guided step rail, with a
- * touch transport (coarse scrub + fine wheel at 1px = 4ms + ±1-frame nudges) and
- * a guided marking queue that auto-jumps near each predicted crossing.
+ * The analyze flow (VIDEO_ANALYSIS_REWORK Phase B, prototype-approved 2026-07-11; reshaped for
+ * the desktop 2026-09-02): Set up → Lines → Sync → Scan → Compare as a step rail, with a
+ * touch transport (coarse scrub + fine wheel at 1px = 4ms + ±1-frame nudges).
+ *
+ * Set up is the video and the timing on one screen — they were two steps while the flow was
+ * phone-first, and on a monitor that was two half-empty pages. Marking by hand is gone from the
+ * rail: the detector reads every driver's quickest ten laps itself (Scan), and the dots that
+ * used to be the marking queue are a folded-away check of what it found.
  *
  * Data layer is the existing manual session schema (manualJson v2) and sync
  * math — this component replaces only the UX of UnifiedVideoAnalysisClient.
@@ -13,9 +17,20 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronRight, Film, FolderOpen, Pause, Play, Upload } from "lucide-react";
+import {
+  ChevronRight,
+  Film,
+  FolderOpen,
+  Loader2,
+  Pause,
+  Play,
+  Plus,
+  Upload,
+  X,
+} from "lucide-react";
 import { uploadVideoToLibrary } from "@/lib/videos/clientUpload";
 import { DriverComparePanel } from "@/components/videoAnalysis/DriverComparePanel";
+import { DrawLoupe } from "@/components/videoAnalysis/DrawLoupe";
 import {
   describeVideoError,
   diagnoseMissingPicture,
@@ -30,14 +45,23 @@ import type {
   ManualTimingSession,
   ManualVideoSessionV2,
 } from "@/lib/manualVideoAnalysis/types";
-import { lapSfKey, LAP_START_LINE_KEY } from "@/lib/manualVideoAnalysis/types";
+import {
+  lapSfKey,
+  LAP_START_LINE_KEY,
+  nextRivalRole,
+  withSelectedLaps,
+} from "@/lib/manualVideoAnalysis/types";
 import {
   applyDefaultIsOnVideo,
   applyTop3LapSelection,
   defaultDriverKeys,
   normalizeManualSession,
   pickBestNLapNumbers,
+  reconcileTimingSessions,
+  seatAddedSession,
+  sessionTimeClash,
   setDriverRoles,
+  usedRoles,
 } from "@/lib/manualVideoAnalysis/timing";
 import {
   hasOwnAnchor,
@@ -45,14 +69,27 @@ import {
   visibleCrossings,
   type VisibleCrossing,
 } from "@/lib/manualVideoAnalysis/sync";
+import { fitLapsToCrossings } from "@/lib/manualVideoAnalysis/syncFingerprint";
+import {
+  CLOCK_DISAGREE_SEC,
+  predictedCrossingSec,
+  predictedLapOneSec,
+} from "@/lib/manualVideoAnalysis/wallClock";
 import type { FieldDriver } from "@/lib/videoAnalysis/findCrossings/field";
+import { blobSource } from "@/lib/videoAnalysis/findCrossings/frameSource";
+import { readRecordingStart } from "@/lib/videoAnalysis/findCrossings/mp4";
 import {
   findTimingSession,
   hasMarkedLap,
+  participants,
   primaryTimingSession,
   referenceAnchoredSession,
+  removeParticipant,
+  setParticipantAnchor,
+  swapDriverRoles,
   updateTimingSession,
   videoTimeAtLapSf,
+  type Participant,
 } from "@/lib/manualVideoAnalysis/sessionModel";
 import { useLocalVideoSource } from "@/lib/videos/useLocalVideoSource";
 import {
@@ -73,7 +110,8 @@ import {
   type IdentifyResult,
 } from "@/lib/videoAnalysis/findCrossings/identify";
 import { toleranceFor } from "@/lib/videoAnalysis/findCrossings/carColour";
-import { RECIPE_B22_T14, type CrossingEvent } from "@/lib/videoAnalysis/findCrossings/types";
+import { ACTIVE_RECIPE, type CrossingEvent } from "@/lib/videoAnalysis/findCrossings/types";
+import { bandHalfPxFor, lineGeom } from "@/lib/videoAnalysis/findCrossings/geometry";
 import {
   fastestLaps,
   realLaps,
@@ -84,18 +122,36 @@ import {
   type SessionMark,
 } from "@/lib/videoAnalysis/findCrossings/fromSession";
 import {
+  CLOCK_CONFIRM_LAPS,
+  CLOCK_CONFIRM_SEC,
   findEveryCrossing,
   learnTheLap,
+  scanLapStarts,
+  sweepStartFinish,
   type FindResult,
   type LearnResult,
   type RunContext,
 } from "@/lib/videoAnalysis/findCrossings/run";
 import { compareCarsFromManualSession } from "@/lib/videoAnalysis/manualCompareAdapter";
 
+/**
+ * The zone drawn while placing a line is the zone the scan reads — one name for both, so a
+ * picture can never quietly stop describing what the detector does.
+ */
+const DRAWN_RECIPE = ACTIVE_RECIPE;
+
 const FRAME_SEC = 1 / 60;
 /** Laps read per driver. Ten is a real sample for the averages, and ten chances for a rival to
  *  drift out of step when working out which car is which. */
 const SCAN_LAP_COUNT = 10;
+/**
+ * How much footage one pass of the start-line sweep reads before trying to place people again.
+ *
+ * Long enough to hold five or six laps of a club track, which is a whole fingerprint; short
+ * enough that finding everybody early stops the reading. The sweep costs roughly a second of
+ * waiting per second of video, so this is the difference between a minute and five.
+ */
+const SWEEP_PASS_SEC = 100;
 const FINE_SEC_PER_PX = 0.004;
 
 type SectorLineApi = {
@@ -126,15 +182,19 @@ type JobData = {
 
 type LibraryVideo = { id: string; label: string | null; originalFilename: string; bytes: number };
 
-type Step = 1 | 2 | 3 | 4 | 5 | 6;
+type Step = 1 | 2 | 3 | 4 | 5;
+/** The rail, by name — the numbers are an ordering, not something the code should say. */
+const STEP = { setup: 1, lines: 2, sync: 3, scan: 4, compare: 5 } as const satisfies Record<string, Step>;
 const STEP_LABELS: Record<Step, string> = {
-  1: "Video",
-  2: "Timing",
-  3: "Lines",
-  4: "Sync",
-  5: "Mark",
-  6: "Done",
+  1: "Set up",
+  2: "Lines",
+  3: "Sync",
+  4: "Scan",
+  5: "Compare",
 };
+
+/** Tap the picture to walk these: a closer look, closer still, then back out to the whole frame. */
+const ZOOM_STEPS = [1, 3.5, 8];
 
 /** A saved set of sector lines for this track (one camera angle / one way of splitting it). */
 type LineSet = {
@@ -161,6 +221,22 @@ function ordinal(n: number): string {
   return `${n}${suffix[(v - 20) % 10] ?? suffix[v] ?? suffix[0]}`;
 }
 
+/**
+ * A driver's initials, for the tightest labels on the screen.
+ *
+ * The mark grid used to tag a rival's row "R·", which worked while there could only ever be one.
+ * With three people on the video a row has to say which of them it is, in the width of a chip.
+ */
+function initialsOf(name: string | undefined): string {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0]!.toUpperCase())
+    .join("");
+}
+
 export function AnalyzeFlowClient({
   jobId,
   videoUrlForAsset = (id) => `/api/videos/${encodeURIComponent(id)}/file`,
@@ -176,17 +252,21 @@ export function AnalyzeFlowClient({
 
   const [data, setData] = useState<JobData | null>(null);
   const [session, setSession] = useState<ManualVideoSessionV2 | null>(null);
+  /** The session as of the latest change, for the debounced save to read when it fires. */
+  const sessionRef = useRef<ManualVideoSessionV2 | null>(null);
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
   const [step, setStep] = useState<Step>(1);
   /** The step was chosen once, on the first load — a reload after switching line sets must
    *  not move the driver off the step they are on. */
   const routedRef = useRef(false);
-  /** Opened onto a finished analysis (every mark placed) — the Done step reads as the compare,
-   *  not as the end of a wizard the driver did not just walk. */
-  const [resumedDone, setResumedDone] = useState(false);
   // The device file, offered again from the Done step: on desktop Chrome the handle is
   // remembered per job so it is one "Reopen" tap; on a phone it is the camera roll.
   const local = useLocalVideoSource(jobId);
   const doneFileInputRef = useRef<HTMLInputElement | null>(null);
+  /** The same ask as the Done step's, on the video steps — see `localFileButton`. */
+  const videoStepFileInputRef = useRef<HTMLInputElement | null>(null);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [pickedFile, setPickedFile] = useState<File | null>(null);
   const [library, setLibrary] = useState<LibraryVideo[]>([]);
@@ -204,7 +284,6 @@ export function AnalyzeFlowClient({
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [timingLoading, setTimingLoading] = useState(false);
-  const [urlLaneOpen, setUrlLaneOpen] = useState(false);
   const [timingUrls, setTimingUrls] = useState("");
   /** Which time over the start/finish line the Sync step is looking at (1 = the first). */
   const [anchorCrossing, setAnchorCrossing] = useState<number | null>(null);
@@ -244,20 +323,120 @@ export function AnalyzeFlowClient({
   const overlayElRef = useRef<HTMLDivElement | null>(null);
   // Width of the painted frame on screen, so the detector's band can be drawn at the width it
   // really reads (a fraction of frame width) rather than as a hairline that hides it.
-  const [overlayPx, setOverlayPx] = useState(0);
-  useEffect(() => {
-    const el = overlayElRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => setOverlayPx(el.getBoundingClientRect().width));
+  const [overlayBox, setOverlayBox] = useState({ w: 0, h: 0 });
+  const overlayPx = overlayBox.w;
+  const overlayRoRef = useRef<ResizeObserver | null>(null);
+  // Measured the moment the overlay is attached, not on a later effect: the overlay only exists
+  // on the line-bearing steps, so an effect keyed on the video src ran while the element was
+  // still null and the size stayed 0 for the whole session.
+  const setOverlayEl = useCallback((el: HTMLDivElement | null) => {
+    overlayElRef.current = el;
+    overlayRoRef.current?.disconnect();
+    overlayRoRef.current = null;
+    if (!el) {
+      setOverlayBox({ w: 0, h: 0 });
+      return;
+    }
+    const read = () => {
+      const r = el.getBoundingClientRect();
+      setOverlayBox((b) => (b.w === r.width && b.h === r.height ? b : { w: r.width, h: r.height }));
+    };
+    read();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(read);
     ro.observe(el);
-    setOverlayPx(el.getBoundingClientRect().width);
-    return () => ro.disconnect();
-  }, [videoSrc]);
+    overlayRoRef.current = ro;
+  }, []);
+
+  /**
+   * Tap-to-zoom on the picture, for the steps after the lines are drawn.
+   *
+   * Deciding the frame a car actually crosses a line on is pixel work at arm's length: at phone
+   * size the car is a few pixels wide and the line under it thinner than that. Drawing has the
+   * loupe; Sync and Mark had nothing, so the picture magnifies itself instead — tap once for a
+   * closer look at the spot you tapped, twice for closer still, again to come back out. Zoomed
+   * in, a drag walks the picture around.
+   *
+   * Held as fractions of the frame, never pixels, so a resize or a rotate keeps the same patch.
+   */
+  const [zoomView, setZoomView] = useState({ z: 1, tx: 0, ty: 0 });
+  const zoomDragRef = useRef<{
+    x: number;
+    y: number;
+    tx: number;
+    ty: number;
+    w: number;
+    h: number;
+    moved: boolean;
+  } | null>(null);
+
+  /** Keeps the picture covering the frame — no black margin can be dragged into view. */
+  const clampZoom = (z: number, tx: number, ty: number) => ({
+    z,
+    tx: Math.min(0, Math.max(1 - z, tx)),
+    ty: Math.min(0, Math.max(1 - z, ty)),
+  });
+
+  function cycleZoomAt(fx: number, fy: number) {
+    setZoomView((v) => {
+      const i = ZOOM_STEPS.indexOf(v.z);
+      const next = ZOOM_STEPS[(i < 0 ? 0 : i + 1) % ZOOM_STEPS.length]!;
+      if (next === 1) return { z: 1, tx: 0, ty: 0 };
+      // The point under the finger, read back into picture fractions, put at the middle.
+      const cx = (fx - v.tx) / v.z;
+      const cy = (fy - v.ty) / v.z;
+      return clampZoom(next, 0.5 - next * cx, 0.5 - next * cy);
+    });
+  }
+
+  function zoomPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    // Play/pause and anything else with its own press keeps it.
+    if ((e.target as HTMLElement).closest("button")) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    zoomDragRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      tx: zoomView.tx,
+      ty: zoomView.ty,
+      w: r.width,
+      h: r.height,
+      moved: false,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function zoomPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const d = zoomDragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    // A press that wandered is a drag, not a tap — 6px, so a thumb rolling on the glass while
+    // it presses still counts as a tap.
+    if (!d.moved && Math.hypot(dx, dy) > 6) d.moved = true;
+    if (!d.moved || zoomView.z <= 1) return;
+    setZoomView((v) => clampZoom(v.z, d.tx + dx / d.w, d.ty + dy / d.h));
+  }
+
+  function zoomPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    const d = zoomDragRef.current;
+    zoomDragRef.current = null;
+    if (!d || d.moved) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    cycleZoomAt((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+  }
   // Automatic crossing detection — reads the video itself and fills in the unmarked corners.
   const [autoState, setAutoState] = useState<
     "idle" | "learning" | "identifying" | "choosing" | "running" | "review"
   >("idle");
   const [autoLearned, setAutoLearned] = useState<LearnResult | null>(null);
+  /** What the sweep made of each added driver — one line per person, found or not. */
+  const [findState, setFindState] = useState<"idle" | "running">("idle");
+  const [findOutcomes, setFindOutcomes] = useState<
+    Array<{ role: DriverRole; name: string; found: boolean; note: string }> | null
+  >(null);
+  /** Drivers the clock has already been tried for on this recording — once each, not on every render. */
+  const clockTriedRef = useRef<Set<string>>(new Set());
   /** Which of two same-rhythm candidates the driver picked, per line. */
   const [autoChoice, setAutoChoice] = useState<Record<string, number>>({});
   const [autoProgress, setAutoProgress] = useState<ScanProgress | null>(null);
@@ -282,6 +461,8 @@ export function AnalyzeFlowClient({
   const [seenSeeds, setSeenSeeds] = useState<Partial<Record<DriverRole, Record<string, number>>>>(
     {}
   );
+  /** Which way through each line is the corner, as far as a tap at the picker has said. */
+  const [seenDirs, setSeenDirs] = useState<Partial<Record<string, 1 | -1>>>({});
   const [autoNotes, setAutoNotes] = useState<string[]>([]);
   const [autoError, setAutoError] = useState<string | null>(null);
   const autoAbortRef = useRef<AbortController | null>(null);
@@ -293,34 +474,31 @@ export function AnalyzeFlowClient({
     if (!res.ok) return;
     const json = (await res.json()) as JobData;
     setData(json);
+    // The links already pasted live on their chips; the box stays empty for the next one. (It
+    // used to be refilled with every stored link, from when the lane was a textarea — so a
+    // reopened job offered "+" on a driver who was already on the video.)
     const s = json.manual?.session ? normalizeManualSession(json.manual.session) : null;
-    if (s) {
-      setSession(s);
-      setTimingUrls((s.timingUrls ?? []).join("\n"));
-    }
+    if (s) setSession(s);
     if (json.job.videoAssetId) {
       setVideoSrc(videoUrlForAsset(json.job.videoAssetId));
     }
     if (routedRef.current) return;
     routedRef.current = true;
     // Resume at the furthest sensible step. Geometry (Lines) comes before the
-    // temporal steps now: not yet anchored → Lines; anchored → Mark (its no-lines
+    // temporal steps now: not yet anchored → Lines; anchored → Scan (its no-lines
     // fallback routes back to Lines if a resumed session somehow has no corners).
     const anchored = s ? Boolean(referenceAnchoredSession(s)) : false;
     // An analysis that already has sectors opens on its compare, video or not. The video
     // usually lives on the phone and is never uploaded, so every revisit used to land on "Pick
     // the video" and walk the driver back through timing, lines and sync for work the session
     // already holds. The numbers come from the marks; the picture is only needed to WATCH a
-    // sector, and the Done step asks for it there.
+    // sector, and the Compare step asks for it there.
     const finished =
       anchored && s != null && hasMarkedLap(s, json.sectorLines.map((l) => l.lineKey));
     if (finished) {
-      setStep(6);
-      setResumedDone(true);
+      setStep(STEP.compare);
     } else if (json.job.videoAssetId && s && s.timingSessions.length > 0) {
-      setStep(anchored ? 5 : 3);
-    } else if (json.job.videoAssetId) {
-      setStep(2);
+      setStep(anchored ? STEP.scan : STEP.lines);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
@@ -398,6 +576,7 @@ export function AnalyzeFlowClient({
 
   async function persistSession(next: ManualVideoSessionV2) {
     const normalized = normalizeManualSession(next);
+    sessionRef.current = normalized;
     setSession(normalized);
     setSaving(true);
     const res = await fetch(`/api/video-analysis/jobs/${jobId}`, {
@@ -409,10 +588,27 @@ export function AnalyzeFlowClient({
     if (!res.ok) setMsg("Failed to save");
   }
 
-  function schedulePersist(next: ManualVideoSessionV2) {
-    setSession(next);
+  /**
+   * Save soon, and save what is CURRENT when the timer fires — not the object handed in.
+   *
+   * Picking the video schedules a save of the session as it was at that moment. With the video
+   * and the timing on one screen, "This run's laps" can be pressed inside that half-second, and
+   * the timer then wrote the pre-timing snapshot over the loaded laps: the chips vanished and the
+   * next link pasted became "you" (found driving the merged step, 2026-09-02). A patch form takes
+   * the latest session, and the timer reads the latest again when it fires.
+   */
+  function schedulePersist(
+    next: ManualVideoSessionV2 | ((prev: ManualVideoSessionV2) => ManualVideoSessionV2)
+  ) {
+    const resolved = typeof next === "function" ? (sessionRef.current ? next(sessionRef.current) : null) : next;
+    if (!resolved) return;
+    sessionRef.current = resolved;
+    setSession(resolved);
     if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
-    persistTimerRef.current = setTimeout(() => void persistSession(next), 500);
+    persistTimerRef.current = setTimeout(() => {
+      const current = sessionRef.current;
+      if (current) void persistSession(current);
+    }, 500);
   }
 
   /* ---------- video + transport ---------- */
@@ -510,11 +706,27 @@ export function AnalyzeFlowClient({
     const url = URL.createObjectURL(file);
     objectUrlRef.current = url;
     setVideoSrc(url);
-    if (session) schedulePersist({ ...session, localVideoName: file.name });
-    setStep(2);
+    schedulePersist((prev) => ({ ...prev, localVideoName: file.name }));
+    void rememberRecordingStart(file);
   }
 
-  async function pickLibraryAsset(asset: LibraryVideo, opts: { stay?: boolean } = {}) {
+  /**
+   * When the recording began, read from the file's own header and kept with the session.
+   *
+   * It is the one fact that ties the video to wall-clock time, and with it a practice session's
+   * LiveRC stamp says where that driver's lap 1 is on the footage before anyone taps anything —
+   * `wallClock.ts`. A file with no usable date clears the field rather than leaving a stale one
+   * from another video.
+   */
+  async function rememberRecordingStart(file: File) {
+    const started = await readRecordingStart(blobSource(file));
+    schedulePersist((prev) => ({
+      ...prev,
+      localVideoRecordedAtIso: started ? started.toISOString() : null,
+    }));
+  }
+
+  async function pickLibraryAsset(asset: LibraryVideo) {
     setVideoSrc(videoUrlForAsset(asset.id));
     setPickedFile(null);
     // Durable link: re-opening this session streams the asset, no re-picking.
@@ -523,9 +735,7 @@ export function AnalyzeFlowClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ videoAssetId: asset.id }),
     }).catch(() => {});
-    if (session) schedulePersist({ ...session, localVideoName: asset.originalFilename });
-    // From the Done step the video is opened to watch the sectors, not to start over.
-    if (!opts.stay) setStep(2);
+    schedulePersist((prev) => ({ ...prev, localVideoName: asset.originalFilename }));
   }
 
   // Footage opened from the Done step — a re-pick, or Reopen of the remembered file — becomes
@@ -534,9 +744,27 @@ export function AnalyzeFlowClient({
     if (!local.url) return;
     setVideoSrc(local.url);
     setPickedFile(local.file);
-    if (local.file && session) schedulePersist({ ...session, localVideoName: local.file.name });
+    const name = local.file?.name;
+    if (name) schedulePersist((prev) => ({ ...prev, localVideoName: name }));
+    if (local.file) void rememberRecordingStart(local.file);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [local.url]);
+
+  // A reopened job points the player at the UPLOADED copy (see `load`), and marking is nothing
+  // but seeking: every jump on a 29-minute file is then a fresh network fetch, measured at
+  // ~1.8MB and a beat of lag each, against nothing at all for a file on this device. So if the
+  // browser still holds permission for the remembered handle, take the local copy back without
+  // asking. When it doesn't, this is silent and `localFileButton` offers the tap that can.
+  const reopenedLocalRef = useRef(false);
+  useEffect(() => {
+    if (reopenedLocalRef.current || !local.rememberedName || local.url) return;
+    reopenedLocalRef.current = true;
+    void local.reopenIfGranted();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [local.rememberedName, local.url]);
+
+  /** The player is on the uploaded copy: same footage, but every scrub is a round trip. */
+  const playingUploadedCopy = Boolean(videoSrc) && !videoSrc!.startsWith("blob:");
 
   /* ---------- timing ---------- */
 
@@ -552,23 +780,41 @@ export function AnalyzeFlowClient({
     if (defaults.meKey && defaults.meKey === comp) {
       comp = drivers.find((x) => x.key !== defaults.meKey)?.key ?? "";
     }
-    const timingSessions = applyDefaultIsOnVideo(
-      loaded.map((ts) => ({
-        ...ts,
-        drivers: setDriverRoles(ts.drivers, defaults.meKey, comp),
-      }))
+    // Reloading the same timing keeps its identity — the marks and the sync anchor hang off the
+    // session id, and minting a new one left them pointing at a session that no longer existed.
+    const reconciled = reconcileTimingSessions(
+      session.timingSessions,
+      loaded.map((ts) => ({ ...ts, drivers: setDriverRoles(ts.drivers, defaults.meKey, comp) }))
     );
+    const timingSessions = applyDefaultIsOnVideo(reconciled.sessions);
+    // Anything still keyed to a session that was genuinely replaced is stale: its lap numbers
+    // mean something else now. Cleared, and said out loud — never left in the file to be found
+    // by a later scan.
+    const live = new Set(timingSessions.map((ts) => ts.sessionId));
+    const keptMarks = session.marks.filter((m) => live.has(m.sessionId));
+    const droppedMarks = session.marks.length - keptMarks.length;
     const next = normalizeManualSession(
       applyTop3LapSelection({
         ...session,
         timingSource: source,
         timingUrls: source === "url" ? urls ?? [] : session.timingUrls,
         timingSessions,
+        marks: keptMarks,
+        ...(droppedMarks ? { lastScan: undefined } : {}),
         compare: { ...session.compare, my: null, competitor: null, offsetNudgeSec: 0 },
       })
     );
     void persistSession(next);
-    setMsg(null);
+    const carried = timingSessions.filter((ts) =>
+      session.timingSessions.some((p) => p.sessionId === ts.sessionId)
+    ).length;
+    setMsg(
+      droppedMarks
+        ? `Different timing — ${droppedMarks} mark${droppedMarks === 1 ? "" : "s"} from the previous session cleared.`
+        : carried
+          ? "Same timing reloaded — your marks and sync are kept."
+          : null
+    );
   }
 
   async function loadRunTiming() {
@@ -599,10 +845,18 @@ export function AnalyzeFlowClient({
     }
   }
 
-  async function loadUrlTiming() {
-    const urls = timingUrls.split(/\n/).map((u) => u.trim()).filter(Boolean);
-    if (!urls.length) {
-      setMsg("Paste one or more LiveRC / timing URLs (one per line).");
+  /**
+   * Add one link, and with it one more person on the video.
+   *
+   * The first link sets the analysis up: a race result brings the whole heat and the driver picks
+   * a rival out of it, exactly as before. Every link after that is somebody else — a LiveRC
+   * practice page holds precisely one driver's laps, so the only way to have three people off
+   * practice footage is three links, and each takes the next free seat.
+   */
+  async function addTimingUrl() {
+    const url = timingUrls.trim();
+    if (!url) {
+      setMsg("Paste a LiveRC link first.");
       return;
     }
     setTimingLoading(true);
@@ -610,28 +864,100 @@ export function AnalyzeFlowClient({
       const res = await fetch("/api/video-analysis/manual/parse-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls }),
+        body: JSON.stringify({ urls: [url] }),
       });
       const d = (await res.json().catch(() => ({}))) as {
         error?: string;
         sessions?: ManualTimingSession[];
         drivers?: ManualDriver[];
         defaults?: { meKey: string; competitorKey: string };
+        primaryDriverName?: string | null;
       };
       if (!res.ok) throw new Error(d.error || "Could not load timing");
-      const drivers = d.drivers ?? [];
-      applyTimingSessions(
-        d.sessions ?? [],
-        drivers,
-        d.defaults ?? defaultDriverKeys(drivers),
-        "url",
-        urls
-      );
+      const loaded = d.sessions ?? [];
+      if (loaded.length === 0) throw new Error("No laps found at that link");
+
+      if (roster.length === 0) {
+        const drivers = d.drivers ?? [];
+        applyTimingSessions(loaded, drivers, d.defaults ?? defaultDriverKeys(drivers), "url", [url]);
+      } else {
+        addAnotherDriver(loaded, url, d.primaryDriverName ?? null);
+      }
+      setTimingUrls("");
     } catch (err) {
       setMsg(err instanceof Error ? err.message : "Could not load timing");
     } finally {
       setTimingLoading(false);
     }
+  }
+
+  /**
+   * Seat the driver a link is about beside the people already on the video.
+   *
+   * The first link pasted is "you" because nothing else can be — but it need not stay so. When a
+   * later link is plainly the driver's own (the name on it matches the LiveRC name in Settings)
+   * and the seat marked "you" is not, the two change places on the spot; the chips also carry
+   * "That's me" for the case nobody's settings can decide.
+   */
+  function addAnotherDriver(
+    loaded: ManualTimingSession[],
+    url: string,
+    primaryDriverName: string | null
+  ) {
+    if (!session) return;
+    let next = session;
+    const added: string[] = [];
+    const notes: string[] = [];
+    const wanted = primaryDriverName?.trim().toLowerCase() || null;
+    const looksLikeMe = (name: string) => {
+      if (!wanted) return false;
+      const n = name.trim().toLowerCase();
+      return n === wanted || n.includes(wanted) || wanted.includes(n);
+    };
+
+    for (const ts of loaded) {
+      const seat = ts.drivers.find((d) => d.role === "me") ?? ts.drivers[0];
+      if (!seat) continue;
+      if (participants(next).some((p) => p.driver.normalizedName === seat.normalizedName)) {
+        notes.push(`${seat.driverName} is already on this video.`);
+        continue;
+      }
+      const role = nextRivalRole(usedRoles(next.timingSessions));
+      next = {
+        ...next,
+        timingSessions: [...next.timingSessions, seatAddedSession(ts, role, seat.key)],
+        timingUrls: [...(next.timingUrls ?? []), url],
+      };
+      added.push(seat.driverName);
+      const meNow = participants(next).find((p) => p.role === "me");
+      if (looksLikeMe(seat.driverName) && meNow && !looksLikeMe(meNow.driver.driverName)) {
+        next = swapDriverRoles(next, "me", role);
+        notes.push(`${seat.driverName} is you.`);
+      }
+      // Only a sanity check — LiveRC prints the session time to the minute, which places nobody.
+      // Worth saying out loud all the same, because a link from a different part of the day is a
+      // far likelier mistake than a scan that quietly finds nothing.
+      const clash = sessionTimeClash(next.timingSessions, ts.sessionId);
+      if (clash) notes.push(clash);
+    }
+
+    if (added.length === 0) {
+      setMsg(notes.join(" ") || "Nothing to add from that link.");
+      return;
+    }
+    void persistSession(next);
+    setMsg([`${added.join(", ")} added.`, ...notes].join(" "));
+  }
+
+  function dropParticipant(role: DriverRole) {
+    if (!session) return;
+    const who = roster.find((p) => p.role === role)?.driver.driverName ?? "That driver";
+    if (role === "me") {
+      setMsg("Your own laps are what the analysis is built on — load different timing instead.");
+      return;
+    }
+    void persistSession(removeParticipant(session, role));
+    setMsg(`${who} removed.`);
   }
 
   /**
@@ -655,34 +981,51 @@ export function AnalyzeFlowClient({
     void persistSession({
       ...session,
       timingSessions,
-      selectedLaps: {
-        ...session.selectedLaps,
-        competitor: rival ? pickBestNLapNumbers(rival.laps, 3) : [],
-      },
+      selectedLaps: withSelectedLaps(
+        session.selectedLaps,
+        "competitor",
+        rival ? pickBestNLapNumbers(rival.laps, 3) : []
+      ),
       compare: { ...session.compare, competitor: null },
     });
   }
 
-  function toggleSelectedLap(role: DriverRole, lapNumber: number) {
-    if (!session) return;
-    const cur = session.selectedLaps[role === "me" ? "me" : "competitor"];
-    const next = cur.includes(lapNumber)
-      ? cur.filter((n) => n !== lapNumber)
-      : [...cur, lapNumber].sort((a, b) => a - b);
-    schedulePersist({
-      ...session,
-      selectedLaps: { ...session.selectedLaps, [role === "me" ? "me" : "competitor"]: next },
-    });
+  /**
+   * "That's me": the tapped driver takes the seat marked "you", and whoever held it takes theirs.
+   *
+   * Everything already filed under either seat goes with its person — see `swapDriverRoles`.
+   */
+  function makeMe(role: DriverRole) {
+    if (!session || role === "me") return;
+    const who = roster.find((p) => p.role === role)?.driver.driverName ?? "That driver";
+    void persistSession(swapDriverRoles(session, "me", role));
+    setMsg(`${who} is you.`);
   }
 
   /* ---------- sync ---------- */
 
+  /**
+   * Everyone this video is being read for, in the order they were added.
+   *
+   * A race link puts them all in one timing session; several practice links put each in their
+   * own. Nothing below needs to know which, and that is the point of the list — the screen used
+   * to reach into one session for exactly two drivers, which is why every extra link loaded and
+   * then did nothing.
+   */
+  const roster = useMemo<Participant[]>(() => (session ? participants(session) : []), [session]);
   const primary = session ? primaryTimingSession(session) : undefined;
-  const meDriver = primary?.drivers.find((d) => d.role === "me");
-  const compDriver = primary?.drivers.find((d) => d.role === "competitor");
+  const meDriver = roster.find((p) => p.role === "me")?.driver;
+  const rivals = roster.filter((p) => p.role !== "me");
+  const compDriver = rivals[0]?.driver;
   const anchored = session ? Boolean(referenceAnchoredSession(session)) : false;
 
-  const anchorDriver = anchorRole === "me" ? meDriver : compDriver;
+  const anchorParticipant = roster.find((p) => p.role === anchorRole) ?? roster[0];
+  const anchorDriver = anchorParticipant?.driver;
+
+  /** Which timing session a driver's marks and sync belong to. */
+  function sessionIdFor(role: DriverRole): string | undefined {
+    return roster.find((p) => p.role === role)?.sessionId ?? primary?.sessionId;
+  }
 
   /**
    * Every time this driver's car goes over the start/finish line, first time first.
@@ -706,13 +1049,15 @@ export function AnalyzeFlowClient({
   }, [crossings, anchorCrossing]);
 
   function crossingVideoTime(role: DriverRole, c: VisibleCrossing): number | null {
-    if (!session || !primary) return null;
-    return videoTimeAtLapSf(session, primary.sessionId, role, c.lapNumber, c.anchorKind);
+    const sessionId = sessionIdFor(role);
+    if (!session || !sessionId) return null;
+    return videoTimeAtLapSf(session, sessionId, role, c.lapNumber, c.anchorKind);
   }
 
   function lapStartVideoTime(role: DriverRole, lapNumber: number): number | null {
-    if (!session || !primary) return null;
-    return videoTimeAtLapSf(session, primary.sessionId, role, lapNumber, "sf_start");
+    const sessionId = sessionIdFor(role);
+    if (!session || !sessionId) return null;
+    return videoTimeAtLapSf(session, sessionId, role, lapNumber, "sf_start");
   }
 
   /**
@@ -725,40 +1070,252 @@ export function AnalyzeFlowClient({
    */
   function setAnchorAtPlayhead() {
     const crossing = crossings.find((c) => c.index === anchorCrossing);
-    if (!session || !primary || !crossing) return;
+    if (!session || !crossing) return;
     const t = playheadTime();
-    const anchor = {
+    const next = setParticipantAnchor(session, anchorRole, {
       videoTimeSec: t,
       lapNumber: crossing.lapNumber,
       driverRole: anchorRole,
       anchorKind: crossing.anchorKind,
-    };
-    const next = updateTimingSession(session, primary.sessionId, {
-      isOnVideo: true,
-      sync: {
-        ...primary.sync,
-        perLapSfStart: undefined,
-        perLapSfEnd: undefined,
-        ...(anchorRole === "me" ? { anchor } : {}),
-        anchorByRole: { ...primary.sync.anchorByRole, [anchorRole]: anchor },
-      },
     });
     void persistSession(next);
-    const who = anchorRole === "me" ? "Your" : `${compDriver?.driverName ?? "The rival"}'s`;
+    const who = anchorRole === "me" ? "Your" : `${anchorDriver?.driverName ?? "The rival"}'s`;
     setMsg(`${who} ${ordinal(crossing.index)} crossing anchored @ ${t.toFixed(3)}s.`);
+  }
+
+  /**
+   * Is this driver's timing on the video clock at all?
+   *
+   * The anchor has to be on their OWN timing session. A shared one speaks for everybody in the
+   * session it sits in, because a race field leaves together — it says nothing about somebody
+   * imported from a separate practice link, whose transponder clock starts whenever they pressed
+   * go. Treating that as placement would hand every window a plausible-looking time pointing at
+   * the wrong stretch of footage.
+   */
+  function isPlaced(p: Participant): boolean {
+    return Boolean(p.timingSession.sync.anchor || p.timingSession.sync.anchorByRole?.[p.role]);
+  }
+
+  /** Everyone on the video whose clock has not been tied to it yet. */
+  const unplaced = roster.filter((p) => p.role !== "me" && !isPlaced(p));
+
+  /**
+   * Where the wall clock puts each driver's lap 1 — `wallClock.ts`.
+   *
+   * A practice page stamps its start to the second and the file stamps when recording began;
+   * the difference is that driver's first crossing, good to about a second, before anybody taps.
+   * Only practice sessions, and only once the file's date has been read.
+   */
+  const clockLapOne = useMemo(() => {
+    const out = new Map<DriverRole, number>();
+    const recorded = session?.localVideoRecordedAtIso;
+    if (!recorded) return out;
+    for (const p of roster) {
+      const t = predictedLapOneSec(p.timingSession, p.driver, recorded, duration || null);
+      if (t != null) out.set(p.role, t);
+    }
+    return out;
+  }, [session, roster, duration]);
+
+  /** Everyone still to place, you included, whom the clock can place or the sweep can find. */
+  const toPlace = roster.filter(
+    (p) => !isPlaced(p) && (clockLapOne.has(p.role) || (anchored && p.role !== "me"))
+  );
+
+  /**
+   * The selected driver's anchor, where the timing clock disagrees with it.
+   *
+   * Shown, never enforced: the tap stands, the line says where the clock puts that crossing,
+   * and one press hands the driver to the clock. On IMG_4521 a crossing tapped 35s before the
+   * driver's session had even begun cost him every sector, and the clock knew all along.
+   */
+  const clockDisagreement = useMemo(() => {
+    const sync = anchorParticipant?.timingSession.sync;
+    const a = sync?.anchorByRole?.[anchorRole] ?? (anchorRole === "me" ? sync?.anchor : undefined);
+    const lapOne = clockLapOne.get(anchorRole);
+    if (!a || lapOne == null || !anchorDriver) return null;
+    const predicted = predictedCrossingSec(lapOne, anchorDriver, a.lapNumber, a.anchorKind);
+    if (predicted == null || Math.abs(a.videoTimeSec - predicted) <= CLOCK_DISAGREE_SEC) return null;
+    const index = crossings.find((c) => c.lapNumber === a.lapNumber && c.anchorKind === a.anchorKind)?.index;
+    return { index, predictedSec: predicted };
+  }, [anchorParticipant, anchorRole, anchorDriver, clockLapOne, crossings]);
+
+  /** The stretch of footage worth watching for the sweep: your laps as `next` has them, plus a lap either side. */
+  function lapSpanFrom(next: ManualVideoSessionV2): { fromSec: number; toSec: number } | null {
+    const me = participants(next).find((p) => p.role === "me");
+    if (!me) return null;
+    const laps = realLaps([...me.driver.laps]);
+    const times: number[] = [];
+    for (const l of laps) {
+      const at = videoTimeAtLapSf(next, me.sessionId, "me", l.lapNumber, "sf_start");
+      if (at != null) times.push(at, at + l.lapTimeSec);
+    }
+    if (times.length === 0) return null;
+    const pad = Math.max(...laps.map((l) => l.lapTimeSec), 20);
+    return { fromSec: Math.min(...times) - pad, toSec: Math.max(...times) + pad };
+  }
+
+  // The clock's placements run themselves: the moment the Sync step has a video and somebody the
+  // clock can place, the start line is checked where the clock says — once per driver per
+  // recording. A hand tap is still there for anyone it cannot place or does not find.
+  useEffect(() => {
+    if (step !== STEP.sync || !videoSrc || !videoDims) return;
+    if (findState !== "idle" || autoState !== "idle") return;
+    const recorded = session?.localVideoRecordedAtIso;
+    if (!recorded) return;
+    const due = roster.filter(
+      (p) => !isPlaced(p) && clockLapOne.has(p.role) && !clockTriedRef.current.has(`${p.role}@${recorded}`)
+    );
+    if (due.length === 0) return;
+    for (const p of due) clockTriedRef.current.add(`${p.role}@${recorded}`);
+    void findAddedDrivers();
+    // findAddedDrivers and isPlaced read the same state these deps name.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, videoSrc, videoDims, findState, autoState, session, roster, clockLapOne]);
+
+  /**
+   * Work out where the added drivers are, without asking anyone to spot a stranger's car.
+   *
+   * Watch the start/finish line right through, keep every crossing whoever made it, then lay each
+   * driver's lap times over that list and see where they fit. Their times are irregular enough to
+   * only fit in one place — and where they fit in two, nothing is written and the screen says so,
+   * which is the whole reason the manual sync is still on this step.
+   */
+  async function findAddedDrivers(people: Participant[] = toPlace) {
+    if (!session || findState === "running") return;
+    if (people.length === 0) return;
+    setFindState("running");
+    setFindOutcomes(null);
+    setAutoError(null);
+    autoAbortRef.current = new AbortController();
+    try {
+      const ctx = runContext();
+      if (!ctx) throw new Error("The video is not ready yet.");
+
+      let next = session;
+      const found = new Map<DriverRole, { name: string; note: string }>();
+      let starved = 0;
+      const nameOf = (p: Participant) => (p.role === "me" ? "You" : p.driver.driverName);
+      const place = (p: Participant, fit: NonNullable<ReturnType<typeof fitLapsToCrossings>>, how: string) => {
+        next = setParticipantAnchor(next, p.role, {
+          videoTimeSec: fit.anchorVideoTimeSec,
+          lapNumber: fit.anchorLapNumber,
+          driverRole: p.role,
+          // A practice session's first crossing STARTS lap 1 — see `visibleCrossings`.
+          anchorKind: "sf_start",
+        });
+        found.set(p.role, {
+          name: nameOf(p),
+          note: `${fit.matched} of ${fit.of} laps line up, to ${Math.round(fit.medianErrorSec * 1000)}ms.`,
+        });
+        console.debug(
+          `[sync] ${p.role} ${p.driver.driverName} (${how}): lap1 @ ${fit.lapOneStartSec.toFixed(3)}s · ${fit.matched}/${fit.of} · median ${(fit.medianErrorSec * 1000).toFixed(0)}ms · margin ${fit.marginLaps.toFixed(1)}`
+        );
+      };
+
+      // 1. The clock first, for everyone it can place — you included. Eight short windows on the
+      //    start line where the clock says the opening laps begin, then the lap times decide
+      //    whose crossings those were. No tap, and a fraction of the sweep's reading.
+      for (const p of people) {
+        const lapOne = clockLapOne.get(p.role);
+        if (lapOne == null) continue;
+        const laps = [...p.driver.laps]
+          .filter((l) => l.lapTimeSec > 0)
+          .sort((a, b) => a.lapNumber - b.lapNumber);
+        const opening = laps.slice(0, CLOCK_CONFIRM_LAPS);
+        const starts: Array<{ lapNumber: number; startSec: number }> = [];
+        let t = lapOne;
+        for (const l of opening) {
+          starts.push({ lapNumber: l.lapNumber, startSec: t });
+          t += l.lapTimeSec;
+        }
+        const seen = await scanLapStarts(ctx, { role: p.role, starts });
+        starved += seen.starvedSegments;
+        const fit = fitLapsToCrossings(opening, seen.crossingsSec);
+        console.debug(
+          `[sync] clock ${p.role} ${p.driver.driverName}: lap1 predicted ${lapOne.toFixed(1)}s · ${seen.crossingsSec.length} crossings in ${starts.length} windows · fit ${fit ? `${fit.lapOneStartSec.toFixed(3)}s ${fit.matched}/${fit.of}` : "none"}`
+        );
+        // The fingerprint may only confirm the clock, never wander off it: a lock a lap away
+        // would be a different car whose times happened to fit.
+        if (fit && Math.abs(fit.lapOneStartSec - lapOne) <= CLOCK_CONFIRM_SEC + 0.5) {
+          place(p, fit, "clock");
+        }
+      }
+
+      // 2. The rest, by the sweep — everyone still unplaced, found relative to your laps.
+      const rest = people.filter((p) => p.role !== "me" && !isPlaced(p) && !found.has(p.role));
+      const span = rest.length ? lapSpanFrom(next) : null;
+      if (rest.length && !span) {
+        setMsg("Set your own crossing first — the rest are found relative to your laps.");
+      }
+      if (rest.length && span) {
+        const crossings: number[] = [];
+        let framesRead = 0;
+        // In passes, not one long read. Everybody who circulates for the whole session is placed
+        // by the first couple of minutes, and reading the rest of the file to learn nothing costs
+        // about a second of waiting per second of footage. Only somebody still missing extends it.
+        for (
+          let at = span.fromSec;
+          at < span.toSec && rest.some((p) => !found.has(p.role));
+          at += SWEEP_PASS_SEC
+        ) {
+          const pass = await sweepStartFinish(ctx, {
+            fromSec: at,
+            toSec: Math.min(span.toSec, at + SWEEP_PASS_SEC),
+          });
+          crossings.push(...pass.crossingsSec);
+          framesRead += pass.framesRead;
+          starved += pass.starvedSegments;
+          if (pass.crossingsSec.length === 0 && pass.framesRead === 0) break;
+
+          for (const p of rest) {
+            if (found.has(p.role)) continue;
+            const fit = fitLapsToCrossings(p.driver.laps, crossings);
+            if (fit) place(p, fit, "sweep");
+          }
+          console.debug(
+            `[sync] swept to ${Math.min(span.toSec, at + SWEEP_PASS_SEC).toFixed(1)}s · ${crossings.length} crossings · ${framesRead} frames · placed ${found.size}/${people.length}`
+          );
+        }
+      }
+
+      if (starved > 0) {
+        setAutoError(
+          `${starved} stretch${starved === 1 ? "" : "es"} could not be read fast enough — keep this tab in front and try again.`
+        );
+      }
+      setFindOutcomes(
+        people.map((p) => {
+          const hit = found.get(p.role);
+          return {
+            role: p.role,
+            name: nameOf(p),
+            found: Boolean(hit),
+            note: hit?.note ?? "Not found on this video — set a crossing by hand.",
+          };
+        })
+      );
+      if (next !== session) void persistSession(next);
+    } catch (e) {
+      finishWithError(e);
+    } finally {
+      autoAbortRef.current = null;
+      setFindState("idle");
+    }
   }
 
   function pinSelectedLapHere() {
     const crossing = crossings.find((c) => c.index === anchorCrossing);
-    if (!session || !primary || !crossing) return;
+    const ts = anchorParticipant?.timingSession;
+    if (!session || !ts || !crossing) return;
     const t = playheadTime();
     const key = lapSfKey(anchorRole, crossing.lapNumber);
     const patch =
       crossing.anchorKind === "sf_finish"
-        ? { perLapSfEnd: { ...primary.sync.perLapSfEnd, [key]: t } }
-        : { perLapSfStart: { ...primary.sync.perLapSfStart, [key]: t } };
-    const next = updateTimingSession(session, primary.sessionId, {
-      sync: { ...primary.sync, ...patch },
+        ? { perLapSfEnd: { ...ts.sync.perLapSfEnd, [key]: t } }
+        : { perLapSfStart: { ...ts.sync.perLapSfStart, [key]: t } };
+    const next = updateTimingSession(session, ts.sessionId, {
+      sync: { ...ts.sync, ...patch },
     });
     schedulePersist(next);
     setMsg(`${ordinal(crossing.index)} crossing pinned here.`);
@@ -775,32 +1332,56 @@ export function AnalyzeFlowClient({
   );
 
   /**
-   * Only ever your own car.
+   * The laps to read: each driver's quickest ten.
    *
-   * You can pick yourself out of a video; you cannot pick out a rival you have never seen, and
-   * this queue used to ask — "Sandy Iavazzo · L4 · S3 line" is an unanswerable question when
-   * Sandy is one of six identical-looking cars. A rival's crossings are found by arithmetic
-   * instead: their transponder lap times are a fingerprint nothing else in the field matches.
+   * Not laps ticked by hand — that chooser came off the Set up step on 2026-09-02. What this
+   * feeds is an average — your typical time through each corner against a rival's — and an
+   * average wants a real sample. Ten also makes working out which car is yours far more certain,
+   * because a rival has ten chances to drift out of step rather than three.
+   */
+  const scanLaps = useMemo<LapInput[]>(() => {
+    const out: LapInput[] = [];
+    // Everyone on the video, not the first two. A driver whose clock has not been tied to the
+    // video yet is left out: with no anchor there is nothing to aim a window at, and every
+    // target built for them would search the wrong stretch of footage.
+    for (const p of roster) {
+      if (!isPlaced(p)) continue;
+      for (const lapNumber of fastestLaps(p.driver.laps, SCAN_LAP_COUNT)) {
+        const lap = p.driver.laps.find((l) => l.lapNumber === lapNumber);
+        if (lap) out.push({ role: p.role, lapNumber, lapTimeSec: lap.lapTimeSec });
+      }
+    }
+    return out;
+    // lapStartVideoTime reads session + roster, both of which are deps here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, roster]);
+
+  /**
+   * Every crossing the scan is after: each scanned lap over each corner line, in lap order per
+   * driver. The dots on the Scan step and the "jump to this crossing" taps hang off this.
+   *
+   * No SF targets: the scan is only reachable once anchored, and anchored sessions already know
+   * every SF crossing from transponder lap times (the compare adapter derives lap end as start +
+   * lapTime).
    */
   const markQueue = useMemo<MarkTarget[]>(() => {
-    if (!session || !meDriver) return [];
     const targets: MarkTarget[] = [];
-    // No SF targets: Mark is only reachable once anchored, and anchored
-    // sessions already know every SF crossing from transponder lap times
-    // (the compare adapter derives lap end as start + lapTime).
-    for (const lapNumber of session.selectedLaps.me) {
-      for (const line of nonSfLines) {
-        targets.push({ role: "me", lapNumber, lineKey: line.lineKey, label: line.label });
+    const byRole = new Map<DriverRole, number[]>();
+    for (const lap of scanLaps) byRole.set(lap.role, [...(byRole.get(lap.role) ?? []), lap.lapNumber]);
+    for (const [role, laps] of byRole) {
+      for (const lapNumber of [...laps].sort((a, b) => a - b)) {
+        for (const line of nonSfLines) {
+          targets.push({ role, lapNumber, lineKey: line.lineKey, label: line.label });
+        }
       }
     }
     return targets;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.selectedLaps, nonSfLines, meDriver]);
+  }, [scanLaps, nonSfLines]);
 
   function markFor(t: MarkTarget): number | undefined {
     return session?.marks.find(
       (m) =>
-        m.sessionId === primary?.sessionId &&
+        m.sessionId === sessionIdFor(t.role) &&
         m.driverRole === t.role &&
         m.lapNumber === t.lapNumber &&
         m.lineKey === t.lineKey
@@ -813,17 +1394,15 @@ export function AnalyzeFlowClient({
     if (!session || !primary) return null;
     const start = lapStartVideoTime(t.role, t.lapNumber);
     if (start == null) return null;
-    const sibling = session.marks.find(
+    const sibling = liveMarks.find(
       (m) =>
-        m.sessionId === primary.sessionId &&
-        m.lineKey === t.lineKey &&
-        (m.driverRole !== t.role || m.lapNumber !== t.lapNumber)
+        m.lineKey === t.lineKey && (m.driverRole !== t.role || m.lapNumber !== t.lapNumber)
     );
     if (sibling) {
       const sibStart = lapStartVideoTime(sibling.driverRole, sibling.lapNumber);
       if (sibStart != null) return start + (sibling.videoTimeSec - sibStart);
     }
-    const driver = t.role === "me" ? meDriver : compDriver;
+    const driver = roster.find((p) => p.role === t.role)?.driver;
     const lap = driver?.laps.find((l) => l.lapNumber === t.lapNumber);
     if (!lap) return start;
     if (t.lineKey === "sf") return start + lap.lapTimeSec;
@@ -844,7 +1423,7 @@ export function AnalyzeFlowClient({
   );
 
   useEffect(() => {
-    if (step !== 5 || !markQueue.length || draftLines) return;
+    if (step !== STEP.scan || !markQueue.length || draftLines) return;
     // Start at the first unmarked target — also fires when lines are first
     // saved from the in-flow editor and the queue materializes.
     const firstOpen = markQueue.findIndex((t) => markFor(t) == null);
@@ -854,43 +1433,27 @@ export function AnalyzeFlowClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, markQueue.length, draftLines == null]);
 
-  function advanceCursor(from: number) {
-    const nextIdx = from + 1;
-    if (nextIdx >= markQueue.length) {
-      setStep(6);
-      return;
-    }
-    setMarkCursor(nextIdx);
-    jumpToTarget(nextIdx);
-  }
+  // A zoom is aimed at one corner on one line. Changing step, or moving on to a crossing on a
+  // different line, aims somewhere else — so the picture comes back out to the whole frame
+  // instead of leaving the driver staring at the wrong patch of track.
+  const activeLineKey = markQueue[markCursor]?.lineKey ?? null;
+  useEffect(() => {
+    setZoomView({ z: 1, tx: 0, ty: 0 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, activeLineKey, draftLines == null]);
 
-  function confirmMark() {
-    if (!session || !primary) return;
-    const t = markQueue[markCursor];
-    if (!t) {
-      setStep(6);
-      return;
-    }
-    const videoTimeSec = playheadTime();
-    const marks = session.marks.filter(
-      (m) =>
-        !(
-          m.sessionId === primary.sessionId &&
-          m.driverRole === t.role &&
-          m.lapNumber === t.lapNumber &&
-          m.lineKey === t.lineKey
-        )
-    );
-    marks.push({
-      sessionId: primary.sessionId,
-      driverRole: t.role,
-      lapNumber: t.lapNumber,
-      lineKey: t.lineKey,
-      videoTimeSec,
-    });
-    schedulePersist({ ...session, marks });
-    advanceCursor(markCursor);
-  }
+  // The overlay is measured off the screen and the zoom is a transform on it, so what comes
+  // back is the magnified size. The loupe and the detector band want the laid-out size.
+  useEffect(() => {
+    const el = overlayElRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const z = zoomView.z || 1;
+    const w = r.width / z;
+    const h = r.height / z;
+    setOverlayBox((b) => (b.w === w && b.h === h ? b : { w, h }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoomView.z, draftLines == null]);
 
   /* ---------- automatic crossings ---------- */
 
@@ -917,65 +1480,56 @@ export function AnalyzeFlowClient({
   );
 
   /**
-   * The laps to read: each driver's quickest ten.
-   *
-   * Not "the laps you ticked in Timing". What this feeds is an average — your typical time
-   * through each corner against a rival's — and an average wants a real sample. Ten also makes
-   * working out which car is yours far more certain, because a rival has ten chances to drift
-   * out of step rather than three.
-   */
-  const scanLaps = useMemo<LapInput[]>(() => {
-    const out: LapInput[] = [];
-    for (const [role, driver] of [
-      ["me", meDriver],
-      ["competitor", compDriver],
-    ] as const) {
-      if (!driver) continue;
-      for (const lapNumber of fastestLaps(driver.laps, SCAN_LAP_COUNT)) {
-        const lap = driver.laps.find((l) => l.lapNumber === lapNumber);
-        if (lap) out.push({ role, lapNumber, lapTimeSec: lap.lapTimeSec });
-      }
-    }
-    return out;
-  }, [meDriver, compDriver]);
-
-  /**
    * Everyone in the race, with every lap start on the video clock — the two drivers being scanned
    * by the same walk the targets use, the rest placed from the shared tone. This is what lets a
    * crossing be given to the rival who was due there instead of to whoever it sat nearest.
    */
   const scanField = useMemo<FieldDriver[]>(() => {
-    if (!primary) return [];
+    if (!session) return [];
     const out: FieldDriver[] = [];
-    for (const d of primary.drivers) {
-      const role = d.role === "other" ? undefined : d.role;
-      const lapStarts: FieldDriver["lapStarts"] = [];
-      for (const lap of realLaps(d.laps)) {
-        const startSec = role
-          ? lapStartVideoTime(role, lap.lapNumber)
-          : primary.isOnVideo && primary.sync.anchor
-            ? predictSfStartTime(d, lap.lapNumber, primary)
-            : null;
-        if (startSec != null) lapStarts.push({ lapNumber: lap.lapNumber, startSec });
+    // Every timing session on the video, not just the driver's own. Somebody added from their own
+    // practice link brings their whole clock with them, and the matcher can only give a crossing
+    // to the person who was due there if it knows they were on track at all.
+    for (const ts of session.timingSessions) {
+      // No anchor on this session means nothing in it is on the video clock yet. Including it
+      // would hand the matcher lap starts derived from a clock the video has never seen.
+      if (!ts.isOnVideo || !ts.sync.anchor) continue;
+      for (const d of ts.drivers) {
+        const role = d.role === "other" ? undefined : d.role;
+        const lapStarts: FieldDriver["lapStarts"] = [];
+        for (const lap of realLaps(d.laps)) {
+          const startSec = role
+            ? lapStartVideoTime(role, lap.lapNumber)
+            : ts.sync.anchor
+              ? predictSfStartTime(d, lap.lapNumber, ts)
+              : null;
+          if (startSec != null) lapStarts.push({ lapNumber: lap.lapNumber, startSec });
+        }
+        if (lapStarts.length) out.push({ key: role ?? d.key, name: d.driverName, role, lapStarts });
       }
-      if (lapStarts.length) out.push({ key: role ?? d.key, name: d.driverName, role, lapStarts });
     }
     return out;
-    // lapStartVideoTime reads session + primary, both of which are deps here.
+    // lapStartVideoTime reads session + roster, both of which are deps here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, primary]);
+  }, [session, roster]);
+
+  /** Marks belonging to the people currently on the video — theirs may sit in their own session. */
+  const liveMarks = useMemo(() => {
+    const live = new Map(roster.map((p) => [p.role, p.sessionId]));
+    return (session?.marks ?? []).filter((m) => live.get(m.driverRole) === m.sessionId);
+  }, [session, roster]);
 
   const sessionMarks = useMemo<SessionMark[]>(
     () =>
-      (session?.marks ?? [])
-        .filter((m) => m.sessionId === primary?.sessionId)
+      liveMarks
         .map((m) => ({
           driverRole: m.driverRole,
           lapNumber: m.lapNumber,
           lineKey: m.lineKey,
           videoTimeSec: m.videoTimeSec,
+          ...(m.dir ? { dir: m.dir } : {}),
         })),
-    [session, primary]
+    [liveMarks]
   );
 
   const autoReady =
@@ -986,6 +1540,8 @@ export function AnalyzeFlowClient({
     if (!video || !videoDims || !autoAbortRef.current) return null;
     return {
       video,
+      // The file itself, so the frames can be decoded straight out of it rather than played.
+      file: pickedFile ?? local.file ?? null,
       frameW: videoDims.w,
       frameH: videoDims.h,
       durationSec: video.duration || duration,
@@ -1058,7 +1614,7 @@ export function AnalyzeFlowClient({
           ...session,
           lastIdentify: {
             at: new Date().toISOString(),
-            sessionId: primary.sessionId,
+            sessionId: sessionIdFor(role) ?? primary.sessionId,
             driverRole: role,
             lapNumber: found.lapNumber,
             lapStartSec: found.lapStartSec,
@@ -1127,6 +1683,10 @@ export function AnalyzeFlowClient({
     if (Object.keys(picked).length === 0) return;
     const byRole = { ...seenSeeds, [identifyRole]: { ...seenSeeds[identifyRole], ...picked } };
     setSeenSeeds(byRole);
+    // A tap at a hairpin also says which way through the line is the corner.
+    const dirs: Partial<Record<string, 1 | -1>> = { ...seenDirs };
+    for (const [lineKey, o] of Object.entries(picksUsed)) if (o?.dir) dirs[lineKey] = o.dir;
+    setSeenDirs(dirs);
     // What actually went on to the scan, beside what the screen had picked.
     if (session?.lastIdentify && session.lastIdentify.driverRole === identifyRole) {
       schedulePersist({
@@ -1151,7 +1711,7 @@ export function AnalyzeFlowClient({
       setAutoLearned(learned);
       // Your own picks also improve the shared fallback, because a corner sits at much the same
       // point of the lap for anyone driving it.
-      await scanWith({ ...learned.seeds, ...(byRole.me ?? {}) }, learned, byRole);
+      await scanWith({ ...learned.seeds, ...(byRole.me ?? {}) }, learned, byRole, dirs);
     } catch (e) {
       finishWithError(e);
     }
@@ -1217,7 +1777,8 @@ export function AnalyzeFlowClient({
   async function scanWith(
     seeds: Record<string, number>,
     learned: LearnResult,
-    seedsByRole?: Partial<Record<DriverRole, Record<string, number>>>
+    seedsByRole?: Partial<Record<DriverRole, Record<string, number>>>,
+    lineDirections?: Partial<Record<string, 1 | -1>>
   ) {
     setAutoState("running");
     try {
@@ -1228,6 +1789,7 @@ export function AnalyzeFlowClient({
         seedsByRole: seedsByRole ?? seenSeeds,
         car: learned.car,
         cars: learned.cars,
+        lineDirections: lineDirections ?? seenDirs,
       });
 
       const starved = learned.starvedSegments + result.starvedSegments;
@@ -1249,6 +1811,11 @@ export function AnalyzeFlowClient({
       for (const t of result.review.missing) {
         console.debug(`[review] missing ${t.role} L${t.lapNumber} ${t.lineKey} centre ${t.centerSec.toFixed(3)}`);
       }
+      for (const d of result.review.directions) {
+        console.debug(
+          `[review] direction ${d.lineKey} ${d.dir > 0 ? "+" : "-"} (${d.from}) turned ${d.turned} emptied ${d.emptied}`
+        );
+      }
       setAutoReview(result.review);
       setAutoState("review");
       // The whole scan — found, held back and missing, with every candidate — is saved before the
@@ -1263,6 +1830,7 @@ export function AnalyzeFlowClient({
             ...(c.colour ? { colour: c.colour } : {}),
             ...(c.x != null && c.y != null ? { x: c.x, y: c.y } : {}),
             ...(c.dir ? { dir: c.dir } : {}),
+            ...(c.source ? { source: c.source } : {}),
           }));
         const rows: ManualScanRow[] = [
           ...[...review.found, ...review.suspect].map((r) => ({
@@ -1285,10 +1853,50 @@ export function AnalyzeFlowClient({
             candidates: toCandidates(review.candidatesById[t.id] ?? []),
           })),
         ];
+        // The lap boundaries the scan measured, written where every sector calculation already
+        // looks for them. Without this, sector 1 is the only sector with one end on the
+        // transponder's walked clock instead of on the picture — so it silently absorbs every
+        // error in that walk, and the walk accumulates (see `lapClock.ts`).
+        // Grouped by whose lap it is, because each driver's clock lives in the timing session
+        // their laps came from — one shared session in a race, one apiece off practice links.
+        const perSession = new Map<string, { start: Record<string, number>; end: Record<string, number> }>();
+        for (const l of review.measuredLapStarts) {
+          const sessionId = sessionIdFor(l.role);
+          const ts = sessionId ? findTimingSession(session, sessionId) : undefined;
+          if (!ts) continue;
+          const bucket =
+            perSession.get(ts.sessionId) ??
+            { start: { ...ts.sync.perLapSfStart }, end: { ...ts.sync.perLapSfEnd } };
+          bucket.start[lapSfKey(l.role, l.lapNumber)] = l.videoTimeSec;
+          // A lap ends where the next one starts — the same crossing, named from the other side.
+          const prev = review.measuredLapStarts.find(
+            (p) => p.role === l.role && p.lapNumber === l.lapNumber - 1
+          );
+          if (prev) bucket.end[lapSfKey(l.role, l.lapNumber - 1)] = l.videoTimeSec;
+          perSession.set(ts.sessionId, bucket);
+        }
+        let withStarts = session;
+        for (const [sessionId, bucket] of perSession) {
+          const ts = findTimingSession(withStarts, sessionId);
+          if (!ts) continue;
+          withStarts = updateTimingSession(withStarts, sessionId, {
+            sync: { ...ts.sync, perLapSfStart: bucket.start, perLapSfEnd: bucket.end },
+          });
+        }
         schedulePersist({
-          ...session,
+          ...withStarts,
           lastScan: { at: new Date().toISOString(), sessionId: primary.sessionId, rows },
         });
+        if (review.clockDisagreements.length) {
+          // Not hidden inside sector 1: one of the two clocks is wrong and only the driver can
+          // say which.
+          console.debug(
+            `[review] timing sheet vs footage: ` +
+              review.clockDisagreements
+                .map((d) => `${d.lapKey} filmed ${d.filmedSec.toFixed(3)} vs ${d.timedSec.toFixed(3)}`)
+                .join(", ")
+          );
+        }
       }
     } catch (e) {
       finishWithError(e);
@@ -1369,28 +1977,35 @@ export function AnalyzeFlowClient({
       : autoReview.found;
 
     const existing = new Set(
-      session.marks
-        .filter((m) => m.sessionId === primary.sessionId)
-        .map((m) => `${m.driverRole}:${m.lapNumber}:${m.lineKey}`)
+      liveMarks.map((m) => `${m.driverRole}:${m.lapNumber}:${m.lineKey}`)
     );
-    const added = rows.filter((r) => !existing.has(`${r.role}:${r.lapNumber}:${r.lineKey}`));
+    const added = rows.filter(
+      (r) => !existing.has(`${r.role}:${r.lapNumber}:${r.lineKey}`) && sessionIdFor(r.role)
+    );
 
     schedulePersist({
       ...session,
       marks: [
         ...session.marks,
         ...added.map((r) => ({
-          sessionId: primary.sessionId,
+          // A mark belongs to the timing session its driver's laps came from, which for anyone
+          // added by their own practice link is not the driver's own session.
+          sessionId: sessionIdFor(r.role)!,
           driverRole: r.role,
           lapNumber: r.lapNumber,
           lineKey: r.lineKey,
           videoTimeSec: r.videoTimeSec,
           ...(r.source ? { source: r.source } : {}),
+          // Which way the car went through: the line's direction for every later scan.
+          ...(r.dir ? { dir: r.dir } : {}),
           // What else the window saw, so the choice can be re-judged later without a re-scan.
           candidates: r.candidates.map((c) => ({
             t: c.t,
             quality: c.quality,
             ...(c.colour ? { colour: c.colour } : {}),
+            ...(c.x != null && c.y != null ? { x: c.x, y: c.y } : {}),
+            ...(c.dir ? { dir: c.dir } : {}),
+            ...(c.source ? { source: c.source } : {}),
           })),
         })),
       ],
@@ -1574,12 +2189,38 @@ export function AnalyzeFlowClient({
     return new DOMRect(r.left + (r.width - w) / 2, r.top, w, r.height);
   }
 
-  function dragLinePoint(clientX: number, clientY: number, idx: number, end: 1 | 2) {
+  /**
+   * The end nearest the press, wherever the press landed.
+   *
+   * Each end carries a thumb-sized invisible target, and two lines crossing near each other put
+   * those targets on top of one another — whichever happened to be drawn last won, so grabbing
+   * one line's end regularly picked up its neighbour's. Distance decides it instead.
+   */
+  function nearestLineEnd(clientX: number, clientY: number): { idx: number; end: 1 | 2 } | null {
+    const rect = paintedRect(videoRef.current) ?? overlayElRef.current?.getBoundingClientRect();
+    if (!draftLines || !rect || !rect.width || !rect.height) return null;
+    let best: { idx: number; end: 1 | 2 } | null = null;
+    let bestDist = Infinity;
+    draftLines.forEach((l, idx) => {
+      for (const end of [1, 2] as const) {
+        const px = rect.left + (end === 1 ? l.x1 : l.x2) * rect.width;
+        const py = rect.top + (end === 1 ? l.y1 : l.y2) * rect.height;
+        const dist = Math.hypot(px - clientX, py - clientY);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = { idx, end };
+        }
+      }
+    });
+    return best;
+  }
+
+  function dragLinePoint(clientX: number, clientY: number) {
     const d = lineDragRef.current;
     // The picture itself, measured from the element as it is painted right now — the overlay
     // box is meant to match it, but the picture is the thing the fractions describe.
     const rect = paintedRect(videoRef.current) ?? overlayElRef.current?.getBoundingClientRect();
-    if (!d || !rect || !rect.width || !rect.height || d.idx !== idx || d.end !== end) return;
+    if (!d || !rect || !rect.width || !rect.height) return;
     const x = clamp01((clientX - rect.left) / rect.width);
     const y = clamp01((clientY - rect.top) / rect.height);
     setDraftLines(
@@ -1677,7 +2318,7 @@ export function AnalyzeFlowClient({
       void loadLineSets(data.job.track.id);
       setMsg(
         lines.length > 1
-          ? `Saved to ${profileName} — mark each crossing now.`
+          ? `Saved to ${profileName}.`
           : "Saved. Add at least one corner line to unlock sector deltas."
       );
     } catch (err) {
@@ -1701,7 +2342,7 @@ export function AnalyzeFlowClient({
       pair.b,
       data.sectorLines.map((l) => ({ id: l.lineKey, label: l.label }))
     );
-  }, [session, data, step === 6 ? session?.marks.length : 0]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session, data, step === STEP.compare ? session?.marks.length : 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function saveToLibrary() {
     if (!pickedFile) return;
@@ -1730,20 +2371,21 @@ export function AnalyzeFlowClient({
 
   if (!data) return <p className="text-sm text-muted-foreground">Loading…</p>;
 
+  const hasTiming = Boolean(session && session.timingSessions.length > 0);
+  /** One whole lap of yours over every corner — the sector compare exists. */
+  const hasAnalysis = session ? hasMarkedLap(session, data.sectorLines.map((l) => l.lineKey)) : false;
+
   const stepDone = (s: Step): boolean => {
-    if (s === 1) return Boolean(videoSrc);
-    if (s === 2) return Boolean(session && session.timingSessions.length > 0);
-    if (s === 3) return nonSfLines.length > 0;
-    if (s === 4) return anchored;
-    if (s === 5) return markQueue.length > 0 && markQueue.every((t) => markFor(t) != null);
+    if (s === STEP.setup) return Boolean(videoSrc) && hasTiming;
+    if (s === STEP.lines) return nonSfLines.length > 0;
+    if (s === STEP.sync) return anchored;
+    if (s === STEP.scan) return hasAnalysis;
     return false;
   };
 
   const canEnter = (s: Step): boolean => {
-    if (s === 1) return true;
-    if (s === 2) return Boolean(videoSrc);
-    if (s === 3) return stepDone(2) && Boolean(videoSrc);
-    if (s === 4) return stepDone(2) && Boolean(videoSrc);
+    if (s === STEP.setup) return true;
+    if (s === STEP.lines || s === STEP.sync) return hasTiming && Boolean(videoSrc);
     return anchored;
   };
 
@@ -1757,10 +2399,16 @@ export function AnalyzeFlowClient({
       )
     : library;
 
-  // Video-bearing steps go two-pane (big video + controls rail) on desktop; the
-  // rest stay a single narrow column.
+  // Video-bearing steps go two-pane (big video + controls rail) on desktop.
   const isVideoStep =
-    step === 3 || step === 4 || (step === 5 && nonSfLines.length > 0) || Boolean(draftLines);
+    step === STEP.lines ||
+    step === STEP.sync ||
+    (step === STEP.scan && nonSfLines.length > 0) ||
+    Boolean(draftLines);
+
+  // Zoom belongs to the steps where the picture is being read, not drawn on: while an end is in
+  // your hand the loupe is the magnifier, and a press there is already a grab.
+  const canZoom = isVideoStep && !draftLines;
 
   // The frame box takes the video's own shape, so a fisheye or 4:3 clip fills it instead of
   // sitting letterboxed inside a 16:9 hole. Its width is capped by what fits on screen
@@ -1791,7 +2439,7 @@ export function AnalyzeFlowClient({
   // split sat ("all the sectors should be visible on the track at all times", 2026-08-29). The
   // one being worked on is lit; the others stay quiet behind it.
   const staticGuides: DraftLine[] = (() => {
-    if (draftLines || step < 3 || step > 5) return [];
+    if (draftLines || step < STEP.lines || step > STEP.scan) return [];
     return data.sectorLines
       .map((l): DraftLine | null =>
         l.x1 != null && l.y1 != null && l.x2 != null && l.y2 != null
@@ -1804,9 +2452,9 @@ export function AnalyzeFlowClient({
   /** The guide the current step is about — lit, with the rest of the set behind it. */
   const guideActiveKey: string | null = draftLines
     ? null
-    : step === 4
+    : step === STEP.sync
       ? "sf"
-      : step === 5
+      : step === STEP.scan
         ? (markQueue[markCursor]?.lineKey ?? null)
         : null;
 
@@ -1817,7 +2465,7 @@ export function AnalyzeFlowClient({
   const lineSetButton = data ? (
     <button
       type="button"
-      onClick={() => setStep(3)}
+      onClick={() => setStep(STEP.lines)}
       className="flex w-full items-center gap-2 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-left"
     >
       <span className="micro-caps shrink-0 text-faint">Lines</span>
@@ -1828,51 +2476,95 @@ export function AnalyzeFlowClient({
     </button>
   ) : null;
 
+  /**
+   * Half the detector's band for one line, in screen pixels.
+   *
+   * Worked out in the video's OWN pixels and then scaled to the picture on screen, because the
+   * recipe's floor and its line-length ceiling are both measured against the real frame. Drawing
+   * it from screen pixels would show a different strip on a phone than on a desktop.
+   */
+  function bandScreenPx(l: DraftLine): number | null {
+    if (!videoDims?.w || !videoDims.h || !overlayBox.w) return null;
+    const g = lineGeom(
+      { lineKey: l.lineKey, label: l.label, sortOrder: 0, x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2 },
+      videoDims.w,
+      videoDims.h
+    );
+    if (!g.norm) return null;
+    return bandHalfPxFor(g, videoDims.w, DRAWN_RECIPE) * (overlayBox.w / videoDims.w);
+  }
+
   const lineOverlay = overlayLines.length ? (
     <div
-      ref={overlayElRef}
+      ref={setOverlayEl}
       className={cn("absolute", draftLines ? "touch-none" : "pointer-events-none")}
       style={contentRect}
     >
       <svg
         viewBox="0 0 1000 1000"
         preserveAspectRatio="none"
-        className="absolute inset-0 h-full w-full"
+        // Nothing drawn here is grabbable: the detector band is 40-odd pixels wide and would
+        // otherwise swallow presses meant for the ends sitting on top of it.
+        className="pointer-events-none absolute inset-0 h-full w-full"
       >
-        {/* While drawing: the strip the detector actually reads, at true width and exactly the
-            drawn length. The hairline on its own hid this, and a line shorter than the strip is
-            wide was a box the driver could not see (Test A3 S1, 2026-08-29). */}
+        {/* While drawing: the strip the detector actually reads. Width is bandFrac of the frame
+            each side, and — round cap, not butt — it runs one band width past each end, which is
+            the capsule `bandMask()` builds. Motion anywhere in here that swaps sides of the line
+            counts as a crossing, so the patch is the thing worth judging when a line lands near
+            a return lane (Test A3 S1, 2026-08-29). */}
         {draftLines && overlayPx > 0
-          ? overlayLines.map((l) => (
+          ? overlayLines.map((l) => {
+              const band = bandScreenPx(l);
+              if (band == null) return null;
+              return (
+                <line
+                  key={`band-${l.lineKey}`}
+                  x1={l.x1 * 1000}
+                  y1={l.y1 * 1000}
+                  x2={l.x2 * 1000}
+                  y2={l.y2 * 1000}
+                  stroke={l.lineKey === "sf" ? "#ffffff" : "rgb(var(--color-primary))"}
+                  strokeOpacity={0.16}
+                  strokeWidth={2 * band}
+                  // Round adds exactly half a stroke width at each end, which IS the recipe's
+                  // one-band cap. A recipe that stops at the drawn ends gets flat ends.
+                  strokeLinecap={DRAWN_RECIPE.endCapBands === 0 ? "butt" : "round"}
+                  vectorEffect="non-scaling-stroke"
+                />
+              );
+            })
+          : null}
+        {/* A thin, bright line over a dark halo. The paper ink (#8A6A00) is a text colour and
+            vanished on asphalt; over a picture the line is a fill, so it runs at full yellow and
+            carries its own shadow instead of leaning on the frame behind it. */}
+        {overlayLines.map((l) => {
+          const lit = guideActiveKey == null || l.lineKey === guideActiveKey;
+          const dash = l.lineKey === "sf" || !lit ? `${6 / zoomView.z} ${4 / zoomView.z}` : undefined;
+          return (
+            <g key={l.lineKey}>
               <line
-                key={`band-${l.lineKey}`}
                 x1={l.x1 * 1000}
                 y1={l.y1 * 1000}
                 x2={l.x2 * 1000}
                 y2={l.y2 * 1000}
-                stroke={l.lineKey === "sf" ? "rgb(var(--color-foreground))" : "rgb(var(--color-primary-ink))"}
-                strokeOpacity={0.18}
-                strokeWidth={2 * RECIPE_B22_T14.bandFrac * overlayPx}
-                strokeLinecap="butt"
+                stroke="rgba(0,0,0,0.6)"
+                strokeWidth={3 / zoomView.z}
+                strokeOpacity={lit ? 1 : 0.45}
                 vectorEffect="non-scaling-stroke"
+                strokeDasharray={dash}
               />
-            ))
-          : null}
-        {overlayLines.map((l) => {
-          const lit = guideActiveKey == null || l.lineKey === guideActiveKey;
-          return (
-            <line
-              key={l.lineKey}
-              x1={l.x1 * 1000}
-              y1={l.y1 * 1000}
-              x2={l.x2 * 1000}
-              y2={l.y2 * 1000}
-              stroke={l.lineKey === "sf" ? "rgb(var(--color-foreground))" : "rgb(var(--color-primary-ink))"}
-              strokeWidth={2}
-              strokeOpacity={lit ? 1 : 0.35}
-              vectorEffect="non-scaling-stroke"
-              strokeDasharray={l.lineKey === "sf" || !lit ? "6 4" : undefined}
-            />
+              <line
+                x1={l.x1 * 1000}
+                y1={l.y1 * 1000}
+                x2={l.x2 * 1000}
+                y2={l.y2 * 1000}
+                stroke={l.lineKey === "sf" ? "#ffffff" : "rgb(var(--color-primary))"}
+                strokeWidth={1.25 / zoomView.z}
+                strokeOpacity={lit ? 1 : 0.5}
+                vectorEffect="non-scaling-stroke"
+                strokeDasharray={dash}
+              />
+            </g>
           );
         })}
       </svg>
@@ -1885,7 +2577,12 @@ export function AnalyzeFlowClient({
               ? "text-foreground"
               : "text-foreground/45"
           )}
-          style={{ left: `${((l.x1 + l.x2) / 2) * 100}%`, top: `${((l.y1 + l.y2) / 2) * 100}%` }}
+          style={{
+            left: `${((l.x1 + l.x2) / 2) * 100}%`,
+            top: `${((l.y1 + l.y2) / 2) * 100}%`,
+            // A name is a name at any magnification — it labels the line, it doesn't measure it.
+            scale: zoomView.z === 1 ? undefined : String(1 / zoomView.z),
+          }}
         >
           {l.label}
         </span>
@@ -1903,12 +2600,21 @@ export function AnalyzeFlowClient({
                 {/* The halo is what keeps a 1px line readable on dark asphalt; the ink keeps
                     it readable on a white kerb. Neither works alone. */}
                 <span
-                  className="pointer-events-none absolute inset-y-0 w-px bg-primary-ink/80 shadow-[0_0_0_1px_rgba(255,255,255,0.45)]"
+                  className="pointer-events-none absolute inset-y-0 w-px bg-primary shadow-[0_0_0_1px_rgba(0,0,0,0.55)]"
                   style={{ left: `${x * 100}%` }}
                 />
                 <span
-                  className="pointer-events-none absolute inset-x-0 h-px bg-primary-ink/80 shadow-[0_0_0_1px_rgba(255,255,255,0.45)]"
+                  className="pointer-events-none absolute inset-x-0 h-px bg-primary shadow-[0_0_0_1px_rgba(0,0,0,0.55)]"
                   style={{ top: `${y * 100}%` }}
+                />
+                <DrawLoupe
+                  videoRef={videoRef}
+                  boxW={overlayBox.w}
+                  boxH={overlayBox.h}
+                  cx={x}
+                  cy={y}
+                  line={l}
+                  sf={l.lineKey === "sf"}
                 />
               </>
             );
@@ -1925,9 +2631,12 @@ export function AnalyzeFlowClient({
               onPointerDown={(e) => {
                 e.preventDefault();
                 (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-                beginLineDrag(idx, end);
+                // Whichever end is closest to the press wins, not whichever target happens to
+                // be on top — crossing lines used to steal each other's ends.
+                const pick = nearestLineEnd(e.clientX, e.clientY) ?? { idx, end };
+                beginLineDrag(pick.idx, pick.end);
               }}
-              onPointerMove={(e) => dragLinePoint(e.clientX, e.clientY, idx, end)}
+              onPointerMove={(e) => dragLinePoint(e.clientX, e.clientY)}
               onPointerUp={() => endLineDrag()}
               onPointerCancel={() => endLineDrag()}
               // Big invisible grab area, tiny visible mark: you need a thumb-sized target and a
@@ -1936,14 +2645,19 @@ export function AnalyzeFlowClient({
               style={{
                 left: `${(end === 1 ? l.x1 : l.x2) * 100}%`,
                 top: `${(end === 1 ? l.y1 : l.y2) * 100}%`,
+                // The end in your hand stays on top, so a neighbour's target can't take the
+                // pointer back part-way through a drag.
+                zIndex: isActive ? 2 : 1,
               }}
             >
               <span
                 aria-hidden
                 className={cn(
-                  "block rounded-full ring-2 shadow-[0_0_0_1px_rgba(0,0,0,0.55)] transition-[height,width]",
-                  isActive ? "h-3.5 w-3.5 ring-primary" : "h-2.5 w-2.5 ring-background/90",
-                  l.lineKey === "sf" ? "bg-foreground" : "bg-primary-ink"
+                  // A grab point, not a blob: it marks where the end sits and must not hide the
+                  // track under it. The 44px button around it is what your thumb actually hits.
+                  "block rounded-full ring-1 shadow-[0_0_0_1px_rgba(0,0,0,0.6)] transition-[height,width]",
+                  isActive ? "h-2 w-2 ring-white/90" : "h-1.5 w-1.5 ring-black/50",
+                  l.lineKey === "sf" ? "bg-white" : "bg-primary"
                 )}
               />
             </button>
@@ -1955,7 +2669,7 @@ export function AnalyzeFlowClient({
 
   const stepRail = (
     <div className="flex gap-1.5">
-      {([1, 2, 3, 4, 5, 6] as Step[]).map((s) => (
+      {([1, 2, 3, 4, 5] as Step[]).map((s) => (
         <button
           key={s}
           type="button"
@@ -1981,6 +2695,46 @@ export function AnalyzeFlowClient({
     </div>
   );
 
+  /* One tap back onto the file that is already on this device. It sits beside the step's own
+     panel and NEVER inside `transport`: --vchrome there is a measured reserve, so a row added
+     to it is a row taken off the picture. `!draftLines` for the same reason as `canZoom` —
+     while an end is in your hand the step is drawing, not scrubbing. Shown only while the
+     player is on the uploaded copy, which is where the cost is; the tap that opens the file
+     also remembers it, so the next visit is "Reopen". */
+  const localFileButton =
+    isVideoStep && !draftLines && playingUploadedCopy ? (
+      <div className="space-y-1.5">
+        <button
+          type="button"
+          onClick={() => {
+            if (local.rememberedName) void local.reopenRemembered();
+            else if (local.canRemember) void local.pickWithPicker();
+            else videoStepFileInputRef.current?.click();
+          }}
+          className="flex w-full items-center gap-2 rounded-lg border border-border bg-secondary px-3 py-2 text-[11.5px] font-semibold text-muted-foreground hover:text-foreground"
+        >
+          <Film className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          {local.rememberedName
+            ? `Reopen ${local.rememberedName.length > 18 ? "video" : local.rememberedName}`
+            : "Open from this device"}
+        </button>
+        {local.error ? (
+          <p className="text-[11px] leading-snug text-destructive">{local.error}</p>
+        ) : null}
+        <input
+          ref={videoStepFileInputRef}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) local.attachFile(f);
+            e.target.value = "";
+          }}
+        />
+      </div>
+    ) : null;
+
   const transport = (
     // --vchrome: everything else on screen (app bar, page header, step rail, the controls
     // below). Measured, not guessed — see e2e/analyze-lines-layout.spec.ts.
@@ -1993,44 +2747,63 @@ export function AnalyzeFlowClient({
         // shorter than the aspect ratio it was given, so the picture letterboxed by ~1px a side
         // and the lines — normalised to the box — landed ~2 source pixels off at the edges.
         className="relative overflow-hidden rounded-xl bg-black ring-1 ring-inset ring-border"
-        style={{ aspectRatio: String(frameAspect) }}
+        style={{
+          aspectRatio: String(frameAspect),
+          // Only once magnified: at fit size the picture must not eat a page scroll.
+          touchAction: zoomView.z > 1 ? "none" : undefined,
+        }}
+        onPointerDown={canZoom ? zoomPointerDown : undefined}
+        onPointerMove={canZoom ? zoomPointerMove : undefined}
+        onPointerUp={canZoom ? zoomPointerUp : undefined}
+        onPointerCancel={canZoom ? () => (zoomDragRef.current = null) : undefined}
       >
-        <video
-          ref={videoRef}
-          src={videoSrc ?? undefined}
-          muted
-          playsInline
-          preload="auto"
-          className="absolute inset-0 h-full w-full object-contain"
-          onError={(e) => {
-            // Without this a file the browser can't open is just a black box on
-            // a black panel — no message, nothing to act on.
-            setVideoError(describeVideoError(e.currentTarget));
+        {/* Picture and lines magnify together. The lines are fractions of the frame, so one
+            transform over both leaves every line exactly where it was drawn. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            transform: `translate(${zoomView.tx * 100}%, ${zoomView.ty * 100}%) scale(${zoomView.z})`,
+            transformOrigin: "0 0",
           }}
-          // loadedmetadata is not always the moment the size is known: WebKit can report 0×0
-          // there and fire `resize` when it arrives. Every event that can carry it feeds the
-          // same reader, which ignores 0×0.
-          onResize={(e) => readVideoDims(e.currentTarget)}
-          onLoadedData={(e) => readVideoDims(e.currentTarget)}
-          onLoadedMetadata={(e) => {
-            // A dropped video track raises NO error and still reports readyState 4,
-            // so the black-picture case has to be caught here, by size.
-            setVideoError(diagnoseMissingPicture(e.currentTarget)?.message ?? null);
-            setDuration(e.currentTarget.duration || 0);
-            readVideoDims(e.currentTarget);
-            if (coarseElRef.current) {
-              coarseElRef.current.max = String(Math.max(e.currentTarget.duration || 0, 0.01));
-            }
-            if (lastSeekRef.current > 0) requestSeek(lastSeekRef.current);
-            else syncTransportUi(0);
-          }}
-          onSeeked={onVideoSeeked}
-          onTimeUpdate={(e) => {
-            // Playback progress only — scrubbing paints through syncTransportUi.
-            if (!seekTargetRef.current) syncTransportUi(e.currentTarget.currentTime);
-          }}
-          onClick={togglePlay}
-        />
+        >
+          <video
+            ref={videoRef}
+            src={videoSrc ?? undefined}
+            muted
+            playsInline
+            preload="auto"
+            className="absolute inset-0 h-full w-full object-contain"
+            onError={(e) => {
+              // Without this a file the browser can't open is just a black box on
+              // a black panel — no message, nothing to act on.
+              setVideoError(describeVideoError(e.currentTarget));
+            }}
+            // loadedmetadata is not always the moment the size is known: WebKit can report 0×0
+            // there and fire `resize` when it arrives. Every event that can carry it feeds the
+            // same reader, which ignores 0×0.
+            onResize={(e) => readVideoDims(e.currentTarget)}
+            onLoadedData={(e) => readVideoDims(e.currentTarget)}
+            onLoadedMetadata={(e) => {
+              // A dropped video track raises NO error and still reports readyState 4,
+              // so the black-picture case has to be caught here, by size.
+              setVideoError(diagnoseMissingPicture(e.currentTarget)?.message ?? null);
+              setDuration(e.currentTarget.duration || 0);
+              readVideoDims(e.currentTarget);
+              if (coarseElRef.current) {
+                coarseElRef.current.max = String(Math.max(e.currentTarget.duration || 0, 0.01));
+              }
+              if (lastSeekRef.current > 0) requestSeek(lastSeekRef.current);
+              else syncTransportUi(0);
+            }}
+            onSeeked={onVideoSeeked}
+            onTimeUpdate={(e) => {
+              // Playback progress only — scrubbing paints through syncTransportUi.
+              if (!seekTargetRef.current) syncTransportUi(e.currentTarget.currentTime);
+            }}
+            onClick={canZoom ? undefined : togglePlay}
+          />
+          {lineOverlay}
+        </div>
         <span
           ref={timecodeElRef}
           className="pointer-events-none absolute bottom-2 left-2 rounded bg-background/70 px-2 py-0.5 text-[12px] tabular-nums text-foreground backdrop-blur-sm"
@@ -2045,7 +2818,15 @@ export function AnalyzeFlowClient({
         >
           {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="ml-0.5 h-3.5 w-3.5" />}
         </button>
-        {lineOverlay}
+        {zoomView.z > 1 ? (
+          <button
+            type="button"
+            onClick={() => setZoomView({ z: 1, tx: 0, ty: 0 })}
+            className="absolute right-2 top-2 rounded-full bg-background/70 px-2 py-0.5 tabular-nums text-[11px] font-semibold text-foreground backdrop-blur-sm"
+          >
+            {zoomView.z}× · Fit
+          </button>
+        ) : null}
       </div>
 
       {videoError ? (
@@ -2082,15 +2863,13 @@ export function AnalyzeFlowClient({
   return (
     <div
       className={cn(
-        "mx-auto flex w-full flex-col",
-        // On the video steps the picture is the work — let it have the whole window, tighten
-        // the chrome around it, and clamp it by height instead (see `frameMaxWidth`).
-        isVideoStep
-          ? "max-w-md gap-2.5 pb-4 lg:max-w-none"
-          : step === 6
-            ? // The compare is the work now: big player beside the cards, page-wide.
-              "max-w-md gap-4 pb-10 lg:max-w-none"
-            : "max-w-md gap-4 pb-10"
+        // A phone's measure on a phone; the whole page on a desktop, on every step. Set up used
+        // to keep the phone column at any width, which on a monitor was a strip down the middle
+        // (founder call 2026-09-02: every page of the flow takes the whole desktop).
+        "mx-auto flex w-full max-w-md flex-col lg:max-w-none",
+        // On the video steps the picture is the work — tighten the chrome around it, and clamp
+        // it by height instead (see `frameMaxWidth`).
+        isVideoStep ? "gap-2.5 pb-4" : "gap-4 pb-10"
       )}
     >
       {/* header + step rail — one strip on desktop, two rows on a phone. The rail is rendered
@@ -2116,138 +2895,172 @@ export function AnalyzeFlowClient({
 
       {msg ? <p className="text-[11.5px] leading-relaxed text-muted-foreground">{msg}</p> : null}
 
-      {/* ---------- STEP 1: video ---------- */}
-      {step === 1 ? (
-        <div className="space-y-3">
-          <div>
-            <h2 className="text-[16px] font-bold tracking-tight">Pick the video</h2>
-            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              Straight from your camera roll — nothing uploads unless you save it.
-            </p>
-          </div>
-          <label className="flex w-full cursor-pointer flex-col items-center gap-2 rounded-2xl border-[1.5px] border-dashed border-foreground/20 bg-secondary px-4 py-7 text-[13px] font-semibold">
-            <Film className="h-6 w-6 text-muted-foreground" aria-hidden />
-            Choose from camera roll
-            {session?.localVideoName ? (
-              <span className="text-[11px] font-normal text-faint">
-                {session.localVideoName} was used last time — pick it again to relink
-              </span>
-            ) : null}
-            <input
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={(e) => setVideoFile(e.target.files?.[0] ?? null)}
-            />
-          </label>
-          {library.length > 0 ? (
-            <div className="space-y-1.5">
-              <span className="type-data-label">From library</span>
-              {library.slice(0, 5).map((v) => (
-                <button
-                  key={v.id}
-                  type="button"
-                  onClick={() => void pickLibraryAsset(v)}
-                  className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-secondary/60 px-3 py-2.5 text-left"
-                >
-                  <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+      {/* ---------- STEP 1: set up — the video and the timing, side by side ----------
+          Two steps until 2026-09-02 ("Video", "Timing"), each a phone column on a monitor with
+          the rest of the window empty. One screen: what is being analysed, and whose laps. */}
+      {step === STEP.setup && session ? (
+        <div className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
+            <section className="space-y-3 rounded-xl border border-border bg-card p-4">
+              <h2 className="text-[16px] font-bold tracking-tight">Video</h2>
+              {videoSrc ? (
+                <div className="flex items-center gap-2.5 rounded-lg border border-border bg-secondary/60 px-3 py-2.5">
+                  <Film className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                   <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold">
-                    {v.label?.trim() || v.originalFilename}
+                    {pickedFile?.name ?? session.localVideoName ?? "Video"}
                   </span>
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-primary-ink" aria-hidden />
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {/* ---------- STEP 2: timing ---------- */}
-      {step === 2 && session ? (
-        <div className="space-y-3">
-          <div>
-            <h2 className="text-[16px] font-bold tracking-tight">Where do lap times come from?</h2>
-            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              Sector marks get their lap structure from real timing.
-            </p>
-          </div>
-
-          {data.job.runId ? (
-            <button
-              type="button"
-              disabled={timingLoading}
-              onClick={() => void loadRunTiming()}
-              className="flex w-full items-center gap-3 rounded-xl border border-primary-ink/50 bg-primary/5 px-3.5 py-3 text-left disabled:opacity-60"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block text-[13px] font-semibold">This run&apos;s laps</span>
-                <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                  {timingLoading ? "Loading…" : "Imported timing from the linked run"}
-                </span>
-              </span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-primary-ink" aria-hidden />
-            </button>
-          ) : null}
-
-          <button
-            type="button"
-            onClick={() => setUrlLaneOpen((v) => !v)}
-            className="w-full rounded-xl border border-border bg-secondary px-3.5 py-3 text-left text-[13px] font-semibold"
-          >
-            Paste LiveRC URL{data.job.runId ? " instead" : ""}
-          </button>
-          {urlLaneOpen || !data.job.runId ? (
-            <div className="space-y-2">
-              <textarea
-                value={timingUrls}
-                onChange={(e) => setTimingUrls(e.target.value)}
-                rows={3}
-                placeholder="https://…liverc… (one per line)"
-                className="w-full rounded-lg border border-border bg-secondary p-2.5 tabular-nums text-[11px] text-foreground"
-              />
-              <button
-                type="button"
-                disabled={timingLoading}
-                onClick={() => void loadUrlTiming()}
-                className="rounded-lg primary-face bg-primary px-3.5 py-2 text-[12px] font-semibold text-primary-foreground disabled:opacity-60"
-              >
-                {timingLoading ? "Loading…" : "Load laps"}
-              </button>
-            </div>
-          ) : null}
-
-          {meDriver ? (
-            <div className="space-y-2 border-t border-border pt-3">
-              <span className="type-data-label">Your laps to analyze (best 3 pre-selected)</span>
-              <div className="flex flex-wrap gap-1.5">
-                {realLaps([...meDriver.laps])
-                  .sort((a, b) => a.lapTimeSec - b.lapTimeSec)
-                  .slice(0, 10)
-                  .map((l) => (
+                  <label className="shrink-0 cursor-pointer rounded-md border border-border bg-secondary px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground">
+                    Change
+                    <input
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        // A cancelled dialog hands back no file; the one on screen stays.
+                        const f = e.target.files?.[0] ?? null;
+                        if (f) setVideoFile(f);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
+              ) : (
+                <label className="flex w-full cursor-pointer flex-col items-center gap-2 rounded-2xl border-[1.5px] border-dashed border-foreground/20 bg-secondary px-4 py-7 text-[13px] font-semibold">
+                  <Film className="h-6 w-6 text-muted-foreground" aria-hidden />
+                  Choose from camera roll
+                  {session.localVideoName ? (
+                    <span className="text-[11px] font-normal text-faint">
+                      {session.localVideoName} last time
+                    </span>
+                  ) : null}
+                  <input
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={(e) => setVideoFile(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+              )}
+              {library.length > 0 ? (
+                <div className="space-y-1.5">
+                  <span className="type-data-label">From library</span>
+                  {library.slice(0, 5).map((v) => (
                     <button
-                      key={l.lapNumber}
+                      key={v.id}
                       type="button"
-                      onClick={() => toggleSelectedLap("me", l.lapNumber)}
-                      className={cn(
-                        chipToggleClass(session.selectedLaps.me.includes(l.lapNumber)),
-                        "px-2.5 py-1.5 text-[11px] tabular-nums"
-                      )}
+                      onClick={() => void pickLibraryAsset(v)}
+                      className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-secondary/60 px-3 py-2.5 text-left"
                     >
-                      L{l.lapNumber} · {l.lapTimeSec.toFixed(3)}
+                      <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                      <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold">
+                        {v.label?.trim() || v.originalFilename}
+                      </span>
+                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-primary-ink" aria-hidden />
                     </button>
                   ))}
+                </div>
+              ) : null}
+            </section>
+
+            <section className="space-y-3 rounded-xl border border-border bg-card p-4">
+              <h2 className="text-[16px] font-bold tracking-tight">Timing</h2>
+
+              {data.job.runId ? (
+                <button
+                  type="button"
+                  disabled={timingLoading}
+                  onClick={() => void loadRunTiming()}
+                  className="flex w-full items-center gap-3 rounded-xl border border-primary-ink/50 bg-primary/5 px-3.5 py-3 text-left disabled:opacity-60"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-semibold">This run&apos;s laps</span>
+                    <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                      {timingLoading ? "Loading…" : "Imported timing from the linked run"}
+                    </span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-primary-ink" aria-hidden />
+                </button>
+              ) : null}
+
+              {/* The lane is always open under its own heading. It used to hide behind a button
+                  reading "Paste LiveRC URL", which looked like the thing to press to paste. */}
+              <div className="space-y-2">
+                <span className="type-data-label">
+                  {data.job.runId ? "Or paste a LiveRC link" : "Paste a LiveRC link"}
+                </span>
+                {roster.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {roster.map((p) => (
+                      <span
+                        key={p.role}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary py-1 pl-2.5 pr-1 text-[11px]"
+                      >
+                        <span className="font-semibold">{p.driver.driverName}</span>
+                        <span className="tabular-nums text-muted-foreground">
+                          {p.role === "me" ? "You" : `${realLaps([...p.driver.laps]).length} laps`}
+                        </span>
+                        {/* The first link pasted is "you" until somebody says otherwise. */}
+                        {p.role !== "me" ? (
+                          <button
+                            type="button"
+                            onClick={() => makeMe(p.role)}
+                            className="rounded-full border border-border bg-background px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground"
+                          >
+                            That&apos;s me
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => dropParticipant(p.role)}
+                          aria-label={`Remove ${p.driver.driverName}`}
+                          className="rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-3 w-3" aria-hidden />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                <div className="flex gap-1.5">
+                  <input
+                    value={timingUrls}
+                    onChange={(e) => setTimingUrls(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void addTimingUrl();
+                      }
+                    }}
+                    inputMode="url"
+                    placeholder={roster.length ? "Another driver's link" : "https://…liverc…"}
+                    className="min-w-0 flex-1 rounded-lg border border-border bg-secondary p-2.5 text-[11px] text-foreground"
+                  />
+                  <button
+                    type="button"
+                    disabled={timingLoading || !timingUrls.trim()}
+                    onClick={() => void addTimingUrl()}
+                    aria-label="Add this driver"
+                    className="shrink-0 rounded-lg primary-face bg-primary px-3 py-2 text-primary-foreground disabled:opacity-60"
+                  >
+                    {timingLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    ) : (
+                      <Plus className="h-4 w-4" aria-hidden />
+                    )}
+                  </button>
+                </div>
               </div>
-              {(primary?.drivers.length ?? 0) > 1 ? (
+
+              {/* A race link brings the whole heat: say who the sectors are measured against. A
+                  practice link is one person, so there is nothing to pick. */}
+              {meDriver && (primary?.drivers.length ?? 0) > 1 ? (
                 <div className="space-y-1.5 border-t border-border pt-3">
-                  <span className="type-data-label">Compare against (optional)</span>
+                  <span className="type-data-label">Compare against</span>
                   <div className="flex flex-wrap gap-1.5">
                     <button
                       type="button"
                       onClick={() => chooseRival("")}
-                      className={cn(
-                        chipToggleClass(!compDriver),
-                        "px-2.5 py-1.5 text-[11px]"
-                      )}
+                      className={cn(chipToggleClass(!compDriver), "px-2.5 py-1.5 text-[11px]")}
                     >
                       Nobody
                     </button>
@@ -2269,43 +3082,19 @@ export function AnalyzeFlowClient({
                   </div>
                 </div>
               ) : null}
+            </section>
+          </div>
 
-              {compDriver ? (
-                <>
-                  <span className="type-data-label">{compDriver.driverName}&apos;s laps (optional)</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {realLaps([...compDriver.laps])
-                      .sort((a, b) => a.lapTimeSec - b.lapTimeSec)
-                      .slice(0, 6)
-                      .map((l) => (
-                        <button
-                          key={l.lapNumber}
-                          type="button"
-                          onClick={() => toggleSelectedLap("competitor", l.lapNumber)}
-                          className={cn(
-                            chipToggleClass(session.selectedLaps.competitor.includes(l.lapNumber)),
-                        "px-2.5 py-1.5 text-[11px] tabular-nums"
-                          )}
-                        >
-                          L{l.lapNumber} · {l.lapTimeSec.toFixed(3)}
-                        </button>
-                      ))}
-                  </div>
-                </>
-              ) : null}
-              <button
-                type="button"
-                disabled={session.selectedLaps.me.length === 0}
-                onClick={() => setStep(3)}
-                className="w-full rounded-xl primary-face bg-primary py-3.5 text-[13px] font-semibold text-primary-foreground disabled:opacity-50"
-              >
-                Continue
-              </button>
-            </div>
-          ) : null}
+          <button
+            type="button"
+            disabled={!videoSrc || !meDriver}
+            onClick={() => setStep(STEP.lines)}
+            className="w-full rounded-xl primary-face bg-primary py-3.5 text-[13px] font-semibold text-primary-foreground disabled:opacity-50 lg:w-auto lg:min-w-[16rem] lg:px-12"
+          >
+            Continue
+          </button>
         </div>
       ) : null}
-
       {/* ---------- STEP 4: sync ---------- */}
       {/* ---------- one player for every video step ----------
           The player used to be rendered inside each step's own branch (Lines, the line editor,
@@ -2318,8 +3107,8 @@ export function AnalyzeFlowClient({
           is showing. */}
       {session && isVideoStep ? (
         <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-4 lg:items-start">
-          <div className={cn("lg:sticky lg:top-4", step === 5 && !draftLines && "space-y-2.5")}>
-            {step === 5 && !draftLines && markQueue[markCursor] ? (
+          <div className={cn("lg:sticky lg:top-4", step === STEP.scan && !draftLines && "space-y-2.5")}>
+            {step === STEP.scan && !draftLines && markQueue[markCursor] ? (
               <p className="micro-caps text-primary-ink">
                 L{markQueue[markCursor]!.lapNumber} · {markQueue[markCursor]!.label} line
               </p>
@@ -2327,53 +3116,76 @@ export function AnalyzeFlowClient({
             {transport}
           </div>
           <div className="mt-4 space-y-3 lg:mt-0">
-      {step === 4 ? (
+            {localFileButton}
+      {step === STEP.sync ? (
         <>
-          <div>
-            <h2 className="text-[16px] font-bold tracking-tight">Sync the laps</h2>
-            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              Scrub to your car going over the start/finish line, pick{" "}
-              <span className="font-semibold text-foreground">which time over the line</span>{" "}
-              that is, and set it. The first time is usually the easiest to spot. Every lap then
-              syncs from the timing — you only do this once.
-            </p>
-          </div>
+          <h2 className="text-[16px] font-bold tracking-tight">Sync</h2>
           {lineSetButton}
 
-          {compDriver ? (
+          {roster.length > 1 ? (
             <div className="space-y-1.5">
               <span className="type-data-label">Whose crossing are you watching?</span>
-              <div className="flex gap-1.5">
-                {(["me", "competitor"] as const).map((role) => (
+              <div className="flex flex-wrap gap-1.5">
+                {roster.map((p) => (
                   <button
-                    key={role}
+                    key={p.role}
                     type="button"
-                    onClick={() => setAnchorRole(role)}
+                    onClick={() => setAnchorRole(p.role)}
                     className={cn(
-                      chipToggleClass(anchorRole === role),
+                      chipToggleClass(anchorRole === p.role),
                       "px-3 py-2 text-[11.5px]"
                     )}
                   >
-                    {role === "me" ? "You" : compDriver.driverName}
-                    {hasOwnAnchor(primary?.sync ?? {}, role) ? (
+                    {p.role === "me" ? "You" : p.driver.driverName}
+                    {hasOwnAnchor(p.timingSession.sync, p.role) ? (
                       <span className="ml-1.5 text-[8px] tracking-[0.12em] text-gain">SET</span>
                     ) : null}
                   </button>
                 ))}
               </div>
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                {anchorRole === "me"
-                  ? "Yours also places the rest of the field, as long as you all started together."
-                  : `Set this when you can see ${compDriver.driverName} cross the line — it places their laps on their own, instead of assuming you both started at the same moment.`}
-              </p>
             </div>
+          ) : null}
+
+          {/* Everyone still to place — placed from the timing clock and the start line where the
+              file's date allows it, from their lap times otherwise; never by asking the driver
+              to pick a stranger's car out of the footage. */}
+          {toPlace.length > 0 ? (
+            <div className="space-y-2 rounded-xl border border-border bg-secondary/40 px-3 py-2.5">
+              <span className="type-data-label">
+                {toPlace.map((p) => (p.role === "me" ? "You" : p.driver.driverName)).join(", ")} still to place
+              </span>
+              <button
+                type="button"
+                disabled={findState === "running" || !videoSrc}
+                onClick={() => void findAddedDrivers()}
+                className="w-full rounded-lg primary-face bg-primary py-2.5 text-[12.5px] font-semibold text-primary-foreground disabled:opacity-60"
+              >
+                {findState === "running" ? "Watching the start line…" : "Find them on the video"}
+              </button>
+              {/* No percentage: the sweep runs in passes and stops the moment everyone is
+                  placed, so a bar would restart and then vanish part-filled. */}
+              {findState === "running" && autoProgress ? (
+                <p className="text-[11px] text-muted-foreground">{autoProgress.note}</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {findOutcomes?.length ? (
+            <ul className="space-y-1">
+              {findOutcomes.map((o) => (
+                <li key={o.role} className="text-[11.5px] leading-relaxed">
+                  <span className="font-semibold">{o.name}</span>{" "}
+                  <span className={o.found ? "text-gain" : "text-muted-foreground"}>{o.note}</span>
+                </li>
+              ))}
+            </ul>
           ) : null}
 
           <div className="space-y-1.5">
             <span className="type-data-label">
               {anchorRole === "me"
                 ? "Which time over the line is this?"
-                : `Which of ${compDriver?.driverName ?? "their"} crossings is this?`}
+                : `Which of ${anchorDriver?.driverName ?? "their"} crossings is this?`}
             </span>
             <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
               {crossings.map((c) => (
@@ -2396,29 +3208,70 @@ export function AnalyzeFlowClient({
               ))}
             </div>
           </div>
-          <button
-            type="button"
-            disabled={anchorCrossing == null || !videoSrc}
-            onClick={setAnchorAtPlayhead}
-            className={cn(
-              "w-full rounded-xl py-3.5 text-[13px] font-bold disabled:opacity-50",
-              anchored
-                ? "border border-border bg-secondary text-foreground"
-                : "primary-face bg-primary text-primary-foreground"
-            )}
-          >
-            {hasOwnAnchor(primary?.sync ?? {}, anchorRole)
-              ? `Move ${anchorRole === "me" ? "your" : "their"} anchor to this frame (${anchorCrossing != null ? ordinal(anchorCrossing) : "?"} crossing)`
-              : `Set ${anchorRole === "me" ? "your" : "their"} ${anchorCrossing != null ? ordinal(anchorCrossing) : "?"} crossing here`}
-          </button>
+          {/* One button with one name. It used to change to "Move your anchor to this frame"
+              once pressed, which read as a second, different job ("I don't understand why that
+              appears after you click", 2026-09-02). Pressing it again simply sets it again; the
+              line under it says what is set. */}
+          {(() => {
+            const sync = anchorParticipant?.timingSession.sync ?? {};
+            const own = hasOwnAnchor(sync, anchorRole);
+            const at = sync.anchorByRole?.[anchorRole] ?? (anchorRole === "me" ? sync.anchor : undefined);
+            const atIndex = at
+              ? crossings.find((c) => c.lapNumber === at.lapNumber && c.anchorKind === at.anchorKind)?.index
+              : undefined;
+            return (
+              <>
+                <button
+                  type="button"
+                  disabled={anchorCrossing == null || !videoSrc}
+                  onClick={setAnchorAtPlayhead}
+                  className={cn(
+                    "w-full rounded-xl py-3.5 text-[13px] font-bold disabled:opacity-50",
+                    own
+                      ? "border border-border bg-secondary text-foreground"
+                      : "primary-face bg-primary text-primary-foreground"
+                  )}
+                >
+                  {anchorRole === "me"
+                    ? "My car is on the line here"
+                    : `${anchorDriver?.driverName ?? "Their"}'s car is on the line here`}
+                </button>
+                {own && at ? (
+                  <p className="text-[11px] tabular-nums text-muted-foreground">
+                    Set · {atIndex != null ? `${ordinal(atIndex)} crossing` : `lap ${at.lapNumber}`} at{" "}
+                    {fmtClock(at.videoTimeSec)}
+                  </p>
+                ) : null}
+                {clockDisagreement && anchorParticipant ? (
+                  <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-2">
+                    <span className="text-[11.5px] tabular-nums">
+                      Timing clock:{" "}
+                      {clockDisagreement.index != null
+                        ? `${ordinal(clockDisagreement.index)} crossing`
+                        : "that crossing"}{" "}
+                      at {fmtClock(clockDisagreement.predictedSec)}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={findState === "running" || !videoSrc}
+                      onClick={() => void findAddedDrivers([anchorParticipant])}
+                      className="shrink-0 rounded-lg border border-border bg-secondary px-3 py-1.5 text-[11.5px] font-semibold text-foreground disabled:opacity-60"
+                    >
+                      {findState === "running" ? "Checking…" : "Use the clock"}
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            );
+          })()}
           {anchored ? (
             <>
               <button
                 type="button"
-                onClick={() => setStep(5)}
+                onClick={() => setStep(STEP.scan)}
                 className="w-full rounded-xl primary-face bg-primary py-3.5 text-[13px] font-semibold text-primary-foreground"
               >
-                Continue to marking
+                Continue to scan
               </button>
               <details className="rounded-lg border border-border bg-secondary/40 px-3 py-2">
                 <summary className="cursor-pointer text-[11.5px] font-semibold text-muted-foreground">
@@ -2567,7 +3420,7 @@ export function AnalyzeFlowClient({
       ) : null}
 
       {/* ---------- STEP 3: line sets ---------- */}
-      {step === 3 && !draftLines ? (
+      {step === STEP.lines && !draftLines ? (
         <>
           <div>
             <h2 className="text-[16px] font-bold tracking-tight">Which sector lines?</h2>
@@ -2653,7 +3506,7 @@ export function AnalyzeFlowClient({
               </button>
               <button
                 type="button"
-                onClick={() => setStep(anchored ? 6 : 4)}
+                onClick={() => setStep(anchored ? STEP.compare : STEP.sync)}
                 className="w-full rounded-lg border border-border bg-secondary py-2.5 text-[12px] font-semibold text-muted-foreground"
               >
                 Skip — whole-lap compare only
@@ -2670,46 +3523,25 @@ export function AnalyzeFlowClient({
               </button>
               <button
                 type="button"
-                onClick={() => setStep(anchored ? 5 : 4)}
+                onClick={() => setStep(anchored ? STEP.scan : STEP.sync)}
                 className="flex-1 rounded-xl primary-face bg-primary py-3 text-[13px] font-semibold text-primary-foreground"
               >
-                {anchored ? "Continue to marking" : "Continue to sync"}
+                {anchored ? "Continue to scan" : "Continue to sync"}
               </button>
             </div>
           )}
         </>
       ) : null}
 
-      {step === 5 && !draftLines && nonSfLines.length > 0 ? (
+      {/* ---------- STEP 4: scan ----------
+          "Mark" until 2026-09-02, with Skip / Mark crossing buttons and a hand-marking queue at
+          the top. The detector does the marking now; the one button here is the scan. */}
+      {step === STEP.scan && !draftLines && nonSfLines.length > 0 ? (
         <>
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h2 className="text-[16px] font-bold tracking-tight">Mark sector crossings</h2>
-              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                Start/finish is already synced. The video jumps near each corner crossing —
-                fine-tune and confirm.
-              </p>
-            </div>
-          </div>
+          <h2 className="text-[16px] font-bold tracking-tight">Scan</h2>
           {lineSetButton}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => advanceCursor(markCursor)}
-              className="rounded-xl border border-border bg-secondary px-4 py-3.5 text-[12.5px] font-semibold text-muted-foreground"
-            >
-              Skip
-            </button>
-            <button
-              type="button"
-              onClick={confirmMark}
-              className="flex-1 rounded-xl primary-face bg-primary py-3.5 text-[13px] font-semibold text-primary-foreground"
-            >
-              {markCursor >= markQueue.length ? "Finish →" : "Mark crossing"}
-            </button>
-          </div>
 
-          {/* Find the rest — the detector reads the video and fills in every unmarked corner. */}
+          {/* The detector reads the video and fills in every corner. */}
           <div className="rounded-xl border border-border bg-secondary/50 p-3">
             {autoState === "running" || autoState === "learning" || autoState === "identifying" ? (
               <div className="space-y-2">
@@ -2821,7 +3653,7 @@ export function AnalyzeFlowClient({
                       Couldn&rsquo;t follow {role === "me" ? "your" : `${compDriver?.driverName ?? "their"}'s`} car at{" "}
                       {lost.filter((e) => e.role === role).map((e) => e.lineKey.toUpperCase()).join(", ")} — nothing
                       there repeats lap to lap against {role === "me" ? "your" : "their"} timing. That is usually the wrong car
-                      tapped at the picker; run &ldquo;Show me the cars&rdquo; again for {role === "me" ? "yourself" : "them"}.
+                      tapped at the picker — run the scan again and tap {role === "me" ? "yours" : "theirs"}.
                     </p>
                   ));
                 })()}
@@ -2873,17 +3705,9 @@ export function AnalyzeFlowClient({
                     ? "Which one is your car?"
                     : `Which one is ${compDriver?.driverName ?? "theirs"}?`}
                 </span>
-                <p className="text-[12px] leading-relaxed text-foreground">
-                  Every car that crossed each line on lap {identify.lapNumber}. Tap{" "}
-                  {identifyRole === "me" ? "yours" : "theirs"} — the video jumps there so you can
-                  check it.
-                  {identify.lapsChecked > 0
-                    ? ` Each car was looked for again on ${identify.lapsChecked} more of ${identifyRole === "me" ? "your" : "their"} laps, where every driver's timing said it would be. Cars that keep step with somebody else, cross where nobody in the field does, come out of track order, or sit beside the line rather than across it are folded away — and where one car kept step with ${identifyRole === "me" ? "you" : "them"} on nearly every lap, or is the only one left where the field crosses, it is picked for you.`
-                    : ""}
-                  {identify.lines.some((l) => l.options.some((o) => o.hint))
-                    ? ` “Different colour” means it is not the colour of the car the timing put at the start line on ${identifyRole === "me" ? "your" : "their"} laps.`
-                    : ""}
-                </p>
+                {/* The heading is the whole instruction. Every sentence that used to sit here
+                    described how the search works, which the driver never has to know to tap a
+                    car — see the standing rule in CLAUDE.md. */}
                 {/* Read nothing and found nothing are opposite faults with opposite fixes, and
                     without this number the screen cannot tell them apart. */}
                 <p className="micro-caps text-faint">
@@ -3148,42 +3972,21 @@ export function AnalyzeFlowClient({
               </div>
             ) : (
               <div className="space-y-2">
+                {/* The one action on the step, so it wears the yellow. The picker ("which one is
+                    your car?") still opens on its own when two cars keep the same rhythm — the
+                    button that asked for it up front came off with the paragraphs. */}
                 <button
                   type="button"
                   disabled={!autoReady}
                   onClick={runFindCrossings}
-                  className="w-full rounded-lg border border-border bg-secondary py-2.5 text-[12.5px] font-semibold text-foreground disabled:opacity-50"
+                  className="w-full rounded-xl primary-face bg-primary py-3.5 text-[13px] font-semibold text-primary-foreground disabled:opacity-50"
                 >
                   Find every crossing
                 </button>
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  {!videoSrc
-                    ? "Pick the video first."
-                    : autoReady
-                      ? `Reads your quickest ${SCAN_LAP_COUNT} laps, works out where the corners are, and fills them all in. Nothing needs marking.`
-                      : "Draw the sector lines first."}
-                </p>
-                <button
-                  type="button"
-                  disabled={!autoReady}
-                  onClick={() => void runIdentify("me")}
-                  className="w-full rounded-lg border border-border bg-secondary py-2.5 text-[12.5px] font-semibold text-foreground disabled:opacity-50"
-                >
-                  Show me the cars and I&apos;ll point at mine
-                </button>
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Reads one lap and shows a picture of every car crossing each line. Slower, and
-                  the only thing that settles it when several cars run together.
-                </p>
-                {compDriver ? (
-                  <button
-                    type="button"
-                    disabled={!autoReady}
-                    onClick={() => void runIdentify("competitor")}
-                    className="w-full rounded-lg border border-border bg-secondary py-2 text-[11.5px] font-semibold text-muted-foreground disabled:opacity-50"
-                  >
-                    Do the same for {compDriver.driverName}
-                  </button>
+                {!videoSrc ? (
+                  <p className="text-[11px] text-muted-foreground">Pick the video first.</p>
+                ) : !autoReady ? (
+                  <p className="text-[11px] text-muted-foreground">Draw the sector lines first.</p>
                 ) : null}
                 {autoError ? (
                   <p className="text-[11.5px] leading-relaxed text-loss">{autoError}</p>
@@ -3192,8 +3995,13 @@ export function AnalyzeFlowClient({
             )}
           </div>
 
-          {/* progress */}
-          <div className="overflow-x-auto rounded-xl border border-border bg-secondary/50 p-2.5">
+          {/* What was found, lap by lap — folded away, because it is a check rather than a
+              job: every dot is a crossing the scan wrote, a tap jumps the picture to it. */}
+          <details className="rounded-xl border border-border bg-secondary/50 px-2.5 py-2">
+            <summary className="cursor-pointer text-[11.5px] font-semibold tabular-nums text-muted-foreground">
+              Crossings · {markQueue.filter((t) => markFor(t) != null).length} of {markQueue.length}
+            </summary>
+            <div className="overflow-x-auto pt-2">
             <table className="w-full border-collapse">
               <thead>
                 <tr>
@@ -3213,7 +4021,8 @@ export function AnalyzeFlowClient({
                   return (
                     <tr key={key}>
                       <td className="py-1 pr-2 tabular-nums text-[10px] text-muted-foreground">
-                        {role === "competitor" ? "R·" : ""}L{lapNumber}
+                        {role === "me" ? "" : `${initialsOf(roster.find((p) => p.role === role)?.driver.driverName)}·`}
+                        L{lapNumber}
                       </td>
                       {cells.map((lineKey) => {
                         const idx = markQueue.findIndex(
@@ -3249,13 +4058,19 @@ export function AnalyzeFlowClient({
                 })}
               </tbody>
             </table>
-          </div>
+            </div>
+          </details>
           <button
             type="button"
-            onClick={() => setStep(6)}
-            className="w-full rounded-lg border border-border bg-secondary py-2.5 text-[12px] font-semibold text-muted-foreground"
+            onClick={() => setStep(STEP.compare)}
+            className={cn(
+              "w-full rounded-xl py-3.5 text-[13px] font-semibold",
+              hasAnalysis
+                ? "primary-face bg-primary text-primary-foreground"
+                : "border border-border bg-secondary text-muted-foreground"
+            )}
           >
-            Done marking
+            View analysis
           </button>
         </>
       ) : null}
@@ -3263,7 +4078,7 @@ export function AnalyzeFlowClient({
         </div>
       ) : null}
 
-      {step === 5 && session && !draftLines && nonSfLines.length === 0 ? (
+      {step === STEP.scan && session && !draftLines && nonSfLines.length === 0 ? (
         <div className="space-y-3">
           <div>
             <h2 className="text-[16px] font-bold tracking-tight">No sector lines here yet</h2>
@@ -3274,14 +4089,14 @@ export function AnalyzeFlowClient({
           </div>
           <button
             type="button"
-            onClick={() => setStep(3)}
+            onClick={() => setStep(STEP.lines)}
             className="w-full rounded-xl primary-face bg-primary py-3.5 text-[13px] font-semibold text-primary-foreground"
           >
             Back to line sets
           </button>
           <button
             type="button"
-            onClick={() => setStep(6)}
+            onClick={() => setStep(STEP.compare)}
             className="w-full rounded-lg border border-border bg-secondary py-2.5 text-[12px] font-semibold text-muted-foreground"
           >
             Skip — whole-lap compare only
@@ -3289,28 +4104,11 @@ export function AnalyzeFlowClient({
         </div>
       ) : null}
 
-      {/* ---------- STEP 6: done ---------- */}
-      {step === 6 && session && !draftLines ? (
+      {/* ---------- STEP 5: compare ----------
+          No heading: the rail says COMPARE and the board is the page. The "Done — the session
+          has it" line and its paragraph came off on 2026-09-02 with the rest of the blurbs. */}
+      {step === STEP.compare && session && !draftLines ? (
         <div className="space-y-3">
-          <div>
-            <h2 className="flex items-center gap-2 text-[16px] font-bold tracking-tight">
-              {resumedDone ? (
-                "Sector compare"
-              ) : (
-                <>
-                  <Check className="h-4 w-4 text-gain" aria-hidden />
-                  Done — the session has it
-                </>
-              )}
-            </h2>
-            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              {resumedDone
-                ? "Saved from last time — timing, lines, sync and every mark. Nothing to redo."
-                : data.job.runId
-                  ? "Deltas now live on this run's Video section, same place as every compare."
-                  : "The compare is below. To keep it with a run, log the run and start the analysis from its Video section."}
-            </p>
-          </div>
 
           {/* The footage stays on the device, so a reopened session has the numbers and no
               picture. Ask for the file HERE — the compare is already on screen — never by
@@ -3368,7 +4166,7 @@ export function AnalyzeFlowClient({
                     <button
                       key={v.id}
                       type="button"
-                      onClick={() => void pickLibraryAsset(v, { stay: true })}
+                      onClick={() => void pickLibraryAsset(v)}
                       className="inline-flex max-w-[14rem] items-center gap-1 rounded-md border border-border bg-secondary px-2 py-1 text-[11px] font-semibold hover:bg-muted"
                     >
                       <FolderOpen className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
@@ -3402,13 +4200,14 @@ export function AnalyzeFlowClient({
             </p>
           )}
 
-          {/* Page-wide on desktop the button would be a 1,700px yellow bar; it keeps a phone's measure. */}
+          {/* Quiet, not yellow: the board above is the work, and leaving it is not the action.
+              Page-wide on desktop it would be a 1,700px bar; it keeps a phone's measure. */}
           <div className="space-y-3 lg:max-w-md">
           <Link
             href={backHref}
-            className="block w-full rounded-xl primary-face bg-primary py-3.5 text-center text-[13px] font-semibold text-primary-foreground no-underline"
+            className="block w-full rounded-xl border border-border bg-secondary py-3 text-center text-[12.5px] font-semibold text-muted-foreground no-underline hover:text-foreground"
           >
-            {data.job.runId ? "Open in session" : "Back to Video tools"}
+            {data.job.runId ? "Open in session" : "Back to Video"}
           </Link>
 
           {pickedFile && uploadState !== "done" ? (

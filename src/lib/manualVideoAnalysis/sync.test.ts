@@ -330,9 +330,10 @@ if (compStartFromAnchor !== 100) {
   // Marks on another timing session do not count for this one.
   const elsewhere = { ...base, marks: oneLap.marks.map((m) => ({ ...m, sessionId: "q2" })) };
   if (hasMarkedLap(elsewhere, lines)) throw new Error("marks on q2 do not count for q1");
-  // A whole lap that is not a selected lap does not count either.
+  // Any lap of yours counts, chosen on the timing step or not — the scan picks its own ten
+  // (2026-09-02), so `selectedLaps` no longer decides what an analysis is.
   const unselected = { ...base, marks: [mark(1, "s1"), mark(1, "s2")] };
-  if (hasMarkedLap(unselected, lines)) throw new Error("lap 1 is not selected");
+  if (!hasMarkedLap(unselected, lines)) throw new Error("a whole lap counts whether or not it was ticked");
   // A session with no corner lines has nothing to mark, so it is never an analysis.
   if (hasMarkedLap(oneLap, ["sf"])) throw new Error("no corner lines: nothing to show");
 }

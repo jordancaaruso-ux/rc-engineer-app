@@ -59,6 +59,55 @@ const TIMING = {
 };
 TIMING.drivers = TIMING.sessions[0]!.drivers;
 
+/**
+ * A LiveRC practice link's answer: one session, one driver, nobody else in it.
+ *
+ * Pressing "+" again hands back the next person, so the chip lane can be driven the way it is
+ * actually used — your own link first, then one per rival in the video.
+ */
+const PRACTICE_DRIVERS = [
+  { name: "Jordan Caruso", laps: [17.5, 17.31, 17.92, 17.44, 17.68, 17.22] },
+  { name: "Sandy Nguyen", laps: [17.24, 17.51, 16.98, 17.33, 17.09, 17.62] },
+  { name: "Chris Kalfoglou", laps: [18.02, 17.88, 18.31, 17.95, 18.12, 17.79] },
+  { name: "Alex Marino", laps: [17.71, 17.55, 17.99, 17.63, 17.84, 17.48] },
+];
+let practiceIndex = 0;
+
+function practicePayload(url: string) {
+  const who = PRACTICE_DRIVERS[practiceIndex % PRACTICE_DRIVERS.length]!;
+  practiceIndex++;
+  const sessionId = `ts_prac_${practiceIndex}`;
+  const drivers = [
+    {
+      key: `${sessionId}::liverc_practice_session`,
+      driverName: who.name,
+      normalizedName: who.name.toLowerCase(),
+      role: "me",
+      laps: who.laps.map((lapTimeSec, i) => ({
+        lapNumber: i + 1,
+        lapTimeSec,
+        isIncluded: true,
+      })),
+    },
+  ];
+  return {
+    sessions: [
+      {
+        sessionId,
+        label: `practice/${who.name.split(" ")[0]!.toLowerCase()}`,
+        sourceUrl: url,
+        sessionCompletedAtIso: "2026-09-01T02:00:00.000Z",
+        isOnVideo: true,
+        drivers,
+        sync: {},
+      },
+    ],
+    drivers,
+    parserId: "liverc_practice_session_v1",
+    defaults: { meKey: drivers[0]!.key, competitorKey: "" },
+  };
+}
+
 // Mutable server-side session mirror so PATCHed state survives re-fetches
 // within the page session.
 let sessionState: unknown = {
@@ -127,6 +176,14 @@ function AnalyzeFlowPreviewInner() {
       }
       if (url.includes("/api/video-analysis/manual/session-drivers")) {
         return json(TIMING);
+      }
+      if (url.includes("/api/video-analysis/manual/parse-url")) {
+        let pasted = "https://liverc.test/practice";
+        try {
+          const body = JSON.parse(String(init?.body ?? "{}")) as { urls?: string[] };
+          pasted = body.urls?.[0] ?? pasted;
+        } catch {}
+        return json(practicePayload(pasted));
       }
       if (url.includes("/api/videos") && (!init?.method || init.method === "GET")) {
         return json({

@@ -1,16 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import type { SetupFillDraftSubject } from "@/lib/setup/setupFillDraft";
+import {
+  buildSetupFillSteps,
+  countAnsweredSetupFillSteps,
+} from "@/lib/setup/setupFillOrder";
+import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
 
 /**
- * Client half of the sequential-fill draft: the two network calls, and nothing else.
+ * Client half of a parked setup fill: the two network calls, and nothing else.
  *
  * Lives here rather than in either parent because the driver flow (keyed by car) and the admin
- * baseline flow (keyed by chassis model) differ only in which id goes in the body. Everything
- * about debouncing, resume and error surfacing lives in `SetupFillFlow`; everything about the
- * fetch lives here, so neither parent duplicates a line of it.
+ * baseline flow (keyed by chassis model) differ only in which id goes in the body. The debounce
+ * that drives it is `useSetupFillAutosave` below; everything about the fetch is here, so no caller
+ * duplicates a line of it.
  */
 
 export type SetupFillDraftSnapshot = {
@@ -38,8 +43,8 @@ async function jsonFetch(input: RequestInfo, init?: RequestInit): Promise<void> 
 }
 
 /**
- * Pass `null` to disable drafts entirely — the hook returns undefined and `SetupFillFlow` falls
- * back to its original in-memory behaviour with no branching at the call site.
+ * Pass `null` to disable drafts entirely — the hook returns undefined and every caller falls back
+ * to plain in-memory behaviour with no branching at the call site.
  */
 export function useSetupFillDraft(
   subject: SetupFillDraftSubject | null,
@@ -96,4 +101,64 @@ export function useSetupFillDraft(
     () => (enabled ? { save, discard } : undefined),
     [enabled, save, discard]
   );
+}
+
+/** Long enough that typing never waits on a round trip; matches the sheet surface's own debounce. */
+const AUTOSAVE_DEBOUNCE_MS = 1200;
+
+export type SetupFillAutosaveState = "idle" | "saving" | "saved" | "failed";
+
+/**
+ * Park a whole-sheet fill as it is typed.
+ *
+ * The rule the sequential flow set and this keeps: parking must never block, never interrupt and
+ * never move anything on screen. A failure is a word beside the Back link, not an error — the
+ * driver is still filling their sheet in, and the save at the end is the one that counts.
+ *
+ * The grid has no cursor to come back to, so resume is only ever "these values". The sequential
+ * flow's position fields are still sent, as their empty equivalents, because the route requires
+ * them and a parked grid fill must be resumable by the same reader.
+ *
+ * Returns `undefined` for `onChange` when there is no binding, so a caller can hand the sheet its
+ * plain setter instead and nothing about the no-draft path changes.
+ */
+export function useSetupFillAutosave(
+  fillDraft: SetupFillDraftBinding | undefined,
+  template: SetupSheetTemplate
+): { state: SetupFillAutosaveState; report: ((values: SetupSnapshotData) => void) | undefined } {
+  const [state, setState] = useState<SetupFillAutosaveState>("idle");
+  const steps = useMemo(() => buildSetupFillSteps(template), [template]);
+  const timerRef = useRef<number | null>(null);
+
+  const report = useCallback(
+    (values: SetupSnapshotData) => {
+      if (!fillDraft) return;
+      // Each change re-arms the timer and cancels the one before it, so the values captured here
+      // are by construction the newest ones when it finally fires. No ref needed to chase them.
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+      timerRef.current = window.setTimeout(() => {
+        setState("saving");
+        fillDraft
+          .save({
+            values,
+            stepIndex: 0,
+            pendingText: null,
+            pendingStepKey: null,
+            answeredCount: countAnsweredSetupFillSteps(steps, values),
+            stepCount: steps.length,
+          })
+          .then(() => setState("saved"))
+          .catch(() => setState("failed"));
+      }, AUTOSAVE_DEBOUNCE_MS);
+    },
+    [fillDraft, steps]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  return { state, report: fillDraft ? report : undefined };
 }

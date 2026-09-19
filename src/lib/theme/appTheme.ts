@@ -21,10 +21,18 @@ export const APP_THEME = "light" as const;
 /**
  * The page background, as a hex literal.
  *
- * The one value that genuinely cannot be read from CSS: `themeColor`,
- * `manifest.ts`, `capacitor.config.ts`, `public/offline.html` and the iOS
- * `Splash.imageset` all paint before or outside the document, so they carry
- * their own copy. Must match `--page-bg-rgb` under `[data-theme="light"]` in
- * globals.css — move them together or a launch flashes the wrong colour.
+ * The one value that genuinely cannot be read from CSS: `themeColor`, `manifest.ts`,
+ * `capacitor.config.ts` (`ios.backgroundColor`) and `public/offline.html` all paint
+ * before or outside the document, so they carry their own copy. Must match
+ * `--page-bg-rgb` under `[data-theme="light"]` in globals.css — move them together
+ * or a launch flashes the wrong colour.
+ *
+ * The LAUNCH SPLASH is deliberately not on that list any more (2026-09-03). It is the
+ * app icon held open — a lit yellow field with the ink mark — so the iOS
+ * `Splash.imageset` and `plugins.SplashScreen.backgroundColor` carry #FFD60A, and the
+ * web splash paints the same field from `--color-primary` (globals.css, `#pwa-splash`).
+ * Paper is the page; yellow is the launch. `manifest.ts` still carries paper, so an
+ * Android install shows the OS splash in paper for a beat before ours — untested on a
+ * device, left alone rather than guessed at.
  */
 export const PAGE_BG = "#EAE7E0";

@@ -107,12 +107,13 @@ export function TrackTimingSourceNotice({
 
   return (
     <div className={cn("rounded-md border border-border bg-surface-runna-inset p-2.5", className)}>
+      {/*
+        A heading and a box. The old second line explained what a timing site was for and why
+        tracks are shared — a paragraph nobody reads twice, on a card whose own placeholder and
+        button already say the job (founder 2026-09-03).
+      */}
       <p className="text-[12px] font-semibold text-foreground">
-        No timing site saved for {track ?? "this track"}
-      </p>
-      <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-        Nothing to search, so no sessions appear here. Paste its LiveRC or Speedhive page — tracks
-        are shared, so it sticks for everyone.
+        No timing site for {track ?? "this track"}
       </p>
       <div className="mt-2 flex flex-col gap-1.5 sm:flex-row">
         <input
@@ -148,10 +149,9 @@ export function TrackTimingSourceNotice({
           {error}
         </p>
       ) : (
-        <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
-          {PASTE_EXAMPLES}. No URL? Paste one session under{" "}
-          <span className="text-foreground/90">URL Manual</span> instead.
-        </p>
+        /* The example is the whole hint. "No URL? use URL Manual" named a tab that only exists
+           on the lap step, and this card now also stands on the run form's event step. */
+        <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">{PASTE_EXAMPLES}</p>
       )}
     </div>
   );

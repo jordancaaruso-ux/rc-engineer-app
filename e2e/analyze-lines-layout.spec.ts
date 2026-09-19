@@ -30,6 +30,11 @@ for (const size of SIZES) {
     await page.getByRole("button", { name: /heat2_stand/ }).click();
     await page.getByRole("button", { name: /This run's laps/ }).click();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
+    // The editor door is shut until the picture is decoded ("still loading — try again").
+    await page.waitForFunction(() => {
+      const v = document.querySelector("video");
+      return !!v && v.videoWidth > 0;
+    });
     await page.getByRole("button", { name: "Edit lines" }).click();
     await expect(page.getByRole("heading", { name: "Draw sector lines" })).toBeVisible();
     await page.waitForTimeout(500);
@@ -83,9 +88,58 @@ for (const size of SIZES) {
     // The sync step shares the transport — it must size the same way.
     await page.getByRole("button", { name: "Cancel" }).click();
     await page.getByRole("button", { name: /Continue to sync/ }).click();
-    await expect(page.getByRole("heading", { name: "Sync the laps" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sync", exact: true })).toBeVisible();
     const syncWidth = await video.evaluate((el) => el.getBoundingClientRect().width);
     expect(syncWidth).toBeGreaterThan(size.minPictureWidth);
     await page.screenshot({ path: `${SHOTS}/sync-${size.name}.png` });
   });
 }
+
+/**
+ * Two ends parked near each other must not steal each other's presses.
+ *
+ * Each end carries a thumb-sized invisible target. Where two lines cross, those targets overlap
+ * and the one drawn last used to win every press, so grabbing a line regularly picked up its
+ * neighbour instead. The nearest end to the press is the one that moves.
+ */
+test("a press picks the nearest line end, not the one drawn on top", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/debug/analyze-flow-preview");
+  await page.getByRole("button", { name: /heat2_stand/ }).click();
+  await page.getByRole("button", { name: /This run's laps/ }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  // The editor door is shut until the picture is decoded ("still loading — try again").
+  await page.waitForFunction(() => {
+    const v = document.querySelector("video");
+    return !!v && v.videoWidth > 0;
+  });
+  await page.getByRole("button", { name: "Edit lines" }).click();
+  await expect(page.getByRole("heading", { name: "Draw sector lines" })).toBeVisible();
+  await page.waitForTimeout(500);
+
+  const esses = page.getByRole("button", { name: "Move Esses endpoint 1" });
+  const sf = page.getByRole("button", { name: "Move SF endpoint 2" });
+
+  // Park Esses' end 14px from SF's, so both targets cover the same patch of picture.
+  const sfBox = (await sf.boundingBox())!;
+  const essesBox = (await esses.boundingBox())!;
+  await page.mouse.move(essesBox.x + essesBox.width / 2, essesBox.y + essesBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(sfBox.x + sfBox.width / 2 + 14, sfBox.y + sfBox.height / 2, { steps: 6 });
+  await page.mouse.up();
+
+  const sfBefore = (await sf.boundingBox())!;
+  const essesBefore = (await esses.boundingBox())!;
+
+  // Press exactly on SF's end — Esses is drawn later, so its target is the one on top here.
+  const press = { x: sfBefore.x + sfBefore.width / 2, y: sfBefore.y + sfBefore.height / 2 };
+  await page.mouse.move(press.x, press.y);
+  await page.mouse.down();
+  await page.mouse.move(press.x - 90, press.y - 70, { steps: 8 });
+  await page.mouse.up();
+
+  const sfAfter = (await sf.boundingBox())!;
+  const essesAfter = (await esses.boundingBox())!;
+  expect(Math.hypot(essesAfter.x - essesBefore.x, essesAfter.y - essesBefore.y)).toBeLessThan(2);
+  expect(Math.hypot(sfAfter.x - sfBefore.x, sfAfter.y - sfBefore.y)).toBeGreaterThan(50);
+});

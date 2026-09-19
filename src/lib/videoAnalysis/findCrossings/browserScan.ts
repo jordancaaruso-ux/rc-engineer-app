@@ -4,20 +4,21 @@
  * Run the crossing detector against a `<video>` element, in the browser.
  *
  * The detector itself is pure arithmetic over pixel crops; this is the only part that knows
- * about decoding, and it is deliberately the dumbest thing that works everywhere: seek, play,
- * and take each frame as the browser presents it via `requestVideoFrameCallback`.
+ * about frames, and where they come from is `frameSource.ts`: the file decoded directly through
+ * WebCodecs when the browser can (every frame, faster than real time), the video element seeked
+ * and played otherwise (only the frames the browser paints, at real time).
  *
- * Three things about that are load-bearing:
+ * Three things are load-bearing whichever reader is in use:
  *
- *  - **`mediaTime` is the frame's own timestamp**, not a clock reading. This footage is variable
+ *  - **Each frame's own timestamp is the time**, not a clock reading. This footage is variable
  *    frame rate (nominal 59.94, real average 31.5), so any timeline computed from a frame rate
  *    drifts by seconds across a heat and mispairs every frame with the wrong time.
- *  - **Playback stays at 1x by default.** The callback only fires for frames the browser actually
- *    presents, and at higher rates it presents fewer of them — which costs exactly the sub-frame
- *    precision the whole method exists for. Speed comes from decoding less, not faster.
+ *  - **Playback stays at 1x by default.** The paint callback only fires for frames the browser
+ *    actually presents, and at higher rates it presents fewer of them — which costs exactly the
+ *    sub-frame precision the whole method exists for. Speed comes from decoding directly.
  *  - **Windows are merged before decoding.** Two corners a second and a half apart have
- *    overlapping search windows, so they are read in one pass rather than two, and the video is
- *    seeked once instead of twice. Seeking a 4K file is the expensive part.
+ *    overlapping search windows, so they are read in one pass rather than two, and a decode
+ *    starts once (at the keyframe before them) instead of twice.
  *
  * Colour handling differs from the offline harness by necessity. There, brightness came straight
  * off the decoder's own luma plane. A canvas only ever hands back RGBA, so brightness has to be
@@ -31,16 +32,25 @@ import {
   resultFromWindow,
   type TrackedResult,
 } from "./detector";
-import { bandMask, roiFor } from "./geometry";
+import { bandMask, blurKernelForLine, roiFor } from "./geometry";
 import { spansFromMask } from "./spans";
 import {
   bandFrameDiffs,
-  calibrateFromDiffs,
+  calibrateFromClips,
   type LineCalibration,
 } from "./calibrate";
 import type { CarColour } from "./carColour";
 import type { CarColours } from "./field";
-import { RECIPE_B22_T14, type CrossingTarget, type FrameCrop, type Roi, type SectorLine } from "./types";
+import {
+  checkAbort,
+  isAborted,
+  openFrameSource,
+  PlaybackSource,
+  type FrameImage,
+  type FrameSource,
+  type FrameSourceKind,
+} from "./frameSource";
+import { ACTIVE_RECIPE, type CrossingTarget, type FrameCrop, type Roi, type SectorLine } from "./types";
 
 /**
  * Rec.709 luma weights. This recovers brightness from decoded RGB; it is NOT the decoder's luma
@@ -69,18 +79,9 @@ export const DEFAULT_WINDOW_SEC = 2.0;
 const SEGMENT_JOIN_SEC = 0.6;
 /** Longest single decode pass, so progress keeps moving and a stall is bounded. */
 const MAX_SEGMENT_SEC = 20;
-/** A seek that never lands — Safari can swallow one on an element that has never played. */
-const SEEK_TIMEOUT_MS = 20000;
 /**
- * Frames must arrive at least this often IN VIDEO TIME. The browser only hands over frames it
- * actually presents, and a tab that loses focus or falls behind presents far fewer — one run of
- * this scan collected 1332 frames where an identical run collected 2198, with no error anywhere.
- * Below this rate the sub-frame interpolation is meaningless, so the stretch is reported as not
- * found rather than answered badly. A gap is honest; a wrong mark is not.
- */
-const STARVED_MEDIA_GAP_MS = 100;
-/**
- * When a stretch comes back starved, read it again slower rather than losing it.
+ * When a stretch comes back starved, read it again slower rather than losing it. Playback only:
+ * a decoded read never starves, because every frame comes off the decoder in turn.
  *
  * Playing at half speed doubles the time the page has to handle each frame while reading exactly
  * the same frames — the browser paints on its own schedule, and every frame it paints is one we
@@ -92,10 +93,6 @@ const STARVED_MEDIA_GAP_MS = 100;
 const SLOWDOWN_FACTOR = 0.5;
 const SLOWDOWN_ATTEMPTS = 2;
 const MIN_PLAYBACK_RATE = 0.2;
-/** How far before the range a frame may sit and still count as part of it. */
-const PRE_ROLL_TOLERANCE_SEC = 0.05;
-/** Frames left over from before the seek that may be skipped before giving up on the range. */
-const MAX_STALE_FRAMES = 30;
 
 /** Sample clips used to measure each band. Short, and spread across the targets. */
 const CAL_CLIPS: number = 4;
@@ -112,6 +109,12 @@ export type ScanProgress = {
 
 export type BrowserScanOptions = {
   video: HTMLVideoElement;
+  /**
+   * The video file itself, when the driver picked one on this device. With it the frames are
+   * decoded straight out of the file; without it (a library asset streamed by URL) the video
+   * element is played.
+   */
+  file?: Blob | null;
   frameW: number;
   frameH: number;
   lines: SectorLine[];
@@ -175,25 +178,16 @@ export type BrowserScanResult = {
   framesRead: number;
   elapsedMs: number;
   timings: ScanTimings;
+  /** How the frames were read — decoded from the file, or off the playing video. */
+  reader: FrameSourceKind;
 };
 
 /** Mutable accumulator threaded through the scan; summarised into `ScanTimings` at the end. */
 type Meter = { drawMs: number; readMs: number; lumaMs: number; detectMs: number; gaps: number[] };
 
-class Aborted extends Error {
-  constructor() {
-    super("scan cancelled");
-    this.name = "Aborted";
-  }
-}
-
-function checkAbort(signal?: AbortSignal) {
-  if (signal?.aborted) throw new Aborted();
-}
-
 /** True when the scan was stopped by the caller rather than by a fault. */
 export function isScanAborted(e: unknown): boolean {
-  return e instanceof Error && e.name === "Aborted";
+  return isAborted(e);
 }
 
 /**
@@ -224,13 +218,13 @@ class LineCrop {
   }
 
   /**
-   * Read this line's rectangle out of the current video frame.
+   * Read this line's rectangle out of a frame — the playing video element, or a decoded frame.
    * Both views share one readback — the expensive part is `getImageData`, not the arithmetic.
    */
-  read(video: HTMLVideoElement, meter?: Meter): { colour: FrameCrop; luma: FrameCrop } {
+  read(image: FrameImage, meter?: Meter): { colour: FrameCrop; luma: FrameCrop } {
     const t0 = performance.now();
     this.ctx.drawImage(
-      video,
+      image,
       this.roi.x0,
       this.roi.y0,
       this.width,
@@ -258,124 +252,6 @@ class LineCrop {
       luma: { width: this.width, height: this.height, channels: 1, data: this.luma },
     };
   }
-}
-
-/**
- * Seek and wait for it to land.
- *
- * Belt and braces on purpose: Safari can complete a seek on a never-played element without ever
- * firing `seeked`, so the position is polled too, and the whole thing gives up rather than
- * hanging the button forever.
- */
-function seekTo(video: HTMLVideoElement, t: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    let poll = 0;
-    let timer = 0;
-    const done = (err?: Error) => {
-      if (settled) return;
-      settled = true;
-      video.removeEventListener("seeked", onSeeked);
-      signal?.removeEventListener("abort", onAbort);
-      window.clearInterval(poll);
-      window.clearTimeout(timer);
-      if (err) reject(err);
-      else resolve();
-    };
-    const onSeeked = () => done();
-    const onAbort = () => done(new Aborted());
-    video.addEventListener("seeked", onSeeked);
-    signal?.addEventListener("abort", onAbort);
-    poll = window.setInterval(() => {
-      if (!video.seeking && Math.abs(video.currentTime - t) < 0.5 && video.readyState >= 2) done();
-    }, 200);
-    timer = window.setTimeout(
-      () => done(new Error(`The video did not respond to a seek to ${t.toFixed(1)}s.`)),
-      SEEK_TIMEOUT_MS
-    );
-    video.currentTime = t;
-  });
-}
-
-type FrameHandler = (mediaTime: number) => void;
-
-/** Play from here to `to`, handing every presented frame to `onFrame`. */
-/**
- * Play from `from` to `to`, handing over every frame the browser presents in between.
- *
- * `from` matters as much as `to`. A seek does not clear what is already on screen, so the first
- * callback after one routinely delivers the frame that was showing BEFORE it — and when the
- * previous stretch was later in the video, that stale frame is already past `to`, which used to
- * end the pass before it had read anything. The stretch then came back with no frames at all and
- * was reported as too slow to read, which sent two debugging sessions after a performance problem
- * that did not exist. So frames outside the range are skipped until one lands inside it.
- */
-function playRange(
-  video: HTMLVideoElement,
-  from: number,
-  to: number,
-  rate: number,
-  onFrame: FrameHandler,
-  signal?: AbortSignal
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    let handle = 0;
-    const done = (err?: Error) => {
-      if (settled) return;
-      settled = true;
-      signal?.removeEventListener("abort", onAbort);
-      video.removeEventListener("ended", onEnded);
-      if (handle && "cancelVideoFrameCallback" in video) video.cancelVideoFrameCallback(handle);
-      video.pause();
-      if (err) reject(err);
-      else resolve();
-    };
-    const onAbort = () => done(new Aborted());
-    const onEnded = () => done();
-    signal?.addEventListener("abort", onAbort);
-    video.addEventListener("ended", onEnded);
-
-    if (!("requestVideoFrameCallback" in video)) {
-      done(new Error("This browser cannot hand over video frames — try Chrome or Edge."));
-      return;
-    }
-
-    let entered = false;
-    let skipped = 0;
-    const tick: VideoFrameRequestCallback = (_now, meta) => {
-      if (settled) return;
-      const t = meta.mediaTime;
-      if (!entered) {
-        if (t < from - PRE_ROLL_TOLERANCE_SEC || t > to) {
-          // Left over from wherever the video was before the seek. Give it a few frames to
-          // catch up rather than mistaking it for the end of the range.
-          if (++skipped > MAX_STALE_FRAMES) {
-            done();
-            return;
-          }
-          handle = video.requestVideoFrameCallback(tick);
-          return;
-        }
-        entered = true;
-      }
-      if (t > to) {
-        done();
-        return;
-      }
-      try {
-        onFrame(t);
-      } catch (e) {
-        done(e as Error);
-        return;
-      }
-      handle = video.requestVideoFrameCallback(tick);
-    };
-
-    video.playbackRate = rate;
-    handle = video.requestVideoFrameCallback(tick);
-    video.play().catch((e: Error) => done(e));
-  });
 }
 
 type Segment = { from: number; to: number; targets: CrossingTarget[] };
@@ -421,7 +297,7 @@ export function segmentsFor(targets: CrossingTarget[], windowSec: number): Segme
  * comparison in `calibrate.ts` is built to see through traffic.
  */
 async function calibrate(
-  video: HTMLVideoElement,
+  source: FrameSource,
   crops: Map<string, LineCrop>,
   lines: SectorLine[],
   frameW: number,
@@ -431,30 +307,35 @@ async function calibrate(
   onProgress: (done: number, total: number) => void,
   signal?: AbortSignal
 ): Promise<Record<string, LineCalibration>> {
-  const colourFrames = new Map<string, FrameCrop[]>();
-  const lumaFrames = new Map<string, FrameCrop[]>();
+  // One frame list per clip per line: the noise floor is judged clip by clip (`calibrateFromClips`).
+  const colourClips = new Map<string, FrameCrop[][]>();
+  const lumaClips = new Map<string, FrameCrop[][]>();
+  const clipAt: number[] = [];
   for (const line of lines) {
-    colourFrames.set(line.lineKey, []);
-    lumaFrames.set(line.lineKey, []);
+    colourClips.set(line.lineKey, []);
+    lumaClips.set(line.lineKey, []);
   }
 
   const span = Math.max(0, spread.to - spread.from - CAL_CLIP_SEC);
   for (let i = 0; i < CAL_CLIPS; i++) {
     checkAbort(signal);
     const at = spread.from + (CAL_CLIPS === 1 ? 0 : (i / (CAL_CLIPS - 1)) * span);
-    await seekTo(video, at, signal);
-    await playRange(
-      video,
+    clipAt.push(at);
+    for (const line of lines) {
+      colourClips.get(line.lineKey)!.push([]);
+      lumaClips.get(line.lineKey)!.push([]);
+    }
+    await source.readRange(
       at,
       at + CAL_CLIP_SEC,
       rate,
-      () => {
+      (image) => {
         for (const line of lines) {
           const crop = crops.get(line.lineKey)!;
-          const { colour, luma } = crop.read(video);
+          const { colour, luma } = crop.read(image);
           // Copied, not referenced: the crop reuses its buffers every frame.
-          colourFrames.get(line.lineKey)!.push({ ...colour, data: new Uint8Array(colour.data) });
-          lumaFrames.get(line.lineKey)!.push({ ...luma, data: new Uint8Array(luma.data) });
+          colourClips.get(line.lineKey)![i]!.push({ ...colour, data: new Uint8Array(colour.data) });
+          lumaClips.get(line.lineKey)![i]!.push({ ...luma, data: new Uint8Array(luma.data) });
         }
       },
       signal
@@ -465,12 +346,31 @@ async function calibrate(
   const out: Record<string, LineCalibration> = {};
   for (const line of lines) {
     const crop = crops.get(line.lineKey)!;
-    const band = bandMask(line, crop.roi, frameW, frameH, RECIPE_B22_T14);
+    const band = bandMask(line, crop.roi, frameW, frameH, ACTIVE_RECIPE);
     const spans = spansFromMask(band, crop.width, crop.height);
-    const cd = bandFrameDiffs(colourFrames.get(line.lineKey)!, band, spans);
-    const ld = bandFrameDiffs(lumaFrames.get(line.lineKey)!, band, spans);
-    const n = Math.min(cd.length, ld.length);
-    out[line.lineKey] = calibrateFromDiffs(cd.slice(0, n), ld.slice(0, n));
+    // Measured under the blur this line will be read with — the gate is applied after it.
+    const kernel = blurKernelForLine(line, frameW, frameH, ACTIVE_RECIPE);
+    const cd = colourClips.get(line.lineKey)!.map((frames) => bandFrameDiffs(frames, band, spans, kernel));
+    const ld = lumaClips.get(line.lineKey)!.map((frames) => bandFrameDiffs(frames, band, spans, kernel));
+    const paired = cd.map((c, k) => {
+      const n = Math.min(c.length, ld[k]!.length);
+      return { colour: c.slice(0, n), luma: ld[k]!.slice(0, n) };
+    });
+    out[line.lineKey] = calibrateFromClips(
+      paired.map((p) => p.colour),
+      paired.map((p) => p.luma),
+      kernel
+    );
+    // What each clip measured, so a gate that comes out high can be traced to the clip that
+    // raised it rather than argued about.
+    const q = (xs: number[], f: number) =>
+      xs.length ? [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(xs.length * f))] : "-";
+    console.debug(
+      `[scan] cal-clips ${line.lineKey} ` +
+        paired
+          .map((p, k) => `@${clipAt[k]!.toFixed(1)}s ${p.colour.length}f colour ${q(p.colour, 0.05)}/${q(p.colour, 0.5)} luma ${q(p.luma, 0.05)}/${q(p.luma, 0.5)}`)
+          .join(" · ")
+    );
   }
   return out;
 }
@@ -481,6 +381,7 @@ export async function findCrossingsInBrowser(
 ): Promise<BrowserScanResult> {
   const {
     video,
+    file = null,
     frameW,
     frameH,
     lines,
@@ -493,9 +394,10 @@ export async function findCrossingsInBrowser(
     signal,
   } = opts;
   const carFor = (target: CrossingTarget): CarColour | null => {
-    const role = target.id.split(":")[0];
-    const own = role === "me" || role === "competitor" ? cars[role] : undefined;
-    return own ?? car;
+    // Whoever this target belongs to gets judged against their own paint. Anything without a
+    // reference of its own — a sweep window, which belongs to nobody — falls back to the shared one.
+    const role = target.id.split(":")[0] as keyof typeof cars;
+    return cars[role] ?? car;
   };
 
   const startedAt = performance.now();
@@ -509,20 +411,16 @@ export async function findCrossingsInBrowser(
   const crops = new Map<string, LineCrop>();
   for (const line of usedLines) crops.set(line.lineKey, new LineCrop(line, frameW, frameH));
 
-  const wasMuted = video.muted;
-  const wasRate = video.playbackRate;
-  const wasTime = video.currentTime;
-  video.muted = true;
+  // The file decoded directly when the browser can, the player otherwise. A decoded reader that
+  // fails partway (a decoder error on some stretch) is swapped for the player from there on.
+  let source: FrameSource = await openFrameSource(video, file);
+  const fallBackToPlayback = async (why: unknown) => {
+    console.warn(`[frames] decoding failed (${(why as Error)?.message ?? why}) — playing the video instead`);
+    await source.close();
+    source = await PlaybackSource.open(video);
+  };
 
   try {
-    // A never-played element can swallow the first seek outright; one muted play/pause wakes
-    // the decode pipeline before anything is timed against it.
-    try {
-      await video.play();
-      video.pause();
-    } catch {
-      /* autoplay policy — the seeks below usually still work */
-    }
     checkAbort(signal);
 
     const segments = segmentsFor(targets, windowSec);
@@ -532,8 +430,18 @@ export async function findCrossingsInBrowser(
     // Calibration is roughly a fifth of the work; the split keeps the bar honest rather than
     // sitting at zero and then jumping.
     const CAL_SHARE = 0.15;
-    const calibrations = await calibrate(
-      video,
+    report("calibrating", 0, source.kind === "decoded" ? "Reading the file directly" : "Playing the video");
+    let calibrations: Record<string, LineCalibration>;
+    try {
+      calibrations = await calibrateWith(source);
+    } catch (e) {
+      if (isAborted(e) || source.kind !== "decoded") throw e;
+      await fallBackToPlayback(e);
+      calibrations = await calibrateWith(source);
+    }
+    function calibrateWith(src: FrameSource) {
+      return calibrate(
+      src,
       crops,
       usedLines,
       frameW,
@@ -543,11 +451,15 @@ export async function findCrossingsInBrowser(
       (done, total) =>
         report("calibrating", (done / total) * CAL_SHARE, `Reading the lines (${done}/${total})`),
       signal
-    );
+      );
+    }
 
     for (const line of usedLines) {
       const cal = calibrations[line.lineKey];
       if (cal) report("calibrating", CAL_SHARE, `${line.label}: ${cal.reason}`);
+      // The same line the headless harness prints, so a browser scan and a harness run on the
+      // same footage can be compared gate for gate.
+      if (cal) console.debug(`[scan] cal ${line.lineKey} → ${cal.mode} @ ${cal.thresh} · ${cal.reason}`);
     }
 
     const results: TrackedResult[] = [];
@@ -583,7 +495,7 @@ export async function findCrossingsInBrowser(
             crop.roi,
             frameW,
             frameH,
-            { ...RECIPE_B22_T14, thresh: cal ? cal.thresh : RECIPE_B22_T14.thresh },
+            { ...ACTIVE_RECIPE, thresh: cal ? cal.thresh : ACTIVE_RECIPE.thresh },
             cal?.mode === "luma" ? 1 : 4
           );
           return {
@@ -597,28 +509,22 @@ export async function findCrossingsInBrowser(
 
         const segStart = performance.now();
         const segFramesBefore = framesRead;
-        const mediaGaps: number[] = [];
-        let lastMediaTime: number | null = null;
-        await seekTo(video, segment.from, signal);
-        await playRange(
-          video,
+        const range = await source.readRange(
           segment.from,
           segment.to,
           rate,
-          (t) => {
+          (image, t) => {
             framesRead++;
             const now = performance.now();
             if (lastFrameAt) meter.gaps.push(now - lastFrameAt);
             lastFrameAt = now;
-            if (lastMediaTime != null && t > lastMediaTime) mediaGaps.push((t - lastMediaTime) * 1000);
-            lastMediaTime = t;
             // One readback per line per frame at most, shared by every target on that line.
             const read = new Map<string, { colour: FrameCrop; luma: FrameCrop }>();
             for (const s of scanners) {
               if (t < s.from || t > s.to) continue;
               let frame = read.get(s.target.lineKey);
               if (!frame) {
-                frame = s.crop.read(video, meter);
+                frame = s.crop.read(image, meter);
                 read.set(s.target.lineKey, frame);
               }
               const d0 = performance.now();
@@ -631,26 +537,29 @@ export async function findCrossingsInBrowser(
           signal
         );
 
-        const sortedGaps = [...mediaGaps].sort((a, b) => a - b);
-        const medianMediaGapMs = sortedGaps.length
-          ? sortedGaps[Math.floor(sortedGaps.length / 2)]
-          : Infinity;
         return {
           scanners,
-          medianMediaGapMs,
-          starved: medianMediaGapMs > STARVED_MEDIA_GAP_MS,
+          medianMediaGapMs: range.medianGapMs,
+          starved: range.starved,
           frames: framesRead - segFramesBefore,
           wallMs: performance.now() - segStart,
           rate,
         };
       };
 
-      let pass = await readSegment(playbackRate);
+      let pass;
+      try {
+        pass = await readSegment(playbackRate);
+      } catch (e) {
+        if (isAborted(e) || source.kind !== "decoded") throw e;
+        await fallBackToPlayback(e);
+        pass = await readSegment(playbackRate);
+      }
       // Slowing the video down is what buys time per frame, because the browser only hands over
       // frames it paints and painting is tied to playback speed. A stretch with every line active
       // costs several times what a single narrow window does, so the same machine that keeps up
       // easily on one keeps up on none here — and the answer is fewer frames per second of wall
-      // clock, not fewer frames read.
+      // clock, not fewer frames read. A decoded read never starves, so this never runs for one.
       for (let attempt = 0; pass.starved && attempt < SLOWDOWN_ATTEMPTS; attempt++) {
         const slower = pass.rate * SLOWDOWN_FACTOR;
         if (slower < MIN_PLAYBACK_RATE) break;
@@ -667,7 +576,7 @@ export async function findCrossingsInBrowser(
       // One line per stretch, for the console: the only way to see WHY a scan starved on a
       // machine that decodes the same file perfectly on a bare page.
       console.debug(
-        `[scan] ${segment.from.toFixed(2)}–${segment.to.toFixed(2)}s rate ${pass.rate} · ${pass.frames} frames in ${Math.round(pass.wallMs)}ms · median media gap ${Math.round(pass.medianMediaGapMs)}ms${starved ? " STARVED" : ""} · per frame draw ${(meter.drawMs / Math.max(1, framesRead)).toFixed(1)} read ${(meter.readMs / Math.max(1, framesRead)).toFixed(1)} luma ${(meter.lumaMs / Math.max(1, framesRead)).toFixed(1)} detect ${(meter.detectMs / Math.max(1, framesRead)).toFixed(1)}ms`
+        `[scan] ${segment.from.toFixed(2)}–${segment.to.toFixed(2)}s ${source.kind}${source.kind === "playback" ? ` rate ${pass.rate}` : ""} · ${pass.frames} frames in ${Math.round(pass.wallMs)}ms · median media gap ${Math.round(pass.medianMediaGapMs)}ms${starved ? " STARVED" : ""} · per frame draw ${(meter.drawMs / Math.max(1, framesRead)).toFixed(1)} read ${(meter.readMs / Math.max(1, framesRead)).toFixed(1)} luma ${(meter.lumaMs / Math.max(1, framesRead)).toFixed(1)} detect ${(meter.detectMs / Math.max(1, framesRead)).toFixed(1)}ms`
       );
       segmentReports.push({
         from: segment.from,
@@ -686,7 +595,7 @@ export async function findCrossingsInBrowser(
           s.scanner.samples,
           s.scanner.frames,
           s.scanner.trackerConfig,
-          { car: carFor(s.target) }
+          { car: carFor(s.target), bounds: s.scanner.bounds }
         );
         results.push(starved ? { ...r, detectedSec: null, source: null, candidates: [] } : r);
       }
@@ -708,13 +617,12 @@ export async function findCrossingsInBrowser(
         detectMs: meter.detectMs,
         medianFrameGapMs: gaps.length ? gaps[Math.floor(gaps.length / 2)] : 0,
       },
+      reader: source.kind,
     };
   } finally {
-    video.pause();
-    video.playbackRate = wasRate;
-    video.muted = wasMuted;
+    await source.close();
     try {
-      video.currentTime = wasTime;
+      video.pause();
     } catch {
       /* the element may be torn down mid-scan */
     }

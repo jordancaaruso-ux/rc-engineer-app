@@ -711,6 +711,7 @@ export function LapTimesIngestPanel({
   onTrackTimingUrlsSaved,
   editingRunId,
   eventMyRcmUrl,
+  onSaveEventMyRcmUrl,
 }: {
   value: LapIngestFormValue;
   onChange: (next: LapIngestFormValue) => void;
@@ -737,6 +738,11 @@ export function LapTimesIngestPanel({
    * their own class rather than MyRCM's front page. Never fetched — see `myRcmPdfSource.ts`.
    */
   eventMyRcmUrl?: string | null;
+  /**
+   * Save that page onto the meeting, from beside the button that uses it. Absent when there is
+   * no meeting to hang it on — the lap-analysis library takes MyRCM files with no event at all.
+   */
+  onSaveEventMyRcmUrl?: (url: string) => Promise<{ ok: true } | { ok: false; error: string }>;
 }) {
   const hasLiveRcTrack = Boolean(trackId?.trim() && trackLiveRcUrl?.trim());
   const hasSpeedhiveTrack = Boolean(trackId?.trim() && trackSpeedhiveUrl?.trim());
@@ -2417,6 +2423,7 @@ export function LapTimesIngestPanel({
         <MyRcmPdfImportCard
           pastedUrl={myRcmPastedUrl}
           openUrl={isMyRcmHostUrl(eventMyRcmUrl) ? eventMyRcmUrl!.trim() : null}
+          onSaveOpenUrl={onSaveEventMyRcmUrl}
           hasImported={attachedBlocks.some((b) => b.parserId === MYRCM_PDF_PARSER_ID)}
           onImported={attachMyRcmPdf}
           selectedDriverIdFor={(sid) => blockForImportedSession(sid)?.selectedDriverIds?.[0] ?? null}

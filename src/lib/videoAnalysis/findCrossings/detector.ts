@@ -10,8 +10,17 @@
  * hundreds of megabytes if you hold it all, and nothing here needs more than the previous frame.
  */
 
-import { dilate5, findBlobs, gaussianBlur5, motionMaskInBand } from "./imageOps";
-import { bandMask, lineGeom, roiFor, signedDistance } from "./geometry";
+import { blurFrame, dilate5, findBlobs, motionMaskInBandBg, type BlurKernel } from "./imageOps";
+import {
+  bandHalfPxFor,
+  bandMask,
+  blurKernelFor,
+  crossedOnLine,
+  lineGeom,
+  roiFor,
+  signedDistance,
+  type LineGeom,
+} from "./geometry";
 import { expandSpans, spanArea, spansFromMask, type RowSpans } from "./spans";
 import {
   buildTracks,
@@ -74,10 +83,31 @@ export class WindowScanner {
   private readonly dilBuf: { a: Uint8Array; b: Uint8Array; horiz: Uint8Array };
   private readonly seen: Uint8Array;
   private readonly stack: Int32Array;
+  /** An all-zero "moving" mask, for the slow background drift that touches every pixel. */
+  private readonly none: Uint8Array;
+  /** The frame-to-frame half of the motion mask alone — what the background may not learn from. */
+  private readonly changed: Uint8Array;
 
   private frameIndex = 0;
   private hasPrev = false;
   private readonly bandHalfPx: number;
+  /** The blur this line is read under — see `blurKernelFor`. */
+  readonly kernel: BlurKernel;
+  /**
+   * What the band looks like with nothing on it, in the channels motion is measured on and after
+   * the same blur — so a frame can be asked "how far is this pixel from empty track?" as well as
+   * "how far is it from last frame?". The first is what sees a slow, small, faint car; the second
+   * is blind to it. Only kept when the recipe asks (`bgGateMultiple`).
+   */
+  private bgMotion: Float32Array | null = null;
+  /**
+   * The opening frames, kept until there are enough to take a median. A background copied from
+   * frame one contains whatever was in frame one — on a busy line, a car — and a background
+   * that contains a car reports empty track as "motion" where the car was, for as long as it
+   * takes to fade. The per-pixel median of the first several frames contains no car that was
+   * moving, which on a sector line is every car.
+   */
+  private bgInit: Uint8Array[] = [];
   /**
    * What the crop looks like with nothing moving in it — RGB per pixel, learnt as the window
    * plays, updated only where nothing is moving so a car is never learnt as track. This is what
@@ -90,7 +120,7 @@ export class WindowScanner {
   constructor(
     line: SectorLine,
     private readonly roi: Roi,
-    frameW: number,
+    private readonly frameW: number,
     frameH: number,
     private readonly params: DetectorParams,
     channels = 3
@@ -99,7 +129,8 @@ export class WindowScanner {
     this.roiH = roi.y1 - roi.y0;
     this.geom = lineGeom(line, frameW, frameH);
     this.band = bandMask(line, roi, frameW, frameH, params);
-    this.bandHalfPx = params.bandFrac * frameW;
+    this.bandHalfPx = bandHalfPxFor(this.geom, frameW, params);
+    this.kernel = blurKernelFor(this.geom, params);
 
     this.bandSpans = spansFromMask(this.band, this.roiW, this.roiH);
     this.horizSpans = expandSpans(this.bandSpans, 2);
@@ -115,6 +146,8 @@ export class WindowScanner {
     this.dilBuf = { a: new Uint8Array(px), b: new Uint8Array(px), horiz: new Uint8Array(px) };
     this.seen = new Uint8Array(px);
     this.stack = new Int32Array(px);
+    this.none = new Uint8Array(px);
+    this.changed = new Uint8Array(px);
   }
 
   /** Pixels actually visited per frame — useful when deciding whether a device can keep up. */
@@ -135,10 +168,21 @@ export class WindowScanner {
     const prevIdx = (this.frameIndex + 1) % 2;
     this.frameIndex++;
 
-    const blurred = gaussianBlur5(frame, this.bandSpans, this.horizSpans, {
+    const blurred = blurFrame(frame, this.kernel, this.bandSpans, this.horizSpans, {
       horiz: this.horiz,
       out: this.blur[curIdx],
     });
+    if (this.params.bgGateMultiple != null && !this.bgMotion) {
+      if (this.params.bgInit === "first") {
+        this.bgMotion = initBackground(blurred, this.bandSpans);
+      } else {
+        this.bgInit.push(new Uint8Array(blurred.data));
+        if (this.bgInit.length >= BG_INIT_FRAMES) {
+          this.bgMotion = medianBackground(this.bgInit, blurred, this.bandSpans);
+          this.bgInit = [];
+        }
+      }
+    }
     if (!this.hasPrev) {
       this.hasPrev = true;
       return;
@@ -150,7 +194,16 @@ export class WindowScanner {
       data: this.blur[prevIdx],
     };
 
-    motionMaskInBand(prev, blurred, this.params.thresh, this.band, this.bandSpans, this.motion);
+    motionMaskInBandBg(
+      prev,
+      blurred,
+      this.params.thresh,
+      this.bgMotion,
+      this.params.thresh * (this.params.bgGateMultiple ?? 1),
+      this.band,
+      this.bandSpans,
+      this.motion
+    );
     const grown = dilate5(this.motion, this.roiW, this.roiH, this.dilateSpans, this.dilBuf);
 
     const blobs = findBlobs(
@@ -160,7 +213,9 @@ export class WindowScanner {
       this.params.minArea,
       this.dilateSpans[DILATE_ITERATIONS - 1],
       this.seen,
-      this.stack
+      this.stack,
+      // With a background in play, a blob must contain something that actually changed.
+      this.bgMotion ? this.motion : undefined
     );
 
     const fgSpans = this.dilateSpans[DILATE_ITERATIONS - 1];
@@ -173,6 +228,9 @@ export class WindowScanner {
     let nearestY = 0;
     const obs: FrameObs = { t, blobs: [] };
     for (const b of blobs) {
+      // A degenerate contour has no centroid; a NaN here becomes a NaN crossing time downstream
+      // (seen in the candidate list of a Bendigo S5 window, 2026-09-02).
+      if (!Number.isFinite(b.cx) || !Number.isFinite(b.cy)) continue;
       const x = b.cx + this.roi.x0;
       const y = b.cy + this.roi.y0;
       const signed = signedDistance(this.geom, x, y);
@@ -197,17 +255,80 @@ export class WindowScanner {
 
     // Learn the background from this frame — everywhere nothing moved. Done after sampling, so
     // the frame's own cars were judged against a background that did not yet include them.
-    if (colourFrame && this.bg) updateBackground(this.bg, colourFrame, grown, fgSpans);
+    // Learn wherever nothing CHANGED this frame — judged by the frame-to-frame test alone, so a
+    // thing that stops in the band is learnt as band within a few frames rather than defended
+    // as "motion" for as long as it differs (see `motionMaskInBandBg`). The frame-to-frame
+    // pixels are grown the same way the mask is, so a moving car's whole body is spared, not
+    // just its edges. `grown` is spent by now, so its buffers are reused. Without a background
+    // test the mask holds nothing but frame-to-frame pixels and `grown` already is that.
+    let still = grown;
+    if (this.bgMotion) {
+      const changedSpans = this.dilateSpans[DILATE_ITERATIONS - 1];
+      for (let y = 0; y < changedSpans.h; y++) {
+        const from = changedSpans.x0[y];
+        const to = changedSpans.x1[y];
+        for (let x = from; x < to; x++) {
+          const p = y * this.roiW + x;
+          this.changed[p] = this.motion[p] === 1 || this.motion[p] === 3 ? 1 : 0;
+        }
+      }
+      still = dilate5(this.changed, this.roiW, this.roiH, this.dilateSpans, this.dilBuf);
+    }
+    if (colourFrame && this.bg) updateBackground(this.bg, colourFrame, still, fgSpans);
+    if (this.bgMotion) {
+      updateBackground(this.bgMotion, blurred, still, this.bandSpans);
+      // And everywhere, slowly — so whatever the light does drifts into the background too.
+      updateBackground(this.bgMotion, blurred, this.none, this.bandSpans, BG_ALPHA_SLOW);
+    }
   }
 
   /** Tracker settings scaled to this line's band, so nothing is tuned to one resolution. */
   get trackerConfig(): TrackerConfig {
     return defaultTrackerConfig(this.bandHalfPx);
   }
+
+  /** What a crossing has to satisfy to be counted as this line's — see `crossedOnLine`. */
+  get bounds(): CrossingBounds {
+    return { geom: this.geom, frameW: this.frameW, params: this.params };
+  }
 }
 
 /** How quickly the background follows a change in the light. ~10 frames to settle. */
 const BG_ALPHA = 0.15;
+/**
+ * The slow, unconditional rate the motion background also drifts at: a ghost left by something
+ * in the opening frame is gone in about two seconds, and a car that stops in the band becomes
+ * track over the same span, rather than either being held as "motion" for the whole window.
+ */
+const BG_ALPHA_SLOW = 0.02;
+/**
+ * Opening frames whose per-pixel median becomes the first background. Odd, so the median is a
+ * real sample; long enough that a car crossing the band at any speed covers a pixel for fewer
+ * than half of them.
+ */
+const BG_INIT_FRAMES = 9;
+
+/** Per-pixel, per-channel median of the opening frames, over the band only. */
+function medianBackground(frames: Uint8Array[], shape: FrameCrop, spans: RowSpans): Float32Array {
+  const c = shape.channels;
+  const cc = Math.min(3, c);
+  const bg = new Float32Array(shape.width * shape.height * 3);
+  const vals = new Uint8Array(frames.length);
+  const mid = frames.length >> 1;
+  for (let y = 0; y < spans.h; y++) {
+    const from = spans.x0[y];
+    const to = spans.x1[y];
+    for (let x = from; x < to; x++) {
+      const p = y * shape.width + x;
+      for (let ch = 0; ch < cc; ch++) {
+        for (let f = 0; f < frames.length; f++) vals[f] = frames[f]![p * c + ch]!;
+        vals.sort();
+        bg[p * 3 + ch] = vals[mid]!;
+      }
+    }
+  }
+  return bg;
+}
 /** A pixel must differ from the background by at least this much, on some channel, to be car. */
 const BG_MIN_FG_DIFF = 24;
 /** Fewer car pixels than this and the sample is not trusted over the plain patch. */
@@ -216,6 +337,7 @@ const MIN_CAR_PIXELS = 16;
 /** The first frame is the background until something better is learnt. RGB only, spans only. */
 function initBackground(frame: FrameCrop, spans: RowSpans): Float32Array {
   const c = frame.channels;
+  const cc = Math.min(3, c);
   const bg = new Float32Array(frame.width * frame.height * 3);
   for (let y = 0; y < spans.h; y++) {
     const from = spans.x0[y];
@@ -223,17 +345,22 @@ function initBackground(frame: FrameCrop, spans: RowSpans): Float32Array {
     for (let x = from; x < to; x++) {
       const p = y * frame.width + x;
       const i = p * c;
-      bg[p * 3] = frame.data[i];
-      bg[p * 3 + 1] = frame.data[i + 1];
-      bg[p * 3 + 2] = frame.data[i + 2];
+      for (let ch = 0; ch < cc; ch++) bg[p * 3 + ch] = frame.data[i + ch];
     }
   }
   return bg;
 }
 
 /** Move the background toward this frame wherever nothing is moving. A car is never learnt. */
-function updateBackground(bg: Float32Array, frame: FrameCrop, moving: Uint8Array, spans: RowSpans): void {
+function updateBackground(
+  bg: Float32Array,
+  frame: FrameCrop,
+  moving: Uint8Array,
+  spans: RowSpans,
+  alpha = BG_ALPHA
+): void {
   const c = frame.channels;
+  const cc = Math.min(3, c);
   for (let y = 0; y < spans.h; y++) {
     const from = spans.x0[y];
     const to = spans.x1[y];
@@ -242,9 +369,7 @@ function updateBackground(bg: Float32Array, frame: FrameCrop, moving: Uint8Array
       if (moving[p]) continue;
       const i = p * c;
       const q = p * 3;
-      bg[q] += BG_ALPHA * (frame.data[i] - bg[q]);
-      bg[q + 1] += BG_ALPHA * (frame.data[i + 1] - bg[q + 1]);
-      bg[q + 2] += BG_ALPHA * (frame.data[i + 2] - bg[q + 2]);
+      for (let ch = 0; ch < cc; ch++) bg[q + ch] += alpha * (frame.data[i + ch] - bg[q + ch]);
     }
   }
 }
@@ -402,6 +527,15 @@ export function resultFromSamples(
 
 /** How close a track's crossing must be to a frame-pair event to count as the same crossing. */
 const TRACK_MATCH_SEC = 0.05;
+/**
+ * A tracked-only crossing nearer than this to a confirmed one is the same pass, not another car:
+ * two cars nose to tail are further apart than this, a car and its shadow are not.
+ */
+const EXTRA_TRACK_GAP_SEC = 0.4;
+/** Most tracked-only crossings a window offers beside its confirmed ones. */
+const MAX_EXTRA_TRACKS = 2;
+/** Fewest observations behind a tracked-only crossing before it is worth offering. */
+const MIN_EXTRA_SUPPORT = 6;
 
 /** Where the chosen time came from, so a result can explain itself. */
 export type CrossingSource = "confirmed" | "rescued" | "unconfirmed";
@@ -426,6 +560,15 @@ export type TrackedResult = CrossingResult & {
   candidateColours: Array<Rgb | undefined>;
   /** Candidates thrown out for being the wrong colour car. */
   colourRejected: number;
+  /** Candidates thrown out for changing sides somewhere other than on the drawn line. */
+  offLineRejected?: number;
+};
+
+/** Everything `crossedOnLine` needs, carried from the scanner that produced the samples. */
+export type CrossingBounds = {
+  geom: LineGeom;
+  frameW: number;
+  params: DetectorParams;
 };
 
 /**
@@ -455,13 +598,21 @@ export function resultFromWindow(
   samples: BandSample[],
   frames: FrameObs[],
   cfg: TrackerConfig,
-  opts: { qualityFloor?: number; car?: CarColour | null } = {}
+  opts: { qualityFloor?: number; car?: CarColour | null; bounds?: CrossingBounds | null } = {}
 ): TrackedResult {
-  const { qualityFloor = 0, car = null } = opts;
-  const events = eventsFromSamples(samples);
+  const { qualityFloor = 0, car = null, bounds = null } = opts;
+  // Where it changed sides, not just that it did. Applied to both producers before anything is
+  // chosen from them, so a return-lane pass can never be the nearest candidate to a prediction.
+  const onLine = (e: { x?: number; y?: number }): boolean =>
+    bounds == null || crossedOnLine(bounds.geom, bounds.frameW, bounds.params, e.x, e.y);
+  const allEvents = eventsFromSamples(samples);
+  const events = allEvents.filter(onLine);
   const tracks = buildTracks(frames, cfg);
   const motions = frameMotions(frames, cfg.maxSpeedPxPerSec * cfg.maxGapSec);
-  const crossings = trackCrossings(tracks, cfg, true, motions);
+  const allCrossings = trackCrossings(tracks, cfg, true, motions);
+  const crossings = allCrossings.filter(onLine);
+  const offLineRejected =
+    allEvents.length - events.length + (allCrossings.length - crossings.length);
   const colourRejected = 0;
 
   const confirmedPairs = events
@@ -471,23 +622,61 @@ export function resultFromWindow(
     }))
     .filter((p) => p.track != null);
 
-  let pool = confirmedPairs.map((p) => p.event);
-  let colourOf = new Map(confirmedPairs.map((p) => [p.event.t, p.track!.colour]));
-  let source: CrossingSource = "confirmed";
-  if (!pool.length && crossings.length) {
+  const matchedTracks = new Set(confirmedPairs.map((p) => p.track!));
+  const fromTrack = (c: (typeof crossings)[number]): CrossingEvent => ({
+    t: c.t,
     // Quality here is the track's own support, capped to the same 0..10 scale the frame-pair
     // events use, so a caller comparing the two numbers is not misled.
-    pool = crossings.map((c) => ({ t: c.t, quality: Math.min(10, c.support), x: c.x, y: c.y, dir: c.dir }));
-    colourOf = new Map(crossings.map((c) => [c.t, c.colour]));
+    quality: Math.min(10, c.support),
+    x: c.x,
+    y: c.y,
+    dir: c.dir,
+    source: "rescued",
+  });
+
+  let pool: CrossingEvent[] = confirmedPairs.map((p) => ({ ...p.event, source: "confirmed" as const }));
+  const colourOf = new Map<number, Rgb | undefined>();
+  for (const p of confirmedPairs) colourOf.set(p.event.t, p.track!.colour);
+  for (const c of crossings) if (!colourOf.has(c.t)) colourOf.set(c.t, c.colour);
+  let source: CrossingSource = "confirmed";
+  // **Every car the window tracked stays on offer.** The pick still comes from the confirmed
+  // pairs, but a car-like track that crossed with no frame-pair flip of its own is still a car
+  // that crossed. The nearest-blob trace watches one thing at a time — whichever blob is nearer
+  // the line — so when two cars go through a window a second apart, the second car's flip is
+  // often simply never sampled. At Bendigo (2026-09-02, a rival 1.1s behind) the S2 window's pool
+  // held the rival alone; this driver's slot was handed the rival's time, the duplicate rule
+  // rightly threw it out, and the result was a hole with the car plainly in the picture. Those
+  // tracks go into the candidates as "rescued": never chosen here over a confirmed one, but there
+  // for the chain and the field matching, which know whose lap it is.
+  // A track this close to a confirmed crossing is the same pass seen twice — the shell and its
+  // shadow, or one car split into two blobs — not a second car, and the chain would take
+  // whichever of the two sat nearer its guess. Only tracks clear of every confirmed crossing are
+  // offered.
+  // And only the best-supported few of them: a busy line — kerbing, a marshal, spectators behind
+  // the fence — throws dozens of tracked-only crossings a window (the July recipe's wide zones on
+  // the 4K reference footage: 28–34 a window on S5), and offering all of them turned that run's
+  // chain from 2 moves into 28. Two cars in one window is the case this serves; a third is
+  // already the field matching's problem, not the window's.
+  const confirmedTimes = confirmedPairs.map((p) => p.event.t);
+  const clearOfConfirmed = (t: number) =>
+    confirmedTimes.every((ct) => Math.abs(ct - t) > EXTRA_TRACK_GAP_SEC);
+  let extra: CrossingEvent[] = crossings
+    .filter((c) => !matchedTracks.has(c) && clearOfConfirmed(c.t) && c.support >= MIN_EXTRA_SUPPORT)
+    .sort((a, b) => b.support - a.support)
+    .slice(0, MAX_EXTRA_TRACKS)
+    .map(fromTrack);
+  if (!pool.length && crossings.length) {
+    pool = crossings.map(fromTrack);
+    extra = [];
     source = "rescued";
   } else if (!pool.length) {
-    pool = events;
-    colourOf = new Map();
+    pool = events.map((e) => ({ ...e, source: "unconfirmed" as const }));
     source = "unconfirmed";
   }
 
   let picked = pickCrossing(pool, target.centerSec, source === "unconfirmed" ? qualityFloor : 0);
   if (picked && car) picked = colourTiebreak(picked, pool, colourOf, car);
+  const offered = [...pool, ...extra].sort((a, b) => a.t - b.t);
   return {
     ...target,
     detectedSec: picked ? picked.t : null,
@@ -498,10 +687,11 @@ export function resultFromWindow(
     trackCrossingCount: crossings.length,
     // Each candidate carries its own colour: the usual reason a window has more than one is that
     // more than one car went through it, and those are exactly the ones that need telling apart.
-    candidates: pool.map((e) => ({ ...e, colour: colourOf.get(e.t) })),
-    candidateColours: pool.map((e) => colourOf.get(e.t)),
+    candidates: offered.map((e) => ({ ...e, colour: colourOf.get(e.t) })),
+    candidateColours: offered.map((e) => colourOf.get(e.t)),
     colour: picked ? colourOf.get(picked.t) : undefined,
     colourRejected,
+    offLineRejected,
   };
 }
 

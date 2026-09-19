@@ -8,6 +8,7 @@ import {
   bestLap,
   displayName,
   ghostClip,
+  idealLap,
   lapRows,
   sectorLeaders,
   segmentDefs,
@@ -156,6 +157,13 @@ const sandy: CompareDriver = {
   const leaders = sectorLeaders([me, sandy], segs, stat);
   assert(leaders[0]?.driver.key === "sandy" && leaders[1]?.driver.key === "me" && leaders[2]?.driver.key === "sandy", `leaders: ${leaders.map((l) => l?.driver.key).join()}`);
   assert(sectorLeaders([{ ...sandy, laps: [] }], segs, stat).every((l) => l == null), "nobody, no leader");
+
+  // The ideal lap: Sandy's best through each sector, each one a real lap, the total made up.
+  const ideal = idealLap(segs.map((s) => segmentStats(sandy, s)));
+  assert(ideal.cells[0]?.lapNumber === 4 && ideal.cells[0].sec === 2.75, `S1 best is L4: ${JSON.stringify(ideal.cells[0])}`);
+  assert(ideal.total != null && Math.abs(ideal.total - (2.75 + 4.3 + 10.3)) < 1e-6, `ideal total: ${ideal.total}`);
+  // A sector nobody has a clean time through leaves the total unknown, never a guess.
+  assert(idealLap([{ times: [], clean: [], top5: null, best: null, median: null, sd: null }]).total === null, "no best, no total");
 }
 
 // Names off the timing site.

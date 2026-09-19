@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
-import { SetupFillFlow } from "@/components/setup/SetupFillFlow";
 import { SetupFillDraftResumeCard } from "@/components/setup/SetupFillDraftResumeCard";
-import { useSetupFillDraft } from "@/components/setup/useSetupFillDraft";
+import {
+  useSetupFillAutosave,
+  useSetupFillDraft,
+  type SetupFillDraftBinding,
+} from "@/components/setup/useSetupFillDraft";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import type { SetupSheetTemplate } from "@/lib/setupSheetTemplate";
@@ -26,9 +29,9 @@ import {
  * Admin authoring for a global baseline setup — details first, then the values.
  *
  * Same two-step shape drivers get in `NewCarSetupClient`, and for the same reason: the starting
- * point decides how long the fill takes and can't be changed halfway through. A blank baseline gets
- * the sequential one-question flow (the only sane way to enter 70 values); starting from an
- * existing baseline gets the grid, because a pro sheet is usually kit with fifteen changes.
+ * point decides how long the fill takes and can't be changed halfway through. It is also the same
+ * ONE surface since 2026-09-03 — a blank baseline used to open the sequential one-question flow,
+ * which is gone; see the note in `NewCarSetupClient` for why.
  */
 
 export type BaselineStartOption = {
@@ -97,9 +100,9 @@ export function BaselineSetupEditorClient({
   const [clearingDraft, setClearingDraft] = useState(false);
 
   /*
-   * Drafts only exist on the create-from-empty path — the edit path already has a real row, and
-   * `SetupFillFlow` is never mounted there (see the `started && !isEdit && mode === "empty"`
-   * branch below). Passing null disables the whole thing at the hook.
+   * Drafts only exist on the create-from-empty path — the edit path already has a real row to save
+   * into, and copying an existing baseline lands a full sheet in one tap. Passing null disables the
+   * whole thing at the hook; the sheet below is handed the binding only in that one case.
    */
   const draftBinding = useSetupFillDraft(isEdit ? null : { setupSheetModelId: modelId }, {
     name: name.trim() || null,
@@ -163,40 +166,28 @@ export function BaselineSetupEditorClient({
     }
   };
 
-  if (started && !isEdit && mode === "empty") {
-    return (
-      <SetupFillFlow
-        template={template}
-        initialValues={resumed && parkedDraft ? parkedDraft.values : startValues}
-        initialStepIndex={resumed ? parkedDraft?.stepIndex : undefined}
-        initialPendingText={resumed ? parkedDraft?.pendingText : null}
-        initialPendingStepKey={resumed ? parkedDraft?.pendingStepKey : null}
-        fillDraft={draftBinding}
-        subject={name.trim() || modelName}
-        saveLabel="Publish baseline"
-        saving={saving}
-        error={error}
-        onSave={(values) => void save(values)}
-        onCancel={() => {
-          setStarted(false);
-          setResumed(false);
-          router.refresh();
-        }}
-      />
-    );
-  }
-
   if (started) {
     return (
       <BaselineSheetFill
         template={template}
-        initialValues={startValues}
+        initialValues={resumed && parkedDraft ? parkedDraft.values : startValues}
         subject={name.trim() || modelName}
         saveLabel={isEdit ? "Save baseline" : "Publish baseline"}
         saving={saving}
         error={error}
+        /* Only the create-from-empty path has a draft at all — see `draftBinding` above. */
+        fillDraft={!isEdit && mode === "empty" ? draftBinding : undefined}
         onSave={(values) => void save(values)}
-        onCancel={() => (isEdit ? router.push(backHref) : setStarted(false))}
+        onCancel={() => {
+          if (isEdit) {
+            router.push(backHref);
+            return;
+          }
+          setStarted(false);
+          setResumed(false);
+          // The draft may have just been saved or discarded; re-read so the card matches.
+          router.refresh();
+        }}
       />
     );
   }
@@ -398,7 +389,7 @@ export function BaselineSetupEditorClient({
             setStarted(true);
           }}
         >
-          {!isEdit && mode === "empty" ? "Start filling" : "Open the sheet"}
+          Open the sheet
         </button>
       </div>
       </SurfaceCard>
@@ -406,7 +397,7 @@ export function BaselineSetupEditorClient({
   );
 }
 
-/** Whole sheet at once — for values that are already mostly right. Nothing saves until you say so. */
+/** The whole sheet at once. Nothing is published until you say so; a fresh fill parks as you type. */
 function BaselineSheetFill({
   template,
   initialValues,
@@ -414,6 +405,7 @@ function BaselineSheetFill({
   saveLabel,
   saving,
   error,
+  fillDraft,
   onSave,
   onCancel,
 }: {
@@ -423,26 +415,44 @@ function BaselineSheetFill({
   saveLabel: string;
   saving: boolean;
   error: string | null;
+  /** Omit and nothing is parked until the final save. */
+  fillDraft?: SetupFillDraftBinding;
   onSave: (values: SetupSnapshotData) => void;
   onCancel: () => void;
 }) {
   const [values, setValues] = useState<SetupSnapshotData>(initialValues);
+  const { state: draftState, report } = useSetupFillAutosave(fillDraft, template);
+
+  const onChange = useCallback(
+    (next: SetupSnapshotData) => {
+      setValues(next);
+      report?.(next);
+    },
+    [report]
+  );
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <Eyebrow>{subject}</Eyebrow>
-        <button
-          type="button"
-          className="ui-caption text-muted-foreground underline"
-          onClick={onCancel}
-          disabled={saving}
-        >
-          Back
-        </button>
+        <div className="flex items-center gap-3">
+          {report && draftState !== "idle" ? (
+            <span className="ui-caption text-muted-foreground">
+              {draftState === "saving" ? "Saving…" : draftState === "saved" ? "Saved" : "Not saved"}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            className="ui-caption text-muted-foreground underline"
+            onClick={onCancel}
+            disabled={saving}
+          >
+            Back
+          </button>
+        </div>
       </div>
 
-      <SetupSheetView value={values} template={template} enableFieldSearch onChange={setValues} />
+      <SetupSheetView value={values} template={template} enableFieldSearch onChange={onChange} />
 
       {error ? <p className="ui-caption text-destructive">{error}</p> : null}
 

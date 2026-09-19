@@ -1,5 +1,7 @@
 import "server-only";
 
+import { timingUserAgent } from "@/lib/http/timingUserAgent";
+
 const PRACTICE_API_BASE = "https://practice-api.speedhive.com";
 const DEFAULT_TIMEOUT_MS = 18_000;
 
@@ -54,7 +56,7 @@ async function practiceFetchJson<T>(path: string, query?: Record<string, string>
       headers: {
         Accept: "application/json",
         Origin: "https://sporthive.com",
-        "User-Agent": process.env.LAP_IMPORT_USER_AGENT?.trim() || "RC-Engineer/1.0",
+        "User-Agent": timingUserAgent(),
       },
     });
     if (!res.ok) {

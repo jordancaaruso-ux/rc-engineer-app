@@ -37,7 +37,7 @@ test("a track with no timing site says so, and takes the URL inline", async ({ p
   await page.getByRole("option", { name: new RegExp(name) }).click();
 
   // The state that used to read as a broken scan.
-  await expect(page.getByText(`No timing site saved for ${name}`)).toBeVisible();
+  await expect(page.getByText(`No timing site for ${name}`)).toBeVisible();
 
   await page
     .getByRole("textbox", { name: `Timing site URL for ${name}` })
@@ -50,7 +50,7 @@ test("a track with no timing site says so, and takes the URL inline", async ({ p
 
 /**
  * The earlier ask: a track created mid-run now takes its timing page at creation, so the
- * driver never reaches the "No timing site saved" state at all. Asserted without a reload,
+ * driver never reaches the "No timing site" state at all. Asserted without a reload,
  * because the value of asking early is that discovery is already pointed somewhere by the
  * time they scroll down to the lap panel.
  */
@@ -66,7 +66,7 @@ test("a track created mid-run takes its timing page there and then", async ({ pa
   await page.getByRole("button", { name: "Add track" }).click();
 
   await expect(page.getByText(`Searching ${name} on LiveRC (tftr.liverc.com).`)).toBeVisible();
-  await expect(page.getByText(`No timing site saved for ${name}`)).toHaveCount(0);
+  await expect(page.getByText(`No timing site for ${name}`)).toHaveCount(0);
 });
 
 /**

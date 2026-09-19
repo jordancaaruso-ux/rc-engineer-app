@@ -23,6 +23,7 @@
  */
 
 import type { CrossingEvent } from "./types";
+import { lapDrift } from "./lapClock";
 
 /** What the second pass needs from the first: where it looked, and what it found. */
 export type RefinableResult = {
@@ -58,6 +59,12 @@ const defaultLapKey = (r: RefinableResult) => String(r.lapNumber);
  * three-second impostor which prompted this cannot win.
  */
 const MAX_CHAIN_DRIFT_SEC = 1.2;
+/**
+ * How much nearer the chain's prediction a tracked-only ("rescued") candidate must sit than a
+ * confirmed one before it is preferred. Half a second: the second car in a window is a second or
+ * so away, a shadow or a shaken kerb a few tenths.
+ */
+const RESCUED_PENALTY_SEC = 0.5;
 /** Fewest laps a gap must be measured over before it is trusted as a prediction. */
 const MIN_GAP_SAMPLES = 4;
 
@@ -170,6 +177,14 @@ export function flagImplausible<T extends RefinableResult>(
   // belonged to neither — half of EACH driver's rows fell outside it, and a scan came back
   // "20 added, 20 odd" with the detector having found 36 of 40. The transponder gives every
   // driver their own lap starts; the agreement that matters is a driver with themselves.
+  // **Against the lap, not against the clock.** The lap starts come from the transponder — one
+  // anchor plus every lap time added up — and that walk drifts: at Bendigo (2026-09-01) it slid a
+  // whole second across nine laps, mostly in one step where the timing sheet's lap 8 was half a
+  // second longer than the footage. Judged against it, laps 9 to 11 stopped clustering with the
+  // rest and were held as odd, though the gaps between their own crossings were the tightest in
+  // the session. Each lap's drift is measured from its own crossings and taken off first, so this
+  // check asks what it means to ask: is this crossing where it usually is on THIS lap.
+  const drift = lapDrift(results, shape.sfAt, sfKey, lapKey);
   const byDriverLine = new Map<string, Array<{ id: string; offset: number }>>();
   for (const r of results) {
     if (r.lineKey === sfKey || r.detectedSec == null) continue;
@@ -178,7 +193,7 @@ export function flagImplausible<T extends RefinableResult>(
     if (start == null) continue;
     const group = `${driverOfKey(key)}|${r.lineKey}`;
     const list = byDriverLine.get(group) ?? [];
-    list.push({ id: r.id, offset: r.detectedSec - start });
+    list.push({ id: r.id, offset: r.detectedSec - start - (drift.get(key)?.driftSec ?? 0) });
     byDriverLine.set(group, list);
   }
 
@@ -399,15 +414,23 @@ export function refineByChaining<T extends RefinableResult>(
       const expected = anchorTime != null && gap != null ? anchorTime + gap : null;
 
       if (expected != null && row.candidates.length) {
+        // A tracked-only candidate has to be clearly nearer the prediction than a confirmed one
+        // to be taken over it: it is there for the car the trace never sampled (a second ahead
+        // or behind), not to nudge a confirmed crossing by a few tenths.
+        const cost = (c: CrossingEvent) =>
+          Math.abs(c.t - expected) + (c.source === "rescued" ? RESCUED_PENALTY_SEC : 0);
         let best: CrossingEvent | null = null;
         for (const c of row.candidates) {
           if (Math.abs(c.t - expected) > MAX_CHAIN_DRIFT_SEC) continue;
-          if (!best || Math.abs(c.t - expected) < Math.abs(best.t - expected)) best = c;
+          if (!best || cost(c) < cost(best)) best = c;
         }
         if (best && best.t !== row.detectedSec) {
           if (row.detectedSec != null) row.movedBy = best.t - row.detectedSec;
           row.detectedSec = best.t;
           row.quality = best.quality;
+          // A candidate knows how sure its window was of it; a row moved onto a tracked-only
+          // crossing says "rescued", not whatever its first pick was.
+          if (best.source) row.source = best.source;
         }
       }
 
@@ -479,6 +502,81 @@ export function dropDuplicates<T extends RefinableResult>(
     }
   }
   return dropped;
+}
+
+/**
+ * Two rows within this of each other on one line, for two different drivers, are one event —
+ * the same blob crossing once, handed to two windows. Two cars side by side would be two blobs
+ * and two times; a single time cannot be two cars.
+ */
+export const SAME_EVENT_SEC = 0.06;
+
+/**
+ * One crossing, one car: the same event claimed by two drivers is dropped from one of them.
+ *
+ * On Bendigo practice (2026-09-01) the rival's S1 window kept finding only one car — ours — and
+ * being handed it, at the identical millisecond it had already been written as ours. The field
+ * matcher labelled those rows as somebody else's, but labelled rows still sat in the sample the
+ * plausibility check learns "usual" from, and four stolen times outvoted the two real ones: his
+ * every S1 was held, and his sector 1 and sector 2 read blank. A row that is provably another
+ * car's is not evidence about this car, and never sees the vote.
+ *
+ * Who keeps it: a fixed row (a hand mark or a lap start) always; then the driver the field gave
+ * it to, if it named one; then the better-supported source; then whoever it fitted best. The
+ * loser leaves a gap, exactly as a within-driver duplicate does.
+ */
+export function dropCrossDriverDuplicates<T extends RefinableResult & { claimedBy?: { key: string } }>(
+  results: T[],
+  roleOf: (r: T) => string,
+  fixed: Set<string>,
+  sameEventSec = SAME_EVENT_SEC
+): Set<string> {
+  const rank = (r: T) =>
+    r.source === "confirmed" ? 3 : r.source === "rescued" ? 2 : r.source === "unconfirmed" ? 1 : 0;
+  const byLine = new Map<string, T[]>();
+  for (const r of results) {
+    if (r.detectedSec == null) continue;
+    const list = byLine.get(r.lineKey) ?? [];
+    list.push(r);
+    byLine.set(r.lineKey, list);
+  }
+  const dropped = new Set<string>();
+  for (const [, list] of byLine) {
+    const sorted = [...list].sort((a, b) => a.detectedSec! - b.detectedSec!);
+    for (let i = 0; i < sorted.length; i++) {
+      const a = sorted[i]!;
+      if (dropped.has(a.id)) continue;
+      for (let j = i + 1; j < sorted.length; j++) {
+        const b = sorted[j]!;
+        if (b.detectedSec! - a.detectedSec! >= sameEventSec) break;
+        if (dropped.has(b.id) || roleOf(a) === roleOf(b)) continue;
+        const loser = pickLoser(a, b, roleOf, fixed, rank);
+        if (loser) dropped.add(loser.id);
+      }
+    }
+  }
+  return dropped;
+}
+
+function pickLoser<T extends RefinableResult & { claimedBy?: { key: string } }>(
+  a: T,
+  b: T,
+  roleOf: (r: T) => string,
+  fixed: Set<string>,
+  rank: (r: T) => number
+): T | null {
+  const aFixed = fixed.has(a.id);
+  const bFixed = fixed.has(b.id);
+  if (aFixed && bFixed) return null;
+  if (aFixed) return b;
+  if (bFixed) return a;
+  // The field already said whose it is: the row it named keeps it, the other goes.
+  if (a.claimedBy && a.claimedBy.key === roleOf(b)) return a;
+  if (b.claimedBy && b.claimedBy.key === roleOf(a)) return b;
+  if (a.claimedBy && !b.claimedBy) return a;
+  if (b.claimedBy && !a.claimedBy) return b;
+  if (rank(a) !== rank(b)) return rank(a) < rank(b) ? a : b;
+  return Math.abs(a.detectedSec! - a.centerSec) > Math.abs(b.detectedSec! - b.centerSec) ? a : b;
 }
 
 /**

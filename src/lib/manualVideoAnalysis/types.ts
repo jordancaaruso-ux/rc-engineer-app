@@ -6,7 +6,20 @@ export const MANUAL_VIDEO_SESSION_VERSION_LEGACY = 1 as const;
 /** Mark key for calculated lap start (SF crossing). */
 export const LAP_START_LINE_KEY = "__lap_start__" as const;
 
-export type DriverRole = "me" | "competitor";
+/**
+ * Whose laps a mark, an anchor or a lap selection belongs to.
+ *
+ * "me" is the driver; everyone else on the video is a rival. The first rival is still called
+ * "competitor", so every analysis saved before this existed keeps working unchanged and the
+ * two-driver case is byte-identical to what it always was — a third driver onward is "r3", "r4".
+ * A role is unique across the WHOLE analysis, never per timing session: the scan files its work
+ * under `role:lap:line`, so two drivers sharing a role would share a slot.
+ *
+ * Practice is why there can be more than two. A LiveRC practice link carries exactly one driver,
+ * so the only way to have several people off practice footage is several links — each its own
+ * timing session, each contributing one role here.
+ */
+export type DriverRole = "me" | "competitor" | `r${number}`;
 
 /**
  * Which of a field's drivers this analysis is about.
@@ -16,6 +29,56 @@ export type DriverRole = "me" | "competitor";
  * compared against whoever the timing site happened to list first.
  */
 export type DriverSlot = DriverRole | "other";
+
+/** Laps chosen for analysis, per driver. Always carries the two original slots. */
+export type SelectedLaps = Partial<Record<DriverRole, number[]>> & {
+  me: number[];
+  competitor: number[];
+};
+
+const RIVAL_ROLE_RE = /^r(?:[2-9]|[1-9]\d+)$/;
+
+/** A role string off disk or out of a scan id — null when it is not one. */
+export function asDriverRole(v: unknown): DriverRole | null {
+  if (v === "me" || v === "competitor") return v;
+  if (typeof v === "string" && RIVAL_ROLE_RE.test(v)) return v as DriverRole;
+  return null;
+}
+
+/** Same, but never null: anything unrecognised reads as the driver. */
+export function parseDriverRole(v: unknown): DriverRole {
+  return asDriverRole(v) ?? "me";
+}
+
+export function isRivalRole(role: DriverRole): boolean {
+  return role !== "me";
+}
+
+/**
+ * The next free rival seat.
+ *
+ * "competitor" first, so adding one other driver writes exactly the analysis the app has always
+ * written; "r3" onward after that, numbered by how many people are on the video rather than by
+ * how many rivals — which is the number the chips on screen show.
+ */
+export function nextRivalRole(used: Iterable<DriverRole>): DriverRole {
+  const taken = new Set<string>(used);
+  if (!taken.has("competitor")) return "competitor";
+  for (let n = 3; n < 64; n++) {
+    const role = `r${n}` as DriverRole;
+    if (!taken.has(role)) return role;
+  }
+  return "r64";
+}
+
+/** Copy of `selectedLaps` with one driver's laps replaced. */
+export function withSelectedLaps(
+  prev: SelectedLaps,
+  role: DriverRole,
+  laps: number[]
+): SelectedLaps {
+  return { ...prev, me: prev.me, competitor: prev.competitor, [role]: laps };
+}
 export type AnchorKind = "sf_start" | "sf_finish";
 export type CompareAlignAt = "sf_start" | "sf_finish";
 
@@ -97,6 +160,8 @@ export type ManualScanCandidate = {
   y?: number;
   /** Which way it crossed — see `CrossingEvent.dir`. */
   dir?: 1 | -1;
+  /** How sure the window was of it — see `CrossingEvent.source`. */
+  source?: "confirmed" | "rescued" | "unconfirmed";
 };
 
 /** One car the picker offered at one line, with every verdict the timing put under it. */
@@ -146,6 +211,11 @@ export type ManualFrameMark = {
   videoTimeSec: number;
   /** How the time was reached — absent on a hand mark. */
   source?: "confirmed" | "rescued" | "unconfirmed";
+  /**
+   * Which way the car crossed, when the detector chose this time. The line's direction for
+   * every later scan of this session — see `findCrossings/direction.ts`. Absent on a hand mark.
+   */
+  dir?: 1 | -1;
   /** Everything else the window saw, when this mark came from the detector. */
   candidates?: ManualScanCandidate[];
 };
@@ -189,11 +259,16 @@ export type ManualVideoSessionV2 = {
   timingSource: "run" | "url";
   timingUrls?: string[];
   localVideoName?: string | null;
+  /**
+   * When the recording began (UTC), read from the file's own header. With it, a practice
+   * session's LiveRC start stamp says where that driver's lap 1 is on the video — `wallClock.ts`.
+   */
+  localVideoRecordedAtIso?: string | null;
   /** Snipping-tool crop — zooms playback to the track region only. */
   viewCropNorm?: VideoViewCropNorm;
   timingSessions: ManualTimingSession[];
   compare: ManualCompareState;
-  selectedLaps: { me: number[]; competitor: number[] };
+  selectedLaps: SelectedLaps;
   marks: ManualFrameMark[];
   lastScan?: ManualScanRecord;
   lastIdentify?: ManualIdentifyRecord;
@@ -243,7 +318,7 @@ function parseV1(raw: Record<string, unknown>): ManualVideoSessionV2 | null {
       ? {
           videoTimeSec: Number(anchorRaw.videoTimeSec) || 0,
           lapNumber: Number(anchorRaw.lapNumber) || 1,
-          driverRole: anchorRaw.driverRole === "competitor" ? "competitor" : "me",
+          driverRole: parseDriverRole(anchorRaw.driverRole),
           anchorKind: "sf_finish",
         }
       : undefined,
@@ -251,7 +326,7 @@ function parseV1(raw: Record<string, unknown>): ManualVideoSessionV2 | null {
 
   const marks = (raw.marks as Array<Record<string, unknown>>).map((m) => ({
     sessionId,
-    driverRole: m.driverRole === "competitor" ? "competitor" : "me",
+    driverRole: parseDriverRole(m.driverRole),
     lapNumber: Number(m.lapNumber) || 0,
     lineKey: String(m.lineKey ?? ""),
     videoTimeSec: Number(m.videoTimeSec) || 0,
@@ -281,6 +356,26 @@ function parseV1(raw: Record<string, unknown>): ManualVideoSessionV2 | null {
   };
 }
 
+/**
+ * Every driver's chosen laps, not just the first two.
+ *
+ * The two original slots are required — an analysis without them is not one — but a third driver
+ * onward has to survive a reload too, and reading only `me` and `competitor` would silently drop
+ * their lap choices while leaving their marks in place.
+ */
+function parseSelectedLaps(raw: Record<string, unknown>): SelectedLaps {
+  const out: SelectedLaps = {
+    me: raw.me as number[],
+    competitor: raw.competitor as number[],
+  };
+  for (const [key, value] of Object.entries(raw)) {
+    const role = asDriverRole(key);
+    if (!role || role === "me" || role === "competitor") continue;
+    if (Array.isArray(value)) out[role] = value.filter((n) => typeof n === "number");
+  }
+  return out;
+}
+
 function parseV2(raw: Record<string, unknown>): ManualVideoSessionV2 | null {
   if (raw.version !== MANUAL_VIDEO_SESSION_VERSION) return null;
   if (!Array.isArray(raw.timingSessions) || !Array.isArray(raw.marks)) return null;
@@ -294,7 +389,7 @@ function parseV2(raw: Record<string, unknown>): ManualVideoSessionV2 | null {
     if (typeof o.sessionId !== "string" || typeof o.lapNumber !== "number") return null;
     return {
       sessionId: o.sessionId,
-      role: o.role === "competitor" ? "competitor" : "me",
+      role: parseDriverRole(o.role),
       lapNumber: o.lapNumber,
     };
   };
@@ -304,6 +399,8 @@ function parseV2(raw: Record<string, unknown>): ManualVideoSessionV2 | null {
     timingSource: raw.timingSource === "url" ? "url" : "run",
     timingUrls: Array.isArray(raw.timingUrls) ? (raw.timingUrls as string[]) : [],
     localVideoName: typeof raw.localVideoName === "string" ? raw.localVideoName : null,
+    localVideoRecordedAtIso:
+      typeof raw.localVideoRecordedAtIso === "string" ? raw.localVideoRecordedAtIso : null,
     viewCropNorm:
       raw.viewCropNorm && typeof raw.viewCropNorm === "object"
         ? (raw.viewCropNorm as VideoViewCropNorm)
@@ -316,7 +413,7 @@ function parseV2(raw: Record<string, unknown>): ManualVideoSessionV2 | null {
       offsetNudgeSec:
         typeof compareRaw.offsetNudgeSec === "number" ? compareRaw.offsetNudgeSec : undefined,
     },
-    selectedLaps: { me: selected.me as number[], competitor: selected.competitor as number[] },
+    selectedLaps: parseSelectedLaps(selected),
     marks: raw.marks as ManualFrameMark[],
     lastScan:
       raw.lastScan && typeof raw.lastScan === "object" && Array.isArray((raw.lastScan as ManualScanRecord).rows)

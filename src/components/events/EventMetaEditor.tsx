@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { eventDateToYmd } from "@/lib/eventDateParse";
-import { isEndDateBeforeStartDateYmd } from "@/lib/eventDateValidation";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
@@ -11,6 +10,7 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { TrackCombobox } from "@/components/runs/TrackCombobox";
 import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
 import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
+import { EventDateRangeField } from "@/components/events/EventDateRangeField";
 
 type TrackOption = {
   id: string;
@@ -96,10 +96,6 @@ export function EventMetaEditor(props: Props) {
     return [{ id: seedId, name: props.initialLegacyTrackLabel ?? "Current track" }, ...tracks];
   }, [tracks, props.initialTrackId, props.initialLegacyTrackLabel]);
 
-  const dateRangeInvalid = useMemo(
-    () => isEndDateBeforeStartDateYmd(startDate, endDate),
-    [startDate, endDate]
-  );
   const hasLegacyTrack = Boolean(props.initialIsLegacyTrack && props.initialLegacyTrackLabel?.trim());
   const canSaveWithoutTrackLink = hasLegacyTrack && !trackId.trim();
 
@@ -113,7 +109,6 @@ export function EventMetaEditor(props: Props) {
       setMessage("Select a track for this event.");
       return;
     }
-    if (dateRangeInvalid) return;
 
     setSaving(true);
     setMessage(null);
@@ -219,31 +214,16 @@ export function EventMetaEditor(props: Props) {
           </div>
         </div>
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="min-w-0">
-          <label className="block text-[11px] text-muted-foreground mb-1">Start date</label>
-          <input
-            type="date"
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            aria-label="Start date"
-          />
-        </div>
-        <div className="min-w-0">
-          <label className="block text-[11px] text-muted-foreground mb-1">End date</label>
-          <input
-            type="date"
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            aria-label="End date"
-          />
-        </div>
-      </div>
-      {dateRangeInvalid ? (
-        <p className="text-[11px] text-destructive">End date must be on or after the start date.</p>
-      ) : null}
+      <EventDateRangeField
+        label="Dates"
+        startYmd={startDate}
+        endYmd={endDate}
+        onChange={(next) => {
+          setStartDate(next.startYmd);
+          setEndDate(next.endYmd);
+        }}
+        triggerClassName="rounded-md border border-border bg-card"
+      />
       <div>
         <label className="block text-[11px] text-muted-foreground mb-1">Notes (optional)</label>
         <input
@@ -389,12 +369,12 @@ export function EventMetaEditor(props: Props) {
       <div className="flex items-center gap-2">
         <button
           type="button"
-          disabled={saving || (!trackId.trim() && !canSaveWithoutTrackLink) || dateRangeInvalid}
+          disabled={saving || (!trackId.trim() && !canSaveWithoutTrackLink)}
           onClick={() => void save()}
           className={cn(
             buttonLinkClassName("primary"),
             "text-xs px-3 py-1.5",
-            (saving || (!trackId.trim() && !canSaveWithoutTrackLink) || dateRangeInvalid) &&
+            (saving || (!trackId.trim() && !canSaveWithoutTrackLink)) &&
               "opacity-70 pointer-events-none"
           )}
         >

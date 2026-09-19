@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
@@ -38,10 +39,16 @@ export function BandHeader({
   label,
   addHref,
   addLabel,
+  action,
 }: {
   label: string;
   addHref?: string;
   addLabel?: string;
+  /**
+   * A control of the band's own in place of the `+` link — for the one band whose action is not
+   * "go to a page" (the video library's Upload is a file pick). Same row, same right-hand slot.
+   */
+  action?: ReactNode;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
@@ -49,7 +56,9 @@ export function BandHeader({
           `.eyebrow-root` (its own bottom rule) plus `mb-2`, and both are the floating-in-the-gutter
           spacing this row replaces. The rule here is the card's, full-bleed to its edges. */}
       <span className="eyebrow-label min-w-0">{label}</span>
-      {addHref ? (
+      {action ? (
+        <span className="-my-1 flex shrink-0 items-center">{action}</span>
+      ) : addHref ? (
         <Link
           href={addHref}
           aria-label={addLabel ?? `Add to ${label}`}

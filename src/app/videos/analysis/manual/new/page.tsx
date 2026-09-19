@@ -1,147 +1,45 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
-import Link from "next/link";
-import { CardPanel } from "@/components/ui/CardPanel";
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageBackLink } from "@/components/ui/PageBackLink";
-import { useRouter, useSearchParams } from "next/navigation";
-import { emptyManualSession } from "@/lib/manualVideoAnalysis/types";
+import { NewAnalysisCard } from "@/components/videoAnalysis/NewAnalysisCard";
 
-function NewLapSyncForm() {
-  const router = useRouter();
+/**
+ * New analysis, as its own page.
+ *
+ * The Video page carries the same card in its first cell; this route stays for the doors that
+ * arrive with the track and the run already known — a run's Video section links here with both
+ * in the query string. Same card, full width, the same measure as the dashboard.
+ */
+function NewAnalysisPage() {
   const sp = useSearchParams();
-  const presetTrackId = sp.get("trackId") ?? "";
-  const presetProfileId = sp.get("profileId") ?? "";
-  const presetRunId = sp.get("runId") ?? "";
-
-  const [tracks, setTracks] = useState<Array<{ id: string; name: string }>>([]);
-  const [trackId, setTrackId] = useState(presetTrackId);
-  const [runId] = useState(presetRunId);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-
-  useEffect(() => {
-    void fetch("/api/tracks")
-      .then((r) => r.json())
-      .catch(() => ({ tracks: [] }))
-      .then((d) => {
-        const list = d.tracks ?? d;
-        if (Array.isArray(list)) setTracks(list);
-      });
-  }, []);
-
-  /** The session opens on the track's most recent line set — you confirm or swap it
-   * in the flow's Lines step, so there's nothing to choose here. */
-  async function resolveProfileId(): Promise<string | null> {
-    if (presetProfileId) return presetProfileId;
-    const res = await fetch(`/api/tracks/${trackId}/camera-profiles`);
-    if (res.ok) {
-      const { profiles } = (await res.json()) as { profiles?: Array<{ id: string }> };
-      if (profiles?.[0]) return profiles[0].id;
-    }
-    const created = await fetch(`/api/tracks/${trackId}/camera-profiles`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Sector lines" }),
-    });
-    if (!created.ok) return null;
-    const { profile } = (await created.json()) as { profile: { id: string } };
-    return profile.id;
-  }
-
-  async function createJob() {
-    if (!trackId) {
-      setMsg("Select a track.");
-      return;
-    }
-
-    setCreating(true);
-    setMsg(null);
-
-    const profileId = await resolveProfileId();
-    if (!profileId) {
-      setCreating(false);
-      setMsg("Could not set up sector lines for this track.");
-      return;
-    }
-
-    const session = {
-      ...emptyManualSession(),
-      timingSource: runId.trim() ? ("run" as const) : ("url" as const),
-      compare: { my: null, competitor: null, alignAt: "sf_start" as const },
-    };
-
-    const res = await fetch("/api/video-analysis/jobs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        trackId,
-        profileId,
-        runId: runId.trim() || null,
-        analysisMode: "manual",
-        manualJson: session,
-      }),
-    });
-    setCreating(false);
-    if (!res.ok) {
-      setMsg("Failed to create session");
-      return;
-    }
-    const { id } = await res.json();
-    router.push(`/videos/analysis/jobs/${id}`);
-  }
-
+  const runId = sp.get("runId") ?? "";
   return (
-    <CardPanel className="max-w-lg" contentClassName="flex flex-col gap-4 text-sm">
-      <label className="text-xs">
-        Track
-        <select
-          className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1"
-          value={trackId}
-          onChange={(e) => setTrackId(e.target.value)}
-        >
-          <option value="">Select track</option>
-          {tracks.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <button
-        type="button"
-        className="rounded-md primary-face bg-primary px-3 py-2 text-sm text-primary-foreground w-fit disabled:opacity-50"
-        disabled={creating}
-        onClick={() => void createJob()}
-      >
-        {creating ? "Starting…" : "Start video analysis"}
-      </button>
-
-      {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
-    </CardPanel>
+    <>
+      <header className="page-header">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <PageBackLink href={runId ? "/runs/history" : "/videos"} />
+          <div>
+            <h1 className="page-title">New analysis</h1>
+          </div>
+        </div>
+      </header>
+      <section className="page-body tools-wide">
+        <NewAnalysisCard
+          presetTrackId={sp.get("trackId") ?? ""}
+          presetProfileId={sp.get("profileId") ?? ""}
+          presetRunId={runId}
+        />
+      </section>
+    </>
   );
 }
 
 export default function NewManualVideoAnalysisPage() {
   return (
-    <>
-      <header className="page-header">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <PageBackLink href="/analysis" />
-          <div>
-            <h1 className="page-title">Video analysis</h1>
-            <p className="page-subtitle">
-              Watch your video, optionally link LiveRC laps, anchor SF, and compare drivers.
-            </p>
-          </div>
-        </div>
-      </header>
-      <section className="page-body">
-        <Suspense>
-          <NewLapSyncForm />
-        </Suspense>
-      </section>
-    </>
+    <Suspense>
+      <NewAnalysisPage />
+    </Suspense>
   );
 }

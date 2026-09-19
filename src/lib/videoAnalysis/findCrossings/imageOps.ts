@@ -23,6 +23,15 @@ import type { FrameCrop } from "./types";
 const BLUR5 = [1, 4, 6, 4, 1] as const;
 const BLUR5_SUM = 16;
 const BLUR5_ROUND = (BLUR5_SUM * BLUR5_SUM) >> 1;
+/** And its row for ksize 3, in quarters. */
+const BLUR3_SUM = 4;
+const BLUR3_ROUND = (BLUR3_SUM * BLUR3_SUM) >> 1;
+
+/**
+ * Blur kernel width in pixels. 5 is the validated recipe; 3 and 1 (no blur) exist for lines
+ * where the car is only a few pixels across — see `blurKernelFor` in `geometry.ts`.
+ */
+export type BlurKernel = 1 | 3 | 5;
 
 /** BORDER_REFLECT_101: index -1 maps to 1, -2 to 2, len to len-2, len+1 to len-3. */
 function reflect101(i: number, len: number): number {
@@ -100,6 +109,78 @@ export function gaussianBlur5(
   return { width: w, height: h, channels: c, data: out };
 }
 
+/** Separable 3-tap blur, same borders and rounding as the 5-tap. */
+export function gaussianBlur3(
+  src: FrameCrop,
+  outSpans: RowSpans,
+  horizSpans: RowSpans,
+  scratch: { horiz: Int32Array; out: Uint8Array }
+): FrameCrop {
+  const { width: w, height: h, channels: c, data } = src;
+  const { horiz, out } = scratch;
+
+  for (let y = 0; y < h; y++) {
+    const from = horizSpans.x0[y];
+    const to = horizSpans.x1[y];
+    if (to <= from) continue;
+    const rowOff = y * w * c;
+    for (let x = from; x < to; x++) {
+      const xm1 = reflect101(x - 1, w) * c;
+      const x00 = x * c;
+      const xp1 = reflect101(x + 1, w) * c;
+      for (let ch = 0; ch < c; ch++) {
+        horiz[rowOff + x00 + ch] =
+          data[rowOff + xm1 + ch] + 2 * data[rowOff + x00 + ch] + data[rowOff + xp1 + ch];
+      }
+    }
+  }
+
+  for (let y = 0; y < h; y++) {
+    const from = outSpans.x0[y];
+    const to = outSpans.x1[y];
+    if (to <= from) continue;
+    const ym1 = reflect101(y - 1, h) * w * c;
+    const y00 = y * w * c;
+    const yp1 = reflect101(y + 1, h) * w * c;
+    for (let x = from; x < to; x++) {
+      const xc = x * c;
+      for (let ch = 0; ch < c; ch++) {
+        const sum = horiz[ym1 + xc + ch] + 2 * horiz[y00 + xc + ch] + horiz[yp1 + xc + ch];
+        out[y00 + xc + ch] = (sum + BLUR3_ROUND) / (BLUR3_SUM * BLUR3_SUM);
+      }
+    }
+  }
+
+  return { width: w, height: h, channels: c, data: out };
+}
+
+/**
+ * Blur with the kernel asked for. Kernel 1 copies the pixels through untouched — copied rather
+ * than aliased, because the scanner alternates two output buffers and compares this frame's
+ * against the last one's.
+ */
+export function blurFrame(
+  src: FrameCrop,
+  kernel: BlurKernel,
+  outSpans: RowSpans,
+  horizSpans: RowSpans,
+  scratch: { horiz: Int32Array; out: Uint8Array }
+): FrameCrop {
+  if (kernel === 5) return gaussianBlur5(src, outSpans, horizSpans, scratch);
+  if (kernel === 3) return gaussianBlur3(src, outSpans, horizSpans, scratch);
+  const { width: w, height: h, channels: c, data } = src;
+  const { out } = scratch;
+  for (let y = 0; y < h; y++) {
+    const from = outSpans.x0[y];
+    const to = outSpans.x1[y];
+    if (to <= from) continue;
+    const a = (y * w + from) * c;
+    const b = (y * w + to) * c;
+    out.set(data.subarray(a, b), a);
+  }
+  return { width: w, height: h, channels: c, data: out };
+}
+
 /**
  * Frame-to-frame motion inside the band: per-channel absolute difference, largest channel wins,
  * keep pixels strictly above `thresh`. Using the max channel rather than greyscale is what lets
@@ -134,6 +215,73 @@ export function motionMaskInBand(
         if (d > maxDiff) maxDiff = d;
       }
       if (maxDiff > thresh) out[rowPx + x] = 1;
+    }
+  }
+  return out;
+}
+
+/**
+ * The same motion mask, with a second question asked of every band pixel: does it differ from
+ * what this spot looks like with nothing on it? Frame-to-frame difference measures CHANGE, so
+ * its signal is proportional to speed: a car four pixels long moving two pixels a frame changes
+ * half of itself per frame, and against a surface near its own tone that is 6–7 levels after
+ * the blur — under any gate that keeps sensor noise out (Bendigo S1, 2026-09-02: one car seen
+ * on 8 of 10 laps, the other never). Against the learnt empty track the same car reads its full
+ * contrast every frame, however slowly it moves. Either test admits the pixel.
+ *
+ * `bg` is the blurred background in the same channels as the frames, or null before it exists.
+ *
+ * The mask says which test admitted each pixel — 1 for a frame-to-frame change, 2 for a
+ * difference from the background alone — because the background must be learnt from the first
+ * and not the second. A thing that arrives in the band and then stands still (a marshal, a
+ * parked car, the camera settling after a nudge) differs from the background for as long as the
+ * background is not updated where it stands; if being different is what stops the update, it is
+ * flagged forever, and the far end of Bendigo S1 filled with static blobs a thousand pixels
+ * across that flipped sides every frame (2026-09-02). Only a frame-to-frame change is allowed
+ * to defend a pixel from being learnt as background.
+ */
+export function motionMaskInBandBg(
+  a: FrameCrop,
+  b: FrameCrop,
+  thresh: number,
+  bg: Float32Array | null,
+  bgThresh: number,
+  band: Uint8Array,
+  spans: RowSpans,
+  out: Uint8Array
+): Uint8Array {
+  const { width: w, channels: c } = a;
+  const colorCh = Math.min(3, c);
+  out.fill(0);
+  for (let y = 0; y < spans.h; y++) {
+    const from = spans.x0[y];
+    const to = spans.x1[y];
+    if (to <= from) continue;
+    const rowPx = y * w;
+    const rowByte = rowPx * c;
+    for (let x = from; x < to; x++) {
+      if (!band[rowPx + x]) continue;
+      const i = rowByte + x * c;
+      let maxDiff = 0;
+      for (let ch = 0; ch < colorCh; ch++) {
+        const d = Math.abs(b.data[i + ch] - a.data[i + ch]);
+        if (d > maxDiff) maxDiff = d;
+      }
+      if (maxDiff > thresh) {
+        out[rowPx + x] = 1;
+        continue;
+      }
+      if (!bg) continue;
+      const q = (rowPx + x) * 3;
+      let bgDiff = 0;
+      for (let ch = 0; ch < colorCh; ch++) {
+        const d = Math.abs(b.data[i + ch] - bg[q + ch]);
+        if (d > bgDiff) bgDiff = d;
+      }
+      // 3: differs from the background AND changed a little this frame — under the gate, but
+      // above half of it. That is what a crawling car looks like, and it is enough to say the
+      // pixel is part of something moving; a 2 on its own is not.
+      if (bgDiff > bgThresh) out[rowPx + x] = maxDiff * 2 > thresh ? 3 : 2;
     }
   }
   return out;
@@ -238,6 +386,13 @@ function neighbourIndex(dx: number, dy: number): number {
  * centres, so a lone pixel yields a zero-area contour and is discarded exactly as the probe
  * discarded it.
  */
+/**
+ * @param support Optional undilated motion mask (`motionMaskInBandBg`). When given, a blob with
+ *        no pixel that actually changed this frame (value 1 or 3) is not returned: it is a
+ *        patch that differs from the background and nothing more — a thing that stopped, a
+ *        shadow the light moved, the codec settling — and a crossing is by definition a car in
+ *        motion. The background test is allowed to fill a moving car out, never to invent one.
+ */
 export function findBlobs(
   mask: Uint8Array,
   w: number,
@@ -245,10 +400,12 @@ export function findBlobs(
   minArea: number,
   spans: RowSpans,
   seen: Uint8Array,
-  stack: Int32Array
+  stack: Int32Array,
+  support?: Uint8Array
 ): Blob[] {
   seen.fill(0);
   const blobs: Blob[] = [];
+  const moved = (p: number) => support![p] === 1 || support![p] === 3;
 
   for (let sy = 0; sy < h; sy++) {
     const from = spans.x0[sy];
@@ -261,6 +418,7 @@ export function findBlobs(
       // Flood the component first so it is never traced twice; scan order guarantees this
       // pixel is on the component's outer boundary.
       let sp = 0;
+      let supported = !support || moved(start);
       stack[sp++] = start;
       seen[start] = 1;
       while (sp > 0) {
@@ -274,10 +432,12 @@ export function findBlobs(
           const np = ny * w + nx;
           if (mask[np] && !seen[np]) {
             seen[np] = 1;
+            if (!supported && moved(np)) supported = true;
             if (sp < stack.length) stack[sp++] = np;
           }
         }
       }
+      if (!supported) continue;
 
       const contour = traceBoundary(mask, w, h, sx, sy);
       const blob = polygonBlob(contour);

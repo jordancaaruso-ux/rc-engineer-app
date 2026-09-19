@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
-import { CHASSIS_PLATFORMS, chassisPlatformLabel } from "@/lib/cars/carClasses";
+import { disciplineLabel } from "@/lib/cars/carClasses";
+import { DisciplineField } from "@/components/cars/DisciplineField";
 
 /**
  * Everything the car itself is, as one settings list.
@@ -145,12 +146,19 @@ export function CarDetailsCard(props: Props) {
     }
   }
 
-  /** Discipline saves the moment it is picked — the old Save button only appeared once you were
-   *  already dirty, which meant the control changed shape while you were using it. */
+  /**
+   * Discipline saves the moment it is complete — the old Save button only appeared once you were
+   * already dirty, which meant the control changed shape while you were using it.
+   *
+   * A half-answer arrives as `""` (a class with no power yet, an "Other" with no name yet) and is
+   * deliberately NOT saved and NOT treated as a clear: mid-answer is not an instruction to wipe
+   * the row. `DisciplineField` holds the partial state; this only ever sees finished ones.
+   */
   async function pickDiscipline(next: string) {
+    if (!next || next === discipline) return;
     const previous = discipline;
     setDiscipline(next);
-    if (!(await patch({ carClass: next || null }, "discipline"))) setDiscipline(previous);
+    if (!(await patch({ carClass: next }, "discipline"))) setDiscipline(previous);
   }
 
   /** Linking a chassis re-renders the row as a fact, so there is nothing to hold in state. */
@@ -159,7 +167,7 @@ export function CarDetailsCard(props: Props) {
     await patch({ setupSheetModelId: next }, "chassis");
   }
 
-  const resolvedDiscipline = chassisPlatformLabel(props.inferredDiscipline ?? discipline);
+  const resolvedDiscipline = disciplineLabel(props.inferredDiscipline ?? discipline);
 
   return (
     <CardPanel contentClassName="space-y-3">
@@ -209,17 +217,26 @@ export function CarDetailsCard(props: Props) {
           <StaticRow label="Chassis" value={props.chassisText ?? "Not set"} />
         )}
 
-        {/* Discipline: a question only when the catalog can't answer, and never a paragraph. */}
+        {/*
+          Discipline: a question only when the catalog can't answer, and never a paragraph.
+
+          It is the one row that can't be a single control any more (2026-09-03): the answer is a
+          class plus electric-or-nitro, so it stacks label-above-controls the way `EditRow` does
+          rather than squeezing three things into a 190px right-hand column at 390px wide.
+        */}
         {props.inferredDiscipline == null ? (
-          <SelectRow
-            label="Discipline"
-            value={discipline}
-            placeholder="Pick one"
-            options={CHASSIS_PLATFORMS.map((p) => ({ id: p.id, label: p.label }))}
-            onPick={(v) => void pickDiscipline(v)}
-            busy={busy}
-            saved={savedField === "discipline"}
-          />
+          <div className="flex flex-col gap-2 border-b border-border/50 py-2.5">
+            <span className="flex items-center gap-2 text-muted-foreground">
+              Discipline
+              {savedField === "discipline" ? <SavedTick /> : null}
+            </span>
+            <DisciplineField
+              value={discipline}
+              onChange={(v) => void pickDiscipline(v)}
+              disabled={busy}
+              selectClassName="bg-card text-[13px]"
+            />
+          </div>
         ) : resolvedDiscipline ? (
           <StaticRow label="Discipline" value={resolvedDiscipline} />
         ) : null}

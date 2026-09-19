@@ -8,6 +8,53 @@ import {
   diagnoseMissingPicture,
 } from "@/lib/videos/videoPlaybackDiagnosis";
 import { SectorLineMap, type MappedSectorLine } from "./SectorLineMap";
+import { areBothBufferedForPlay } from "@/components/videos/videoOverlayPlayback";
+
+/** How long to wait for the ghost's frames before starting anyway (ms). */
+const READY_WAIT_MS = 2500;
+/** How long to wait for the pre-play alignment seek to land (ms). */
+const ALIGN_WAIT_MS = 400;
+
+/** Resolve when both clips can play through, or when the wait runs out. */
+function waitUntilBothPlayable(
+  a: HTMLVideoElement,
+  b: HTMLVideoElement,
+  timeoutMs: number
+): Promise<void> {
+  if (areBothBufferedForPlay(a, b)) return Promise.resolve();
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      a.removeEventListener("canplay", check);
+      b.removeEventListener("canplay", check);
+      a.removeEventListener("canplaythrough", check);
+      b.removeEventListener("canplaythrough", check);
+      resolve();
+    };
+    const check = () => {
+      if (areBothBufferedForPlay(a, b)) done();
+    };
+    const timer = setTimeout(done, timeoutMs);
+    a.addEventListener("canplay", check);
+    b.addEventListener("canplay", check);
+    a.addEventListener("canplaythrough", check);
+    b.addEventListener("canplaythrough", check);
+  });
+}
+
+/** Resolve when this clip's in-flight seek lands, or when the wait runs out. */
+function waitForSeek(v: HTMLVideoElement, timeoutMs: number): Promise<void> {
+  if (!v.seeking) return Promise.resolve();
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      v.removeEventListener("seeked", done);
+      resolve();
+    };
+    const timer = setTimeout(done, timeoutMs);
+    v.addEventListener("seeked", done);
+  });
+}
 
 /**
  * Ghosted sector clip: the same analyzed video loaded twice, both laps seeked to
@@ -54,6 +101,8 @@ export function SectorClipPlayer({
   const aRef = useRef<HTMLVideoElement | null>(null);
   const bRef = useRef<HTMLVideoElement | null>(null);
   const rafRef = useRef<number | null>(null);
+  /** A play tap is waiting on both clips' frames — further taps are ignored, not treated as pause. */
+  const armingRef = useRef(false);
   const [playing, setPlaying] = useState(false);
   const [clock, setClock] = useState(0);
   const [playbackNote, setPlaybackNote] = useState<string | null>(null);
@@ -95,7 +144,11 @@ export function SectorClipPlayer({
     // Keep the ghost frame-synced to the master; only hard-seek on real drift so
     // we don't thrash the decoder every frame.
     const desiredB = bWindow.startSec + t;
-    if (Math.abs(b.currentTime - desiredB) > 0.08) b.currentTime = desiredB;
+    // `!b.seeking` matters as much as the 0.08 gate: without it the next frame reads a
+    // currentTime the in-flight correction has not reached yet, decides it is still wrong, and
+    // seeks again — interrupting its own seek. Measured 2026-09-03 on a remote clip: two of
+    // three snaps fired mid-seek. `videoOverlaySync.ts` guards its own lock the same way.
+    if (!b.seeking && Math.abs(b.currentTime - desiredB) > 0.08) b.currentTime = desiredB;
     setClock(Math.min(t, clipDur));
     if (t >= clipDur) {
       a.pause();
@@ -119,10 +172,28 @@ export function SectorClipPlayer({
       return;
     }
     if (clock >= clipDur - 0.02) seekTo(0);
+
+    // Neither car starts until BOTH have their frames. The ghost is parked at a different lap —
+    // minutes away in the file — so on the uploaded copy its data had not arrived when play was
+    // called, and it began up to 561ms behind (measured 2026-09-03); the drift rule above then
+    // threw it forward, which reads as the ghost skipping. Same bar the other dual-video player
+    // uses (`areBothBufferedForPlay`), and on a local file this resolves immediately.
+    if (armingRef.current) return; // a second tap while arming is not a pause
+    armingRef.current = true;
     try {
+      await waitUntilBothPlayable(a, b, READY_WAIT_MS);
+      // Put the ghost exactly on its frame before anything moves, so play starts aligned
+      // rather than correcting into alignment once it is already running.
+      const desiredB = bWindow.startSec + (a.currentTime - aWindow.startSec);
+      if (Math.abs(b.currentTime - desiredB) > 0.001) {
+        b.currentTime = desiredB;
+        await waitForSeek(b, ALIGN_WAIT_MS);
+      }
       await Promise.all([a.play(), b.play()]);
     } catch {
       return; // autoplay rejection — user can tap again
+    } finally {
+      armingRef.current = false;
     }
     setPlaying(true);
     stopLoop();

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
-import { isChassisPlatformId } from "@/lib/cars/carClasses";
+import { isDisciplineValue, isKnownDisciplineClass } from "@/lib/cars/carClasses";
 import { normalizeSetupSheetModelName } from "@/lib/setupSheetModels/normalizeModelName";
 import { StorageConfigurationError } from "@/lib/setupDocuments/storage";
 import { recordChassisTypeRequest } from "@/lib/setupSheetModels/chassisTypeRequests";
@@ -102,8 +102,13 @@ export async function POST(request: Request): Promise<NextResponse> {
    * The ADMIN door stays optional: the by-hand path starts from an empty schema and the founder
    * is authoring a catalog row whose slug the platform map already answers for. Sending it is
    * still honoured — it is the requirement, not the column, that is scoped to the driver.
+   *
+   * The two gates differ by more than presence since 2026-09-03. The driver's must be a COMPLETE
+   * answer (`isDisciplineValue`: class + electric/nitro, and a name if they chose "Other"); the
+   * admin's accepts a bare class too (`isKnownDisciplineClass`), so a bulk manifest of forty
+   * chassis isn't blocked on one missing word by the person who is about to review every row.
    */
-  if (derive && !isChassisPlatformId(discipline)) {
+  if (derive && !isDisciplineValue(discipline)) {
     return NextResponse.json(
       {
         error: discipline
@@ -113,7 +118,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       { status: 400 }
     );
   }
-  if (!derive && discipline && !isChassisPlatformId(discipline)) {
+  if (!derive && discipline && !isKnownDisciplineClass(discipline)) {
     return NextResponse.json({ error: "That isn't a discipline we know." }, { status: 400 });
   }
 
