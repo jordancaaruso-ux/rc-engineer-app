@@ -86,6 +86,30 @@ run(
   { allowFailure: true }
 );
 
-runWithRetry("npx prisma migrate deploy");
+/**
+ * 2026-09-19 — two builders, one database. Every push to `beta` is built twice: by the beta project
+ * (its production) and by the main project (a preview nobody opens). Both point at the production
+ * database, and the advisory lock is off (top of this file), so both ran
+ * `20260919120000_tire_type_position` in the same second. The preview won and applied both tyre
+ * migrations cleanly; the beta build hit "column already exists" and left a FAILED row, which makes
+ * every later `migrate deploy` — beta AND production — stop with P3009. Marking that row rolled back
+ * is enough: the winner's row for the same name stays, so nothing is re-applied.
+ */
+const RACED_TIRE_POSITION_MIGRATION = "20260919120000_tire_type_position";
+
+/**
+ * The race itself: the main project's preview of `beta` has no business migrating production — the
+ * beta project's own build does that. Narrow on purpose (this one branch, this one case) so every
+ * other preview behaves exactly as it did.
+ */
+const isMainProjectPreviewOfBeta =
+  process.env.VERCEL_GIT_COMMIT_REF === "beta" && process.env.VERCEL_ENV !== "production";
+
+if (isMainProjectPreviewOfBeta) {
+  console.log("[vercel-build] preview of beta in the main project — leaving migrations to the beta project's build.");
+} else {
+  run(`npx prisma migrate resolve --rolled-back "${RACED_TIRE_POSITION_MIGRATION}"`, { allowFailure: true });
+  runWithRetry("npx prisma migrate deploy");
+}
 run("node scripts/build-kb-chunk-index.cjs");
 run("npx next build");
