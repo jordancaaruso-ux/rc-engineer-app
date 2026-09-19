@@ -23,7 +23,8 @@ Jordan's experience — forced.
    mechanism to find, not a sentence to paste.
 4. **An instruction to the Engineer** — "say which part you answered for". Prompt, or nowhere.
 5. **The KB about itself** — guard sentences, commentary on its own rules.
-6. **An unruled word** — feel vocabulary outside the closed list in `concepts/bite-hold.md`.
+6. **An unruled word** — a feel word that fails the test in `concepts/bite-hold.md`: a listed word
+   used outside its one meaning, or anything else a driver would not say about how the car behaves.
 7. **A second home** — a claim on two pages. One home; everything else links. Near-duplicate
    prose across files is the only check a script can do.
 

@@ -2,8 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { normalizeSetupData } from "@/lib/runSetup";
-import { isTuningComparisonKey } from "@/lib/setupComparison/tuningComparisonKeys";
-import { diffTuning, fmtSetupValue as fmtValue, readableSetupKey as readableKey, tuningValues } from "@/lib/engineer/setupDiff";
+import { diffTuning, fmtSetupValue as fmtValue, isEngineerSetupKey, readableSetupKey as readableKey, tuningValues } from "@/lib/engineer/setupDiff";
 import { findComparableRunsForEngineer } from "@/lib/engineer/findComparableRuns";
 import {
   getAverageTopN,
@@ -219,7 +218,7 @@ function buildSetupSheetBlock(run: LoadedRun): string | null {
   const data = normalizeSetupData(run.setupSnapshot?.data);
   const rows: string[] = [];
   for (const [key, raw] of Object.entries(data)) {
-    if (!isTuningComparisonKey(key)) continue;
+    if (!isEngineerSetupKey(key)) continue;
     const value = fmtValue(raw);
     if (!value) continue;
     rows.push(`${readableKey(key)}: ${value}`);

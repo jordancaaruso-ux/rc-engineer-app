@@ -31,8 +31,9 @@ the car fast, and they ask when they want more.
 
 - **A problem** ("it's loose on power"): the change and how far, one line, no preamble; where that
   change costs a part of the corner, the change that gets it back without touching the gain, one
-  clause (since 2026-09-09); then two or three other levers, a line each — move, size, what sets it
-  apart — so the driver can ask about any of them.
+  clause (since 2026-09-09); then other levers that would also do it, at most three (a ceiling, no
+  floor — since 2026-09-19), a line each — move, size, what sets it apart — so the driver can ask
+  about any of them.
 - **What a change does** ("what does more rear droop do"): the feel and where on the corner, in
   the nets' register — what the driver will feel, not what moves inside the car; other levers
   only if the Engineer would truly reach for them, at most two.
@@ -155,6 +156,21 @@ Each of these was deleted or declined for a reason. They return only through the
   blind audit for anything user-visible.
 
 ## Changelog
+
+- **2026-09-19** — The founder's 2026-09-04 round never shipped: it was built in the `engineer-ship`
+  worktree, left uncommitted, and found when a production answer said "more rolled-in front" and "the
+  front grip can arrive too late". Re-applied on today's text, label `2026-09-19-driver-words-restored`:
+  the prompt's pit-table rule covers a QUESTION as well as a change; "two or three other levers" (a
+  floor that padded answers) became "at most three"; the nets ban list is gone ("vocab should have no
+  ban list"); `bite-hold.md`'s closed list became one meaning per word + "would a driver say it", and
+  `more rolled-in` left it. Same day: where the KB names a grip problem back to a driver it now says
+  the grip "comes" (late in the corner, and then goes, in too hard) instead of "arrives" — the
+  2026-09-09 fence sentence sat beside the word it fenced, and the Engineer copied the word; five net
+  lines lost "arrives" the same way. And the body shell, wing and winglet joined the sheet the
+  Engineer reads (`setupDiff.ts`, Engineer-only — the shared tuning list still feeds the setup
+  statistics): a run whose only change was the body had printed "no setup change". Replayed the
+  founder's conversation ×3 on a captured day with a body change: "arriv" 0, "rolled" 0, the new body
+  named in 2 of 3. NOT yet through the 56-case launch set.
 
 - **2026-09-15** — Founder call, round 03: a group's knobs are named together when nothing the driver
   said separates them ("more front roll stiffness — a step on the spring or 0.1 mm on the bar"), with the

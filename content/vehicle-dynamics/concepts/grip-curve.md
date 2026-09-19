@@ -32,7 +32,7 @@ the window in [[bite-hold]] moving with grip, drawn as geometry.
   short for the climb. The driver reads this as grip that is never there, numb, imprecise; in a
   quick corner it is the whole corner. The lever is a faster climb: load sooner.
 - **The point overshoots the peak** — the climb was too fast for today's curve. The driver reads
-  this as grip that arrives and then goes: the car bites, then lets go, with little warning the
+  this as grip that comes and then goes: the car bites, then lets go, with little warning the
   sharper the peak. The lever is a slower climb: load later.
 
 Between them is the window: the point reaches the peak and stays near it for the part of the corner

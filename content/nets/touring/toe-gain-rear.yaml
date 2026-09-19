@@ -24,7 +24,7 @@ less:
   reviewed: true
   confidence: majority
   before_settled: "it extends on the way in, so less rear toe there — less security on the first input"
-  once_settled: "as more rear toe — more rear grip, less rotation, more forward traction — arriving as the car rolls and squats"
+  once_settled: "as more rear toe — more rear grip, less rotation, more forward traction — coming in as the car rolls and squats"
 physics:
   - bump-steer-toe-gain.md
   - toe.md

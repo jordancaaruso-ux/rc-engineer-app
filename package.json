@@ -66,7 +66,7 @@
     "engineer:launch:score": "npx tsx scripts/engineer-eval/ingest-launch-grades.ts",
     "engineer:round:page": "npx tsx scripts/engineer-eval/build-round-page.ts",
     "test:engineer-starters": "node --import tsx --test src/lib/engineerStarterQuestions.test.ts",
-    "test:engineer-history": "node --import tsx --test src/lib/engineer/historyShape.test.ts src/lib/engineer/rangeScope.test.ts src/lib/engineer/nameMatch.test.ts src/lib/engineer/fieldPace.test.ts src/lib/engineer/rivals.test.ts",
+    "test:engineer-history": "node --import tsx --test src/lib/engineer/historyShape.test.ts src/lib/engineer/setupDiff.test.ts src/lib/engineer/rangeScope.test.ts src/lib/engineer/nameMatch.test.ts src/lib/engineer/fieldPace.test.ts src/lib/engineer/rivals.test.ts",
     "db:backfill-field-stats": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/backfill-field-stats.ts",
     "engineer:range:fixture": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/engineer-eval/capture-range-fixture.ts",
     "test:engineer-follow": "playwright test e2e/engineer-follow-scroll.spec.ts --project=mobile-chromium",

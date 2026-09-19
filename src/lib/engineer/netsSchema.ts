@@ -29,50 +29,17 @@
  * knob that does the same thing throughout the corner carries one `effect` line per side. The
  * unevenness is the physics talking, which is the only kind allowed.
  *
- * The driver's own words. `bite-hold.md` carries a closed feel vocabulary and names the coinages
- * that are not on it; the founder extended it with the balance words (steering, rotation,
- * forward traction, push, snap). The validator enforces the ban list, not an allow list — an
- * allow list is unenforceable on free text.
+ * The driver's own words. A line describes behaviour a driver can read off the car — responsive
+ * or lazy, where on the corner, on or off the throttle, understeer, rotation, drive — never a
+ * conclusion drawn from the physics that the driver could not feel. There is NO word list, banned
+ * or allowed (founder, 2026-09-04: "vocab should have no ban list"): a list only ever catches what
+ * was already complained about, and the 2026-08-27 ban list ended up forbidding "lazy", the word
+ * drivers actually use for the opposite of responsive. The test is the reader, not a lexicon.
  */
 
 export const NET_CONFIDENCES = ["consensus", "majority", "contested"] as const;
 export const NET_SIDES = ["more", "less"] as const;
 
-/**
- * Words that are not feel words, however natural they sound.
- *
- * `concepts/bite-hold.md` names the first group itself: *"`punchy`, `crisper`, `takes a set`,
- * `lined up`, `skatey`, `on top of it`, `nervous-feeling`, `too immediate` are examples, not the
- * boundary."* The second group are coinages earlier drafts introduced and shipped. The founder's
- * rule for what to do when a coinage is the only word that fits is the important half: *"it is a
- * sign the change has not been understood well enough to predict its feel — in which case say
- * what the change does mechanically, or name where in the corner and what the car does there,
- * and stop."*
- */
-export const BANNED_FEEL_COINAGES: readonly string[] = [
-  "punchy",
-  "crisper",
-  "takes a set",
-  "lined up",
-  "skatey",
-  "on top of it",
-  "nervous-feeling",
-  "too immediate",
-  // "push" is NOT here: founder 2026-08-27 — push is a real balance word (understeer caused by
-  // a lack of rotation from the rear), and it joins the closed list with the other balance words.
-  "wandering",
-  "wanders",
-  "steadier",
-  "lazier",
-  "lazy",
-  "twitchy",
-  "darty",
-  "snappy",
-  "sharper",
-  "sharpens",
-  "washes",
-  "planted-feeling",
-];
 
 export const NET_LINE_MAX = 170;
 export const NET_STEP_MAX = 140;
@@ -171,15 +138,6 @@ function capped(v: unknown, max: number): boolean {
   return typeof v === "string" && v.trim().length > 0 && v.trim().length <= max;
 }
 
-/** Coinages found in a line. Word-boundary matched so "lazy" does not fire on "lazily". */
-export function findBannedCoinages(text: string): string[] {
-  const hay = text.toLowerCase();
-  return BANNED_FEEL_COINAGES.filter((word) => {
-    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return new RegExp(`(^|[^a-z])${escaped}([^a-z]|$)`, "i").test(hay);
-  });
-}
-
 function checkLine(errs: string[], field: string, v: unknown, required: boolean): void {
   if (v == null) {
     if (required) errs.push(`${field}: required — one line, in the driver's words`);
@@ -188,12 +146,6 @@ function checkLine(errs: string[], field: string, v: unknown, required: boolean)
   if (!capped(v, NET_LINE_MAX)) {
     errs.push(`${field}: must be a non-empty string of at most ${NET_LINE_MAX} chars`);
     return;
-  }
-  const banned = findBannedCoinages(v as string);
-  if (banned.length > 0) {
-    errs.push(
-      `${field}: "${banned.join('", "')}" ${banned.length === 1 ? "is a coinage" : "are coinages"} — per bite-hold.md, that means the change is not understood well enough to predict its feel. Say what it does mechanically, or name where in the corner and what the car does there, and stop`
-    );
   }
 }
 

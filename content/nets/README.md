@@ -67,9 +67,9 @@ FRONT ANTI-ROLL BAR | a normal move: 0.1 mm
 
 DIFF OIL | a normal move: 1,000 cSt
   THICKER
-    EFFECT: less rotation off throttle and more rotation on throttle — …
+    EFFECT: more drive off the corner — both rear tyres put the power down — with more rotation on throttle; …
   THINNER
-    EFFECT: more rotation off throttle and less on throttle — …
+    EFFECT: less drive off the corner and less rotation on throttle; …
 ```
 
 Since 2026-09-02 the heading carries no parameter id and there is no WHY line: the ids leaked into
@@ -83,11 +83,13 @@ Damper oil is the proof the shape is right: its THROUGH THE MIDDLE line says *"n
 — `bite-hold.md` is explicit that damping moves *when* load arrives without changing the roll angle
 the car ends up at.
 
-**Corner types are never named.** A hairpin is slow, so it lasts a long time and *is* settled; a
-180° hairpin and a 90° sweeper of four times the radius take the same time. What matters is
-duration against the car's roll time, and the Engineer gets that from the driver ("how long are you
-turning for, and how quick are you going through it?") when it is missing and would change the
-answer.
+**Corner types are never named, and the corner's clock is never asked.** What matters is duration
+against the car's roll time, and the Engineer works that out from what the driver has already said
+— which corner, where on it, how the car behaved. The question "how long are you turning for, and
+how quick?" came out of the prompt on 2026-09-03 (founder: "a lot of drivers would struggle to
+answer that accurately"); a contested block's discriminator names something to watch after the
+change, never that question. Founder 2026-09-02, still open against `corner-regime.md`: in a
+hairpin the car may be in transition for longest, not settled — see that page's founder mark.
 
 ---
 
@@ -106,7 +108,7 @@ two_answers: true                # true => before_settled + once_settled per sid
 more:
   reviewed: true                 # founder has passed this side; false = AI-drafted
   confidence: consensus          # consensus | majority | contested — per side
-  before_settled: "..."          # max 170 chars each, driver's words, no banned coinage
+  before_settled: "..."          # max 170 chars each, in the driver's words (no word list)
   once_settled: "..."
 less:
   reviewed: false
@@ -125,22 +127,21 @@ sources:                         # authoring record only — never rendered, nev
 
 ### The words
 
-`concepts/bite-hold.md` carries the closed list of feel words — *bite, initial grip, overall grip,
-hold, precise, pointy, planted, forgiving, numb, unpredictable, imprecise, smoother, more rolled-in,
-on the track, in the track, entry, mid-corner, on power* — and the rule that matters more than the
-list:
+A line says what a driver can read off the car: responsive or lazy, where on the corner, on or off
+the throttle, understeer, rotation, drive, security, how it lets go. It never says a conclusion the
+driver could not feel — "the settled share moves to the rear" is physics, and physics lives in
+`content/vehicle-dynamics/`. Founder, 2026-09-04: *"use terms that people would use to describe
+general car behaviour rather than physics — things a driver can interpret from the handling, not
+assume based on physics."*
 
-> anything outside it is not a feel word that needs replacing with a better adjective, it is a sign
-> the change has not been understood well enough to predict its feel — in which case say what the
-> change does **mechanically**, or name **where in the corner** and **what the car does there**, and
-> stop.
+**There is no word list.** Not a banned one, not an allowed one. The 2026-08-27 ban list (punchy,
+crisper, takes a set, wandering, steadier, lazier, twitchy, darty, sharper…) was retired the same
+day the founder reached for "lazy" as the driver's word for the opposite of responsive and found it
+banned. A list only ever catches what was already complained about; the test is whether a driver
+would say it, and that is judged by the founder's pass, not a validator. `bite-hold.md` carries the
+same rule and the shared meanings of the words that need one.
 
-The validator enforces this as a **banned-coinage list**, not an allowed list — an allowed list is
-unenforceable on free text. It is seeded with the coinages `bite-hold.md` names (punchy, crisper,
-takes a set, skatey, on top of it, nervous-feeling) plus every one earlier drafts shipped (pushes,
-wandering, steadier, lazier, twitchy, darty, sharper).
-
-**The balance words** — founder-dictated 2026-08-27, on `bite-hold.md`'s closed list:
+**The balance words** — founder-dictated 2026-08-27, defined on `bite-hold.md`:
 
 | Word | Means |
 |---|---|
@@ -152,7 +153,7 @@ wandering, steadier, lazier, twitchy, darty, sharper).
 | **snap** | a quick oversteer |
 
 These are what the run log records and what these entries are for. Note `push` is a balance word
-with a specific meaning and is *not* a coinage — an earlier ban list had it wrong.
+with a specific meaning.
 
 ### `step`
 
@@ -168,7 +169,7 @@ this was the field every one of them landed in. Measured from users' setup data 
 
 | Field | Cap |
 |---|---|
-| each line | 170 chars, no banned coinage |
+| each line | 170 chars |
 | `step` | 140 chars, or null |
 | `label` / each `words` entry | 40 chars |
 | `contested` fields | 200 chars each |
@@ -180,7 +181,7 @@ ceiling stops an entry growing back into the one the model favours by bulk.
 ## Validation
 
 `npm run nets:check` — schema, `id` = `parameter`, the shape on each side matches `two_answers`, no
-banned coinage on any line, contested ⇒ both claims + discriminator, `physics` files resolve, render
+contested ⇒ both claims + discriminator, `physics` files resolve, render
 ceiling, no duplicate parameter per discipline, and a list of every side still `reviewed: false`.
 
 ---

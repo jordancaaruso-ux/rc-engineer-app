@@ -17,11 +17,11 @@ two_answers: false
 more:
   reviewed: true
   confidence: majority
-  effect: "the rear squats less on power and the drive arrives sooner — more forward traction and more on-power steering on a smooth track; less forgiving over bumps under power"
+  effect: "the rear squats less on power and the drive comes in sooner — more forward traction and more on-power steering on a smooth track; less forgiving over bumps under power"
 less:
   reviewed: false
   confidence: majority
-  effect: "the rear squats more on power and the drive arrives later — less forward traction and less on-power steering on a smooth track; more forgiving over bumps under power"
+  effect: "the rear squats more on power and the drive comes in later — less forward traction and less on-power steering on a smooth track; more forgiving over bumps under power"
 physics:
   - anti-dive-anti-squat.md
 sources:

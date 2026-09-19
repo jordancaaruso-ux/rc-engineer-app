@@ -23,11 +23,24 @@ export function readableSetupKey(key: string): string {
   return key.replace(/[_\-]+/g, " ").trim();
 }
 
-/** The tuning keys only — the blob also carries tyres, battery, body and free text. */
+/**
+ * The body on the car. The shared tuning list leaves these out because its other readers are
+ * setup statistics, where a shell name is not a number to aggregate. To the Engineer a new shell
+ * is a change the driver made: until 2026-09-19 a run whose only change was the body printed
+ * "no setup change", and the Engineer asked a driver what he had tried on the run he tried it.
+ */
+const ENGINEER_BODY_KEYS = new Set<string>(["bodyshell", "wing", "winglet"]);
+
+/** What the Engineer reads off a sheet: the tuning keys plus the body. */
+export function isEngineerSetupKey(key: string): boolean {
+  return isTuningComparisonKey(key) || ENGINEER_BODY_KEYS.has(key);
+}
+
+/** Tuning and body keys only — the blob also carries tyres, battery, electronics and free text. */
 export function tuningValues(data: unknown): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, raw] of Object.entries(normalizeSetupData(data))) {
-    if (!isTuningComparisonKey(key)) continue;
+    if (!isEngineerSetupKey(key)) continue;
     const value = fmtSetupValue(raw);
     if (value) out[key] = value;
   }

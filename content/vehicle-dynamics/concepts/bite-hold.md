@@ -24,15 +24,14 @@ with nothing on the car changed.
 
 **Per axle.** Front and rear each have their own bite/hold.
 
-## Feel vocabulary (the closed list)
+## Feel vocabulary
 
-These are the **only** words available for describing how a change feels, for asking the driver
-where a problem is, and for naming their problem back to them (founder, 2026-09-08). Their own
-words stay theirs to repeat; this list is what the Engineer adds. The list is closed:
-anything outside it is not a feel word that needs replacing with a better adjective, it is a sign
-the change has not been understood well enough to predict its feel — in which case say what the
-change does **mechanically**, or name **where in the corner** and **what the car does there**, and
-stop.
+These words carry one meaning each, here and in the nets — for describing how a change feels, for
+asking the driver where a problem is, and for naming their problem back to them (founder,
+2026-09-08). Their own words stay theirs to repeat. Anything else passes one test: would a driver
+say it about how the car behaves. Never describe a feel by what moves inside the car. (Founder,
+2026-09-04 — replaces the closed list and its "say it mechanically" fallback, which was producing
+questions in the physics' words.)
 
 - **Grip, and when in the corner it comes** (founder, 2026-09-09): `bite`, `initial grip`, `overall grip`; to
   a driver grip is `sooner` or `later in the corner`, `more grip in the middle`, `more grip through the
@@ -42,7 +41,7 @@ stop.
 - **Hold end of the window:** `planted`, `forgiving`
 - **Too little bite:** `numb`, `unpredictable`, `imprecise`, `vague`, `floaty` (founder, 2026-08-28:
   floaty is vague, lacks precision, doesn't do what you want — this group, not a damping word)
-- **Roll-centre / link language:** `smoother`, `more rolled-in`, `on the track`, `in the track`
+- **Roll-centre / link language:** `smoother`, `on the track`, `in the track`
 - **Phase** (founder, 2026-09-08): `entering` / `turning in`, `in the middle`, `exiting` — the
   three places in the driver's words; "entry", "mid-corner", "going in" and "coming out" are ours
 - **Throttle:** `on power`, `off power` — a separate axis from the phase above for entering and the
@@ -56,11 +55,6 @@ stop.
   Response comes from several things — the angle the car gives the tyre ([[steering-response]]) as
   much as initial grip — and bite is one of them (founder, 2026-08-29). Never a word for a lower
   roll centre or a flatter upper link.
-
-Everything else is a coinage, however natural it sounds. `punchy`, `crisper`, `takes a set`,
-`lined up`, `skatey`, `on top of it`, `nervous-feeling`, `too immediate` are examples, not the
-boundary — the boundary is this list. A coinage carries no mechanism, cannot be checked on track,
-and leaves the driver asking what was meant.
 
 ## Reading a complaint (a method, not a dictionary)
 
@@ -111,21 +105,21 @@ facts, never against the words.
    ([[grip-curve]]) — or whether it is the angle the car gives the tyre rather than the grip
    ([[steering-response]]; "initial steering", more of it or a calmer first input, is the angle
    first, as that page says):
-   - it **arrives late** (there once settled, not on the first input). Read this with fact 2: grip
-     that arrives for the last tenth of a corner is, to the driver, no grip in that corner — and in a
-     fast car or a quick corner most corners are like that, so "no grip anywhere" and "it arrives
+   - it **comes late in the corner** (there once settled, not on the first input). Read this with fact 2: grip
+     that comes for the last tenth of a corner is, to the driver, no grip in that corner — and in a
+     fast car or a quick corner most corners are like that, so "no grip anywhere" and "it comes
      late" are often the same complaint, not two;
-   - it **has no bite** — the grip that arrives is progressive and low rather than sharp and high.
-     This usually goes hand in hand with arriving late, because the same knobs move both, but it is
-     not the same fact: bite is the shape of the arrival, lateness its timing. A driver who says
+   - it **has no bite** — the grip that comes is progressive and low rather than sharp and high.
+     This usually goes hand in hand with coming late, because the same knobs move both, but it is
+     not the same fact: bite is the shape of how the grip comes in, lateness its timing. A driver who says
      "bite", "numb", "imprecise", "unpredictable", "vague" or "floaty" has used this page's words and named this fact
-     — the initial grip, which is entering the corner, so fact 2 is answered too. It is not the never-arrives
+     — the initial grip, which is entering the corner, so fact 2 is answered too. It is not the never-there
      case below, and neither needs separating with a question;
-   - it **never arrives** — the grip is not there at all, or the tyre and track are the limit
+   - it **is never there** — the grip is not there at all, or the tyre and track are the limit
      before the car is;
-   - it **arrives and then goes**, suddenly and without warning — past the bite end of the window,
+   - it **comes and then goes**, suddenly and without warning — past the bite end of the window,
      or something running out ([[droop-downstop]], [[ride-height-and-rake]]);
-   - it **arrives too hard** — too much bite;
+   - it **comes in too hard** — too much bite;
    - the car **moves too far, or too fast or too slow**, getting there — a question of how the car
      moves, not of its grip; how far it moves and how fast are set by different things
      ([[roll-stiffness]], [[damping]]).
