@@ -15,14 +15,21 @@ function collect(rows: Array<Record<string, string | null>>, key: string): strin
 
 export async function tireTypeIdsInUse(ids: string[]): Promise<Set<string>> {
   if (ids.length === 0) return new Set();
-  const [sets, parts] = await Promise.all([
+  const [sets, fronts, parts] = await Promise.all([
     prisma.run.groupBy({ by: ["tireTypeId"], where: { tireTypeId: { in: ids } } }),
+    // A row that is only ever somebody's FRONT tire is just as much in use: deleting it would
+    // null that end of their run through the foreign key, with nothing said.
+    prisma.run.groupBy({ by: ["frontTireTypeId"], where: { frontTireTypeId: { in: ids } } }),
     prisma.eventParticipation.groupBy({
       by: ["controlledTireTypeId"],
       where: { controlledTireTypeId: { in: ids } },
     }),
   ]);
-  return new Set([...collect(sets, "tireTypeId"), ...collect(parts, "controlledTireTypeId")]);
+  return new Set([
+    ...collect(sets, "tireTypeId"),
+    ...collect(fronts, "frontTireTypeId"),
+    ...collect(parts, "controlledTireTypeId"),
+  ]);
 }
 
 export async function additiveTypeIdsInUse(ids: string[]): Promise<Set<string>> {

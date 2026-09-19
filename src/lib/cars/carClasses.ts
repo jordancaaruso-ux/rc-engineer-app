@@ -37,7 +37,11 @@
  * `raceClass`; if it ever needs to drive behaviour it belongs there, not here.
  */
 
-/** Where it races. Purely how the picker groups the classes — nothing branches on it. */
+/**
+ * Where it races. Only how the class picker groups its rows. What a class means for TIRES — which
+ * slice of the catalog, and whether front and rear are logged apart — is decided per class id in
+ * `tireProfile.ts`, not from this.
+ */
 export type DisciplineSurface = "onroad" | "offroad";
 
 export type PowerId = "electric" | "nitro";

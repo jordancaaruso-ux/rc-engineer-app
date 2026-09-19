@@ -20,6 +20,7 @@ import {
   parseWarmerTimingMinutes,
 } from "@/lib/runs/applyRunContextToSetupSnapshot";
 import { normalizeTirePrep, derivedWarmerTimingMinutes } from "@/lib/runs/tirePrep";
+import { normalizeTireFitment } from "@/lib/tires/tireFitment";
 import { draftCompletionDayStamp } from "@/lib/runs/draftCompletionDay";
 import { applyTireRunNumberCascade } from "@/lib/tires/applyTireRunNumberCascade";
 import { getSetupSheetFieldKeysForCarRow } from "@/lib/runs/setupSheetFieldKeysForCar";
@@ -65,6 +66,20 @@ type RunUpsertBody = {
   warmerTimingMinutes?: number | null;
   /** Ordered tire-prep applications (see src/lib/runs/tirePrep.ts). */
   tirePrep?: unknown;
+  /**
+   * The FRONT tire on a car that logs front and rear apart (off-road). The un-prefixed fields
+   * above are then the rear. Same meanings, same stint rule.
+   *
+   * ABSENT IS NOT NULL. A client that says nothing about the front — every bundle built before
+   * 2026-09-19, which a PWA or the iOS shell can keep running for days — must not wipe one that
+   * is stored. `frontTireTypeId: null` is the instruction to clear it.
+   */
+  frontTireTypeId?: string | null;
+  frontTireStintId?: string | null;
+  frontTireAgeKnown?: boolean;
+  frontTireRunNumber?: number;
+  /** What each end is glued to (see src/lib/tires/tireFitment.ts). Absent = leave as stored. */
+  tireFitment?: unknown;
   setupData?: unknown;
   /** When set, server merges setupData onto this snapshot (full or sparse) and stores audit delta. */
   setupBaselineSnapshotId?: string | null;
@@ -180,6 +195,9 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     conditionsSource: string | null;
     tireTypeId: string | null;
     tireStintId: string | null;
+    frontTireTypeId: string | null;
+    frontTireStintId: string | null;
+    frontTireRunNumber: number | null;
     sortAt: Date;
   } | null = null;
   if (params.mode === "update") {
@@ -202,6 +220,9 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         // and what keeps an edit on the stint it already belongs to.
         tireTypeId: true,
         tireStintId: true,
+        frontTireTypeId: true,
+        frontTireStintId: true,
+        frontTireRunNumber: true,
         sortAt: true,
         importedLapTimeSessionId: true,
       },
@@ -308,6 +329,12 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     typeof body.additiveTypeId === "string" && body.additiveTypeId.trim()
       ? body.additiveTypeId.trim()
       : null;
+  // The key being present is the instruction — see `RunUpsertBody.frontTireTypeId`.
+  const frontTireSent = "frontTireTypeId" in body;
+  const frontTireTypeId =
+    typeof body.frontTireTypeId === "string" && body.frontTireTypeId.trim()
+      ? body.frontTireTypeId.trim()
+      : null;
   const needsParticipationCheck =
     loggingComplete && Boolean(body.eventId) && body.sessionType === "RACE_MEETING";
 
@@ -325,7 +352,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
    * The car row is read ONCE. It used to be fetched twice from the same table by the
    * same key — once for the setup-sheet keys, once for the name.
    */
-  const [baselineRow, pdfLinks, tireType, additiveType, participation, carRow, track] =
+  const [baselineRow, pdfLinks, tireType, additiveType, participation, carRow, track, frontTireType] =
     await Promise.all([
       baselineId
         ? prisma.setupSnapshot.findFirst({
@@ -367,6 +394,9 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
             where: communityTrackByIdWhere(body.trackId),
             select: { name: true, latitude: true, longitude: true },
           })
+        : null,
+      frontTireTypeId
+        ? prisma.tireType.findUnique({ where: { id: frontTireTypeId }, select: { id: true } })
         : null,
     ]);
 
@@ -419,6 +449,63 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       ? body.tireStintId.trim()
       : (keepsStoredCompound ? existingUpdate!.tireStintId : null) ?? randomUUID()
     : null;
+
+  /*
+   * The front end of a front/rear car: the same rules as above, run a second time over its own
+   * columns. Two lives of rubber, because fronts and rears wear at different rates and are
+   * replaced at different times (founder ruling 2026-09-19).
+   *
+   * Nothing here asks what the car races. A touring car's form never sends a front, and a run is
+   * front/rear because it HAS one — not because of what its car is classed as today.
+   */
+  if (frontTireTypeId && !frontTireType) {
+    return NextResponse.json({ error: "Tire type not found" }, { status: 400 });
+  }
+  const keepsStoredFrontCompound =
+    existingUpdate != null &&
+    frontTireTypeId != null &&
+    existingUpdate.frontTireTypeId === frontTireTypeId;
+  const frontStintFromBody =
+    typeof body.frontTireStintId === "string" && body.frontTireStintId.trim()
+      ? body.frontTireStintId.trim()
+      : null;
+  const frontTireRunNumberFromBody =
+    typeof body.frontTireRunNumber === "number" && Number.isFinite(body.frontTireRunNumber)
+      ? Math.max(1, Math.floor(body.frontTireRunNumber))
+      : null;
+  const frontTireRunNumber = frontTireTypeId
+    ? (frontTireRunNumberFromBody ??
+      (keepsStoredFrontCompound
+        ? Math.max(1, Math.floor(Number(existingUpdate!.frontTireRunNumber) || 1))
+        : 1))
+    : null;
+  let frontTireStintId = frontTireTypeId
+    ? (frontStintFromBody ??
+      (keepsStoredFrontCompound ? existingUpdate!.frontTireStintId : null) ??
+      randomUUID())
+    : null;
+  // One stint id is one life of rubber on ONE end. A client that sent the rear's id for the front
+  // would weld the two sets into a single chain, so the front gets its own.
+  if (frontTireStintId != null && frontTireStintId === tireStintId) frontTireStintId = randomUUID();
+  /** Written only when the client spoke about the front at all; otherwise the row keeps its own. */
+  const frontTireColumns = frontTireSent
+    ? {
+        frontTireTypeId,
+        frontTireStintId,
+        frontTireRunNumber,
+        frontTireAgeKnown: frontTireTypeId ? body.frontTireAgeKnown !== false : null,
+      }
+    : {};
+  // SQL NULL when empty, never JSON null: the "own list" scan finds its rows by this column
+  // being non-null (`/api/tire-fitment/recent`).
+  const tireFitmentColumn =
+    "tireFitment" in body
+      ? {
+          tireFitment:
+            (normalizeTireFitment(body.tireFitment) as PrismaTypes.InputJsonValue | null) ??
+            Prisma.DbNull,
+        }
+      : {};
 
   // Run-context tires MUST be applied before persisting the snapshot; otherwise loaded
   // baseline / client setupData leaks stale tires into DB (overwrite ran after create).
@@ -614,6 +701,8 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         tireStintId,
         tireAgeKnown,
         tireRunNumber,
+        ...frontTireColumns,
+        ...tireFitmentColumn,
         additiveTypeId,
         warmerTimingMinutes,
         tirePrep: tirePrep as unknown as PrismaTypes.InputJsonValue,
@@ -664,6 +753,8 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       tireStintId,
       tireAgeKnown,
       tireRunNumber,
+      ...frontTireColumns,
+      ...tireFitmentColumn,
       additiveTypeId,
       warmerTimingMinutes,
       tirePrep: tirePrep as unknown as PrismaTypes.InputJsonValue,
@@ -757,6 +848,21 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       nextTireRunNumber: tireRunNumber,
       sortAt: existing.sortAt,
     });
+    // The front end's own set, corrected the same way. Reported under the one key the form
+    // already reads: the rear's result wins, and a front-only correction is not left unsaid.
+    if (frontTireSent && frontTireRunNumber != null && existing.frontTireRunNumber != null) {
+      const frontCascade = await applyTireRunNumberCascade({
+        userId: params.userId,
+        runId: existing.id,
+        end: "front",
+        tireStintId: frontTireStintId,
+        previousTireStintId: existing.frontTireStintId,
+        previousTireRunNumber: existing.frontTireRunNumber,
+        nextTireRunNumber: frontTireRunNumber,
+        sortAt: existing.sortAt,
+      });
+      tireRunNumberCascade = tireRunNumberCascade ?? frontCascade;
+    }
   }
 
   const importedLapSets = Array.isArray(body.importedLapSets) ? body.importedLapSets : [];

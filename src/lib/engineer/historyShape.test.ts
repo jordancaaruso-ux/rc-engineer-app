@@ -299,3 +299,43 @@ test("the block names the range, the count, what is not shown, and reads as DRIV
   assert.match(block, /SETUP ON THE CAR AT THE LAST RUN SHOWN \(A800RR, 2026-08-01\)/);
   assert.equal(renderHistoryBlock({ scopeLabel: "x", runs: [], omittedOlder: 0, lastSetup: null }), null);
 });
+
+test("a front/rear run names both ends on its line; a single-tyre line is untouched", () => {
+  const buggy = run({
+    carId: "buggy", carName: "CAT PB",
+    tyreName: "Cactus Yellow", tyreRun: 2, tyreStintId: "rear-a",
+    frontTyreName: "AKA Array Clay", frontTyreRun: 6, frontTyreAgeKnown: false, frontTyreStintId: "front-a",
+  });
+  const touring = run({ tyreName: "Sorex 28", tyreRun: 3, tyreStintId: "s1" });
+  const [buggyLine] = renderRunLines([buggy]);
+  assert.match(buggyLine, /front tyre run 6\?  AKA Array Clay  rear tyre run 2  Cactus Yellow/);
+  const [touringLine] = renderRunLines([touring]);
+  assert.match(touringLine, /tyre run 3  Sorex 28/);
+  assert.doesNotMatch(touringLine, /front|rear/);
+});
+
+test("the tyre tables follow the REAR set and flag where the fronts changed inside it", () => {
+  const rear = { tyreName: "Cactus Yellow", tyreStintId: "rear-a", carId: "buggy" };
+  const runs = [
+    run({ ...rear, tyreRun: 1, best: 20.0, frontTyreName: "Array Clay", frontTyreRun: 4, frontTyreStintId: "front-a" }),
+    run({ ...rear, tyreRun: 2, best: 20.2, frontTyreName: "Array Clay", frontTyreRun: 5, frontTyreStintId: "front-a" }),
+    run({ ...rear, tyreRun: 3, best: 20.1, frontTyreName: "Dirt Webs", frontTyreRun: 1, frontTyreStintId: "front-b" }),
+  ];
+  // One set — the rear's — not split by the front change.
+  assert.equal(groupTyreSets(runs).length, 1);
+  const section = renderTyreSection(runs)!;
+  assert.match(section, /run 2 best 20\.20 /);
+  assert.match(section, /run 3 \(front tyres changed\) best 20\.10 /);
+  assert.equal(section.match(/front tyres changed/g)?.length, 1, "flagged once, where it happened");
+});
+
+test("the front/rear legend appears only when the range holds a front/rear run", () => {
+  const base = { scopeLabel: "last 5 runs", omittedOlder: 0, lastSetup: null };
+  const onRoad = renderHistoryBlock({ ...base, runs: [run({ tyreRun: 1, tyreStintId: "s1" })] });
+  assert.doesNotMatch(onRoad ?? "", /REAR set only/);
+  const offRoad = renderHistoryBlock({
+    ...base,
+    runs: [run({ tyreRun: 1, tyreStintId: "r1", frontTyreName: "Array Clay", frontTyreRun: 1, frontTyreStintId: "f1" })],
+  });
+  assert.match(offRoad ?? "", /follow the REAR set only/);
+});

@@ -12,6 +12,7 @@ import { deriveEditEntry } from "@/lib/runs/wizardEntry";
 import { WIZARD_STEPS } from "@/lib/runs/wizardWalk";
 import { safeAppPath } from "@/lib/navigation/safeAppPath";
 import { confirmRunReturnHref } from "@/lib/runs/confirmRunHref";
+import { disciplineForCar } from "@/lib/cars/chassisPlatform";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +83,13 @@ export default async function EditRunPage({
       tireAgeKnown: true,
       tireType: { select: { id: true, displayName: true } },
       tireRunNumber: true,
+      // The front end of a front/rear car, and what each end is glued to.
+      frontTireTypeId: true,
+      frontTireStintId: true,
+      frontTireAgeKnown: true,
+      frontTireRunNumber: true,
+      frontTireType: { select: { id: true, displayName: true } },
+      tireFitment: true,
       additiveTypeId: true,
       warmerTimingMinutes: true,
       tirePrep: true,
@@ -148,11 +156,18 @@ export default async function EditRunPage({
     );
   }
 
-  const [cars, allTracks, favouriteTrackIds] = await Promise.all([
+  const [carRows, allTracks, favouriteTrackIds] = await Promise.all([
     prisma.car.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, setupSheetTemplate: true, setupSheetModelId: true },
+      select: {
+        id: true,
+        name: true,
+        setupSheetTemplate: true,
+        setupSheetModelId: true,
+        carClass: true,
+        setupSheetModel: { select: { slug: true, discipline: true } },
+      },
     }),
     prisma.track.findMany({
       where: trackCatalogScopeWhere(user),
@@ -171,6 +186,17 @@ export default async function EditRunPage({
     }),
     getFavouriteTrackIdsForUser(user.id),
   ]);
+
+  // The discipline decides which tires the form offers and how it asks for them, same as a new
+  // run — the edit form was handed no platform at all before 2026-09-19.
+  const cars = carRows.map(({ setupSheetModel, carClass, ...c }) => ({
+    ...c,
+    platform: disciplineForCar({
+      carClass,
+      setupSheetTemplate: c.setupSheetTemplate,
+      setupSheetModel,
+    }),
+  }));
 
   const favSet = new Set(favouriteTrackIds);
   const favouriteTracks = allTracks.filter((t) => favSet.has(t.id));
@@ -280,6 +306,12 @@ export default async function EditRunPage({
             tireStintId: run.tireStintId,
             tireAgeKnown: run.tireAgeKnown,
             tireRunNumber: run.tireRunNumber,
+            frontTireTypeId: run.frontTireTypeId,
+            frontTireStintId: run.frontTireStintId,
+            frontTireAgeKnown: run.frontTireAgeKnown,
+            frontTireRunNumber: run.frontTireRunNumber,
+            frontTireType: run.frontTireType,
+            tireFitment: run.tireFitment,
             additiveTypeId: run.additiveTypeId,
             warmerTimingMinutes: run.warmerTimingMinutes,
             tirePrep: run.tirePrep,

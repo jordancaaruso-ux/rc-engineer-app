@@ -35,6 +35,12 @@ const pickerRunSelect = {
   tireType: { select: { id: true, displayName: true } },
     tireStintId: true,
     tireAgeKnown: true,
+  // The front end of a front/rear run, and what each end is glued to.
+  frontTireType: { select: { id: true, displayName: true } },
+  frontTireStintId: true,
+  frontTireAgeKnown: true,
+  frontTireRunNumber: true,
+  tireFitment: true,
   event: { select: { name: true } },
 } as const;
 

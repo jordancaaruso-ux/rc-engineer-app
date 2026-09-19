@@ -61,6 +61,27 @@ export function tireAgeReadout(source: TireAgeSource, value: TireStintValue): Ti
 }
 
 /**
+ * The same answer as `tireAgeReadout`, on one line — for a front/rear car, where two of the big
+ * "On the car now" boxes stacked on a phone would push the rear tire off the screen (founder call
+ * 2026-09-19: both ends on one screen, the readout shrinks to a line per end). A carried count
+ * says so in the line itself, because the separate hint line is gone too. Null while no tire is
+ * picked: the dimmed chips already say that.
+ */
+export function tireAgeReadoutLine(source: TireAgeSource, value: TireStintValue): string | null {
+  if (source === null) return null;
+  const lead = source === "carried" ? "Carried on · " : "";
+  if (!value.ageKnown) {
+    return `${lead}Age unknown · ${
+      value.runsCompleted === 0
+        ? "first run since you got them"
+        : `${runs(value.runsCompleted)} since you got them`
+    }`;
+  }
+  if (value.runsCompleted === 0) return `${lead}New tires · this will be run 1`;
+  return `${lead}${runs(value.runsCompleted)} on these · this will be run ${value.runsCompleted + 1}`;
+}
+
+/**
  * The line under the chips. Says where the count came from so a carried number
  * is never mistaken for one the driver entered — and says nothing once they have
  * corrected it, because then they already know.

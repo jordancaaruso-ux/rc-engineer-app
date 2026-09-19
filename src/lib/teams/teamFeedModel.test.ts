@@ -287,3 +287,27 @@ test("a feed entry carries no attribution verdict", () => {
     assert.ok(!(banned in entry), `TeamFeedEntry must not expose "${banned}"`);
   }
 });
+
+test("a front/rear run says which end moved — the two ends are separate sets", () => {
+  const front = { frontTireTypeId: "f1", frontTireTypeLabel: "AKA Array Clay", frontTireAgeKnown: true };
+  // New fronts only; the rears are the same set, one run older.
+  const rows = computeAlsoMoved(
+    run({ id: "a", tireStintId: "r1", tireRunNumber: 3, ...front, frontTireStintId: "f-new", frontTireRunNumber: 1 }),
+    run({ id: "b", tireStintId: "r1", tireRunNumber: 2, ...front, frontTireStintId: "f-old", frontTireRunNumber: 6 })
+  );
+  assert.equal(rows.find((r) => r.kind === "tires")?.detail, "Front: New set · Rear: Run 2 → 3");
+
+  // Only the front compound changed, and the rear count is unknown-aged: just the front is said.
+  const compound = computeAlsoMoved(
+    run({ id: "a", tireStintId: "r1", tireAgeKnown: false, frontTireTypeId: "f2", frontTireTypeLabel: "Dirt Webs", frontTireStintId: "f2s" }),
+    run({ id: "b", tireStintId: "r1", tireAgeKnown: false, ...front, frontTireStintId: "f1s" })
+  );
+  assert.equal(compound.find((r) => r.kind === "tires")?.detail, "Front: AKA Array Clay → Dirt Webs");
+
+  // Nothing moved on either end: no row at all.
+  const same = computeAlsoMoved(
+    run({ id: "a", tireStintId: "r1", tireRunNumber: 2, ...front, frontTireStintId: "f1s", frontTireRunNumber: 4 }),
+    run({ id: "b", tireStintId: "r1", tireRunNumber: 2, ...front, frontTireStintId: "f1s", frontTireRunNumber: 4 })
+  );
+  assert.equal(same.filter((r) => r.kind === "tires").length, 0);
+});

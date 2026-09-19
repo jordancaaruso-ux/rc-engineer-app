@@ -146,6 +146,12 @@ const runHistorySelect = {
   track: { select: { id: true, name: true } },
   tireStintId: true,
   tireAgeKnown: true,
+  // The front end of a front/rear car, and what each end is glued to.
+  frontTireRunNumber: true,
+  frontTireStintId: true,
+  frontTireAgeKnown: true,
+  frontTireType: { select: { id: true, displayName: true } },
+  tireFitment: true,
   tireType: {
     select: {
       id: true,
@@ -496,7 +502,7 @@ export default async function RunHistoryPage({
   }
 
   if (!teamAccessDenied) {
-    const [cars, tracks, scopedEvents, tireSets] = await Promise.all([
+    const [cars, tracks, scopedEvents, tireSets, frontTireSets] = await Promise.all([
       prisma.car.findMany({
         where: { userId: user.id },
         orderBy: { name: "asc" },
@@ -515,6 +521,12 @@ export default async function RunHistoryPage({
         where: { userId: user.id, tireTypeId: { not: null } },
         _count: { _all: true },
       }),
+      // Front tires of front/rear runs: a compound run only on the front still belongs in the list.
+      prisma.run.groupBy({
+        by: ["frontTireTypeId"],
+        where: { userId: user.id, frontTireTypeId: { not: null } },
+        _count: { _all: true },
+      }),
     ]);
     filterCars = cars.map((c) => ({ id: c.id, label: c.name }));
     filterTracks = tracks.map((t) => ({ id: t.id, label: t.name }));
@@ -523,7 +535,14 @@ export default async function RunHistoryPage({
     const tireTypeNames = new Map<string, string>(
       (
         await prisma.tireType.findMany({
-          where: { id: { in: tireSets.map((t) => t.tireTypeId!).filter(Boolean) } },
+          where: {
+            id: {
+              in: [
+                ...tireSets.map((t) => t.tireTypeId!),
+                ...frontTireSets.map((t) => t.frontTireTypeId!),
+              ].filter(Boolean),
+            },
+          },
           select: { id: true, displayName: true },
         })
       ).map((t) => [t.id, t.displayName] as const)
@@ -531,6 +550,11 @@ export default async function RunHistoryPage({
     const tireTypeCounts = new Map<string, number>();
     for (const row of tireSets) {
       const identity = tireTypeNames.get(row.tireTypeId!);
+      if (!identity) continue;
+      tireTypeCounts.set(identity, (tireTypeCounts.get(identity) ?? 0) + row._count._all);
+    }
+    for (const row of frontTireSets) {
+      const identity = tireTypeNames.get(row.frontTireTypeId!);
       if (!identity) continue;
       tireTypeCounts.set(identity, (tireTypeCounts.get(identity) ?? 0) + row._count._all);
     }

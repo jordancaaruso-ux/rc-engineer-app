@@ -21,6 +21,7 @@ import { randomUUID } from "crypto";
 import { applyTireRunNumberCascade } from "@/lib/tires/applyTireRunNumberCascade";
 import { applyRunCarMove } from "@/lib/runs/applyRunCarMove";
 import { normalizeTirePrep, tirePrepHasContent, derivedWarmerTimingMinutes } from "@/lib/runs/tirePrep";
+import { normalizeTireFitment } from "@/lib/tires/tireFitment";
 import { getFiveMinuteStintStartingAt, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
 import { normalizeLapTimes } from "@/lib/runLaps";
 import { LAP_SESSION_VERSION } from "@/lib/lapSession/types";
@@ -159,6 +160,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       tireTypeId: true,
       tireStintId: true,
       tireRunNumber: true,
+      frontTireTypeId: true,
+      frontTireStintId: true,
+      frontTireRunNumber: true,
       unconfirmedAt: true,
       conditionsAirTempC: true,
       conditionsTrackTempC: true,
@@ -380,6 +384,66 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
   }
 
+  /*
+   * The FRONT tire of a front/rear car — the block above, run over the front's own columns
+   * (2026-09-19). Its own stint and its own count, so a front correction moves the front's later
+   * runs and never the rear's. Clearing the front tire clears everything that described it.
+   */
+  const wantsFrontTireChange =
+    "frontTireTypeId" in body || "frontTireRunNumber" in body || "frontTireAgeKnown" in body;
+  let nextFrontTireStintId = run.frontTireStintId;
+  let nextFrontTireRunNumber = run.frontTireRunNumber;
+  if (wantsFrontTireChange) {
+    if ("frontTireTypeId" in body) {
+      const raw = body.frontTireTypeId;
+      if (raw === null || raw === "") {
+        data.frontTireTypeId = null;
+        data.frontTireStintId = null;
+        data.frontTireRunNumber = null;
+        data.frontTireAgeKnown = null;
+        nextFrontTireStintId = null;
+        nextFrontTireRunNumber = null;
+      } else if (typeof raw === "string") {
+        const tire = await prisma.tireType.findUnique({ where: { id: raw }, select: { id: true } });
+        if (!tire) return NextResponse.json({ error: "Tire type not found" }, { status: 400 });
+        data.frontTireTypeId = tire.id;
+        if (tire.id !== run.frontTireTypeId) {
+          nextFrontTireStintId = randomUUID();
+          data.frontTireStintId = nextFrontTireStintId;
+          // A front that was never there has no count to keep; it starts as a fresh set unless
+          // the same request says otherwise just below.
+          if (run.frontTireRunNumber == null) {
+            nextFrontTireRunNumber = 1;
+            data.frontTireRunNumber = 1;
+            data.frontTireAgeKnown = true;
+          }
+        }
+      }
+    }
+    const hasFront = ("frontTireTypeId" in data ? data.frontTireTypeId : run.frontTireTypeId) != null;
+    if ("frontTireRunNumber" in body && hasFront) {
+      const n =
+        typeof body.frontTireRunNumber === "number"
+          ? body.frontTireRunNumber
+          : Number(String(body.frontTireRunNumber ?? "").trim());
+      if (!Number.isFinite(n) || n < 1) {
+        return NextResponse.json({ error: "Run number must be 1 or more" }, { status: 400 });
+      }
+      nextFrontTireRunNumber = Math.floor(n);
+      data.frontTireRunNumber = nextFrontTireRunNumber;
+    }
+    if ("frontTireAgeKnown" in body && hasFront) {
+      data.frontTireAgeKnown = body.frontTireAgeKnown === false ? false : true;
+    }
+  }
+
+  /* What each end is glued to — insert, wheel, modifications. Normalised like the whole-run
+     write; SQL NULL when emptied, because the "own list" scan filters on the column. */
+  if ("tireFitment" in body) {
+    data.tireFitment =
+      (normalizeTireFitment(body.tireFitment) as Prisma.InputJsonValue | null) ?? Prisma.DbNull;
+  }
+
   /* The car. Its own write, because the setup snapshot has to travel with it. */
   const wantsCarMove =
     typeof body.carId === "string" && body.carId.trim() && body.carId.trim() !== run.carId;
@@ -424,6 +488,19 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       nextTireRunNumber,
       sortAt: run.sortAt,
     });
+  }
+  if (wantsFrontTireChange && run.frontTireRunNumber != null && nextFrontTireRunNumber != null) {
+    const frontCascade = await applyTireRunNumberCascade({
+      userId,
+      runId: run.id,
+      end: "front",
+      tireStintId: nextFrontTireStintId,
+      previousTireStintId: run.frontTireStintId,
+      previousTireRunNumber: run.frontTireRunNumber,
+      nextTireRunNumber: nextFrontTireRunNumber,
+      sortAt: run.sortAt,
+    });
+    tireCascade = tireCascade ?? frontCascade;
   }
 
 

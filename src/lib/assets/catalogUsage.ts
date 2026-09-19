@@ -16,8 +16,12 @@ export async function tireTypeUsedByOthers(
   creatorUserId: string
 ): Promise<boolean> {
   const [setByOther, participationByOther] = await Promise.all([
+    // Either end: on a front/rear car the same catalog row can be somebody's front tire only.
     prisma.run.count({
-      where: { tireTypeId, userId: { not: creatorUserId } },
+      where: {
+        OR: [{ tireTypeId }, { frontTireTypeId: tireTypeId }],
+        userId: { not: creatorUserId },
+      },
     }),
     prisma.eventParticipation.count({
       where: { controlledTireTypeId: tireTypeId, userId: { not: creatorUserId } },

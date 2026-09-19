@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { chipToggleClass } from "@/components/ui/chipToggle";
 import { Eyebrow } from "@/components/ui/panel";
@@ -15,10 +15,13 @@ import {
   expandedTireCountChips,
   tireAgeHint,
   tireAgeReadout,
+  tireAgeReadoutLine,
   TIRE_COUNT_CHIPS,
   type TireCountChip,
 } from "@/lib/tires/tireAgeReadout";
 import type { LastRunTires, TireAgeSource, TireStintValue } from "@/lib/tires/tireStintValue";
+import type { TireBucket } from "@/lib/cars/tireProfile";
+import type { TireEnd } from "@/lib/tires/tireCatalogFilter";
 
 /**
  * Tires are defined by how many runs are on them — not by a named set you point
@@ -45,6 +48,13 @@ import type { LastRunTires, TireAgeSource, TireStintValue } from "@/lib/tires/ti
  * says **New tires**; a carried set says how many runs are *on* them and promises
  * the run number in the sub-line. Anything meaning different rubber clears the
  * stint id, and the server mints a fresh one on save.
+ *
+ * ONE END OF A FRONT/REAR CAR (2026-09-19). An off-road car logs its front and rear tires apart,
+ * each with its own count, and `RunSplitTireSelectionPanel` mounts this panel twice with
+ * `variant="compact"`. Every rule above is the same — that is why it is this panel and not a
+ * copy — but the presentation is cut down so both ends fit one phone screen: the end's name for
+ * a heading, the insert/wheel row in `children`, the chips, and the answer on one line in place
+ * of the hint and the big box. The default variant is untouched, markup included.
  */
 
 export type { TireStintValue };
@@ -73,6 +83,14 @@ type Props = {
   lastRunTires?: LastRunTires | null;
   /** Ranks the compound list by what you run on cars of this car's discipline. */
   carId?: string | null;
+  /** The slice of the catalog this car shops from; null = the whole list. */
+  bucket?: TireBucket | null;
+  /** "compact" = one end of a front/rear car. See the header. */
+  variant?: "full" | "compact";
+  /** Compact only: which end this is. Names the heading and the controls, sorts the picker. */
+  end?: TireEnd;
+  /** Compact only: rendered between the tire and its count — the insert / wheel row. */
+  children?: ReactNode;
   /**
    * Changes identity when the form swaps to a different context (another car),
    * so an answer given for the old one isn't left standing over the new value.
@@ -119,6 +137,10 @@ export function RunTireSelectionPanel({
   onChange,
   lastRunTires,
   carId,
+  bucket,
+  variant = "full",
+  end,
+  children,
   resetSignal,
   onUserTouched,
   onPrefillClear,
@@ -245,6 +267,56 @@ export function RunTireSelectionPanel({
     [commit, last, source, value]
   );
 
+  if (variant === "compact") {
+    const endName = end === "front" ? "Front" : "Rear";
+    const line = tireAgeReadoutLine(source, value);
+    return (
+      <div className="space-y-2">
+        <Eyebrow>{endName}</Eyebrow>
+        <TireTypeCombobox
+          value={tireTypeId}
+          carId={carId}
+          bucket={bucket}
+          end={end}
+          onChange={(id) => handleCompoundChange(id, null)}
+          onSelectedTypeChange={(opt) => {
+            if (opt) handleCompoundChange(opt.id, opt.displayName);
+          }}
+          className={prefillFieldClass}
+          placeholder={`${endName} tire…`}
+          aria-label={`${endName} tire compound`}
+        />
+        {children}
+        <div
+          className={cn(
+            "flex gap-1.5",
+            expanded ? "flex-nowrap overflow-x-auto pb-1" : "flex-wrap"
+          )}
+          role="group"
+          aria-label={`Runs on the ${endName.toLowerCase()} tires`}
+        >
+          {chips.map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              aria-pressed={activeChip === chip.key}
+              disabled={!tireTypeId}
+              onClick={() => chooseCount(chip)}
+              className={cn(
+                chipToggleClass(activeChip === chip.key),
+                "shrink-0 px-3 py-2 text-xs",
+                !tireTypeId && "border-dashed opacity-50"
+              )}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+        {line ? <div className="text-[12px] font-medium text-foreground">{line}</div> : null}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
@@ -260,6 +332,7 @@ export function RunTireSelectionPanel({
           <TireTypeCombobox
             value={tireTypeId}
             carId={carId}
+            bucket={bucket}
             onChange={(id) => handleCompoundChange(id, null)}
             onSelectedTypeChange={(opt) => {
               if (opt) handleCompoundChange(opt.id, opt.displayName);

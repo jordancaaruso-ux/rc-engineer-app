@@ -62,6 +62,11 @@ const RUN_SELECT = {
   tireAgeKnown: true,
   tireStintId: true,
   tireTypeId: true,
+  // The front end of a front/rear car (off-road). Null on every single-tyre run.
+  frontTireRunNumber: true,
+  frontTireAgeKnown: true,
+  frontTireStintId: true,
+  frontTireType: { select: { displayName: true, modelCode: true } },
   conditionsAirTempC: true,
   conditionsTrackTempC: true,
   lapTimes: true,
@@ -244,6 +249,14 @@ export function toHistoryRun(r: Row, zone: string | null, field: FieldPace | nul
     tyreRun: r.tireRunNumber,
     tyreAgeKnown: r.tireAgeKnown,
     tyreStintId: r.tireStintId,
+    ...(r.frontTireType
+      ? {
+          frontTyreName: r.frontTireType.displayName ?? r.frontTireType.modelCode ?? null,
+          frontTyreRun: r.frontTireRunNumber,
+          frontTyreAgeKnown: r.frontTireAgeKnown !== false,
+          frontTyreStintId: r.frontTireStintId,
+        }
+      : {}),
     airC: r.conditionsAirTempC,
     trackC: r.conditionsTrackTempC,
     unconfirmed: r.unconfirmedAt != null,

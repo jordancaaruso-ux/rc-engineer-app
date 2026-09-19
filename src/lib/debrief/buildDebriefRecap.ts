@@ -327,8 +327,13 @@ export function buildDebriefRecap(
   const tyres: DebriefTyre[] = [];
   const pairsByTyre = new Map<string, Pair[]>();
   for (const pair of chronological) {
-    const name = pair.run.tireType?.displayName?.trim();
-    if (!name) continue;
+    const rearName = pair.run.tireType?.displayName?.trim();
+    if (!rearName) continue;
+    // A front/rear car's "tyre" is the pairing it went out on, front first. "From new" below
+    // still follows the REAR set's own life of rubber (`tireStintId`) — a front wear line is a
+    // later call, logged in docs/NOT_YET_BUILT.md.
+    const frontName = pair.run.frontTireType?.displayName?.trim();
+    const name = frontName ? `${frontName} / ${rearName}` : rearName;
     const list = pairsByTyre.get(name) ?? [];
     list.push(pair);
     pairsByTyre.set(name, list);

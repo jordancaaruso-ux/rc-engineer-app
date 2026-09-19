@@ -117,3 +117,55 @@ test("the sweep's stand-in parent: nothing logged today, so every session copies
     ]
   );
 });
+
+test("a front/rear car's front tyre counts on from its OWN number, by the same sessions", () => {
+  // Rears are on their 1st run, fronts already on their 6th — they age apart (2026-09-19).
+  const run1 = {
+    id: "run-1",
+    instant: at("09:00"),
+    tireStintId: "rear-a",
+    tireRunNumber: 1,
+    frontTireStintId: "front-a",
+    frontTireRunNumber: 6,
+  };
+  const plan = planBackfilledRuns({
+    parent: run1,
+    confirmedDayRuns: [run1],
+    sessions: [
+      { id: "s-2", instant: at("09:50") },
+      { id: "s-3", instant: at("10:40") },
+    ],
+  });
+  assert.deepEqual(
+    plan.map((p) => [p.sessionId, p.tireRunNumber, p.frontTireRunNumber]),
+    [
+      ["s-2", 2, 7],
+      ["s-3", 3, 8],
+    ]
+  );
+});
+
+test("counting back floors the front at 1 too, and a single-tyre source plans no front", () => {
+  const parent = {
+    id: "run-3",
+    instant: at("11:00"),
+    tireStintId: "rear-a",
+    tireRunNumber: 3,
+    frontTireStintId: "front-a",
+    frontTireRunNumber: 1,
+  };
+  const back = planBackfilledRuns({
+    parent,
+    confirmedDayRuns: [parent],
+    sessions: [{ id: "s-1", instant: at("09:00") }],
+  });
+  assert.deepEqual(back.map((p) => [p.tireRunNumber, p.frontTireRunNumber]), [[2, 1]]);
+
+  const touring = { id: "run-9", instant: at("09:00"), tireStintId: "set-a", tireRunNumber: 2 };
+  const single = planBackfilledRuns({
+    parent: touring,
+    confirmedDayRuns: [touring],
+    sessions: [{ id: "s-2", instant: at("10:00") }],
+  });
+  assert.deepEqual(single.map((p) => [p.tireRunNumber, p.frontTireRunNumber]), [[3, null]]);
+});

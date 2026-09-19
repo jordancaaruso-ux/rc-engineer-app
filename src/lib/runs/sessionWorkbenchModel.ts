@@ -81,6 +81,11 @@ export type WorkbenchRunSource = {
   tireRunNumber?: number | null;
   tireAgeKnown?: boolean | null;
   tireType?: { id: string; displayName: string } | null;
+  /** The front end of a front/rear run; the four above are then the rear. */
+  frontTireStintId?: string | null;
+  frontTireRunNumber?: number | null;
+  frontTireAgeKnown?: boolean | null;
+  frontTireType?: { id: string; displayName: string } | null;
   /**
    * The trend card's two non-lap figures. Optional like the rest of this structural
    * type, so a caller that doesn't select them gets a strip with dashes rather than a
@@ -170,6 +175,10 @@ export function buildGroupTrendModel(
       tireRunNumber: run.tireRunNumber ?? null,
       tireAgeKnown: run.tireAgeKnown ?? null,
       tireType: run.tireType ?? null,
+      frontTireStintId: run.frontTireStintId ?? null,
+      frontTireRunNumber: run.frontTireRunNumber ?? null,
+      frontTireAgeKnown: run.frontTireAgeKnown ?? null,
+      frontTireType: run.frontTireType ?? null,
     }))
   );
 

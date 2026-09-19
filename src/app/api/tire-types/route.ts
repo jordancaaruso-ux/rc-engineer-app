@@ -5,6 +5,8 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { matchTireTypes, suggestModelCodeFromDisplayName } from "@/lib/tires/matchTireType";
 import { ensureSeedTireTypes } from "@/lib/tires/ensureSeedTireTypes";
 import { notifyAdminsOfUnverifiedAsset } from "@/lib/assets/notifyAdminReview";
+import { parseTireBucket } from "@/lib/tires/tireCatalogFilter";
+import { TIRE_CATALOG_MAX, tireCatalogScopeWhere } from "@/lib/tires/tireCatalogScope";
 
 /**
  * The picker downloads the catalog once and filters locally, so this is the ceiling on what is
@@ -12,15 +14,19 @@ import { notifyAdminsOfUnverifiedAsset } from "@/lib/assets/notifyAdminReview";
  * concerned. 500 was written when the catalog was ~30 rows; the 1/10 off-road import took it to
  * 739 and would have made 239 tires unreachable and unsearchable. Headroom, not a page size.
  * The real answer at the next jump is filtering the list by what the car races, which keeps any
- * one driver's list short no matter how big the catalog gets.
+ * one driver's list short no matter how big the catalog gets — that is `?bucket=` below
+ * (2026-09-19). The cap stays as the ceiling for a car nothing can place, which still gets it all.
  */
-const CATALOG_MAX = 2000;
+const CATALOG_MAX = TIRE_CATALOG_MAX;
 
 const TIRE_TYPE_SELECT = {
   id: true,
   displayName: true,
   modelCode: true,
   verifiedAt: true,
+  // The picker sorts on these; it never shows them.
+  discipline: true,
+  position: true,
 } as const;
 
 export async function GET(request: Request) {
@@ -32,6 +38,15 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q")?.trim() ?? "";
+
+  // One row by id — how the picker names a selection it was handed (a copied run, a spec tire)
+  // that sits outside the car's bucket. Never filtered: the tire is already on the run.
+  const id = searchParams.get("id")?.trim() ?? "";
+  if (id) {
+    const one = await prisma.tireType.findUnique({ where: { id }, select: TIRE_TYPE_SELECT });
+    return NextResponse.json({ tireTypes: one ? [one] : [] });
+  }
+
   // The picker filters locally so its search is instant, which only holds if it
   // was handed the whole catalog — a cap of 50 silently hid the tail and pushed
   // drivers into creating duplicates of types that already existed. Default stays
@@ -43,8 +58,11 @@ export async function GET(request: Request) {
     await ensureSeedTireTypes();
   }
 
+  const where = await tireCatalogScopeWhere(parseTireBucket(searchParams.get("bucket")), user.id);
+
   if (q.length >= 1) {
     const catalog = await prisma.tireType.findMany({
+      where,
       select: TIRE_TYPE_SELECT,
       orderBy: [{ displayName: "asc" }],
       take: CATALOG_MAX,
@@ -57,6 +75,7 @@ export async function GET(request: Request) {
   }
 
   const tireTypes = await prisma.tireType.findMany({
+    where,
     select: TIRE_TYPE_SELECT,
     orderBy: [{ displayName: "asc" }],
     take,
@@ -79,6 +98,8 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       displayName?: string;
       modelCode?: string;
+      /** The bucket of the car it was added from — keeps a buggy tire out of touring lists. */
+      discipline?: string;
     };
 
     const displayName = body.displayName?.trim();
@@ -115,6 +136,10 @@ export async function POST(request: Request) {
         displayName,
         modelCode,
         createdByUserId: user.id,
+        // An unknown value is dropped, not refused: the tire is real either way, and an unplaced
+        // row simply shows in every list. `position` is deliberately left unset — stamping the
+        // end it was added from would bury it when the same driver opens the other end.
+        discipline: parseTireBucket(body.discipline),
       },
       select: TIRE_TYPE_SELECT,
     });

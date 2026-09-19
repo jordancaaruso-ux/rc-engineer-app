@@ -16,6 +16,14 @@ export type DashboardSerializedRun = {
   tireRunNumber: number;
   tireStintId: string | null;
   tireAgeKnown: boolean;
+  /** The front end of a front/rear car; all null on a single-tire run. */
+  frontTireTypeId?: string | null;
+  frontTireType?: { id: string; displayName: string } | null;
+  frontTireRunNumber?: number | null;
+  frontTireStintId?: string | null;
+  frontTireAgeKnown?: boolean | null;
+  /** What each end is glued to — see src/lib/tires/tireFitment.ts. */
+  tireFitment?: unknown;
   setupSnapshot: { id: string; data: unknown };
   event?: {
     id: string;

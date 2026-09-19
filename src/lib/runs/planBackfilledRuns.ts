@@ -20,6 +20,12 @@ export type BackfillPlanRun = {
   instant: Date;
   tireStintId: string | null;
   tireRunNumber: number;
+  /**
+   * The front end of a front/rear car (off-road, 2026-09-19) — its own life of rubber and its own
+   * count. Absent or null on a single-tire run, and then nothing is planned for it.
+   */
+  frontTireStintId?: string | null;
+  frontTireRunNumber?: number | null;
 };
 
 export type BackfillPlanSession = {
@@ -39,6 +45,12 @@ export type BackfillPlanEntry = {
    * covers, and the tyre cascade repairs when the driver confirms.
    */
   tireRunNumber: number;
+  /**
+   * The same position on the source's FRONT rubber — both ends went round the track together, so
+   * they move by the same number of sessions from their own starting counts. Null when the
+   * source has no front tyre.
+   */
+  frontTireRunNumber: number | null;
 };
 
 export function planBackfilledRuns(input: {
@@ -64,30 +76,30 @@ export function planBackfilledRuns(input: {
     if (!source) source = input.parent;
 
     const sourceT = source.instant.getTime();
-    let tireRunNumber = 1;
-    if (source.tireStintId) {
-      if (sourceT < t) {
-        // How many planned sessions sit between the source and this one, this one included.
-        const k = sessions.filter((s) => {
-          const st = s.instant.getTime();
-          return st > sourceT && st <= t;
-        }).length;
-        tireRunNumber = Math.max(1, source.tireRunNumber + k);
-      } else {
-        // Before the parent, on the parent's rubber: count back from it.
-        const k = sessions.filter((s) => {
-          const st = s.instant.getTime();
-          return st >= t && st < sourceT;
-        }).length;
-        tireRunNumber = Math.max(1, source.tireRunNumber - k);
-      }
-    }
+    // Sessions away from the source, signed: later ones count up from it (this one included);
+    // ones before the parent, on the parent's rubber, count back from it.
+    const offset =
+      sourceT < t
+        ? sessions.filter((s) => {
+            const st = s.instant.getTime();
+            return st > sourceT && st <= t;
+          }).length
+        : -sessions.filter((s) => {
+            const st = s.instant.getTime();
+            return st >= t && st < sourceT;
+          }).length;
+    const tireRunNumber = source.tireStintId ? Math.max(1, source.tireRunNumber + offset) : 1;
+    const frontTireRunNumber =
+      source.frontTireStintId && source.frontTireRunNumber != null
+        ? Math.max(1, source.frontTireRunNumber + offset)
+        : null;
 
     out.push({
       sessionId: session.id,
       instant: session.instant,
       setupSourceRunId: source.id,
       tireRunNumber,
+      frontTireRunNumber,
     });
   }
   return out;
