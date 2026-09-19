@@ -14,6 +14,7 @@ import {
   Wrench,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
+import { keyboardCoversBar } from "@/lib/runs/wizardKeyboard";
 import {
   WIZARD_STEPS,
   nextWalkStep,
@@ -257,37 +258,46 @@ export function LogRunWizardBottomBar({
   // keyboard genuinely up → hidden; dismissed by any gesture → back, whoever
   // holds focus.
   //
-  // 120px threshold: safely above iOS URL-bar show/hide noise (~60px), well
-  // under any keyboard. Pinch-zoom also shrinks the visual viewport, but zoom is
-  // locked app-wide (viewport meta + gesture guard), so it can't fake a
-  // keyboard here. Old browsers without visualViewport keep the focus guess,
-  // including the persistent-editor exemption for the sheet's held input.
-  // (Debounced: the resize streams while the keyboard animates.)
+  //
+  // 2026-09-19 — measuring ALONE stuck too, the other way. "Zoom is locked app-wide" was the
+  // assumption here and it is false on a desktop browser (a trackpad pinch ignores the viewport
+  // meta): a page left at 1.2× measures exactly like a keyboard, and the bar sat at opacity 0 —
+  // still taking taps — until the zoom was undone. The founder finished a run by tapping where
+  // the buttons had been. A measurement taken as the page mounts had the same one-way shape: only
+  // a later `resize` could correct it. So it is focus AND measurement now (`keyboardCoversBar`),
+  // re-read on every event that can change either, and a stale reading cannot outlive the focus
+  // that excuses it. (Debounced: the resize streams while the keyboard animates.)
   useEffect(() => {
-    const vv = window.visualViewport;
+    const vv = window.visualViewport ?? null;
     let t: number | undefined;
-    if (vv) {
-      const sync = () => {
-        window.clearTimeout(t);
-        t = window.setTimeout(() => {
-          setKeyboardOpen(vv.height < window.innerHeight - 120);
-        }, 50);
-      };
-      vv.addEventListener("resize", sync);
-      sync();
-      return () => {
-        window.clearTimeout(t);
-        vv.removeEventListener("resize", sync);
-      };
-    }
     const sync = () => {
       window.clearTimeout(t);
-      t = window.setTimeout(() => setKeyboardOpen(isTextEntry(document.activeElement)), 80);
+      t = window.setTimeout(() => {
+        setKeyboardOpen(
+          keyboardCoversBar({
+            focusedTextEntry: isTextEntry(document.activeElement),
+            layoutHeight: window.innerHeight,
+            visualHeight: vv ? vv.height : null,
+            visualScale: vv ? vv.scale : null,
+          })
+        );
+      }, 50);
     };
+    vv?.addEventListener("resize", sync);
+    vv?.addEventListener("scroll", sync);
+    window.addEventListener("resize", sync);
+    window.addEventListener("pageshow", sync);
+    document.addEventListener("visibilitychange", sync);
     document.addEventListener("focusin", sync);
     document.addEventListener("focusout", sync);
+    sync();
     return () => {
       window.clearTimeout(t);
+      vv?.removeEventListener("resize", sync);
+      vv?.removeEventListener("scroll", sync);
+      window.removeEventListener("resize", sync);
+      window.removeEventListener("pageshow", sync);
+      document.removeEventListener("visibilitychange", sync);
       document.removeEventListener("focusin", sync);
       document.removeEventListener("focusout", sync);
     };
@@ -377,7 +387,13 @@ export function LogRunWizardBottomBar({
       >
         {/* The one surface: actions · ticks · progression track. Card-edged
             on purpose — it must not read as the app dock. */}
-        <div className="pointer-events-auto mx-auto grid w-full max-w-md gap-1.5 rounded-[20px] border border-white/[0.08] bg-card/[0.78] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),transparent_40%)] p-2 shadow-[0_22px_48px_-18px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.22)] backdrop-blur-[40px] backdrop-saturate-[1.7]">
+        <div
+          className={cn(
+            // Hidden means gone: at opacity 0 these buttons were still live under the thumb.
+            keyboardOpen ? "pointer-events-none" : "pointer-events-auto",
+            "mx-auto grid w-full max-w-md gap-1.5 rounded-[20px] border border-white/[0.08] bg-card/[0.78] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),transparent_40%)] p-2 shadow-[0_22px_48px_-18px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.22)] backdrop-blur-[40px] backdrop-saturate-[1.7]"
+          )}
+        >
           {/* Grabber (E1) — the sheet cue; opens the run summary. */}
           <button
             type="button"
