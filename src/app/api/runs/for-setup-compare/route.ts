@@ -121,7 +121,10 @@ export async function GET(request: Request) {
     return tb - ta;
   });
 
-  return NextResponse.json({ runs: runs.map(withIncludedBestLapForPicker) });
+  // `viewerUserId`: this list is the run OWNER's runs and the viewer's, merged, and the pop-up
+  // sorts them into "Mine" and the rest. It cannot do that without knowing who is looking, and
+  // every host but one forgot to tell it — so a teammate's runs were listed as "Mine" (2026-09-19).
+  return NextResponse.json({ runs: runs.map(withIncludedBestLapForPicker), viewerUserId: userId });
 }
 
 async function loadPickerRuns(

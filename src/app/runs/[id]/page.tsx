@@ -266,6 +266,7 @@ export default async function RunPage(props: {
           allowRunMutations={isOwner}
           runOwnerDisplayName={runOwnerDisplayName}
           runOwnedByViewer={isOwner}
+          viewerUserId={user.id}
         />
       </section>
     </>

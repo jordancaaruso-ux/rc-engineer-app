@@ -7,6 +7,7 @@ import { GitCompare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { setupChangedRowsSincePrevious } from "@/lib/setupCompare/changedSincePrevious";
+import { isSetupChangeNoiseKey } from "@/lib/setupCompare/setupChangeNoise";
 import { SetupChangedSincePreviousList } from "@/components/runs/SetupChangedSincePreviousList";
 import {
   formatRunPickerLine,
@@ -147,6 +148,14 @@ export function SetupSheetModal({
   const [selectedDocId, setSelectedDocId] = useState("");
   const [comparePickerRuns, setComparePickerRuns] = useState<SetupSheetModalRun[]>([]);
   const [comparePickerLoading, setComparePickerLoading] = useState(false);
+  /**
+   * Who is looking, as the compare route tells it. Every host is SUPPOSED to pass `viewerUserId`
+   * and until 2026-09-19 every host but one passed `null` — so the merged list below was never
+   * split, and a teammate's runs were offered under "Mine". The route knows the answer whatever
+   * the host forgot, so the pop-up no longer depends on being told.
+   */
+  const [viewerIdFromRoute, setViewerIdFromRoute] = useState<string | null>(null);
+  const viewerId = viewerUserId ?? viewerIdFromRoute;
   const [setupDocs, setSetupDocs] = useState<SetupCompareDoc[]>([]);
   const [teammateRuns, setTeammateRuns] = useState<SetupSheetModalRun[]>([]);
   const [teammateDisplay, setTeammateDisplay] = useState<Record<string, string>>({});
@@ -293,6 +302,18 @@ export function SetupSheetModal({
 
   const fallbackPickerRuns = pickerRuns ?? [];
 
+  /**
+   * Somebody else's run. Then the host's own list is no use for "Mine", whatever it calls itself:
+   * the run page hands over the OWNER's runs under `runListSource="my_runs"`, so the pop-up listed
+   * a teammate's club night as the viewer's and offered none of the viewer's own (2026-09-19).
+   * The route below returns both drivers' runs and says which are whose. `copy` is the server's
+   * own "this is a teammate's run" — it needs no viewer id from the host.
+   */
+  const anchorIsPeers =
+    saveContext?.action === "copy" ||
+    (viewerUserId != null && run?.userId != null && run.userId !== viewerUserId);
+  const usesMergedList = runListSource === "team_runs" || anchorIsPeers;
+
   useEffect(() => {
     if (!open || !run?.id) {
       setComparePickerRuns([]);
@@ -300,7 +321,7 @@ export function SetupSheetModal({
       return;
     }
 
-    if (runListSource === "team_runs") {
+    if (usesMergedList) {
       let alive = true;
       setComparePickerLoading(true);
       void fetch(`/api/runs/for-setup-compare?runId=${encodeURIComponent(run.id)}`, {
@@ -309,14 +330,19 @@ export function SetupSheetModal({
         .then(async (res) => {
           const data = (await res.json().catch(() => ({}))) as {
             runs?: SetupSheetModalRun[];
+            viewerUserId?: string;
             error?: string;
           };
           if (!res.ok) throw new Error(data.error ?? `Failed (${res.status})`);
-          return Array.isArray(data.runs) ? data.runs : [];
+          return {
+            runs: Array.isArray(data.runs) ? data.runs : [],
+            viewer: typeof data.viewerUserId === "string" ? data.viewerUserId : null,
+          };
         })
-        .then((runs) => {
+        .then(({ runs, viewer }) => {
           if (!alive) return;
           setComparePickerRuns(runs);
+          if (viewer) setViewerIdFromRoute(viewer);
         })
         .catch(() => {
           if (!alive) return;
@@ -342,7 +368,7 @@ export function SetupSheetModal({
       : fallbackPickerRuns;
     setComparePickerRuns(sameCar);
     setComparePickerLoading(false);
-  }, [open, run?.id, runListSource, viewerUserId, pickerRuns]);
+  }, [open, run?.id, usesMergedList, viewerUserId, pickerRuns]);
 
   // Standalone library setups (uploads + PetitRC downloads) on this car's setup
   // sheet — a third compare source alongside my runs / teammate runs. Fetched
@@ -419,13 +445,17 @@ export function SetupSheetModal({
     [runs, run?.id]
   );
 
-  // My runs come from the local pool (in team context the merged list also
-  // holds teammate rows, so filter to the viewer when we know who they are).
+  // My runs come from the local pool. In team context the merged list also holds the run
+  // owner's rows, so it is cut down to the viewer's — and when nobody has said who the viewer is,
+  // "Mine" is EMPTY rather than everything: a missing tab is a gap, a teammate's club night
+  // listed as yours is a lie (2026-09-19). On an own-runs host the pool is the viewer's by
+  // contract, so there a row is only dropped when it is plainly someone else's.
   // Teammate runs are fetched separately so they're available in EITHER context.
-  const myRuns = useMemo(
-    () => (viewerUserId ? otherRuns.filter((r) => r.userId === viewerUserId) : otherRuns),
-    [otherRuns, viewerUserId]
-  );
+  const myRuns = useMemo(() => {
+    if (viewerId) return otherRuns.filter((r) => r.userId === viewerId);
+    if (usesMergedList) return [];
+    return otherRuns.filter((r) => !r.userId || !run?.userId || r.userId === run.userId);
+  }, [otherRuns, viewerId, usesMergedList, run?.userId]);
 
   // Only offer a source with something to pick — except Teammates, which stays
   // visible whenever the viewer has any teammate (empty state explains the gap).
@@ -447,13 +477,16 @@ export function SetupSheetModal({
 
   // Keep the active source valid as pools load in / change.
   useEffect(() => {
+    // Not while the run list is still on its way: "Mine" is absent until it lands, and jumping
+    // to Teammates in that gap would leave the driver on the wrong tab once it does.
+    if (comparePickerLoading) return;
     if (availableSources.length === 0) return;
     if (!availableSources.includes(compareSource)) {
       setCompareSource(availableSources[0]!);
       setOtherRunId("");
       setSelectedDocId("");
     }
-  }, [availableSources, compareSource]);
+  }, [availableSources, compareSource, comparePickerLoading]);
 
   const sourceRuns = compareSource === "teammates" ? teammateRuns : myRuns;
 
@@ -576,10 +609,28 @@ export function SetupSheetModal({
     };
   }, [open, previousRunOnCar?.id, previousRunOnCar?.setupSnapshot?.id, previousRunOnCar?.setupSnapshot?.data]);
 
+  // Tyres and the sheet's header boxes (driver, race, track, date) are not setup changes. The
+  // Sessions list already dropped them; this one did not, and against a teammate's sheet the
+  // driver's name would have led the list.
   const changedSincePrevious = useMemo(() => {
     if (!previousRunOnCar?.setupSnapshot?.id || previousSetupData == null) return null;
-    return setupChangedRowsSincePrevious(runSetup, previousSetupData);
+    return setupChangedRowsSincePrevious(runSetup, previousSetupData).filter(
+      (row) => !isSetupChangeNoiseKey(row.key)
+    );
   }, [previousRunOnCar, previousSetupData, runSetup]);
+
+  /**
+   * This run against the setup picked to compare with. Founder call 2026-09-19, reversing the
+   * no-list half of the 2026-08-14 ruling: flipping the sheet SHOWS a difference, a list FINDS
+   * them. It takes the place of "vs previous" while comparing — both at once made the pop-up
+   * a screen taller, and the previous run is not the question any more.
+   */
+  const changedVsBaseline = useMemo(() => {
+    if (!baselineValue) return null;
+    return setupChangedRowsSincePrevious(runSetup, baselineValue).filter(
+      (row) => !isSetupChangeNoiseKey(row.key)
+    );
+  }, [baselineValue, runSetup]);
 
   const template = useMemo(() => {
     if (modelTemplate) return modelTemplate;
@@ -721,7 +772,7 @@ export function SetupSheetModal({
       aria-label="Setup"
     >
       <div
-        className="setup-sheet-modal-panel bg-background border border-border rounded-lg shadow-xl max-h-[90vh] overflow-auto w-full max-w-4xl"
+        className="setup-sheet-modal-panel bg-background border border-border rounded-lg shadow-xl max-h-[90vh] overflow-auto [scrollbar-gutter:stable] w-full max-w-4xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/*
@@ -812,7 +863,7 @@ export function SetupSheetModal({
             <>
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Eyebrow>Setup vs previous run</Eyebrow>
+                  <Eyebrow>{compareOpen && !editingNow ? "Compare setup" : "Setup vs previous run"}</Eyebrow>
                   {/*
                     Unavailable while correcting, and that is not a new rule — `editingNow` has
                     always dropped out of edit mode the moment a baseline lands, because the compare
@@ -850,12 +901,16 @@ export function SetupSheetModal({
                     Compare to another run
                   </button>
                 </div>
-                {comparePickerLoading ||
-                (run.setupSnapshot?.id != null && loadedSetupData == null) ||
-                (previousRunOnCar?.setupSnapshot?.id != null && previousSetupData == null) ? (
+                {compareOpen && !editingNow ? null : comparePickerLoading ||
+                  (run.setupSnapshot?.id != null && loadedSetupData == null) ||
+                  (previousRunOnCar?.setupSnapshot?.id != null && previousSetupData == null) ? (
                   <p className="text-muted-foreground text-xs">Loading changes…</p>
                 ) : (
-                  <SetupChangedSincePreviousList rows={changedSincePrevious} runId={run?.id ?? null} />
+                  <SetupChangedSincePreviousList
+                    rows={changedSincePrevious}
+                    runId={run?.id ?? null}
+                    maxRows={3}
+                  />
                 )}
                 {compareOpen && !editingNow ? (
                   <div className="space-y-2 pt-1">
@@ -921,6 +976,16 @@ export function SetupSheetModal({
                     )}
                     {hasBaselineSelection && baselineSetupLoading ? (
                       <p className="text-xs text-muted-foreground">Loading comparison setup…</p>
+                    ) : null}
+                    {compareActive && changedVsBaseline ? (
+                      <SetupChangedSincePreviousList
+                        // A new pick starts shut again, whatever the last one was opened to.
+                        key={compareSource === "setups" ? selectedDocId : otherRunId}
+                        rows={changedVsBaseline}
+                        runId={run?.id ?? null}
+                        maxRows={3}
+                        against="other"
+                      />
                     ) : null}
                     {compareActive && baselineLabel ? (
                       <p className="text-[11px] text-muted-foreground">

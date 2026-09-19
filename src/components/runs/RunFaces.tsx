@@ -172,6 +172,7 @@ export function RunFaces({
   openFace = null,
   onDeleted,
   className,
+  viewerUserId = null,
 }: {
   run: Run;
   /** From `buildGroupRunRows`; null when the host loaded no setup snapshots. */
@@ -201,6 +202,11 @@ export function RunFaces({
   /** Called instead of `router.refresh()` once a delete lands (hosts that hold a list). */
   onDeleted?: () => void;
   className?: string;
+  /**
+   * Who is looking. The setup pop-up sorts its compare list into "Mine" and the rest with it; it
+   * was hardcoded `null` here until 2026-09-19, which listed a teammate's runs as the viewer's.
+   */
+  viewerUserId?: string | null;
 }) {
   const router = useRouter();
   const [face, setFace] = useState<Face>("laps");
@@ -1560,7 +1566,7 @@ export function RunFaces({
           run={sheetModal.run}
           pickerRuns={sheetModal.pickerRuns}
           runListSource={runListSource}
-          viewerUserId={null}
+          viewerUserId={viewerUserId}
           /*
            * The same handler the inline sheet uses, and for the same reason: a correction
            * made in the pop-up earns the same questions as one made in the face. This door
@@ -1583,7 +1589,7 @@ export function RunFaces({
           runListSource={runListSource}
           userDisplayName={runOwnerDisplayName}
           runOwnedByViewer={allowRunMutations}
-          viewerUserId={null}
+          viewerUserId={viewerUserId}
         />
       ) : null}
       {allowRunMutations ? (

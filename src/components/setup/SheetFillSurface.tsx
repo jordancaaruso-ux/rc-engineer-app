@@ -704,7 +704,44 @@ export function SheetFillSurface({
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", onTouchEnd);
     };
-    const measure = () => setStage({ width: el.clientWidth, height: el.clientHeight });
+    /*
+     * The stage's height is set from its width (`stageHeightStyle`), and outside this component
+     * width DOES depend on height: inside a scroller with no reserved gutter, a taller sheet
+     * summons a scrollbar, the scrollbar takes ~15px of width, the sheet gets shorter, the
+     * scrollbar leaves, and round it goes at frame rate. Seen 2026-09-19 on a teammate's setup
+     * (their view is a row shorter than the owner's, which put it on the knife-edge) — measured
+     * flipping every frame at window widths 744–756 × 900.
+     *
+     * So a width that bounces straight back to where it just was, by no more than a scrollbar,
+     * is held at the NARROWER of the two: that is the state with the scrollbar in it, and the
+     * only one of the pair that is true whichever way the scroller settles. A real resize moves
+     * further than a scrollbar and lets go of it.
+     */
+    const SCROLLBAR_MAX_PX = 24;
+    const BOUNCE_MS = 400;
+    let lastWidth = -1;
+    let beforeLastWidth = -1;
+    let lastChangeAt = 0;
+    let heldWidth: number | null = null;
+    const measure = () => {
+      const raw = el.clientWidth;
+      const height = el.clientHeight;
+      if (heldWidth != null && Math.abs(raw - heldWidth) > SCROLLBAR_MAX_PX) heldWidth = null;
+      if (raw !== lastWidth) {
+        const now = performance.now();
+        const bounced =
+          raw === beforeLastWidth &&
+          Math.abs(raw - lastWidth) <= SCROLLBAR_MAX_PX &&
+          now - lastChangeAt < BOUNCE_MS;
+        if (bounced && heldWidth == null) heldWidth = Math.min(raw, lastWidth);
+        beforeLastWidth = lastWidth;
+        lastWidth = raw;
+        lastChangeAt = now;
+      }
+      const width = heldWidth ?? raw;
+      // No new object for an unchanged size: every one re-renders the sheet and re-clamps the view.
+      setStage((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
+    };
     measure();
     if (typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(measure);

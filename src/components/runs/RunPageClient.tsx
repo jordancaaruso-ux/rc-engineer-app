@@ -53,6 +53,7 @@ export function RunPageClient({
   onBack,
   layout = "single",
   columnClassName,
+  viewerUserId = null,
 }: {
   run: Run;
   pickerRuns: CompareRunShape[];
@@ -75,6 +76,11 @@ export function RunPageClient({
   layout?: "single" | "split";
   /** Passed to both column cards in split mode. */
   columnClassName?: string;
+  /**
+   * Who is looking. The setup pop-up sorts its compare list into "Mine" and the rest with it; it
+   * was hardcoded `null` here until 2026-09-19, which listed a teammate's runs as the viewer's.
+   */
+  viewerUserId?: string | null;
 }) {
   const router = useRouter();
   const [setupOpen, setSetupOpen] = useState(false);
@@ -127,7 +133,7 @@ export function RunPageClient({
         run={setupOpen ? (run as unknown as SetupSheetModalRun) : null}
         pickerRuns={pickerRuns as SetupSheetModalRun[]}
         runListSource={runListSource}
-        viewerUserId={null}
+        viewerUserId={viewerUserId}
         startEditing={setupEditing}
         /*
          * Only passed when the viewer may actually correct this run. The modal treats the
@@ -158,7 +164,7 @@ export function RunPageClient({
           runListSource={runListSource}
           userDisplayName={runOwnerDisplayName}
           runOwnedByViewer={runOwnedByViewer}
-          viewerUserId={null}
+          viewerUserId={viewerUserId}
         />
       ) : null}
     </>

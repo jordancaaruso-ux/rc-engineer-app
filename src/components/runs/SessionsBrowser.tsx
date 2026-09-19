@@ -494,6 +494,7 @@ export function SessionsBrowser({
                 : memberDisplayByUserId[activeRun.userId ?? ""] ?? null
             }
             runOwnedByViewer={activeRun.userId === viewerUserId}
+            viewerUserId={viewerUserId}
             placement="header"
             layout="split"
             columnClassName={PANE.card}
@@ -884,6 +885,7 @@ function OneSession({
                       }
                       pickerRuns={pickerRuns}
                       runListSource={runListSource}
+                      viewerUserId={viewerUserId}
                       openFace={
                         setupFocus?.runId === run.id
                           ? { face: "setup", nonce: setupFocus.nonce }

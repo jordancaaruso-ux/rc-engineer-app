@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react";
 import { Maximize2 } from "lucide-react";
-import type { SetupChangedRow } from "@/lib/setupCompare/changedSincePrevious";
+import { orderSetupChangedRows, type SetupChangedRow } from "@/lib/setupCompare/changedSincePrevious";
 import { SheetBoxCrop, useSheetBoxCrops } from "@/components/runs/SheetBoxCrop";
 import { InlineValueEdit } from "@/components/runs/InlineValueEdit";
 import { setupKeyIsInlineEditable } from "@/lib/setup/inlineEditableKeys";
@@ -21,6 +21,8 @@ export function SetupChangedSincePreviousList({
   className,
   runId,
   onEditValue,
+  maxRows,
+  against = "previous",
 }: {
   rows: SetupChangedRow[] | null;
   className?: string;
@@ -42,10 +44,24 @@ export function SetupChangedSincePreviousList({
    * teammate's run showed no opener at all while the owner's showed one on every row.
    */
   runId?: string | null;
+  /**
+   * Show this many rows, then "Show all N". The setup pop-up uses it: a 19-row list above the
+   * sheet pushed the sheet off the screen (founder call 2026-09-19). Which rows lead is
+   * `orderSetupChangedRows`. Without it the list is whole, in its scrolling frame, as before.
+   */
+  maxRows?: number;
+  /**
+   * The list is this run against ANOTHER setup — a picked run, a teammate's, a saved sheet — not
+   * against the run before it. The columns stop saying Now / Was, and the other value is not
+   * struck through: nothing was replaced, they are two cars.
+   */
+  against?: "previous" | "other";
 }) {
   // Called before the early returns below, because a hook cannot be skipped on some renders.
+  // The whole list, not the visible slice, so opening the rest does not fetch again.
   const crops = useSheetBoxCrops(runId, (rows ?? []).map((r) => r.key));
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   if (rows == null) {
     return (
@@ -57,10 +73,14 @@ export function SetupChangedSincePreviousList({
   if (rows.length === 0) {
     return (
       <p className={cn("text-muted-foreground text-xs", className)}>
-        No setup changes since your previous run on this car.
+        {against === "other" ? "No differences." : "No setup changes since your previous run on this car."}
       </p>
     );
   }
+
+  const ordered = orderSetupChangedRows(rows);
+  const capped = maxRows != null && ordered.length > maxRows;
+  const shown = capped && !showAll ? ordered.slice(0, maxRows) : ordered;
 
   const cropByKey = crops.kind === "ready" ? crops.byKey : null;
   const spansPages = cropByKey
@@ -74,7 +94,12 @@ export function SetupChangedSincePreviousList({
         // fill the frame and the sticky header band reaches the right edge — the
         // reason this box used to be `w-fit`. The cap stops a one-row diff in a
         // wide pane from stranding the label and its value half a screen apart.
-        "max-h-48 w-full max-w-[30rem] overflow-y-auto rounded-md border border-border bg-muted/70",
+        "w-full max-w-[30rem] overflow-y-auto rounded-md border border-border bg-muted/70",
+        // Opened, a capped list gets a taller frame and scrolls INSIDE it, with "Show fewer" pinned
+        // to the frame's foot. The first cut let it run to its full length, and against a teammate's
+        // car that is fifty to a hundred rows with the only way back at the very bottom (founder,
+        // 2026-09-19).
+        capped && showAll ? "max-h-[min(24rem,55vh)]" : "max-h-48",
         className
       )}
     >
@@ -97,10 +122,10 @@ export function SetupChangedSincePreviousList({
           with no sheet, which is most of them. */}
       <div className="grid grid-cols-[minmax(0,1fr)_fit-content(30%)_fit-content(30%)_auto]">
         <div className={cn(HEAD_CELL, "pl-3.5 pr-2 text-left")}>Parameter</div>
-        <div className={cn(HEAD_CELL, "px-2 text-right")}>Now</div>
-        <div className={cn(HEAD_CELL, "pl-2 pr-3.5 text-right")}>Was</div>
+        <div className={cn(HEAD_CELL, "px-2 text-right")}>{against === "other" ? "This run" : "Now"}</div>
+        <div className={cn(HEAD_CELL, "pl-2 pr-3.5 text-right")}>{against === "other" ? "Other" : "Was"}</div>
         <div className={cn(HEAD_CELL, cropByKey ? "pr-2" : "")} />
-        {rows.map((row, i) => {
+        {shown.map((row, i) => {
           const crop = cropByKey?.get(row.key);
           const open = openKey === row.key;
           return (
@@ -126,7 +151,12 @@ export function SetupChangedSincePreviousList({
                     row.value
                   )}
                 </div>
-                <div className="min-w-0 break-words pl-2 pr-3.5 py-[7px] text-right text-[12px] tabular-nums leading-tight text-faint line-through">
+                <div
+                  className={cn(
+                    "min-w-0 break-words pl-2 pr-3.5 py-[7px] text-right text-[12px] tabular-nums leading-tight",
+                    against === "other" ? "text-muted-foreground" : "text-faint line-through"
+                  )}
+                >
                   {row.previousValue}
                 </div>
                 <div className={cn("flex items-center self-stretch", crop ? "pr-2" : "")}>
@@ -164,6 +194,20 @@ export function SetupChangedSincePreviousList({
             </Fragment>
           );
         })}
+        {capped ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              // Shutting it from halfway down would leave the frame scrolled past its three rows.
+              if (showAll) e.currentTarget.parentElement?.parentElement?.scrollTo({ top: 0 });
+              setShowAll((was) => !was);
+            }}
+            aria-expanded={showAll}
+            className="tap-active sticky bottom-0 z-10 col-span-4 border-t border-border bg-secondary/95 px-3.5 py-[7px] text-left text-[12px] font-medium text-muted-foreground backdrop-blur-sm hover:text-foreground"
+          >
+            {showAll ? "Show fewer" : `Show all ${ordered.length}`}
+          </button>
+        ) : null}
       </div>
     </div>
   );
