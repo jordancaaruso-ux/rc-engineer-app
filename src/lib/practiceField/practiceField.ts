@@ -251,3 +251,47 @@ export function importedSessionIsPractice(sourceUrl: string | null | undefined):
   if (url.includes("speedhive") && /\/practice\/\d+\/activities\//.test(url)) return true;
   return false;
 }
+
+/**
+ * What heads a brought-in driver's column on the lap sheet.
+ *
+ * The import's own driver name is last, not first: on MYLAPS it is a label the chip's owner
+ * typed (or, for a practice loop, a time — MYLAPS names nobody), and a column headed by a word
+ * you didn't choose is a column you have to decode. So: your saved name for that chip, then what
+ * the practice list called them when they were ticked, then the site's name, then the number.
+ */
+export function practiceColumnName(input: {
+  transponder: string | null | undefined;
+  saved: readonly KnownCompetitor[];
+  /** What the Practice list showed when this driver was ticked, this visit. */
+  visitName?: string | null;
+  /** The timing site's own name for them, kept with the import. */
+  siteName?: string | null;
+  /** The driver name the import parsed — the old heading. */
+  importName?: string | null;
+}): string {
+  const chip = input.transponder ? normalizeSpeedhiveTransponderNumber(input.transponder) : null;
+  const savedName = chip ? input.saved.find((s) => s.transponder === chip)?.name : null;
+  return (
+    savedName?.trim() ||
+    input.visitName?.trim() ||
+    input.siteName?.trim() ||
+    (chip ? `Transponder ${chip}` : "") ||
+    input.importName?.trim() ||
+    "Imported session"
+  );
+}
+
+/**
+ * The surname that goes over one of a driver's own run columns once the sheet holds more than
+ * one driver — "Caruso" above "Run 5", beside "David CALWELL". Null for the placeholders a run
+ * wears when nobody's name is known, which would print "Me" as if it were a surname.
+ */
+export function runOwnerSurname(driverLabel: string | null | undefined): string | null {
+  const label = driverLabel?.trim() ?? "";
+  if (!label || /^(me|driver)$/i.test(label)) return null;
+  const parts = label.split(/\s+/);
+  const last = parts[parts.length - 1]!;
+  // Timing sites shout; a saved name doesn't. One case for both.
+  return last.charAt(0).toUpperCase() + last.slice(1).toLowerCase();
+}

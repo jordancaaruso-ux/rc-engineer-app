@@ -89,6 +89,7 @@ export function PracticeFieldBrowser({
   onTick,
   onOpenSession,
   lookCache,
+  onSavedChange,
 }: {
   trackId: string;
   trackName: string;
@@ -112,6 +113,8 @@ export function PracticeFieldBrowser({
   onOpenSession?: (importedSessionId: string) => void;
   /** See {@link PracticeLookCache}. Omitted on the page, where Look is a button and means "ask". */
   lookCache?: PracticeLookCache;
+  /** The saved drivers changed here (Save) — the lap sheet names columns from the same list. */
+  onSavedChange?: (saved: KnownCompetitor[]) => void;
 }) {
   const [source, setSource] = useState<PracticeFieldSource>(
     preferredSource && sources.includes(preferredSource) ? preferredSource : sources[0] ?? "liverc"
@@ -315,6 +318,16 @@ export function PracticeFieldBrowser({
     const wasImported = heldId != null;
     const id = await bringIn(session);
     if (!id) return;
+    // Beside the laps, write down whose they are and where — the import cannot tell, and the
+    // lap sheet needs both: the name to head the column, the track to keep it in scope. Awaited,
+    // because the host re-reads the library the moment it hears of the tick.
+    if (d.transponder) {
+      await fetch(`/api/lap-time-sessions/${encodeURIComponent(id)}/practice-driver`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transponder: d.transponder, siteName: d.siteName, trackId }),
+      }).catch(() => {});
+    }
     if (mode === "tick") {
       onTick?.({ importedSessionId: id, displayName: practiceDriverDisplayName(d, saved) }, true);
     } else if (wasImported) {
@@ -330,6 +343,7 @@ export function PracticeFieldBrowser({
     }
     const next = [...saved.filter((s) => s.transponder !== d.transponder), { name, transponder: d.transponder }];
     setSaved(next);
+    onSavedChange?.(next);
     setNamingKey(null);
     setNameDraft("");
     try {
@@ -341,6 +355,7 @@ export function PracticeFieldBrowser({
       if (!res.ok) throw new Error();
     } catch {
       setSaved(saved);
+      onSavedChange?.(saved);
       setNote("Couldn't save that driver.");
     }
   }

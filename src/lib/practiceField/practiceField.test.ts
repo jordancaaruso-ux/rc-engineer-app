@@ -5,8 +5,10 @@ import {
   groupLiveRcPracticeRows,
   groupMylapsActivities,
   importedSessionIsPractice,
+  practiceColumnName,
   practiceDriverDisplayName,
   practiceQueryAsTransponder,
+  runOwnerSurname,
   type LiveRcPracticeRowInput,
 } from "@/lib/practiceField/practiceField";
 
@@ -115,4 +117,22 @@ test("an imported session is practice or race by where it came from", () => {
   assert.equal(importedSessionIsPractice("https://speedhive.mylaps.com/sessions/123"), false);
   assert.equal(importedSessionIsPractice("myrcm-pdf://abc/file.pdf"), false);
   assert.equal(importedSessionIsPractice(null), false);
+});
+
+test("a brought-in column is headed by your name for them, then the list's, the site's, the number", () => {
+  const saved = [{ name: "Tim", transponder: "7281046" }];
+  assert.equal(practiceColumnName({ transponder: "7281046", saved, siteName: "T HILLIER 2", importName: "20 Sept, 6:32 PM" }), "Tim");
+  assert.equal(practiceColumnName({ transponder: "2450937", saved, visitName: "Dale" }), "Dale");
+  assert.equal(practiceColumnName({ transponder: "2450937", saved, siteName: "BC Racing" }), "BC Racing");
+  assert.equal(practiceColumnName({ transponder: "2450937", saved, importName: "20 Sept, 6:32 PM" }), "Transponder 2450937");
+  assert.equal(practiceColumnName({ transponder: null, saved, importName: "David Calwell" }), "David Calwell");
+});
+
+test("a run's owner reads as a surname, in one case, and never as a placeholder", () => {
+  assert.equal(runOwnerSurname("Jordan Caruso"), "Caruso");
+  assert.equal(runOwnerSurname("JORDAN CARUSO"), "Caruso");
+  assert.equal(runOwnerSurname("Cher"), "Cher");
+  assert.equal(runOwnerSurname("Me"), null);
+  assert.equal(runOwnerSurname("Driver"), null);
+  assert.equal(runOwnerSurname(""), null);
 });

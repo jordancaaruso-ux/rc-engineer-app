@@ -28,7 +28,30 @@ export type ImportedLibrarySession = {
    * hours out in Melbourne, so the lap sheet turns this into a real instant before printing it.
    */
   trackClockIso: string | null;
+  /**
+   * Whose practice it is, as the practice list knew them when it was brought in — see
+   * `/api/lap-time-sessions/[id]/practice-driver`. Null on anything brought in another way.
+   */
+  practiceTransponder: string | null;
+  practiceSiteName: string | null;
 };
+
+function practiceDriverFromPayload(parsedPayload: unknown): {
+  transponder: string | null;
+  siteName: string | null;
+  trackName: string | null;
+} {
+  const hint =
+    parsedPayload && typeof parsedPayload === "object"
+      ? (parsedPayload as { sessionHint?: unknown }).sessionHint
+      : null;
+  const h = hint && typeof hint === "object" ? (hint as Record<string, unknown>) : {};
+  return {
+    transponder: typeof h.practiceTransponder === "string" && h.practiceTransponder ? h.practiceTransponder : null,
+    siteName: typeof h.practiceSiteName === "string" && h.practiceSiteName ? h.practiceSiteName : null,
+    trackName: typeof h.practiceTrackName === "string" && h.practiceTrackName ? h.practiceTrackName : null,
+  };
+}
 
 type LibraryApiSession = {
   id: string;
@@ -58,15 +81,19 @@ function toLibrarySession(s: LibraryApiSession): ImportedLibrarySession | null {
     }),
   };
   const shown = importedSessionTimeForDisplay(whenIso, timeOpts);
+  const practiceDriver = practiceDriverFromPayload(s.parsedPayload);
   return {
     id: s.id,
     selectLabel: formatDriverSessionLabel(parsed.driverName, whenIso, timeOpts),
     name: parsed.driverName?.trim() || "Imported session",
     laps: parsed.rows,
     sortTimeIso: whenIso,
-    trackName: s.trackName ?? null,
+    // A rival's practice is linked to no run, so its track is the one it was ticked at.
+    trackName: s.trackName ?? practiceDriver.trackName,
     kind: importedSessionIsPractice(s.sourceUrl) ? "practice" : "race",
     trackClockIso: shown.timeZone === "UTC" ? shown.iso : null,
+    practiceTransponder: practiceDriver.transponder,
+    practiceSiteName: practiceDriver.siteName,
   };
 }
 
@@ -86,8 +113,11 @@ function toLibrarySession(s: LibraryApiSession): ImportedLibrarySession | null {
 export function useImportedLapLibrary(enabled = true): {
   sessions: ImportedLibrarySession[];
   reload: (ensureId?: string) => Promise<void>;
+  /** False until the first read comes back — an empty list then means "none", not "not yet". */
+  loaded: boolean;
 } {
   const [sessions, setSessions] = useState<ImportedLibrarySession[]>([]);
+  const [loaded, setLoaded] = useState(false);
   /** Asked for by id, outside the newest 200 — kept across reloads or they would drop off again. */
   const extras = useRef<Map<string, ImportedLibrarySession>>(new Map());
   const alive = useRef(true);
@@ -116,6 +146,8 @@ export function useImportedLapLibrary(enabled = true): {
       if (alive.current) setSessions(mapped);
     } catch {
       // Keep what is on screen: a failed refresh must not empty a sheet someone is reading.
+    } finally {
+      if (alive.current) setLoaded(true);
     }
   }, []);
 
@@ -127,5 +159,5 @@ export function useImportedLapLibrary(enabled = true): {
     };
   }, [enabled, reload]);
 
-  return { sessions, reload };
+  return { sessions, reload, loaded };
 }

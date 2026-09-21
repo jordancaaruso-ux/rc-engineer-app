@@ -56,7 +56,12 @@ import {
   type PracticeFieldPick,
   type PracticeLookCache,
 } from "@/components/laps/PracticeFieldBrowser";
-import type { PracticeFieldSource } from "@/lib/practiceField/practiceField";
+import {
+  practiceColumnName,
+  runOwnerSurname,
+  type PracticeFieldSource,
+} from "@/lib/practiceField/practiceField";
+import type { KnownCompetitor } from "@/lib/speedhive/knownCompetitors";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/setup-sheet/SetupSheetModal";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import { formatCompareRunMetaLine } from "@/lib/runCompareMeta";
@@ -355,6 +360,7 @@ function ColumnHeaderBlock({
   series,
   meta,
   isTarget,
+  owner = null,
   isPerson = false,
   compact = false,
   summaryDelta,
@@ -364,6 +370,12 @@ function ColumnHeaderBlock({
   series: ComparisonSeries;
   meta: SeriesMeta;
   isTarget: boolean;
+  /**
+   * Whose run this is — "Caruso" — printed over the run's name once the sheet holds more than
+   * one driver (founder, 2026-09-22). On a sheet of only your own runs it stays off: every
+   * column would say the same word, which is the noise the session-not-driver rule removed.
+   */
+  owner?: string | null;
   /** The sheet's clock — see the grid's `timeZone` prop. */
   timeZone?: string | null;
   /** The column is a driver off a timing sheet, so its name splits into first / SURNAME. */
@@ -382,6 +394,12 @@ function ColumnHeaderBlock({
               column you are looking at. */}
           {isPerson ? (
             <DriverNameStack name={meta.name} />
+          ) : owner ? (
+            // Same two lines as a rival's first name / SURNAME, so the headers stand level.
+            <div className="leading-tight">
+              <div className="truncate text-[10px] font-normal text-foreground/80">{owner}</div>
+              <div className="truncate font-medium text-foreground">{meta.name}</div>
+            </div>
           ) : (
             <div className="truncate font-medium text-foreground">{meta.name}</div>
           )}
@@ -477,6 +495,7 @@ export function LapComparisonColumnGrid({
   pickerRunsForModal = NO_RUNS as CompareRunShape[],
   runListSource = "my_runs",
   librarySessions = [],
+  libraryLoaded = true,
   onLibraryChanged,
   viewerUserId = null,
   memberDisplayByUserId,
@@ -534,12 +553,21 @@ export function LapComparisonColumnGrid({
     kind?: "practice" | "race";
     /** The track's clock as-if-UTC, when the timing site printed one — see `useImportedLapLibrary`. */
     trackClockIso?: string | null;
+    /** Whose practice it is, as the practice list knew them — see `useImportedLapLibrary`. */
+    practiceTransponder?: string | null;
+    practiceSiteName?: string | null;
   }>;
   /**
    * The Practice tab brought a session in: re-read the library so it can become a column.
    * Handed the new session's id, which the host must make sure is in the list it hands back.
    */
   onLibraryChanged?: (ensureId?: string) => Promise<void> | void;
+  /**
+   * False while the host's library is still on its way. Both hosts fetch it after mount, so a
+   * sheet opened WITH a brought-in column (`?columns=library:…` — the "Detailed analysis" door)
+   * renders once before that column's laps exist; the tick must survive that render.
+   */
+  libraryLoaded?: boolean;
   viewerUserId?: string | null;
   memberDisplayByUserId?: Record<string, string>;
   /**
@@ -733,6 +761,25 @@ export function LapComparisonColumnGrid({
    * nothing; a column headed by a name you didn't pick is a column you have to decode.
    */
   const [practiceNames, setPracticeNames] = useState<Record<string, string>>({});
+  /**
+   * The saved drivers, so a brought-in column wears YOUR name for its transponder on every
+   * visit. Asked for only when some column could use it; the Practice tab keeps it in step.
+   */
+  const [savedDrivers, setSavedDrivers] = useState<KnownCompetitor[]>([]);
+  const anyPracticeTransponder = librarySessions.some((l) => l.practiceTransponder);
+  useEffect(() => {
+    if (!anyPracticeTransponder) return;
+    let alive = true;
+    fetch("/api/settings/known-competitors", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { competitors?: KnownCompetitor[] } | null) => {
+        if (alive && data?.competitors) setSavedDrivers(data.competitors);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [anyPracticeTransponder]);
 
   /*
    * Which chart is up. A race sheet opens on the gap to the leader — the picture of the
@@ -1033,7 +1080,16 @@ export function LapComparisonColumnGrid({
         sortIso: libInstantIso,
         whenIso: libInstantIso,
         trackName: lib.trackName ?? null,
-        name: practiceNames[ser.id] ?? (lib.name?.trim() || lib.selectLabel),
+        name:
+          lib.kind === "practice"
+            ? practiceColumnName({
+                transponder: lib.practiceTransponder,
+                saved: savedDrivers,
+                visitName: practiceNames[ser.id],
+                siteName: lib.practiceSiteName,
+                importName: lib.name?.trim() || lib.selectLabel,
+              })
+            : lib.name?.trim() || lib.selectLabel,
         segment: lib.kind === "practice" ? "practice" : "field",
         trackKey: lapCompareTrackKey(lib.trackName),
         fieldRunId: null,
@@ -1158,6 +1214,7 @@ export function LapComparisonColumnGrid({
     primaryLaps,
     librarySessions,
     practiceNames,
+    savedDrivers,
     pickerZone,
     memberDisplayByUserId,
     otherFieldRuns,
@@ -1580,8 +1637,16 @@ export function LapComparisonColumnGrid({
    */
   useEffect(() => {
     const valid = new Set(scopeFilteredRows.map((r) => r.series.id));
-    setSelectedComparisonIds((prev) => prev.filter((id) => valid.has(id) && id !== targetId));
-  }, [scopeFilteredRows, targetId]);
+    setSelectedComparisonIds((prev) =>
+      prev.filter(
+        (id) =>
+          id !== targetId &&
+          // A brought-in column is not judged until the library it lives in has arrived —
+          // pruned on the first render, "Detailed analysis" opened without the rival you ticked.
+          (valid.has(id) || (!libraryLoaded && id.startsWith("library:")))
+      )
+    );
+  }, [scopeFilteredRows, targetId, libraryLoaded]);
 
   /**
    * What the target dropdown may offer: whatever "How far to look" allows, plus
@@ -2178,14 +2243,39 @@ export function LapComparisonColumnGrid({
    * from elsewhere. A race's field is the pool you choose from; a column added from another
    * heat still needs a chip, or there would be a column on the sheet nothing above it names.
    */
+  /*
+   * Whose run each run-column is, once the sheet mixes drivers. A run series carries its
+   * driver as its label ("Jordan Caruso"; a teammate's name in team mode) and its SESSION as
+   * its name ("Run 5") — a person column is the other way round and needs nothing added.
+   */
+  const ownerBySeriesId = useMemo(() => {
+    const out = new Map<string, string>();
+    if (!targetSeries) return out;
+    const onSheet = [targetSeries, ...comparisonSeries];
+    const isPersonColumn = (s: ComparisonSeries) =>
+      s.id === targetSeries.id ? anchorIsImportedSheet : s.sourceType === "imported";
+    const drivers = new Set(
+      onSheet.map((s) => (isPersonColumn(s) ? metaById.get(s.id)?.name ?? s.label : s.label).trim().toLowerCase())
+    );
+    if (drivers.size < 2) return out;
+    for (const s of onSheet) {
+      if (isPersonColumn(s)) continue;
+      const surname = runOwnerSurname(s.label);
+      if (surname) out.set(s.id, surname);
+    }
+    return out;
+  }, [targetSeries, comparisonSeries, metaById, anchorIsImportedSheet]);
+
   const driverChips = useMemo((): LapDriverChip[] => {
     if (!targetSeries) return [];
     const selected = new Set(selectedComparisonIds);
     const chips: LapDriverChip[] = [];
     const seen = new Set<string>();
-    const push = (id: string, label: string, loaded: boolean) => {
+    const push = (id: string, name: string, loaded: boolean) => {
       if (seen.has(id)) return;
       seen.add(id);
+      const owner = ownerBySeriesId.get(id);
+      const label = owner ? `${owner} · ${name}` : name;
       chips.push({ id, label, on: id === targetSeries.id || selected.has(id), isTarget: id === targetSeries.id, loaded });
     };
     push(targetSeries.id, metaById.get(targetSeries.id)?.name ?? targetSeries.label, true);
@@ -2195,7 +2285,7 @@ export function LapComparisonColumnGrid({
     }
     for (const s of comparisonSeries) push(s.id, metaById.get(s.id)?.name ?? s.label, true);
     return chips;
-  }, [targetSeries, targetSession, comparisonSeries, selectedComparisonIds, metaById]);
+  }, [targetSeries, targetSession, comparisonSeries, selectedComparisonIds, metaById, ownerBySeriesId]);
 
   const selectAllChips = useCallback(() => {
     setSelectedComparisonIds((prev) => {
@@ -2421,6 +2511,7 @@ export function LapComparisonColumnGrid({
               tickedImportIds={practiceTickedImportIds}
               onTick={onPracticeTick}
               lookCache={practiceLookCache}
+              onSavedChange={setSavedDrivers}
             />
           ) : null}
           <LapCompareSessionList
@@ -2632,6 +2723,7 @@ export function LapComparisonColumnGrid({
                     series={targetSeries}
                     meta={metaFor(targetSeries)}
                     isTarget
+                    owner={ownerBySeriesId.get(targetSeries.id) ?? null}
                     isPerson={anchorIsImportedSheet}
                     compact={compactColumns}
                     summaryDelta={null}
@@ -2654,6 +2746,7 @@ export function LapComparisonColumnGrid({
                       series={s}
                       meta={metaFor(s)}
                       isTarget={false}
+                      owner={ownerBySeriesId.get(s.id) ?? null}
                       isPerson={s.sourceType === "imported"}
                       compact={compactColumns}
                       summaryDelta={d}

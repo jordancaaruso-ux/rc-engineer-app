@@ -47,7 +47,7 @@ export function LapAnalysisBoard({
   driverCount?: number | null;
   sourceLabel?: string | null;
 }) {
-  const { sessions: librarySessions, reload: reloadLibrary } = useImportedLapLibrary();
+  const { sessions: librarySessions, reload: reloadLibrary, loaded: libraryLoaded } = useImportedLapLibrary();
 
   /*
    * Drawn only after hydration, and this is not a preference.
@@ -105,6 +105,7 @@ export function LapAnalysisBoard({
         runListSource={runListSource}
         librarySessions={librarySessions}
         onLibraryChanged={reloadLibrary}
+        libraryLoaded={libraryLoaded}
         viewerUserId={viewerUserId}
         initialTargetId={initialTargetId}
         initialComparisonIds={initialComparisonIds}
