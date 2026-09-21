@@ -31,12 +31,92 @@ export function readableSetupKey(key: string): string {
  */
 const ENGINEER_BODY_KEYS = new Set<string>(["bodyshell", "wing", "winglet"]);
 
-/** What the Engineer reads off a sheet: the tuning keys plus the body. */
+/**
+ * Gearing and the motor. Left out of the shared tuning list for the same reason as the body, and
+ * hidden from the Engineer until 2026-09-21: a driver with spur 66, pinion 39 and a 21.5T on his
+ * sheet asked "What fdr for 21.5T" and was told "there's no current ratio… What FDR are you running
+ * now?" — the app asking a driver for a number he had already given it (founder: "sure").
+ * The spellings are the ones the chassis sheets in production actually use.
+ */
+const ENGINEER_DRIVETRAIN_KEYS = new Set<string>([
+  "spur",
+  "spur_gear",
+  "spurgear",
+  "pinion",
+  "fdr",
+  "motor",
+  "motor_timing",
+]);
+
+/** What the Engineer reads off a sheet: the tuning keys, the body, the gearing and the motor. */
 export function isEngineerSetupKey(key: string): boolean {
-  return isTuningComparisonKey(key) || ENGINEER_BODY_KEYS.has(key);
+  return isTuningComparisonKey(key) || ENGINEER_BODY_KEYS.has(key) || ENGINEER_DRIVETRAIN_KEYS.has(key);
 }
 
-/** Tuning and body keys only — the blob also carries tyres, battery, electronics and free text. */
+/**
+ * Spur ÷ pinion, worked out here so the model never divides (north star: the arithmetic is done in
+ * code). NOT the final drive ratio — that is this times the car's internal ratio, which no sheet
+ * key reliably carries — and the line it prints says so. Null unless both are plain numbers.
+ */
+export function spurOverPinion(values: Record<string, string>): string | null {
+  const spur = Number(values.spur ?? values.spur_gear ?? values.spurgear);
+  const pinion = Number(values.pinion);
+  if (!Number.isFinite(spur) || !Number.isFinite(pinion) || spur <= 0 || pinion <= 0) return null;
+  return (spur / pinion).toFixed(3);
+}
+
+/**
+ * Sheet keys that mean a lever exists under another name. A net's `parameter` is the canonical
+ * key; sheets spell some knobs differently (droop is a downstop on an Awesomatix, flex is a C45
+ * brace or a top-deck screw). Only ever used to AVOID saying a lever is missing.
+ */
+const LEVER_KEY_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  droop_front: ["downstop_front"],
+  droop_rear: ["downstop_rear"],
+  top_deck_front: ["c45_installed_front", "top_deck", "topdeck"],
+  top_deck_rear: ["c45_installed_rear", "top_deck", "topdeck"],
+  top_deck_screws: ["top_deck", "topdeck", "motor_mount_screws", "c45_installed"],
+  spring_front: ["front_spring", "front_shock_spring"],
+  spring_rear: ["rear_spring", "rear_shock_spring"],
+  shock_angle_front: ["shock_position_front", "front_shock_position", "front_shock_tower", "front_arm_shock", "shock_tower"],
+  shock_angle_rear: ["shock_position_rear", "rear_shock_position", "rear_shock_tower", "rear_arm_shock", "shock_tower"],
+  arb_front: ["front_anti_roll_bar", "front_arb", "front_roll_bar"],
+  arb_rear: ["rear_anti_roll_bar", "rear_arb", "rear_roll_bar"],
+  damper_oil_front: ["front_shock_oil", "fr_shock_oil", "front_damper_oil"],
+  damper_oil_rear: ["rear_shock_oil", "re_shock_oil", "rear_damper_oil"],
+};
+
+function sheetHasLever(parameter: string, sheetKeys: readonly string[]): boolean {
+  const stems = [parameter, ...(LEVER_KEY_ALIASES[parameter] ?? [])];
+  // `upper_inner_shims_front` is `upper_inner_shims_ff` + `_fr` on a sheet that splits the end.
+  if (parameter.endsWith("_front")) stems.push(`${parameter.slice(0, -"_front".length)}_f`);
+  if (parameter.endsWith("_rear")) stems.push(`${parameter.slice(0, -"_rear".length)}_r`);
+  return sheetKeys.some((k) => stems.some((s) => k === s || k.startsWith(s)));
+}
+
+/**
+ * The Engineer's levers this car's sheet has no box for — asked for five hairpin levers on an
+ * A800RR, it offered "move the front shocks one hole more laid down" on a car with no shock holes
+ * (round 04, 2026-09-19; founder 2026-09-21: only offer what is on the sheet).
+ *
+ * Deliberately timid, because a false "not on this car" takes a real lever away: it answers only
+ * for a sheet the Engineer can already read (`minReadable` canonical keys), and gives up — returns
+ * [] — when more than `maxMissing` levers look absent, which is what a sheet whose boxes are
+ * spelled some other way looks like. Most of the 230 chassis in production are in that state, so
+ * for most cars this says nothing, which is the honest answer.
+ */
+export function leversNotOnSheet(
+  levers: ReadonlyArray<{ parameter: string; label: string }>,
+  sheetKeys: readonly string[],
+  opts: { minReadable?: number; maxMissing?: number } = {}
+): string[] {
+  const keys = [...new Set(sheetKeys.map((k) => k.trim().toLowerCase()).filter(Boolean))];
+  if (keys.filter(isEngineerSetupKey).length < (opts.minReadable ?? 20)) return [];
+  const missing = levers.filter((l) => !sheetHasLever(l.parameter, keys)).map((l) => l.label);
+  return missing.length > (opts.maxMissing ?? 6) ? [] : missing;
+}
+
+/** Tuning, body, gearing and motor keys only — the blob also carries tyres, battery, electronics and free text. */
 export function tuningValues(data: unknown): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, raw] of Object.entries(normalizeSetupData(data))) {

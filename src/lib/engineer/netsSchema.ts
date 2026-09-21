@@ -114,6 +114,15 @@ export type NetEntry = {
   /** A normal-sized move, in the founder's words, shared by both directions. `null` until dictated. */
   step: string | null;
   /**
+   * Where this knob normally sits on the discipline's cars, and where the far end of that is
+   * (founder, 2026-09-21: yes to normal values per knob). Optional — most knobs have none yet.
+   * The Engineer told a car on 4° of rear toe-in to add more, and blind it cannot see the 4°: with
+   * the range on the wire it skips a used-up lever when it can read the car, and says where the
+   * end is when it cannot. A range is the founder's to give; one drafted from logged runs says so
+   * in a YAML comment until he has passed it.
+   */
+  usual?: string | null;
+  /**
    * True when the knob does one thing before the car settles and another once it has: each side
    * carries `before_settled` + `once_settled`. False: each side carries one `effect` line.
    */
@@ -215,6 +224,10 @@ export function validateNetEntry(raw: unknown): string[] {
     errs.push(`step: must be null or a string of at most ${NET_STEP_MAX} chars`);
   }
 
+  if (e.usual != null && !capped(e.usual, NET_STEP_MAX)) {
+    errs.push(`usual: must be absent, null or a string of at most ${NET_STEP_MAX} chars — where the knob normally sits`);
+  }
+
   if (typeof e.two_answers !== "boolean") {
     errs.push("two_answers: required boolean — true if the knob does one thing before the car settles and another once it has");
   }
@@ -266,7 +279,11 @@ export function unreviewedSides(entry: NetEntry): string[] {
  */
 export function renderNetEntry(entry: NetEntry): string {
   const lines: string[] = [];
-  lines.push(entry.label.toUpperCase() + (entry.step ? ` | a normal move: ${entry.step}` : ""));
+  lines.push(
+    entry.label.toUpperCase() +
+      (entry.step ? ` | a normal move: ${entry.step}` : "") +
+      (entry.usual ? ` | usually runs: ${entry.usual}` : "")
+  );
   for (const side of NET_SIDES) {
     const s = entry[side];
     if (!s) continue;

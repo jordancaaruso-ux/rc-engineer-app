@@ -10,6 +10,9 @@ words:
   more: "more toe-in"
   less: "less toe-in"
 step: "0.25° per side is a normal move; 0.5° when the problem is chronic and everywhere; 0.1° is barely felt"   # founder-dictated 2026-08-27, corrected same day
+# AI-DRAFTED 2026-09-21 from 628 logged runs (13 drivers, mostly one): the middle is 3.2°, nine in ten sit
+# between 2.5° and 4°. Founder pass owed — the founder said yes to normal values per knob, not to these numbers.
+usual: "about 3° per side; most cars sit between 2.5° and 3.5°, and 4° is the far end of what is run"
 two_answers: false
 more:
   reviewed: true

@@ -157,6 +157,32 @@ Each of these was deleted or declined for a reason. They return only through the
 
 ## Changelog
 
+- **2026-09-21** — Founder read a week of real testers' questions from production beside round 04 and
+  ruled: "we need to have a strong distinction between when the engineer can read a car and when it
+  can't… focus on the things that would still require improving even if it can't read the car." Measured
+  the same day: 140 of the 230 chassis in production have sheets whose boxes the app cannot name, so for
+  most cars the Engineer is blind, and until now it was never told so — the setup block was simply
+  absent. Label `2026-09-21-blind-car`. (1) `driverData.ts` always prints a setup
+  block: the values, or **NOT VISIBLE** and why — nothing filled in, or N boxes filled in on a chassis the
+  app cannot name yet ("that gap is the app's, not the driver's"). A tester with an empty sheet had been
+  told his sheet "was copied forward and is not yet verified". (2) Spur, pinion, FDR, motor and motor
+  timing join the sheet the Engineer reads (`setupDiff.ts`), with spur ÷ pinion worked out in code: a
+  tester with 66/39 and a 21.5T on his sheet asked "What fdr for 21.5T" and was asked what ratio he ran.
+  A hedged `drafts/gearing.md` gives the mechanism and what the driver can see; it carries no ratio for
+  any motor. (3) A net may carry `usual` — where the knob normally sits — rendered as "usually runs",
+  with one nets-header sentence: a car at the far end has little left in that lever; blind, say where
+  the end is. Rear toe only so far, drafted from 628 logged runs, founder pass owed (rear toe-in led seven
+  of ten rear-grip answers on cars already at 3° to 4°). (4) A readable sheet names the levers it has no
+  box for (`leversNotOnSheet` — timid by design: silent unless the sheet is already readable and few
+  levers look absent), after "move the front shocks one hole more laid down" was offered on an A800RR.
+  (5) The block states what the car races and, when that is not touring, that the priors were written for
+  1/10 touring cars — the first tester on a 1/8 nitro buggy would have been handed touring steps with no
+  warning. All five are facts on the wire. One prompt sentence rides with them, because a first pass
+  with the facts alone told the driver it was blind in only 2 of 7 blind conversations: when the block
+  says the setup is not visible, say so once in the conversation, in a clause, with what would change
+  that, and give each move as a direction and a size (founder's read of that sentence owed). Round 05 (15 conversations, 12 of them
+  blind, real testers' questions) published for his read. NOT through the 56-case launch set.
+
 - **2026-09-19** — The founder's 2026-09-04 round never shipped: it was built in the `engineer-ship`
   worktree, left uncommitted, and found when a production answer said "more rolled-in front" and "the
   front grip can arrive too late". Re-applied on today's text, label `2026-09-19-driver-words-restored`:

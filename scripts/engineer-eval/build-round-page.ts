@@ -4,6 +4,10 @@
  *
  *   npm run engineer:round:page -- --batch round-01 [--context run-with-setup] [--arm v1-nets] [--title "Round 01"] [--out path.html]
  *
+ * --context takes a comma-separated list since round 05 (2026-09-21): that round asks the same
+ * Engineer with no driver data, a known car with nothing on its sheet, a sheet the app cannot name,
+ * and a readable sheet — each group is headed by what the Engineer could see, its block folded away.
+ *
  * Reads answers/<batch>/<arm>__<context>.json, writes answers/<batch>/round-page.html (and --out,
  * for publishing as an artifact: no document skeleton, <title> + <style> first). Same look as the
  * app: ash paper, Sora for the title, one card per conversation, the context folded away.
@@ -46,20 +50,36 @@ function main() {
   const batch = argValue("--batch");
   if (!batch) { console.error("Usage: engineer:round:page -- --batch <name> [--context run-with-setup] [--arm v1-nets] [--title ...] [--out ...]"); process.exit(1); }
   const arm = argValue("--arm") ?? "v1-nets";
-  const context = argValue("--context") ?? "run-with-setup";
+  const contexts = (argValue("--context") ?? "run-with-setup").split(",").map((s) => s.trim()).filter(Boolean);
+  const context = contexts[0];
   const title = argValue("--title") ?? batch.replace(/^round-0*/, "Round ");
   const dir = path.join(__dirname, "answers", batch);
-  const file = JSON.parse(fs.readFileSync(path.join(dir, `${arm}__${context}.json`), "utf8")) as AnswerFile;
-  const cases = Object.entries(file.cases);
+  const files = contexts.map((c) => JSON.parse(fs.readFileSync(path.join(dir, `${arm}__${c}.json`), "utf8")) as AnswerFile);
+  const cases = files.flatMap((f) => Object.entries(f.cases));
 
-  const ctx = file.fixture
-    ? `<details class="ctx"><summary>What the Engineer was given: the driver's latest run and setup</summary><pre>${esc(file.fixture)}</pre></details>`
-    : `<p class="ctx none">The Engineer was given no driver data.</p>`;
+  // What the Engineer could see, in plain words — the heading over each group of a mixed round.
+  const seen = (f: AnswerFile): string =>
+    !f.fixture
+      ? "No driver data at all — a new account, or the General setting"
+      : /NOT VISIBLE/.test(f.fixture)
+        ? /filled in \d+ boxes/.test(f.fixture)
+          ? "Can't read the car — the sheet is filled in, but the app can't name its boxes yet"
+          : "Can't read the car — a known car with nothing on its setup sheet"
+        : "Can read the car — the driver's latest run and setup";
 
-  const cards = cases.map(([id, c], i) => {
-    const turns = c.turns.map((t) => `<div class="turn ${t.role}"><div class="who">${t.role === "user" ? "Driver" : "Engineer"}</div><div class="body">${t.role === "user" ? `<p>${esc(t.content)}</p>` : md(t.content)}</div></div>`).join("");
-    return `<section class="card" id="${esc(id)}"><div class="head"><span class="n">${i + 1}</span><span class="id">${esc(id)}</span><span class="shape">${esc(c.shape)}</span><span class="src">${c.source === "driver" ? "another driver" : "founder"}</span></div>${turns}</section>`;
-  }).join("\n");
+  let n = 0;
+  const section = (f: AnswerFile): string => {
+    const given = f.fixture
+      ? `<details class="ctx"><summary>What the Engineer was given</summary><pre>${esc(f.fixture)}</pre></details>`
+      : `<p class="ctx none">The Engineer was given no driver data.</p>`;
+    const group = Object.entries(f.cases).map(([id, c]) => {
+      const turns = c.turns.map((t) => `<div class="turn ${t.role}"><div class="who">${t.role === "user" ? "Driver" : "Engineer"}</div><div class="body">${t.role === "user" ? `<p>${esc(t.content)}</p>` : md(t.content)}</div></div>`).join("");
+      return `<section class="card" id="${esc(id)}"><div class="head"><span class="n">${++n}</span><span class="id">${esc(id)}</span><span class="shape">${esc(c.shape)}</span><span class="src">${c.source === "driver" ? "another driver" : "founder"}</span></div>${turns}</section>`;
+    }).join("\n");
+    return (files.length > 1 ? `<h2 class="sec">${esc(seen(f))}</h2>` : "") + given + group;
+  };
+  const ctx = "";
+  const cards = files.map(section).join("\n");
 
   const style = `
   html { background: #EAE7E0; }
@@ -68,6 +88,7 @@ function main() {
   header b { font-family: "Sora", system-ui, sans-serif; font-size: 20px; letter-spacing: -0.01em; }
   header span { color: #C9C4B8; font-size: 14px; }
   main { max-width: 820px; margin: 0 auto; padding: 18px 16px 48px; }
+  .sec { font: 700 11px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #6B6760; margin: 28px 0 8px; }
   .ctx { font-size: 13px; color: #6B6760; margin: 0 0 18px; } .ctx summary { cursor: pointer; }
   .ctx pre { white-space: pre-wrap; background: #F6F5F1; color: #3A3733; padding: 10px; border-radius: 6px; max-height: 280px; overflow: auto; font-size: 12px; }
   .card { background: #FFFFFF; border-radius: 10px; padding: 14px 18px 6px; margin: 0 0 20px; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
@@ -81,7 +102,7 @@ function main() {
   @media (max-width: 480px) { .turn { grid-template-columns: 1fr; gap: 2px; } main { padding: 12px 10px 40px; } }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }`;
 
-  const inner = `<header><b>${esc(title)}</b><span>${cases.length} conversations · ${esc(context === "none" ? "no driver data" : "with the driver's run and setup")}</span></header>
+  const inner = `<header><b>${esc(title)}</b><span>${cases.length} conversations · ${esc(files.length > 1 ? "what the Engineer could see is named over each group" : context === "none" ? "no driver data" : "with the driver's run and setup")}</span></header>
 <main>${ctx}${cards}</main>`;
 
   const full = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Engineer Review Round</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&display=swap"><style>${style}</style></head><body>${inner}</body></html>`;

@@ -1,0 +1,24 @@
+{
+  "about": "Round 05, 2026-09-21 — the blind car. Founder: 'we need to have a strong distinction between when the engineer can read a car and when it can't… focus on the things that would still require improving even if it can't read the car.' Twelve of fifteen are asked with NO readable setup, in the three ways that happens: no runs at all (none), a known car with nothing on its sheet (blind-known-car — a real tester's Yokomo MS2.1), and a sheet filled in on a chassis the app cannot name yet (blind-unnamed-sheet-buggy — a real tester's 1/8 nitro buggy, which is also not a touring car). Three are asked with a readable A800RR sheet to check the levers-on-the-sheet line, the rear-toe usual range and the gearing rows. Questions marked 'driver' are real testers' words from production the week of 2026-09-14; the rest repeat round 04 so the two can be read side by side. Run one context at a time: --contexts <context> --only <its ids>.",
+  "contexts": ["none", "blind-known-car", "blind-unnamed-sheet-buggy", "run-with-setup-0919"],
+  "cases": [
+    { "id": "n-01", "shape": "symptom", "source": "driver", "turns": ["The car is loose on corner entry — the rear steps out as I turn in. What do I try first?"] },
+    { "id": "n-02", "shape": "direction", "source": "founder", "turns": ["how can i get more rear grip everywhere"] },
+    { "id": "n-03", "shape": "knob", "source": "driver", "turns": ["What fdr for 21.5T"] },
+    { "id": "n-04", "shape": "knob", "source": "driver", "turns": ["What do heavier swatbars front and rear do"] },
+    { "id": "n-05", "shape": "symptom", "source": "founder", "turns": ["my car loses the rear mid corner", "im already on 4 degrees of rear toe"] },
+
+    { "id": "k-01", "shape": "symptom", "source": "driver", "turns": ["The car is loose on corner entry — the rear steps out as I turn in. What do I try first?"] },
+    { "id": "k-02", "shape": "review", "source": "driver", "turns": ["Read this run and tell me what to change for the next one — or whether to leave it alone and run it again."] },
+    { "id": "k-03", "shape": "conditions", "source": "driver", "turns": ["super low grip track, like driving on ice. how would you generate more overall grip, and a little more rear grip balance"] },
+    { "id": "k-04", "shape": "direction", "source": "driver", "turns": ["Give me 5 levers for more hairpin steering"] },
+
+    { "id": "b-01", "shape": "symptom", "source": "driver", "turns": ["Felt good but was slow. I think the car is too soft and the tyres are too soft. What should I change?"] },
+    { "id": "b-02", "shape": "symptom", "source": "driver", "turns": ["The car is loose on corner entry — the rear steps out as I turn in. What do I try first?"] },
+    { "id": "b-03", "shape": "knob", "source": "founder", "turns": ["what does more rear droop do"] },
+
+    { "id": "r-01", "shape": "direction", "source": "driver", "turns": ["Give me 5 levers for more hairpin steering"] },
+    { "id": "r-02", "shape": "conditions", "source": "founder", "turns": ["how can i get more rear grip, super low grip and extremely fast car"] },
+    { "id": "r-03", "shape": "knob", "source": "driver", "turns": ["Gearing", "What fdr for 21.5T"] }
+  ]
+}

@@ -33,6 +33,11 @@
     { "date": "2026-09-09", "ruling": "Lowering the rear body is not a traction-roll move", "file": "content/vehicle-dynamics/concepts/load-transfer.md", "present": "not a traction-roll move" },
     { "date": "2026-09-09", "ruling": "Initial steering is the steering geometry first", "file": "content/vehicle-dynamics/concepts/steering-response.md", "present": "The first input is the geometry's before it is the grip's" },
     { "date": "2026-09-14", "ruling": "Toe and bump steer before caster and Ackermann for a first-input complaint", "file": "content/vehicle-dynamics/concepts/steering-response.md", "present": "The four are not equals" },
-    { "date": "2026-09-15", "ruling": "Nothing separates a group's knobs: name the group move with a step on each", "file": "src/lib/engineer/nets.ts", "present": "give the group move with a step on each knob" }
+    { "date": "2026-09-15", "ruling": "Nothing separates a group's knobs: name the group move with a step on each", "file": "src/lib/engineer/nets.ts", "present": "give the group move with a step on each knob" },
+
+    { "date": "2026-09-21", "ruling": "A strong distinction between when the Engineer can read a car and when it can't: a car it cannot read says so, and why", "file": "src/lib/engineer/driverData.ts", "present": "): NOT VISIBLE." },
+    { "date": "2026-09-21", "ruling": "The Engineer sees the gearing and the motor that are on the driver's sheet", "file": "src/lib/engineer/setupDiff.ts", "present": "ENGINEER_DRIVETRAIN_KEYS.has(key)" },
+    { "date": "2026-09-21", "ruling": "Normal values per knob: a lever says where it usually runs", "file": "src/lib/engineer/netsSchema.ts", "present": "usually runs:" },
+    { "date": "2026-09-21", "ruling": "Only offer levers that exist on the driver's sheet", "file": "src/lib/engineer/driverData.ts", "present": "NO BOX ON THIS CAR'S SETUP SHEET FOR" }
   ]
 }

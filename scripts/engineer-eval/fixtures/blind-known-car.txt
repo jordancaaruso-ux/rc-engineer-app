@@ -1,0 +1,18 @@
+THE DRIVER'S MOST RECENT LOGGED SESSION. Unless they say otherwise, assume questions about "the car" mean this one.
+
+car: Yokomo MS2.1
+track: Radio Racing Cars SA
+grip: LOW
+layout style: MEDIUM
+tyre run number: 1
+air temp °C: 17
+humidity %: 51
+laps recorded: 15
+best lap (s): 17.24
+average of the best 5 laps (s): 17.31
+session date: 2026-09-19
+unconfirmed: the app filed this run from the timing sheet. The laps are real; the driver has not confirmed anything else about it.
+
+SETUP ON THE CAR (Yokomo MS2.1): NOT VISIBLE.
+The driver has not filled in a setup sheet for this car. Once they do, the values the car ran appear here.
+No setting on this car can be seen — not a spring, an oil, a toe, a camber or a ride height.

@@ -174,6 +174,38 @@ Format: `case · context — what he said → what it is (rule / net / KB scope 
   initial steering" as "add more shims". One in 314 saved replies. NOT fixed yet.
 - Round 03 cards still unjudged by him: f-17, f-19, f-22, f-25, f-28, f-32, f-36, f-37, f-49.
 
+### 2026-09-21 — a week of real testers, and the blind car
+
+- He asked who had used the app that week; the production log had 12 Engineer questions from three
+  testers (on the OLD production Engineer, ec6b134). He asked for a review of those and of round 04's
+  fifteen. The review was Claude's, not his — round 04's cards are still unjudged by him. What it
+  found, each checked against production data: rear toe-in led 7 of ~10 rear-grip answers on cars
+  already at 3° to 4° (one tester on 4° was told to add more); a tester with spur 66 / pinion 39 /
+  21.5T on his sheet asked "What fdr for 21.5T" and was told "there's no current ratio… What FDR are
+  you running now?" — the Engineer is not shown gearing; a tester with an EMPTY sheet was told his
+  sheet "was copied forward and is not yet verified"; "front shocks one hole more laid down" offered
+  on an A800RR; two of three active testers hit a parked KB page (gearing, tyre temperature).
+- Offered five next steps — (1) let it see spur, pinion, motor; (2) normal values per knob; (3) only
+  levers on the driver's sheet; (4) a plain "can't see your setup" line; (5) get beta's Engineer live.
+  His: **"one sure, two yes, three yes. I think we need to have a strong distinction between when the
+  engineer can read a car and when it can't. In terms of being able to read a car, we need to do the
+  setup sheet stuff. But I would say for now, focus on the things that would still require improving
+  even if it can't read the car."** Then: "Continue using best judgement, then do another review of 15
+  questions." → BUILT same day, label `2026-09-21-blind-car` (north star changelog has the five
+  parts). Measured while building: 140 of 230 production chassis have sheets whose boxes the app
+  cannot name — his "setup sheet stuff" is the larger half, and none of it is in this change.
+- **Claude's calls, not his — each needs his read:** the one prompt sentence (say once that the setup
+  is not visible and what would change that); the rear-toe `usual` line ("about 3° per side; most
+  cars sit between 2.5° and 3.5°, and 4° is the far end of what is run" — drafted from 628 logged
+  runs, most of them his own car; in round 04 f-32 he himself called a 3° car "super high rear toe",
+  so his number may be lower); `drafts/gearing.md` (mechanism and what the driver can see, no ratio
+  for any motor — the page he had parked until after launch); the non-touring fact line.
+- Two questions put to him, unanswered: blind, should it commit to a change with a step (as now) or
+  lean toward asking what the driver runs; one usual range per knob for touring, or split by surface
+  or class.
+- Round 05 (15 conversations, 12 blind, real testers' questions) published to the round artifact.
+  Unjudged.
+
 ## Fixes landed from this batch
 
 - **2026-09-09, from cards 3–4 (30 edits, 21 files; nets:check 37/37, tsc, 4 suites green):**

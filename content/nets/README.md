@@ -163,6 +163,21 @@ number here: an earlier pass invented, widened or misapplied a figure in ten of 
 this was the field every one of them landed in. Measured from users' setup data is also out
 (founder, 2026-08-26: "not yet").
 
+### `usual`
+
+Optional. **Where the knob normally sits**, and where the far end of that is — "about 3° per side;
+most cars sit between 2.5° and 3.5°, and 4° is the far end of what is run". Added 2026-09-21 on a
+founder yes to "normal values per knob", after the Engineer told a car already on 4° of rear toe-in to
+add more, and led seven of ten rear-grip answers with rear toe on cars at 3° to 4°. Rendered on the
+heading as `usually runs:`; the nets header says what it is for (a car at the far end has little left
+in that lever; blind, say where the end is).
+
+It states where cars SIT, never what a value does — that is a line's job. A range drafted from logged
+runs is allowed here, unlike `step`, but only with a YAML comment saying so and that the founder's
+pass is owed; his number replaces it the moment he gives one. Most knobs have none, and a knob whose
+usual value depends on the surface or the class (ride height, damper oil) gets none until he says how
+to split it.
+
 ---
 
 ## Caps
@@ -171,6 +186,7 @@ this was the field every one of them landed in. Measured from users' setup data 
 |---|---|
 | each line | 170 chars |
 | `step` | 140 chars, or null |
+| `usual` | 140 chars, null or absent |
 | `label` / each `words` entry | 40 chars |
 | `contested` fields | 200 chars each |
 | **whole rendered entry (both sides)** | **1,100 chars** |

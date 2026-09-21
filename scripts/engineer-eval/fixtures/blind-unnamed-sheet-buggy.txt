@@ -1,0 +1,19 @@
+THE DRIVER'S MOST RECENT LOGGED SESSION. Unless they say otherwise, assume questions about "the car" mean this one.
+
+car: Sparko F8SE
+what this car races: 1/8 Buggy 4WD · Nitro
+The setup effect priors in this request, their step sizes and their usual values were written for 1/10 touring cars. Nothing in this request was written for this car's class.
+track: Southern Districts Model Car Club
+tyre run number: 1
+air temp °C: 18.4
+humidity %: 67
+laps recorded: 12
+best lap (s): 33.73
+average of the best 5 laps (s): 33.87
+best five minutes (laps/time): 9/5:19.2
+session date: 2026-09-20
+unconfirmed: the app filed this run from the timing sheet. The laps are real; the driver has not confirmed anything else about it.
+
+SETUP ON THE CAR (Sparko F8SE): NOT VISIBLE.
+The driver filled in 60 boxes on this car's setup sheet, but the app has not yet learned which box is which on this chassis's sheet, so none of them can be read. That gap is the app's, not the driver's: they have already filled the sheet in.
+No setting on this car can be seen — not a spring, an oil, a toe, a camber or a ride height.

@@ -4,7 +4,17 @@ import { prisma } from "@/lib/prisma";
 import { isSplitTireRun } from "@/lib/tires/runTireEnds";
 import { normalizeTireFitment } from "@/lib/tires/tireFitment";
 import { normalizeSetupData } from "@/lib/runSetup";
-import { diffTuning, fmtSetupValue as fmtValue, isEngineerSetupKey, readableSetupKey as readableKey, tuningValues } from "@/lib/engineer/setupDiff";
+import {
+  diffTuning,
+  fmtSetupValue as fmtValue,
+  leversNotOnSheet,
+  readableSetupKey as readableKey,
+  spurOverPinion,
+  tuningValues,
+} from "@/lib/engineer/setupDiff";
+import { loadNets } from "@/lib/engineer/nets";
+import { disciplineForCar } from "@/lib/cars/chassisPlatform";
+import { disciplineLabel, parseDiscipline } from "@/lib/cars/carClasses";
 import { findComparableRunsForEngineer } from "@/lib/engineer/findComparableRuns";
 import {
   getAverageTopN,
@@ -140,7 +150,18 @@ async function loadRun(userId: string, runId: string | null) {
       trackLayoutNameSnapshot: true,
       trackDirection: true,
       setupSnapshot: { select: { data: true } },
-      car: { select: { id: true, name: true, chassis: true, setupSheetModelId: true } },
+      car: {
+        select: {
+          id: true,
+          name: true,
+          chassis: true,
+          setupSheetModelId: true,
+          // What the car races (disciplineForCar) and which boxes its chassis's sheet has.
+          carClass: true,
+          setupSheetTemplate: true,
+          setupSheetModel: { select: { slug: true, discipline: true, schemaJson: true } },
+        },
+      },
       track: { select: { name: true, gripTags: true, layoutTags: true } },
       trackLayout: { select: { name: true } },
       tireType: { select: { displayName: true, modelCode: true } },
@@ -225,6 +246,17 @@ function buildSessionFactsBlock(
   };
 
   push("car", run.car?.name ?? run.car?.chassis);
+  // What the car IS, as the chassis or the driver declared it. Everything the Engineer was given
+  // about what a knob does was written for one class of car; a driver on anything else is owed
+  // that fact in place of a confident touring-car step (founder's open call, 2026-09-19: "the
+  // honest line for non-touring cars"). A fact on the wire, not a prompt rule.
+  const discipline = disciplineForCar(run.car);
+  push("what this car races", disciplineLabel(discipline));
+  if (discipline && parseDiscipline(discipline)?.classId !== "touring") {
+    facts.push(
+      "The setup effect priors in this request, their step sizes and their usual values were written for 1/10 touring cars. Nothing in this request was written for this car's class."
+    );
+  }
   push("class", run.raceClass);
   push("track", run.track?.name);
   push("layout", run.trackLayout?.name ?? run.trackLayoutNameSnapshot);
@@ -256,8 +288,12 @@ function buildSessionFactsBlock(
   push("driver's rating of the car (1-10)", run.carRating);
   push("session date", fmtLocalDate(run, zone));
   if (run.unconfirmedAt != null) {
+    // With nothing on the sheet there was no setup to copy — saying one was copied made the
+    // Engineer tell a driver with an empty sheet that his sheet "is not yet verified" (2026-09-19).
     facts.push(
-      "unconfirmed: the app filed this run from the timing sheet. The laps are real; the setup, tyres and additive were copied from the previous logged run and the driver has not confirmed them."
+      Object.keys(tuningValues(run.setupSnapshot?.data)).length > 0
+        ? "unconfirmed: the app filed this run from the timing sheet. The laps are real; the setup, tyres and additive were copied from the previous logged run and the driver has not confirmed them."
+        : "unconfirmed: the app filed this run from the timing sheet. The laps are real; the driver has not confirmed anything else about it."
     );
   }
 
@@ -268,23 +304,65 @@ function buildSessionFactsBlock(
   return [heading, "", ...facts].join("\n");
 }
 
-function buildSetupSheetBlock(run: LoadedRun): string | null {
+/** Box keys on the chassis's own sheet — every box, filled or not. [] when the chassis has none. */
+function chassisSheetKeys(run: LoadedRun): string[] {
+  const schema = run.car?.setupSheetModel?.schemaJson as { fields?: Array<{ key?: unknown }> } | null | undefined;
+  if (!schema || !Array.isArray(schema.fields)) return [];
+  return schema.fields.map((f) => (typeof f?.key === "string" ? f.key : "")).filter(Boolean);
+}
+
+/**
+ * The sheet, or — since 2026-09-21 — a plain statement that there is no sheet to read and why.
+ *
+ * Founder, 2026-09-21: "we need to have a strong distinction between when the engineer can read a
+ * car and when it can't." Before this the block was simply absent, so the Engineer was never told
+ * it was blind, could not tell a driver who had filled nothing in from one who had filled in 61
+ * boxes the app could not name, and told a driver with an empty sheet that his sheet "was copied
+ * forward and is not yet verified". Both cases are FACTS about the sheet; what to do about being
+ * blind stays the prompt's ("say you can't see it, then answer what the physics alone can").
+ */
+/** Boxes with something in them, readable or not — what the driver has typed onto a sheet. */
+function filledBoxCount(data: unknown): number {
+  return Object.values(normalizeSetupData(data)).filter((raw) => fmtValue(raw) != null).length;
+}
+
+function buildSetupSheetBlock(
+  run: LoadedRun,
+  levers: ReadonlyArray<{ parameter: string; label: string }>,
+  /** The same car's other runs that day: a run the app filed from the timing sheet can carry an empty sheet on a day the driver filled one in. */
+  sameCarDay: ReadonlyArray<{ setupSnapshot: { data: unknown } | null }>
+): string {
   const data = normalizeSetupData(run.setupSnapshot?.data);
-  const rows: string[] = [];
-  for (const [key, raw] of Object.entries(data)) {
-    if (!isEngineerSetupKey(key)) continue;
-    const value = fmtValue(raw);
-    if (!value) continue;
-    rows.push(`${readableKey(key)}: ${value}`);
-    if (rows.length >= MAX_SETUP_ROWS) break;
-  }
-  if (rows.length === 0) return null;
   const car = run.car?.name ?? run.car?.chassis ?? "this car";
+  const values = tuningValues(data);
+  const rows = Object.entries(values)
+    .slice(0, MAX_SETUP_ROWS)
+    .map(([key, value]) => `${readableKey(key)}: ${value}`);
+
+  if (rows.length === 0) {
+    const filled = Math.max(filledBoxCount(data), ...sameCarDay.map((r) => filledBoxCount(r.setupSnapshot?.data)));
+    return [
+      `SETUP ON THE CAR (${car}): NOT VISIBLE.`,
+      filled > 0
+        ? `The driver filled in ${filled} boxes on this car's setup sheet, but the app has not yet learned which box is which on this chassis's sheet, so none of them can be read. That gap is the app's, not the driver's: they have already filled the sheet in.`
+        : "The driver has not filled in a setup sheet for this car. Once they do, the values the car ran appear here.",
+      "No setting on this car can be seen — not a spring, an oil, a toe, a camber or a ride height.",
+    ].join("\n");
+  }
+
+  const ratio = spurOverPinion(values);
+  const missing = leversNotOnSheet(levers, [...chassisSheetKeys(run), ...Object.keys(values)]);
   return [
     `SETUP ON THE CAR (${car}, the session above).`,
     "These are the values the car actually ran. Reason with them; do not read them back.",
     "",
     ...rows.sort(),
+    ...(ratio
+      ? ["", `spur ÷ pinion: ${ratio} (the final drive ratio is this multiplied by the car's internal ratio, which is not on the sheet)`]
+      : []),
+    ...(missing.length > 0
+      ? ["", `NO BOX ON THIS CAR'S SETUP SHEET FOR: ${missing.join(", ")}. A manufacturer's sheet lists what adjusts on the car.`]
+      : []),
   ].join("\n");
 }
 
@@ -510,8 +588,12 @@ export async function buildDriverDataBlocks(params: {
   const parts: string[] = [];
   const facts = buildSessionFactsBlock(run, params.runId == null, zone, fieldByRun.get(run.id) ?? null);
   if (facts) parts.push(facts);
-  const setup = buildSetupSheetBlock(run);
-  if (setup) parts.push(setup);
+  // The lever list the "no box for" line is checked against. A nets failure must never take the
+  // driver's data down with it — no levers just means that one line is not printed.
+  const levers = await loadNets({ discipline: "touring" })
+    .then((n) => n.entries.map((e) => ({ parameter: e.parameter, label: e.label.toLowerCase() })))
+    .catch(() => [] as Array<{ parameter: string; label: string }>);
+  parts.push(buildSetupSheetBlock(run, levers, day.filter((r) => r.carId === run.carId)));
 
   const dayBlock = buildDayBlock(run, day, predecessorOf, zone, fieldByRun);
   if (dayBlock) parts.push(dayBlock);

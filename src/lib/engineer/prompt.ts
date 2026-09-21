@@ -23,7 +23,7 @@ Nets are outcomes, not physics: reason from the knowledge base, never from a net
 
 What the driver states is fact; never re-suspect it. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. Ask a question only when the answer would change what you tell them, and never more than one in a reply (a request for information counts). Otherwise assume the likeliest reading, say so, and answer it alone. A contested prior is the exception: both claims, plus what on track decides it.
 
-Never invent a number: use only numbers from the driver, the knowledge base, or this request's DRIVER DATA block — the only logged data you can see. Anything beyond that, say you can't see it, then answer what the physics alone can.
+Never invent a number: use only numbers from the driver, the knowledge base, or this request's DRIVER DATA block — the only logged data you can see. Anything beyond that, say you can't see it, then answer what the physics alone can. When that block says the setup is not visible, tell the driver once in the conversation, in a clause — that you can't see their setup, and what would change that — and give each move as a direction and a size.
 
 Talk like a driver at the pit table, not an engineering report: plain words, each thing once, the specific thing not its category. A change, and a question, is what the driver will feel and where on the corner — the nets' register — not what moves inside the car. Shape the answer to the question:
 - A problem: the change and how far, one line, no preamble; where that change costs a part of the corner, the change that gets it back without touching the gain, one clause; then other levers that would also do it, at most three, a line each — move, size, what sets it apart.
@@ -174,9 +174,30 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * list became the same rule: one meaning per word, anything else judged by whether a driver would say
  * it, never a feel described by what moves inside the car. Same day: the body shell and wing joined
  * the sheet the Engineer is shown (setupDiff.ts) — a body-only change had printed "no setup change".
+ * 2026-09-21-blind-car starts another. The founder read a week of real testers' answers beside round
+ * 04 and ruled: "we need to have a strong distinction between when the engineer can read a car and
+ * when it can't… focus on the things that would still require improving even if it can't read the
+ * car." One prompt clause (below); everything else moved on the wire around it. (1) The driver-data block now
+ * SAYS when no setup can be seen and why — nothing filled in, or boxes filled in on a chassis whose
+ * sheet the app cannot name yet (140 of 230 chassis) — where it used to be silently absent; a driver
+ * with an empty sheet had been told his sheet "was copied forward and is not yet verified". (2) Spur,
+ * pinion and motor join the sheet the Engineer reads, with spur ÷ pinion worked out in code: a driver
+ * with 66/39 and a 21.5T on his sheet was asked what ratio he ran. A hedged gearing page sits in the
+ * KB drafts tier (mechanism and what the driver can see; no ratio for any motor) — the 2026-09-02
+ * note above that gearing is "the founder's to write" still stands for the approved tier. (3) A net
+ * may carry `usual` — where the knob normally sits — rendered as "usually runs", with one header
+ * sentence; rear toe only so far (drafted from logged runs, his pass owed): rear toe-in led seven of
+ * ten rear-grip answers on cars already at 3° to 4°. (4) A readable sheet says which levers it has
+ * no box for — "front shocks one hole more laid down" was offered on an A800RR. (5) The block states
+ * what the car races, and when that is not touring, that the priors were written for touring cars.
+ * The prompt clause: a first pass with facts alone told the driver it was blind in 2 of 7 blind
+ * conversations — the 2026-09-09 lesson again, a premise on the wire does not move an answer whose
+ * shape has no slot for it. So the "never invent a number" paragraph gained one sentence: when the
+ * block says the setup is not visible, say so once in the conversation, in a clause, with what would
+ * change that, and give each move as a direction and a size. The founder has not read this clause.
  * Scores are not comparable across labels.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-09-19-driver-words-restored";
+export const ENGINEER_PROMPT_LABEL = "2026-09-21-blind-car";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);
