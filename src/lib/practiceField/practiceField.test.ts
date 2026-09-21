@@ -8,7 +8,7 @@ import {
   practiceColumnName,
   practiceDriverDisplayName,
   practiceQueryAsTransponder,
-  runOwnerSurname,
+  runOwnerName,
   type LiveRcPracticeRowInput,
 } from "@/lib/practiceField/practiceField";
 
@@ -128,11 +128,11 @@ test("a brought-in column is headed by your name for them, then the list's, the 
   assert.equal(practiceColumnName({ transponder: null, saved, importName: "David Calwell" }), "David Calwell");
 });
 
-test("a run's owner reads as a surname, in one case, and never as a placeholder", () => {
-  assert.equal(runOwnerSurname("Jordan Caruso"), "Caruso");
-  assert.equal(runOwnerSurname("JORDAN CARUSO"), "Caruso");
-  assert.equal(runOwnerSurname("Cher"), "Cher");
-  assert.equal(runOwnerSurname("Me"), null);
-  assert.equal(runOwnerSurname("Driver"), null);
-  assert.equal(runOwnerSurname(""), null);
+test("a run's owner is its driver's name, and never a placeholder", () => {
+  assert.equal(runOwnerName("Jordan Caruso"), "Jordan Caruso");
+  assert.equal(runOwnerName("  Jordan   Caruso "), "Jordan Caruso");
+  assert.equal(runOwnerName("Me"), null);
+  assert.equal(runOwnerName("Driver"), null);
+  assert.equal(runOwnerName(""), null);
+  assert.equal(runOwnerName(null), null);
 });

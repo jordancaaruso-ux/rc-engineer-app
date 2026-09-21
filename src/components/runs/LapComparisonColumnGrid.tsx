@@ -60,7 +60,6 @@ import {
 import {
   practiceColumnName,
   runOwnerName,
-  runOwnerSurname,
   type PracticeFieldSource,
 } from "@/lib/practiceField/practiceField";
 import type { KnownCompetitor } from "@/lib/speedhive/knownCompetitors";
@@ -373,9 +372,11 @@ function ColumnHeaderBlock({
   meta: SeriesMeta;
   isTarget: boolean;
   /**
-   * Whose run this is — "Caruso" — printed over the run's name once the sheet holds more than
-   * one driver (founder, 2026-09-22). On a sheet of only your own runs it stays off: every
-   * column would say the same word, which is the noise the session-not-driver rule removed.
+   * Whose run this is — "Jordan Caruso" — drawn over the run's name exactly as a rival's name
+   * is drawn (first name light, SURNAME bold), once the sheet holds more than one driver
+   * (founder, 2026-09-22: "the full name identical to the others"). On a sheet of only your own
+   * runs it stays off: every column would say the same name, which is the noise the
+   * session-not-driver rule removed.
    */
   owner?: string | null;
   /** The sheet's clock — see the grid's `timeZone` prop. */
@@ -397,11 +398,11 @@ function ColumnHeaderBlock({
           {isPerson ? (
             <DriverNameStack name={meta.name} />
           ) : owner ? (
-            // Same two lines as a rival's first name / SURNAME, so the headers stand level.
-            <div className="leading-tight">
-              <div className="truncate text-[10px] font-normal text-foreground/80">{owner}</div>
+            // The driver as every other column names one, then WHICH of their runs this is.
+            <>
+              <DriverNameStack name={owner} />
               <div className="truncate font-medium text-foreground">{meta.name}</div>
-            </div>
+            </>
           ) : (
             <div className="truncate font-medium text-foreground">{meta.name}</div>
           )}
@@ -1389,9 +1390,13 @@ export function LapComparisonColumnGrid({
   const pickerGroups = useMemo((): LapPickerGroup[] => {
     const toRow = (r: { id: string; sortIso: string; label: string }): LapPickerRow => {
       const m = metaById.get(r.id);
+      // A run row leads with its driver — "Jordan Caruso · Run 4" (founder, 2026-09-22) — the
+      // same title the target row above it wears. A run series carries its driver as its label.
+      const owner = r.id.startsWith("history:") ? runOwnerName(seriesById.get(r.id)?.label) : null;
+      const sessionName = m?.name ?? r.label;
       return {
         id: r.id,
-        name: m?.name ?? r.label,
+        name: owner ? `${owner} · ${sessionName}` : sessionName,
         /*
          * The car joins the time on the second line. It used to BE the heading, which read as
          * seven rows of "A800RR" over seven different sessions; on a field row the context is
@@ -1529,7 +1534,12 @@ export function LapComparisonColumnGrid({
           trackName: trackCtx,
           row: {
             id: `held:${r.id}`,
-            name: dayRunNames[r.id] || formatRunSessionDisplay(r, { fallback: carName ?? "Run" }),
+            name: [
+              runOwnerName((r.userId ? memberDisplayByUserId?.[r.userId]?.trim() : "") || primaryRunLabel),
+              dayRunNames[r.id] || formatRunSessionDisplay(r, { fallback: carName ?? "Run" }),
+            ]
+              .filter(Boolean)
+              .join(" · "),
             when: [fmtWhen(resolveRunDisplayInstant(r).toISOString()), carName]
               .filter(Boolean)
               .join(" · "),
@@ -1555,7 +1565,7 @@ export function LapComparisonColumnGrid({
           trackName: anchorTrackName,
           row: {
             id: `held:${compareAnchorRun.id}`,
-            name: pm?.name ?? "This run",
+            name: [runOwnerName(primaryRunLabel), pm?.name ?? "This run"].filter(Boolean).join(" · "),
             when: [fmtWhen(pm?.whenIso ?? pm?.sortIso ?? anchorInstantIso), pm?.context ?? null]
               .filter(Boolean)
               .join(" · "),
@@ -1600,6 +1610,8 @@ export function LapComparisonColumnGrid({
     pickerZone,
     targetId,
     neighbourRunSeries,
+    memberDisplayByUserId,
+    primaryRunLabel,
   ]);
 
   /*
@@ -2279,8 +2291,8 @@ export function LapComparisonColumnGrid({
     if (drivers.size < 2) return out;
     for (const s of onSheet) {
       if (isPersonColumn(s)) continue;
-      const surname = runOwnerSurname(s.label);
-      if (surname) out.set(s.id, surname);
+      const owner = runOwnerName(s.label);
+      if (owner) out.set(s.id, owner);
     }
     return out;
   }, [targetSeries, comparisonSeries, metaById, anchorIsImportedSheet]);
