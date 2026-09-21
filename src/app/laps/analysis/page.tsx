@@ -18,6 +18,8 @@ import { LapAnalysisBoard } from "@/components/laps/LapAnalysisBoard";
 import { LapAnalysisLibrary } from "@/components/laps/LapAnalysisLibrary";
 import { CompetitorPracticePull } from "@/components/laps/CompetitorPracticePull";
 import { parseKnownCompetitorsSetting } from "@/lib/speedhive/knownCompetitors";
+import { practiceFieldSourcesForTrack } from "@/lib/practiceField/loadPracticeField";
+import { calendarYmdInTimeZone } from "@/lib/formatDate";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 
 /**
@@ -297,23 +299,39 @@ export default async function LapAnalysisPage(props: {
   }
 
   /*
-   * The pull card's two ingredients. Tracks are cut to the ones with a MYLAPS practice page,
-   * because those are the only ones a chip can be looked up in — offering the rest would be
-   * offering a button that cannot work.
+   * The practice card's two ingredients. Tracks are cut twice: to the ones with a LiveRC or MYLAPS
+   * link, because those are the only ones that can be looked in; and to the viewer's own — run
+   * at, created or favourited — because the catalog holds a thousand LiveRC clubs and a dropdown
+   * of all of them is a dropdown nobody can use.
    */
-  const [competitors, speedhiveTracks, librarySpeedhiveNames, libraryLiveRcName, libraryMyName] =
+  const [competitors, timingTracks, librarySpeedhiveNames, libraryLiveRcName, libraryMyName] =
     await Promise.all([
       getKnownCompetitorsSetting(user.id).then(parseKnownCompetitorsSetting),
       prisma.track.findMany({
-        where: { speedhiveUrl: { not: null } },
+        where: {
+          AND: [
+            { OR: [{ liveRcUrl: { not: null } }, { speedhiveUrl: { not: null } }] },
+            {
+              OR: [
+                { runs: { some: { userId: user.id } } },
+                { favouriteTracks: { some: { userId: user.id } } },
+                { userId: user.id, catalogSource: null },
+              ],
+            },
+          ],
+        },
         orderBy: { name: "asc" },
         take: 300,
-        select: { id: true, name: true },
+        select: { id: true, name: true, liveRcUrl: true, speedhiveUrl: true },
       }),
       getSpeedhiveDriverNamesForUser(user.id),
       getLiveRcDriverNameSetting(user.id),
       getMyNameSetting(user.id),
     ]);
+
+  const practiceTracks = timingTracks
+    .map((t) => ({ id: t.id, name: t.name, sources: practiceFieldSourcesForTrack(t) }))
+    .filter((t) => t.sources.length > 0);
 
   /** Same set the session view matches on — see `sessionHasDriver` in the library. */
   const libraryViewerNames = [
@@ -331,7 +349,13 @@ export default async function LapAnalysisPage(props: {
       <LapAnalysisLibrary
         eventId={eventId}
         viewerNames={libraryViewerNames}
-        importSlot={<CompetitorPracticePull competitors={competitors} tracks={speedhiveTracks} />}
+        importSlot={
+          <CompetitorPracticePull
+            competitors={competitors}
+            tracks={practiceTracks}
+            todayYmd={calendarYmdInTimeZone(new Date(), user.timeZone?.trim() || "UTC")}
+          />
+        }
       />
     </Shell>
   );

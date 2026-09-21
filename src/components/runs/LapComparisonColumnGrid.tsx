@@ -39,6 +39,7 @@ import {
 import { formatFiveMinuteStint, formatLap, normalizeLapTimes } from "@/lib/runLaps";
 import { calendarYmdInTimeZone, formatRunDateTime, formatRunDateWeekday } from "@/lib/formatDate";
 import { formatRunSessionDisplay } from "@/lib/runSession";
+import { wallClockAsUtcToInstant } from "@/lib/eventActive";
 import { buildDayRunNameMap } from "@/lib/runs/buildRunHistoryGroups";
 import { cn } from "@/lib/utils";
 import {
@@ -50,6 +51,12 @@ import {
   type LapPickerRow,
 } from "@/components/runs/LapCompareSessionPicker";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
+import {
+  PracticeFieldBrowser,
+  type PracticeFieldPick,
+  type PracticeLookCache,
+} from "@/components/laps/PracticeFieldBrowser";
+import type { PracticeFieldSource } from "@/lib/practiceField/practiceField";
 import { SetupSheetModal, type SetupSheetModalRun } from "@/components/setup-sheet/SetupSheetModal";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import { formatCompareRunMetaLine } from "@/lib/runCompareMeta";
@@ -126,7 +133,13 @@ type SeriesMeta = {
  * had to tick anyway — two steps to say one thing. Segments carve the same set
  * by *whose* sessions they are, and every row inside stays individually tickable.
  */
-type CompareSegmentKey = "driver" | "teammates" | "field" | "library";
+/**
+ * The picker's tabs, split by what kind of session a row is (founder call 2026-09-21): yours,
+ * a teammate's, a driver in a RACE, or someone's PRACTICE. "Field" never said "race" and blurred
+ * into "everyone", and "My imports" was a tab about where a row came from rather than what it
+ * was — its races now sit under Race results and its practice under Practice.
+ */
+type CompareSegmentKey = "driver" | "teammates" | "field" | "practice";
 
 /**
  * The default for the run-list props. One shared instance, NOT `= []` in the signature: a
@@ -464,6 +477,7 @@ export function LapComparisonColumnGrid({
   pickerRunsForModal = NO_RUNS as CompareRunShape[],
   runListSource = "my_runs",
   librarySessions = [],
+  onLibraryChanged,
   viewerUserId = null,
   memberDisplayByUserId,
   initialTargetId,
@@ -516,7 +530,16 @@ export function LapComparisonColumnGrid({
     sortTimeIso: string;
     /** Track this import was run at, via its linked run; null when never linked. */
     trackName?: string | null;
+    /** Someone's practice files under Practice; anything else is a race result. */
+    kind?: "practice" | "race";
+    /** The track's clock as-if-UTC, when the timing site printed one — see `useImportedLapLibrary`. */
+    trackClockIso?: string | null;
   }>;
+  /**
+   * The Practice tab brought a session in: re-read the library so it can become a column.
+   * Handed the new session's id, which the host must make sure is in the list it hands back.
+   */
+  onLibraryChanged?: (ensureId?: string) => Promise<void> | void;
   viewerUserId?: string | null;
   memberDisplayByUserId?: Record<string, string>;
   /**
@@ -554,8 +577,8 @@ export function LapComparisonColumnGrid({
     () => ({
       driver: primaryIsViewer || anchorIsImportedSheet ? "My runs" : primaryRunLabel,
       teammates: "Teammates",
-      field: "Field",
-      library: "My imports",
+      field: "Race results",
+      practice: "Practice",
     }),
     [primaryIsViewer, anchorIsImportedSheet, primaryRunLabel]
   );
@@ -661,6 +684,55 @@ export function LapComparisonColumnGrid({
     anchorIsImportedSheet ? "field" : "driver"
   );
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  /*
+   * The Practice tab. Which timing sites this run's track can be read from is asked of OUR
+   * database once, up front, so the tab is only offered where it can work; the timing site
+   * itself is not touched until the tab is opened (founder call 2026-08-27: on demand only).
+   */
+  const practiceTrackId = compareAnchorRun.track?.id ?? null;
+  const [practiceSources, setPracticeSources] = useState<PracticeFieldSource[]>([]);
+  useEffect(() => {
+    if (!practiceTrackId) return;
+    let alive = true;
+    fetch(`/api/laps/practice-field?trackId=${encodeURIComponent(practiceTrackId)}`, {
+      cache: "no-store",
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { sources?: PracticeFieldSource[] } | null) => {
+        if (alive) setPracticeSources(data?.sources ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [practiceTrackId]);
+  /*
+   * The picker is drawn twice — the phone's sheet and the desktop rail — and one is only hidden
+   * by CSS. The Practice list talks to a timing site, so it mounts in the ONE that is on screen
+   * (null until measured: neither), and what it found is held here so reopening the phone sheet,
+   * which unmounts its contents on close, never asks the same question twice.
+   */
+  const [isLgUp, setIsLgUp] = useState<boolean | null>(null);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const read = () => setIsLgUp(mq.matches);
+    read();
+    mq.addEventListener("change", read);
+    return () => mq.removeEventListener("change", read);
+  }, []);
+  // State, not a ref, only so render may read it; it is never replaced, just filled.
+  const [practiceLookCache] = useState<PracticeLookCache>(() => new Map());
+  /** Series ticked from the Practice tab this visit — known to be at this track, so never scoped out. */
+  const [practicePickIds, setPracticePickIds] = useState<string[]>([]);
+  /** Ticked, brought in, and waiting for the library re-read to hand back their laps. */
+  const [pendingPracticeIds, setPendingPracticeIds] = useState<string[]>([]);
+  /**
+   * What the Practice list called each driver it put on the sheet — your saved name for them
+   * first. The import only knows the timing site's label, which on MYLAPS can be a nickname or
+   * nothing; a column headed by a name you didn't pick is a column you have to decode.
+   */
+  const [practiceNames, setPracticeNames] = useState<Record<string, string>>({});
 
   /*
    * Which chart is up. A race sheet opens on the gap to the leader — the picture of the
@@ -949,15 +1021,20 @@ export function LapComparisonColumnGrid({
         lib.laps
       );
       rawLibrary.push(ser);
+      // A track's clock becomes the real instant it was, read in the zone this sheet prints in —
+      // so "3:30 PM at the track" prints as 3:30 PM here, and sits in the right day.
+      const libInstantIso = lib.trackClockIso
+        ? wallClockAsUtcToInstant(new Date(lib.trackClockIso), pickerZone).toISOString()
+        : lib.sortTimeIso;
       metaById.set(ser.id, {
         metaLine: "Imported lap-time library",
         setupRun: null,
         selectLabel: lib.selectLabel,
-        sortIso: lib.sortTimeIso,
-        whenIso: lib.sortTimeIso,
+        sortIso: libInstantIso,
+        whenIso: libInstantIso,
         trackName: lib.trackName ?? null,
-        name: lib.name?.trim() || lib.selectLabel,
-        segment: "library",
+        name: practiceNames[ser.id] ?? (lib.name?.trim() || lib.selectLabel),
+        segment: lib.kind === "practice" ? "practice" : "field",
         trackKey: lapCompareTrackKey(lib.trackName),
         fieldRunId: null,
         context: null,
@@ -1080,6 +1157,8 @@ export function LapComparisonColumnGrid({
     compareAnchorRun,
     primaryLaps,
     librarySessions,
+    practiceNames,
+    pickerZone,
     memberDisplayByUserId,
     otherFieldRuns,
     fieldSetsByRunId,
@@ -1132,6 +1211,9 @@ export function LapComparisonColumnGrid({
    */
   const seriesMatchesScope = useCallback(
     (seriesId: string, sortIso: string) =>
+      // Ticked from this track's practice list, so it IS at this track — which the import itself
+      // cannot say (an import only learns its track from a run it is linked to).
+      practicePickIds.includes(seriesId) ||
       lapSeriesMatchesCompareScope({
         seriesId,
         sortIso,
@@ -1151,6 +1233,7 @@ export function LapComparisonColumnGrid({
       otherRuns,
       anchorTrackKey,
       trackKeyForSeries,
+      practicePickIds,
     ]
   );
 
@@ -1181,11 +1264,19 @@ export function LapComparisonColumnGrid({
       const k = segmentFor(r.series.id);
       counts.set(k, (counts.get(k) ?? 0) + 1);
     }
-    const order: CompareSegmentKey[] = ["driver", "teammates", "field", "library"];
-    return order
-      .filter((k) => (counts.get(k) ?? 0) > 0)
-      .map((k) => ({ key: k, label: segmentLabels[k], count: counts.get(k)! }));
-  }, [scopeFilteredRows, segmentFor, segmentLabels]);
+    const order: CompareSegmentKey[] = ["driver", "teammates", "field", "practice"];
+    return (
+      order
+        // Practice is offered whenever this track's practice can be looked at, rows or not: its
+        // list is fetched on opening the tab, so an empty count is not an empty tab.
+        .filter((k) => (counts.get(k) ?? 0) > 0 || (k === "practice" && practiceSources.length > 0))
+        .map((k) => ({
+          key: k,
+          label: segmentLabels[k],
+          count: k === "practice" ? null : counts.get(k)!,
+        }))
+    );
+  }, [scopeFilteredRows, segmentFor, segmentLabels, practiceSources]);
 
   useEffect(() => {
     if (segments.length === 0) return;
@@ -1275,8 +1366,14 @@ export function LapComparisonColumnGrid({
     if (activeSegment === "field") {
       if (compareOptionRows.length === 0) return [];
       const own: LapPickerRow[] = [];
+      /** Races brought in by link or PDF, not hanging off one of the driver's runs. */
+      const broughtIn: LapPickerRow[] = [];
       const byRun = new Map<string, LapPickerRow[]>();
       for (const r of compareOptionRows) {
+        if (r.id.startsWith("library:")) {
+          broughtIn.push(toRow(r));
+          continue;
+        }
         const rid = metaById.get(r.id)?.fieldRunId ?? null;
         if (!rid) {
           own.push(toRow(r));
@@ -1328,6 +1425,7 @@ export function LapComparisonColumnGrid({
                 : null,
         });
       }
+      if (broughtIn.length > 0) groups.push({ key: "library", label: "Brought in", rows: broughtIn });
       return groups;
     }
 
@@ -1455,6 +1553,8 @@ export function LapComparisonColumnGrid({
     lastRunIdRef.current = currentRunId;
     setSelectedComparisonIds([]);
     setExpandedFieldRunIds([]);
+    setPracticePickIds([]);
+    setPendingPracticeIds([]);
   }, [currentRunId]);
 
   /*
@@ -1723,7 +1823,7 @@ export function LapComparisonColumnGrid({
       if (session.key === "this_sheet") continue;
       for (const k of session.segments) counts.set(k, (counts.get(k) ?? 0) + 1);
     }
-    const order: CompareSegmentKey[] = ["driver", "teammates", "field", "library"];
+    const order: CompareSegmentKey[] = ["driver", "teammates", "field", "practice"];
     return order
       .filter((k) => (counts.get(k) ?? 0) > 0)
       .map((k) => ({ key: k, label: segmentLabels[k], count: counts.get(k)! }));
@@ -2007,6 +2107,49 @@ export function LapComparisonColumnGrid({
     return tiles;
   }, [targetSeries, comparisonSeries, metaById, seriesList]);
 
+  /*
+   * A tick in the Practice tab. The session is in the library by now (the browser brought it
+   * in), but not necessarily in THIS render's series list — so the tick waits on the library
+   * re-read and lands the moment its laps are in hand.
+   */
+  const onPracticeTick = useCallback(
+    (pick: PracticeFieldPick, on: boolean) => {
+      const id = `library:${pick.importedSessionId}`;
+      if (!on) {
+        setPendingPracticeIds((prev) => prev.filter((x) => x !== id));
+        setSelectedComparisonIds((prev) => prev.filter((x) => x !== id));
+        return;
+      }
+      setPracticeNames((prev) => (prev[id] === pick.displayName ? prev : { ...prev, [id]: pick.displayName }));
+      setPracticePickIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+      setPendingPracticeIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+      if (!seriesById.has(id)) void onLibraryChanged?.(pick.importedSessionId);
+    },
+    [seriesById, onLibraryChanged]
+  );
+  useEffect(() => {
+    if (pendingPracticeIds.length === 0) return;
+    const ready = pendingPracticeIds.filter((id) => scopeFilteredRows.some((r) => r.series.id === id));
+    if (ready.length === 0) return;
+    setPendingPracticeIds((prev) => prev.filter((id) => !ready.includes(id)));
+    setSelectedComparisonIds((prev) => [...prev, ...ready.filter((id) => !prev.includes(id))]);
+  }, [pendingPracticeIds, scopeFilteredRows]);
+  /** Library ids the Practice tab should draw as ticked — on the sheet, or on their way. */
+  const practiceTickedImportIds = useMemo(
+    () =>
+      [...selectedComparisonIds, ...pendingPracticeIds]
+        .filter((id) => id.startsWith("library:"))
+        .map((id) => id.slice("library:".length)),
+    [selectedComparisonIds, pendingPracticeIds]
+  );
+  /** A track on both timing sites opens on the one this run's own laps came from. */
+  const practicePreferredSource = useMemo((): PracticeFieldSource | null => {
+    const from = timingSourceFromSourceUrl(
+      (run.importedLapSets ?? []).find((s) => s.sourceUrl?.trim())?.sourceUrl ?? null
+    );
+    return from === "liverc" ? "liverc" : from === "speedhive" ? "mylaps" : null;
+  }, [run.importedLapSets]);
+
   const toggleComparison = useCallback((id: string) => {
     setSelectedComparisonIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -2260,6 +2403,26 @@ export function LapComparisonColumnGrid({
             active={activeSegment}
             onSelect={(k) => setActiveSegment(k as CompareSegmentKey)}
           />
+          {activeSegment === "practice" &&
+          practiceTrackId &&
+          practiceSources.length > 0 &&
+          isLgUp === (idPrefix === "rail") ? (
+            <PracticeFieldBrowser
+              // One per run: another run is another track and another day.
+              key={`${currentRunId}:${practiceTrackId}`}
+              trackId={practiceTrackId}
+              trackName={anchorTrackName ?? "this track"}
+              sources={practiceSources}
+              preferredSource={practicePreferredSource}
+              initialDayYmd={calendarYmdInTimeZone(anchorInstantIso, pickerZone)}
+              maxDayYmd={calendarYmdInTimeZone(new Date(), pickerZone)}
+              mode="tick"
+              autoLook
+              tickedImportIds={practiceTickedImportIds}
+              onTick={onPracticeTick}
+              lookCache={practiceLookCache}
+            />
+          ) : null}
           <LapCompareSessionList
             groups={pickerGroups}
             selectedIds={selectedComparisonIds}

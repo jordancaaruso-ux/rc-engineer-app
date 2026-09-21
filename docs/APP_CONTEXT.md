@@ -459,6 +459,20 @@ avgTop10, median field pace, ranks).
   MYLAPS' practice API serves any chip unauthenticated, so
   `discoverSpeedhivePracticeSessionsForChip` is the user-scoped walk with the identity as an
   argument. ⚠️ **Pulled only when asked** (founder call): nothing schedules it.
+- **Everyone's practice** (`src/lib/practiceField/`, 2026-09-21). One list of who practised at a
+  track, read from ONE timing site at a time — LiveRC by day (its day page prints name, class,
+  chip, laps and fast lap, so one request answers everything), MYLAPS as recent activity across
+  days (chip + the owner's own label; laps fetched per driver when opened). A track on both gets
+  a switch, never a merge. Searched by name or transponder; saved competitors are one-tap
+  filters and their saved name beats the site's. Two doors onto the same
+  `PracticeFieldBrowser`: the "Someone else's practice" card on `/laps/analysis` (bring in, then
+  open), and the lap sheet's **Practice** tab (tick = bring in + become a column; track and day
+  come from the run). `POST /api/laps/practice-field` is the look; its `GET` only says which
+  sites a track is on. ⚠️ Same rule: **on a press, never on a timer.**
+- **The lap sheet's tabs** are by KIND of session since 2026-09-21: My runs · Teammates ·
+  **Race results** (was "Field") · **Practice**. "My imports" is gone as a tab — a brought-in
+  session files under Race results or Practice by the URL it came from
+  (`importedSessionIsPractice`).
 - **MyLaps OAuth** (`src/lib/mylaps/`) links a real Speedhive account with PKCE.
 - **Watching:** `WatchedLapSource` rows are polled by `/api/cron/watch-results` to push a
   "new run detected" nudge. ⚠️ **The cron was dropped in `f1991af` and has never fired in

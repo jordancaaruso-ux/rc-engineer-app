@@ -17,8 +17,9 @@ import { normalizeSpeedhiveTransponderNumber } from "@/lib/speedhive/speedhiveTr
  * a week later, and the name is the only part of the row a human can check. The chip is still
  * the identity — two rows with the same number collapse to one.
  *
- * Nothing is fetched from here. The row is a phone book entry; pulling their laps happens on
- * the lap analysis page, when you ask for it.
+ * Nothing is fetched from here. The row is a phone book entry; their laps are pulled where
+ * practice is looked at — the lap analysis page and the lap sheet's Practice tab — and only
+ * when asked. One entry works at LiveRC and MYLAPS tracks alike: both print the chip.
  */
 export function KnownCompetitorsField({ initial }: { initial: KnownCompetitor[] }) {
   const [rows, setRows] = useState<KnownCompetitor[]>(initial);
@@ -132,7 +133,7 @@ export function KnownCompetitorsField({ initial }: { initial: KnownCompetitor[] 
 
       <p className="ui-caption text-muted-foreground">
         {hint ??
-          "Their MYLAPS number. Saved here, you can pull their practice from a track's timing without hunting for a link — MYLAPS tracks only."}
+          "Their transponder number. Saved here, they're one tap away when you look at a track's practice."}
       </p>
     </div>
   );

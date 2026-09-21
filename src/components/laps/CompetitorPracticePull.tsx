@@ -1,188 +1,70 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
-import { formatRunDateTime } from "@/lib/formatDate";
-import { formatLap } from "@/lib/runLaps";
+import { PracticeFieldBrowser } from "@/components/laps/PracticeFieldBrowser";
+import type { PracticeFieldSource } from "@/lib/practiceField/practiceField";
 import type { KnownCompetitor } from "@/lib/speedhive/knownCompetitors";
 
-type PulledSession = {
-  sessionUrl: string;
-  sessionCompletedAtIso: string | null;
-  lapCount: number;
-  bestLapSeconds: number | null;
-  importedSessionId: string | null;
-};
-
 /**
- * Pull a saved driver's practice at a track, on a button.
+ * Someone else's practice at a track, with no run of your own to start from: pick where, press
+ * Look, and everyone who practised is there to search — a team manager's door, or yours on a day
+ * you didn't drive. The lap sheet's Practice tab is the same list for "who else was out with me".
  *
- * With no saved competitor the card stays on the page and points at Settings. It used to
- * vanish entirely, which made it a door nobody could find (founder call, 2026-09-16). It still
- * needs a track whose MYLAPS practice page we know — without one nothing here can work.
+ * It used to take one saved driver and one MYLAPS track and hand back that driver's sessions.
+ * Since 2026-09-21 (founder call) it reads the whole practice list — LiveRC tracks included —
+ * and the saved drivers are one-tap filters over it. See `PracticeFieldBrowser`.
  *
- * Nothing here fetches until asked, and asking is the whole interaction: pick who, pick where,
- * press. Their session then imports like any other and opens on the sheet, where it can be
- * compared with a run of yours.
+ * Nothing here fetches until asked. With no track that can be looked in, the card is not drawn:
+ * nothing on it could work.
  */
 export function CompetitorPracticePull({
   competitors,
   tracks,
+  todayYmd,
 }: {
   competitors: KnownCompetitor[];
-  /** Only tracks with a MYLAPS practice page — the rest cannot be looked in. */
-  tracks: Array<{ id: string; name: string }>;
+  /** Only tracks with a LiveRC or MYLAPS practice link — the rest cannot be looked in. */
+  tracks: Array<{ id: string; name: string; sources: PracticeFieldSource[] }>;
+  /** Today in the viewer's zone, YYYY-MM-DD — where the day box opens, and as far as it goes. */
+  todayYmd: string;
 }) {
   const router = useRouter();
-  const [transponder, setTransponder] = useState(competitors[0]?.transponder ?? "");
   const [trackId, setTrackId] = useState(tracks[0]?.id ?? "");
-  const [busy, setBusy] = useState(false);
-  const [importingUrl, setImportingUrl] = useState<string | null>(null);
-  const [sessions, setSessions] = useState<PulledSession[] | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  const track = tracks.find((t) => t.id === trackId) ?? null;
 
   if (tracks.length === 0) return null;
-
-  async function pull() {
-    setBusy(true);
-    setNote(null);
-    setSessions(null);
-    try {
-      const res = await fetch("/api/laps/competitor-practice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transponder, trackId }),
-      });
-      const data = (await res.json().catch(() => null)) as
-        | { sessions?: PulledSession[]; hint?: string | null; error?: string }
-        | null;
-      if (!res.ok) {
-        setNote(data?.error ?? "That didn't work.");
-        return;
-      }
-      setSessions(data?.sessions ?? []);
-      if (data?.hint) setNote(data.hint);
-    } catch {
-      setNote("That didn't work.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function open(session: PulledSession) {
-    if (session.importedSessionId) {
-      router.push(`/laps/analysis?session=${encodeURIComponent(session.importedSessionId)}`);
-      return;
-    }
-    setImportingUrl(session.sessionUrl);
-    setNote(null);
-    try {
-      const res = await fetch("/api/lap-time-sessions/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls: [session.sessionUrl] }),
-      });
-      const data = (await res.json().catch(() => null)) as {
-        results?: Array<{ success?: boolean; importedSessionId?: string; error?: string }>;
-      } | null;
-      const first = data?.results?.[0];
-      if (first?.success && first.importedSessionId) {
-        router.push(`/laps/analysis?session=${encodeURIComponent(first.importedSessionId)}`);
-        return;
-      }
-      setNote(first?.error ?? "Couldn't bring that session in.");
-    } catch {
-      setNote("Couldn't bring that session in.");
-    } finally {
-      setImportingUrl(null);
-    }
-  }
-
-  const selectClass =
-    "min-w-0 flex-1 rounded-md border border-border bg-card px-2.5 py-2 text-[13px] text-foreground outline-none focus:ring-1 focus:ring-primary-ink/50";
 
   return (
     <CardPanel contentClassName="space-y-3">
       <Eyebrow>Someone else&apos;s practice</Eyebrow>
-      {competitors.length === 0 ? (
-        <Link
-          href="/settings#drivers-you-know"
-          className="btn-surface inline-flex px-3 py-2 text-[13px] font-medium"
-        >
-          Add a competitor
-        </Link>
-      ) : (
-      <div className="flex flex-wrap gap-2">
-        <select
-          value={transponder}
-          onChange={(e) => setTransponder(e.target.value)}
-          aria-label="Driver"
-          className={selectClass}
-        >
-          {competitors.map((c) => (
-            <option key={c.transponder} value={c.transponder}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={trackId}
-          onChange={(e) => setTrackId(e.target.value)}
-          aria-label="Track"
-          className={selectClass}
-        >
-          {tracks.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void pull()}
-          className="btn-surface shrink-0 px-3 py-2 text-[13px] font-medium disabled:opacity-60"
-        >
-          {busy ? "Looking…" : "Look"}
-        </button>
-      </div>
-      )}
-
-      {note ? <p className="text-[11px] text-muted-foreground">{note}</p> : null}
-
-      {sessions && sessions.length > 0 ? (
-        <ul className="divide-y divide-border/60 rounded-md border border-border">
-          {sessions.map((s) => (
-            <li key={s.sessionUrl}>
-              <button
-                type="button"
-                disabled={importingUrl != null}
-                onClick={() => void open(s)}
-                className="tap-active flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition hover:bg-muted/40 disabled:opacity-60"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] text-foreground">
-                    {s.sessionCompletedAtIso ? formatRunDateTime(s.sessionCompletedAtIso) : "Practice"}
-                  </span>
-                  <span className="ui-caption mt-0.5 block truncate">
-                    {s.lapCount} lap{s.lapCount === 1 ? "" : "s"}
-                    {s.bestLapSeconds != null ? ` · best ${formatLap(s.bestLapSeconds)}` : ""}
-                  </span>
-                </span>
-                <span className="type-timestamp shrink-0">
-                  {importingUrl === s.sessionUrl
-                    ? "Bringing in…"
-                    : s.importedSessionId
-                      ? "Open"
-                      : "Bring in"}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+      <select
+        value={trackId}
+        onChange={(e) => setTrackId(e.target.value)}
+        aria-label="Track"
+        className="w-full min-w-0 rounded-md border border-border bg-card px-2.5 py-2 text-[13px] text-foreground outline-none focus:ring-1 focus:ring-primary-ink/50"
+      >
+        {tracks.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </select>
+      {track ? (
+        // Keyed on the track: another track is another list, another day box, another site switch.
+        <PracticeFieldBrowser
+          key={track.id}
+          trackId={track.id}
+          trackName={track.name}
+          sources={track.sources}
+          initialDayYmd={todayYmd}
+          maxDayYmd={todayYmd}
+          mode="open"
+          competitors={competitors}
+          onOpenSession={(id) => router.push(`/laps/analysis?session=${encodeURIComponent(id)}`)}
+        />
       ) : null}
     </CardPanel>
   );

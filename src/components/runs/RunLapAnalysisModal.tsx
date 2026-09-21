@@ -72,7 +72,7 @@ export function RunLapAnalysisModal({
   const [importedLapSetsFull, setImportedLapSetsFull] = useState<RunWithImports["importedLapSets"] | null>(null);
   const [importedLapsLoading, setImportedLapsLoading] = useState(false);
   const [importedLapsError, setImportedLapsError] = useState<string | null>(null);
-  const libraryLapSessions = useImportedLapLibrary(open);
+  const { sessions: libraryLapSessions, reload: reloadLibrary } = useImportedLapLibrary(open);
 
   // Only on the viewer's own run: on a teammate's sheet the viewer's runs would land under
   // the teammate's name, and the page's list already carries what the team shares.
@@ -260,6 +260,7 @@ export function RunLapAnalysisModal({
               pickerRunsForModal={setupPickerRuns ?? pickerRuns}
               runListSource={runListSource}
               librarySessions={libraryLapSessions}
+              onLibraryChanged={reloadLibrary}
               viewerUserId={viewerUserId}
               memberDisplayByUserId={memberDisplayByUserId}
               /*

@@ -5,6 +5,7 @@ import type { CheerioAPI } from "cheerio";
 import { parseLiveRcSessionDisplayTimeToUtcIso } from "@/lib/lapUrlParsers/livercSessionTime";
 import {
   liveRcNameMatchesConfigured,
+  liveRcPracticeRowTransponder,
   normalizeLiveRcDriverNameForMatch,
 } from "@/lib/lapWatch/liveRcNameNormalize";
 
@@ -41,6 +42,47 @@ function guessDriverNameFromPracticeRow($: CheerioAPI, tr: unknown, linkText: st
   if (fromCell) return fromCell;
   if (looksLikePersonNameCell(linkText)) return linkText;
   return linkText || cells[0] || "Practice session";
+}
+
+/**
+ * Class, chip, lap count and fast lap off one practice-list row.
+ *
+ * The page prints them as `<small>ISTC 13.5T (2799719)</small>` under the name, then a laps cell
+ * ("17 / 5:21") and a "Fast: 15.613 / Avg: 18.899" cell. The fast cell is found by its own word
+ * rather than by column number, and the laps cell is the one before it — a club that adds a
+ * column moves both together.
+ */
+function readPracticeRowDetail(
+  $: CheerioAPI,
+  tr: unknown
+): Pick<ExtractedPracticeSession, "className" | "transponder" | "lapCount" | "fastLapSeconds"> {
+  const empty = { className: null, transponder: null, lapCount: null, fastLapSeconds: null };
+  if (!tr) return empty;
+  const row = $(tr as never);
+
+  const small = normalizeWhitespace(row.find("small").first().text());
+  const transponder = liveRcPracticeRowTransponder(small);
+  const className = small.replace(/\(\d{4,10}\)\s*$/, "").trim() || null;
+
+  let lapCount: number | null = null;
+  let fastLapSeconds: number | null = null;
+  const cells = row.find("td").toArray();
+  const fastIndex = cells.findIndex((td) => /\bFast:/i.test($(td).text()));
+  if (fastIndex >= 0) {
+    const fast = /\bFast:\s*(\d+(?:\.\d+)?)/i.exec($(cells[fastIndex]!).text());
+    const seconds = fast ? Number(fast[1]) : Number.NaN;
+    if (Number.isFinite(seconds) && seconds > 0) fastLapSeconds = seconds;
+    if (fastIndex > 0) {
+      // "17<br />5:21" has no space in it, so its text is "175:21". The cell's sort key is the
+      // lap count on its own; without one, the text BEFORE the line break is.
+      const lapCell = $(cells[fastIndex - 1]!);
+      const beforeBreak = lapCell.contents().first().text();
+      const laps = /^\s*(\d{1,4})\s*$/.exec(lapCell.attr("data-sort") ?? beforeBreak);
+      const n = laps ? Number(laps[1]) : Number.NaN;
+      if (Number.isInteger(n) && n >= 0) lapCount = n;
+    }
+  }
+  return { className, transponder, lapCount, fastLapSeconds };
 }
 
 function absoluteUrl(baseUrl: string, href: string): string | null {
@@ -195,6 +237,15 @@ export type ExtractedPracticeSession = {
   sessionCompletedAtIso: string | null;
   sessionId: string;
   sessionUrl: string;
+  /**
+   * The rest of the row, read cell by cell. `driverName` above runs name, class and chip together
+   * (it is a matcher's haystack); these are the same facts kept apart, for a list a person reads.
+   * Each is null when the page doesn't print it.
+   */
+  className: string | null;
+  transponder: number | null;
+  lapCount: number | null;
+  fastLapSeconds: number | null;
 };
 
 export type ExtractedRaceSession = {
@@ -253,6 +304,7 @@ export function extractPracticeSessions(html: string, pageUrl: string): Extracte
       sessionCompletedAtIso,
       sessionId,
       sessionUrl,
+      ...readPracticeRowDetail($, tr.length ? tr.get(0) : null),
     });
   }
 

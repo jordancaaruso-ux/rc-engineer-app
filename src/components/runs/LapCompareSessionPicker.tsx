@@ -58,7 +58,8 @@ export type LapPickerGroup = {
 export type LapPickerSegment = {
   key: string;
   label: string;
-  count: number;
+  /** Null draws no number — Practice is a list fetched on opening, so it has none to show. */
+  count: number | null;
 };
 
 export function LapCompareSegmentBar({
@@ -101,9 +102,11 @@ export function LapCompareSegmentBar({
             onClick={() => onSelect(s.key)}
           >
             {s.label}
-            <span className={cn("ml-1 tabular-nums", on ? "opacity-70" : "opacity-60")}>
-              {s.count}
-            </span>
+            {s.count != null ? (
+              <span className={cn("ml-1 tabular-nums", on ? "opacity-70" : "opacity-60")}>
+                {s.count}
+              </span>
+            ) : null}
           </button>
         );
       })}
