@@ -28,6 +28,7 @@ import {
 import { LapCompareDriverChips, type LapDriverChip } from "@/components/runs/LapCompareDriverChips";
 import {
   LapCompareStatTiles,
+  TargetMark,
   type LapStatTile,
 } from "@/components/runs/LapCompareStatTiles";
 import {
@@ -58,6 +59,7 @@ import {
 } from "@/components/laps/PracticeFieldBrowser";
 import {
   practiceColumnName,
+  runOwnerName,
   runOwnerSurname,
   type PracticeFieldSource,
 } from "@/lib/practiceField/practiceField";
@@ -712,6 +714,8 @@ export function LapComparisonColumnGrid({
     anchorIsImportedSheet ? "field" : "driver"
   );
   const [pickerOpen, setPickerOpen] = useState(false);
+  /** Phone sheet only: whether the target's own pickers are showing — see `renderPicker`. */
+  const [targetPickerOpen, setTargetPickerOpen] = useState(false);
 
   /*
    * The Practice tab. Which timing sites this run's track can be read from is asked of OUR
@@ -1988,13 +1992,28 @@ export function LapComparisonColumnGrid({
     );
   }
 
+  /**
+   * What the target is CALLED where it stands alone — the top card and the Change sheet's row:
+   * "Jordan Caruso · Run 6". A run is named after its session everywhere it sits beside its
+   * siblings, but on its own "Run 6" does not say whose (founder, 2026-09-22). A driver off a
+   * timing sheet is already a name and stays as it is.
+   */
+  const targetTitle = useMemo(() => {
+    if (!targetSeries) return "";
+    const name = metaById.get(targetSeries.id)?.name ?? targetSeries.label;
+    const isPersonTarget =
+      targetSeries.id === "run:primary" ? anchorIsImportedSheet : targetSeries.sourceType === "imported";
+    const driver = isPersonTarget ? null : runOwnerName(targetSeries.label);
+    return driver ? `${driver} · ${name}` : name;
+  }, [targetSeries, metaById, anchorIsImportedSheet]);
+
   /** The pinned, untickable row at the top of the picker: what everything is measured against. */
   const targetPickerRow = useMemo((): LapPickerRow | null => {
     if (!targetSeries) return null;
     const m = metaById.get(targetSeries.id);
     return {
       id: targetSeries.id,
-      name: m?.name ?? targetSeries.label,
+      name: targetTitle,
       // The driver above, the session and its time below — the same two lines every
       // other row in the picker reads, and the same two the column header prints.
       when: [m?.sortIso ? fmtWhen(m.whenIso ?? m.sortIso) : "—", m?.context ?? null]
@@ -2002,7 +2021,7 @@ export function LapComparisonColumnGrid({
         .join(" · "),
       bestLap: targetSeries.bestLap,
     };
-  }, [targetSeries, metaById, fmtWhen]);
+  }, [targetSeries, metaById, fmtWhen, targetTitle]);
 
   /** What the "Compared with" bar reads out, so the grid never has to be scrolled to find out. */
   const comparedWithLabel = useMemo(() => {
@@ -2404,9 +2423,8 @@ export function LapComparisonColumnGrid({
   function renderStatTiles(layout: "tiles" | "band") {
     const heading = targetSeries
       ? {
-          name: metaFor(targetSeries).name,
+          name: targetTitle,
           context: [
-            "target",
             metaFor(targetSeries).sortIso
               ? fmtWhen(metaFor(targetSeries).whenIso ?? metaFor(targetSeries).sortIso)
               : null,
@@ -2438,6 +2456,14 @@ export function LapComparisonColumnGrid({
   function renderPicker(idPrefix: string) {
     const sessionSelectId = `${idPrefix}-lap-compare-target`;
     const scopeId = `${idPrefix}-lap-compare-scope`;
+    /*
+     * On the phone the target is ONE marked row until you ask to change it (founder,
+     * 2026-09-22: the sheet's two halves read as one puzzle). Open, it was a tab bar and two
+     * dropdowns sitting directly over a second, identical tab bar — and the thing the sheet is
+     * opened for nine times in ten, ticking something to compare, began below the fold. The
+     * desktop rail has the room and keeps it standing.
+     */
+    const targetControlsShown = idPrefix !== "sheet" || targetPickerOpen;
     return (
       <div className="space-y-3">
         {/*
@@ -2446,9 +2472,21 @@ export function LapComparisonColumnGrid({
          * be set to what it already says reads as broken.
          */}
         <div className="space-y-1">
-          <label className="ui-label-caps text-[9px] uppercase tracking-wider" htmlFor={sessionSelectId}>
-            Target
-          </label>
+          <div className="flex items-center justify-between gap-2">
+            <TargetMark className="mb-0" />
+            {idPrefix === "sheet" ? (
+              <button
+                type="button"
+                className="tap-active text-[11px] font-medium text-primary-ink"
+                aria-expanded={targetPickerOpen}
+                onClick={() => setTargetPickerOpen((v) => !v)}
+              >
+                {targetPickerOpen ? "Done" : "Change target"}
+              </button>
+            ) : null}
+          </div>
+          {targetControlsShown ? (
+            <>
           <LapCompareSegmentBar
             segments={targetSegments}
             active={targetSegment}
@@ -2481,6 +2519,8 @@ export function LapComparisonColumnGrid({
             )}
           </select>
           {renderTargetDriverSelect(idPrefix, { fullWidth: true })}
+            </>
+          ) : null}
         </div>
 
         {/* The two dropdowns' answer, right under them — see `LapCompareTargetRow`. */}

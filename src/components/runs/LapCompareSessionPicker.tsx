@@ -177,7 +177,6 @@ export function LapCompareTargetRow({ target }: { target: LapPickerRow | null })
       data-testid="lap-compare-target-row"
       className="flex items-center gap-2.5 rounded-md border border-primary-ink/60 bg-primary/10 px-2 py-1.5"
     >
-      <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
       <span className="min-w-0 flex-1 leading-tight">
         <span className="block truncate text-[12px] text-foreground">{target.name}</span>
         <span className="block truncate text-[10px] tabular-nums text-muted-foreground">

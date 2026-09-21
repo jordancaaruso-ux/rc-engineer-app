@@ -39,7 +39,10 @@ test("the target row wears the opened run's own clock, not its import's", async 
   const targetWhen = targetRow.locator("span > span").nth(1);
   await expect(targetWhen).toContainText(headerWhen);
 
-  // Same instant again in the session dropdown above it, which names this sheet.
+  // Same instant again in the session dropdown, which names this sheet. On the phone sheet the
+  // target's pickers sit behind "Change target" (2026-09-22); the row above is always there.
+  const changeTarget = dialog.getByRole("button", { name: "Change target" });
+  if (await changeTarget.count()) await changeTarget.click();
   await expect(page.locator("#sheet-lap-compare-target")).toHaveValue("this_sheet");
   const selected = await page
     .locator("#sheet-lap-compare-target option:checked")

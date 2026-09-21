@@ -49,13 +49,30 @@ export type LapStatTile = {
 };
 
 export type LapStatHeading = {
-  /** Who the figures belong to — a driver on a race sheet, a session on your own runs. */
+  /**
+   * Who the figures belong to — the driver on a race sheet, "Jordan Caruso · Run 6" on your own
+   * run. It read "Run 6" alone until 2026-09-22 (founder: "this should say Jordan Caruso run 6,
+   * and be clear that that's the target").
+   */
   name: string;
-  /** "target · 9 Aug, 1:20 PM · Finals D" */
+  /** "9 Aug, 1:20 PM · Finals D" — the word "target" is the mark above, not a prefix here. */
   context: string | null;
   /** The way to change the target, when there is a choice. */
   control?: ReactNode;
 };
+
+/**
+ * The target's mark: the yellow dot and the word, the same pair the Change sheet puts on its
+ * target row — one sign for "everything here is measured against this", wherever it appears.
+ */
+export function TargetMark({ className }: { className?: string }) {
+  return (
+    <div className={cn("mb-0.5 flex items-center gap-1.5", className)}>
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
+      <span className="ui-label-caps text-[9px] uppercase tracking-wider">Target</span>
+    </div>
+  );
+}
 
 export function LapCompareStatTiles({
   tiles,
@@ -76,6 +93,7 @@ export function LapCompareStatTiles({
       <div className={cn("overflow-hidden rounded-md border border-border", className)}>
         {heading ? (
           <div className="border-b border-border bg-surface-runna px-3 py-2 leading-tight">
+            <TargetMark />
             {/* The control carries the name when there is a choice; otherwise the name stands. */}
             {heading.control ?? (
               <div className="truncate text-[13px] font-semibold text-foreground">{heading.name}</div>
@@ -120,6 +138,7 @@ export function LapCompareStatTiles({
       {heading ? (
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-border bg-surface-runna px-3 py-2">
           <div className="min-w-0 leading-tight">
+            <TargetMark />
             <div className="truncate text-[13px] font-semibold text-foreground">{heading.name}</div>
             {heading.context ? (
               <div className="truncate text-[10px] text-muted-foreground">{heading.context}</div>

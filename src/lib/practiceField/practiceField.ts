@@ -287,6 +287,12 @@ export function practiceColumnName(input: {
  * one driver — "Caruso" above "Run 5", beside "David CALWELL". Null for the placeholders a run
  * wears when nobody's name is known, which would print "Me" as if it were a surname.
  */
+/** The driver of a run, in full, for where there is room — null for the same placeholders. */
+export function runOwnerName(driverLabel: string | null | undefined): string | null {
+  const label = driverLabel?.trim().replace(/\s+/g, " ") ?? "";
+  return !label || /^(me|driver)$/i.test(label) ? null : label;
+}
+
 export function runOwnerSurname(driverLabel: string | null | undefined): string | null {
   const label = driverLabel?.trim() ?? "";
   if (!label || /^(me|driver)$/i.test(label)) return null;
