@@ -31,6 +31,8 @@ import type { FieldPace } from "@/lib/engineer/fieldPace";
 import { FIELD_RUN_SELECT, loadFieldPaceForRuns } from "@/lib/engineer/fieldPaceLoad";
 import { matchDriverName } from "@/lib/engineer/nameMatch";
 import { driverKey, driversOnSheets, renderRivalSection, renderRivalsSummary, type RivalRun } from "@/lib/engineer/rivals";
+import { renderLapsBlock } from "@/lib/engineer/lapsBlock";
+import { loadLapsSessions } from "@/lib/engineer/lapsLoad";
 
 /**
  * Driver-data blocks: the driver's own latest session, its setup, the rest of that day, and
@@ -533,6 +535,31 @@ function buildDayBlock(
   ].join("\n");
 }
 
+/**
+ * The LAPS block for the session's local day: the timed sessions linked to the day's runs plus
+ * any loose import of the driver's whose time on track falls on that day (the sweep files
+ * practice without a run). The day is the run's, in the same zone as every other clock here.
+ */
+async function buildDayLapsBlock(
+  userId: string,
+  anchor: LoadedRun,
+  day: DayRun[],
+  zone: string | null
+): Promise<string | null> {
+  const centre = (anchor.sortAt ?? anchor.createdAt).getTime();
+  const anchorDay = runLocalDayKey(anchor, { viewerTimeZone: zone ?? undefined });
+  const runs = [anchor, ...day.filter((r) => r.id !== anchor.id)];
+  const sessions = await loadLapsSessions({
+    userId,
+    runs,
+    window: { from: new Date(centre - DAY_WINDOW_MS), to: new Date(centre + DAY_WINDOW_MS) },
+    zone,
+    keep: (s) => s.ymd === anchorDay,
+  });
+  const where = anchor.track?.name ? ` at ${anchor.track.name}` : "";
+  return renderLapsBlock(sessions, `on ${fmtLocalDate(anchor, zone)}${where}`);
+}
+
 function buildComparableRunsBlock(
   rows: Awaited<ReturnType<typeof findComparableRunsForEngineer>>,
   zone: string | null
@@ -597,6 +624,11 @@ export async function buildDriverDataBlocks(params: {
 
   const dayBlock = buildDayBlock(run, day, predecessorOf, zone, fieldByRun);
   if (dayBlock) parts.push(dayBlock);
+
+  // Every lap of every driver in the day's timed sessions (lapsBlock.ts) — the day the
+  // session above sits in, whatever car the driver was in. A failed read just drops the block.
+  const lapsBlock = await buildDayLapsBlock(params.userId, run, day, zone).catch(() => null);
+  if (lapsBlock) parts.push(lapsBlock);
 
   // Who else was on the day's timing sheets, and — if the question names one — you against
   // them session by session. The day's runs, the session itself included.

@@ -5,7 +5,8 @@
  *
  * Client-safe: the subject bar reads and writes this in the URL, the chat route reads it off
  * the request body, and driverHistory.ts turns it into the runs the Engineer sees. The filter
- * is explicit on purpose — the Engineer has no tools and cannot query the database, so the
+ * is explicit on purpose — the Engineer cannot query the database (its one tool reads LiveRC, not
+ * the log — tools.ts), so the
  * driver names the runs (in the picker, or by naming a meeting in the question — nameMatch.ts)
  * and the app attaches exactly that.
  */

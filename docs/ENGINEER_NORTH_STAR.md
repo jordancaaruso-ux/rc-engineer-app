@@ -143,19 +143,52 @@ Each of these was deleted or declined for a reason. They return only through the
   (`driverData.ts`) — plain statements of what is true, nothing about how to think. The
   prompt sentence that once denied data exists now draws the line around exactly what is
   attached, and it is still load-bearing.
-- **No tools, no choice chips, no status theatre.** The old pipeline grew to ~99K
+- **One tool, no choice chips, no status theatre.** The old pipeline grew to ~99K
   chars a turn one reasonable addition at a time; the payload-contract test exists so additions
   fail loudly instead of accreting. The one switch the driver holds is the subject bar:
   Auto reads the latest run, a pin reads a chosen run, a **range** reads the runs the driver
   named (a track, a car type, a span of dates — since 2026-09-14), General attaches no run.
   The range is always the driver's choice, never inferred from the wording of the question:
-  the Engineer has no tools and cannot query the log, so the app attaches exactly what was
-  named and the block says what is and isn't in it.
+  the Engineer cannot query the log, so the app attaches exactly what was named and the block
+  says what is and isn't in it. Since 2026-09-22 it holds exactly one tool (`tools.ts`): LiveRC's
+  practice page for a day at the subject's track, read on request — founder call, because a
+  question asked at midday needs the morning that has happened, not last night's copy. The status
+  line names the read ("Fetching LiveRC results…") because it is a real request in flight, not
+  theatre. Anything the app already stores rides as a block, never as a tool; a second tool is a
+  north-star change, not an addition.
 - **No unmeasured ships.** A change to prompt, payload, model, KB tiering, or nets rendering
   ships only on: physics gate clean, harness win ≥65/35 (or judge-gated at κ≥0.75), and a Jordan
   blind audit for anything user-visible.
 
 ## Changelog
+
+- **2026-09-22** — "Let's focus on getting lap times perfect for now." The founder's own production
+  questions of 14–17 September — "delta from new to old tyres per run", "average pace delta to Tim
+  Hilyear, first 5 laps and last 5", "who had the least fade" — had been answered "I can't see
+  lap-by-lap times": each run went to the Engineer as best / top 5 / 5-min only, and rivals as
+  best / top 5 / median. Measured before building: every lap of every driver on his busiest day (SA
+  State Titles Saturday, 15 sessions, 761 laps) is ~1,700 tokens. Label `2026-09-22-laps`, prompt text
+  unchanged. (1) **LAPS block** (`lapsBlock.ts`, `lapsLoad.ts`): every lap of every driver in the timed
+  sessions the driver was in — the day's for a run subject, the range's for a range — from the sessions
+  already imported (a race result keeps the whole sheet; practice is one driver), on the TRACK's clock
+  (`trackClock.ts`; a stamp-less LiveRC race result takes its run's clock), two-site copies of one
+  session collapsed by their laps. Under each driver, in code: best, top 5, median, last five vs first
+  five, spread; a lap under 60% of the driver's median (a race's opening lap from the grid, 7.11 in an
+  18-second class) is listed but left out of the figures. (2) **The first tool** (`livercPracticeTool.ts`,
+  `tools.ts`, the loop in `chat.ts`): LiveRC's practice page for a day at the subject's track — every
+  driver, class, chip, and per session the clock, laps and fastest lap — read on request. Founder call:
+  "fine for the engineer to call it upon request … you could be asking midday, and then it's going to
+  have to get it anyway." Offered only when the subject's track has a LiveRC page; never in General;
+  three calls per answer; the chat's status line reads "Fetching LiveRC results…" while it runs. The
+  result opens "DRIVER DATA —" so the never-invent-a-number sentence covers it; the prompt says
+  nothing about tools. The eval harness serves a recorded page (`fixtures/<ctx>.liverc.txt`, captured
+  for real by `capture-run-fixture.ts --practice-day`) so a round never touches LiveRC. Round 06 (ten
+  lap-time questions in his words over the SA Saturday): it fetched on exactly the three practice
+  questions; "who had the least fade" came back +0.36 vs +0.69 across the five shared heats, +0.39 vs
+  +0.41 with Tim's bad heat left out — exact on the block's figures; every checked gap right to the
+  hundredth. Driven on the dev server: `preparing → thinking → fetching → thinking → tokens`, and an
+  empty day answered "no practice sessions were recorded on the timing loop for that day". NOT through
+  the 56-case launch set; the founder's read of round 06 owed.
 
 - **2026-09-21** — Founder read a week of real testers' questions from production beside round 04 and
   ruled: "we need to have a strong distinction between when the engineer can read a car and when it

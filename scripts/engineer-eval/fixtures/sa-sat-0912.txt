@@ -1,0 +1,237 @@
+THE SESSION BEING DISCUSSED.
+
+car: A800RR
+what this car races: 1/10 Touring · Electric
+track: Radio Racing Cars SA
+grip: LOW
+layout style: MEDIUM
+tyre: Sweep D-32
+tyre run number: 1
+additive: Mighty Gripper - Yellow
+air temp °C: 18.8
+humidity %: 49
+laps recorded: 17
+best lap (s): 17.68
+average of the best 5 laps (s): 17.88
+best five minutes (laps/time): 17/5:09.8
+place in the session by best lap: P1 of 6 timed drivers
+best lap vs the fastest driver's best (s, positive = slower; 0.00 = you were fastest): 0.00
+average of best 5 vs the best top-5 in the field (s): 0.00
+best lap vs the field's median best (s, negative = faster than the middle of the field): -0.51
+driver's rating of the car (1-10): 8
+session date: 2026-09-12
+
+SETUP ON THE CAR (A800RR, the session above).
+These are the values the car actually ran. Reason with them; do not read them back.
+
+ackermann position: Rearward
+arb front: 1.2
+arb rear: 1.3
+body position from windshield: 58
+bodyshell: Wolverine 0.4
+bump steer shims front: 3
+c45 installed front: no
+c45 installed rear: yes
+camber front: -1.8
+camber rear: -2
+caster front: 4
+caster rear: -3
+damper oil front: 400
+damper oil rear: 450
+damper percent front: 60
+damper percent rear: 60
+damping front: linear
+damping rear: linear
+diff height front: Up
+diff height rear: Up
+diff oil: 5k
+downstop front: 23.6
+downstop rear: 22.4
+front spring rate gf mm: 76.3
+inner steering angle: 26
+motor lateral shift: 1.75
+motor: HW G5
+pinion: 44
+rear hrb setting: 3.5
+rear spring rate gf mm: 119.6
+ride height front: 4.6
+ride height rear: 5
+servo horn height: 17mm
+spring front: std
+spring gap front: 1
+spring gap rear: 3.2
+spring rear: std
+spur: 95
+toe front: -1.3
+toe gain shims rear: 3.5
+toe rear: 3
+under hub shims front: 0
+under hub shims rear: 0
+under lower arm shims ff: 2.5
+under lower arm shims fr: 2.5
+under lower arm shims rf: 3
+under lower arm shims rr: 3
+upper inner shims ff: 2
+upper inner shims fr: 2
+upper inner shims rf: 2.75
+upper inner shims rr: 2.75
+upper outer shims front: 1.5
+upper outer shims rear: 1.5
+upstop front: -
+upstop rear: -
+weight balance front percent: 50
+wing: Speciale 0.5
+winglet: no
+
+spur ÷ pinion: 2.159 (the final drive ratio is this multiplied by the car's internal ratio, which is not on the sheet)
+
+NO BOX ON THIS CAR'S SETUP SHEET FOR: front shock position, rear shock position. A manufacturer's sheet lists what adjusts on the car.
+
+THIS DAY'S RUNS ON THIS CAR — 2026-09-12, A800RR, 7 runs. Earliest first.
+"changed" is what moved on the setup sheet since that same car's previous run. A run
+with no readable sheet has no "changed" line: that is unknown, not unchanged.
+"P3/12 +0.21 to P1" is your place and gap to the fastest driver's best lap in that session's
+timing sheet — the field drove the same track at the same time, so it cancels the track's movement.
+
+08:58  best 17.83  top5 18.12  rated 7/10  tyre run 1  14.7°C
+    no setup change since the run of 2026-09-11
+10:21  best 17.66  top5 17.78  5min 18/5:15.2  P1/7 0.00 to P1  rated 7/10  tyre run 1  16.7°C
+    changed: toe rear 3 → 3.2
+12:15  best 17.39  top5 17.58  5min 17/5:05.5  P1/7 0.00 to P1  rated 8/10  tyre run 1  19.1°C
+    changed: spur 95 → 96
+13:41  best 17.70  top5 17.92  5min 17/5:10.2  P1/7 0.00 to P1  rated 7/10  tyre run 2  19.8°C
+    changed: pinion 43 → 44, spur 96 → 95, toe rear 3.2 → 3
+15:31  best 17.76  top5 17.90  5min 17/5:11.5  P1/5 0.00 to P1  rated 8/10  tyre run 3  19.6°C
+    changed: camber front -1.8 → -2
+16:53  best 17.68  top5 17.88  5min 17/5:09.8  P1/6 0.00 to P1  rated 8/10  tyre run 1  18.8°C  (the session above)
+    changed: camber front -2 → -1.8, inner steering angle 27 → 26, toe front -1.2 → -1.3
+17:48  best 17.94  top5 18.00  5min 17/5:12.4  P2/7 +0.04 to P1  rated 7/10  tyre run 5  16.1°C
+    no setup change
+
+LAPS — every lap of every driver in the timed sessions you were in, on 2026-09-12 at Radio Racing Cars SA. Sessions earliest first; laps in the order they were driven; the clock is the track's.
+Under each driver, worked out in code from those laps: best; the average of the best 5; the median; the median of the last five laps minus the median of the first five (positive = slower at the end); and the spread, the 90th-percentile lap minus the 10th. A lap far outside the rest is usually a crash, a marshal or a stop, not pace. A "partial lap" is one under 60% of that driver's median — a race's opening lap from the grid, or a cut; it is listed but left out of the figures.
+A session with one driver is a practice session: the timing site keeps practice one driver per page, so only your own laps are here.
+
+08:58  Practice  (1 driver)
+  12/09/2026, 08:58 am (you): 18.51 18.05 19.52 19.41 17.83 33.66 20.49
+      best 17.83 · top5 18.66 · median 19.41 · spread 15.84
+
+08:58  Jordan Caruso · ISTC 13.5t  (1 driver)
+  Jordan Caruso (you): 18.25 19.81 17.61 19.48 17.90 35.97 21.64 47.61 25.48 20.66 32.30 18.38 18.23 18.31 18.46
+      best 17.61 · top5 18.06 · median 19.48 · last five vs first five +0.13 · spread 18.07
+
+09:02  Practice  (1 driver)
+  12/09/2026, 09:02 am (you): 23.06 23.24 32.27 18.49 18.20 18.32 18.21
+      best 18.20 · top5 19.25 · median 18.49 · spread 14.07
+
+09:48  Race · ISTC 13.5t (Heat 2/2)  (7 drivers)
+  JORDAN CARUSO (you): 7.11 19.30 17.76 17.66 18.26 17.98 17.85 17.69 17.96 18.04 18.02 18.68 17.97 18.02 18.00 18.33 18.34 18.21
+      best 17.66 · top5 17.78 · median 18.02 · last five vs first five +0.23 · spread 0.99 · 1 partial lap left out
+  RHYS MARSHALL: 16.17 18.66 17.98 19.00 18.11 18.37 18.64 18.82 18.06 19.01 18.83 18.64 18.77 18.77 18.73 18.64 18.98
+      best 16.17 · top5 17.74 · median 18.66 · last five vs first five +0.66 · spread 1.03
+  MARTIN GRANTHAM: 20.02 18.69 18.47 23.61 18.93 18.38 18.43 20.10 18.70 19.06 18.99 19.08 18.78 19.24 19.17 19.30
+      best 18.38 · top5 18.53 · median 19.03 · last five vs first five +0.25 · spread 1.67
+  JUSTIN VERGUNST: 21.76 19.27 18.82 18.86 18.59 19.13 18.87 18.70 18.91 18.95 18.89 19.18 18.99 19.27 19.08 19.27
+      best 18.59 · top5 18.77 · median 18.97 · last five vs first five +0.31 · spread 0.57
+  RICHARD GRONCKI: 8.77 19.04 18.78 19.42 19.07 21.35 19.35 23.99 19.05 19.54 19.02 19.04 19.12 18.70 19.11 19.00
+      best 18.70 · top5 18.91 · median 19.07 · last five vs first five −0.03 · spread 2.57 · 1 partial lap left out
+  KOHEN MOULD: 1.63 19.19 18.97 19.52 19.93 19.06 19.33 19.65 18.57 19.00 19.74 24.59 19.37 20.77 19.94 18.83 19.30
+      best 18.57 · top5 18.89 · median 19.35 · last five vs first five +0.18 · spread 1.94 · 1 partial lap left out
+  STEVEN CORO: 5.02 22.11 20.00 19.50 19.00 21.20 19.38 22.00 19.20 19.54 25.84 19.22 20.06 19.37 19.15 18.92
+      best 18.92 · top5 19.10 · median 19.50 · last five vs first five −0.78 · spread 3.10 · 1 partial lap left out
+
+10:40  Race · ISTC 13.5t (Heat 2/2)  (7 drivers)
+  JORDAN CARUSO (you): 17.85 17.65 17.39 17.57 17.59 18.05 18.19 17.81 17.73 18.02 18.27 17.96 18.08 18.35 18.34 18.31 18.33
+      best 17.39 · top5 17.58 · median 18.02 · last five vs first five +0.75 · spread 0.77
+  TIMOTHY HILYEAR: 18.63 17.80 17.86 17.82 17.98 18.17 17.98 18.42 18.37 18.71 18.58 18.57 18.59 18.51 18.71 18.66 18.42
+      best 17.80 · top5 17.89 · median 18.42 · last five vs first five +0.73 · spread 0.89
+  RHYS MARSHALL: 19.12 18.26 18.52 18.44 18.32 18.33 18.51 18.56 18.67 18.72 18.85 18.90 18.72 18.80 18.92 18.98 18.99
+      best 18.26 · top5 18.37 · median 18.72 · last five vs first five +0.49 · spread 0.68
+  RICHARD GRONCKI: 18.60 18.31 18.16 18.64 18.67 18.71 19.06 19.25 19.01 18.80 18.82 18.74 18.93 18.93 18.96 19.58
+      best 18.16 · top5 18.48 · median 18.81 · last five vs first five +0.33 · spread 0.94
+  JUSTIN VERGUNST: 19.36 18.70 18.87 18.68 19.00 18.59 18.94 18.93 19.91 19.27 20.09 19.14 18.74 18.97 19.36 19.54
+      best 18.59 · top5 18.71 · median 18.98 · last five vs first five +0.27 · spread 1.23
+  TOMAS BURATOVICH: 18.75 18.46 18.94 19.07 19.59 19.06 19.54 18.96 19.07 19.28 19.18 19.75 18.94 18.64 21.90 19.24
+      best 18.46 · top5 18.74 · median 19.07 · last five vs first five +0.30 · spread 1.11
+  MARTIN GRANTHAM: 18.50 18.30 18.25 18.79 18.31 18.49 46.52 19.36 18.79 19.96
+      best 18.25 · top5 18.37 · median 18.64 · last five vs first five +1.05 · spread 1.71
+
+12:30  Race · ISTC 13.5t (Heat 2/2)  (7 drivers)
+  JORDAN CARUSO (you): 18.39 17.99 18.09 17.70 18.13 17.75 18.08 18.41 18.28 18.17 18.14 19.71 18.36 18.20 18.15 18.29 18.40
+      best 17.70 · top5 17.92 · median 18.17 · last five vs first five +0.19 · spread 0.66
+  RHYS MARSHALL: 18.32 18.38 19.70 18.36 18.26 18.99 18.46 18.45 18.53 18.64 18.84 18.87 18.77 18.81 18.79 18.76 18.70
+      best 18.26 · top5 18.35 · median 18.70 · last five vs first five +0.42 · spread 0.67
+  JUSTIN VERGUNST: 18.73 18.26 18.30 18.43 18.55 18.61 18.81 18.57 18.87 18.96 19.17 18.49 19.31 19.18 18.90 19.13
+      best 18.26 · top5 18.41 · median 18.77 · last five vs first five +0.70 · spread 0.88
+  TIMOTHY HILYEAR: 18.36 18.05 18.17 18.11 18.38 17.90 18.00 18.25 18.20 18.09 18.53 18.29 18.76 18.59 25.84 19.63
+      best 17.90 · top5 18.03 · median 18.27 · last five vs first five +0.60 · spread 1.63
+  MARTIN GRANTHAM: 19.04 18.27 18.63 18.32 18.50 18.81 19.03 19.02 27.14 19.13 18.79 18.67 18.93 19.05 18.98 19.02
+      best 18.27 · top5 18.48 · median 18.96 · last five vs first five +0.48 · spread 0.80
+  RICHARD GRONCKI: 18.94 18.72 18.67 18.75 18.93 19.86 21.87 18.78 22.13 18.97 18.82 26.63 19.24 19.49 19.28 20.31
+      best 18.67 · top5 18.75 · median 19.11 · last five vs first five +0.75 · spread 3.41
+  TOMAS BURATOVICH: 18.96 37.41 18.69 19.02 18.93 18.76 18.61 18.90 21.07 18.85 21.02 19.10 19.47 19.16 19.25
+      best 18.61 · top5 18.76 · median 19.02 · last five vs first five +0.29 · spread 2.38
+
+14:11  Race · ISTC 13.5t (Heat 2/2)  (7 drivers)
+  TIMOTHY HILYEAR: 18.04 19.80 18.26 18.09 18.11 17.85 17.77 18.30 17.87 18.15 18.16 18.35 18.13 18.44 18.81 18.37 18.40
+      best 17.77 · top5 17.93 · median 18.16 · last five vs first five +0.29 · spread 0.96
+  JORDAN CARUSO (you): 18.50 17.95 18.06 17.82 17.76 18.01 17.96 18.00 21.45 18.39 18.18 18.05 18.15 18.32 18.35 18.37 18.21
+      best 17.76 · top5 17.90 · median 18.15 · last five vs first five +0.37 · spread 0.67
+  JUSTIN VERGUNST: 18.24 18.36 18.26 18.02 18.00 18.16 18.67 18.23 18.25 18.45 18.64 18.89 18.53 18.58 20.01 19.03 18.78
+      best 18.00 · top5 18.13 · median 18.45 · last five vs first five +0.54 · spread 1.02
+  MARTIN GRANTHAM: 19.34 18.76 18.73 19.22 18.67 18.74 18.90 18.88 18.66 19.49 18.96 19.11 18.87 19.07 19.07 19.58
+      best 18.66 · top5 18.71 · median 18.93 · last five vs first five +0.31 · spread 0.82
+  RICHARD GRONCKI: 19.34 18.73 18.52 18.77 18.85 19.45 18.97 19.17 18.82 18.91 19.20 19.67 19.68 19.16 19.12 19.25
+      best 18.52 · top5 18.74 · median 19.14 · last five vs first five +0.48 · spread 0.94
+  RHYS MARSHALL: 19.27 21.80 19.60 18.87 18.66 22.38
+      best 18.66 · top5 19.64 · median 19.43 · spread 3.72
+  TOMAS BURATOVICH: 18.51 24.55
+      best 18.51 · top5 21.53 · median 21.53
+
+15:57  Race · ISTC 13.5t (Heat 2/2)  (6 drivers)
+  JORDAN CARUSO (you): 18.10 18.11 18.02 17.68 19.90 17.78 17.89 18.00 18.07 18.16 18.23 18.22 18.21 18.18 18.35 18.49 18.34
+      best 17.68 · top5 17.88 · median 18.16 · last five vs first five +0.25 · spread 0.71
+  TIMOTHY HILYEAR: 18.43 18.64 18.42 18.11 18.15 18.01 17.98 18.12 18.42 21.27 18.66 18.22 18.42 18.29 18.39 18.67 18.47
+      best 17.98 · top5 18.07 · median 18.42 · last five vs first five −0.00 · spread 0.66
+  RHYS MARSHALL: 19.02 18.28 18.34 18.36 18.35 18.30 18.43 18.28 18.56 18.44 18.45 18.84 18.73 18.70 18.77 18.89 18.65
+      best 18.28 · top5 18.31 · median 18.45 · last five vs first five +0.38 · spread 0.61
+  JUSTIN VERGUNST: 18.69 18.81 18.43 18.11 18.42 18.54 18.37 19.93 18.90 18.58 18.66 18.90 18.98 18.65 19.10 18.84 18.86
+      best 18.11 · top5 18.37 · median 18.69 · last five vs first five +0.43 · spread 0.73
+  STEPHEN WESLEY: 19.72 19.51 18.77 18.49 18.45 18.56 18.58 18.88 18.85 18.74 19.57 19.03 18.90 19.21 19.16 19.26
+      best 18.45 · top5 18.56 · median 18.89 · last five vs first five +0.39 · spread 1.08
+  RICHARD GRONCKI: 19.45 24.29 18.75 19.25 18.92 19.47 19.30 19.75 19.12 18.93 18.96 19.73 19.84 18.94 19.22 19.32
+      best 18.75 · top5 18.90 · median 19.27 · last five vs first five +0.07 · spread 0.93
+
+17:49  Race · ISTC 13.5t (Heat 2/2)  (7 drivers)
+  JORDAN CARUSO (you): 19.86 18.19 18.12 18.26 17.95 17.94 18.15 18.04 18.04 18.03 18.16 18.21 19.51 18.45 18.45 18.80 18.30
+      best 17.94 · top5 18.00 · median 18.19 · last five vs first five +0.26 · spread 1.56
+  TIMOTHY HILYEAR: 18.53 18.67 17.89 18.07 18.20 18.00 18.10 18.30 18.25 18.10 18.12 18.40 18.28 20.05 18.23 21.13 20.20
+      best 17.89 · top5 18.03 · median 18.25 · last five vs first five +1.85 · spread 2.20
+  RHYS MARSHALL: 18.88 18.61 18.35 20.10 18.41 18.47 18.29 18.61 18.49 18.43 18.52 18.74 18.58 18.57 19.29 18.94 18.82
+      best 18.29 · top5 18.39 · median 18.58 · last five vs first five +0.22 · spread 0.94
+  JUSTIN VERGUNST: 19.56 19.69 19.03 18.55 18.75 18.96 19.10 19.05 18.62 18.60 19.48 18.77 19.29 19.30 19.41 19.30
+      best 18.55 · top5 18.66 · median 19.08 · last five vs first five +0.26 · spread 0.96
+  RICHARD GRONCKI: 19.13 19.09 18.70 18.72 18.85 18.81 19.10 18.96 19.03 19.41 19.07 19.61 19.02 19.83 19.34 19.15
+      best 18.70 · top5 18.81 · median 19.08 · last five vs first five +0.49 · spread 0.89
+  MARTIN GRANTHAM: 19.46 19.19 18.99 18.78 18.74 18.78 21.63 19.15 18.93 19.33 18.90 19.32 18.77 18.93 19.19 19.19
+      best 18.74 · top5 18.79 · median 19.07 · last five vs first five +0.20 · spread 0.68
+  STEPHEN WESLEY: 19.83 18.82 18.36 18.66 19.54 19.20 18.64 18.63 18.84 19.02 18.50 21.33 20.78 19.27 20.72 19.11
+      best 18.36 · top5 18.56 · median 19.06 · last five vs first five +1.89 · spread 2.28
+
+RIVALS — the drivers who shared the most timed sessions with you in this filter, and your gap to
+each (you minus them: negative = you were quicker). Name one to see it session by session.
+
+JUSTIN VERGUNST — 6 shared sessions: best lap -0.66 on average, top 5 -0.66; you were quicker on best lap in 6 of 6
+RHYS MARSHALL — 6 shared sessions: best lap -0.54 on average, top 5 -0.50; you were quicker on best lap in 5 of 5 (1 left out for a cut lap)
+RICHARD GRONCKI — 6 shared sessions: best lap -0.90 on average, top 5 -0.92; you were quicker on best lap in 6 of 6
+MARTIN GRANTHAM — 5 shared sessions: best lap -0.77 on average, top 5 -0.74; you were quicker on best lap in 5 of 5
+TIMOTHY HILYEAR — 5 shared sessions: best lap -0.18 on average, top 5 -0.13; you were quicker on best lap in 4 of 5
+TOMAS BURATOVICH — 3 shared sessions: best lap -0.99 on average, top 5 -1.00; you were quicker on best lap in 2 of 2 (1 left out for a cut lap)
+
+EARLIER RUNS ON THIS CAR IN THE MOST SIMILAR CONDITIONS.
+Closest first. How close each one is decides how much weight it carries — a run that differs
+on tyre or grip is weaker evidence, and saying so is better than leaning on it.
+
+2026-09-12 15:31 at Radio Racing Cars SA — rated 8/10. same tyre, same grip level, same layout style.
+2026-09-12 13:41 at Radio Racing Cars SA — rated 7/10. same tyre, same grip level, same layout style.
+2026-09-12 12:15 at Radio Racing Cars SA — rated 8/10. same tyre, same grip level, same layout style.

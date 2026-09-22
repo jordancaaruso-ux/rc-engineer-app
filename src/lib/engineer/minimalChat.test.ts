@@ -86,7 +86,9 @@ test("the prompt draws the data line exactly where the payload does", () => {
     "the prompt must still tell the model to say when data is beyond what is attached"
   );
   assert.ok(!/context json/i.test(all), "there is no context JSON to point the model at");
-  assert.ok(!/tool/i.test(all), "the Engineer sends no tools; instructions about them would be a lie");
+  // The one tool (livercPracticeTool.ts, since 2026-09-22) describes itself on the wire in its own
+  // definition; prompt words about it would drift from that definition, and General sends none.
+  assert.ok(!/tool/i.test(all), "the prompt says nothing about tools: the tool's definition is its only description");
 });
 
 test("empty and oversized messages are handled before they reach the wire", () => {

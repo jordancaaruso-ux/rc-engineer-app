@@ -6,6 +6,7 @@ import { generateEngineerChatReply } from "@/lib/engineer/chat";
 import { buildDriverDataBlocks } from "@/lib/engineer/driverData";
 import { buildDriverHistoryBlocks } from "@/lib/engineer/driverHistory";
 import { parseRangeScope } from "@/lib/engineer/rangeScope";
+import { engineerTools, loadEngineerToolContext } from "@/lib/engineer/tools";
 import type { EngineerChatMessage } from "@/lib/engineer/payload";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
 import { checkAiBudget, engineerQuotaSnapshot, recordAiUsage } from "@/lib/aiUsage/ledger";
@@ -279,6 +280,14 @@ export async function POST(request: Request) {
             question: latestQuestion,
           }).catch(() => []);
 
+    // What the Engineer may read for itself this turn (tools.ts; founder call 2026-09-22):
+    // the subject's track on LiveRC, on request. General attaches no subject and so no tool,
+    // and a track with no LiveRC page offers none either.
+    const toolContext =
+      generalMode || driverBlocks.length === 0
+        ? null
+        : await loadEngineerToolContext({ userId: user.id, runId: runId || null, scope: rangeScope }).catch(() => null);
+
     if (useStream) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
@@ -296,9 +305,17 @@ export async function POST(request: Request) {
           try {
             send("status", { phase: "preparing" });
             send("status", { phase: "thinking" });
+            const tools = toolContext
+              ? {
+                  ...engineerTools(toolContext),
+                  onCall: () => send("status", { phase: "fetching" }),
+                  onAnswering: () => send("status", { phase: "thinking" }),
+                }
+              : undefined;
             const out = await generateEngineerChatReply({
               messages,
               driverBlocks,
+              tools,
               onToken: (t) => send("token", { t }),
             });
             await recordAiUsage({
@@ -347,7 +364,11 @@ export async function POST(request: Request) {
       });
     }
 
-    const out = await generateEngineerChatReply({ messages, driverBlocks });
+    const out = await generateEngineerChatReply({
+      messages,
+      driverBlocks,
+      tools: toolContext ? engineerTools(toolContext) : undefined,
+    });
 
     await recordAiUsage({
       userId: user.id,

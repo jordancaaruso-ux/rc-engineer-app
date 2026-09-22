@@ -22,6 +22,8 @@ const SLOW_WARNING_SEC = 45;
 const STATUS_LABELS: Record<string, string> = {
   preparing: "Reading your runs and the notes…",
   thinking: "Thinking…",
+  // The Engineer asked to read the day's practice on LiveRC (tools.ts) — a real request, in flight.
+  fetching: "Fetching LiveRC results…",
 };
 const STATUS_FALLBACK = "Thinking…";
 

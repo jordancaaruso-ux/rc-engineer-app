@@ -195,9 +195,22 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * shape has no slot for it. So the "never invent a number" paragraph gained one sentence: when the
  * block says the setup is not visible, say so once in the conversation, in a clause, with what would
  * change that, and give each move as a direction and a size. The founder has not read this clause.
- * Scores are not comparable across labels.
+ *
+ * 2026-09-22 — "lap times perfect": the prompt text is UNCHANGED; the label moves because what the
+ * model is handed changed twice. (1) A LAPS block (lapsBlock.ts) carries every lap of every driver in
+ * the timed sessions the driver was in — the day's, or the range's — with best / top 5 / median /
+ * last-five-vs-first-five / spread worked out in code under each driver. Measured first: the
+ * founder's busiest day is ~1,700 tokens. His own production questions ("average pace delta to Tim,
+ * first 5 laps and last 5", "who had the least fade") had been answered "I can't see lap-by-lap times"
+ * because only best / top 5 / 5-min per run was on the wire. (2) The Engineer's first tool: LiveRC's
+ * practice page for a day at the subject's track, on request (livercPracticeTool.ts, tools.ts),
+ * founder call: "fine for the engineer to call it upon request … you could be asking midday". The
+ * result text opens "DRIVER DATA —" so the never-invent-a-number sentence covers it without a prompt
+ * word about tools; the tool's own definition is its only description. Round 06 (ten lap-time
+ * questions over the SA Saturday): fetched on exactly the three practice questions, every checked
+ * number right. Scores are not comparable across labels.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-09-21-blind-car";
+export const ENGINEER_PROMPT_LABEL = "2026-09-22-laps";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);

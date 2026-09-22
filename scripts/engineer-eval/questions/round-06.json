@@ -1,0 +1,15 @@
+{
+  "contexts": ["sa-sat-0912", "none"],
+  "cases": [
+    { "id": "l-01", "shape": "laps", "source": "founder 2026-09-22", "turns": ["was that actually faster?"] },
+    { "id": "l-02", "shape": "laps", "source": "founder 2026-09-22", "turns": ["has the track gotten better as the day goes on?"] },
+    { "id": "l-03", "shape": "laps", "source": "founder prod 2026-09-15", "turns": ["what was the average pace delta to tim hilyear, first 5 laps, and last 5 laps", "who had the least fade"] },
+    { "id": "l-04", "shape": "laps", "source": "founder prod 2026-09-03", "turns": ["Was this run genuinely faster, or just a cleaner drive? Look at the consistency, not only the best lap."] },
+    { "id": "l-05", "shape": "laps", "source": "founder 2026-09-22", "turns": ["How's my pace relative to everyone else compared to the earlier heats today?"] },
+    { "id": "l-06", "shape": "laps-practice", "source": "founder 2026-09-22", "turns": ["how did the 13.5 field look in practice today compared to the racing"] },
+    { "id": "l-07", "shape": "laps-practice", "source": "founder 2026-09-22", "turns": ["did the track get faster after lunch", "who was quickest in practice this arvo"] },
+    { "id": "l-08", "shape": "laps", "source": "founder prod 2026-09-11", "turns": ["I had 2 new tire runs today. Was the drop off more the 1st or 2nd time going from 1st run to 2nd run tire"] },
+    { "id": "l-09", "shape": "laps", "source": "founder 2026-09-22", "turns": ["where am i losing time to tim in the last heat"] },
+    { "id": "l-10", "shape": "laps-practice", "source": "founder 2026-09-22", "turns": ["what did everyone else run in practice"] }
+  ]
+}

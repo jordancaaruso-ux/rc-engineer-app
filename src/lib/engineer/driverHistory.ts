@@ -3,6 +3,8 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { renderHistoryBlock, type HistoryRun } from "@/lib/engineer/historyShape";
+import { renderLapsBlock } from "@/lib/engineer/lapsBlock";
+import { loadLapsSessions } from "@/lib/engineer/lapsLoad";
 import type { FieldPace } from "@/lib/engineer/fieldPace";
 import { FIELD_RUN_SELECT, loadFieldPaceForRuns } from "@/lib/engineer/fieldPaceLoad";
 import { matchDriverName } from "@/lib/engineer/nameMatch";
@@ -343,15 +345,43 @@ export async function buildDriverHistoryBlocks(params: {
   const rivalName = params.question
     ? matchDriverName(params.question, driversOnSheets(runs).map((d) => d.name))
     : null;
+  const scopeLabel = await describeScope(params.scope, carIds, rows, event);
   const content = renderHistoryBlock({
-    scopeLabel: await describeScope(params.scope, carIds, rows, event),
+    scopeLabel,
     runs,
     omittedOlder,
     lastSetup,
     rival: rivalName ? driverKey(rivalName) : null,
   });
   if (!content) return [];
-  return [{ id: "driver-history", cacheStable: false, content }];
+
+  // Every lap of every driver in the range's timed sessions (lapsBlock.ts): the sessions
+  // linked to the runs shown, plus the driver's loose imports that fall on the same days at the
+  // range's track. A failed read drops the block, never the range.
+  const laps = await buildRangeLapsBlock(params.userId, rows, params.scope, zone, scopeLabel).catch(() => null);
+  return [{ id: "driver-history", cacheStable: false, content: laps ? `${content}\n\n${laps}` : content }];
+}
+
+async function buildRangeLapsBlock(
+  userId: string,
+  rows: Row[],
+  scope: EngineerRangeScope,
+  zone: string | null,
+  scopeLabel: string
+): Promise<string | null> {
+  const days = new Set(rows.map((r) => localYmd(r, zone)));
+  const instants = rows.map((r) => (r.sortAt ?? r.createdAt).getTime());
+  const linkedIds = new Set(rows.map((r) => r.id));
+  const sessions = await loadLapsSessions({
+    userId,
+    runs: rows,
+    window: { from: new Date(Math.min(...instants) - DATE_SLACK_MS), to: new Date(Math.max(...instants) + DATE_SLACK_MS) },
+    zone,
+    keep: (s) =>
+      (s.linkedRunId != null && linkedIds.has(s.linkedRunId)) ||
+      (days.has(s.ymd) && (!scope.trackId || s.trackId == null || s.trackId === scope.trackId)),
+  });
+  return renderLapsBlock(sessions, `across ${scopeLabel}`);
 }
 
 /**

@@ -206,6 +206,38 @@ Format: `case · context — what he said → what it is (rule / net / KB scope 
 - Round 05 (15 conversations, 12 blind, real testers' questions) published to the round artifact.
   Unjudged.
 
+### 2026-09-22 — lap times: "you have to be too specific"
+
+His morning read, after a night's sleep on round 05: "you have to be too specific to get the lap time
+analysis or comparison that I want. Like I often get the answer, I can't see that." And on the setup
+side: "when you said if it's already reaching four that's too high — we've given it a static rule,
+which is one of the things we want to avoid." Then: "Let's focus on getting lap times perfect for now."
+
+- **What "I can't see that" was, measured.** 114 production answers in 60 days, 2 said it, both old.
+  His own of 14–17 September were the real ones, and they split two ways: (a) the subject bar sets the
+  scope, never the question — the SA tyre-delta question asked on a single run got "I can only see this
+  session's 15 laps", the same question three days later with the range picked got a good answer; (b)
+  lap-by-lap was never on the wire at all — "first 5 laps vs last 5", "least fade" could not be answered
+  however worded.
+- **His rulings.** Everyone in the class's laps, or results and every lap of every driver, "so that it
+  can interpret it with all the information that a person would have". Practice from LiveRC: "fine for
+  the engineer to call it upon request … you could be asking midday, and then it's going to have to get
+  it anyway" — and a "fetching LiveRC results" line in the thinking indicator. Built the same day
+  (north star changelog 2026-09-22): the LAPS block and the first tool.
+- **On the static rule he named:** he is right; the `usual` header sentence ("a car at the far end has
+  little left in that lever") is a rule with a number in it and mine to pull. The mechanism that would
+  let the Engineer reason it out — a tyre's grip rises with slip angle to a peak and not beyond, so
+  each degree of toe-in buys less and costs the same drag — is on no KB page (checked: `toe-and-scrub.md`
+  has the slip angle and the scrub, not the peak). Proposed as one physics sentence for his ruling;
+  not written. Parked behind lap times at his word.
+- **Readable sheets vs blind answers:** my view given — every hour on blind answers polishes the
+  fallback, every hour on readable sheets moves a driver out of it; 140 of 230 chassis are unreadable
+  and the first strangers at launch will mostly be blind cars. He chose lap times first.
+- **Round 06** (ten lap-time questions in his words over his SA Saturday, the day's laps on the wire,
+  LiveRC's practice page recorded) published as version 13 of the round artifact. My read: the
+  numbers I checked are all right; it fetched on exactly the three practice questions; l-08 correctly
+  flagged a tyre-run label that did not fit the question. His read owed.
+
 ## Fixes landed from this batch
 
 - **2026-09-09, from cards 3–4 (30 edits, 21 files; nets:check 37/37, tsc, 4 suites green):**

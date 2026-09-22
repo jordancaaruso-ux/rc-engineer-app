@@ -12,6 +12,11 @@
  * under fixtures/<name>.txt used verbatim as the driver-data block (a real render captured from
  * driverData.ts, trimmed to the majority active user: car, track, laps, setup).
  *
+ * A context may also carry fixtures/<name>.liverc.txt — the Engineer's one tool's answer, captured
+ * for real by capture-run-fixture.ts --practice-day. When that file exists the tool is offered
+ * exactly as the chat route offers it, and every call is answered from the file, so a round is
+ * repeatable and never touches LiveRC. An assistant turn records the calls it made in `fetched`.
+ *
  * Writes answers/<batch>/<arm>__<context>.json (gitignored). Resumes per case. Requires
  * OPENAI_API_KEY (answers run on the Engineer's own model/transport).
  */
@@ -20,11 +25,13 @@ import path from "node:path";
 import { generateEngineerChatReply } from "@/lib/engineer/chat";
 import type { EngineerChatMessage, EngineerPayloadBlock } from "@/lib/engineer/payload";
 import { ENGINEER_PROMPT_VERSION } from "@/lib/engineer/prompt";
+import { LIVERC_PRACTICE_TOOL_DEFINITION } from "@/lib/engineer/livercPracticeTool";
+import type { EngineerTools } from "@/lib/engineer/toolTypes";
 import { getArm } from "./arms";
 
 type LaunchCase = { id: string; shape: string; source: string; turns: string[] };
 type LaunchSet = { contexts: string[]; cases: LaunchCase[] };
-type Turn = { role: "user" | "assistant"; content: string };
+type Turn = { role: "user" | "assistant"; content: string; fetched?: string[] };
 type CaseResult = { shape: string; source: string; turns: Turn[]; model: string; usage: unknown[] };
 type AnswerFile = {
   arm: string;
@@ -45,6 +52,21 @@ function loadFixture(name: string): string | null {
   const file = path.join(__dirname, "fixtures", `${name}.txt`);
   if (!fs.existsSync(file)) throw new Error(`No fixture file for context "${name}": ${file}`);
   return fs.readFileSync(file, "utf8").trim();
+}
+
+/** The tool, answered from the context's recorded LiveRC text; null when the context has none. */
+function loadToolFixture(name: string, fetched: string[]): EngineerTools | null {
+  if (name === "none") return null;
+  const file = path.join(__dirname, "fixtures", `${name}.liverc.txt`);
+  if (!fs.existsSync(file)) return null;
+  const text = fs.readFileSync(file, "utf8").trim();
+  return {
+    definitions: [LIVERC_PRACTICE_TOOL_DEFINITION],
+    run: async (toolName, args) => {
+      fetched.push(`${toolName} ${args}`);
+      return text;
+    },
+  };
 }
 
 async function main() {
@@ -85,14 +107,17 @@ async function main() {
         for (const q of c.turns) {
           turns.push({ role: "user", content: q });
           const history: EngineerChatMessage[] = turns.map((t) => ({ role: t.role, content: t.content }));
-          const out = await generateEngineerChatReply({ messages: history, blocks, driverBlocks });
-          turns.push({ role: "assistant", content: out.reply });
+          const fetched: string[] = [];
+          const tools = loadToolFixture(context, fetched) ?? undefined;
+          const out = await generateEngineerChatReply({ messages: history, blocks, driverBlocks, tools });
+          turns.push({ role: "assistant", content: out.reply, ...(fetched.length > 0 ? { fetched } : {}) });
           usage.push(out.usage);
           model = out.model;
         }
         file.cases[c.id] = { shape: c.shape, source: c.source, turns, model, usage };
         done++;
-        console.log(`ok (${turns.filter((t) => t.role === "assistant").map((t) => t.content.length).join("+")} chars)`);
+        const fetches = turns.filter((t) => t.fetched?.length).length;
+        console.log(`ok (${turns.filter((t) => t.role === "assistant").map((t) => t.content.length).join("+")} chars${fetches ? `, fetched LiveRC on ${fetches} turn${fetches === 1 ? "" : "s"}` : ""})`);
       } catch (err) {
         console.log(`FAILED: ${err instanceof Error ? err.message : String(err)}`);
       }

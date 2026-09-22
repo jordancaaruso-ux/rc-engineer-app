@@ -122,8 +122,8 @@ export function buildChatCompletionBody(
     body.temperature = temperature;
   }
   // MEASURED 2026-07-30: on /v1/chat/completions an explicit reasoning_effort cannot be
-  // combined with function tools. The Engineer sends no tools, so the knob is live on both
-  // endpoints — the condition is kept because ENGINEER_API=chat is still a supported escape hatch.
+  // combined with function tools. On Responses (the default) effort and the Engineer's one tool
+  // coexist; on the chat escape hatch a request carrying tools drops the knob.
   const effortAllowed = responsesApiEnabled() || !("tools" in body);
   const effort = effortAllowed ? engineerReasoningEffort(model) : null;
   if (effort) {
@@ -326,7 +326,8 @@ async function readOpenAiChatStream(
     }
   }
 
-  // No tool-call accumulation: the Engineer sends no tools, so a tool_calls delta can never arrive.
+  // No tool-call accumulation: chat.ts attaches tools only on the Responses path, so a tool_calls
+  // delta can never arrive here.
   return { content: content.length > 0 ? content : null, toolCalls: null, usage };
 }
 

@@ -38,6 +38,10 @@
     { "date": "2026-09-21", "ruling": "A strong distinction between when the Engineer can read a car and when it can't: a car it cannot read says so, and why", "file": "src/lib/engineer/driverData.ts", "present": "): NOT VISIBLE." },
     { "date": "2026-09-21", "ruling": "The Engineer sees the gearing and the motor that are on the driver's sheet", "file": "src/lib/engineer/setupDiff.ts", "present": "ENGINEER_DRIVETRAIN_KEYS.has(key)" },
     { "date": "2026-09-21", "ruling": "Normal values per knob: a lever says where it usually runs", "file": "src/lib/engineer/netsSchema.ts", "present": "usually runs:" },
-    { "date": "2026-09-21", "ruling": "Only offer levers that exist on the driver's sheet", "file": "src/lib/engineer/driverData.ts", "present": "NO BOX ON THIS CAR'S SETUP SHEET FOR" }
+    { "date": "2026-09-21", "ruling": "Only offer levers that exist on the driver's sheet", "file": "src/lib/engineer/driverData.ts", "present": "NO BOX ON THIS CAR'S SETUP SHEET FOR" },
+
+    { "date": "2026-09-22", "ruling": "Every lap of every driver in the sessions the driver was in goes to the Engineer, with the arithmetic done in code", "file": "src/lib/engineer/lapsBlock.ts", "present": "LAPS — every lap of every driver" },
+    { "date": "2026-09-22", "ruling": "The Engineer reads LiveRC's practice page for the day itself, on request, not from a nightly copy", "file": "src/lib/engineer/livercPracticeTool.ts", "present": "read_liverc_practice_day" },
+    { "date": "2026-09-22", "ruling": "While it reads LiveRC the chat says so", "file": "src/components/engineer/EngineerThinkingIndicator.tsx", "present": "Fetching LiveRC results" }
   ]
 }

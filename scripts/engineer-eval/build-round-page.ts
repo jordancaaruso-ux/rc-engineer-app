@@ -15,7 +15,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-type Turn = { role: "user" | "assistant"; content: string };
+type Turn = { role: "user" | "assistant"; content: string; fetched?: string[] };
 type AnswerFile = { arm: string; context: string; fixture: string | null; cases: Record<string, { shape: string; source: string; turns: Turn[] }> };
 
 function argValue(flag: string): string | null {
@@ -65,15 +65,21 @@ function main() {
         ? /filled in \d+ boxes/.test(f.fixture)
           ? "Can't read the car — the sheet is filled in, but the app can't name its boxes yet"
           : "Can't read the car — a known car with nothing on its setup sheet"
-        : "Can read the car — the driver's latest run and setup";
+        : /^LAPS — /m.test(f.fixture)
+          ? "Can read the car — the driver's run and setup, every lap of every driver that day, and LiveRC's practice page on request"
+          : "Can read the car — the driver's latest run and setup";
 
   let n = 0;
   const section = (f: AnswerFile): string => {
+    // The tool's recorded answer for this context, when it has one (generate-conversations.ts).
+    const toolFile = path.join(__dirname, "fixtures", `${f.context}.liverc.txt`);
+    const toolText = fs.existsSync(toolFile) ? fs.readFileSync(toolFile, "utf8").trim() : null;
     const given = f.fixture
-      ? `<details class="ctx"><summary>What the Engineer was given</summary><pre>${esc(f.fixture)}</pre></details>`
+      ? `<details class="ctx"><summary>What the Engineer was given</summary><pre>${esc(f.fixture)}</pre></details>` +
+        (toolText ? `<details class="ctx"><summary>What LiveRC answered when the Engineer asked for the day's practice</summary><pre>${esc(toolText)}</pre></details>` : "")
       : `<p class="ctx none">The Engineer was given no driver data.</p>`;
     const group = Object.entries(f.cases).map(([id, c]) => {
-      const turns = c.turns.map((t) => `<div class="turn ${t.role}"><div class="who">${t.role === "user" ? "Driver" : "Engineer"}</div><div class="body">${t.role === "user" ? `<p>${esc(t.content)}</p>` : md(t.content)}</div></div>`).join("");
+      const turns = c.turns.map((t) => `<div class="turn ${t.role}"><div class="who">${t.role === "user" ? "Driver" : "Engineer"}${t.fetched?.length ? `<span class="fetched">fetched LiveRC</span>` : ""}</div><div class="body">${t.role === "user" ? `<p>${esc(t.content)}</p>` : md(t.content)}</div></div>`).join("");
       return `<section class="card" id="${esc(id)}"><div class="head"><span class="n">${++n}</span><span class="id">${esc(id)}</span><span class="shape">${esc(c.shape)}</span><span class="src">${c.source === "driver" ? "another driver" : "founder"}</span></div>${turns}</section>`;
     }).join("\n");
     return (files.length > 1 ? `<h2 class="sec">${esc(seen(f))}</h2>` : "") + given + group;
@@ -97,6 +103,7 @@ function main() {
   .head .id { font-weight: 600; color: #1A1A1A; } .head .shape { background: #EEECE6; padding: 0 8px; border-radius: 10px; }
   .turn { display: grid; grid-template-columns: 80px 1fr; gap: 10px; padding: 10px 0; border-top: 1px solid #EEECE6; }
   .turn .who { font-size: 13px; font-weight: 700; color: #6B6760; padding-top: 2px; }
+  .turn .who .fetched { display: block; font-weight: 600; font-size: 11px; color: #8A6D00; background: #FFF3C4; border-radius: 8px; padding: 1px 6px; margin-top: 4px; }
   .turn.user .body p { font-weight: 600; }
   .body p { margin: 0 0 8px; max-width: 62ch; } .body ul, .body ol { margin: 4px 0 8px 20px; padding: 0; } .body li { margin: 0 0 4px; max-width: 60ch; }
   @media (max-width: 480px) { .turn { grid-template-columns: 1fr; gap: 2px; } main { padding: 12px 10px 40px; } }
