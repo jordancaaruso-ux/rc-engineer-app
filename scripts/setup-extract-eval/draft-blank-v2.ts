@@ -438,8 +438,9 @@ export type V2Result = {
   labeledRaw: Labeled[];
 };
 
-function assemble(input: { geometry: BlankAcroFormGeometry; labeled: Map<string, Labeled>; carName: string; model: string; widthPx: number; heightPx: number; pHash64: string; warnings: string[]; layout: LayoutBlock[] }): V2Result {
+function assemble(input: { geometry: BlankAcroFormGeometry; labeled: Map<string, Labeled>; carName: string; model: string; widthPx: number; heightPx: number; pHash64: string; warnings: string[]; layout: LayoutBlock[]; suggestLinks?: boolean }): V2Result {
   const { geometry, labeled, warnings } = input;
+  const suggest = (key: string, label: string | undefined) => (input.suggestLinks === false ? undefined : suggestUniversalParameterId(key, label));
   const seen = new Set<string>();
   const fields: V2Field[] = [];
   const calFields: ImageCalibrationField[] = [];
@@ -467,7 +468,7 @@ function assemble(input: { geometry: BlankAcroFormGeometry; labeled: Map<string,
     const key = keyFromAcroName(first.optionSetName!, seen);
     const optionLabels = near.map((m) => labeled.get(m.name)!.optionLabel!);
     if (new Set(optionLabels.map((s) => s.toLowerCase())).size !== optionLabels.length) { warnings.push(`lone_set_duplicate_labels:${setKey}`); continue; }
-    const uni = first.universalParameterId || suggestUniversalParameterId(key, first.optionSetName) || undefined;
+    const uni = first.universalParameterId || suggest(key, first.optionSetName) || undefined;
     fields.push({ key, displayLabel: first.optionSetName!, section: first.section, valueType: "choice", options: optionLabels, ...(uni ? { universalParameterId: uni } : {}), confidence: Math.min(...near.map((m) => labeled.get(m.name)!.confidence)), printedLabel: optionLabels.join(" / "), pdfFieldNames: near.map((m) => m.name) });
     const optionRefs: Record<string, { pdfFieldName: string; widgetInstanceIndex?: number }> = {};
     near.forEach((m, i) => { optionRefs[optionLabels[i]!] = { pdfFieldName: m.name, widgetInstanceIndex: 0 }; });
@@ -483,7 +484,7 @@ function assemble(input: { geometry: BlankAcroFormGeometry; labeled: Map<string,
     const key = keyFromAcroName(geo.name, seen);
     const displayLabel = l?.displayLabel || geo.name;
     const section = l?.section || "";
-    const uni = l?.universalParameterId || suggestUniversalParameterId(key, displayLabel) || undefined;
+    const uni = l?.universalParameterId || suggest(key, displayLabel) || undefined;
     const base = { key, displayLabel, section, ...(uni ? { universalParameterId: uni } : {}), confidence: l?.confidence ?? 0, printedLabel: l?.printedLabel ?? "", pdfFieldNames: [geo.name] };
 
     if (geo.kind === "text") {
@@ -626,7 +627,9 @@ export async function draftBlankV2(input: {
     for (const l of list) if (l && typeof l.name === "string" && !labeled.has(l.name)) labeled.set(l.name, { ...l, confidence: typeof l.confidence === "number" ? l.confidence : 0.5, fieldKind: l.fieldKind ?? "text", printedLabel: l.printedLabel ?? "", section: l.section ?? "", displayLabel: l.displayLabel || l.name });
     log(`labels read: ${labeled.size} of ${fields.length} fields`);
     const sub = { ...geometry, fields };
-    return assemble({ geometry: sub, labeled, carName: input.carName, model: input.model, widthPx: W, heightPx: H, pHash64: await dHash(page), warnings, layout });
+    // Helpers were told to link only what they are sure of; the word-matcher would link any box
+    // whose name contains "caster" or "camber" (a caster block spacer, a camber link hole).
+    return assemble({ geometry: sub, labeled, carName: input.carName, model: input.model, widthPx: W, heightPx: H, pHash64: await dHash(page), warnings, layout, suggestLinks: false });
   }
 
   const batches: Array<typeof crops> = [];

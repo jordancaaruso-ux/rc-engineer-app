@@ -75,8 +75,12 @@ ${pictures}
 - A LONE tick box (\`widgets\` = 1) is usually one option of a set drawn as separate PDF fields ("YES" and
   "NO" as two fields). Then set \`optionSetName\` to the set's name and \`optionLabel\` to THIS box's
   printed word; \`displayLabel\` = the set name. Keep \`fieldKind\` "choice".
-- \`universalParameterId\`: ONLY when the box is one of these cross-car parameters, matched to the right
-  end and pivot. Omit it otherwise — a wrong one is worse than none.
+- \`universalParameterId\`: ONLY when what the driver writes in this box IS that parameter's own value,
+  in its own units, at the right end and pivot: \`caster_front\` is the caster angle in degrees,
+  \`upper_outer_shims_front\` is the shim stack in mm. A part, insert, block, spacer position or mount
+  choice that CHANGES a setting is not that setting: "Caster block insert", "Caster block spacing
+  (fwd / back)", "Caster block link mount" and "Steering stop spacing" all stay unlinked. Omit it
+  whenever in doubt — a wrong one is worse than none.
 ${ids.length ? `\n  ${ids.join(", ")}\n` : "\n  (none registered for this discipline)\n"}
 - \`confidence\`: 0 to 1, your honest probability that \`displayLabel\` is what a careful racer who owns
   this car would write. A clearly traced leader line onto a part you can name is high confidence even

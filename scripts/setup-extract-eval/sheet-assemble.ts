@@ -25,13 +25,22 @@ function arg(name: string): string | undefined {
 
 const STOP = new Set(["the", "a", "an", "of", "mm", "deg", "degrees", "cst", "g", "front", "rear", "fr", "rr", "f", "r", "left", "right", "l", "side", "setting", "type", "value", "option", "position", "mount", "mounting"]);
 const AX: Record<string, string> = { front: "front", fr: "front", f: "front", rear: "rear", rr: "rear", r: "rear", bk: "rear" };
-const STEM: Record<string, string> = { castor: "caster", bodyshell: "body", motormount: "motor", inside: "inner", outside: "outer", ht: "height", spacers: "shim", spacer: "shim", shims: "shim", springs: "spring", tyres: "tyre", tires: "tyre", tire: "tyre", weights: "weight", shocks: "shock", damper: "shock", dampers: "shock", arb: "antiroll", anti: "antiroll", roll: "", bar: "", sway: "antiroll", rh: "rideheight", fdr: "fdr", final: "fdr", drive: "fdr", ratio: "", gear: "", differential: "diff", pistons: "piston", hole: "", holes: "" };
+const STEM: Record<string, string> = { bottom: "lower", top: "upper", castor: "caster", bodyshell: "body", motormount: "motor", inside: "inner", outside: "outer", ht: "height", spacers: "shim", spacer: "shim", shims: "shim", springs: "spring", tyres: "tyre", tires: "tyre", tire: "tyre", weights: "weight", shocks: "shock", damper: "shock", dampers: "shock", arb: "antiroll", anti: "antiroll", roll: "", bar: "", sway: "antiroll", rh: "rideheight", fdr: "fdr", final: "fdr", drive: "fdr", ratio: "", gear: "", differential: "diff", pistons: "piston", hole: "", holes: "" };
 
-const norm = (s: string) => String(s || "").toLowerCase().replace(/[’']/g, "").replace(/[^a-z0-9%°.]+/g, " ").replace(/\s+/g, " ").trim();
+// Words written joined or apart ("ballstud" / "ball stud") compare as the separate words.
+const COMPOUNDS: Array<[RegExp, string]> = [
+  [/\bballstuds?\b/g, "ball stud"], [/\bbumpsteer\b/g, "bump steer"], [/\bkickup\b/g, "kick up"],
+  [/\bantisquat\b/g, "anti squat"], [/\bwheelbase\b/g, "wheel base"],
+];
+const norm = (s: string) => COMPOUNDS.reduce((t, [re, to]) => t.replace(re, to),
+  String(s || "").toLowerCase().replace(/[’']/g, "").replace(/[^a-z0-9%°.]+/g, " ").replace(/\s+/g, " ").trim());
 const words = (s: string) => norm(s).split(" ").filter(Boolean);
 const axleOf = (s: string) => { for (const w of words(s)) if (AX[w]) return AX[w]; return null; };
-const core = (s: string) => new Set(words(s).filter((w) => !STOP.has(w)));
-const stem = (set: Set<string>) => new Set([...set].map((w) => (w in STEM ? STEM[w] : w)).filter(Boolean));
+// Single letters ("A-C" hole codes) carry no meaning once the axle letters are handled.
+const core = (s: string) => new Set(words(s).filter((w) => !STOP.has(w) && w.length > 1));
+// Light suffix stemming, for similarity only: "finishing" / "finish", "positions" / "position".
+const suffix = (w: string) => (w.length > 5 && w.endsWith("ing") ? w.slice(0, -3) : w.length > 3 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w);
+const stem = (set: Set<string>) => new Set([...set].map((w) => (w in STEM ? STEM[w] : suffix(w))).filter(Boolean));
 
 // Words that make two otherwise-similar names mean different boxes. A name that carries one side of
 // a pair (and not the other) contradicts a name that carries the other side.
@@ -85,7 +94,7 @@ export function agreement(a: string, b: string, idA?: string | null, idB?: strin
   const small = Math.min(x.size, y.size);
   if (shared === x.size && shared === y.size) return "same";
   if (shared === small) return "close";
-  if (shared / small >= 0.67) return "close";
+  if (shared * 3 >= small * 2) return "close";
   return "diff";
 }
 
@@ -155,18 +164,29 @@ async function main() {
     else if (!agree) tally.disagree++;
     else tally.lowConfidence++;
     const winner = fa.confidence >= fb.confidence ? fa : fb;
+    // A link to a cross-car parameter is a stronger claim than a name: it ships only when both passes made it.
+    const sharedId = fa.universalParameterId && fa.universalParameterId === fb.universalParameterId ? fa.universalParameterId : null;
     rows.push({
       pdfName: name, key, verdict: ready ? "ready" : !agree ? "disagree" : "low-confidence",
       agreement: verdictWord, a: fa.displayLabel, b: fb.displayLabel,
       confA: fa.confidence, confB: fb.confidence,
       printedLabel: fa.printedLabel || fb.printedLabel, section: winner.section || fa.section || fb.section,
       chosen: ready ? winner.displayLabel : null,
-      universalParameterId: ready ? (winner.universalParameterId ?? null) : null,
+      universalParameterId: ready ? sharedId : null,
       options: winner.options ?? null,
     });
   }
 
-  const ready: V2Result = { ...a.result, draftedSchema: { ...a.result.draftedSchema, fields: fieldsA.filter((f) => rows.some((r) => r.key === f.key && r.verdict === "ready")) as V2Field[] } };
+  // What ships: pass A's field (its key, options and PDF fields) under the chosen name and the shared link.
+  const readyRows = new Map(rows.filter((r) => r.verdict === "ready").map((r) => [r.key as string, r]));
+  const readyFields = fieldsA.filter((f) => readyRows.has(f.key)).map((f) => {
+    const r = readyRows.get(f.key)!;
+    const out = { ...f, displayLabel: r.chosen as string, section: (r.section as string) || f.section } as V2Field;
+    if (r.universalParameterId) out.universalParameterId = r.universalParameterId as string;
+    else delete out.universalParameterId;
+    return out;
+  });
+  const ready: V2Result = { ...a.result, draftedSchema: { ...a.result.draftedSchema, fields: readyFields } };
   writeFileSync(join(dir, "ready.json"), JSON.stringify(ready, null, 1));
   writeFileSync(join(dir, "review.json"), JSON.stringify({ car: sheet.name, boxes: rows.length, tally, minConfidence: minConf, rows }, null, 1));
 

@@ -49,8 +49,16 @@ npm run sheets:review -- <dir> [out.html]
 ```
 
 The keep rule compares names by meaning, not wording: extra detail on one side is fine ("ESC" /
-"ESC (speed controller)"), a contradiction is not (front/rear, FF/FR, inner/outer, left/right,
-upper/under), and the same cross-car parameter id on both sides counts as agreement.
+"ESC (speed controller)", "Finish" / "Finishing", "ballstud" / "ball stud"), a contradiction is not
+(front/rear, FF/FR, inner/outer, left/right, upper/under), and the same cross-car parameter id on
+both sides counts as agreement.
+
+**Links to a cross-car parameter** (`universalParameterId`) ship only when BOTH passes chose the same
+one, and only from the helpers: the app's word-matcher (`suggestUniversalParameterId`) is switched off
+for helper-named sheets. On 2026-09-24 it was the source of every wrong link found: "shock cap hole"
+→ spring, "diff oil amount (g)" → diff oil, "downstop measured from axle / arm" → downstop, and every
+"caster block" part (insert, spacing, link mount) → caster. A box is linked only when what the driver
+writes in it IS that parameter's value in its units; a part or position that changes it is not.
 
 ## Measured
 
@@ -63,6 +71,7 @@ manual) and `mtc3-gold.json` (Jordan's own names, rebuilt from his calibration w
 | ARC A11 | per-box (v2) | 92 / 110 | 56 | 0 |
 | ARC A11 | whole-drawing (v3) | 110 / 110 | 93 | 0 |
 | Mugen MTC3 | whole-drawing (v3) | 78 same + 27 close / 118 (token overlap vs Jordan's words) | 70 | 0 |
+| Associated B7.1 (off-road) | whole-drawing, lean helpers | no answer key; every shipped name checked by hand against the print | 113 / 132 | 0 found |
 
 On the MTC3 almost every remaining "miss" is the same part in different words (Jordan's "Uptravel
 Limit" = up-stop, "Above Hub Shims" = upper outer shims). Checked name by name, everything shipped was
@@ -71,12 +80,14 @@ an eccentric insert, fixed since by a primer line), so 0.7 keeps a margin; 0.8 i
 
 ## What it costs
 
-Measured 2026-09-23: 104.7M raw tokens for the ARC and the MTC3 together (two layout helpers, 94 block
-helpers, 4 re-runs) — about 52M per 150-box sheet, roughly 2.5x the per-box method. Half of it is each
-helper's ~61k-token starting context (project instructions, memory index, every tool definition)
-re-read on each of its ~8 steps; the `sheet-namer` agent type strips that to Read + Write and should
-cut it sharply (not yet measured: agent types load at session start). Five long helpers (the two
-layouts and the two hardest drawings) used 25M between them.
+**Measured 2026-09-24 with the lean `sheet-namer` helpers: 9.4M raw tokens for the whole B7.1
+(132 boxes, 20 blocks)** — the layout helper 3.6M, the 40 namers 5.9M (about 0.15M each, ~5 steps).
+That is about 5x cheaper than 2026-09-23, when general-purpose helpers cost ~52M per 150-box sheet
+(104.7M for the ARC and the MTC3 together) because each re-read a ~61k-token starting context
+(project instructions, memory index, every tool definition) on each of ~8 steps. The layout helper
+is still a general-purpose agent and is now the biggest single cost; a lean layout agent type is the
+next saving. Measure any run with the session's subagent transcripts, never the `subagent_tokens`
+figure an Agent result reports.
 
 ## Known gaps
 
