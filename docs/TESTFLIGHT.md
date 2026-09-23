@@ -24,14 +24,35 @@ Run `npx prisma db push` (or migrate deploy) after pulling schema changes.
 On a Mac with Xcode:
 
 ```bash
-export CAPACITOR_SERVER_URL="https://YOUR-VERCEL-URL.vercel.app"
-npm run cap:sync
+npm install
+npm run cap:sync   # points the shell at https://www.jrcdynamics.com
 npm run cap:open
 ```
 
 (`cap:sync` / `cap:open` are npm aliases for `cap sync ios` / `cap open ios`.)
 
-Set **Signing & Capabilities** in Xcode (team, bundle id). Build to a device or archive for TestFlight.
+With no `CAPACITOR_SERVER_URL` the shell loads the live site on its **www** host: the bare domain
+redirects to www, and the shell treats a hop to another host as a link out of the app. Set the
+variable only to aim a build at beta or a LAN dev server.
+
+**Already in the project (2026-09-23):** team `66GYDV7V7S` (Jordan Caruso, Individual) with automatic
+signing; `App/App.entitlements` carrying push; Info.plist sentences for camera, microphone, photo
+library and location (the file pickers and the track pin need them — a missing camera sentence kills
+the app on "Take Video"); `ITSAppUsesNonExemptEncryption = NO`, so uploads skip the encryption
+question. Xcode registers the bundle id on the first build to a plugged-in phone. Build to a device or
+archive for TestFlight.
+
+### Owed before submitting for review (found 2026-09-23)
+
+- **Google sign-in inside the shell.** Offering Google means Apple requires Sign in with Apple too, and
+  Google refuses sign-in from an embedded web view anyway. Hide the button when the request is the
+  shell (`isNativeShellRequest`); email + code stays.
+- **Signed out, the shell lands on `/welcome`**, the pitch page, with plan prices and Join buttons.
+  `/join` and `/billing` already hide prices in the shell; `/welcome` does not. Send the shell to
+  `/login` instead.
+- **A sign-in for Apple's reviewer** that needs no inbox, on an account that already has a plan (the
+  app sells nothing, so the reviewer can't buy one).
+- **Screenshots** at the largest iPhone size App Store Connect asks for.
 
 ## 4. Magic links in the iOS shell
 
@@ -75,7 +96,7 @@ Already wired in this repo:
 
 ### Steps that need the Mac / Apple portal
 
-1. **Xcode → Signing & Capabilities → + Capability → Push Notifications.** This writes the `aps-environment` entitlement; without it registration fails at runtime. (Not committed here — it edits the Xcode project.)
+1. **Push capability — done in the repo (2026-09-23).** `App/App.entitlements` carries `aps-environment` (wired by `CODE_SIGN_ENTITLEMENTS`); Xcode shows it under Signing & Capabilities. Without it registration fails at runtime.
 2. **Apple Developer → Keys → new key with APNs enabled.** Download the `.p8` **once** — it can't be re-downloaded.
 3. Set on Vercel:
 
