@@ -167,6 +167,8 @@ export async function importMyRcmPdf(params: {
           parsedPayload: payload,
           sessionCompletedAt,
           fieldStatsJson,
+          // Uploaded again by hand: a deleted copy comes back.
+          hiddenAt: null,
         },
         select: { id: true, createdAt: true, sessionCompletedAt: true },
       })

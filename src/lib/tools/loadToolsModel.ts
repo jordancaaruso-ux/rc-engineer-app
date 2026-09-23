@@ -14,6 +14,7 @@ import {
 import { chassisBottomAt, chassisPlateCorners } from "@/lib/rollCenter/engine";
 import { DEFAULT_CHASSIS_HALF_WIDTH_MM, resolvePackForTemplateKey } from "@/lib/rollCenter/packs";
 import { encodeLabSlot, extractGeometryFields } from "@/lib/rollCenter/labState";
+import { loadSessionNames, SESSION_NAMING_SELECT } from "@/lib/lapImport/loadSessionNames";
 import {
   MAX_UNLINKED_LAPS,
   MAX_VIDEO_JOBS,
@@ -118,22 +119,15 @@ export async function loadToolsModel(input: {
      * band reported "500 more waiting" on a real account, because event-hub expansion stores
      * every race on the hub and almost none of them are yours to file.
      */
+    // Deleted sessions (`hiddenAt`) are gone from this band for good; see the schema note.
     prisma.importedLapTimeSession.findMany({
-      where: { userId, linkedRunId: null, createdAt: { gte: unlinkedSince } },
+      where: { userId, linkedRunId: null, hiddenAt: null, createdAt: { gte: unlinkedSince } },
       orderBy: [{ sessionCompletedAt: "desc" }, { createdAt: "desc" }],
       take: MAX_UNLINKED_LAPS,
-      select: {
-        id: true,
-        createdAt: true,
-        sessionCompletedAt: true,
-        sourceUrl: true,
-        eventDetectionSource: true,
-        eventDetectionSessionLabel: true,
-        eventRaceClass: true,
-      },
+      select: SESSION_NAMING_SELECT,
     }),
     prisma.importedLapTimeSession.count({
-      where: { userId, linkedRunId: null, createdAt: { gte: unlinkedSince } },
+      where: { userId, linkedRunId: null, hiddenAt: null, createdAt: { gte: unlinkedSince } },
     }),
   ]);
 
@@ -154,6 +148,9 @@ export async function loadToolsModel(input: {
     if (!hasAnyValue(values)) return [];
     return [{ run, car: run.car, values, setupSheetModelId: modelId }];
   });
+
+  // Whose, which run, where and when — the same names the library and the session page use.
+  const lapNames = await loadSessionNames({ userId, rows: unlinkedLapRows, timeZone });
 
   return {
     geometry: buildGeometry(comparable, timeZone),
@@ -177,21 +174,18 @@ export async function loadToolsModel(input: {
           : `/videos/analysis/jobs/${encodeURIComponent(job.id)}`,
       };
     }),
-    unlinkedLaps: unlinkedLapRows.map(
-      (row): ToolsLapSession => ({
+    unlinkedLaps: unlinkedLapRows.map((row): ToolsLapSession => {
+      const name = lapNames.get(row.id);
+      return {
         id: row.id,
-        title: lapSessionTitle(row),
-        detail: [
-          // The on-track time when timing gave one, otherwise when it was imported. Never the
-          // raw ISO — these are UTC machine timestamps.
-          formatRunDateOnly(row.sessionCompletedAt ?? row.createdAt, timeZone),
-          hostOf(row.sourceUrl),
-        ]
-          .filter(Boolean)
-          .join(" · "),
+        title: name?.title ?? "Imported session",
+        time: name?.timeLabel ?? null,
+        detail: name?.detail ?? null,
+        groupKey: name?.groupKey ?? "unnamed",
+        groupLabel: name?.groupLabel ?? formatRunDateOnly(row.sessionCompletedAt ?? row.createdAt, timeZone),
         href: `/laps/analysis?session=${encodeURIComponent(row.id)}`,
-      })
-    ),
+      };
+    }),
     unlinkedLapTotal,
   };
 }
@@ -212,41 +206,6 @@ function hasAnyValue(values: Record<string, unknown>): boolean {
     if (typeof v === "object") return Object.keys(v as object).length > 0;
     return true;
   });
-}
-
-/** `https://www.grccc.liverc.com/practice/…` → "grccc.liverc.com". */
-function hostOf(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return "";
-  }
-}
-
-/**
- * What to call a timing session on one line.
- *
- * `eventDetectionSessionLabel` is NOT a session label on a practice row — detection writes the
- * matched DRIVER name there, so using it first put "Jordan Caruso" at the top of every row on
- * the driver's own page (seen 2026-08-19). It is only the session's name on a race row, where
- * detection copies the LiveRC result link text ("Race 15: ISTC Modified").
- *
- * Everything else falls back to the kind of session it was, with the host on the line below.
- * A hostname is where a session came from, not what it is, and it made three different races
- * read as three copies of "tftr.liverc.com".
- */
-function lapSessionTitle(row: {
-  eventDetectionSource: string | null;
-  eventDetectionSessionLabel: string | null;
-  eventRaceClass: string | null;
-}): string {
-  const race = row.eventDetectionSource === "race";
-  const label = race ? row.eventDetectionSessionLabel?.trim() : null;
-  return (
-    row.eventRaceClass?.trim() ||
-    label ||
-    (row.eventDetectionSource === "practice" ? "Practice session" : "Imported session")
-  );
 }
 
 type Comparable = {

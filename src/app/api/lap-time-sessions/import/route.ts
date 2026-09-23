@@ -111,7 +111,7 @@ export async function POST(request: Request) {
       }
       continue;
     }
-    const r = await importOneTimingUrl(user.id, url, ctx);
+    const r = await importOneTimingUrl(user.id, url, { ...ctx, restoreIfHidden: true });
     results.push(r);
   }
 

@@ -31,6 +31,7 @@ export function LapAnalysisBoard({
   whenIso = null,
   driverCount = null,
   sourceLabel = null,
+  context: contextOverride = null,
 }: {
   run: CompareRunShape;
   otherRuns: CompareRunShape[];
@@ -46,6 +47,11 @@ export function LapAnalysisBoard({
   whenIso?: string | null;
   driverCount?: number | null;
   sourceLabel?: string | null;
+  /**
+   * The whole context line, already formatted — an imported session's page sends one written on
+   * the track's clock. Wins over the parts above.
+   */
+  context?: string | null;
 }) {
   const { sessions: librarySessions, reload: reloadLibrary, loaded: libraryLoaded } = useImportedLapLibrary();
 
@@ -82,7 +88,7 @@ export function LapAnalysisBoard({
    * when a session ran, this has to say the same thing, and the only way to guarantee that
    * is to read the same clock.
    */
-  const context = [
+  const context = contextOverride ?? [
     trackName,
     whenIso ? formatRunDateTime(whenIso) : null,
     driverCount != null && driverCount > 1 ? `${driverCount} drivers` : null,

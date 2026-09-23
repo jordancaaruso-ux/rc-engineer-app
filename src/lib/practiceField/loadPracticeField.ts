@@ -130,7 +130,7 @@ async function markAlreadyImported(userId: string, drivers: PracticeFieldDriver[
   const urls = drivers.flatMap((d) => (d.sessions ?? []).map((s) => s.sessionUrl));
   if (urls.length === 0) return;
   const existing = await prisma.importedLapTimeSession.findMany({
-    where: { userId, sourceUrl: { in: urls } },
+    where: { userId, sourceUrl: { in: urls }, hiddenAt: null },
     select: { id: true, sourceUrl: true },
   });
   if (existing.length === 0) return;

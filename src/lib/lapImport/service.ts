@@ -99,6 +99,12 @@ export async function importOneTimingUrl(
     speedhiveDriverNames?: string[];
     speedhiveTransponderNumbers?: number[];
     allowAnyPublicHost?: boolean;
+    /**
+     * The driver pasted this exact link themselves: a session they deleted comes back. Every
+     * automatic caller (the sweep, event detection, watched links) leaves it out, which is what
+     * keeps a deleted session deleted.
+     */
+    restoreIfHidden?: boolean;
   }
 ): Promise<ImportOneUrlResult> {
   const v = await validateTimingHttpUrlResolved(url, {
@@ -159,6 +165,7 @@ export async function importOneTimingUrl(
       parsedPayload: payload,
       sessionCompletedAt,
       fieldStatsJson,
+      ...(context?.restoreIfHidden ? { hiddenAt: null } : {}),
     },
     create: {
       userId,
@@ -286,9 +293,10 @@ export async function linkImportedSessionsToRun(params: {
     const owned = ownedAll.filter((s) => ids.includes(s.id));
     if (owned.length === 0) return;
 
+    // A session the driver puts on a run is in use again, whatever they deleted before.
     await tx.importedLapTimeSession.updateMany({
       where: { id: { in: ownedAll.map((s) => s.id) }, userId: params.userId },
-      data: { linkedRunId: params.runId },
+      data: { linkedRunId: params.runId, hiddenAt: null },
     });
 
     // Earliest on track wins the primary pointer, so the run's session time and

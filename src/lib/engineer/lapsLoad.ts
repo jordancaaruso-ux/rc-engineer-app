@@ -142,7 +142,8 @@ export async function loadLapsSessions(params: {
       OR: [
         ...(runIds.length ? [{ linkedRunId: { in: runIds } }] : []),
         ...(detectedIds.length ? [{ id: { in: detectedIds } }] : []),
-        { sessionCompletedAt: { gte: params.window.from, lte: params.window.to } },
+        // Loose sessions on the day — never one the driver deleted. Linked ones can't be deleted.
+        { sessionCompletedAt: { gte: params.window.from, lte: params.window.to }, hiddenAt: null },
       ],
     },
     select: {

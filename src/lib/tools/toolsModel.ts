@@ -106,10 +106,15 @@ export type ToolsVideoJob = {
 
 export type ToolsLapSession = {
   id: string;
-  /** The race class or session label when timing gave one, otherwise what kind of session it was. */
+  /** Whose and which run — "Jordan Caruso · Run 3" — or a race's own name (`lapImport/sessionNaming`). */
   title: string;
-  /** When, and where it came from — "17 Jul 2026 · grccc.liverc.com". */
-  detail: string;
+  /** The time on the track's clock, "7:48 PM"; null when the timing site gave none. */
+  time: string | null;
+  /** A race's second line — "9 drivers". */
+  detail: string | null;
+  /** The day-and-track heading the row files under, "Tue 22 Sept · Chargers RC", and its key. */
+  groupKey: string;
+  groupLabel: string;
   href: string;
 };
 

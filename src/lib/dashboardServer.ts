@@ -811,7 +811,13 @@ export async function loadDashboardHomeModel(
     // driver's tick, minus the ones they unticked. Cheap (indexed on `[userId, sweepFiledAt]`),
     // and empty for anyone the sweep never saw.
     prisma.importedLapTimeSession.findMany({
-      where: { userId, linkedRunId: null, detectionPromptDismissedAt: null, sweepFiledAt: { gte: todayStart } },
+      where: {
+        userId,
+        linkedRunId: null,
+        detectionPromptDismissedAt: null,
+        hiddenAt: null,
+        sweepFiledAt: { gte: todayStart },
+      },
       orderBy: { sessionCompletedAt: "asc" },
       select: {
         id: true,

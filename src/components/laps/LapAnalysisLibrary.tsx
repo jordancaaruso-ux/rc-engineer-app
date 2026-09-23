@@ -7,25 +7,18 @@ import { ChevronRight } from "lucide-react";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
 import { MyRcmPdfImportCard } from "@/components/runs/MyRcmPdfImportCard";
-import {
-  primaryLapRowsFromImportedPayload,
-  sessionUtcOffsetMinutesFromImportedPayload,
-} from "@/lib/lapImport/fromPayload";
+import { ActionToast } from "@/components/ui/ActionToast";
+import { SessionDeletedUndo } from "@/components/laps/SessionDeletedUndo";
+import { deletedSessionsMessage, setImportedSessionsHidden } from "@/components/laps/sessionDeletion";
+import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
 import { importedSessionTitle } from "@/lib/lapImport/sessionTitle";
+import { groupNamedSessions, type SessionName } from "@/lib/lapImport/sessionNaming";
 import { MYRCM_PDF_SOURCE_PREFIX } from "@/lib/lapUrlParsers/myRcmPdfSource";
 import { sameLocalCalendarDay } from "@/lib/lapCompareScope";
 import { parseSpeedhivePracticeActivityRef } from "@/lib/speedhive/speedhivePracticeUrl";
-import {
-  importedSessionTimeForDisplay,
-  importedSessionTimeIsTrackClock,
-  resolveImportedSessionDisplayTimeIso,
-  resolveImportedSessionHasWallClockTime,
-  timingSourceFromParserId,
-  timingSourceFromSourceUrl,
-} from "@/lib/lapImport/labels";
+import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 import type { ImportedSessionFieldStatsPreviewV1 } from "@/lib/lapImport/computeImportedSessionFieldStats";
 import { formatRunDateTime } from "@/lib/formatDate";
-import { formatLap } from "@/lib/runLaps";
 import { cn } from "@/lib/utils";
 
 type SessionRow = {
@@ -41,6 +34,8 @@ type SessionRow = {
   eventDetectionSource?: string | null;
   eventDetectionSessionLabel?: string | null;
   eventRaceClass?: string | null;
+  /** Whose, which run, where and when — named on the server with the rest of its day. */
+  name?: SessionName | null;
 };
 
 /** Rows drawn before the "show more" line. Twenty is about a phone screen of scrolling. */
@@ -131,63 +126,44 @@ export function LapAnalysisLibrary({
   const rows = useMemo(
     () =>
       sessions.map((s) => {
+        const name = s.name ?? null;
         const parsed = primaryLapRowsFromImportedPayload(s.parsedPayload);
         const whenIso = resolveImportedSessionDisplayTimeIso({
           sessionCompletedAt: s.sessionCompletedAt ?? null,
           parsedPayload: s.parsedPayload,
           createdAt: s.createdAt,
         });
-        const source =
-          timingSourceFromParserId(s.parserId) ?? timingSourceFromSourceUrl(s.sourceUrl);
         const drivers = s.fieldStatsPreview?.driverCount ?? 0;
-        const title = importedSessionTitle({
-          ...s,
-          driverName: parsed?.driverName ?? null,
-          driverCount: drivers,
-          sessionNumber: parseSpeedhivePracticeActivityRef(s.sourceUrl)?.trainingSessionId ?? null,
-        });
+        // Named on the server (founder call, 2026-09-23: whose, which run, where, when). The old
+        // namer stays only as the fallback for a row that came back without a name.
+        const title =
+          name?.title ??
+          importedSessionTitle({
+            ...s,
+            driverName: parsed?.driverName ?? null,
+            driverCount: drivers,
+            sessionNumber: parseSpeedhivePracticeActivityRef(s.sourceUrl)?.trainingSessionId ?? null,
+          });
         /*
-         * The session's time on the TRACK's clock; only "added" below stays on the viewer's
-         * (founder ruling 2026-09-18). This list was the last screen still printing an imported
-         * time in the viewer's zone — the pickers have used `formatImportedSessionTime` all
-         * along — so ~290 LiveRC rows were reading about ten hours late, a 9:25 am practice as
-         * 7:25 pm. A row with no on-track time at all is showing its import instant, which IS
-         * the viewer's event, so it stays on their clock and says nothing about a track.
+         * The day, track and time live on the group heading and the row's right edge now (the
+         * track's clock, as the 2026-09-18 ruling wants). What's left for the second line is a
+         * race's class and field size, and why an old race sits up here: it came in later. Only
+         * when the two days differ — "added" on the day it was raced says nothing.
          */
-        const timeOpts = {
-          timingSource: source,
-          parserId: s.parserId,
-          sourceUrl: s.sourceUrl,
-          isWallClockTime: resolveImportedSessionHasWallClockTime({
-            sessionCompletedAt: s.sessionCompletedAt ?? null,
-            parsedPayload: s.parsedPayload,
-          }),
-          utcOffsetMinutes: sessionUtcOffsetMinutesFromImportedPayload(s.parsedPayload),
-        };
-        const shown = importedSessionTimeForDisplay(whenIso, timeOpts);
-        const whenText = formatRunDateTime(shown.iso, shown.timeZone);
         const detail = [
-          importedSessionTimeIsTrackClock(timeOpts) ? `${whenText} at the track` : whenText,
-          s.trackName,
-          source,
-          // The leading driver, once the title is the race rather than a person. On a field
-          // of 30 this is the only name on the row, and it's the one worth having.
-          drivers > 1 && parsed?.driverName?.trim() ? parsed.driverName.trim() : null,
-          drivers > 1 ? `${drivers} drivers` : null,
-          drivers > 1 && s.fieldStatsPreview?.medianBestSeconds != null
-            ? `median best ${formatLap(s.fieldStatsPreview.medianBestSeconds)}`
-            : null,
-          // The list is in upload order and the row shows the race's date, so a 9 Aug race
-          // sitting above 10 Aug ones needs to say why: it came in later. Only when the two
-          // days differ — "added" on the day it was raced says nothing.
+          name?.detail ?? null,
           sameLocalCalendarDay(s.createdAt, whenIso) ? null : `added ${formatRunDateTime(s.createdAt)}`,
         ]
           .filter(Boolean)
           .join(" · ");
         return {
           id: s.id,
+          name,
           title,
+          time: name?.timeLabel ?? null,
           detail,
+          // On a run, its laps are that run's: Select mode leaves it alone.
+          onRun: s.linkedRunId != null,
           /*
            * A PDF you uploaded by hand is yours whether or not your name is on it. The
            * "mine" scope exists because one pasted LiveRC event page imports thirty
@@ -201,7 +177,10 @@ export function LapAnalysisLibrary({
             sessionHasDriver(s.parsedPayload, viewerNorms),
           // The URL is in the haystack on purpose: a LiveRC race URL carries the club and
           // the class, which is often the only place the class name appears at all.
-          haystack: `${title} ${detail} ${s.sourceUrl}`.toLowerCase(),
+          haystack: [title, name?.autoTitle, name?.groupLabel, detail, s.sourceUrl]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase(),
         };
       }),
     [sessions, viewerNorms]
@@ -222,6 +201,25 @@ export function LapAnalysisLibrary({
   }, [rows, query, scope, viewerNorms]);
 
   const visible = useMemo(() => filtered.slice(0, shown), [filtered, shown]);
+  /** Under "Tue 22 Sept · Chargers RC" headings, in upload order, each day newest first. */
+  const visibleGroups = useMemo(
+    () => groupNamedSessions(visible, (row) => row.name ?? undefined),
+    [visible]
+  );
+
+  /*
+   * Select mode: tick many, delete them at once (founder pick, 2026-09-23). What "Select all"
+   * reaches is everything the scope and search show, not just the twenty drawn — clearing an
+   * event page's thirty races is the job it exists for. Sessions on a run are never ticked.
+   */
+  const [selecting, setSelecting] = useState(false);
+  const [ticked, setTicked] = useState<Set<string>>(() => new Set());
+  const [deleting, setDeleting] = useState(false);
+  const [selectErr, setSelectErr] = useState<string | null>(null);
+  const [undoIds, setUndoIds] = useState<string[] | null>(null);
+  const tickable = useMemo(() => filtered.filter((r) => !r.onRun), [filtered]);
+  const tickedIds = useMemo(() => tickable.filter((r) => ticked.has(r.id)).map((r) => r.id), [tickable, ticked]);
+  const allTicked = tickable.length > 0 && tickedIds.length === tickable.length;
 
   const loadSessions = useCallback(async () => {
     setListErr(null);
@@ -244,6 +242,43 @@ export function LapAnalysisLibrary({
   useEffect(() => {
     void loadSessions();
   }, [loadSessions]);
+
+  function toggleTick(id: string) {
+    setTicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function exitSelect() {
+    setSelecting(false);
+    setTicked(new Set());
+    setSelectErr(null);
+  }
+
+  async function deleteTicked() {
+    if (tickedIds.length === 0) return;
+    setDeleting(true);
+    setSelectErr(null);
+    const res = await setImportedSessionsHidden(tickedIds, true);
+    setDeleting(false);
+    if (!res.ok) {
+      setSelectErr(res.error);
+      return;
+    }
+    const gone = new Set(res.ids);
+    setSessions((prev) => prev.filter((s) => !gone.has(s.id)));
+    setTotal((t) => (t == null ? t : Math.max(0, t - res.ids.length)));
+    exitSelect();
+    if (res.ids.length > 0) setUndoIds(res.ids);
+  }
+
+  async function undoDelete(ids: string[]) {
+    await setImportedSessionsHidden(ids, false);
+    await loadSessions();
+  }
 
   const runImport = useCallback(
     async (urls: string[]) => {
@@ -449,40 +484,89 @@ export function LapAnalysisLibrary({
          * because "the race in Thailand from March" is exactly what someone comes here for.
          * So: newest first, twenty at a time, and a box to find a name in.
          */}
-        {sessions.length > PAGE_SIZE ? (
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setShown(PAGE_SIZE);
-            }}
-            placeholder="Find a driver, track or class…"
-            aria-label="Search imported sessions"
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-[13px] outline-none focus:ring-1 focus:ring-primary-ink/50"
-          />
+        {sessions.length > 0 ? (
+          <div className="flex items-center gap-2">
+            {sessions.length > PAGE_SIZE ? (
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setShown(PAGE_SIZE);
+                }}
+                placeholder="Find a driver, track or class…"
+                aria-label="Search imported sessions"
+                className="min-w-0 flex-1 rounded-md border border-border bg-card px-3 py-2 text-[13px] outline-none focus:ring-1 focus:ring-primary-ink/50"
+              />
+            ) : (
+              <span className="flex-1" />
+            )}
+            <button
+              type="button"
+              onClick={() => (selecting ? exitSelect() : setSelecting(true))}
+              className="tap-active shrink-0 rounded-md border border-border bg-card px-3.5 py-2 text-[13px] font-semibold text-foreground transition hover:bg-muted"
+            >
+              {selecting ? "Cancel" : "Select"}
+            </button>
+          </div>
         ) : null}
 
         {sessions.length > 0 ? (
           <CardPanel contentClassName="p-0">
-            <ul>
-              {visible.map((row) => (
-                <li key={row.id} className="border-b border-border/60 last:border-b-0">
-                  <Link
-                    href={`/laps/analysis?session=${encodeURIComponent(row.id)}`}
-                    className="tap-active flex items-center justify-between gap-3 px-4 py-2.5 transition hover:bg-muted/40"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="ui-title block truncate text-[13px] font-semibold text-foreground">
-                        {row.title}
+            {visibleGroups.map((group) => (
+              <section key={group.key} aria-label={group.label || undefined}>
+                {group.label ? (
+                  <h3 className="px-4 pb-0.5 pt-2.5 text-[11.5px] font-semibold leading-4 text-foreground/75">
+                    {group.label}
+                  </h3>
+                ) : null}
+                <ul>
+                  {group.items.map((row) => {
+                    const text = (
+                      <span className="min-w-0 flex-1">
+                        <span className="ui-title block truncate text-[13px] font-semibold text-foreground">
+                          {row.title}
+                        </span>
+                        {row.detail ? (
+                          <span className="ui-caption mt-0.5 block truncate">{row.detail}</span>
+                        ) : null}
                       </span>
-                      <span className="ui-caption mt-0.5 block truncate">{row.detail}</span>
-                    </span>
-                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                  </Link>
-                </li>
-              ))}
-            </ul>
+                    );
+                    return (
+                      <li key={row.id} className="border-b border-border/60 last:border-b-0">
+                        {!selecting ? (
+                          <Link
+                            href={`/laps/analysis?session=${encodeURIComponent(row.id)}`}
+                            className="tap-active flex items-center gap-3 px-4 py-2.5 transition hover:bg-muted/40"
+                          >
+                            {text}
+                            {row.time ? <span className="type-timestamp shrink-0">{row.time}</span> : null}
+                            <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                          </Link>
+                        ) : row.onRun ? (
+                          <div className="flex items-center gap-3 px-4 py-2.5">
+                            <span className="size-[18px] shrink-0" aria-hidden />
+                            {text}
+                            <span className="type-timestamp shrink-0">On a run</span>
+                          </div>
+                        ) : (
+                          <label className="tap-active flex cursor-pointer items-center gap-3 px-4 py-2.5 transition hover:bg-muted/40">
+                            <input
+                              type="checkbox"
+                              className="size-[18px] shrink-0 accent-primary"
+                              checked={ticked.has(row.id)}
+                              onChange={() => toggleTick(row.id)}
+                            />
+                            {text}
+                            {row.time ? <span className="type-timestamp shrink-0">{row.time}</span> : null}
+                          </label>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
             {visible.length < filtered.length ? (
               <button
                 type="button"
@@ -503,7 +587,46 @@ export function LapAnalysisLibrary({
             Nothing here matches “{query.trim()}”.
           </CardPanel>
         ) : null}
+        {selecting ? <div className="h-20" aria-hidden /> : null}
       </div>
+
+      {selecting ? (
+        /* Clears the bottom dock the way the run form's save bar does; floats on desktop. */
+        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+4.75rem)] z-40 px-4 md:bottom-8">
+          <div className="pointer-events-auto mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl border border-border bg-card/95 p-2 shadow-[0_12px_30px_-10px_rgba(60,52,32,0.5)] backdrop-blur-xl">
+            <button
+              type="button"
+              onClick={() => setTicked(allTicked ? new Set() : new Set(tickable.map((r) => r.id)))}
+              disabled={tickable.length === 0}
+              className="tap-active rounded-lg px-3 py-2 text-[13px] font-semibold text-foreground transition hover:bg-muted disabled:opacity-50"
+            >
+              {allTicked ? "Select none" : "Select all"}
+            </button>
+            {selectErr ? (
+              <span className="min-w-0 flex-1 truncate text-[11px] text-destructive" role="alert">
+                {selectErr}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void deleteTicked()}
+              disabled={tickedIds.length === 0 || deleting}
+              aria-busy={deleting}
+              className="tap-active h-10 shrink-0 rounded-full bg-destructive px-5 text-[13px] font-semibold text-white transition hover:brightness-110 disabled:bg-muted disabled:text-muted-foreground"
+            >
+              {deleting ? "Deleting…" : tickedIds.length > 0 ? `Delete ${tickedIds.length}` : "Delete"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <ActionToast
+        message={undoIds ? deletedSessionsMessage(undoIds.length) : null}
+        action={undoIds ? { label: "Undo", onClick: () => void undoDelete(undoIds) } : null}
+        onDismiss={() => setUndoIds(null)}
+      />
+      {/* A session deleted on its own page lands the driver back here, with its Undo. */}
+      <SessionDeletedUndo onChanged={loadSessions} />
     </div>
   );
 }

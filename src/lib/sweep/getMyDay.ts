@@ -433,6 +433,7 @@ async function looseRowsForDay(
       linkedRunId: null,
       sweepFiledAt: { not: null },
       detectionPromptDismissedAt: null,
+      hiddenAt: null,
       sessionCompletedAt: {
         gte: new Date(day.start.getTime() - LOOSE_WINDOW_SLACK_MS),
         lt: new Date(day.end.getTime() + LOOSE_WINDOW_SLACK_MS),

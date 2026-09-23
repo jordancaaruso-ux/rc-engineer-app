@@ -28,7 +28,7 @@ function isMachineMarker(v: string): boolean {
   return /^[a-z0-9]+(?:_[a-z0-9]+)+$/.test(v);
 }
 
-function usable(v: string | null | undefined): string | null {
+export function usable(v: string | null | undefined): string | null {
   const t = v?.trim();
   if (!t) return null;
   return isMachineMarker(t) ? null : t;
@@ -47,7 +47,7 @@ function usable(v: string | null | undefined): string | null {
  * refused and the caller falls through to "Practice"/"Race" — which is what the fallback below
  * was written for, and could never reach while Speedhive was handing us a "name".
  */
-function isOnlyADate(v: string): boolean {
+export function isOnlyADate(v: string): boolean {
   return /^[\d/.\-: ,]+(?:\s*[ap]\.?m\.?)?$/i.test(v.trim());
 }
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { BandHeader } from "@/components/ui/BandHeader";
+import { SessionDeletedUndo } from "@/components/laps/SessionDeletedUndo";
 import type { ToolsLapSession } from "@/lib/tools/toolsModel";
 
 /**
@@ -20,6 +21,9 @@ import type { ToolsLapSession } from "@/lib/tools/toolsModel";
  * "not on a run" was 503 rows, because expanding a LiveRC event hub stores every race on it and
  * almost none of them are yours — the band read "500 more waiting", a true number describing no
  * task anyone had. See `UNLINKED_LAP_WINDOW_DAYS`.
+ *
+ * Rows are named for whose and which run, under a day-and-track heading, with the time on the
+ * right (founder pick, 2026-09-23 — three rows reading "Imported session" told him nothing).
  */
 export function LapImportBench({
   sessions,
@@ -29,6 +33,14 @@ export function LapImportBench({
   total: number;
 }) {
   const remaining = Math.max(0, total - sessions.length);
+
+  // Newest on track first, so one day's rows already sit together.
+  const groups: Array<{ key: string; label: string; items: ToolsLapSession[] }> = [];
+  for (const session of sessions) {
+    const last = groups[groups.length - 1];
+    if (last && last.key === session.groupKey) last.items.push(session);
+    else groups.push({ key: session.groupKey, label: session.groupLabel, items: [session] });
+  }
 
   return (
     /* `h-full` + a flex column: on the three-across desktop Tools grid this card is stretched to
@@ -44,26 +56,38 @@ export function LapImportBench({
           result PDF — and read it here.
         </p>
       ) : (
-        <ul className="flex-1">
-          {sessions.map((session) => (
-            <li key={session.id} className="border-b border-border/60 last:border-b-0">
-              <Link
-                href={session.href}
-                className="tap-active flex items-center justify-between gap-3 px-4 py-2.5 transition hover:bg-muted/40"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="ui-title block truncate text-[13px] font-semibold text-foreground">
-                    {session.title}
-                  </span>
-                  <span className="ui-caption mt-0.5 block truncate">{session.detail}</span>
-                </span>
-                {/* Was "not on a run" — a state, back when filing it onto one was all a row
-                    could lead to. The row leads somewhere now, so the chevron says it. */}
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              </Link>
-            </li>
+        <div className="flex-1">
+          {groups.map((group) => (
+            <section key={group.key} aria-label={group.label}>
+              <h3 className="px-4 pb-0.5 pt-2.5 text-[11.5px] font-semibold leading-4 text-foreground/75">
+                {group.label}
+              </h3>
+              <ul>
+                {group.items.map((session) => (
+                  <li key={session.id} className="border-b border-border/60 last:border-b-0">
+                    <Link
+                      href={session.href}
+                      className="tap-active flex items-center gap-3 px-4 py-2.5 transition hover:bg-muted/40"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="ui-title block truncate text-[13px] font-semibold text-foreground">
+                          {session.title}
+                        </span>
+                        {session.detail ? (
+                          <span className="ui-caption mt-0.5 block truncate">{session.detail}</span>
+                        ) : null}
+                      </span>
+                      {session.time ? (
+                        <span className="type-timestamp shrink-0">{session.time}</span>
+                      ) : null}
+                      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       )}
 
       <Link
@@ -75,6 +99,9 @@ export function LapImportBench({
         </span>
         <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
       </Link>
+
+      {/* The Undo for a session just deleted on its own page, which sent the driver back here. */}
+      <SessionDeletedUndo />
     </CardPanel>
   );
 }

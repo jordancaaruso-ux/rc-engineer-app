@@ -425,6 +425,7 @@ export async function loadDetectedRunPrompts(userId: string): Promise<DetectedRu
       linkedEventId: { in: scopedIds },
       eventDetectionSource: { in: ["practice", "race"] },
       detectionPromptDismissedAt: null,
+      hiddenAt: null,
     },
     select: {
       id: true,

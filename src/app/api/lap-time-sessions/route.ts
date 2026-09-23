@@ -4,6 +4,7 @@ import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { importedSessionFieldStatsPreviewFromJson } from "@/lib/lapImport/computeImportedSessionFieldStats";
 import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
+import { loadSessionNames, SESSION_NAMING_SELECT } from "@/lib/lapImport/loadSessionNames";
 
 export async function GET() {
   if (!hasDatabaseUrl()) {
@@ -19,12 +20,15 @@ export async function GET() {
    * (2026-08-27: "I've imported a bunch of MyRCM sessions, but they're not in the list").
    * `total` rides along so the page can say the list is cut, rather than looking complete.
    */
-  const [rows, total] = await Promise.all([
+  // Deleted sessions (`hiddenAt`) leave the library and every lap-sheet picker fed from here.
+  const [rows, total, viewerUser] = await Promise.all([
     prisma.importedLapTimeSession.findMany({
-    where: { userId: userId },
+    where: { userId: userId, hiddenAt: null },
     orderBy: { createdAt: "desc" },
     take: 200,
     select: {
+      // Everything the session's name is built from — whose, which run, where and when.
+      ...SESSION_NAMING_SELECT,
       id: true,
       createdAt: true,
       sessionCompletedAt: true,
@@ -49,8 +53,15 @@ export async function GET() {
       },
     },
     }),
-    prisma.importedLapTimeSession.count({ where: { userId } }),
+    prisma.importedLapTimeSession.count({ where: { userId, hiddenAt: null } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { timeZone: true } }),
   ]);
+
+  const names = await loadSessionNames({
+    userId,
+    rows,
+    timeZone: viewerUser?.timeZone?.trim() || null,
+  });
 
   const sessions = rows
     .map((r) => ({
@@ -68,6 +79,8 @@ export async function GET() {
       trackName: r.linkedRun?.track?.name ?? r.linkedRun?.trackNameSnapshot ?? null,
       parsedPayload: r.parsedPayload,
       fieldStatsPreview: importedSessionFieldStatsPreviewFromJson(r.fieldStatsJson),
+      customName: r.customName,
+      name: names.get(r.id) ?? null,
     }))
     /*
      * Most recently UPLOADED first. The list sorted by when the race happened, so a MyRCM

@@ -170,7 +170,8 @@ export async function getCachedToolsModel(userId: string, timeZone: string) {
       async () => loadToolsModel({ userId, timeZone }),
       // v2: the geometry band carries the solved front axle + its chassis plate for the drawing.
       // An entry from v1 would hand the schematic `undefined` and take the page down with it.
-      [`tools-v2-${userId}-${timeZone}`],
+      // v3: lap sessions carry their day-and-track heading and time (session naming, 2026-09-23).
+      [`tools-v3-${userId}-${timeZone}`],
       {
         tags: [runsTag(userId), carsTag(userId), dashboardTag(userId)],
         revalidate: 30,

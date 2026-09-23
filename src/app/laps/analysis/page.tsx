@@ -13,6 +13,7 @@ import { formatRunSessionDisplay } from "@/lib/runSession";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { toCompareRunShape } from "@/lib/runCompareShape";
 import { loadImportedSessionAnchor } from "@/lib/lapImport/importedSessionAnchor";
+import { loadSessionNames, SESSION_NAMING_SELECT } from "@/lib/lapImport/loadSessionNames";
 import { getSpeedhiveDriverNamesForUser } from "@/lib/speedhive/speedhiveDriverSettings";
 import { LapAnalysisBoard } from "@/components/laps/LapAnalysisBoard";
 import { LapAnalysisLibrary } from "@/components/laps/LapAnalysisLibrary";
@@ -21,6 +22,8 @@ import { parseKnownCompetitorsSetting } from "@/lib/speedhive/knownCompetitors";
 import { practiceFieldSourcesForTrack } from "@/lib/practiceField/loadPracticeField";
 import { calendarYmdInTimeZone } from "@/lib/formatDate";
 import { PageBackLink } from "@/components/ui/PageBackLink";
+import { SessionTitleEditor } from "@/components/laps/SessionTitleEditor";
+import { DeleteSessionButton } from "@/components/laps/DeleteSessionButton";
 
 /**
  * Lap time analysis — the sheet, with or without a run behind it.
@@ -109,14 +112,24 @@ function parseColumns(v: string | string[] | undefined): string[] | undefined {
   return ids.length > 0 ? ids : undefined;
 }
 
+/** The timing site, the way a driver would say it. */
+const TIMING_SOURCE_LABEL: Record<string, string> = {
+  liverc: "LiveRC",
+  myrcm: "MyRCM",
+  speedhive: "MYLAPS",
+};
+
 function Shell({
   title,
+  titleSlot,
   subtitle,
   backHref,
   wide = false,
   children,
 }: {
   title: string;
+  /** Replaces the plain title — an imported session's title is also where it is renamed. */
+  titleSlot?: ReactNode;
   subtitle?: string | null;
   backHref: string;
   /**
@@ -162,7 +175,9 @@ function Shell({
            * over this one and truncates it: that is app-wide behaviour for any long page title,
            * and it is not this page's to change.
            */}
-          <h1 className="page-title max-w-full [overflow-wrap:anywhere]">{title}</h1>
+          {titleSlot ?? (
+            <h1 className="page-title max-w-full [overflow-wrap:anywhere]">{title}</h1>
+          )}
         </div>
       </header>
       <section className={wide ? "page-body laps-wide" : "page-body max-w-6xl"}>
@@ -220,6 +235,49 @@ export default async function LapAnalysisPage(props: {
     if (!anchor) notFound();
 
     /*
+     * The session's name: whose it is and which run of the day, a race's own name, or what the
+     * driver typed (founder calls, 2026-09-23). Worked out with the rest of its day, the same way
+     * the Tools card and the library name it, so all three agree.
+     */
+    const namingRow = await prisma.importedLapTimeSession.findFirst({
+      where: { id: sessionId, userId: user.id },
+      select: {
+        ...SESSION_NAMING_SELECT,
+        linkedRunId: true,
+        detectedPrimaryForRun: { select: { id: true } },
+      },
+    });
+    const name = namingRow
+      ? ((
+          await loadSessionNames({
+            userId: user.id,
+            rows: [namingRow],
+            timeZone: user.timeZone?.trim() || null,
+          })
+        ).get(sessionId) ?? null)
+      : null;
+    const title = name?.title ?? anchor.title;
+    // A session on a run holds that run's laps: the run is what gets deleted, not this.
+    const onRun = Boolean(namingRow?.linkedRunId || namingRow?.detectedPrimaryForRun);
+    const sourceWord = anchor.sourceLabel ? (TIMING_SOURCE_LABEL[anchor.sourceLabel] ?? null) : null;
+    /*
+     * Formatted here, on the track's clock, rather than in the browser: the board's own line
+     * read the session time in the phone's zone, which for a LiveRC time (stored as the track's
+     * clock) printed hours out. An explicit clock renders the same on the server and the phone.
+     */
+    const context = name
+      ? [
+          name.isCustom ? name.autoTitle : null,
+          name.place,
+          name.timeLabel ? `${name.dayLabel} · ${name.timeLabel}` : name.dayLabel,
+          anchor.driverCount > 1 ? `${anchor.driverCount} drivers` : null,
+          sourceWord && sourceWord !== name.place ? sourceWord : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : null;
+
+    /*
      * A race opens on its whole field, in finishing order (founder call, 2026-08-27). The
      * other drivers on the sheet are the reason it was opened; a sheet showing one column
      * and a picker is a sheet you have to build before you can read it. `?columns=` still
@@ -237,9 +295,20 @@ export default async function LapAnalysisPage(props: {
     });
 
     return (
-      <Shell title={anchor.title} backHref="/laps/analysis" wide>
+      <Shell
+        title={title}
+        titleSlot={
+          <SessionTitleEditor
+            sessionId={sessionId}
+            title={title}
+            autoTitle={name?.autoTitle ?? anchor.title}
+          />
+        }
+        backHref="/laps/analysis"
+        wide
+      >
         <LapAnalysisBoard
-          run={anchor.run}
+          run={{ ...anchor.run, sessionLabel: title }}
           otherRuns={myRuns.map(toCompareRunShape)}
           runListSource="my_runs"
           primaryDriverName={anchor.anchorDriverName}
@@ -250,7 +319,9 @@ export default async function LapAnalysisPage(props: {
           whenIso={anchor.whenIso}
           driverCount={anchor.driverCount}
           sourceLabel={anchor.sourceLabel}
+          context={context}
         />
+        {onRun ? null : <DeleteSessionButton sessionId={sessionId} />}
       </Shell>
     );
   }

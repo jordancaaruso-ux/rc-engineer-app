@@ -1927,6 +1927,18 @@ model ImportedLapTimeSession {
   track   Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
   trackId String?
 
+  /**
+   * The driver's own name for this session, typed on its page. Null = the automatic name
+   * (`lapImport/sessionNaming.ts`: whose it is and which run of the day, or the race's own name).
+   */
+  customName String?
+  /**
+   * When the driver deleted this session. It is hidden, not erased, so the evening sweep, an event
+   * page or a watched link — which all upsert by URL — find the row and leave it alone rather than
+   * importing it fresh. Pasting the link again by hand clears it; so does attaching it to a run.
+   */
+  hiddenAt DateTime?
+
   @@unique([userId, sourceUrl])
   @@index([userId, createdAt])
   @@index([linkedEventId])

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { runsTag } from "@/lib/cacheTags";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
@@ -7,6 +9,7 @@ import {
   sessionCompletedAtIsoFromImportedPayload,
   sessionUtcOffsetMinutesFromImportedPayload,
 } from "@/lib/lapImport/fromPayload";
+import { SESSION_CUSTOM_NAME_MAX } from "@/lib/lapImport/sessionNaming";
 
 export async function GET(_request: Request, ctx: { params: Promise<{ id: string }> }) {
   if (!hasDatabaseUrl()) {
@@ -73,6 +76,72 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       linkedEventId: row.linkedEventId,
       fieldStatsJson,
     },
+  });
+}
+
+/**
+ * Rename or delete one imported session.
+ *
+ * `customName`: the driver's own name for it; blank puts the automatic name back.
+ * `hidden`: true deletes it — hidden, not erased, so nothing automatic re-imports it (see the
+ * schema note on `hiddenAt`); false is the Undo. A session on a run can't be deleted here: its
+ * laps are that run's laps, and the run is what gets deleted.
+ */
+export async function PATCH(request: Request, ctx: { params: Promise<{ id: string }> }) {
+  if (!hasDatabaseUrl()) {
+    return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
+  }
+  const userId = await getAuthenticatedApiUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await ctx.params;
+
+  const body = (await request.json().catch(() => null)) as {
+    customName?: unknown;
+    hidden?: unknown;
+  } | null;
+  const data: { customName?: string | null; hiddenAt?: Date | null } = {};
+  if (body && "customName" in body) {
+    if (body.customName !== null && typeof body.customName !== "string") {
+      return NextResponse.json({ error: "customName must be text or null" }, { status: 400 });
+    }
+    const name = typeof body.customName === "string" ? body.customName.trim().replace(/\s+/g, " ") : "";
+    data.customName = name ? name.slice(0, SESSION_CUSTOM_NAME_MAX) : null;
+  }
+  if (body && "hidden" in body) {
+    if (typeof body.hidden !== "boolean") {
+      return NextResponse.json({ error: "hidden must be true or false" }, { status: 400 });
+    }
+    data.hiddenAt = body.hidden ? new Date() : null;
+  }
+  if (!("customName" in data) && !("hiddenAt" in data)) {
+    return NextResponse.json({ error: "Nothing to change" }, { status: 400 });
+  }
+
+  const row = await prisma.importedLapTimeSession.findFirst({
+    where: { id, userId },
+    select: { id: true, linkedRunId: true, detectedPrimaryForRun: { select: { id: true } } },
+  });
+  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (data.hiddenAt && (row.linkedRunId || row.detectedPrimaryForRun)) {
+    return NextResponse.json(
+      { error: "This session is on a run. Delete the run instead." },
+      { status: 409 }
+    );
+  }
+
+  const updated = await prisma.importedLapTimeSession.update({
+    where: { id: row.id },
+    data,
+    select: { id: true, customName: true, hiddenAt: true },
+  });
+
+  // The Tools band is cached (`getCachedToolsModel`) and lists exactly these rows.
+  revalidatePath("/tools");
+  revalidatePath("/laps/analysis");
+  revalidateTag(runsTag(userId), { expire: 0 });
+
+  return NextResponse.json({
+    session: { id: updated.id, customName: updated.customName, hidden: updated.hiddenAt != null },
   });
 }
 
