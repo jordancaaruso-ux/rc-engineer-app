@@ -41,6 +41,23 @@ function normalizeNumberish(v: unknown): number | null {
   return parseNumericFromSetupString(v, { allowKSuffix: false });
 }
 
+/**
+ * Is this value a NUMBER, give or take a unit — "5.4", "-1.5°", "450 cSt", "0,5 mm" — as opposed
+ * to a name that happens to contain one?
+ *
+ * `normalizeNumberish` is deliberately generous: it digs the first number out of anything, which is
+ * right for a box the app already KNOWS is numeric ("5.4mm" typed into ride height). It was also
+ * what GUESSED the kind of an unknown box, and there it is wrong: "Wolverine 0.5" is a body shell,
+ * not 0.5. The change list printed "0.5 ← 0.7" for a body swap, and a swap at the same thickness —
+ * "Wolverine 0.7" → "Twister 0.7", or a motor "HW G4R" → "Orca G4R" — compared as 0.7 = 0.7 and was
+ * not reported as a change at all (founder report, 2026-09-19). Guessing takes the strict reading.
+ */
+function isBareNumeric(v: unknown): boolean {
+  if (typeof v === "number") return Number.isFinite(v);
+  if (typeof v !== "string") return false;
+  return /^[+\-−]?\d+(?:[.,]\d+)?\s*(?:[a-zA-Zµ°%"'/]{0,6})$/.test(v.trim());
+}
+
 function formatNormalized(v: unknown): string {
   if (v == null || v === "") return "—";
   if (Array.isArray(v)) return v.length ? v.join(", ") : "—";
@@ -68,7 +85,7 @@ function inferKind(key: string, a: unknown, b: unknown): FieldKind {
   if (boolToken(aS) && boolToken(bS) && (aS !== "" || bS !== "")) return "boolean";
   const an = normalizeNumberish(a);
   const bn = normalizeNumberish(b);
-  if (an != null && bn != null) return "number";
+  if (an != null && bn != null && isBareNumeric(a) && isBareNumeric(b)) return "number";
   // categorical: treat case-insensitive if short tokens
   return "categorical";
 }

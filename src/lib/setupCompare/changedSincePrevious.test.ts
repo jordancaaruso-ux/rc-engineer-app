@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { orderSetupChangedRows, type SetupChangedRow } from "./changedSincePrevious";
+import { orderSetupChangedRows, setupChangedRowsSincePrevious, type SetupChangedRow } from "./changedSincePrevious";
 
 const row = (key: string, label = key): SetupChangedRow => ({ key, label, value: "1", previousValue: "2" });
 
@@ -39,4 +39,29 @@ test("the list handed in is not reordered in place", () => {
   const rows = [row("pinion"), row("camber_front", "Camber (Front)")];
   orderSetupChangedRows(rows);
   assert.equal(rows[0]!.key, "pinion");
+});
+
+// ---- names that contain a number are names (founder report 2026-09-19) ----
+
+const changes = (now: Record<string, unknown>, was: Record<string, unknown>) =>
+  setupChangedRowsSincePrevious(now, was).map((r) => `${r.key}: ${r.value} <- ${r.previousValue}`);
+
+test("a body shell reads as its name, not as the thickness inside it", () => {
+  assert.deepEqual(changes({ body: "Wolverine 0.5", wing: "Speciale 0.4" }, { body: "Twister 0.7", wing: "Speciale 0.7" }), [
+    "body: Wolverine 0.5 <- Twister 0.7",
+    "wing: Speciale 0.4 <- Speciale 0.7",
+  ]);
+});
+
+test("a swap that keeps the same number inside the name is still a change", () => {
+  assert.deepEqual(changes({ body: "Wolverine 0.7" }, { body: "Twister 0.7" }), ["body: Wolverine 0.7 <- Twister 0.7"]);
+  assert.deepEqual(changes({ motor: "HW G4R" }, { motor: "Orca G4R" }), ["motor: HW G4R <- Orca G4R"]);
+});
+
+test("a plain number, with or without a unit, still compares as a number", () => {
+  // Same value written two ways is not a change…
+  assert.deepEqual(changes({ some_gap: "5.40" }, { some_gap: "5.4" }), []);
+  assert.deepEqual(changes({ some_gap: "5.4mm" }, { some_gap: "5.4 mm" }), []);
+  // …and a real change still is.
+  assert.deepEqual(changes({ some_gap: "5.4 mm" }, { some_gap: "5.6 mm" }), ["some_gap: 5.4 <- 5.6"]);
 });
