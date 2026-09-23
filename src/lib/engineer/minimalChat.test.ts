@@ -13,7 +13,7 @@ import {
   standardEngineerBlocks,
   type EngineerPayloadBlock,
 } from "@/lib/engineer/payload";
-import { buildChatCompletionBody } from "@/lib/engineer/openai";
+import { buildChatCompletionBody, ENGINEER_REASONING_EFFORT_DEFAULT } from "@/lib/engineer/openai";
 import {
   ENGINEER_CHAT_SYSTEM_PROMPT,
   ENGINEER_KB_HEADER,
@@ -113,6 +113,14 @@ test("GPT-5 and later get the effort and never a temperature; older models the r
     const old = buildChatCompletionBody("gpt-4o", 0.3, { messages: [] });
     assert.equal(old.temperature, 0.3);
     assert.equal(old.reasoning_effort, undefined);
+
+    // Unset (production) and junk both send the stated default, never the model's own default.
+    for (const env of [undefined, "hgih"]) {
+      if (env === undefined) delete process.env.ENGINEER_REASONING_EFFORT;
+      else process.env.ENGINEER_REASONING_EFFORT = env;
+      const body = buildChatCompletionBody("gpt-6-sol", 0.3, { messages: [] });
+      assert.equal(body.reasoning_effort, ENGINEER_REASONING_EFFORT_DEFAULT);
+    }
   } finally {
     if (saved === undefined) delete process.env.ENGINEER_REASONING_EFFORT;
     else process.env.ENGINEER_REASONING_EFFORT = saved;

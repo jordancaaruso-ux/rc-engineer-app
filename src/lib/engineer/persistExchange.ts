@@ -34,6 +34,7 @@ export async function persistEngineerChatExchange(params: {
   range?: EngineerMessageContextSnapshot["range"];
   source?: string;
   promptVersion?: string;
+  model?: string;
 }): Promise<PersistedChatExchange> {
   const threadId = await getOrCreateThread({
     userId: params.userId,
@@ -48,6 +49,7 @@ export async function persistEngineerChatExchange(params: {
     range: params.range ?? null,
     source: params.source,
     promptVersion: params.promptVersion ?? ENGINEER_PROMPT_VERSION,
+    ...(params.model ? { model: params.model } : {}),
   };
 
   await prisma.engineerChatMessage.create({

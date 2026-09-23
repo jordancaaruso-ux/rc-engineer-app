@@ -15,6 +15,8 @@ export type EngineerMessageContextSnapshot = {
   capturedAtIso?: string;
   /** Engineer build that produced the answer — see engineer/prompt.ts. */
   promptVersion?: string;
+  /** The model that wrote it; the prompt version alone can't tell a Terra answer from a Sol one. */
+  model?: string;
 };
 
 export type EngineerRatingInput = {

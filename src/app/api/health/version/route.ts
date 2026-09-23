@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { engineerChatModel, engineerReasoningEffort } from "@/lib/engineer/openai";
 import { ENGINEER_PROMPT_VERSION } from "@/lib/engineer/prompt";
 
 export const dynamic = "force-dynamic";
@@ -13,15 +14,20 @@ export const dynamic = "force-dynamic";
  *
  * Deliberately unauthenticated (middleware lets /api/health/* through): the question it answers
  * usually comes up *because* auth sent you somewhere unexpected. Emits only build identity and the
- * Engineer's prompt label + fingerprint — no config, no secrets. Check it after every deploy.
+ * Engineer's prompt label + fingerprint, model and thinking setting — no secrets. The model and
+ * setting are here because an env override on Vercel would change them without a code change.
+ * Check it after every deploy.
  */
 export async function GET() {
+  const { model } = engineerChatModel();
   return NextResponse.json({
     env: process.env.VERCEL_ENV ?? "local",
     branch: process.env.VERCEL_GIT_COMMIT_REF ?? null,
     commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
     message: process.env.VERCEL_GIT_COMMIT_MESSAGE?.split("\n")[0] ?? null,
     engineer: ENGINEER_PROMPT_VERSION,
+    engineerModel: model,
+    engineerEffort: engineerReasoningEffort(model),
     deploymentUrl: process.env.VERCEL_URL ?? null,
     region: process.env.VERCEL_REGION ?? null,
   });

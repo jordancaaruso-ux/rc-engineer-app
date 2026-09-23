@@ -94,24 +94,34 @@ function modelSupportsCustomTemperature(model: string): boolean {
 const REASONING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
 
 /**
- * `ENGINEER_REASONING_EFFORT` — unset by default, which keeps the model's own default and
- * leaves the request body byte-identical to before this knob existed. An unrecognised value
- * is ignored rather than forwarded: a typo here would 400 every Engineer answer. Pre-GPT-5
- * models reject the param outright, so it is only ever attached to GPT-5 and later.
+ * The thinking setting every Engineer answer is sent with. Sent explicitly, not left to the model's
+ * default: a new snapshot can change its default, and until 2026-09-24 production ran the default
+ * (medium) while every harness round ran `.env.local`'s "high" — so the answers the founder graded
+ * were thought harder than drivers' answers, and nothing said so. Medium is the setting Sol was
+ * measured at when it replaced Terra.
+ */
+export const ENGINEER_REASONING_EFFORT_DEFAULT = "medium";
+
+/**
+ * `ENGINEER_REASONING_EFFORT` overrides the default. An unrecognised value is ignored rather than
+ * forwarded: a typo here would 400 every Engineer answer. Pre-GPT-5 models reject the param
+ * outright, so it is only ever attached to GPT-5 and later.
  */
 export function engineerReasoningEffort(model: string): string | null {
+  if (!isGpt5OrLater(model)) return null;
   const raw = process.env.ENGINEER_REASONING_EFFORT?.trim().toLowerCase();
-  if (!raw || !REASONING_EFFORTS.has(raw)) return null;
-  return isGpt5OrLater(model) ? raw : null;
+  return raw && REASONING_EFFORTS.has(raw) ? raw : ENGINEER_REASONING_EFFORT_DEFAULT;
 }
 
 /**
- * CHAT model (founder decision 2026-08-01, blind pairwise): gpt-5.6-terra beat gpt-5.5
- * 3-1-1 on the stripped prompt at $0.055/answer vs $0.145 and p50 11s vs 21s. terra@medium
- * beat terra@high 2-0-3, so effort stays medium (the env default). The rebuild's model
- * bench (any provider, harness decides) may replace this.
+ * CHAT model — founder decision 2026-09-24: "Let's just use sol, and develop prompt / kb around
+ * that. Terra is weaker, if it wins it's because we've developed around it." Measured first: both at
+ * medium on round 07 (12 questions × 6 tries), four blind judges gave gpt-6-sol 41 pairs to Terra's 3
+ * (28 ties), 0 mistakes to 29, and none of his NEVER lines broken to 4; same cost and p50 (10.5 s).
+ * Sol missed his j-01 thicker rear diff and asks the driver something 4× as often (ledger 2026-09-24).
+ * Before: gpt-5.6-terra (2026-08-01, blind pairwise over gpt-5.5, 3-1-1).
  */
-export const ENGINEER_CHAT_MODEL = "gpt-5.6-terra";
+export const ENGINEER_CHAT_MODEL = "gpt-6-sol";
 
 export function engineerChatModel(): { model: string; temperature: number } {
   return { model: process.env.ENGINEER_MODEL?.trim() || ENGINEER_CHAT_MODEL, temperature: 0.3 };

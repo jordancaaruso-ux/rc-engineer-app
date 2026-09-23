@@ -475,7 +475,13 @@ mistakes in Terra's answers and 0 in Sol's:
   run.
 
 **Blind page for his picks:** https://claude.ai/artifact/9BLaGjTfteJqmQAVWxT8GU (12 pairs, picks in
-its db `picks/<pairId>`). Awaiting his picks. No model switch without his call.
+its db `picks/<pairId>`).
+
+**His call, same day, before any picks: "Let's just use sol, and develop prompt / kb around that. Terra
+is weaker, if it wins it's because we've developed around it."** He asked which thinking setting. Claude
+recommended medium: it's what Sol was measured at, and it's fast. High roughly doubles the thinking and
+the wait, for a cost that's input-dominated either way. The default is now `gpt-6-sol` at an explicit
+medium, and the ruling is in the roll-call (48/48).
 
 ## Fixes landed from this batch
 

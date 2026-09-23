@@ -23,12 +23,18 @@
  * Model and reasoning effort come from ENGINEER_MODEL / ENGINEER_REASONING_EFFORT (shell beats
  * .env.local). Every case records the model, the effort it ran at and each turn's time, because an
  * unrecorded effort once left a round's answers unmatched to what drivers get. `--dry` prints the
- * settings a run would use and stops before any call.
+ * settings a run would use and stops before any call. A run on any other model or effort than the
+ * app's stops unless `--bench` says the comparison is deliberate.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { generateEngineerChatReply } from "@/lib/engineer/chat";
-import { engineerChatModel, engineerReasoningEffort } from "@/lib/engineer/openai";
+import {
+  ENGINEER_CHAT_MODEL,
+  ENGINEER_REASONING_EFFORT_DEFAULT,
+  engineerChatModel,
+  engineerReasoningEffort,
+} from "@/lib/engineer/openai";
 import type { EngineerChatMessage, EngineerPayloadBlock } from "@/lib/engineer/payload";
 import { ENGINEER_PROMPT_VERSION } from "@/lib/engineer/prompt";
 import { LIVERC_PRACTICE_TOOL_DEFINITION } from "@/lib/engineer/livercPracticeTool";
@@ -97,8 +103,18 @@ async function main() {
 
   const setting = engineerChatModel().model;
   const effortOf = (model: string) => engineerReasoningEffort(model) ?? "model default";
-  console.log(`model ${setting} · reasoning effort ${effortOf(setting)}`);
+  // A round is only worth grading if it is what drivers get: for weeks .env.local ran every round at
+  // effort "high" while production ran medium. Comparing other settings on purpose takes --bench.
+  const app = `${ENGINEER_CHAT_MODEL} at "${ENGINEER_REASONING_EFFORT_DEFAULT}"`;
+  const offApp = setting !== ENGINEER_CHAT_MODEL || effortOf(setting) !== ENGINEER_REASONING_EFFORT_DEFAULT;
+  console.log(`model ${setting} · reasoning effort ${effortOf(setting)}${offApp ? ` — NOT the app (${app})` : " — the app's setting"}`);
   if (process.argv.includes("--dry")) return;
+  if (offApp && !process.argv.includes("--bench")) {
+    console.error(
+      `Stopped: these answers would not be what drivers get. Remove ENGINEER_MODEL / ENGINEER_REASONING_EFFORT from .env.local, or pass --bench to compare settings on purpose.`
+    );
+    process.exit(1);
+  }
 
   const blocks = await arm.buildBlocks();
   const outDir = path.join(__dirname, "answers", batch);

@@ -162,6 +162,21 @@ Each of these was deleted or declined for a reason. They return only through the
 
 ## Changelog
 
+- **2026-09-24 — the Engineer moves to GPT-6 Sol** (founder: "Let's just use sol, and develop prompt /
+  kb around that. Terra is weaker, if it wins it's because we've developed around it"). Measured
+  first on round 07 (12 questions × 6 tries), both at medium:
+  - Four blind judges: Sol won 41 pairs, Terra 3, with 28 ties. They found 0 mistakes in Sol's
+    answers and 29 in Terra's.
+  - His NEVER lines broken: 0 by Sol, 4 by Terra.
+  - Cost and p50 wait were the same. The physics check was the judges' (the knowledge base in hand).
+  - His blind audit: he ruled without it.
+
+  Found on the way: every round before this ran at effort high (`.env.local`), while production ran
+  medium. The effort is now sent explicitly (`ENGINEER_REASONING_EFFORT_DEFAULT`, medium). The
+  harness stops on any model or effort that isn't the app's unless `--bench`. Saved answers and
+  `/api/health/version` name the model. The prompt and KB were tuned on Terra at high, so from here
+  every round runs on Sol at medium.
+
 - **2026-09-23, night — his targets** (founder: "get me to say what i think a good answer would be, so
   you can continue iterating with a goal. cant let it be too rigid"). Per question he writes a must, a
   never and his pick (questions/round-07.targets.json); a try fails only on a must or a never. Trials
