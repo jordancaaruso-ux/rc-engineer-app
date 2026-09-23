@@ -63,7 +63,9 @@ takes its load **sooner** on the way in, so its grip is there **earlier**. Softe
 **What makes the change bigger or smaller.**
 
 - **How much transfer there is to move.** The settled mechanism can only redistribute the transfer
-  that exists, so it shrinks as cornering force falls — with grip, and with speed.
+  that exists, so it shrinks as cornering force falls — with grip, and with speed. Low grip also
+  slows the car, which gives every corner more middle for it to act in (above): each corner's
+  settled change is smaller, but more of every corner runs on it (founder, 2026-09-23).
 - **How hard that tyre is already worked.** The settled mechanism bites harder the further the
   loaded tyre already sits into the falling part of its curve ([[tyre-load-sensitivity]]).
 - **Nothing at all before the car has rolled.** At turn-in the springs have not deflected, so they
@@ -78,8 +80,7 @@ moves both the timing and the share.
 **Two changes can share one test** (founder, 2026-09-09). A change that gives one phase and costs the
 other can be paired with a change whose gain is that phase and whose cost does not fall on the first
 change's gain. Damping is the lever that gives timing and takes nothing once the car has settled
-([[bite-hold]]), which is why it is the usual second half: soften a bar for the middle, and thinner oil
-brings the first input back without touching the middle the bar just gave. A pair is offered as one
+([[bite-hold]]), which is why it is the usual second half. A pair is offered as one
 test when the driver has one run to find out, and as two runs in order when they have the time — the
 first change first, because a pair that works does not say which half did it.
 

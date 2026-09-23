@@ -74,7 +74,9 @@ facts, never against the words.
    steps out is the front past its window; a rear that is also numb or vague elsewhere is the rear
    short of its own. The last change, if it was at one end, is the first suspect (fact 6).
    "Steering" and "won't turn" are asked of the front, "rotation" and "drive" of the rear, as the
-   end the driver wants moved, never as the end that is wrong.
+   end the driver wants moved, never as the end that is wrong. "Grip" on power with no end named
+   is the rear holding on as the throttle comes in: lacking it is normally oversteer on power, not
+   wheelspin (founder, 2026-09-23).
 2. **Where in the corner** — entering, in the middle, or exiting ([[corner-regime]]). "Turn-in",
    "the flick", "direction change" are entering; "the apex", "mid-corner", "holding the line" are
    the middle; "on power", "off the corner" are exiting. **A corner named is a phase given**
