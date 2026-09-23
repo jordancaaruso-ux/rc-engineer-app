@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronRight } from "lucide-react";
+import { Bookmark, Check, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { importedSessionTimeForDisplay } from "@/lib/lapImport/labels";
 import { formatLap } from "@/lib/runLaps";
@@ -28,8 +28,8 @@ import {
  *
  * One piece, two hosts. On the lap analysis page a session is imported and opened on its own
  * (`mode="open"`); in the lap sheet's Practice tab a session is ticked and becomes a column
- * (`mode="tick"`). Everything else — the search, the buttons, Save, the timing-site switch — is
- * the same on purpose, so it is learned once.
+ * (`mode="tick"`). Everything else — the search, the buttons, Save competitor, the timing-site
+ * switch — is the same on purpose, so it is learned once.
  *
  * Nothing is fetched until asked. "Asked" is the Find button on the page, and opening the tab
  * in the lap sheet (`autoLook`); after that the search narrows a list already in hand and
@@ -360,6 +360,29 @@ export function PracticeFieldBrowser({
     }
   }
 
+  /**
+   * The other half of Save competitor. Until 2026-09-24 a saved driver could only be removed
+   * from Settings: "I click it once, and then I can't unsave" (founder).
+   */
+  async function unsaveDriver(d: PracticeFieldDriver) {
+    if (!d.transponder) return;
+    const next = saved.filter((s) => s.transponder !== d.transponder);
+    setSaved(next);
+    onSavedChange?.(next);
+    try {
+      const res = await fetch("/api/settings/known-competitors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ knownCompetitors: next.length > 0 ? serializeKnownCompetitorsSetting(next) : null }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setSaved(saved);
+      onSavedChange?.(saved);
+      setNote("Couldn't remove that driver.");
+    }
+  }
+
   function sessionsOf(d: PracticeFieldDriver): PracticeFieldSession[] | "loading" | { hint: string } {
     if (d.sessions) return d.sessions;
     return (d.transponder ? chipSessions[d.transponder] : null) ?? "loading";
@@ -509,9 +532,13 @@ export function PracticeFieldBrowser({
                           You
                         </span>
                       ) : isSaved ? (
-                        <span className="ml-1.5 rounded border border-border px-1 text-[10px] font-medium text-muted-foreground">
-                          Yours
-                        </span>
+                        // A bookmark, not a word: "Yours" read as "this is you" (founder,
+                        // 2026-09-24). It marks one of your saved competitors.
+                        <Bookmark
+                          className="ml-1.5 inline size-3 -translate-y-px fill-current text-muted-foreground"
+                          aria-label="Saved competitor"
+                          role="img"
+                        />
                       ) : null}
                     </span>
                     <span className="ui-caption mt-0.5 block tabular-nums">
@@ -598,7 +625,19 @@ export function PracticeFieldBrowser({
                       </ul>
                     ) : null}
 
-                    {!isSaved && !d.isViewer && d.transponder ? (
+                    {isSaved && !d.isViewer && d.transponder ? (
+                      // Saved. Pressing it again takes them off the list — the same button, the
+                      // other way, like a bookmark.
+                      <button
+                        type="button"
+                        aria-pressed
+                        onClick={() => void unsaveDriver(d)}
+                        className="btn-surface inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium"
+                      >
+                        <Bookmark className="size-3 fill-current" aria-hidden />
+                        Saved
+                      </button>
+                    ) : !isSaved && !d.isViewer && d.transponder ? (
                       namingKey === d.key ? (
                         <form
                           className="flex gap-2"
@@ -616,7 +655,7 @@ export function PracticeFieldBrowser({
                             className={cn(inputClass, "flex-1 py-1.5 text-[13px]")}
                           />
                           <button type="submit" className="btn-surface shrink-0 px-2.5 py-1.5 text-[12px] font-medium">
-                            Save
+                            Save competitor
                           </button>
                         </form>
                       ) : (
@@ -631,9 +670,10 @@ export function PracticeFieldBrowser({
                               setNameDraft("");
                             }
                           }}
-                          className="btn-surface px-2.5 py-1.5 text-[12px] font-medium"
+                          className="btn-surface inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium"
                         >
-                          Save
+                          <Bookmark className="size-3" aria-hidden />
+                          Save competitor
                         </button>
                       )
                     ) : null}
