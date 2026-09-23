@@ -82,6 +82,48 @@ export function isBelievableBest(best: number, avgTop5: number): boolean {
   return best >= avgTop5 - slack;
 }
 
+function ordinal(n: number): string {
+  const suffix = n % 100 >= 11 && n % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
+  return `${n}${suffix}`;
+}
+
+function signed(v: number): string {
+  const r = Math.round(v * 100) / 100;
+  return r > 0 ? `+${r.toFixed(2)}` : r < 0 ? `-${Math.abs(r).toFixed(2)}` : "0.00";
+}
+
+/**
+ * A best lap's rank on its sheet in words — "quickest of 10", "3rd-quickest of 12" — never "P1/10".
+ * The LAPS block prints finishing places ("P1 TIMOTHY HILYEAR" — he won the SA 15:31 heat), and
+ * beside it the driver's "P1/5" by best lap read as the result: the Engineer told the founder Tim
+ * had him by 0.01 on best lap, when he was 0.01 quicker (round 06h, 2026-09-23).
+ */
+export function lapRankShort(f: Pick<FieldPace, "rank" | "n">): string | null {
+  if (f.rank == null) return null;
+  return f.rank === 1 ? `quickest of ${f.n}` : `${ordinal(f.rank)}-quickest of ${f.n}`;
+}
+
+/**
+ * "quickest lap of 7, 0.30 clear" / "3rd-quickest lap of 12, +0.21 to the quickest". Worked from the
+ * laps as the Engineer sees them, to the hundredth: from the timing site's thousandths, a 17.76 against
+ * a 17.77 in the LAPS block came out "0.02 clear" here.
+ */
+export function lapRankWords(f: FieldPace): string | null {
+  if (f.gapBestToP1 == null || f.rank == null) return null;
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  const mine = f.entrants.find((e) => e.isMe)?.best ?? null;
+  const others = f.entrants
+    .filter((e) => !e.isMe && !e.cut && e.best != null)
+    .map((e) => e.best as number)
+    .sort((a, b) => a - b);
+  if (f.rank === 1) {
+    const clear = mine != null && others.length > 0 ? `, ${(r2(others[0]) - r2(mine)).toFixed(2)} clear` : "";
+    return `quickest lap of ${f.n}${clear}`;
+  }
+  const gap = mine != null && others.length > 0 ? r2(mine) - r2(others[0]) : f.gapBestToP1;
+  return `${ordinal(f.rank)}-quickest lap of ${f.n}, ${signed(gap)} to the quickest`;
+}
+
 function lapsEqual(a: number[], b: number[]): boolean {
   if (a.length !== b.length || a.length === 0) return false;
   for (let i = 0; i < a.length; i++) if (Math.abs(a[i] - b[i]) > 0.0005) return false;

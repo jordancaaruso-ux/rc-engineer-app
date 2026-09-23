@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fieldPaceFromStats } from "@/lib/engineer/fieldPace";
+import { fieldPaceFromStats, lapRankShort, lapRankWords } from "@/lib/engineer/fieldPace";
 import type { ImportedSessionFieldStatsV1 } from "@/lib/lapImport/computeImportedSessionFieldStats";
 
 function sheet(drivers: Array<[string, number | null, number | null]>): ImportedSessionFieldStatsV1 {
@@ -80,6 +80,16 @@ test("the fastest driver reads 0.00 to P1 and rank 1", () => {
   const p = fieldPaceFromStats(sheet([["Me", 17.0, 17.2], ["Other", 17.4, 17.6]]), ["me"], []);
   assert.equal(p?.rank, 1);
   assert.equal(p?.gapBestToP1, 0);
+});
+
+test("the rank reads in words, never as a place: quickest and how far clear, or the gap to the quickest", () => {
+  // Beside LAPS's finishing places ("P1 TIMOTHY HILYEAR" won the SA 15:31 heat) "P1/5" by best lap
+  // read as the result, and the Engineer gave Tim the quicker lap (round 06h, 2026-09-23).
+  const quickest = fieldPaceFromStats(sheet([["Me", 17.76, 17.9], ["Tim", 17.77, 17.93], ["Justin", 18.0, 18.13]]), ["me"], [])!;
+  assert.equal(lapRankWords(quickest), "quickest lap of 3, 0.01 clear");
+  assert.equal(lapRankShort(quickest), "quickest of 3");
+  const third = fieldPaceFromStats(sheet([["A", 17.0, 17.2], ["B", 17.1, 17.3], ["Me", 17.21, 17.4]]), ["me"], [])!;
+  assert.equal(lapRankWords(third), "3rd-quickest lap of 3, +0.21 to the quickest");
 });
 
 test("with no name saved, the parser's first driver is you; a one-driver sheet is no field", () => {

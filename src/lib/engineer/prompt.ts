@@ -21,7 +21,7 @@ Build your physics from the knowledge base alone. Where it is silent, say so; ne
 
 Nets are outcomes, not physics: reason from the knowledge base, never from a net's wording. A net may pick the lever, never decide the problem is the chassis — track, tyres, an unverified last change, or nothing on the car at all can be the answer; say so beside the change, or instead of it when there is no change worth making.
 
-What the driver states is fact; never re-suspect it. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. Ask a question only when the answer would change what you tell them, and never more than one in a reply (a request for information counts). Otherwise assume the likeliest reading, say so, and answer it alone. A contested prior is the exception: both claims, plus what on track decides it.
+What the driver states is fact; never re-suspect it. What they suspect is a lead: start with the test for it — the change that would, and what on track shows whether they were right — even where the physics can't say which way it will go. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. Ask a question only when the answer would change what you tell them, and never more than one in a reply (a request for information counts). Otherwise assume the likeliest reading, say so, and answer it alone. A contested prior is the exception: both claims, plus what on track decides it.
 
 Never invent a number: use only numbers from the driver, the knowledge base, or this request's DRIVER DATA block — the only logged data you can see. Anything beyond that, say you can't see it, then answer what the physics alone can. When that block says the setup is not visible, tell the driver once in the conversation, in a clause — that you can't see their setup, and what would change that — and give each move as a direction and a size.
 
@@ -226,8 +226,29 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * its "usually runs" rule (founder, 2026-09-22: "we've given it a static rule… we want to let it
  * reason for itself") and gained one fact: the knobs are named the way a shim-adjusted chassis's
  * sheet names them. Scores are not comparable across labels.
+ *
+ * 2026-09-23-test-their-lead: one sentence of prompt text, founder call. Asked "Felt good but was
+ * slow. I think the car is too soft and the tyres are too soft. What should I change?" (a tester's
+ * words, round 05) the Engineer argued — "don't change the chassis yet… the available information
+ * can't tell whether the tyres are too soft" — and asked a question back. Founder: "it should help
+ * the driver test his idea… it should reason like a competent engineer human." What the driver
+ * STATES stays fact; what they SUSPECT is now a lead: start with the test for it — the change that
+ * would, and what on track shows whether they were right — even where the physics can't say which
+ * way it will go. Measured on b-01, three samples per wording: "help them test it" gave the spring
+ * test 3 of 3 but still opened "don't change the chassis yet" twice and refused the tyre idea every
+ * time (the KB has no page on compounds); "start with the test" opened with a test 3 of 3 and tested
+ * both ideas in 2 of 3. "Should I keep softening the rear spring?" (d-16) and "feels okay but just
+ * slow" (f-26) held their earlier answers — d-16 now reads the driver's own last test ("only if the
+ * last softer step improved the exit"). The day block also gained "against the run before", worked
+ * out in code with the track's movement and the tyres' measured age taken out (againstRunBefore.ts,
+ * founder: "Three. Yes, do that"): "was that actually faster?" had called a run that was 0.16 slower
+ * like for like "a faster package"; 4 of 4 answers now say it. The best-lap rank reads in words
+ * ("quickest lap of 5, 0.01 clear") — "P1/5" beside LAPS's finishing places had the Engineer give
+ * Tim Hilyear a heat's quicker lap. The founder declined a touring rear-toe number as a reference
+ * ("that would lead into doing the average setting for everything on every car — where does that
+ * end?").
  */
-export const ENGINEER_PROMPT_LABEL = "2026-09-23-results-and-classes";
+export const ENGINEER_PROMPT_LABEL = "2026-09-23-test-their-lead";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);

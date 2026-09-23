@@ -27,12 +27,13 @@ import { formatFiveMinuteStint } from "@/lib/runLaps";
 import { runLocalDayKey } from "@/lib/runs/buildRunHistoryGroups";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import type { EngineerPayloadBlock } from "@/lib/engineer/payload";
-import type { FieldPace } from "@/lib/engineer/fieldPace";
+import { lapRankShort, lapRankWords, type FieldPace } from "@/lib/engineer/fieldPace";
 import { FIELD_RUN_SELECT, loadFieldPaceForRuns } from "@/lib/engineer/fieldPaceLoad";
 import { matchDriverNameInQuestions } from "@/lib/engineer/nameMatch";
 import { driverKey, driversOnSheets, renderRivalSection, renderRivalsSummary, type RivalRun } from "@/lib/engineer/rivals";
-import { lapsRivalNames, lapsTrackMoveByRun, renderLapsBlock, type LapsSession } from "@/lib/engineer/lapsBlock";
+import { lapsFigures, lapsRivalNames, lapsTrackMoveByRun, renderLapsBlock, type LapsSession } from "@/lib/engineer/lapsBlock";
 import { loadLapsSessions } from "@/lib/engineer/lapsLoad";
+import { againstRunBefore, type DayRunPace } from "@/lib/engineer/againstRunBefore";
 
 /**
  * Driver-data blocks: the driver's own latest session, its setup, the rest of that day, and
@@ -282,7 +283,7 @@ function buildSessionFactsBlock(
   // The field from the timing sheet (fieldPace.ts): the one comparison that cancels the
   // track's own movement, because everyone drove the same surface at the same time.
   if (field && field.gapBestToP1 != null) {
-    push("place in the session by best lap", `P${field.rank} of ${field.n} timed drivers`);
+    push("rank by best lap in the session (not the finishing order)", `${lapRankShort(field)} timed drivers`);
     push("best lap vs the fastest driver's best (s, positive = slower; 0.00 = you were fastest)", fmtDelta(field.gapBestToP1));
     if (field.gapTop5ToP1 != null) push("average of best 5 vs the best top-5 in the field (s)", fmtDelta(field.gapTop5ToP1));
     if (field.gapBestToMedian != null) push("best lap vs the field's median best (s, negative = faster than the middle of the field)", fmtDelta(field.gapBestToMedian));
@@ -469,7 +470,9 @@ function buildDayBlock(
   zone: string | null,
   fieldByRun: Map<string, FieldPace>,
   /** The track's movement per run (lapsBlock.ts): the other drivers against their own day. */
-  trackMoveByRun: Map<string, number>
+  trackMoveByRun: Map<string, number>,
+  /** Each run's own laps in LAPS: the average without slow laps. */
+  cleanAverageByRun: Map<string, number>
 ): string | null {
   if (day.length < 2) return null;
   const multiCar = new Set(day.map((r) => r.carId)).size > 1;
@@ -483,6 +486,35 @@ function buildDayBlock(
     if (!setLetter.has(stint)) setLetter.set(stint, String.fromCharCode(65 + (setLetter.size % 26)));
     return setLetter.get(stint)!;
   };
+  // Lettered up front in the order the run lines below meet them, so the "against the run before"
+  // line can name a set that first runs later in the day without reshuffling the letters.
+  for (const run of day) {
+    if (run.frontTireTypeId != null && run.frontTireRunNumber != null) {
+      letterOf(run.frontTireStintId);
+      letterOf(run.tireStintId);
+    } else if (run.tireRunNumber != null) {
+      letterOf(run.tireStintId);
+    }
+  }
+  const paces = new Map<string, DayRunPace>(
+    day.map((run) => [
+      run.id,
+      {
+        id: run.id,
+        clock: fmtLocalTime(run, zone),
+        top5: runPace(run).top5,
+        trackMove: trackMoveByRun.get(run.id) ?? null,
+        set: run.tireStintId ?? null,
+        setLetter: run.tireStintId ? (setLetter.get(run.tireStintId) ?? null) : null,
+        tyreRun: run.tireRunNumber ?? null,
+        splitTyres: run.frontTireTypeId != null,
+        unconfirmed: run.unconfirmedAt != null,
+        cleanAverage: cleanAverageByRun.get(run.id) ?? null,
+      },
+    ])
+  );
+  const dayPaces = [...paces.values()];
+  let anyAgainst = false;
 
   for (const run of day) {
     const pace = runPace(run);
@@ -492,9 +524,7 @@ function buildDayBlock(
       fmtSecs(pace.best) ? `best ${fmtSecs(pace.best)}` : "no lap times",
       fmtSecs(pace.top5) ? `top5 ${fmtSecs(pace.top5)}` : null,
       pace.stint ? `5min ${pace.stint}` : null,
-      fieldByRun.get(run.id)?.gapBestToP1 != null
-        ? `P${fieldByRun.get(run.id)!.rank}/${fieldByRun.get(run.id)!.n} ${fmtDelta(fieldByRun.get(run.id)!.gapBestToP1!)} to P1`
-        : null,
+      fieldByRun.has(run.id) ? lapRankWords(fieldByRun.get(run.id)!) : null,
       run.carRating != null ? `rated ${run.carRating}/10` : "not rated",
       // A front/rear run states both counts — the ends are separate sets. A single-tyre run's
       // cell is unchanged.
@@ -511,17 +541,26 @@ function buildDayBlock(
 
     const prev = predecessorOf.get(run.id);
     if (!prev) continue;
-    const changes = diffTuning(tuningValues(prev.setupSnapshot?.data), tuningValues(run.setupSnapshot?.data));
-    if (changes == null) continue; // No readable sheet one side — unknown, not unchanged.
     const prevDay = fmtLocalDate(prev, zone);
     const thisDay = fmtLocalDate(run, zone);
-    const since = prevDay !== thisDay ? ` since the run of ${prevDay}` : "";
-    if (changes.length === 0) {
-      lines.push(`    no setup change${since}`);
-    } else {
-      const shown = changes.slice(0, MAX_CHANGES_LISTED).join(", ");
-      const more = changes.length > MAX_CHANGES_LISTED ? `, +${changes.length - MAX_CHANGES_LISTED} more` : "";
-      lines.push(`    changed${since}: ${shown}${more}`);
+    const changes = diffTuning(tuningValues(prev.setupSnapshot?.data), tuningValues(run.setupSnapshot?.data));
+    // No readable sheet one side — unknown, not unchanged: no "changed" line.
+    if (changes != null) {
+      const since = prevDay !== thisDay ? ` since the run of ${prevDay}` : "";
+      if (changes.length === 0) {
+        lines.push(`    no setup change${since}`);
+      } else {
+        const shown = changes.slice(0, MAX_CHANGES_LISTED).join(", ");
+        const more = changes.length > MAX_CHANGES_LISTED ? `, +${changes.length - MAX_CHANGES_LISTED} more` : "";
+        lines.push(`    changed${since}: ${shown}${more}`);
+      }
+    }
+    // Today only: the track's movement and the tyres' measured drop are the day's own.
+    const prevPace = paces.get(prev.id);
+    const against = prevDay === thisDay && prevPace ? againstRunBefore(prevPace, paces.get(run.id)!, dayPaces) : null;
+    if (against) {
+      lines.push(`    ${against}`);
+      anyAgainst = true;
     }
   }
 
@@ -574,14 +613,23 @@ function buildDayBlock(
     `with no readable sheet has no "changed" line: that is unknown, not unchanged.`,
     ...(day.some((r) => fieldByRun.has(r.id))
       ? [
-          `"P3/12 +0.21 to P1" is your place by best lap and your gap to the fastest driver's best lap in that`,
-          `session's timing sheet — the field drove the same track at the same time, so it cancels the track's movement.`,
+          `"quickest lap of 7, 0.30 clear" or "3rd-quickest lap of 12, +0.21 to the quickest" ranks your best lap among the`,
+          `best laps on that session's timing sheet — not the finishing order, which LAPS gives — with the gap to the next`,
+          `or to the quickest. The field drove the same track at the same time, so it cancels the track's movement.`,
         ]
       : []),
     ...(anySets
       ? [
           `"tyres set C run 2" is run 2 on set C: the same letter is the same set of rubber, a new letter another`,
           `set — new if it reads run 1, used before today if higher.`,
+        ]
+      : []),
+    ...(anyAgainst
+      ? [
+          `"against 15:31, the run before" is that car's previous run today: the change in top five (positive = slower);`,
+          `then how much slower or quicker the track was than at that run (the other drivers against their own day, in`,
+          `LAPS below) and the top five with that taken out; then with the tyres' age taken out as well — what today's own`,
+          `sets lost from their run 1 to that run number.`,
         ]
       : []),
     ...(anyUnconfirmed
@@ -704,7 +752,25 @@ export async function buildDriverDataBlocks(params: {
   // The day's timed sessions, every lap of every driver (lapsBlock.ts) — loaded before the day
   // block, which takes the track's movement from them. A failed read just drops what uses them.
   const lapsSessions = await loadDayLapsSessions(params.userId, run, day, zone).catch(() => [] as LapsSession[]);
-  const dayBlock = buildDayBlock(run, day, predecessorOf, zone, fieldByRun, lapsTrackMoveByRun(lapsSessions));
+  // A run the timing site listed twice (two practice pages, two sites) takes the sheet with most laps.
+  const cleanAverageByRun = new Map<string, number>();
+  const lapsOfRun = new Map<string, number>();
+  for (const s of lapsSessions) {
+    const mine = s.linkedRunId ? s.drivers.find((d) => d.isMe) : null;
+    const clean = mine ? lapsFigures(mine.laps)?.cleanAverage : null;
+    if (!s.linkedRunId || !mine || clean == null || (lapsOfRun.get(s.linkedRunId) ?? -1) >= mine.laps.length) continue;
+    cleanAverageByRun.set(s.linkedRunId, clean);
+    lapsOfRun.set(s.linkedRunId, mine.laps.length);
+  }
+  const dayBlock = buildDayBlock(
+    run,
+    day,
+    predecessorOf,
+    zone,
+    fieldByRun,
+    lapsTrackMoveByRun(lapsSessions),
+    cleanAverageByRun
+  );
   if (dayBlock) parts.push(dayBlock);
 
   // Every lap of every driver in the day's timed sessions (lapsBlock.ts) — the day the

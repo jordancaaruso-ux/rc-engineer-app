@@ -64,10 +64,10 @@ test("the field rides on the run line, the changed line, a tyre table and a rank
     run({ dateYmd: "2026-09-12", clock: "11:00", tyreRun: 2, tyreStintId: "b", best: 17.70, field: null, tuning: { toe_rear: "3.2" } }),
   ];
   const lines = renderRunLines(runs);
-  assert.match(lines[0], /vs field P3\/12, \+0\.10 to P1 \(top5 \+0\.15\), -0\.20 vs median/);
-  assert.match(lines[2], /changed: toe rear 3 → 3\.2 {2}\(gap to P1 vs previous run: \+0\.20\)/);
+  assert.match(lines[0], /vs field: 3rd-quickest lap of 12, \+0\.10 to the quickest \(top5 \+0\.15\), -0\.20 vs median/);
+  assert.match(lines[2], /changed: toe rear 3 → 3\.2 {2}\(gap to the quickest lap vs previous run: \+0\.20\)/);
   // Day 2's run 1 follows day 1's run 2: no same-day tyre delta, but the field delta crosses days.
-  assert.match(lines[4], /no setup change {2}\(gap to P1 vs previous run: -0\.30\)/);
+  assert.match(lines[4], /no setup change {2}\(gap to the quickest lap vs previous run: -0\.30\)/);
   assert.ok(!/vs field/.test(lines[6]), "a run without a sheet carries no field");
 
   const tyres = renderTyreFieldSection(runs) ?? "";
@@ -76,8 +76,8 @@ test("the field rides on the run line, the changed line, a tyre table and a rank
   assert.match(tyres, /run 2 vs run 1: best \+0\.20 \(1 set\)/, "set b has one run with a field, so only set a counts");
 
   const best = renderBestFieldSection(runs) ?? "";
-  assert.match(best, /1\. 0\.00 to P1 {2}P1\/10 {2}2026-09-12 Sat 10:00 {2}\(best 17\.60 on tyre run 1, -0\.30 vs field median\)/);
-  assert.match(best, /2\. \+0\.10 to P1 {2}P3\/12/);
+  assert.match(best, /1\. 0\.00 to the quickest lap, quickest of 10 {2}2026-09-12 Sat 10:00 {2}\(best 17\.60 on tyre run 1, -0\.30 vs field median\)/);
+  assert.match(best, /2\. \+0\.10 to the quickest lap, 3rd-quickest of 12/);
   assert.equal(renderBestFieldSection([runs[0]]), null, "one run is not a ranking");
   assert.equal(renderTyreFieldSection([runs[0], runs[3]]), null);
 

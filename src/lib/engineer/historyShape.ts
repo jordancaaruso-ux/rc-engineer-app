@@ -1,5 +1,5 @@
 import { diffTuning } from "@/lib/engineer/setupDiff";
-import type { FieldPace } from "@/lib/engineer/fieldPace";
+import { lapRankShort, lapRankWords, type FieldPace } from "@/lib/engineer/fieldPace";
 import { renderRivalSection, renderRivalsSummary } from "@/lib/engineer/rivals";
 
 /**
@@ -377,7 +377,7 @@ export function renderBestFieldSection(runs: HistoryRun[]): string | null {
     "",
     ...ranked.map(
       (r, i) =>
-        `${i + 1}. ${fmtDelta(r.field!.gapBestToP1!)} to P1  P${r.field!.rank}/${r.field!.n}  ${fmtDay(r.dateYmd)}${r.clock ? ` ${r.clock}` : ""}${multiTrack ? `  ${r.trackName ?? "no track"}` : ""}  (best ${fmtSecs(r.best)} on tyre run ${r.tyreRun ?? "?"}${r.field!.gapBestToMedian != null ? `, ${fmtDelta(r.field!.gapBestToMedian)} vs field median` : ""})`
+        `${i + 1}. ${fmtDelta(r.field!.gapBestToP1!)} to the quickest lap, ${lapRankShort(r.field!)}  ${fmtDay(r.dateYmd)}${r.clock ? ` ${r.clock}` : ""}${multiTrack ? `  ${r.trackName ?? "no track"}` : ""}  (best ${fmtSecs(r.best)} on tyre run ${r.tyreRun ?? "?"}${r.field!.gapBestToMedian != null ? `, ${fmtDelta(r.field!.gapBestToMedian)} vs field median` : ""})`
     ),
   ].join("\n");
 }
@@ -467,7 +467,7 @@ export function renderRunLines(runs: HistoryRun[], adj: TyreAdjustments = new Ma
     const f = run.field;
     const field =
       f && f.gapBestToP1 != null
-        ? `vs field P${f.rank}/${f.n}, ${fmtDelta(f.gapBestToP1)} to P1${f.gapTop5ToP1 != null ? ` (top5 ${fmtDelta(f.gapTop5ToP1)})` : ""}${f.gapBestToMedian != null ? `, ${fmtDelta(f.gapBestToMedian)} vs median` : ""}`
+        ? `vs field: ${lapRankWords(f)}${f.gapTop5ToP1 != null ? ` (top5 ${fmtDelta(f.gapTop5ToP1)})` : ""}${f.gapBestToMedian != null ? `, ${fmtDelta(f.gapBestToMedian)} vs median` : ""}`
         : null;
     const bits = [
       fmtDay(run.dateYmd),
@@ -516,7 +516,7 @@ export function renderRunLines(runs: HistoryRun[], adj: TyreAdjustments = new Ma
     }
     // Against the field the day cancels, so this one may cross days.
     if (run.field?.gapBestToP1 != null && prev.field?.gapBestToP1 != null) {
-      moves.push(`gap to P1 vs previous run: ${fmtDelta(run.field.gapBestToP1 - prev.field.gapBestToP1)}`);
+      moves.push(`gap to the quickest lap vs previous run: ${fmtDelta(run.field.gapBestToP1 - prev.field.gapBestToP1)}`);
     }
     const eqMove = moves.length > 0 ? `  (${moves.join("; ")})` : "";
     if (changes.length === 0) {
@@ -592,7 +592,7 @@ export function renderHistoryBlock(params: {
         : []),
       ...(runs.some((r) => r.field)
         ? [
-            `"vs field" is from the timing sheet of that session: your place by best lap out of the timed entrants, your best lap minus the fastest driver's (0.00 = you were fastest), the same for the top-5 average, and your best minus the field's median best (negative = faster than the middle of the field). Everyone in the session drove the same track at the same time, so these cancel the track's own movement in a way lap times cannot. A run without it was not imported from a timing sheet with two or more drivers.`,
+            `"vs field" is from the timing sheet of that session: where your best lap ranks among the timed entrants' best laps (not the finishing order) — for the quickest, how far clear of the next — your best lap minus the fastest driver's otherwise, the same for the top-5 average, and your best minus the field's median best (negative = faster than the middle of the field). Everyone in the session drove the same track at the same time, so these cancel the track's own movement in a way lap times cannot. A run without it was not imported from a timing sheet with two or more drivers.`,
           ]
         : []),
       ...(runs.some((r) => r.unconfirmed)

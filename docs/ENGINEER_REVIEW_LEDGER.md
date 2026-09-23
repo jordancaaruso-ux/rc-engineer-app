@@ -289,6 +289,32 @@ shim-adjusted chassis's sheet names them; "RC race engineer".
   rule. k-03 still suggested under-hub shims on the Yokomo ("e.g."), so the parts fact alone didn't fix
   it; b-01 still argued with the driver (not touched — his call).
 
+### 2026-09-23 later — his three calls
+
+Asked for his normal touring rear toe (as a reference for r-02), the toe draft, the buggy answer and the
+lap-time fix, he said:
+
+- **Rear toe number — no.** "If we're gonna do normal rear toe for touring car, that would then lead
+  into doing the average rear toe or average setting for everything on every car. Like, where does
+  that end?" Ruling logged: no normal-setting numbers are written for the Engineer; a car's reference
+  points come from its own data. r-02 (more toe at 3.2°) stays open until that data is on the wire —
+  the published setups for the car (2 of 230 chassis have any in production) or the driver's own runs.
+- **The toe draft — "I'm not sure what that is."** Owed: four plain sentences in
+  `drafts/toe-on-the-grip-curve.md`, already read by the Engineer as unverified; it did not stop r-02.
+- **b-01 — "it should help the driver test his idea… it should reason like a competent engineer
+  human."** Built: one prompt sentence (label `2026-09-23-test-their-lead`). Three samples per wording:
+  "help them test it" → the spring test 3/3, but "don't change the chassis yet" 2/3 and the tyre idea
+  refused 3/3; "start with the test for it" → opens with the test 3/3, tests both ideas 2/3. d-16
+  ("keep softening the rear spring?") now reads the driver's own last test; f-26 unchanged. Still
+  pulling against it, both his to rule: bite-hold.md fact 6 ("These come first, always") and no KB page
+  on tyre compound.
+- **"Three. Yes, do that"** (the tyre effect worked out in code). Built: "against the run before" on
+  every run of the day — top five, then the track in words ("the track 0.08 slower than then"), then
+  the tyres' age from the day's own sets. l-01 and l-04: 4 of 4 samples say the new set hid a ~0.16
+  loss. **Found on the way and fixed:** "P1/5" (best-lap rank) beside LAPS's finishing "P1 TIMOTHY
+  HILYEAR" — one of two l-05 answers gave Tim two heats' quicker pace; the rank now reads "quickest lap
+  of 5, 0.01 clear" and both re-run l-05 answers match the sheet on every margin (checked by script).
+
 ## Fixes landed from this batch
 
 - **2026-09-09, from cards 3–4 (30 edits, 21 files; nets:check 37/37, tsc, 4 suites green):**

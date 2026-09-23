@@ -162,6 +162,29 @@ Each of these was deleted or declined for a reason. They return only through the
 
 ## Changelog
 
+- **2026-09-23, later** — His three calls on the review. Label `2026-09-23-test-their-lead`. (1) **A
+  driver's suspicion is a lead to test** (founder: "it should help the driver test his idea… it should
+  reason like a competent engineer human"): one prompt sentence — what the driver states stays fact;
+  what they suspect gets the test for it first, the change and what on track shows whether they were
+  right, even where the physics can't say which way it will go. b-01 ("I think the car is too soft
+  and the tyres are too soft") went from arguing to opening with the test in 3 of 3 samples, both
+  ideas tested in 2 of 3; d-16 and f-26 kept their answers. Still pulling the other way, both
+  founder-owned: `concepts/bite-hold.md` fact 6 says the tyre/prep check "comes first, always", and
+  the KB has no page on tyre compound, so the tyre idea is still refused once in three. (2) **"Was that
+  faster?" is arithmetic done in code** ("Three. Yes, do that"): under each run of the day, "against
+  the run before" — the top five's change, then with the track's movement taken out (said in words:
+  "the track 0.08 slower than then"), then with the tyres' age taken out as measured on the day's own
+  sets, never on a set both runs used (`againstRunBefore.ts`). The SA 16:53 run on a new set now reads
+  "+0.16 with the tyres' age taken out too"; 4 of 4 answers say the fresh set hid a small loss, where
+  round 06d called it "a faster package". (3) **The best-lap rank reads in words** — "quickest lap of
+  5, 0.01 clear", "2nd-quickest lap of 7, +0.05 to the quickest" — in the day block, the session facts
+  and the range block: beside LAPS's finishing places ("P1 TIMOTHY HILYEAR", who won the 15:31 heat)
+  "P1/5" read as the result and one answer gave Tim the quicker lap. (4) **No normal-setting numbers**:
+  asked for his normal touring rear toe as a reference, the founder declined — "that would then lead
+  into doing the average setting for everything on every car. Like, where does that end?" A car's
+  reference points come from its own data (its published setups, the driver's own runs), never from
+  a table written for the Engineer. Rulings 41/41. NOT through the 56-case launch set.
+
 - **2026-09-23** — Founder: "act as me to review the engineer answers… it also needs to have info on
   all disciplines of cars", then "continue using your best judgement — keep in mind the goal of the
   engineer". A review of rounds 05 and 06 written as him (the ledger has it) found 7 of round 06's 12
