@@ -159,7 +159,7 @@ async function main() {
       pdfName: name, key, verdict: ready ? "ready" : !agree ? "disagree" : "low-confidence",
       agreement: verdictWord, a: fa.displayLabel, b: fb.displayLabel,
       confA: fa.confidence, confB: fb.confidence,
-      printedLabel: fa.printedLabel || fb.printedLabel, section: winner.section,
+      printedLabel: fa.printedLabel || fb.printedLabel, section: winner.section || fa.section || fb.section,
       chosen: ready ? winner.displayLabel : null,
       universalParameterId: ready ? (winner.universalParameterId ?? null) : null,
       options: winner.options ?? null,

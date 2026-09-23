@@ -64,7 +64,9 @@ ${pictures}
 - \`displayLabel\`: what a driver would call it WITHOUT the sheet in front of them: end, corner or pivot
   (FF / FR / RF / RR), the part, units in brackets. **Two different boxes must never share a
   displayLabel.** Use the house words in the primer.
-- \`section\`: the printed section heading in Title Case, from the briefing's block list.
+- \`section\`: the printed section heading in Title Case, from the briefing's block list. Where the sheet
+  prints no heading over the block, name the area of the car instead ("Front Suspension", "Rear
+  Suspension", "Shocks", "Chassis", "Drivetrain", "Electronics", "Header"). Never leave it empty.
 - \`fieldKind\`: "text" for a written value; for tick boxes "choice" when exactly one gets marked,
   "multi" when several commonly do (screw positions, weight positions, top-deck cuts).
 - \`options\`: for tick groups ONLY (\`widgets\` > 1): one entry per box, \`{"widgetIndex": <k − 1>,
