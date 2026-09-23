@@ -206,8 +206,7 @@ export function LapCompareSessionList({
     <div className={cn("space-y-3", className)}>
       {total === 0 ? (
         <p className="px-0.5 py-3 text-[11px] text-muted-foreground">
-          Nothing else to compare against here. Widen the scope to reach other tracks and
-          events.
+          Nothing else at this track to compare against.
         </p>
       ) : (
         groups.map((g) => (

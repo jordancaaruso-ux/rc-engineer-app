@@ -36,6 +36,7 @@ import {
   lapCompareFieldSeriesRunId,
   lapCompareTrackKey,
   lapSeriesMatchesCompareScope,
+  type LapCompareScope,
 } from "@/lib/lapCompareScope";
 import { formatFiveMinuteStint, formatLap, normalizeLapTimes } from "@/lib/runLaps";
 import { calendarYmdInTimeZone, formatRunDateTime, formatRunDateWeekday } from "@/lib/formatDate";
@@ -58,6 +59,7 @@ import {
   type PracticeLookCache,
 } from "@/components/laps/PracticeFieldBrowser";
 import {
+  importedSessionIsPractice,
   practiceColumnName,
   runOwnerName,
   type PracticeFieldSource,
@@ -489,6 +491,7 @@ function SetupHint({
 export function LapComparisonColumnGrid({
   primaryDriverName,
   primaryIsViewer = true,
+  viewerName = null,
   run,
   currentRunId,
   otherRuns = NO_RUNS as CompareRunShape[],
@@ -514,6 +517,11 @@ export function LapComparisonColumnGrid({
   primaryDriverName?: string | null;
   /** False when the run belongs to a teammate; drops the "(my runs)" wording. */
   primaryIsViewer?: boolean;
+  /**
+   * Who is LOOKING, by the name their own runs go under. Only read on an imported sheet, where
+   * `otherRuns` are the viewer's runs and the anchor is whoever is on that sheet.
+   */
+  viewerName?: string | null;
   run: {
     lapTimes: unknown;
     lapSession?: unknown;
@@ -593,6 +601,16 @@ export function LapComparisonColumnGrid({
 
   /** `loadImportedSessionAnchor` mints `import:<id>`; a real run's id never looks like that. */
   const anchorIsImportedSheet = compareAnchorRun.id.startsWith("import:");
+
+  /**
+   * Whose name the runs in `otherRuns` go under. On a run they are its driver's own (or a
+   * teammate's, named by the roster); on an imported sheet they are the VIEWER's, whoever the
+   * sheet belongs to — Sandy's practice, opened from the library, put "Sandy" over every one of
+   * Jordan's runs compared against it (reported 2026-09-24).
+   */
+  const ownRunsLabel = anchorIsImportedSheet
+    ? viewerName?.trim() || (primaryIsViewer ? primaryRunLabel : "Me")
+    : primaryRunLabel;
 
   /**
    * The words the WHOLE picker uses — the tabs, and the headings in the target dropdown above
@@ -690,30 +708,27 @@ export function LapComparisonColumnGrid({
 
   const [setupModalRun, setSetupModalRun] = useState<CompareRunShape | null>(null);
   /*
-   * Defaults to the track, not the day. "Same calendar day" was the old default and it
-   * quietly hid half a test day: the day was resolved from raw instants in the reader's
-   * zone, so a session that ran across the reader's midnight lost everything on the far
-   * side of it (reported 2026-08-09 — a continuous MR33 Arena test day). The track is
-   * the question a lap sheet is opened to answer anyway, and no clock can break it.
+   * The track, and only ever the track (founder call, 2026-09-24: "you're only ever comparing
+   * lap times from the same track") — "Everything" is gone, and the two narrower looks below
+   * stay inside it. "Same calendar day" was the old default and it quietly hid half a test
+   * day: the day was resolved from raw instants in the reader's zone, so a session that ran
+   * across the reader's midnight lost everything on the far side of it (reported 2026-08-09 —
+   * a continuous MR33 Arena test day). A sheet with no track of its own cannot say what "here"
+   * is, so the predicate lets everything through for it rather than showing an empty list.
    */
-  const [compareScope, setCompareScope] = useState<"all" | "same_day" | "same_event" | "same_track">(
-    // …unless this run has no track, where "same track" has nothing to match on and
-    // would open the sheet on an empty list. Scoping to a venue you never recorded is
-    // a dead end, so those runs start at "All" instead.
-    () =>
-      lapCompareTrackKey(compareAnchorRun.track?.name ?? compareAnchorRun.trackNameSnapshot ?? null)
-        ? "same_track"
-        : "all"
-  );
+  const [compareScope, setCompareScope] = useState<LapCompareScope>("same_track");
   const [activeSegment, setActiveSegment] = useState<CompareSegmentKey>("driver");
   /*
    * Which segment the TARGET dropdown lists. A race you only read opens on its field — the
-   * other drivers on that sheet are the whole reason it was opened; your own run opens on
+   * other drivers on that sheet are the whole reason it was opened; someone's practice opens on
+   * Practice (it read "Race results" over Sandy's practice, 2026-09-24); your own run opens on
    * your runs. Falls back to whatever is non-empty (effect below).
    */
-  const [targetSegment, setTargetSegment] = useState<CompareSegmentKey>(() =>
-    anchorIsImportedSheet ? "field" : "driver"
-  );
+  const [targetSegment, setTargetSegment] = useState<CompareSegmentKey>(() => {
+    if (!anchorIsImportedSheet) return "driver";
+    const sheet = run.importedLapSets?.find((s) => s.isPrimaryUser) ?? run.importedLapSets?.[0];
+    return importedSessionIsPractice(sheet?.sourceUrl) ? "practice" : "field";
+  });
   const [pickerOpen, setPickerOpen] = useState(false);
   /** Phone sheet only: whether the target's own pickers are showing — see `renderPicker`. */
   const [targetPickerOpen, setTargetPickerOpen] = useState(false);
@@ -1027,7 +1042,7 @@ export function LapComparisonColumnGrid({
       // driver is the wrong name to print above a column that isn't theirs. The
       // roster is only passed in team mode; solo lists fall through unchanged.
       const runDriverLabel =
-        (r.userId ? memberDisplayByUserId?.[r.userId]?.trim() : "") || primaryRunLabel;
+        (r.userId ? memberDisplayByUserId?.[r.userId]?.trim() : "") || ownRunsLabel;
       const ser = buildComparisonSeries(
         `history:${r.id}`,
         runDriverLabel,
@@ -1037,7 +1052,7 @@ export function LapComparisonColumnGrid({
       );
       rawHistory.push(ser);
       const metaLine = formatCompareRunMetaLine(r);
-      const carName = r.car?.name?.trim() || r.carNameSnapshot?.trim() || primaryRunLabel;
+      const carName = r.car?.name?.trim() || r.carNameSnapshot?.trim() || ownRunsLabel;
       const whenIso = resolveRunDisplayInstant(r).toISOString();
       const sortIso = resolveRunSortInstant(r).toISOString();
       const trackCtx = r.track?.name?.trim() || r.trackNameSnapshot?.trim() || null;
@@ -1066,6 +1081,8 @@ export function LapComparisonColumnGrid({
     const rawLibrary: ComparisonSeries[] = [];
     for (const lib of librarySessions) {
       if (!lib.laps?.length) continue;
+      // The sheet you opened is in the library too; it is not something to compare itself with.
+      if (anchorIsImportedSheet && `import:${lib.id}` === compareAnchorRun.id) continue;
       const ser = buildComparisonSeries(
         `library:${lib.id}`,
         lib.selectLabel,
@@ -1138,7 +1155,7 @@ export function LapComparisonColumnGrid({
       const whenIso = resolveRunDisplayInstant(r).toISOString();
       const sortIso = resolveRunSortInstant(r).toISOString();
       const raceName = formatRunSessionDisplay(r, {
-        fallback: r.car?.name?.trim() || r.carNameSnapshot?.trim() || primaryRunLabel,
+        fallback: r.car?.name?.trim() || r.carNameSnapshot?.trim() || ownRunsLabel,
       });
       const trackCtx = r.track?.name?.trim() || r.trackNameSnapshot?.trim() || null;
       for (const s of merged) {
@@ -1213,6 +1230,7 @@ export function LapComparisonColumnGrid({
   }, [
     run,
     primaryRunLabel,
+    ownRunsLabel,
     historyPickOptions,
     dayRunNames,
     compareAnchorRun,
@@ -1535,7 +1553,7 @@ export function LapComparisonColumnGrid({
           row: {
             id: `held:${r.id}`,
             name: [
-              runOwnerName((r.userId ? memberDisplayByUserId?.[r.userId]?.trim() : "") || primaryRunLabel),
+              runOwnerName((r.userId ? memberDisplayByUserId?.[r.userId]?.trim() : "") || ownRunsLabel),
               dayRunNames[r.id] || formatRunSessionDisplay(r, { fallback: carName ?? "Run" }),
             ]
               .filter(Boolean)
@@ -1612,6 +1630,7 @@ export function LapComparisonColumnGrid({
     neighbourRunSeries,
     memberDisplayByUserId,
     primaryRunLabel,
+    ownRunsLabel,
   ]);
 
   /*
@@ -2588,10 +2607,9 @@ export function LapComparisonColumnGrid({
             value={compareScope}
             onChange={(e) => setCompareScope(e.target.value as typeof compareScope)}
           >
-            <option value="same_track">This track only</option>
+            <option value="same_track">This track</option>
             {compareAnchorRun.eventId ? <option value="same_event">This event only</option> : null}
             <option value="same_day">This calendar day only</option>
-            <option value="all">Everything</option>
           </select>
         </div>
       </div>

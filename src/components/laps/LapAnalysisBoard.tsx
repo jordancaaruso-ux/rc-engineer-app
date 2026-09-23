@@ -25,6 +25,7 @@ export function LapAnalysisBoard({
   runListSource,
   primaryDriverName,
   primaryIsViewer,
+  viewerName = null,
   initialTargetId,
   initialComparisonIds,
   viewerUserId = null,
@@ -41,6 +42,8 @@ export function LapAnalysisBoard({
   primaryDriverName?: string | null;
   /** False on an imported session the viewer didn't drive — drops the "(my runs)" wording. */
   primaryIsViewer: boolean;
+  /** The viewer's own name — what their runs are called beside someone else's session. */
+  viewerName?: string | null;
   initialTargetId?: string;
   initialComparisonIds?: string[];
   viewerUserId?: string | null;
@@ -127,6 +130,7 @@ export function LapAnalysisBoard({
       <LapComparisonColumnGrid
         primaryDriverName={primaryDriverName}
         primaryIsViewer={primaryIsViewer}
+        viewerName={viewerName}
         run={sheetRun}
         currentRunId={run.id}
         otherRuns={otherRuns.filter((r) => r.id !== run.id)}

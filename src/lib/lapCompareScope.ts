@@ -15,7 +15,8 @@
  *                   this one. Scoped exactly like the `history:` row of that run.
  */
 
-export type LapCompareScope = "all" | "same_day" | "same_event" | "same_track";
+/** All three are within the sheet's track; there is no wider look (founder call, 2026-09-24). */
+export type LapCompareScope = "same_day" | "same_event" | "same_track";
 
 const FIELD_PREFIX = "field:";
 
@@ -93,18 +94,19 @@ export function lapSeriesMatchesCompareScope(input: {
   // into a run logged in August and the compare list came up empty.
   if (seriesId.startsWith("imported:")) return true;
 
-  if (scope === "all") return true;
-  if (scope === "same_day") return sameLocalCalendarDay(sortIso, anchorInstantIso);
-
-  // same_track — the default. "Was I quicker here?" is the question a lap sheet is
-  // actually opened to answer, and unlike same_day it cannot be broken by a session
-  // that crosses midnight. A series whose track is unknown (an imported session never
-  // linked to a run) is dropped rather than guessed at; it stays reachable under "All".
-  if (scope === "same_track") {
-    if (seriesId === "run:primary") return true;
-    if (!anchorTrackKey) return false;
-    return (trackKeyForSeries?.(seriesId) ?? null) === anchorTrackKey;
+  /*
+   * Every scope is the anchor's track first (founder call, 2026-09-24: "you're only ever
+   * comparing lap times from the same track"). "Was I quicker here?" is the question a lap
+   * sheet is opened to answer, and a time from another circuit answers nothing. A series whose
+   * track is unknown (an import never linked to a run and not matched to a club) is dropped
+   * rather than guessed at. Only a sheet whose OWN track is unknown lets everything through:
+   * it cannot say what "here" is, and hiding every session would be a dead end.
+   */
+  if (seriesId !== "run:primary" && anchorTrackKey) {
+    if ((trackKeyForSeries?.(seriesId) ?? null) !== anchorTrackKey) return false;
   }
+  if (scope === "same_track") return true;
+  if (scope === "same_day") return sameLocalCalendarDay(sortIso, anchorInstantIso);
 
   // same_event. With no event on the anchor there is nothing to match, so keep
   // everything attached to a run and drop the free-floating library sessions.

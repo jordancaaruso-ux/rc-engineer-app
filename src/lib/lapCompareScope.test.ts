@@ -74,7 +74,7 @@ test("same_day keeps the run's own imported race field regardless of its date", 
 });
 
 test("same_day keeps the imported field under every scope", () => {
-  for (const scope of ["all", "same_day", "same_event"] as const) {
+  for (const scope of ["same_track", "same_day", "same_event"] as const) {
     assert.equal(
       lapSeriesMatchesCompareScope({
         seriesId: "imported:set1",
@@ -98,19 +98,29 @@ test("same_day still filters library sessions and other runs by calendar day", (
   assert.equal(lapSeriesMatchesCompareScope({ seriesId: "history:r1", ...on }), true);
 });
 
-test("all keeps everything", () => {
-  for (const id of ["run:primary", "imported:s1", "history:r1", "library:l1"]) {
-    assert.equal(
-      lapSeriesMatchesCompareScope({
-        seriesId: id,
-        sortIso: APR_10,
-        scope: "all",
-        anchorInstantIso: AUG_2,
-      }),
-      true,
-      `${id} dropped under scope all`
-    );
-  }
+test("every scope is the sheet's track first: the same day or event at another track is out", () => {
+  const elsewhere = (id: string) =>
+    id === "history:away" ? lapCompareTrackKey("Geelong") : lapCompareTrackKey("MR33 Arena");
+  const sameDay = {
+    sortIso: localIso(2026, 8, 2, 9),
+    scope: "same_day" as const,
+    anchorInstantIso: AUG_2,
+    anchorTrackKey: lapCompareTrackKey("MR33 Arena"),
+    trackKeyForSeries: elsewhere,
+  };
+  assert.equal(lapSeriesMatchesCompareScope({ seriesId: "history:home", ...sameDay }), true);
+  assert.equal(lapSeriesMatchesCompareScope({ seriesId: "history:away", ...sameDay }), false);
+  const sameEvent = {
+    sortIso: APR_10,
+    scope: "same_event" as const,
+    anchorInstantIso: AUG_2,
+    anchorEventId: "evt-1",
+    eventIdForHistoryRun: () => "evt-1",
+    anchorTrackKey: lapCompareTrackKey("MR33 Arena"),
+    trackKeyForSeries: elsewhere,
+  };
+  assert.equal(lapSeriesMatchesCompareScope({ seriesId: "history:home", ...sameEvent }), true);
+  assert.equal(lapSeriesMatchesCompareScope({ seriesId: "history:away", ...sameEvent }), false);
 });
 
 test("same_event matches history runs on the anchor's event", () => {
@@ -207,7 +217,7 @@ test("same_track drops a series whose track is unknown rather than guessing", ()
     }),
     false
   );
-  // And with no track on the anchor there is nothing to match against.
+  // A sheet with no track of its own cannot say what "here" is: nothing is hidden from it.
   assert.equal(
     lapSeriesMatchesCompareScope({
       seriesId: "history:r1",
@@ -217,7 +227,7 @@ test("same_track drops a series whose track is unknown rather than guessing", ()
       anchorTrackKey: null,
       trackKeyForSeries: () => lapCompareTrackKey("MR33 Arena"),
     }),
-    false
+    true
   );
 });
 

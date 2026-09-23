@@ -147,8 +147,14 @@ async function trackNamesBySpeedhiveLocation(userId: string, locations: number[]
   return out;
 }
 
+/** The columns the track lookup reads — a subset of {@link SESSION_NAMING_SELECT}. */
+export type SessionTrackRow = Pick<
+  SessionNamingDbRow,
+  "id" | "sourceUrl" | "parsedPayload" | "track" | "linkedRun" | "linkedEvent"
+>;
+
 function trackNameOf(
-  row: SessionNamingDbRow,
+  row: SessionTrackRow,
   byHost: Map<string, string>,
   byLocation: Map<number, string>
 ): string | null {
@@ -166,6 +172,37 @@ function trackNameOf(
     hintString(row.parsedPayload, "practiceLocationName") ||
     null
   );
+}
+
+/**
+ * Which track each session was at: the sweep's, a linked run's or event's, the practice list's,
+ * or the club whose LiveRC address or MYLAPS location matches; null when none of ours does. The
+ * lap sheet scopes every comparison by this (same track only — founder call, 2026-09-24), so the
+ * pickers read it for every session, not just the ones on a run.
+ */
+export async function loadSessionTrackNames(
+  userId: string,
+  rows: readonly SessionTrackRow[]
+): Promise<Map<string, string | null>> {
+  const hosts = [
+    ...new Set(
+      rows
+        .map((r) => hostOf(r.sourceUrl))
+        .filter((h): h is string => !!h && h.endsWith(".liverc.com"))
+    ),
+  ];
+  const locations = [
+    ...new Set(
+      rows
+        .map((r) => parseSpeedhivePracticeActivityRef(r.sourceUrl)?.locationId ?? null)
+        .filter((l): l is number => l != null)
+    ),
+  ];
+  const [byHost, byLocation] = await Promise.all([
+    trackNamesByLiveRcHost(userId, hosts),
+    trackNamesBySpeedhiveLocation(userId, locations),
+  ]);
+  return new Map(rows.map((r) => [r.id, trackNameOf(r, byHost, byLocation)]));
 }
 
 function toNamingRow(row: SessionNamingDbRow, trackName: string | null): SessionNamingRow {
@@ -235,27 +272,10 @@ export async function loadSessionNames(params: {
   ]);
 
   const all = [...rows, ...siblings];
-  const hosts = [
-    ...new Set(
-      all
-        .map((r) => hostOf(r.sourceUrl))
-        .filter((h): h is string => !!h && h.endsWith(".liverc.com"))
-    ),
-  ];
-  const locations = [
-    ...new Set(
-      all
-        .map((r) => parseSpeedhivePracticeActivityRef(r.sourceUrl)?.locationId ?? null)
-        .filter((l): l is number => l != null)
-    ),
-  ];
-  const [byHost, byLocation] = await Promise.all([
-    trackNamesByLiveRcHost(userId, hosts),
-    trackNamesBySpeedhiveLocation(userId, locations),
-  ]);
+  const tracks = await loadSessionTrackNames(userId, all);
 
   const named = nameImportedSessions(
-    all.map((r) => toNamingRow(r, trackNameOf(r, byHost, byLocation))),
+    all.map((r) => toNamingRow(r, tracks.get(r.id) ?? null)),
     viewer,
     { timeZone: params.timeZone, now: params.now }
   );

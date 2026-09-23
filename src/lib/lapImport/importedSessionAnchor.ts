@@ -88,6 +88,8 @@ export async function loadImportedSessionAnchor(
       eventDetectionSource: true,
       eventDetectionSessionLabel: true,
       eventRaceClass: true,
+      // The sweep files a loose import with the track it found it at.
+      track: { select: { id: true, name: true } },
       linkedRun: {
         select: { trackNameSnapshot: true, track: { select: { id: true, name: true } } },
       },
@@ -146,11 +148,12 @@ export async function loadImportedSessionAnchor(
   });
 
   const trackName =
+    row.track?.name?.trim() ||
     row.linkedEvent?.track?.name?.trim() ||
     row.linkedRun?.track?.name?.trim() ||
     row.linkedRun?.trackNameSnapshot?.trim() ||
     null;
-  const trackId = row.linkedEvent?.track?.id ?? row.linkedRun?.track?.id ?? null;
+  const trackId = row.track?.id ?? row.linkedEvent?.track?.id ?? row.linkedRun?.track?.id ?? null;
 
   const anchorRows = sets.find((s) => s.isPrimaryUser)?.laps ?? [];
 

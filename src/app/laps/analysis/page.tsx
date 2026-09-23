@@ -4,17 +4,16 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
-import {
-  getKnownCompetitorsSetting,
-  getLiveRcDriverNameSetting,
-  getMyNameSetting,
-} from "@/lib/appSettings";
+import { getKnownCompetitorsSetting, getMyNameSetting } from "@/lib/appSettings";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { toCompareRunShape } from "@/lib/runCompareShape";
 import { loadImportedSessionAnchor } from "@/lib/lapImport/importedSessionAnchor";
-import { loadSessionNames, SESSION_NAMING_SELECT } from "@/lib/lapImport/loadSessionNames";
-import { getSpeedhiveDriverNamesForUser } from "@/lib/speedhive/speedhiveDriverSettings";
+import {
+  loadSessionNames,
+  loadSessionNamingViewer,
+  SESSION_NAMING_SELECT,
+} from "@/lib/lapImport/loadSessionNames";
 import { LapAnalysisBoard } from "@/components/laps/LapAnalysisBoard";
 import { LapAnalysisLibrary } from "@/components/laps/LapAnalysisLibrary";
 import { CompetitorPracticePull } from "@/components/laps/CompetitorPracticePull";
@@ -213,16 +212,11 @@ export default async function LapAnalysisPage(props: {
      * Every name timing might print the viewer under. A race they DID enter should open on
      * their own row rather than the winner's, and this is the only thread connecting an
      * imported sheet back to the person reading it — an import has no user column beyond
-     * who happened to fetch it.
+     * who happened to fetch it. The same viewer names the session and the viewer's own runs.
      */
-    const [speedhiveNames, liveRcName] = await Promise.all([
-      getSpeedhiveDriverNamesForUser(user.id),
-      getLiveRcDriverNameSetting(user.id),
-    ]);
-    const myName = await getMyNameSetting(user.id);
-    const viewerNames = [...speedhiveNames, liveRcName ?? "", myName ?? ""].filter(Boolean);
+    const viewer = await loadSessionNamingViewer(user.id);
 
-    const anchor = await loadImportedSessionAnchor(user.id, sessionId, { viewerNames });
+    const anchor = await loadImportedSessionAnchor(user.id, sessionId, { viewerNames: [...viewer.names] });
     if (!anchor) notFound();
 
     /*
@@ -244,12 +238,19 @@ export default async function LapAnalysisPage(props: {
             userId: user.id,
             rows: [namingRow],
             timeZone: user.timeZone?.trim() || null,
+            viewer,
           })
         ).get(sessionId) ?? null)
       : null;
     const title = name?.title ?? anchor.title;
     // A session on a run holds that run's laps: the run is what gets deleted, not this.
     const onRun = Boolean(namingRow?.linkedRunId || namingRow?.detectedPrimaryForRun);
+    /*
+     * The sheet compares within its track only (founder call, 2026-09-24). A loose import has no
+     * run or event to take a track from; the namer's lookup — the sweep's track, the practice
+     * list's, the club whose LiveRC address matches — gives it the same one its heading shows.
+     */
+    const trackName = anchor.trackName ?? name?.trackName ?? null;
     const sourceWord = anchor.sourceLabel ? (TIMING_SOURCE_LABEL[anchor.sourceLabel] ?? null) : null;
     /*
      * Formatted here, on the track's clock, rather than in the browser: the board's own line
@@ -301,14 +302,19 @@ export default async function LapAnalysisPage(props: {
         <LapAnalysisBoard
           /* The sheet names its column after the DRIVER already; its session line wants the
              run ("Run 3", the race, or what the driver typed), not the name a second time. */
-          run={{ ...anchor.run, sessionLabel: name?.label ?? anchor.title }}
+          run={{
+            ...anchor.run,
+            sessionLabel: name?.label ?? anchor.title,
+            trackNameSnapshot: anchor.run.trackNameSnapshot ?? trackName,
+          }}
           otherRuns={myRuns.map(toCompareRunShape)}
           runListSource="my_runs"
           primaryDriverName={anchor.anchorDriverName}
           primaryIsViewer={anchor.anchorIsViewer}
+          viewerName={viewer.displayName}
           initialTargetId={initialTargetId}
           initialComparisonIds={initialComparisonIds ?? wholeField}
-          trackName={anchor.trackName}
+          trackName={trackName}
           whenIso={anchor.whenIso}
           driverCount={anchor.driverCount}
           sourceLabel={anchor.sourceLabel}

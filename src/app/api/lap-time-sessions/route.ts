@@ -4,6 +4,7 @@ import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { importedSessionFieldStatsPreviewFromJson } from "@/lib/lapImport/computeImportedSessionFieldStats";
 import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
+import { loadSessionTrackNames } from "@/lib/lapImport/loadSessionNames";
 
 /**
  * The newest imports with their laps, for the lap-sheet pickers (`useImportedLapLibrary`). The
@@ -46,16 +47,19 @@ export async function GET() {
       eventDetectionSource: true,
       eventDetectionSessionLabel: true,
       eventRaceClass: true,
-      // An import has no track of its own; the only claim it can make is via the run
-      // it was linked to. The lap sheet's "same track" scope needs this, and an
-      // unlinked import stays honestly trackless rather than being guessed at.
+      // Where it was: the sweep's track, a linked run's or event's, or (below) the club whose
+      // timing address matches. The lap sheet only compares within one track, so a session
+      // with no track of ours never reaches a picker.
+      track: { select: { name: true } },
       linkedRun: {
         select: { trackNameSnapshot: true, track: { select: { name: true } } },
       },
+      linkedEvent: { select: { track: { select: { name: true } } } },
     },
     }),
     prisma.importedLapTimeSession.count({ where: { userId, hiddenAt: null } }),
   ]);
+  const tracks = await loadSessionTrackNames(userId, rows);
 
   const sessions = rows
     .map((r) => ({
@@ -70,7 +74,7 @@ export async function GET() {
       eventDetectionSource: r.eventDetectionSource,
       eventDetectionSessionLabel: r.eventDetectionSessionLabel,
       eventRaceClass: r.eventRaceClass,
-      trackName: r.linkedRun?.track?.name ?? r.linkedRun?.trackNameSnapshot ?? null,
+      trackName: tracks.get(r.id) ?? null,
       parsedPayload: r.parsedPayload,
       fieldStatsPreview: importedSessionFieldStatsPreviewFromJson(r.fieldStatsJson),
     }))

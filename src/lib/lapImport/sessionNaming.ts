@@ -87,6 +87,8 @@ export type SessionName = {
   runNumber: number | null;
   /** The track, or the timing site when no track could be matched. */
   place: string;
+  /** The track alone — null when only the timing site is known. What the lap sheet scopes by. */
+  trackName: string | null;
   /** Calendar day of the session on the track's clock, YYYY-MM-DD. */
   dayKey: string;
   /** "Tue 22 Sept" — the year only when it isn't this year. */
@@ -345,7 +347,8 @@ function draftName(
    */
   const siteRunNumber = isRace ? null : (parseSpeedhivePracticeActivityRef(row.sourceUrl)?.trainingSessionId ?? null);
 
-  const place = usable(row.trackName) ?? siteLabel(row.sourceUrl);
+  const trackName = usable(row.trackName) ?? null;
+  const place = trackName ?? siteLabel(row.sourceUrl);
   const groupKey = `${dayKey}|${normalizeName(place)}`;
 
   const race = isRace ? raceNameOf(row, hint) : null;
@@ -363,6 +366,7 @@ function draftName(
     who,
     isViewer,
     place,
+    trackName,
     dayKey,
     dayLabel,
     timeLabel,
@@ -443,6 +447,7 @@ export function nameImportedSessions(
       isViewer: draft.isViewer,
       runNumber,
       place: draft.place,
+      trackName: draft.trackName,
       dayKey: draft.dayKey,
       dayLabel: draft.dayLabel,
       timeLabel: draft.timeLabel,
