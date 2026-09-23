@@ -54,6 +54,12 @@ test("each gpt-5.6 tier prices off its own row", () => {
   assert.deepEqual(modelRate("gpt-5.6"), { input: 5, output: 30 });
 });
 
+test("gpt-6 tiers price off their own rows", () => {
+  assert.deepEqual(modelRate("gpt-6-sol"), { input: 2, output: 10 });
+  assert.deepEqual(modelRate("gpt-6-luna"), { input: 0.1, output: 0.5 });
+  assert.deepEqual(modelRate("gpt-6-sol-2026-09-22"), { input: 2, output: 10 });
+});
+
 test("unknown models fall back to the expensive rate, never to free", () => {
   const rate = modelRate("some-future-model");
   assert.equal(rate.input, 5);

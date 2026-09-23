@@ -440,6 +440,43 @@ his targets (36M prompt tokens, 88% cached; ≈US$45 at the 08-06 blended rate, 
   his targets: 9 good, 3 close (j-01 try 2 skips the diff; s-02 try 2 offers toe gain; a-01 no "go
   thicker" branch), 0 wrong; o-01's 16.87 still his call.
 
+### 2026-09-24 — GPT-6 Sol against Terra ("I want to know if Sol is better than Terra")
+
+**Found first:** every harness round so far ran Terra at reasoning effort **high**, because `.env.local`
+sets ENGINEER_REASONING_EFFORT=high. Production sends no effort, which is Terra's default, **medium**.
+The answers he graded were therefore thought harder than drivers' answers. The harness now prints and
+records model, effort and time per turn (`--dry` shows them with no call).
+
+**The test:** both models at medium, on the landed payload (v1-nets). All 12 round-07 questions, 6 tries
+each: 144 conversations, 192 calls, batches `r07-{terra,sol}-med-{a..f}`.
+
+**Speed, length and cost:** the same wait (p50 10.5 s for both; p90 14 s Terra, 16 s Sol) and the same
+cost (a first question about 10c). Sol writes a fifth less (105 words against 134).
+
+**His NEVERs, graded blind by Claude (first reply, 24 tries each):**
+- Terra broke 4: g-01 thicker diff, s-02 rear toe gain, and s-05 thinner front oil twice. Two more g-01
+  tries gave the thicker diff "if it's wheelspin".
+- Sol broke 0.
+
+**His j-01 MUST (thicker rear diff):** Terra 4 of 6, Sol 0 of 6. Sol chose a softer front bar every
+time and asked whether the push is on power only.
+
+**Questions:** Sol asks the driver something in 23 of 96 replies, Terra in 6. Neither ever replied with
+only a question.
+
+**Four blind Claude judges, all 72 pairs:** Sol won 41, Terra won 3, 28 ties. They found 29 real
+mistakes in Terra's answers and 0 in Sol's:
+- Terra's NEVERs as above.
+- Six o-01 tries misread the laps or which run changed what.
+- s-04-a: the roll-centre check was backwards.
+- s-07-f: "push" was fixed at the front.
+- On s-06 the judges counted Terra's "lower both roll centres" (3 of 6) as wrong, because the logged
+  run that tried it was slower. His target line WANTED that suggestion. Sol never offered it, citing the
+  run.
+
+**Blind page for his picks:** https://claude.ai/artifact/9BLaGjTfteJqmQAVWxT8GU (12 pairs, picks in
+its db `picks/<pairId>`). Awaiting his picks. No model switch without his call.
+
 ## Fixes landed from this batch
 
 - **2026-09-09, from cards 3–4 (30 edits, 21 files; nets:check 37/37, tsc, 4 suites green):**

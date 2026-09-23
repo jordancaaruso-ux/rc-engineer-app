@@ -13,6 +13,7 @@ import {
   standardEngineerBlocks,
   type EngineerPayloadBlock,
 } from "@/lib/engineer/payload";
+import { buildChatCompletionBody } from "@/lib/engineer/openai";
 import {
   ENGINEER_CHAT_SYSTEM_PROMPT,
   ENGINEER_KB_HEADER,
@@ -98,6 +99,24 @@ test("empty and oversized messages are handled before they reach the wire", () =
   ]);
   assert.equal(msgs.length, 3, "blank turns are dropped");
   assert.equal(msgs[2].content?.length, 4096, "long turns are capped");
+});
+
+test("GPT-5 and later get the effort and never a temperature; older models the reverse", () => {
+  const saved = process.env.ENGINEER_REASONING_EFFORT;
+  process.env.ENGINEER_REASONING_EFFORT = "medium";
+  try {
+    for (const model of ["gpt-5.6-terra", "gpt-6-sol", "gpt-6-sol-2026-09-22"]) {
+      const body = buildChatCompletionBody(model, 0.3, { messages: [] });
+      assert.equal(body.temperature, undefined, `${model} refuses a custom temperature`);
+      assert.equal(body.reasoning_effort, "medium", `${model} takes the effort knob`);
+    }
+    const old = buildChatCompletionBody("gpt-4o", 0.3, { messages: [] });
+    assert.equal(old.temperature, 0.3);
+    assert.equal(old.reasoning_effort, undefined);
+  } finally {
+    if (saved === undefined) delete process.env.ENGINEER_REASONING_EFFORT;
+    else process.env.ENGINEER_REASONING_EFFORT = saved;
+  }
 });
 
 test("prompt version fingerprints the prompt text, so a wording change is traceable", () => {

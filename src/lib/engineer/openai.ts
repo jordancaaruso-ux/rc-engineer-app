@@ -72,12 +72,21 @@ export function mustGetOpenAiKey(): string {
 }
 
 /**
- * Some models (GPT-5 family, o-series) only allow the default sampler — sending
+ * GPT-5 and every generation after it (gpt-5.6-terra, gpt-6-sol, …) are reasoning models: they
+ * take a reasoning effort and refuse a custom temperature. A bare `startsWith("gpt-5")` sent
+ * gpt-6 models a temperature and no effort.
+ */
+function isGpt5OrLater(model: string): boolean {
+  return /^gpt-([5-9]|[1-9]\d)/.test(model.trim().toLowerCase());
+}
+
+/**
+ * Some models (GPT-5 and later, o-series) only allow the default sampler — sending
  * temperature≠1 errors. Omit `temperature` in the request body for those.
  */
 function modelSupportsCustomTemperature(model: string): boolean {
   const m = model.trim().toLowerCase();
-  if (m.startsWith("gpt-5")) return false;
+  if (isGpt5OrLater(m)) return false;
   if (/^o[0-9]/.test(m)) return false;
   return true;
 }
@@ -87,13 +96,13 @@ const REASONING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "
 /**
  * `ENGINEER_REASONING_EFFORT` — unset by default, which keeps the model's own default and
  * leaves the request body byte-identical to before this knob existed. An unrecognised value
- * is ignored rather than forwarded: a typo here would 400 every Engineer answer. Non-GPT-5
- * models reject the param outright, so it is only ever attached to `gpt-5*`.
+ * is ignored rather than forwarded: a typo here would 400 every Engineer answer. Pre-GPT-5
+ * models reject the param outright, so it is only ever attached to GPT-5 and later.
  */
 export function engineerReasoningEffort(model: string): string | null {
   const raw = process.env.ENGINEER_REASONING_EFFORT?.trim().toLowerCase();
   if (!raw || !REASONING_EFFORTS.has(raw)) return null;
-  return model.trim().toLowerCase().startsWith("gpt-5") ? raw : null;
+  return isGpt5OrLater(model) ? raw : null;
 }
 
 /**

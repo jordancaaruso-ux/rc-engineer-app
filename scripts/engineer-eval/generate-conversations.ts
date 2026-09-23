@@ -19,10 +19,16 @@
  *
  * Writes answers/<batch>/<arm>__<context>.json (gitignored). Resumes per case. Requires
  * OPENAI_API_KEY (answers run on the Engineer's own model/transport).
+ *
+ * Model and reasoning effort come from ENGINEER_MODEL / ENGINEER_REASONING_EFFORT (shell beats
+ * .env.local). Every case records the model, the effort it ran at and each turn's time, because an
+ * unrecorded effort once left a round's answers unmatched to what drivers get. `--dry` prints the
+ * settings a run would use and stops before any call.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { generateEngineerChatReply } from "@/lib/engineer/chat";
+import { engineerChatModel, engineerReasoningEffort } from "@/lib/engineer/openai";
 import type { EngineerChatMessage, EngineerPayloadBlock } from "@/lib/engineer/payload";
 import { ENGINEER_PROMPT_VERSION } from "@/lib/engineer/prompt";
 import { LIVERC_PRACTICE_TOOL_DEFINITION } from "@/lib/engineer/livercPracticeTool";
@@ -32,7 +38,17 @@ import { getArm } from "./arms";
 type LaunchCase = { id: string; shape: string; source: string; turns: string[] };
 type LaunchSet = { contexts: string[]; cases: LaunchCase[] };
 type Turn = { role: "user" | "assistant"; content: string; fetched?: string[] };
-type CaseResult = { shape: string; source: string; turns: Turn[]; model: string; usage: unknown[] };
+type CaseResult = {
+  shape: string;
+  source: string;
+  turns: Turn[];
+  model: string;
+  /** The effort sent, or "model default" when none was (the production case today). */
+  effort?: string;
+  usage: unknown[];
+  /** Wall time of each assistant turn, ms. */
+  ms?: number[];
+};
 type AnswerFile = {
   arm: string;
   context: string;
@@ -79,6 +95,11 @@ async function main() {
   const contexts = argValue("--contexts")?.split(",").map((s) => s.trim()) ?? set.contexts;
   const cases = set.cases.filter((c) => !only || only.includes(c.id));
 
+  const setting = engineerChatModel().model;
+  const effortOf = (model: string) => engineerReasoningEffort(model) ?? "model default";
+  console.log(`model ${setting} · reasoning effort ${effortOf(setting)}`);
+  if (process.argv.includes("--dry")) return;
+
   const blocks = await arm.buildBlocks();
   const outDir = path.join(__dirname, "answers", batch);
   fs.mkdirSync(outDir, { recursive: true });
@@ -102,6 +123,7 @@ async function main() {
       process.stdout.write(`[${arm.id} · ${context}] ${c.id} (${c.turns.length} turn${c.turns.length > 1 ? "s" : ""}) … `);
       const turns: Turn[] = [];
       const usage: unknown[] = [];
+      const ms: number[] = [];
       let model = "";
       try {
         for (const q of c.turns) {
@@ -109,12 +131,14 @@ async function main() {
           const history: EngineerChatMessage[] = turns.map((t) => ({ role: t.role, content: t.content }));
           const fetched: string[] = [];
           const tools = loadToolFixture(context, fetched) ?? undefined;
+          const started = Date.now();
           const out = await generateEngineerChatReply({ messages: history, blocks, driverBlocks, tools });
+          ms.push(Date.now() - started);
           turns.push({ role: "assistant", content: out.reply, ...(fetched.length > 0 ? { fetched } : {}) });
           usage.push(out.usage);
           model = out.model;
         }
-        file.cases[c.id] = { shape: c.shape, source: c.source, turns, model, usage };
+        file.cases[c.id] = { shape: c.shape, source: c.source, turns, model, effort: effortOf(model), usage, ms };
         done++;
         const fetches = turns.filter((t) => t.fetched?.length).length;
         console.log(`ok (${turns.filter((t) => t.role === "assistant").map((t) => t.content.length).join("+")} chars${fetches ? `, fetched LiveRC on ${fetches} turn${fetches === 1 ? "" : "s"}` : ""})`);

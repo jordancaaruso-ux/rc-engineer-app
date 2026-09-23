@@ -45,6 +45,9 @@ const MODEL_RATES_USD_PER_MTOK: Record<string, { input: number; output: number }
   // the "gpt-5" prefix and get priced at 1.25/10. Pin it to the dearest tier — over-counting caps
   // early, which is visible; under-counting is not.
   "gpt-5.6": { input: 5, output: 30 },
+  // gpt-6 (2026-09-22). No untiered "gpt-6" row: an unlisted tier (Astra) falls to UNKNOWN_MODEL_RATE.
+  "gpt-6-sol": { input: 2, output: 10 },
+  "gpt-6-luna": { input: 0.1, output: 0.5 },
 };
 
 /** Conservative (high) fallback: better to cap early than to under-count a model we don't know. */
