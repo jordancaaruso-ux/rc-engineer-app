@@ -327,7 +327,11 @@ their captures are `fixtures/private-*.txt`, git-excluded, never committed.
 
 **Fixed without a ruling** (label `2026-09-23-round-07`): "contested" out of the prompt and the nets
 header; HRB spelled out on the sheet; "against the run before" in on-track order (it had printed
-"against 14:53" under a 14:46 run filed later from the timing sheet).
+"against 14:53" under a 14:46 run filed later from the timing sheet). Re-asked: "contested" 0 of 4
+(s-03, s-04 twice each; "genuinely goes either way" instead). HRB: "rear HRB (hydraulic roll bar)
+setting" was still read as the body height once in two; with the full name first, "rear hydraulic roll
+bar (HRB) setting", 3 of 3 name it right (round-07e/f/g). They still assume a higher number is a
+stiffer bar — the sheet says what a box is, not yet which way is more.
 - **b-01 — "it should help the driver test his idea… it should reason like a competent engineer
   human."** Built: one prompt sentence (label `2026-09-23-test-their-lead`). Three samples per wording:
   "help them test it" → the spring test 3/3, but "don't change the chassis yet" 2/3 and the tyre idea
