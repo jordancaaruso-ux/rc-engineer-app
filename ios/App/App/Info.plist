@@ -51,5 +51,21 @@
 	     than letting the phone's own dark mode pick white status-bar text over it. -->
 	<key>UIUserInterfaceStyle</key>
 	<string>Light</string>
+	<!-- HTTPS only, nothing custom: answers App Store Connect's encryption question on every upload. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<!-- The sentences under iOS's permission prompts. Without the camera and microphone ones the app
+	     is killed the moment someone taps "Take Video" on a file picker; without the location one the
+	     nearby-tracks list and the track pin silently get nothing. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Film your runs, photograph a timing screen to read your laps, or take a profile photo.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Records the sound on videos you film of your runs.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose run videos, timing-screen photos or a profile photo from your library.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save pictures from the app to your Photos.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Finds tracks near you and pins a new track where you're standing.</string>
 </dict>
 </plist>

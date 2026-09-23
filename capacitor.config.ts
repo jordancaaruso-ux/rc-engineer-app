@@ -1,14 +1,19 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 /**
- * iOS shell loads the hosted Next.js app (Vercel). Set CAPACITOR_SERVER_URL to your
- * production or preview origin before `npx cap sync ios`.
+ * The shell loads the hosted Next.js app (Vercel). With nothing set, `npm run cap:sync` points it at
+ * the live site; set CAPACITOR_SERVER_URL to aim a build somewhere else (beta, or a dev server).
+ *
+ * The default is the WWW host on purpose: the bare jrcdynamics.com answers with a redirect to www,
+ * and the shell treats a hop to a different host as a link out of the app — the sign-in cookie and
+ * the start page have to live on the exact host the app opens.
  *
  * Local device testing against dev server (same LAN):
  *   CAPACITOR_SERVER_URL=http://192.168.x.x:3000 npx cap sync ios
  * (iOS may require `cleartext: true` for http — we set it automatically for non-https URLs.)
  */
-const serverUrl = process.env.CAPACITOR_SERVER_URL?.trim();
+const PRODUCTION_ORIGIN = "https://www.jrcdynamics.com";
+const serverUrl = process.env.CAPACITOR_SERVER_URL?.trim() || PRODUCTION_ORIGIN;
 
 const config: CapacitorConfig = {
   appId: "com.rcengineer.app",
@@ -23,12 +28,10 @@ const config: CapacitorConfig = {
    * subscription bought on the web. Keep in sync with NATIVE_SHELL_UA_TOKEN.
    */
   appendUserAgent: "JRCShell/1",
-  server: serverUrl
-    ? {
-        url: serverUrl,
-        cleartext: serverUrl.startsWith("http://"),
-      }
-    : undefined,
+  server: {
+    url: serverUrl,
+    cleartext: serverUrl.startsWith("http://"),
+  },
   ios: {
     /**
      * `automatic` insets the WKWebView scroll view so the first paint often shows
