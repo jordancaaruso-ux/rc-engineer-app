@@ -252,6 +252,18 @@ function isBestLapOf(series: ComparisonSeries, lap: LapRow): boolean {
   return series.bestLap != null && lap.lapTimeSeconds === series.bestLap;
 }
 
+/** The laps that count — lap 0 and excluded laps left out, the same set `bestLap` is read from. */
+function countedLaps(series: ComparisonSeries): number {
+  return series.laps.filter(
+    (l) => l.lapNumber !== 0 && l.isIncluded && Number.isFinite(l.lapTimeSeconds)
+  ).length;
+}
+
+/** "24 laps", the way the pickers say it. */
+function lapCountLabel(n: number): string {
+  return `${n} lap${n === 1 ? "" : "s"}`;
+}
+
 /**
  * The whole-session numbers every column carries, in the order the header stacks them.
  *
@@ -1410,23 +1422,25 @@ export function LapComparisonColumnGrid({
       const m = metaById.get(r.id);
       // A run row leads with its driver — "Jordan Caruso · Run 4" (founder, 2026-09-22) — the
       // same title the target row above it wears. A run series carries its driver as its label.
-      const owner = r.id.startsWith("history:") ? runOwnerName(seriesById.get(r.id)?.label) : null;
+      const series = seriesById.get(r.id);
+      const owner = r.id.startsWith("history:") ? runOwnerName(series?.label) : null;
       const sessionName = m?.name ?? r.label;
       return {
         id: r.id,
         name: owner ? `${owner} · ${sessionName}` : sessionName,
         /*
-         * The car joins the time on the second line. It used to BE the heading, which read as
-         * seven rows of "A800RR" over seven different sessions; on a field row the context is
-         * the race name and the group heading already says it.
+         * The car joins the time on the second line, then the lap count. The car used to BE
+         * the heading, which read as seven rows of "A800RR" over seven different sessions; on
+         * a field row the context is the race name and the group heading already says it.
          */
         when: [
           r.sortIso ? fmtWhen(m?.whenIso ?? r.sortIso) : "—",
           m?.segment === "field" ? null : m?.context ?? null,
+          series && (m?.loaded ?? true) ? lapCountLabel(countedLaps(series)) : null,
         ]
           .filter(Boolean)
           .join(" · "),
-        bestLap: seriesById.get(r.id)?.bestLap ?? null,
+        bestLap: series?.bestLap ?? null,
         note:
           r.id === neighbourRunSeries.previousId
             ? "Previous run"
@@ -1788,8 +1802,11 @@ export function LapComparisonColumnGrid({
     trackName: string | null;
     /** Every tab this session belongs under. A heat you drove is both yours and a field. */
     segments: CompareSegmentKey[];
-    /** `loaded` is false while a rival's laps are still on their way from the server. */
-    drivers: Array<{ id: string; name: string; bestLap: number | null; loaded: boolean }>;
+    /**
+     * `loaded` is false while a rival's laps are still on their way from the server. `laps`
+     * counts the laps that count — the ones `bestLap` was read from.
+     */
+    drivers: Array<{ id: string; name: string; bestLap: number | null; laps: number; loaded: boolean }>;
   };
 
   /** `run:primary` + this sheet's `imported:` field → "this_sheet"; `history:`/`field:` → their run; `library:` → itself. */
@@ -1833,6 +1850,7 @@ export function LapComparisonColumnGrid({
         id: s.id,
         name: s.id.startsWith("library:") ? (m?.name ?? s.label) : s.label,
         bestLap: s.bestLap,
+        laps: countedLaps(s),
         loaded: m?.loaded ?? true,
       });
     }
@@ -2046,8 +2064,13 @@ export function LapComparisonColumnGrid({
       id: targetSeries.id,
       name: targetTitle,
       // The driver above, the session and its time below — the same two lines every
-      // other row in the picker reads, and the same two the column header prints.
-      when: [m?.sortIso ? fmtWhen(m.whenIso ?? m.sortIso) : "—", m?.context ?? null]
+      // other row in the picker reads, and the same two the column header prints — plus
+      // the lap count, which the dropdowns above also print.
+      when: [
+        m?.sortIso ? fmtWhen(m.whenIso ?? m.sortIso) : "—",
+        m?.context ?? null,
+        lapCountLabel(countedLaps(targetSeries)),
+      ]
         .filter(Boolean)
         .join(" · "),
       bestLap: targetSeries.bestLap,
@@ -2378,10 +2401,25 @@ export function LapComparisonColumnGrid({
    * notations for the same instant, on one screen, and the long one overflowed
    * the rail's select anyway.
    */
+  /**
+   * Name, time, then the two numbers that tell one session from the next: best lap and how
+   * many laps. Six of your practice runs on one morning are "Jordan Caruso · 9 Aug" six times
+   * over; the time alone doesn't say which was the good one (founder, 2026-09-24). On a sheet
+   * with several drivers the numbers are the leader's — P1 on a race, you on your own run.
+   */
   function targetSessionLabel(session: TargetSession): string {
     const when = session.sortIso ? fmtWhen(session.whenIso || session.sortIso) : null;
     const n = session.drivers.length;
-    return [session.name, when, n > 1 ? `${n} drivers` : null].filter(Boolean).join(" · ");
+    const lead = session.drivers[0];
+    return [
+      session.name,
+      when,
+      n > 1 ? `${n} drivers` : null,
+      lead?.loaded ? formatLap(lead.bestLap) : null,
+      lead?.loaded ? lapCountLabel(lead.laps) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
 
   /**
@@ -2403,7 +2441,7 @@ export function LapComparisonColumnGrid({
       <option key={d.id} value={d.id} disabled={!d.loaded}>
         {numbered ? `P${i + 1} · ` : ""}
         {d.name}
-        {d.loaded ? ` · ${formatLap(d.bestLap)}` : " · loading…"}
+        {d.loaded ? ` · ${formatLap(d.bestLap)} · ${lapCountLabel(d.laps)}` : " · loading…"}
       </option>
     ));
     if (opts?.variant === "heading") {
