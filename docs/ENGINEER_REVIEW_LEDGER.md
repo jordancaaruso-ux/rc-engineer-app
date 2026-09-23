@@ -430,6 +430,15 @@ his targets (36M prompt tokens, 88% cached; ≈US$45 at the 08-06 blended rate, 
 - Noise, learned the hard way: the same wording scored 6 of 12 and then 1 of 12 on one question ten
   minutes apart; a-01's second branch runs ~4 in 10 on the round-07 prompt and ~1 in 6 on every new
   wording tried, not pinned to one sentence.
+- **His "Yes" (same night): the four KB facts committed (fcfb5c4)** — bite-hold fact 1 (grip on
+  power), corner-regime (low grip = more middle; the pair loses its thinner-oil example), new
+  concepts/tyre-heat.md. The real payload was checked equal to the tested one (line wrapping and one
+  provenance mark aside); rulings 47/47. No new Engineer calls: the page he asked for ("show me the most
+  recent answer set") is the tested answers, tries 1–2 of all twelve (batches round-07-final-a/b =
+  yes a/b + hyes a/b; the fixed guard re-run over the stored text, which removed one false
+  "Correction" from o-01): https://claude.ai/artifact/TNw1GdGs3XRtPwf4zN9uZG. Claude's notes against
+  his targets: 9 good, 3 close (j-01 try 2 skips the diff; s-02 try 2 offers toe gain; a-01 no "go
+  thicker" branch), 0 wrong; o-01's 16.87 still his call.
 
 ## Fixes landed from this batch
 
