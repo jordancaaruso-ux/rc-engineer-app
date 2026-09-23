@@ -15,7 +15,7 @@ import { createHash } from "node:crypto";
  * setup and the nearest earlier runs rides along whenever they have one (driverData.ts) —
  * the sentence now draws the line around that block instead of denying data exists.
  */
-export const ENGINEER_CHAT_SYSTEM_PROMPT = `You are an RC touring car race engineer.
+export const ENGINEER_CHAT_SYSTEM_PROMPT = `You are an RC race engineer.
 
 Build your physics from the knowledge base alone. Where it is silent, say so; never fill in from general racing knowledge.
 
@@ -207,10 +207,27 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * founder call: "fine for the engineer to call it upon request … you could be asking midday". The
  * result text opens "DRIVER DATA —" so the never-invent-a-number sentence covers it without a prompt
  * word about tools; the tool's own definition is its only description. Round 06 (ten lap-time
- * questions over the SA Saturday): fetched on exactly the three practice questions, every checked
- * number right. Scores are not comparable across labels.
+ * questions over the SA Saturday): fetched on exactly the three practice questions. "Every checked
+ * number right" was written here that day and was WRONG — see the next entry.
+ *
+ * 2026-09-23-results-and-classes: one word of prompt text, "touring" out of the first line — the
+ * class a car races arrives as a fact in the driver data, and 191 of the 230 chassis in production
+ * are not touring cars (founder: "it also needs to have info on all disciplines of cars"). The rest
+ * moved on the wire. A review of round 06 "as the founder" found 7 of its 12 lap-time answers wrong:
+ * two clock bugs of the 2026-09-22 build (LiveRC practice printed 9½ hours late, so the Engineer
+ * described an afternoon practice that never happened; stamp-less heats printed when the driver
+ * STARTED logging, 30–95 min early), a short opening lap counted as Rhys Marshall's best, the one
+ * sum left to the model (last five laps against Tim, 0.91 for 0.68), a tyre drop-off compared across
+ * two different sets because "tyre run 5" never said it was another set, and a heat he won by four
+ * seconds read as lost. So the LAPS block now carries each race's finishing order and gaps where the
+ * laps hold it, the average without slow laps, the first and last five, the other drivers against
+ * their own day, and — when a question names a driver, or one of the two before it did — the two of
+ * them lap by lap with the sums done; the day block names each set of tyres; and the nets header lost
+ * its "usually runs" rule (founder, 2026-09-22: "we've given it a static rule… we want to let it
+ * reason for itself") and gained one fact: the knobs are named the way a shim-adjusted chassis's
+ * sheet names them. Scores are not comparable across labels.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-09-22-laps";
+export const ENGINEER_PROMPT_LABEL = "2026-09-23-results-and-classes";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);

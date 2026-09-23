@@ -1,7 +1,7 @@
 /**
  * Capture a REAL per-run driver-data block — what the Engineer is handed for one driver's run.
  *
- *   npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/engineer-eval/capture-run-fixture.ts --email you@example.com [--run <id>] [--out <file>] [--practice-day YYYY-MM-DD]
+ *   npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/engineer-eval/capture-run-fixture.ts --email you@example.com [--run <id>] [--out <file>] [--practice-day YYYY-MM-DD] [--question "…"]
  *
  * Renders driverData.ts for that account's latest run (or --run) against whatever DATABASE_URL
  * points at, prints it, and writes it to --out when given. Beside capture-range-fixture.ts, which
@@ -12,6 +12,9 @@
  * at the run's track (tools.ts) — and writes its text beside --out as <out minus .txt>.liverc.txt,
  * which generate-conversations.ts serves as the tool's answer for that context. One request to
  * LiveRC, like a press on the lap sheet's Practice tab.
+ *
+ * --question renders the block as that question would get it: a driver named in it adds the
+ * RIVALS "VS" section and the LAPS lap-by-lap section. Without it, neither is there.
  *
  * A capture of someone else's run is THEIR data: keep it out of fixtures/ (tracked) unless it has
  * been cut down to the car and the sheet. answers/ is git-ignored.
@@ -33,7 +36,7 @@ async function main() {
   const user = await prisma.user.findFirst({ where: { email }, select: { id: true } });
   if (!user) throw new Error(`No user with email ${email}`);
 
-  const blocks = await buildDriverDataBlocks({ userId: user.id, runId: argValue("--run"), question: null });
+  const blocks = await buildDriverDataBlocks({ userId: user.id, runId: argValue("--run"), question: argValue("--question") });
   const content = blocks[0]?.content ?? "";
   if (!content) {
     console.log("No runs on that account — the Engineer is sent no driver data at all.");

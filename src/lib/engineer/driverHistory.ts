@@ -3,11 +3,11 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { renderHistoryBlock, type HistoryRun } from "@/lib/engineer/historyShape";
-import { renderLapsBlock } from "@/lib/engineer/lapsBlock";
+import { lapsRivalNames, renderLapsBlock } from "@/lib/engineer/lapsBlock";
 import { loadLapsSessions } from "@/lib/engineer/lapsLoad";
 import type { FieldPace } from "@/lib/engineer/fieldPace";
 import { FIELD_RUN_SELECT, loadFieldPaceForRuns } from "@/lib/engineer/fieldPaceLoad";
-import { matchDriverName } from "@/lib/engineer/nameMatch";
+import { matchDriverNameInQuestions } from "@/lib/engineer/nameMatch";
 import { driverKey, driversOnSheets } from "@/lib/engineer/rivals";
 import type { EngineerPayloadBlock } from "@/lib/engineer/payload";
 import { describeRangeDates, type EngineerRangeScope } from "@/lib/engineer/rangeScope";
@@ -317,6 +317,8 @@ export async function buildDriverHistoryBlocks(params: {
    * loaded timing sheets, typos forgiven — nameMatch.ts) gets a VS section (rivals.ts).
    */
   question?: string | null;
+  /** The driver's one or two messages before it, latest first — a follow-up rarely repeats a name. */
+  earlierQuestions?: ReadonlyArray<string>;
 }): Promise<EngineerPayloadBlock[]> {
   const { rows, omittedOlder, zone, carIds, event } = await loadRunsInRange(params.userId, params.scope).catch(() => ({
     rows: [] as Row[],
@@ -342,9 +344,8 @@ export async function buildDriverHistoryBlocks(params: {
         }
       : null;
 
-  const rivalName = params.question
-    ? matchDriverName(params.question, driversOnSheets(runs).map((d) => d.name))
-    : null;
+  const questions = [params.question, ...(params.earlierQuestions ?? [])];
+  const rivalName = matchDriverNameInQuestions(questions, driversOnSheets(runs).map((d) => d.name))?.name ?? null;
   const scopeLabel = await describeScope(params.scope, carIds, rows, event);
   const content = renderHistoryBlock({
     scopeLabel,
@@ -358,7 +359,7 @@ export async function buildDriverHistoryBlocks(params: {
   // Every lap of every driver in the range's timed sessions (lapsBlock.ts): the sessions
   // linked to the runs shown, plus the driver's loose imports that fall on the same days at the
   // range's track. A failed read drops the block, never the range.
-  const laps = await buildRangeLapsBlock(params.userId, rows, params.scope, zone, scopeLabel).catch(() => null);
+  const laps = await buildRangeLapsBlock(params.userId, rows, params.scope, zone, scopeLabel, questions).catch(() => null);
   return [{ id: "driver-history", cacheStable: false, content: laps ? `${content}\n\n${laps}` : content }];
 }
 
@@ -367,7 +368,8 @@ async function buildRangeLapsBlock(
   rows: Row[],
   scope: EngineerRangeScope,
   zone: string | null,
-  scopeLabel: string
+  scopeLabel: string,
+  questions: ReadonlyArray<string | null | undefined>
 ): Promise<string | null> {
   const days = new Set(rows.map((r) => localYmd(r, zone)));
   const instants = rows.map((r) => (r.sortAt ?? r.createdAt).getTime());
@@ -381,7 +383,8 @@ async function buildRangeLapsBlock(
       (s.linkedRunId != null && linkedIds.has(s.linkedRunId)) ||
       (days.has(s.ymd) && (!scope.trackId || s.trackId == null || s.trackId === scope.trackId)),
   });
-  return renderLapsBlock(sessions, `across ${scopeLabel}`);
+  const rival = matchDriverNameInQuestions(questions, lapsRivalNames(sessions));
+  return renderLapsBlock(sessions, `across ${scopeLabel}`, { rival });
 }
 
 /**

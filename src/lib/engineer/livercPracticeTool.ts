@@ -14,6 +14,7 @@
  *
  * Pure: the definition and the renderer have no server imports. The executor is in tools.ts.
  */
+import { trackClockTime } from "@/lib/lapImport/trackClock";
 import type { PracticeFieldDriver } from "@/lib/practiceField/practiceField";
 
 export const LIVERC_PRACTICE_TOOL_NAME = "read_liverc_practice_day";
@@ -49,15 +50,16 @@ export function parsePracticeDayArg(argumentsJson: string): string | null {
 
 const fmt = (v: number): string => v.toFixed(2);
 
-function clockOf(iso: string | null, zone: string | null): string | null {
-  if (!iso) return null;
-  const t = Date.parse(iso);
-  if (Number.isNaN(t)) return null;
-  try {
-    return new Date(t).toLocaleTimeString("en-AU", { timeZone: zone ?? undefined, hour: "2-digit", minute: "2-digit", hour12: false });
-  } catch {
-    return null;
-  }
+/**
+ * The session's time as the track's timing screen showed it. LiveRC lists practice in the track's
+ * own time with no zone, and the parser stores those digits as-if-UTC (trackClock.ts), so they are
+ * read back as they are — the same reading the app's practice list uses. Reading them in a zone
+ * shifted Adelaide's 08:58 practice to 18:28, and the Engineer told a driver about an afternoon
+ * practice that never happened (2026-09-23).
+ */
+function clockOf(iso: string | null, sessionUrl: string): string | null {
+  const at = trackClockTime({ iso, timingSource: "liverc", sourceUrl: sessionUrl });
+  return at ? at.toISOString().slice(11, 16) : null;
 }
 
 function classKey(s: string | null | undefined): string {
@@ -73,7 +75,6 @@ export function renderLivercPracticeDay(params: {
   trackName: string;
   dayYmd: string;
   drivers: readonly PracticeFieldDriver[];
-  zone: string | null;
   myClass: string | null;
 }): string {
   const head = `DRIVER DATA — LIVERC PRACTICE at ${params.trackName}, ${params.dayYmd}, read from LiveRC just now.`;
@@ -109,7 +110,7 @@ export function renderLivercPracticeDay(params: {
         .sort((a, b) => Date.parse(a.sessionCompletedAtIso ?? "") - Date.parse(b.sessionCompletedAtIso ?? ""))
         .map((s) =>
           [
-            clockOf(s.sessionCompletedAtIso, params.zone) ?? "time unknown",
+            clockOf(s.sessionCompletedAtIso, s.sessionUrl) ?? "time unknown",
             s.lapCount != null ? `${s.lapCount} laps` : null,
             s.bestLapSeconds != null ? `fastest ${fmt(s.bestLapSeconds)}` : "no fastest lap",
           ]

@@ -162,6 +162,41 @@ Each of these was deleted or declined for a reason. They return only through the
 
 ## Changelog
 
+- **2026-09-23** — Founder: "act as me to review the engineer answers… it also needs to have info on
+  all disciplines of cars", then "continue using your best judgement — keep in mind the goal of the
+  engineer". A review of rounds 05 and 06 written as him (the ledger has it) found 7 of round 06's 12
+  lap-time answers wrong — and the 2026-09-22 entry below claimed "every checked gap right": that
+  claim was false. Label `2026-09-23-results-and-classes`. (1) **Two clock bugs of the 2026-09-22
+  build, fixed**: LiveRC practice printed 9½ hours late (`livercPracticeTool.ts` read the track's
+  wall-clock stamp in a zone; it now reads it as the app's practice list does), so the Engineer
+  described an "afternoon practice" that ran at 8:58 am; and a heat with no stamp took the run's
+  `sortAt` — when the driver started logging, 30–95 min before the heat — where it now takes the time
+  the app shows (`resolveRunDisplayInstant`). (2) **The LAPS block carries the results**: each driver's
+  laps and total time, and — where no driver has a short lap — the finishing order by laps then time,
+  with the gap to the winner (LiveRC's parser stores "you" first, so the sheet's order was never the
+  result); the average without slow laps (a lap 5% over the driver's median); the first and last five
+  with how many slow laps sit in each; one short-lap rule shared in spirit with the RIVALS table (a
+  best 0.75 s or 4% clear of the driver's next-best ordinary lap — Rhys Marshall's 16.17 opening lap
+  had been his "best"); "the other drivers against their own day" under each race — the track's
+  movement; and, when the question or one of the two before it names a driver (a unique first name
+  counts: "tim"), the two of you lap by lap with the running total and the averages done in code.
+  (3) **The day block names each set of tyres** (A, B, C… from the tyre stint) and, for a set run
+  more than once that day, its measured drop, raw and with the track's movement taken out — "tyre run
+  5" had never said it was a different, used set, and a drop-off question compared two sets. (4) **The
+  rear-toe "usually runs" rule is off the wire**: the nets header sentence ("a car at the far end has
+  little left in that lever") is gone and no drafted `usual` is rendered — founder, 2026-09-22: "we've
+  given it a static rule… we want to let it reason for itself". The mechanism it stood in for is a
+  drafts-tier page, `drafts/toe-on-the-grip-curve.md` (his read owed). The nets header gained one fact:
+  the knobs are named the way a shim-adjusted chassis's sheet names them. (5) **One prompt word**: "You
+  are an RC race engineer" — "touring" out; the class arrives as a fact, and 191 of 230 production
+  chassis are not touring cars. Re-run on the recaptured SA day: "where am I losing time to Tim" now
+  names the 1.3 s first lap and the 4.08 s win (2 of 2 samples); "least fade" gives +0.36 v +0.69 and
+  +0.39 v +0.41 without his crash heat (2 of 2); "quickest in practice this arvo" says there was no
+  afternoon practice; the tyre drop-off answer finds the one set with a second run. Setup, round 05
+  re-run: with no drafted numbers, a car visibly on 3.2° of rear toe was told to add more (r-02) — the
+  rule was doing a job, and what replaces it is a reference the founder gives, not a rule. NOT through
+  the 56-case launch set.
+
 - **2026-09-22** — "Let's focus on getting lap times perfect for now." The founder's own production
   questions of 14–17 September — "delta from new to old tyres per run", "average pace delta to Tim
   Hilyear, first 5 laps and last 5", "who had the least fade" — had been answered "I can't see
@@ -185,8 +220,8 @@ Each of these was deleted or declined for a reason. They return only through the
   for real by `capture-run-fixture.ts --practice-day`) so a round never touches LiveRC. Round 06 (ten
   lap-time questions in his words over the SA Saturday): it fetched on exactly the three practice
   questions; "who had the least fade" came back +0.36 vs +0.69 across the five shared heats, +0.39 vs
-  +0.41 with Tim's bad heat left out — exact on the block's figures; every checked gap right to the
-  hundredth. Driven on the dev server: `preparing → thinking → fetching → thinking → tokens`, and an
+  +0.41 with Tim's bad heat left out — exact on the block's figures. ("Every checked gap right to the
+  hundredth" was written here and was wrong: see 2026-09-23.) Driven on the dev server: `preparing → thinking → fetching → thinking → tokens`, and an
   empty day answered "no practice sessions were recorded on the timing loop for that day". NOT through
   the 56-case launch set; the founder's read of round 06 owed.
 

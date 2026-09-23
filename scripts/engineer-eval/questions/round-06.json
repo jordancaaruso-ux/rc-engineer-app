@@ -1,4 +1,5 @@
 {
+  "about": "Round 06, lap times over the founder's SA State Titles Saturday (12 Sep 2026). A driver named in a question changes what the Engineer is sent (a lap-by-lap section), so l-03 runs under fixtures/sa-sat-0912-tim.txt and l-09 under fixtures/sa-sat-0912-tim-first.txt — each captured with that question by capture-run-fixture.ts --question; every other case under sa-sat-0912. Batch round-06d (2026-09-23) is the run after the lap-time fixes.",
   "contexts": ["sa-sat-0912", "none"],
   "cases": [
     { "id": "l-01", "shape": "laps", "source": "founder 2026-09-22", "turns": ["was that actually faster?"] },

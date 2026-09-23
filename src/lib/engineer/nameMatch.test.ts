@@ -7,7 +7,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { editDistance, matchDriverName, matchNamedScope } from "@/lib/engineer/nameMatch";
+import { editDistance, matchDriverName, matchDriverNameInMessage, matchNamedScope } from "@/lib/engineer/nameMatch";
 
 const DRIVERS = ["Jordan Caruso", "Tim Hilyear", "Sam Hilyear", "Bob Jones", "Lee Vo"];
 
@@ -18,6 +18,20 @@ test("a driver is found by surname, typo and all; two who share it need a first 
   assert.equal(matchDriverName("am I quicker than jones?", DRIVERS), "Bob Jones");
   assert.equal(matchDriverName("the car is loose on exit", DRIVERS), null);
   assert.equal(matchDriverName("compare me to vo", DRIVERS), null, "a two-letter surname is never matched");
+});
+
+test("no surname: a first name, or the short form it starts, finds the one driver it can mean", () => {
+  const SA = ["JORDAN CARUSO", "TIMOTHY HILYEAR", "RHYS MARSHALL", "JUSTIN VERGUNST"];
+  assert.deepEqual(matchDriverNameInMessage("where am i losing time to tim in the last heat", SA), {
+    name: "TIMOTHY HILYEAR",
+    word: "tim",
+  });
+  assert.equal(matchDriverName("how was rhys in the first heat", SA), "RHYS MARSHALL");
+  assert.equal(matchDriverName("where am i losing time", SA), null, "\"time\" is not a short form of anyone");
+  assert.equal(matchDriverName("was tim quicker", [...SA, "TIM FORSTER"]), null, "two drivers it could mean");
+  // A surname that fits two drivers decides on its own: no falling through to a first name.
+  assert.equal(matchDriverName("how do I compare to hillyear, tim", ["Tim Hilyear", "Sam Hilyear", "Timothy Jones"]), "Tim Hilyear");
+  assert.equal(matchDriverName("how do I compare to hillyear", ["Tim Hilyear", "Sam Hilyear", "Howard Smith"]), null);
 });
 
 const NAMES = {

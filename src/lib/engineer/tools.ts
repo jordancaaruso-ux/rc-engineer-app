@@ -24,17 +24,15 @@ import { MAX_TOOL_CALLS_PER_ANSWER, type EngineerTools } from "@/lib/engineer/to
 
 export type EngineerToolContext = {
   userId: string;
-  track: { name: string; liveRcUrl: string; timeZone: string | null };
+  track: { name: string; liveRcUrl: string };
   /** The class the driver logged for the subject run; null when unknown. */
   myClass: string | null;
-  /** The zone clocks print in when the track has none saved. */
-  zone: string | null;
 };
 
 async function trackWithLiveRc(trackId: string | null | undefined) {
   if (!trackId) return null;
-  const t = await prisma.track.findUnique({ where: { id: trackId }, select: { name: true, liveRcUrl: true, timeZone: true } }).catch(() => null);
-  return t?.liveRcUrl?.trim() ? { name: t.name, liveRcUrl: t.liveRcUrl.trim(), timeZone: t.timeZone } : null;
+  const t = await prisma.track.findUnique({ where: { id: trackId }, select: { name: true, liveRcUrl: true } }).catch(() => null);
+  return t?.liveRcUrl?.trim() ? { name: t.name, liveRcUrl: t.liveRcUrl.trim() } : null;
 }
 
 /**
@@ -46,22 +44,21 @@ export async function loadEngineerToolContext(params: {
   runId: string | null;
   scope: EngineerRangeScope | null;
 }): Promise<EngineerToolContext | null> {
-  const owner = await prisma.user.findUnique({ where: { id: params.userId }, select: { timeZone: true } }).catch(() => null);
   if (params.scope) {
     const track = await trackWithLiveRc(params.scope.trackId);
-    return track ? { userId: params.userId, track, myClass: null, zone: owner?.timeZone ?? null } : null;
+    return track ? { userId: params.userId, track, myClass: null } : null;
   }
   const run = await prisma.run
     .findFirst({
       where: params.runId ? { id: params.runId, userId: params.userId } : { userId: params.userId },
       orderBy: params.runId ? undefined : { sortAt: "desc" },
-      select: { trackId: true, raceClass: true, localTimeZone: true },
+      select: { trackId: true, raceClass: true },
     })
     .catch(() => null);
   if (!run) return null;
   const track = await trackWithLiveRc(run.trackId);
   if (!track) return null;
-  return { userId: params.userId, track, myClass: run.raceClass, zone: run.localTimeZone ?? owner?.timeZone ?? null };
+  return { userId: params.userId, track, myClass: run.raceClass };
 }
 
 export function engineerTools(ctx: EngineerToolContext): EngineerTools {
@@ -89,7 +86,6 @@ export function engineerTools(ctx: EngineerToolContext): EngineerTools {
           trackName: ctx.track.name,
           dayYmd: day,
           drivers: result.drivers,
-          zone: ctx.track.timeZone ?? ctx.zone,
           myClass: ctx.myClass,
         });
       } catch {

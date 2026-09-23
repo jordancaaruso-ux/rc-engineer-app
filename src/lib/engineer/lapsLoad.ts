@@ -7,6 +7,7 @@ import { normalizeLiveRcDriverNameForMatch } from "@/lib/lapWatch/liveRcNameNorm
 import { primaryNormsFromImportedLapSets } from "@/lib/lapImport/importedTimingFieldStatsForEngineer";
 import { trackClockTime } from "@/lib/lapImport/trackClock";
 import { normalizeLapTimes } from "@/lib/runLaps";
+import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import type { LapsDriver, LapsSession } from "@/lib/engineer/lapsBlock";
 
 /**
@@ -18,9 +19,12 @@ import type { LapsDriver, LapsSession } from "@/lib/engineer/lapsBlock";
  *
  * Time is the TRACK's clock (lapImport/trackClock.ts): LiveRC and MyRCM stamps are stored as the
  * track's wall clock written as UTC, Speedhive's practice loop as a real instant with an offset,
- * and a LiveRC race result often carries no stamp at all — that one takes its linked run's clock,
- * in the same zone as every other clock in the driver's block. Reading a LiveRC stamp in a zone
- * printed a 15:53 Friday session as 01:23 Saturday (seen on the founder's SA weekend, 2026-09-22).
+ * and a LiveRC race result often carries no stamp at all — that one takes its linked run's time as
+ * the app shows it (`resolveRunDisplayInstant`), in the same zone as every other clock in the
+ * driver's block. Reading a LiveRC stamp in a zone printed a 15:53 Friday session as 01:23
+ * Saturday (2026-09-22); and the first fallback read the run's `sortAt` — when the driver STARTED
+ * logging, 30 to 95 minutes before the heat — so every stamp-less heat of the founder's SA
+ * Saturday printed early and the day block beside it disagreed (2026-09-23).
  *
  * "You" on a sheet is found the way the race-field view finds it — the run's own primary lap-set
  * name, the driver's saved LiveRC name, the import's own server match (`sessionHint.name`), then a
@@ -32,6 +36,10 @@ export type LapsRunInput = {
   id: string;
   createdAt: Date;
   sortAt: Date | null;
+  /** The three stamps `resolveRunDisplayInstant` weighs — required so every caller selects them. */
+  sessionCompletedAt: Date | null;
+  loggingCompletedAt: Date | null;
+  unconfirmedAt: Date | null;
   lapTimes: unknown;
   importedLapTimeSessionId: string | null;
   importedLapSets: Array<{ driverName: string; isPrimaryUser: boolean }>;
@@ -87,9 +95,12 @@ function lapsEqual(a: readonly number[], b: readonly number[]): boolean {
   return true;
 }
 
-/** A run's instant as the wall clock of `zone`, written as UTC — the same shape trackClockTime gives. */
+/**
+ * A run's time as the app shows it, as the wall clock of `zone` written as UTC — the same shape
+ * trackClockTime gives, and the same moment the day block prints for that run.
+ */
 function runWallClock(run: LapsRunInput, zone: string | null): Date {
-  const instant = run.sortAt ?? run.createdAt;
+  const instant = resolveRunDisplayInstant(run);
   if (!zone) return instant;
   try {
     return instantToWallClockAsUtc(instant, zone);
@@ -188,7 +199,13 @@ export async function loadLapsSessions(params: {
       let mine = parsed.drivers.find((d) => norms.has(d.norm) || norms.has(normalizeLiveRcDriverNameForMatch(d.name)));
       if (!mine && runLaps.length > 0) mine = parsed.drivers.find((d) => lapsEqual(d.laps, runLaps));
       if (!mine && parsed.drivers.length === 1) mine = parsed.drivers[0];
-      drivers = parsed.drivers.map((d) => ({ name: d.name, isMe: d === mine, laps: d.laps }));
+      // A practice page of one driver is the asker's own; MYLAPS names that one driver by the
+      // session's date ("12/09/2026, 08:58 am"), which the block then printed as a person.
+      drivers = parsed.drivers.map((d) => ({
+        name: !isRace && parsed.drivers.length === 1 && d === mine ? "you" : d.name,
+        isMe: d === mine,
+        laps: d.laps,
+      }));
     }
     const signatureLaps = (drivers.find((d) => d.isMe) ?? drivers[0]).laps;
     out.push({
@@ -197,6 +214,7 @@ export async function loadLapsSessions(params: {
       clock: at.toISOString().slice(11, 16),
       dateYmd: ymd,
       drivers,
+      linkedRunId: run?.id ?? null,
       at: at.getTime(),
       linked: run != null,
       createdAt: row.createdAt.getTime(),

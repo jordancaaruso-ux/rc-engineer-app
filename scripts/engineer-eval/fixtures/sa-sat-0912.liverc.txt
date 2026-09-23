@@ -1,56 +1,56 @@
 DRIVER DATA — LIVERC PRACTICE at Radio Racing Cars SA, 2026-09-12, read from LiveRC just now. 43 drivers, 45 sessions. By class; drivers by their fastest lap of the day; each driver's sessions earliest first as the track's clock, laps, fastest lap. "(you)" is your own chip or LiveRC name. Every session on LiveRC's page is here, whoever drove it.
 
 ISTC 21.5t — 15 drivers
-  Robbie Storey: 18:12 12 laps fastest 20.48
-  Jordan De Filippis: 18:11 13 laps fastest 20.68
-  Charlie Baxter: 18:11 21 laps fastest 20.80
-  Sean Perry: 18:14 15 laps fastest 21.06
-  Ilya Harpas: 18:11 22 laps fastest 21.29
-  Blake Purdie: 18:08 18 laps fastest 21.37
-  Thorsten Tophinke: 18:18 5 laps fastest 21.41
-  Paul Evans: 18:16 9 laps fastest 21.61
-  Reece Schaefer: 18:13 7 laps fastest 21.75
-  Phillip Merrick: 18:00 14 laps fastest 21.78
-  Ronald Maya: 18:12 13 laps fastest 22.30
-  Chang Ling: 18:05 5 laps fastest 23.34 · 18:13 6 laps fastest 22.73
-  David Arthur: 18:06 16 laps fastest 22.86
-  Brett Freeman: 18:04 9 laps fastest 23.99
-  Ben Wesley: 18:02 6 laps fastest 24.77
+  Robbie Storey: 08:42 12 laps fastest 20.48
+  Jordan De Filippis: 08:41 13 laps fastest 20.68
+  Charlie Baxter: 08:41 21 laps fastest 20.80
+  Sean Perry: 08:44 15 laps fastest 21.06
+  Ilya Harpas: 08:41 22 laps fastest 21.29
+  Blake Purdie: 08:38 18 laps fastest 21.37
+  Thorsten Tophinke: 08:48 5 laps fastest 21.41
+  Paul Evans: 08:46 9 laps fastest 21.61
+  Reece Schaefer: 08:43 7 laps fastest 21.75
+  Phillip Merrick: 08:30 14 laps fastest 21.78
+  Ronald Maya: 08:42 13 laps fastest 22.30
+  Chang Ling: 08:35 5 laps fastest 23.34 · 08:43 6 laps fastest 22.73
+  David Arthur: 08:36 16 laps fastest 22.86
+  Brett Freeman: 08:34 9 laps fastest 23.99
+  Ben Wesley: 08:32 6 laps fastest 24.77
 
 ISTC 13.5t — 14 drivers
-  Jordan Caruso (you): 18:28 12 laps fastest 17.61
-  Rhys Marshall: 18:26 15 laps fastest 18.63
-  Justin Vergunst: 18:29 16 laps fastest 18.70
-  Tomas Buratovich: 18:22 12 laps fastest 18.79
-  Martin Grantham: 18:22 13 laps fastest 18.85
-  Richard Groncki: 18:23 18 laps fastest 18.96
-  Kohen Mould: 18:32 6 laps fastest 19.03
-  Steven Coro: 18:23 12 laps fastest 19.10
-  Stephen Wesley: 18:21 9 laps fastest 19.27
-  Jamie O'Brien: 18:26 10 laps fastest 19.74
-  Jim Cranston: 18:24 5 laps fastest 20.12
-  Matthew Flay: 18:21 22 laps fastest 20.31
-  Tim Forster: 18:25 1 laps fastest 26.05 · 18:32 4 laps fastest 24.16
-  Renato Angelo Benci: 18:07 2 laps fastest 24.91
+  Jordan Caruso (you): 08:58 12 laps fastest 17.61
+  Rhys Marshall: 08:56 15 laps fastest 18.63
+  Justin Vergunst: 08:59 16 laps fastest 18.70
+  Tomas Buratovich: 08:52 12 laps fastest 18.79
+  Martin Grantham: 08:52 13 laps fastest 18.85
+  Richard Groncki: 08:53 18 laps fastest 18.96
+  Kohen Mould: 09:02 6 laps fastest 19.03
+  Steven Coro: 08:53 12 laps fastest 19.10
+  Stephen Wesley: 08:51 9 laps fastest 19.27
+  Jamie O'Brien: 08:56 10 laps fastest 19.74
+  Jim Cranston: 08:54 5 laps fastest 20.12
+  Matthew Flay: 08:51 22 laps fastest 20.31
+  Tim Forster: 08:55 1 laps fastest 26.05 · 09:02 4 laps fastest 24.16
+  Renato Angelo Benci: 08:37 2 laps fastest 24.91
 
 ISTC Modified — 6 drivers
-  Jordan Hunting: 18:37 15 laps fastest 17.03
-  Antoni Caretti: 18:41 11 laps fastest 17.13
-  Simon Nicholson: 18:37 19 laps fastest 17.20
-  Hamish Scott: 18:40 5 laps fastest 18.66
-  John Karnaros: 18:37 17 laps fastest 18.68
-  David Merrett: 18:37 13 laps fastest 20.39
+  Jordan Hunting: 09:07 15 laps fastest 17.03
+  Antoni Caretti: 09:11 11 laps fastest 17.13
+  Simon Nicholson: 09:07 19 laps fastest 17.20
+  Hamish Scott: 09:10 5 laps fastest 18.66
+  John Karnaros: 09:07 17 laps fastest 18.68
+  David Merrett: 09:07 13 laps fastest 20.39
 
 TCR — 3 drivers
-  Jim Cranston: 18:50 5 laps fastest 22.96
-  Theodore Theodorou: 18:48 16 laps fastest 23.48
-  Brett Freeman: 18:50 1 laps fastest 28.22
+  Jim Cranston: 09:20 5 laps fastest 22.96
+  Theodore Theodorou: 09:18 16 laps fastest 23.48
+  Brett Freeman: 09:20 1 laps fastest 28.22
 
 Unknown Class — 3 drivers
-  Timothy Hilyear: 18:29 17 laps fastest 18.12
-  Scott Giles: 17:49 11 laps fastest 26.89
-  Unknown Driver: 18:46 1 laps fastest 29.32
+  Timothy Hilyear: 08:59 17 laps fastest 18.12
+  Scott Giles: 08:19 11 laps fastest 26.89
+  Unknown Driver: 09:16 1 laps fastest 29.32
 
 Formula 1 — 2 drivers
-  Ronald Maya: 17:49 13 laps fastest 26.60
-  John Karnaros: 17:48 12 laps fastest 26.69
+  Ronald Maya: 08:19 13 laps fastest 26.60
+  John Karnaros: 08:18 12 laps fastest 26.69

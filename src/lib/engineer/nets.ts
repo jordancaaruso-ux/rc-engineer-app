@@ -48,13 +48,21 @@ const NETS_DRAFTS_DIR = path.join(NETS_DIR, "drafts");
  * `**Moved by:**` links (netFamilies.ts). A rear spring and a rear bar were arriving as two
  * unrelated levers and coming back as two separate alternatives; the header now says a group is
  * one change and alternatives come from other groups. No list is maintained anywhere.
+ *
+ * 2026-09-23: the "Usually runs" sentence is gone (founder, 2026-09-22: "if it's already reaching
+ * four that's too high — we've given it a static rule, which is one of the things we want to avoid;
+ * we want to let it reason for itself"). It told the model a car at the far end "has little left in
+ * that lever, so lead with another", and the model said exactly that. One fact came in its place:
+ * the knobs are named the way a shim-adjusted chassis's sheet names them — a Yokomo it could not
+ * read was told to add "under-hub shims" (round 05, k-03).
  */
 export const ENGINEER_NETS_HEADER = `SETUP EFFECT PRIORS ("nets") — outcomes, in the driver's words. Probabilistic: "most likely", never "will".
 Each entry is one knob, with what each direction most likely does — both directions side by side. A knob that does one thing on the way into the corner and another from the middle on carries TWO lines per direction — ENTERING THE CORNER and IN THE MIDDLE AND EXITING — because it genuinely has two answers, and which one matters today depends on how long the corner lasts against how long this car takes to settle. The knowledge base above carries that rule; work out from it and from what the driver has told you which line applies, and say so. Speak of places on the corner — entering the corner, in the middle, exiting — never of whether the car has "settled": that is the knowledge base's word, not the driver's. A knob with one EFFECT line per direction has one answer for the corner; where that answer splits on something else — throttle, car speed — the line says so. A longer entry is not a better lever.
 Entries under a GROUP line are versions of one change — the thing the group is named for, at the end the label says. Name the group and the end. Where something the driver said separates the knobs, pick the knob and say what makes it the one (the knowledge base says what separates them); where nothing does, give the group move with a step on each knob as the ways to make it, and say which you would try first for carrying the least cost. Take the other levers from other groups, never from the same one. A knob with no GROUP line stands alone. A GROUP line may carry BOTH ENDS TOGETHER lines: the same move at both ends, which moves when the whole car's grip comes and not the front-to-rear balance — the answer to "both front and rear" questions.
 What makes an effect bigger, smaller or worth the opposite move lives in the knowledge base, once — never in these lines. Never treat a prior as evidence about the mechanism it points at.
 A line that says "can" or "tends toward" means exactly that: it goes that way more often than not, and not always.
-Every entry carries the same weight: no prior outranks another — choose by fit to the driver's problem, never by how an entry is worded. Where a side carries CONTESTED claims, present both and the on-track discriminator, never pick silently. A "normal move" is what a typical-sized change looks like; size the move to the problem — a chronic one that is everywhere takes a big move, a small complaint a small one. "Usually runs" is where that knob normally sits: a car already at the far end of it has little left in that lever, so lead with another; when you cannot see the car's value, give the move and name that end as a number, so the driver can tell whether they are already there.
+Every entry carries the same weight: no prior outranks another — choose by fit to the driver's problem, never by how an entry is worded. Where a side carries CONTESTED claims, present both and the on-track discriminator, never pick silently. A "normal move" is what a typical-sized change looks like; size the move to the problem — a chronic one that is everywhere takes a big move, a small complaint a small one.
+The knobs are named the way a shim-adjusted touring car's setup sheet names them — shims under the hub, at the ends of the upper link, under the lower arm's mounts. Another chassis may make the same adjustment with other parts, or not have it.
 
 `;
 

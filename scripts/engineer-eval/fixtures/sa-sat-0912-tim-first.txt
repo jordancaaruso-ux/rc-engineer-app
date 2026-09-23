@@ -226,6 +226,31 @@ A session with one driver is a practice session: the timing site keeps practice 
   P7 STEPHEN WESLEY · 16 laps 5:09.26, 1 lap down: 19.83 18.82 18.36 18.66 19.54 19.20 18.64 18.63 18.84 19.02 18.50 21.33 20.78 19.27 20.72 19.11
       best 18.36 · top5 18.56 · median 19.06 · average without slow laps 18.96 · first five 18.82 → last five 20.72 (3 slow) (+1.89) · spread 2.28 · slow laps 21.33, 20.78, 20.72
 
+YOU AGAINST TIMOTHY HILYEAR ("tim" in the question), LAP BY LAP — the 5 sessions you both drove, worked out in code. "Your lap minus theirs" is lap by lap (negative = you were quicker that lap); the running total adds those up (negative = you were ahead over those laps); "—" is a short lap on either side, left out of the total.
+
+12:15  Race — you P1 17 laps 5:05.46; TIMOTHY HILYEAR P2 17 laps 5:11.78
+  your lap minus theirs: −0.78 −0.15 −0.47 −0.25 −0.39 −0.12 +0.21 −0.61 −0.64 −0.70 −0.31 −0.61 −0.51 −0.16 −0.38 −0.36 −0.09
+  running total:         −0.78 −0.94 −1.41 −1.66 −2.05 −2.17 −1.96 −2.57 −3.21 −3.91 −4.22 −4.83 −5.34 −5.51 −5.88 −6.24 −6.32
+  first five 17.59 v 17.86 (−0.27) · last five 18.33 v 18.59 (−0.25) · average without slow laps 17.97 v 18.34 (−0.37)
+13:41  Race — you P1 17 laps 5:10.22; TIMOTHY HILYEAR P4 16 laps 5:01.15
+  your lap minus theirs: +0.03 −0.06 −0.07 −0.40 −0.25 −0.15 +0.08 +0.16 +0.08 +0.07 −0.39 +1.42 −0.41 −0.39 −7.69 −1.34
+  running total:         +0.03 −0.03 −0.10 −0.50 −0.76 −0.91 −0.83 −0.67 −0.59 −0.52 −0.91 +0.51 +0.10 −0.29 −7.98 −9.32
+  first five 18.09 v 18.17 (−0.07) · last five 18.29 v 18.76 (2 slow) (−0.48) · average without slow laps 18.16 v 18.26 (−0.11)
+15:31  Race — you P2 17 laps 5:11.52; TIMOTHY HILYEAR P1 17 laps 5:10.91
+  your lap minus theirs: +0.45 −1.86 −0.21 −0.27 −0.35 +0.16 +0.19 −0.30 +3.58 +0.24 +0.02 −0.30 +0.02 −0.12 −0.46 −0.00 −0.19
+  running total:         +0.45 −1.40 −1.61 −1.88 −2.23 −2.07 −1.89 −2.18 +1.40 +1.64 +1.66 +1.36 +1.39 +1.26 +0.80 +0.80 +0.61
+  first five 17.95 v 18.11 (1 slow) (−0.16) · last five 18.32 v 18.40 (−0.08) · average without slow laps 18.13 v 18.19 (−0.06)
+16:53  Race — you P1 17 laps 5:09.75; TIMOTHY HILYEAR P2 17 laps 5:14.66
+  your lap minus theirs: −0.33 −0.53 −0.40 −0.43 +1.75 −0.23 −0.10 −0.12 −0.34 −3.10 −0.43 +0.00 −0.21 −0.11 −0.04 −0.17 −0.13
+  running total:         −0.33 −0.86 −1.26 −1.69 +0.07 −0.16 −0.26 −0.37 −0.71 −3.82 −4.24 −4.24 −4.45 −4.56 −4.60 −4.78 −4.91
+  first five 18.10 (1 slow) v 18.42 (−0.32) · last five 18.34 v 18.42 (−0.07) · average without slow laps 18.12 v 18.34 (−0.22)
+17:48  Race — you P1 17 laps 5:12.43; TIMOTHY HILYEAR P2 17 laps 5:16.51
+  your lap minus theirs: +1.33 −0.48 +0.23 +0.18 −0.25 −0.06 +0.05 −0.26 −0.21 −0.06 +0.03 −0.19 +1.23 −1.60 +0.21 −2.33 −1.90
+  running total:         +1.33 +0.85 +1.08 +1.26 +1.01 +0.95 +0.99 +0.73 +0.52 +0.46 +0.49 +0.30 +1.53 −0.07 +0.15 −2.18 −4.08
+  first five 18.19 (1 slow) v 18.20 (−0.02) · last five 18.45 (1 slow) v 20.05 (3 slow) (−1.60) · average without slow laps 18.20 v 18.22 (−0.02)
+
+Averaged across the sessions, you minus TIMOTHY HILYEAR: first five −0.17 over 5 · last five −0.50 over 5 · average without slow laps −0.16 over 5.
+
 RIVALS — the drivers who shared the most timed sessions with you in this filter, and your gap to
 each (you minus them: negative = you were quicker). Name one to see it session by session.
 
@@ -235,6 +260,17 @@ RICHARD GRONCKI — 6 shared sessions: best lap -0.90 on average, top 5 -0.92; y
 MARTIN GRANTHAM — 5 shared sessions: best lap -0.77 on average, top 5 -0.74; you were quicker on best lap in 5 of 5
 TIMOTHY HILYEAR — 5 shared sessions: best lap -0.18 on average, top 5 -0.13; you were quicker on best lap in 4 of 5
 TOMAS BURATOVICH — 3 shared sessions: best lap -0.99 on average, top 5 -1.00; you were quicker on best lap in 2 of 2 (1 left out for a cut lap)
+
+VS TIMOTHY HILYEAR — every timed session you both ran in this filter. Gaps are you minus TIMOTHY HILYEAR: negative = you
+were quicker. A session with a cut lap on either side is shown but left out of the averages.
+
+2026-09-12 Sat  12:15  you best 17.39 top5 17.58  TIMOTHY HILYEAR best 17.80 top5 17.89  → best -0.42  top5 -0.30
+2026-09-12 Sat  13:41  you best 17.70 top5 17.92  TIMOTHY HILYEAR best 17.90 top5 18.03  → best -0.20  top5 -0.11
+2026-09-12 Sat  15:31  you best 17.76 top5 17.90  TIMOTHY HILYEAR best 17.77 top5 17.93  → best -0.02  top5 -0.03
+2026-09-12 Sat  16:53  you best 17.68 top5 17.88  TIMOTHY HILYEAR best 17.98 top5 18.07  → best -0.30  top5 -0.20
+2026-09-12 Sat  17:48  you best 17.94 top5 18.00  TIMOTHY HILYEAR best 17.89 top5 18.03  → best +0.04  top5 -0.03
+
+Across 5 clean shared sessions: best lap -0.18 on average, top 5 -0.13; you were quicker on best lap in 4 of 5.
 
 EARLIER RUNS ON THIS CAR IN THE MOST SIMILAR CONDITIONS.
 Closest first. How close each one is decides how much weight it carries — a run that differs

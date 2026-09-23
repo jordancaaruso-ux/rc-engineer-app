@@ -66,8 +66,20 @@ function median(xs: number[]): number | null {
 function believableBest(d: { bestLapSeconds: number | null; avgTop5Seconds: number | null }): boolean {
   if (!finite(d.bestLapSeconds)) return false;
   if (!finite(d.avgTop5Seconds)) return true;
-  const slack = Math.max(0.75, d.avgTop5Seconds * 0.04);
-  return d.bestLapSeconds >= d.avgTop5Seconds - slack;
+  return isBelievableBest(d.bestLapSeconds, d.avgTop5Seconds);
+}
+
+/**
+ * The slack for "that best lap is not pace", shared with the LAPS block (lapsBlock.ts) so the laps
+ * and the RIVALS table judge a lap the same way: a best more than max(0.75 s, 4%) under a reference —
+ * here the same driver's own best-five average (the stored stats carry no laps); the LAPS block,
+ * which has every lap, measures against the next three. Rhys Marshall's 16.17 opening lap in an 18.2 heat (SA,
+ * 2026-09-12) was left out here and counted as his best in the laps — the Engineer then skipped his
+ * real 17.98 and got his practice gap wrong.
+ */
+export function isBelievableBest(best: number, avgTop5: number): boolean {
+  const slack = Math.max(0.75, avgTop5 * 0.04);
+  return best >= avgTop5 - slack;
 }
 
 function lapsEqual(a: number[], b: number[]): boolean {

@@ -236,7 +236,58 @@ which is one of the things we want to avoid." Then: "Let's focus on getting lap 
 - **Round 06** (ten lap-time questions in his words over his SA Saturday, the day's laps on the wire,
   LiveRC's practice page recorded) published as version 13 of the round artifact. My read: the
   numbers I checked are all right; it fetched on exactly the three practice questions; l-08 correctly
-  flagged a tyre-run label that did not fit the question. His read owed.
+  flagged a tyre-run label that did not fit the question. His read owed. **That read was wrong — see
+  2026-09-23: I had checked only the easy numbers.**
+
+### 2026-09-23 — rounds 05 and 06 reviewed "as him", then "continue using your best judgement"
+
+His ask: "Act as me to review the engineer answers. Make subtle changes, review them and discuss what
+needs to be improved… it also needs to have info on all disciplines of cars — discuss the best way to
+do this regarding nets and the prompt… discuss for now, no changes." The review is CLAUDE'S, written
+in his voice, at https://claude.ai/artifact/33YxSPCjcZmAFGNuLhKysb — every card marked up strike /
+insert with a one-line why. None of it is his ruling until he says so.
+
+- **Round 06 as reviewed: 1 good, 4 close, 7 wrong** (of 12 answers). Two of the wrong were my clock
+  bugs (practice 9½ h late → "quickest in the afternoon practice" for a practice at 8:58 am; stamp-less
+  heats at the time logging started). The rest: a sum the model did itself (0.91 for 0.68), a tyre
+  drop-off compared across two sets, "where am I losing time to Tim" missing a 1.3 s first lap and a
+  heat he won by 4 s, Rhys's 16.17 short lap as his best, and "was that faster" crediting the car
+  with a crash lap and new tyres.
+- **Round 05 as reviewed: 2 good, 10 close, 4 wrong, 1 needs an off-road racer.** Wrong: the
+  rear-toe "far end" rule twice (the static rule he named), more toe on a car visibly at 3.2° (r-02),
+  and b-01 talking a buggy driver out of his own "too soft" read. Close: car-specific parts named on
+  cars it can't read (under-hub shims to a Yokomo), loose-entry answers that never consider the front,
+  stray sentences, machinery words ("gearing guidance here is unverified").
+- **Discipline plan, proposed (not ruled):** one prompt with "touring" out; one physics KB plus the
+  off-road and pan-car physics it lacks; nets per FAMILY (on-road independent / pan & F1 / 1/10
+  off-road / 1/8 off-road), written by what a change does, not by the A800's shims; each readable
+  sheet box to carry what it adjusts, which end, which way is "more" — the contract with the sheet
+  work; an off-road round read by an off-road racer before deciding what a buggy gets meanwhile.
+
+**Then his "continue using your best judgement — keep in mind the goal of the engineer". Built, label
+`2026-09-23-results-and-classes` (north star changelog has the parts):** both clocks fixed; results,
+average without slow laps, first/last five with slow laps counted, the track's movement per race and
+a lap-by-lap section for a named driver (unique first names count) in LAPS; tyre sets lettered with
+their measured drop in the day block; the rear-toe `usual` and its header rule off the wire; the toe
+mechanism as `drafts/toe-on-the-grip-curve.md`; one fact that the knobs are named the way a
+shim-adjusted chassis's sheet names them; "RC race engineer".
+
+- **Round 06 re-run (batch round-06d, two samples of the Tim questions): 9 read as he would want, 3
+  close, 0 wrong.** l-09 names lap 1 (1.33 s) and lap 13 (1.23 s) and the 4.08 s win; l-03 gives 0.17 /
+  0.50 with "the last-five gap includes his late slow laps"; least fade +0.36 v +0.69 and +0.39 v
+  +0.41 without his crash heat; "this arvo" → "there wasn't any afternoon practice"; l-08 finds the
+  one set with a second run (+0.34 raw, +0.25 with the track out). Close: l-01 and l-04 still call the
+  run faster (they now quantify the fresh set but don't net it out, nor see the 1.7 s is one smaller
+  mistake); l-07 slips a sign on the post-lunch track. Round artifact v14.
+- **Found on the way:** leaving slow laps OUT of first/last five fixed "fade" but broke "where am I
+  losing time" (l-09 lost lap 1 and the win); counting them IN with "(3 slow)" beside the five fixed
+  both. One sample is not a result — the l-03/l-09 re-runs were done twice.
+- **Round 05 re-run (round-05c):** "I'm already on 4° of rear toe" now reasons ("4° is not, by itself,
+  proof… the useful limit depends on the tyre, grip and toe gain") — no rule. But r-02 went back to
+  "add 0.5° rear toe-in" on the A800 at 3.2°: with the drafted numbers gone the model has no reference
+  for "a lot". The fix is a reference he gives (his normal rear toe for touring, as information), not a
+  rule. k-03 still suggested under-hub shims on the Yokomo ("e.g."), so the parts fact alone didn't fix
+  it; b-01 still argued with the driver (not touched — his call).
 
 ## Fixes landed from this batch
 

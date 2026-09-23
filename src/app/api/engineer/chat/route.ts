@@ -268,16 +268,22 @@ export async function POST(request: Request) {
     // wins (a pinned run, or an old-era client), otherwise their latest run. A driver with no
     // runs gets [] and the request is byte-identical to the data-less one — and General asks
     // for exactly that request on purpose (theory only, nothing from the logs attached).
-    // The latest question rides along so a driver NAMED in it can be compared (rivals.ts).
-    const latestQuestion = [...messages].reverse().find((m) => m.role === "user")?.content ?? null;
+    // The latest question rides along so a driver NAMED in it can be compared (rivals.ts), with
+    // the two before it for a follow-up that doesn't repeat the name ("who had the least fade").
+    const userQuestions = [...messages].reverse().filter((m) => m.role === "user").map((m) => m.content);
+    const latestQuestion = userQuestions[0] ?? null;
+    const earlierQuestions = userQuestions.slice(1, 3);
     const driverBlocks = generalMode
       ? []
       : rangeScope
-        ? await buildDriverHistoryBlocks({ userId: user.id, scope: rangeScope, question: latestQuestion }).catch(() => [])
+        ? await buildDriverHistoryBlocks({ userId: user.id, scope: rangeScope, question: latestQuestion, earlierQuestions }).catch(
+            () => []
+          )
         : await buildDriverDataBlocks({
             userId: user.id,
             runId: runId || null,
             question: latestQuestion,
+            earlierQuestions,
           }).catch(() => []);
 
     // What the Engineer may read for itself this turn (tools.ts; founder call 2026-09-22):

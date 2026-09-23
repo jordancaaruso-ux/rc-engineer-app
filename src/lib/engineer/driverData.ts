@@ -29,9 +29,9 @@ import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import type { EngineerPayloadBlock } from "@/lib/engineer/payload";
 import type { FieldPace } from "@/lib/engineer/fieldPace";
 import { FIELD_RUN_SELECT, loadFieldPaceForRuns } from "@/lib/engineer/fieldPaceLoad";
-import { matchDriverName } from "@/lib/engineer/nameMatch";
+import { matchDriverNameInQuestions } from "@/lib/engineer/nameMatch";
 import { driverKey, driversOnSheets, renderRivalSection, renderRivalsSummary, type RivalRun } from "@/lib/engineer/rivals";
-import { renderLapsBlock } from "@/lib/engineer/lapsBlock";
+import { lapsRivalNames, lapsTrackMoveByRun, renderLapsBlock, type LapsSession } from "@/lib/engineer/lapsBlock";
 import { loadLapsSessions } from "@/lib/engineer/lapsLoad";
 
 /**
@@ -410,9 +410,12 @@ function loadRunsAround(userId: string, carIds: string[], centre: number) {
       carId: true,
       carRating: true,
       tireRunNumber: true,
+      // Which set of rubber: runs sharing a stint share one set (the tyre wear chains' key).
+      tireStintId: true,
       // Front/rear cars: the front's own count. Null on every single-tyre run.
       frontTireTypeId: true,
       frontTireRunNumber: true,
+      frontTireStintId: true,
       conditionsAirTempC: true,
       lapTimes: true,
       lapSession: true,
@@ -454,16 +457,32 @@ async function loadDayRuns(
   return { day, predecessorOf };
 }
 
+/** "set C run 2"; with no set known, "run 2". */
+function tyreSet(letter: string | null, run: number | null | undefined): string {
+  return [letter ? `set ${letter}` : null, run != null ? `run ${run}` : null].filter(Boolean).join(" ") || "unknown";
+}
+
 function buildDayBlock(
   anchor: LoadedRun,
   day: DayRun[],
   predecessorOf: Map<string, DayRun>,
   zone: string | null,
-  fieldByRun: Map<string, FieldPace>
+  fieldByRun: Map<string, FieldPace>,
+  /** The track's movement per run (lapsBlock.ts): the other drivers against their own day. */
+  trackMoveByRun: Map<string, number>
 ): string | null {
   if (day.length < 2) return null;
   const multiCar = new Set(day.map((r) => r.carId)).size > 1;
   const lines: string[] = [];
+  // A letter per set of rubber, in the order the day first ran it: "tyre run 5" alone read as the
+  // second run of the set before it — it was a different, used set — and the Engineer compared
+  // the wrong runs for a tyre drop-off (round 06, 2026-09-23).
+  const setLetter = new Map<string, string>();
+  const letterOf = (stint: string | null | undefined): string | null => {
+    if (!stint) return null;
+    if (!setLetter.has(stint)) setLetter.set(stint, String.fromCharCode(65 + (setLetter.size % 26)));
+    return setLetter.get(stint)!;
+  };
 
   for (const run of day) {
     const pace = runPace(run);
@@ -480,9 +499,9 @@ function buildDayBlock(
       // A front/rear run states both counts — the ends are separate sets. A single-tyre run's
       // cell is unchanged.
       run.frontTireTypeId != null && run.frontTireRunNumber != null
-        ? `tyre run front ${run.frontTireRunNumber} / rear ${run.tireRunNumber}`
+        ? `tyres front ${tyreSet(letterOf(run.frontTireStintId), run.frontTireRunNumber)} / rear ${tyreSet(letterOf(run.tireStintId), run.tireRunNumber)}`
         : run.tireRunNumber != null
-          ? `tyre run ${run.tireRunNumber}`
+          ? `tyres ${tyreSet(letterOf(run.tireStintId), run.tireRunNumber)}`
           : null,
       run.conditionsAirTempC != null ? `${run.conditionsAirTempC}°C` : null,
       run.unconfirmedAt != null ? "(unconfirmed — setup and tyres carried, not logged by the driver)" : null,
@@ -506,11 +525,47 @@ function buildDayBlock(
     }
   }
 
+  // A set run more than once today: how its top five moved from its first run today, raw and with
+  // the track's movement taken out. The knowledge base is right that a used tyre is not simply a
+  // slower one (tyre-wear.md) — so the Engineer gets this set's measured change, not an assumption.
+  // Without it, "was that actually faster?" on a new set against a third run credited the car. The
+  // track's movement is the LAPS block's "other drivers against their own day", not the field's
+  // median top five: two drivers who stopped early in one SA heat moved that median by half a second.
+  const setRuns = new Map<string, DayRun[]>();
+  for (const run of day) {
+    const letter = letterOf(run.tireStintId);
+    if (!letter) continue;
+    if (!setRuns.has(letter)) setRuns.set(letter, []);
+    setRuns.get(letter)!.push(run);
+  }
+  const setLines: string[] = [];
+  for (const [letter, runs] of setRuns) {
+    if (runs.length < 2) continue;
+    const first = runs[0];
+    const firstTop5 = runPace(first).top5;
+    const firstMove = trackMoveByRun.get(first.id) ?? null;
+    if (firstTop5 == null) continue;
+    const steps = runs
+      .slice(1)
+      .map((r) => {
+        const top5 = runPace(r).top5;
+        if (top5 == null) return null;
+        const move = trackMoveByRun.get(r.id) ?? null;
+        const track =
+          move != null && firstMove != null ? `; ${fmtDelta(top5 - firstTop5 - (move - firstMove))} with the track taken out` : "";
+        return `run ${r.tireRunNumber} ${fmtSecs(top5)} (${fmtDelta(top5 - firstTop5)}${track})`;
+      })
+      .filter((s): s is string => s != null);
+    if (steps.length === 0) continue;
+    setLines.push(`  set ${letter}: run ${first.tireRunNumber} ${fmtSecs(firstTop5)} → ${steps.join(" → ")}`);
+  }
+
   const dayLabel = fmtLocalDate(day[0], zone);
   const what = multiCar ? "cars of this type" : (anchor.car?.name ?? "this car");
   // Only when the day holds one: the sentence is a cost on every other day's block, and the
   // eval fixtures are frozen snapshots of the ordinary shape.
   const anyUnconfirmed = day.some((r) => r.unconfirmedAt != null);
+  const anySets = setLetter.size > 0;
   return [
     // Not "the whole day": a run logged without a car cannot be attributed to a car type,
     // so it is absent here even though the driver was out in it.
@@ -519,8 +574,14 @@ function buildDayBlock(
     `with no readable sheet has no "changed" line: that is unknown, not unchanged.`,
     ...(day.some((r) => fieldByRun.has(r.id))
       ? [
-          `"P3/12 +0.21 to P1" is your place and gap to the fastest driver's best lap in that session's`,
-          `timing sheet — the field drove the same track at the same time, so it cancels the track's movement.`,
+          `"P3/12 +0.21 to P1" is your place by best lap and your gap to the fastest driver's best lap in that`,
+          `session's timing sheet — the field drove the same track at the same time, so it cancels the track's movement.`,
+        ]
+      : []),
+    ...(anySets
+      ? [
+          `"tyres set C run 2" is run 2 on set C: the same letter is the same set of rubber, a new letter another`,
+          `set — new if it reads run 1, used before today if higher.`,
         ]
       : []),
     ...(anyUnconfirmed
@@ -532,6 +593,13 @@ function buildDayBlock(
       : []),
     "",
     ...lines,
+    ...(setLines.length > 0
+      ? [
+          "",
+          `TYRE SETS RUN MORE THAN ONCE TODAY — each later run's top five against that set's first run today (positive = slower), then the same with the track's movement taken out (the other drivers against their own day, in LAPS below).`,
+          ...setLines,
+        ]
+      : []),
   ].join("\n");
 }
 
@@ -540,24 +608,33 @@ function buildDayBlock(
  * any loose import of the driver's whose time on track falls on that day (the sweep files
  * practice without a run). The day is the run's, in the same zone as every other clock here.
  */
-async function buildDayLapsBlock(
+async function loadDayLapsSessions(
   userId: string,
   anchor: LoadedRun,
   day: DayRun[],
   zone: string | null
-): Promise<string | null> {
+): Promise<LapsSession[]> {
   const centre = (anchor.sortAt ?? anchor.createdAt).getTime();
   const anchorDay = runLocalDayKey(anchor, { viewerTimeZone: zone ?? undefined });
   const runs = [anchor, ...day.filter((r) => r.id !== anchor.id)];
-  const sessions = await loadLapsSessions({
+  return loadLapsSessions({
     userId,
     runs,
     window: { from: new Date(centre - DAY_WINDOW_MS), to: new Date(centre + DAY_WINDOW_MS) },
     zone,
     keep: (s) => s.ymd === anchorDay,
   });
+}
+
+function renderDayLapsBlock(
+  anchor: LoadedRun,
+  sessions: LapsSession[],
+  zone: string | null,
+  questions: ReadonlyArray<string | null | undefined>
+): string | null {
   const where = anchor.track?.name ? ` at ${anchor.track.name}` : "";
-  return renderLapsBlock(sessions, `on ${fmtLocalDate(anchor, zone)}${where}`);
+  const rival = matchDriverNameInQuestions(questions, lapsRivalNames(sessions));
+  return renderLapsBlock(sessions, `on ${fmtLocalDate(anchor, zone)}${where}`, { rival });
 }
 
 function buildComparableRunsBlock(
@@ -593,6 +670,8 @@ export async function buildDriverDataBlocks(params: {
   runId: string | null;
   /** The driver's latest message; a driver named in it gets a VS section over the day (rivals.ts). */
   question?: string | null;
+  /** The driver's one or two messages before it, latest first — a follow-up rarely repeats a name. */
+  earlierQuestions?: ReadonlyArray<string>;
 }): Promise<EngineerPayloadBlock[]> {
   const run = await loadRun(params.userId, params.runId).catch(() => null);
   if (!run) return [];
@@ -622,12 +701,16 @@ export async function buildDriverDataBlocks(params: {
     .catch(() => [] as Array<{ parameter: string; label: string }>);
   parts.push(buildSetupSheetBlock(run, levers, day.filter((r) => r.carId === run.carId)));
 
-  const dayBlock = buildDayBlock(run, day, predecessorOf, zone, fieldByRun);
+  // The day's timed sessions, every lap of every driver (lapsBlock.ts) — loaded before the day
+  // block, which takes the track's movement from them. A failed read just drops what uses them.
+  const lapsSessions = await loadDayLapsSessions(params.userId, run, day, zone).catch(() => [] as LapsSession[]);
+  const dayBlock = buildDayBlock(run, day, predecessorOf, zone, fieldByRun, lapsTrackMoveByRun(lapsSessions));
   if (dayBlock) parts.push(dayBlock);
 
   // Every lap of every driver in the day's timed sessions (lapsBlock.ts) — the day the
   // session above sits in, whatever car the driver was in. A failed read just drops the block.
-  const lapsBlock = await buildDayLapsBlock(params.userId, run, day, zone).catch(() => null);
+  const questions = [params.question, ...(params.earlierQuestions ?? [])];
+  const lapsBlock = renderDayLapsBlock(run, lapsSessions, zone, questions);
   if (lapsBlock) parts.push(lapsBlock);
 
   // Who else was on the day's timing sheets, and — if the question names one — you against
@@ -641,9 +724,7 @@ export async function buildDriverDataBlocks(params: {
   }));
   const rivals = renderRivalsSummary(dayRuns);
   if (rivals) parts.push(rivals);
-  const rivalName = params.question
-    ? matchDriverName(params.question, driversOnSheets(dayRuns).map((d) => d.name))
-    : null;
+  const rivalName = matchDriverNameInQuestions(questions, driversOnSheets(dayRuns).map((d) => d.name))?.name ?? null;
   if (rivalName) {
     const vs = renderRivalSection(dayRuns, driverKey(rivalName));
     if (vs) parts.push(vs);

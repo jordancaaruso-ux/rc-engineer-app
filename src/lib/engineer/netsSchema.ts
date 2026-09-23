@@ -277,12 +277,17 @@ export function unreviewedSides(entry: NetEntry): string[] {
  * whole KB is present anyway. `physics:` stays in the YAML as the validator's anti-substitution
  * hook; the model never needed it.
  */
+/*
+ * `usual` is validated but NOT rendered since 2026-09-23. The only one written (rear toe, drafted
+ * from logged runs, "4° is the far end of what is run") became the static rule the founder objected
+ * to — "if it's already reaching four that's too high" — and its middle sat at 3.2° where he calls
+ * 3° "super high rear toe". It comes back on the wire only with the founder's own numbers.
+ */
 export function renderNetEntry(entry: NetEntry): string {
   const lines: string[] = [];
   lines.push(
     entry.label.toUpperCase() +
-      (entry.step ? ` | a normal move: ${entry.step}` : "") +
-      (entry.usual ? ` | usually runs: ${entry.usual}` : "")
+      (entry.step ? ` | a normal move: ${entry.step}` : "")
   );
   for (const side of NET_SIDES) {
     const s = entry[side];

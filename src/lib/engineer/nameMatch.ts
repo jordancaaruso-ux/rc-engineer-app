@@ -108,26 +108,77 @@ function scoreCandidate(
  * (the last word of the name) must be there, typos forgiven; the first name helps break a tie
  * between two drivers who share one. "tim hilyear", "hilyear", "hillyear" all find Tim
  * Hilyear; a surname shared by two drivers with neither first name given finds no one.
+ *
+ * With no surname in the message, a first name finds the ONE driver on the sheets it can mean —
+ * the name itself, or the short form it starts ("tim" → Timothy Hilyear: the founder's own "where
+ * am i losing time to tim in the last heat", 2026-09-23). Two drivers it could mean → no one. A
+ * first name can also be an everyday word ("how" starts Howard), so the caller is handed the word
+ * that matched and says so beside what it builds.
  */
+/**
+ * The driver named in the latest question, else in the one or two before it — "who had the least
+ * fade", asked straight after "my delta to tim hilyear", still means Tim. The latest question that
+ * names anyone decides; it is never mixed with an older one.
+ */
+export function matchDriverNameInQuestions(
+  questions: ReadonlyArray<string | null | undefined>,
+  names: readonly string[]
+): { name: string; word: string } | null {
+  for (const q of questions) {
+    if (!q?.trim()) continue;
+    const hit = matchDriverNameInMessage(q, names);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 export function matchDriverName(message: string, names: readonly string[]): string | null {
+  return matchDriverNameInMessage(message, names)?.name ?? null;
+}
+
+export function matchDriverNameInMessage(
+  message: string,
+  names: readonly string[]
+): { name: string; word: string } | null {
   const msg = nameTokens(message);
   if (msg.length === 0) return null;
-  const scored: Array<{ name: string; matched: number; surname: string }> = [];
+  // A surname in the message decides, even when it fits two drivers and so finds no one.
+  const bySurname = matchBySurname(msg, names);
+  if (bySurname !== undefined) return bySurname;
+  const seen = new Set<string>();
+  const byFirst: Array<{ name: string; word: string }> = [];
+  for (const name of names) {
+    const tokens = nameTokens(name);
+    const key = tokens.join(" ");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const first = tokens[0];
+    if (first == null || first.length < 3) continue;
+    const word = msg.find((m) => !STOP.has(m) && m.length >= 3 && (m === first || first.startsWith(m)));
+    if (word) byFirst.push({ name, word });
+  }
+  return byFirst.length === 1 ? byFirst[0] : null;
+}
+
+/** undefined = no surname in the message at all; null = one that fits two drivers. */
+function matchBySurname(msg: string[], names: readonly string[]): { name: string; word: string } | null | undefined {
+  const scored: Array<{ name: string; matched: number; word: string }> = [];
   for (const name of names) {
     const tokens = nameTokens(name);
     if (tokens.length === 0) continue;
     const surname = tokens[tokens.length - 1];
     if (surname.length < 4) continue;
-    if (!msg.some((m) => tokenMatches(surname, m))) continue;
+    const word = msg.find((m) => tokenMatches(surname, m));
+    if (!word) continue;
     const matched = tokens.filter((t) => msg.some((m) => tokenMatches(t, m))).length;
-    scored.push({ name, matched, surname });
+    scored.push({ name, matched, word });
   }
-  if (scored.length === 0) return null;
+  if (scored.length === 0) return undefined;
   scored.sort((a, b) => b.matched - a.matched);
   const best = scored[0];
   const rival = scored[1];
   if (rival && rival.matched === best.matched && rival.name !== best.name) return null;
-  return best.name;
+  return { name: best.name, word: best.word };
 }
 
 /**
