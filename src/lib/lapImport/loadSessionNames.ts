@@ -76,11 +76,11 @@ function hostOf(url: string | null | undefined): string | null {
   }
 }
 
-function practiceTrackNameOf(parsedPayload: unknown): string | null {
+function hintString(parsedPayload: unknown, key: string): string | null {
   if (!parsedPayload || typeof parsedPayload !== "object") return null;
   const hint = (parsedPayload as { sessionHint?: unknown }).sessionHint;
   if (!hint || typeof hint !== "object") return null;
-  const v = (hint as { practiceTrackName?: unknown }).practiceTrackName;
+  const v = (hint as Record<string, unknown>)[key];
   return typeof v === "string" && v.trim() ? v.trim() : null;
 }
 
@@ -159,9 +159,11 @@ function trackNameOf(
     row.linkedEvent?.track?.name?.trim() ||
     row.linkedRun?.track?.name?.trim() ||
     row.linkedRun?.trackNameSnapshot?.trim() ||
-    practiceTrackNameOf(row.parsedPayload) ||
+    hintString(row.parsedPayload, "practiceTrackName") ||
     (host && host.endsWith(".liverc.com") ? byHost.get(host) : null) ||
     (location ? byLocation.get(location) : null) ||
+    // No track of ours matches: the timing site's own name for the location beats "MYLAPS".
+    hintString(row.parsedPayload, "practiceLocationName") ||
     null
   );
 }

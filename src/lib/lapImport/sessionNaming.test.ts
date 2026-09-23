@@ -288,8 +288,8 @@ test("MYLAPS practice takes the timing site's own session number from its link",
     viewer,
     opts
   ).get("sh5");
-  // Nobody is named on a MYLAPS practice loop, but the site says which run of the chip's day it was.
-  assert.equal(n?.title, "Run 5");
+  // Nothing says whose (an import from before chips were kept): still never a bare "Run 5".
+  assert.equal(n?.title, "Unknown driver · Run 5");
   assert.equal(n?.runNumber, 5);
   assert.equal(n?.timeLabel, "5:12 PM");
   // A year that isn't this one shows, without en-GB's comma after the weekday.
@@ -309,4 +309,34 @@ test("label is the name without its driver, or what the driver typed", () => {
   assert.equal(names.get("b")?.label, "Diff oil test");
   // LiveRC prints the track's clock written as UTC; the lap sheet needs it to fix its own times.
   assert.equal(names.get("a")?.trackClockIso, "2026-09-22T18:55:00.000Z");
+});
+
+test("MYLAPS practice names the chip: your saved name, else its owner's label, else the number", () => {
+  const run = (id: string, hint: Record<string, unknown>): SessionNamingRow => ({
+    id,
+    createdAt: "2026-09-16T00:20:10.000Z",
+    sessionCompletedAt: "2025-09-28T15:12:36.531Z",
+    sourceUrl: `https://speedhive.mylaps.com/practice/4591/activities/${id}/sessions/5`,
+    parserId: "speedhive_practice_v1",
+    parsedPayload: {
+      sessionDrivers: [{ driverName: "28/09/2025, 05:12 pm", laps: [16.2] }],
+      sessionHint: { name: "28/09/2025, 05:12 pm", ...hint },
+      sessionUtcOffsetMinutes: 120,
+    },
+  });
+  const names = nameImportedSessions(
+    [
+      run("11", { practiceTransponder: "2799719", practiceSiteName: "Caruso" }),
+      run("12", { practiceTransponder: "7281046", practiceSiteName: "T HILLIER" }),
+      run("13", { practiceTransponder: "5550001" }),
+      run("14", { practiceTransponder: "4412087", practiceSiteName: "Whatever" }),
+    ],
+    viewer,
+    opts
+  );
+  assert.equal(names.get("11")?.title, "Caruso · Run 5");
+  assert.equal(names.get("12")?.title, "Tim · Run 5");
+  assert.equal(names.get("13")?.title, "Transponder 5550001 · Run 5");
+  // One of the viewer's own chips is the viewer, by name.
+  assert.equal(names.get("14")?.title, "Jordan Caruso · Run 5");
 });

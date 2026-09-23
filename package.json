@@ -254,6 +254,7 @@
     "test:demo-dates": "npx tsx --test src/lib/demo/demoDateShift.test.ts",
     "laps:backfill-liverc-names": "dotenv -e .env.local -- tsx scripts/backfill-liverc-race-session-names.ts",
     "laps:backfill-liverc-dates": "dotenv -e .env.local -- tsx scripts/backfill-liverc-race-session-dates.ts",
+    "laps:backfill-speedhive-chips": "dotenv -e .env.local -- tsx scripts/backfill-speedhive-practice-chips.ts",
     "test:lap-session-title": "npx tsx --test src/lib/lapImport/sessionTitle.test.ts src/lib/lapImport/sessionNaming.test.ts",
     "test:lap-race-charts": "npx tsx --test src/lib/lapRaceCharts.test.ts",
     "demo:leaks": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/dev-check-demo-leaks.ts"

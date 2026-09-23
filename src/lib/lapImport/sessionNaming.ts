@@ -412,7 +412,13 @@ export function nameImportedSessions(
   for (const { row, draft } of drafts) {
     const runNumber = draft.isRace ? null : (draft.siteRunNumber ?? runNumberById.get(row.id) ?? null);
     const label = draft.isRace ? (draft.raceName ?? "Race") : runNumber != null ? `Run ${runNumber}` : "Practice";
-    const autoTitle = draft.who ? `${draft.who} · ${label}` : label;
+    /*
+     * A run is never just "Run 5" (founder call, 2026-09-23): your saved name, the name the timing
+     * site gives, or the transponder, and only when none of those is known, "Unknown driver".
+     * A race you weren't in is the one title that stands alone — the race is its name.
+     */
+    const who = draft.who ?? (draft.isRace ? null : "Unknown driver");
+    const autoTitle = who ? `${who} · ${label}` : label;
     const custom = row.customName?.trim().slice(0, SESSION_CUSTOM_NAME_MAX) || null;
     out.set(row.id, {
       id: row.id,

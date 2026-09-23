@@ -21,6 +21,14 @@ export type SpeedhivePracticeActivityRow = {
   chipCode?: string;
 };
 
+/** One practice visit (a transponder's day at a location), as the practice API describes it. */
+export type SpeedhivePracticeActivityDetail = {
+  id: number;
+  chipCode?: string;
+  chipLabel?: string;
+  location?: { id?: number; name?: string };
+};
+
 export type SpeedhivePracticeSessionRow = {
   id: number;
   locationId?: number;
@@ -151,6 +159,21 @@ export async function fetchPracticeSessionsForChipAtLocation(
     { order: "desc" }
   );
   return Array.isArray(data.locations) ? data.locations : [];
+}
+
+/**
+ * Whose practice visit this was: the chip it was timed on, the label its owner gave that chip, and
+ * the location's own name. The laps feed (`fetchPracticeTrainingSessions`) carries none of it.
+ */
+export async function fetchPracticeActivity(activityId: number): Promise<SpeedhivePracticeActivityDetail | null> {
+  try {
+    const data = await practiceFetchJson<SpeedhivePracticeActivityDetail>(
+      `/api/v1/training/activities/${activityId}`
+    );
+    return data?.id ? data : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchPracticeTrainingSessions(

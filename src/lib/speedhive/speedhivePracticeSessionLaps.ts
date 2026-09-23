@@ -2,7 +2,8 @@ import "server-only";
 
 import type { LapUrlParseResult, LapUrlSessionDriver } from "@/lib/lapUrlParsers/types";
 import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
-import { fetchPracticeTrainingSessions } from "@/lib/speedhive/speedhivePracticeClient";
+import { fetchPracticeActivity, fetchPracticeTrainingSessions } from "@/lib/speedhive/speedhivePracticeClient";
+import { normalizeSpeedhiveTransponderNumber } from "@/lib/speedhive/speedhiveTransponder";
 import {
   parseSpeedhivePracticeActivityRef,
   buildSpeedhivePracticeActivityUrl,
@@ -67,7 +68,15 @@ export async function importSpeedhivePracticeActivity(
   }
 
   try {
-    const trainingSessions = await fetchPracticeTrainingSessions(ref.activityId);
+    /*
+     * The visit itself says whose it was — its chip and the label its owner gave it. Kept on the
+     * session so the run can be named (founder call 2026-09-23: "a run should never just say
+     * run x"). Its own failure never costs the laps.
+     */
+    const [trainingSessions, activity] = await Promise.all([
+      fetchPracticeTrainingSessions(ref.activityId),
+      fetchPracticeActivity(ref.activityId),
+    ]);
     if (trainingSessions.length === 0) {
       return {
         parserId: PARSER_ID,
@@ -130,11 +139,20 @@ export async function importSpeedhivePracticeActivity(
         ? new Date(startIso).toISOString()
         : null;
 
+    const chip = activity?.chipCode ? normalizeSpeedhiveTransponderNumber(activity.chipCode) : null;
+    const chipLabel = activity?.chipLabel?.trim() || null;
+    const locationName = activity?.location?.name?.trim() || null;
+
     return {
       parserId: PARSER_ID,
       laps: primary.laps,
       sessionDrivers,
-      sessionHint: { name: primary.driverName },
+      sessionHint: {
+        name: primary.driverName,
+        ...(chip ? { practiceTransponder: chip } : {}),
+        ...(chipLabel ? { practiceSiteName: chipLabel } : {}),
+        ...(locationName ? { practiceLocationName: locationName } : {}),
+      },
       sessionCompletedAtIso,
       sessionUtcOffsetMinutes: speedhivePracticeUtcOffsetMinutes(blocks),
       message: null,

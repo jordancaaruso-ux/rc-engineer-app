@@ -42,6 +42,11 @@ export interface LapUrlParseResult {
   sessionHint?: {
     name?: string | null;
     className?: string | null;
+    /** MYLAPS practice: the chip the run was timed on, and the label its owner gave that chip. */
+    practiceTransponder?: string | null;
+    practiceSiteName?: string | null;
+    /** MYLAPS practice: the location's own name ("Arena33 DJK Onroad"). */
+    practiceLocationName?: string | null;
   };
   /**
    * UTC ISO instant when the timing provider exposes session/run time on track
