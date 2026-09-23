@@ -308,7 +308,9 @@ export default async function LapAnalysisPage(props: {
         wide
       >
         <LapAnalysisBoard
-          run={{ ...anchor.run, sessionLabel: title }}
+          /* The sheet names its column after the DRIVER already; its session line wants the
+             run ("Run 3", the race, or what the driver typed), not the name a second time. */
+          run={{ ...anchor.run, sessionLabel: name?.label ?? anchor.title }}
           otherRuns={myRuns.map(toCompareRunShape)}
           runListSource="my_runs"
           primaryDriverName={anchor.anchorDriverName}
@@ -320,6 +322,7 @@ export default async function LapAnalysisPage(props: {
           driverCount={anchor.driverCount}
           sourceLabel={anchor.sourceLabel}
           context={context}
+          trackClockIso={name?.trackClockIso ?? null}
         />
         {onRun ? null : <DeleteSessionButton sessionId={sessionId} />}
       </Shell>

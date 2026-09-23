@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { wallClockAsUtcToInstant } from "@/lib/eventActive";
 import { LapComparisonColumnGrid } from "@/components/runs/LapComparisonColumnGrid";
 import { formatRunDateTime } from "@/lib/formatDate";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
@@ -32,6 +33,7 @@ export function LapAnalysisBoard({
   driverCount = null,
   sourceLabel = null,
   context: contextOverride = null,
+  trackClockIso = null,
 }: {
   run: CompareRunShape;
   otherRuns: CompareRunShape[];
@@ -52,6 +54,13 @@ export function LapAnalysisBoard({
    * the track's clock. Wins over the parts above.
    */
   context?: string | null;
+  /**
+   * An imported session's time on the TRACK's clock, written as UTC (`SessionName.trackClockIso`).
+   * The grid prints times in the phone's zone, so a LiveRC time stored as the track's clock read
+   * hours out ("20 Jul, 1:30 AM" under a 3:30 PM session). Turned back into the real instant here,
+   * the same way the grid already does for sessions brought in from the library.
+   */
+  trackClockIso?: string | null;
 }) {
   const { sessions: librarySessions, reload: reloadLibrary, loaded: libraryLoaded } = useImportedLapLibrary();
 
@@ -71,6 +80,21 @@ export function LapAnalysisBoard({
    */
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  const sheetRun = useMemo(() => {
+    if (!mounted || !trackClockIso || !run.id.startsWith("import:")) return run;
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const at = new Date(trackClockIso);
+    if (Number.isNaN(at.getTime())) return run;
+    const instantIso = wallClockAsUtcToInstant(at, zone).toISOString();
+    return {
+      ...run,
+      sessionCompletedAt: instantIso,
+      sortAt: instantIso,
+      // Everyone on the sheet ran in the same session.
+      importedLapSets: run.importedLapSets?.map((set) => ({ ...set, sessionCompletedAt: instantIso })),
+    };
+  }, [mounted, run, trackClockIso]);
   if (!mounted) {
     return (
       <p className="px-1 py-6 text-[13px] text-muted-foreground" aria-live="polite">
@@ -103,10 +127,10 @@ export function LapAnalysisBoard({
       <LapComparisonColumnGrid
         primaryDriverName={primaryDriverName}
         primaryIsViewer={primaryIsViewer}
-        run={run}
+        run={sheetRun}
         currentRunId={run.id}
         otherRuns={otherRuns.filter((r) => r.id !== run.id)}
-        compareAnchorRun={run}
+        compareAnchorRun={sheetRun}
         pickerRunsForModal={otherRuns}
         runListSource={runListSource}
         librarySessions={librarySessions}

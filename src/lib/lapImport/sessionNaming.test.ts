@@ -258,3 +258,55 @@ test("groups keep the order of their first session; each day reads newest first"
     [["old"], ["c", "a"]]
   );
 });
+
+test("a session on one of the viewer's runs is theirs, whatever name the sheet printed", () => {
+  const n = nameImportedSessions(
+    [practice("a", "J CARUSO RACING", "2026-09-22T18:55:00.000Z", { linkedRunId: "run1" })],
+    viewer,
+    opts
+  ).get("a");
+  assert.equal(n?.title, "Jordan Caruso · Run 1");
+  assert.equal(n?.isViewer, true);
+});
+
+test("MYLAPS practice takes the timing site's own session number from its link", () => {
+  const n = nameImportedSessions(
+    [
+      {
+        id: "sh5",
+        createdAt: "2026-09-16T00:20:10.000Z",
+        sessionCompletedAt: "2025-09-28T15:12:36.531Z",
+        sourceUrl: "https://speedhive.mylaps.com/practice/4591/activities/6646551409/sessions/5",
+        parserId: "speedhive_practice_v1",
+        parsedPayload: {
+          sessionDrivers: [{ driverName: "28/09/2025, 05:12 pm", laps: [16.2] }],
+          sessionHint: { name: "28/09/2025, 05:12 pm" },
+          sessionUtcOffsetMinutes: 120,
+        },
+      },
+    ],
+    viewer,
+    opts
+  ).get("sh5");
+  // Nobody is named on a MYLAPS practice loop, but the site says which run of the chip's day it was.
+  assert.equal(n?.title, "Run 5");
+  assert.equal(n?.runNumber, 5);
+  assert.equal(n?.timeLabel, "5:12 PM");
+  // A year that isn't this one shows, without en-GB's comma after the weekday.
+  assert.match(n?.dayLabel ?? "", /^Sun 28 Sept? 2025$/);
+});
+
+test("label is the name without its driver, or what the driver typed", () => {
+  const names = nameImportedSessions(
+    [
+      practice("a", "Jordan Caruso", "2026-09-22T18:55:00.000Z"),
+      practice("b", "Jordan Caruso", "2026-09-22T19:21:00.000Z", { customName: "Diff oil test" }),
+    ],
+    viewer,
+    opts
+  );
+  assert.equal(names.get("a")?.label, "Run 1");
+  assert.equal(names.get("b")?.label, "Diff oil test");
+  // LiveRC prints the track's clock written as UTC; the lap sheet needs it to fix its own times.
+  assert.equal(names.get("a")?.trackClockIso, "2026-09-22T18:55:00.000Z");
+});

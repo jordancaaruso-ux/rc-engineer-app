@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
@@ -18,7 +19,7 @@ import { sameLocalCalendarDay } from "@/lib/lapCompareScope";
 import { parseSpeedhivePracticeActivityRef } from "@/lib/speedhive/speedhivePracticeUrl";
 import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
 import type { ImportedSessionFieldStatsPreviewV1 } from "@/lib/lapImport/computeImportedSessionFieldStats";
-import { formatRunDateTime } from "@/lib/formatDate";
+import { calendarYmdInTimeZone, formatRunDateTime } from "@/lib/formatDate";
 import { cn } from "@/lib/utils";
 
 type SessionRow = {
@@ -150,9 +151,13 @@ export function LapAnalysisLibrary({
          * race's class and field size, and why an old race sits up here: it came in later. Only
          * when the two days differ — "added" on the day it was raced says nothing.
          */
+        // Upload day on the phone's calendar against the session's day on the track's.
+        const addedLater = name
+          ? calendarYmdInTimeZone(s.createdAt, Intl.DateTimeFormat().resolvedOptions().timeZone) !== name.dayKey
+          : !sameLocalCalendarDay(s.createdAt, whenIso);
         const detail = [
           name?.detail ?? null,
-          sameLocalCalendarDay(s.createdAt, whenIso) ? null : `added ${formatRunDateTime(s.createdAt)}`,
+          addedLater ? `added ${formatRunDateTime(s.createdAt)}` : null,
         ]
           .filter(Boolean)
           .join(" · ");
@@ -220,6 +225,13 @@ export function LapAnalysisLibrary({
   const tickable = useMemo(() => filtered.filter((r) => !r.onRun), [filtered]);
   const tickedIds = useMemo(() => tickable.filter((r) => ticked.has(r.id)).map((r) => r.id), [tickable, ticked]);
   const allTicked = tickable.length > 0 && tickedIds.length === tickable.length;
+  /*
+   * The Select bar is portaled to <body>: a `fixed` element inside the page body's transformed
+   * wrapper is fixed to THAT box, not the screen, and landed at the foot of a long list instead of
+   * over the dock (same trap as the run form's save bar). Gated until mount for the portal.
+   */
+  const [barMounted, setBarMounted] = useState(false);
+  useEffect(() => setBarMounted(true), []);
 
   const loadSessions = useCallback(async () => {
     setListErr(null);
@@ -590,7 +602,7 @@ export function LapAnalysisLibrary({
         {selecting ? <div className="h-20" aria-hidden /> : null}
       </div>
 
-      {selecting ? (
+      {selecting && barMounted ? createPortal(
         /* Clears the bottom dock the way the run form's save bar does; floats on desktop. */
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+4.75rem)] z-40 px-4 md:bottom-8">
           <div className="pointer-events-auto mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl border border-border bg-card/95 p-2 shadow-[0_12px_30px_-10px_rgba(60,52,32,0.5)] backdrop-blur-xl">
@@ -617,7 +629,8 @@ export function LapAnalysisLibrary({
               {deleting ? "Deleting…" : tickedIds.length > 0 ? `Delete ${tickedIds.length}` : "Delete"}
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       ) : null}
 
       <ActionToast

@@ -10,6 +10,7 @@ import {
 import { isOnlyADate, usable } from "@/lib/lapImport/sessionTitle";
 import { MYRCM_PDF_SOURCE_PREFIX } from "@/lib/lapUrlParsers/myRcmPdfSource";
 import { importedSessionIsPractice, practiceColumnName } from "@/lib/practiceField/practiceField";
+import { parseSpeedhivePracticeActivityRef } from "@/lib/speedhive/speedhivePracticeUrl";
 import type { KnownCompetitor } from "@/lib/speedhive/knownCompetitors";
 import { normalizeSpeedhiveTransponderNumber } from "@/lib/speedhive/speedhiveTransponder";
 
@@ -53,6 +54,8 @@ export type SessionNamingRow = {
   trackName?: string | null;
   /** The viewer's transponder the sweep found this session by. Found that way, it is theirs. */
   sweepChipCode?: string | null;
+  /** The viewer's run it is attached to. Attached, it is the viewer's own session. */
+  linkedRunId?: string | null;
 };
 
 export type SessionNamingViewer = {
@@ -72,6 +75,8 @@ export type SessionName = {
   title: string;
   /** The automatic name, kept when renamed so the page can still say what it was. */
   autoTitle: string;
+  /** The name without its driver — "Run 3", a race's name — or what the driver typed. */
+  label: string;
   isCustom: boolean;
   isRace: boolean;
   /** Whose session: the viewer, the practice driver, or null on a race the viewer wasn't in. */
@@ -87,6 +92,11 @@ export type SessionName = {
   dayLabel: string;
   /** "7:48 PM" on the track's clock. Null when the timing site gave no time at all. */
   timeLabel: string | null;
+  /**
+   * The track's clock written as UTC, when that is how this session prints — the lap sheet turns
+   * it back into a real instant in the phone's zone so its own times agree with this name.
+   */
+  trackClockIso: string | null;
   /** The list heading this session files under, and its key. */
   groupKey: string;
   groupLabel: string;
@@ -221,8 +231,10 @@ function runtimeTimeZone(): string {
   }
 }
 
-type Draft = Omit<SessionName, "title" | "autoTitle" | "runNumber" | "isCustom"> & {
+type Draft = Omit<SessionName, "title" | "autoTitle" | "label" | "runNumber" | "isCustom"> & {
   raceName: string | null;
+  /** MYLAPS practice: the site's own number for this session in the chip's day. */
+  siteRunNumber: number | null;
   /** Numbering bucket: whose, where, which day. Null when the driver is unknown. */
   bucket: string | null;
 };
@@ -251,6 +263,7 @@ function draftName(
   const siteName = hintText(hint, "practiceSiteName");
   let matchedPrinted: string | null = null;
   let isViewer = false;
+  if (row.linkedRunId) isViewer = true;
   if (isRace) {
     const mine = drivers.find((d) => d.name && viewer.names.has(normalizeName(d.name)));
     if (mine) {
@@ -307,10 +320,18 @@ function draftName(
   const shown = importedSessionTimeForDisplay(whenIso, timeOpts);
   const zone = shown.timeZone ?? opts.timeZone ?? runtimeTimeZone();
   const dayKey = calendarYmdInTimeZone(shown.iso, zone);
-  const dayLabel = formatRunDateWeekday(shown.iso, zone, opts.now);
+  // en-GB puts a comma after the weekday once a year is shown ("Sun, 28 Sept 2025").
+  const dayLabel = formatRunDateWeekday(shown.iso, zone, opts.now).replace(/^([A-Za-z]{3}),\s*/, "$1 ");
   // A session with no time of its own is only showing when it was imported: no time on the row.
   const timeLabel = hasWallClock ? formatRunTimeOnly(shown.iso, zone) : null;
   const sortMs = new Date(shown.iso).getTime();
+  const trackClockIso = shown.timeZone === "UTC" ? shown.iso : null;
+  /*
+   * MYLAPS numbers a transponder's practice sessions through its day ("…/activities/66465/
+   * sessions/5" is that chip's fifth) — the timing site's own count, so it beats anything we
+   * could count from the sessions we happen to hold.
+   */
+  const siteRunNumber = isRace ? null : (parseSpeedhivePracticeActivityRef(row.sourceUrl)?.trainingSessionId ?? null);
 
   const place = usable(row.trackName) ?? siteLabel(row.sourceUrl);
   const groupKey = `${dayKey}|${normalizeName(place)}`;
@@ -333,6 +354,8 @@ function draftName(
     dayKey,
     dayLabel,
     timeLabel,
+    trackClockIso,
+    siteRunNumber,
     groupKey,
     groupLabel: `${dayLabel} · ${place}`,
     driverCount,
@@ -387,7 +410,7 @@ export function nameImportedSessions(
 
   const out = new Map<string, SessionName>();
   for (const { row, draft } of drafts) {
-    const runNumber = draft.isRace ? null : (runNumberById.get(row.id) ?? null);
+    const runNumber = draft.isRace ? null : (draft.siteRunNumber ?? runNumberById.get(row.id) ?? null);
     const label = draft.isRace ? (draft.raceName ?? "Race") : runNumber != null ? `Run ${runNumber}` : "Practice";
     const autoTitle = draft.who ? `${draft.who} · ${label}` : label;
     const custom = row.customName?.trim().slice(0, SESSION_CUSTOM_NAME_MAX) || null;
@@ -395,6 +418,7 @@ export function nameImportedSessions(
       id: row.id,
       title: custom ?? autoTitle,
       autoTitle,
+      label: custom ?? label,
       isCustom: custom != null,
       isRace: draft.isRace,
       who: draft.who,
@@ -404,6 +428,7 @@ export function nameImportedSessions(
       dayKey: draft.dayKey,
       dayLabel: draft.dayLabel,
       timeLabel: draft.timeLabel,
+      trackClockIso: draft.trackClockIso,
       groupKey: draft.groupKey,
       groupLabel: draft.groupLabel,
       driverCount: draft.driverCount,

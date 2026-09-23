@@ -121,7 +121,7 @@ export function SessionTitleEditor({
             enterKeyHint="done"
             autoComplete="off"
             disabled={saving}
-            className="h-11 w-full rounded-lg border border-primary-ink/70 bg-card px-3 text-[17px] font-bold tracking-tight text-foreground outline-none ring-2 ring-primary/30 placeholder:font-semibold placeholder:text-muted-foreground"
+            className="h-11 w-full rounded-lg border border-primary-ink/70 bg-card px-2.5 text-[16px] font-bold tracking-tight text-foreground outline-none ring-2 ring-primary/30 placeholder:font-semibold placeholder:text-muted-foreground"
           />
         </label>
         <button
