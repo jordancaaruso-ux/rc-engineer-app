@@ -602,6 +602,12 @@ export async function draftBlankV2(input: {
         return {
           name: f.name, kind: f.kind, widgets: f.widgets.length, where: where(u), nameSaysAxle: axleFromFieldName(f.name),
           region: { x: +u.xPct.toFixed(3), y: +u.yPct.toFixed(3), w: +u.wPct.toFixed(3), h: +u.hPct.toFixed(3) },
+          // One rect per widget, in widgetIndex order (the order the pictures number them 1..n), so a
+          // whole-drawing picture can outline and tag every tick box of a group, not just its union.
+          widgetRegions: f.widgets.map((w) => {
+            const r = normRegion(w.region);
+            return { x: +r.xPct.toFixed(4), y: +r.yPct.toFixed(4), w: +r.wPct.toFixed(4), h: +r.hPct.toFixed(4) };
+          }),
           ...(input.composite
             ? { box: join(input.cropsDir!, `${safe(f.name)}-box.jpg`) }
             : { tight: join(input.cropsDir!, `${safe(f.name)}-tight.jpg`), wide: join(input.cropsDir!, `${safe(f.name)}-wide.jpg`), page: join(input.cropsDir!, `${safe(f.name)}-page.jpg`) }),

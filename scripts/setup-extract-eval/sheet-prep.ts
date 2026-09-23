@@ -81,6 +81,21 @@ async function main() {
     batches.push(file);
   }
 
+  // The gridded page again, with every box outlined: the layout helper draws its blocks around the
+  // boxes it can see, so a drawing and the callout boxes that point into it land in one block.
+  {
+    const sharpMod = (await import("sharp")).default;
+    const gridded = await gridOverlayJpeg(page, W, H);
+    const gm = await sharpMod(gridded).metadata();
+    const gw = gm.width ?? 1600, gh = gm.height ?? 1;
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${gw}" height="${gh}">`;
+    for (const f of manifest.fields as Array<{ widgetRegions?: Array<{ x: number; y: number; w: number; h: number }> }>) {
+      for (const r of f.widgetRegions ?? []) svg += `<rect x="${r.x * gw - 1}" y="${r.y * gh - 1}" width="${r.w * gw + 2}" height="${r.h * gh + 2}" fill="rgba(255,0,200,0.18)" stroke="#ff00c8" stroke-width="2"/>`;
+    }
+    svg += `</svg>`;
+    await sharpMod(gridded).composite([{ input: Buffer.from(svg), top: 0, left: 0 }]).jpeg({ quality: 85 }).toFile(join(dir, "page-grid-boxes.jpg"));
+  }
+
   writeFileSync(join(dir, "sheet.json"), JSON.stringify({
     modelId: model.id, name: model.name, slug: model.slug, discipline: model.discipline,
     blankId: blank.id, pageCount: blank.pageCount, pdf: join(dir, "blank.pdf"),

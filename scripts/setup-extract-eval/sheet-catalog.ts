@@ -23,27 +23,20 @@ function arg(name: string): string | undefined {
 }
 
 /**
- * A label no human chose for this box. Three kinds, and all three read as nonsense to a driver:
- *  - Acrobat's own default, in any language ("Text70", "Texto47", "Casilla de verificación581").
- *  - The key prettified back into a label ("uppr_links_caster" -> "Uppr links caster").
- *  - A machine-split tick group ("Fr caster · box 1 of 3").
+ * A label a driver cannot act on. The app's own marker comes first: the ingest writes
+ * "Box 12 · page 1, upper left" for any box whose PDF name carried no meaning
+ * (`PLACEHOLDER_LABEL_PREFIX`). An earlier version of this test missed that shape and reported
+ * wholly unnamed sheets as fully named. Second: Acrobat's default spelled out, in any language
+ * ("Text form field 1", "Texto47"). Labels tidied from a meaningful PDF name ("Fr caster") count
+ * as named here, poor as they often read.
  */
-const ACROBAT_DEFAULT =
-  /^(text|txt|texto|texte|testo|tekst|check ?box|checkbox|casilla(\s+de\s+verificaci[oó]n)?|case\s*[àa]\s*cocher|kontrollk[äa]stchen|casella(\s+di\s+controllo)?|selectievakje|field|champ|campo|feld|box|untitled|radio|button|bot[oó]n|dropdown|combo|list|undefined)\s*[-_ ]?\d*$/i;
-
-function prettifyKey(key: string): string {
-  const words = key.replace(/__b\d+$/, "").replace(/[_-]+/g, " ").trim();
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
+const ACRO = /^(text|txt|texto|texte|testo|tekst|checkbox|check|casilla|casilladeverificacion|kontrollkastchen|casella|selectievakje|field|champ|campo|feld|box|untitled|radio|button|dropdown|combo|list|formfield|textformfield|checkboxformfield)\d*$/;
+const alnum = (x: string) => x.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "");
 
 export function isPlaceholderName(key: string, label: string | undefined): boolean {
   const l = (label ?? "").trim();
-  if (!l) return true;
-  if (l.toLowerCase() === key.toLowerCase()) return true;
-  if (ACROBAT_DEFAULT.test(l)) return true;
-  if (/·\s*box\s+\d+\s+of\s+\d+/i.test(l)) return true;
-  // The label carries nothing the key did not already say.
-  return l.toLowerCase() === prettifyKey(key).toLowerCase();
+  if (!l || l.startsWith("Box ")) return true;
+  return ACRO.test(alnum(key.replace(/__b\d+$/, ""))) || ACRO.test(alnum(l));
 }
 
 function fieldsOf(schemaJson: unknown): SchemaField[] {

@@ -33,15 +33,59 @@ const axleOf = (s: string) => { for (const w of words(s)) if (AX[w]) return AX[w
 const core = (s: string) => new Set(words(s).filter((w) => !STOP.has(w)));
 const stem = (set: Set<string>) => new Set([...set].map((w) => (w in STEM ? STEM[w] : w)).filter(Boolean));
 
-export function agreement(a: string, b: string): "same" | "close" | "diff" {
-  const x = stem(core(a)), y = stem(core(b));
+// Words that make two otherwise-similar names mean different boxes. A name that carries one side of
+// a pair (and not the other) contradicts a name that carries the other side.
+const OPPOSITES: Array<[string[], string[]]> = [
+  [["inner", "inboard", "inside"], ["outer", "outboard", "outside"]],
+  [["upper", "top"], ["lower", "bottom", "under"]],
+  [["left"], ["right"]],
+  [["high"], ["low"]],
+  [["min", "minimum"], ["max", "maximum"]],
+  [["ff", "rf"], ["fr", "rr"]],
+];
+const FUNCTION_WORDS = new Set(["the", "of", "at", "on", "in", "for", "and", "or", "to", "with", "from", "by", "is", "per", "box", "boxes"]);
+const wordSet = (s: string) => new Set(words(s));
+
+/** Which pivot of an axle a name points at: the second letter of FF/FR/RF/RR, or its words. */
+function pivotOf(s: string): "F" | "R" | null {
+  const t = norm(s);
+  const code = t.match(/\b(ff|fr|rf|rr)\b/);
+  if (code) return code[1][1].toUpperCase() as "F" | "R";
+  if (/\b(front|forward) (link|pivot|mount|ball|stud|block|holder|pin)\b|\bforward\b|\bleading\b/.test(t)) return "F";
+  if (/\b(rear|back) (link|pivot|mount|ball|stud|block|holder|pin)\b|\brearward\b|\btrailing\b/.test(t)) return "R";
+  return null;
+}
+
+function contradicts(a: string, b: string): boolean {
+  const wa = wordSet(a), wb = wordSet(b);
+  for (const [g1, g2] of OPPOSITES) {
+    const a1 = g1.some((w) => wa.has(w)), a2 = g2.some((w) => wa.has(w));
+    const b1 = g1.some((w) => wb.has(w)), b2 = g2.some((w) => wb.has(w));
+    if ((a1 && !a2 && b2 && !b1) || (a2 && !a1 && b1 && !b2)) return true;
+  }
+  const ax = axleOf(a), ay = axleOf(b);
+  if (ax && ay && ax !== ay) return true;
+  const pa = pivotOf(a), pb = pivotOf(b);
+  return Boolean(pa && pb && pa !== pb);
+}
+
+/**
+ * Do two independent names mean the same box? Extra detail on one side is fine ("ESC" / "ESC (speed
+ * controller)", "Front bump steer shims" / "…, steering link inner end"); a contradiction is not
+ * (front vs rear, FF vs FR, inner vs outer, left vs right, upper vs under). The same cross-car
+ * parameter id on both sides is agreement; two different ids are not.
+ */
+export function agreement(a: string, b: string, idA?: string | null, idB?: string | null): "same" | "close" | "diff" {
+  if (contradicts(a, b)) return "diff";
+  if (idA && idB) return idA === idB ? "same" : "diff";
+  const strip = (s: Set<string>) => new Set([...s].filter((w) => !FUNCTION_WORDS.has(w)));
+  const x = strip(stem(core(a))), y = strip(stem(core(b)));
   if (x.size === 0 || y.size === 0) return norm(a) === norm(b) ? "same" : "diff";
   const shared = [...x].filter((w) => y.has(w)).length;
-  const ax = axleOf(a), ay = axleOf(b);
-  if (ax && ay && ax !== ay) return "diff";
-  const denom = Math.max(x.size, y.size);
-  if (shared === denom) return "same";
-  if (shared / denom >= 0.5) return "close";
+  const small = Math.min(x.size, y.size);
+  if (shared === x.size && shared === y.size) return "same";
+  if (shared === small) return "close";
+  if (shared / small >= 0.67) return "close";
   return "diff";
 }
 
@@ -103,7 +147,7 @@ async function main() {
     if (seen.has(key)) continue;
     seen.add(key);
     if (!fa || !fb) { tally.onlyOnePass++; rows.push({ pdfName: name, key, verdict: "one-pass-only", a: fa?.displayLabel ?? null, b: fb?.displayLabel ?? null }); continue; }
-    const verdictWord = agreement(fa.displayLabel, fb.displayLabel);
+    const verdictWord = agreement(fa.displayLabel, fb.displayLabel, fa.universalParameterId, fb.universalParameterId);
     const confOk = fa.confidence >= minConf && fb.confidence >= minConf;
     const agree = verdictWord !== "diff";
     const ready = agree && confOk;

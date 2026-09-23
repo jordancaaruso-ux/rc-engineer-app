@@ -1,0 +1,489 @@
+{
+ "car": "Mugen MTC3",
+ "calibration": "Mugen MTC3 VER 3101-1",
+ "gold": {
+  "Text21": {
+   "label": "Race"
+  },
+  "Text15": {
+   "label": "Spur"
+  },
+  "Text13": {
+   "label": "Motor"
+  },
+  "Text9": {
+   "label": "Servo"
+  },
+  "Text16": {
+   "label": "Tires"
+  },
+  "Text6": {
+   "label": "Track"
+  },
+  "Text2": {
+   "label": "Driver"
+  },
+  "Check Box5": {
+   "label": "Layout",
+   "optionLabel": "fast"
+  },
+  "Check Box4": {
+   "label": "Layout",
+   "optionLabel": "mixed"
+  },
+  "Check Box3": {
+   "label": "Layout",
+   "optionLabel": "technical"
+  },
+  "Text14": {
+   "label": "Pinion"
+  },
+  "Text22": {
+   "label": "Result"
+  },
+  "Text12": {
+   "label": "Battery"
+  },
+  "Text17": {
+   "label": "Additive"
+  },
+  "Check Box22": {
+   "label": "ARB - Rear",
+   "options": {
+    "0": "f_1_1",
+    "1": "f_1_2",
+    "2": "f_1_3"
+   }
+  },
+  "Text82": {
+   "label": "Diff Oil"
+  },
+  "Text23": {
+   "label": "Lower Arm FF Shims"
+  },
+  "Text24": {
+   "label": "Lower Arm FR Shims"
+  },
+  "Text8": {
+   "label": "Receiver"
+  },
+  "Text74": {
+   "label": "Lower Arm RF Shims"
+  },
+  "Text75": {
+   "label": "Lower Arm RR Shims"
+  },
+  "Text70": {
+   "label": "Toe (Rear)"
+  },
+  "Check Box6": {
+   "label": "Traction",
+   "optionLabel": "low"
+  },
+  "Check Box8": {
+   "label": "Traction",
+   "optionLabel": "high"
+  },
+  "Check Box7": {
+   "label": "Traction",
+   "optionLabel": "medium"
+  },
+  "Text18": {
+   "label": "Warmer C"
+  },
+  "Check Box19": {
+   "label": "ARB - Front",
+   "options": {
+    "0": "f_1_1",
+    "1": "f_1_2",
+    "2": "f_1_3"
+   }
+  },
+  "Text29": {
+   "label": "Toe (Front)"
+  },
+  "Check Box47": {
+   "label": "A22480 alu"
+  },
+  "Text52": {
+   "label": "Car Weight"
+  },
+  "Text83": {
+   "label": "Diff Oil (G)"
+  },
+  "Text71": {
+   "label": "Droop (Rear)"
+  },
+  "Text3": {
+   "label": "Date"
+  },
+  "Text68": {
+   "label": "Camber (Rear)"
+  },
+  "Text77": {
+   "label": "Caster - Rear"
+  },
+  "Check Box9": {
+   "label": "Clip / O-Ring - Front",
+   "options": {
+    "0": "clip",
+    "1": "o_ring"
+   }
+  },
+  "Text30": {
+   "label": "Droop (Front)"
+  },
+  "Text48": {
+   "label": "Spring (Rear)"
+  },
+  "Text7": {
+   "label": "Transmitter"
+  },
+  "Text19": {
+   "label": "Warmer Time"
+  },
+  "Check Box10": {
+   "label": "Active / Fixed - Front",
+   "options": {
+    "0": "active",
+    "1": "fixed"
+   }
+  },
+  "Text42": {
+   "label": "Body Up Stop"
+  },
+  "Text28": {
+   "label": "Camber (Front)"
+  },
+  "Text36": {
+   "label": "Caster - Front"
+  },
+  "Text51": {
+   "label": "Chassis Type"
+  },
+  "Text31": {
+   "label": "Spring (Front)"
+  },
+  "Text20": {
+   "label": "Sidewall Glue"
+  },
+  "Text10": {
+   "label": "Steering Expo"
+  },
+  "Check Box24": {
+   "label": "Top Deck Cuts",
+   "optionLabel": "a"
+  },
+  "Check Box25": {
+   "label": "Top Deck Cuts",
+   "optionLabel": "b"
+  },
+  "Check Box42": {
+   "label": "Top Deck Cuts",
+   "optionLabel": "c"
+  },
+  "Check Box43": {
+   "label": "Top Deck Cuts",
+   "optionLabel": "d"
+  },
+  "Check Box2": {
+   "label": "Surface",
+   "options": {
+    "0": "asphalt",
+    "1": "carpet"
+   }
+  },
+  "Check Box23": {
+   "label": "Hex Width - Rear",
+   "options": {
+    "1": "0",
+    "2": "f_0_5"
+   }
+  },
+  "Text49": {
+   "label": "Oil / damper (Rear)"
+  },
+  "Check Box50": {
+   "label": "Side Stiffener"
+  },
+  "Text11": {
+   "label": "Steering Speed"
+  },
+  "Text72": {
+   "label": "Toe Gain Shims"
+  },
+  "Check Box20": {
+   "label": "Hex Width - Front",
+   "options": {
+    "1": "f_0_5",
+    "2": "0"
+   }
+  },
+  "Text32": {
+   "label": "Oil / damper (Front)"
+  },
+  "Check Box26": {
+   "label": "Top Deck Screws",
+   "optionLabel": "a"
+  },
+  "Check Box27": {
+   "label": "Top Deck Screws",
+   "optionLabel": "b"
+  },
+  "Check Box40": {
+   "label": "Top Deck Screws",
+   "optionLabel": "c"
+  },
+  "Check Box39": {
+   "label": "Top Deck Screws",
+   "optionLabel": "d"
+  },
+  "Check Box41": {
+   "label": "Top Deck Screws",
+   "optionLabel": "e"
+  },
+  "Text63": {
+   "label": "Weight On A2440"
+  },
+  "Text25": {
+   "label": "Bump Steer Shims"
+  },
+  "Check Box33": {
+   "label": "Clip / O-Ring - Rear",
+   "options": {
+    "0": "clip",
+    "1": "o_ring"
+   }
+  },
+  "Check Box38": {
+   "label": "Diff Height - Rear",
+   "options": {
+    "0": "high",
+    "1": "low"
+   }
+  },
+  "Check Box21": {
+   "label": "Piston Type - Rear",
+   "options": {
+    "0": "bypass",
+    "1": "piston_opt"
+   }
+  },
+  "Text76": {
+   "label": "Ride Ht (Rear)"
+  },
+  "Check Box30": {
+   "label": "Screw Pos (IN/OUT)",
+   "options": {
+    "0": "in",
+    "1": "out"
+   }
+  },
+  "Check Box36": {
+   "label": "Shock Angle - Rear",
+   "options": {
+    "0": "out_3mm",
+    "1": "f_2_5mm",
+    "2": "f_2_0mm",
+    "3": "f_1_5mm",
+    "4": "f_1_0mm",
+    "5": "f_0_5mm",
+    "6": "in_omm"
+   }
+  },
+  "Check Box28": {
+   "label": "Steering Rod Pos",
+   "options": {
+    "0": "in",
+    "1": "out"
+   }
+  },
+  "Check Box32": {
+   "label": "Active / Fixed - Rear",
+   "options": {
+    "0": "active",
+    "1": "fixed"
+   }
+  },
+  "Check Box31": {
+   "label": "Diff Height - Front",
+   "options": {
+    "0": "high",
+    "1": "low"
+   }
+  },
+  "Check Box18": {
+   "label": "Piston Type - Front",
+   "options": {
+    "0": "bypass",
+    "1": "piston_opt"
+   }
+  },
+  "Text34": {
+   "label": "Ride Ht (Front)"
+  },
+  "Text67": {
+   "label": "Servo Horn Height"
+  },
+  "Check Box14": {
+   "label": "Shock Angle - Front",
+   "options": {
+    "0": "out_3mm",
+    "1": "f_2_5mm",
+    "2": "f_1_5mm",
+    "3": "f_2_0mm",
+    "4": "f_1_0mm",
+    "5": "f_0_5mm",
+    "6": "in_omm"
+   }
+  },
+  "Check Box16": {
+   "label": "Shock Orientation - Front",
+   "options": {
+    "0": "vertical",
+    "1": "horizontal"
+   }
+  },
+  "Text5": {
+   "label": "Track Temperature"
+  },
+  "Text87": {
+   "label": "Hole to Windshield"
+  },
+  "Check Box53": {
+   "label": "Motor Mount Screws",
+   "optionLabel": "1"
+  },
+  "Check Box54": {
+   "label": "Motor Mount Screws",
+   "optionLabel": "2"
+  },
+  "Check Box55": {
+   "label": "Motor Mount Screws",
+   "optionLabel": "3"
+  },
+  "Check Box56": {
+   "label": "Motor Mount Screws",
+   "optionLabel": "4"
+  },
+  "Text53": {
+   "label": "Weight Balance F%/R%"
+  },
+  "Check Box15": {
+   "label": "Ackermann Plate F/R",
+   "options": {
+    "0": "f",
+    "1": "r"
+   }
+  },
+  "Text4": {
+   "label": "Outside Temperature"
+  },
+  "Text84": {
+   "label": "Rear Body Post Shim"
+  },
+  "Check Box48": {
+   "label": "Rear Body Post Type",
+   "optionLabel": "b"
+  },
+  "Check Box49": {
+   "label": "Rear Body Post Type",
+   "optionLabel": "c"
+  },
+  "Text41": {
+   "label": "Steering Lock - Inner"
+  },
+  "Text40": {
+   "label": "Steering Lock - Outer"
+  },
+  "Text78": {
+   "label": "Uptravel Limit - Rear"
+  },
+  "Text69": {
+   "label": "Above Hub Shims - Rear"
+  },
+  "Check Box29": {
+   "label": "Steering Arm (STD / OPT)",
+   "options": {
+    "0": "std",
+    "1": "opt"
+   }
+  },
+  "Text73": {
+   "label": "Under Hub Shims - Rear"
+  },
+  "Text37": {
+   "label": "Upper Link FF Height"
+  },
+  "Text38": {
+   "label": "Upper Link FR Height"
+  },
+  "Text79": {
+   "label": "Upper Link RF Height"
+  },
+  "Text80": {
+   "label": "Upper Link RR Height"
+  },
+  "Text35": {
+   "label": "Uptravel Limit - Front"
+  },
+  "Text27": {
+   "label": "Above Hub Shims - Front"
+  },
+  "Text26": {
+   "label": "Under Hub Shims - Front"
+  },
+  "Text64": {
+   "label": "Front Body Post Height"
+  },
+  "Check Box17": {
+   "label": "Shock Orientation - Rear",
+   "options": {
+    "0": "vertical",
+    "1": "horizontal"
+   }
+  },
+  "Text85": {
+   "label": "Bodyshell and Wing Type"
+  },
+  "Text81": {
+   "label": "Top Deck Thickness - Rear"
+  },
+  "Check Box11": {
+   "label": "ARB Mount - Inside / Outside",
+   "options": {
+    "0": "inside",
+    "1": "outside"
+   }
+  },
+  "Text50": {
+   "label": "Shock Rod Extension - Rear"
+  },
+  "Text39": {
+   "label": "Top Deck Thickness - Front"
+  },
+  "Text33": {
+   "label": "Shock Rod Extension - Front"
+  },
+  "Text86": {
+   "label": "Above Rear Wheel Arch Height"
+  },
+  "Check Box46": {
+   "label": "Front Body Posts (Wide/Narrow)",
+   "options": {
+    "0": "wide",
+    "1": "narrow"
+   }
+  },
+  "Text88": {
+   "label": "Rear Windshield to Rear Wing"
+  },
+  "Check Box13": {
+   "label": "Uptravel Limit Measuring Method",
+   "options": {
+    "0": "under_arm",
+    "1": "axle"
+   }
+  }
+ }
+}

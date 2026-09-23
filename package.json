@@ -222,6 +222,7 @@
     "setup-extract:draft-blank-v2": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/setup-extract-eval/draft-blank-v2.ts",
     "sheets:catalog": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/setup-extract-eval/sheet-catalog.ts",
     "sheets:prep": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/setup-extract-eval/sheet-prep.ts",
+    "sheets:blocks": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/setup-extract-eval/sheet-blocks.ts",
     "sheets:instructions": "node scripts/setup-extract-eval/sheet-instructions.cjs",
     "sheets:assemble": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/setup-extract-eval/sheet-assemble.ts",
     "sheets:review": "node scripts/setup-extract-eval/sheet-review.cjs",
