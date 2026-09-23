@@ -67,7 +67,9 @@ Safety lives in `.claude/settings.json` + `.claude/hooks/`, not in prose. Hooks 
 permission layer, so they still prompt under `bypassPermissions`. Three are wired up in
 `settings.json`; `.claude/hooks/guard-test.cjs` is present but registered nowhere and does nothing.
 
-- `prod-guard.cjs` — any production-DB or deploy-pipeline command raises a prompt.
+- `prod-guard.cjs` — refuses production-DB writes and the deploy pipeline (`db:push`, `db:seed`,
+  `migrate deploy`, `npm run build`). One exception since 2026-09-23 (founder call): the plain
+  `npm run db:migrate:deploy` runs when `.env.local` points at scratch-dev (`ep-muddy-unit`).
 - `kb-guard.cjs` — writes to `content/vehicle-dynamics/*.md` (top level) raise a prompt. That prose
   is quoted verbatim to paying drivers as ground truth, so edit it only when the user's latest
   message asks for it; otherwise propose the diff in chat. Drafts under

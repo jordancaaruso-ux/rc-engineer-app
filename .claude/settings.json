@@ -5,7 +5,6 @@
       "Bash(npm run build)",
       "Bash(npm run db:push)",
       "Bash(npm run db:seed)",
-      "Bash(npm run db:migrate:deploy)",
       "Bash(neonctl projects delete *)",
       "Bash(neonctl branches delete *)",
       "Bash(neonctl branches reset *)",

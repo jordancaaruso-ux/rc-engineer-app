@@ -12,7 +12,48 @@
 //
 // Repair tooling stays open on purpose: `db:migrate:reconcile` and `migrate resolve` are the
 // sanctioned way out of drift (AGENTS.md hard rule #2), so they are not matched here.
+//
+// ONE exception (founder call, 2026-09-23 — he was on his phone and couldn't paste the command):
+// the plain `npm run db:migrate:deploy` may run when, and only when, .env.local points at the
+// scratch-dev Neon branch (ep-muddy-unit) and nothing in the shell overrides it. The live
+// database (ep-hidden-rice), any other host, an inline DATABASE_URL, another env file, or any
+// other command shape stays blocked.
 "use strict";
+
+const fs = require("node:fs");
+const path = require("node:path");
+
+const SCRATCH_DEV_HOST = "ep-muddy-unit";
+const PRODUCTION_HOST = "ep-hidden-rice";
+
+function isScratchDevUrl(url) {
+  return typeof url === "string" && url.includes(SCRATCH_DEV_HOST) && !url.includes(PRODUCTION_HOST);
+}
+
+function envFileValue(text, key) {
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (!m || m[1] !== key) continue;
+    const v = m[2];
+    const quoted = v.length >= 2 && (v[0] === '"' || v[0] === "'") && v[v.length - 1] === v[0];
+    return quoted ? v.slice(1, -1) : v;
+  }
+  return null;
+}
+
+/** `npm run db:migrate:deploy`, exactly, aimed at scratch-dev. */
+function isScratchDevMigrateDeploy(cmd) {
+  if (!/^\s*npm\s+run\s+db:migrate:deploy\s*$/.test(cmd)) return false;
+  // dotenv-cli never overrides a DATABASE_URL the shell already has, so that one must be safe too.
+  if (process.env.DATABASE_URL && !isScratchDevUrl(process.env.DATABASE_URL)) return false;
+  try {
+    const root = path.resolve(__dirname, "..", "..");
+    const text = fs.readFileSync(path.join(root, ".env.local"), "utf8");
+    return isScratchDevUrl(envFileValue(text, "DATABASE_URL"));
+  } catch {
+    return false;
+  }
+}
 
 let raw = "";
 process.stdin.on("data", (c) => (raw += c));
@@ -74,6 +115,7 @@ process.stdin.on("end", () => {
 
   const hit = BLOCKED.find(([re]) => re.test(executable));
   if (!hit) process.exit(0);
+  if (isScratchDevMigrateDeploy(cmd)) process.exit(0);
 
   process.stdout.write(
     JSON.stringify({
