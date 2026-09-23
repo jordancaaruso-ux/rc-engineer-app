@@ -7,69 +7,35 @@ import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { MyRcmPdfImportCard } from "@/components/runs/MyRcmPdfImportCard";
 import { ActionToast } from "@/components/ui/ActionToast";
 import { SessionDeletedUndo } from "@/components/laps/SessionDeletedUndo";
 import { deletedSessionsMessage, setImportedSessionsHidden } from "@/components/laps/sessionDeletion";
-import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
-import { importedSessionTitle } from "@/lib/lapImport/sessionTitle";
 import { groupNamedSessions, type SessionName } from "@/lib/lapImport/sessionNaming";
-import { MYRCM_PDF_SOURCE_PREFIX } from "@/lib/lapUrlParsers/myRcmPdfSource";
-import { sameLocalCalendarDay } from "@/lib/lapCompareScope";
-import { parseSpeedhivePracticeActivityRef } from "@/lib/speedhive/speedhivePracticeUrl";
-import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
-import type { ImportedSessionFieldStatsPreviewV1 } from "@/lib/lapImport/computeImportedSessionFieldStats";
-import { calendarYmdInTimeZone, formatRunDateTime } from "@/lib/formatDate";
-import { cn } from "@/lib/utils";
 
+/** One row of `/api/lap-time-sessions/library` — named on the server, newest race first. */
 type SessionRow = {
   id: string;
-  createdAt: string;
-  sessionCompletedAt?: string | null;
   sourceUrl: string;
-  parserId: string;
-  linkedRunId: string | null;
-  parsedPayload?: unknown;
-  fieldStatsPreview?: ImportedSessionFieldStatsPreviewV1 | null;
-  trackName?: string | null;
-  eventDetectionSource?: string | null;
-  eventDetectionSessionLabel?: string | null;
-  eventRaceClass?: string | null;
-  /** Whose, which run, where and when — named on the server with the rest of its day. */
-  name?: SessionName | null;
+  /** Its laps are one of your runs': Select mode leaves it alone. */
+  onRun: boolean;
+  /** On one of your runs, or you're on the sheet — your name, your chip. */
+  mine: boolean;
+  name: SessionName;
 };
+
+/**
+ * Yours, or everyone else's (founder call, 2026-09-24). Pasting one LiveRC event page imports
+ * every race on it — thirty classes, most of them strangers' — so a driver who has pasted a few
+ * owns hundreds of sessions they never chose one by one. The two never share a list.
+ */
+type Scope = "mine" | "others";
+
+const SCOPE_LABEL: Record<Scope, string> = { mine: "My runs", others: "Other drivers" };
 
 /** Rows drawn before the "show more" line. Twenty is about a phone screen of scrolling. */
 const PAGE_SIZE = 20;
-
-function normalizeDriverName(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-/**
- * Was the viewer on this timing sheet?
- *
- * The honest answer to "why is there a session here I never chose to upload": pasting ONE
- * LiveRC event page imports every race on it — thirty classes, most of them strangers'. That
- * is the right behaviour (it is what makes a rival's heat available at all) and it is also
- * why a list of 200 reads as a list of somebody else's racing.
- *
- * There is no "how did this get here" column on the row, and adding one would only describe
- * new imports. Whether YOUR name is on the sheet is the question actually being asked, it is
- * answerable from data already loaded, and it stays true for rows imported before today.
- */
-function sessionHasDriver(parsedPayload: unknown, viewerNorms: Set<string>): boolean {
-  if (viewerNorms.size === 0) return false;
-  if (!parsedPayload || typeof parsedPayload !== "object") return false;
-  const drivers = (parsedPayload as { sessionDrivers?: unknown }).sessionDrivers;
-  if (!Array.isArray(drivers)) return false;
-  for (const raw of drivers) {
-    if (!raw || typeof raw !== "object") continue;
-    const name = (raw as { driverName?: unknown }).driverName;
-    if (typeof name === "string" && viewerNorms.has(normalizeDriverName(name))) return true;
-  }
-  return false;
-}
 
 type ImportResultRow =
   | { url: string; success: true; importedSessionId: string }
@@ -89,12 +55,9 @@ type ImportResultRow =
  */
 export function LapAnalysisLibrary({
   eventId,
-  viewerNames = [],
   importSlot = null,
 }: {
   eventId?: string | null;
-  /** Every spelling timing prints the viewer under — see `sessionHasDriver`. */
-  viewerNames?: string[];
   /**
    * Rendered in the import column, under the two upload doors. It is another way to bring a
    * session in, so it belongs beside them — below the sessions list a driver with a hundred
@@ -103,110 +66,67 @@ export function LapAnalysisLibrary({
   importSlot?: ReactNode;
 }) {
   const router = useRouter();
-  const [scope, setScope] = useState<"mine" | "all">("mine");
-  const viewerNorms = useMemo(
-    () => new Set(viewerNames.map(normalizeDriverName).filter(Boolean)),
-    [viewerNames]
-  );
+  const [scope, setScope] = useState<Scope>("mine");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const [lastResults, setLastResults] = useState<ImportResultRow[]>([]);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
-  /** How many imports the account holds — the API sends the newest 200, and says so. */
+  /** How many imports the account holds — only more than the list when it hit its ceiling. */
   const [total, setTotal] = useState<number | null>(null);
   const [listErr, setListErr] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [shown, setShown] = useState(PAGE_SIZE);
 
-  /**
-   * Row text computed once per session, not once per render of a filtered list — the
-   * driver name comes out of `parsedPayload`, which is the whole parse, and doing that
-   * inside the map meant re-walking every payload on every keystroke of the search box.
+  /*
+   * Named on the server (founder call, 2026-09-23: whose, which run, where, when). The day, track
+   * and time live on the group heading and the row's right edge; the second line is a race's class
+   * and field size.
    */
   const rows = useMemo(
     () =>
-      sessions.map((s) => {
-        const name = s.name ?? null;
-        const parsed = primaryLapRowsFromImportedPayload(s.parsedPayload);
-        const whenIso = resolveImportedSessionDisplayTimeIso({
-          sessionCompletedAt: s.sessionCompletedAt ?? null,
-          parsedPayload: s.parsedPayload,
-          createdAt: s.createdAt,
-        });
-        const drivers = s.fieldStatsPreview?.driverCount ?? 0;
-        // Named on the server (founder call, 2026-09-23: whose, which run, where, when). The old
-        // namer stays only as the fallback for a row that came back without a name.
-        const title =
-          name?.title ??
-          importedSessionTitle({
-            ...s,
-            driverName: parsed?.driverName ?? null,
-            driverCount: drivers,
-            sessionNumber: parseSpeedhivePracticeActivityRef(s.sourceUrl)?.trainingSessionId ?? null,
-          });
-        /*
-         * The day, track and time live on the group heading and the row's right edge now (the
-         * track's clock, as the 2026-09-18 ruling wants). What's left for the second line is a
-         * race's class and field size, and why an old race sits up here: it came in later. Only
-         * when the two days differ — "added" on the day it was raced says nothing.
-         */
-        // Upload day on the phone's calendar against the session's day on the track's.
-        const addedLater = name
-          ? calendarYmdInTimeZone(s.createdAt, Intl.DateTimeFormat().resolvedOptions().timeZone) !== name.dayKey
-          : !sameLocalCalendarDay(s.createdAt, whenIso);
-        const detail = [
-          name?.detail ?? null,
-          addedLater ? `added ${formatRunDateTime(s.createdAt)}` : null,
-        ]
+      sessions.map((s) => ({
+        id: s.id,
+        name: s.name,
+        title: s.name.title,
+        time: s.name.timeLabel,
+        detail: s.name.detail,
+        onRun: s.onRun,
+        mine: s.mine,
+        // The URL is in the haystack on purpose: a LiveRC race URL carries the club and
+        // the class, which is often the only place the class name appears at all.
+        haystack: [s.name.title, s.name.autoTitle, s.name.groupLabel, s.name.detail, s.sourceUrl]
           .filter(Boolean)
-          .join(" · ");
-        return {
-          id: s.id,
-          name,
-          title,
-          time: name?.timeLabel ?? null,
-          detail,
-          // On a run, its laps are that run's: Select mode leaves it alone.
-          onRun: s.linkedRunId != null,
-          /*
-           * A PDF you uploaded by hand is yours whether or not your name is on it. The
-           * "mine" scope exists because one pasted LiveRC event page imports thirty
-           * strangers' races; a MyRCM result is one race, chosen one file at a time —
-           * and the default scope was hiding every one of them (2026-08-27: "I've
-           * imported a bunch of MyRCM sessions, but they're not in the list").
-           */
-          isMine:
-            s.linkedRunId != null ||
-            s.sourceUrl.startsWith(MYRCM_PDF_SOURCE_PREFIX) ||
-            sessionHasDriver(s.parsedPayload, viewerNorms),
-          // The URL is in the haystack on purpose: a LiveRC race URL carries the club and
-          // the class, which is often the only place the class name appears at all.
-          haystack: [title, name?.autoTitle, name?.groupLabel, detail, s.sourceUrl]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase(),
-        };
-      }),
-    [sessions, viewerNorms]
+          .join(" ")
+          .toLowerCase(),
+      })),
+    [sessions]
   );
 
-  const mineCount = useMemo(() => rows.filter((r) => r.isMine).length, [rows]);
-
-  const filtered = useMemo(() => {
-    // No configured name = no way to tell whose sheet is whose, and the toggle is hidden.
-    // Without this guard the default scope would silently filter the whole list to nothing
-    // on exactly the accounts that can't see why.
-    const canScope = viewerNorms.size > 0;
-    const base = canScope && scope === "mine" ? rows.filter((r) => r.isMine) : rows;
+  // A search reaches both lists: each count is what it holds for the search, so a rival's name
+  // typed under My runs shows where their sessions are.
+  const matching = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return base;
+    if (!q) return rows;
     const terms = q.split(/\s+/);
-    return base.filter((r) => terms.every((t) => r.haystack.includes(t)));
-  }, [rows, query, scope, viewerNorms]);
+    return rows.filter((r) => terms.every((t) => r.haystack.includes(t)));
+  }, [rows, query]);
+  const mineCount = useMemo(() => matching.filter((r) => r.mine).length, [matching]);
+  const othersCount = matching.length - mineCount;
+
+  // One list with nothing in it isn't a choice: the switch shows only when both hold sessions.
+  const holdsMine = useMemo(() => rows.some((r) => r.mine), [rows]);
+  const holdsOthers = useMemo(() => rows.some((r) => !r.mine), [rows]);
+  const showScope = holdsMine && holdsOthers;
+  const activeScope: Scope = !holdsMine ? "others" : !holdsOthers ? "mine" : scope;
+
+  const filtered = useMemo(
+    () => matching.filter((r) => (activeScope === "mine" ? r.mine : !r.mine)),
+    [matching, activeScope]
+  );
 
   const visible = useMemo(() => filtered.slice(0, shown), [filtered, shown]);
-  /** Under "Tue 22 Sept · Chargers RC" headings, in upload order, each day newest first. */
+  /** Under "Tue 22 Sept · Chargers RC" headings, newest race first, each day newest first. */
   const visibleGroups = useMemo(
     () => groupNamedSessions(visible, (row) => row.name ?? undefined),
     [visible]
@@ -236,7 +156,7 @@ export function LapAnalysisLibrary({
   const loadSessions = useCallback(async () => {
     setListErr(null);
     try {
-      const res = await fetch("/api/lap-time-sessions", { cache: "no-store" });
+      const res = await fetch("/api/lap-time-sessions/library", { cache: "no-store" });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         setListErr((data as { error?: string })?.error ?? "Could not load sessions.");
@@ -431,54 +351,34 @@ export function LapAnalysisLibrary({
       </div>
 
       <div className="mt-4 space-y-2.5 lg:mt-0">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Eyebrow>Imported sessions</Eyebrow>
-          {/*
-           * Defaults to "I was in it". Pasting one LiveRC event page imports every race on
-           * that page, so a driver who has pasted a handful of event links owns hundreds of
-           * sessions they never chose one by one — the list read as somebody else's racing.
-           * Everything is still there under "Everything"; it just isn't the first thing.
-           */}
-          {viewerNorms.size > 0 && rows.length > mineCount ? (
-            <div className="flex shrink-0 items-center gap-1 text-[11px]">
-              {(
-                [
-                  // "My runs": you were in it, or you uploaded it yourself.
-                  ["mine", `My runs (${mineCount})`],
-                  // "200 of 648": the list is the newest imports, not all of them.
-                  [
-                    "all",
-                    total != null && total > rows.length
-                      ? `Everything (${rows.length} of ${total})`
-                      : `Everything (${rows.length})`,
-                  ],
-                ] as const
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => {
-                    setScope(key);
-                    setShown(PAGE_SIZE);
-                  }}
-                  className={cn(
-                    "tap-active rounded-full px-2.5 py-1 font-medium transition",
-                    scope === key
-                      ? "bg-primary/15 text-primary-ink"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-        {scope === "all" && rows.length > mineCount ? (
-          <p className="text-[11px] leading-snug text-muted-foreground">
-            Most of these came in with a LiveRC event page — pasting one brings in every race on
-            it, which is what makes a rival&apos;s heat readable here.
-          </p>
+        <Eyebrow>Imported sessions</Eyebrow>
+        {/*
+         * The first thing on the list, full width and in the app's own switch — it was two 11px
+         * words in a corner, and the founder couldn't tell which list he was reading (2026-09-24).
+         */}
+        {showScope ? (
+          <SegmentedControl<Scope>
+            ariaLabel="Whose sessions"
+            value={activeScope}
+            onChange={(next) => {
+              setScope(next);
+              setShown(PAGE_SIZE);
+            }}
+            segmentClassName="py-2.5 text-[15px]"
+            options={(["mine", "others"] as const).map((key) => {
+              const count = key === "mine" ? mineCount : othersCount;
+              return {
+                value: key,
+                ariaLabel: `${SCOPE_LABEL[key]}, ${count}`,
+                label: (
+                  <>
+                    <span>{SCOPE_LABEL[key]}</span>
+                    <span className="font-normal tabular-nums opacity-60">{count}</span>
+                  </>
+                ),
+              };
+            })}
+          />
         ) : null}
         {listErr ? <p className="text-[11px] text-destructive">{listErr}</p> : null}
         {!listErr && sessions.length === 0 ? (
@@ -596,8 +496,14 @@ export function LapAnalysisLibrary({
         ) : null}
         {sessions.length > 0 && filtered.length === 0 ? (
           <CardPanel contentClassName="text-[12px] text-muted-foreground">
-            Nothing here matches “{query.trim()}”.
+            Nothing in {SCOPE_LABEL[activeScope]} matches “{query.trim()}”.
           </CardPanel>
+        ) : null}
+        {/* Only an account past the list's ceiling: say it's cut rather than look complete. */}
+        {total != null && total > sessions.length ? (
+          <p className="type-timestamp px-1">
+            Newest {sessions.length} of {total} imports
+          </p>
         ) : null}
         {selecting ? <div className="h-20" aria-hidden /> : null}
       </div>

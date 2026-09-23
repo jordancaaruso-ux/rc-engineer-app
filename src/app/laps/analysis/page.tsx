@@ -378,41 +378,30 @@ export default async function LapAnalysisPage(props: {
    * at, created or favourited — because the catalog holds a thousand LiveRC clubs and a dropdown
    * of all of them is a dropdown nobody can use.
    */
-  const [competitors, timingTracks, librarySpeedhiveNames, libraryLiveRcName, libraryMyName] =
-    await Promise.all([
-      getKnownCompetitorsSetting(user.id).then(parseKnownCompetitorsSetting),
-      prisma.track.findMany({
-        where: {
-          AND: [
-            { OR: [{ liveRcUrl: { not: null } }, { speedhiveUrl: { not: null } }] },
-            {
-              OR: [
-                { runs: { some: { userId: user.id } } },
-                { favouriteTracks: { some: { userId: user.id } } },
-                { userId: user.id, catalogSource: null },
-              ],
-            },
-          ],
-        },
-        orderBy: { name: "asc" },
-        take: 300,
-        select: { id: true, name: true, liveRcUrl: true, speedhiveUrl: true },
-      }),
-      getSpeedhiveDriverNamesForUser(user.id),
-      getLiveRcDriverNameSetting(user.id),
-      getMyNameSetting(user.id),
-    ]);
+  const [competitors, timingTracks] = await Promise.all([
+    getKnownCompetitorsSetting(user.id).then(parseKnownCompetitorsSetting),
+    prisma.track.findMany({
+      where: {
+        AND: [
+          { OR: [{ liveRcUrl: { not: null } }, { speedhiveUrl: { not: null } }] },
+          {
+            OR: [
+              { runs: { some: { userId: user.id } } },
+              { favouriteTracks: { some: { userId: user.id } } },
+              { userId: user.id, catalogSource: null },
+            ],
+          },
+        ],
+      },
+      orderBy: { name: "asc" },
+      take: 300,
+      select: { id: true, name: true, liveRcUrl: true, speedhiveUrl: true },
+    }),
+  ]);
 
   const practiceTracks = timingTracks
     .map((t) => ({ id: t.id, name: t.name, sources: practiceFieldSourcesForTrack(t) }))
     .filter((t) => t.sources.length > 0);
-
-  /** Same set the session view matches on — see `sessionHasDriver` in the library. */
-  const libraryViewerNames = [
-    ...librarySpeedhiveNames,
-    libraryLiveRcName ?? "",
-    libraryMyName ?? "",
-  ].filter(Boolean);
 
   return (
     <Shell
@@ -422,7 +411,6 @@ export default async function LapAnalysisPage(props: {
     >
       <LapAnalysisLibrary
         eventId={eventId}
-        viewerNames={libraryViewerNames}
         importSlot={
           <CompetitorPracticePull
             competitors={competitors}

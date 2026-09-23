@@ -4,8 +4,11 @@ import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { importedSessionFieldStatsPreviewFromJson } from "@/lib/lapImport/computeImportedSessionFieldStats";
 import { resolveImportedSessionDisplayTimeIso } from "@/lib/lapImport/labels";
-import { loadSessionNames, SESSION_NAMING_SELECT } from "@/lib/lapImport/loadSessionNames";
 
+/**
+ * The newest imports with their laps, for the lap-sheet pickers (`useImportedLapLibrary`). The
+ * Laptime Analysis list reads `/api/lap-time-sessions/library` instead: every session, named.
+ */
 export async function GET() {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
@@ -20,15 +23,13 @@ export async function GET() {
    * (2026-08-27: "I've imported a bunch of MyRCM sessions, but they're not in the list").
    * `total` rides along so the page can say the list is cut, rather than looking complete.
    */
-  // Deleted sessions (`hiddenAt`) leave the library and every lap-sheet picker fed from here.
-  const [rows, total, viewerUser] = await Promise.all([
+  // Deleted sessions (`hiddenAt`) leave every lap-sheet picker fed from here.
+  const [rows, total] = await Promise.all([
     prisma.importedLapTimeSession.findMany({
     where: { userId: userId, hiddenAt: null },
     orderBy: { createdAt: "desc" },
     take: 200,
     select: {
-      // Everything the session's name is built from — whose, which run, where and when.
-      ...SESSION_NAMING_SELECT,
       id: true,
       createdAt: true,
       sessionCompletedAt: true,
@@ -54,14 +55,7 @@ export async function GET() {
     },
     }),
     prisma.importedLapTimeSession.count({ where: { userId, hiddenAt: null } }),
-    prisma.user.findUnique({ where: { id: userId }, select: { timeZone: true } }),
   ]);
-
-  const names = await loadSessionNames({
-    userId,
-    rows,
-    timeZone: viewerUser?.timeZone?.trim() || null,
-  });
 
   const sessions = rows
     .map((r) => ({
@@ -79,18 +73,10 @@ export async function GET() {
       trackName: r.linkedRun?.track?.name ?? r.linkedRun?.trackNameSnapshot ?? null,
       parsedPayload: r.parsedPayload,
       fieldStatsPreview: importedSessionFieldStatsPreviewFromJson(r.fieldStatsJson),
-      customName: r.customName,
-      name: names.get(r.id) ?? null,
     }))
     /*
-     * Most recently UPLOADED first. The list sorted by when the race happened, so a MyRCM
-     * PDF uploaded tonight for a race run on 9 Aug filed itself under 9 Aug — below that
-     * day's LiveRC sessions and out of sight (founder, 2026-08-27: "for MyRCM it's sorted
-     * into date of creation, not date of upload"). A library is read newest-in first; the
-     * race's own date stays printed on the row.
-     *
-     * One pasted LiveRC event page lands thirty races in the same second, so within an
-     * upload the race clock still decides — the weekend reads in order, not in insert order.
+     * Most recently UPLOADED first — the pickers' "newest 200" — and within one upload (one
+     * pasted LiveRC event page lands thirty races in the same second) the race clock decides.
      */
     .sort((a, b) => {
       const ua = new Date(a.createdAt).getTime();

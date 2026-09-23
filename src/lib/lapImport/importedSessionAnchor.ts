@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { rawSessionDriversFromImportedPayload } from "@/lib/lapImport/importedIngestPlan";
 import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
 import { importedSessionTitle } from "@/lib/lapImport/sessionTitle";
+import { isViewerPrintedName } from "@/lib/lapImport/sessionNaming";
 import {
   resolveImportedSessionDisplayTimeIso,
   timingSourceFromParserId,
@@ -60,10 +61,6 @@ function lapsTotal(laps: number[]): number {
   return sum;
 }
 
-function normalizeName(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
 /**
  * Every entrant's laps, in classification order (most laps, then lowest total time).
  *
@@ -108,8 +105,9 @@ export async function loadImportedSessionAnchor(
     (a, b) => b.laps.length - a.laps.length || lapsTotal(a.laps) - lapsTotal(b.laps)
   );
 
-  const viewerNorms = new Set((opts?.viewerNames ?? []).map(normalizeName).filter(Boolean));
-  const mine = viewerNorms.size > 0 ? ordered.find((d) => viewerNorms.has(normalizeName(d.driverName))) : undefined;
+  // The same "is this you" as the session's name, so a sheet named yours opens on your row.
+  const viewerNames = opts?.viewerNames ?? [];
+  const mine = ordered.find((d) => isViewerPrintedName(d.driverName, viewerNames));
   const anchor = mine ?? ordered[0]!;
 
   const whenIso = resolveImportedSessionDisplayTimeIso({

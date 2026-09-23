@@ -8,6 +8,7 @@ import {
   timingSourceFromSourceUrl,
 } from "@/lib/lapImport/labels";
 import { isOnlyADate, usable } from "@/lib/lapImport/sessionTitle";
+import { liveRcNameMatchesConfigured } from "@/lib/lapWatch/liveRcNameNormalize";
 import { MYRCM_PDF_SOURCE_PREFIX } from "@/lib/lapUrlParsers/myRcmPdfSource";
 import { importedSessionIsPractice, practiceColumnName } from "@/lib/practiceField/practiceField";
 import { parseSpeedhivePracticeActivityRef } from "@/lib/speedhive/speedhivePracticeUrl";
@@ -121,7 +122,7 @@ function normalizeName(name: string): string {
 }
 
 /** Every name the viewer goes by, one per entry — the LiveRC setting holds one name per line. */
-function viewerNameSet(names: readonly string[]): Set<string> {
+function viewerNameList(names: readonly string[]): string[] {
   const out = new Set<string>();
   for (const raw of names) {
     for (const line of String(raw ?? "").split(/\r?\n/)) {
@@ -129,7 +130,18 @@ function viewerNameSet(names: readonly string[]): Set<string> {
       if (n) out.add(n);
     }
   }
-  return out;
+  return [...out];
+}
+
+/**
+ * Is a name printed on a sheet one of the viewer's? The rule the sweep and race detection already
+ * use (`liveRcNameMatchesConfigured`): word order and punctuation don't count — MyRCM prints
+ * "Caruso Jordan" — and a one-word name has to match exactly. `viewerNames` may hold several
+ * names per entry, one per line, as the LiveRC setting does.
+ */
+export function isViewerPrintedName(printed: string | null | undefined, viewerNames: readonly string[]): boolean {
+  if (!printed?.trim()) return false;
+  return viewerNames.some((n) => liveRcNameMatchesConfigured(printed, n));
 }
 
 function chipSet(chips: readonly (string | number)[]): Set<string> {
@@ -241,7 +253,7 @@ type Draft = Omit<SessionName, "title" | "autoTitle" | "label" | "runNumber" | "
 
 function draftName(
   row: SessionNamingRow,
-  viewer: { names: Set<string>; chips: Set<string>; displayName: string | null; saved: readonly KnownCompetitor[] },
+  viewer: { names: string[]; chips: Set<string>; displayName: string | null; saved: readonly KnownCompetitor[] },
   opts: { timeZone: string | null; now: Date }
 ): Draft {
   const drivers = sheetDrivers(row.parsedPayload);
@@ -265,7 +277,7 @@ function draftName(
   let isViewer = false;
   if (row.linkedRunId) isViewer = true;
   if (isRace) {
-    const mine = drivers.find((d) => d.name && viewer.names.has(normalizeName(d.name)));
+    const mine = drivers.find((d) => isViewerPrintedName(d.name, viewer.names));
     if (mine) {
       isViewer = true;
       matchedPrinted = mine.name;
@@ -273,11 +285,11 @@ function draftName(
   } else {
     if (row.sweepChipCode?.trim()) isViewer = true;
     if (chip && viewer.chips.has(chip)) isViewer = true;
-    if (printed && viewer.names.has(normalizeName(printed))) {
+    if (isViewerPrintedName(printed, viewer.names)) {
       isViewer = true;
       matchedPrinted = printed;
     }
-    if (siteName && viewer.names.has(normalizeName(siteName))) isViewer = true;
+    if (isViewerPrintedName(siteName, viewer.names)) isViewer = true;
   }
 
   let who: string | null = null;
@@ -376,7 +388,7 @@ export function nameImportedSessions(
   opts?: { timeZone?: string | null; now?: Date }
 ): Map<string, SessionName> {
   const ctx = {
-    names: viewerNameSet(viewer.names),
+    names: viewerNameList(viewer.names),
     chips: chipSet(viewer.transponders),
     displayName: viewer.displayName,
     saved: viewer.saved,
@@ -445,14 +457,25 @@ export function nameImportedSessions(
   return out;
 }
 
+/**
+ * Newest first by when the session ran — its day on the track's clock, then its time — never by
+ * when it was imported. The library's order (founder call, 2026-09-24: "it should be sorted
+ * chronologically"); it replaces newest-upload-first from 2026-08-27, whose worry (a MyRCM PDF of
+ * an old race sinking out of sight) is met by uploading opening that session straight away.
+ */
+export function newestSessionFirst(a: SessionName, b: SessionName): number {
+  if (a.dayKey !== b.dayKey) return a.dayKey < b.dayKey ? 1 : -1;
+  return b.sortMs - a.sortMs || a.id.localeCompare(b.id);
+}
+
 export type SessionGroup<T> = { key: string; label: string; items: T[] };
 
 /**
  * File named sessions under their day-and-track heading.
  *
- * Headings come in the order their first session does, so a list sorted newest-UPLOAD-first keeps
- * that order (a race from March uploaded tonight still leads — founder call, 2026-08-27). Inside a
- * heading the day reads newest first, by the track's clock.
+ * Headings come in the order their first session does: the library hands sessions in newest race
+ * first (`newestSessionFirst`), the Tools card newest upload first. Inside a heading the day reads
+ * newest first, by the track's clock.
  */
 export function groupNamedSessions<T>(items: readonly T[], nameOf: (item: T) => SessionName | undefined): SessionGroup<T>[] {
   const groups: SessionGroup<T>[] = [];

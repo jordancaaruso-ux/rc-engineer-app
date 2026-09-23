@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { groupNamedSessions, nameImportedSessions, type SessionNamingRow } from "@/lib/lapImport/sessionNaming";
+import {
+  groupNamedSessions,
+  nameImportedSessions,
+  newestSessionFirst,
+  type SessionNamingRow,
+} from "@/lib/lapImport/sessionNaming";
 import { MYRCM_PDF_SOURCE_PREFIX } from "@/lib/lapUrlParsers/myRcmPdfSource";
 
 const NOW = new Date("2026-09-23T10:00:00.000Z");
@@ -339,4 +344,56 @@ test("MYLAPS practice names the chip: your saved name, else its owner's label, e
   assert.equal(names.get("13")?.title, "Transponder 5550001 · Run 5");
   // One of the viewer's own chips is the viewer, by name.
   assert.equal(names.get("14")?.title, "Jordan Caruso · Run 5");
+});
+
+test("a sheet that prints the viewer surname first is still theirs; a one-word name must match exactly", () => {
+  const pdf = (id: string, drivers: string[]): SessionNamingRow => ({
+    id,
+    createdAt: "2026-08-27T12:02:00.000Z",
+    sessionCompletedAt: "2026-02-15T14:00:00.000Z",
+    sourceUrl: `${MYRCM_PDF_SOURCE_PREFIX}abc123/${id}.pdf`,
+    parserId: "myrcm-pdf",
+    parsedPayload: {
+      sessionDrivers: drivers.map((driverName) => ({ driverName, laps: [20.1] })),
+      sessionHint: { name: "Finals A Final run 1", className: "Touring Car Open BL" },
+    },
+  });
+  const names = nameImportedSessions(
+    [
+      pdf("final", ["Ellerbrock Lukas", "Caruso Jordan", "Codd Lincoln"]),
+      pdf("comma", ["Caruso, Jordan", "Codd Lincoln"]),
+      // "J Caruso" is one usable word: it never reaches another Caruso.
+      pdf("other", ["Mark Caruso", "Codd Lincoln"]),
+    ],
+    viewer,
+    opts
+  );
+  assert.equal(names.get("final")?.isViewer, true);
+  assert.equal(names.get("final")?.title, "Jordan Caruso · Finals A Final run 1");
+  assert.equal(names.get("comma")?.isViewer, true);
+  assert.equal(names.get("other")?.isViewer, false);
+  assert.equal(names.get("other")?.title, "Finals A Final run 1");
+});
+
+test("the library reads newest race first, whenever each was imported", () => {
+  const march = {
+    ...race("march", ["Sam Other", "Lee Third"], "2026-03-08T14:00:00.000Z", "Club Round 1 A-Main"),
+    // Uploaded after everything else here.
+    createdAt: "2026-09-23T09:00:00.000Z",
+  };
+  const names = nameImportedSessions(
+    [
+      march,
+      practice("a", "Jordan Caruso", "2026-09-22T18:55:00.000Z"),
+      practice("c", "Jordan Caruso", "2026-09-22T19:48:00.000Z"),
+      practice("old", "Jordan Caruso", "2026-09-20T09:00:00.000Z"),
+    ],
+    viewer,
+    opts
+  );
+  const order = ["march", "a", "old", "c"]
+    .map((id) => names.get(id)!)
+    .sort(newestSessionFirst)
+    .map((n) => n.id);
+  assert.deepEqual(order, ["c", "a", "old", "march"]);
 });
