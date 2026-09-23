@@ -49,7 +49,7 @@ inner steering angle: 26.5
 motor lateral shift: 1.75
 motor: HW G5
 pinion: 42
-rear hrb setting: 3.5
+rear hydraulic roll bar (HRB) setting: 3.5
 rear spring rate gf mm: 119.6
 ride height front: 4.8
 ride height rear: 5.2
@@ -83,3 +83,94 @@ winglet: no
 spur ÷ pinion: 2.286 (the final drive ratio is this multiplied by the car's internal ratio, which is not on the sheet)
 
 NO BOX ON THIS CAR'S SETUP SHEET FOR: front shock position, rear shock position. A manufacturer's sheet lists what adjusts on the car.
+
+THIS DAY'S RUNS ON THIS CAR — 2026-09-19, A800RR, 9 runs. Earliest first.
+"changed" is what moved on the setup sheet since that same car's previous run. A run
+with no readable sheet has no "changed" line: that is unknown, not unchanged.
+"tyres set C run 2" is run 2 on set C: the same letter is the same set of rubber, a new letter another
+set — new if it reads run 1, used before today if higher.
+"against 15:31, the run before" is that car's previous run today: the change in top five (positive = slower);
+then how much slower or quicker the track was than at that run (the other drivers against their own day, in
+LAPS below) and the top five with that taken out; then with the tyres' age taken out as well — what today's own
+sets lost from their run 1 to that run number.
+An "unconfirmed" run was filed by the app from the timing sheet: its laps are real, but its
+setup and tyres were copied from the previous logged run and the driver has not confirmed
+them. Read its pace; do not read its sheet as a deliberate change.
+
+14:17  best 16.35  top5 16.56  5min 17/5:02.3  rated 4/10  tyres set A run 7  22.4°C
+14:53  best 16.09  top5 16.28  5min 17/5:15.7  rated 6/10  tyres set A run 8  22.4°C
+    changed: front spring rate gf mm 76.3 → 68.4, spring gap front 1 → 0
+    against 14:46, the run before: top5 -0.70. Average without slow laps 16.99 → 16.52.
+14:46  best 16.65  top5 16.99  not rated  tyres run 1  23.3°C  (unconfirmed — setup and tyres carried, not logged by the driver)
+    against 14:17, the run before: top5 +0.43. Average without slow laps 16.95 → 16.99.
+15:29  best 15.86  top5 15.99  5min 19/5:12.0  rated 7/10  tyres set A run 9  23.1°C
+    against 14:53, the run before: top5 -0.29; tyres: set A run 9 against set A run 8 — no other set today went from its run 1 to a run 8. Average without slow laps 16.52 → 16.33.
+15:59  best 16.07  top5 16.21  rated 6/10  tyres set A run 10  23.1°C
+    changed: upper inner shims ff 2 → 2.75, upper inner shims fr 2 → 2.75, upper inner shims rf 2.75 → 3.75, upper inner shims rr 2.75 → 3.75
+    against 15:29, the run before: top5 +0.23; tyres: set A run 10 against set A run 9 — no other set today went from its run 1 to a run 9. Average without slow laps 16.33 → 16.44.
+16:34  best 15.82  top5 15.91  5min 17/5:15.1  rated 6/10  tyres set B run 6  23.5°C
+    changed: upper inner shims ff 2.75 → 2, upper inner shims fr 2.75 → 2, upper inner shims rf 3.75 → 2.75, upper inner shims rr 3.75 → 2.75
+    against 15:59, the run before: top5 -0.30; tyres: set B run 6 against set A run 10 — no set today went from its run 1 to a run 10. Average without slow laps 16.44 → 16.17.
+17:17  best 15.76  top5 15.83  rated 7/10  tyres set C run 1  22.3°C
+    changed: ride height front 4.6 → 4.8, ride height rear 5 → 5.2
+    against 16:34, the run before: top5 -0.08; tyres: set C run 1 against set B run 6 — no set today went from its run 1 to a run 6. Average without slow laps 16.17 → 15.99.
+17:49  best 15.58  top5 15.71  rated 7/10  tyres set C run 2  22.4°C
+    changed: bump steer shims front 3 → 2.5, toe gain shims rear 3.5 → 3
+    against 17:17, the run before: top5 -0.12; tyres: set C run 2 against set C run 1 — no other set today went from its run 1 to a run 2. Average without slow laps 15.99 → 15.97.
+18:14  best 15.61  top5 15.79  5min 16/5:05.3  rated 8/10  tyres set C run 3  19.6°C  (the session above)
+    changed: bodyshell Wolverine 0.4 → Vortex 0.5, wing Speciale 0.5 → Wolverine 0.4
+    against 17:49, the run before: top5 +0.08; tyres: set C run 3 against set C run 2 — no other set today went from its run 1 to a run 2. Average without slow laps 15.97 → 15.93.
+
+TYRE SETS RUN MORE THAN ONCE TODAY — each later run's top five against that set's first run today (positive = slower), then the same with the track's movement taken out (the other drivers against their own day, in LAPS below).
+  set A: run 7 16.56 → run 8 16.28 (-0.27) → run 9 15.99 (-0.57) → run 10 16.21 (-0.34)
+  set C: run 1 15.83 → run 2 15.71 (-0.12) → run 3 15.79 (-0.04)
+
+LAPS — every lap of every driver in the timed sessions you were in, on 2026-09-19 at TFTR. Sessions earliest first; laps in the order they were driven; the clock is the track's.
+Worked out in code from those laps, for each driver: laps and total time; best; the average of the best 5; the median; the average without slow laps; the median of the first five laps → of the last five (positive = slower at the end), with "(2 slow)" where slow laps sit inside a five; and the spread, the 90th-percentile lap minus the 10th.
+A short lap — under 60% of that driver's median, or a best more than 0.75 s (or 4%) quicker than their next-best lap — is a race's opening lap from the grid, a cut or a timing glitch: listed, and left out of every figure but the total. A slow lap — more than 5% over that driver's median — is a mistake, a marshal or a stop: listed, and left out of the average without slow laps only; the total time and the day's "5min" figure carry every one.
+Where no driver in a race has a short lap, the drivers are in finishing order — most laps, then least time — with their place and their gap to the winner; a race with a short lap on the sheet gets no places.
+A session with one driver is a practice session: the timing site keeps practice one driver per page, so only your own laps are here.
+
+14:17  Practice · ISTC 13.5T  (1 driver)
+  you · 20 laps 6:03.89: 21.78 18.17 21.64 20.68 17.20 17.86 20.58 16.84 16.84 16.42 16.64 19.02 17.12 17.38 16.86 17.07 21.62 17.28 16.53 16.35
+      best 16.35 · top5 16.56 · median 17.24 · average without slow laps 16.95 · first five 20.68 (4 slow) → last five 17.07 (1 slow) (−3.61) · spread 5.20 · slow laps 21.78, 18.17, 21.64, 20.68, 20.58, 19.02, 21.62
+
+14:46  Practice · ISTC 13.5T  (1 driver)
+  you · 6 laps 1:43.33: 18.39 17.47 16.85 16.92 17.03 16.65
+      best 16.65 · top5 16.99 · median 16.98 · average without slow laps 16.99 · spread 1.74 · slow lap 18.39
+
+14:53  Practice · ISTC 13.5T  (1 driver)
+  you · 17 laps 5:15.70: 18.10 16.90 16.64 34.91 16.81 16.12 16.40 17.54 16.38 16.74 16.42 16.63 30.34 16.44 16.58 16.66 16.09
+      best 16.09 · top5 16.28 · median 16.64 · average without slow laps 16.52 · first five 16.90 (2 slow) → last five 16.58 (1 slow) (−0.32) · spread 14.21 · slow laps 18.10, 34.91, 17.54, 30.34
+
+15:29  Practice · ISTC 13.5T  (1 driver)
+  you · 24 laps 6:36.44: 17.44 17.46 16.58 16.60 16.34 21.26 16.61 16.32 15.86 16.53 16.52 16.04 16.20 16.05 19.31 17.22 16.15 18.88 16.40 15.98 3.74 20.74 16.02 16.20
+      best 15.86 · top5 15.99 · median 16.52 · average without slow laps 16.33 · first five 16.60 (2 slow) → last five 16.20 (1 slow) (−0.40) · spread 3.28 · slow laps 17.44, 17.46, 21.26, 19.31, 18.88, 20.74 · 1 short lap left out
+
+15:59  Practice · ISTC 13.5T  (1 driver)
+  you · 15 laps 4:16.49: 17.85 16.54 16.25 18.50 17.16 16.24 21.16 16.58 16.82 16.20 16.35 18.09 16.36 16.30 16.07
+      best 16.07 · top5 16.21 · median 16.54 · average without slow laps 16.44 · first five 17.16 (2 slow) → last five 16.35 (1 slow) (−0.81) · spread 2.30 · slow laps 17.85, 18.50, 21.16, 18.09
+
+16:34  Practice · ISTC 13.5T  (1 driver)
+  you · 23 laps 7:00.32: 16.34 19.88 16.13 16.19 19.84 16.88 30.70 16.26 20.07 16.34 16.21 20.34 16.18 15.99 15.89 15.91 34.53 16.21 16.41 15.98 15.95 15.82 16.25
+      best 15.82 · top5 15.91 · median 16.25 · average without slow laps 16.17 · first five 16.34 (2 slow) → last five 15.98 (−0.36) · spread 4.43 · slow laps 19.88, 19.84, 30.70, 20.07, 20.34, 34.53
+
+17:17  Practice · ISTC 13.5T  (1 driver)
+  you · 17 laps 4:50.79: 15.76 26.35 16.29 16.11 16.06 15.89 16.27 15.92 16.09 15.98 15.81 15.85 24.62 15.85 15.93 15.91 16.10
+      best 15.76 · top5 15.83 · median 15.98 · average without slow laps 15.99 · first five 16.11 (1 slow) → last five 15.93 (1 slow) (−0.18) · spread 8.82 · slow laps 26.35, 24.62
+
+17:49  Practice · ISTC 13.5T  (1 driver)
+  you · 18 laps 4:57.32: 16.07 15.63 15.97 20.64 15.82 15.58 16.04 17.36 15.75 16.14 15.76 19.82 16.33 16.27 16.34 15.95 15.96 15.89
+      best 15.58 · top5 15.71 · median 16.01 · average without slow laps 15.97 · first five 15.97 (1 slow) → last five 15.96 (−0.02) · spread 4.19 · slow laps 20.64, 17.36, 19.82
+
+18:14  Practice · ISTC 13.5T  (1 driver)
+  you · 17 laps 5:21.29: 15.95 16.01 15.61 16.31 17.59 18.60 15.90 15.89 15.81 37.05 18.92 20.78 15.75 33.11 16.18 15.95 15.89
+      best 15.61 · top5 15.79 · median 16.01 · average without slow laps 15.93 · first five 16.01 (1 slow) → last five 15.95 (1 slow) (−0.07) · spread 17.36 · slow laps 17.59, 18.60, 37.05, 18.92, 20.78, 33.11
+
+EARLIER RUNS ON THIS CAR IN THE MOST SIMILAR CONDITIONS.
+Closest first. How close each one is decides how much weight it carries — a run that differs
+on tyre or grip is weaker evidence, and saying so is better than leaning on it.
+
+2026-09-19 17:49 at TFTR — rated 7/10. same tyre, same grip level, same layout style.
+2026-09-19 17:17 at TFTR — rated 7/10. same tyre, same grip level, same layout style.
+2026-09-19 16:34 at TFTR — rated 6/10. same tyre, same grip level, same layout style.

@@ -252,12 +252,13 @@ function buildSessionFactsBlock(
   // What the car IS, as the chassis or the driver declared it. Everything the Engineer was given
   // about what a knob does was written for one class of car; a driver on anything else is owed
   // that fact in place of a confident touring-car step (founder's open call, 2026-09-19: "the
-  // honest line for non-touring cars"). A fact on the wire, not a prompt rule.
+  // honest line for non-touring cars"). A fact on the wire, not a prompt rule. It named "their usual
+  // values" until those came off the wire (2026-09-23) — a fact about something no longer sent.
   const discipline = disciplineForCar(run.car);
   push("what this car races", disciplineLabel(discipline));
   if (discipline && parseDiscipline(discipline)?.classId !== "touring") {
     facts.push(
-      "The setup effect priors in this request, their step sizes and their usual values were written for 1/10 touring cars. Nothing in this request was written for this car's class."
+      "The setup effect priors in this request and their step sizes were written for 1/10 touring cars. Nothing in this request was written for this car's class."
     );
   }
   push("class", run.raceClass);
@@ -515,6 +516,20 @@ function buildDayBlock(
   );
   const dayPaces = [...paces.values()];
   let anyAgainst = false;
+  // Each run's previous run on the same car today, in the order they were on track.
+  const runOnTrackBefore = new Map<string, DayRun>();
+  const byCar = new Map<string, DayRun[]>();
+  for (const r of day) {
+    const key = r.carId ?? "unknown";
+    if (!byCar.has(key)) byCar.set(key, []);
+    byCar.get(key)!.push(r);
+  }
+  for (const runs of byCar.values()) {
+    const ordered = [...runs].sort((a, b) => resolveRunDisplayInstant(a).getTime() - resolveRunDisplayInstant(b).getTime());
+    ordered.forEach((r, i) => {
+      if (i > 0) runOnTrackBefore.set(r.id, ordered[i - 1]);
+    });
+  }
 
   for (const run of day) {
     const pace = runPace(run);
@@ -540,12 +555,11 @@ function buildDayBlock(
     lines.push(bits.join("  "));
 
     const prev = predecessorOf.get(run.id);
-    if (!prev) continue;
-    const prevDay = fmtLocalDate(prev, zone);
-    const thisDay = fmtLocalDate(run, zone);
-    const changes = diffTuning(tuningValues(prev.setupSnapshot?.data), tuningValues(run.setupSnapshot?.data));
+    const changes = prev ? diffTuning(tuningValues(prev.setupSnapshot?.data), tuningValues(run.setupSnapshot?.data)) : null;
     // No readable sheet one side — unknown, not unchanged: no "changed" line.
-    if (changes != null) {
+    if (prev && changes != null) {
+      const prevDay = fmtLocalDate(prev, zone);
+      const thisDay = fmtLocalDate(run, zone);
       const since = prevDay !== thisDay ? ` since the run of ${prevDay}` : "";
       if (changes.length === 0) {
         lines.push(`    no setup change${since}`);
@@ -555,9 +569,12 @@ function buildDayBlock(
         lines.push(`    changed${since}: ${shown}${more}`);
       }
     }
-    // Today only: the track's movement and the tyres' measured drop are the day's own.
-    const prevPace = paces.get(prev.id);
-    const against = prevDay === thisDay && prevPace ? againstRunBefore(prevPace, paces.get(run.id)!, dayPaces) : null;
+    // Today only: the track's movement and the tyres' measured drop are the day's own. "The run
+    // before" is the one on track before it, by the clock the app shows: a run filed later from the
+    // timing sheet sorts after runs it preceded, and printed "against 14:53, the run before" under 14:46.
+    const onTrackBefore = runOnTrackBefore.get(run.id);
+    const prevPace = onTrackBefore ? paces.get(onTrackBefore.id) : undefined;
+    const against = prevPace ? againstRunBefore(prevPace, paces.get(run.id)!, dayPaces) : null;
     if (against) {
       lines.push(`    ${against}`);
       anyAgainst = true;

@@ -18,9 +18,21 @@ export function fmtSetupValue(v: unknown): string | null {
   return null;
 }
 
+/**
+ * Sheet abbreviations that name a part, spelled out. Round 07 (2026-09-23): two answers of two read
+ * "rear hrb setting" — the Awesomatix hydraulic roll bar — as the rear body height and told a
+ * tester to move his body 0.75 mm. What a box IS is a fact about the car, the first entry of the
+ * sheet contract (each box: what it adjusts, which end, which way is more); what it DOES is still
+ * the knowledge base's to say, or not. The full name leads: "rear HRB (hydraulic roll bar) setting"
+ * was still read as the body height in one answer of two.
+ */
+const PART_NAMES: ReadonlyArray<[RegExp, string]> = [[/\bhrb\b/, "hydraulic roll bar (HRB)"]];
+
 /** `front_spring_rate_gf_mm` -> `front spring rate gf mm` — readable without inventing a label. */
 export function readableSetupKey(key: string): string {
-  return key.replace(/[_\-]+/g, " ").trim();
+  let s = key.replace(/[_\-]+/g, " ").trim();
+  for (const [abbr, name] of PART_NAMES) s = s.replace(abbr, name);
+  return s;
 }
 
 /**

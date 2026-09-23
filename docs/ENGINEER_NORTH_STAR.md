@@ -162,6 +162,20 @@ Each of these was deleted or declined for a reason. They return only through the
 
 ## Changelog
 
+- **2026-09-23, evening — round 07, the first small round** (founder: smaller rounds, "start first round
+  now"). Twelve real setup questions from production, never used before — seven of his, five on testers'
+  cars (a 1/8 nitro buggy, an A800R, an AMX3 on the A800RR sheet, a Yokomo with nothing on its sheet),
+  each asked twice, graded by Claude before he read them (answers/round-07a/claude-grades.json; the
+  page folds each grade under its card). Claude's grades: 3 good, 7 close, 2 wrong. Label
+  `2026-09-23-round-07` for what was fixed without a ruling: (1) the word "contested" still reached
+  drivers (2 of 24) from the prompt's own "a contested prior" and the nets header — both now say "goes
+  either way", with roll-call lines; (2) a sheet's "rear hrb setting" is spelled out as the hydraulic
+  roll bar — both answers on a tester's sheet had read it as the rear body height; (3) "against the run
+  before" follows the order the runs were on track. Open for him: a 1/8 buggy got opposite diff advice
+  on two tries (no off-road physics); more rear toe offered on a car at 4° (a car's own reference data);
+  "make the tyre work harder" and "hard to drive when grip comes up" skip the bar and roll-centre moves
+  his own July notes named; a 16.87 first practice lap 0.55 s clear of any other lap was taken as real.
+
 - **2026-09-23, later** — His three calls on the review. Label `2026-09-23-test-their-lead`. (1) **A
   driver's suspicion is a lead to test** (founder: "it should help the driver test his idea… it should
   reason like a competent engineer human"): one prompt sentence — what the driver states stays fact;
@@ -209,7 +223,7 @@ Each of these was deleted or declined for a reason. They return only through the
   rear-toe "usually runs" rule is off the wire**: the nets header sentence ("a car at the far end has
   little left in that lever") is gone and no drafted `usual` is rendered — founder, 2026-09-22: "we've
   given it a static rule… we want to let it reason for itself". The mechanism it stood in for is a
-  drafts-tier page, `drafts/toe-on-the-grip-curve.md` (his read owed). The nets header gained one fact:
+  drafts-tier page, `drafts/toe-on-the-grip-curve.md` (deleted the same day — founder: "delete"). The nets header gained one fact:
   the knobs are named the way a shim-adjusted chassis's sheet names them. (5) **One prompt word**: "You
   are an RC race engineer" — "touring" out; the class arrives as a fact, and 191 of 230 production
   chassis are not touring cars. Re-run on the recaptured SA day: "where am I losing time to Tim" now

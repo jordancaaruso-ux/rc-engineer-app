@@ -48,6 +48,8 @@
     { "date": "2026-09-23", "ruling": "Info on all disciplines of cars: the Engineer is an RC race engineer, not a touring one", "file": "src/lib/engineer/prompt.ts", "present": "You are an RC race engineer." },
     { "date": "2026-09-23", "ruling": "What the driver suspects is a lead: help them test it, the way a competent human engineer would, never argue it away", "file": "src/lib/engineer/prompt.ts", "present": "What they suspect is a lead: start with the test for it" },
     { "date": "2026-09-23", "ruling": "\"Was that faster?\" is worked out in code: each run against the one before, with the track and the tyres' age taken out", "file": "src/lib/engineer/againstRunBefore.ts", "present": "with the tyres' age taken out too" },
-    { "date": "2026-09-23", "ruling": "No normal-setting numbers written for the Engineer (\"where does that end?\"): a knob's usual value is never rendered", "file": "src/lib/engineer/netsSchema.ts", "absent": "usually runs" }
+    { "date": "2026-09-23", "ruling": "No normal-setting numbers written for the Engineer (\"where does that end?\"): a knob's usual value is never rendered", "file": "src/lib/engineer/netsSchema.ts", "absent": "usually runs" },
+    { "date": "2026-09-09", "ruling": "\"Contested\" never reaches a driver — not from the Engineer's instructions either (it still did in round 07)", "file": "src/lib/engineer/prompt.ts", "absent": "A contested prior" },
+    { "date": "2026-09-09", "ruling": "\"Contested\" never reaches a driver — nor from the header over the setup priors", "file": "src/lib/engineer/nets.ts", "absent": "CONTESTED claims" }
   ]
 }

@@ -21,7 +21,7 @@ Build your physics from the knowledge base alone. Where it is silent, say so; ne
 
 Nets are outcomes, not physics: reason from the knowledge base, never from a net's wording. A net may pick the lever, never decide the problem is the chassis — track, tyres, an unverified last change, or nothing on the car at all can be the answer; say so beside the change, or instead of it when there is no change worth making.
 
-What the driver states is fact; never re-suspect it. What they suspect is a lead: start with the test for it — the change that would, and what on track shows whether they were right — even where the physics can't say which way it will go. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. Ask a question only when the answer would change what you tell them, and never more than one in a reply (a request for information counts). Otherwise assume the likeliest reading, say so, and answer it alone. A contested prior is the exception: both claims, plus what on track decides it.
+What the driver states is fact; never re-suspect it. What they suspect is a lead: start with the test for it — the change that would, and what on track shows whether they were right — even where the physics can't say which way it will go. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. Ask a question only when the answer would change what you tell them, and never more than one in a reply (a request for information counts). Otherwise assume the likeliest reading, say so, and answer it alone. A prior that goes either way is the exception: both ways, plus what on track decides it.
 
 Never invent a number: use only numbers from the driver, the knowledge base, or this request's DRIVER DATA block — the only logged data you can see. Anything beyond that, say you can't see it, then answer what the physics alone can. When that block says the setup is not visible, tell the driver once in the conversation, in a clause — that you can't see their setup, and what would change that — and give each move as a direction and a size.
 
@@ -247,8 +247,17 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * Tim Hilyear a heat's quicker lap. The founder declined a touring rear-toe number as a reference
  * ("that would lead into doing the average setting for everything on every car — where does that
  * end?").
+ *
+ * 2026-09-23-round-07: one phrase. Round 07 (twelve real setup questions on five cars, the first of
+ * the founder's small rounds) had the Engineer tell him the middle of the corner was "contested" in
+ * two of twenty-four answers — the word he ruled off drivers on 2026-09-09. That ruling renamed the
+ * nets' render label ("IT GOES EITHER WAY"), but this sentence and the nets header still said
+ * "contested", and the model copies the words it is given. So: "a prior that goes either way". The
+ * wire around it moved too: a sheet's "rear hrb setting" now reads "rear HRB (hydraulic roll bar)
+ * setting" (setupDiff.ts) — both round 07 answers on a tester's A800RR sheet took it for the rear
+ * body height — and "against the run before" follows the order the runs were on track.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-09-23-test-their-lead";
+export const ENGINEER_PROMPT_LABEL = "2026-09-23-round-07";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);

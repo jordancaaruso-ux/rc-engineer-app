@@ -2,7 +2,7 @@ THE DRIVER'S MOST RECENT LOGGED SESSION. Unless they say otherwise, assume quest
 
 car: Sparko F8SE
 what this car races: 1/8 Buggy 4WD · Nitro
-The setup effect priors in this request, their step sizes and their usual values were written for 1/10 touring cars. Nothing in this request was written for this car's class.
+The setup effect priors in this request and their step sizes were written for 1/10 touring cars. Nothing in this request was written for this car's class.
 track: Southern Districts Model Car Club
 tyre run number: 1
 air temp °C: 18.4
