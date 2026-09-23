@@ -37,7 +37,8 @@ const BY_PREFIX_AND_KEY: Array<{ test: (k: string) => boolean; min: number }> = 
   { test: (k) => k === "diff_oil", min: 1000 },
   // Bump steer rod/block mm shim.
   { test: (k) => k.startsWith("bump_steer"), min: 0.25 },
-  // HRB setting (Hydraulic Roll Bar) uses numbered detents; 1 click is the meaningful step.
+  // HRB setting — the rear body height (founder, 2026-09-23; this line once said "Hydraulic Roll Bar",
+  // which was wrong and misled the Engineer's sheet labels for an evening). 1 is the meaningful step.
   { test: (k) => k.includes("hrb"), min: 1 },
   // Steering angle setting: 1° is a typical click.
   { test: (k) => k.includes("steering_angle"), min: 1 },

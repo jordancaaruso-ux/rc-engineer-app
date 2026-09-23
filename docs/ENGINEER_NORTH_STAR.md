@@ -166,15 +166,18 @@ Each of these was deleted or declined for a reason. They return only through the
   now"). Twelve real setup questions from production, never used before — seven of his, five on testers'
   cars (a 1/8 nitro buggy, an A800R, an AMX3 on the A800RR sheet, a Yokomo with nothing on its sheet),
   each asked twice, graded by Claude before he read them (answers/round-07a/claude-grades.json; the
-  page folds each grade under its card). Claude's grades: 3 good, 7 close, 2 wrong. Label
-  `2026-09-23-round-07` for what was fixed without a ruling: (1) the word "contested" still reached
-  drivers (2 of 24) from the prompt's own "a contested prior" and the nets header — both now say "goes
-  either way", with roll-call lines; (2) a sheet's "rear hrb setting" is spelled out as the hydraulic
-  roll bar — both answers on a tester's sheet had read it as the rear body height; (3) "against the run
-  before" follows the order the runs were on track. Open for him: a 1/8 buggy got opposite diff advice
-  on two tries (no off-road physics); more rear toe offered on a car at 4° (a car's own reference data);
-  "make the tyre work harder" and "hard to drive when grip comes up" skip the bar and roll-centre moves
-  his own July notes named; a 16.87 first practice lap 0.55 s clear of any other lap was taken as real.
+  page folds each grade under its card). Claude's grades: 3 good, 8 close, 1 wrong (first written
+  3/7/2 — Claude had graded the Engineer wrong for reading "rear hrb setting" as the rear body height,
+  which it is; founder: "hrb is rear body height"). Label `2026-09-23-round-07` for what was fixed
+  without a ruling: (1) the word "contested" still reached drivers (2 of 24) from the prompt's own "a
+  contested prior" and the nets header — both now say "goes either way", with roll-call lines; (2)
+  "against the run before" follows the order the runs were on track; (3) a sheet's "rear hrb setting"
+  reads "rear body height (HRB) setting" — after an evening of saying "hydraulic roll bar", Claude's
+  guess from a wrong code comment, undone before any push. Open for him: a 1/8 buggy got opposite diff
+  advice on two tries (no off-road physics); more rear toe offered on a car at 4° (a car's own
+  reference data); "make the tyre work harder" and "hard to drive when grip comes up" skip the bar and
+  roll-centre moves his own July notes named; a 16.87 first practice lap 0.55 s clear of any other lap
+  was taken as real.
 
 - **2026-09-23, later** — His three calls on the review. Label `2026-09-23-test-their-lead`. (1) **A
   driver's suspicion is a lead to test** (founder: "it should help the driver test his idea… it should

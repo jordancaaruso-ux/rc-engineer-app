@@ -49,7 +49,7 @@ inner steering angle: 26.5
 motor lateral shift: 1.75
 motor: HW G5
 pinion: 42
-rear hydraulic roll bar (HRB) setting: 3.5
+rear body height (HRB) setting: 3.5
 rear spring rate gf mm: 119.6
 ride height front: 4.8
 ride height rear: 5.2

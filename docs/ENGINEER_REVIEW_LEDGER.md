@@ -304,34 +304,6 @@ lap-time fix, he said:
   Explained to him the same evening; his ruling: **"delete"** — deleted. On "these come first, always"
   (bite-hold.md fact 6): **"not sure"** — left as it is; round 07 shows how often it steers answers.
 
-### 2026-09-23 evening — round 07, setup (the first small round)
-
-His call on the loop: small rounds, "start first round now". Twelve real setup questions from
-production (`questions/round-07.json`), each asked twice (batches round-07a, round-07b), Claude's grade
-written before he read them (`answers/round-07a/claude-grades.json`) and folded under each card on the
-page: https://claude.ai/artifact/FdPPP7qHWDRe9X1YU7q6C5. Testers' questions run on their own runs —
-Jayden cmuaeokh600eekw043x5kk9uh (Sparko F8SE), Glenn cmu9eyp5u005ijz04rtild67s (A800R), Robbie
-cmu8764t4000zl0049adehaee (AMX3 on the A800RR sheet), Ant cmu86f1bg00c2l504pd4xt5it (Yokomo MS2.1);
-their captures are `fixtures/private-*.txt`, git-excluded, never committed.
-
-**Claude's grades (his comparison owed): 3 good, 7 close, 2 wrong.**
-- Wrong: j-01 (the buggy — opposite rear-diff advice on the two tries, never says which of three
-  diffs); o-01 (both tries read "rear hrb setting" — the hydraulic roll bar — as the rear body height
-  and told Robbie to move it 0.75 mm; both crowned a run on a 16.87 first practice lap 0.55 s clear of
-  any other lap he did).
-- Close: j-02 (touring spring logic on a buggy), g-01 (more rear toe on Glenn's car at 4°), s-01 (only
-  toe for "make the tyre work harder" — his July note wanted bar and roll centre), s-02 (one try adds
-  rear toe gain after "rear toe hasn't helped"; neither takes front grip away), s-03 and s-04 (the word
-  "contested"), s-05 (no roll-centre move for "hard to drive when grip comes up").
-- Good: a-01, s-06, s-07 ("outliers": honest that it has nothing to compare against, reads his own day).
-
-**Fixed without a ruling** (label `2026-09-23-round-07`): "contested" out of the prompt and the nets
-header; HRB spelled out on the sheet; "against the run before" in on-track order (it had printed
-"against 14:53" under a 14:46 run filed later from the timing sheet). Re-asked: "contested" 0 of 4
-(s-03, s-04 twice each; "genuinely goes either way" instead). HRB: "rear HRB (hydraulic roll bar)
-setting" was still read as the body height once in two; with the full name first, "rear hydraulic roll
-bar (HRB) setting", 3 of 3 name it right (round-07e/f/g). They still assume a higher number is a
-stiffer bar — the sheet says what a box is, not yet which way is more.
 - **b-01 — "it should help the driver test his idea… it should reason like a competent engineer
   human."** Built: one prompt sentence (label `2026-09-23-test-their-lead`). Three samples per wording:
   "help them test it" → the spring test 3/3, but "don't change the chassis yet" 2/3 and the tyre idea
@@ -345,6 +317,39 @@ stiffer bar — the sheet says what a box is, not yet which way is more.
   loss. **Found on the way and fixed:** "P1/5" (best-lap rank) beside LAPS's finishing "P1 TIMOTHY
   HILYEAR" — one of two l-05 answers gave Tim two heats' quicker pace; the rank now reads "quickest lap
   of 5, 0.01 clear" and both re-run l-05 answers match the sheet on every margin (checked by script).
+
+### 2026-09-23 evening — round 07, setup (the first small round)
+
+His call on the loop: small rounds, "start first round now". Twelve real setup questions from
+production (`questions/round-07.json`), each asked twice (batches round-07a, round-07b), Claude's grade
+written before he read them (`answers/round-07a/claude-grades.json`) and folded under each card on the
+page: https://claude.ai/artifact/FdPPP7qHWDRe9X1YU7q6C5. Testers' questions run on their own runs —
+Jayden cmuaeokh600eekw043x5kk9uh (Sparko F8SE), Glenn cmu9eyp5u005ijz04rtild67s (A800R), Robbie
+cmu8764t4000zl0049adehaee (AMX3 on the A800RR sheet), Ant cmu86f1bg00c2l504pd4xt5it (Yokomo MS2.1);
+their captures are `fixtures/private-*.txt`, git-excluded, never committed.
+
+**Claude's grades: 3 good, 8 close, 1 wrong** (first written 3/7/2 — see the HRB correction below).
+- Wrong: j-01 (the buggy — opposite rear-diff advice on the two tries, never says which of three diffs).
+- Close: o-01 (both tries crown 18:03 on a 16.87 first practice lap 0.55 s clear of any other lap Robbie
+  did — his call whether that lap is real), j-02 (touring spring logic on a buggy), g-01 (more rear toe
+  on Glenn's car at 4°), s-01 (only toe for "make the tyre work harder" — his July note wanted bar and
+  roll centre), s-02 (one try adds rear toe gain after "rear toe hasn't helped"; neither takes front
+  grip away), s-03 and s-04 (the word "contested"), s-05 (no roll-centre move for "hard to drive when
+  grip comes up").
+- Good: a-01, s-06, s-07 ("outliers": honest that it has nothing to compare against, reads his own day).
+
+**Fixed without a ruling** (label `2026-09-23-round-07`): "contested" out of the prompt and the nets
+header — re-asked, 0 of 4 (s-03, s-04 twice each; "genuinely goes either way" instead); "against the
+run before" in on-track order (it had printed "against 14:53" under a 14:46 run filed later from the
+timing sheet).
+
+**The HRB mistake — Claude's, not the Engineer's.** Claude graded o-01 wrong for reading "rear hrb
+setting" as the rear body height, took "Hydraulic Roll Bar" from a code comment
+(`trendMinimumDeltas.ts`) without asking, and put "hydraulic roll bar (HRB)" on the wire. Founder:
+**"hrb is rear body height."** The Engineer had it right in both answers. Undone before anything was
+pushed: the sheet now says "rear body height (HRB) setting", the comment is corrected, o-01 is regraded.
+The lesson: what a part IS comes from him or the manufacturer's sheet, never from a guess — the
+agreement check caught Claude, not the Engineer.
 
 ## Fixes landed from this batch
 

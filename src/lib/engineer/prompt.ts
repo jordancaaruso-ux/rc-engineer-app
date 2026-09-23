@@ -253,9 +253,11 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * two of twenty-four answers — the word he ruled off drivers on 2026-09-09. That ruling renamed the
  * nets' render label ("IT GOES EITHER WAY"), but this sentence and the nets header still said
  * "contested", and the model copies the words it is given. So: "a prior that goes either way". The
- * wire around it moved too: a sheet's "rear hrb setting" now reads "rear HRB (hydraulic roll bar)
- * setting" (setupDiff.ts) — both round 07 answers on a tester's A800RR sheet took it for the rear
- * body height — and "against the run before" follows the order the runs were on track.
+ * wire around it moved too: "against the run before" follows the order the runs were on track, and
+ * a sheet's "rear hrb setting" reads "rear body height (HRB) setting" (setupDiff.ts). That last one
+ * went wrong first: the same evening it said "hydraulic roll bar", taken from a wrong code comment,
+ * and Claude graded the Engineer wrong for reading HRB as the rear body height — which it is
+ * (founder: "hrb is rear body height"). Corrected before anything was pushed.
  */
 export const ENGINEER_PROMPT_LABEL = "2026-09-23-round-07";
 
