@@ -1,0 +1,29 @@
+{
+  "about": "Trial 6 (2026-09-23): trial 5 without N1 (the diff prior rewording), which cost j-01 its thicker diff in 3 of 6 at n=6. Founder-call edits only.",
+  "edits": [
+    {
+      "block": "nets",
+      "find": "the front rolls in faster, so the initial steering comes sooner — the same amount, there for longer, so it can feel like more; too far and it is too reactive",
+      "replace": "the front rolls in faster, so the initial steering comes sooner and the car reacts quicker to every input — the same amount, there for longer, so it can feel like more; too far and it is edgy and hard to drive",
+      "why": "his a-01 and s-05 notes: thinner oil makes it more reactive."
+    },
+    {
+      "block": "kb",
+      "find": "than sharing the load evenly would, all else equal.",
+      "replace": "than sharing the load evenly would, all else equal.\n\n**Heat.** A tyre heats from the work it does — the force it carries times how far it slides — so it heats more the more of each corner it spends loaded, and the harder it is loaded. Stiffer in roll — a stiffer bar or spring, a higher roll centre, less flex — loads the tyres sooner, so they work for more of every corner ([[bite-hold]]); made at one end only, that end also takes a larger share of the load transfer, so its outside tyre is loaded harder than before ([[corner-regime]]). Toe heats a tyre by scrubbing it ([[toe-and-scrub]]).",
+      "why": "s-01: toe was the only heat mechanism in the KB; t2 wording (one end only) made it ask which end 2 of 2."
+    },
+    {
+      "block": "kb",
+      "find": "end the driver wants moved, never as the end that is wrong.",
+      "replace": "end the driver wants moved, never as the end that is wrong. \"Grip\" on power with no end named is the rear holding on as the throttle comes in: lacking it is oversteer on power, not wheelspin (founder, 2026-09-23).",
+      "why": "g-01: \"How do I improve on power grip\" read as wheelspin/drive in every try; his must: \"lack of on power grip is normally oversteer\"."
+    },
+    {
+      "block": "kb",
+      "find": "brings the first input back without touching the middle the bar just gave.",
+      "replace": "brings the first input back without touching the middle the bar just gave. A cost is only worth winning back if the driver will miss it — a calmer first input is no cost to a driver who called the car hard to drive.",
+      "why": "s-05: softer front bar, then thinner front oil to win back the first input, on a car he called hard to drive — his never: \"thinner oil would make reactivity worse\" (the pair paragraph is his 09-09 ruling; this narrows when it applies)."
+    }
+  ]
+}

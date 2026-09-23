@@ -1,0 +1,11 @@
+{
+  "about": "Trial 4 (2026-09-23): the reworded E1 alone — Claude's prompt call — to see what it does without the founder-call edits.",
+  "edits": [
+    {
+      "block": "prompt",
+      "find": "What the driver states is fact; never re-suspect it.",
+      "replace": "What the driver states is fact; never re-suspect it — and a change they say didn't help counts against the thing it works through, not just that one setting.",
+      "why": "s-02: rear toe gain offered after \"Rear toe hasn't helped\" (his never); the first wording (t1) held 1 of 4."
+    }
+  ]
+}

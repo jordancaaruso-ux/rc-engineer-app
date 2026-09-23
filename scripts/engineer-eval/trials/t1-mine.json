@@ -1,0 +1,17 @@
+{
+  "about": "Trial 1 (2026-09-23, round 07 targets): prompt wording only — Claude's call, inside the founder's rulings. E1 extends his 'What the driver states is fact' to changes that work the same way (s-02: rear toe gain after 'rear toe hasn't helped'). E2 makes the pair's second half recover only a cost the driver minds (s-05: thinner front oil to win back a calmer first input on a car he called hard to drive).",
+  "edits": [
+    {
+      "block": "prompt",
+      "find": "What the driver states is fact; never re-suspect it.",
+      "replace": "What the driver states is fact; never re-suspect it, and a change they say didn't help rules out the ones that work the same way.",
+      "why": "s-02 try A: 'take 0.5 shim out of the rear toe-gain stack' straight after 'Rear toe hasn't helped' — his never."
+    },
+    {
+      "block": "prompt",
+      "find": "where that change costs a part of the corner, the change that gets it back",
+      "replace": "where that change costs something the driver still wants, the change that gets it back",
+      "why": "s-05 both tries: softer front bar, then thinner front oil to bring back the first input — on a car he said is hard to drive; his never: 'thinner oil would make reactivity worse'."
+    }
+  ]
+}

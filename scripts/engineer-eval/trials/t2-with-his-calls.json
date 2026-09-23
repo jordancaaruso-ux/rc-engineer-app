@@ -1,0 +1,41 @@
+{
+  "about": "Trial 2 (2026-09-23): trial 1 plus three changes that are the FOUNDER'S CALL (nets and KB physics), measured before he rules. N1 reorders the diff prior so its balance effect comes first, in the words a driver uses for it (g-01: thicker diff for \"on power grip\"; j-01 try B: freer diff for on-power push). N2 says plainly that thinner front oil makes the car react quicker (his a-01 and s-05 notes; that side is AI-drafted, awaiting his pass). K1 adds where tyre heat comes from beyond toe (s-01: toe was the only way the KB knew to make a tyre work).",
+  "edits": [
+    {
+      "block": "prompt",
+      "find": "What the driver states is fact; never re-suspect it.",
+      "replace": "What the driver states is fact; never re-suspect it, and a change they say didn't help rules out the ones that work the same way.",
+      "why": "s-02 try A: 'take 0.5 shim out of the rear toe-gain stack' straight after 'Rear toe hasn't helped' — his never."
+    },
+    {
+      "block": "prompt",
+      "find": "where that change costs a part of the corner, the change that gets it back",
+      "replace": "where that change costs something the driver still wants, the change that gets it back",
+      "why": "s-05 both tries: softer front bar, then thinner front oil to bring back the first input — on a car he said is hard to drive; his never: 'thinner oil would make reactivity worse'."
+    },
+    {
+      "block": "nets",
+      "find": "EFFECT: more drive off the corner — both rear tyres put the power down — with more rotation on throttle; less rotation off throttle; biggest in tight corners",
+      "replace": "EFFECT: more rotation on throttle — the rear gives up side grip to put the power down — and more drive off the corner; less rotation off throttle; biggest in tight corners",
+      "why": "g-01 both tries led with a thicker diff for \"How do I improve on power grip\" — his never."
+    },
+    {
+      "block": "nets",
+      "find": "EFFECT: less drive off the corner and less rotation on throttle; more rotation off throttle; too thin and it will not put the power down; biggest in tight corners",
+      "replace": "EFFECT: less rotation on throttle — more rear side grip on power — and less drive off the corner; more rotation off throttle; too thin and it will not put the power down; biggest in tight corners",
+      "why": "the mirror of the thicker side."
+    },
+    {
+      "block": "nets",
+      "find": "the front rolls in faster, so the initial steering comes sooner — the same amount, there for longer, so it can feel like more; too far and it is too reactive",
+      "replace": "the front rolls in faster, so the initial steering comes sooner and the car reacts quicker to every input — the same amount, there for longer, so it can feel like more; too far and it is edgy and hard to drive",
+      "why": "his a-01 and s-05 notes: thinner oil makes it more reactive."
+    },
+    {
+      "block": "kb",
+      "find": "than sharing the load evenly would, all else equal.",
+      "replace": "than sharing the load evenly would, all else equal.\n\n**Heat.** A tyre heats from the work it does — the force it carries times how far it slides. The end that takes the larger share of the load transfer — a stiffer bar or spring, a higher roll centre, less flex at that end ([[corner-regime]]) — loads its outside tyre harder, so that tyre works harder and heats more. Toe heats a tyre by scrubbing it ([[toe-and-scrub]]).",
+      "why": "s-01: \"how can i get the tire to work harder\" got toe only; his pick: stiffer everything, bar, spring, higher rc, less flex, more toe, more camber."
+    }
+  ]
+}

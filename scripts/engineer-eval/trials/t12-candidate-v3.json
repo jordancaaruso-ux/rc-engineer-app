@@ -1,0 +1,41 @@
+{
+  "about": "Trial 12 (2026-09-23): candidate v2 with the hard-to-drive example carried in the prompt's pair clause. E1 is Claude's call; E2, E3, N2, K1, K2 are the FOUNDER'S CALL.",
+  "edits": [
+    {
+      "block": "prompt",
+      "find": "What the driver states is fact; never re-suspect it.",
+      "replace": "What the driver states is fact; never re-suspect it — and a change they say didn't help counts against the thing it works through, not just that one setting.",
+      "why": "s-02: rear toe gain offered after \"Rear toe hasn't helped\" (his never); the first wording (t1) held 1 of 4."
+    },
+    {
+      "block": "nets",
+      "find": "the front rolls in faster, so the initial steering comes sooner — the same amount, there for longer, so it can feel like more; too far and it is too reactive",
+      "replace": "the front rolls in faster, so the initial steering comes sooner and the car reacts quicker to every input — the same amount, there for longer, so it can feel like more; too far and it is edgy and hard to drive",
+      "why": "his a-01 and s-05 notes: thinner oil makes it more reactive."
+    },
+    {
+      "block": "kb",
+      "find": "than sharing the load evenly would, all else equal.",
+      "replace": "than sharing the load evenly would, all else equal.\n\n**Heat.** A tyre heats from the work it does — the force it carries times how far it slides — so it heats more the more of each corner it spends loaded, and the harder it is loaded. Stiffer in roll — a stiffer bar or spring, a higher roll centre, less flex — loads the tyres sooner, so they work for more of every corner ([[bite-hold]]); made at one end only, that end also takes a larger share of the load transfer, so its outside tyre is loaded harder than before ([[corner-regime]]). Toe heats a tyre by scrubbing it ([[toe-and-scrub]]).",
+      "why": "s-01: toe was the only heat mechanism in the KB; t2 wording (one end only) made it ask which end 2 of 2."
+    },
+    {
+      "block": "kb",
+      "find": "end the driver wants moved, never as the end that is wrong.",
+      "replace": "end the driver wants moved, never as the end that is wrong. \"Grip\" on power with no end named is the rear holding on as the throttle comes in: lacking it is oversteer on power, not wheelspin (founder, 2026-09-23).",
+      "why": "g-01: \"How do I improve on power grip\" read as wheelspin/drive in every try; his must: \"lack of on power grip is normally oversteer\"."
+    },
+    {
+      "block": "prompt",
+      "find": "Ask a question only when the answer would change what you tell them, and never more than one in a reply (a request for information counts). Otherwise assume the likeliest reading, say so, and answer it alone.",
+      "replace": "Assume the likeliest reading, say so, and answer it. Ask a question only after that answer, only when its answer would change what you tell them, never about something they have already told you, and never more than one in a reply (a request for information counts).",
+      "why": "E3 v2: v1 (\"never instead of an answer: answer the likeliest reading first, say so, then ask\") ended 22 of 30 answers on a question, some asking what the driver had already said."
+    },
+    {
+      "block": "prompt",
+      "find": "where that change costs a part of the corner, the change that gets it back",
+      "replace": "where that change costs a part of the corner the driver will miss — a calmer first input is no cost on a car they called hard to drive — the change that gets it back",
+      "why": "s-05: with only \"the driver will miss\" the thinner-front-oil pair stayed in 3-4 of 6; with the example in the KB (t9) it dropped to 1 of 6 — moved here, since an instruction does not belong in the KB."
+    }
+  ]
+}

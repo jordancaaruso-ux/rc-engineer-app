@@ -1,0 +1,70 @@
+{
+  "about": "The founder's targets for round 07 — what a good answer must get right, must never do, and what he would pick. Dictated in chat on 2026-09-23 after the discussion (\"get me to say what i think a good answer would be, so you can continue iterating with a goal. cant let it be too rigid because to an extent we want the engineer to reason unbiased, not necessarily exactly as i would\"). `said` is his text exactly as he sent it, typos kept — never reworded, never shown to the Engineer, never pasted into the prompt, KB or nets. `reading` is Claude's reading of it for grading, marked where unsure; he corrects it, it never outranks `said`. Grading: a try FAILS only on a must missed or a never done; a pick that differs from his, with a sound reason, is not wrong — it goes on his \"it disagreed with you\" list. Hold-outs (not tuned against; run only at the end of a loop): a-01, s-06, j-02. No target given: o-01, s-03, s-04, s-07 — general checks only (same advice both tries, nothing the driver said failed, numbers right).",
+  "holdouts": ["a-01", "s-06", "j-02"],
+  "targets": {
+    "j-01": {
+      "said": "must - thicker diff, not sure with offroad diffs but assume rear. \nmy pick - lower front rc, softer front bar, thicker diff, less rear toe, softer front roll stiffness probaly a better way to put it, could be bar spring rc.\nnever - thinner rear diff, will maek the on throttle understeer worse",
+      "reading": {
+        "must": ["a thicker diff (rear, he assumes; unsure for off-road diffs)"],
+        "never": ["a thinner rear diff — makes the on-throttle understeer worse"],
+        "pick": ["lower front roll centre", "softer front bar", "thicker diff", "less rear toe", "softer front roll stiffness (bar, spring or roll centre)"]
+      }
+    },
+    "j-02": {
+      "said": "can give less overall rear grip, would wanna link to corner regime probably, slower car on lower grip means the stiffer effect in the middle is a greater portion of the corner. stiffer rear can limit rotation in tight corners (doesnt agree with corner regime i think, never understood why it happens)",
+      "reading": {
+        "must": ["it can give less overall rear grip", "links to the corner regime: on low grip the car is slower, so the middle — where stiffer means less rear grip — is a bigger part of the corner"],
+        "never": [],
+        "pick": ["a stiffer rear can limit rotation in tight corners (he does not know why; a gap, not a claim)"]
+      }
+    },
+    "g-01": {
+      "said": "lack of on power grip is normally oversteer, so thicken diff would make it worse. id suggest thinner, more rera toe, more rear gain, stiffer rear can often help in touring car, some other classes would prefer softer or lower rear rc, ",
+      "reading": {
+        "must": ["reads lack of on-power grip as oversteer on power (normally)"],
+        "never": ["a thicker diff — makes it worse"],
+        "pick": ["thinner diff", "more rear toe", "more rear gain (read as rear toe gain — UNSURE, ask him)", "stiffer rear can often help in a touring car", "other classes: softer rear or lower rear roll centre"]
+      }
+    },
+    "a-01": {
+      "said": "- this is pretty good. depends though, thinner oil ould make it more reactinve and worse, would dpeend on context, thicker might make it better.",
+      "reading": {
+        "must": ["the oil goes either way here: thinner can make it more reactive and worse, thicker might be better — says what decides it"],
+        "never": [],
+        "pick": ["the round 07 answer was \"pretty good\""]
+      }
+    },
+    "s-01": {
+      "said": "- generally stiffer everything, bar, spring, higher rc, less flec, more toe more camber",
+      "reading": {
+        "must": [],
+        "never": [],
+        "pick": ["stiffer everything: bar, spring, higher roll centre, less flex", "more toe", "more camber"]
+      }
+    },
+    "s-02": {
+      "said": "- dont suggest rear toe gain here, toe already didnt work. thicker rear shock oil oculd be better, could be worse though i guess. less roll center split could help, stiffer rear can sometimes help, softer rear can sometimes help",
+      "reading": {
+        "must": [],
+        "never": ["rear toe gain (or any rear toe) — he said toe already didn't work"],
+        "pick": ["thicker rear shock oil (either way)", "less roll-centre split", "stiffer rear or softer rear (either can help)"]
+      }
+    },
+    "s-05": {
+      "said": "-higher upper inner maybe, softer front bar good, thinner oil would make reactivity worse. id try thicker diff, less bump steer, less rear toe? things to smoothen out the front but maintain more rotation",
+      "reading": {
+        "must": [],
+        "never": ["thinner oil — makes it more reactive, and the driver said hard to drive"],
+        "pick": ["higher upper inner (maybe)", "softer front bar", "thicker diff", "less bump steer", "less rear toe (?)", "aim: smooth the front but keep rotation"]
+      }
+    },
+    "s-06": {
+      "said": "would like a lower roll center suggestion, highe rupper inner specifically. softer bars good too",
+      "reading": {
+        "must": [],
+        "never": [],
+        "pick": ["a lower roll centre — higher upper inner specifically (wanted)", "softer bars"]
+      }
+    }
+  }
+}

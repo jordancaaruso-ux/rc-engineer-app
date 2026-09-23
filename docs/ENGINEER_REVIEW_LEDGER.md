@@ -351,6 +351,64 @@ pushed: the sheet now says "rear body height (HRB) setting", the comment is corr
 The lesson: what a part IS comes from him or the manufacturer's sheet, never from a guess — the
 agreement check caught Claude, not the Engineer.
 
+### 2026-09-23 night — his targets, and the first loop against them
+
+His call on the method: **"get me to say what i think a good answer would be, so you can continue
+iterating with a goal. cant let it be too rigid because to an extent we want the engineer to reason
+unbiased, not necessarily exactly as i would."** Agreed shape: per question a MUST, a NEVER and HIS
+PICK; a try fails only on a must missed or a never done; a different pick with a sound reason goes on
+his "it disagreed with you" list. His words for 8 of the 12 round-07 questions, verbatim, are in
+`questions/round-07.targets.json` (never shown to the Engineer). Hold-outs a-01, s-06, j-02.
+
+**What his targets said about Claude's grades:** three were off. g-01 — Claude called the thicker diff
+"the right lead"; he: "lack of on power grip is normally oversteer, so thicken diff would make it
+worse". s-01 — Claude marked down more rear toe; he'd use toe. s-05 — Claude missed that thinner oil
+makes a hard-to-drive car more reactive.
+
+**Method learned:** two tries a question is noise — the same unchanged Engineer gave 0 of 2 and 3 of 6
+on one never. Every comparison below is 6 tries against 6 of today's Engineer (batches round-07-t0a…f),
+all edits applied by the harness (`arms.ts` v1-nets-trial + `trials/*.json`), no shipped file moved.
+
+| Question (his line) | Today (6 tries) | Final trial (6 tries) |
+|---|---|---|
+| g-01 never: thicker diff for "on power grip" | offered 5 | 0 — thinner diff led 2, "assuming the rear steps out" 2 |
+| s-01 "stiffer everything… more toe" | only a question 5; stiffer 0 | always answers; stiffer bar/spring/rc 6 |
+| s-02 never: rear toe gain after "rear toe hasn't helped" | 3 | 3 (8 of 28 across every run with E1) |
+| s-05 never: thinner oil on a hard-to-drive car | 1 (+2 only a question) | 3 (never only a question) |
+| j-01 must: thicker rear diff (buggy) | 5 | 5 — never (freer diff) 0 both |
+| j-02 (hold-out) his corner-regime link | 0 of 4 | 0 of 2; 3 of 6 with K4 |
+| a-01 / s-06 (hold-outs) | 2/2, 2/2 | 1/2 (+1 close), 1/2 (+1 argued from his own day) |
+
+**The final trial** (`trials/final-2026-09-23.json`, + K4 in `final-plus-k4.json`):
+- E1 (prompt — Claude's call): "a change they say didn't help counts against the thing it works
+  through, not just that one setting". Needed WITH K2: with K2 and without E1, toe gain came back 11
+  of 12 (t5, t6).
+- K2 (bite-hold.md fact 1 — HIS CALL): "'Grip' on power with no end named is the rear holding on as the
+  throttle comes in: lacking it is oversteer on power, not wheelspin." Carries g-01.
+- E3 (prompt, his question rulings — HIS CALL): answer the likeliest reading first; a question only
+  after, only if it would change the advice, never about what they already said. Question-only replies
+  4 of 30 → 0; answers ending on a question 5 → 12 of 30 (the first wording made it 22).
+- K1 (tyre-load-sensitivity.md — HIS CALL): where tyre heat comes from — stiffer in roll loads the tyres
+  sooner, one end only also harder; toe scrubs. With E3, s-01 gives his answer 6 of 6.
+- N2 (damper-oil-front THINNER, AI-drafted side — HIS CALL): "reacts quicker to every input… too far and
+  it is edgy and hard to drive" — his a-01/s-05 words; no measurable effect alone.
+- K4 (corner-regime.md — HIS CALL): low grip also slows the car, so every corner has more middle.
+
+**Dropped after measuring:** N1, the diff prior with its balance effect first ("the rear gives up side
+grip to put the power down") — best on g-01 (6 of 6) but j-01 lost its thicker diff (3 of 6, one freer
+diff). E2/K3, "the change that gets it back" only for a cost the driver will miss (prompt and KB, with
+and without the hard-to-drive example) — s-05 thinner oil stayed 2–4 of 6.
+
+**Open, his call:** the 09-09 pair ("soften a bar for the middle, and thinner oil brings the first input
+back", corner-regime.md) is where s-05's thinner oil comes from; nothing in wording stopped it. Also:
+"more rear gain" in his g-01 line read as rear toe gain — unconfirmed.
+
+**Found on the way (a code bug, not a ruling):** the roll-centre guard (`rcGuardCorrections`,
+rcDirections.ts) appends "Correction — … a move above states the direction backwards" to CORRECT
+sentences when a second move word sits nearer the lever ("0.5 mm more upper-inner shim or 0.5 mm less
+upper-outer shim"; "remove … under-lower-arm shims — more front grip"). Seen in round-03, 05c, 07d,
+t7b, hfa — live in production.
+
 ## Fixes landed from this batch
 
 - **2026-09-09, from cards 3–4 (30 edits, 21 files; nets:check 37/37, tsc, 4 suites green):**
