@@ -37,6 +37,13 @@ const SCOPE_LABEL: Record<Scope, string> = { mine: "My runs", others: "Other dri
 /** Rows drawn before the "show more" line. Twenty is about a phone screen of scrolling. */
 const PAGE_SIZE = 20;
 
+/**
+ * The page's one Import button, on the link box and on the MyRCM row alike (founder call,
+ * 2026-09-24: the two should look identical). As tall as the link box beside it.
+ */
+const IMPORT_BUTTON =
+  "tap-active shrink-0 rounded-md border border-transparent primary-face bg-primary px-3.5 py-2 text-[13px] font-semibold leading-5 text-primary-foreground transition hover:brightness-105 disabled:opacity-50";
+
 type ImportResultRow =
   | { url: string; success: true; importedSessionId: string }
   | { url: string; success: false; error: string };
@@ -294,28 +301,23 @@ export function LapAnalysisLibrary({
       <div className="space-y-3">
         <CardPanel contentClassName="space-y-2.5">
           <Eyebrow>Upload a timing link</Eyebrow>
-          {/* One row. It grows as you paste — a 3-row box that is empty 95% of the time
-              was most of what made this card fill a screen. */}
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            rows={1}
-            placeholder={"Paste a LiveRC or Speedhive link…"}
-            className="w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground outline-none tabular-nums"
-            disabled={busy}
-            aria-label="Timing links, one per line"
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
+          {/* One row, Import beside the box. It grows as you paste — a 3-row box that is empty
+              95% of the time was most of what made this card fill a screen. */}
+          <div className="flex items-start gap-2">
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={1}
+              placeholder="LiveRC or Speedhive link"
+              className="min-w-0 flex-1 resize-y rounded-md border border-border bg-background px-3 py-2 text-[13px] leading-5 text-foreground outline-none tabular-nums"
               disabled={busy}
-              onClick={() => void onImport()}
-              className="rounded-lg primary-face bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:brightness-105 disabled:opacity-50"
-            >
+              aria-label="Timing links, one per line"
+            />
+            <button type="button" disabled={busy} onClick={() => void onImport()} className={IMPORT_BUTTON}>
               {busy ? "Importing…" : "Import"}
             </button>
-            {hint ? <span className="text-[11px] text-muted-foreground">{hint}</span> : null}
           </div>
+          {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
           {lastResults.some((r) => !r.success) ? (
             <ul className="space-y-1 border-t border-border pt-2.5 text-[11px]">
               {lastResults
@@ -341,6 +343,7 @@ export function LapAnalysisLibrary({
           pastedUrl={null}
           openUrl={null}
           hasImported={false}
+          closedImportClassName={IMPORT_BUTTON}
           onImported={(res) => {
             void loadSessions();
             router.push(`/laps/analysis?session=${encodeURIComponent(res.importedSessionId)}`);
@@ -350,158 +353,166 @@ export function LapAnalysisLibrary({
         {importSlot}
       </div>
 
-      <div className="mt-4 space-y-2.5 lg:mt-0">
-        <Eyebrow>Imported sessions</Eyebrow>
+      <div className="mt-4 lg:mt-0">
         {/*
-         * The first thing on the list, full width and in the app's own switch — it was two 11px
-         * words in a corner, and the founder couldn't tell which list he was reading (2026-09-24).
+         * One card, headed like the upload card beside it — the same band at the same height
+         * (founder call, 2026-09-24) — with the switch, the search and the list all under it.
          */}
-        {showScope ? (
-          <SegmentedControl<Scope>
-            ariaLabel="Whose sessions"
-            value={activeScope}
-            onChange={(next) => {
-              setScope(next);
-              setShown(PAGE_SIZE);
-            }}
-            segmentClassName="py-2.5 text-[15px]"
-            options={(["mine", "others"] as const).map((key) => {
-              const count = key === "mine" ? mineCount : othersCount;
-              return {
-                value: key,
-                ariaLabel: `${SCOPE_LABEL[key]}, ${count}`,
-                label: (
-                  <>
-                    <span>{SCOPE_LABEL[key]}</span>
-                    <span className="font-normal tabular-nums opacity-60">{count}</span>
-                  </>
-                ),
-              };
-            })}
-          />
-        ) : null}
-        {listErr ? <p className="text-[11px] text-destructive">{listErr}</p> : null}
-        {!listErr && sessions.length === 0 ? (
-          <CardPanel contentClassName="text-[12px] text-muted-foreground">
-            Nothing imported yet. Paste a link above and it lands here.
-          </CardPanel>
-        ) : null}
+        <CardPanel contentClassName="space-y-2.5">
+          <Eyebrow>Imported sessions</Eyebrow>
+          {/*
+           * The first thing on the list, full width and in the app's own switch — it was two 11px
+           * words in a corner, and the founder couldn't tell which list he was reading (2026-09-24).
+           */}
+          {showScope ? (
+            <SegmentedControl<Scope>
+              ariaLabel="Whose sessions"
+              value={activeScope}
+              onChange={(next) => {
+                setScope(next);
+                setShown(PAGE_SIZE);
+              }}
+              // One line at phone width: "Other drivers" and its count broke onto two at 15px.
+              segmentClassName="whitespace-nowrap px-1.5 py-2.5 text-[14px]"
+              options={(["mine", "others"] as const).map((key) => {
+                const count = key === "mine" ? mineCount : othersCount;
+                return {
+                  value: key,
+                  ariaLabel: `${SCOPE_LABEL[key]}, ${count}`,
+                  label: (
+                    <>
+                      <span>{SCOPE_LABEL[key]}</span>
+                      <span className="text-[12px] font-normal tabular-nums opacity-60">{count}</span>
+                    </>
+                  ),
+                };
+              })}
+            />
+          ) : null}
+          {listErr ? <p className="text-[11px] text-destructive">{listErr}</p> : null}
+          {!listErr && sessions.length === 0 ? (
+            <p className="text-[12px] text-muted-foreground">
+              Nothing imported yet. Paste a link above and it lands here.
+            </p>
+          ) : null}
 
-        {/*
-         * A search box and a page size, because this list is not the handful it sounds like.
-         * Measured on a real account: 200 rows, ~12,000px of scroll, because expanding ONE
-         * LiveRC event hub stores every race on it — 30 classes you have never driven, filed
-         * under names you have never heard of. The same measurement that gave the Tools band
-         * its fortnight window (see UNLINKED_LAP_WINDOW_DAYS); this page can't use a window,
-         * because "the race in Thailand from March" is exactly what someone comes here for.
-         * So: newest first, twenty at a time, and a box to find a name in.
-         */}
-        {sessions.length > 0 ? (
-          <div className="flex items-center gap-2">
-            {sessions.length > PAGE_SIZE ? (
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setShown(PAGE_SIZE);
-                }}
-                placeholder="Find a driver, track or class…"
-                aria-label="Search imported sessions"
-                className="min-w-0 flex-1 rounded-md border border-border bg-card px-3 py-2 text-[13px] outline-none focus:ring-1 focus:ring-primary-ink/50"
-              />
-            ) : (
-              <span className="flex-1" />
-            )}
-            <button
-              type="button"
-              onClick={() => (selecting ? exitSelect() : setSelecting(true))}
-              className="tap-active shrink-0 rounded-md border border-border bg-card px-3.5 py-2 text-[13px] font-semibold text-foreground transition hover:bg-muted"
-            >
-              {selecting ? "Cancel" : "Select"}
-            </button>
-          </div>
-        ) : null}
-
-        {sessions.length > 0 ? (
-          <CardPanel contentClassName="p-0">
-            {visibleGroups.map((group) => (
-              <section key={group.key} aria-label={group.label || undefined}>
-                {group.label ? (
-                  <h3 className="px-4 pb-0.5 pt-2.5 text-[11.5px] font-semibold leading-4 text-foreground/75">
-                    {group.label}
-                  </h3>
-                ) : null}
-                <ul>
-                  {group.items.map((row) => {
-                    const text = (
-                      <span className="min-w-0 flex-1">
-                        <span className="ui-title block truncate text-[13px] font-semibold text-foreground">
-                          {row.title}
-                        </span>
-                        {row.detail ? (
-                          <span className="ui-caption mt-0.5 block truncate">{row.detail}</span>
-                        ) : null}
-                      </span>
-                    );
-                    return (
-                      <li key={row.id} className="border-b border-border/60 last:border-b-0">
-                        {!selecting ? (
-                          <Link
-                            href={`/laps/analysis?session=${encodeURIComponent(row.id)}`}
-                            className="tap-active flex items-center gap-3 px-4 py-2.5 transition hover:bg-muted/40"
-                          >
-                            {text}
-                            {row.time ? <span className="type-timestamp shrink-0">{row.time}</span> : null}
-                            <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                          </Link>
-                        ) : row.onRun ? (
-                          <div className="flex items-center gap-3 px-4 py-2.5">
-                            <span className="size-[18px] shrink-0" aria-hidden />
-                            {text}
-                            <span className="type-timestamp shrink-0">On a run</span>
-                          </div>
-                        ) : (
-                          <label className="tap-active flex cursor-pointer items-center gap-3 px-4 py-2.5 transition hover:bg-muted/40">
-                            <input
-                              type="checkbox"
-                              className="size-[18px] shrink-0 accent-primary"
-                              checked={ticked.has(row.id)}
-                              onChange={() => toggleTick(row.id)}
-                            />
-                            {text}
-                            {row.time ? <span className="type-timestamp shrink-0">{row.time}</span> : null}
-                          </label>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            ))}
-            {visible.length < filtered.length ? (
+          {/*
+           * A search box and a page size, because this list is not the handful it sounds like.
+           * Measured on a real account: 200 rows, ~12,000px of scroll, because expanding ONE
+           * LiveRC event hub stores every race on it — 30 classes you have never driven, filed
+           * under names you have never heard of. The same measurement that gave the Tools band
+           * its fortnight window (see UNLINKED_LAP_WINDOW_DAYS); this page can't use a window,
+           * because "the race in Thailand from March" is exactly what someone comes here for.
+           * So: newest first, twenty at a time, and a box to find a name in.
+           */}
+          {sessions.length > 0 ? (
+            <div className="flex items-center gap-2">
+              {sessions.length > PAGE_SIZE ? (
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setShown(PAGE_SIZE);
+                  }}
+                  placeholder="Find a driver, track or class…"
+                  aria-label="Search imported sessions"
+                  className="min-w-0 flex-1 rounded-md border border-border bg-card px-3 py-2 text-[13px] outline-none focus:ring-1 focus:ring-primary-ink/50"
+                />
+              ) : (
+                <span className="flex-1" />
+              )}
               <button
                 type="button"
-                onClick={() => setShown((n) => n + PAGE_SIZE)}
-                className="tap-active flex w-full items-center justify-between gap-3 border-t border-border/60 px-4 py-2.5 text-left transition hover:bg-muted/40"
+                onClick={() => (selecting ? exitSelect() : setSelecting(true))}
+                className="tap-active shrink-0 rounded-md border border-border bg-card px-3.5 py-2 text-[13px] font-semibold text-foreground transition hover:bg-muted"
               >
-                <span className="type-timestamp">
-                  {filtered.length - visible.length} more
-                  {query.trim() ? " matching" : ""}
-                </span>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                {selecting ? "Cancel" : "Select"}
               </button>
-            ) : null}
-          </CardPanel>
-        ) : null}
-        {sessions.length > 0 && filtered.length === 0 ? (
-          <CardPanel contentClassName="text-[12px] text-muted-foreground">
-            Nothing in {SCOPE_LABEL[activeScope]} matches “{query.trim()}”.
-          </CardPanel>
-        ) : null}
+            </div>
+          ) : null}
+          {sessions.length > 0 && filtered.length === 0 ? (
+            <p className="text-[12px] text-muted-foreground">
+              Nothing in {SCOPE_LABEL[activeScope]} matches “{query.trim()}”.
+            </p>
+          ) : null}
+
+          {visible.length > 0 ? (
+            // The rows run edge to edge, down to the card's foot.
+            <div className="-mx-3 -mb-3 border-t border-border/60">
+              {visibleGroups.map((group) => (
+                <section key={group.key} aria-label={group.label || undefined}>
+                  {group.label ? (
+                    <h3 className="px-3 pb-0.5 pt-2.5 text-[11.5px] font-semibold leading-4 text-foreground/75">
+                      {group.label}
+                    </h3>
+                  ) : null}
+                  <ul>
+                    {group.items.map((row) => {
+                      const text = (
+                        <span className="min-w-0 flex-1">
+                          <span className="ui-title block truncate text-[13px] font-semibold text-foreground">
+                            {row.title}
+                          </span>
+                          {row.detail ? (
+                            <span className="ui-caption mt-0.5 block truncate">{row.detail}</span>
+                          ) : null}
+                        </span>
+                      );
+                      return (
+                        <li key={row.id} className="border-b border-border/60 last:border-b-0">
+                          {!selecting ? (
+                            <Link
+                              href={`/laps/analysis?session=${encodeURIComponent(row.id)}`}
+                              className="tap-active flex items-center gap-3 px-3 py-2.5 transition hover:bg-muted/40"
+                            >
+                              {text}
+                              {row.time ? <span className="type-timestamp shrink-0">{row.time}</span> : null}
+                              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                            </Link>
+                          ) : row.onRun ? (
+                            <div className="flex items-center gap-3 px-3 py-2.5">
+                              <span className="size-[18px] shrink-0" aria-hidden />
+                              {text}
+                              <span className="type-timestamp shrink-0">On a run</span>
+                            </div>
+                          ) : (
+                            <label className="tap-active flex cursor-pointer items-center gap-3 px-3 py-2.5 transition hover:bg-muted/40">
+                              <input
+                                type="checkbox"
+                                className="size-[18px] shrink-0 accent-primary"
+                                checked={ticked.has(row.id)}
+                                onChange={() => toggleTick(row.id)}
+                              />
+                              {text}
+                              {row.time ? <span className="type-timestamp shrink-0">{row.time}</span> : null}
+                            </label>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ))}
+              {visible.length < filtered.length ? (
+                <button
+                  type="button"
+                  onClick={() => setShown((n) => n + PAGE_SIZE)}
+                  className="tap-active flex w-full items-center justify-between gap-3 border-t border-border/60 px-3 py-2.5 text-left transition hover:bg-muted/40"
+                >
+                  <span className="type-timestamp">
+                    {filtered.length - visible.length} more
+                    {query.trim() ? " matching" : ""}
+                  </span>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </CardPanel>
         {/* Only an account past the list's ceiling: say it's cut rather than look complete. */}
         {total != null && total > sessions.length ? (
-          <p className="type-timestamp px-1">
+          <p className="type-timestamp mt-2 px-1">
             Newest {sessions.length} of {total} imports
           </p>
         ) : null}

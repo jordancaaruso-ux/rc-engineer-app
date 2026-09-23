@@ -26,12 +26,12 @@ import {
  * Everyone who practised at a track: a search box, your saved drivers as one-tap filters, and
  * the list — quickest first, a driver's sessions folded under them.
  *
- * One piece, two hosts. On the lap analysis page a session is brought in and opened on its own
+ * One piece, two hosts. On the lap analysis page a session is imported and opened on its own
  * (`mode="open"`); in the lap sheet's Practice tab a session is ticked and becomes a column
  * (`mode="tick"`). Everything else — the search, the buttons, Save, the timing-site switch — is
  * the same on purpose, so it is learned once.
  *
- * Nothing is fetched until asked. "Asked" is the Look button on the page, and opening the tab
+ * Nothing is fetched until asked. "Asked" is the Find button on the page, and opening the tab
  * in the lap sheet (`autoLook`); after that the search narrows a list already in hand and
  * touches nothing. A track on both timing sites shows ONE site's list at a time, never a merge
  * (founder call 2026-09-21): the same driver is named differently on each.
@@ -101,7 +101,7 @@ export function PracticeFieldBrowser({
   initialDayYmd: string;
   maxDayYmd?: string;
   mode: "open" | "tick";
-  /** Look as soon as this mounts. The lap sheet's tab is the press; the page has a button. */
+  /** Find as soon as this mounts. The lap sheet's tab is the press; the page has a button. */
   autoLook?: boolean;
   /** The saved drivers, when the host already holds them; fetched here otherwise. */
   competitors?: KnownCompetitor[];
@@ -111,7 +111,7 @@ export function PracticeFieldBrowser({
   onTick?: (pick: PracticeFieldPick, on: boolean) => void;
   /** `open` mode: a brought-in session was asked for. */
   onOpenSession?: (importedSessionId: string) => void;
-  /** See {@link PracticeLookCache}. Omitted on the page, where Look is a button and means "ask". */
+  /** See {@link PracticeLookCache}. Omitted on the page, where Find is a button and means "ask". */
   lookCache?: PracticeLookCache;
   /** The saved drivers changed here (Save) — the lap sheet names columns from the same list. */
   onSavedChange?: (saved: KnownCompetitor[]) => void;
@@ -298,10 +298,10 @@ export function PracticeFieldBrowser({
         setBroughtIn((m) => ({ ...m, [session.sessionUrl]: id }));
         return id;
       }
-      setNote(first?.error ?? data?.error ?? "Couldn't bring that session in.");
+      setNote(first?.error ?? data?.error ?? "Couldn't import that session.");
       return null;
     } catch {
-      setNote("Couldn't bring that session in.");
+      setNote("Couldn't import that session.");
       return null;
     } finally {
       setBusyUrl(null);
@@ -425,7 +425,7 @@ export function PracticeFieldBrowser({
             onClick={() => void runLook(source, dayYmd)}
             className="btn-surface shrink-0 px-3 py-2 text-[13px] font-medium disabled:opacity-60"
           >
-            {look.kind === "looking" ? "Looking…" : "Look"}
+            {look.kind === "looking" ? "Finding…" : "Find"}
           </button>
         ) : null}
       </div>
@@ -474,7 +474,7 @@ export function PracticeFieldBrowser({
         </div>
       ) : null}
 
-      {look.kind === "looking" ? <p className="ui-caption">Looking…</p> : null}
+      {look.kind === "looking" ? <p className="ui-caption">Finding…</p> : null}
       {look.kind === "failed" ? <p className="ui-caption">{look.message}</p> : null}
 
       {drivers && drivers.length > 0 ? (
@@ -536,7 +536,7 @@ export function PracticeFieldBrowser({
 
                 {expanded ? (
                   <div className="space-y-2 border-t border-border/60 bg-muted/40 px-2.5 pb-2.5 pt-2">
-                    {sessions === "loading" ? <p className="ui-caption px-1">Looking…</p> : null}
+                    {sessions === "loading" ? <p className="ui-caption px-1">Finding…</p> : null}
                     {sessions && sessions !== "loading" && !Array.isArray(sessions) ? (
                       <p className="ui-caption px-1">{sessions.hint}</p>
                     ) : null}
@@ -584,11 +584,11 @@ export function PracticeFieldBrowser({
                                 </span>
                                 <span className="type-timestamp shrink-0">
                                   {busy
-                                    ? "Bringing in…"
+                                    ? "Importing…"
                                     : mode === "open"
                                       ? importedId
                                         ? "Open"
-                                        : "Bring in"
+                                        : "Import"
                                       : null}
                                 </span>
                               </button>
@@ -666,7 +666,7 @@ export function PracticeFieldBrowser({
           onClick={() => void lookUpTransponder(askedTransponder)}
           className="btn-surface px-3 py-2 text-[13px] font-medium disabled:opacity-60"
         >
-          {chipSessions[askedTransponder] === "loading" ? "Looking…" : `Look up ${askedTransponder}`}
+          {chipSessions[askedTransponder] === "loading" ? "Finding…" : `Find ${askedTransponder}`}
         </button>
       ) : null}
       {drivers && visible.length === 0 && askedTransponder && typeof chipSessions[askedTransponder] === "object" && !Array.isArray(chipSessions[askedTransponder]) ? (

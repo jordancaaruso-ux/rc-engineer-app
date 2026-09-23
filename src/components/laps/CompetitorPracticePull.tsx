@@ -10,7 +10,7 @@ import type { KnownCompetitor } from "@/lib/speedhive/knownCompetitors";
 
 /**
  * Someone else's practice at a track, with no run of your own to start from: pick where, press
- * Look, and everyone who practised is there to search — a team manager's door, or yours on a day
+ * Find, and everyone who practised is there to search — a team manager's door, or yours on a day
  * you didn't drive. The lap sheet's Practice tab is the same list for "who else was out with me".
  *
  * It used to take one saved driver and one MYLAPS track and hand back that driver's sessions.

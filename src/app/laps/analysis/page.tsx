@@ -122,7 +122,6 @@ const TIMING_SOURCE_LABEL: Record<string, string> = {
 function Shell({
   title,
   titleSlot,
-  subtitle,
   backHref,
   wide = false,
   children,
@@ -130,7 +129,6 @@ function Shell({
   title: string;
   /** Replaces the plain title — an imported session's title is also where it is renamed. */
   titleSlot?: ReactNode;
-  subtitle?: string | null;
   backHref: string;
   /**
    * The sheet states take the dashboard's 1760px axis (`laps-wide`): lap columns keep
@@ -180,19 +178,12 @@ function Shell({
           )}
         </div>
       </header>
-      <section className={wide ? "page-body laps-wide" : "page-body max-w-6xl"}>
-        {/*
-         * A `subtitle` here is only ever page-level copy that carries no times — the
-         * SESSION's context line (track · when · drivers · source) is rendered inside
-         * `LapAnalysisBoard` instead, so its clock is the browser's and matches the grid's.
-         * It cannot live under the title either way: `.page-header .page-subtitle` is
-         * `display: none` app-wide.
-         */}
-        {subtitle ? (
-          <p className="ui-caption mb-3 text-muted-foreground">{subtitle}</p>
-        ) : null}
-        {children}
-      </section>
+      {/*
+       * No line of copy under the title: the library's went (founder call, 2026-09-24), and a
+       * session's context line (track · when · drivers · source) is drawn inside
+       * `LapAnalysisBoard`, so its clock is the browser's and matches the grid's.
+       */}
+      <section className={wide ? "page-body laps-wide" : "page-body max-w-6xl"}>{children}</section>
     </>
   );
 }
@@ -404,11 +395,7 @@ export default async function LapAnalysisPage(props: {
     .filter((t) => t.sources.length > 0);
 
   return (
-    <Shell
-      title="Lap time analysis"
-      subtitle="Read any timing sheet — a race you drove, a teammate's practice, a meeting on the other side of the world."
-      backHref="/tools"
-    >
+    <Shell title="Lap time analysis" backHref="/tools">
       <LapAnalysisLibrary
         eventId={eventId}
         importSlot={
