@@ -162,6 +162,17 @@ Each of these was deleted or declined for a reason. They return only through the
 
 ## Changelog
 
+- **2026-09-23, night — his targets** (founder: "get me to say what i think a good answer would be, so
+  you can continue iterating with a goal. cant let it be too rigid"). Per question he writes a must, a
+  never and his pick (questions/round-07.targets.json); a try fails only on a must or a never. Trials
+  run through the harness (`arms.ts` v1-nets-trial + trials/*.json) at six tries a question — two were
+  noise. Label `2026-09-23-his-targets`, under "continue using your best judgement": a change the
+  driver says didn't help counts against what it works through (rear toe gain after "rear toe hasn't
+  helped" 3 of 6 → 1 of 6); a reply is never only a question ("how can I get the tire to work harder"
+  had drawn only "Which end?" 5 of 6 → 0); the roll-centre guard stopped correcting right answers.
+  Four KB edits measured and waiting on his yes (trials/his-yes-2026-09-23.json; ledger has the
+  numbers). Stopped by him on OpenAI spend after ~930 calls.
+
 - **2026-09-23, evening — round 07, the first small round** (founder: smaller rounds, "start first round
   now"). Twelve real setup questions from production, never used before — seven of his, five on testers'
   cars (a 1/8 nitro buggy, an A800R, an AMX3 on the A800RR sheet, a Yokomo with nothing on its sheet),

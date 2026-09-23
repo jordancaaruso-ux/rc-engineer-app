@@ -1,0 +1,16 @@
+{
+  "about": "Ablation: E3v4 (no E1) + K1 alone.",
+  "edits": [
+    {
+      "block": "prompt",
+      "find": "What the driver states is fact; never re-suspect it — and a change they say didn't help counts against the thing it works through, not just that one setting. What they suspect is a lead: start with the test for it — the change that would, and what on track shows whether they were right — even where the physics can't say which way it will go. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. Assume the likeliest reading, say so, and answer it. Ask a question only after that answer, only when its answer would change what you tell them, never about something they have already told you, and never more than one in a reply (a request for information counts). ",
+      "replace": "What the driver states is fact; never re-suspect it. What they suspect is a lead: start with the test for it — the change that would, and what on track shows whether they were right — even where the physics can't say which way it will go. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. Ask a question only when the answer would change what you tell them, and never more than one in a reply (a request for information counts). Otherwise assume the likeliest reading, say so, and answer it alone. A reply is never only a question. "
+    },
+    {
+      "block": "kb",
+      "find": "=== vehicle-dynamics/concepts/tyre-load-sensitivity.md ===",
+      "replace": "=== vehicle-dynamics/concepts/tyre-heat.md ===\n\n## Tyre heat — what makes a tyre work\r\n**Concepts:** [[bite-hold]], [[corner-regime]], [[toe-and-scrub]]\r\n\r\n**Physics.** A tyre heats from the work it does — the force it carries times how far it slides — so it\r\nheats more the more of each corner it spends loaded, and the harder it is loaded. Stiffer in roll — a\r\nstiffer bar or spring, a higher roll centre, less flex — loads the tyres sooner, so they work for more\r\nof every corner ([[bite-hold]]); made at one end only, that end also takes a larger share of the load\r\ntransfer, so its outside tyre is loaded harder than before ([[corner-regime]]). Toe heats a tyre by\r\nscrubbing it ([[toe-and-scrub]]).\n\n=== vehicle-dynamics/concepts/tyre-load-sensitivity.md ===",
+      "why": "s-01: toe was the only heat mechanism in the KB; founder's pick: \"generally stiffer everything, bar, spring, higher rc, less flec, more toe more camber\". Its own page (the trials had it inside tyre-load-sensitivity, a tyre-only page)."
+    }
+  ]
+}

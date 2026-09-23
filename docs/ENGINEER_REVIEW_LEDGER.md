@@ -409,6 +409,28 @@ sentences when a second move word sits nearer the lever ("0.5 mm more upper-inne
 upper-outer shim"; "remove … under-lower-arm shims — more front grip"). Seen in round-03, 05c, 07d,
 t7b, hfa — live in production.
 
+**Then "Continue using your best judgement" — landed on main (label `2026-09-23-his-targets`), stopped
+by him on spend ("You've used a lot of open ai money, stop now I think").** ~930 Engineer calls since
+his targets (36M prompt tokens, 88% cached; ≈US$45 at the 08-06 blended rate, more if uncached).
+- Landed, Claude's calls: E1 (a change they say didn't help counts against what it works through);
+  "A reply is never only a question" added to his question rule, unchanged otherwise (the answer-first
+  rewrites were rejected: more trailing questions, fewer second branches); the roll-centre guard fixed
+  (6 of 1,503 stored replies carried a "Correction", 5 false; now 1, the real one), tests added.
+- Measured on the landed prompt, 6 tries each: g-01 thicker diff 5 of 6 (unchanged — needs K2); s-01
+  never only a question now, but toe/camber, not "stiffer" (needs K1); s-02 toe gain 1 of 6; s-05
+  thinner oil 2 of 6; j-01 thicker rear diff 5 of 6; a-01 "or go thicker" 3 of 6.
+- Awaiting his yes (kb-guard), `trials/his-yes-2026-09-23.json`, measured on top: g-01 0 of 6 (all read
+  "the rear steps out"); s-01 stiffer 6 of 6; j-02 his corner-regime link 2 of 2 (0 without); s-06 his
+  lower roll centre 2 of 2; s-05 thinner oil about 1 in 6 over 30 tries (4 in 10 without); j-01 thicker
+  rear diff 3 of 6, never the thinner. K1 new page concepts/tyre-heat.md; K2 bite-hold fact 1; K4
+  corner-regime "how far"; PAIR the 09-09 example ("soften a bar… thinner oil brings the first input
+  back") out of the pair paragraph.
+- Dropped after measuring: N2 (thinner front oil wording), TG (static and gained toe the same where
+  both exist) — no effect either way.
+- Noise, learned the hard way: the same wording scored 6 of 12 and then 1 of 12 on one question ten
+  minutes apart; a-01's second branch runs ~4 in 10 on the round-07 prompt and ~1 in 6 on every new
+  wording tried, not pinned to one sentence.
+
 ## Fixes landed from this batch
 
 - **2026-09-09, from cards 3–4 (30 edits, 21 files; nets:check 37/37, tsc, 4 suites green):**

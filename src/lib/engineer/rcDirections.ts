@@ -78,14 +78,23 @@ export function rcMovesBlock(levers: RcLever[]): string {
 }
 
 const ADD_WORDS = /\b(add|adds|added|adding|more|extra|install|installing|installed|put)\b/gi;
-const REMOVE_WORDS = /\b(remove|removes|removed|removing|fewer|take out|taking out|took out|pull|pulled)\b/gi;
+const REMOVE_WORDS = /\b(remove|removes|removed|removing|fewer|less|take out|taking out|took out|pull|pulled)\b/gi;
+/**
+ * A quantifier AFTER a shim mention belongs to what follows it, not to the shims — "…under-lower-arm
+ * shims** — more front grip" read as "more under-lower-arm shims" and appended a false correction to
+ * a right answer (round 07, 2026-09-23). After the mention only a verb binds ("…shims removed").
+ */
+const QUANTIFIER = /^(more|extra|fewer|less)$/i;
 const RC_MENTION = /\broll[-\s]?cent(?:re|er)s?\b|\bRC\b/i;
 const RC_UP_WORDS = /\b(raise|raises|raised|raising|higher|up|lift|lifts|lifting)\b/i;
 const RC_DOWN_WORDS = /\b(lower|lowers|lowered|lowering|drop|drops|dropping|down)\b/i;
 
-/** "raise/lower the roll centre by 0.25 mm" or "0.25 mm of roll centre". */
+/**
+ * "raise/lower the roll centre by 0.25 mm" or "0.25 mm of roll centre" — but not "by 0.5 mm of
+ * shim", which is the shim sizing the ruling asks for (round 05c, a false correction).
+ */
 const RC_DISTANCE_A =
-  /\b(raise|raises|raised|raising|lower|lowers|lowered|lowering|move|moves|moving|drop|drops|lift|lifts)\b[^.!?\n]{0,40}?\broll[-\s]?cent(?:re|er)\b[^.!?\n]{0,20}?\bby\s+\d+(?:\.\d+)?\s*mm\b/i;
+  /\b(raise|raises|raised|raising|lower|lowers|lowered|lowering|move|moves|moving|drop|drops|lift|lifts)\b[^.!?\n]{0,40}?\broll[-\s]?cent(?:re|er)\b[^.!?\n]{0,20}?\bby\s+\d+(?:\.\d+)?\s*mm\b(?!\s+of\s+(?:[\w-]+\s+){0,3}shims?\b)/i;
 const RC_DISTANCE_B = /\b\d+(?:\.\d+)?\s*mm\s+of\s+(?:front\s+|rear\s+)?(?:roll[-\s]?cent(?:re|er)|RC)\b/i;
 
 /** How far a move verb may sit from the shim mention it governs. */
@@ -113,6 +122,7 @@ function nearestMove(sentence: string, start: number, end: number): "add" | "rem
     for (const m of sentence.matchAll(re)) {
       const mStart = m.index ?? 0;
       const mEnd = mStart + m[0].length;
+      if (mStart >= end && QUANTIFIER.test(m[0])) continue;
       const distance = mStart >= end ? mStart - end : mEnd <= start ? start - mEnd : 0;
       if (distance > MOVE_VERB_REACH) continue;
       if (!best || distance < best.distance) {
@@ -136,7 +146,10 @@ function windowAround(text: string, index: number, length: number, radius: numbe
  */
 export function rcGuardCorrections(reply: string, levers: RcLever[]): string[] {
   const out = new Set<string>();
-  const sentences = reply.split(/(?<=[.!?])\s+|\n+/);
+  // A semicolon ends the clause too: "remove 0.5 mm rear upper-inner shim only; if it … the
+  // current lower rear roll-centre direction was helping" names the move in one clause and the
+  // car as it is now in the next (round 07, a false correction).
+  const sentences = reply.split(/(?<=[.!?;])\s+|\n+/);
 
   for (const sentence of sentences) {
     const rcMatch = RC_MENTION.exec(sentence);

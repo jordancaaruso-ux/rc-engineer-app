@@ -1,0 +1,47 @@
+{
+  "about": "E3 v3 + the KB proposals (K1 heat page, K2, K4, N2, TG) + the pair example out — the full package, FOUNDER'S CALL for everything but E3.",
+  "edits": [
+    {
+      "block": "prompt",
+      "find": "Assume the likeliest reading, say so, and answer it. Ask a question only after that answer, only when its answer would change what you tell them, never about something they have already told you, and never more than one in a reply (a request for information counts).",
+      "replace": "Ask a question only when the answer would change what you tell them — even then, answer the likeliest reading first — and never more than one in a reply (a request for information counts). Otherwise assume the likeliest reading, say so, and answer it alone.",
+      "why": "a-01 (hold-out): with E3 v2 first in the rule, the Yokomo answer lost its other branch (\"if it keeps moving after the kerb, go thicker\") — 2 of 14 against 5 of 8 on the round-07 prompt; the doubt went into a question instead. v3 keeps the round-07 rule and only adds: even when asking, answer first."
+    },
+    {
+      "block": "kb",
+      "find": "=== vehicle-dynamics/concepts/tyre-load-sensitivity.md ===",
+      "replace": "=== vehicle-dynamics/concepts/tyre-heat.md ===\n\n## Tyre heat — what makes a tyre work\r\n**Concepts:** [[bite-hold]], [[corner-regime]], [[toe-and-scrub]]\r\n\r\n**Physics.** A tyre heats from the work it does — the force it carries times how far it slides — so it\r\nheats more the more of each corner it spends loaded, and the harder it is loaded. Stiffer in roll — a\r\nstiffer bar or spring, a higher roll centre, less flex — loads the tyres sooner, so they work for more\r\nof every corner ([[bite-hold]]); made at one end only, that end also takes a larger share of the load\r\ntransfer, so its outside tyre is loaded harder than before ([[corner-regime]]). Toe heats a tyre by\r\nscrubbing it ([[toe-and-scrub]]).\n\n=== vehicle-dynamics/concepts/tyre-load-sensitivity.md ===",
+      "why": "s-01: toe was the only heat mechanism in the KB; founder's pick: \"generally stiffer everything, bar, spring, higher rc, less flec, more toe more camber\". Its own page (the trials had it inside tyre-load-sensitivity, a tyre-only page)."
+    },
+    {
+      "block": "kb",
+      "find": "end the driver wants moved, never as the end that is wrong.",
+      "replace": "end the driver wants moved, never as the end that is wrong. \"Grip\" on power with no end named is the rear holding on as the throttle comes in: lacking it is normally oversteer on power, not wheelspin (founder, 2026-09-23).",
+      "why": "g-01: \"How do I improve on power grip\" read as wheelspin; founder: \"lack of on power grip is normally oversteer\"."
+    },
+    {
+      "block": "kb",
+      "find": "so it shrinks as cornering force falls — with grip, and with speed.",
+      "replace": "so it shrinks as cornering force falls — with grip, and with speed. Low grip also slows the car, which gives every corner more middle for it to act in (above): each corner's settled change is smaller, but more of every corner runs on it (founder, 2026-09-23).",
+      "why": "j-02 (hold-out): 0 of 4 made his link — \"slower car on lower grip means the stiffer effect in the middle is a greater portion of the corner\"; every try cited only the smaller-transfer half of the page."
+    },
+    {
+      "block": "nets",
+      "find": "the front rolls in faster, so the initial steering comes sooner — the same amount, there for longer, so it can feel like more; too far and it is too reactive",
+      "replace": "the front rolls in faster, so the initial steering comes sooner and the car reacts quicker to every input — the same amount, there for longer, so it can feel like more; too far and it is edgy and hard to drive",
+      "why": "his a-01 and s-05 notes: thinner oil makes it more reactive."
+    },
+    {
+      "block": "kb",
+      "find": "so it arrives exactly when the outer rear is loaded ([[toe-and-scrub]] made dynamic).",
+      "replace": "so it arrives exactly when the outer rear is loaded ([[toe-and-scrub]] made dynamic). Where both exist — the loaded outer rear, in the middle and on power — they are the same thing: the tyre runs the sum ([[toe-and-scrub]]).",
+      "why": "s-02: after \"Rear toe hasn't helped\" the Engineer offers toe gain \"unlike static toe, it only comes in under load\" (8 of 28); the page says only how the two differ, never where they are the same."
+    },
+    {
+      "block": "kb",
+      "find": "which is why it is the usual second half: soften a bar for the middle, and thinner oil\r\nbrings the first input back without touching the middle the bar just gave.",
+      "replace": "which is why it is the usual second half.",
+      "why": "s-05: the 09-09 pair example (soften a bar, thinner oil brings the first input back) is copied onto a car the founder called hard to drive — his never \"thinner oil would make reactivity worse\"; wording around it failed 4 ways."
+    }
+  ]
+}

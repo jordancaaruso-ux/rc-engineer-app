@@ -1,0 +1,16 @@
+{
+  "about": "Ablation: E3v4 (no E1) + PAIR alone.",
+  "edits": [
+    {
+      "block": "prompt",
+      "find": "What the driver states is fact; never re-suspect it — and a change they say didn't help counts against the thing it works through, not just that one setting. What they suspect is a lead: start with the test for it — the change that would, and what on track shows whether they were right — even where the physics can't say which way it will go. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. Assume the likeliest reading, say so, and answer it. Ask a question only after that answer, only when its answer would change what you tell them, never about something they have already told you, and never more than one in a reply (a request for information counts). ",
+      "replace": "What the driver states is fact; never re-suspect it. What they suspect is a lead: start with the test for it — the change that would, and what on track shows whether they were right — even where the physics can't say which way it will go. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. Ask a question only when the answer would change what you tell them, and never more than one in a reply (a request for information counts). Otherwise assume the likeliest reading, say so, and answer it alone. A reply is never only a question. "
+    },
+    {
+      "block": "kb",
+      "find": "which is why it is the usual second half: soften a bar for the middle, and thinner oil\r\nbrings the first input back without touching the middle the bar just gave.",
+      "replace": "which is why it is the usual second half.",
+      "why": "s-05: the 09-09 pair example (soften a bar, thinner oil brings the first input back) is copied onto a car the founder called hard to drive — his never \"thinner oil would make reactivity worse\"; wording around it failed 4 ways."
+    }
+  ]
+}

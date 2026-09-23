@@ -74,6 +74,31 @@ test("an RC distance is caught in both phrasings", () => {
   assert.equal(b.length, 1);
 });
 
+test("a move sized in shim millimetres is not an RC distance", () => {
+  // Round 05c: sized exactly as ruled, corrected anyway.
+  const shim = "- **Raise rear roll centre by 0.5 mm of shim**—for example, remove 0.5 mm from the rear upper-inner shims.";
+  assert.deepEqual(rcGuardCorrections(shim, LEVERS), []);
+  const rc = rcGuardCorrections("Raise rear roll centre by 0.5 mm: remove 0.5 mm from both rear upper-inner shim stacks.", LEVERS);
+  assert.equal(rc.filter((c) => c.includes("shim millimetres")).length, 1, rc.join("\n"));
+});
+
+test("round 07's false corrections stay silent: 'less' before a lever, a comparative after one", () => {
+  // Both right, both once corrected as "backwards" in front of the driver (2026-09-23).
+  const right = [
+    "- **Lower the front roll centre with 0.5 mm more upper-inner shim or 0.5 mm less upper-outer shim** — more middle steering, but your earlier all-round upper-inner-shim test was slower, so I would not make that the first move.",
+    "- **Lower the front roll centre: remove 0.5 mm from the front under-hub or under-lower-arm shims** — more front grip in the middle, but a calmer, less pointy first input.",
+  ].join("\n");
+  assert.deepEqual(rcGuardCorrections(right, LEVERS), []);
+  // A move in one clause, the car as it stands in the next.
+  const twoClauses =
+    "For the geometry test, remove 0.5 mm rear upper-inner shim only; if it improves the quick direction changes but hurts the long turns, the current lower rear roll-centre direction was helping the longer corners.";
+  assert.deepEqual(rcGuardCorrections(twoClauses, LEVERS), []);
+  // …and "less" still counts as a move where it is one.
+  const wrong = rcGuardCorrections("Raise the front roll centre with 0.5 mm less upper-outer shim.", LEVERS);
+  assert.equal(wrong.length, 1, wrong.join("\n"));
+  assert.match(wrong[0], /upper-outer/);
+});
+
 test("prose with no roll-centre mention is never touched", () => {
   const reply =
     "Go 50 cSt thinner on the front oil; add 0.25° front camber; remove a rear toe-gain shim.";

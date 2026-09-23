@@ -1,0 +1,16 @@
+{
+  "about": "Ablation: E3v4 (no E1) + K4 alone.",
+  "edits": [
+    {
+      "block": "prompt",
+      "find": "What the driver states is fact; never re-suspect it — and a change they say didn't help counts against the thing it works through, not just that one setting. What they suspect is a lead: start with the test for it — the change that would, and what on track shows whether they were right — even where the physics can't say which way it will go. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. Assume the likeliest reading, say so, and answer it. Ask a question only after that answer, only when its answer would change what you tell them, never about something they have already told you, and never more than one in a reply (a request for information counts). ",
+      "replace": "What the driver states is fact; never re-suspect it. What they suspect is a lead: start with the test for it — the change that would, and what on track shows whether they were right — even where the physics can't say which way it will go. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. Ask a question only when the answer would change what you tell them, and never more than one in a reply (a request for information counts). Otherwise assume the likeliest reading, say so, and answer it alone. A reply is never only a question. "
+    },
+    {
+      "block": "kb",
+      "find": "so it shrinks as cornering force falls — with grip, and with speed.",
+      "replace": "so it shrinks as cornering force falls — with grip, and with speed. Low grip also slows the car, which gives every corner more middle for it to act in (above): each corner's settled change is smaller, but more of every corner runs on it (founder, 2026-09-23).",
+      "why": "j-02 (hold-out): 0 of 4 made his link — \"slower car on lower grip means the stiffer effect in the middle is a greater portion of the corner\"; every try cited only the smaller-transfer half of the page."
+    }
+  ]
+}

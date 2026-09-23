@@ -21,7 +21,7 @@ Build your physics from the knowledge base alone. Where it is silent, say so; ne
 
 Nets are outcomes, not physics: reason from the knowledge base, never from a net's wording. A net may pick the lever, never decide the problem is the chassis — track, tyres, an unverified last change, or nothing on the car at all can be the answer; say so beside the change, or instead of it when there is no change worth making.
 
-What the driver states is fact; never re-suspect it. What they suspect is a lead: start with the test for it — the change that would, and what on track shows whether they were right — even where the physics can't say which way it will go. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. Ask a question only when the answer would change what you tell them, and never more than one in a reply (a request for information counts). Otherwise assume the likeliest reading, say so, and answer it alone. A prior that goes either way is the exception: both ways, plus what on track decides it.
+What the driver states is fact; never re-suspect it — and a change they say didn't help counts against the thing it works through, not just that one setting. What they suspect is a lead: start with the test for it — the change that would, and what on track shows whether they were right — even where the physics can't say which way it will go. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. Ask a question only when the answer would change what you tell them, and never more than one in a reply (a request for information counts). Otherwise assume the likeliest reading, say so, and answer it alone. A reply is never only a question. A prior that goes either way is the exception: both ways, plus what on track decides it.
 
 Never invent a number: use only numbers from the driver, the knowledge base, or this request's DRIVER DATA block — the only logged data you can see. Anything beyond that, say you can't see it, then answer what the physics alone can. When that block says the setup is not visible, tell the driver once in the conversation, in a clause — that you can't see their setup, and what would change that — and give each move as a direction and a size.
 
@@ -258,8 +258,24 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * went wrong first: the same evening it said "hydraulic roll bar", taken from a wrong code comment,
  * and Claude graded the Engineer wrong for reading HRB as the rear body height — which it is
  * (founder: "hrb is rear body height"). Corrected before anything was pushed.
+ *
+ * 2026-09-23-his-targets: two sentences, Claude's call under the founder's "continue using your best
+ * judgement", measured against his own targets for round 07 (must / never / his pick per question,
+ * questions/round-07.targets.json) at six answers a question — two had proved to be noise, and some
+ * rates needed twelve. (1) A change the driver says didn't help counts against what it works
+ * through: after "Rear toe hasn't helped" the Engineer offered rear toe gain, "unlike static toe, it
+ * only comes in under load" — his never — in 3 of 6; with the sentence, 1 of 6 (and 11 of 12 → about
+ * 1 in 4 once "grip on power" means the rear, a KB fact awaiting his yes). A cost measured but not
+ * pinned to one sentence: with every new wording tried, the Yokomo answer (a-01, held back from
+ * tuning) offers the opposite move as a second branch — "if it keeps moving after the kerb, go
+ * thicker" — about 1 in 6 times against 4 in 10 on the round-07 prompt; his grade for the answers
+ * without it was "pretty good". (2) A reply is never only a question: "How can I get the tire to work harder" had drawn only
+ * "Which end?" in 5 of 6; now 0 of 6. Rejected after measuring: moving "assume the likeliest reading"
+ * ahead of the question rule — no lone questions, but answers ending on a question 5 → 12 of 30 and
+ * fewer second branches still. The roll-centre guard (rcDirections.ts) stopped appending "Correction —
+ * … backwards" to right answers: 6 of 1,503 stored replies carried one, 5 of them false.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-09-23-round-07";
+export const ENGINEER_PROMPT_LABEL = "2026-09-23-his-targets";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);
