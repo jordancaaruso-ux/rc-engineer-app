@@ -1,0 +1,122 @@
+{
+  "about": "Round 08, 2026-09-24 — setup, the first round on GPT-6 Sol at medium (the app's setting since c21413d; founder: \"give me 15 setup questions using medium sol and ill review them\"). Every question is a real one from production, in the asker's words, never used in a round before. Fourteen are the founder's own (July–September), asked on his A800RR: run-with-setup-0919 (TFTR, 19 Sep, with its setup), sa-sat-0912 (Radio Racing Cars SA, low grip, the state-titles Saturday, with the LiveRC tool) and private-sa-fri-first-run (SA Friday, tyre run 5). One is a tester's app-starter question on his own run (Robbie's AMX3). Two cases are the real two-turn threads (p-08: 1 Aug; p-09: 19 Sep, asked on the 0919 run itself). One try each: what a driver would see. Run one context at a time: --contexts <context> --only <its ids>.",
+  "contexts": [
+    "run-with-setup-0919",
+    "sa-sat-0912",
+    "private-sa-fri-first-run",
+    "private-robbie-amx3"
+  ],
+  "cases": [
+    {
+      "id": "p-01",
+      "context": "run-with-setup-0919",
+      "shape": "symptom+time",
+      "source": "founder prod 2026-07-05",
+      "turns": ["Car is pushing mid-corner on my last run. 10 minutes until the next one - what do I do?"]
+    },
+    {
+      "id": "p-02",
+      "context": "private-sa-fri-first-run",
+      "shape": "symptom",
+      "source": "founder prod 2026-07-06",
+      "turns": ["My car was quite good in the last session i did, if anything it could have had a little more rear grip medium high speed on throttle, how can i fix this"]
+    },
+    {
+      "id": "p-03",
+      "context": "sa-sat-0912",
+      "shape": "symptom",
+      "source": "founder prod 2026-07-27",
+      "turns": ["how can i get more overall bite - the grip is super low and car just feels like its sliding across the surface"]
+    },
+    {
+      "id": "p-04",
+      "context": "run-with-setup-0919",
+      "shape": "symptom",
+      "source": "founder prod 2026-07-28",
+      "turns": ["Give me some suggestions to get some more stability on throttle - i want it to drive straighter off the corner more predicably"]
+    },
+    {
+      "id": "p-05",
+      "context": "sa-sat-0912",
+      "shape": "symptom+field",
+      "source": "founder prod 2026-07-29",
+      "turns": ["how can i get some more rotation - feel like im missing some pace and the others' cars rotate more while still having rear grip"]
+    },
+    {
+      "id": "p-06",
+      "context": "run-with-setup-0919",
+      "shape": "conditions",
+      "source": "founder prod 2026-07-29",
+      "turns": ["My low grip setup isn’t working in higher grip - what should I do"]
+    },
+    {
+      "id": "p-07",
+      "context": "private-sa-fri-first-run",
+      "shape": "symptom+tyres",
+      "source": "founder prod 2026-07-30",
+      "turns": ["How can I get more steering - balance is good on new tires but quickly goes away"]
+    },
+    {
+      "id": "p-08",
+      "context": "sa-sat-0912",
+      "shape": "symptom+lead",
+      "source": "founder prod 2026-08-01 (thread turns 2–3)",
+      "turns": [
+        "My car just seems slow - feels okay but doesn’t carry corner speed like the fastest guys",
+        "Higher roll centers normally make the car faster in very low grip"
+      ]
+    },
+    {
+      "id": "p-09",
+      "context": "run-with-setup-0919",
+      "shape": "open+feedback",
+      "source": "founder prod 2026-09-19, on this run",
+      "turns": [
+        "What other ways could I help the car today",
+        "Needed to make steering smoother, more front flex helped, and softer front spring"
+      ]
+    },
+    {
+      "id": "p-10",
+      "context": "run-with-setup-0919",
+      "shape": "what-if",
+      "source": "founder prod 2026-08-01",
+      "turns": ["What would happen if I lowered the lower inner point front and rear"]
+    },
+    {
+      "id": "p-11",
+      "context": "run-with-setup-0919",
+      "shape": "what-if",
+      "source": "founder prod 2026-08-31",
+      "turns": ["What would happen if I reduce shims under the hub on the rear"]
+    },
+    {
+      "id": "p-12",
+      "context": "sa-sat-0912",
+      "shape": "what-if",
+      "source": "founder prod 2026-07-30",
+      "turns": ["How will a stiffer rim / wheel affect handling"]
+    },
+    {
+      "id": "p-13",
+      "context": "run-with-setup-0919",
+      "shape": "understanding",
+      "source": "founder prod 2026-08-30",
+      "turns": ["When do I go stiffer on the rear springs and when do I go softer? What tells me which one I need?"]
+    },
+    {
+      "id": "p-14",
+      "context": "run-with-setup-0919",
+      "shape": "new-track",
+      "source": "founder prod 2026-09-03",
+      "turns": ["I'm racing a track I've never been to. What should I find out about it, and what would you start from?"]
+    },
+    {
+      "id": "p-15",
+      "context": "private-robbie-amx3",
+      "shape": "starter",
+      "source": "tester prod 2026-09-18 (Robbie, the app's starter question)",
+      "turns": ["Read this run and tell me what to change for the next one — or whether to leave it alone and run it again."]
+    }
+  ]
+}
