@@ -1,147 +1,110 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-Counts and paths below were verified against the tree on 2026-08-18; if one disagrees with the code,
-the code is right — fix the line.
-
 RC car race-engineering app for competitive 1/10-scale radio-control racing: log every on-track run,
 import lap times from public timing sites, read setup sheets out of manufacturer PDFs, and ask an
 LLM "Engineer" what to change next. Next.js 16 App Router + React 19 + Prisma/Postgres (Neon),
-deployed on Vercel (`syd1`), also shipped as a PWA and an iOS Capacitor shell. Solo-founder product,
-live with paying users — production is not a hypothetical.
+deployed on Vercel (`syd1`), also shipped as a PWA and iOS/Android Capacitor shells. Solo-founder
+product, live with paying users, so a production mistake reaches real drivers.
+
+If a line here disagrees with the code, the code is right; fix the line.
 
 ## Commands
 
 ```
-npx tsc --noEmit          # typecheck — the first gate
+npx tsc --noEmit          # typecheck, the first gate
 npm run lint              # eslint
 npm run dev               # dev server
-npx next build            # LOCAL production build
+npx next build            # local production build
 ```
 
-- **`npm run build` is the Vercel pipeline**, not a local build: it runs `scripts/vercel-build.cjs`,
-  which does `prisma migrate deploy` first. Denied at the harness level. Use `npx next build`.
-- **No test runner.** No Jest, no Vitest. Tests are plain `node:test` or bare `tsx` scripts, one npm
-  script per area — 114 of them (`npm run test:nav`, `test:blank-upload`, `test:engineer-chat`, …).
-  Run the one matching what you changed; `grep test: package.json` to find it.
-- **One test file directly:** `npx tsx --test path/to/x.test.ts`. Anything importing a `server-only`
-  module needs `node --conditions=react-server --import tsx path/to/x.test.ts` — that's why the
-  scripts look inconsistent. Copy the invocation from the nearest existing `test:*` script.
-- **`db:*` scripts point at whatever `.env.local` points at.** 12 of the 13 hardcode
-  `dotenv-cli -e .env.local`, so reaching a real database is their default, not an opt-in.
-  Since 2026-07-31 `.env.local` points at the Neon **scratch-dev** branch (`ep-muddy-unit`);
-  **production is `ep-hidden-rice`**. Grep the host before running one — the filename tells you
-  nothing, and scratch-dev is a copy-on-write clone, so it holds real users' rows: isolated, not
-  anonymised. Drift repair is `npm run db:migrate:reconcile` or `prisma migrate resolve` — never
-  `db push`. Use `DATABASE_URL_UNPOOLED` for `prisma migrate`; the pooler throws P1002 lock timeouts.
-- Slow and costly, only when asked: `engineer:eval*` (the rebuilt harness), `setup-extract:eval`.
-- iOS shell: `npm run cap:sync` / `npm run cap:open`. Android shell: `cap:sync:android` /
-  `cap:open:android` (`android/` generated 2026-09-14; needs `google-services.json` for push).
-- Timing sweep crons (`/api/cron/timing-sweep`, `timing-sweep-plan`) are Bearer `CRON_SECRET`;
-  the sweep is dark on production until `TIMING_SWEEP_ENABLED=1` and always live on a dev server.
-- **Two Vercel projects, one database.** `rc-engineer-app` deploys `main` to jrcdynamics.com;
-  `rc-engineer-beta` (created 2026-09-15) deploys the `beta` branch to beta.jrcdynamics.com with
-  `AUTH_ONLY_EMAILS` + `SWEEP_LISTENER_EMAILS` as its doors. Pushing `beta` migrates the
-  production database (`vercel-build.cjs`), so migrations must stay additive. Never promote a
-  beta deployment inside the main project.
+- `npm run build` is the Vercel pipeline, not a local build: it migrates the database first. It is
+  blocked; use `npx next build`.
+- No test runner. Each area has its own `test:*` npm script (`grep test: package.json`); run the one
+  matching what you changed. One file: `npx tsx --test path/to/x.test.ts`, or
+  `node --conditions=react-server --import tsx path/to/x.test.ts` when it imports a `server-only`
+  module. Copy the invocation from the nearest existing script.
+- `db:*` scripts hit whatever `.env.local` points at. Today that is the scratch-dev copy
+  (`ep-muddy-unit`); production is `ep-hidden-rice`. Check the host before running one.
+  More in `.claude/rules/database.md`.
+- Slow and costly, run only when asked: `engineer:eval*`, `setup-extract:eval`.
+- Pushing `main` or `beta` deploys. Use the `deploy` skill's checklist first.
 
-Verification order before calling something done: `npx tsc --noEmit` → the matching `test:*` →
-`npx next build`. There is no CI — nothing else will catch it.
+Before calling work done: `npx tsc --noEmit` → the matching `test:*` → `npx next build`, then drive
+the app if the change can be seen. There is no CI; nothing else will catch a miss.
 
-**Nothing gets lost (founder call, 2026-09-19).** A whole round of Engineer rulings (2026-09-04) was
-built in a side worktree, never committed, and was missing from production for two weeks. So:
-- **Engineer, KB and nets work happens in the main folder only.** Side worktrees are for risky UI or
-  video experiments. If you must build elsewhere, your last message says in plain words "this is NOT
-  in main", and the memory note says WHERE it lives, not just that it was built.
-- **Every session commits its own work under its own name the same day** (`git add <your files>`,
-  never a blanket sweep of other sessions' files). Catch-all commits are what hid the loss.
-- **Before any deploy:** `npm run engineer:rulings -- --ref origin/main` (or `origin/beta`) — one
-  key sentence per founder ruling, checked against the code that will ship. Add a line to
-  `scripts/engineer-eval/rulings.json` whenever a ruling lands.
-- **After any deploy:** open `/api/health/version` — commit + Engineer label of what is serving.
-- The founder's review of Engineer answers is logged in `docs/ENGINEER_REVIEW_LEDGER.md`.
+## Nothing gets lost
 
-## Guards you will meet
+A round of Engineer rulings once sat uncommitted in a side worktree for two weeks and never reached
+production. So:
+- Engineer, KB and nets work happens in the main folder only. Side worktrees are for risky UI or
+  video experiments. If you must build elsewhere, your last message says plainly "this is NOT in
+  main", and your memory note names the folder and branch.
+- Commit your own work the same day: `git add <your files>`, never a sweep of other sessions' files.
+- Jordan runs several sessions in this folder at once. Run `git branch --show-current` right before
+  committing, because another session may have moved it. Never `git stash`, checkout or reset files
+  in the main folder: that pulls other sessions' unsaved work out from under them.
+- Commit and deploy status in memory notes goes stale. Check git before repeating it.
 
-Safety lives in `.claude/settings.json` + `.claude/hooks/`, not in prose. Hooks fire below the
-permission layer, so they still prompt under `bypassPermissions`. Three are wired up in
-`settings.json`; `.claude/hooks/guard-test.cjs` is present but registered nowhere and does nothing.
+## Guards
 
-- `prod-guard.cjs` — refuses production-DB writes and the deploy pipeline (`db:push`, `db:seed`,
-  `migrate deploy`, `npm run build`). One exception since 2026-09-23 (founder call): the plain
-  `npm run db:migrate:deploy` runs when `.env.local` points at scratch-dev (`ep-muddy-unit`).
-- `kb-guard.cjs` — writes to `content/vehicle-dynamics/*.md` (top level) raise a prompt. That prose
-  is quoted verbatim to paying drivers as ground truth, so edit it only when the user's latest
-  message asks for it; otherwise propose the diff in chat. Drafts under
-  `content/vehicle-dynamics/drafts/` are open. The `audit-kb` skill carries the real rules.
-- `uncommitted-guard.cjs` — end-of-turn warning listing dirty git worktrees. Jordan runs several
-  sessions in parallel, so **check `git branch --show-current` before committing**; another session
-  may have moved HEAD.
-- Pushing to a git remote always prompts (global hook), and `main` deploys production on push.
+Safety is enforced by `.claude/settings.json` and `.claude/hooks/`, not by this file. Hooks fire even
+under `bypassPermissions`.
+- `prod-guard.cjs` blocks production-database writes and the deploy pipeline. One exception: plain
+  `npm run db:migrate:deploy` runs when `.env.local` points at scratch-dev.
+- `kb-guard.cjs` asks before any write to `content/vehicle-dynamics/*.md` (top level). That text is
+  quoted to paying drivers as fact, so edit it only when Jordan's latest message asks for it;
+  otherwise propose the change in chat. `drafts/` is open. The `audit-kb` skill has the rules.
+- `uncommitted-guard.cjs` warns at the end of a turn about uncommitted work in any worktree.
+- Every `git push` asks first, and pushing `main` deploys production.
+- After changing a hook, run `node .claude/hooks/guard-test.cjs`, which checks each guard against
+  its test cases.
 
-**Drive the app whenever it would help** (founder call, 2026-08-11, reversing the older "never drive
-it" rule). Start the dev server, click through the flow, take screenshots — seeing a change actually
-work beats reporting that it compiles. The `run` skill knows how to launch this project. Typecheck
-and tests are still the floor, not the ceiling: if a claim can be checked in a browser, check it.
-Bugs like the one that produced this line — a route that typechecks, builds, and 500s only on
-Vercel — are invisible to `tsc`. Use a LAN IP listed in `allowedDevOrigins`, or the page renders and
-nothing is clickable.
+## Drive the app
+
+If a claim can be checked in a browser, check it: start the dev server, click through the flow,
+take screenshots. Typecheck and tests are the floor, not proof; some bugs only show in a real
+browser, like a route that builds cleanly and 500s on Vercel. The `run` skill launches this project.
+Use a LAN IP listed in `allowedDevOrigins` (`next.config.mjs`): an unlisted origin renders pages
+where nothing is clickable.
+
+Jordan often uses the same dev server. Every `src/` save and every build reloads his page and wipes
+what he hasn't saved, so batch your edits and tell him before a build.
 
 ## Architecture
 
-**Request path.** `src/middleware.ts` (edge, uses the Prisma-free `src/auth.config.ts`) gates
-everything except `/login/*`, `/privacy`, `/terms`, `/api/health/*` (incl. `/api/health/version`) and
-`/api/stripe/webhook` — unauthenticated APIs get 401 JSON, pages get redirected. `src/auth.ts` (Node)
-holds the real NextAuth v5 config: magic-link email + optional Google, with a sign-in allowlist
-(`AuthAllowedEmail` table + `AUTH_ALLOWED_EMAILS`). Pages call `requireCurrentUser()`, routes call
-`getAuthenticatedApiUser()` (`src/lib/currentUser.ts`). Entitlement is always derived server-side in
-`src/lib/entitlement.ts` from the Stripe webhook's `Subscription` row — never trusted from a client.
+- **Request path.** `src/middleware.ts` (edge) gates everything except `/login/*`, `/privacy`,
+  `/terms`, `/api/health/*` and `/api/stripe/webhook`. Pages call `requireCurrentUser()`, API routes
+  call `getAuthenticatedApiUser()` (`src/lib/currentUser.ts`). Entitlement comes only from
+  `src/lib/entitlement.ts` reading the Stripe webhook's `Subscription` row, never from the client.
+- **Logic lives in `src/lib`**; `src/components` and `src/app` stay thin over it. Four subsystems
+  carry most of the weight:
+  1. **Runs.** A `Run` is one 5–8 minute on-track session, the atomic unit of the product. Every run
+     has a required `SetupSnapshot`, plus tyres, conditions, driver feel and lap times.
+  2. **Lap import.** `src/lib/lapUrlParsers/` reads LiveRC / MyRCM / MyLaps Speedhive into an
+     `ImportedLapTimeSession`; `lapWatch/` polls watched URLs.
+  3. **Setup sheets.** A chassis (`SetupSheetModel`) is shared by everyone racing that model. The
+     driver fills boxes over a server-rendered picture of the PDF page, never a client-side PDF
+     engine. Images and scanned PDFs are refused by design.
+  4. **The Engineer.** `src/lib/engineer/`; its rules are in `.claude/rules/engineer.md`.
+- **Caches that go stale.** `bestLapSeconds`/`avgTop5LapSeconds` on `Run`, the setup aggregations
+  (`src/lib/setupAggregations/`) and the sheet page images. After a change that affects stats,
+  rebuild via `POST /api/setup-aggregations/rebuild`, or the numbers go quietly wrong. Cache tags:
+  `src/lib/cachedReads.ts` + `revalidateUser.ts`.
+- **Native packages that don't bundle.** `onnxruntime-node`, `@napi-rs/canvas`, `pdf-to-img` and
+  `pdfjs-dist` are in `serverExternalPackages`, and every file they load at runtime is listed in
+  `outputFileTracingIncludes` (`next.config.mjs`). If a PDF route works locally but 500s or returns
+  nothing on Vercel, check that list first; it has caused two outages.
 
-**`src/lib` is where the logic lives** (59 domain folders); `src/components` and `src/app` are
-thin over it. Four subsystems carry most of the weight:
+## Specs
 
-1. **Runs** — a `Run` is one 5–8 minute on-track session and the atomic unit of the whole product.
-   Every run has a required `SetupSnapshot`, plus tyres, conditions, driver feel, and lap times. The
-   log-run wizard (`src/components/runs/`) is the biggest surface in the app.
-2. **Lap import** — `src/lib/lapUrlParsers/` scrapes LiveRC / MyRCM / MyLaps Speedhive into an
-   `ImportedLapTimeSession`; `lapWatch/` polls watched URLs and pushes "new run detected" nudges.
-3. **Setup sheets** — a chassis (`SetupSheetModel`) is global and shared by everyone racing that
-   model; a `SetupSheetCalibration` maps one PDF layout onto its field keys. The driver fills boxes
-   over a **server-rendered picture** of the page, never a client-side PDF engine. Images and
-   flat/scanned PDFs are refused at the door by design. Details in the north star.
-4. **The Engineer** — the LLM assistant, rebuilt ground-up 2026-08-13. `src/lib/engineer/` is
-   the whole thing: KB loader, short prompt, block-based payload builder, transport
-   (`DEBUG_ENGINEER_WIRE=1` dumps the real request), persist + ratings. Chat is the only
-   surface; the old satellites (quick-fix, hints, dashboard suggestions) are deleted, not
-   dormant. **The payload's cache-stable-prefix order is enforced in code** and every
-   behaviour change lands through the eval harness first — read the north star before touching
-   prompt, payload, KB, or nets.
-
-**Materialised data.** `bestLapSeconds`/`avgTop5LapSeconds` on `Run`, the setup aggregations in
-`src/lib/setupAggregations/`, and the sheet page images are all caches with their own staleness.
-After a change affecting stats, rebuild via `POST /api/setup-aggregations/rebuild` or the numbers go
-quietly wrong. Cache tags: `src/lib/cachedReads.ts` + `revalidateUser.ts`.
-
-**Native deps that don't bundle.** `onnxruntime-node` (local PP-OCR), `@napi-rs/canvas`,
-`pdf-to-img` and `pdfjs-dist` are in `serverExternalPackages`, and everything they load by runtime
-path is listed in `outputFileTracingIncludes` in `next.config.mjs`. Two production outages so far
-came from a file the tracer couldn't see — if a PDF route works locally and 500s or returns nothing
-on Vercel, check the trace before anything else.
-
-## Read the north star before you build
-
-`docs/` holds 33 spec documents that are the product source of truth. Find the one that matches and
-read it first; if nothing matches, you don't need one. A spec is intent, not shipped code —
-`docs/NOT_YET_BUILT.md` says what isn't real yet, and no feature is real because a doc describes it.
-
-**Lost, or new to the codebase?** `docs/APP_CONTEXT.md` is the full map — every surface, route,
-model and subsystem in one file, with the reasoning behind each. It is orientation, not a spec:
-read it to find the right north star, then read that.
+`docs/` holds the product specs ("north stars"). Read the matching one before building; if none
+matches, you don't need one. A spec is intent, not shipped code: `docs/NOT_YET_BUILT.md` says what
+isn't real yet. Lost? `docs/APP_CONTEXT.md` maps every surface, route and model.
 
 | Task touches | Read |
 |---|---|
-| Any `.tsx` — styling, layout, visual rework | `docs/VISUAL_NORTH_STAR.md` |
-| Engineer — anything: prompts, payload, KB, nets, evals, chat UX | `docs/ENGINEER_NORTH_STAR.md` (rewritten 2026-08-13; the old quality/iteration docs are deleted) |
+| Any `.tsx`: styling, layout, visual rework | `docs/VISUAL_NORTH_STAR.md` |
+| Engineer: prompts, payload, KB, nets, evals, chat UX | `docs/ENGINEER_NORTH_STAR.md` |
 | Setup sheet upload, import, OCR, calibration | `docs/SETUP_UPLOAD_NORTH_STAR.md` |
 | What to build next / is this in scope | `docs/PRODUCT_NORTH_STAR.md` |
 | Dashboard | `docs/DASHBOARD_NORTH_STAR.md` |
@@ -151,37 +114,29 @@ read it to find the right north star, then read that.
 | Roll centre calculator | `docs/ROLL_CENTER_NORTH_STAR.md` |
 | Video analysis, traces, sector compare | `docs/VIDEO_ANALYSIS_REWORK_NORTH_STAR.md`, `docs/VIDEO_TRACE_NORTH_STAR.md`, `docs/SECTOR_COMPARE_NORTH_STAR.md` |
 | PWA, service worker, push | `docs/PWA_NORTH_STAR.md` |
-| Timing sweep — runs filed from the timing site, draft claims, placeholders, evening summary, arming, Blob schedule | `docs/TIMING_SWEEP_NORTH_STAR.md` |
-| iOS shell, TestFlight, native push | `docs/TESTFLIGHT.md` |
+| Timing sweep: runs filed from the timing site, draft claims, placeholders, evening summary, arming, crons | `docs/TIMING_SWEEP_NORTH_STAR.md` |
+| iOS/Android shells, TestFlight, native push | `docs/TESTFLIGHT.md` |
 | Billing, pricing, the paid door | `docs/MONETISATION_NORTH_STAR.md` |
 | Writing KB drafts | `docs/VEHICLE_DYNAMICS_PHYSICS_KB_ROADMAP.md` |
 
-## Conventions that aren't guessable
+## Conventions
 
-- **UI primitives already exist** — `SurfaceCard`, `CardPanel`, `HeroPanel`, `PagedCard`,
-  `panel.tsx` (`PanelTitle`, `PanelSubtitle`, `HubRowTitle`, `Eyebrow`, `StatStrip`, `StatTile`),
-  `Button`/`ButtonLink`. Check `src/components/ui/` before writing a new one. Use semantic tokens
-  (`bg-background`, `text-primary`), never new raw hex. Yellow = actions only; green/red = pace and
-  quality deltas only (volume deltas are neutral). Everything must work at 390px with the bottom
-  dock visible. **One theme since 2026-08-18** — ash paper, stamped as `data-theme="light"` by
-  `src/lib/theme/appTheme.ts`; there is no switch and no `rc_theme` cookie. The dark values remain
-  as the `:root` ground that paper overrides, so build for paper and don't add a second theme path.
-- **No explanatory blurbs in the UI.** Do not write helper paragraphs telling the driver how a
-  feature works ("Upload your video on the next screen...", "Their crossings are found from their
-  own lap times..."). They read as clutter, especially at 390px, and the control should explain
-  itself. A label, a placeholder, or a few words on the button is the whole budget. If a screen
-  genuinely cannot be understood without a sentence, ask first instead of shipping the paragraph.
-- **Delta sign convention:** lap deltas are `cell − anchor`, so **positive = slower**. Pace vs field
-  is user − field, so **negative = faster than the field**.
-- **Canonical units:** lap times in seconds, temperatures °C, wind km/h, geometry mm and degrees,
-  damper oil cSt, spring rate gf/mm.
-- **Three timestamps on a Run, deliberately not collapsed:** `createdAt` (row written),
-  `sessionCompletedAt` (when the car was actually on track, from timing import, UTC), and `sortAt`
-  (stamped once at create, the stable ordering axis so re-imports never reshuffle a day).
-- `allowedDevOrigins` in `next.config.mjs` pins LAN IPs. An unlisted origin serves pages that render
-  but silently fail hydration — they look fine and nothing is clickable.
-- Field names ending `Iso` are UTC machine timestamps; never show them to a user unconverted.
-- Files sometimes come back double-encoded (UTF-8 mojibake) and feed garbage into the Engineer
-  context. Grep for it before committing prose changes.
-- `next dev` has served stale CSS through repeated restarts. Verify a `globals.css` change against
-  `npx next build`, not the dev server.
+- **Deltas.** Lap deltas are `cell − anchor`, so positive = slower. Pace vs field is user − field,
+  so negative = faster than the field.
+- **Units.** Lap times in seconds, temperatures °C, wind km/h, geometry mm and degrees, damper oil
+  cSt, spring rate gf/mm.
+- **A Run has three timestamps, kept apart on purpose.** `createdAt` (row written),
+  `sessionCompletedAt` (when the car was on track, UTC, from timing import) and `sortAt` (stamped
+  once at create, so re-imports never reshuffle a day).
+- Field names ending `Iso` are UTC machine timestamps; convert them before a user sees them.
+- Files sometimes come back double-encoded (UTF-8 mojibake: every em dash turns into three junk
+  characters), which feeds garbage into the Engineer. Grep for it before committing prose.
+  PowerShell `Set-Content`/`Out-File` without `-Encoding utf8` is the usual cause.
+- Screens, styling and copy have their own rules in `.claude/rules/ui.md`, which load when you open
+  a `.tsx` or CSS file.
+
+## Changing these instructions
+
+Add a rule to this file or to `.claude/rules/` only after the same mistake has happened twice. A
+one-off lesson goes in a memory note instead. Anything that must never happen belongs in a hook,
+because hooks are enforced and this file is only advice.

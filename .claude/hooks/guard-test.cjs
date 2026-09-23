@@ -1,19 +1,32 @@
 // Guard proof harness for .claude/hooks/*.cjs — run: node .claude/hooks/guard-test.cjs
 // Builds hook stdin in-process so no shell escaping is involved.
 const { execFileSync } = require("child_process");
+const fs = require("fs");
 const REPO = require("path").resolve(__dirname, "../..");  // repo root, wherever it is cloned
 const WIN = String.raw`c:\Users\Jordan\rc-engineer-app`;
+const PROD_URL = "postgresql://u:p@ep-hidden-rice-a7r12ixp-pooler.example/neondb";
 
-function run(hook, tool_input) {
+// prod-guard lets the exact `npm run db:migrate:deploy` through only while .env.local points at
+// scratch-dev (founder call 2026-09-23), so that one case's answer depends on this machine.
+let envLocalIsScratch = false;
+try {
+  const line = fs.readFileSync(`${REPO}/.env.local`, "utf8").match(/^\s*DATABASE_URL\s*=.*$/m);
+  envLocalIsScratch = !!line && line[0].includes("ep-muddy-unit") && !line[0].includes("ep-hidden-rice");
+} catch {}
+
+function run(hook, tool_input, envOverride = {}) {
+  const env = { ...process.env };
+  delete env.DATABASE_URL; // a DATABASE_URL in the caller's shell must not change the answers
   const out = execFileSync("node", [`${REPO}/.claude/hooks/${hook}`], {
     input: JSON.stringify({ tool_input }),
     encoding: "utf8",
+    env: { ...env, ...envOverride },
   });
   return out.trim() ? JSON.parse(out).hookSpecificOutput.permissionDecision.toUpperCase() : "ALLOW";
 }
 
 const cases = [
-  // [hook, label, tool_input, expected]
+  // [hook, label, tool_input, expected, env override?]
   ["kb-guard.cjs", "Edit locked prose (Windows abs)", { file_path: `${WIN}\\content\\vehicle-dynamics\\roll-centre.md` }, "ASK"],
   ["kb-guard.cjs", "Edit locked prose (POSIX rel)", { file_path: "content/vehicle-dynamics/roll-centre.md" }, "ASK"],
   ["kb-guard.cjs", "Edit reviewed net", { file_path: "content/nets/touring/front-arb.yaml" }, "ASK"],
@@ -32,7 +45,9 @@ const cases = [
   ["prod-guard.cjs", "npm run build", { command: "npm run build" }, "DENY"],
   ["prod-guard.cjs", "dotenv-cli -> prisma db push", { command: "npx dotenv-cli -e .env.local -- prisma db push" }, "DENY"],
   ["prod-guard.cjs", "npm run db:push", { command: "npm run db:push" }, "DENY"],
-  ["prod-guard.cjs", "npm run db:migrate:deploy", { command: "npm run db:migrate:deploy" }, "DENY"],
+  ["prod-guard.cjs", `db:migrate:deploy, .env.local ${envLocalIsScratch ? "scratch" : "NOT scratch"}`, { command: "npm run db:migrate:deploy" }, envLocalIsScratch ? "ALLOW" : "DENY"],
+  ["prod-guard.cjs", "db:migrate:deploy, shell has prod URL", { command: "npm run db:migrate:deploy" }, "DENY", { DATABASE_URL: PROD_URL }],
+  ["prod-guard.cjs", "db:migrate:deploy composed", { command: "npm run db:migrate:deploy && echo done" }, "DENY"],
   ["prod-guard.cjs", "prisma migrate deploy (raw)", { command: "npx prisma migrate deploy" }, "DENY"],
   ["prod-guard.cjs", "npm run db:seed", { command: "npm run db:seed" }, "DENY"],
   ["prod-guard.cjs", "composed: sh -c npm run build", { command: 'sh -c "npm run build"' }, "DENY"],
@@ -54,8 +69,8 @@ const cases = [
 ];
 
 let fail = 0;
-for (const [hook, label, input, expected] of cases) {
-  const got = run(hook, input);
+for (const [hook, label, input, expected, envOverride] of cases) {
+  const got = run(hook, input, envOverride);
   const ok = got === expected;
   if (!ok) fail++;
   console.log(`${ok ? "PASS" : "FAIL"}  ${hook.replace(".cjs", "").padEnd(10)} ${label.padEnd(32)} expected ${expected.padEnd(5)} got ${got}`);
