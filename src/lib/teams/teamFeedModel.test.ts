@@ -162,6 +162,20 @@ test("temperature rows appear only when both runs have the reading", () => {
   assert.equal(missingOne.filter((r) => r.kind === "trackTemp").length, 0);
 });
 
+test("units: a teammate's temperature move reads in the viewer's unit", () => {
+  const baseline = run({ id: "b", conditionsTrackTempC: 20, conditionsAirTempC: 18 });
+  const now = run({ id: "a", conditionsTrackTempC: 25, conditionsAirTempC: 18 });
+  assert.equal(
+    computeAlsoMoved(now, baseline).find((r) => r.kind === "trackTemp")?.detail,
+    "20 → 25 °C (+5)"
+  );
+  // The difference is taken after converting: +5 °C is +9 °F, not +41.
+  assert.equal(
+    computeAlsoMoved(now, baseline, "imperial").find((r) => r.kind === "trackTemp")?.detail,
+    "68 → 77 °F (+9)"
+  );
+});
+
 test("new tyres only when both stints are known and differ", () => {
   const changed = computeAlsoMoved(
     run({ id: "a", tireStintId: "s2" }),

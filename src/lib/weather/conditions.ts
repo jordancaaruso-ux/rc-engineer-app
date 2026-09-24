@@ -1,3 +1,5 @@
+import { formatTemp, formatWind, type UnitSystem } from "@/lib/units/unitSystem";
+
 /**
  * Normalized run conditions shape + human labels.
  *
@@ -110,20 +112,25 @@ export function describeSky(
   return null;
 }
 
-/** Round a temperature to a whole degree for display. */
-export function formatTempC(tempC: number | null | undefined): string | null {
-  if (typeof tempC !== "number" || !Number.isFinite(tempC)) return null;
-  return `${Math.round(tempC)}°C`;
+/** Round a stored °C temperature to a whole degree for display, in the driver's unit. */
+export function formatTempC(
+  tempC: number | null | undefined,
+  units: UnitSystem = "metric"
+): string | null {
+  return formatTemp(tempC, units);
 }
 
 /**
  * Compact one-line summary for chips / list rows, e.g. "18°C · Sunny".
  * Returns null when there's nothing to show.
  */
-export function formatConditionsSummary(c: RunConditions | null | undefined): string | null {
+export function formatConditionsSummary(
+  c: RunConditions | null | undefined,
+  units: UnitSystem = "metric"
+): string | null {
   if (isConditionsEmpty(c)) return null;
   const parts: string[] = [];
-  const temp = formatTempC(c!.airTempC);
+  const temp = formatTempC(c!.airTempC, units);
   if (temp) parts.push(temp);
   const sky = describeSky(c!.weatherCode, c!.cloudCoverPct);
   if (sky) parts.push(sky.label);
@@ -135,17 +142,20 @@ export function formatConditionsSummary(c: RunConditions | null | undefined): st
  * (sky, humidity, wind, track temp) for a tooltip. Null when empty.
  */
 export function formatConditionsChip(
-  c: RunConditions | null | undefined
+  c: RunConditions | null | undefined,
+  units: UnitSystem = "metric"
 ): { value: string; title: string } | null {
   if (isConditionsEmpty(c)) return null;
-  const temp = formatTempC(c!.airTempC);
+  const temp = formatTempC(c!.airTempC, units);
   const sky = describeSky(c!.weatherCode, c!.cloudCoverPct);
   const value = temp ?? sky?.label ?? "—";
   const titleParts: string[] = [];
   if (temp) titleParts.push(`Air ${temp}`);
   if (sky) titleParts.push(sky.label);
   if (c!.humidityPct != null) titleParts.push(`${c!.humidityPct}% humidity`);
-  if (c!.windKph != null) titleParts.push(`${Math.round(c!.windKph)} km/h wind`);
-  if (c!.trackTempC != null) titleParts.push(`track ${Math.round(c!.trackTempC)}°C`);
+  const wind = formatWind(c!.windKph, units);
+  if (wind) titleParts.push(`${wind} wind`);
+  const track = formatTempC(c!.trackTempC, units);
+  if (track) titleParts.push(`track ${track}`);
   return { value, title: titleParts.join(" · ") };
 }

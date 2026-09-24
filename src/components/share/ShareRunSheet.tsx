@@ -19,6 +19,7 @@ import {
   type ShareSections,
 } from "@/lib/share/shareCardModel";
 import { useShareFiles, type ShareTarget } from "@/components/share/useShareFiles";
+import { useUnits } from "@/components/providers/UnitsProvider";
 
 /**
  * "Share this run" — choose what travels, look at exactly what will be sent, send it.
@@ -110,6 +111,7 @@ export function ShareRunSheet({
 }) {
   const [cardStyle, setCardStyle] = useState<ShareCardStyle>("hero");
   const [sections, setSections] = useState<ShareSections>(allSectionsOn);
+  const units = useUnits();
   const [includeSetup, setIncludeSetup] = useState<boolean>(Boolean(setupSnapshotId));
   const [previewLoading, setPreviewLoading] = useState(true);
   const [page, setPage] = useState(0);
@@ -155,8 +157,11 @@ export function ShareRunSheet({
     const query = new URLSearchParams({ style: cardStyle });
     const list = serializeSections(sections);
     if (list) query.set("sections", list);
+    // In the URL, not only read on the server: the picture is cached for five minutes by its
+    // address, and a flip of the units switch has to draw a new one.
+    query.set("units", units);
     return `/api/runs/${encodeURIComponent(runId)}/share-card?${query.toString()}`;
-  }, [runId, cardStyle, sections]);
+  }, [runId, cardStyle, sections, units]);
 
   /*
    * Every chip redraws a 1080px picture server-side, so a driver walking the row would queue six

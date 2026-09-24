@@ -124,7 +124,8 @@ isn't real yet. Lost? `docs/APP_CONTEXT.md` maps every surface, route and model.
 - **Deltas.** Lap deltas are `cell − anchor`, so positive = slower. Pace vs field is user − field,
   so negative = faster than the field.
 - **Units.** Lap times in seconds, temperatures °C, wind km/h, geometry mm and degrees, damper oil
-  cSt, spring rate gf/mm.
+  cSt, spring rate gf/mm. That is how they are stored. A driver on the °F switch reads temperature
+  and wind converted, so screens print them through `src/lib/units/unitSystem.ts`, never a literal °C.
 - **A Run has three timestamps, kept apart on purpose.** `createdAt` (row written),
   `sessionCompletedAt` (when the car was on track, UTC, from timing import) and `sortAt` (stamped
   once at create, so re-imports never reshuffle a day).

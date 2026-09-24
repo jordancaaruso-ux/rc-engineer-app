@@ -79,6 +79,8 @@ import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { runConditionsFromRecord } from "@/lib/weather/runConditionsRecord";
 import { skyLabelFromCloudCover, skyLabelFromWeatherCode } from "@/lib/weather/conditions";
 import { formatTirePrepLine } from "@/lib/runs/tirePrep";
+import { useUnits } from "@/components/providers/UnitsProvider";
+import { formatTemp, formatWind } from "@/lib/units/unitSystem";
 import { lapImportHref } from "@/lib/runs/lapImportHref";
 import { cn } from "@/lib/utils";
 
@@ -211,6 +213,7 @@ export function RunFaces({
   viewerUserId?: string | null;
 }) {
   const router = useRouter();
+  const units = useUnits();
   const [face, setFace] = useState<Face>("laps");
   const [editing, setEditing] = useState(false);
   // A different run is a different record — never inherit the previous one's mode.
@@ -365,10 +368,13 @@ export function RunFaces({
    */
   const weatherLine = useMemo(() => {
     const parts: string[] = [];
-    if (conditions.airTempC != null) parts.push(`${Math.round(conditions.airTempC)}°C air`);
-    if (conditions.trackTempC != null) parts.push(`${Math.round(conditions.trackTempC)}°C track`);
+    const air = formatTemp(conditions.airTempC, units);
+    if (air) parts.push(`${air} air`);
+    const track = formatTemp(conditions.trackTempC, units);
+    if (track) parts.push(`${track} track`);
     if (conditions.humidityPct != null) parts.push(`${Math.round(conditions.humidityPct)}%`);
-    if (conditions.windKph != null) parts.push(`${Math.round(conditions.windKph)} km/h`);
+    const wind = formatWind(conditions.windKph, units);
+    if (wind) parts.push(wind);
     if (skyDisplay) parts.push(skyDisplay.toLowerCase());
     return parts.length > 0 ? parts.join(" · ") : null;
   }, [
@@ -377,6 +383,7 @@ export function RunFaces({
     conditions.trackTempC,
     conditions.windKph,
     skyDisplay,
+    units,
   ]);
 
   /*
@@ -385,10 +392,13 @@ export function RunFaces({
    * the additive is its own picker and would otherwise be printed twice.
    */
   const prepLine = useMemo(
-    () => formatTirePrepLine(tirePrepSteps, run.additiveType?.displayName ?? null),
-    [run.additiveType?.displayName, tirePrepSteps]
+    () => formatTirePrepLine(tirePrepSteps, run.additiveType?.displayName ?? null, units),
+    [run.additiveType?.displayName, tirePrepSteps, units]
   );
-  const prepSequenceLine = useMemo(() => formatTirePrepLine(tirePrepSteps, null), [tirePrepSteps]);
+  const prepSequenceLine = useMemo(
+    () => formatTirePrepLine(tirePrepSteps, null, units),
+    [tirePrepSteps, units]
+  );
 
   /* ------------------------------------------------------ what was said -- */
   const feel = useMemo(() => {

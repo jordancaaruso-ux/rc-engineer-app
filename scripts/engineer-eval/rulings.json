@@ -66,6 +66,7 @@
     { "date": "2026-09-24", "ruling": "The app adds its own Other options button, which sends his words", "file": "src/lib/engineer/nextQuestions.ts", "present": "OTHER_OPTIONS_QUESTION = \"What are some other options I could try?\"" },
     { "date": "2026-09-24", "ruling": "\"No setup change\" is said only when nothing on the sheet moved: on a sheet the Engineer can barely read, the boxes it cannot read are counted (founder: \"make that fix\")", "file": "src/lib/engineer/setupDiff.ts", "present": "\"boxes not shown here\" are boxes on a sheet the app cannot read yet" },
     { "date": "2026-09-24", "ruling": "A sheet the Engineer reads only a box or two of says so: every setting not listed is unknown, not absent and not unchanged", "file": "src/lib/engineer/driverData.ts", "present": ": ONLY PARTLY VISIBLE." },
-    { "date": "2026-09-24", "ruling": "The range block says so too", "file": "src/lib/engineer/historyShape.ts", "present": ": ONLY PARTLY VISIBLE." }
+    { "date": "2026-09-24", "ruling": "The range block says so too", "file": "src/lib/engineer/historyShape.ts", "present": ": ONLY PARTLY VISIBLE." },
+    { "date": "2026-09-24", "ruling": "A driver on °F hears temperatures and wind in °F and mph; what the Engineer reads stays metric (founder: one simple units switch)", "file": "src/lib/engineer/unitsBlock.ts", "present": "This driver reads temperatures in °F and wind speeds in mph." }
   ]
 }

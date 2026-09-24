@@ -16,6 +16,8 @@ import { BRAND_DOMAIN, PRODUCT_NAME } from "@/lib/brand/brandNames";
 import { auth } from "@/auth";
 
 import { AuthSessionProvider } from "@/components/providers/AuthSessionProvider";
+import { UnitsProvider } from "@/components/providers/UnitsProvider";
+import { unitSystemForRequest } from "@/lib/units/unitSystemServer";
 
 import { CapacitorDeepLinkBridge } from "@/components/capacitor/CapacitorDeepLinkBridge";
 import { CapacitorPushBridge } from "@/components/capacitor/CapacitorPushBridge";
@@ -256,6 +258,9 @@ export default async function RootLayout({
   if (PERF_ENABLED) await beginPagePerf();
 
   const session = await perfSpan("auth", () => auth());
+  // °C or °F for every screen, known before first paint (lib/units/unitSystem.ts). Cached per
+  // driver, so a warm page pays about a millisecond for it.
+  const units = await perfSpan("units", () => unitSystemForRequest(session?.user?.id));
 
   return (
 
@@ -405,6 +410,7 @@ export default async function RootLayout({
           >{`(function(){try{var tz=Intl.DateTimeFormat().resolvedOptions().timeZone;document.cookie='${RC_TIMEZONE_COOKIE}='+encodeURIComponent(tz)+';path=/;max-age=31536000;SameSite=Lax';}catch(e){}})();`}</Script>
 
           <AuthSessionProvider session={session}>
+          <UnitsProvider initial={units}>
 
             <TimeZoneCookieSync />
             <ReturnTrailTracker />
@@ -439,6 +445,7 @@ export default async function RootLayout({
             {/* Dev-only markup layer: tap anything to pin a note. Never ships. */}
             {process.env.NODE_ENV !== "production" ? <DevMarkupLayer /> : null}
 
+          </UnitsProvider>
           </AuthSessionProvider>
 
         </div>

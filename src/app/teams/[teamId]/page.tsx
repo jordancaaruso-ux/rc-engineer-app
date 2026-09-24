@@ -10,6 +10,7 @@ import { RelativeTime } from "@/components/ui/RelativeTime";
 import { loadTeamFeedModel } from "@/lib/teams/loadTeamFeed";
 import { TeamFeed } from "@/components/teams/TeamFeed";
 import { TeamRosterStrip } from "@/components/teams/TeamRosterStrip";
+import { unitSystemForRequest } from "@/lib/units/unitSystemServer";
 
 /**
  * `force-dynamic` with no `revalidate`: a comment must appear the moment it is posted, and
@@ -45,6 +46,7 @@ export default async function TeamFeedPage({ params, searchParams }: Props): Pro
     viewerId: user.id,
     teamId,
     timeZone,
+    units: await unitSystemForRequest(user.id),
     pinnedRunId: pinnedRunId ?? null,
   });
   // Non-members get a 404 rather than a 403 — team existence isn't confirmed to outsiders.

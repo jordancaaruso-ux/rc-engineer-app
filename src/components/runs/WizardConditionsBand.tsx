@@ -5,6 +5,14 @@ import { Eyebrow } from "@/components/ui/panel";
 import { getCurrentPosition, GeolocationRequestError } from "@/lib/location/getCurrentPosition";
 import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 import { describeSky, formatTempC, type RunConditions } from "@/lib/weather/conditions";
+import { useUnits } from "@/components/providers/UnitsProvider";
+import {
+  formatWind,
+  tempFigure,
+  tempFromInput,
+  tempUnit,
+  type UnitSystem,
+} from "@/lib/units/unitSystem";
 
 type BandTrack = {
   id: string;
@@ -34,19 +42,16 @@ function parseTempInput(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function fmtTempField(n: number | null): string {
-  return typeof n === "number" && Number.isFinite(n) ? String(Math.round(n * 10) / 10) : "";
-}
-
 /** The reading, spelled out: air temp · sky · humidity · wind. */
-function readoutLine(c: RunConditions): string | null {
+function readoutLine(c: RunConditions, units: UnitSystem): string | null {
   const parts: string[] = [];
-  const temp = formatTempC(c.airTempC);
+  const temp = formatTempC(c.airTempC, units);
   if (temp) parts.push(temp);
   const sky = describeSky(c.weatherCode, c.cloudCoverPct);
   if (sky) parts.push(sky.label);
   if (c.humidityPct != null) parts.push(`${Math.round(c.humidityPct)}%`);
-  if (c.windKph != null) parts.push(`${Math.round(c.windKph)} km/h`);
+  const wind = formatWind(c.windKph, units);
+  if (wind) parts.push(wind);
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
@@ -73,10 +78,12 @@ export function WizardConditionsBand({
   );
   const [locationError, setLocationError] = useState<string | null>(null);
   const fetchedKeyRef = useRef<string | null>(null);
+  // The probe is typed in the driver's unit and lifted to the form as °C.
+  const units = useUnits();
 
   const hasPin = trackHasMarkedLocation(track ?? {});
   const stored = storedConditions ?? null;
-  const storedLine = stored ? readoutLine(stored) : null;
+  const storedLine = stored ? readoutLine(stored, units) : null;
 
   const fetchFor = useCallback(
     async (coords: { latitude: number; longitude: number }, key: string) => {
@@ -142,7 +149,7 @@ export function WizardConditionsBand({
     }
   }, [track, hasPin, deviceCoords, fetchFor, requestDeviceLocation]);
 
-  const previewLine = preview ? readoutLine(preview) : null;
+  const previewLine = preview ? readoutLine(preview, units) : null;
   const line = storedLine ?? previewLine;
   const loading = phase === "loading";
 
@@ -222,17 +229,20 @@ export function WizardConditionsBand({
             id="wizard-track-temp"
             type="text"
             inputMode="decimal"
-            value={fmtTempField(trackTempC)}
-            onChange={(e) => onTrackTempChange(parseTempInput(e.target.value))}
+            value={tempFigure(trackTempC, units)}
+            onChange={(e) => {
+              const typed = parseTempInput(e.target.value);
+              onTrackTempChange(typed == null ? null : tempFromInput(units, typed));
+            }}
             placeholder="—"
-            aria-label="Track temp in degrees Celsius"
+            aria-label={`Track temp in degrees ${units === "imperial" ? "Fahrenheit" : "Celsius"}`}
             className="form-control w-full py-2 pl-3 pr-7 fig-stat"
           />
           <span
             aria-hidden
             className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-faint"
           >
-            °C
+            {tempUnit(units)}
           </span>
         </div>
       </div>

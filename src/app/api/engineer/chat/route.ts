@@ -5,6 +5,8 @@ import { hasOpenAiApiKey } from "@/lib/openaiServerEnv";
 import { generateEngineerChatReply } from "@/lib/engineer/chat";
 import { buildDriverDataBlocks } from "@/lib/engineer/driverData";
 import { buildDriverHistoryBlocks } from "@/lib/engineer/driverHistory";
+import { engineerUnitsBlocks } from "@/lib/engineer/unitsBlock";
+import { unitSystemForRequest } from "@/lib/units/unitSystemServer";
 import { parseRangeScope } from "@/lib/engineer/rangeScope";
 import { engineerTools, loadEngineerToolContext } from "@/lib/engineer/tools";
 import type { EngineerChatMessage } from "@/lib/engineer/payload";
@@ -299,6 +301,10 @@ export async function POST(request: Request) {
         ? null
         : await loadEngineerToolContext({ userId: user.id, runId: runId || null, scope: rangeScope }).catch(() => null);
 
+    // A driver on °F gets one cache-stable UNITS block ahead of the driver data, General included
+    // (unitsBlock.ts); a metric driver gets none, and their request is unchanged.
+    const payloadBlocks = [...engineerUnitsBlocks(await unitSystemForRequest(user.id)), ...driverBlocks];
+
     if (useStream) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
@@ -325,7 +331,7 @@ export async function POST(request: Request) {
               : undefined;
             const out = await generateEngineerChatReply({
               messages,
-              driverBlocks,
+              driverBlocks: payloadBlocks,
               tools,
               onToken: (t) => send("token", { t }),
             });
@@ -381,7 +387,7 @@ export async function POST(request: Request) {
 
     const out = await generateEngineerChatReply({
       messages,
-      driverBlocks,
+      driverBlocks: payloadBlocks,
       tools: toolContext ? engineerTools(toolContext) : undefined,
     });
 

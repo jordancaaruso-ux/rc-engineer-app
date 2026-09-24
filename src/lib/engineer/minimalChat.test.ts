@@ -20,6 +20,7 @@ import {
   ENGINEER_PROMPT_LABEL,
   ENGINEER_PROMPT_VERSION,
 } from "@/lib/engineer/prompt";
+import { ENGINEER_IMPERIAL_UNITS_TEXT, engineerUnitsBlocks } from "@/lib/engineer/unitsBlock";
 
 const KB = "=== vehicle-dynamics/springs.md ===\n\nStiffer springs move load faster.";
 
@@ -125,6 +126,28 @@ test("GPT-5 and later get the effort and never a temperature; older models the r
     if (saved === undefined) delete process.env.ENGINEER_REASONING_EFFORT;
     else process.env.ENGINEER_REASONING_EFFORT = saved;
   }
+});
+
+test("units: a metric driver's request is unchanged; a °F driver's carries one stable block after the prompt", () => {
+  const driverData: EngineerPayloadBlock = { id: "driver-data", cacheStable: false, content: "air temp °C: 30" };
+  const q = [{ role: "user" as const, content: "q" }];
+
+  assert.deepEqual(engineerUnitsBlocks("metric"), []);
+  const before = buildEngineerMessages([...standardEngineerBlocks(KB), driverData], q);
+  const metric = buildEngineerMessages(
+    [...standardEngineerBlocks(KB), ...engineerUnitsBlocks("metric"), driverData],
+    q
+  );
+  assert.deepEqual(metric, before, "metric adds nothing");
+
+  const imperial = buildEngineerMessages(
+    [...standardEngineerBlocks(KB), ...engineerUnitsBlocks("imperial"), driverData],
+    q
+  );
+  assert.equal(imperial.length, before.length + 1);
+  assert.equal(imperial[2].content, ENGINEER_IMPERIAL_UNITS_TEXT, "straight after the prompt");
+  assert.equal(imperial[3].content, "air temp °C: 30", "the driver data stays metric");
+  assert.equal(engineerUnitsBlocks("imperial")[0].cacheStable, true);
 });
 
 test("prompt version fingerprints the prompt text, so a wording change is traceable", () => {

@@ -3,6 +3,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { sanitizeIanaTimeZone } from "@/lib/rcTimeZoneCookie";
+import { stampDefaultUnitSystem } from "@/lib/units/unitSystemServer";
 
 /**
  * Persist the signed-in account's IANA zone from the device that is looking.
@@ -39,10 +40,15 @@ export async function POST(req: Request) {
 
   // The inequality means a returning device costs one cheap no-op query rather
   // than a write on every visit — the same guard the run-create path uses.
-  const { count } = await prisma.user.updateMany({
-    where: { id: userId, OR: [{ timeZone: null }, { timeZone: { not: timeZone } }] },
-    data: { timeZone },
-  });
+  const [{ count }] = await Promise.all([
+    prisma.user.updateMany({
+      where: { id: userId, OR: [{ timeZone: null }, { timeZone: { not: timeZone } }] },
+      data: { timeZone },
+    }),
+    // The first zone this driver's device reports settles their units: °F from a US zone,
+    // metric elsewhere. Only when nothing is stored yet (unitSystemServer.ts).
+    stampDefaultUnitSystem(userId, timeZone),
+  ]);
 
   return NextResponse.json({ ok: true, changed: count > 0 });
 }

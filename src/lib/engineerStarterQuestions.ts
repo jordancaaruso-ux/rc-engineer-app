@@ -16,6 +16,8 @@
  * a request for a mechanism rather than a rule of thumb.
  */
 
+import type { UnitSystem } from "@/lib/units/unitSystem";
+
 export type EngineerStarterFamily = "range" | "run" | "feel" | "plan" | "learn";
 
 export type EngineerStarterQuestion = {
@@ -24,8 +26,15 @@ export type EngineerStarterQuestion = {
   label: string;
   /** What lands in the composer. The driver edits it before sending. */
   text: string;
+  /** `text` for a driver on °F, where the question quotes a temperature (units switch). */
+  imperialText?: string;
   family: EngineerStarterFamily;
 };
+
+/** The question as this driver would ask it: the °F wording where it quotes a temperature. */
+export function starterQuestionText(question: EngineerStarterQuestion, units: UnitSystem): string {
+  return units === "imperial" && question.imperialText ? question.imperialText : question.text;
+}
 
 export type EngineerStarterState = {
   /** A run is the current subject — Auto or pinned. False in General mode. */
@@ -180,6 +189,8 @@ const PLAN_QUESTIONS: EngineerStarterQuestion[] = [
     id: "plan-cold-damp",
     label: "Cold and damp",
     text: "It's around 8°C and damp today. What does that do to the car, and what do I change for it?",
+    imperialText:
+      "It's around 45°F and damp today. What does that do to the car, and what do I change for it?",
     family: "plan",
   },
   {

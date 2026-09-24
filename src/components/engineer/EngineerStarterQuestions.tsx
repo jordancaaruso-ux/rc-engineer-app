@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import type { EngineerStarterQuestion } from "@/lib/engineerStarterQuestions";
+import { starterQuestionText, type EngineerStarterQuestion } from "@/lib/engineerStarterQuestions";
+import { useUnits } from "@/components/providers/UnitsProvider";
 
 /**
  * Tappable starter questions above the composer (founder call, 2026-08-18).
@@ -235,6 +236,7 @@ function StarterChip({
   onPick: (question: EngineerStarterQuestion) => void;
   shape: "pill" | "card";
 }) {
+  const units = useUnits();
   return (
     <button
       type="button"
@@ -242,7 +244,7 @@ function StarterChip({
       onClick={() => onPick(question)}
       // The full question is what lands in the box — show it on hover so a
       // desktop driver knows what a tap is about to write.
-      title={question.text}
+      title={starterQuestionText(question, units)}
       className={cn(
         // Outline, never a yellow fill: these are prompts, not the action. Yellow
         // fill stays on Send. The dot is `primary-ink` — yellow doing a foreground

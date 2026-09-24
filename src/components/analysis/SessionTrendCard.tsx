@@ -31,6 +31,8 @@ import { SetupSheetModal, type SetupSheetModalRun } from "@/components/runs/RunH
 import { SetupCascadeQuestions } from "@/components/runs/SetupCascadeQuestions";
 import type { SetupEditorSavedResult } from "@/components/setup/useSetupEditorSave";
 import { cn } from "@/lib/utils";
+import { useUnits } from "@/components/providers/UnitsProvider";
+import { formatTemp } from "@/lib/units/unitSystem";
 
 /**
  * Session trend — how the pace of an event or day moved, run by run: best / avg
@@ -1964,6 +1966,7 @@ function SeriesFigureRow({
  * than silence, and a run with neither figure gives the tyre and the clock their space back.
  */
 function RunExtraFigures({ run }: { run: AnalysisTrendRun | null | undefined }) {
+  const units = useUnits();
   const rating = run?.carRating ?? null;
   const air = run?.airTempC ?? null;
   if (rating == null && air == null) return null;
@@ -1979,7 +1982,7 @@ function RunExtraFigures({ run }: { run: AnalysisTrendRun | null | undefined }) 
     rating != null
       ? `Car rating ${rating} out of 10${band ? ` — ${band.toLowerCase()}` : ""}`
       : undefined;
-  const airLabel = air != null ? `${Math.round(air)}°C` : null;
+  const airLabel = formatTemp(air, units);
 
   /*
    * Caption voice, not figure voice: 9.5px label against a 11px numeral, a step under

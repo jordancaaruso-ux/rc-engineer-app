@@ -3,6 +3,7 @@ import { getBoolFromSetupString } from "@/lib/a800rrSetupRead";
 import { CALIBRATION_PAIR_GROUPS } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import { normalizeTirePrep, formatTirePrepLine } from "@/lib/runs/tirePrep";
+import type { UnitSystem } from "@/lib/units/unitSystem";
 
 /**
  * Additive + timing line for read surfaces. When a `tirePrep` sequence exists it
@@ -13,11 +14,12 @@ import { normalizeTirePrep, formatTirePrepLine } from "@/lib/runs/tirePrep";
 export function formatAdditiveTimingLine(
   additiveType: { displayName: string } | null | undefined,
   warmerTimingMinutes: number | null | undefined,
-  tirePrep?: unknown
+  tirePrep?: unknown,
+  units: UnitSystem = "metric"
 ): string | null {
   const steps = normalizeTirePrep(tirePrep);
   if (steps.length > 0) {
-    return formatTirePrepLine(steps, additiveType?.displayName ?? null);
+    return formatTirePrepLine(steps, additiveType?.displayName ?? null, units);
   }
   const parts: string[] = [];
   if (additiveType?.displayName?.trim()) parts.push(additiveType.displayName.trim());
@@ -63,6 +65,8 @@ export function formatRunTiresDetailLine(params: {
   warmerTimingMinutes?: number | null;
   tirePrep?: unknown;
   setupSnapshotData?: unknown;
+  /** The reader's units, for a warmer temperature in the prep. */
+  units?: UnitSystem;
 }): string {
   // Wear-first identity: the compound + which run this was on the set. Set numbers are
   // internal counters and anchors are retired — neither belongs in run detail lines.
@@ -73,7 +77,8 @@ export function formatRunTiresDetailLine(params: {
   const additive = formatAdditiveTimingLine(
     params.additiveType,
     params.warmerTimingMinutes,
-    params.tirePrep
+    params.tirePrep,
+    params.units
   );
   if (additive) extras.push(additive);
   const prep = formatTirePrepSummaryFromSnapshot(params.setupSnapshotData);

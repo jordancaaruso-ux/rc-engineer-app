@@ -54,6 +54,7 @@ import { collectSetupSheetTemplateKeys } from "@/lib/setupSheetModels/collectTem
 import { applyRunContextToSetupSnapshot } from "@/lib/runs/applyRunContextToSetupSnapshot";
 import { chosenBackfillSessions } from "@/lib/runs/backfillCandidates";
 import { formatTirePrepSummaryFromSnapshot } from "@/lib/runs/runTireContextDisplay";
+import { useUnits } from "@/components/providers/UnitsProvider";
 import {
   normalizeTirePrep,
   tirePrepFromLegacy,
@@ -666,6 +667,8 @@ export function NewRunForm(props: {
   returnHref?: string | null;
 }) {
   const router = useRouter();
+  // A warmer temperature in the prep lines reads in the driver's unit.
+  const units = useUnits();
   const returnHref = props.returnHref ?? null;
   const copyLastRunCtx = useCopyLastRunFormOptional();
   const todayDraftCtx = useDraftRunOptional();
@@ -4511,7 +4514,8 @@ export function NewRunForm(props: {
             const prep = wizardPrepIn
               ? formatTirePrepLine(
                   tirePrep,
-                  additiveTypeId ? additiveTypesById[additiveTypeId]?.displayName ?? null : null
+                  additiveTypeId ? additiveTypesById[additiveTypeId]?.displayName ?? null : null,
+                  units
                 ) || "prep logged"
               : null;
             return prep ? `${base} · ${prep}` : base;
@@ -4612,7 +4616,8 @@ export function NewRunForm(props: {
             value:
               formatTirePrepLine(
                 tirePrep,
-                additiveTypeId ? additiveTypesById[additiveTypeId]?.displayName ?? null : null
+                additiveTypeId ? additiveTypesById[additiveTypeId]?.displayName ?? null : null,
+                units
               ) ?? "none",
             jump: "equipment",
           },
@@ -4690,7 +4695,8 @@ export function NewRunForm(props: {
                         lastRun.warmerTimingMinutes,
                         Boolean(lastRun.additiveTypeId ?? lastRun.additiveType?.id)
                       ),
-                  lastRun.additiveType?.displayName ?? null
+                  lastRun.additiveType?.displayName ?? null,
+                  units
                 ) ?? "—"
               : "…",
           },
@@ -5515,7 +5521,8 @@ export function NewRunForm(props: {
                 const extras: string[] = [];
                 const additive = formatTirePrepLine(
                   tirePrep,
-                  additiveTypeId ? additiveTypesById[additiveTypeId]?.displayName ?? null : null
+                  additiveTypeId ? additiveTypesById[additiveTypeId]?.displayName ?? null : null,
+                  units
                 );
                 if (additive) extras.push(additive);
                 const prep = formatTirePrepSummaryFromSnapshot(setupData);

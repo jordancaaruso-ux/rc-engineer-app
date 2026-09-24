@@ -7,6 +7,8 @@ import { formatRunDateTime } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { buildShareRunCard, parseCardStyle, parseSectionsParam } from "@/lib/share/shareCardModel";
 import { renderRunCard } from "@/lib/share/renderRunCard";
+import { parseUnitSystem } from "@/lib/units/unitSystem";
+import { unitSystemForRequest } from "@/lib/units/unitSystemServer";
 
 /**
  * The run picture, as a PNG.
@@ -79,6 +81,8 @@ export async function GET(request: Request, { params }: Params) {
   const { searchParams } = new URL(request.url);
   const style = parseCardStyle(searchParams.get("style"));
   const sections = parseSectionsParam(searchParams.get("sections"));
+  // The share sheet sends the unit it is showing; a bare URL gets the driver's own.
+  const units = parseUnitSystem(searchParams.get("units")) ?? (await unitSystemForRequest(userId));
 
   const run = await prisma.run.findFirst({ where: { id, userId }, select: shareRunSelect });
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -117,6 +121,7 @@ export async function GET(request: Request, { params }: Params) {
     driverName: run.user?.name ?? null,
     setupData: run.setupSnapshot?.data,
     previousSetupData,
+    units,
   });
 
   return await renderRunCard(card);

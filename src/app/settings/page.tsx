@@ -19,6 +19,7 @@ import { parseKnownCompetitorsSetting } from "@/lib/speedhive/knownCompetitors";
 import { YouSection } from "@/components/settings/YouSection";
 import { TimingIdentitySection } from "@/components/settings/TimingIdentitySection";
 import { SettingsNavSection } from "@/components/settings/SettingsNavSection";
+import { UnitsSection } from "@/components/settings/UnitsSection";
 import { DeleteAccountRow } from "@/components/settings/DeleteAccountRow";
 import { HelpRow } from "@/components/settings/HelpRow";
 import { OnboardingResetSection } from "@/components/settings/OnboardingResetSection";
@@ -141,6 +142,8 @@ export default async function SettingsPage() {
           {/* Remounted 2026-09-14 with the timing sweep: the evening summary goes by push to
               anyone who has said yes here, by email to everyone else. */}
           <NotificationsSection />
+
+          <UnitsSection />
 
           <SettingsNavSection isAdmin={isAdmin} />
 

@@ -46,7 +46,13 @@ import {
   uiStateFromParsed,
   type PhaseBalance,
 } from "@/lib/runHandlingAssessment";
-import { normalizeTirePrep, tirePrepFromLegacy, type TirePrepStep } from "@/lib/runs/tirePrep";
+import {
+  formatWarmerTemp,
+  normalizeTirePrep,
+  tirePrepFromLegacy,
+  type TirePrepStep,
+} from "@/lib/runs/tirePrep";
+import type { UnitSystem } from "@/lib/units/unitSystem";
 
 /** Final image width. Everything below is measured against it. */
 export const CARD_WIDTH = 1080;
@@ -233,6 +239,8 @@ export type BuildShareCardParams = {
   /** This run's setup and the previous run's on the same car, for the diff. */
   setupData?: unknown;
   previousSetupData?: unknown;
+  /** The sharer's units, for the air temperature and the warmers. Metric when omitted. */
+  units?: UnitSystem;
 };
 
 const MEETING_LABELS: Record<string, string> = {
@@ -251,7 +259,7 @@ const MEETING_LABELS: Record<string, string> = {
  *
  * One line per step: the card gives this cell two mono lines, the way the session view does.
  */
-function tirePrepLines(run: ShareRunInput): string[] {
+function tirePrepLines(run: ShareRunInput, units: UnitSystem): string[] {
   const stored = normalizeTirePrep(run.tirePrep);
   const steps: TirePrepStep[] =
     stored.length > 0
@@ -262,7 +270,11 @@ function tirePrepLines(run: ShareRunInput): string[] {
     const bits: string[] = [];
     if (s.minutes != null && s.minutes > 0) bits.push(`${s.minutes}m`);
     bits.push(s.appliedAdditive ? "additive" : "no sauce");
-    if (s.warmers) bits.push(`warmers${s.temperatureC != null ? ` ${s.temperatureC}°` : ""}`);
+    if (s.warmers) {
+      bits.push(
+        `warmers${s.temperatureC != null ? ` ${formatWarmerTemp(s.temperatureC, units, { bare: true })}` : ""}`
+      );
+    }
     // A real separator: satori collapses runs of spaces, so padding would not hold.
     return bits.join(" · ");
   });
@@ -424,7 +436,8 @@ export function buildShareRunCard(params: BuildShareCardParams): ShareRunCard {
 
   const carName = run.car?.name ?? run.carNameSnapshot ?? "Deleted car";
   const trackName = run.track?.name ?? run.trackNameSnapshot ?? null;
-  const conditionsChip = formatConditionsChip(runConditionsFromRecord(run));
+  const units = params.units ?? "metric";
+  const conditionsChip = formatConditionsChip(runConditionsFromRecord(run), units);
   const title = formatRunSessionDisplay(run, { fallback: "Testing run" });
   const eventName = run.event?.name ?? null;
   const driverName = params.driverName?.trim() || null;
@@ -474,7 +487,7 @@ export function buildShareRunCard(params: BuildShareCardParams): ShareRunCard {
               : "—",
           },
           { label: "Additive", value: run.additiveType?.displayName ?? "—" },
-          { label: "Tire prep", value: "", mono: true, lines: tirePrepLines(run) },
+          { label: "Tire prep", value: "", mono: true, lines: tirePrepLines(run, units) },
         ]
       : [];
 

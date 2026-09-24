@@ -3,6 +3,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { loadTeamFeedModel } from "@/lib/teams/loadTeamFeed";
+import { unitSystemForRequest } from "@/lib/units/unitSystemServer";
 
 export const dynamic = "force-dynamic";
 
@@ -18,12 +19,16 @@ export async function GET(request: Request, ctx: Ctx) {
 
   const { teamId } = await ctx.params;
   const url = new URL(request.url);
-  const timeZone = await getExplicitTimeZoneForRunFormatting();
+  const [timeZone, units] = await Promise.all([
+    getExplicitTimeZoneForRunFormatting(),
+    unitSystemForRequest(userId),
+  ]);
 
   const model = await loadTeamFeedModel({
     viewerId: userId,
     teamId,
     timeZone,
+    units,
     cursor: url.searchParams.get("cursor"),
     pinnedRunId: url.searchParams.get("run"),
   });

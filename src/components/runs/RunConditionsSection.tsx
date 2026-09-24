@@ -11,6 +11,15 @@ import {
   describeSky,
   type RunConditions,
 } from "@/lib/weather/conditions";
+import { useUnits } from "@/components/providers/UnitsProvider";
+import {
+  tempFigure,
+  tempFromInput,
+  tempUnit,
+  windFigure,
+  windFromInput,
+  windUnit,
+} from "@/lib/units/unitSystem";
 
 type ConditionsTrack = {
   id: string;
@@ -59,6 +68,16 @@ export function RunConditionsSection({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deviceCoords, setDeviceCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  // Typed and shown in the driver's unit, stored °C and km/h (lib/units/unitSystem.ts).
+  const units = useUnits();
+  const typedTemp = (raw: string) => {
+    const n = parseNumberInput(raw);
+    return n == null ? null : tempFromInput(units, n);
+  };
+  const typedWind = (raw: string) => {
+    const n = parseNumberInput(raw);
+    return n == null ? null : windFromInput(units, n);
+  };
 
   const hasPin = trackHasMarkedLocation(track ?? {});
 
@@ -190,28 +209,28 @@ export function RunConditionsSection({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <label htmlFor="cond-air-temp" className={LABEL_CLASS}>
-            Air temp (°C)
+            Air temp ({tempUnit(units)})
           </label>
           <input
             id="cond-air-temp"
             type="text"
             inputMode="decimal"
-            value={fmtField(value.airTempC)}
-            onChange={(e) => patch({ airTempC: parseNumberInput(e.target.value) })}
+            value={tempFigure(value.airTempC, units)}
+            onChange={(e) => patch({ airTempC: typedTemp(e.target.value) })}
             placeholder="—"
             className={INPUT_CLASS}
           />
         </div>
         <div className="space-y-1">
           <label htmlFor="cond-track-temp" className={LABEL_CLASS}>
-            Track temp (°C)
+            Track temp ({tempUnit(units)})
           </label>
           <input
             id="cond-track-temp"
             type="text"
             inputMode="decimal"
-            value={fmtField(value.trackTempC)}
-            onChange={(e) => patch({ trackTempC: parseNumberInput(e.target.value) })}
+            value={tempFigure(value.trackTempC, units)}
+            onChange={(e) => patch({ trackTempC: typedTemp(e.target.value) })}
             placeholder="probe"
             className={INPUT_CLASS}
           />
@@ -261,14 +280,14 @@ export function RunConditionsSection({
         </div>
         <div className="space-y-1">
           <label htmlFor="cond-wind" className={LABEL_CLASS}>
-            Wind (km/h)
+            Wind ({windUnit(units)})
           </label>
           <input
             id="cond-wind"
             type="text"
             inputMode="decimal"
-            value={fmtField(value.windKph)}
-            onChange={(e) => patch({ windKph: parseNumberInput(e.target.value) })}
+            value={windFigure(value.windKph, units)}
+            onChange={(e) => patch({ windKph: typedWind(e.target.value) })}
             placeholder="—"
             className={INPUT_CLASS}
           />

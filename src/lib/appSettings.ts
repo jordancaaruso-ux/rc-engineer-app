@@ -69,6 +69,12 @@ export const APP_SETTING_KEYS = {
   onboardingSkippedSteps: "onboardingSkippedSteps",
   /** ISO timestamp they tapped Ignore on the dashboard resume card — it never returns. */
   onboardingResumeDismissedAt: "onboardingResumeDismissedAt",
+  /**
+   * "metric" | "imperial" — what temperatures and wind read in (`lib/units/unitSystem.ts`).
+   * Stamped from the device's time zone the first time it reports one, so a US driver who
+   * travels to a race abroad keeps the unit they started on; the Settings switch overwrites it.
+   */
+  unitSystem: "unitSystem",
 } as const;
 
 export type AppSettingKey = (typeof APP_SETTING_KEYS)[keyof typeof APP_SETTING_KEYS];

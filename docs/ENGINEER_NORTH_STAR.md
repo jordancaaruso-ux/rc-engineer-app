@@ -172,6 +172,23 @@ Each of these was deleted or declined for a reason. They return only through the
 
 ## Changelog
 
+- **2026-09-24, evening — a driver on °F** (founder: "let's build a switch for Imperial units", "one
+  simple switch"). The Settings units switch (°C · km/h or °F · mph) reaches the Engineer as one
+  cache-stable UNITS block straight after the prompt (`unitsBlock.ts`), sent only to a driver on °F.
+  Everything the Engineer reads stays metric (KB, nets, driver data). The block says so, asks for °F
+  and mph in the answer, says converting is not inventing a number, gives the no-32 rule for a
+  difference, reads a bare temperature as °F, and keeps setup figures in their own units. A metric
+  driver's request is byte-identical to before (payload test in `minimalChat.test.ts`), which is
+  every question in the harness, so the pairwise harness was not re-run. No prompt change; the label
+  stays.
+
+  Measured on Sol at medium, 9 calls (~$0.45): six General questions, and three with his latest run
+  from the scratch copy attached (1025R, 23.2 °C). Not one °C or km/h in the nine answers. 23.2 °C
+  came back as "about 74°F", "went from 80 to 110" as 80°F to 110°F, "10 degrees cooler" as 10°F,
+  "15 mph gusting" stayed mph, and questions with no temperature in them gained no unit talk. The
+  block lengthens the cached prefix rather than breaking it: 33,066 tokens cached from the second
+  call on.
+
 - **2026-09-24, late night — a sheet the Engineer can barely read** (founder: "make that fix"). He
   asked what his Bayside answer would look like "if the engineer didn't understand the setup". The
   answer found a hole in the 2026-09-21 blind-car split: NOT VISIBLE fired only when the Engineer could

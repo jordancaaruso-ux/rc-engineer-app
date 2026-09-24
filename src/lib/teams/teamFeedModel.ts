@@ -1,4 +1,5 @@
 import { calendarYmdInTimeZone } from "@/lib/formatDate";
+import { tempIn, tempUnit, type UnitSystem } from "@/lib/units/unitSystem";
 import { setupChangedRowsSincePrevious } from "@/lib/setupCompare/changedSincePrevious";
 import { isSetupChangeNoiseKey } from "@/lib/setupCompare/setupChangeNoise";
 
@@ -146,10 +147,13 @@ export function computeSetupChangedRows(
     }));
 }
 
-function formatTempDelta(from: number, to: number): string {
+/** "20 → 25 °C (+5)", in the viewer's unit: the difference is taken after converting. */
+function formatTempDelta(fromC: number, toC: number, units: UnitSystem): string {
+  const from = tempIn(units, fromC);
+  const to = tempIn(units, toC);
   const delta = to - from;
   const sign = delta > 0 ? "+" : "";
-  return `${round1(from)} → ${round1(to)} °C (${sign}${round1(delta)})`;
+  return `${round1(from)} → ${round1(to)} ${tempUnit(units)} (${sign}${round1(delta)})`;
 }
 
 function round1(n: number): number {
@@ -164,7 +168,9 @@ function round1(n: number): number {
  */
 export function computeAlsoMoved(
   run: TeamFeedRunInput,
-  baseline: TeamFeedRunInput
+  baseline: TeamFeedRunInput,
+  /** The viewer's, not the run owner's: everyone reads a teammate's run in their own unit. */
+  units: UnitSystem = "metric"
 ): AlsoMovedRow[] {
   const rows: AlsoMovedRow[] = [];
 
@@ -173,7 +179,7 @@ export function computeAlsoMoved(
       rows.push({
         kind: "trackTemp",
         label: "Track temp",
-        detail: formatTempDelta(baseline.conditionsTrackTempC, run.conditionsTrackTempC),
+        detail: formatTempDelta(baseline.conditionsTrackTempC, run.conditionsTrackTempC, units),
       });
     }
   }
@@ -183,7 +189,7 @@ export function computeAlsoMoved(
       rows.push({
         kind: "airTemp",
         label: "Air temp",
-        detail: formatTempDelta(baseline.conditionsAirTempC, run.conditionsAirTempC),
+        detail: formatTempDelta(baseline.conditionsAirTempC, run.conditionsAirTempC, units),
       });
     }
   }
@@ -311,13 +317,14 @@ export function formatPaceDelta(deltaSeconds: number | null): string | null {
 export function buildFeedEntry(
   runsDesc: readonly TeamFeedRunInput[],
   index: number,
-  timeZone: string
+  timeZone: string,
+  units: UnitSystem = "metric"
 ): TeamFeedEntry {
   const run = runsDesc[index];
   const baseline = pickPreviousComparableRun(runsDesc, index, timeZone);
 
   const allChanged = baseline ? computeSetupChangedRows(run.setupData, baseline.setupData) : [];
-  const allAlsoMoved = baseline ? computeAlsoMoved(run, baseline) : [];
+  const allAlsoMoved = baseline ? computeAlsoMoved(run, baseline, units) : [];
 
   return {
     runId: run.id,

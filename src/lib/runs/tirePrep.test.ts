@@ -14,9 +14,13 @@ import {
   newTirePrepStep,
   TIRE_PREP_DEFAULT_MINUTES,
   TIRE_PREP_DEFAULT_TEMP_C,
+  TIRE_PREP_TEMP_SLIDER,
   MAX_TIRE_PREP_STEPS,
+  defaultWarmerTempC,
+  formatWarmerTemp,
   type TirePrepStep,
 } from "@/lib/runs/tirePrep";
+import { tempFromInput } from "@/lib/units/unitSystem";
 
 const step = (p: Partial<TirePrepStep> = {}): TirePrepStep => ({
   ...emptyTirePrepStep(),
@@ -147,4 +151,33 @@ test("formatTirePrepLine reads as a human sequence", () => {
   );
   assert.equal(formatTirePrepLine([], "VP"), "VP");
   assert.equal(formatTirePrepLine([], null), null);
+});
+
+test("units: a warmer dialled in °F reads back exactly as dialled", () => {
+  for (let f = TIRE_PREP_TEMP_SLIDER.imperial.min; f <= TIRE_PREP_TEMP_SLIDER.imperial.max; f += 10) {
+    const [stored] = normalizeTirePrep([
+      { minutes: 10, warmers: true, temperatureC: tempFromInput("imperial", f) },
+    ]);
+    assert.equal(formatWarmerTemp(stored.temperatureC!, "imperial"), `${f}°F`, `${f}°F`);
+  }
+  // A new warmer step starts on the °F slider's default stop, not 70 °C converted (158 °F).
+  const fresh = newTirePrepStep(step({ warmers: true }), "imperial");
+  assert.equal(formatWarmerTemp(fresh.temperatureC!, "imperial"), "160°F");
+  assert.equal(defaultWarmerTempC("metric"), TIRE_PREP_DEFAULT_TEMP_C);
+});
+
+test("units: the prep line reads in the reader's unit, whole degrees either way", () => {
+  const steps: TirePrepStep[] = [
+    step({ minutes: 20, warmers: false }),
+    step({ minutes: 10, warmers: true, towels: true, temperatureC: 55 }),
+  ];
+  assert.equal(
+    formatTirePrepLine(steps, "VP", "imperial"),
+    "VP · 20m bench + 10m warmers 131°F (towels)"
+  );
+  // A °F-dialled warmer (65.56 °C stored) reads as a whole °C to a metric teammate.
+  assert.equal(
+    formatTirePrepLine([step({ minutes: 10, warmers: true, temperatureC: 65.56 })], null, "metric"),
+    "10m warmers 66°C"
+  );
 });

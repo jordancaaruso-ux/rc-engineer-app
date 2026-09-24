@@ -16,6 +16,7 @@ import { gatherSpeedhiveResults } from "@/lib/sweep/gatherSpeedhiveResults";
 import { gatherLiveRc } from "@/lib/sweep/gatherLiveRc";
 import { dayBoundsForYmd } from "@/lib/sweep/getMyDayDays";
 import { renderEveningSummaryEmail, renderEveningSummaryPush } from "@/lib/sweep/eveningSummary";
+import { unitSystemForUser } from "@/lib/units/unitSystemServer";
 import { reportSweepFailure } from "@/lib/observability/reportSweep";
 import {
   racedIntoTheEvening,
@@ -276,6 +277,8 @@ async function deliverDaySummary(params: {
     unconfirmedCount: runs.filter((r) => r.unconfirmedAt != null).length,
     unloggedCount: unlogged,
     openPath,
+    // The email's air line, in the driver's unit; the push carries no temperature.
+    units: await unitSystemForUser(userId),
   };
 
   const [webDevices, nativeDevices] = await Promise.all([

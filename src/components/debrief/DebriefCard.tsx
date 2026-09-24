@@ -18,6 +18,8 @@ import type { WorkbenchDebrief } from "@/lib/runs/sessionWorkbenchModel";
 import { formatRunDateShort } from "@/lib/formatDate";
 import { formatLap } from "@/lib/runLaps";
 import { cn } from "@/lib/utils";
+import { useUnits } from "@/components/providers/UnitsProvider";
+import { formatTempRange } from "@/lib/units/unitSystem";
 
 /**
  * The debrief — the driver's own note on a meeting, with the figures beside it.
@@ -294,6 +296,7 @@ function RecapLines({
   const rows: Row[] = [];
   let best: ReactNode = null;
   const [openSetupCarId, setOpenSetupCarId] = useState<string | null>(null);
+  const units = useUnits();
 
   /*
    * The three lap figures side by side under ONE word, "Best" — founder call 2026-09-14
@@ -400,10 +403,9 @@ function RecapLines({
     });
   }
 
+  // One decimal, spaced, in the reader's unit: "18.4 °C", "65.1–71.6 °F".
   const air = recap.airTempC
-    ? recap.airTempC.min === recap.airTempC.max
-      ? `${recap.airTempC.min} °C`
-      : `${recap.airTempC.min}–${recap.airTempC.max} °C`
+    ? formatTempRange(recap.airTempC.min, recap.airTempC.max, units, { space: true, decimals: 1 })
     : null;
 
   if (recap.tyres.length === 1) {

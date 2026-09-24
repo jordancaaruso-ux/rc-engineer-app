@@ -14,3 +14,7 @@ export function carsTag(userId: string): string {
 export function tracksTag(userId: string): string {
   return `tracks-${userId}`;
 }
+
+export function unitSystemTag(userId: string): string {
+  return `units-${userId}`;
+}

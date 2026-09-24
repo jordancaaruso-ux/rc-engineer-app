@@ -15,6 +15,8 @@
  * surfaces and aggregations keep working; `tirePrep` is the source of truth.
  */
 
+import { tempFromInput, tempIn, tempUnit, type UnitSystem } from "@/lib/units/unitSystem";
+
 export type TirePrepStep = {
   /** Was the run's additive (re)applied on this step? false = heat-only. */
   appliedAdditive: boolean;
@@ -46,6 +48,34 @@ export const TIRE_PREP_TEMP_MAX_C = 100;
 export const TIRE_PREP_DEFAULT_MINUTES = 20;
 export const TIRE_PREP_DEFAULT_TEMP_C = 70;
 
+/**
+ * The warmer-temp slider in each unit (units switch, 2026-09-24). Imperial is the same habitual
+ * band on round stops rather than 5 °C steps converted: 120–210 °F in tens covers 50–100 °C, and
+ * a stop reads 150, not 131. Stored as °C either way.
+ */
+export const TIRE_PREP_TEMP_SLIDER: Record<
+  UnitSystem,
+  { min: number; max: number; step: number; defaultValue: number }
+> = {
+  metric: {
+    min: TIRE_PREP_TEMP_MIN_C,
+    max: TIRE_PREP_TEMP_MAX_C,
+    step: 5,
+    defaultValue: TIRE_PREP_DEFAULT_TEMP_C,
+  },
+  imperial: { min: 120, max: 210, step: 10, defaultValue: 160 },
+};
+
+/**
+ * The warmer temp a new warmer step starts on, stored as °C: the slider's default stop in the
+ * driver's unit, so the shown default is the logged value in °F too (160 °F, not 158).
+ */
+export function defaultWarmerTempC(units: UnitSystem = "metric"): number {
+  return units === "imperial"
+    ? tempFromInput("imperial", TIRE_PREP_TEMP_SLIDER.imperial.defaultValue)
+    : TIRE_PREP_DEFAULT_TEMP_C;
+}
+
 const MINUTES_HARD_MAX = 600;
 const TEMP_HARD_MAX = 250;
 
@@ -60,11 +90,16 @@ function coerceMinutes(raw: unknown): number | null {
   return clampInt(n, 0, MINUTES_HARD_MAX);
 }
 
+/*
+ * Two decimals, not whole degrees: a warmer set in °F is stored as °C (150 °F = 65.56 °C), and
+ * rounding that to 66 would read back as 151 °F. Every °C figure logged so far is whole, so
+ * this changes none of them.
+ */
 function coerceTemp(raw: unknown): number | null {
   if (raw == null || raw === "") return null;
   const n = typeof raw === "number" ? raw : Number(String(raw).trim());
   if (!Number.isFinite(n)) return null;
-  return clampInt(n, 0, TEMP_HARD_MAX);
+  return Math.min(TEMP_HARD_MAX, Math.max(0, Math.round(n * 100) / 100));
 }
 
 export function emptyTirePrepStep(): TirePrepStep {
@@ -77,14 +112,14 @@ export function emptyTirePrepStep(): TirePrepStep {
  * additive) for fast repeat prep, but resets the numeric boxes to the fixed
  * defaults so they read a value immediately (`—` is never shown on add).
  */
-export function newTirePrepStep(prev?: TirePrepStep): TirePrepStep {
+export function newTirePrepStep(prev?: TirePrepStep, units: UnitSystem = "metric"): TirePrepStep {
   const warmers = prev ? prev.warmers : false;
   return {
     appliedAdditive: prev ? prev.appliedAdditive : true,
     minutes: TIRE_PREP_DEFAULT_MINUTES,
     warmers,
     towels: warmers ? Boolean(prev?.towels) : false,
-    temperatureC: warmers ? TIRE_PREP_DEFAULT_TEMP_C : null,
+    temperatureC: warmers ? defaultWarmerTempC(units) : null,
   };
 }
 
@@ -158,11 +193,24 @@ export function derivedWarmerTimingMinutes(steps: TirePrepStep[]): number | null
   return any ? total : null;
 }
 
-function formatStep(s: TirePrepStep): string {
+/**
+ * A warmer temperature as a step prints it, whole degrees in the driver's unit: "55°C",
+ * "150°F". `bare` drops the letter ("55°") for the compact step lists.
+ */
+export function formatWarmerTemp(
+  temperatureC: number,
+  units: UnitSystem = "metric",
+  opts?: { bare?: boolean }
+): string {
+  const figure = Math.round(tempIn(units, temperatureC));
+  return opts?.bare ? `${figure}°` : `${figure}${tempUnit(units)}`;
+}
+
+function formatStep(s: TirePrepStep, units: UnitSystem): string {
   const where = s.warmers ? "warmers" : "bench";
   const mins = s.minutes != null && s.minutes > 0 ? `${s.minutes}m ` : "";
   let out = `${mins}${where}`.trim();
-  if (s.warmers && s.temperatureC != null) out += ` ${s.temperatureC}°C`;
+  if (s.warmers && s.temperatureC != null) out += ` ${formatWarmerTemp(s.temperatureC, units)}`;
   if (s.warmers && s.towels) out += " (towels)";
   if (!s.appliedAdditive) out += " · no sauce";
   return out;
@@ -171,14 +219,16 @@ function formatStep(s: TirePrepStep): string {
 /**
  * Human-readable one-liner for read surfaces (run detail, compare, Engineer):
  *   "VP · 20m bench + 10m warmers 55°C (towels)"
- * Returns null when there is nothing to show.
+ * Returns null when there is nothing to show. `units` is the reader's; the Engineer reads
+ * metric, the unit its knowledge base is written in.
  */
 export function formatTirePrepLine(
   steps: TirePrepStep[],
-  additiveDisplayName?: string | null
+  additiveDisplayName?: string | null,
+  units: UnitSystem = "metric"
 ): string | null {
   const content = steps.filter(stepHasContent);
-  const seq = content.map(formatStep).join(" + ");
+  const seq = content.map((s) => formatStep(s, units)).join(" + ");
   const additive = additiveDisplayName?.trim();
   if (!seq && !additive) return null;
   if (!seq) return additive ?? null;

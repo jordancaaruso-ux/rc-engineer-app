@@ -13,13 +13,14 @@ import {
 } from "@/components/runs/TirePrepIcons";
 import {
   MAX_TIRE_PREP_STEPS,
-  TIRE_PREP_TEMP_MIN_C,
-  TIRE_PREP_TEMP_MAX_C,
   TIRE_PREP_DEFAULT_MINUTES,
-  TIRE_PREP_DEFAULT_TEMP_C,
+  TIRE_PREP_TEMP_SLIDER,
+  defaultWarmerTempC,
   newTirePrepStep,
   type TirePrepStep,
 } from "@/lib/runs/tirePrep";
+import { useUnits } from "@/components/providers/UnitsProvider";
+import { tempFromInput, tempIn, tempUnit } from "@/lib/units/unitSystem";
 import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
 
 type Props = {
@@ -51,12 +52,8 @@ const MINUTES_SLIDER = {
   step: 1, // every minute reachable (founder, 2026-07-15)
   defaultValue: TIRE_PREP_DEFAULT_MINUTES,
 };
-const TEMP_SLIDER = {
-  min: TIRE_PREP_TEMP_MIN_C,
-  max: TIRE_PREP_TEMP_MAX_C,
-  step: 5, // 5° steps only — no 1° refinement needed for warmer temps
-  defaultValue: TIRE_PREP_DEFAULT_TEMP_C,
-};
+// Warmer temp: 5 °C steps only — no 1° refinement needed for warmer temps. In °F it is
+// tens on the same band (TIRE_PREP_TEMP_SLIDER, units switch 2026-09-24).
 
 function ValueChip({
   value,
@@ -142,6 +139,11 @@ export function RunAdditiveTimingPanel({
   const [ranNone, setRanNone] = useState(false);
   const [openRuler, setOpenRuler] = useState<OpenRuler>(null);
   const controlId = controlAdditive?.id ?? null;
+  // The warmer temp is dialled in the driver's unit and stored °C. The chip and the slider read
+  // whole degrees: a °F stop stored as 65.56 °C reads back as exactly 150.
+  const units = useUnits();
+  const tempSlider = TIRE_PREP_TEMP_SLIDER[units];
+  const shownTemp = (c: number | null) => (c == null ? null : Math.round(tempIn(units, c)));
 
   // Reset the none-escape whenever the mandated additive changes (event switch).
   useEffect(() => {
@@ -171,7 +173,7 @@ export function RunAdditiveTimingPanel({
     if (tirePrep.length >= MAX_TIRE_PREP_STEPS) return;
     // Carry the previous step's on/off choices forward; pre-fill the numeric
     // boxes with the logged-by-default values so nothing reads "—".
-    const next = newTirePrepStep(tirePrep[tirePrep.length - 1]);
+    const next = newTirePrepStep(tirePrep[tirePrep.length - 1], units);
     onTirePrepChange([...tirePrep, next]);
     // The common flow is add → set time: open the new row's minutes ruler.
     setOpenRuler({ row: tirePrep.length, kind: "min" });
@@ -273,7 +275,7 @@ export function RunAdditiveTimingPanel({
                           // Fill the temp box with the default so it never reads "—".
                           updateStep(i, {
                             warmers: true,
-                            temperatureC: step.temperatureC ?? TIRE_PREP_DEFAULT_TEMP_C,
+                            temperatureC: step.temperatureC ?? defaultWarmerTempC(units),
                           });
                         }
                       }}
@@ -292,7 +294,7 @@ export function RunAdditiveTimingPanel({
                   </div>
                   {step.warmers ? (
                     <ValueChip
-                      value={step.temperatureC}
+                      value={shownTemp(step.temperatureC)}
                       unit="°"
                       open={tempOpen}
                       onClick={() => toggleRuler(i, "temp")}
@@ -329,14 +331,14 @@ export function RunAdditiveTimingPanel({
                       />
                     ) : (
                       <PrepSlider
-                        value={step.temperatureC}
-                        onChange={(v) => updateStep(i, { temperatureC: v })}
-                        min={TEMP_SLIDER.min}
-                        max={TEMP_SLIDER.max}
-                        step={TEMP_SLIDER.step}
-                        defaultValue={TEMP_SLIDER.defaultValue}
+                        value={shownTemp(step.temperatureC)}
+                        onChange={(v) => updateStep(i, { temperatureC: tempFromInput(units, v) })}
+                        min={tempSlider.min}
+                        max={tempSlider.max}
+                        step={tempSlider.step}
+                        defaultValue={tempSlider.defaultValue}
                         label="Warmer temp"
-                        unit="°C"
+                        unit={tempUnit(units)}
                         ariaLabel={`Warmer temperature, application ${i + 1}`}
                       />
                     )}

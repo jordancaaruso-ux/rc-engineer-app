@@ -16,6 +16,7 @@ import { displayRunNotes } from "@/lib/runNotes";
 import { Eyebrow } from "@/components/ui/panel";
 import { formatRunTiresOneLine } from "@/lib/tires/runTireEnds";
 import { formatRunTiresDetailLine } from "@/lib/runs/runTireContextDisplay";
+import { useUnits } from "@/components/providers/UnitsProvider";
 import { RollCenterCompareStrip } from "@/components/rollCenter/RollCenterGeometryBlock";
 import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 
@@ -104,6 +105,7 @@ export function RunComparePanel({
   const [mode, setMode] = useState<CompareMode>("current_setup");
   const [otherRunId, setOtherRunId] = useState("");
   const [activeTick, setActiveTick] = useState(0);
+  const units = useUnits();
 
   useEffect(() => {
     const bump = () => setActiveTick((t) => t + 1);
@@ -332,6 +334,7 @@ export function RunComparePanel({
                   additiveType: baseRun.additiveType,
                   warmerTimingMinutes: baseRun.warmerTimingMinutes,
                   tirePrep: baseRun.tirePrep,
+                  units,
                 })}
               </p>
             </div>

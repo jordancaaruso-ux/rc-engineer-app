@@ -47,6 +47,12 @@ test("lines: figures in Debrief order, tyres only when more than one, then the a
   ]);
 });
 
+test("lines: the air reads in the driver's unit", () => {
+  const lines = eveningSummaryLines({ ...base, units: "imperial" });
+  assert.ok(lines.includes("Air 64–73°F"), lines.join(" | "));
+  assert.ok(!lines.some((l) => l.includes("°C")));
+});
+
 test("push: one line with the best mark and what is left to do", () => {
   const p = renderEveningSummaryPush(base);
   assert.equal(p.title, "Your day at MR33 Arena");

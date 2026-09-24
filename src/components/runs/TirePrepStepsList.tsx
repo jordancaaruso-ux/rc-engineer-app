@@ -4,10 +4,13 @@ import {
   TowelRollIcon,
 } from "@/components/runs/TirePrepIcons";
 import {
+  formatWarmerTemp,
   normalizeTirePrep,
   tirePrepFromLegacy,
   type TirePrepStep,
 } from "@/lib/runs/tirePrep";
+import { useUnits } from "@/components/providers/UnitsProvider";
+import type { UnitSystem } from "@/lib/units/unitSystem";
 
 /**
  * Read-only tire-prep step list (sessions prep panel + expanded-run "Tire prep"
@@ -29,19 +32,21 @@ export function resolveTirePrepSteps(run: {
   return tirePrepFromLegacy(run.warmerTimingMinutes, Boolean(run.additiveType));
 }
 
-function stepLine(s: TirePrepStep): string {
+function stepLine(s: TirePrepStep, units: UnitSystem): string {
   const bits: string[] = [];
   if (s.minutes != null && s.minutes > 0) bits.push(`${s.minutes}m`);
   bits.push(s.appliedAdditive ? "additive" : "no sauce");
   if (s.warmers) {
     bits.push(
-      `warmers${s.temperatureC != null ? ` ${s.temperatureC}°` : ""}${s.towels ? " · towels" : ""}`
+      `warmers${s.temperatureC != null ? ` ${formatWarmerTemp(s.temperatureC, units, { bare: true })}` : ""}${s.towels ? " · towels" : ""}`
     );
   }
   return bits.join(" · ");
 }
 
+/** Rendered only inside client screens (run detail, the sessions table): it reads the units hook. */
 export function TirePrepStepsList({ steps }: { steps: TirePrepStep[] }) {
+  const units = useUnits();
   if (steps.length === 0) {
     return <p className="text-xs text-muted-foreground">No tire prep logged.</p>;
   }
@@ -58,7 +63,7 @@ export function TirePrepStepsList({ steps }: { steps: TirePrepStep[] }) {
             {s.warmers ? <WarmerSteamIcon className="h-3 w-3" /> : null}
             {s.towels ? <TowelRollIcon className="h-3 w-3" /> : null}
           </span>
-          <span className="min-w-0">{stepLine(s)}</span>
+          <span className="min-w-0">{stepLine(s, units)}</span>
         </div>
       ))}
     </div>

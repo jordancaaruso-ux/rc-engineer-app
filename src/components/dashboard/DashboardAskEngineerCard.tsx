@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { EngineerStarterQuestion } from "@/lib/engineerStarterQuestions";
+import { starterQuestionText, type EngineerStarterQuestion } from "@/lib/engineerStarterQuestions";
+import { useUnits } from "@/components/providers/UnitsProvider";
 import { useReducedMotion } from "@/components/ui/motion";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
@@ -41,6 +42,7 @@ export function DashboardAskEngineerCard({
   questions: EngineerStarterQuestion[];
 }) {
   const reduced = useReducedMotion();
+  const units = useUnits();
   const [index, setIndex] = useState(0);
   const [stopped, setStopped] = useState(false);
 
@@ -64,9 +66,9 @@ export function DashboardAskEngineerCard({
       <Eyebrow dot="muted">Ask the Engineer</Eyebrow>
 
       <Link
-        href={`/engineer?prompt=${encodeURIComponent(question.text)}`}
+        href={`/engineer?prompt=${encodeURIComponent(starterQuestionText(question, units))}`}
         prefetch
-        aria-label={question.text}
+        aria-label={starterQuestionText(question, units)}
         onPointerDown={() => setStopped(true)}
         onFocus={() => setStopped(true)}
         className="tap-active mt-1.5 flex items-center gap-2.5 rounded-lg border border-border bg-muted/40 px-3 py-2.5 transition hover:border-primary-ink/30"

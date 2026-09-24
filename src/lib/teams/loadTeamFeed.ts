@@ -10,6 +10,7 @@ import {
   type TeamFeedRunInput,
 } from "@/lib/teams/teamFeedModel";
 import { loadTeamMemberDisplays, type TeamMemberDisplay } from "@/lib/teams/teamMemberDisplay";
+import type { UnitSystem } from "@/lib/units/unitSystem";
 
 /** One page of the feed. Small on purpose — this is a glanceable surface, not an archive. */
 export const TEAM_FEED_PAGE_SIZE = 20;
@@ -183,6 +184,8 @@ export type LoadTeamFeedParams = {
   viewerId: string;
   teamId: string;
   timeZone: string;
+  /** The viewer's units, for the "also moved" temperatures. Metric when omitted. */
+  units?: UnitSystem;
   cursor?: string | null;
   /** Run id from a notification deep link (`?run=`). Returned separately from the page. */
   pinnedRunId?: string | null;
@@ -197,6 +200,7 @@ export type LoadTeamFeedParams = {
  */
 export async function loadTeamFeedModel(params: LoadTeamFeedParams): Promise<TeamFeedModel | null> {
   const { viewerId, teamId, timeZone } = params;
+  const units = params.units ?? "metric";
 
   const team = await prisma.team.findFirst({
     where: { id: teamId },
@@ -267,7 +271,7 @@ export async function loadTeamFeedModel(params: LoadTeamFeedParams): Promise<Tea
     : pageRuns;
 
   const entriesByRunId = focusRuns.length
-    ? await buildEntriesForRuns({ focusRuns, memberIds, sharedRunFilter, timeZone, displays, viewerId, teamId, viewerIsAdmin })
+    ? await buildEntriesForRuns({ focusRuns, memberIds, sharedRunFilter, timeZone, units, displays, viewerId, teamId, viewerIsAdmin })
     : new Map<string, TeamFeedEntryView>();
 
   const oldest = pageRuns[pageRuns.length - 1];
@@ -290,12 +294,13 @@ async function buildEntriesForRuns(args: {
   memberIds: string[];
   sharedRunFilter: { userId: { in: string[] }; shareWithTeam: true; loggingComplete: true };
   timeZone: string;
+  units: UnitSystem;
   displays: ReadonlyMap<string, TeamMemberDisplay>;
   viewerId: string;
   teamId: string;
   viewerIsAdmin: boolean;
 }): Promise<Map<string, TeamFeedEntryView>> {
-  const { focusRuns, sharedRunFilter, timeZone, displays, viewerId, teamId, viewerIsAdmin } = args;
+  const { focusRuns, sharedRunFilter, timeZone, units, displays, viewerId, teamId, viewerIsAdmin } = args;
 
   // Baseline candidates: the same members' runs within a few days of the oldest entry on the
   // page, plus everything from the meetings on this page (a meeting can span several days).
@@ -368,7 +373,7 @@ async function buildEntriesForRuns(args: {
   for (const run of focusRuns) {
     const idx = indexById.get(run.id);
     if (idx == null) continue;
-    const entry = buildFeedEntry(hydrated, idx, timeZone);
+    const entry = buildFeedEntry(hydrated, idx, timeZone, units);
     const display = displays.get(run.userId);
     out.set(run.id, {
       runId: run.id,

@@ -1,6 +1,7 @@
 import { BRAND_DOMAIN, PRODUCT_NAME } from "@/lib/brand/brandNames";
 import type { DebriefRecap } from "@/lib/debrief/buildDebriefRecap";
 import { formatBestLap } from "@/lib/sweep/formatLap";
+import { formatTempRange, type UnitSystem } from "@/lib/units/unitSystem";
 
 /**
  * "Your day at MR33" — the evening summary, rendered for a push (two short lines) and for an
@@ -25,6 +26,8 @@ export type EveningSummaryInput = {
   unloggedCount: number;
   /** App-relative path that opens the day — and carries the sheet's flag when one is waiting. */
   openPath: string;
+  /** The driver's units, for the air line. Metric when omitted. */
+  units?: UnitSystem;
 };
 
 function runWord(n: number): string {
@@ -64,11 +67,7 @@ export function eveningSummaryLines(input: EveningSummaryInput): string[] {
       }
     }
     if (r.airTempC) {
-      lines.push(
-        r.airTempC.min === r.airTempC.max
-          ? `Air ${Math.round(r.airTempC.min)}°C`
-          : `Air ${Math.round(r.airTempC.min)}–${Math.round(r.airTempC.max)}°C`,
-      );
+      lines.push(`Air ${formatTempRange(r.airTempC.min, r.airTempC.max, input.units ?? "metric")}`);
     }
   } else if (input.runCount > 0) {
     lines.push(runWord(input.runCount));

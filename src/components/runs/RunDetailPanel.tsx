@@ -27,6 +27,8 @@ import {
 } from "@/lib/runHandlingAssessment";
 import { formatConditionsChip } from "@/lib/weather/conditions";
 import { runConditionsFromRecord } from "@/lib/weather/runConditionsRecord";
+import { useUnits } from "@/components/providers/UnitsProvider";
+import { tempFigure, tempUnit, windFigure, windUnit } from "@/lib/units/unitSystem";
 import type { RunCompareListSource } from "@/lib/runCompareCatalog";
 import type { CompareRunShape } from "@/components/runs/RunComparePanel";
 import { TirePrepStepsList, resolveTirePrepSteps } from "@/components/runs/TirePrepStepsList";
@@ -324,6 +326,7 @@ export function RunDetailPanel({
   columnClassName?: string;
 }) {
   const router = useRouter();
+  const units = useUnits();
   const todayDraft = useDraftRunOptional();
   /*
    * Correcting a logged run happens HERE now, not only behind the pencil that
@@ -651,7 +654,7 @@ export function RunDetailPanel({
     if (expandedLapStatDetail !== null) setLastLapStatDetail(expandedLapStatDetail);
   }, [expandedLapStatDetail]);
   const runConditions = runConditionsFromRecord(run);
-  const conditionsChip = formatConditionsChip(runConditions);
+  const conditionsChip = formatConditionsChip(runConditions, units);
   /*
    * The weather used to reach the page as a single "Cond." chip — readable, but
    * nothing you could argue with. A track temperature typed from memory the next
@@ -675,12 +678,18 @@ export function RunDetailPanel({
   const conditionCells = useMemo(
     () =>
       [
-        { key: "trackTempC", label: "Track temp", unit: "°C", value: runConditions.trackTempC },
-        { key: "airTempC", label: "Air temp", unit: "°C", value: runConditions.airTempC },
-        { key: "humidityPct", label: "Humidity", unit: "%", value: runConditions.humidityPct },
-        { key: "windKph", label: "Wind", unit: "km/h", value: runConditions.windKph },
-      ].filter((c) => c.value != null),
-    [runConditions.trackTempC, runConditions.airTempC, runConditions.humidityPct, runConditions.windKph]
+        { key: "trackTempC", label: "Track temp", unit: tempUnit(units), value: tempFigure(runConditions.trackTempC, units) },
+        { key: "airTempC", label: "Air temp", unit: tempUnit(units), value: tempFigure(runConditions.airTempC, units) },
+        {
+          key: "humidityPct",
+          label: "Humidity",
+          unit: "%",
+          value: runConditions.humidityPct != null ? String(runConditions.humidityPct) : "",
+        },
+        { key: "windKph", label: "Wind", unit: windUnit(units), value: windFigure(runConditions.windKph, units) },
+        // Figures come back as strings in the reader's unit, one decimal at most; "" = never taken.
+      ].filter((c) => c.value !== ""),
+    [runConditions.trackTempC, runConditions.airTempC, runConditions.humidityPct, runConditions.windKph, units]
   );
   const hasAnyCondition = conditionCells.length > 0;
   /**

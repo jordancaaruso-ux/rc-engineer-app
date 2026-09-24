@@ -38,8 +38,10 @@ import { matchNamedScope } from "@/lib/engineer/nameMatch";
 import {
   ENGINEER_STARTER_BOARD_COUNT,
   selectEngineerStarterQuestions,
+  starterQuestionText,
   type EngineerStarterQuestion,
 } from "@/lib/engineerStarterQuestions";
+import { useUnits } from "@/components/providers/UnitsProvider";
 
 /**
  * The Engineer chat: the conversation card and the history card, the subject bar, the starter
@@ -222,6 +224,7 @@ export function EngineerChatPanel({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const units = useUnits();
   const { pinnedRunId, general: generalMode, range: rangeScope } = readSubject(searchParams);
   // Stable identity for effects and the send callback: the URL re-parses to a new object
   // every render, but the same query string is the same range.
@@ -625,11 +628,12 @@ export function EngineerChatPanel({
   const fillFromStarter = (question: EngineerStarterQuestion) => {
     // Fills, never sends: a mis-tap costs nothing, and it can't spend a request from the
     // monthly cap. The driver adds which corner, which round, then sends.
-    setInput(question.text);
+    const text = starterQuestionText(question, units);
+    setInput(text);
     const el = composerRef.current;
     if (!el) return;
     el.focus();
-    const end = question.text.length;
+    const end = text.length;
     el.setSelectionRange(end, end);
   };
 
