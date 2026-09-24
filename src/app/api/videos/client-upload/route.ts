@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { hasDatabaseUrl } from "@/lib/env";
 import { requireApiFeature } from "@/lib/entitlementGuards";
@@ -40,6 +41,12 @@ export async function POST(request: Request): Promise<NextResponse> {
               ? "Sign in to upload videos."
               : "Video upload needs an active subscription."
           );
+        }
+        // Video is closed for release (founder call 2026-08-02; `videos/layout.tsx`): the screens refuse
+        // every non-admin, and so must the doors behind them, or a script on a Pro account could store
+        // any number of 2 GB files (2026-09-24 launch audit). Lift this with the layout's gate.
+        if (!isAuthAdminEmail(gate.user.email)) {
+          throw new Error("Video analysis isn't open yet.");
         }
         // The client mints `videos/<uuid>.<ext>` — anything else is not ours.
         if (!/^videos\/[0-9a-fA-F-]{36}\.(mp4|webm|mov)$/.test(pathname)) {

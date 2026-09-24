@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { head } from "@vercel/blob";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
@@ -44,6 +45,12 @@ export async function POST(request: Request) {
   const gate = await requireApiFeature("video");
   if (gate.response) return gate.response;
   const userId = gate.user.id;
+  // Video is closed for release (founder call 2026-08-02; `videos/layout.tsx`): the screens refuse
+  // every non-admin, and so must the doors behind them, or a script on a Pro account could store
+  // any number of 2 GB files (2026-09-24 launch audit). Lift this with the layout's gate.
+  if (!isAuthAdminEmail(gate.user.email)) {
+    return NextResponse.json({ error: "Video analysis isn't open yet." }, { status: 403 });
+  }
 
   const ct = request.headers.get("content-type") ?? "";
   // Register a client-direct blob upload (big files never pass through this server).

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUserId } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { prisma } from "@/lib/prisma";
 import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
 import { canonicalSetupTemplateForUserCarId } from "@/lib/carSetupScope";
@@ -91,8 +92,14 @@ export async function POST(request: Request, ctx: Ctx) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const userId = await getAuthenticatedApiUserId();
-    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authUser = await getAuthenticatedApiUser();
+  if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Founder ingest tool, admins only (2026-09-24 launch audit): one call crawls PetitRC and stores
+  // and processes up to 2,000 PDFs, and nothing in the app links drivers to it.
+  if (!isAuthAdminEmail(authUser.email)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  const userId = authUser.id;
   const { batchId } = await ctx.params;
 
   const batch = await prisma.setupImportBatch.findFirst({

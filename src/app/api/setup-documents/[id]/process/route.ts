@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { processSetupDocumentImport } from "@/lib/setupDocuments/processImport";
 import { tryCreateSetupFromParsedDocument } from "@/lib/setupDocuments/tryCreateSetupFromParsedDocument";
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
+import { sourceTypeFromMime } from "@/lib/setupDocuments/storage";
 import {
   checkAiBudget,
   recordEstimatedAiUsage,
@@ -33,6 +34,8 @@ export async function POST(_: Request, ctx: Ctx) {
       currentStage: true,
       lastCompletedStage: true,
       calibrationProfileId: true,
+      mimeType: true,
+      sourceType: true,
     },
   });
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -90,10 +93,12 @@ export async function POST(_: Request, ctx: Ctx) {
   const dbg = process.env.DEBUG_SETUP_PROCESS_TIMING === "1";
   const t0 = dbg ? performance.now() : 0;
   try {
+    // Only an image reaches a model; a PDF costs no AI money (see quick-create).
+    const sourceType = doc.sourceType ?? sourceTypeFromMime(doc.mimeType);
     await recordEstimatedAiUsage({
       userId: user.id,
       feature: "setup-extract",
-      estimatedCostUsd: SETUP_EXTRACT_ESTIMATED_COST_USD,
+      estimatedCostUsd: sourceType === "IMAGE" ? SETUP_EXTRACT_ESTIMATED_COST_USD : 0,
     });
     await processSetupDocumentImport({ docId: doc.id, userId: user.id });
     const auto = await tryCreateSetupFromParsedDocument({ docId: doc.id, userId: user.id });

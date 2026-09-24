@@ -698,10 +698,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       if (!budget.ok) {
         throw new Error(budget.message);
       }
+      // Counted either way (the daily import cap is also a compute guard), but only an image
+      // reaches a model — a PDF is read by its form fields and local OCR, so it costs no AI
+      // money. Booking $0.12 for every PDF ate into the same allowance as Engineer questions
+      // (2026-09-24 launch audit).
       await recordEstimatedAiUsage({
         userId: user.id,
         feature: "setup-extract",
-        estimatedCostUsd: SETUP_EXTRACT_ESTIMATED_COST_USD,
+        estimatedCostUsd: sourceType === "IMAGE" ? SETUP_EXTRACT_ESTIMATED_COST_USD : 0,
       });
       await processSetupDocumentImport({ docId: created.id, userId: user.id });
     } catch (e) {

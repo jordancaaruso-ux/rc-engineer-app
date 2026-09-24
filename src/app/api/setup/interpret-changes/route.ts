@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { requireApiFeature } from "@/lib/entitlementGuards";
+import { checkAiBudget, recordEstimatedAiUsage } from "@/lib/aiUsage/ledger";
+import { SETUP_INTERPRET_ESTIMATED_COST_USD } from "@/lib/aiUsage/budgets";
 import { hasOpenAiApiKey, getOpenAiApiKey } from "@/lib/openaiServerEnv";
 import { prisma } from "@/lib/prisma";
 import { isA800RRCar } from "@/lib/setupSheetTemplateId";
@@ -12,6 +14,8 @@ import { isDerivedSetupKey } from "@/lib/setupCalculations/a800rrDerived";
 import { getCalibrationFieldKind } from "@/lib/setupCalibrations/calibrationFieldCatalog";
 
 export const dynamic = "force-dynamic";
+
+const MAX_CHANGES_TEXT = 2000;
 
 type EditProposal = {
   fieldKey: string;
@@ -43,16 +47,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "OPENAI_API_KEY is not set" }, { status: 500 });
   }
 
-  const user = await getAuthenticatedApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // A paid plan and the AI allowance (2026-09-24 launch audit): before that any signed-in account,
+  // unpaid included, could loop this with text of any length against the founder's OpenAI bill.
+  const gate = await requireApiFeature("logging");
+  if (gate.response) return gate.response;
+  const user = gate.user;
   const body = (await request.json().catch(() => null)) as
     | { carId?: unknown; setupData?: unknown; changesText?: unknown }
     | null;
 
   const carId = typeof body?.carId === "string" ? body.carId.trim() : "";
-  const changesText = typeof body?.changesText === "string" ? body.changesText.trim() : "";
+  // A driver's change note is a line or two; a page of it is not a note.
+  const changesText =
+    typeof body?.changesText === "string" ? body.changesText.trim().slice(0, MAX_CHANGES_TEXT) : "";
   if (!carId) return NextResponse.json({ error: "carId is required" }, { status: 400 });
   if (!changesText) return NextResponse.json({ error: "changesText is required" }, { status: 400 });
+
+  const budget = await checkAiBudget({
+    userId: user.id,
+    userEmail: user.email,
+    feature: "setup-interpret",
+  });
+  if (!budget.ok) return NextResponse.json({ error: budget.message }, { status: 429 });
 
   const car = await prisma.car.findFirst({
     where: { id: carId, userId: user.id },
@@ -118,6 +134,11 @@ Rules:
 - Prefer returning fewer edits rather than guessing.`;
 
   const apiKey = mustKey();
+  await recordEstimatedAiUsage({
+    userId: user.id,
+    feature: "setup-interpret",
+    estimatedCostUsd: SETUP_INTERPRET_ESTIMATED_COST_USD,
+  });
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },

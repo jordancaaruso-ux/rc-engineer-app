@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
-import { getAuthenticatedApiUserId } from "@/lib/currentUser";
+import { getAuthenticatedApiUser } from "@/lib/currentUser";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { prisma } from "@/lib/prisma";
 import { discoverPetitRcSetupPdfs } from "@/lib/petitrc/discoverPetitRcPdfs";
 
@@ -10,8 +11,14 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  const userId = await getAuthenticatedApiUserId();
-    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authUser = await getAuthenticatedApiUser();
+  if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Founder ingest tool, admins only (2026-09-24 launch audit): one call crawls PetitRC and stores
+  // and processes up to 2,000 PDFs, and nothing in the app links drivers to it.
+  if (!isAuthAdminEmail(authUser.email)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  const userId = authUser.id;
   const body = (await request.json().catch(() => ({}))) as { url?: string; maxPdfs?: number };
   const rawUrl = typeof body.url === "string" ? body.url.trim() : "";
   if (!rawUrl) return NextResponse.json({ error: "url is required" }, { status: 400 });

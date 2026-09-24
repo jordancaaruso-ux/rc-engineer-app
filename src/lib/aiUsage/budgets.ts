@@ -13,6 +13,10 @@ import { TIER_LABELS } from "@/lib/brand/brandNames";
 export const AI_USAGE_FEATURES = [
   "engineer-chat",
   "setup-extract",
+  // The two small gpt-4o-mini reads on the run form. Until 2026-09-24 (launch audit) they had no
+  // allowance, no record and no plan check, so any signed-in account could loop them.
+  "lap-photo",
+  "setup-interpret",
 ] as const;
 
 export type AiUsageFeature = (typeof AI_USAGE_FEATURES)[number];
@@ -132,7 +136,16 @@ export const DEFAULT_AI_BUDGET: AiBudget = {
 const FEATURE_DAILY_CALLS: Record<AiUsageFeature, number> = {
   "engineer-chat": 60,
   "setup-extract": 25,
+  "lap-photo": 30,
+  "setup-interpret": 40,
 };
+
+/**
+ * Booked per call for the small reads, which report no token usage back to the ledger. Rounded up
+ * from gpt-4o-mini's price so the shared daily/monthly cost caps still see them.
+ */
+export const LAP_PHOTO_ESTIMATED_COST_USD = 0.01;
+export const SETUP_INTERPRET_ESTIMATED_COST_USD = 0.005;
 
 function envNumber(raw: string | undefined): number | null {
   const n = Number(raw);
