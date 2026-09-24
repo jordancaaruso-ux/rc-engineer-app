@@ -67,6 +67,59 @@ export function isEngineerSetupKey(key: string): boolean {
 }
 
 /**
+ * Fewer boxes than this that the Engineer can read, and it cannot read the sheet: what it sees is
+ * the gearing, the motor, the body — a box or two — and not one spring, bar, oil or geometry
+ * setting. Every Xray X4, the ARC A11 and most Schumachers are here; an A800RR shows 60-odd.
+ */
+export const MIN_READABLE_BOXES = 20;
+
+/**
+ * A sheet split by what the Engineer is shown: `read` is `tuningValues`; `unread` is every other box
+ * with something in it — a box on a chassis sheet the app has not learned yet ("text20"), or one it
+ * never shows (tyres, battery, notes).
+ */
+export type SheetRead = { read: Record<string, string>; unread: Record<string, string> };
+
+export function readSheet(data: unknown): SheetRead {
+  const read: Record<string, string> = {};
+  const unread: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(normalizeSetupData(data))) {
+    const value = fmtSetupValue(raw);
+    if (value) (isEngineerSetupKey(key) ? read : unread)[key] = value;
+  }
+  return { read, unread };
+}
+
+/**
+ * The Engineer can read too little of this sheet for what it reads to stand for the car. Until
+ * 2026-09-24 such a sheet's "changed" line looked only at the boxes it could read — the gearing —
+ * so a run where the springs and a bar moved printed "no setup change", and the founder's own
+ * Bayside May–June, read as an X4 would be, said it 27 times where the truth was 2.
+ */
+export function sheetMostlyUnread(sheet: SheetRead): boolean {
+  return Object.keys(sheet.read).length < MIN_READABLE_BOXES && Object.keys(sheet.unread).length > 0;
+}
+
+/**
+ * The part of the sheet the app cannot read — one wording for the run block and the range block.
+ * Founder, 2026-09-21: "a strong distinction between when the engineer can read a car and when it
+ * can't". `filled` is how many boxes the driver has filled in.
+ */
+export function notVisibleLines(filled: number): string[] {
+  return [
+    filled > 0
+      ? `The driver filled in ${filled} boxes on this car's setup sheet, but the app has not yet learned which box is which on this chassis's sheet, so none of them can be read. That gap is the app's, not the driver's: they have already filled the sheet in.`
+      : "The driver has not filled in a setup sheet for this car. Once they do, the values the car ran appear here.",
+    "No setting on this car can be seen — not a spring, an oil, a toe, a camber or a ride height.",
+  ];
+}
+
+/** The same, for a sheet read in part: the rows above it are all that can be seen. */
+export function partlyVisibleLine(unread: number): string {
+  return `The driver filled in ${unread} more ${unread === 1 ? "box" : "boxes"} on this car's setup sheet that the app cannot read yet: it has not learned which box is which on this chassis's sheet. That gap is the app's, not the driver's. Every setting not listed above is unknown — not absent, and not unchanged.`;
+}
+
+/**
  * Spur ÷ pinion, worked out here so the model never divides (north star: the arithmetic is done in
  * code). NOT the final drive ratio — that is this times the car's internal ratio, which no sheet
  * key reliably carries — and the line it prints says so. Null unless both are plain numbers.
@@ -124,20 +177,14 @@ export function leversNotOnSheet(
   opts: { minReadable?: number; maxMissing?: number } = {}
 ): string[] {
   const keys = [...new Set(sheetKeys.map((k) => k.trim().toLowerCase()).filter(Boolean))];
-  if (keys.filter(isEngineerSetupKey).length < (opts.minReadable ?? 20)) return [];
+  if (keys.filter(isEngineerSetupKey).length < (opts.minReadable ?? MIN_READABLE_BOXES)) return [];
   const missing = levers.filter((l) => !sheetHasLever(l.parameter, keys)).map((l) => l.label);
   return missing.length > (opts.maxMissing ?? 6) ? [] : missing;
 }
 
 /** Tuning, body, gearing and motor keys only — the blob also carries tyres, battery, electronics and free text. */
 export function tuningValues(data: unknown): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [key, raw] of Object.entries(normalizeSetupData(data))) {
-    if (!isEngineerSetupKey(key)) continue;
-    const value = fmtSetupValue(raw);
-    if (value) out[key] = value;
-  }
-  return out;
+  return readSheet(data).read;
 }
 
 /**
@@ -165,6 +212,10 @@ export function diffTuning(
   next: Record<string, string>
 ): string[] | null {
   if (Object.keys(prev).length === 0 || Object.keys(next).length === 0) return null;
+  return listChanges(prev, next);
+}
+
+function listChanges(prev: Record<string, string>, next: Record<string, string>): string[] {
   const changes: string[] = [];
   for (const key of [...new Set([...Object.keys(prev), ...Object.keys(next)])].sort()) {
     if (sameSetupValue(prev[key], next[key])) continue;
@@ -172,3 +223,41 @@ export function diffTuning(
   }
   return changes;
 }
+
+/**
+ * What moved between two sheets, for a "changed" line: the boxes the Engineer reads, by name, and
+ * `unread` — how many boxes it cannot read moved. Null when either sheet has nothing filled in.
+ *
+ * On a sheet the Engineer reads, `unread` is always 0 and the line is `diffTuning`'s: there the
+ * boxes it is not shown are the tyres, the battery and the notes (27 of the 29 A800RR runs where
+ * only those moved), and counting them would make the Engineer ask about every new set of tyres.
+ * On a sheet it can barely read (`sheetMostlyUnread`) every box counts, so "no setup change" is
+ * said only when nothing on the sheet moved.
+ */
+export function diffSheet(prev: SheetRead, next: SheetRead): { changes: string[]; unread: number } | null {
+  const filled = (s: SheetRead) => Object.keys(s.read).length + Object.keys(s.unread).length;
+  if (filled(prev) === 0 || filled(next) === 0) return null;
+  if (!sheetMostlyUnread(prev) && !sheetMostlyUnread(next)) {
+    const changes = diffTuning(prev.read, next.read);
+    return changes == null ? null : { changes, unread: 0 };
+  }
+  let unread = 0;
+  for (const key of new Set([...Object.keys(prev.unread), ...Object.keys(next.unread)])) {
+    if (!sameSetupValue(prev.unread[key], next.unread[key])) unread++;
+  }
+  return { changes: listChanges(prev.read, next.read), unread };
+}
+
+/** "pinion 39 → 40, and 3 boxes not shown here" — null when nothing moved ("no setup change"). */
+export function changedWords(change: { changes: string[]; unread: number }, maxListed: number): string | null {
+  const { changes, unread } = change;
+  if (changes.length === 0 && unread === 0) return null;
+  const shown = changes.slice(0, maxListed).join(", ");
+  const more = changes.length > maxListed ? `, +${changes.length - maxListed} more` : "";
+  if (unread === 0) return `${shown}${more}`;
+  const boxes = `${unread} ${unread === 1 ? "box" : "boxes"} not shown here`;
+  return changes.length > 0 ? `${shown}${more}, and ${boxes}` : `only ${boxes}`;
+}
+
+/** The sentence a block adds when one of its "changed" lines counts boxes the Engineer cannot read. */
+export const UNREAD_BOXES_NOTE = `"boxes not shown here" are boxes on a sheet the app cannot read yet: something in them moved, but not which setting or which way.`;

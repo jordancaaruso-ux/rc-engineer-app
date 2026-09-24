@@ -7,7 +7,17 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { diffTuning, isEngineerSetupKey, leversNotOnSheet, spurOverPinion, tuningValues } from "@/lib/engineer/setupDiff";
+import {
+  changedWords,
+  diffSheet,
+  diffTuning,
+  isEngineerSetupKey,
+  leversNotOnSheet,
+  readSheet,
+  sheetMostlyUnread,
+  spurOverPinion,
+  tuningValues,
+} from "@/lib/engineer/setupDiff";
 
 const sheet = { bodyshell: "Twister", wing: "Std", damper_oil_front: "450", motor: "21.5", body_notes: "trimmed" };
 
@@ -71,4 +81,34 @@ test("a sheet the Engineer cannot read says nothing about what the car lacks", (
   // A readable sheet that spells its knobs another way would look like a car with no levers at all.
   const otherSpelling = a800rrKeys.map((k) => (k.startsWith("toe_") || k.startsWith("camber_") ? k : `x_${k}`));
   assert.deepEqual(leversNotOnSheet(levers, otherSpelling, { minReadable: 3, maxMissing: 2 }), []);
+});
+
+// An Xray X4-style sheet: the Engineer reads the gearing and the motor; the springs and the bar sit
+// in boxes the app has not named yet. Until 2026-09-24 a run where those moved printed "no setup change".
+const x4 = { pinion: 39, spur: 66, motor: "21.5", text20: "1", text34: "12", text41: "450" };
+
+test("a sheet the Engineer barely reads never says nothing moved when a box it cannot read did", () => {
+  const change = diffSheet(readSheet(x4), readSheet({ ...x4, text20: "1.1", text34: "14" }));
+  assert.deepEqual(change, { changes: [], unread: 2 });
+  assert.equal(changedWords(change!, 8), "only 2 boxes not shown here");
+  const regear = diffSheet(readSheet(x4), readSheet({ ...x4, pinion: 40, text20: "1.1" }));
+  assert.equal(changedWords(regear!, 8), "pinion 39 → 40, and 1 box not shown here");
+});
+
+test("nothing moved anywhere on the sheet is still no setup change; nothing filled in on one side is unknown", () => {
+  assert.equal(changedWords(diffSheet(readSheet(x4), readSheet({ ...x4 }))!, 8), null);
+  assert.equal(diffSheet(readSheet({}), readSheet(x4)), null);
+  // A sheet with no box the Engineer can read at all counts its boxes the same way.
+  assert.deepEqual(diffSheet(readSheet({ text1: "a", text2: "3" }), readSheet({ text1: "a", text2: "4" })), { changes: [], unread: 1 });
+});
+
+test("on a sheet the Engineer reads, the boxes it is not shown do not count — they are the tyres and the battery", () => {
+  const readable = Object.fromEntries(a800rrKeys.slice(0, 20).map((k) => [k, "1"]));
+  const sheet = { ...readable, tires: "Matrix Z36 #1", battery: "EAM 7000 #1" };
+  assert.equal(sheetMostlyUnread(readSheet(sheet)), false);
+  assert.equal(sheetMostlyUnread(readSheet(x4)), true);
+  const newTyres = diffSheet(readSheet(sheet), readSheet({ ...sheet, tires: "Matrix Z36 #2" }));
+  assert.deepEqual(newTyres, { changes: [], unread: 0 });
+  assert.equal(changedWords(newTyres!, 8), null);
+  assert.equal(changedWords(diffSheet(readSheet(sheet), readSheet({ ...sheet, arb_front: "1.1", tires: "x" }))!, 8), "arb front 1 → 1.1");
 });

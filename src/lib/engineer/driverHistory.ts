@@ -11,7 +11,7 @@ import { matchDriverNameInQuestions } from "@/lib/engineer/nameMatch";
 import { driverKey, driversOnSheets } from "@/lib/engineer/rivals";
 import type { EngineerPayloadBlock } from "@/lib/engineer/payload";
 import { describeRangeDates, type EngineerRangeScope } from "@/lib/engineer/rangeScope";
-import { readableSetupKey, tuningValues } from "@/lib/engineer/setupDiff";
+import { readSheet, readableSetupKey, sheetMostlyUnread } from "@/lib/engineer/setupDiff";
 import {
   getAverageTopN,
   getBestLap,
@@ -233,6 +233,7 @@ export async function countRunsInRange(userId: string, scope: EngineerRangeScope
 export function toHistoryRun(r: Row, zone: string | null, field: FieldPace | null = null): HistoryRun {
   const laps = primaryLapRowsFromRun(r);
   const stint = getDisplayFiveMinuteStint(laps, readFiveMinStartLap(r.lapSession));
+  const sheet = readSheet(r.setupSnapshot?.data);
   return {
     id: r.id,
     dateYmd: localYmd(r, zone),
@@ -262,8 +263,28 @@ export function toHistoryRun(r: Row, zone: string | null, field: FieldPace | nul
     airC: r.conditionsAirTempC,
     trackC: r.conditionsTrackTempC,
     unconfirmed: r.unconfirmedAt != null,
-    tuning: tuningValues(r.setupSnapshot?.data),
+    tuning: sheet.read,
+    unread: sheet.unread,
     field,
+  };
+}
+
+/**
+ * The last run's sheet as the range block states it: the rows the Engineer reads, and how many
+ * filled boxes it cannot. Null when that run's sheet is empty.
+ */
+export function lastSetupOf(last: Row, zone: string | null): Parameters<typeof renderHistoryBlock>[0]["lastSetup"] {
+  const sheet = readSheet(last.setupSnapshot?.data);
+  const unread = Object.keys(sheet.unread).length;
+  if (Object.keys(sheet.read).length === 0 && unread === 0) return null;
+  return {
+    carName: last.car?.name ?? last.car?.chassis ?? null,
+    dateYmd: localYmd(last, zone),
+    rows: Object.entries(sheet.read)
+      .map(([k, v]) => `${readableSetupKey(k)}: ${v}`)
+      .sort(),
+    unread,
+    partly: sheetMostlyUnread(sheet),
   };
 }
 
@@ -331,18 +352,7 @@ export async function buildDriverHistoryBlocks(params: {
 
   const fieldByRun = await loadFieldPaceForRuns(params.userId, rows).catch(() => new Map<string, FieldPace>());
   const runs = rows.map((r) => toHistoryRun(r, zone, fieldByRun.get(r.id) ?? null));
-  const last = rows[rows.length - 1];
-  const lastTuning = tuningValues(last.setupSnapshot?.data);
-  const lastSetup =
-    Object.keys(lastTuning).length > 0
-      ? {
-          carName: last.car?.name ?? last.car?.chassis ?? null,
-          dateYmd: localYmd(last, zone),
-          rows: Object.entries(lastTuning)
-            .map(([k, v]) => `${readableSetupKey(k)}: ${v}`)
-            .sort(),
-        }
-      : null;
+  const lastSetup = lastSetupOf(rows[rows.length - 1], zone);
 
   const questions = [params.question, ...(params.earlierQuestions ?? [])];
   const rivalName = matchDriverNameInQuestions(questions, driversOnSheets(runs).map((d) => d.name))?.name ?? null;

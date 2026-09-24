@@ -63,6 +63,9 @@
     { "date": "2026-09-24", "ruling": "Damper oil is not \"the usual second half\" of a pair — the front bar kept coming with thinner oil \"as if it's like hard written into the knowledge base\" (founder: \"Yes\")", "file": "content/vehicle-dynamics/concepts/corner-regime.md", "absent": "which is why it is the usual second half" },
     { "date": "2026-09-24", "ruling": "The first answer is \"a pretty quick single safe change, still some things that are a little interesting\"; the other main levers wait for \"what are some other options I could try\"", "file": "src/lib/engineer/prompt.ts", "present": "The other main levers wait until the driver asks for other options" },
     { "date": "2026-09-24", "ruling": "The Engineer picks two to three follow-up buttons per answer", "file": "src/lib/engineer/prompt.ts", "present": "as [[next: first | second | third]]" },
-    { "date": "2026-09-24", "ruling": "The app adds its own Other options button, which sends his words", "file": "src/lib/engineer/nextQuestions.ts", "present": "OTHER_OPTIONS_QUESTION = \"What are some other options I could try?\"" }
+    { "date": "2026-09-24", "ruling": "The app adds its own Other options button, which sends his words", "file": "src/lib/engineer/nextQuestions.ts", "present": "OTHER_OPTIONS_QUESTION = \"What are some other options I could try?\"" },
+    { "date": "2026-09-24", "ruling": "\"No setup change\" is said only when nothing on the sheet moved: on a sheet the Engineer can barely read, the boxes it cannot read are counted (founder: \"make that fix\")", "file": "src/lib/engineer/setupDiff.ts", "present": "\"boxes not shown here\" are boxes on a sheet the app cannot read yet" },
+    { "date": "2026-09-24", "ruling": "A sheet the Engineer reads only a box or two of says so: every setting not listed is unknown, not absent and not unchanged", "file": "src/lib/engineer/driverData.ts", "present": ": ONLY PARTLY VISIBLE." },
+    { "date": "2026-09-24", "ruling": "The range block says so too", "file": "src/lib/engineer/historyShape.ts", "present": ": ONLY PARTLY VISIBLE." }
   ]
 }

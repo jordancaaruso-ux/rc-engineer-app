@@ -5,10 +5,16 @@ import { isSplitTireRun } from "@/lib/tires/runTireEnds";
 import { normalizeTireFitment } from "@/lib/tires/tireFitment";
 import { normalizeSetupData } from "@/lib/runSetup";
 import {
-  diffTuning,
+  UNREAD_BOXES_NOTE,
+  changedWords,
+  diffSheet,
   fmtSetupValue as fmtValue,
   leversNotOnSheet,
+  notVisibleLines,
+  partlyVisibleLine,
+  readSheet,
   readableSetupKey as readableKey,
+  sheetMostlyUnread,
   spurOverPinion,
   tuningValues,
 } from "@/lib/engineer/setupDiff";
@@ -338,32 +344,31 @@ function buildSetupSheetBlock(
 ): string {
   const data = normalizeSetupData(run.setupSnapshot?.data);
   const car = run.car?.name ?? run.car?.chassis ?? "this car";
-  const values = tuningValues(data);
+  const sheet = readSheet(data);
+  const values = sheet.read;
   const rows = Object.entries(values)
     .slice(0, MAX_SETUP_ROWS)
     .map(([key, value]) => `${readableKey(key)}: ${value}`);
 
   if (rows.length === 0) {
     const filled = Math.max(filledBoxCount(data), ...sameCarDay.map((r) => filledBoxCount(r.setupSnapshot?.data)));
-    return [
-      `SETUP ON THE CAR (${car}): NOT VISIBLE.`,
-      filled > 0
-        ? `The driver filled in ${filled} boxes on this car's setup sheet, but the app has not yet learned which box is which on this chassis's sheet, so none of them can be read. That gap is the app's, not the driver's: they have already filled the sheet in.`
-        : "The driver has not filled in a setup sheet for this car. Once they do, the values the car ran appear here.",
-      "No setting on this car can be seen — not a spring, an oil, a toe, a camber or a ride height.",
-    ].join("\n");
+    return [`SETUP ON THE CAR (${car}): NOT VISIBLE.`, ...notVisibleLines(filled)].join("\n");
   }
 
+  // A sheet the Engineer can read a box or two of — the gearing and the motor on an Xray X4 —
+  // is said to be one, so those rows are not taken for the whole car (2026-09-24).
+  const partly = sheetMostlyUnread(sheet);
   const ratio = spurOverPinion(values);
   const missing = leversNotOnSheet(levers, [...chassisSheetKeys(run), ...Object.keys(values)]);
   return [
-    `SETUP ON THE CAR (${car}, the session above).`,
+    partly ? `SETUP ON THE CAR (${car}, the session above): ONLY PARTLY VISIBLE.` : `SETUP ON THE CAR (${car}, the session above).`,
     "These are the values the car actually ran. Reason with them; do not read them back.",
     "",
     ...rows.sort(),
     ...(ratio
       ? ["", `spur ÷ pinion: ${ratio} (the final drive ratio is this multiplied by the car's internal ratio, which is not on the sheet)`]
       : []),
+    ...(partly ? ["", partlyVisibleLine(Object.keys(sheet.unread).length)] : []),
     ...(missing.length > 0
       ? ["", `NO BOX ON THIS CAR'S SETUP SHEET FOR: ${missing.join(", ")}. A manufacturer's sheet lists what adjusts on the car.`]
       : []),
@@ -516,6 +521,7 @@ function buildDayBlock(
   );
   const dayPaces = [...paces.values()];
   let anyAgainst = false;
+  let anyUnread = false;
   // Each run's previous run on the same car today, in the order they were on track.
   const runOnTrackBefore = new Map<string, DayRun>();
   const byCar = new Map<string, DayRun[]>();
@@ -555,19 +561,15 @@ function buildDayBlock(
     lines.push(bits.join("  "));
 
     const prev = predecessorOf.get(run.id);
-    const changes = prev ? diffTuning(tuningValues(prev.setupSnapshot?.data), tuningValues(run.setupSnapshot?.data)) : null;
-    // No readable sheet one side — unknown, not unchanged: no "changed" line.
-    if (prev && changes != null) {
+    const change = prev ? diffSheet(readSheet(prev.setupSnapshot?.data), readSheet(run.setupSnapshot?.data)) : null;
+    // Nothing filled in on one side — unknown, not unchanged: no "changed" line.
+    if (prev && change != null) {
       const prevDay = fmtLocalDate(prev, zone);
       const thisDay = fmtLocalDate(run, zone);
       const since = prevDay !== thisDay ? ` since the run of ${prevDay}` : "";
-      if (changes.length === 0) {
-        lines.push(`    no setup change${since}`);
-      } else {
-        const shown = changes.slice(0, MAX_CHANGES_LISTED).join(", ");
-        const more = changes.length > MAX_CHANGES_LISTED ? `, +${changes.length - MAX_CHANGES_LISTED} more` : "";
-        lines.push(`    changed${since}: ${shown}${more}`);
-      }
+      const words = changedWords(change, MAX_CHANGES_LISTED);
+      lines.push(words == null ? `    no setup change${since}` : `    changed${since}: ${words}`);
+      if (change.unread > 0) anyUnread = true;
     }
     // Today only: the track's movement and the tyres' measured drop are the day's own. "The run
     // before" is the one on track before it, by the clock the app shows: a run filed later from the
@@ -627,7 +629,8 @@ function buildDayBlock(
     // so it is absent here even though the driver was out in it.
     `THIS DAY'S RUNS ON ${multiCar ? "CARS OF THIS TYPE" : "THIS CAR"} — ${dayLabel}, ${what}, ${day.length} runs. Earliest first.`,
     `"changed" is what moved on the setup sheet since that same car's previous run. A run`,
-    `with no readable sheet has no "changed" line: that is unknown, not unchanged.`,
+    `with nothing filled in on one side has no "changed" line: that is unknown, not unchanged.`,
+    ...(anyUnread ? [UNREAD_BOXES_NOTE] : []),
     ...(day.some((r) => fieldByRun.has(r.id))
       ? [
           `"quickest lap of 7, 0.30 clear" or "3rd-quickest lap of 12, +0.21 to the quickest" ranks your best lap among the`,

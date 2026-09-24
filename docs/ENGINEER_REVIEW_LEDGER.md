@@ -611,6 +611,37 @@ answers 93 words (131 live); the app's button repeated by the Engineer 2 of 27 (
 softer front bar paired with oil 0 of 5; 13 of 14 answers naming a cost offer a "what if it does"
 button; his NEVERs clean; no guard corrections. The review page gets these answers next.
 
+### 2026-09-24 late night — "what would this answer look like if the engineer didn't understand the setup?"
+
+He pasted his real Bayside answer (A800RR, May–June: "the stiffer front tested on May 23… front bar
+1 → 1.1 and stiffer front spring") and asked what it would be on a car the Engineer cannot read. The
+answer: it never gets "box 20 went 1 → 1.1". A box it cannot name is dropped. Worse, where it reads a
+box or two (gearing, motor, wing), every run where only the suspension moved printed "no setup
+change". Readable boxes per raced chassis (scratch-dev): A800RR 68/234, Mi10 29/154, MTC3 28/145;
+Xray X4 '22/'23/'26 6; ARC A11 4; Icon2 5; Eclipse6 4; CAT PB 5; RC8B4.2e 5; Axon TC10/4 and B7.1 0.
+Mi10 and MTC3 sheets also hide damper oil (Mi10 the bars too), and the A800RR hides top deck, SRS
+arrangement, final drive, diff shims and total weight. Those gaps close only when the Engineer reads
+the sheet's own names; not this fix.
+
+His call: **"make that fix."** Built (see the north star changelog): ONLY PARTLY VISIBLE plus a count
+of unreadable boxes that moved, on sheets with fewer than 20 readable boxes; readable sheets unchanged.
+
+Test: his Bayside range re-keyed as an X4 (only motor, pinion, spur, body, wing readable),
+before/after, 3 samples each of his own question and "it pushes in the middle of the corner and lacks
+steering on power", 12 calls ≈ $0.50 (batch `partly-2026-09-24`, fixtures `private-partly-*`, not
+committed).
+- His question, before: 3 of 3 said the setup never changed ("23 May: the setup stayed unchanged…
+  That improvement cannot be credited to a setup change"; "credit a change that wasn't made").
+- After: 0 of 3. All three named the runs where unreadable boxes moved and said they could not name
+  them. One found the real 23 May change: "14:39 → 15:31… Three unreadable boxes moved, so it was a
+  promising package, not an identifiable single adjustment".
+- Problem question, before: 0 of 3 said what they could not see, and 2 of 3 sent him to the tyres
+  "with no recorded setup change".
+- After: 3 of 3 said it once ("I can't see your rear-toe setting; a readable setup sheet would let me
+  check where you're starting"), with sizes as before.
+- Loose end: a button "Which box changed on 27 June?", which it cannot answer. His picture idea (the
+  changed-box crop under an answer) would answer that one.
+
 ## Fixes landed from this batch
 
 - **2026-09-09, from cards 3–4 (30 edits, 21 files; nets:check 37/37, tsc, 4 suites green):**

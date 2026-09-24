@@ -172,6 +172,30 @@ Each of these was deleted or declined for a reason. They return only through the
 
 ## Changelog
 
+- **2026-09-24, late night — a sheet the Engineer can barely read** (founder: "make that fix"). He
+  asked what his Bayside answer would look like "if the engineer didn't understand the setup". The
+  answer found a hole in the 2026-09-21 blind-car split: NOT VISIBLE fired only when the Engineer could
+  read no box at all. On a sheet where it reads a box or two, it went unflagged: the gearing, motor,
+  body and wing on every Xray X4, the ARC A11 and most Schumachers. Those rows were shown as "the values
+  the car actually ran", and a run where the springs and a bar moved printed "no setup change". Now:
+  - Such a sheet is **ONLY PARTLY VISIBLE**, with how many filled boxes cannot be read and "every setting
+    not listed above is unknown — not absent, and not unchanged".
+  - Its "changed" lines count the boxes that moved which the Engineer cannot read ("only 2 boxes not
+    shown here"). "No setup change" now means nothing on the sheet moved.
+  - A sheet it reads (20+ boxes, an A800RR) is unchanged. The boxes it is not shown there are the
+    tyres, the battery and the notes: 27 of the 29 A800RR runs where only those moved.
+  - The range block now says NOT VISIBLE too; the run block has since 09-21.
+
+  No prompt change; the label stays. Measured on his Bayside May–June range, re-keyed so the Engineer
+  reads only what an X4 shows (12 calls on Sol at medium, ~$0.50): "no setup change" lines 27 → 0. Before,
+  3 of 3 answers to his own question said the setup never changed ("credit a change that wasn't made").
+  After, 0 of 3 did and 3 of 3 said which runs moved unreadable boxes, and one found his real 23 May
+  bar-and-spring run as "three unreadable boxes moved… a promising package". Problem question: before,
+  2 of 3 blamed the tyres "with no recorded setup change" and 0 of 3 said what they could not see.
+  After, 3 of 3 said it once ("I can't see your rear-toe setting; a readable setup sheet would let me
+  check where you're starting") and none claimed nothing changed. Seen on the way: its own follow-up
+  button then asked "Which box changed on 27 June?", which it cannot answer.
+
 - **2026-09-24, night — follow-up buttons** (founder: "I think this is the direction we need to work
   on… this is sort of the only way that we can really push the engineer to the next level because
   right now… there's too many variables that he has to think about when answering"). The first answer

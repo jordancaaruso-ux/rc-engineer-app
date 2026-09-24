@@ -1,4 +1,4 @@
-import { diffTuning } from "@/lib/engineer/setupDiff";
+import { UNREAD_BOXES_NOTE, changedWords, diffSheet, notVisibleLines, partlyVisibleLine } from "@/lib/engineer/setupDiff";
 import { lapRankShort, lapRankWords, type FieldPace } from "@/lib/engineer/fieldPace";
 import { renderRivalSection, renderRivalsSummary } from "@/lib/engineer/rivals";
 
@@ -15,7 +15,7 @@ import { renderRivalSection, renderRivalsSummary } from "@/lib/engineer/rivals";
  * - Every number is one the driver can find on screen: best lap, average of the best 5, the
  *   five-minute stint, the rating, the tyre run number, the air temperature.
  * - "changed" is what moved on the sheet since that same physical car's previous run in the
- *   list; a run with no readable sheet has no "changed" line — unknown, not unchanged.
+ *   list; a run with nothing filled in on one side has no "changed" line — unknown, not unchanged.
  * - The deltas are worked out HERE, in code. The prompt forbids the model inventing a number,
  *   and subtraction across forty lap times is exactly where an invented number comes from.
  * - Sign convention is the app's: lap deltas are later − earlier, so positive = slower.
@@ -64,6 +64,8 @@ export type HistoryRun = {
   unconfirmed: boolean;
   /** Tuning keys → values; {} when the sheet is not readable. */
   tuning: Record<string, string>;
+  /** Every other box with something in it (setupDiff `readSheet`); absent = none. */
+  unread?: Record<string, string>;
   /** Your pace against the session's field, from the timing sheet; null when there is none. */
   field: FieldPace | null;
 };
@@ -505,8 +507,8 @@ export function renderRunLines(runs: HistoryRun[], adj: TyreAdjustments = new Ma
     const prev = lastByCar.get(carKey);
     lastByCar.set(carKey, run);
     if (!prev) continue;
-    const changes = diffTuning(prev.tuning, run.tuning);
-    if (changes == null) continue;
+    const change = diffSheet(sheetOf(prev), sheetOf(run));
+    if (change == null) continue;
     // The tyre-corrected movement against the previous run, so a change's effect can be read
     // with the rubber's ageing already taken out — same day only, or the day is inside it too.
     const prevEq = adjustedBest(prev, adj);
@@ -519,15 +521,24 @@ export function renderRunLines(runs: HistoryRun[], adj: TyreAdjustments = new Ma
       moves.push(`gap to the quickest lap vs previous run: ${fmtDelta(run.field.gapBestToP1 - prev.field.gapBestToP1)}`);
     }
     const eqMove = moves.length > 0 ? `  (${moves.join("; ")})` : "";
-    if (changes.length === 0) {
-      lines.push(`    no setup change${eqMove}`);
-    } else {
-      const shown = changes.slice(0, MAX_CHANGES_LISTED).join(", ");
-      const more = changes.length > MAX_CHANGES_LISTED ? `, +${changes.length - MAX_CHANGES_LISTED} more` : "";
-      lines.push(`    changed: ${shown}${more}${eqMove}`);
-    }
+    const words = changedWords(change, MAX_CHANGES_LISTED);
+    lines.push(words == null ? `    no setup change${eqMove}` : `    changed: ${words}${eqMove}`);
   }
   return lines;
+}
+
+const sheetOf = (run: HistoryRun) => ({ read: run.tuning, unread: run.unread ?? {} });
+
+/** Whether a "changed" line counts boxes the Engineer cannot read — the block then says what they are. */
+function anyUnreadChange(runs: HistoryRun[]): boolean {
+  const lastByCar = new Map<string, HistoryRun>();
+  for (const run of runs) {
+    const carKey = run.carId ?? "unknown";
+    const prev = lastByCar.get(carKey);
+    lastByCar.set(carKey, run);
+    if (prev && (diffSheet(sheetOf(prev), sheetOf(run))?.unread ?? 0) > 0) return true;
+  }
+  return false;
 }
 
 /** The best runs once the tyre-run loss is taken out — the ranking a driver asks for next. */
@@ -559,8 +570,12 @@ export function renderHistoryBlock(params: {
   runs: HistoryRun[];
   /** Runs inside the range but older than the ones shown. */
   omittedOlder: number;
-  /** The last shown run's readable sheet, or null. */
-  lastSetup: { carName: string | null; dateYmd: string; rows: string[] } | null;
+  /**
+   * The last shown run's sheet: the rows the Engineer reads, and how many filled boxes it cannot
+   * (`unread`; `partly` when those are most of the sheet — setupDiff `sheetMostlyUnread`). Null
+   * when that run's sheet is empty.
+   */
+  lastSetup: { carName: string | null; dateYmd: string; rows: string[]; unread?: number; partly?: boolean } | null;
   /** A driver named in the question (rivals.ts `driverKey`), for a VS section; null for none. */
   rival?: string | null;
 }): string | null {
@@ -578,7 +593,8 @@ export function renderHistoryBlock(params: {
   parts.push(
     [
       `DRIVER DATA — RUNS IN A RANGE. The driver chose this range: ${params.scopeLabel}. ${runs.length} run${runs.length === 1 ? "" : "s"} shown, earliest first.${omitted} Nothing outside this range is attached; the driver's other runs are not visible here.`,
-      `"changed" is what moved on the setup sheet since that same ${multiCar ? "physical car's" : "car's"} previous run in this list. A run with no "changed" line has no readable sheet on one side: that is unknown, not unchanged. "tyre run N" is the Nth run on that set of rubber; a "?" means the driver was not sure how old the set was.`,
+      `"changed" is what moved on the setup sheet since that same ${multiCar ? "physical car's" : "car's"} previous run in this list. A run with no "changed" line has nothing filled in on one side: that is unknown, not unchanged. "tyre run N" is the Nth run on that set of rubber; a "?" means the driver was not sure how old the set was.`,
+      ...(anyUnreadChange(runs) ? [UNREAD_BOXES_NOTE] : []),
       // Only when a front/rear run is in the range, so an on-road block is unchanged.
       ...(runs.some((r) => r.frontTyreName)
         ? [
@@ -623,15 +639,22 @@ export function renderHistoryBlock(params: {
     if (vs) parts.push(vs);
   }
 
-  if (params.lastSetup && params.lastSetup.rows.length > 0) {
+  const setup = params.lastSetup;
+  const setupHeading = setup ? `SETUP ON THE CAR AT THE LAST RUN SHOWN (${setup.carName ?? "this car"}, ${setup.dateYmd})` : "";
+  if (setup && setup.rows.length > 0) {
     parts.push(
       [
-        `SETUP ON THE CAR AT THE LAST RUN SHOWN (${params.lastSetup.carName ?? "this car"}, ${params.lastSetup.dateYmd}).`,
+        setup.partly ? `${setupHeading}: ONLY PARTLY VISIBLE.` : `${setupHeading}.`,
         "These are the values the car ran that day. Reason with them; do not read them back.",
         "",
-        ...params.lastSetup.rows,
+        ...setup.rows,
+        ...(setup.partly ? ["", partlyVisibleLine(setup.unread ?? 0)] : []),
       ].join("\n")
     );
+  } else if (setup && (setup.unread ?? 0) > 0) {
+    // The range said nothing at all about a sheet it could not read until 2026-09-24; the run
+    // block has said NOT VISIBLE since 2026-09-21.
+    parts.push([`${setupHeading}: NOT VISIBLE.`, ...notVisibleLines(setup.unread ?? 0)].join("\n"));
   }
 
   return parts.join("\n\n");

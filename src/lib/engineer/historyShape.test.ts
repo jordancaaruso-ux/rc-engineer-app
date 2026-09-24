@@ -339,3 +339,29 @@ test("the front/rear legend appears only when the range holds a front/rear run",
   });
   assert.match(offRoad ?? "", /follow the REAR set only/);
 });
+
+test("a range on a sheet the Engineer barely reads says so, and counts what moved in the boxes it cannot read", () => {
+  // An Xray X4 read the way the app reads one today: the gearing, and boxes it has not named.
+  const gearing = { pinion: "39", spur: "66" };
+  const runs = [
+    run({ tuning: gearing, unread: { text20: "1", text34: "12" } }),
+    run({ tuning: gearing, unread: { text20: "1.1", text34: "14" } }),
+    run({ tuning: gearing, unread: { text20: "1.1", text34: "14" } }),
+  ];
+  const lines = renderRunLines(runs);
+  assert.match(lines[2], /changed: only 2 boxes not shown here/);
+  assert.match(lines[4], /no setup change/, "nothing on the sheet moved");
+  const lastSetup = { carName: "X4", dateYmd: "2026-08-01", rows: ["pinion: 39", "spur: 66"], unread: 2, partly: true };
+  const block = renderHistoryBlock({ scopeLabel: "x", runs, omittedOlder: 0, lastSetup }) ?? "";
+  assert.match(block, /^"boxes not shown here" are boxes on a sheet the app cannot read yet/m);
+  assert.match(block, /SETUP ON THE CAR AT THE LAST RUN SHOWN \(X4, 2026-08-01\): ONLY PARTLY VISIBLE\.\n/);
+  assert.match(block, /spur: 66\n\nThe driver filled in 2 more boxes .* Every setting not listed above is unknown/);
+
+  const blind = renderHistoryBlock({ scopeLabel: "x", runs, omittedOlder: 0, lastSetup: { ...lastSetup, rows: [], partly: true } }) ?? "";
+  assert.match(blind, /\(X4, 2026-08-01\): NOT VISIBLE\.\nThe driver filled in 2 boxes .*\nNo setting on this car can be seen/);
+
+  // A readable sheet reads exactly as before: no note, no heading flag.
+  const readable = renderHistoryBlock({ scopeLabel: "x", runs: [run({ tuning: { toe_rear: "3" } }), run({ tuning: { toe_rear: "3.5" } })], omittedOlder: 0, lastSetup: { ...lastSetup, unread: 5, partly: false } }) ?? "";
+  assert.doesNotMatch(readable, /not shown here|PARTLY|NOT VISIBLE/);
+  assert.match(readable, /\(X4, 2026-08-01\)\.\nThese are the values/);
+});
