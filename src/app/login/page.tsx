@@ -4,7 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { JrcMark } from "@/components/brand/JrcMark";
 import { DoorScene } from "@/components/brand/DoorScene";
 import { buttonLinkClassName, primaryButtonClassName } from "@/components/ui/ButtonLink";
@@ -86,13 +86,20 @@ function LoginForm() {
     searchParams.get("mode") === "signup" ? "signup" : "signin"
   );
   const signingUp = inApp && mode === "signup";
+  const emailRef = useRef<HTMLInputElement | null>(null);
 
   const from = searchParams.get("from") || "/";
   const callbackUrl = from.startsWith("/") ? from : "/";
 
+  /**
+   * Switching to sign-up changes the heading AND the button, and puts the cursor in the email box —
+   * with only the heading changing, the founder couldn't tell anything had happened (2026-09-24).
+   * The focus runs inside the tap itself, which is what lets iOS raise the keyboard.
+   */
   function switchMode(next: "signin" | "signup"): void {
     setError(null);
     setMode(next);
+    emailRef.current?.focus();
   }
 
   /** A stranger's email. The website points at the plans; the app offers its own sign-up. */
@@ -103,6 +110,7 @@ function LoginForm() {
           onSignUp={() => {
             setError(null);
             setMode("signup");
+            emailRef.current?.focus();
           }}
         />
       ) : (
@@ -289,7 +297,9 @@ function LoginForm() {
           className="door-sheet login-sheen rc-reveal mt-9 p-6"
           style={{ "--rc-delay": "170ms" } as CSSProperties}
         >
-          <h1 className="page-title text-center">{signingUp ? "Sign up" : "Sign in"}</h1>
+          <h1 className="page-title text-center">
+            {signingUp ? "Create your account" : "Sign in"}
+          </h1>
 
           {showGoogle ? (
             <button
@@ -315,6 +325,7 @@ function LoginForm() {
             <label className="block">
               <span className="type-data-label mb-2 block">Email</span>
               <input
+                ref={emailRef}
                 type="email"
                 name="email"
                 value={email}
@@ -333,7 +344,13 @@ function LoginForm() {
                 "primary-action-chip-prominent w-full px-4 py-3 text-[13px] uppercase tracking-[0.14em] disabled:cursor-not-allowed disabled:opacity-60"
               )}
             >
-              {pending ? "Sending…" : "Continue with email"}
+              {signingUp
+                ? pending
+                  ? "Creating…"
+                  : "Create account"
+                : pending
+                  ? "Sending…"
+                  : "Continue with email"}
             </button>
           </form>
 
