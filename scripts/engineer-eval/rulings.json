@@ -8,7 +8,7 @@
     { "date": "2026-09-03", "ruling": "\"No change worth making\" is an allowed answer", "file": "src/lib/engineer/prompt.ts", "present": "or instead of it when there is no change worth making" },
 
     { "date": "2026-09-04", "ruling": "Questions are asked in the driver's words too, not only changes", "file": "src/lib/engineer/prompt.ts", "present": "A change, and a question, is what the driver will feel and where on the corner" },
-    { "date": "2026-09-04", "ruling": "Other levers: at most three, no minimum", "file": "src/lib/engineer/prompt.ts", "present": "then other levers that would also do it, at most three" },
+    { "date": "2026-09-24", "ruling": "Other levers: the 4 Sept \"at most three\" cap stays gone; a problem gets the other main levers (founder: \"yes\", 2026-09-24)", "file": "src/lib/engineer/prompt.ts", "absent": "then other levers that would also do it, at most three" },
     { "date": "2026-09-04", "ruling": "No banned-word list (it had banned \"lazy\")", "file": "src/lib/engineer/netsSchema.ts", "absent": "BANNED_FEEL_COINAGES" },
     { "date": "2026-09-04", "ruling": "Feel words pass one test: would a driver say it", "file": "content/vehicle-dynamics/concepts/bite-hold.md", "present": "would a driver say it about how the car behaves" },
     { "date": "2026-09-04", "ruling": "\"More rolled-in\" is not a driver's word", "file": "content/vehicle-dynamics/concepts/bite-hold.md", "absent": "more rolled-in" },
