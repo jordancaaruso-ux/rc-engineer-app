@@ -3,7 +3,11 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
 import { clientIpKey } from "@/lib/clientIp";
 import { getPricePlans, getStripe, stripeConfigured } from "@/lib/stripe";
-import { PUBLIC_SIGNUP_SOURCE, normalizeSignupEmail } from "@/lib/billing/paidSignupLogic";
+import {
+  APP_SIGNUP_FROM,
+  PUBLIC_SIGNUP_SOURCE,
+  normalizeSignupEmail,
+} from "@/lib/billing/paidSignupLogic";
 
 /**
  * The paid door (MONETISATION_NORTH_STAR.md, Phase 1): create a Stripe Checkout Session for a
@@ -73,8 +77,12 @@ export async function POST(request: Request): Promise<Response> {
           client_reference_id: user.id,
         }
       : {
-          // Stranger: Stripe collects the email; the webhook keys provisioning off this stamp.
-          metadata: { source: PUBLIC_SIGNUP_SOURCE },
+          // Stranger: Stripe collects the email; the webhook keys provisioning off this stamp, and
+          // skips the sign-in email when the payer came from the app (already signed in there).
+          metadata: {
+            source: PUBLIC_SIGNUP_SOURCE,
+            ...(fromApp ? { from: APP_SIGNUP_FROM } : {}),
+          },
           ...(prefillEmail ? { customer_email: prefillEmail } : {}),
         }),
   });

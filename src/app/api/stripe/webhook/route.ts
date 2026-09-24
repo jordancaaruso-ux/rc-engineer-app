@@ -5,7 +5,11 @@ import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { getStripe, stripeConfigured, resolveTierForPriceId } from "@/lib/stripe";
 import { deriveSubscriptionSchedule } from "@/lib/stripeSubscriptionSync";
-import { extractCheckoutEmail, isPublicSignupSession } from "@/lib/billing/paidSignupLogic";
+import {
+  extractCheckoutEmail,
+  isAppSignupSession,
+  isPublicSignupSession,
+} from "@/lib/billing/paidSignupLogic";
 import { provisionPaidUser, sendPaidSignupSignInLink } from "@/lib/billing/paidSignup";
 import { applyRunWindow } from "@/lib/runs/runWindow";
 import { revalidateAfterRunMutation } from "@/lib/revalidateUser";
@@ -81,7 +85,9 @@ async function syncFromCheckoutSession(session: Stripe.Checkout.Session): Promis
     await syncSubscription(await getStripe().subscriptions.retrieve(subId));
   }
 
-  if (publicSignupEmail) {
+  // Someone who signed up in the app is already signed in there — the thank-you page sends them
+  // back to it — so a code email would only confuse them.
+  if (publicSignupEmail && !isAppSignupSession(session)) {
     await sendPaidSignupSignInLink(publicSignupEmail);
   }
 }

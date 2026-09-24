@@ -13,6 +13,12 @@
 /** Stamped into `metadata.source` by the public checkout route; the webhook keys off it exactly. */
 export const PUBLIC_SIGNUP_SOURCE = "public-signup";
 
+/**
+ * Stamped into `metadata.from` by the public checkout when it started from the app's welcome email
+ * (`/join?email=…&from=app`, 2026-09-24).
+ */
+export const APP_SIGNUP_FROM = "app";
+
 /** The subset of a Stripe.Checkout.Session the paid-signup path reads. */
 export type CheckoutSessionSignupLike = {
   client_reference_id?: string | null;
@@ -39,6 +45,15 @@ export function normalizeSignupEmail(raw: string | null | undefined): string | n
  */
 export function isPublicSignupSession(session: CheckoutSessionSignupLike): boolean {
   return session.metadata?.source === PUBLIC_SIGNUP_SOURCE;
+}
+
+/**
+ * Did this checkout start from the app's welcome email? That account was made in the app and is
+ * already signed in there, so the payer needs no sign-in code. The founder got one on his own test
+ * and couldn't tell why (2026-09-24).
+ */
+export function isAppSignupSession(session: CheckoutSessionSignupLike): boolean {
+  return session.metadata?.from === APP_SIGNUP_FROM;
 }
 
 /**

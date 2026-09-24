@@ -8,8 +8,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  APP_SIGNUP_FROM,
   PUBLIC_SIGNUP_SOURCE,
   extractCheckoutEmail,
+  isAppSignupSession,
   isPublicSignupSession,
   normalizeSignupEmail,
 } from "@/lib/billing/paidSignupLogic";
@@ -29,6 +31,17 @@ test("only the exact metadata stamp marks a public signup", () => {
   assert.equal(isPublicSignupSession({ client_reference_id: null, metadata: null }), false);
   assert.equal(isPublicSignupSession({ metadata: { source: "something-else" } }), false);
   assert.equal(isPublicSignupSession({}), false);
+});
+
+test("only a checkout from the app's welcome email skips the sign-in email", () => {
+  assert.equal(
+    isAppSignupSession({ metadata: { source: PUBLIC_SIGNUP_SOURCE, from: APP_SIGNUP_FROM } }),
+    true,
+  );
+  // A stranger paying on the website has no account yet — the code email is their only way in.
+  assert.equal(isAppSignupSession({ metadata: { source: PUBLIC_SIGNUP_SOURCE } }), false);
+  assert.equal(isAppSignupSession({ metadata: null }), false);
+  assert.equal(isAppSignupSession({}), false);
 });
 
 test("extractCheckoutEmail prefers what the buyer typed into Checkout", () => {
