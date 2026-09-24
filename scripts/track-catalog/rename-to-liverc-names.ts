@@ -114,7 +114,12 @@ async function rename(): Promise<void> {
       notes.push(`  - ${t.name} (${h ?? t.liveRcUrl}) — not on LiveRC's list, left alone`);
       continue;
     }
-    const name = tidyName(c.name);
+    // Same words with only the capitals different — the driver's "Radio Racing Cars SA" against
+    // LiveRC's "Radio racing cars sa" — is already the LiveRC name, and the driver's spelling is the
+    // tidier one, so it stays (founder's rename on production, 2026-09-24).
+    const liveName = tidyName(c.name);
+    const sameWords = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+    const name = sameWords(liveName) === sameWords(t.name) ? t.name : liveName;
     const catalogEventCount = c.eventCount ?? null;
     if (name === t.name && catalogEventCount === t.catalogEventCount) continue;
 
