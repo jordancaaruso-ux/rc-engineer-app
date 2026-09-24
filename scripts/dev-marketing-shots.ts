@@ -92,7 +92,14 @@ async function subjects() {
   const best = [...today].filter((r) => r.bestLapSeconds != null).sort((a, b) => a.bestLapSeconds! - b.bestLapSeconds!)[0] ?? today[0];
   const main = [...today].reverse().find((r) => r.meetingSessionType === "RACE") ?? today.at(-1)!;
   const thread = await prisma.engineerChatThread.findFirst({ where: { userId }, orderBy: { updatedAt: "desc" }, select: { id: true, messages: { orderBy: { createdAt: "asc" }, take: 1, select: { content: true } } } });
-  return { best, main, eventId: today[0].eventId, carId: best.carId!, threadQuestion: thread?.messages[0]?.content ?? null };
+  // The fullest race result on file: the lap sheet shows every driver as a column.
+  const races = await prisma.importedLapTimeSession.findMany({ where: { userId, eventDetectionSource: "race" }, select: { id: true, parsedPayload: true } });
+  const drivers = (payload: unknown) => {
+    const list = (payload as { sessionDrivers?: unknown[] } | null)?.sessionDrivers;
+    return Array.isArray(list) ? list.length : 0;
+  };
+  const race = races.sort((a, b) => drivers(b.parsedPayload) - drivers(a.parsedPayload))[0];
+  return { best, main, eventId: today[0].eventId, carId: best.carId!, threadQuestion: thread?.messages[0]?.content ?? null, raceSessionId: race?.id ?? null };
 }
 
 async function shotList(): Promise<Shot[]> {
@@ -208,6 +215,20 @@ async function shotList(): Promise<Shot[]> {
     },
     { name: "lap-analysis", path: "/laps/analysis" },
     ...(s.eventId ? [{ name: "event", path: `/events/${s.eventId}` }] : []),
+    // A whole race result: every driver a column, each lap green or red, the chart above.
+    ...(s.raceSessionId ? [{
+      name: "lap-sheet",
+      path: `/laps/analysis?session=${encodeURIComponent(s.raceSessionId)}`,
+      act: async (page: Page) => {
+        // On a phone the green and red lap grid starts below the fold: put the chart at the top so
+        // the chart and the first laps share the frame. A wide screen already shows both.
+        if ((page.viewportSize()?.width ?? 0) >= 700) return;
+        await page.getByText(/^Trace$/).first().evaluate((el) => el.scrollIntoView({ block: "start" })).catch(() => {});
+        await page.evaluate(() => window.scrollBy(0, -28));
+        await page.addStyleTag({ content: ".mobile-brand-mark,.title-condenser,[aria-label='Account and settings']{display:none!important}" });
+        await page.waitForTimeout(500);
+      },
+    }] : []),
   ];
 }
 
