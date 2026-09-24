@@ -21,7 +21,8 @@ import { isDemoIdentity } from "@/lib/demo/demoAccess";
 import { clientIpKey } from "@/lib/clientIp";
 import { persistEngineerChatExchange } from "@/lib/engineer/persistExchange";
 import type { EngineerMessageContextSnapshot } from "@/lib/engineer/types";
-import { engineerOpenAiUserMessage } from "@/lib/openAiRetry";
+import { ENGINEER_OPENAI_UNAVAILABLE_MESSAGE, engineerOpenAiUserMessage } from "@/lib/openAiRetry";
+import { notifyAdminsOfAiOutage } from "@/lib/aiUsage/notifyAiOutage";
 
 const MAX_MESSAGE_CHARS = 4096;
 
@@ -359,6 +360,7 @@ export async function POST(request: Request) {
             });
           } catch (err) {
             const { message } = exceptionToClientPayload(err);
+            if (message === ENGINEER_OPENAI_UNAVAILABLE_MESSAGE) void notifyAdminsOfAiOutage();
             send("error", { message });
           } finally {
             controller.close();
@@ -418,6 +420,7 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("[api/engineer/chat]", err);
     const { message, debug } = exceptionToClientPayload(err);
+    if (message === ENGINEER_OPENAI_UNAVAILABLE_MESSAGE) void notifyAdminsOfAiOutage();
     return jsonError(500, message, debug);
   }
 }

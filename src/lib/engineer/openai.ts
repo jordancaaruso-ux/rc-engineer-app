@@ -2,8 +2,13 @@ import "server-only";
 
 import { getOpenAiApiKey } from "@/lib/openaiServerEnv";
 import {
+  ENGINEER_OPENAI_BUSY_MESSAGE,
+  ENGINEER_OPENAI_TIMEOUT_MESSAGE,
+  OPENAI_RETRY_WAIT_BUDGET_MS,
   computeOpenAiRetryDelayMs,
+  engineerOpenAiCallTimeoutMs,
   engineerOpenAiUserMessage,
+  isOpenAiQuotaExhaustedError,
   isOpenAiTpmRateLimitError,
   maxOpenAiRateLimitAttempts,
   openAiErrorMessage,
@@ -505,6 +510,27 @@ export async function postChatCompletion(
   // which endpoint served the answer.
   const responses = responsesApiEnabled();
   const url = responses ? OPENAI_RESPONSES_URL : OPENAI_CHAT_COMPLETIONS_URL;
+  // Failure handling (2026-09-24 launch audit): a total cap on retry waits, one retry for an
+  // OpenAI server error or a dropped connection, never a retry for an empty balance, and a
+  // ceiling on each call so a stalled answer ends in words instead of a route killed at 120 s.
+  const retryDeadline = Date.now() + OPENAI_RETRY_WAIT_BUDGET_MS;
+  const timeoutMs = engineerOpenAiCallTimeoutMs();
+  let transientRetried = false;
+  const timedOut = { ok: false, status: 504, data: { error: { message: ENGINEER_OPENAI_TIMEOUT_MESSAGE } } };
+  const busy = (status: number) => ({
+    ok: false,
+    status,
+    data: { error: { message: ENGINEER_OPENAI_BUSY_MESSAGE } },
+  });
+  const isAbort = (err: unknown) =>
+    err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
+  /** Retry a rate limit if the budget allows it; `null` means give up with `data` as it is. */
+  const rateLimitWait = (data: Record<string, unknown>, status: number, attempt: number) => {
+    if (isContextTooLargeOpenAiError(data) || isOpenAiQuotaExhaustedError(data)) return null;
+    if (!isOpenAiTpmRateLimitError(data, status) || attempt >= maxAttempts - 1) return null;
+    const waitMs = computeOpenAiRetryDelayMs(parseOpenAiRetryAfterMs(data), attempt);
+    return Date.now() + waitMs <= retryDeadline ? waitMs : null;
+  };
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const wireBody = {
@@ -519,31 +545,58 @@ export async function postChatCompletion(
       const finalBody = responses ? toResponsesBody(wireBody) : wireBody;
       console.log("[engineer-wire]", JSON.stringify(finalBody, null, 2));
     }
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(responses ? toResponsesBody(wireBody) : wireBody),
-    });
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(responses ? toResponsesBody(wireBody) : wireBody),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (err) {
+      if (isAbort(err)) return timedOut;
+      // A dropped connection before any answer arrived: nothing was streamed, so one retry.
+      console.error("[engineer-openai] request failed", err);
+      if (!transientRetried && attempt < maxAttempts - 1) {
+        transientRetried = true;
+        await sleepMs(1500);
+        continue;
+      }
+      return busy(502);
+    }
+    // An OpenAI server error before any answer arrived: one retry, then a plain "busy".
+    if (res.status >= 500) {
+      console.error(`[engineer-openai] OpenAI ${res.status}`, await res.text().catch(() => ""));
+      if (!transientRetried && attempt < maxAttempts - 1) {
+        transientRetried = true;
+        await sleepMs(1500);
+        continue;
+      }
+      return busy(res.status);
+    }
     if (useStream) {
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
         // "Request too large" never resolves by waiting — surface it so callers can shrink.
-        if (
-          !isContextTooLargeOpenAiError(data) &&
-          isOpenAiTpmRateLimitError(data, res.status) &&
-          attempt < maxAttempts - 1
-        ) {
-          await sleepMs(computeOpenAiRetryDelayMs(parseOpenAiRetryAfterMs(data), attempt));
+        const waitMs = rateLimitWait(data, res.status, attempt);
+        if (waitMs != null) {
+          await sleepMs(waitMs);
           continue;
         }
         return { ok: false, status: res.status, data };
       }
-      const streamResult = responses
-        ? await readOpenAiResponsesStream(res, onToken)
-        : await readOpenAiChatStream(res, onToken);
+      let streamResult: ChatCompletionStreamResult;
+      try {
+        streamResult = responses
+          ? await readOpenAiResponsesStream(res, onToken)
+          : await readOpenAiChatStream(res, onToken);
+      } catch (err) {
+        if (isAbort(err)) return timedOut;
+        throw err;
+      }
       // Shape the streamed usage like a non-stream body so one usage reader serves both paths.
       return {
         ok: true,
@@ -552,17 +605,20 @@ export async function postChatCompletion(
         data: streamResult.usage ? { usage: streamResult.usage } : undefined,
       };
     }
-    const raw = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    let raw: Record<string, unknown>;
+    try {
+      raw = (await res.json()) as Record<string, unknown>;
+    } catch (err) {
+      if (isAbort(err)) return timedOut;
+      raw = {};
+    }
     // Errors keep their native shape — the classifiers read `error.message` prose, which is
     // identical on both endpoints.
     const data = res.ok && responses ? responsesToChatCompletion(raw) : raw;
     if (res.ok) return { ok: true, status: res.status, data };
-    if (
-      !isContextTooLargeOpenAiError(data) &&
-      isOpenAiTpmRateLimitError(data, res.status) &&
-      attempt < maxAttempts - 1
-    ) {
-      await sleepMs(computeOpenAiRetryDelayMs(parseOpenAiRetryAfterMs(data), attempt));
+    const waitMs = rateLimitWait(data, res.status, attempt);
+    if (waitMs != null) {
+      await sleepMs(waitMs);
       continue;
     }
     return { ok: false, status: res.status, data };

@@ -4,8 +4,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  ENGINEER_OPENAI_UNAVAILABLE_MESSAGE,
   computeOpenAiRetryDelayMs,
+  engineerOpenAiCallTimeoutMs,
   engineerOpenAiUserMessage,
+  isOpenAiQuotaExhaustedError,
   isOpenAiTpmRateLimitError,
   parseOpenAiRetryAfterMs,
 } from "@/lib/openAiRetry";
@@ -54,6 +57,37 @@ test("engineerOpenAiUserMessage maps rate limits to friendly copy", () => {
     "Engineer is busy — try again in ~30s"
   );
   assert.equal(engineerOpenAiUserMessage("invalid_api_key"), "invalid_api_key");
+});
+
+
+test("out of credit is never treated as a rate limit, and never shown raw", () => {
+  const quota = {
+    error: {
+      message:
+        "You exceeded your current quota, please check your plan and billing details.",
+      type: "insufficient_quota",
+      code: "insufficient_quota",
+    },
+  };
+  assert.ok(isOpenAiQuotaExhaustedError(quota));
+  assert.ok(!isOpenAiTpmRateLimitError(quota, 429), "waiting never fixes an empty balance");
+  assert.equal(
+    engineerOpenAiUserMessage(quota.error.message),
+    ENGINEER_OPENAI_UNAVAILABLE_MESSAGE,
+  );
+  assert.ok(!isOpenAiQuotaExhaustedError({ error: { message: "Rate limit reached ... tokens per min" } }));
+});
+
+test("the call timeout has a floor and an override", () => {
+  const before = process.env.ENGINEER_OPENAI_TIMEOUT_MS;
+  delete process.env.ENGINEER_OPENAI_TIMEOUT_MS;
+  assert.equal(engineerOpenAiCallTimeoutMs(), 75_000);
+  process.env.ENGINEER_OPENAI_TIMEOUT_MS = "180000";
+  assert.equal(engineerOpenAiCallTimeoutMs(), 180_000);
+  process.env.ENGINEER_OPENAI_TIMEOUT_MS = "10";
+  assert.equal(engineerOpenAiCallTimeoutMs(), 75_000, "a nonsense value falls back");
+  if (before === undefined) delete process.env.ENGINEER_OPENAI_TIMEOUT_MS;
+  else process.env.ENGINEER_OPENAI_TIMEOUT_MS = before;
 });
 
 console.log("openAiRetry.test.ts OK");
