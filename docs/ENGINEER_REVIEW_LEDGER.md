@@ -529,6 +529,28 @@ other main levers with what each does, and none left out for going either way.
 **Open for him:** his 09-04 ruling "at most three, no minimum" — the new wording has no cap (roll-call
 flags it MISSING until he rules).
 
+### 2026-09-24 evening — p-05, rear toe gain sold as rotation; buttons after an answer
+
+His note, in chat: "when asked for more rotation the engineer said try more rear toe gain which is the
+opposite of what it should be".
+- **p-05 · SA Sat** ("how can i get some more rotation… the others' cars rotate more while still having
+  rear grip"). The round-08 page answer (round-08-shape-a) led with "about 0.2° more rear toe gain… It
+  should let the car rotate more as you turn in, while bringing rear security back in the middle and on
+  power". The old-prompt answer went the other way (less toe gain, right); shape-b led with a softer front
+  bar.
+- → **What it was:** the rear toe gain card's reviewed entering-the-corner line, "it extends on the way in,
+  so less rear toe there — less security on the first input", sold as the benefit. p-02 and p-04 used the
+  same line correctly, as a warning.
+- → **His call:** "I think delete it". Landed: toe-gain-rear.yaml is one line per side (the MORE side's
+  mirror went with it); ruling on the roll-call. Not yet re-measured.
+
+Same message, a product idea: after each answer, buttons — "give me some more suggestions that might
+work", "give me some spring suggestions that might work", "explain what this would do in this scenario,
+why should or shouldn't I do this". "I feel like that's how conversations normally happen with the
+engineer rather than one instant suggestion." His calls on it: the first answer short, "with the other
+behind more options"; the Engineer picks two to three buttons per answer. The spec's "no choice chips"
+line (the July tap-answers to the Engineer's own question) needs amending if it ships.
+
 ## Fixes landed from this batch
 
 - **2026-09-09, from cards 3–4 (30 edits, 21 files; nets:check 37/37, tsc, 4 suites green):**

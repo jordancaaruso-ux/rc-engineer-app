@@ -6,6 +6,11 @@
 # Split into two lines 2026-08-27 (founder: the corner clock applies to anything that behaves differently initially and mid-corner). Same words as before.
 # v5 (2026-08-27): one entry per knob, both directions inside. The LESS side is the founder-reviewed text
 # carried over from rear-toe-gain-more.yaml; the MORE side is AI-DRAFTED by inversion and awaits his pass (reviewed: false).
+# One line per side again 2026-09-24 (founder: "I think delete it"). The entering-the-corner line said more
+# toe gain costs security on the first input, because the rear extends on the way in. Asked for more
+# rotation, the Engineer sold that line as the fix ("more rear toe gain … rotate more as you turn in"),
+# which he called "the opposite of what it should be". Both sides' entering lines went (the MORE side's was
+# its mirror); each side keeps its middle-and-exit line, word for word, as its one effect.
 id: toe_gain_shims_rear
 discipline: touring
 parameter: toe_gain_shims_rear
@@ -14,17 +19,15 @@ words:
   more: "more shims — less toe gain"
   less: "fewer shims — more toe gain"
 step: "half a shim, depending on how sensitive the car is — about 0.2° more gain from static ride height to compressed onto the board"   # founder-dictated 2026-08-27
-two_answers: true
+two_answers: false
 more:
   reviewed: false
   confidence: majority
-  before_settled: "less change on the way in — the rear keeps more of its static toe, so more security on the first input"
-  once_settled: "as less rear toe — a little less rear grip, more rotation, less forward traction — the toe stays nearer static as the car rolls and squats"
+  effect: "as less rear toe — a little less rear grip, more rotation, less forward traction — the toe stays nearer static as the car rolls and squats"
 less:
   reviewed: true
   confidence: majority
-  before_settled: "it extends on the way in, so less rear toe there — less security on the first input"
-  once_settled: "as more rear toe — more rear grip, less rotation, more forward traction — coming in as the car rolls and squats"
+  effect: "as more rear toe — more rear grip, less rotation, more forward traction — coming in as the car rolls and squats"
 physics:
   - bump-steer-toe-gain.md
   - toe.md
