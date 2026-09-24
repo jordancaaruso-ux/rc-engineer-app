@@ -73,6 +73,17 @@ manual) and `mtc3-gold.json` (Jordan's own names, rebuilt from his calibration w
 | Mugen MTC3 | whole-drawing (v3) | 78 same + 27 close / 118 (token overlap vs Jordan's words) | 70 | 0 |
 | Associated B7.1 (off-road) | whole-drawing, lean helpers, touring guide | 118 + 117 / 120 firm (manual key) | 113 / 132 | 1 (bellcrank for rack) |
 | Associated B7.1 (off-road) | same + buggy section in the guide | 119 + 119 / 120 firm | 117 / 132 | 0 |
+| TLR 22X (off-road, second brand) | same | 52 + 52 / 65 firm (drawing boxes only) | 97 / 139 (36 on drawings) | 1 |
+
+**The TLR is the fair buggy test** (its key, `tlr-22x-gold.cjs` from TLR's kit manual p54, covers the
+73 drawing boxes; the 61 printed-table names that shipped were checked by eye and read right). Its
+one wrong name, and most of its misses, come from the PDF's own field names: the form was rebuilt and
+about 20 names point at the wrong part ("Caster Angle" = kick-up, "St Rack Ball Insert" = inner
+camber-link insert, "Rr Inner Camber Ht" = diff height, "Transmission Brace" = motor plate). On a
+drawing box with no printed word the field name is the only text, and both passes leaned on it. At
+0.7 three more of those would have shipped, so 0.8 stays. Next fix to try: treat a field name on an
+unprinted drawing box as a weak hint, and give the second pass no field names at all, so a
+misleading name shows up as a disagreement instead of a shared mistake.
 
 The B7.1 key (`associated-b71-gold.cjs`, notes in `associated-b71-research.md`) comes from Associated's
 B7.1 manual, whose kit setup page is a filled copy of the same sheet. The buggy section of the guide

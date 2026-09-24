@@ -93,7 +93,8 @@ the side view and label FF vs FR (RF vs RR) explicitly — both passes of this j
 
 ## Other drawn boxes that print little
 
-Downstop / droop (arrow from arm or axle to the board), up-stop, ride height, camber, toe (front
+Downstop (arrow from the arm or chassis to the board) or droop (from the wheel, hub or axle; see House
+words), up-stop, ride height, camber, toe (front
 toe-out / toe-in, rear toe-in), caster, kick-up, anti-squat, Ackermann, maximum steering angle,
 shock tower hole and arm hole positions (inner / outer, 1…n), anti-roll bar, axle height, diff height,
 belt tension, top deck cuts, chassis flex screws fitted or removed, motor mount screw positions,
@@ -146,9 +147,15 @@ describe touring pivots: leave buggy ballstud washers unlinked.
 "upright"; "hex width"; "top deck"; "motor mount"; "bump steer"; "Ackermann".
 
 Different sheets use different words for the same thing. Name it in the words above, and put the
-sheet's own word in `printedLabel`: droop = downstop; uptravel limit = up-stop; above hub shims =
-upper outer shims; upper link height = upper inner shims (a height in mm); steering lock = maximum
-steering angle; rod extension = shock length / rod end gap; ARB = anti-roll bar.
+sheet's own word in `printedLabel`: uptravel limit = up-stop; above hub shims = upper outer shims;
+upper link height = upper inner shims (a height in mm); steering lock = maximum steering angle; rod
+extension = shock length / rod end gap; ARB = anti-roll bar.
+
+**Droop and downstop are two different measurements**, whatever the sheet calls them. Downstop is
+measured under the arm or chassis on a droop gauge (a few mm) and set by the downstop screws:
+link it to `downstop_front` / `downstop_rear`. Droop is measured at the wheel, hub or axle (tens of
+mm): link it to `droop_front` / `droop_rear`. Link by what the box measures, not by its word; if you
+cannot tell which, leave it unlinked.
 
 ## Confidence
 
