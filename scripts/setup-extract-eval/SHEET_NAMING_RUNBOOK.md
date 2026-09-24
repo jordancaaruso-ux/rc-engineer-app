@@ -71,7 +71,15 @@ manual) and `mtc3-gold.json` (Jordan's own names, rebuilt from his calibration w
 | ARC A11 | per-box (v2) | 92 / 110 | 56 | 0 |
 | ARC A11 | whole-drawing (v3) | 110 / 110 | 93 | 0 |
 | Mugen MTC3 | whole-drawing (v3) | 78 same + 27 close / 118 (token overlap vs Jordan's words) | 70 | 0 |
-| Associated B7.1 (off-road) | whole-drawing, lean helpers | no answer key; every shipped name checked by hand against the print | 113 / 132 | 0 found |
+| Associated B7.1 (off-road) | whole-drawing, lean helpers, touring guide | 118 + 117 / 120 firm (manual key) | 113 / 132 | 1 (bellcrank for rack) |
+| Associated B7.1 (off-road) | same + buggy section in the guide | 119 + 119 / 120 firm | 117 / 132 | 0 |
+
+The B7.1 key (`associated-b71-gold.cjs`, notes in `associated-b71-research.md`) comes from Associated's
+B7.1 manual, whose kit setup page is a filled copy of the same sheet. The buggy section of the guide
+was written from that research, so the retest flatters it; another brand's buggy is the fair check.
+The one pair nothing settles from the drawing is the servo link (two "Ball Stud Spacing" boxes by the
+steering block): both passes stay under 0.5 and it goes to review. Manual research found every other
+answer but cost 39M tokens as a general-purpose helper; a lean manual-reading step is still to build.
 
 On the MTC3 almost every remaining "miss" is the same part in different words (Jordan's "Uptravel
 Limit" = up-stop, "Above Hub Shims" = upper outer shims). Checked name by name, everything shipped was

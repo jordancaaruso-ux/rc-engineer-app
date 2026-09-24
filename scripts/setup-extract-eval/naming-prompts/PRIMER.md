@@ -36,6 +36,10 @@ last resort for a box whose line you truly cannot follow, and it must carry conf
 
 ## Touring car (1/10 on-road) anatomy
 
+This section and the shim table below describe a TOURING car. Buggies, trucks and 1/8 cars put the
+steering and the links in different places: never carry a touring position over to another car type
+(see the off-road section for how those differ).
+
 - **Lower arm** (wishbone): pivots on two inner pins or balls held by **suspension mounts**
   (blocks) or the **bulkhead**, which sit on the chassis. Its outer end carries the hub carrier.
 - **FF, FR, RF, RR**: first letter = axle (Front / Rear), second letter = the forward (F) or rearward
@@ -96,12 +100,45 @@ belt tension, top deck cuts, chassis flex screws fitted or removed, motor mount 
 battery position, ballast weights (g) and where each sits, body post positions, bumper and arm parts
 (part-number tick boxes: name the part, e.g. "Front arms: R158032 / R158034(H)").
 
-## Off-road (buggy, truck) additions
+## Off-road (buggy, truck) anatomy
 
-Camber link inner position (tower holes) and outer position (hub holes), shock tower and arm holes,
-roll-centre inserts / pills (inner and outer, front and rear), hub or pivot-ball spacers, kick-up,
-anti-squat, rear toe-in blocks, wheelbase spacers, bump steer (steering block holes or shims),
-Ackermann, slipper, wing angle and height. Same rule: follow the line, name the part.
+Buggies put the links and the steering in different places from a touring car. Common layouts
+(brands differ, so let the drawing and the sheet's words decide):
+
+- **Front suspension**: the arms hinge on pins in a front bulkhead or arm mount on the chassis; its
+  angle is the kick-up, and shims between chassis and bulkhead move the pins up or down. Outboard, a
+  caster block (C-hub) pivots on the arm's outer pin and carries the steering block on a kingpin.
+  Caster = kick-up + the caster block (often an insert: 0 / +2.5 / +5). Spacers on the outer pin in
+  front of or behind the caster block move it fore-aft ("caster block spacing"). A steering stop
+  screw in the caster block limits steering lock.
+- **Camber links**: the INNER end sits in holes on the shock tower, or in a separate ballstud mount
+  on the chassis over the front bulkhead / on the rear gearbox. A hole row there (1-2-3) is the
+  camber link's inner position (its length). The OUTER end sits on the caster block (often on a
+  bolt-on "link mount") or on the rear hub (often on a bolt-on hub link mount). Washers under a
+  camber link ballstud raise that end ("ball stud spacing"); washers under a bolt-on link mount
+  ("camber link spacing") raise the mount and its ball together. Name them "camber link inner /
+  outer ballstud washers".
+- **Steering**: servo → SERVO LINK → bellcrank(s) → rack or drag link → STEERING LINKS (tie rods) →
+  steering blocks. The servo link is a short link from the servo horn to one bellcrank, often two
+  rod ends on a set screw with a spacer between them (the spacer sets its length); it is not a
+  suspension or steering link, and boxes on it name the servo link. The steering links' INNER
+  ballstuds sit in the ends of the rack or on the bellcranks; washers there change Ackermann and bump
+  steer ("steering rack ballstud washers"). Their OUTER ballstuds sit on the steering block's arm or a
+  bolt-on steering plate: those washers are the bump steer washers. "Position: Top / Bottom" beside
+  a steering plate = which face of the steering block arm the plate is bolted to. Bellcrank / rack
+  height (Up / Down) also sets bump steer.
+- **Shocks**: hole rows on a tower are the upper shock positions; rows on an arm (often lettered
+  A-B-C) are the lower shock positions. Limiters (inside / outside) limit shock travel.
+- **Rear arms**: each rear arm hinges on a pin through a front and a rear mount (Associated: C and D
+  blocks; others: suspension holders, RF / RR) that take eccentric inserts (pills). A grid of circles
+  on a mount drawing = every insert position; a tick records where the hinge pin sits (toe-in,
+  anti-squat, roll centre). Some cars use separate toe-in and anti-squat blocks instead.
+- **Rear hub**: axle height (+0 … +3) is usually an eccentric insert in the hub; hub spacers fore or
+  aft of the hub set the wheelbase ("hub spacing"); arm spacing moves the arm along its pin.
+
+On an off-road sheet, link a universalParameterId only for the plain settings (ride height, camber,
+toe, anti-roll bar, springs, shock oil, bump steer washers). The shim ids in the touring table above
+describe touring pivots: leave buggy ballstud washers unlinked.
 
 ## House words
 
@@ -117,4 +154,9 @@ steering angle; rod extension = shock length / rod end gap; ARB = anti-roll bar.
 
 - The line lands clearly on a part you can name → 0.85 or higher, even with no word printed.
 - It lands clearly but the part could be one of two things → pick the likelier, 0.55–0.75.
+- The line lands on a ball stud, a spacer or a hole row, and the drawing does not show WHICH link
+  (camber link, steering link, servo link, toe link…) runs from it → decide from the car-type
+  section (where that car type mounts each link) and from which links the drawing's other boxes
+  already account for. Confident only when that leaves one answer; if two links still fit, 0.6 or
+  less. A ball stud near the bulkhead is a camber link on one car and a steering link on another.
 - You cannot follow it → positional name, 0.4 or less.

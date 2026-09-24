@@ -46,4 +46,9 @@ Write TWO files in the work folder.
 
 Keep `layout.md` under about 200 lines. Do not guess a heading you cannot read; say so.
 
+Say where each line lands in plain shapes ("a rod end at the top", "the round spacer under it", "the
+low 3-2-1 hole row by the bulkhead"). Do not decide which link or adjustment an unprinted part is
+(steering link, servo link, camber link…): the namers decide that, and a wrong call here would be
+copied by every one of them.
+
 Reply with ONE line: the number of blocks.
