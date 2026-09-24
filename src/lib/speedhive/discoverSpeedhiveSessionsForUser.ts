@@ -8,7 +8,9 @@ import {
   fetchOrganizationEventsSince,
   fetchSessionClassification,
   parseSpeedhiveLapTimeSeconds,
+  type SpeedhiveClassificationRow,
   type SpeedhiveEventRow,
+  type SpeedhiveSessionRow,
 } from "@/lib/speedhive/speedhiveClient";
 import {
   SPEEDHIVE_EVENT_LOOKBACK_DAYS,
@@ -37,6 +39,47 @@ import { organizationIdFromTrackUrl } from "@/lib/speedhive/speedhiveUrl";
 
 const MAX_EVENTS = 12;
 const MAX_SESSIONS_PER_EVENT = 40;
+
+/*
+ * A scan used to read up to 12 events × 40 sessions of results one at a time, with no clock, and
+ * the scan route is killed at 60 s — so a club with a busy MYLAPS history answered "Couldn't check
+ * the timing site just now" every time (2026-09-24 launch audit). Now a few are read at once, and
+ * past the budget the scan returns what it found, marked incomplete.
+ */
+const SCAN_BUDGET_MS = 40_000;
+const CLASSIFICATION_READS_AT_ONCE = 4;
+
+type ClassificationRead =
+  | { kind: "read"; rows: SpeedhiveClassificationRow[] }
+  | { kind: "failed" }
+  | { kind: "skipped" };
+
+/** Each session's results, in the sessions' order, a few at a time; none started past `deadline`. */
+async function readClassifications(
+  sessions: readonly SpeedhiveSessionRow[],
+  deadline: number
+): Promise<ClassificationRead[]> {
+  const out = new Array<ClassificationRead>(sessions.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < sessions.length) {
+      const i = next++;
+      if (Date.now() > deadline) {
+        out[i] = { kind: "skipped" };
+        continue;
+      }
+      try {
+        out[i] = { kind: "read", rows: await fetchSessionClassification(sessions[i]!.id) };
+      } catch {
+        out[i] = { kind: "failed" };
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(CLASSIFICATION_READS_AT_ONCE, sessions.length) }, worker)
+  );
+  return out;
+}
 
 export type SpeedhiveDiscoveredSession = {
   sessionUrl: string;
@@ -188,6 +231,7 @@ async function discoverSpeedhiveOrganizationSessionsForUser(input: {
   const dayYmd = input.dayYmd?.trim() && input.timeZone ? input.dayYmd.trim() : null;
   const zone = input.timeZone ?? "UTC";
   let incomplete = false;
+  const deadline = Date.now() + SCAN_BUDGET_MS;
 
   try {
     const { events: sortedEvents, complete } = await eventsForDiscovery(organizationId, dayYmd);
@@ -201,16 +245,26 @@ async function discoverSpeedhiveOrganizationSessionsForUser(input: {
         ? eventSessions.filter((s) => (speedhiveSessionLocalYmd(s.startTime, zone) ?? eventYmd) === dayYmd)
         : eventSessions.slice(0, MAX_SESSIONS_PER_EVENT);
 
-      for (const sess of sessions) {
-        if (!sess.id) continue;
-        let classification;
-        try {
-          classification = await fetchSessionClassification(sess.id);
-        } catch {
+      if (Date.now() > deadline) {
+        incomplete = true;
+        break;
+      }
+      const readable = sessions.filter((s) => s.id);
+      const reads = await readClassifications(readable, deadline);
+      for (let i = 0; i < readable.length; i++) {
+        const sess = readable[i]!;
+        const read = reads[i]!;
+        if (read.kind === "skipped") {
+          // Out of time: say so rather than let the route be killed with nothing to show.
+          incomplete = true;
+          continue;
+        }
+        if (read.kind === "failed") {
           // Unread, not a race the driver was absent from.
           if (dayYmd) incomplete = true;
           continue;
         }
+        const classification = read.rows;
 
         if (!sawTransponderFields && sessionClassificationHasTransponderFields(classification)) {
           sawTransponderFields = true;

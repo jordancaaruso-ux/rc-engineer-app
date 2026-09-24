@@ -254,6 +254,7 @@
     "layout:probe": "npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx scripts/dev-layout-probe.ts",
     "brief": "node scripts/generate-project-brief.cjs",
     "test:demo-dates": "npx tsx --test src/lib/demo/demoDateShift.test.ts",
+    "test:fetch-text": "npx tsx --test src/lib/lapUrlParsers/fetchText.test.ts",
     "laps:backfill-liverc-names": "dotenv -e .env.local -- tsx scripts/backfill-liverc-race-session-names.ts",
     "laps:backfill-liverc-dates": "dotenv -e .env.local -- tsx scripts/backfill-liverc-race-session-dates.ts",
     "laps:backfill-speedhive-chips": "dotenv -e .env.local -- tsx scripts/backfill-speedhive-practice-chips.ts",

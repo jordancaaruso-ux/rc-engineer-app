@@ -20,6 +20,7 @@ import type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
 import { eventIsActiveOnLocalToday } from "@/lib/eventActive";
 import { discoverLiveRcSessionsForUser } from "@/lib/lapWatch/discoverLiveRcSessionsForUser";
 import { eventIdsInScopeForUser } from "@/lib/events/eventParticipation";
+import { isSharedDemoAccount } from "@/lib/demo/demoAccess";
 
 export type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
 
@@ -109,9 +110,17 @@ const lastSyncAtByUser = new Map<string, number>();
 
 /**
  * Import new LiveRC sessions for events that configure practice/results URLs.
- * Scoped to calendar-active events, else the single most recent event.
+ * Scoped to calendar-active events ONLY.
+ *
+ * It used to fall back to "the single most recent event" when nothing was on today, so every
+ * dashboard open re-read LiveRC for a meeting weeks gone: 40–80 page reads each time, per driver,
+ * nothing shared between them. At launch scale that is exactly the traffic that gets a timing site
+ * to block our servers — and then lap import stops for everyone at once (2026-09-24 audit). A
+ * finished meeting's late results still arrive through the run form's scan and "Get my day".
  */
 export async function syncRecentEventLapSources(userId: string): Promise<void> {
+  // Every demo visitor is the same account; its season is seeded, never synced.
+  if (isSharedDemoAccount({ id: userId })) return;
   const now = Date.now();
   const lastAt = lastSyncAtByUser.get(userId) ?? 0;
   if (now - lastAt < SYNC_COOLDOWN_MS) return;
@@ -127,7 +136,7 @@ export async function syncRecentEventLapSources(userId: string): Promise<void> {
   const liveNorm = liveName ? normalizeLiveRcDriverNameForMatch(liveName) : "";
 
   const scope = await getEventLapDetectionScope(userId);
-  if (scope.scopedEventIds.length === 0) return;
+  if (scope.strategy !== "active_today" || scope.scopedEventIds.length === 0) return;
 
   const scoped = await prisma.event.findMany({
     where: { id: { in: scope.scopedEventIds } },
