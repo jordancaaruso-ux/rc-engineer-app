@@ -79,7 +79,9 @@ facts, never against the words.
    wheelspin (founder, 2026-09-23).
 2. **Where in the corner** — entering, in the middle, or exiting ([[corner-regime]]). "Turn-in",
    "the flick", "direction change" are entering; "the apex", "mid-corner", "holding the line" are
-   the middle; "on power", "off the corner" are exiting. **A corner named is a phase given**
+   the middle; "on power", "off the corner" are exiting (founder, 2026-09-24: "on power generally means
+   exit"). A message that also names another place is two problems, that place and exiting, not that
+   place on the throttle. **A corner named is a phase given**
    (founder, 2026-09-09): its time decides it before any assumption — length divided by speed against
    how long the car takes to finish rolling ([[corner-regime]]). A hairpin is long and slow, so it is
    mostly the middle, more than any other corner on the track; a chicane, a flick or a direction change

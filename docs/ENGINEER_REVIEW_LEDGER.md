@@ -573,6 +573,23 @@ https://claude.ai/artifact/44vcQdBX9a16URLhVteBZG (db `buttons/<id>`).
   driverData.ts was being read out (14 of 21 earlier replies to j-01/j-02). **Landed**, prompt label
   `2026-09-24-steps-not-touring`: one sentence, moves in steps and nothing about where the sizes come
   from. Trialled: 0 of 12.
+- His yes to the knowledge edit: "yeah do that - make sure the thicker diff problem isn't back… we don't
+  want when someone says more on power grip to say thicker diff. If they have a problem on power, or
+  it's oversteering or they want more grip, generally it means like a thinner diff would help. Although I
+  guess it can go either way." → **Landed** in bite-hold.md, word for word as proposed. Checked on the
+  live prompt with the edit, g-01 × 6, s-02, p-02, p-04 × 3 (batches onpower-*): thicker diff 0 of 15;
+  thinner diff offered in 9 (g-01 3 of 6, s-02 3 of 3, p-04 3 of 3), always for rotation or oversteer on
+  power. The diff card already says this (thinner = less rotation on throttle); nothing changed there.
+- "It keeps pairing softer front bar with thinner oil as if it's like hard written into the knowledge
+  base… I don't know if like instantly going for two things to be paired together is the right way…
+  if you say… the front bar should help. But might reduce initial steering, if it does here are some
+  suggestions, or maybe we don't need that and we just use the new button method." → It is written in
+  twice: the 2026-09-09 paired-change slot in the prompt ("the change that gets it back without touching
+  the gain") and corner-regime.md's "Damping is the lever that gives timing… which is why it is the
+  usual second half". Live shape: 5 of 6 j-01 replies pair them. Button trial v2 (same slot): 2 of 5,
+  because the Engineer put "How do I keep the turn-in?" on a button instead. **Proposed, his yes owed:**
+  in the button build the first answer names the cost and a button carries the fixes; "the usual second
+  half" comes off corner-regime.md (a frequency the mechanism doesn't give).
 
 ## Fixes landed from this batch
 
