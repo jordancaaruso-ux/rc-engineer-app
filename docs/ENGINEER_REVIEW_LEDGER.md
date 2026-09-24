@@ -483,6 +483,52 @@ recommended medium: it's what Sol was measured at, and it's fast. High roughly d
 the wait, for a cost that's input-dominated either way. The default is now `gpt-6-sol` at an explicit
 medium, and the ruling is in the roll-call (48/48).
 
+### 2026-09-24 — round 08 on Sol: his notes on 1–4, and the "problem" answer rebuilt
+
+Round 08 had 15 real, never-tested setup questions, with one Sol answer each
+(questions/round-08.json, batch round-08, $0.46). Page: https://claude.ai/artifact/Vmmpiv8nw3eYcn5Ppk7uDq.
+
+His notes, in chat:
+- **p-01 · 0919** (push mid-corner, 10 minutes): "take .25 per side of [rear toe] out, is good. But
+  I'd also want some suggestions that actually give more steering. So maybe soft front bar, soft front
+  spring… although I guess with only 10 minutes, reducing rear toe is good."
+- **p-02 · SA Fri** (a little more rear grip, medium-high speed, on throttle): "it's looking too hard
+  for things that don't have another effect that could be negative. So like raising the rear of the
+  shell, I think that's really good. More rear toe, is good. But it's not talking about rear roll
+  stiffness at all… even if it's hedged, it should at least say that. And describe what each does. Or
+  say, test it. If it's worse, go the other way. Because it can go either way."
+- **p-03 · SA Sat** (more bite, sliding): "Stiffer bars are good. I would say raising roll center,
+  lowering the upper inner is what I'd want to see. More overall camber, maybe."
+- **p-04 · 0919** (straighter off the corner): "toe and diff are the most predictable, but it could
+  explain something about rear spring. Or… roll center maybe — generally higher roll center drives
+  more precisely and straighter off the corner." → **KB, his call**: the nets say rear roll centre up
+  is "exit either way".
+- "I would be a little concerned that we're like adding band-aids rather than sorting the fundamental
+  problem… Just discuss for now." Then: "do the 'rewrite how a fix this problem answer is built'".
+
+→ **What it is:** not missing knowledge. For 1–3 the nets carry every lever he named, with what decides
+the either-way ones on track. It is the answer shape: the Terra-era "other levers that would also do
+it, at most three… what sets it apart".
+
+→ **Prompt, landed** (label `2026-09-24-sol-answer-shape`): the predictable change first, then the
+other main levers with what each does, and none left out for going either way.
+
+**Measured** (trials/answer-shape-2026-09-24.json; 94 calls, $1.95):
+- Parts named per answer: 2.3 → 3.4 (round 07) and 1.8 → 2.4 (round 08).
+- His NEVERs: 0 of 24.
+- Three blind judges: 29 to 9, 13 ties. Slips: 4 against 0. o-01's follow-up twice says the laps
+  "don't show a clear loss of pace" (true, but it reads as doubting him). s-02-a leads with less front
+  bump-in.
+
+**Where his four notes stand now:**
+- p-03 now has the roll-centre raise (2 of 2).
+- p-04 now offers the rear bar as an either-way test (2 of 2).
+- p-01 now leads with the softer front bar and drops the toe.
+- p-02 still leaves rear roll stiffness out (2 of 2).
+
+**Open for him:** his 09-04 ruling "at most three, no minimum" — the new wording has no cap (roll-call
+flags it MISSING until he rules).
+
 ## Fixes landed from this batch
 
 - **2026-09-09, from cards 3–4 (30 edits, 21 files; nets:check 37/37, tsc, 4 suites green):**

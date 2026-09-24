@@ -1,0 +1,11 @@
+{
+  "about": "2026-09-24 — the \"fix this problem\" answer rebuilt for Sol (founder: \"do the rewrite how a fix this problem answer is built\"). His round-08 notes 1–4: Sol gave the one safe change and left out levers that can go either way (\"looking too hard for things that don’t have another effect that could be negative\"); he wants the predictable change first, then the other main levers, each with what it does, either-way ones as \"test it. If it’s worse, go the other way\". Replaces the Terra-era \"other levers that would also do it, at most three … what sets it apart\".",
+  "edits": [
+    {
+      "block": "prompt",
+      "find": "- A problem: the change and how far, one line, no preamble; where that change costs a part of the corner, the change that gets it back without touching the gain, one clause; then other levers that would also do it, at most three, a line each — move, size, what sets it apart.",
+      "replace": "- A problem: the most predictable change first — the change and how far, one line, no preamble; where it costs a part of the corner, the change that gets it back without touching the gain, one clause. Then the other main levers for the same problem, a line each — the move, its size, and what the driver will feel and where on the corner. Leave none out because it can go either way: give it as a test — which way to try, what on track shows it worked, and go the other way if it’s worse.",
+      "why": "His round-08 notes 1–4: breadth, what each does, either-way levers as tests."
+    }
+  ]
+}

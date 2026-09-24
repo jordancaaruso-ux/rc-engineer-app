@@ -162,6 +162,22 @@ Each of these was deleted or declined for a reason. They return only through the
 
 ## Changelog
 
+- **2026-09-24, later — "a problem" rebuilt for Sol** (founder: "do the rewrite…"). His round-08 notes:
+  Sol gave one safe change and left out the levers that go either way. The knowledge was already in the
+  payload, and the Terra-era wording ("other levers that would also do it, at most three") held Sol
+  back. New: the most predictable change first, then the other main levers, each with what the driver
+  will feel, and none left out for going either way — given as a test. Label
+  `2026-09-24-sol-answer-shape`.
+
+  Measured on Sol at medium (rounds 07 and 08):
+  - Parts named per answer: 2.3 → 3.4 on round 07, 1.8 → 2.4 on round 08.
+  - His NEVER lines broken: 0 of 24.
+  - Blind judges: 29 pairs to 9, 13 ties.
+  - Watch: 4 slips against 0; see the prompt.ts note.
+
+  His 2026-09-04 ruling "at most three, no minimum" is flagged MISSING in the roll-call until he says
+  whether the cap stays gone.
+
 - **2026-09-24 — the Engineer moves to GPT-6 Sol** (founder: "Let's just use sol, and develop prompt /
   kb around that. Terra is weaker, if it wins it's because we've developed around it"). Measured
   first on round 07 (12 questions × 6 tries), both at medium:
