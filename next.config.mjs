@@ -73,6 +73,11 @@ const nextConfig = {
     // "Cannot load @napi-rs/canvas … ReferenceError: DOMMatrix is not defined". Local `next build`
     // cannot catch it — check the route's own `.nft.json` after building.
     "/api/setup-snapshots/**": RASTER_NATIVE_FILES,
+    // The in-app PDF viewer (View original file, View as PDF, the run's PDF review) draws each page
+    // with `pdfServerRaster` too, and was the one rasterizing prefix never listed: its `.nft.json`
+    // held no canvas, no worker and no fonts (2026-09-24 launch audit) — the same shape as the
+    // three August outages above, waiting for the first driver to open a PDF on Vercel.
+    "/api/pdf-view/**": RASTER_NATIVE_FILES,
     // MyRCM run-result PDFs (`lapUrlParsers/myRcmPdfText.ts`). `standardFontDataUrl()` resolves the
     // font directory with `require.resolve` and hands pdfjs a *path*, which the tracer cannot
     // follow — the same invisible hop as the three rasterizer outages above. Verified against the

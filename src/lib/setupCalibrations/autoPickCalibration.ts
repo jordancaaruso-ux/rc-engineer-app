@@ -119,26 +119,85 @@ export async function buildCalibrationFingerprints(input: {
   });
   const docById = new Map(docs.map((d) => [d.id, d] as const));
 
-  const out: CalibrationFingerprint[] = [];
-  for (const c of deduped) {
-    if (!c.exampleDocumentId) continue;
+  // Order is kept: callers rely on most-recent-first (see `pickExactCalibration`).
+  const fingerprints = await mapInOrder(deduped, FINGERPRINT_READ_CONCURRENCY, async (c) => {
+    if (!c.exampleDocumentId) return null;
     const doc = docById.get(c.exampleDocumentId);
-    if (!doc) continue;
+    if (!doc) return null;
     try {
-      const bytes = await readBytesFromStorageRef(doc.storagePath);
-      const fp = await fingerprintPdfFormFieldsFromBytes(new Uint8Array(bytes));
-      if (fp.names.length < minNameCount) continue;
-      out.push({
+      const names = await exampleFieldNames(doc.id, doc.storagePath);
+      if (names.length < minNameCount) return null;
+      return {
         calibrationId: c.id,
         calibrationName: c.name,
-        names: fp.names,
+        names,
         setupSheetModelId: c.setupSheetModelId,
         setupSheetModelName: c.setupSheetModel?.name ?? null,
-      });
+      } satisfies CalibrationFingerprint;
     } catch {
-      // Skip broken examples
+      return null; // Skip broken examples
+    }
+  });
+  return fingerprints.filter((f): f is CalibrationFingerprint => f != null);
+}
+
+/*
+ * Example-PDF field names, remembered (2026-09-24 launch audit). Every upload used to download and
+ * parse EVERY auto-pickable calibration's example PDF, one after another: ~230 since the 19 Sep
+ * ingest, around 300 MB per upload. An onboarding import went from 9–18 s to ~37 s and grew with
+ * each chassis added, against a 60 s give-up on the run form's upload door.
+ *
+ * A stored example never changes, so its names are computed once per example document: in this
+ * server's memory, and inside the Next runtime in the shared data cache too, so a fresh server
+ * does not pay again. What is not remembered yet is read several at a time.
+ */
+const FINGERPRINT_READ_CONCURRENCY = 8;
+const exampleNamesMemo = new Map<string, string[]>();
+
+async function readExampleFieldNames(storagePath: string): Promise<string[]> {
+  const bytes = await readBytesFromStorageRef(storagePath);
+  const fp = await fingerprintPdfFormFieldsFromBytes(new Uint8Array(bytes));
+  return fp.names;
+}
+
+async function exampleFieldNames(documentId: string, storagePath: string): Promise<string[]> {
+  const key = `${documentId}:${storagePath}`;
+  const memo = exampleNamesMemo.get(key);
+  if (memo) return memo;
+
+  let names: string[] | null = null;
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    try {
+      const { unstable_cache } = await import("next/cache");
+      names = await unstable_cache(
+        () => readExampleFieldNames(storagePath),
+        ["calibration-example-field-names-v1", key],
+        { revalidate: false }
+      )();
+    } catch {
+      names = null; // A broken example, or no cache here: the direct read below decides.
     }
   }
+  if (names == null) names = await readExampleFieldNames(storagePath);
+  exampleNamesMemo.set(key, names);
+  return names;
+}
+
+/** `Promise.all` over `items` with at most `limit` in flight; results keep the input order. */
+async function mapInOrder<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]!);
+    }
+  });
+  await Promise.all(workers);
   return out;
 }
 

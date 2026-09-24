@@ -179,6 +179,36 @@ export function pickHourlyObservation(
 
 export type FetchImpl = (url: string) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
 
+/*
+ * Kept per server (2026-09-24 launch audit). A request is one place (to ~1 km) and one UTC day, so
+ * every run logged at a track that day asks the same question — and the free tier caps calls a day
+ * per address, an address our servers share with other customers. A past day never changes;
+ * today's is kept briefly. The timeout matters because saving a run waits on this lookup.
+ */
+const WEATHER_TIMEOUT_MS = 6000;
+const WEATHER_TODAY_TTL_MS = 20 * 60 * 1000;
+const WEATHER_PAST_TTL_MS = 12 * 60 * 60 * 1000;
+const WEATHER_CACHE_MAX_ENTRIES = 1000;
+const weatherBodies = new Map<string, { body: unknown; expiresAt: number }>();
+
+function readWeatherBody(url: string): unknown {
+  const hit = weatherBodies.get(url);
+  if (!hit) return undefined;
+  if (hit.expiresAt <= Date.now()) {
+    weatherBodies.delete(url);
+    return undefined;
+  }
+  return hit.body;
+}
+
+function storeWeatherBody(url: string, body: unknown, ttlMs: number): void {
+  weatherBodies.set(url, { body, expiresAt: Date.now() + ttlMs });
+  if (weatherBodies.size > WEATHER_CACHE_MAX_ENTRIES) {
+    const oldest = weatherBodies.keys().next().value;
+    if (oldest !== undefined) weatherBodies.delete(oldest);
+  }
+}
+
 /**
  * Fetch normalized conditions for a location at an instant (default: now).
  * `opts.fetchImpl` / `opts.now` are injectable for tests.
@@ -199,21 +229,31 @@ export async function fetchRunConditionsFromOpenMeteo(
     now: opts?.now,
   });
 
-  const doFetch: FetchImpl = opts?.fetchImpl ?? ((url) => fetch(url) as ReturnType<FetchImpl>);
+  // Injected fetches (tests) bypass the shared copy so every case sees its own response.
+  const shared = !opts?.fetchImpl;
+  const doFetch: FetchImpl =
+    opts?.fetchImpl ??
+    ((url) => fetch(url, { signal: AbortSignal.timeout(WEATHER_TIMEOUT_MS) }) as ReturnType<FetchImpl>);
 
-  let res: Awaited<ReturnType<FetchImpl>>;
-  try {
-    res = await doFetch(req.url);
-  } catch (err) {
-    throw new WeatherFetchError(
-      `Weather lookup failed: ${err instanceof Error ? err.message : "network error"}`
-    );
+  let body = (shared ? readWeatherBody(req.url) : undefined) as { hourly?: OpenMeteoHourly } | undefined;
+  if (body === undefined) {
+    let res: Awaited<ReturnType<FetchImpl>>;
+    try {
+      res = await doFetch(req.url);
+    } catch (err) {
+      throw new WeatherFetchError(
+        `Weather lookup failed: ${err instanceof Error ? err.message : "network error"}`
+      );
+    }
+    if (!res.ok) {
+      throw new WeatherFetchError(`Weather service returned ${res.status}.`);
+    }
+    body = (await res.json()) as { hourly?: OpenMeteoHourly };
+    if (shared) {
+      const today = utcDateStamp(at) === utcDateStamp(opts?.now ?? new Date());
+      storeWeatherBody(req.url, body, today ? WEATHER_TODAY_TTL_MS : WEATHER_PAST_TTL_MS);
+    }
   }
-  if (!res.ok) {
-    throw new WeatherFetchError(`Weather service returned ${res.status}.`);
-  }
-
-  const body = (await res.json()) as { hourly?: OpenMeteoHourly };
   const obs = pickHourlyObservation(body, req.targetHourIso);
   if (!obs) {
     throw new WeatherFetchError("No weather reading available for that time and place.");
