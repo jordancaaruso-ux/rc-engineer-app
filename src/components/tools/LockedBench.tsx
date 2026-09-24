@@ -18,6 +18,8 @@ import type { PaidTier } from "@/lib/entitlementLogic";
  * three-across desktop grid a locked bench stands level with an open one beside it. The door is
  * yellow for the reason the Lab's lone door is: the only action on a band is never a quiet one.
  * It carries `?plan=`, so the Subscription page opens with that plan picked (see `BillingClient`).
+ * Inside the iPhone/Android app the door's strip is hidden (`web-only`, globals.css): the app
+ * sells nothing, so there the bench only says which plan includes it.
  *
  * The Teams page borrows it for the New team card when the plan's team limit is reached (2026-09-24),
  * with `stretch={false}`: in a page column `h-full` took the whole page height and pushed the door
@@ -48,7 +50,7 @@ export function LockedBench({
           {line}
         </p>
       </div>
-      <div className="mt-auto flex items-center justify-end border-t border-border bg-muted/40 px-4 py-2.5">
+      <div className="web-only mt-auto flex items-center justify-end border-t border-border bg-muted/40 px-4 py-2.5">
         <ButtonLink href={`/billing?plan=${includedIn}`}>Upgrade to {plan}</ButtonLink>
       </div>
     </CardPanel>

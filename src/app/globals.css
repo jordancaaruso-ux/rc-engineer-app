@@ -757,6 +757,18 @@ html[data-native="true"] #pwa-splash {
 }
 
 /*
+ * Inside the iPhone/Android app nothing is sold or pointed at (App Store guideline 3.1.3(f), the
+ * rule /join and /billing already follow with `ShellPlanNotice`). A locked surface there still
+ * says which plan includes it; only its door to buy ("Upgrade to …", the Starter "Upgrade" row)
+ * carries `web-only`. Keyed on the same `data-native` stamp as the splash rule above, which the
+ * bootstrap script in layout.tsx sets before anything paints. Unlayered, so it beats the door's
+ * own `flex` utility without `!important`.
+ */
+html[data-native="true"] .web-only {
+  display: none;
+}
+
+/*
  * Elevated panel surface — the shared "lift" that makes cards siblings of the
  * dashboard hero instead of flat near-black rectangles. Warm top sheen + a
  * gradient that lifts the top edge + a soft drop shadow so panels read off the

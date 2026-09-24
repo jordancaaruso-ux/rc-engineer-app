@@ -45,10 +45,11 @@ export function RunHistoryViewMore({
 }) {
   // The Starter upsell, and the whole of it: one row at the foot of the list, in every
   // placement, saying what the plan is holding back. It sits after "Show recent only", and
-  // yields to "View more" while there are still visible runs the page has not loaded.
+  // yields to "View more" while there are still visible runs the page has not loaded. Hidden
+  // inside the iPhone/Android app, which sells nothing (`web-only`, globals.css).
   const upgradeRow =
     hiddenByPlanCount > 0 ? (
-      <div className="flex items-center justify-center pt-2">
+      <div className="web-only flex items-center justify-center pt-2">
         <Link href="/billing" className={FOOT_LINK_CLASS}>
           {hiddenByPlanCount} older run{hiddenByPlanCount === 1 ? "" : "s"} ·{" "}
           <span className="text-primary-ink">Upgrade</span>

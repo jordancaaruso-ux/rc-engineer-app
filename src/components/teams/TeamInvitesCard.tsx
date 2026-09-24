@@ -113,7 +113,8 @@ export function TeamInvitesCard({
                     {rowBusy === "accept" ? "Joining…" : "Accept"}
                   </Button>
                 ) : (
-                  <ButtonLink href={`/billing?plan=${joinLock.includedIn}`}>
+                  // Hidden inside the app, which sells nothing (`web-only`, globals.css).
+                  <ButtonLink href={`/billing?plan=${joinLock.includedIn}`} className="web-only">
                     Upgrade to {TIER_LABELS[joinLock.includedIn]}
                   </ButtonLink>
                 )}

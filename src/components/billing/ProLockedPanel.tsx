@@ -17,6 +17,8 @@ import Link from "next/link";
  *
  * The door carries `?plan=`, so the Subscription page opens with the plan it names already
  * picked (the phone preselects one plan; without this a Notebook door landed on Race Engineer).
+ * Inside the iPhone/Android app the door is hidden (`web-only`, globals.css): the app sells
+ * nothing, so there the panel only says which plan includes the feature.
  *
  * Component name kept as-is: "pro" is still the internal tier id, and renaming the file would
  * churn every import for a string that is now read from `TIER_LABELS`.
@@ -39,7 +41,7 @@ export function ProLockedPanel({
         </p>
         <h2 className="mt-2 text-lg font-semibold">{title}</h2>
         <p className="mt-2 text-sm text-muted-foreground">{blurb}</p>
-        <div className="mt-5">
+        <div className="web-only mt-5">
           <Link href={`/billing?plan=${includedIn}`} className={buttonLinkClassName("primary")}>
             Upgrade to {label}
           </Link>
