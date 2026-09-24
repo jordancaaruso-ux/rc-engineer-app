@@ -17,7 +17,8 @@ import { liveRcNameMatchesConfigured } from "@/lib/lapWatch/liveRcNameNormalize"
 import { resolveImportedSessionDisplayTimeIso, resolveImportedSessionHasWallClockTime } from "@/lib/lapImport/labels";
 import { buildImportedIngestPlanFromPayload } from "@/lib/lapImport/importedIngestPlan";
 import type { DetectedRunPrompt } from "@/lib/detectedRunPrompt";
-import { eventIsActiveOnLocalToday } from "@/lib/eventActive";
+import { eventIsOnTodayAtTrack } from "@/lib/eventActive";
+import { resolveTrackTimeZone } from "@/lib/tracks/trackTimeZone";
 import { discoverLiveRcSessionsForUser } from "@/lib/lapWatch/discoverLiveRcSessionsForUser";
 import { eventIdsInScopeForUser } from "@/lib/events/eventParticipation";
 import { isSharedDemoAccount } from "@/lib/demo/demoAccess";
@@ -40,7 +41,7 @@ export type EventLapDetectionScopeResult = {
 };
 
 /**
- * Same scoping as sync and dashboard prompts: active-on-local-today events, else the single most recent by endDate.
+ * Same scoping as sync and dashboard prompts: events on today at their track, else the single most recent by endDate.
  */
 export async function getEventLapDetectionScope(userId: string): Promise<EventLapDetectionScopeResult> {
   const scopedIds = await eventIdsInScopeForUser(userId);
@@ -48,13 +49,25 @@ export async function getEventLapDetectionScope(userId: string): Promise<EventLa
     return { scopedEventIds: [], strategy: "fallback_most_recent", activeTodayCount: 0 };
   }
 
-  const candidates = await prisma.event.findMany({
-    where: { id: { in: scopedIds } },
-    orderBy: { endDate: "desc" },
-    take: EVENT_LAP_DETECTION_CANDIDATE_TAKE,
-    select: { id: true, startDate: true, endDate: true },
-  });
-  const active = candidates.filter(eventIsActiveOnLocalToday);
+  const [candidates, owner] = await Promise.all([
+    prisma.event.findMany({
+      where: { id: { in: scopedIds } },
+      orderBy: { endDate: "desc" },
+      take: EVENT_LAP_DETECTION_CANDIDATE_TAKE,
+      select: {
+        id: true,
+        startDate: true,
+        endDate: true,
+        track: { select: { timeZone: true, latitude: true, longitude: true } },
+      },
+    }),
+    prisma.user.findUnique({ where: { id: userId }, select: { timeZone: true } }),
+  ]);
+  // "Today" is the track's day, not the server's (UTC on Vercel).
+  const now = new Date();
+  const active = candidates.filter((e) =>
+    eventIsOnTodayAtTrack(e, resolveTrackTimeZone(e.track ?? {}, owner), now)
+  );
   const scoped = active.length > 0 ? active : candidates.slice(0, 1);
   return {
     scopedEventIds: scoped.map((e) => e.id),

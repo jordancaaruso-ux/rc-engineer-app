@@ -6,6 +6,7 @@ import { test } from "node:test";
 import {
   eventCalendarStatus,
   eventIsActiveOnCalendarDay,
+  eventIsOnTodayAtTrack,
   pickFeaturedEvent,
   startOfDayInTimeZone,
   todayBoundsInTimeZone,
@@ -148,4 +149,35 @@ test("wallClockAsUtcToInstant: Sydney summer (AEDT +11)", () => {
 test("wallClockAsUtcToInstant: negative offset (Los Angeles, PDT -7)", () => {
   const real = wallClockAsUtcToInstant(new Date("2026-07-19T16:36:00.000Z"), "America/Los_Angeles");
   assert.equal(real.toISOString(), "2026-07-19T23:36:00.000Z");
+});
+
+test("eventIsOnTodayAtTrack: a Sydney race morning counts before 10 am, when the server's UTC day hasn't turned", () => {
+  const sep26 = { startDate: new Date(Date.UTC(2026, 8, 26, 12)), endDate: new Date(Date.UTC(2026, 8, 26, 12)) };
+  const eightAmSydney = new Date("2026-09-25T22:00:00.000Z"); // 08:00 AEST on the 26th
+  assert.equal(eventIsOnTodayAtTrack(sep26, "Australia/Sydney", eightAmSydney), true);
+  assert.equal(eventIsActiveOnCalendarDay(sep26, "UTC", "2026-09-25"), false); // what the UTC server saw
+  const elevenPmBefore = new Date("2026-09-25T13:00:00.000Z"); // 23:00 AEST on the 25th
+  assert.equal(eventIsOnTodayAtTrack(sep26, "Australia/Sydney", elevenPmBefore), false);
+});
+
+test("eventIsOnTodayAtTrack: an American evening meeting still counts after 5 pm Pacific", () => {
+  const sep30 = { startDate: new Date(Date.UTC(2026, 8, 30, 12)), endDate: new Date(Date.UTC(2026, 8, 30, 12)) };
+  const sevenPmPacific = new Date("2026-10-01T02:00:00.000Z"); // 19:00 PDT on the 30th
+  assert.equal(eventIsOnTodayAtTrack(sep30, "America/Los_Angeles", sevenPmPacific), true);
+  const nextEvening = new Date("2026-10-02T02:00:00.000Z"); // 19:00 PDT on 1 Oct
+  assert.equal(eventIsOnTodayAtTrack(sep30, "America/Los_Angeles", nextEvening), false);
+});
+
+test("eventIsOnTodayAtTrack: older rows at local midnight or UTC midnight still land on their day", () => {
+  const sydneyMidnight = new Date("2026-09-25T14:00:00.000Z"); // 00:00 AEST on the 26th
+  const ev1 = { startDate: sydneyMidnight, endDate: sydneyMidnight };
+  assert.equal(eventIsOnTodayAtTrack(ev1, "Australia/Sydney", new Date("2026-09-26T02:00:00.000Z")), true);
+  const utcMidnight = new Date("2026-09-30T00:00:00.000Z");
+  const ev2 = { startDate: utcMidnight, endDate: utcMidnight };
+  assert.equal(eventIsOnTodayAtTrack(ev2, "America/New_York", new Date("2026-09-30T23:00:00.000Z")), true); // 19:00 EDT
+});
+
+test("eventIsOnTodayAtTrack: a three-day meeting counts on its middle day", () => {
+  const titles = { startDate: new Date(Date.UTC(2026, 9, 2, 12)), endDate: new Date(Date.UTC(2026, 9, 4, 12)) };
+  assert.equal(eventIsOnTodayAtTrack(titles, "Australia/Brisbane", new Date("2026-10-02T23:30:00.000Z")), true); // 09:30 on 3 Oct
 });

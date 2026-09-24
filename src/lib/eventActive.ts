@@ -1,4 +1,5 @@
 import { calendarYmdInTimeZone } from "@/lib/formatDate";
+import { eventDateToYmd } from "@/lib/eventDateParse";
 
 /** Local-midnight helpers for legacy callers. */
 export function startOfLocalDay(d: Date): Date {
@@ -123,6 +124,32 @@ export function eventIsActiveOnCalendarDay(
   todayYmd?: string
 ): boolean {
   return eventCalendarStatus(ev, timeZone, todayYmd) === "active";
+}
+
+/**
+ * Is this meeting on today's date AT ITS TRACK? `timeZone` is the track's zone
+ * (`resolveTrackTimeZone`), never the server's: Vercel runs in UTC, which started an Australian
+ * race day's check at 10 am and ended an American evening meeting's at 5–8 pm (2026-09-24).
+ *
+ * New rows store the date at UTC noon of the calendar day (`parseEventDateYmd`), but older rows
+ * hold UTC midnight, local midnight or a session time. So each row is read both ways, as a UTC
+ * calendar day and as a day at the track, and counts if either says today. At worst a meeting is
+ * checked one day extra; a miss would skip it.
+ */
+export function eventIsOnTodayAtTrack(
+  ev: { startDate: Date | string; endDate: Date | string },
+  timeZone: string,
+  now = new Date()
+): boolean {
+  const today = todayYmdInTimeZone(timeZone, now);
+  const covers = (start: string, end: string) => start <= today && today <= end;
+  return (
+    covers(eventDateToYmd(ev.startDate), eventDateToYmd(ev.endDate)) ||
+    covers(
+      calendarYmdInTimeZone(ev.startDate, timeZone),
+      calendarYmdInTimeZone(ev.endDate, timeZone)
+    )
+  );
 }
 
 /** @deprecated Prefer {@link eventIsActiveOnCalendarDay} with explicit timezone. */
