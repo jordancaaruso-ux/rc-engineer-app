@@ -5,8 +5,9 @@ import { ProLockedPanel } from "@/components/billing/ProLockedPanel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 
 /**
- * Lap time analysis is Notebook's (founder call 2026-09-15), so a Starter member meets this room
- * locked: the same visible-but-locked twin the Geometry Lab and the Engineer have. The check sits
+ * Lap time analysis is Race Engineer's (founder call 2026-09-24; Notebook's from 2026-09-15 until
+ * then), so a Starter or Notebook member meets this room locked: the same visible-but-locked twin
+ * the Geometry Lab and the Engineer have. The check sits
  * in the segment layout for the Lab's reason: one gate covers every state of the route (the
  * library, `?session=`, `?run=`) and `/laps/import`, which redirects here.
  *
@@ -14,7 +15,8 @@ import { PageBackLink } from "@/components/ui/PageBackLink";
  * onto this page. It is for the other doors: a run's "Detailed analysis", an old link.
  *
  * Only the reading room is locked. Laps still come in on the run form on every plan, and a run's
- * own lap sheet (its pop-up) is session review, which Starter keeps.
+ * own lap sheet (its pop-up) is session review, which every plan keeps — all but its Practice tab,
+ * which reads other drivers' practice and so answers 402 below Race Engineer.
  */
 export default async function LapAnalysisLayout({
   children,

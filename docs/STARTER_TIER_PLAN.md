@@ -55,6 +55,13 @@ where the build departed from the plan and why.
   Laptime Analysis out on Starter and list it on Notebook; the compare table splits "Session
   review" from "Laptime Analysis". Every locked door links `/billing?plan=<tier>`, so the phone
   opens with that plan picked.
+- **Amended 2026-09-24 (founder call): lap time analysis is Race Engineer's, not Notebook's.**
+  `lap-analysis` moved from Notebook's features to Race Engineer's, so Notebook now meets Tools
+  exactly as Starter does (two locked benches, both "Included in Race Engineer"), the
+  "Detailed analysis" door opens the locked page on both, and the lap sheet's Practice tab (other
+  drivers' practice, `/api/laps/practice-field`) is Race Engineer's too. The line: sessions you
+  drove are the notebook's, reading anyone else's is Race Engineer's. Plan cards cross Laptime
+  Analysis out on Notebook and list it on Race Engineer.
 
 ## The rulings (2026-09-09)
 

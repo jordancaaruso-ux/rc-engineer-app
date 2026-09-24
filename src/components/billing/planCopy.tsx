@@ -20,8 +20,9 @@ import {
  * Founder rulings baked in (2026-09-15): video is on no surface, not as a feature and not as
  * "soon"; the Engineer is Race Engineer's feature, so Notebook's one question a day is worded as a
  * taste and sits last; the Starter window is written in runs. Later the same day: lap time
- * analysis is Notebook's (a Tools bench, not the notebook), so Starter lists it crossed out and
- * the compare table gives it a row of its own.
+ * analysis is a Tools bench, not the notebook, so the compare table gives it a row of its own.
+ * It was Notebook's until 2026-09-24 and is Race Engineer's since (founder call), so both
+ * cheaper cards list it crossed out and Race Engineer's lists it.
  */
 
 /** The window as a word, so the card reads as a sentence; digits if it ever moves off one. */
@@ -63,7 +64,6 @@ export const PLAN_BULLETS: Record<PaidTier, PlanBullet[]> = {
     { text: "Session review: pace, consistency, mistakes" },
     { text: "Compare runs and setups" },
     { text: "Laps from LiveRC and Speedhive" },
-    { text: "Laptime Analysis: any race, any driver" },
     {
       text: `A taste of the Engineer: ${
         STANDARD_ENGINEER_DAILY_QUESTIONS === 1
@@ -71,12 +71,14 @@ export const PLAN_BULLETS: Record<PaidTier, PlanBullet[]> = {
           : `${STANDARD_ENGINEER_DAILY_QUESTIONS} questions`
       } a day`,
     },
+    { text: "Laptime Analysis", off: true },
     { text: "Roll-centre and geometry", off: true },
   ],
   pro: [
     { text: "The Engineer" },
     { text: `Everything in ${TIER_LABELS.standard}` },
     { text: "A whole race weekend's questions in one day" },
+    { text: "Laptime Analysis: any race, any driver" },
     { text: "Roll-centre and geometry tools" },
     { text: "Remaining-this-month meter" },
   ],
@@ -88,7 +90,7 @@ export const COMPARE_ROWS: Array<{ label: string } & Record<PaidTier, string>> =
   { label: "Run logging (LiveRC · Speedhive)", starter: "✓", standard: "✓", pro: "✓" },
   { label: "Session review", starter: "✓", standard: "✓", pro: "✓" },
   { label: "Compare runs & setups", starter: "✓", standard: "✓", pro: "✓" },
-  { label: "Laptime Analysis · any race", starter: "—", standard: "✓", pro: "✓" },
+  { label: "Laptime Analysis · any race", starter: "—", standard: "—", pro: "✓" },
   {
     label: "The Engineer",
     starter: "—",

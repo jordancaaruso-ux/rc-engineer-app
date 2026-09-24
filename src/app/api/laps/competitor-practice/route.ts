@@ -15,8 +15,8 @@ export async function POST(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  // The pull feeds lap time analysis, which is Notebook's (founder call 2026-09-15): Starter
-  // gets the 402 before anything reaches out to MYLAPS.
+  // The pull feeds lap time analysis, which is Race Engineer's (founder call 2026-09-24): Starter
+  // and Notebook get the 402 before anything reaches out to MYLAPS.
   const gate = await requireApiFeature("lap-analysis");
   if (gate.response) return gate.response;
   const userId = gate.user.id;

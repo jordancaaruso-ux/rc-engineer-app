@@ -48,7 +48,7 @@ const STATES = [
     tier: "starter",
     status: "active",
     periodEnd: () => new Date(Date.now() + 30 * 86400000),
-    expect: `/engineer locked ('Included in ${TIER_LABELS.pro}') · /tools: both benches locked (Laptime Analysis → ${TIER_LABELS.standard}, Geometry Lab → ${TIER_LABELS.pro}) · /laps/analysis locked · /videos + /analysis/roll-center locked · Sessions ends with 'N older runs · Upgrade' once more than ${STARTER_RUN_WINDOW} runs are logged`,
+    expect: `/engineer locked ('Included in ${TIER_LABELS.pro}') · /tools: both benches locked ('Included in ${TIER_LABELS.pro}') · /laps/analysis locked · /videos + /analysis/roll-center locked · Sessions ends with 'N older runs · Upgrade' once more than ${STARTER_RUN_WINDOW} runs are logged`,
   },
   {
     key: "standard",
@@ -59,7 +59,7 @@ const STATES = [
     // Interpolated, not spelled out: these expectations are printed to whoever runs the script, and
     // a hardcoded number here quietly becomes a lie the next time the allowances move (it already
     // did once — this line said "0 of 2 left today" after the 2026-08-06 reprice to 1/day).
-    expect: `/tools: Laptime Analysis open, Geometry Lab locked · /videos + /analysis/roll-center locked · /engineer '${STANDARD_ENGINEER_DAILY_QUESTIONS} of ${STANDARD_ENGINEER_DAILY_QUESTIONS} ... left today' · next ask refused`,
+    expect: `/tools: both benches locked ('Included in ${TIER_LABELS.pro}') · /laps/analysis locked · a run's lap sheet has no Practice tab · /videos + /analysis/roll-center locked · /engineer '${STANDARD_ENGINEER_DAILY_QUESTIONS} of ${STANDARD_ENGINEER_DAILY_QUESTIONS} ... left today' · next ask refused`,
   },
   {
     key: "pro",

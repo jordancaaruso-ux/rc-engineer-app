@@ -46,14 +46,14 @@ import { LockedBench } from "@/components/tools/LockedBench";
  * component, the model's `video` list and the `/videos` pages are all still in the tree; putting
  * it back is the import and one line of JSX.
  *
- * Each plan sees its own benches (founder call, later 2026-09-15). Lap time analysis is
- * Notebook's and the Geometry Lab is Race Engineer's, and the page says so on the bench itself
- * (`LockedBench`) rather than one tap behind it: a Starter member was offered "Open the lab" here
- * and met "not available" on the other side. What the plan includes leads and a locked bench
- * follows, the cheaper upgrade first: Race Engineer sees the page as it was, Notebook sees
- * Laptime Analysis and then the Lab locked, Starter sees two locked benches with Notebook's
- * first. Notebook no longer gets its car's roll centres drawn here either — those numbers are
- * the Lab's answer, and the Lab is the thing it is being sold.
+ * Each plan sees its own benches (founder call, later 2026-09-15), and the page says so on the
+ * bench itself (`LockedBench`) rather than one tap behind it: a Starter member was offered "Open
+ * the lab" here and met "not available" on the other side. Both benches are Race Engineer's:
+ * the Geometry Lab from the start, lap time analysis since 2026-09-24 (founder call; it was
+ * Notebook's before). So Race Engineer sees the page as it was, and Starter and Notebook see the
+ * same two locked benches, Laptime Analysis first. Notebook no longer gets its car's roll centres
+ * drawn here either — those numbers are the Lab's answer, and the Lab is the thing it is being
+ * sold.
  */
 export const metadata: Metadata = {
   title: "Tools",
@@ -85,7 +85,7 @@ export default async function ToolsPage(): Promise<ReactNode> {
   const { tier } = await getEntitlement(user);
   const labOpen = isFeatureEntitled(tier, "roll-center");
   const lapsOpen = isFeatureEntitled(tier, "lap-analysis");
-  // Starter holds neither bench, so there is nothing of theirs to read.
+  // Starter and Notebook hold neither bench, so there is nothing of theirs to read.
   const model = labOpen || lapsOpen ? await getCachedToolsModel(user.id, timeZone) : null;
 
   // Each band carries its own heading, as the top row of its own card (founder pin,
@@ -175,9 +175,8 @@ export default async function ToolsPage(): Promise<ReactNode> {
           list grows, and its door is pinned to the foot.
         */}
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-          {/* What the plan includes leads; a locked bench follows (header). Laptime Analysis
-              needs the cheaper plan, so whenever the Lab is shut it goes first: open before
-              locked on Notebook, Notebook's lock before Race Engineer's on Starter. */}
+          {/* Race Engineer holds both benches, the Lab first. Every other plan holds neither
+              (header), and Laptime Analysis leads the two locks. */}
           {labOpen ? geometryBench : lapBench}
           {labOpen ? lapBench : geometryBench}
         </div>

@@ -11,9 +11,11 @@
  * (docs/STARTER_TIER_PLAN.md).
  *
  * The Tools benches are not the notebook (founder call 2026-09-15): lap time analysis
- * (`lap-analysis`, the `/laps/analysis` room that reads any timing sheet) starts at Standard and
- * the Geometry Lab (`roll-center`) at Pro, so Starter's Tools tab is two locked benches.
- * Reading your own run's laps is `review`, and Starter keeps it.
+ * (`lap-analysis`, the `/laps/analysis` room that reads any timing sheet) and the Geometry Lab
+ * (`roll-center`) are both Pro's, so Starter's and Standard's Tools tab is two locked benches.
+ * Lap time analysis started at Standard and moved up to Pro (founder call 2026-09-24): the
+ * sessions you drove are the notebook's, reading anyone else's is Race Engineer's. Reading your
+ * own run's laps, with its race and its teammates, is `review`, and every plan keeps it.
  */
 
 export type Tier = "none" | "starter" | "standard" | "pro";
@@ -34,8 +36,8 @@ export type Feature =
   | "roll-center";
 
 const STARTER_FEATURES: Feature[] = ["logging", "review", "compare"];
-const STANDARD_FEATURES: Feature[] = [...STARTER_FEATURES, "lap-analysis", "engineer"];
-const PRO_FEATURES: Feature[] = [...STANDARD_FEATURES, "video", "roll-center"];
+const STANDARD_FEATURES: Feature[] = [...STARTER_FEATURES, "engineer"];
+const PRO_FEATURES: Feature[] = [...STANDARD_FEATURES, "lap-analysis", "video", "roll-center"];
 
 const TIER_FEATURES: Record<Tier, ReadonlySet<Feature>> = {
   none: new Set<Feature>(),

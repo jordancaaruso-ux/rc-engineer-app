@@ -37,7 +37,8 @@ export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
-  // Same door as the sheet it feeds: lap time analysis is Notebook's (founder call 2026-09-15).
+  // Same door as the sheet it feeds: lap time analysis is Race Engineer's (founder call
+  // 2026-09-24). A 402 here is also what keeps the Practice tab off a run's lap sheet below it.
   const gate = await requireApiFeature("lap-analysis");
   if (gate.response) return gate.response;
 

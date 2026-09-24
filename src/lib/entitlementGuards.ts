@@ -48,7 +48,7 @@ export async function getEntitledApiUser(): Promise<{ user: User; entitlement: E
  * Segment layouts / server pages — is this paid feature LOCKED for the current viewer?
  * `requireCurrentUser` inside already bounces unauthenticated → /login and unpaid → /billing, so
  * "locked" here means exactly one thing: a paying subscriber whose tier is short of the feature
- * (Notebook at the Geometry Lab, Starter at the Engineer and at lap time analysis) — the
+ * (Notebook at the Geometry Lab and lap time analysis, Starter at those and the Engineer) — the
  * visible-but-locked upsell state (`ProLockedPanel`), never a redirect.
  */
 export async function isFeatureLockedForCurrentUser(feature: Feature): Promise<boolean> {
