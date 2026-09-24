@@ -57,6 +57,30 @@ export function isAppSignupSession(session: CheckoutSessionSignupLike): boolean 
 }
 
 /**
+ * Whose account a completed checkout belongs to. `memberUserId` is the signed-in account the
+ * checkout named (`client_reference_id`); `publicSignup` means the payer needs an account made
+ * from their checkout email, plus the sign-in code.
+ *
+ * A checkout naming the shared demo account is a stranger's. A visitor browsing the demo who
+ * pressed "Get your own garage" carried the demo's session into checkout, and the webhook linked
+ * the payment to the demo: no account of their own, no code, and the demo's plan overwritten for
+ * every visitor after (2026-09-24 audit). The checkout route now opens a stranger's checkout for a
+ * demo session; this keeps any session opened before that fix, or any other route to it, right.
+ */
+export function resolveCheckoutOwner(
+  session: CheckoutSessionSignupLike,
+  isDemoAccountId: (id: string) => boolean,
+): { memberUserId: string | null; publicSignup: boolean } {
+  const ref = session.client_reference_id?.trim() || null;
+  const demoRef = ref != null && isDemoAccountId(ref);
+  const memberUserId = demoRef ? null : ref;
+  return {
+    memberUserId,
+    publicSignup: memberUserId == null && (demoRef || isPublicSignupSession(session)),
+  };
+}
+
+/**
  * The email to provision from. `customer_details.email` is what the buyer actually typed into
  * Checkout (always present on a completed session); `customer_email` is only the pre-fill hint,
  * kept as a fallback for defensive completeness.

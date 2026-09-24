@@ -8,9 +8,10 @@ import { deriveSubscriptionSchedule } from "@/lib/stripeSubscriptionSync";
 import {
   extractCheckoutEmail,
   isAppSignupSession,
-  isPublicSignupSession,
+  resolveCheckoutOwner,
 } from "@/lib/billing/paidSignupLogic";
 import { provisionPaidUser, sendPaidSignupSignInLink } from "@/lib/billing/paidSignup";
+import { isSharedDemoAccount } from "@/lib/demo/demoAccess";
 import { applyRunWindow } from "@/lib/runs/runWindow";
 import { revalidateAfterRunMutation } from "@/lib/revalidateUser";
 
@@ -27,6 +28,8 @@ async function syncSubscription(sub: Stripe.Subscription): Promise<void> {
   const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
   const user = await prisma.user.findFirst({ where: { stripeCustomerId: customerId } });
   if (!user) return; // customer not linked to a user yet — nothing to sync
+  // The shared demo account keeps its seeded plan; a real payment never lands on it.
+  if (isSharedDemoAccount({ id: user.id, email: user.email })) return;
 
   const priceId = sub.items.data[0]?.price?.id ?? null;
   const tier = await resolveTierForPriceId(priceId);
@@ -57,7 +60,10 @@ async function syncSubscription(sub: Stripe.Subscription): Promise<void> {
 async function syncFromCheckoutSession(session: Stripe.Checkout.Session): Promise<void> {
   const customerId =
     typeof session.customer === "string" ? session.customer : session.customer?.id ?? null;
-  const userId = session.client_reference_id;
+  // A checkout naming the demo account is a stranger's (see `resolveCheckoutOwner`).
+  const { memberUserId: userId, publicSignup } = resolveCheckoutOwner(session, (id) =>
+    isSharedDemoAccount({ id }),
+  );
   if (userId && customerId) {
     await prisma.user
       .update({ where: { id: userId }, data: { stripeCustomerId: customerId } })
@@ -69,10 +75,7 @@ async function syncFromCheckoutSession(session: Stripe.Checkout.Session): Promis
   // the sign-in link only AFTER the sync succeeds, so a sync failure retries without having sent.
   // Ordering within the handler is safe because a thrown error drops the event claim for retry,
   // and every step here is idempotent.
-  const publicSignupEmail =
-    !userId && customerId && isPublicSignupSession(session)
-      ? extractCheckoutEmail(session)
-      : null;
+  const publicSignupEmail = publicSignup && customerId ? extractCheckoutEmail(session) : null;
   if (publicSignupEmail && customerId) {
     await provisionPaidUser(publicSignupEmail, customerId);
   }

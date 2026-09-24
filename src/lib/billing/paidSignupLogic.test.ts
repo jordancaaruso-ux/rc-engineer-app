@@ -14,6 +14,7 @@ import {
   isAppSignupSession,
   isPublicSignupSession,
   normalizeSignupEmail,
+  resolveCheckoutOwner,
 } from "@/lib/billing/paidSignupLogic";
 
 test("normalizeSignupEmail lowercases, trims, and rejects junk", () => {
@@ -71,4 +72,28 @@ test("a malformed typed email falls through to the pre-fill rather than dying", 
     }),
     "good@example.com",
   );
+});
+
+test("a checkout naming the demo account provisions the payer's own account", () => {
+  const isDemo = (id: string) => id === "demo0000000000000000user1";
+  // Opened from a demo session before the checkout fix: no public stamp, the demo as reference.
+  assert.deepEqual(
+    resolveCheckoutOwner({ client_reference_id: "demo0000000000000000user1", metadata: null }, isDemo),
+    { memberUserId: null, publicSignup: true },
+  );
+  // A real member's checkout still links to them and is never a public signup.
+  assert.deepEqual(
+    resolveCheckoutOwner({ client_reference_id: "member-1", metadata: null }, isDemo),
+    { memberUserId: "member-1", publicSignup: false },
+  );
+  // A stranger's checkout: no reference, the public stamp.
+  assert.deepEqual(
+    resolveCheckoutOwner({ metadata: { source: PUBLIC_SIGNUP_SOURCE } }, isDemo),
+    { memberUserId: null, publicSignup: true },
+  );
+  // Neither a reference nor the stamp: nobody to provision.
+  assert.deepEqual(resolveCheckoutOwner({ metadata: null }, isDemo), {
+    memberUserId: null,
+    publicSignup: false,
+  });
 });

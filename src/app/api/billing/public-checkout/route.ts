@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
 import { clientIpKey } from "@/lib/clientIp";
+import { isSharedDemoAccount } from "@/lib/demo/demoAccess";
 import { getPricePlans, getStripe, stripeConfigured } from "@/lib/stripe";
 import {
   APP_SIGNUP_FROM,
@@ -51,8 +52,12 @@ export async function POST(request: Request): Promise<Response> {
   const origin =
     request.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
 
-  // Middleware doesn't gate this route, but a session cookie may still be present.
-  const user = await getAuthenticatedApiUser();
+  // Middleware doesn't gate this route, but a session cookie may still be present. The shared demo
+  // session is a stranger's borrowed one (the /join page treats it that way too): buying from it
+  // must make the payer their own account, never put the plan on the demo's (2026-09-24 audit).
+  const signedIn = await getAuthenticatedApiUser();
+  const user =
+    signedIn && !isSharedDemoAccount({ id: signedIn.id, email: signedIn.email }) ? signedIn : null;
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",

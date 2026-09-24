@@ -8,7 +8,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { decideDemoRequest, isDemoIdentity } from "@/lib/demo/demoAccess";
+import { decideDemoRequest, isSharedDemoAccount, isDemoIdentity } from "@/lib/demo/demoAccess";
 
 const env = { DEMO_USER_ID: "demo0000000000000000user1", DEMO_USER_EMAIL: "demo@jrcdynamics.com" };
 
@@ -67,4 +67,14 @@ test("unset env ⇒ nobody is demo, ever", () => {
     isDemoIdentity({ id: "", email: "" }, { DEMO_USER_ID: "", DEMO_USER_EMAIL: "" }),
     false,
   );
+});
+
+test("isSharedDemoAccount also knows the seed's fixed id, so billing never goes dark", () => {
+  assert.equal(isSharedDemoAccount({ id: "demo0000000000000000user1" }, env), true);
+  assert.equal(isSharedDemoAccount({ email: "demo@jrcdynamics.com" }, env), true);
+  // Env unset: the identity check is dark, but the seed id still counts for billing.
+  assert.equal(isSharedDemoAccount({ id: "demo0000000000000000user1" }, {}), true);
+  assert.equal(isSharedDemoAccount({ id: "a-real-driver", email: "driver@example.com" }, env), false);
+  assert.equal(isSharedDemoAccount({ id: null, email: null }, {}), false);
+  assert.equal(isSharedDemoAccount({ id: "" }, {}), false);
 });

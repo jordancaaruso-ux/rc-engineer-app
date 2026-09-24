@@ -56,6 +56,24 @@ export function demoCatalogUserId(env: DemoEnv = process.env as DemoEnv): string
 }
 
 /**
+ * Is this the shared demo account, for anything that must never treat it as a real driver? The
+ * configured identity OR the seed's fixed id, so it never goes dark either.
+ *
+ * - Billing: nothing may be bought onto it. A visitor who paid while still carrying the demo's
+ *   session had the plan land there (2026-09-24 audit) — no account of their own, no sign-in
+ *   code, and the demo's plan overwritten for everyone after.
+ * - Background timing-site reads: every visitor is the same account, so a launch-day crowd
+ *   opening its dashboard would read LiveRC on the demo's behalf over and over.
+ */
+export function isSharedDemoAccount(
+  identity: { id?: string | null; email?: string | null },
+  env: DemoEnv = process.env as DemoEnv,
+): boolean {
+  if (isDemoIdentity(identity, env)) return true;
+  return Boolean(identity.id) && identity.id === demoCatalogUserId(env);
+}
+
+/**
  * Central read-only decision for a demo session's request. Non-demo sessions never reach
  * this. Page-path POSTs (server actions) are forbidden too — the one server action in the
  * app is founder tooling anyway.
