@@ -97,6 +97,7 @@ async function maybePersistEngineerReply(params: {
   range?: EngineerMessageContextSnapshot["range"];
   source?: string;
   model?: string;
+  nextQuestions?: string[];
 }): Promise<EngineerChatFeedbackPayload | null> {
   const userQuestion = [...params.messages].reverse().find((m) => m.role === "user")?.content ?? "";
   if (!userQuestion.trim() || !params.reply.trim()) return null;
@@ -112,6 +113,7 @@ async function maybePersistEngineerReply(params: {
       range: params.range,
       source: params.source,
       model: params.model,
+      nextQuestions: params.nextQuestions,
     });
   } catch (err) {
     console.error("[api/engineer/chat] persist exchange failed", err);
@@ -346,9 +348,11 @@ export async function POST(request: Request) {
                   range: rangeScope,
                   source: "llm",
                   model: out.model,
+                  nextQuestions: out.nextQuestions,
                 });
             send("done", {
               reply: out.reply,
+              nextQuestions: out.nextQuestions,
               resolvedFocus: null,
               anchor: null,
               feedback,
@@ -400,11 +404,13 @@ export async function POST(request: Request) {
           range: rangeScope,
           source: "llm",
           model: out.model,
+          nextQuestions: out.nextQuestions,
         });
 
     return NextResponse.json({
       contextJson: null,
       reply: out.reply,
+      nextQuestions: out.nextQuestions,
       resolvedFocus: null,
       anchor: null,
       feedback,

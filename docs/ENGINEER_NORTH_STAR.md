@@ -29,11 +29,18 @@ and must never promise more than it sends. Founder call 2026-09-02: an earlier f
 (change / mechanism / what to feel for / when it wouldn't apply) is retired — people want to make
 the car fast, and they ask when they want more.
 
-- **A problem** ("it's loose on power"): the change and how far, one line, no preamble; where that
-  change costs a part of the corner, the change that gets it back without touching the gain, one
-  clause (since 2026-09-09); then other levers that would also do it, at most three (a ceiling, no
-  floor — since 2026-09-19), a line each — move, size, what sets it apart — so the driver can ask
-  about any of them.
+- **A problem** ("it's loose on power"): the most predictable change first, and how far, one line,
+  no preamble; where it costs a part of the corner, what it costs, one clause, and nothing yet about
+  getting that back — the fix waits for the driver to ask (since 2026-09-24, replacing the
+  2026-09-09 paired change). Then, only where it earns its place, something a little interesting, a
+  line or two. The other main levers wait until the driver asks for other options; then they all
+  come, a line each, the either-way ones as a test (founder, 2026-09-24: "a pretty quick single safe
+  change, still some things that are a little interesting, but then say you know what are some other
+  options I could try, what about this").
+- **Follow-up buttons** (since 2026-09-24): every reply ends with the two or three things this
+  driver would most likely ask next, which the app shows as buttons under the newest answer beside
+  its own **Other options**; a tap sends. Where the lead change costs a part of the corner, one of
+  them asks what to do if it does. When the Engineer asks where, its buttons are the answers.
 - **What a change does** ("what does more rear droop do"): the feel and where on the corner, in
   the nets' register — what the driver will feel, not what moves inside the car; other levers
   only if the Engineer would truly reach for them, at most two.
@@ -143,9 +150,12 @@ Each of these was deleted or declined for a reason. They return only through the
   (`driverData.ts`) — plain statements of what is true, nothing about how to think. The
   prompt sentence that once denied data exists now draws the line around exactly what is
   attached, and it is still load-bearing.
-- **One tool, no choice chips, no status theatre.** The old pipeline grew to ~99K
+- **One tool, no status theatre, and one kind of button in the chat.** The old pipeline grew to ~99K
   chars a turn one reasonable addition at a time; the payload-contract test exists so additions
-  fail loudly instead of accreting. The one switch the driver holds is the subject bar:
+  fail loudly instead of accreting. The July choice chips stay deleted as their own mechanism; the
+  follow-up buttons under the newest answer (founder call 2026-09-24, §2) are the one kind of
+  button in the conversation — the Engineer's next questions plus the app's Other options, a tap
+  sends. The one switch the driver holds is the subject bar:
   Auto reads the latest run, a pin reads a chosen run, a **range** reads the runs the driver
   named (a track, a car type, a span of dates — since 2026-09-14), General attaches no run.
   The range is always the driver's choice, never inferred from the wording of the question:
@@ -161,6 +171,23 @@ Each of these was deleted or declined for a reason. They return only through the
   blind audit for anything user-visible.
 
 ## Changelog
+
+- **2026-09-24, night — follow-up buttons** (founder: "I think this is the direction we need to work
+  on… this is sort of the only way that we can really push the engineer to the next level because
+  right now… there's too many variables that he has to think about when answering"). The first answer
+  is "a pretty quick single safe change, still some things that are a little interesting"; what the
+  change costs is named, and the fix for it waits for the driver's ask (founder "Yes", replacing the
+  2026-09-09 paired change); the other main levers wait for **Other options** and then all come — the
+  4 Sept cap stays gone. Every reply ends with the Engineer's two or three next questions, shown as
+  buttons under the newest answer beside the app's own Other options; a tap sends. Built after a
+  mockup and a 27-question review page he asked for; label `2026-09-24-follow-up-buttons`.
+
+  Measured on Sol at medium, rounds 07 and 08, with Other options tapped on each (60 calls, $1.57):
+  - First answers 93 words, against 131 live.
+  - The Engineer repeats the app's button on 2 of 27 answers (11 before the prompt said not to).
+  - A softer front bar comes paired with thinner oil 0 of 5 times (live: 5 of 6 on j-01).
+  - 13 of the 14 answers that name a cost offer a "what if it does" button.
+  - His NEVER lines stay clean.
 
 - **2026-09-24, later — "a problem" rebuilt for Sol** (founder: "do the rewrite…"). His round-08 notes:
   Sol gave one safe change and left out the levers that go either way. The knowledge was already in the

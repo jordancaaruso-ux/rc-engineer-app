@@ -2,6 +2,7 @@ import "server-only";
 
 import { loadFullVehicleDynamicsKb } from "@/lib/engineer/kb";
 import { ENGINEER_NETS_HEADER, loadNets } from "@/lib/engineer/nets";
+import { holdBackNextQuestions, splitNextQuestions } from "@/lib/engineer/nextQuestions";
 import { rcGuardCorrections, rcLeversFromNets } from "@/lib/engineer/rcDirections";
 import { engineerOpenAiUserMessage } from "@/lib/openAiRetry";
 import {
@@ -70,8 +71,12 @@ export async function generateEngineerChatReply(params: {
    * byte-identical to before tools existed.
    */
   tools?: EngineerTools;
-}): Promise<{ reply: string; usage: EngineerChatUsage | null; model: string }> {
+}): Promise<{ reply: string; nextQuestions: string[]; usage: EngineerChatUsage | null; model: string }> {
   const apiKey = mustGetOpenAiKey();
+  // The follow-up line (nextQuestions.ts) is held back from the live stream as it arrives, so the
+  // driver never sees `[[next: …]]` flash up before the buttons replace it.
+  const stream = params.onToken ? holdBackNextQuestions(params.onToken) : null;
+  const onToken = stream ? stream.push : undefined;
   const kb = await loadFullVehicleDynamicsKb();
   if (kb.files.length === 0) {
     throw new Error("The vehicle-dynamics knowledge base is empty — the Engineer has nothing to reason from.");
@@ -106,7 +111,7 @@ export async function generateEngineerChatReply(params: {
       ...(toolDefs.length > 0 ? { tools: toolDefs } : {}),
     });
 
-  let res = await postChatCompletion(apiKey, bodyFor(messages), params.onToken);
+  let res = await postChatCompletion(apiKey, bodyFor(messages), onToken);
 
   // One degradation, not a ladder. The whole request is ~16K tokens against a 500K-TPM
   // pool, so the only realistic way to be too large is a conversation that has run very
@@ -117,7 +122,7 @@ export async function generateEngineerChatReply(params: {
     if (lastUser) {
       console.warn("[engineer-chat] request too large — retrying with the latest question only");
       messages = buildEngineerMessages(blocks, [lastUser]);
-      res = await postChatCompletion(apiKey, bodyFor(messages), params.onToken);
+      res = await postChatCompletion(apiKey, bodyFor(messages), onToken);
     }
   }
 
@@ -148,7 +153,7 @@ export async function generateEngineerChatReply(params: {
       messages = [...messages, { role: "tool", tool_call_id: call.id, content: result }];
     }
     params.tools.onAnswering?.();
-    res = await postChatCompletion(apiKey, bodyFor(messages), params.onToken);
+    res = await postChatCompletion(apiKey, bodyFor(messages), onToken);
   }
 
   if (!res.ok) {
@@ -158,8 +163,12 @@ export async function generateEngineerChatReply(params: {
     throw new Error(engineerOpenAiUserMessage(rawMsg));
   }
   addUsage();
+  stream?.flush();
 
-  let reply = contentOf(res).trim();
+  // The follow-up line comes off before anything else reads the reply: the guard below appends
+  // after the answer, and a correction written after the line would strand it mid-text.
+  const split = splitNextQuestions(contentOf(res).trim());
+  let reply = split.text;
 
   // Deterministic roll-centre direction guard (rcDirections.ts, founder call 2026-09-01):
   // a shim-move/RC-direction pairing that contradicts the solver-checked table, or a move
@@ -180,6 +189,7 @@ export async function generateEngineerChatReply(params: {
     reply:
       reply ||
       "I couldn't generate a response from the model. Try rephrasing your question.",
+    nextQuestions: reply ? split.nextQuestions : [],
     usage: usageTotal.completionCalls > 0 ? usageTotal : null,
     model,
   };
@@ -207,7 +217,7 @@ export async function runEngineerChatTurn(params: {
   question: string;
   blocks?: EngineerPayloadBlock[];
   onToken?: (delta: string) => void;
-}): Promise<{ reply: string; usage: EngineerChatUsage | null; model: string }> {
+}): Promise<{ reply: string; nextQuestions: string[]; usage: EngineerChatUsage | null; model: string }> {
   return generateEngineerChatReply({
     messages: [{ role: "user", content: params.question.trim() }],
     blocks: params.blocks,

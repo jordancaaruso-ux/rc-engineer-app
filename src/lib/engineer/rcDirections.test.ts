@@ -99,6 +99,19 @@ test("round 07's false corrections stay silent: 'less' before a lever, a compara
   assert.match(wrong[0], /upper-outer/);
 });
 
+test("a move verb stays in its own clause: 'add at A, or remove from B' is right (2026-09-24)", () => {
+  // Corrected as "backwards" in front of the driver: the nearer "remove" was read as the upper-inner move.
+  const right =
+    "- **Lower the rear roll centre:** add **0.5 mm** at the rear upper-inner links, *or* remove **0.5 mm** from the rear upper-outer or under-lower-arm shims. Try only one.";
+  assert.deepEqual(rcGuardCorrections(right, LEVERS), []);
+  // A wrong move inside the lever's own clause is still caught across the comma before it.
+  const wrong = rcGuardCorrections("Lower the rear roll centre, remove 0.5 mm of rear upper-inner shim.", LEVERS);
+  assert.equal(wrong.length, 1, wrong.join("\n"));
+  // A comma inside a number is not a clause edge.
+  const oil = rcGuardCorrections("Raise the front roll centre: take out 1,000 of nothing, then remove 0.5 mm of upper-inner shim.", LEVERS);
+  assert.deepEqual(oil, []);
+});
+
 test("prose with no roll-centre mention is never touched", () => {
   const reply =
     "Go 50 cSt thinner on the front oil; add 0.25° front camber; remove a rear toe-gain shim.";

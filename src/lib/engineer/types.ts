@@ -17,6 +17,8 @@ export type EngineerMessageContextSnapshot = {
   promptVersion?: string;
   /** The model that wrote it; the prompt version alone can't tell a Terra answer from a Sol one. */
   model?: string;
+  /** The follow-up buttons the Engineer picked for this answer (nextQuestions.ts). */
+  nextQuestions?: string[];
 };
 
 export type EngineerRatingInput = {

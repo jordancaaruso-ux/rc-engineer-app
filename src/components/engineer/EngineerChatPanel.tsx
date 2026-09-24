@@ -5,6 +5,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowUp, ChevronDown, MessageSquarePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EngineerMessageRatingRow } from "@/components/engineer/EngineerMessageRatingRow";
+import { EngineerNextQuestions } from "@/components/engineer/EngineerNextQuestions";
+import { OTHER_OPTIONS_QUESTION } from "@/lib/engineer/nextQuestions";
 import { EngineerRangePicker, type EngineerRangeOptions } from "@/components/engineer/EngineerRangePicker";
 import { EngineerRunPicker } from "@/components/engineer/EngineerRunPicker";
 import { EngineerStarterQuestions } from "@/components/engineer/EngineerStarterQuestions";
@@ -60,6 +62,7 @@ type RatingContext = {
   answer?: string;
   runId?: string | null;
   compareRunId?: string | null;
+  nextQuestions?: string[];
 };
 
 type ChatMessage = {
@@ -67,7 +70,13 @@ type ChatMessage = {
   content: string;
   messageId?: string;
   ratingContext?: RatingContext;
+  /** The follow-up buttons the Engineer picked for this answer. */
+  nextQuestions?: string[];
 };
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((q): q is string => typeof q === "string" && q.trim().length > 0) : [];
+}
 
 type ThreadSummary = {
   id: string;
@@ -95,12 +104,13 @@ const HISTORY_PREVIEW_COUNT = 3;
 async function readSseStream(
   res: Response,
   handlers: { onToken?: (text: string) => void; onStatus?: (phase: string) => void }
-): Promise<{ reply: string; feedback: EngineerChatFeedback | null }> {
+): Promise<{ reply: string; nextQuestions: string[]; feedback: EngineerChatFeedback | null }> {
   const reader = res.body?.getReader();
   if (!reader) throw new Error("Stream had no body");
   const decoder = new TextDecoder();
   let buffer = "";
   let reply = "";
+  let nextQuestions: string[] = [];
   let feedback: EngineerChatFeedback | null = null;
 
   while (true) {
@@ -126,6 +136,7 @@ async function readSseStream(
         handlers.onStatus?.(data.phase);
       } else if (event === "done") {
         if (typeof data.reply === "string" && data.reply.trim()) reply = data.reply;
+        nextQuestions = stringList(data.nextQuestions);
         if (data.feedback && typeof data.feedback === "object") {
           const fb = data.feedback as Record<string, unknown>;
           if (typeof fb.threadId === "string" && typeof fb.assistantMessageId === "string") {
@@ -145,7 +156,7 @@ async function readSseStream(
     }
   }
 
-  return { reply, feedback };
+  return { reply, nextQuestions, feedback };
 }
 
 function mapApiMessages(
@@ -162,6 +173,7 @@ function mapApiMessages(
         content,
         messageId: typeof m.id === "string" ? m.id : undefined,
         ratingContext: m.ratingContext,
+        nextQuestions: stringList(m.ratingContext?.nextQuestions),
       });
     } else {
       out.push({ role, content });
@@ -558,7 +570,7 @@ export function EngineerChatPanel({
           const body = (await res.json().catch(() => ({}))) as { error?: string };
           throw new Error(body.error ?? `HTTP ${res.status}`);
         }
-        const { reply, feedback } = await readSseStream(res, {
+        const { reply, nextQuestions, feedback } = await readSseStream(res, {
           onStatus: (phase) => setStatusPhase(phase),
           onToken: (t) => applyAssistant((prev) => ({ ...prev, content: prev.content + t })),
         });
@@ -567,6 +579,7 @@ export function EngineerChatPanel({
           content: reply || prev.content,
           messageId: feedback?.assistantMessageId,
           ratingContext: feedback?.ratingContext,
+          nextQuestions,
         }));
         if (feedback?.threadId) setThreadId(feedback.threadId);
         void refreshThreads();
@@ -692,6 +705,15 @@ export function EngineerChatPanel({
                         {m.content || (m.role === "assistant" ? "—" : "")}
                       </div>
                     )}
+                    {/* Follow-up buttons ride the newest answer only (founder, 2026-09-24). */}
+                    {m.role === "assistant" && m.content && idx === messages.length - 1 && !sending ? (
+                      <EngineerNextQuestions
+                        questions={m.nextQuestions ?? []}
+                        offerOtherOptions={messages[idx - 1]?.content !== OTHER_OPTIONS_QUESTION}
+                        disabled={panelBusy}
+                        onAsk={(q) => void send(q)}
+                      />
+                    ) : null}
                     {ratingsEnabled && m.role === "assistant" && m.messageId ? (
                       <EngineerMessageRatingRow
                         messageId={m.messageId}

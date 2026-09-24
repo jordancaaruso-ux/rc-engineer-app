@@ -136,6 +136,20 @@ function nearestMove(sentence: string, start: number, end: number): "add" | "rem
   return best && !tied ? best.kind : null;
 }
 
+/**
+ * The clause a lever mention sits in: the sentence cut at the commas either side (a comma inside a
+ * number, "1,000", is not a cut). A move verb belongs to its own clause — "add 0.5 mm at the rear
+ * upper-inner links, or remove 0.5 mm from the rear upper-outer" once read the nearer "remove" as
+ * the upper-inner move and corrected a right answer in front of the driver (2026-09-24).
+ */
+function clauseAround(sentence: string, start: number, end: number): { text: string; offset: number } {
+  const cuts = [...sentence.matchAll(/,(?!\d)/g)].map((m) => m.index ?? 0);
+  const before = cuts.filter((i) => i < start);
+  const from = before.length > 0 ? before[before.length - 1] + 1 : 0;
+  const to = cuts.find((i) => i >= end) ?? sentence.length;
+  return { text: sentence.slice(from, to), offset: from };
+}
+
 function windowAround(text: string, index: number, length: number, radius: number): string {
   return text.slice(Math.max(0, index - radius), Math.min(text.length, index + length + radius));
 }
@@ -166,7 +180,8 @@ export function rcGuardCorrections(reply: string, levers: RcLever[]): string[] {
       for (const lever of levers) {
         const m = leverPattern(lever).exec(sentence);
         if (!m) continue;
-        const move = nearestMove(sentence, m.index, m.index + m[0].length);
+        const clause = clauseAround(sentence, m.index, m.index + m[0].length);
+        const move = nearestMove(clause.text, m.index - clause.offset, m.index - clause.offset + m[0].length);
         if (!move) continue;
         const expected =
           move === "add" ? lever.addEffect : lever.addEffect === "up" ? "down" : "up";

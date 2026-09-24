@@ -43,7 +43,8 @@ import { getArm } from "./arms";
 
 type LaunchCase = { id: string; shape: string; source: string; turns: string[] };
 type LaunchSet = { contexts: string[]; cases: LaunchCase[] };
-type Turn = { role: "user" | "assistant"; content: string; fetched?: string[] };
+/** `next`: the follow-up buttons the Engineer picked (nextQuestions.ts), kept out of `content` as in the app. */
+type Turn = { role: "user" | "assistant"; content: string; fetched?: string[]; next?: string[] };
 type CaseResult = {
   shape: string;
   source: string;
@@ -150,7 +151,12 @@ async function main() {
           const started = Date.now();
           const out = await generateEngineerChatReply({ messages: history, blocks, driverBlocks, tools });
           ms.push(Date.now() - started);
-          turns.push({ role: "assistant", content: out.reply, ...(fetched.length > 0 ? { fetched } : {}) });
+          turns.push({
+            role: "assistant",
+            content: out.reply,
+            ...(fetched.length > 0 ? { fetched } : {}),
+            ...(out.nextQuestions.length > 0 ? { next: out.nextQuestions } : {}),
+          });
           usage.push(out.usage);
           model = out.model;
         }

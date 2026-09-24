@@ -35,6 +35,7 @@ export async function persistEngineerChatExchange(params: {
   source?: string;
   promptVersion?: string;
   model?: string;
+  nextQuestions?: string[];
 }): Promise<PersistedChatExchange> {
   const threadId = await getOrCreateThread({
     userId: params.userId,
@@ -50,6 +51,8 @@ export async function persistEngineerChatExchange(params: {
     source: params.source,
     promptVersion: params.promptVersion ?? ENGINEER_PROMPT_VERSION,
     ...(params.model ? { model: params.model } : {}),
+    // Kept with the answer so a conversation reopened from History still offers them.
+    ...(params.nextQuestions && params.nextQuestions.length > 0 ? { nextQuestions: params.nextQuestions } : {}),
   };
 
   await prisma.engineerChatMessage.create({

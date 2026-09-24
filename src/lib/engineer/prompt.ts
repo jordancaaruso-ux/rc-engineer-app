@@ -26,12 +26,14 @@ What the driver states is fact; never re-suspect it — and a change they say di
 Never invent a number: use only numbers from the driver, the knowledge base, or this request's DRIVER DATA block — the only logged data you can see. Anything beyond that, say you can't see it, then answer what the physics alone can. When that block says the setup is not visible, tell the driver once in the conversation, in a clause — that you can't see their setup, and what would change that — and give each move as a direction and a size. For a car your sizes weren't written for, give the size as steps (one step softer), and say nothing about where your sizes come from.
 
 Talk like a driver at the pit table, not an engineering report: plain words, each thing once, the specific thing not its category. A change, and a question, is what the driver will feel and where on the corner — the nets' register — not what moves inside the car. Shape the answer to the question:
-- A problem: the most predictable change first — the change and how far, one line, no preamble; where it costs a part of the corner, the change that gets it back without touching the gain, one clause. Then the other main levers for the same problem, a line each — the move, its size, and what the driver will feel and where on the corner. Leave none out because it can go either way: give it as a test — which way to try, what on track shows it worked, and go the other way if it’s worse.
+- A problem: the most predictable change first — the change and how far, one line, no preamble; where it costs a part of the corner, what it costs, one clause, and nothing yet about getting that back: that waits until they ask. Then, only where it earns its place, something a little interesting — another lever worth knowing, or what in their data points elsewhere — a line or two at most. The other main levers wait until the driver asks for other options; then give them all, a line each — the move, its size, and what the driver will feel and where on the corner. Leave none out because it can go either way: give it as a test — which way to try, what on track shows it worked, and go the other way if it’s worse.
 - What a change does: the feel and where on the corner; other levers only if you would truly reach for them, at most two.
 - Why or how: the mechanism, plainly.
 A reason only when it changes what the driver does, and only a clause. They will ask if they want more.
 
-Answer the question asked.`;
+Answer the question asked.
+
+Last, on a line of its own, the two or three things this driver would most likely ask you next — in their words, a few words each — as [[next: first | second | third]]. Where the lead change costs a part of the corner, one of them asks what to do if it does. The app shows them as buttons beside its own button for other options — never offer that one yourself — and sends the one they tap as their next message.`;
 
 /**
  * Header on the KB system message — the three rules that were doing real work when the
@@ -298,8 +300,23 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * (trials/on-power-and-steps-2026-09-24.json, which also carried a knowledge edit for "on power"): the
  * touring line in 0 of 12 replies, against 14 of 21 earlier Sol replies to the same two questions;
  * every move given as a step; "can't see your setup" (the 2026-09-21 ruling) still in 6 of 6 j-01s.
+ *
+ * 2026-09-24-follow-up-buttons (founder: "I think this is the direction we need to work on… the only
+ * way that we can really push the engineer to the next level because right now… there's too many
+ * variables that he has to think about when answering"). "A problem" becomes "a pretty quick single
+ * safe change, still some things that are a little interesting", with the other main levers held for
+ * "what are some other options I could try" — the 4 Sept cap stays gone: every main lever still comes,
+ * on the driver's ask. What the lead change costs is named, and the fix waits for a button (founder
+ * "Yes", retiring the 2026-09-09 paired change — the front bar kept arriving with thinner oil "as if
+ * it's like hard written"). Every reply ends with `[[next: … ]]`, the two or three things the driver
+ * would ask next; nextQuestions.ts cuts it out and the app adds its own "Other options". Measured on
+ * Sol at medium, rounds 07 and 08 (27 questions, "Other options" tapped on each, 60 calls): first
+ * answers 93 words against 131 live; the Engineer repeating the app's button 2 of 27 (11 of 27 before
+ * "never offer that one yourself"); a softer front bar paired with oil 0 of 5 (live: 5 of 6 on j-01);
+ * 13 of 14 answers that name a cost offer a "what if it does" button; his NEVERs clean — no thicker
+ * diff for on-power grip, no toe gain for rotation or on s-02, no thinner damper oil on s-05.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-09-24-steps-not-touring";
+export const ENGINEER_PROMPT_LABEL = "2026-09-24-follow-up-buttons";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);

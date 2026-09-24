@@ -596,6 +596,21 @@ https://claude.ai/artifact/44vcQdBX9a16URLhVteBZG (db `buttons/<id>`).
   paired-change slot comes out of the first answer in the button build, where a button carries the
   fixes; until then the live prompt keeps it, and the 2026-09-09 ruling moves when the build lands.
 
+### 2026-09-24 night — the follow-up buttons, built
+
+In the app (not pushed): the Engineer ends each reply with `[[next: … ]]`; nextQuestions.ts cuts it
+out of the reply and the live stream; the newest answer shows the app's **Other options** (sends "What
+are some other options I could try?") and the Engineer's picks; a tap sends; the buttons are kept
+with the answer so History reopens them. Prompt label `2026-09-24-follow-up-buttons`; the 2026-09-09
+paired-change ruling is replaced by his "Yes" (the cost is named, the fix waits for a button). The
+roll-centre guard no longer pairs a move with a lever across a comma (the "add at the upper inner,
+or remove from the upper outer" false correction).
+
+Measured on the build, rounds 07 + 08 with Other options tapped on each (60 calls, $1.57): first
+answers 93 words (131 live); the app's button repeated by the Engineer 2 of 27 (11 in the trial);
+softer front bar paired with oil 0 of 5; 13 of 14 answers naming a cost offer a "what if it does"
+button; his NEVERs clean; no guard corrections. The review page gets these answers next.
+
 ## Fixes landed from this batch
 
 - **2026-09-09, from cards 3–4 (30 edits, 21 files; nets:check 37/37, tsc, 4 suites green):**
