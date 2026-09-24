@@ -9,6 +9,7 @@ import {
   type SummaryDelta,
 } from "@/lib/dashboardSummary";
 import { formatLap } from "@/lib/runLaps";
+import { lapImportHref } from "@/lib/runs/lapImportHref";
 import { cn } from "@/lib/utils";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { RatingDial } from "@/components/ui/RatingDial";
@@ -47,6 +48,10 @@ export function DashboardHeroCard({
   dayStamp: string;
 }) {
   const isLapSeries = hero.seriesKind === "laps";
+  // The last run was logged without lap times. The card keeps its place and asks for them,
+  // rather than leaving the top of the page empty (2026-09-24).
+  const untimed = hero.bestLap == null;
+  const thinSeries = hero.series.length < 2;
 
   // "Where your pace is" said nothing and named no venue, which is how a mixed-track
   // series went unnoticed. The card is about the most recent session, so it says so, and
@@ -126,9 +131,27 @@ export function DashboardHeroCard({
           <div className="micro-caps text-faint">
             {lapLabel}
           </div>
-          <div className="mt-2.5 font-medium tabular-nums leading-[.84] tracking-[-.045em] text-foreground text-[clamp(3.5rem,4.6vw,5.5rem)]">
-            {formatLap(hero.bestLap)}
-          </div>
+          {untimed ? (
+            <>
+              <div className="mt-3 text-[28px] font-medium leading-none tracking-[-.02em] text-faint">
+                No lap times
+              </div>
+              {recentRun ? (
+                <Link
+                  href={lapImportHref(recentRun.id)}
+                  prefetch={false}
+                  className="tap-active mt-4 inline-flex items-center gap-1 text-[12.5px] font-semibold text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+                >
+                  Add lap times
+                  <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+                </Link>
+              ) : null}
+            </>
+          ) : (
+            <div className="mt-2.5 font-medium tabular-nums leading-[.84] tracking-[-.045em] text-foreground text-[clamp(3.5rem,4.6vw,5.5rem)]">
+              {formatLap(hero.bestLap)}
+            </div>
+          )}
           {hero.deltaSeconds != null ? (
             <div className="mt-4 flex items-center gap-2.5">
               <DeltaChip seconds={hero.deltaSeconds} />
@@ -186,14 +209,18 @@ export function DashboardHeroCard({
                 ? "Pace · per run today"
                 : isLapSeries
                   ? "Pace · laps in your last run"
-                  : `Pace · last ${hero.series.length}${hero.trackName ? ` at ${hero.trackName}` : " sessions"}`}
+                  : thinSeries
+                    ? `Pace${hero.trackName ? ` at ${hero.trackName}` : ""}`
+                    : `Pace · last ${hero.series.length}${hero.trackName ? ` at ${hero.trackName}` : " sessions"}`}
             </span>
-            <span className="shrink-0 text-[12px] text-faint">
-              {isLapSeries && hero.trackName ? `first session at ${hero.trackName}` : "lower is faster"}
-              {hero.foundSeconds != null && hero.foundSeconds > 0.001
-                ? ` · ${hero.foundSeconds.toFixed(3)} s found`
-                : ""}
-            </span>
+            {thinSeries ? null : (
+              <span className="shrink-0 text-[12px] text-faint">
+                {isLapSeries && hero.trackName ? `first session at ${hero.trackName}` : "lower is faster"}
+                {hero.foundSeconds != null && hero.foundSeconds > 0.001
+                  ? ` · ${hero.foundSeconds.toFixed(3)} s found`
+                  : ""}
+              </span>
+            )}
           </div>
           <PaceChart
             series={hero.series}
@@ -202,6 +229,15 @@ export function DashboardHeroCard({
             // Track-day only ever means "one run so far today", never a first visit — the
             // empty state must not claim a venue is new when he has raced there for years.
             trackName={isTrackDay ? null : hero.trackName}
+            // An untimed last run is a visit the series cannot see, so "first session at"
+            // would be wrong about it. Count only what was timed.
+            emptyNote={
+              untimed && !isTrackDay && hero.trackName
+                ? hero.series.length === 0
+                  ? `No timed laps at ${hero.trackName} yet`
+                  : `One timed session at ${hero.trackName} so far`
+                : undefined
+            }
           />
         </div>
       </div>

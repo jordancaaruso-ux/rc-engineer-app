@@ -432,9 +432,10 @@ export type DashboardHomeModel = {
    *
    * Costs no extra query: `completedRunRows` (the full history behind the 30-day summary
    * and the records board) already carries best lap, laps and track per run. Null when
-   * the account has nothing to plot yet.
+   * there is no run to anchor on, or on a track day with no lap times at all.
    */
   heroPace: null | {
+    /** Null when the anchor run has no lap times — the card asks for them instead. */
     bestLap: number | null;
     avgTop5: number | null;
     /** 1–10 handling rating behind the first dial; null when the run was not rated. */
@@ -1308,7 +1309,12 @@ export async function loadDashboardHomeModel(
         ? anchorRun.bestLapSeconds
         : anchorBest;
 
-    if (series.length > 0 || anchorBest != null) {
+    // An off day always gets a hero once there is a last run, timed or not (2026-09-24).
+    // A last run logged without lap times, at a track with fewer than two timed sessions,
+    // left nothing to plot, `heroPace` stayed null, and the desktop's whole top-left went
+    // blank. The card now says the laps are missing and links to add them. A track day
+    // with no laps is still null here: `DashboardTodayNoLapsCard` takes that slot.
+    if (series.length > 0 || anchorBest != null || (!hasRunToday && recentRun)) {
       heroPace = {
         bestLap: anchorBest,
         avgTop5: hasRunToday
@@ -1320,9 +1326,10 @@ export async function loadDashboardHomeModel(
           ? (todaysRuns[todaysRuns.length - 1]?.carRating ?? null)
           : (recentRun?.carRating ?? null),
         // Last point vs the one before it: the move the driver just made. A lap series has
-        // no earlier session to move from, so there is no honest delta to show.
+        // no earlier session to move from, so there is no honest delta to show. Neither has
+        // an untimed anchor: its series is all older sessions, and their gap is not its move.
         deltaSeconds:
-          seriesKind === "sessions" && series.length >= 2
+          seriesKind === "sessions" && series.length >= 2 && anchorBest != null
             ? series[series.length - 1].best - series[series.length - 2].best
             : null,
         consistency:

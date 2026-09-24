@@ -42,19 +42,24 @@ export function PaceChart({
   deltaSeconds,
   kind = "sessions",
   trackName,
+  emptyNote,
 }: {
   series: Array<{ runId: string; label: string; best: number }>;
   deltaSeconds: number | null;
   kind?: "sessions" | "laps";
   /** Named in the empty state so a thin series says WHERE it is thin. */
   trackName?: string | null;
+  /** Replaces the empty state's own wording when the caller knows better. */
+  emptyNote?: string;
 }) {
   const isLaps = kind === "laps";
 
   if (series.length < 2) {
     return (
       <div className="flex h-[168px] items-center justify-center rounded-lg border border-dashed border-border px-4 text-center text-[12px] text-faint">
-        {series.length === 0
+        {emptyNote
+          ? emptyNote
+          : series.length === 0
           ? "No timed laps yet"
           : isLaps
             ? "One timed lap so far"
