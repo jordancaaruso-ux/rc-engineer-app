@@ -4,6 +4,7 @@ import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
 import { clientIpKey } from "@/lib/clientIp";
 import { isEmailAuthAllowed } from "@/lib/authAllowlist";
 import { consumeSignInCode } from "@/lib/auth/signInCode";
+import { isAppReviewerCode } from "@/lib/auth/appReviewer";
 import { normalizeCodeInput } from "@/lib/auth/signInCodeShared";
 import { mintMagicLinkPath } from "@/lib/auth/mintMagicLinkUrl";
 
@@ -67,7 +68,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   });
   if (!emailRl.ok) return rateLimitResponse(emailRl.retryAfterSec);
 
-  const accepted = await consumeSignInCode(email, code);
+  // Apple's reviewer types a fixed code, since no email reaches them (`lib/auth/appReviewer.ts`).
+  const accepted = isAppReviewerCode(email, code) || (await consumeSignInCode(email, code));
   if (!accepted) {
     return NextResponse.json({ ok: false, error: GENERIC_FAILURE }, { status: 401 });
   }

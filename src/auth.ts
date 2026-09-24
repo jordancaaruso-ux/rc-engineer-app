@@ -10,6 +10,7 @@ import { isEmailAuthAllowed } from "@/lib/authAllowlist";
 import { isMagicLinkSmtpConfigured } from "@/lib/emailAuthEnv";
 import { renderMagicLinkEmail } from "@/lib/auth/magicLinkEmail";
 import { issueSignInCode } from "@/lib/auth/signInCode";
+import { isAppReviewerEmail } from "@/lib/auth/appReviewer";
 
 const hasSmtpConfig = isMagicLinkSmtpConfigured();
 const googleId = process.env.AUTH_GOOGLE_ID?.trim();
@@ -35,6 +36,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async sendVerificationRequest(params) {
         const { identifier, url, provider } = params;
         if (!(await isEmailAuthAllowed(identifier))) {
+          return;
+        }
+        // Apple's reviewer has no inbox to send to; they type the fixed code instead.
+        if (isAppReviewerEmail(identifier)) {
           return;
         }
         // After the allowlist gate on purpose — a declined address must never get a live code.

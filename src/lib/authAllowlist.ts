@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { parseEmailSetFromEnv } from "@/lib/authEmailSets";
 import { isOpenSignupEnabled } from "@/lib/authOpenSignup";
+import { isAppReviewerEmail } from "@/lib/auth/appReviewer";
 
 /** Comma- or whitespace-separated list in env (case-insensitive). */
 export function parseEnvAuthAllowlist(): Set<string> {
@@ -30,6 +31,8 @@ export async function isEmailAuthAllowed(email: string): Promise<boolean> {
   if (!normalized) return false;
   const only = parseAuthOnlyEmails();
   if (only.size > 0 && !only.has(normalized)) return false;
+  // Apple's reviewer, even after they have tested Delete account (`lib/auth/appReviewer.ts`).
+  if (isAppReviewerEmail(normalized)) return true;
   // Open public signup: any well-formed address is allowed, so the PrismaAdapter creates the
   // account on first sign-in. This is the single pivot — both gates in `auth.ts`
   // (`sendVerificationRequest` + the `signIn` callback) call this one function. Unset = the

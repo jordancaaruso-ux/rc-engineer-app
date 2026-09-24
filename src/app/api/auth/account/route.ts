@@ -3,6 +3,10 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { collectUserBlobUrls, deleteBlobUrls } from "@/lib/account/deleteAccountBlobs";
 import { DEMO_READ_ONLY_MESSAGE, isDemoIdentity } from "@/lib/demo/demoAccess";
+import { getStripe, stripeConfigured } from "@/lib/stripe";
+
+/** Stripe statuses with nothing left to cancel. */
+const ENDED_STATUSES = new Set(["canceled", "incomplete_expired"]);
 
 /**
  * GDPR / App Store: delete the signed-in user and all owned data (DB cascades), plus the files
@@ -21,6 +25,29 @@ export async function DELETE() {
   // demo dataset. Guard it explicitly (MONETISATION_NORTH_STAR.md Phase 3).
   if (isDemoIdentity({ id, email: session?.user?.email })) {
     return NextResponse.json({ error: DEMO_READ_ONLY_MESSAGE, demo: true }, { status: 403 });
+  }
+
+  // The plan ends with the account. Until 2026-09-24 the Stripe subscription outlived the delete
+  // and kept charging a card for an account nobody could open. If Stripe can't be reached, nothing
+  // is deleted: a retry costs the driver a minute, a missed cancel costs them money every month.
+  const plan = await prisma.subscription.findUnique({
+    where: { userId: id },
+    select: { stripeSubscriptionId: true, status: true },
+  });
+  if (plan?.stripeSubscriptionId && !ENDED_STATUSES.has(plan.status) && stripeConfigured()) {
+    try {
+      await getStripe().subscriptions.cancel(plan.stripeSubscriptionId);
+    } catch (err) {
+      // Already gone on Stripe's side is the outcome we wanted.
+      const code = (err as { code?: string } | null)?.code;
+      if (code !== "resource_missing") {
+        console.error(`[account-delete] user=${id} could not cancel ${plan.stripeSubscriptionId}`, err);
+        return NextResponse.json(
+          { error: "We couldn't cancel your plan just now, so nothing was deleted. Try again in a minute." },
+          { status: 502 },
+        );
+      }
+    }
   }
 
   // Read the file refs first — the cascade below destroys the rows that point at them.

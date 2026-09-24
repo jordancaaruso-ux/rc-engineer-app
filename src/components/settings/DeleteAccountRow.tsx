@@ -19,7 +19,7 @@ export function DeleteAccountRow() {
   async function onDeleteAccount() {
     if (
       !window.confirm(
-        `Delete your ${PRODUCT_NAME} account and all runs, setups, and uploads? This cannot be undone.`
+        `Delete your ${PRODUCT_NAME} account and all runs, setups, and uploads? Your plan is cancelled too. This cannot be undone.`
       )
     ) {
       return;

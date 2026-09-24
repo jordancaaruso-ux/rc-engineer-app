@@ -3,6 +3,7 @@ import { cache } from "react";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
+import { isAppReviewerEmail } from "@/lib/auth/appReviewer";
 import { deriveSubscriptionTier, isBillingEnforced, type Tier } from "@/lib/entitlementLogic";
 
 export type { Feature, Tier } from "@/lib/entitlementLogic";
@@ -34,11 +35,15 @@ const FULL_ACCESS: Entitlement = { tier: "pro", entitled: true, grandfathered: t
  * the comp codes BEFORE flipping `BILLING_ENFORCED`, or testers land on /billing.
  *
  * Still deliberately independent of `isEmailAuthAllowed` — open signup must never grant access.
+ *
+ * One exception beside the admins (2026-09-24): Apple's App Store reviewer, whose address and code
+ * are set on Vercel. Reviewers test Delete account, and a comped plan would die with the deleted
+ * account (`lib/auth/appReviewer.ts`).
  */
 export async function isGrandfatheredEmail(email: string | null | undefined): Promise<boolean> {
   const normalized = email?.trim().toLowerCase();
   if (!normalized) return false;
-  return isAuthAdminEmail(normalized);
+  return isAuthAdminEmail(normalized) || isAppReviewerEmail(normalized);
 }
 
 /**

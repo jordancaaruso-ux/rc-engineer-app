@@ -44,8 +44,9 @@ export default auth((req) => {
   if (pathname === "/login" || pathname.startsWith("/login/")) {
     return NextResponse.next();
   }
-  // Legal pages must be readable before sign-in — /login links to both.
-  if (pathname === "/privacy" || pathname === "/terms") {
+  // Legal pages must be readable before sign-in — /login links to both. /support is the App Store
+  // listing's help address, opened by people who may never have signed in.
+  if (pathname === "/privacy" || pathname === "/terms" || pathname === "/support") {
     return NextResponse.next();
   }
   if (pathname.startsWith("/api/health/")) {

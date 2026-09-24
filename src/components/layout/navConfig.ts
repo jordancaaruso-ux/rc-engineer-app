@@ -45,7 +45,7 @@ export function isHiddenNavRoute(pathname: string | null | undefined): boolean {
   if (pathname === "/login" || pathname.startsWith("/login/")) return true;
   // Both legal pages are public. /terms was missing here until the 2026-09-05 pre-release walk:
   // a signed-out reader got the full dock and rail, and every tap on it bounced to /login.
-  if (pathname === "/privacy" || pathname === "/terms") return true;
+  if (pathname === "/privacy" || pathname === "/terms" || pathname === "/support") return true;
   // The paid door's public surfaces — a stranger has no session, so every nav tap would just
   // bounce to /login (MONETISATION_NORTH_STAR.md Phases 1+4).
   if (pathname === "/welcome") return true;
