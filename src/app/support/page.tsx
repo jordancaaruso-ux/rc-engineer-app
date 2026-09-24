@@ -27,7 +27,7 @@ export default function SupportPage() {
         <h2 className="text-base font-semibold">Deleting your account</h2>
         <p className="mt-2 text-muted-foreground">
           <span className="text-foreground">Settings → Delete account</span> removes your account,
-          your runs, setups and uploads, and cancels your plan. It can&apos;t be undone.
+          your runs, setups and uploads, and cancels your plan. It can’t be undone.
         </p>
       </section>
 
