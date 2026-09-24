@@ -5,8 +5,9 @@ import {
   evaluateCodeAttempt,
   generateSignInCode,
   hashSignInCode,
+  mayIssueSignInCode,
 } from "@/lib/auth/signInCodeLogic";
-import { SIGN_IN_CODE_TTL_MS } from "@/lib/auth/signInCodeShared";
+import { MAX_CODE_ATTEMPTS, SIGN_IN_CODE_TTL_MS } from "@/lib/auth/signInCodeShared";
 
 /**
  * Database side of the emailed sign-in code. The rules live in `signInCodeLogic.ts`; this file
@@ -29,22 +30,43 @@ function authSecret(): string {
   return secret;
 }
 
+/** Thrown instead of issuing a code once the send limits in `mayIssueSignInCode` are reached. */
+export class SignInCodeLimitError extends Error {
+  constructor() {
+    super("Too many sign-in codes were asked for. Wait a few minutes, then try again.");
+    this.name = "SignInCodeLimitError";
+  }
+}
+
 /**
- * Mint the code that goes in the email. Any earlier code for this address is dropped first:
- * asking for a new sign-in must invalidate the old one, or a stale email stays live for its full
- * TTL. Expired rows anywhere are swept on the way past — cheap, indexed, and it saves owning a
- * cron for a table that only ever holds in-flight sign-ins.
+ * Mint the code that goes in the email. Asking for a new sign-in invalidates every earlier code
+ * for the address, or a stale email stays live for its full TTL. Earlier codes are kept, dead —
+ * their guesses used up — until they expire, because they are also the count the send limits
+ * read (`mayIssueSignInCode`, 2026-09-24 launch audit). Expired rows anywhere are swept on the way
+ * past — cheap, indexed, and it saves owning a cron for a table that only holds in-flight sign-ins.
  *
  * Callers must run this AFTER the allowlist gate, so a declined address never gets a live code.
+ * Throws `SignInCodeLimitError` rather than sending past the limits.
  */
 export async function issueSignInCode(email: string): Promise<string> {
   const identifier = email.trim().toLowerCase();
-  const code = generateSignInCode();
   const now = new Date();
 
-  await prisma.signInCode.deleteMany({
-    where: { OR: [{ identifier }, { expires: { lt: now } }] },
+  await prisma.signInCode.deleteMany({ where: { expires: { lt: now } } });
+  const [liveForAddress, liveSitewide] = await Promise.all([
+    prisma.signInCode.count({ where: { identifier } }),
+    prisma.signInCode.count(),
+  ]);
+  if (!mayIssueSignInCode({ liveForAddress, liveSitewide })) {
+    throw new SignInCodeLimitError();
+  }
+
+  // Dead, not deleted: the next guess against any of these exceeds the cap and burns it.
+  await prisma.signInCode.updateMany({
+    where: { identifier },
+    data: { attempts: MAX_CODE_ATTEMPTS },
   });
+  const code = generateSignInCode();
   await prisma.signInCode.create({
     data: {
       identifier,

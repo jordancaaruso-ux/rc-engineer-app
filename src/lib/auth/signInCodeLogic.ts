@@ -44,6 +44,29 @@ export function codeMatchesHash(code: string, storedHash: string, secret: string
 }
 
 /**
+ * Codes one address may be sent inside one code lifetime (15 minutes). Before this (2026-09-24
+ * launch audit) nothing limited the sends at all: a script could have the site email one inbox
+ * over and over, or thousands of made-up app accounts once each, burning the sending quota and
+ * the domain's reputation — after which every driver's code lands late or in spam.
+ */
+export const MAX_CODES_PER_ADDRESS_WINDOW = 5;
+
+/**
+ * Codes the whole site may have issued inside one code lifetime before it stops sending. A
+ * circuit breaker for a scripted flood across many addresses; a real launch-day rush is a few
+ * codes a minute, far below it.
+ */
+export const MAX_LIVE_CODES_SITEWIDE = 400;
+
+/** May one more code be issued, given the codes already issued inside the current lifetime? */
+export function mayIssueSignInCode(input: { liveForAddress: number; liveSitewide: number }): boolean {
+  return (
+    input.liveForAddress < MAX_CODES_PER_ADDRESS_WINDOW &&
+    input.liveSitewide < MAX_LIVE_CODES_SITEWIDE
+  );
+}
+
+/**
  * Decide the fate of one guess against a stored row. Pure so the exhaustion rule is testable
  * without a database: the caller has already incremented `attempts`, and this says both whether
  * the guess was right and whether the row survives.

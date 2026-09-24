@@ -4,10 +4,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  MAX_CODES_PER_ADDRESS_WINDOW,
+  MAX_LIVE_CODES_SITEWIDE,
   codeMatchesHash,
   evaluateCodeAttempt,
   generateSignInCode,
   hashSignInCode,
+  mayIssueSignInCode,
 } from "@/lib/auth/signInCodeLogic";
 import {
   MAX_CODE_ATTEMPTS,
@@ -115,6 +118,40 @@ test("an expired row is refused and burned even with the right code", () => {
     expires: EARLIER,
     secret: SECRET,
     attemptsAfterIncrement: 1,
+    now: new Date(),
+  });
+  assert.deepEqual(result, { ok: false, burn: true });
+});
+
+test("an address gets five codes per lifetime, then waits", () => {
+  assert.equal(mayIssueSignInCode({ liveForAddress: 0, liveSitewide: 0 }), true);
+  assert.equal(
+    mayIssueSignInCode({ liveForAddress: MAX_CODES_PER_ADDRESS_WINDOW - 1, liveSitewide: 10 }),
+    true,
+  );
+  assert.equal(
+    mayIssueSignInCode({ liveForAddress: MAX_CODES_PER_ADDRESS_WINDOW, liveSitewide: 10 }),
+    false,
+  );
+});
+
+test("the site stops sending when a flood fills the window", () => {
+  assert.equal(
+    mayIssueSignInCode({ liveForAddress: 0, liveSitewide: MAX_LIVE_CODES_SITEWIDE - 1 }),
+    true,
+  );
+  assert.equal(mayIssueSignInCode({ liveForAddress: 0, liveSitewide: MAX_LIVE_CODES_SITEWIDE }), false);
+});
+
+test("a code cancelled by a newer one can never be used", () => {
+  // `issueSignInCode` marks earlier codes with MAX_CODE_ATTEMPTS used; the next guess exceeds it.
+  const code = "123456";
+  const result = evaluateCodeAttempt({
+    code,
+    storedHash: hashSignInCode(code, SECRET),
+    expires: LATER,
+    secret: SECRET,
+    attemptsAfterIncrement: MAX_CODE_ATTEMPTS + 1,
     now: new Date(),
   });
   assert.deepEqual(result, { ok: false, burn: true });
