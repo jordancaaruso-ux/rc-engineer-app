@@ -21,10 +21,43 @@ function assertActionItemDelegate(client: PrismaClient): void {
   }
 }
 
+/**
+ * Pool settings for serverless (2026-09-24 launch audit). Prisma's default pool is
+ * `num_cpus * 2 + 1` — 5 on a Vercel function — with a 10 s wait, and under Fluid compute one
+ * instance serves many requests at once through that one pool. A dashboard or Paddock cache
+ * rebuild alone fans 13–25 queries into it, and production logged P2024 "Timed out fetching a new
+ * connection from the connection pool" four times in one week with ~7 active drivers.
+ *
+ * DATABASE_URL points at Neon's PgBouncer (`-pooler`), which accepts thousands of client
+ * connections and multiplexes them onto ~400 server ones, so 15 per instance is headroom, not
+ * load. Not much higher: 50 heavy scans at once on a small compute just moves the queue into
+ * Postgres. Anything already set on the URL wins, so an operator can still tune it there.
+ * String-appended on purpose — a URL round-trip could re-encode the password.
+ */
+const POOL_PARAMS: ReadonlyArray<readonly [string, string]> = [
+  ["connection_limit", "15"],
+  ["pool_timeout", "20"],
+  ["connect_timeout", "15"],
+];
+
+export function withPoolParams(raw: string | undefined): string | undefined {
+  if (!raw) return raw;
+  let url = raw;
+  for (const [key, value] of POOL_PARAMS) {
+    if (new RegExp(`[?&]${key}=`).test(url)) continue;
+    url += `${url.includes("?") ? "&" : "?"}${key}=${value}`;
+  }
+  return url;
+}
+
 const basePrisma =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: ["error", "warn"],
+    datasourceUrl: withPoolParams(process.env.DATABASE_URL),
+    // Interactive transactions wait at most 2 s for a connection by default — shorter than the
+    // pool's own wait — so under load a run save failed (P2028) before any page query did.
+    transactionOptions: { maxWait: 10_000, timeout: 15_000 },
   });
 
 /**
@@ -52,8 +85,8 @@ export const runsIncludingHidden = basePrisma.run;
 
 assertActionItemDelegate(prisma);
 
-if (process.env.NODE_ENV !== "production") {
-  // Cache the base client, never the extended proxy — otherwise each HMR pass would
-  // wrap the previous proxy and stack a new timing layer on every query.
-  globalForPrisma.prisma = basePrisma;
-}
+// Cache the base client, never the extended proxy — otherwise each HMR pass would wrap the
+// previous proxy and stack a new timing layer on every query. Cached in production too: if the
+// bundler evaluates this module in more than one server chunk, every copy still shares ONE pool
+// per process instead of opening a pool each.
+globalForPrisma.prisma = basePrisma;
