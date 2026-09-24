@@ -49,6 +49,12 @@ const SYSTEM_NAME = "Track catalog";
 const SOURCE = "liverc";
 /** Same name this close to an existing track = the same venue. Only used when both have pins. */
 const SAME_PLACE_M = 30_000;
+/**
+ * LiveRC hosts the lookalike check would fold into a driver's track, but the founder says are a
+ * different venue. `grcor` (Geelong RC Offroaders, at Avalon) read as a driver's "Geelong" —
+ * "They're different, add it" (2026-09-24).
+ */
+const NOT_A_TWIN = new Set(["grcor.liverc.com"]);
 
 // ---------------------------------------------------------------- names
 
@@ -295,7 +301,7 @@ async function importRows(): Promise<void> {
       skipped.push(`  = ${c.name} — already in the catalog with this LiveRC link`);
       continue;
     }
-    const twin = existing.find((t) => {
+    const twin = NOT_A_TWIN.has(c.sourceRef.toLowerCase()) ? undefined : existing.find((t) => {
       if (containment(t.name, c.name) < 0.75) return false;
       if (t.latitude == null || t.longitude == null || c.latitude == null || c.longitude == null) return true;
       return metres({ lat: t.latitude, lon: t.longitude }, { lat: c.latitude, lon: c.longitude }) <= SAME_PLACE_M;
