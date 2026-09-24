@@ -86,7 +86,9 @@ export function RunLogQuickSetupUpload(props: {
       setInfo(null);
       setStage("uploading");
       scheduleStageHints(setStage, timersRef);
-      const result = await postQuickCreateSetup(file, { carId });
+      // 3 minutes, like the other upload doors. The server keeps going after a browser gives up, so
+      // an early give-up made the driver's retry a second copy of the same setup.
+      const result = await postQuickCreateSetup(file, { carId }, { timeoutMs: 180_000 });
       clearTimers(timersRef);
       if (!result.ok) {
         setError(result.error);
