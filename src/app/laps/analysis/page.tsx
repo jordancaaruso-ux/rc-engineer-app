@@ -335,11 +335,40 @@ export default async function LapAnalysisPage(props: {
     });
     if (!run) notFound();
 
-    const pickerSource = await prisma.run.findMany({
-      where: { userId: user.id, carId: run.carId ?? undefined },
-      orderBy: { sortAt: "desc" },
-      take: PICKER_RUNS_TAKE,
-      select: analysisRunSelect,
+    /*
+     * This car's runs, and every run at this track whatever the car — the pop-up's list
+     * (`useRunsAtTrackForPicker`). The sheet only compares within the track, and a run there on
+     * the other car is still yours to measure against; it used to reach this page only as a
+     * second copy of its timing import, which the sheet no longer lists (2026-09-24).
+     */
+    const trackName = run.track?.name?.trim() || run.trackNameSnapshot?.trim() || null;
+    const [sameCarRuns, runsAtTrack] = await Promise.all([
+      prisma.run.findMany({
+        where: { userId: user.id, carId: run.carId ?? undefined },
+        orderBy: { sortAt: "desc" },
+        take: PICKER_RUNS_TAKE,
+        select: analysisRunSelect,
+      }),
+      trackName
+        ? prisma.run.findMany({
+            where: {
+              userId: user.id,
+              OR: [
+                { track: { name: { equals: trackName, mode: "insensitive" } } },
+                { trackNameSnapshot: { equals: trackName, mode: "insensitive" } },
+              ],
+            },
+            orderBy: { sortAt: "desc" },
+            take: PICKER_RUNS_TAKE,
+            select: analysisRunSelect,
+          })
+        : Promise.resolve([]),
+    ]);
+    const seenRunIds = new Set<string>();
+    const pickerSource = [...sameCarRuns, ...runsAtTrack].filter((r) => {
+      if (seenRunIds.has(r.id)) return false;
+      seenRunIds.add(r.id);
+      return true;
     });
 
     const myName = await getMyNameSetting(user.id);

@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LapRow } from "@/lib/lapAnalysis";
+import { applyMedianBandAutoExclude } from "@/lib/lapImport/autoExcludeOutlierLaps";
 import { primaryLapRowsFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import { rawSessionDriversFromImportedPayload } from "@/lib/lapImport/importedIngestPlan";
 import {
   formatDriverSessionLabel,
   importedSessionTimeForDisplay,
@@ -11,7 +13,17 @@ import {
   timingSourceFromParserId,
   timingSourceFromSourceUrl,
 } from "@/lib/lapImport/labels";
-import { importedSessionIsPractice } from "@/lib/practiceField/practiceField";
+import { importedSessionIsRaceResult } from "@/lib/practiceField/practiceField";
+
+/** One entrant on a brought-in race sheet. */
+export type ImportedLibraryDriver = {
+  /** The sheet's own id for them ("sd-3") — the same one the session's own page uses. */
+  id: string;
+  name: string;
+  laps: LapRow[];
+  /** The viewer's own row, by the name their session is named for. */
+  isViewer: boolean;
+};
 
 export type ImportedLibrarySession = {
   id: string;
@@ -20,7 +32,11 @@ export type ImportedLibrarySession = {
   laps: LapRow[];
   sortTimeIso: string;
   trackName: string | null;
-  /** Someone's practice, or a race result — which tab of the lap sheet it is filed under. */
+  /**
+   * Which tab of the lap sheet it is filed under. A race is a LiveRC race result or a MyRCM sheet
+   * (founder call, 2026-09-24); everything else — someone's practice, any MYLAPS session — is one
+   * driver's laps and files under Practice, or under My runs when it is the viewer's.
+   */
   kind: "practice" | "race";
   /**
    * The session time as the TRACK's clock, digits written as UTC, when the timing site gave one
@@ -34,6 +50,15 @@ export type ImportedLibrarySession = {
    */
   practiceTransponder: string | null;
   practiceSiteName: string | null;
+  /** One of the viewer's runs this session is on. That run already carries these laps. */
+  onRunId: string | null;
+  /** The viewer's own: on one of their runs, or their name or chip on the sheet. */
+  mine: boolean;
+  /** Its name without a driver — "Run 3", a race's own name — as the library names it. */
+  label: string | null;
+  sourceUrl: string | null;
+  /** A race's entrants with laps, in finishing order. Empty on anything that is not a race. */
+  drivers: ImportedLibraryDriver[];
 };
 
 function practiceDriverFromPayload(parsedPayload: unknown): {
@@ -60,8 +85,41 @@ type LibraryApiSession = {
   sourceUrl?: string | null;
   parserId?: string | null;
   trackName?: string | null;
+  onRunId?: string | null;
+  mine?: boolean;
+  viewerDriverId?: string | null;
+  label?: string | null;
   parsedPayload: unknown;
 };
+
+/**
+ * Laps as the session's own page shows them: every driver's marshal laps and cut laps left out by
+ * the same rule, so a column ticked here reads the same numbers as that sheet opened on its own.
+ */
+function sheetLapRows(times: readonly number[]): LapRow[] {
+  return applyMedianBandAutoExclude(
+    times.map((t, i) => ({ lapNumber: i + 1, lapTimeSeconds: t, isIncluded: true }))
+  );
+}
+
+function lapsTotal(laps: readonly number[]): number {
+  let sum = 0;
+  for (const t of laps) sum += t;
+  return sum;
+}
+
+/** A race sheet's entrants, most laps then least time first — the order its own page numbers them. */
+function raceDrivers(parsedPayload: unknown, viewerDriverId: string | null): ImportedLibraryDriver[] {
+  const raw = (rawSessionDriversFromImportedPayload(parsedPayload) ?? []).filter((d) => d.laps.length > 0);
+  return [...raw]
+    .sort((a, b) => b.laps.length - a.laps.length || lapsTotal(a.laps) - lapsTotal(b.laps))
+    .map((d) => ({
+      id: d.id,
+      name: d.driverName,
+      laps: sheetLapRows(d.laps),
+      isViewer: viewerDriverId != null && d.id === viewerDriverId,
+    }));
+}
 
 function toLibrarySession(s: LibraryApiSession): ImportedLibrarySession | null {
   const parsed = primaryLapRowsFromImportedPayload(s.parsedPayload);
@@ -82,18 +140,25 @@ function toLibrarySession(s: LibraryApiSession): ImportedLibrarySession | null {
   };
   const shown = importedSessionTimeForDisplay(whenIso, timeOpts);
   const practiceDriver = practiceDriverFromPayload(s.parsedPayload);
+  const kind = importedSessionIsRaceResult(s.sourceUrl) ? "race" : "practice";
+  const drivers = kind === "race" ? raceDrivers(s.parsedPayload, s.viewerDriverId ?? null) : [];
   return {
     id: s.id,
     selectLabel: formatDriverSessionLabel(parsed.driverName, whenIso, timeOpts),
     name: parsed.driverName?.trim() || "Imported session",
-    laps: parsed.rows,
+    laps: sheetLapRows(parsed.rows.map((r) => r.lapTimeSeconds)),
     sortTimeIso: whenIso,
     // A rival's practice is linked to no run, so its track is the one it was ticked at.
     trackName: s.trackName ?? practiceDriver.trackName,
-    kind: importedSessionIsPractice(s.sourceUrl) ? "practice" : "race",
+    kind,
     trackClockIso: shown.timeZone === "UTC" ? shown.iso : null,
     practiceTransponder: practiceDriver.transponder,
     practiceSiteName: practiceDriver.siteName,
+    onRunId: s.onRunId ?? null,
+    mine: Boolean(s.mine),
+    label: s.label?.trim() || null,
+    sourceUrl: s.sourceUrl ?? null,
+    drivers,
   };
 }
 
@@ -107,10 +172,16 @@ function toLibrarySession(s: LibraryApiSession): ImportedLibrarySession | null {
  * on the phone five minutes ago should be in the list either way.
  *
  * `reload` is for the Practice tab, which brings a session in and needs it on the sheet
- * straight away. The list endpoint returns the newest 200 only, so a session brought in long ago
- * and ticked again today is asked for by id when the list doesn't hold it.
+ * straight away; one it can't find in the list is asked for by id.
+ *
+ * `trackName`: the sheet's track. The sheet compares within it only, so it asks for every
+ * session there — not the newest 200 uploads, which left older races at that track unlisted.
+ * With no track, the newest 200.
  */
-export function useImportedLapLibrary(enabled = true): {
+export function useImportedLapLibrary(
+  enabled = true,
+  trackName: string | null = null
+): {
   sessions: ImportedLibrarySession[];
   reload: (ensureId?: string) => Promise<void>;
   /** False until the first read comes back — an empty list then means "none", not "not yet". */
@@ -122,9 +193,13 @@ export function useImportedLapLibrary(enabled = true): {
   const extras = useRef<Map<string, ImportedLibrarySession>>(new Map());
   const alive = useRef(true);
 
+  const track = trackName?.trim() || null;
   const reload = useCallback(async (ensureId?: string) => {
     try {
-      const res = await fetch("/api/lap-time-sessions", { cache: "no-store" });
+      const res = await fetch(
+        track ? `/api/lap-time-sessions?track=${encodeURIComponent(track)}` : "/api/lap-time-sessions",
+        { cache: "no-store" }
+      );
       const data = (await res.json().catch(() => null)) as { sessions?: LibraryApiSession[] } | null;
       if (!data?.sessions) return;
       const mapped: ImportedLibrarySession[] = [];
@@ -149,7 +224,7 @@ export function useImportedLapLibrary(enabled = true): {
     } finally {
       if (alive.current) setLoaded(true);
     }
-  }, []);
+  }, [track]);
 
   useEffect(() => {
     alive.current = true;

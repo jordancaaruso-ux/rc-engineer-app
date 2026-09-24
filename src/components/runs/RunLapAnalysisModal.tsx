@@ -76,7 +76,7 @@ export function RunLapAnalysisModal({
     sessions: libraryLapSessions,
     reload: reloadLibrary,
     loaded: libraryLoaded,
-  } = useImportedLapLibrary(open);
+  } = useImportedLapLibrary(open, run.track?.name?.trim() || run.trackNameSnapshot?.trim() || null);
 
   // Only on the viewer's own run: on a teammate's sheet the viewer's runs would land under
   // the teammate's name, and the page's list already carries what the team shares.

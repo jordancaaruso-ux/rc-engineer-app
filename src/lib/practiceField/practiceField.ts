@@ -253,6 +253,23 @@ export function importedSessionIsPractice(sourceUrl: string | null | undefined):
 }
 
 /**
+ * Does the lap sheet list this timing sheet under Race results?
+ *
+ * LiveRC race results and MyRCM (a link or a PDF), nothing else (founder call, 2026-09-24:
+ * "Race results should only be LiveRC race results or MyRCM race results. It shouldn't be
+ * Speedhive links from a race that I competed in"). A MYLAPS session is one driver's laps, whatever
+ * the meeting was, and someone's practice is practice. A sheet with no source at all is an old
+ * run's field from before sources were kept, and stays a race, where it always was.
+ */
+export function importedSessionIsRaceResult(sourceUrl: string | null | undefined): boolean {
+  const url = sourceUrl?.trim().toLowerCase() ?? "";
+  if (!url) return true;
+  if (importedSessionIsPractice(url)) return false;
+  if (url.startsWith("myrcm-pdf://") || url.includes("myrcm.")) return true;
+  return url.includes("liverc.com");
+}
+
+/**
  * What heads a brought-in driver's column on the lap sheet.
  *
  * The import's own driver name is last, not first: on MYLAPS it is a label the chip's owner

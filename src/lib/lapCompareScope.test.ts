@@ -3,6 +3,9 @@ import { test } from "node:test";
 import {
   lapCompareFieldSeriesId,
   lapCompareFieldSeriesRunId,
+  lapCompareIsLibrarySeries,
+  lapCompareLibraryRaceSeriesId,
+  lapCompareLibraryRaceSessionId,
   lapCompareTrackKey,
   lapSeriesMatchesCompareScope,
   sameLocalCalendarDay,
@@ -15,6 +18,28 @@ test("field series ids round-trip the run they hang off", () => {
   assert.equal(lapCompareFieldSeriesRunId("history:run_1"), null);
   assert.equal(lapCompareFieldSeriesRunId("field:"), null);
   assert.equal(lapCompareFieldSeriesRunId("field:noset"), null);
+});
+
+test("a driver in a brought-in race round-trips its session, and counts as the library", () => {
+  const id = lapCompareLibraryRaceSeriesId("sess_1", "sd-3");
+  assert.equal(id, "librace:sess_1:sd-3");
+  assert.equal(lapCompareLibraryRaceSessionId(id), "sess_1");
+  assert.equal(lapCompareLibraryRaceSessionId("library:sess_1"), null);
+  assert.equal(lapCompareLibraryRaceSessionId("librace:"), null);
+  assert.equal(lapCompareIsLibrarySeries(id), true);
+  assert.equal(lapCompareIsLibrarySeries("library:sess_1"), true);
+  assert.equal(lapCompareIsLibrarySeries("history:run_1"), false);
+  // Free-floating like any library session: no event to match it against.
+  assert.equal(
+    lapSeriesMatchesCompareScope({
+      seriesId: id,
+      sortIso: new Date().toISOString(),
+      scope: "same_event",
+      anchorInstantIso: new Date().toISOString(),
+      anchorEventId: null,
+    }),
+    false
+  );
 });
 
 test("a rival off another run's timing sheet is scoped like that run", () => {

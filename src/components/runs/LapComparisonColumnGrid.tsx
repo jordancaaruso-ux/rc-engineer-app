@@ -34,6 +34,9 @@ import {
 import {
   lapCompareFieldSeriesId,
   lapCompareFieldSeriesRunId,
+  lapCompareIsLibrarySeries,
+  lapCompareLibraryRaceSeriesId,
+  lapCompareLibraryRaceSessionId,
   lapCompareTrackKey,
   lapSeriesMatchesCompareScope,
   type LapCompareScope,
@@ -60,6 +63,7 @@ import {
 } from "@/components/laps/PracticeFieldBrowser";
 import {
   importedSessionIsPractice,
+  importedSessionIsRaceResult,
   practiceColumnName,
   runOwnerName,
   type PracticeFieldSource,
@@ -71,7 +75,6 @@ import { formatCompareRunMetaLine } from "@/lib/runCompareMeta";
 import {
   formatDriverSessionLabel,
   formatDriverSessionLabelWithContext,
-  resolveImportedSessionDisplayTimeIso,
   timingSourceFromSourceUrl,
 } from "@/lib/lapImport/labels";
 import { resolveRunDisplayInstant, resolveRunSortInstant } from "@/lib/runCompareMeta";
@@ -148,6 +151,43 @@ type SeriesMeta = {
  * was — its races now sit under Race results and its practice under Practice.
  */
 type CompareSegmentKey = "driver" | "teammates" | "field" | "practice";
+
+/**
+ * One race, as the picker lists it under Race results: its name, then its entrants in finishing
+ * order — the viewer's own row among them (founder call, 2026-09-24: "listed are the races. Then
+ * you click on it and then you can individually import specific drivers from that race").
+ *
+ * Three kinds: this sheet's own race (`this_race`), the race on another run's timing sheet
+ * (`race:<runId>`), and a race brought into the library that is on none of the viewer's runs
+ * (`lib:<sessionId>`). Only LiveRC and MyRCM sheets are races — see `importedSessionIsRaceResult`.
+ */
+type RaceGroup = {
+  key: string;
+  name: string;
+  /** Ordering instant, like every other row; `whenIso` is the one printed. */
+  sortIso: string;
+  whenIso: string;
+  trackKey: string | null;
+  trackName: string | null;
+  /** Series ids in finishing order. */
+  driverIds: string[];
+  /** A run race's laps are fetched when it is opened; null for the other two kinds. */
+  runId: string | null;
+  /** This sheet's own race: first, and never folded. */
+  pinned: boolean;
+};
+
+/** The target picker's key for a series standing on its own — a run, a practice session. */
+function soloSessionKey(seriesId: string): string {
+  if (seriesId === "run:primary") return "this_run";
+  if (seriesId.startsWith("history:")) return `run:${seriesId.slice("history:".length)}`;
+  return seriesId;
+}
+
+/** The two sessions the sheet was opened on, pinned above the rest of their tab. */
+function isThisSheetSession(key: string): boolean {
+  return key === "this_run" || key === "this_race";
+}
 
 /**
  * The default for the run-list props. One shared instance, NOT `= []` in the signature: a
@@ -252,11 +292,13 @@ function isBestLapOf(series: ComparisonSeries, lap: LapRow): boolean {
   return series.bestLap != null && lap.lapTimeSeconds === series.bestLap;
 }
 
-/** The laps that count — lap 0 and excluded laps left out, the same set `bestLap` is read from. */
-function countedLaps(series: ComparisonSeries): number {
-  return series.laps.filter(
-    (l) => l.lapNumber !== 0 && l.isIncluded && Number.isFinite(l.lapTimeSeconds)
-  ).length;
+/**
+ * Laps driven — every lap but lap 0, struck-out ones included. The number the timing sheet
+ * prints and the number of rows the column has; a race listed by finishing position reads
+ * wrong otherwise (the winner "18 laps" above fifth place's 19, 2026-09-24).
+ */
+function lapsDriven(series: ComparisonSeries): number {
+  return series.laps.filter((l) => l.lapNumber !== 0 && Number.isFinite(l.lapTimeSeconds)).length;
 }
 
 /** "24 laps", the way the pickers say it. */
@@ -579,6 +621,16 @@ export function LapComparisonColumnGrid({
     /** Whose practice it is, as the practice list knew them — see `useImportedLapLibrary`. */
     practiceTransponder?: string | null;
     practiceSiteName?: string | null;
+    /** One of the viewer's runs it is on: that run carries these laps, so the copy is left out. */
+    onRunId?: string | null;
+    /** The viewer's own session — filed under My runs, not Practice. */
+    mine?: boolean;
+    /** Its name without a driver — "Run 3", a race's own name. */
+    label?: string | null;
+    /** Where it was imported from; a sheet already on a run in this list is not listed twice. */
+    sourceUrl?: string | null;
+    /** A race's entrants in finishing order; each is a row of its own under Race results. */
+    drivers?: Array<{ id: string; name: string; laps: LapRow[]; isViewer: boolean }>;
   }>;
   /**
    * The Practice tab brought a session in: re-read the library so it can become a column.
@@ -623,6 +675,16 @@ export function LapComparisonColumnGrid({
   const ownRunsLabel = anchorIsImportedSheet
     ? viewerName?.trim() || (primaryIsViewer ? primaryRunLabel : "Me")
     : primaryRunLabel;
+
+  /**
+   * The VIEWER's own imported sessions — on no run, their name on the sheet — go where the
+   * viewer's runs go: My runs, or Teammates on a teammate's shared run, under the viewer's name.
+   */
+  const viewerSessionsLabel =
+    (viewerUserId ? memberDisplayByUserId?.[viewerUserId]?.trim() : "") ||
+    (anchorIsImportedSheet || primaryIsViewer ? ownRunsLabel : "Me");
+  const viewerSessionsSegment: CompareSegmentKey =
+    !anchorIsImportedSheet && !primaryIsViewer ? "teammates" : "driver";
 
   /**
    * The words the WHOLE picker uses — the tabs, and the headings in the target dropdown above
@@ -848,7 +910,8 @@ export function LapComparisonColumnGrid({
   );
   const [fieldSetsByRunId, setFieldSetsByRunId] = useState<Record<string, ImportedSet[]>>({});
   const [fieldFetchState, setFieldFetchState] = useState<Record<string, "loading" | "error">>({});
-  const [expandedFieldRunIds, setExpandedFieldRunIds] = useState<string[]>([]);
+  /** Races opened under Race results, by `RaceGroup.key`. Opening a run's race fetches its laps. */
+  const [expandedRaceKeys, setExpandedRaceKeys] = useState<string[]>([]);
 
   /**
    * Every other run in the picker with rivals on its timing sheet. Read off
@@ -865,14 +928,14 @@ export function LapComparisonColumnGrid({
     [otherRuns, currentRunId]
   );
 
-  const toggleFieldRun = useCallback((runId: string) => {
-    setExpandedFieldRunIds((prev) =>
-      prev.includes(runId) ? prev.filter((x) => x !== runId) : [...prev, runId]
-    );
+  const toggleRace = useCallback((key: string) => {
+    setExpandedRaceKeys((prev) => (prev.includes(key) ? prev.filter((x) => x !== key) : [...prev, key]));
   }, []);
 
   useEffect(() => {
-    const wanted = new Set<string>(expandedFieldRunIds);
+    const wanted = new Set<string>(
+      expandedRaceKeys.filter((k) => k.startsWith("race:")).map((k) => k.slice("race:".length))
+    );
     // A ticked rival whose race was folded again still needs its laps — and so does a
     // rival chosen as the TARGET from a race that has never been unfolded.
     const targetRunId = lapCompareFieldSeriesRunId(targetId);
@@ -918,9 +981,9 @@ export function LapComparisonColumnGrid({
     }
     // No cancel token on purpose: marking a run "loading" re-runs this effect,
     // and a cleanup that dropped the in-flight response would lose every fetch.
-  }, [expandedFieldRunIds, selectedComparisonIds, targetId, fieldSetsByRunId, fieldFetchState, otherFieldRuns]);
+  }, [expandedRaceKeys, selectedComparisonIds, targetId, fieldSetsByRunId, fieldFetchState, otherFieldRuns]);
 
-  const { seriesList, metaById, heldBackDuplicates } = useMemo(() => {
+  const { seriesList, metaById, heldBackDuplicates, races } = useMemo(() => {
     const metaById = new Map<string, SeriesMeta>();
 
     const primarySeries = buildComparisonSeries(
@@ -945,6 +1008,7 @@ export function LapComparisonColumnGrid({
      * itself, which `resolveRunDisplayInstant` prefers.
      */
     const anchorSessionIso = resolveRunDisplayInstant(compareAnchorRun).toISOString();
+    const anchorSortIso = resolveRunSortInstant(compareAnchorRun).toISOString();
     const anchorSessionName = formatRunSessionDisplay(compareAnchorRun, {
       fallback:
         compareAnchorRun.car?.name?.trim() ||
@@ -958,41 +1022,8 @@ export function LapComparisonColumnGrid({
     const anchorTrack = lapCompareTrackKey(
       compareAnchorRun.track?.name ?? compareAnchorRun.trackNameSnapshot ?? null
     );
-
-    metaById.set(primarySeries.id, {
-      metaLine: formatCompareRunMetaLine(compareAnchorRun),
-      setupRun: compareAnchorRun,
-      selectLabel: formatDriverSessionLabel(primaryRunLabel, meSortIso, {
-        timingSource: timingSourceFromSourceUrl(primaryImport?.sourceUrl),
-        sourceUrl: primaryImport?.sourceUrl,
-        isWallClockTime: primaryImport?.sessionCompletedAt != null,
-      }),
-      // Ordered by the same axis as its day-mates; PRINTED with its on-track clock.
-      sortIso: resolveRunSortInstant(compareAnchorRun).toISOString(),
-      whenIso: meSortIso,
-      trackName:
-        compareAnchorRun.track?.name?.trim() || compareAnchorRun.trackNameSnapshot?.trim() || null,
-      /*
-       * On your own run the column is named after the SESSION ("Run 5", "Qualifying") and the
-       * car rides the subline — three of your runs side by side all read "Jordan Caruso"
-       * otherwise. On an imported race it is the other way round: every rival column is
-       * already named after its driver, and the target was the one column wearing the
-       * race's name — "measure everything against ISTC 13.5", as if a class could drive
-       * (founder, 2026-08-27). So there the driver names the column and the race is the
-       * context, the same shape as the columns beside it.
-       */
-      name: anchorIsImportedSheet
-        ? primaryRunLabel
-        : dayRunNames[compareAnchorRun.id] || anchorSessionName,
-      segment: "driver",
-      trackKey: anchorTrack,
-      fieldRunId: null,
-      // The car on your own run — the same subline every "My runs" row wears.
-      context: anchorIsImportedSheet
-        ? anchorSessionName
-        : compareAnchorRun.car?.name?.trim() || compareAnchorRun.carNameSnapshot?.trim() || null,
-      loaded: true,
-    });
+    const anchorTrackLabel =
+      compareAnchorRun.track?.name?.trim() || compareAnchorRun.trackNameSnapshot?.trim() || null;
 
     // A run can hold two timing imports when a break split the session, and each
     // stores its own set per driver. Joined by driver so a rival is one column
@@ -1010,35 +1041,78 @@ export function LapComparisonColumnGrid({
           })),
         }))
     );
+    /** Does this sheet hold a race — rivals off a LiveRC or MyRCM result, not practice or MYLAPS? */
+    const thisSheetIsRace = mergedImportedSets.some(
+      (s) => !s.isPrimaryUser && importedSessionIsRaceResult(s.sourceUrl)
+    );
+
+    metaById.set(primarySeries.id, {
+      metaLine: formatCompareRunMetaLine(compareAnchorRun),
+      setupRun: compareAnchorRun,
+      selectLabel: formatDriverSessionLabel(primaryRunLabel, meSortIso, {
+        timingSource: timingSourceFromSourceUrl(primaryImport?.sourceUrl),
+        sourceUrl: primaryImport?.sourceUrl,
+        isWallClockTime: primaryImport?.sessionCompletedAt != null,
+      }),
+      // Ordered by the same axis as its day-mates; PRINTED with its on-track clock.
+      sortIso: anchorSortIso,
+      whenIso: meSortIso,
+      trackName: anchorTrackLabel,
+      /*
+       * On your own run the column is named after the SESSION ("Run 5", "Qualifying") and the
+       * car rides the subline — three of your runs side by side all read "Jordan Caruso"
+       * otherwise. On an imported race it is the other way round: every rival column is
+       * already named after its driver, and the target was the one column wearing the
+       * race's name — "measure everything against ISTC 13.5", as if a class could drive
+       * (founder, 2026-08-27). So there the driver names the column and the race is the
+       * context, the same shape as the columns beside it.
+       */
+      name: anchorIsImportedSheet
+        ? primaryRunLabel
+        : dayRunNames[compareAnchorRun.id] || anchorSessionName,
+      /*
+       * Where the sheet's own driver is listed once something else is the target: with your runs
+       * when it is you (or it is a run), with the race when it is a driver in a race you only
+       * read, with practice when it is someone's practice.
+       */
+      segment:
+        anchorIsImportedSheet && !primaryIsViewer ? (thisSheetIsRace ? "field" : "practice") : "driver",
+      trackKey: anchorTrack,
+      fieldRunId: null,
+      // The car on your own run — the same subline every "My runs" row wears.
+      context: anchorIsImportedSheet
+        ? anchorSessionName
+        : compareAnchorRun.car?.name?.trim() || compareAnchorRun.carNameSnapshot?.trim() || null,
+      loaded: true,
+    });
 
     const rawImported: ComparisonSeries[] = [];
     for (const s of mergedImportedSets) {
       if (!s.laps?.length) continue;
+      // The sheet's own driver is `run:primary`; their set is the same laps again.
+      if (s.isPrimaryUser) continue;
       const label = (s.displayName?.trim() || s.driverName).trim() || "Imported";
       const ser = buildComparisonSeries(`imported:${s.id}`, label, "imported", importedSetToLapRows(s.laps));
       rawImported.push(ser);
-      const fallbackWhen =
-        typeof s.createdAt === "string"
-          ? s.createdAt
-          : s.createdAt != null
-            ? s.createdAt.toISOString()
-            : anchorSessionIso;
-      const whenIso = resolveImportedSessionDisplayTimeIso({
-        sessionCompletedAt: s.sessionCompletedAt ?? null,
-        parsedPayload: undefined,
-        createdAt: fallbackWhen,
-      });
       metaById.set(ser.id, {
         metaLine: null,
         setupRun: null,
-        selectLabel: formatDriverSessionLabel(label, whenIso, {
+        selectLabel: formatDriverSessionLabel(label, anchorSessionIso, {
           timingSource: timingSourceFromSourceUrl(s.sourceUrl),
           sourceUrl: s.sourceUrl,
           isWallClockTime: s.sessionCompletedAt != null,
         }),
-        sortIso: whenIso,
+        /*
+         * This sheet's clock, not the set's: a rival on your timing sheet was on track when you
+         * were. The set's own time fell back to when it was imported, which put the Bayside
+         * field a day after the race it ran in.
+         */
+        sortIso: anchorSortIso,
+        whenIso: anchorSessionIso,
+        trackName: anchorTrackLabel,
         name: label,
-        segment: "field",
+        // A rival off a race sheet sits in the race; someone's practice beside yours is practice.
+        segment: importedSessionIsRaceResult(s.sourceUrl) ? "field" : "practice",
         // The field came in on THIS run's timing sheet, so it was at this track
         // by construction — it has no track of its own to read.
         trackKey: anchorTrack,
@@ -1090,23 +1164,98 @@ export function LapComparisonColumnGrid({
       });
     }
 
+    /*
+     * Sheets already hanging off a run on this list. The same race imported a second time (an
+     * event page, then the race again from a run) is one race, and the run's copy is the one
+     * that knows whose it is.
+     */
+    const sheetUrlsOnRuns = new Set<string>();
+    for (const r of [compareAnchorRun, ...otherRuns]) {
+      for (const s of r.importedLapSets ?? []) {
+        const url = s.sourceUrl?.trim();
+        if (url) sheetUrlsOnRuns.add(url);
+      }
+    }
+
+    const races: RaceGroup[] = [];
+
     const rawLibrary: ComparisonSeries[] = [];
+    /** Drivers in brought-in races: never deduped, or a race could lose half its field. */
+    const rawLibraryRace: ComparisonSeries[] = [];
     for (const lib of librarySessions) {
       if (!lib.laps?.length) continue;
       // The sheet you opened is in the library too; it is not something to compare itself with.
       if (anchorIsImportedSheet && `import:${lib.id}` === compareAnchorRun.id) continue;
-      const ser = buildComparisonSeries(
-        `library:${lib.id}`,
-        lib.selectLabel,
-        "imported",
-        lib.laps
-      );
-      rawLibrary.push(ser);
+      /*
+       * A session on one of your runs IS that run — its laps, its car, its setup and its name
+       * live there. Listed again it was a second "JORDAN CARUSO" row under Race results with the
+       * sheet's raw laps, a cut lap for its best (founder, 2026-09-24: "the target should be my
+       * run from that race"). A run the host left off this list (another car) stays off.
+       */
+      if (lib.onRunId) continue;
+      if (lib.sourceUrl && sheetUrlsOnRuns.has(lib.sourceUrl.trim())) continue;
       // A track's clock becomes the real instant it was, read in the zone this sheet prints in —
       // so "3:30 PM at the track" prints as 3:30 PM here, and sits in the right day.
       const libInstantIso = lib.trackClockIso
         ? wallClockAsUtcToInstant(new Date(lib.trackClockIso), pickerZone).toISOString()
         : lib.sortTimeIso;
+      const libTrackKey = lapCompareTrackKey(lib.trackName);
+
+      const raceDrivers = lib.kind === "race" ? (lib.drivers ?? []).filter((d) => d.laps.length > 0) : [];
+      if (raceDrivers.length > 0) {
+        // Only this track's races can ever be offered; the rest are not worth building.
+        if (anchorTrack && libTrackKey !== anchorTrack) continue;
+        const raceName = lib.label?.trim() || "Race";
+        const driverIds: string[] = [];
+        for (const d of raceDrivers) {
+          const id = lapCompareLibraryRaceSeriesId(lib.id, d.id);
+          // Your own row in a race you brought in is one of your sessions: it reads like a run.
+          const ser = buildComparisonSeries(
+            id,
+            d.isViewer ? viewerSessionsLabel : d.name,
+            d.isViewer ? "run" : "imported",
+            d.laps
+          );
+          rawLibraryRace.push(ser);
+          driverIds.push(id);
+          metaById.set(id, {
+            metaLine: "Imported lap-time library",
+            setupRun: null,
+            selectLabel: formatDriverSessionLabelWithContext(d.name, libInstantIso, raceName),
+            sortIso: libInstantIso,
+            whenIso: libInstantIso,
+            trackName: lib.trackName ?? null,
+            name: d.isViewer ? raceName : d.name,
+            segment: d.isViewer ? viewerSessionsSegment : "field",
+            trackKey: libTrackKey,
+            fieldRunId: null,
+            context: d.isViewer ? null : raceName,
+            loaded: true,
+          });
+        }
+        races.push({
+          key: `lib:${lib.id}`,
+          name: raceName,
+          sortIso: libInstantIso,
+          whenIso: libInstantIso,
+          trackKey: libTrackKey,
+          trackName: lib.trackName ?? null,
+          driverIds,
+          runId: null,
+          pinned: false,
+        });
+        continue;
+      }
+
+      // One driver's session: yours under My runs, anyone else's under Practice.
+      const mine = Boolean(lib.mine);
+      const ser = buildComparisonSeries(
+        `library:${lib.id}`,
+        mine ? viewerSessionsLabel : lib.selectLabel,
+        mine ? "run" : "imported",
+        lib.laps
+      );
+      rawLibrary.push(ser);
       metaById.set(ser.id, {
         metaLine: "Imported lap-time library",
         setupRun: null,
@@ -1114,8 +1263,9 @@ export function LapComparisonColumnGrid({
         sortIso: libInstantIso,
         whenIso: libInstantIso,
         trackName: lib.trackName ?? null,
-        name:
-          lib.kind === "practice"
+        name: mine
+          ? lib.label?.trim() || "Practice"
+          : lib.kind === "practice"
             ? practiceColumnName({
                 transponder: lib.practiceTransponder,
                 saved: savedDrivers,
@@ -1124,8 +1274,8 @@ export function LapComparisonColumnGrid({
                 importName: lib.name?.trim() || lib.selectLabel,
               })
             : lib.name?.trim() || lib.selectLabel,
-        segment: lib.kind === "practice" ? "practice" : "field",
-        trackKey: lapCompareTrackKey(lib.trackName),
+        segment: mine ? viewerSessionsSegment : "practice",
+        trackKey: libTrackKey,
         fieldRunId: null,
         context: null,
         loaded: true,
@@ -1145,8 +1295,9 @@ export function LapComparisonColumnGrid({
       const metaSets = r.importedLapSets ?? [];
       const loadedSets = fieldSetsByRunId[r.id] ?? null;
       const loaded = loadedSets != null || metaSets.every((s) => Array.isArray(s.laps));
+      const sheetSets = loadedSets ?? metaSets;
       const merged = mergeImportedLapSetsByDriver(
-        (loadedSets ?? metaSets)
+        sheetSets
           .filter((s) => !s.isPrimaryUser)
           .map((s) => ({
             id: s.id,
@@ -1166,10 +1317,10 @@ export function LapComparisonColumnGrid({
       );
       const whenIso = resolveRunDisplayInstant(r).toISOString();
       const sortIso = resolveRunSortInstant(r).toISOString();
-      const raceName = formatRunSessionDisplay(r, {
-        fallback: r.car?.name?.trim() || r.carNameSnapshot?.trim() || ownRunsLabel,
-      });
+      // The race's own name — "Qualifying", "A Main" — which is what heads it under Race results.
+      const raceName = formatRunSessionDisplay(r, { fallback: "Race" });
       const trackCtx = r.track?.name?.trim() || r.trackNameSnapshot?.trim() || null;
+      const idBySetId = new Map<string, string>();
       for (const s of merged) {
         // A rival whose sheet came back with no laps has nothing to compare.
         if (loaded && s.laps.length === 0) continue;
@@ -1181,6 +1332,8 @@ export function LapComparisonColumnGrid({
           importedSetToLapRows(s.laps)
         );
         (loaded ? rawOtherField : rawOtherFieldPending).push(ser);
+        const isRaceRow = importedSessionIsRaceResult(s.sourceUrl);
+        if (isRaceRow) idBySetId.set(s.id, ser.id);
         metaById.set(ser.id, {
           metaLine: null,
           setupRun: null,
@@ -1191,13 +1344,32 @@ export function LapComparisonColumnGrid({
           whenIso,
           trackName: trackCtx,
           name: label,
-          segment: "field",
+          segment: isRaceRow ? "field" : "practice",
           trackKey: lapCompareTrackKey(trackCtx),
           fieldRunId: r.id,
           context: raceName,
           loaded,
         });
       }
+      if (idBySetId.size === 0) continue;
+      // The race in its own order — the sheet's — with the run's driver in their place in it.
+      const driverIds: string[] = [];
+      for (const s of sheetSets) {
+        const id = s.isPrimaryUser ? `history:${r.id}` : idBySetId.get(s.id);
+        if (id && !driverIds.includes(id)) driverIds.push(id);
+      }
+      for (const id of idBySetId.values()) if (!driverIds.includes(id)) driverIds.push(id);
+      races.push({
+        key: `race:${r.id}`,
+        name: raceName,
+        sortIso,
+        whenIso,
+        trackKey: lapCompareTrackKey(trackCtx),
+        trackName: trackCtx,
+        driverIds,
+        runId: r.id,
+        pinned: false,
+      });
     }
 
     /*
@@ -1237,12 +1409,68 @@ export function LapComparisonColumnGrid({
         twinName ? `Same laps as ${twinName}` : "Same laps as another row"
       );
     }
-    const list = [primarySeries, ...dedupedOthers, ...rawOtherFieldPending];
-    return { seriesList: list, metaById, heldBackDuplicates };
+    const list = [primarySeries, ...dedupedOthers, ...rawLibraryRace, ...rawOtherFieldPending];
+
+    /*
+     * This sheet's own race, when it is one: the sheet's driver and the rivals off the same
+     * result, in the sheet's order (which is finishing order — see `importedSessionAnchor`).
+     */
+    if (thisSheetIsRace) {
+      const driverIds: string[] = [];
+      for (const s of mergedImportedSets) {
+        const id = s.isPrimaryUser ? "run:primary" : `imported:${s.id}`;
+        if (!s.isPrimaryUser && !importedSessionIsRaceResult(s.sourceUrl)) continue;
+        if (!driverIds.includes(id)) driverIds.push(id);
+      }
+      if (!driverIds.includes("run:primary")) driverIds.unshift("run:primary");
+      races.unshift({
+        key: "this_race",
+        name: formatRunSessionDisplay(compareAnchorRun, { fallback: "Race" }),
+        sortIso: anchorSortIso,
+        whenIso: anchorSessionIso,
+        trackKey: anchorTrack,
+        trackName: anchorTrackLabel,
+        driverIds,
+        runId: null,
+        pinned: true,
+      });
+    }
+
+    /*
+     * Finishing order: most laps, then least time — the result, whatever order the sheet's rows
+     * were saved in. A run's own row was saved first, which put the driver P1 behind a car that
+     * did a lap more. A race whose laps are still on their way keeps the sheet's order until
+     * they land.
+     */
+    const listedById = new Map(list.map((s) => [s.id, s]));
+    const finish = (id: string) => {
+      const laps = (listedById.get(id)?.laps ?? []).filter(
+        (l) => l.lapNumber !== 0 && Number.isFinite(l.lapTimeSeconds)
+      );
+      return { laps: laps.length, total: laps.reduce((sum, l) => sum + l.lapTimeSeconds, 0) };
+    };
+    // Only what made it onto the list; a race left with nobody else in it is not a race to pick from.
+    const keptRaces = races
+      .map((race) => {
+        const driverIds = race.driverIds.filter((id) => listedById.has(id));
+        const pending = driverIds.some((id) => metaById.get(id)?.loaded === false);
+        if (!pending) {
+          const keyed = driverIds.map((id) => ({ id, ...finish(id) }));
+          keyed.sort((a, b) => b.laps - a.laps || a.total - b.total);
+          return { ...race, driverIds: keyed.map((k) => k.id) };
+        }
+        return { ...race, driverIds };
+      })
+      .filter((race) => race.driverIds.some((id) => id !== "run:primary" && !id.startsWith("history:")));
+
+    return { seriesList: list, metaById, heldBackDuplicates, races: keptRaces };
   }, [
     run,
     primaryRunLabel,
+    primaryIsViewer,
     ownRunsLabel,
+    viewerSessionsLabel,
+    viewerSessionsSegment,
     historyPickOptions,
     dayRunNames,
     compareAnchorRun,
@@ -1252,6 +1480,7 @@ export function LapComparisonColumnGrid({
     savedDrivers,
     pickerZone,
     memberDisplayByUserId,
+    otherRuns,
     otherFieldRuns,
     fieldSetsByRunId,
     anchorIsImportedSheet,
@@ -1281,6 +1510,12 @@ export function LapComparisonColumnGrid({
       }
       if (seriesId.startsWith("library:")) {
         const lib = librarySessions.find((l) => l.id === seriesId.slice("library:".length));
+        return lapCompareTrackKey(lib?.trackName ?? null);
+      }
+      // A driver in a brought-in race was wherever that race was.
+      const libraryRaceId = lapCompareLibraryRaceSessionId(seriesId);
+      if (libraryRaceId) {
+        const lib = librarySessions.find((l) => l.id === libraryRaceId);
         return lapCompareTrackKey(lib?.trackName ?? null);
       }
       // A rival off another run's sheet was wherever that run was.
@@ -1340,6 +1575,24 @@ export function LapComparisonColumnGrid({
       .filter(({ series, sortIso }) => seriesMatchesScope(series.id, sortIso));
   }, [seriesList, targetId, metaById, seriesMatchesScope]);
 
+  /**
+   * The races under Race results, as far as "How far to look" reaches: this sheet's own first,
+   * then newest first. A race is in when its drivers are — they share a day, a track and an event.
+   */
+  const racesInScope = useMemo(() => {
+    const inScope = races.filter(
+      (race) => race.pinned || race.driverIds.some((id) => seriesMatchesScope(id, race.sortIso))
+    );
+    return inScope.sort((a, b) => (a.pinned ? -1 : b.pinned ? 1 : compareOptionSort(a, b)));
+  }, [races, seriesMatchesScope]);
+
+  /** Which race a series is a driver in, if any — across every race, in scope or not. */
+  const raceKeyBySeriesId = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const race of races) for (const id of race.driverIds) if (!out.has(id)) out.set(id, race.key);
+    return out;
+  }, [races]);
+
   const segmentFor = useCallback(
     (seriesId: string): CompareSegmentKey => metaById.get(seriesId)?.segment ?? "driver",
     [metaById]
@@ -1349,13 +1602,16 @@ export function LapComparisonColumnGrid({
    * Only segments that actually hold something are offered. A solo testing run
    * has one (its driver); a club race with an imported timing sheet has two;
    * a team session can have all four. An empty tab is a dead end you can press.
+   * Race results counts RACES: its rows are races you open, not a flat list of drivers.
    */
   const segments = useMemo(() => {
     const counts = new Map<CompareSegmentKey, number>();
     for (const r of scopeFilteredRows) {
       const k = segmentFor(r.series.id);
+      if (k === "field") continue;
       counts.set(k, (counts.get(k) ?? 0) + 1);
     }
+    counts.set("field", racesInScope.length);
     const order: CompareSegmentKey[] = ["driver", "teammates", "field", "practice"];
     return (
       order
@@ -1368,7 +1624,7 @@ export function LapComparisonColumnGrid({
           count: k === "practice" ? null : counts.get(k)!,
         }))
     );
-  }, [scopeFilteredRows, segmentFor, segmentLabels, practiceSources]);
+  }, [scopeFilteredRows, segmentFor, segmentLabels, practiceSources, racesInScope]);
 
   useEffect(() => {
     if (segments.length === 0) return;
@@ -1394,6 +1650,47 @@ export function LapComparisonColumnGrid({
     for (const s of seriesList) m.set(s.id, s);
     return m;
   }, [seriesList]);
+
+  /**
+   * A column named after a PERSON — a driver off a timing sheet — rather than after a session
+   * with its driver drawn over it. The sheet's own driver is one only on an imported sheet.
+   */
+  const isPersonSeries = useCallback(
+    (s: ComparisonSeries) => (s.id === "run:primary" ? anchorIsImportedSheet : s.sourceType === "imported"),
+    [anchorIsImportedSheet]
+  );
+
+  /** Whose session a run-like row is — "Jordan Caruso" — or null on a person row. */
+  const ownerOf = useCallback(
+    (id: string): string | null => {
+      const s = seriesById.get(id);
+      return s && !isPersonSeries(s) ? runOwnerName(s.label) : null;
+    },
+    [seriesById, isPersonSeries]
+  );
+
+  /** The viewer's own row, for the "You" beside it in a race. */
+  const isViewerRow = useCallback(
+    (id: string): boolean => {
+      if (id === "run:primary") return primaryIsViewer;
+      if (id.startsWith("history:")) {
+        const r = otherRuns.find((o) => o.id === id.slice("history:".length));
+        return viewerUserId ? r?.userId === viewerUserId : primaryIsViewer || anchorIsImportedSheet;
+      }
+      return lapCompareIsLibrarySeries(id) && seriesById.get(id)?.sourceType === "run";
+    },
+    [primaryIsViewer, otherRuns, viewerUserId, anchorIsImportedSheet, seriesById]
+  );
+
+  /** A driver as a race lists them: the person on the sheet, or whose run it is. */
+  const raceDriverName = useCallback(
+    (id: string): string => {
+      const s = seriesById.get(id);
+      if (!s) return "Driver";
+      return ownerOf(id) ?? metaById.get(id)?.name ?? s.label;
+    },
+    [seriesById, ownerOf, metaById]
+  );
 
   /**
    * The driver's own runs either side of this one, in the order the Sessions list keeps —
@@ -1423,7 +1720,7 @@ export function LapComparisonColumnGrid({
       // A run row leads with its driver — "Jordan Caruso · Run 4" (founder, 2026-09-22) — the
       // same title the target row above it wears. A run series carries its driver as its label.
       const series = seriesById.get(r.id);
-      const owner = r.id.startsWith("history:") ? runOwnerName(series?.label) : null;
+      const owner = ownerOf(r.id);
       const sessionName = m?.name ?? r.label;
       return {
         id: r.id,
@@ -1436,7 +1733,7 @@ export function LapComparisonColumnGrid({
         when: [
           r.sortIso ? fmtWhen(m?.whenIso ?? r.sortIso) : "—",
           m?.segment === "field" ? null : m?.context ?? null,
-          series && (m?.loaded ?? true) ? lapCountLabel(countedLaps(series)) : null,
+          series && (m?.loaded ?? true) ? lapCountLabel(lapsDriven(series)) : null,
         ]
           .filter(Boolean)
           .join(" · "),
@@ -1454,77 +1751,50 @@ export function LapComparisonColumnGrid({
       m?.trackName ?? (m?.trackKey != null && m.trackKey === anchorTrackKey ? anchorTrackName : null);
 
     /*
-     * The field is grouped by RACE, not by day and track: this run's own sheet
-     * first and always open, then every other race in scope folded shut until
-     * asked for. Inside a race every entrant shares a day and a venue, so the
-     * day/track buckets below would say nothing; between races, the race name
-     * is exactly what needs saying. The venue is only appended when it is not
-     * this one, which can only happen once the scope has been widened.
+     * Race results is a list of RACES (founder call, 2026-09-24: "listed are the races. Then you
+     * click on it and then you can individually import specific drivers from that race"): this
+     * sheet's own first and always open, then every other race in scope folded shut until asked
+     * for — your runs' races and the ones brought into the library alike. Inside a race the
+     * drivers read in finishing order, you among them, and the target greyed where it finished.
+     * The venue is only appended when it is not this one.
      */
     if (activeSegment === "field") {
-      if (compareOptionRows.length === 0) return [];
-      const own: LapPickerRow[] = [];
-      /** Races brought in by link or PDF, not hanging off one of the driver's runs. */
-      const broughtIn: LapPickerRow[] = [];
-      const byRun = new Map<string, LapPickerRow[]>();
-      for (const r of compareOptionRows) {
-        if (r.id.startsWith("library:")) {
-          broughtIn.push(toRow(r));
-          continue;
-        }
-        const rid = metaById.get(r.id)?.fieldRunId ?? null;
-        if (!rid) {
-          own.push(toRow(r));
-          continue;
-        }
-        const rows = byRun.get(rid) ?? [];
-        rows.push(toRow(r));
-        byRun.set(rid, rows);
-      }
-      const groups: LapPickerGroup[] = [];
-      if (own.length > 0) {
-        // Named after the session, not "This session": beside "Race · 15 Jul" and
-        // "Race · 8 Jul" the reader needs the same kind of name here.
-        const pm = metaById.get("run:primary");
-        // On an imported race the race's name is the anchor's CONTEXT (the driver names the
-        // column); on your own run it is the anchor's NAME (the car is the context).
-        const sessionName = anchorIsImportedSheet ? pm?.context : pm?.name;
-        const label = [sessionName ?? null, pm?.sortIso ? fmtWhen(pm.whenIso ?? pm.sortIso) : null]
-          .filter(Boolean)
-          .join(" · ");
-        groups.push({ key: "field", label: label || "This session", rows: own });
-      }
-      // `compareOptionRows` is already newest-first, and a Map keeps insertion
-      // order, so the races come out in the same order as every other list.
-      for (const [rid, rows] of byRun) {
-        const m = metaById.get(rows[0]!.id);
-        const r = otherRuns.find((o) => o.id === rid);
-        const trackName = r?.track?.name?.trim() || r?.trackNameSnapshot?.trim() || null;
-        const elsewhere = trackName != null && lapCompareTrackKey(trackName) !== anchorTrackKey;
-        const expanded = expandedFieldRunIds.includes(rid);
-        const fetchState = fieldFetchState[rid];
-        groups.push({
-          key: `field:${rid}`,
-          label: [
-            m?.context ?? null,
-            m?.sortIso ? fmtWhen(m.whenIso ?? m.sortIso) : null,
-            elsewhere ? trackName : null,
-          ]
+      return racesInScope.map((race): LapPickerGroup => {
+        const expanded = race.pinned || expandedRaceKeys.includes(race.key);
+        const fetchState = race.runId ? fieldFetchState[race.runId] : undefined;
+        const elsewhere = race.trackName != null && race.trackKey !== anchorTrackKey;
+        const rows: LapPickerRow[] = [];
+        race.driverIds.forEach((id, i) => {
+          const series = seriesById.get(id);
+          if (!series) return;
+          const m = metaById.get(id);
+          const isTarget = id === targetId;
+          rows.push({
+            // The target is listed where it finished, but it is not something to tick.
+            id: isTarget ? `target:${id}` : id,
+            name: `P${i + 1} · ${raceDriverName(id)}`,
+            when: m?.loaded === false ? "" : lapCountLabel(lapsDriven(series)),
+            bestLap: series.bestLap,
+            disabled: isTarget,
+            note: isTarget ? "Target" : isViewerRow(id) ? "You" : null,
+          });
+        });
+        return {
+          key: race.key,
+          label: [race.name, race.whenIso ? fmtWhen(race.whenIso) : null, elsewhere ? race.trackName : null]
             .filter(Boolean)
             .join(" · "),
           rows,
-          collapsed: !expanded,
-          onToggle: () => toggleFieldRun(rid),
+          collapsed: race.pinned ? undefined : !expanded,
+          onToggle: race.pinned ? undefined : () => toggleRace(race.key),
           status:
             fetchState === "error"
               ? "Couldn't load this race's laps"
               : expanded && fetchState === "loading"
                 ? "Loading laps…"
                 : null,
-        });
-      }
-      if (broughtIn.length > 0) groups.push({ key: "library", label: "Brought in", rows: broughtIn });
-      return groups;
+        };
+      });
     }
 
     type Placed = {
@@ -1628,9 +1898,13 @@ export function LapComparisonColumnGrid({
     anchorTrackKey,
     anchorTrackName,
     otherRuns,
-    expandedFieldRunIds,
+    racesInScope,
+    expandedRaceKeys,
     fieldFetchState,
-    toggleFieldRun,
+    toggleRace,
+    raceDriverName,
+    isViewerRow,
+    ownerOf,
     anchorIsImportedSheet,
     heldBackByAnchor,
     heldBackDuplicates,
@@ -1658,7 +1932,7 @@ export function LapComparisonColumnGrid({
     if (lastRunIdRef.current === currentRunId) return;
     lastRunIdRef.current = currentRunId;
     setSelectedComparisonIds([]);
-    setExpandedFieldRunIds([]);
+    setExpandedRaceKeys([]);
     setPracticePickIds([]);
     setPendingPracticeIds([]);
   }, [currentRunId]);
@@ -1692,7 +1966,7 @@ export function LapComparisonColumnGrid({
           id !== targetId &&
           // A brought-in column is not judged until the library it lives in has arrived —
           // pruned on the first render, "Detailed analysis" opened without the rival you ticked.
-          (valid.has(id) || (!libraryLoaded && id.startsWith("library:")))
+          (valid.has(id) || (!libraryLoaded && lapCompareIsLibrarySeries(id)))
       )
     );
   }, [scopeFilteredRows, targetId, libraryLoaded]);
@@ -1791,17 +2065,25 @@ export function LapComparisonColumnGrid({
    * (founder, 2026-08-27). The dropdown used to list SERIES — one row per driver per
    * session, every rival of every heat in scope flattened into one list. The target is
    * always a driver in a session; this is the session half, and `drivers` is the other.
+   *
+   * A run of yours is ONE session, with one driver — you — under My runs; the race it was in is
+   * another, under Race results, with everyone in it. They used to be one: "Run 3 · 10 drivers"
+   * under My runs, no name of yours on it, and the whole field in a driver dropdown beneath
+   * (founder, 2026-09-24: "the target is the race; the target should be my run from that race").
    */
   type TargetSession = {
     key: string;
-    name: string;
+    /** What the dropdown prints first: whose and which ("Jordan Caruso · Run 3"), or the race. */
+    title: string;
     /** Ordering and day-cutting instant; `whenIso` is the one printed. */
     sortIso: string;
     whenIso: string;
     trackKey: string | null;
     trackName: string | null;
-    /** Every tab this session belongs under. A heat you drove is both yours and a field. */
+    /** The tab it is listed under. */
     segments: CompareSegmentKey[];
+    /** A race: its drivers in finishing order, numbered in the driver dropdown. */
+    isRace: boolean;
     /**
      * `loaded` is false while a rival's laps are still on their way from the server. `laps`
      * counts the laps that count — the ones `bestLap` was read from.
@@ -1809,136 +2091,130 @@ export function LapComparisonColumnGrid({
     drivers: Array<{ id: string; name: string; bestLap: number | null; laps: number; loaded: boolean }>;
   };
 
-  /** `run:primary` + this sheet's `imported:` field → "this_sheet"; `history:`/`field:` → their run; `library:` → itself. */
-  const sessionKeyForSeries = useCallback((seriesId: string): string => {
-    if (seriesId === "run:primary" || seriesId.startsWith("imported:")) return "this_sheet";
-    if (seriesId.startsWith("history:")) return `run:${seriesId.slice("history:".length)}`;
-    const rid = lapCompareFieldSeriesRunId(seriesId);
-    if (rid) return `run:${rid}`;
-    return seriesId;
-  }, []);
+  /** The session a column started in, for the charts' "same start": its race, when it had one. */
+  const startKeyOf = useCallback(
+    (seriesId: string): string => raceKeyBySeriesId.get(seriesId) ?? soloSessionKey(seriesId),
+    [raceKeyBySeriesId]
+  );
 
   const targetSessions = useMemo((): TargetSession[] => {
-    const byKey = new Map<string, TargetSession>();
+    const driverOf = (id: string): TargetSession["drivers"][number] | null => {
+      const s = seriesById.get(id);
+      if (!s) return null;
+      return {
+        id,
+        name: raceDriverName(id),
+        bestLap: s.bestLap,
+        laps: lapsDriven(s),
+        loaded: metaById.get(id)?.loaded ?? true,
+      };
+    };
+    const out: TargetSession[] = [];
+    for (const race of racesInScope) {
+      const drivers = race.driverIds
+        .map(driverOf)
+        .filter((d): d is NonNullable<typeof d> => d != null);
+      if (drivers.length === 0) continue;
+      out.push({
+        key: race.key,
+        title: race.name,
+        sortIso: race.sortIso,
+        whenIso: race.whenIso,
+        trackKey: race.trackKey,
+        trackName: race.trackName,
+        segments: ["field"],
+        isRace: true,
+        drivers,
+      });
+    }
+    /*
+     * Everything else stands alone: a run, someone's practice. A rival off a race sheet is only
+     * ever chosen inside their race. This sheet's own driver is on offer whatever the scope — a
+     * sheet whose own laps have left its target list has nothing to measure against.
+     */
     for (const s of seriesList) {
       const m = metaById.get(s.id);
-      const key = sessionKeyForSeries(s.id);
-      let session = byKey.get(key);
-      if (!session) {
-        session = {
-          key,
-          name: "",
-          sortIso: m?.sortIso ?? "",
-          whenIso: m?.whenIso ?? m?.sortIso ?? "",
-          trackKey: m?.trackKey ?? null,
-          trackName:
-            m?.trackName ??
-            (m?.trackKey != null && m.trackKey === anchorTrackKey ? anchorTrackName : null),
-          segments: [],
-          drivers: [],
-        };
-        byKey.set(key, session);
-      }
-      const seg = m?.segment ?? "driver";
-      if (!session.segments.includes(seg)) session.segments.push(seg);
-      /*
-       * The DRIVER's name, which is the series label — your own rows are named after their
-       * session in `metaById` ("Run 1"), and "Run 1" is not who was driving. A library
-       * import is the one series whose label is a session line, so it keeps its meta name.
-       */
-      session.drivers.push({
-        id: s.id,
-        name: s.id.startsWith("library:") ? (m?.name ?? s.label) : s.label,
-        bestLap: s.bestLap,
-        laps: countedLaps(s),
-        loaded: m?.loaded ?? true,
+      const segment = m?.segment ?? "driver";
+      if (segment === "field") continue;
+      if (s.id !== "run:primary" && !seriesMatchesScope(s.id, m?.sortIso ?? "")) continue;
+      const driver = driverOf(s.id);
+      if (!driver) continue;
+      const owner = ownerOf(s.id);
+      const name = m?.name ?? s.label;
+      // Your own row on a race sheet you imported: your name, then the race.
+      const title =
+        s.id === "run:primary" && anchorIsImportedSheet && primaryIsViewer
+          ? [viewerName?.trim() || name, m?.context ?? null].filter(Boolean).join(" · ")
+          : owner
+            ? `${owner} · ${name}`
+            : name;
+      out.push({
+        key: soloSessionKey(s.id),
+        title,
+        sortIso: m?.sortIso ?? "",
+        whenIso: m?.whenIso ?? m?.sortIso ?? "",
+        trackKey: m?.trackKey ?? null,
+        trackName:
+          m?.trackName ??
+          (m?.trackKey != null && m.trackKey === anchorTrackKey ? anchorTrackName : null),
+        segments: [segment],
+        isRace: false,
+        drivers: [driver],
       });
     }
-
-    /*
-     * This sheet's drivers in CLASSIFICATION order. The series list puts the anchor first
-     * and the field after it, but on an imported race the anchor may have finished third,
-     * and "P3" is what the driver select needs to say. `importedLapSets` arrives in
-     * finishing order, with the anchor's own row flagged primary.
-     */
-    const thisSheet = byKey.get("this_sheet");
-    if (thisSheet) {
-      const order = new Map<string, number>();
-      (run.importedLapSets ?? []).forEach((set, i) => {
-        order.set(set.isPrimaryUser ? "run:primary" : `imported:${set.id}`, i);
-      });
-      if (!order.has("run:primary")) order.set("run:primary", -1);
-      thisSheet.drivers.sort(
-        (a, b) =>
-          (order.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.id) ?? Number.MAX_SAFE_INTEGER)
-      );
-      const pm = metaById.get("run:primary");
-      // Race name on an imported sheet (the anchor's context); the run's name on your own.
-      thisSheet.name = (anchorIsImportedSheet ? pm?.context : pm?.name) ?? "This sheet";
-      thisSheet.sortIso = pm?.sortIso ?? thisSheet.sortIso;
-      thisSheet.whenIso = pm?.whenIso ?? thisSheet.sortIso;
-    }
-
-    for (const session of byKey.values()) {
-      if (session.key === "this_sheet") continue;
-      if (session.key.startsWith("run:")) {
-        const rid = session.key.slice("run:".length);
-        const r = otherRuns.find((o) => o.id === rid);
-        session.name =
-          dayRunNames[rid] ||
-          (r
-            ? formatRunSessionDisplay(r, {
-                fallback: r.car?.name?.trim() || r.carNameSnapshot?.trim() || "Run",
-              })
-            : "Run");
-        // You first, then the rest of that sheet in its own order.
-        session.drivers.sort(
-          (a, b) => Number(b.id.startsWith("history:")) - Number(a.id.startsWith("history:"))
-        );
-        continue;
-      }
-      session.name = session.drivers[0]?.name ?? session.key;
-    }
-
-    /*
-     * "How far to look" applies here too: a session is offered when any of its drivers is
-     * in scope. This sheet always is. Newest first after it, like every other list.
-     */
-    const inScope = [...byKey.values()].filter(
-      (session) =>
-        session.key === "this_sheet" ||
-        session.drivers.some((d) => seriesMatchesScope(d.id, session.sortIso))
-    );
-    return inScope.sort((a, b) => {
-      if (a.key === "this_sheet") return -1;
-      if (b.key === "this_sheet") return 1;
-      return compareOptionSort(a, b);
-    });
+    // This sheet first — its race, then its run — then newest first, like every other list.
+    const pinRank = (key: string) => (key === "this_race" ? 0 : key === "this_run" ? 1 : 2);
+    return out.sort((a, b) => pinRank(a.key) - pinRank(b.key) || compareOptionSort(a, b));
   }, [
+    racesInScope,
     seriesList,
+    seriesById,
     metaById,
-    sessionKeyForSeries,
-    run.importedLapSets,
-    otherRuns,
-    dayRunNames,
+    raceDriverName,
+    ownerOf,
     seriesMatchesScope,
     anchorIsImportedSheet,
+    primaryIsViewer,
+    viewerName,
     anchorTrackKey,
     anchorTrackName,
   ]);
 
-  /** The session the current target sits in. Derived, so the two can never disagree. */
-  const targetSessionKey = sessionKeyForSeries(targetId);
+  /**
+   * The session the current target sits in. Derived, so the two can never disagree. A run you
+   * raced is in two — your run, and the race — and the open tab says which one is meant.
+   */
+  const targetSessionKey = useMemo(() => {
+    const holding = targetSessions.filter((s) => s.drivers.some((d) => d.id === targetId));
+    return (
+      (
+        holding.find((s) => s.segments.includes(targetSegment)) ??
+        holding.find((s) => !s.isRace) ??
+        holding[0]
+      )?.key ?? ""
+    );
+  }, [targetSessions, targetId, targetSegment]);
   const targetSession = targetSessions.find((s) => s.key === targetSessionKey) ?? null;
+  /** Is the target's session one the open tab lists? If not, the dropdown asks for one. */
+  const targetSessionInTab = targetSession?.segments.includes(targetSegment) ?? false;
+  /**
+   * The race the target ran in, whichever tab it was chosen from. The heading's driver switch
+   * and the chip row read it: your run's rivals stay one tap away.
+   */
+  const targetRaceSession = useMemo(
+    () => targetSessions.find((s) => s.isRace && s.drivers.some((d) => d.id === targetId)) ?? null,
+    [targetSessions, targetId]
+  );
 
   /**
    * The same tabs as Compare with, over the SESSION dropdown. Headings inside a dropdown were
-   * not enough: "if I have a lot of runs I'd never find those" (founder, 2026-08-27).
+   * not enough: "if I have a lot of runs I'd never find those" (founder, 2026-08-27). This
+   * sheet's own run and race count too: a sheet whose only race is its own still needs Race
+   * results, or a rival in it could never be made the target.
    */
   const targetSegments = useMemo(() => {
     const counts = new Map<CompareSegmentKey, number>();
     for (const session of targetSessions) {
-      if (session.key === "this_sheet") continue;
       for (const k of session.segments) counts.set(k, (counts.get(k) ?? 0) + 1);
     }
     const order: CompareSegmentKey[] = ["driver", "teammates", "field", "practice"];
@@ -1954,21 +2230,17 @@ export function LapComparisonColumnGrid({
   }, [targetSegments, targetSegment]);
 
   /**
-   * The session dropdown's groups: this sheet on its own line, then the chosen tab's sessions
-   * by day and track — and whatever session holds the current target, whichever tab it is
-   * under, because a `<select>` whose value is not among its options draws the first one
-   * while the grid measures against another.
+   * The session dropdown's groups: this sheet's own run or race on its own line, then the chosen
+   * tab's sessions by day and track. Only that tab's: a race held under My runs because it held
+   * the target read as "my runs include race results" all over again. When the target lives in
+   * another tab the dropdown asks to choose instead (`targetSessionInTab`).
    */
   const targetSessionGroups = useMemo(() => {
     const pinned: TargetSession[] = [];
     const rest: TargetSession[] = [];
     for (const session of targetSessions) {
-      if (session.key === "this_sheet") {
-        pinned.push(session);
-        continue;
-      }
-      const wanted = session.segments.includes(targetSegment) || session.key === targetSessionKey;
-      if (wanted) rest.push(session);
+      if (!session.segments.includes(targetSegment)) continue;
+      (isThisSheetSession(session.key) ? pinned : rest).push(session);
     }
     const groups: Array<{ key: string; label: string | null; sessions: TargetSession[] }> = [
       { key: "this_sheet", label: null, sessions: pinned },
@@ -1987,7 +2259,6 @@ export function LapComparisonColumnGrid({
   }, [
     targetSessions,
     targetSegment,
-    targetSessionKey,
     anchorTrackName,
     anchorTrackKey,
     anchorInstantIso,
@@ -2012,15 +2283,19 @@ export function LapComparisonColumnGrid({
     [targetId]
   );
 
-  /** Choosing a session lands on its own driver when there is one — you — else its leader. */
+  /** Choosing a session lands on the run's own driver when there is one — you — else its winner. */
   const onTargetSessionChange = useCallback(
     (key: string) => {
       const session = targetSessions.find((s) => s.key === key);
       if (!session) return;
-      const own = session.drivers.find((d) => d.id === "run:primary" || d.id.startsWith("history:"));
+      const own = session.drivers.find((d) =>
+        d.id === "run:primary"
+          ? !anchorIsImportedSheet || primaryIsViewer
+          : d.id.startsWith("history:") || isViewerRow(d.id)
+      );
       chooseTarget((own ?? session.drivers[0])?.id ?? "run:primary");
     },
-    [targetSessions, chooseTarget]
+    [targetSessions, chooseTarget, anchorIsImportedSheet, primaryIsViewer, isViewerRow]
   );
 
   function metaFor(s: ComparisonSeries): SeriesMeta {
@@ -2050,11 +2325,9 @@ export function LapComparisonColumnGrid({
   const targetTitle = useMemo(() => {
     if (!targetSeries) return "";
     const name = metaById.get(targetSeries.id)?.name ?? targetSeries.label;
-    const isPersonTarget =
-      targetSeries.id === "run:primary" ? anchorIsImportedSheet : targetSeries.sourceType === "imported";
-    const driver = isPersonTarget ? null : runOwnerName(targetSeries.label);
+    const driver = isPersonSeries(targetSeries) ? null : runOwnerName(targetSeries.label);
     return driver ? `${driver} · ${name}` : name;
-  }, [targetSeries, metaById, anchorIsImportedSheet]);
+  }, [targetSeries, metaById, isPersonSeries]);
 
   /** The pinned, untickable row at the top of the picker: what everything is measured against. */
   const targetPickerRow = useMemo((): LapPickerRow | null => {
@@ -2069,7 +2342,7 @@ export function LapComparisonColumnGrid({
       when: [
         m?.sortIso ? fmtWhen(m.whenIso ?? m.sortIso) : "—",
         m?.context ?? null,
-        lapCountLabel(countedLaps(targetSeries)),
+        lapCountLabel(lapsDriven(targetSeries)),
       ]
         .filter(Boolean)
         .join(" · "),
@@ -2297,19 +2570,20 @@ export function LapComparisonColumnGrid({
   /**
    * The columns as the charts see them: target first, then every ticked column in grid
    * order. `sameSessionAsTarget` is what lets Gap and Position know which lines shared a
-   * start — the session key is the same one the target picker groups by, so "same race"
-   * means the same thing in both places.
+   * start — the race, the same one Race results lists them under, so "same race" means the
+   * same thing in both places.
    */
   const chartSeries = useMemo((): LapChartSeries[] => {
     if (!targetSeries) return [];
+    const targetStart = startKeyOf(targetSeries.id);
     return [targetSeries, ...comparisonSeries].map((s) => ({
       id: s.id,
       name: metaById.get(s.id)?.name ?? s.label,
       series: s,
       isTarget: s.id === targetSeries.id,
-      sameSessionAsTarget: sessionKeyForSeries(s.id) === targetSessionKey,
+      sameSessionAsTarget: startKeyOf(s.id) === targetStart,
     }));
-  }, [targetSeries, comparisonSeries, metaById, sessionKeyForSeries, targetSessionKey]);
+  }, [targetSeries, comparisonSeries, metaById, startKeyOf]);
 
   /**
    * The chip row: everyone in the target's session, ticked or not, then anything ticked
@@ -2325,19 +2599,17 @@ export function LapComparisonColumnGrid({
     const out = new Map<string, string>();
     if (!targetSeries) return out;
     const onSheet = [targetSeries, ...comparisonSeries];
-    const isPersonColumn = (s: ComparisonSeries) =>
-      s.id === targetSeries.id ? anchorIsImportedSheet : s.sourceType === "imported";
     const drivers = new Set(
-      onSheet.map((s) => (isPersonColumn(s) ? metaById.get(s.id)?.name ?? s.label : s.label).trim().toLowerCase())
+      onSheet.map((s) => (isPersonSeries(s) ? metaById.get(s.id)?.name ?? s.label : s.label).trim().toLowerCase())
     );
     if (drivers.size < 2) return out;
     for (const s of onSheet) {
-      if (isPersonColumn(s)) continue;
+      if (isPersonSeries(s)) continue;
       const owner = runOwnerName(s.label);
       if (owner) out.set(s.id, owner);
     }
     return out;
-  }, [targetSeries, comparisonSeries, metaById, anchorIsImportedSheet]);
+  }, [targetSeries, comparisonSeries, metaById, isPersonSeries]);
 
   const driverChips = useMemo((): LapDriverChip[] => {
     if (!targetSeries) return [];
@@ -2352,13 +2624,33 @@ export function LapComparisonColumnGrid({
       chips.push({ id, label, on: id === targetSeries.id || selected.has(id), isTarget: id === targetSeries.id, loaded });
     };
     push(targetSeries.id, metaById.get(targetSeries.id)?.name ?? targetSeries.label, true);
-    for (const d of targetSession?.drivers ?? []) {
+    /*
+     * The pool is the race the target ran in — your run's rivals are one tap away whichever
+     * tab the target was picked from — else the target's own session.
+     */
+    const targetRaceKey = raceKeyBySeriesId.get(targetSeries.id) ?? null;
+    const pool = targetRaceKey
+      ? (races.find((r) => r.key === targetRaceKey)?.driverIds ?? [])
+      : (targetSession?.drivers.map((d) => d.id) ?? []);
+    for (const id of pool) {
+      const s = seriesById.get(id);
+      if (!s) continue;
       // Named like its column: the driver on a race sheet, the session on your own runs.
-      push(d.id, metaById.get(d.id)?.name ?? d.name, d.loaded);
+      push(id, metaById.get(id)?.name ?? s.label, metaById.get(id)?.loaded ?? true);
     }
     for (const s of comparisonSeries) push(s.id, metaById.get(s.id)?.name ?? s.label, true);
     return chips;
-  }, [targetSeries, targetSession, comparisonSeries, selectedComparisonIds, metaById, ownerBySeriesId]);
+  }, [
+    targetSeries,
+    targetSession,
+    comparisonSeries,
+    selectedComparisonIds,
+    metaById,
+    ownerBySeriesId,
+    raceKeyBySeriesId,
+    races,
+    seriesById,
+  ]);
 
   const selectAllChips = useCallback(() => {
     setSelectedComparisonIds((prev) => {
@@ -2402,21 +2694,23 @@ export function LapComparisonColumnGrid({
    * the rail's select anyway.
    */
   /**
-   * Name, time, then the two numbers that tell one session from the next: best lap and how
-   * many laps. Six of your practice runs on one morning are "Jordan Caruso · 9 Aug" six times
-   * over; the time alone doesn't say which was the good one (founder, 2026-09-24). On a sheet
-   * with several drivers the numbers are the leader's — P1 on a race, you on your own run.
+   * Whose and which, when, then the two numbers that tell one session from the next: best lap
+   * and how many laps. Six of your practice runs on one morning are "Jordan Caruso · 9 Aug" six
+   * times over; the time alone doesn't say which was the good one (founder, 2026-09-24). A race
+   * says how many drove instead — the driver dropdown under it carries each one's numbers.
    */
   function targetSessionLabel(session: TargetSession): string {
     const when = session.sortIso ? fmtWhen(session.whenIso || session.sortIso) : null;
-    const n = session.drivers.length;
-    const lead = session.drivers[0];
+    if (session.isRace) {
+      const n = session.drivers.length;
+      return [session.title, when, `${n} driver${n === 1 ? "" : "s"}`].filter(Boolean).join(" · ");
+    }
+    const only = session.drivers[0];
     return [
-      session.name,
+      session.title,
       when,
-      n > 1 ? `${n} drivers` : null,
-      lead?.loaded ? formatLap(lead.bestLap) : null,
-      lead?.loaded ? lapCountLabel(lead.laps) : null,
+      only?.loaded ? formatLap(only.bestLap) : null,
+      only?.loaded ? lapCountLabel(only.laps) : null,
     ]
       .filter(Boolean)
       .join(" · ");
@@ -2424,19 +2718,20 @@ export function LapComparisonColumnGrid({
 
   /**
    * The driver half of the target choice, drawn wherever the question "whose numbers are
-   * these?" gets asked: in the picker under the session, and in the stat strip's heading.
-   * One control, two homes, distinct ids. Null when the session has one driver — a select
-   * that can only be set to what it already says reads as broken.
+   * these?" gets asked: in the picker under the race, and in the stat strip's heading, where it
+   * is the race the target ran in whichever tab it was picked from. One control, two homes,
+   * distinct ids. Null when there is nobody else to choose — a select that can only be set to
+   * what it already says reads as broken.
    */
   function renderTargetDriverSelect(
     idPrefix: string,
+    session: TargetSession | null,
     opts?: { fullWidth?: boolean; variant?: "heading" }
   ) {
-    const drivers = targetSession?.drivers ?? [];
+    const drivers = session?.drivers ?? [];
     if (drivers.length < 2) return null;
-    // Finishing positions are only known for THIS sheet's field, and only mean something
-    // when the sheet is a race somebody imported in finishing order.
-    const numbered = targetSession?.key === "this_sheet" && anchorIsImportedSheet;
+    // In the picker a race lists its drivers in finishing order, so the order is the result.
+    const numbered = Boolean(session?.isRace) && Boolean(opts?.fullWidth);
     const options = drivers.map((d, i) => (
       <option key={d.id} value={d.id} disabled={!d.loaded}>
         {numbered ? `P${i + 1} · ` : ""}
@@ -2498,18 +2793,18 @@ export function LapComparisonColumnGrid({
               ? fmtWhen(metaFor(targetSeries).whenIso ?? metaFor(targetSeries).sortIso)
               : null,
             // A rival off this sheet carries no context of their own (the sheet IS
-            // the context), so the session names them — unless it already did.
+            // the context), so the race names them — unless it already did.
             metaFor(targetSeries).context ??
-              (targetSession && targetSession.name !== metaFor(targetSeries).name
-                ? targetSession.name
+              (targetRaceSession && targetRaceSession.title !== metaFor(targetSeries).name
+                ? targetRaceSession.title
                 : null),
           ]
             .filter(Boolean)
             .join(" · "),
           control:
             layout === "band"
-              ? renderTargetDriverSelect("band", { variant: "heading" })
-              : renderTargetDriverSelect("tiles"),
+              ? renderTargetDriverSelect("band", targetRaceSession, { variant: "heading" })
+              : renderTargetDriverSelect("tiles", targetRaceSession),
         }
       : null;
     return (
@@ -2565,10 +2860,19 @@ export function LapComparisonColumnGrid({
           <select
             id={sessionSelectId}
             className="w-full rounded-md border border-border bg-card px-2 py-2 text-xs outline-none"
-            value={targetSessionKey}
+            value={targetSessionInTab ? targetSessionKey : ""}
             onChange={(e) => onTargetSessionChange(e.target.value)}
             aria-label="Target session"
           >
+            {targetSessionInTab ? null : (
+              <option value="" disabled>
+                {targetSegment === "field"
+                  ? "Choose a race"
+                  : targetSegment === "practice"
+                    ? "Choose a session"
+                    : "Choose a run"}
+              </option>
+            )}
             {targetSessionGroups.map((g) =>
               g.label == null ? (
                 g.sessions.map((session) => (
@@ -2587,7 +2891,7 @@ export function LapComparisonColumnGrid({
               )
             )}
           </select>
-          {renderTargetDriverSelect(idPrefix, { fullWidth: true })}
+          {targetSessionInTab ? renderTargetDriverSelect(idPrefix, targetSession, { fullWidth: true }) : null}
             </>
           ) : null}
         </div>
@@ -2832,7 +3136,7 @@ export function LapComparisonColumnGrid({
                     meta={metaFor(targetSeries)}
                     isTarget
                     owner={ownerBySeriesId.get(targetSeries.id) ?? null}
-                    isPerson={anchorIsImportedSheet}
+                    isPerson={isPersonSeries(targetSeries)}
                     compact={compactColumns}
                     summaryDelta={null}
                     onViewSetup={setSetupModalRun}

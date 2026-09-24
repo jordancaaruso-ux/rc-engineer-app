@@ -5,6 +5,7 @@ import {
   groupLiveRcPracticeRows,
   groupMylapsActivities,
   importedSessionIsPractice,
+  importedSessionIsRaceResult,
   practiceColumnName,
   practiceDriverDisplayName,
   practiceQueryAsTransponder,
@@ -117,6 +118,18 @@ test("an imported session is practice or race by where it came from", () => {
   assert.equal(importedSessionIsPractice("https://speedhive.mylaps.com/sessions/123"), false);
   assert.equal(importedSessionIsPractice("myrcm-pdf://abc/file.pdf"), false);
   assert.equal(importedSessionIsPractice(null), false);
+});
+
+test("race results are LiveRC races and MyRCM, never MYLAPS or practice", () => {
+  assert.equal(importedSessionIsRaceResult("https://tftr.liverc.com/results/?p=view_race_result&id=1"), true);
+  assert.equal(importedSessionIsRaceResult("https://www.myrcm.ch/myrcm/report/en/97370/388960?reportKey=4750"), true);
+  assert.equal(importedSessionIsRaceResult("myrcm-pdf://abc/report.pdf"), true);
+  assert.equal(importedSessionIsRaceResult("https://tftr.liverc.com/practice/?p=view_session&id=24639316"), false);
+  assert.equal(importedSessionIsRaceResult("https://speedhive.mylaps.com/sessions/123"), false);
+  assert.equal(importedSessionIsRaceResult("https://speedhive.mylaps.com/practice/4591/activities/1"), false);
+  assert.equal(importedSessionIsRaceResult("https://example.com/results/1"), false);
+  // An old run's field kept no source: it stays where it always was.
+  assert.equal(importedSessionIsRaceResult(null), true);
 });
 
 test("a brought-in column is headed by your name for them, then the list's, the site's, the number", () => {

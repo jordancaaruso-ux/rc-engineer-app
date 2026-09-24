@@ -13,12 +13,15 @@
  *   `field:<runId>:<setId>` — a rival off the timing sheet of ANOTHER run in the
  *                   picker, so a competitor's first heat can be measured against
  *                   this one. Scoped exactly like the `history:` row of that run.
+ *   `librace:<sessionId>:<driverId>` — one driver in a race brought into the library
+ *                   and on none of the viewer's runs. Scoped like `library:`.
  */
 
 /** All three are within the sheet's track; there is no wider look (founder call, 2026-09-24). */
 export type LapCompareScope = "same_day" | "same_event" | "same_track";
 
 const FIELD_PREFIX = "field:";
+const LIBRARY_RACE_PREFIX = "librace:";
 
 export function lapCompareFieldSeriesId(runId: string, setId: string): string {
   return `${FIELD_PREFIX}${runId}:${setId}`;
@@ -31,6 +34,24 @@ export function lapCompareFieldSeriesRunId(seriesId: string): string | null {
   const cut = rest.indexOf(":");
   if (cut <= 0) return null;
   return rest.slice(0, cut);
+}
+
+export function lapCompareLibraryRaceSeriesId(sessionId: string, driverId: string): string {
+  return `${LIBRARY_RACE_PREFIX}${sessionId}:${driverId}`;
+}
+
+/** `librace:<sessionId>:<driverId>` → the imported session; null for any other id. */
+export function lapCompareLibraryRaceSessionId(seriesId: string): string | null {
+  if (!seriesId.startsWith(LIBRARY_RACE_PREFIX)) return null;
+  const rest = seriesId.slice(LIBRARY_RACE_PREFIX.length);
+  const cut = rest.indexOf(":");
+  if (cut <= 0) return null;
+  return rest.slice(0, cut);
+}
+
+/** A session from the viewer's library, on none of their runs: `library:` or `librace:`. */
+export function lapCompareIsLibrarySeries(seriesId: string): boolean {
+  return seriesId.startsWith("library:") || seriesId.startsWith(LIBRARY_RACE_PREFIX);
 }
 
 /**
@@ -110,7 +131,7 @@ export function lapSeriesMatchesCompareScope(input: {
 
   // same_event. With no event on the anchor there is nothing to match, so keep
   // everything attached to a run and drop the free-floating library sessions.
-  if (!anchorEventId) return !seriesId.startsWith("library:");
+  if (!anchorEventId) return !lapCompareIsLibrarySeries(seriesId);
 
   if (seriesId === "run:primary") return primaryRunEventId === anchorEventId;
   // A rival off another run's timing sheet was at that run's event, by construction.

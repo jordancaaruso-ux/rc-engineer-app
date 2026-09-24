@@ -65,7 +65,11 @@ export function LapAnalysisBoard({
    */
   trackClockIso?: string | null;
 }) {
-  const { sessions: librarySessions, reload: reloadLibrary, loaded: libraryLoaded } = useImportedLapLibrary();
+  // The sheet's own track — the only place its pickers look.
+  const { sessions: librarySessions, reload: reloadLibrary, loaded: libraryLoaded } = useImportedLapLibrary(
+    true,
+    run.track?.name?.trim() || run.trackNameSnapshot?.trim() || null
+  );
 
   /*
    * Drawn only after hydration, and this is not a preference.
