@@ -111,8 +111,10 @@ export default function PrivacyPage() {
         <ul className="list-disc space-y-1 pl-5">
           <li>Vercel — application hosting, file storage (uploads), and anonymous page counts.</li>
           <li>Neon — managed PostgreSQL database.</li>
+          <li>Stripe — payments and subscriptions. Your card details go to Stripe, never to us.</li>
           <li>OpenAI — AI features, as described above.</li>
           <li>Our email provider — sending sign-in links and notifications.</li>
+          <li>Sentry — reports of errors in the app (the page, browser and error), so we can fix them.</li>
           <li>Google — only if you choose to sign in with Google.</li>
           <li>Apple / browser push services — only if you enable notifications.</li>
           <li>Open-Meteo — weather lookup by track location and time.</li>
