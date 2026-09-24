@@ -84,6 +84,34 @@ export function upgradeTierFor(feature: Feature): PaidTier {
 export const STARTER_RUN_WINDOW = 15;
 
 /**
+ * How many teams a member on this plan may be in (founder call 2026-09-24): none on Starter, one
+ * on Notebook, any number on Race Engineer. `null` = no limit. Counted over memberships, never
+ * pending invites.
+ *
+ * It limits STARTING and JOINING a team, nothing else. A member who drops to a cheaper plan keeps
+ * the teams they are already in and just can't add another: the founder left the downgrade case
+ * open, and nobody was in a team on a cheaper plan when this shipped, so the simple rule won.
+ */
+export function teamLimitFor(tier: Tier): number | null {
+  if (tier === "pro") return null;
+  if (tier === "standard") return 1;
+  return 0;
+}
+
+/**
+ * May a member on this plan, already in `teamCount` teams, start or join one more? When not, the
+ * plan the lock sells: Notebook to Starter (its one team), Race Engineer to Notebook (any number).
+ */
+export function teamJoinVerdict(
+  tier: Tier,
+  teamCount: number,
+): { ok: true } | { ok: false; includedIn: PaidTier } {
+  const limit = teamLimitFor(tier);
+  if (limit == null || teamCount < limit) return { ok: true };
+  return { ok: false, includedIn: tier === "standard" ? "pro" : "standard" };
+}
+
+/**
  * Stripe subscription statuses that grant access. Everything else (canceled, past_due, incomplete,
  * unpaid, paused, …) does not.
  */

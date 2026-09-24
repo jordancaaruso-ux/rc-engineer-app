@@ -62,6 +62,9 @@ where the build departed from the plan and why.
   drivers' practice, `/api/laps/practice-field`) is Race Engineer's too. The line: sessions you
   drove are the notebook's, reading anyone else's is Race Engineer's. Plan cards cross Laptime
   Analysis out on Notebook and list it on Race Engineer.
+- **Amended 2026-09-24 (founder call): no teams on Starter.** Notebook may be in one team, Race
+  Engineer any number (`teamLimitFor`). A Starter member meets the New team card and every
+  invite's Accept locked, selling Notebook. Plan cards cross "Teams" out on Starter.
 
 ## The rulings (2026-09-09)
 

@@ -4,7 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Button } from "@/components/ui/Button";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 import { Eyebrow } from "@/components/ui/panel";
+import { TIER_LABELS } from "@/lib/brand/brandNames";
+import type { PaidTier } from "@/lib/entitlementLogic";
 import type { PendingInviteForViewer } from "@/lib/teams/pendingInvites";
 
 type InviteAction = "accept" | "decline";
@@ -21,8 +24,19 @@ type InviteAction = "accept" | "decline";
  * The one line of copy is the disclosure, not a how-to: accepting shares the driver's whole run
  * history with the team, retroactively, and the API comment on the accept route requires the UI to
  * say so before the call is made.
+ *
+ * `joinLock` is the plan's team limit (`teamLimitFor`, founder call 2026-09-24): Starter joins no
+ * team, Notebook one. Then Accept becomes the door to the plan that holds one more, the line says
+ * which plan that is, and Decline stays. The invite stays pending, so it can still be accepted
+ * after an upgrade.
  */
-export function TeamInvitesCard({ invites }: { invites: PendingInviteForViewer[] }) {
+export function TeamInvitesCard({
+  invites,
+  joinLock = null,
+}: {
+  invites: PendingInviteForViewer[];
+  joinLock?: { includedIn: PaidTier } | null;
+}) {
   const router = useRouter();
   const [answeredIds, setAnsweredIds] = useState<string[]>([]);
   const [busy, setBusy] = useState<{ id: string; action: InviteAction } | null>(null);
@@ -83,16 +97,26 @@ export function TeamInvitesCard({ invites }: { invites: PendingInviteForViewer[]
                 ) : null}
               </div>
               <p className="text-[12px] text-muted-foreground">
-                The team sees your runs, past ones too. You see theirs.
+                {joinLock == null
+                  ? "The team sees your runs, past ones too. You see theirs."
+                  : joinLock.includedIn === "pro"
+                    ? `More than one team is included in ${TIER_LABELS.pro}.`
+                    : `Teams are included in ${TIER_LABELS[joinLock.includedIn]}.`}
               </p>
               <div className="flex gap-2">
-                <Button
-                  disabled={busy != null}
-                  aria-busy={rowBusy === "accept"}
-                  onClick={() => void respond(invite, "accept")}
-                >
-                  {rowBusy === "accept" ? "Joining…" : "Accept"}
-                </Button>
+                {joinLock == null ? (
+                  <Button
+                    disabled={busy != null}
+                    aria-busy={rowBusy === "accept"}
+                    onClick={() => void respond(invite, "accept")}
+                  >
+                    {rowBusy === "accept" ? "Joining…" : "Accept"}
+                  </Button>
+                ) : (
+                  <ButtonLink href={`/billing?plan=${joinLock.includedIn}`}>
+                    Upgrade to {TIER_LABELS[joinLock.includedIn]}
+                  </ButtonLink>
+                )}
                 <Button
                   variant="outline"
                   disabled={busy != null}

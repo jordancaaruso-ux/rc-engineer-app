@@ -8,8 +8,10 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { listTeamsWithActivity } from "@/lib/teams/loadTeamFeed";
 import { listPendingInvitesForUser } from "@/lib/teams/pendingInvites";
+import { teamJoinLock } from "@/lib/teams/teamLimit";
 import { CreateTeamForm } from "@/components/teams/CreateTeamForm";
 import { TeamInvitesCard } from "@/components/teams/TeamInvitesCard";
+import { LockedBench } from "@/components/tools/LockedBench";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,10 @@ export const dynamic = "force-dynamic";
  * With one team there is nothing to choose, so go straight to it; the picker only earns its place
  * when there is more than one. An unanswered invite overrides that: redirecting a driver who is
  * already on one team would carry them straight past the invite they came to answer.
+ *
+ * The plan's team limit (`teamLimitFor`, founder call 2026-09-24) is drawn here, where it bites:
+ * Starter joins no team and Notebook one, so at the limit the New team card becomes a lock and an
+ * invite's Accept becomes the door to the plan that holds one more. The two routes refuse too.
  */
 export default async function TeamsPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
@@ -41,6 +47,8 @@ export default async function TeamsPage(): Promise<ReactNode> {
 
   if (teams.length === 1 && invites.length === 0) redirect(`/teams/${teams[0].id}`);
 
+  const joinLock = await teamJoinLock({ id: user.id, email: user.email ?? null }, teams.length);
+
   return (
     <>
       <header className="page-header is-echo">
@@ -55,7 +63,7 @@ export default async function TeamsPage(): Promise<ReactNode> {
       </header>
 
       <section className="page-body max-w-2xl space-y-4">
-        {invites.length > 0 ? <TeamInvitesCard invites={invites} /> : null}
+        {invites.length > 0 ? <TeamInvitesCard invites={invites} joinLock={joinLock} /> : null}
 
         {teams.length > 0 ? (
           <CardPanel contentClassName="p-0">
@@ -86,7 +94,20 @@ export default async function TeamsPage(): Promise<ReactNode> {
           </CardPanel>
         ) : null}
 
-        <CreateTeamForm />
+        {joinLock == null ? (
+          <CreateTeamForm />
+        ) : (
+          <LockedBench
+            label="New team"
+            stretch={false}
+            includedIn={joinLock.includedIn}
+            line={
+              joinLock.includedIn === "pro"
+                ? "Be in more than one team."
+                : "Share runs with your teammates."
+            }
+          />
+        )}
       </section>
     </>
   );

@@ -13,6 +13,8 @@ import {
   isBillingEnforced,
   isFeatureEntitled,
   lowestTierWithFeature,
+  teamJoinVerdict,
+  teamLimitFor,
   upgradeTierFor,
 } from "@/lib/entitlementLogic";
 
@@ -57,6 +59,23 @@ test("every plan keeps its own run's lap sheet: that is review, not lap time ana
   for (const tier of ["starter", "standard", "pro"] as const) {
     assert.equal(isFeatureEntitled(tier, "review"), true);
   }
+});
+
+test("teams (2026-09-24): none on Starter, one on Notebook, any number on Race Engineer", () => {
+  assert.equal(teamLimitFor("starter"), 0);
+  assert.equal(teamLimitFor("standard"), 1);
+  assert.equal(teamLimitFor("pro"), null);
+  assert.equal(teamLimitFor("none"), 0);
+});
+
+test("the team lock sells the next plan that holds one more team", () => {
+  assert.deepEqual(teamJoinVerdict("starter", 0), { ok: false, includedIn: "standard" });
+  assert.deepEqual(teamJoinVerdict("standard", 0), { ok: true });
+  assert.deepEqual(teamJoinVerdict("standard", 1), { ok: false, includedIn: "pro" });
+  // A downgrade keeps the teams it had; only the next one is refused.
+  assert.deepEqual(teamJoinVerdict("standard", 3), { ok: false, includedIn: "pro" });
+  assert.deepEqual(teamJoinVerdict("pro", 0), { ok: true });
+  assert.deepEqual(teamJoinVerdict("pro", 12), { ok: true });
 });
 
 test("a Starter member keeps their last fifteen runs", () => {

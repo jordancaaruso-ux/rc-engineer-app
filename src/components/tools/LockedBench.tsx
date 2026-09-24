@@ -18,19 +18,29 @@ import type { PaidTier } from "@/lib/entitlementLogic";
  * three-across desktop grid a locked bench stands level with an open one beside it. The door is
  * yellow for the reason the Lab's lone door is: the only action on a band is never a quiet one.
  * It carries `?plan=`, so the Subscription page opens with that plan picked (see `BillingClient`).
+ *
+ * The Teams page borrows it for the New team card when the plan's team limit is reached (2026-09-24),
+ * with `stretch={false}`: in a page column `h-full` took the whole page height and pushed the door
+ * under the dock.
  */
 export function LockedBench({
   label,
   includedIn,
   line,
+  stretch = true,
 }: {
   label: string;
   includedIn: PaidTier;
   line: string;
+  /** Fill the grid cell's height, as Tools' three-across row needs. Off, the card fits its content. */
+  stretch?: boolean;
 }) {
   const plan = TIER_LABELS[includedIn];
   return (
-    <CardPanel className="h-full" contentClassName="flex h-full flex-col p-0">
+    <CardPanel
+      className={stretch ? "h-full" : undefined}
+      contentClassName={stretch ? "flex h-full flex-col p-0" : "flex flex-col p-0"}
+    >
       <BandHeader label={label} />
       <div className="px-4 pb-4 pt-3">
         <p className="micro-caps text-muted-foreground">Included in {plan}</p>

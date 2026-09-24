@@ -5,6 +5,7 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { isEmailAuthAllowed } from "@/lib/authAllowlist";
 import { checkInviteResponse, parseInviteAction } from "@/lib/teams/teamInviteRules";
 import { notifyAdminOfTeamInviteReply } from "@/lib/teams/notifyTeamInvite";
+import { teamJoinLock, teamLockMessage } from "@/lib/teams/teamLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,13 @@ export async function POST(request: Request, ctx: Ctx) {
       { error: "Your email is not on the sign-in allowlist for this app." },
       { status: 403 }
     );
+  }
+
+  // The plan's team limit (`teamLimitFor`): Starter joins none, Notebook one. Decline stays open, and
+  // the invite stays pending, so an upgrade (or leaving the team they are in) lets them accept it.
+  if (action === "accept") {
+    const lock = await teamJoinLock({ id: user.id, email: user.email ?? null });
+    if (lock) return NextResponse.json({ error: teamLockMessage(lock.includedIn) }, { status: 402 });
   }
 
   // One transaction so a membership can never exist alongside a still-pending invite.

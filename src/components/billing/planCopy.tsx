@@ -22,7 +22,8 @@ import {
  * taste and sits last; the Starter window is written in runs. Later the same day: lap time
  * analysis is a Tools bench, not the notebook, so the compare table gives it a row of its own.
  * It was Notebook's until 2026-09-24 and is Race Engineer's since (founder call), so both
- * cheaper cards list it crossed out and Race Engineer's lists it.
+ * cheaper cards list it crossed out and Race Engineer's lists it. Teams, same day: none on
+ * Starter, one on Notebook, any number on Race Engineer (`teamLimitFor` enforces it).
  */
 
 /** The window as a word, so the card reads as a sentence; digits if it ever moves off one. */
@@ -53,6 +54,7 @@ export const PLAN_BULLETS: Record<PaidTier, PlanBullet[]> = {
     { text: "Session review: pace, consistency, mistakes" },
     { text: "Compare runs and setups" },
     { text: "Laps from LiveRC and Speedhive" },
+    { text: "Teams", off: true },
     { text: "Laptime Analysis", off: true },
     { text: "The Engineer", off: true },
     { text: "Roll-centre and geometry", off: true },
@@ -64,6 +66,7 @@ export const PLAN_BULLETS: Record<PaidTier, PlanBullet[]> = {
     { text: "Session review: pace, consistency, mistakes" },
     { text: "Compare runs and setups" },
     { text: "Laps from LiveRC and Speedhive" },
+    { text: "One team" },
     {
       text: `A taste of the Engineer: ${
         STANDARD_ENGINEER_DAILY_QUESTIONS === 1
@@ -80,6 +83,7 @@ export const PLAN_BULLETS: Record<PaidTier, PlanBullet[]> = {
     { text: "A whole race weekend's questions in one day" },
     { text: "Laptime Analysis: any race, any driver" },
     { text: "Roll-centre and geometry tools" },
+    { text: "Any number of teams" },
     { text: "Remaining-this-month meter" },
   ],
 };
@@ -90,6 +94,7 @@ export const COMPARE_ROWS: Array<{ label: string } & Record<PaidTier, string>> =
   { label: "Run logging (LiveRC · Speedhive)", starter: "✓", standard: "✓", pro: "✓" },
   { label: "Session review", starter: "✓", standard: "✓", pro: "✓" },
   { label: "Compare runs & setups", starter: "✓", standard: "✓", pro: "✓" },
+  { label: "Teams", starter: "—", standard: "One", pro: "Any number" },
   { label: "Laptime Analysis · any race", starter: "—", standard: "—", pro: "✓" },
   {
     label: "The Engineer",
