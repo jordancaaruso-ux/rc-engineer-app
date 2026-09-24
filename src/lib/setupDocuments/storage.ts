@@ -4,7 +4,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { get, put } from "@vercel/blob";
+import { get, head, put } from "@vercel/blob";
+import { isAllowedSetupDocumentBlobUrl } from "@/lib/setupDocuments/blobStorageRef";
 
 /**
  * Local disk fallback (development only — no `BLOB_READ_WRITE_TOKEN`).
@@ -254,6 +255,26 @@ export async function readBytesFromStorageRef(ref: string): Promise<Buffer> {
     return Buffer.from(await res.arrayBuffer());
   }
   return readLocalUploadBytes(trimmed);
+}
+
+/**
+ * Size and content type of a setup sheet the browser uploaded straight to Blob, read from storage
+ * (`head`), never from the request. Null when the URL is not one of our uploads or storage can't
+ * find it. Check this BEFORE `readBytesFromStorageRef`, which reads the whole file into memory.
+ */
+export async function headSetupDocumentUpload(
+  url: string
+): Promise<{ size: number; contentType: string } | null> {
+  if (!isAllowedSetupDocumentBlobUrl(url)) return null;
+  try {
+    const meta = await head(url.trim(), { token: process.env.BLOB_READ_WRITE_TOKEN });
+    return {
+      size: meta.size,
+      contentType: (meta.contentType ?? "").split(";")[0]!.trim().toLowerCase(),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function storageRefIsReadable(ref: string): Promise<boolean> {

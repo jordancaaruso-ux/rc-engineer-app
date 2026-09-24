@@ -3,6 +3,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import {
+  headSetupDocumentUpload,
   sourceTypeFromMime,
   StorageConfigurationError,
   storeSetupDocumentFile,
@@ -11,7 +12,6 @@ import { SETUP_DOCUMENT_ALLOWED_MIME, SETUP_DOCUMENT_MAX_BYTES } from "@/lib/set
 import { SetupDocumentImportStages } from "@/lib/setupDocuments/importStages";
 import { resolveOwnedCarId } from "@/lib/cars/resolveOwnedCarId";
 import { canonicalSetupTemplateForUserCarId } from "@/lib/carSetupScope";
-import { isAllowedSetupDocumentBlobUrl } from "@/lib/setupDocuments/blobStorageRef";
 import { DRIVER_VISIBLE_SETUP_DOCUMENT_WHERE } from "@/lib/setupDocuments/driverVisibleDocuments";
 
 export async function GET(request: Request) {
@@ -79,11 +79,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing storagePath" }, { status: 400 });
     }
     preStoredPath = body.storagePath.trim();
-    if (!isAllowedSetupDocumentBlobUrl(preStoredPath)) {
+    // Size and type come from storage, before anything is downloaded (2026-09-24 launch audit).
+    const stored = await headSetupDocumentUpload(preStoredPath);
+    if (!stored) {
       return NextResponse.json({ error: "Invalid storagePath" }, { status: 400 });
     }
+    if (stored.size > SETUP_DOCUMENT_MAX_BYTES) {
+      return NextResponse.json({ error: "File too large (max 12 MB)" }, { status: 400 });
+    }
     originalFilename = body.originalFilename?.trim() || "upload";
-    mimeType = (body.mimeType || "").toLowerCase();
+    mimeType = stored.contentType;
     carIdRaw = body.carId ?? null;
     setupSheetModelIdRaw = body.setupSheetModelId ?? null;
   } else if (ct.includes("multipart/form-data")) {

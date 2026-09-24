@@ -25,8 +25,7 @@ import {
 } from "@/lib/setupCalibrations/fingerprintPick";
 import { processSetupDocumentImport } from "@/lib/setupDocuments/processImport";
 import { tryCreateSetupFromParsedDocument } from "@/lib/setupDocuments/tryCreateSetupFromParsedDocument";
-import { isAllowedSetupDocumentBlobUrl } from "@/lib/setupDocuments/blobStorageRef";
-import { readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
+import { headSetupDocumentUpload, readBytesFromStorageRef } from "@/lib/setupDocuments/storage";
 import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 import {
   extractPdfFormFields,
@@ -143,11 +142,16 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: "Missing storagePath" }, { status: 400 });
     }
     preStoredPath = body.storagePath.trim();
-    if (!isAllowedSetupDocumentBlobUrl(preStoredPath)) {
+    // Size and type come from storage, before anything is downloaded (2026-09-24 launch audit).
+    const stored = await headSetupDocumentUpload(preStoredPath);
+    if (!stored) {
       return NextResponse.json({ error: "Invalid storagePath" }, { status: 400 });
     }
+    if (stored.size > SETUP_DOCUMENT_MAX_BYTES) {
+      return NextResponse.json({ error: "File too large (max 12 MB)" }, { status: 400 });
+    }
     originalFilename = body.originalFilename?.trim() || "upload";
-    mimeType = (body.mimeType || "").toLowerCase();
+    mimeType = stored.contentType;
     explicitCarIdRaw = typeof body.carId === "string" ? body.carId : null;
     explicitModelIdRaw = typeof body.setupSheetModelId === "string" ? body.setupSheetModelId : null;
     blockOnModelMismatch = body.blockOnModelMismatch === true;

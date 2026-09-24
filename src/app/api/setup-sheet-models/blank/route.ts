@@ -6,7 +6,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { isDisciplineValue, isKnownDisciplineClass } from "@/lib/cars/carClasses";
 import { normalizeSetupSheetModelName } from "@/lib/setupSheetModels/normalizeModelName";
-import { StorageConfigurationError } from "@/lib/setupDocuments/storage";
+import { headSetupDocumentUpload, StorageConfigurationError } from "@/lib/setupDocuments/storage";
 import { recordChassisTypeRequest } from "@/lib/setupSheetModels/chassisTypeRequests";
 import {
   createModelFromBlank,
@@ -61,12 +61,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!storagePath) {
       return NextResponse.json({ error: "storagePath is required." }, { status: 400 });
     }
+    // This file becomes the blank every driver on the chassis is drawn from, so it must be one of
+    // our own uploads, and its size and type come from storage, not the request (2026-09-24 audit).
+    const stored = await headSetupDocumentUpload(storagePath);
+    if (!stored) {
+      return NextResponse.json({ error: "We couldn't find that upload. Try again." }, { status: 400 });
+    }
     upload = {
       kind: "stored",
       storagePath,
       originalFilename: typeof body.originalFilename === "string" ? body.originalFilename : "blank.pdf",
-      mimeType: typeof body.mimeType === "string" ? body.mimeType : "application/pdf",
-      byteSize: typeof body.byteSize === "number" ? body.byteSize : 1,
+      mimeType: stored.contentType,
+      byteSize: stored.size,
     };
   } else {
     let form: FormData;
