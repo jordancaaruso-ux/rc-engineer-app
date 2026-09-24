@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-RC car race-engineering app for competitive 1/10-scale radio-control racing: log every on-track run,
+RC car race-engineering app for competitive radio-control racing at any scale: log every on-track run,
 import lap times from public timing sites, read setup sheets out of manufacturer PDFs, and ask an
 LLM "Engineer" what to change next. Next.js 16 App Router + React 19 + Prisma/Postgres (Neon),
 deployed on Vercel (`syd1`), also shipped as a PWA and iOS/Android Capacitor shells. Solo-founder
