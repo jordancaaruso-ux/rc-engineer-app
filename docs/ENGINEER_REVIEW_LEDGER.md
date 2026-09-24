@@ -551,6 +551,29 @@ engineer rather than one instant suggestion." His calls on it: the first answer 
 behind more options"; the Engineer picks two to three buttons per answer. The spec's "no choice chips"
 line (the July tap-answers to the Engineer's own question) needs amending if it ships.
 
+Then, after the mockup: "I think this is the direction we need to work on… this is sort of the only way
+that we can really push the engineer to the next level because right now… there's too many variables that
+he has to think about when answering so if we give like a pretty quick single safe change, still some
+things that are a little interesting but then say you know what are some other options I could try, what
+about this". Review page of the 27 round-07/08 questions with buttons:
+https://claude.ai/artifact/44vcQdBX9a16URLhVteBZG (db `buttons/<id>`).
+
+### 2026-09-24 night — his review of the button page, card 1 (j-01, Jayden's 1/8 buggy)
+
+- "On power generally means exit, so this one lots of understeer mid corner, on power lack steering. Like
+  that means on the exit of the corner, on power it lacks steering, and I have lots of understeer mid
+  corner." → 11 of 12 earlier Sol replies read it as the middle on the throttle. bite-hold.md already
+  says "on power" is exiting; its fact 3 ("Entering and the middle can be either") gave the other
+  reading. **Knowledge edit proposed, his yes owed** (locked page): after "…are exiting", "(founder,
+  2026-09-24: "on power generally means exit"). A message that also names another place is two
+  problems, that place and exiting, not that place on the throttle." Trialled: 6 of 6 replies treat the
+  exit as its own problem; 3 of 6 bring the thicker rear diff in for it.
+- "He needs to stop saying the steps in my notes are for touring cars, so I wouldn't apply them to your
+  buggy. Don't… Just don't say that. Say, one step or whatever." → the non-touring fact line in
+  driverData.ts was being read out (14 of 21 earlier replies to j-01/j-02). **Landed**, prompt label
+  `2026-09-24-steps-not-touring`: one sentence, moves in steps and nothing about where the sizes come
+  from. Trialled: 0 of 12.
+
 ## Fixes landed from this batch
 
 - **2026-09-09, from cards 3–4 (30 edits, 21 files; nets:check 37/37, tsc, 4 suites green):**

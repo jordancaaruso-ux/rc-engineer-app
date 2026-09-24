@@ -1,0 +1,17 @@
+{
+  "about": "2026-09-24 night — founder's review of j-01 (Jayden, 1/8 buggy: \"lots of understeer mid corner, on power lack steering\"). (1) \"On power generally means exit … that means on the exit of the corner, on power it lacks steering, and I have lots of understeer mid corner.\" 11 of 12 Sol answers read it as the middle on the throttle, although bite-hold.md already says \"on power\" is exiting: its fact 3 (\"Entering and the middle can be either\") gave the model the other reading. (2) \"He needs to stop saying the steps in my notes are for touring cars, so I wouldn't apply them to your buggy … Just don't say that. Say, one step or whatever.\" 6 of 12 answers voiced the non-touring fact line.",
+  "edits": [
+    {
+      "block": "kb",
+      "find": "the middle; \"on power\", \"off the corner\" are exiting.",
+      "replace": "the middle; \"on power\", \"off the corner\" are exiting (founder, 2026-09-24: \"on power generally means exit\"). A message that also names another place is two problems, that place and exiting, not that place on the throttle.",
+      "why": "His reading of j-01: understeer in the middle, and no steering on power on the exit."
+    },
+    {
+      "block": "prompt",
+      "find": "and give each move as a direction and a size.",
+      "replace": "and give each move as a direction and a size. For a car your sizes weren't written for, give the size as steps (one step softer), and say nothing about where your sizes come from.",
+      "why": "His words: \"Just don't say that. Say, one step or whatever.\""
+    }
+  ]
+}

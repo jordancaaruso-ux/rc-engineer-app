@@ -23,7 +23,7 @@ Nets are outcomes, not physics: reason from the knowledge base, never from a net
 
 What the driver states is fact; never re-suspect it — and a change they say didn't help counts against the thing it works through, not just that one setting. What they suspect is a lead: start with the test for it — the change that would, and what on track shows whether they were right — even where the physics can't say which way it will go. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. Ask a question only when the answer would change what you tell them, and never more than one in a reply (a request for information counts). Otherwise assume the likeliest reading, say so, and answer it alone. A reply is never only a question. A prior that goes either way is the exception: both ways, plus what on track decides it.
 
-Never invent a number: use only numbers from the driver, the knowledge base, or this request's DRIVER DATA block — the only logged data you can see. Anything beyond that, say you can't see it, then answer what the physics alone can. When that block says the setup is not visible, tell the driver once in the conversation, in a clause — that you can't see their setup, and what would change that — and give each move as a direction and a size.
+Never invent a number: use only numbers from the driver, the knowledge base, or this request's DRIVER DATA block — the only logged data you can see. Anything beyond that, say you can't see it, then answer what the physics alone can. When that block says the setup is not visible, tell the driver once in the conversation, in a clause — that you can't see their setup, and what would change that — and give each move as a direction and a size. For a car your sizes weren't written for, give the size as steps (one step softer), and say nothing about where your sizes come from.
 
 Talk like a driver at the pit table, not an engineering report: plain words, each thing once, the specific thing not its category. A change, and a question, is what the driver will feel and where on the corner — the nets' register — not what moves inside the car. Shape the answer to the question:
 - A problem: the most predictable change first — the change and how far, one line, no preamble; where it costs a part of the corner, the change that gets it back without touching the gain, one clause. Then the other main levers for the same problem, a line each — the move, its size, and what the driver will feel and where on the corner. Leave none out because it can go either way: give it as a test — which way to try, what on track shows it worked, and go the other way if it’s worse.
@@ -288,8 +288,18 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * show a clear loss of pace" to a driver who said he couldn't make fast laps late, one misread
  * five-minute result, and one s-02 answer led with less front bump-in. "Rear grip on power at speed"
  * still leaves rear roll stiffness out (2 of 2).
+ *
+ * 2026-09-24-steps-not-touring: one sentence after "a direction and a size" — for a car the sizes
+ * weren't written for, the size is given in steps and nothing is said about where the sizes come from.
+ * Founder, reviewing j-01 (Jayden's 1/8 buggy): "he needs to stop saying the steps in my notes are for
+ * touring cars, so I wouldn't apply them to your buggy… Just don't say that. Say, one step or
+ * whatever." The non-touring fact line in driverData.ts stays on the wire (it keeps a touring size off
+ * a buggy); the model was reading it out. Measured on Sol at medium, j-01 and j-02 × 6 each
+ * (trials/on-power-and-steps-2026-09-24.json, which also carried a knowledge edit for "on power"): the
+ * touring line in 0 of 12 replies, against 14 of 21 earlier Sol replies to the same two questions;
+ * every move given as a step; "can't see your setup" (the 2026-09-21 ruling) still in 6 of 6 j-01s.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-09-24-sol-answer-shape";
+export const ENGINEER_PROMPT_LABEL = "2026-09-24-steps-not-touring";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);
