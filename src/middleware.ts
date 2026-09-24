@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import authConfig from "@/auth.config";
 import { DEMO_READ_ONLY_MESSAGE, decideDemoRequest } from "@/lib/demo/demoAccess";
+import { isNativeShellUserAgent } from "@/lib/nativeShell";
 
 const { auth } = NextAuth(authConfig);
 
@@ -88,6 +89,12 @@ export default auth((req) => {
     if (req.auth) {
       return NextResponse.redirect(new URL("/", req.url));
     }
+    // Never inside the iPhone/Android app: the pitch carries plan prices and Join buttons, and an
+    // app may not point at a subscription sold on the web — the rule /join and /billing already
+    // follow in the shell. The app's front door is the sign-in form.
+    if (isNativeShellUserAgent(req.headers.get("user-agent"))) {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
     return NextResponse.next();
   }
   // Demo entry (the page redirects to /api/auth/demo, which is matcher-exempt).
@@ -121,10 +128,12 @@ export default auth((req) => {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    // A stranger hitting the front door gets the pitch, not a sign-in form. Deep links keep
-    // going to /login so an existing user's bookmark works after their session expires.
+    // A stranger hitting the front door gets the pitch, not a sign-in form — except inside the
+    // app, which never shows the pitch (see /welcome above). Deep links keep going to /login so
+    // an existing user's bookmark works after their session expires.
     if (pathname === "/") {
-      return NextResponse.redirect(new URL("/welcome", req.url));
+      const door = isNativeShellUserAgent(req.headers.get("user-agent")) ? "/login" : "/welcome";
+      return NextResponse.redirect(new URL(door, req.url));
     }
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("from", pathname);

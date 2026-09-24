@@ -44,12 +44,15 @@ archive for TestFlight.
 
 ### Owed before submitting for review (found 2026-09-23)
 
-- **Google sign-in inside the shell.** Offering Google means Apple requires Sign in with Apple too, and
-  Google refuses sign-in from an embedded web view anyway. Hide the button when the request is the
-  shell (`isNativeShellRequest`); email + code stays.
-- **Signed out, the shell lands on `/welcome`**, the pitch page, with plan prices and Join buttons.
-  `/join` and `/billing` already hide prices in the shell; `/welcome` does not. Send the shell to
-  `/login` instead.
+- ~~Google sign-in inside the shell~~ **built 2026-09-24** (live once main deploys). Offering Google
+  means Apple requires Sign in with Apple too, and it can't finish in the app anyway: Google hands off
+  to Safari, which comes back without the app's PKCE cookie (Auth.js `InvalidCheck`, seen on the
+  first device build). `/api/auth/config-hint` reports Google off in the shell, so the form is email
+  + code only and drops "Back to home".
+- ~~Signed out, the shell lands on `/welcome`~~ **built 2026-09-24** (live once main deploys). The
+  pitch carries plan prices and Join buttons; `middleware.ts` now sends the shell's `/` and
+  `/welcome` to `/login`. Every other price path in the app goes through `/join` or `/billing`,
+  which already hide prices in the shell.
 - **A sign-in for Apple's reviewer** that needs no inbox, on an account that already has a plan (the
   app sells nothing, so the reviewer can't buy one).
 - **Screenshots** at the largest iPhone size App Store Connect asks for.

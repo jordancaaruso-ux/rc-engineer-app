@@ -57,6 +57,7 @@ function LoginForm() {
   const [openSignup, setOpenSignup] = useState(false);
   const [smtpConfigured, setSmtpConfigured] = useState(true);
   const [configLoaded, setConfigLoaded] = useState(false);
+  const [inApp, setInApp] = useState(false);
 
   const from = searchParams.get("from") || "/";
   const callbackUrl = from.startsWith("/") ? from : "/";
@@ -88,10 +89,12 @@ function LoginForm() {
           googleOAuthConfigured?: boolean;
           smtpConfigured?: boolean;
           openSignup?: boolean;
+          nativeShell?: boolean;
         };
         if (cancelled) return;
         if (hint.googleOAuthConfigured === true) setGoogleOAuthConfigured(true);
         if (hint.openSignup === true) setOpenSignup(true);
+        if (hint.nativeShell === true) setInApp(true);
         setSmtpConfigured(hint.smtpConfigured === true);
       } catch {
         /* ignore */
@@ -277,17 +280,19 @@ function LoginForm() {
           </p>
         </div>
 
-        <p
-          className="rc-reveal mt-7 text-center"
-          style={{ "--rc-delay": "270ms" } as CSSProperties}
-        >
-          <Link
-            href="/"
-            className="type-data-label underline-offset-4 transition-colors hover:text-muted-foreground hover:underline"
+        {configLoaded && !inApp ? (
+          <p
+            className="rc-reveal mt-7 text-center"
+            style={{ "--rc-delay": "270ms" } as CSSProperties}
           >
-            ← Back to home
-          </Link>
-        </p>
+            <Link
+              href="/"
+              className="type-data-label underline-offset-4 transition-colors hover:text-muted-foreground hover:underline"
+            >
+              ← Back to home
+            </Link>
+          </p>
+        ) : null}
       </div>
     </div>
   );
