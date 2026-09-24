@@ -70,6 +70,13 @@ import Link from "next/link";
 
 const ROLL_MAX_DEG = 3;
 
+/**
+ * Half-width of the bump slider's rest detent, in screen pixels. Pixels rather than millimetres
+ * because it is a feel: the same finger-width catch on a phone as on a desktop, where the
+ * slider is three times longer.
+ */
+const BUMP_DETENT_PX = 8;
+
 /** Square reset button sitting against each pose slider. */
 const POSE_ICON_BUTTON =
   "tap-active grid size-5 shrink-0 place-items-center rounded border border-border text-muted-foreground transition hover:border-primary-ink/40 hover:text-foreground disabled:pointer-events-none disabled:opacity-30";
@@ -453,6 +460,8 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
    * stays 2mm of squat, and the absolute readout re-reads itself.
    */
   const [bumpMm, setBumpMm] = useState(0);
+  /** Set by a key press on the bump slider: arrow-key steps skip the rest detent. */
+  const bumpKeyNudge = useRef(false);
   const [copied, setCopied] = useState(false);
   /** Sliders or the setup's own sheet. Sliders is the default — see the toggle's note below. */
   const [inputMode, setInputMode] = useState<"sliders" | "sheet">("sliders");
@@ -1456,16 +1465,40 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
 
         <div className="flex items-center gap-2">
           <span className="type-data-label w-[2.5rem] shrink-0">Bump</span>
-          <input
-            type="range"
-            min={0}
-            max={2 * staticRh}
-            step={0.1}
-            value={staticRh + bumpMm}
-            onChange={(e) => setBumpMm(Number(e.target.value) - staticRh)}
-            aria-label="Chassis bump — ride height in millimetres"
-            className="min-w-0 flex-1 accent-primary"
-          />
+          {/*
+           * Rest sits dead centre of the travel (0 to twice static), so a mark at 50% is exactly
+           * where the thumb lands at rest, and a drag that comes within BUMP_DETENT_PX of it snaps
+           * there. Arrow keys skip the snap, or a step off rest would snap straight back.
+           */}
+          <div className="relative flex min-w-0 flex-1 items-center">
+            <span
+              aria-hidden
+              className="pointer-events-none absolute left-1/2 top-1/2 h-5 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground/70"
+            />
+            <input
+              type="range"
+              min={0}
+              max={2 * staticRh}
+              step={0.1}
+              value={staticRh + bumpMm}
+              onKeyDown={() => {
+                bumpKeyNudge.current = true;
+              }}
+              onPointerDown={() => {
+                bumpKeyNudge.current = false;
+              }}
+              onChange={(e) => {
+                const next = Number(e.target.value) - staticRh;
+                const keyed = bumpKeyNudge.current;
+                bumpKeyNudge.current = false;
+                const width = e.currentTarget.getBoundingClientRect().width;
+                const detentMm = width > 0 ? (BUMP_DETENT_PX / width) * 2 * staticRh : 0;
+                setBumpMm(!keyed && Math.abs(next) <= detentMm ? 0 : next);
+              }}
+              aria-label="Chassis bump — ride height in millimetres"
+              className="relative w-full accent-primary"
+            />
+          </div>
           <button
             type="button"
             disabled={bumpAtRest}
