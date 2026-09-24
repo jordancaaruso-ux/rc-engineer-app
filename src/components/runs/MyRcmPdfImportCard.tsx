@@ -134,7 +134,7 @@ export function MyRcmPdfImportCard({
   onImported,
   selectedDriverIdFor,
   onPickDriver,
-  closedImportClassName,
+  alwaysOpen,
   className,
 }: {
   /** The MyRCM page the driver pasted into the URL box, when that is how we got here. */
@@ -166,10 +166,11 @@ export function MyRcmPdfImportCard({
   /** The driver tapped their own row in the list. */
   onPickDriver?: (importedSessionId: string, driverId: string) => void;
   /**
-   * The closed row's "Import", drawn as this button instead of the quiet "Import ›" — the lap
-   * analysis page matches it to its link box's own Import (founder call, 2026-09-24).
+   * Drawn open from the start, with no "Not on MyRCM" to fold it back into a row — the lap
+   * analysis page (founder call, 2026-09-24). Folded, the row carried the same yellow Import as the
+   * link box above it, and the two read as one box twice; open, it is plainly the file door.
    */
-  closedImportClassName?: string;
+  alwaysOpen?: boolean;
   className?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -191,7 +192,7 @@ export function MyRcmPdfImportCard({
     if (pastedUrl || openUrl?.trim()) setExpanded(true);
   }, [pastedUrl, openUrl]);
 
-  const isOpen = expanded || phase.kind !== "idle";
+  const isOpen = alwaysOpen || expanded || phase.kind !== "idle";
   const leadsWithFile = hasImported || phase.kind === "landed";
   const target = openUrl?.trim() || MYRCM_HOME_URL;
   /**
@@ -320,14 +321,10 @@ export function MyRcmPdfImportCard({
           <span className="min-w-0 flex-1 text-[12px] leading-snug text-muted-foreground">
             Raced on MyRCM? Import your result.
           </span>
-          {closedImportClassName ? (
-            <span className={closedImportClassName}>Import</span>
-          ) : (
-            <span className="inline-flex shrink-0 items-center gap-0.5 text-[12px] font-semibold text-foreground">
-              Import
-              <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-            </span>
-          )}
+          <span className="inline-flex shrink-0 items-center gap-0.5 text-[12px] font-semibold text-foreground">
+            Import
+            <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+          </span>
         </button>
       ) : phase.kind === "reading" ? (
         <div className="space-y-2">
@@ -475,7 +472,7 @@ export function MyRcmPdfImportCard({
                 {featured ? "Change class page" : "Save your class page"}
               </button>
             ) : null}
-            {!pastedUrl && !hasImported && !leadsWithFile && !featured ? (
+            {!alwaysOpen && !pastedUrl && !hasImported && !leadsWithFile && !featured ? (
               <button type="button" className={TEXT_LINK} onClick={() => setExpanded(false)}>
                 Not on MyRCM
               </button>

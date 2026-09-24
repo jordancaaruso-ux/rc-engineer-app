@@ -38,8 +38,9 @@ const SCOPE_LABEL: Record<Scope, string> = { mine: "My runs", others: "Other dri
 const PAGE_SIZE = 20;
 
 /**
- * The page's one Import button, on the link box and on the MyRCM row alike (founder call,
- * 2026-09-24: the two should look identical). As tall as the link box beside it.
+ * The link box's Import button, as tall as the box beside it. The MyRCM card below used to fold
+ * into a row carrying this same button, and the two read as one box twice; it now stays open with
+ * its own two doors (founder call, later 2026-09-24).
  */
 const IMPORT_BUTTON =
   "tap-active shrink-0 rounded-md border border-transparent primary-face bg-primary px-3.5 py-2 text-[13px] font-semibold leading-5 text-primary-foreground transition hover:brightness-105 disabled:opacity-50";
@@ -343,7 +344,7 @@ export function LapAnalysisLibrary({
           pastedUrl={null}
           openUrl={null}
           hasImported={false}
-          closedImportClassName={IMPORT_BUTTON}
+          alwaysOpen
           onImported={(res) => {
             void loadSessions();
             router.push(`/laps/analysis?session=${encodeURIComponent(res.importedSessionId)}`);

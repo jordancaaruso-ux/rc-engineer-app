@@ -31,8 +31,6 @@ import {
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { pickFeaturedEvent, todayBoundsInTimeZone } from "@/lib/eventActive";
 import { calendarYmdInTimeZone, formatFeaturedEventDateLabel, RUN_DATETIME_LOCALE } from "@/lib/formatDate";
-// NOTE: `syncRecentEventLapSources` is deliberately NOT imported at module scope —
-// see the dynamic import at its call site below.
 import { loadUserScopedEvents, userCanAccessEvent } from "@/lib/events/eventParticipation";
 import {
   loadResumableDrafts,
@@ -652,27 +650,14 @@ export async function loadDashboardHomeModel(
   // needs every run — a PB is forever). At current scale this is fine; if it
   // gets heavy, materialize a per-run race-pace column + a records rollup.
 
-  // Fire-and-forget: LiveRC fetches + Prisma writes; can take 1–2s. Dashboard no
-  // longer shows detected-session prompts, but background sync keeps event lap
-  // sources fresh for next features / pages.
   /*
-   * Imported lazily, not at module scope.
-   *
-   * This pulls the LiveRC scraping stack — cheerio, the parser registry, the HTML
-   * extractors — which measured at 42 of the 147 modules on the dashboard's server
-   * path, roughly a third of it, plus cheerio's own dependency tree. Every cold lambda
-   * was parsing an HTML scraper before it could render the dashboard, and cold requests
-   * measured p50 270ms / p95 5.2s against 27ms / 376ms warm.
-   *
-   * Nothing here is awaited — it is background freshness for lap sources — so deferring
-   * the import costs the response nothing and takes the whole subtree off the boot path.
+   * No background timing-site read on open (founder call, 2026-09-24). This used to fire
+   * `syncRecentEventLapSources` here, unawaited, to feed a "we found a run" prompt the
+   * Dashboard stopped showing in May. After that it only pre-filled the lap time analysis
+   * list, at the price of re-reading LiveRC on every open — the traffic that gets a timing
+   * site to block the app's servers, and then lap import stops for everyone. Laps arrive when
+   * the driver logs a run, taps Import runs, or pastes a link.
    */
-  void (async () => {
-    const { syncRecentEventLapSources } = await import(
-      "@/lib/eventLapDetection/syncEventLapSources"
-    );
-    await syncRecentEventLapSources(userId);
-  })().catch(() => {});
 
   const actionItemSelect = {
     id: true,

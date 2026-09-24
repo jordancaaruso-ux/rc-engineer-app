@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { BandHeader } from "@/components/ui/BandHeader";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 import { SessionDeletedUndo } from "@/components/laps/SessionDeletedUndo";
 import type { ToolsLapSession } from "@/lib/tools/toolsModel";
 
@@ -48,7 +49,7 @@ export function LapImportBench({
     <CardPanel className="h-full" contentClassName="flex h-full flex-col p-0">
       {/* "Laptime Analysis", not "Lap times" (founder call, 2026-08-27): the band is named for
           what it opens onto, the same way "Geometry Lab" is, not for the rows it lists. */}
-      <BandHeader label="Laptime Analysis" addHref="/laps/analysis" addLabel="Upload a session" />
+      <BandHeader label="Laptime Analysis" />
 
       {sessions.length === 0 ? (
         <p className="flex-1 px-4 py-3 text-[13px] text-muted-foreground">
@@ -90,15 +91,12 @@ export function LapImportBench({
         </div>
       )}
 
-      <Link
-        href="/laps/analysis"
-        className="tap-active mt-auto flex items-center justify-between gap-3 border-t border-border/60 px-4 py-2.5 transition hover:bg-muted/40"
-      >
-        <span className="type-timestamp">
-          {remaining > 0 ? `${remaining} more · upload one` : "Upload a session"}
-        </span>
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-      </Link>
+      {/* The door is a yellow button in the foot, the Geometry Lab's pattern beside it (founder
+          call, 2026-09-24): a "+" in the header and a grey "upload one" line were too quiet to find. */}
+      <div className="mt-auto flex items-center justify-end gap-2 border-t border-border bg-muted/40 px-4 py-2.5">
+        {remaining > 0 ? <span className="type-timestamp mr-auto">{remaining} more</span> : null}
+        <ButtonLink href="/laps/analysis">Open lap time analysis</ButtonLink>
+      </div>
 
       {/* The Undo for a session just deleted on its own page, which sent the driver back here. */}
       <SessionDeletedUndo />

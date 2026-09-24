@@ -125,6 +125,9 @@ const lastSyncAtByUser = new Map<string, number>();
  * Import new LiveRC sessions for events that configure practice/results URLs.
  * Scoped to calendar-active events ONLY.
  *
+ * NOT CALLED since 2026-09-24: the Dashboard's background read was switched off by founder call
+ * (see `dashboardServer.ts`). Kept, not wired, until something deliberately needs it again.
+ *
  * It used to fall back to "the single most recent event" when nothing was on today, so every
  * dashboard open re-read LiveRC for a meeting weeks gone: 40–80 page reads each time, per driver,
  * nothing shared between them. At launch scale that is exactly the traffic that gets a timing site
