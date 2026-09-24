@@ -120,9 +120,12 @@ async function exportUsesTheSheetsFace() {
   assert.ok(normal instanceof PDFRawStream, "the value was not drawn into the file at all");
   const stream = Buffer.from(decodePDFRawStream(normal).decode()).toString("latin1");
 
-  // pdf-lib writes the text as a hex string: `<31322E35> Tj` is "12.5".
-  assert.match(stream, /<31322E35>\s*Tj/, "the value is not in the drawn appearance");
-  assert.match(stream, /Oblique/, "an italic sheet must bake an italic face, not upright Helvetica");
+  // The value is written as a hex string: `<31322E35> Tj` is "12.5". Hex digits are case-free in a
+  // PDF, and the sheet-face writer (2026-09-19) emits lowercase, so match either.
+  assert.match(stream, /<31322E35>\s*Tj/i, "the value is not in the drawn appearance");
+  // Either a baked standard italic (Helvetica-Oblique) or the sheet's own italic from its form
+  // resources (`/Verdana,Italic` on this blank — what the export draws today, checked rendered).
+  assert.match(stream, /Oblique|Italic/, "an italic sheet must draw an italic face, not upright Helvetica");
   assert.match(stream, /1 0 0 rg/, "the sheet's own colour must survive into the drawing");
   console.log("  A800RR export: Verdana Italic → Helvetica-Oblique, red kept");
 }
