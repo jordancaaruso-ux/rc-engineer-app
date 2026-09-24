@@ -590,6 +590,11 @@ https://claude.ai/artifact/44vcQdBX9a16URLhVteBZG (db `buttons/<id>`).
   because the Engineer put "How do I keep the turn-in?" on a button instead. **Proposed, his yes owed:**
   in the button build the first answer names the cost and a button carries the fixes; "the usual second
   half" comes off corner-regime.md (a frequency the mechanism doesn't give).
+- His answer: "Yes." → **Landed** on corner-regime.md: the whole sentence "Damping is the lever that gives
+  timing and takes nothing once the car has settled ([[bite-hold]]), which is why it is the usual second
+  half." went (damping's timing has its home on bite-hold.md; the pair paragraph names no lever now). The
+  paired-change slot comes out of the first answer in the button build, where a button carries the
+  fixes; until then the live prompt keeps it, and the 2026-09-09 ruling moves when the build lands.
 
 ## Fixes landed from this batch
 

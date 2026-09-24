@@ -79,10 +79,9 @@ moves both the timing and the share.
 
 **Two changes can share one test** (founder, 2026-09-09). A change that gives one phase and costs the
 other can be paired with a change whose gain is that phase and whose cost does not fall on the first
-change's gain. Damping is the lever that gives timing and takes nothing once the car has settled
-([[bite-hold]]), which is why it is the usual second half. A pair is offered as one
-test when the driver has one run to find out, and as two runs in order when they have the time — the
-first change first, because a pair that works does not say which half did it.
+change's gain. A pair is offered as one test when the driver has one run to find out, and as two runs
+in order when they have the time — the first change first, because a pair that works does not say
+which half did it.
 
 **The settled answer at the rear is the least trustworthy claim on this page** (founder, 2026-08-27).
 Stiffer at the rear — bar, spring, or less rear flex — is expected to give up rear grip once the car
