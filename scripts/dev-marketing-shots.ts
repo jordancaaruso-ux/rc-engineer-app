@@ -3,6 +3,7 @@
  *
  *   npm run shots:marketing                       # phone (iPhone 15 Pro, 3x) + desktop (1440, 2x)
  *   npm run shots:marketing -- --only=phone       # or --only=desktop
+ *   npm run shots:marketing -- --only=appstore    # the App Store's iPhone + iPad sizes, as the app
  *   npm run shots:marketing -- --pick=dashboard,engineer
  *
  * Why this exists: the pitch page's screenshots were 640px JPEGs of the old dark theme, taken by
@@ -19,7 +20,7 @@
  * page for phone screens where the fold matters.
  */
 import { mkdirSync } from "node:fs";
-import { chromium, type BrowserContext, type Page } from "@playwright/test";
+import { chromium, type BrowserContext, type BrowserContextOptions, type Page } from "@playwright/test";
 import { prisma } from "@/lib/prisma";
 import { demoCatalogUserId } from "@/lib/demo/demoAccess";
 
@@ -30,9 +31,35 @@ const argValue = (name: string) =>
 const BASE = (process.env.SHOTS_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const EMAIL = argValue("email") ?? "demo@jrcdynamics.com";
 const TIME_ZONE = "Australia/Melbourne";
-const ONLY = argValue("only"); // phone | desktop
+const ONLY = argValue("only"); // phone | desktop | appstore
 const PICK = argValue("pick")?.split(",").map((s) => s.trim()).filter(Boolean);
 const OUT = "marketing-shots";
+
+type Kind = "phone" | "desktop" | "appstore-iphone" | "appstore-ipad";
+
+/**
+ * The App Store's two required screenshot sizes (checked 2026-09-24): 6.9-inch iPhone 1320×2868
+ * and 13-inch iPad 2064×2752. Each capture is the screen minus the status bar, which
+ * `shots:stage -- --only=appstore` draws back on top. The user agent is the app's own, `JRCShell/1`
+ * appended, so the screens are the ones the app shows; an iPad's web view calls itself a Mac.
+ */
+const WEBKIT = "AppleWebKit/605.1.15 (KHTML, like Gecko)";
+const CONTEXTS: Record<Kind, BrowserContextOptions> = {
+  // iPhone 15 Pro is 393×852; the stage script adds the 59pt status-bar band on top, so the app
+  // gets the 793 below it — the composite comes out at exactly the device's 1179×2556.
+  phone: { viewport: { width: 393, height: 793 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, timezoneId: TIME_ZONE },
+  desktop: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, timezoneId: TIME_ZONE },
+  // 440×956pt with a 62pt status bar.
+  "appstore-iphone": {
+    viewport: { width: 440, height: 894 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, timezoneId: TIME_ZONE,
+    userAgent: `Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) ${WEBKIT} Mobile/15E148 JRCShell/1`,
+  },
+  // 1032×1376pt with a 24pt status bar.
+  "appstore-ipad": {
+    viewport: { width: 1032, height: 1352 }, deviceScaleFactor: 2, hasTouch: true, timezoneId: TIME_ZONE,
+    userAgent: `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ${WEBKIT} JRCShell/1`,
+  },
+};
 
 /** Everything a viewer should never see in a marketing shot. */
 const HIDE_CSS = `
@@ -272,15 +299,9 @@ async function signIn(ctx: BrowserContext) {
   return page;
 }
 
-async function shoot(kind: "phone" | "desktop", shots: Array<Shot & { index: number }>) {
+async function shoot(kind: Kind, shots: Array<Shot & { index: number }>) {
   const browser = await chromium.launch();
-  const ctx = await browser.newContext(
-    kind === "phone"
-      // iPhone 15 Pro is 393×852; the stage script adds the 59pt status-bar band on top, so the app
-      // gets the 793 below it — the composite comes out at exactly the device's 1179×2556.
-      ? { viewport: { width: 393, height: 793 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, timezoneId: TIME_ZONE }
-      : { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, timezoneId: TIME_ZONE },
-  );
+  const ctx = await browser.newContext(CONTEXTS[kind]);
   const page = await signIn(ctx);
   const dir = `${OUT}/${kind}`;
   mkdirSync(dir, { recursive: true });
@@ -310,8 +331,8 @@ async function main() {
   const all = (await shotList()).map((s, i) => ({ ...s, index: i + 1 }));
   const shots = PICK ? all.filter((s) => PICK.includes(s.name)) : all;
   console.log(`${shots.length} screens as ${EMAIL} on ${BASE}`);
-  if (ONLY !== "desktop") { console.log("phone:"); await shoot("phone", shots); }
-  if (ONLY !== "phone") { console.log("desktop:"); await shoot("desktop", shots); }
+  const kinds: Kind[] = ONLY === "appstore" ? ["appstore-iphone", "appstore-ipad"] : ONLY === "phone" ? ["phone"] : ONLY === "desktop" ? ["desktop"] : ["phone", "desktop"];
+  for (const kind of kinds) { console.log(`${kind}:`); await shoot(kind, shots); }
 }
 
 main()

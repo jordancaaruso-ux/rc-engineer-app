@@ -3,6 +3,7 @@
  *
  *   npm run shots:stage                 # everything under marketing-shots/{phone,desktop}
  *   npm run shots:stage -- --only=hero  # just the staged hero composites
+ *   npm run shots:stage -- --only=appstore  # marketing-shots/appstore/{iphone,ipad}, upload-ready
  *
  * Takes what `dev-marketing-shots.ts` photographed and produces three kinds of file:
  *
@@ -28,11 +29,12 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { chromium, type Page } from "@playwright/test";
+import sharp from "sharp";
 
 const args = process.argv.slice(2);
 const argValue = (name: string) =>
   args.find((a) => a.startsWith(`--${name}=`))?.split("=").slice(1).join("=");
-const ONLY = argValue("only"); // phone | desktop | hero
+const ONLY = argValue("only"); // phone | desktop | hero | appstore
 
 const IN = "marketing-shots";
 const OUT_FRAMED = `${IN}/framed`;
@@ -91,6 +93,44 @@ function statusBarSvg(width: number, height: number, ink: string): string {
       <path d="M26.5 4.3v4.4a2.4 2.4 0 0 0 0-4.4z" fill="${ink}" fill-opacity="0.4"/>
     </g>
   </svg>`;
+}
+
+/** iPadOS status bar: time and date on the left, wifi and battery on the right. */
+function ipadStatusBarSvg(width: number, height: number, ink: string): string {
+  return `
+  <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="position:absolute;inset:0">
+    <text x="20" y="17" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', Inter, system-ui, sans-serif" font-size="12.5" fill="${ink}"><tspan font-weight="600">9:41</tspan><tspan dx="6" font-weight="500">Thu 1 Oct</tspan></text>
+    <g fill="none" stroke="${ink}" stroke-width="1.7" stroke-linecap="round" transform="translate(${width - 60}, 7.5)">
+      <path d="M1 3.6a9 9 0 0 1 11.6 0"/><path d="M3.4 6.3a5.6 5.6 0 0 1 6.8 0"/>
+    </g>
+    <circle cx="${width - 53.2}" cy="16" r="1.3" fill="${ink}"/>
+    <g transform="translate(${width - 40}, 6)">
+      <rect x="0.5" y="0.5" width="22" height="11" rx="3.2" fill="none" stroke="${ink}" stroke-opacity="0.4"/>
+      <rect x="2.3" y="2.3" width="18.4" height="7.4" rx="1.8" fill="${ink}"/>
+      <path d="M24.2 4v4a2.2 2.2 0 0 0 0-4z" fill="${ink}" fill-opacity="0.4"/>
+    </g>
+  </svg>`;
+}
+
+/**
+ * The App Store's required sizes, in points (dev-marketing-shots.ts shoots the screen below the
+ * status bar). Apple refuses a screenshot with any transparency, so these are plain opaque
+ * rectangles: no rounded corners, and no Dynamic Island or home bar, which a real capture never has.
+ */
+const APPSTORE = {
+  iphone: { w: 440, h: 956, statusBar: 62, scale: 3, bar: (ink: string) => statusBarSvg(440, 62, ink) },
+  ipad: { w: 1032, h: 1376, statusBar: 24, scale: 2, bar: (ink: string) => ipadStatusBarSvg(1032, 24, ink) },
+} as const;
+
+function appStoreHtml(shot: string, device: (typeof APPSTORE)[keyof typeof APPSTORE]): string {
+  const band = topLeftColour(shot);
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+    html,body{margin:0;background:${band}}
+    .screen{position:relative;width:${device.w}px;height:${device.h}px;overflow:hidden;background:${band}}
+    .app{position:absolute;left:0;top:${device.statusBar}px;width:${device.w}px;height:${device.h - device.statusBar}px;display:block}
+  </style></head><body>
+    <div class="screen"><img class="app" src="${dataUrl(shot)}">${device.bar("#111")}</div>
+  </body></html>`;
 }
 
 function phoneHtml(shot: string): string {
@@ -249,7 +289,7 @@ async function render(page: Page, html: string, out: string, opts: { width: numb
   console.log(`  ${out}`);
 }
 
-function rawShots(kind: "phone" | "desktop"): string[] {
+function rawShots(kind: "phone" | "desktop" | "appstore-iphone" | "appstore-ipad"): string[] {
   const dir = `${IN}/${kind}`;
   if (!existsSync(dir)) return [];
   return readdirSync(dir).filter((f) => f.endsWith(".png") && !f.endsWith("-full.png")).map((f) => path.join(dir, f));
@@ -259,6 +299,30 @@ const stem = (file: string) => path.basename(file, ".png").replace(/^\d+-/, "");
 
 async function main() {
   const browser = await chromium.launch();
+  if (ONLY === "appstore") {
+    for (const kind of ["iphone", "ipad"] as const) {
+      const device = APPSTORE[kind];
+      const shots = rawShots(`appstore-${kind}`);
+      if (shots.length === 0) throw new Error("No App Store shots — run `npm run shots:marketing -- --only=appstore` first.");
+      const dir = `${IN}/appstore/${kind}`;
+      mkdirSync(dir, { recursive: true });
+      const ctx = await browser.newContext({ deviceScaleFactor: device.scale });
+      const page = await ctx.newPage();
+      console.log(`App Store ${kind}:`);
+      for (const shot of shots) {
+        await page.setViewportSize({ width: device.w, height: device.h });
+        await page.setContent(appStoreHtml(shot, device), { waitUntil: "load" });
+        await page.evaluate(() => (document as Document & { fonts: FontFaceSet }).fonts.ready);
+        const png = await page.screenshot({ clip: { x: 0, y: 0, width: device.w, height: device.h } });
+        const out = `${dir}/${stem(shot)}.png`;
+        await sharp(png).removeAlpha().png().toFile(out);
+        console.log(`  ${out}`);
+      }
+      await ctx.close();
+    }
+    await browser.close();
+    return;
+  }
   const phones = rawShots("phone");
   const desktops = rawShots("desktop");
   if (phones.length + desktops.length === 0) throw new Error("No raw shots — run `npm run shots:marketing` first.");
