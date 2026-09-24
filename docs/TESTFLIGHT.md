@@ -53,6 +53,15 @@ archive for TestFlight.
   pitch carries plan prices and Join buttons; `middleware.ts` now sends the shell's `/` and
   `/welcome` to `/login`. Every other price path in the app goes through `/join` or `/billing`,
   which already hide prices in the shell.
+- ~~A stranger can't get in: sign-in only, "See plans" → a bare "Managed at jrcdynamics.com"~~
+  **built 2026-09-24** (live once main deploys). Apple rejects a sign-in-only app for a service bought
+  on the web (HEY, June 2020), and outside the US storefront the app may not point at the website to
+  buy (3.1.3). In the shell only: "Don't have an account? Sign up" makes an unpaid account
+  (`/api/auth/app-signup`), the normal email code opens it, and it waits on `/login/signed-up`
+  ("You're signed up", Try the demo, Sign out, Delete account) until it has a plan. That screen sends
+  the welcome email once; the email carries the prices and links to `/join?email=…&from=app`, so the
+  checkout pays for that account. "Try the demo" sits under the sign-in card; the demo's "Get your own
+  garage" opens Sign up. All website code: no new build needed.
 - **A sign-in for Apple's reviewer** that needs no inbox, on an account that already has a plan (the
   app sells nothing, so the reviewer can't buy one).
 - **Screenshots** at the largest iPhone size App Store Connect asks for.

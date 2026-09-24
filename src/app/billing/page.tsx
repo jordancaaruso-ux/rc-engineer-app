@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { requireCurrentUserAllowUnpaid } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { getEntitlement } from "@/lib/entitlement";
@@ -86,6 +87,15 @@ export default async function BillingPage({
   const entitlement = await getEntitlement(user);
   // Inside the native shell the plan is shown, never sold — see `lib/nativeShell.ts`.
   if (await isNativeShellRequest()) {
+    // An account the app's sign-up made, with no plan yet, waits on its own screen
+    // (`/login/signed-up`). A lapsed payer keeps this notice.
+    if (!entitlement.entitled) {
+      const sub = await prisma.subscription.findUnique({
+        where: { userId: user.id },
+        select: { id: true },
+      });
+      if (!sub) redirect("/login/signed-up");
+    }
     return <ShellPlanNotice tierLabel={entitlement.entitled ? tierLabel(entitlement.tier) : null} />;
   }
 

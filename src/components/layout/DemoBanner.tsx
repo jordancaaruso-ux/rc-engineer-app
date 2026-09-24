@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
+import { isNativeShellUserAgent } from "@/lib/nativeShell";
 
 /**
  * The demo session's persistent bar (MONETISATION_NORTH_STAR.md Phase 3, decision-board
@@ -15,6 +16,13 @@ export function DemoBanner() {
   const ref = useRef<HTMLDivElement | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Inside the iPhone/Android app /join sells nothing (see `lib/nativeShell.ts`), so "Get your
+  // own garage" leaves the demo for the app's own sign-up instead. Read after mount: the server
+  // render can't see the user agent the same way, and the markup stays identical.
+  const [inApp, setInApp] = useState(false);
+  useEffect(() => {
+    setInApp(isNativeShellUserAgent(navigator.userAgent));
+  }, []);
 
   // The floating top chrome (JRC pill, avatar) pins to --top-chrome-y; tell it how much the
   // banner pushes everything down so the two never overlap. Cleared when the banner unmounts.
@@ -152,6 +160,13 @@ export function DemoBanner() {
           */}
           <Link
             href="/join"
+            onClick={(e) => {
+              if (!inApp) return;
+              e.preventDefault();
+              void signOut({ redirect: false }).then(() => {
+                window.location.assign("/login?mode=signup");
+              });
+            }}
             className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md primary-face bg-primary px-3 py-1.5 text-[12px] font-semibold text-primary-foreground transition-transform hover:-translate-y-px"
           >
             Get your own garage →

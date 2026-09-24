@@ -12,6 +12,7 @@ import { isDemoIdentity } from "@/lib/demo/demoAccess";
 import { JoinPlansClient, type JoinPlan } from "@/components/billing/JoinPlansClient";
 import { ShellPlanNotice } from "@/components/billing/ShellPlanNotice";
 import { isNativeShellRequest } from "@/lib/nativeShellServer";
+import { normalizeSignupEmail } from "@/lib/billing/paidSignupLogic";
 
 export const metadata = { title: `Join ${PRODUCT_NAME}` };
 
@@ -34,9 +35,21 @@ export const metadata = { title: `Join ${PRODUCT_NAME}` };
  * that path mints a second Stripe customer instead of reusing theirs, which is why the bounce
  * existed — it just says so now, and points at both ways on.
  */
-export default async function JoinPage(): Promise<ReactNode> {
+export default async function JoinPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<ReactNode> {
   // Inside the native shell nothing is sold — see `lib/nativeShell.ts`.
   if (await isNativeShellRequest()) return <ShellPlanNotice />;
+
+  // The app's welcome email links here as `?email=…&from=app` (2026-09-24): checkout opens with
+  // the address the account was made with, so the payment lands on that account (the webhook
+  // matches by email), and the thank-you page sends them back to the app.
+  const params = await searchParams;
+  const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+  const prefillEmail = normalizeSignupEmail(first(params.email));
+  const fromApp = first(params.from) === "app";
 
   const session = await auth();
   const viewer = session?.user ?? null;
@@ -170,7 +183,7 @@ export default async function JoinPage(): Promise<ReactNode> {
               Sign-ups aren&rsquo;t open just yet. Check back soon.
             </p>
           ) : (
-            <JoinPlansClient plans={joinPlans} />
+            <JoinPlansClient plans={joinPlans} prefillEmail={prefillEmail} fromApp={fromApp} />
           )}
 
           <div className="flex flex-col gap-2 pt-1 text-center md:max-w-[64ch]">

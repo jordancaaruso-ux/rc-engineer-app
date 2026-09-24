@@ -18,8 +18,10 @@ export async function GET() {
     // signs in by email + code.
     googleOAuthConfigured: Boolean(gid && gsecret) && !inApp,
     // The app has no "home" behind the sign-in form (it never shows the pitch), so the form
-    // drops its "Back to home" link there.
+    // drops its "Back to home" link there — and, since the app can't send a stranger to the paid
+    // door either, offers its own sign-up (`/api/auth/app-signup`) and the demo instead.
     nativeShell: inApp,
+    demoReady: Boolean(process.env.DEMO_USER_ID),
     // Open public signup: anyone can sign in, no code. Lets the UI drop the access-code field
     // and soften "not allowed" copy.
     openSignup,

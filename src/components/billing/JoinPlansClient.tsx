@@ -130,7 +130,16 @@ function PlanRow({
  * Posts to /api/billing/public-checkout; Stripe collects the email and the webhook provisions
  * the account (MONETISATION_NORTH_STAR.md Phase 1, unchanged).
  */
-export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
+export function JoinPlansClient({
+  plans,
+  prefillEmail = null,
+  fromApp = false,
+}: {
+  plans: JoinPlan[];
+  /** From the app's welcome email: checkout opens with this address already in. */
+  prefillEmail?: string | null;
+  fromApp?: boolean;
+}) {
   const [interval, setInterval] = useState<"month" | "year">("month");
   const [selectedTier, setSelectedTier] = useState<PaidTier>("pro");
   const [busy, setBusy] = useState<string | null>(null);
@@ -150,7 +159,11 @@ export function JoinPlansClient({ plans }: { plans: JoinPlan[] }) {
       const res = await fetch("/api/billing/public-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priceId }),
+        body: JSON.stringify({
+          priceId,
+          ...(prefillEmail ? { email: prefillEmail } : {}),
+          ...(fromApp ? { from: "app" } : {}),
+        }),
       });
       const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
       if (!res.ok || !data.url) throw new Error(data.error ?? "Something went wrong");

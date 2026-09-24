@@ -23,7 +23,7 @@ export function parseAuthOnlyEmails(): Set<string> {
  * - `AUTH_DEV_ALLOW_ANY_EMAIL=1` in non-production allows any address (local dev only).
  * - `AUTH_ALLOWED_EMAILS` env list (comma-separated).
  * - `AuthAllowedEmail` rows in the database (invite list).
- * - Paying customers: any account with a `Subscription` row (the paid door — see below).
+ * - Any account that already exists — payers, and the app's own sign-ups (see below).
  */
 export async function isEmailAuthAllowed(email: string): Promise<boolean> {
   const normalized = email.trim().toLowerCase();
@@ -43,13 +43,17 @@ export async function isEmailAuthAllowed(email: string): Promise<boolean> {
     where: { email: normalized },
   });
   if (row != null) return true;
-  // The paid door (MONETISATION_NORTH_STAR.md): payers deliberately get NO allowlist row —
-  // `isGrandfatheredEmail` (entitlement.ts) reads every row as free-Pro-forever, which would
-  // outlive their subscription. Any Subscription row grants sign-in whatever its status: a lapsed
-  // payer must still reach /billing to renew. Entitlement, not sign-in, decides what they can use.
-  const payer = await prisma.user.findFirst({
-    where: { email: normalized, subscription: { isNot: null } },
+  // An account that exists may sign in; entitlement, not sign-in, decides what it can use. Neither
+  // way in writes an allowlist row, because an allowlist row reads as an invite:
+  //   - the paid door (MONETISATION_NORTH_STAR.md): the webhook creates the payer's account, and a
+  //     lapsed payer must still reach /billing to renew;
+  //   - the iPhone app's sign-up (2026-09-24, `/api/auth/app-signup`): the account is created
+  //     unpaid, and its owner has to be able to come back to it and sign in again.
+  // Nothing on the website creates an account for a stranger, so an unknown address is still
+  // turned away there.
+  const account = await prisma.user.findFirst({
+    where: { email: normalized },
     select: { id: true },
   });
-  return payer != null;
+  return account != null;
 }

@@ -269,6 +269,6 @@ comp codes must reach testers BEFORE enforcement flips, or every tester lands on
 | Not the goal | Why |
 |---|---|
 | A free tier without a card | Every account is funded; the Engineer's marginal cost makes freeloaders the worst failure mode for a solo founder, and an account with no card on file is a throwaway that pollutes the shared catalogs. Starter ($2.99, no Engineer) is the floor. If it is ever made free, it is a $0 price through the same door, never open signup. |
-| Open signup without payment | Even a paywalled empty shell reopens the spam/abuse surface and pollutes community aggregations. |
+| Open signup without payment | Even a paywalled empty shell reopens the spam/abuse surface and pollutes community aggregations. **One exception, 2026-09-24 (founder):** the iPhone/Android app has its own sign-up, because Apple rejects a sign-in-only app for a service bought on the web and won't let the app point at /join. It makes an unpaid account that sees only "You're signed up" until a plan exists; the plans reach it by email. Known gap: API routes don't check entitlement (none call `getEntitledApiUser`), so such an account — like any paying one — can still write to the shared catalogs through the API directly. |
 | A marketing site | One landing screen in-app. The demo is the pitch. |
 | Per-visitor demo sandboxes | Real per-visitor writes + cleanup + live-AI abuse surface; the shared read-only account with capped live asks gets 90% of the value. |

@@ -39,9 +39,13 @@ type PaidPlan = {
 export default async function JoinSuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ session_id?: string }>;
+  searchParams: Promise<{ session_id?: string; app?: string }>;
 }): Promise<ReactNode> {
-  const { session_id: sessionId } = await searchParams;
+  const { session_id: sessionId, app } = await searchParams;
+  // Came from the app's welcome email (2026-09-24): the account already exists and is signed in
+  // inside the app, which opens it as soon as it sees the plan — so the way on is back there, not
+  // a code box on this site.
+  const fromApp = app === "1";
 
   // Best-effort: any failure here (bad id, Stripe down, key mismatch) degrades to the generic
   // copy rather than erroring a customer who has JUST paid.
@@ -98,18 +102,24 @@ export default async function JoinSuccessPage({
 
         <div className="door-sheet login-sheen mt-6 p-6">
           <h1 className="page-title text-center">You&rsquo;re on the grid</h1>
-          <p className="mt-3 text-center text-sm leading-relaxed text-muted-foreground">
-            Payment went through. We&rsquo;ve emailed a six-digit sign-in code
-            {payerEmail ? (
-              <>
-                {" "}
-                to <span className="text-foreground">{payerEmail}</span>
-              </>
-            ) : (
-              <> to the address you used at checkout</>
-            )}
-            . It usually arrives within a minute or two.
-          </p>
+          {fromApp ? (
+            <p className="mt-3 text-center text-sm leading-relaxed text-muted-foreground">
+              Payment went through. Go back to the app &mdash; your garage is open.
+            </p>
+          ) : (
+            <p className="mt-3 text-center text-sm leading-relaxed text-muted-foreground">
+              Payment went through. We&rsquo;ve emailed a six-digit sign-in code
+              {payerEmail ? (
+                <>
+                  {" "}
+                  to <span className="text-foreground">{payerEmail}</span>
+                </>
+              ) : (
+                <> to the address you used at checkout</>
+              )}
+              . It usually arrives within a minute or two.
+            </p>
+          )}
 
           {paidPlan ? (
             <dl className="mt-4 flex flex-col gap-1.5 rounded-xl border border-elevate/10 bg-black/30 p-3.5 text-[12.5px]">
@@ -130,7 +140,7 @@ export default async function JoinSuccessPage({
             </dl>
           ) : null}
 
-          {payerEmail ? (
+          {fromApp ? null : payerEmail ? (
             <EnterSignInCode email={payerEmail} callbackUrl="/" />
           ) : (
             /* Without the session we don't know their email, so the code box can't render here.
@@ -146,10 +156,12 @@ export default async function JoinSuccessPage({
           )}
         </div>
 
-        <p className="mt-6 text-center text-xs leading-relaxed text-muted-foreground">
-          Nothing after a few minutes? Check your spam folder first. Still nothing — reply to your
-          Stripe receipt email and we&rsquo;ll get you in.
-        </p>
+        {fromApp ? null : (
+          <p className="mt-6 text-center text-xs leading-relaxed text-muted-foreground">
+            Nothing after a few minutes? Check your spam folder first. Still nothing — reply to your
+            Stripe receipt email and we&rsquo;ll get you in.
+          </p>
+        )}
       </div>
     </div>
   );

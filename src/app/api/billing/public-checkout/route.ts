@@ -3,7 +3,7 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
 import { clientIpKey } from "@/lib/clientIp";
 import { getPricePlans, getStripe, stripeConfigured } from "@/lib/stripe";
-import { PUBLIC_SIGNUP_SOURCE } from "@/lib/billing/paidSignupLogic";
+import { PUBLIC_SIGNUP_SOURCE, normalizeSignupEmail } from "@/lib/billing/paidSignupLogic";
 
 /**
  * The paid door (MONETISATION_NORTH_STAR.md, Phase 1): create a Stripe Checkout Session for a
@@ -28,8 +28,16 @@ export async function POST(request: Request): Promise<Response> {
   });
   if (!rl.ok) return rateLimitResponse(rl.retryAfterSec);
 
-  const body = (await request.json().catch(() => null)) as { priceId?: string } | null;
+  const body = (await request.json().catch(() => null)) as {
+    priceId?: string;
+    email?: unknown;
+    from?: unknown;
+  } | null;
   const priceId = body?.priceId;
+  // From the app's welcome email (`/join?email=…&from=app`): open checkout with the address the
+  // account was made with, so the webhook's match-by-email lands the plan on that account.
+  const prefillEmail = typeof body?.email === "string" ? normalizeSignupEmail(body.email) : null;
+  const fromApp = body?.from === "app";
   if (!priceId) return NextResponse.json({ error: "priceId is required" }, { status: 400 });
   if (!getPricePlans().some((p) => p.priceId === priceId)) {
     return NextResponse.json({ error: "Unknown price" }, { status: 400 });
@@ -47,7 +55,7 @@ export async function POST(request: Request): Promise<Response> {
     line_items: [{ price: priceId, quantity: 1 }],
     // The template literal is Stripe's, filled at redirect time — the success page uses it to
     // look up the payer's email so the sign-in code box can be offered right there.
-    success_url: `${origin}/join/success?session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${origin}/join/success?session_id={CHECKOUT_SESSION_ID}${fromApp ? "&app=1" : ""}`,
     cancel_url: `${origin}/join?status=cancel`,
     // Testers redeem their 100%-off comp codes through this same door — one provisioning path.
     allow_promotion_codes: true,
@@ -67,6 +75,7 @@ export async function POST(request: Request): Promise<Response> {
       : {
           // Stranger: Stripe collects the email; the webhook keys provisioning off this stamp.
           metadata: { source: PUBLIC_SIGNUP_SOURCE },
+          ...(prefillEmail ? { customer_email: prefillEmail } : {}),
         }),
   });
 

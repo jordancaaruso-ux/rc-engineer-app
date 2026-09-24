@@ -4,10 +4,10 @@ import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { JrcMark } from "@/components/brand/JrcMark";
 import { DoorScene } from "@/components/brand/DoorScene";
-import { primaryButtonClassName } from "@/components/ui/ButtonLink";
+import { buttonLinkClassName, primaryButtonClassName } from "@/components/ui/ButtonLink";
 
 /** Official Google "G" mark — multicolor, reads cleanly on the dark surface button. */
 function GoogleMark(): ReactNode {
@@ -47,6 +47,23 @@ const noAccountYet = (
   </>
 );
 
+/** The app's version: it can't point at the plans, so it offers its own sign-up instead. */
+function NoAccountInApp({ onSignUp }: { onSignUp: () => void }): ReactNode {
+  return (
+    <>
+      There&rsquo;s no account for that email.{" "}
+      <button
+        type="button"
+        onClick={onSignUp}
+        className="underline underline-offset-4 hover:text-foreground"
+      >
+        Sign up
+      </button>{" "}
+      instead?
+    </>
+  );
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -58,9 +75,41 @@ function LoginForm() {
   const [smtpConfigured, setSmtpConfigured] = useState(true);
   const [configLoaded, setConfigLoaded] = useState(false);
   const [inApp, setInApp] = useState(false);
+  const [demoReady, setDemoReady] = useState(false);
+  /**
+   * Sign up exists only inside the iPhone/Android app (2026-09-24, founder: "sign in, with a thing
+   * that says don't have an account?"). The website's way in is paying at /join; the app may not
+   * point there, so it makes the account itself (`/api/auth/app-signup`) and the email-code
+   * sign-in below opens it. `?mode=signup` arrives from the demo's "Get your own garage".
+   */
+  const [mode, setMode] = useState<"signin" | "signup">(
+    searchParams.get("mode") === "signup" ? "signup" : "signin"
+  );
+  const signingUp = inApp && mode === "signup";
 
   const from = searchParams.get("from") || "/";
   const callbackUrl = from.startsWith("/") ? from : "/";
+
+  function switchMode(next: "signin" | "signup"): void {
+    setError(null);
+    setMode(next);
+  }
+
+  /** A stranger's email. The website points at the plans; the app offers its own sign-up. */
+  const noAccount = useCallback(
+    (): ReactNode =>
+      inApp ? (
+        <NoAccountInApp
+          onSignUp={() => {
+            setError(null);
+            setMode("signup");
+          }}
+        />
+      ) : (
+        noAccountYet
+      ),
+    [inApp]
+  );
 
   /**
    * The invite code rides in the URL now, not in a box on the form. Nearly everyone arrives here
@@ -75,10 +124,10 @@ function LoginForm() {
       setError(
         openSignup
           ? "That sign-in didn't go through. Please try again."
-          : noAccountYet
+          : noAccount()
       );
     }
-  }, [searchParams, openSignup]);
+  }, [searchParams, openSignup, noAccount]);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,11 +139,13 @@ function LoginForm() {
           smtpConfigured?: boolean;
           openSignup?: boolean;
           nativeShell?: boolean;
+          demoReady?: boolean;
         };
         if (cancelled) return;
         if (hint.googleOAuthConfigured === true) setGoogleOAuthConfigured(true);
         if (hint.openSignup === true) setOpenSignup(true);
         if (hint.nativeShell === true) setInApp(true);
+        if (hint.demoReady === true) setDemoReady(true);
         setSmtpConfigured(hint.smtpConfigured === true);
       } catch {
         /* ignore */
@@ -126,8 +177,26 @@ function LoginForm() {
       };
       if (res.ok && data.ok === true) return true;
       // `needsAccount` means "no invite code was offered and this address isn't known" — the
-      // ordinary stranger. Point them at the paid door rather than at a code they don't have.
-      setError(data.needsAccount === true ? noAccountYet : (data.error ?? noAccountYet));
+      // ordinary stranger. Point them at the way in rather than at a code they don't have.
+      setError(data.needsAccount === true ? noAccount() : (data.error ?? noAccount()));
+      return false;
+    } catch {
+      setError("Could not reach the server. Check your connection and try again.");
+      return false;
+    }
+  }
+
+  /** The app's sign-up: make the (unpaid) account, then the ordinary code sign-in opens it. */
+  async function createAppAccount(normalizedEmail: string): Promise<boolean> {
+    try {
+      const res = await fetch("/api/auth/app-signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (res.ok && data.ok === true) return true;
+      setError(data.error ?? "We couldn't create your account just now. Please try again.");
       return false;
     } catch {
       setError("Could not reach the server. Check your connection and try again.");
@@ -141,6 +210,7 @@ function LoginForm() {
     setPending(true);
     try {
       const normalized = email.trim().toLowerCase();
+      if (signingUp && !(await createAppAccount(normalized))) return;
       if (!(await redeemAccess(normalized))) return;
 
       const res = await signIn("nodemailer", {
@@ -157,7 +227,7 @@ function LoginForm() {
           res.error === "AccessDenied"
             ? openSignup
               ? "That sign-in didn't go through. Please try again."
-              : noAccountYet
+              : noAccount()
             : googleOAuthConfigured
               ? "We couldn't send the sign-in email. Try “Continue with Google” instead."
               : "We couldn't send the sign-in email just now. Please try again shortly."
@@ -219,7 +289,7 @@ function LoginForm() {
           className="door-sheet login-sheen rc-reveal mt-9 p-6"
           style={{ "--rc-delay": "170ms" } as CSSProperties}
         >
-          <h1 className="page-title text-center">Sign in</h1>
+          <h1 className="page-title text-center">{signingUp ? "Sign up" : "Sign in"}</h1>
 
           {showGoogle ? (
             <button
@@ -267,6 +337,19 @@ function LoginForm() {
             </button>
           </form>
 
+          {inApp ? (
+            <p className="mt-4 text-center text-[13px] text-muted-foreground">
+              {signingUp ? "Already have an account?" : "Don’t have an account?"}{" "}
+              <button
+                type="button"
+                onClick={() => switchMode(signingUp ? "signin" : "signup")}
+                className="font-semibold text-primary-ink underline-offset-2 hover:underline"
+              >
+                {signingUp ? "Sign in" : "Sign up"}
+              </button>
+            </p>
+          ) : null}
+
           <p className="mt-5 text-center text-[12px] leading-snug text-muted-foreground">
             By continuing you agree to the{" "}
             <Link href="/terms" className="underline underline-offset-4 hover:text-foreground">
@@ -292,6 +375,20 @@ function LoginForm() {
               ← Back to home
             </Link>
           </p>
+        ) : null}
+
+        {/* The app's other way in without an account. A plain full navigation: /demo mints a
+            demo session on arrival, and a prefetch must never do that. */}
+        {inApp && demoReady ? (
+          <div className="rc-reveal mt-5" style={{ "--rc-delay": "270ms" } as CSSProperties}>
+            <Link
+              href="/demo"
+              prefetch={false}
+              className={buttonLinkClassName("outline", "w-full px-4 py-3")}
+            >
+              Try the demo
+            </Link>
+          </div>
         ) : null}
       </div>
     </div>
