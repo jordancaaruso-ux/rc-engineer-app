@@ -44,6 +44,7 @@ import {
 } from "@/lib/rollCenter/computeFromSnapshot";
 import {
   DEFAULT_CHASSIS_HALF_WIDTH_MM,
+  packWithUpperLink,
   resolveLabPack,
   resolvePackForSnapshot,
 } from "@/lib/rollCenter/packs";
@@ -269,6 +270,12 @@ type Slot = {
    * over an edit they can see on the paper in front of them.
    */
   sheetDirty: boolean;
+  /**
+   * Which upper link inner mount this slot is drawn with — a Lab-only what-if (founder, 2026-09-24).
+   * The sheet can't record it, so it stays out of `fields`: out of the saved setup, the next-run
+   * prefill and the URL. Null means the mount the car was measured on.
+   */
+  upperLink: string | null;
 };
 
 function slotFromFields(
@@ -286,6 +293,7 @@ function slotFromFields(
     fullData: origin?.fullData ?? null,
     write: origin?.write ?? null,
     sheetDirty: false,
+    upperLink: null,
   };
 }
 
@@ -300,6 +308,7 @@ function blankSlot(): Slot {
     fullData: null,
     write: null,
     sheetDirty: false,
+    upperLink: null,
   };
 }
 
@@ -761,6 +770,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
       fullData: active.fullData,
       write: null,
       sheetDirty: false,
+      upperLink: active.upperLink,
     });
   };
 
@@ -790,7 +800,10 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
    * Which car this is, and — when the answer is "we don't know" — the teaching model instead of
    * somebody else's hardpoints. `resolveLabPack` never returns null, so the Lab always draws.
    */
-  const pack = useMemo(() => resolveLabPack(fields as Record<string, unknown>), [fields]);
+  const pack = useMemo(
+    () => packWithUpperLink(resolveLabPack(fields as Record<string, unknown>), active.upperLink),
+    [fields, active.upperLink]
+  );
   /** No measurements behind the drawing: everything that leaves the Lab is sealed off below. */
   const sandbox = pack.isTeachingModel === true;
   const inputs = useMemo(
@@ -802,9 +815,13 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
     [fields, pack]
   );
   const otherFields = other?.fields ?? null;
+  const otherUpperLink = other?.upperLink ?? null;
   const otherPack = useMemo(
-    () => (otherFields ? resolveLabPack(otherFields as Record<string, unknown>) : null),
-    [otherFields]
+    () =>
+      otherFields
+        ? packWithUpperLink(resolveLabPack(otherFields as Record<string, unknown>), otherUpperLink)
+        : null,
+    [otherFields, otherUpperLink]
   );
   const otherInputs = useMemo(
     () =>
@@ -1019,10 +1036,29 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
   // Compare mode: diff other → selected. Single mode: edits vs the loaded sheet
   // (a blank-car session has no list — the no-shim default is not a baseline).
   const changes = useMemo(() => {
-    if (comparing && otherFields) return labChangeList(fields, otherFields);
-    if (active.loaded) return labChangeList(fields, active.loaded);
-    return [];
-  }, [comparing, otherFields, fields, active.loaded]);
+    const lines =
+      comparing && otherFields
+        ? labChangeList(fields, otherFields)
+        : active.loaded
+          ? labChangeList(fields, active.loaded)
+          : [];
+    /*
+     * The upper link is listed so the readouts' movement has a cause on screen, and marked Lab only
+     * because it never reaches the sheet. It can't enable Save: that reads `mergedSaveData`, which
+     * only ever compares sheet keys.
+     */
+    const options = pack.upperLinkOptions;
+    const baseCode = pack.baseUpperLinkCode;
+    if (options && baseCode && (comparing || active.loaded)) {
+      const from = (comparing ? otherUpperLink : null) ?? baseCode;
+      const to = active.upperLink ?? baseCode;
+      if (from !== to) {
+        const name = (code: string) => options[code]?.label ?? code;
+        lines.push(`upper link: ${name(from)} → ${name(to)} (Lab only)`);
+      }
+    }
+    return lines;
+  }, [comparing, otherFields, fields, active.loaded, active.upperLink, otherUpperLink, pack]);
 
   /**
    * The selected slot's whole setup, with this session's geometry edits merged in.
@@ -1475,6 +1511,7 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
               updateActiveSlot((slot) => ({
                 ...slot,
                 fields: slot.loaded ? { ...slot.loaded } : { ...LAB_DEFAULT_FIELDS },
+                upperLink: null,
               }))
             }
           >
@@ -1598,6 +1635,33 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
             }))}
             value={chassisCode ?? inputs.pack.baseChassisCode}
             onChange={(code) => setSlider(["chassis"], code)}
+          />
+        </div>
+        )}
+
+        {/*
+         * The upper link mount — Lab only (founder, 2026-09-24). Drivers hand-write it on the sheet if
+         * at all, so it is never read from a setup; logged setups keep the mount the car was measured
+         * on. Shown in sheet mode too, because the sheet has no box for it.
+         */}
+        {pack.upperLinkOptions && pack.baseUpperLinkCode && (
+        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3 xl:flex-col xl:items-stretch xl:gap-1.5">
+          <span className="type-data-label shrink-0 sm:w-[9.5rem] xl:w-auto">Upper link</span>
+          <SegmentedControl
+            size="sm"
+            className="sm:flex-1"
+            ariaLabel="Upper link mount"
+            options={Object.entries(pack.upperLinkOptions).map(([code, o]) => ({
+              value: code,
+              label: o.label,
+            }))}
+            value={active.upperLink ?? pack.baseUpperLinkCode}
+            onChange={(code) =>
+              updateActiveSlot((slot) => ({
+                ...slot,
+                upperLink: code === pack.baseUpperLinkCode ? null : code,
+              }))
+            }
           />
         </div>
         )}

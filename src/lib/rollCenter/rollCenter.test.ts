@@ -22,6 +22,7 @@ import {
   AWESOMATIX_A800_PACK,
   TEACHING_TC_PACK,
   chassisMountShiftMm,
+  packWithUpperLink,
   resolveLabPack,
   resolvePackForSnapshot,
 } from "./packs";
@@ -427,4 +428,67 @@ test("deltas are datum-robust: shim delta survives a base-geometry error", () =>
     return b.rcHeightMm - a.rcHeightMm;
   };
   assert.ok(Math.abs(d(geo) - d(wrongGeo)) < 0.1, `delta drift ${Math.abs(d(geo) - d(wrongGeo))}`);
+});
+
+test("A800 upper link mounts: LTL and bulkhead lengthen the top link and move its inner end in", () => {
+  const base = AWESOMATIX_A800_PACK;
+  // The base mount, an unknown code, or a car with one mount: the same object, so memos hold.
+  assert.equal(packWithUpperLink(base, "STANDARD"), base);
+  assert.equal(packWithUpperLink(base, null), base);
+  assert.equal(packWithUpperLink(base, "NOT_A_MOUNT"), base);
+  assert.equal(packWithUpperLink(TEACHING_TC_PACK, "LTL"), TEACHING_TC_PACK);
+
+  const ltl = packWithUpperLink(base, "LTL");
+  const bulkhead = packWithUpperLink(base, "BULKHEAD");
+  for (const axle of ["front", "rear"] as const) {
+    assert.equal(ltl[axle].upperInnerX, base[axle].upperInnerX - 1);
+    assert.equal(ltl[axle].upperLen, base[axle].upperLen + 1);
+    assert.equal(bulkhead[axle].upperInnerX, base[axle].upperInnerX - 6);
+    assert.equal(bulkhead[axle].upperLen, base[axle].upperLen + 6);
+    // Nothing else about the car moves.
+    assert.equal(bulkhead[axle].upperInnerZrel, base[axle].upperInnerZrel);
+    assert.equal(bulkhead[axle].lowerInnerX, base[axle].lowerInnerX);
+    assert.equal(bulkhead[axle].lowerLen, base[axle].lowerLen);
+  }
+  // The measured car itself is untouched — the VSUSP anchor still stands on it.
+  assert.equal(base.front.upperInnerX, 19.5);
+
+  const sheet: Record<string, unknown> = {
+    under_lower_arm_shims_ff: "0.5",
+    under_lower_arm_shims_fr: "0.5",
+    under_lower_arm_shims_rf: "1",
+    under_lower_arm_shims_rr: "1",
+    upper_inner_shims_ff: "1.0",
+    upper_inner_shims_fr: "1.0",
+    upper_inner_shims_rf: "0.5",
+    upper_inner_shims_rr: "0.5",
+    under_hub_shims_front: "0.5",
+    under_hub_shims_rear: "0",
+    upper_outer_shims_front: "1",
+    upper_outer_shims_rear: "1",
+    chassis: "C01B-RC",
+    ride_height_front: "5.2",
+    ride_height_rear: "5.4",
+    camber_front: "2.0",
+    camber_rear: "1.5",
+  };
+  const std = computeRollCenterFromSnapshot(sheet, base);
+  const withLtl = computeRollCenterFromSnapshot(sheet, ltl);
+  const withBulkhead = computeRollCenterFromSnapshot(sheet, bulkhead);
+  assert.ok(std && withLtl && withBulkhead, "every mount computes");
+  for (const r of [std, withLtl, withBulkhead]) {
+    // Camber still lands on the sheet's value — a mount-only move of 6 mm would not solve at all.
+    assert.ok(Math.abs(r.front.camberDeg - -2.0) < 0.02, `front camber ${r.front.camberDeg}`);
+    assert.ok(Math.abs(r.rear.camberDeg - -1.5) < 0.02, `rear camber ${r.rear.camberDeg}`);
+    assert.ok(!r.assumptions.some((a) => a.includes("couldn't be matched")), r.assumptions.join("; "));
+  }
+  // A longer top link gives less camber gain, and the bulkhead's 6 mm gives less than the LTL's 1 mm.
+  const gain = (r: NonNullable<typeof std>) => Math.abs(r.front.camberGainDegPerMm ?? 0);
+  assert.ok(gain(withLtl) < gain(std) && gain(withBulkhead) < gain(withLtl),
+    `camber gain ${gain(std)} → ${gain(withLtl)} → ${gain(withBulkhead)}`);
+  // The roll centre moves the same way for both, further for the bulkhead.
+  const dLtl = withLtl.front.rcHeightMm - std.front.rcHeightMm;
+  const dBulkhead = withBulkhead.front.rcHeightMm - std.front.rcHeightMm;
+  assert.ok(Math.sign(dLtl) === Math.sign(dBulkhead) && Math.abs(dBulkhead) > Math.abs(dLtl),
+    `front RC moves ${dLtl} (LTL) and ${dBulkhead} (bulkhead)`);
 });

@@ -32,6 +32,15 @@ export type ChassisOption = {
  */
 export const DEFAULT_CHASSIS_HALF_WIDTH_MM = 45;
 
+/**
+ * One way to mount the upper link's inner end — a holder part, or a mount point on the car itself.
+ * `lengthDeltaMm` is how much longer the top link is than on the pack's base mount.
+ */
+export type UpperLinkOption = {
+  label: string;
+  lengthDeltaMm: number;
+};
+
 export type RollCenterPack = {
   id: string;
   displayName: string;
@@ -62,6 +71,15 @@ export type RollCenterPack = {
    * no Engineer, no stored roll-centre value, nothing into a cross-car aggregate.
    */
   isTeachingModel?: true;
+  /**
+   * The upper link inner mounts this car can run, keyed by a stable code — Lab-only (founder,
+   * 2026-09-24). The choice lives in the Geometry Lab under the chassis and is never read from or
+   * written to a setup sheet: drivers only ever hand-write it, so setups, the sheet strip and the
+   * Engineer keep assuming `baseUpperLinkCode`. Absent on a car with a single mount.
+   */
+  upperLinkOptions?: Readonly<Record<string, UpperLinkOption>>;
+  /** The mount the pack's hardpoints were measured on. */
+  baseUpperLinkCode?: string;
   /**
    * Chassis types these measurements belong to, as community-aggregation template keys (a sheet
    * model's slug key, or a legacy template constant).
@@ -130,6 +148,15 @@ export const AWESOMATIX_A800_PACK: RollCenterPack = {
   // Founder-measured 2026-08-19, ruler across the plate at the axle line: 44mm. Drawn only (see
   // the field doc above), so this moves no number — it just stops the plate being a dashed guess.
   chassisHalfWidthMm: 22,
+  // Founder, 2026-09-24: measured on the standard AM19-R holders. LTL is Awesomatix's AM19-LTL
+  // "longer upper arm holder" in its normal mounting, +1 mm of top link; on the bulkheads, +6 mm.
+  // Lengths only — no height change has been measured, so the inner end moves in at the same height.
+  upperLinkOptions: {
+    STANDARD: { label: "Standard", lengthDeltaMm: 0 },
+    LTL: { label: "LTL", lengthDeltaMm: 1 },
+    BULKHEAD: { label: "Bulkhead", lengthDeltaMm: 6 },
+  },
+  baseUpperLinkCode: "STANDARD",
   // Both the built-in A800RR model and the legacy template collapse to this one key via
   // `templateKeyFromModelSlug`. Any other chassis type gets no geometry until its own hardpoints
   // are measured and added as a pack.
@@ -254,4 +281,33 @@ export function chassisMountShiftMm(pack: RollCenterPack, chassisCode: string | 
   const chosen = pack.chassisOptions[chassisCode];
   if (!base || !chosen) return null;
   return chosen.thicknessMm - base.thicknessMm;
+}
+
+/**
+ * The pack drawn with its upper links on another inner mount. Returns the SAME pack object for the
+ * base mount, an unknown code, or a car with a single mount, so memoised callers don't recompute.
+ *
+ * A longer top link at the same camber means the inner end sits further in: the link grows by the
+ * option's length and its inner mount moves toward the centreline by as much. Moving the mount alone
+ * would leave the camber solve to find that length as turnbuckle trim — and it refuses anything past
+ * 3 mm as bad input, so the 6 mm bulkhead mount would come back as −13° of camber.
+ */
+export function packWithUpperLink(
+  pack: RollCenterPack,
+  code: string | null | undefined
+): RollCenterPack {
+  const options = pack.upperLinkOptions;
+  const baseCode = pack.baseUpperLinkCode;
+  if (!options || !baseCode || !code || code === baseCode) return pack;
+  const chosen = options[code];
+  const base = options[baseCode];
+  if (!chosen || !base) return pack;
+  const d = chosen.lengthDeltaMm - base.lengthDeltaMm;
+  if (d === 0) return pack;
+  const move = (g: AxleGeometry): AxleGeometry => ({
+    ...g,
+    upperInnerX: g.upperInnerX - d,
+    upperLen: g.upperLen + d,
+  });
+  return { ...pack, front: move(pack.front), rear: move(pack.rear) };
 }

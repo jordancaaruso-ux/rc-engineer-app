@@ -126,12 +126,26 @@ It also makes the datum ruling below visible for the first time: the plate's **b
 height, the mounts bolt to its **top**, so a thicker chassis draws as a thicker plate rather than a
 raised car.
 
+### The upper link mount (founder, 2026-09-24)
+
+The A800's top links mount three ways: the standard AM19-R holders (what the pack was measured on),
+Awesomatix's AM19-LTL holders (top link +1 mm), or straight onto the bulkheads (+6 mm). A longer link
+at the same camber puts its inner end further in, so each option lengthens the link and moves its
+inner mount toward the centreline by the same amount. Moving the mount alone would ask the camber
+solve for 6 mm of turnbuckle trim, which it refuses as bad input. Lengths only: no height change has
+been measured.
+
+**A Lab choice, not a sheet value.** The sheet has no box for it — drivers hand-write the mount under
+AM19-R, if at all — so the calc never reads it. Setups, the sheet strip and the Engineer keep the
+measured mount; the Lab's "Upper link" choice under Chassis is a what-if that is never saved.
+`packWithUpperLink` in `packs.ts` is the whole mechanism.
+
 ### What drives the calculation (all from the sheet)
 
 | Input | Source | Effect |
 |---|---|---|
 | **Four shim stacks per axle** — Awesomatix names: **upper inner shims · under lower arm shims · upper outer shims · under hub shims** | Dedicated per-position sheet fields (already exist on the Awesomatix sheet; exact field keys still owed). **Free-typed total stack thickness in mm** — any increment (0.1, 0.25, whatever the driver runs); no step enumeration in the schema. UI: typed number input + 0.25-detent slider (founder rulings 2026-07-11) | Continuous hardpoint offsets. Under-hub is sign-inverted (raises hub → lower ball down in knuckle frame → RC up) |
-| **Build choices** — chassis thickness, bulkhead upper-inner position parts | Sheet fields | Datum shift / discrete hardpoint moves |
+| **Build choices** — chassis thickness (the upper link mount is a Lab choice, not a sheet field — see above) | Sheet fields | Datum shift |
 | **Ride height** (per axle) | Sheet | Chassis heave (~1.2mm RC per mm) |
 | **Camber** (per axle) | Sheet | Engine back-solves camber-link length from the recorded angle |
 | **Tire diameter** (measured/worn) | Sheet / linked tire | Hub height — worn rubber (64→~60mm) moves RC |
@@ -247,7 +261,7 @@ Explicitly **not v1**, explicitly **wanted eventually**. Don't build these now; 
 
 | Item | Owner |
 |---|---|
-| Bulkhead upper-inner position option table (which parts → which x/z offsets) | Jordan — "not sure for now" (2026-07-11); ships without it, flagged as an assumption when relevant |
+| Upper link mount heights — LTL and bulkhead are entered as lengths only (+1 / +6 mm); any height change is unmeasured | Jordan |
 | CAD/drawing source for `cad-verified` upgrade | Jordan / Awesomatix contact |
 
 _History lives in git. This doc carries only what is currently true._
