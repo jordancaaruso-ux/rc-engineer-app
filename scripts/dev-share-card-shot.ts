@@ -5,14 +5,16 @@
  * draws the layout — it is not a browser, it clips overflow silently, and it ignores CSS it does
  * not implement. The only way to know a card is right is to open the picture.
  *
- * No database and no server: it builds a card from a fixture and calls the same renderer the
- * route calls, so what lands in `out/` is what a driver would send.
+ * No database and no server: it builds a card from a fixture and calls the same renderers the
+ * route calls, so what lands in `out/` is what a driver would send — the story in each layout,
+ * then the long picture in both styles.
  *
- *   npx tsx scripts/dev-share-card-shot.ts [outDir]
+ *   npm run share:shots -- [outDir]
  */
 
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import sharp from "sharp";
 import {
   allSectionsOn,
   buildShareRunCard,
@@ -20,7 +22,8 @@ import {
   type ShareCardStyle,
   type ShareRunInput,
 } from "@/lib/share/shareCardModel";
-import { renderRunCard } from "@/lib/share/renderRunCard";
+import { renderReportPng } from "@/lib/share/renderReportCard";
+import { renderStoryPng, STORY_TRACE, type StoryVariant } from "@/lib/share/renderStoryCard";
 
 const LAPS = [
   15.612, 15.388, 15.201, 15.114, 15.276, 15.198, 15.34, 15.402, 15.887, 15.455,
@@ -86,10 +89,27 @@ async function shoot(
   });
 
   // Default paint scale on purpose: these shots are meant to be exactly what a driver sends.
-  const bytes = Buffer.from(await (await renderRunCard(card)).arrayBuffer());
+  const bytes = await renderReportPng(card);
   const file = path.join(outDir, `${name}.png`);
   await writeFile(file, bytes);
-  console.log(`${name}: ${card.height}px tall, ${(bytes.length / 1024).toFixed(0)} KB → ${file}`);
+  const { height } = await sharp(bytes).metadata();
+  console.log(`${name}: ${height}px tall, ${(bytes.length / 1024).toFixed(0)} KB → ${file}`);
+}
+
+async function shootStory(variant: StoryVariant, outDir: string) {
+  const card = buildShareRunCard({
+    run: RUN,
+    style: "story",
+    sections: allSectionsOn(),
+    dateTimeLabel: "Sun 9 Aug · 10:42",
+    dateStamp: "SUN 9 AUG 2026",
+    driverName: "Jordan Caruso",
+    traceBox: STORY_TRACE,
+  });
+  const bytes = await renderStoryPng(card, variant);
+  const file = path.join(outDir, `story-${variant}.png`);
+  await writeFile(file, bytes);
+  console.log(`story-${variant}: ${(bytes.length / 1024).toFixed(0)} KB → ${file}`);
 }
 
 /*
@@ -102,6 +122,7 @@ async function main() {
   const outDir = process.argv[2] ?? path.join(process.cwd(), "share-shots");
   await mkdir(outDir, { recursive: true });
 
+  for (const variant of ["app", "poster", "yellow"] as const) await shootStory(variant, outDir);
   await shoot("hero", "hero", {}, outDir);
   await shoot("report", "report", {}, outDir);
 

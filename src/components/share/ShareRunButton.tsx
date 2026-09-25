@@ -20,12 +20,15 @@ export function ShareRunButton({
   runId,
   runLabel,
   setupSnapshotId,
+  hasLaps,
   className,
   compact = false,
 }: {
   runId: string;
   runLabel: string;
   setupSnapshotId: string | null;
+  /** Whether the run has laps to draw; a story needs a best lap. */
+  hasLaps: boolean;
   className?: string;
   /** Icon-only, for the run-detail header row where the Edit control is also a square. */
   compact?: boolean;
@@ -68,6 +71,7 @@ export function ShareRunButton({
           runId={runId}
           runLabel={runLabel}
           setupSnapshotId={setupSnapshotId}
+          hasLaps={hasLaps}
         />
       ) : null}
     </>

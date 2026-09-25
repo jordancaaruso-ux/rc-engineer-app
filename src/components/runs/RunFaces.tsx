@@ -48,7 +48,7 @@ import { ShareRunButton } from "@/components/share/ShareRunButton";
 import { RatingDial } from "@/components/ui/RatingDial";
 import { ActionToast } from "@/components/ui/ActionToast";
 import { AutoGrowTextarea } from "@/components/ui/AutoGrowTextarea";
-import { runIsShareable } from "@/lib/share/shareCardModel";
+import { runHasLaps, runIsShareable } from "@/lib/share/shareCardModel";
 import {
   computeMistakeLaps,
   fadeOverRunSeconds,
@@ -1539,6 +1539,7 @@ export function RunFaces({
               runId={run.id}
               runLabel={shareLabel}
               setupSnapshotId={run.setupSnapshot?.id ?? null}
+              hasLaps={runHasLaps(run)}
               className="h-full w-full flex-col gap-1 rounded-lg px-1 py-2 text-[9.5px]"
             />
           </div>

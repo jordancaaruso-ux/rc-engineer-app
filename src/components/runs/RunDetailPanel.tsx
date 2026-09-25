@@ -64,7 +64,7 @@ import {
 } from "@/components/runs/HandlingAssessmentFields";
 import { RUN_HISTORY_DATA_CLASS } from "@/components/runs/runHistoryTableColumns";
 import { ShareRunButton } from "@/components/share/ShareRunButton";
-import { runIsShareable } from "@/lib/share/shareCardModel";
+import { runHasLaps, runIsShareable } from "@/lib/share/shareCardModel";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { InlineValueEdit } from "@/components/runs/InlineValueEdit";
 import { InlinePickEdit, type InlinePickOption } from "@/components/runs/InlinePickEdit";
@@ -955,6 +955,7 @@ export function RunDetailPanel({
                 runId={run.id}
                 runLabel={shareLabel}
                 setupSnapshotId={run.setupSnapshot?.id ?? null}
+                hasLaps={runHasLaps(run)}
               />
             ) : null}
             {/*

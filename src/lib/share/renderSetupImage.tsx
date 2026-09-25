@@ -4,6 +4,7 @@ import sharp from "sharp";
 import { CARD_WIDTH } from "@/lib/share/shareCardModel";
 import { ensureRenderedSetupSnapshotPdf } from "@/lib/setup/ensureRunSetupPdf";
 import { renderPdfFirstPageToPng } from "@/lib/setupDocuments/pdfServerRaster";
+import { composeSheetStory, type SheetStoryHeading } from "@/lib/share/renderSetupStory";
 
 /**
  * A setup, as a picture of its own sheet.
@@ -13,9 +14,10 @@ import { renderPdfFirstPageToPng } from "@/lib/setupDocuments/pdfServerRaster";
  * pdfjs + `@napi-rs/canvas`, no headless browser). This resizes it to a predictable width and
  * hands it over. What lands in a group chat is the driver's own paper, unmarked.
  *
- * **No brand footer, by founder call (2026-08-13.)** An earlier version stamped one along the
- * bottom. It is off the setup only — the run card keeps its footer, so the mark still travels
- * with anything the app itself draws. A sheet is the driver's document, not a billboard.
+ * **No brand footer on the plain sheet, by founder call (2026-08-13.)** A sheet is the driver's
+ * document, not a billboard. The STORY page (2026-09-25, founder: "sheet on a story page") frames
+ * the same untouched raster on the app's paper with the car and the day above it — see
+ * `renderSetupStory.tsx`; the sheet's own pixels are still never drawn over.
  *
  * **The sheet is the only thing a setup share may ever look like** ("the pdf appearance is what
  * should surface always"). There is deliberately no fallback picture for a chassis with no sheet;
@@ -42,6 +44,35 @@ export async function renderSetupSheetImage(params: {
   userId: string;
   setupSnapshotId: string;
 }): Promise<Buffer | null> {
+  const sheet = await rasterSetupSheet(params);
+  if (!sheet) return null;
+  /*
+   * One predictable width for every chassis, and a smaller file over a club's wifi.
+   *
+   * A 256-colour PNG: a sheet is black line art with values in one or two inks, which a palette
+   * holds without visible loss, and it lands at ~0.33 MB where full colour was ~0.76 MB
+   * (A800RR, 2026-09-25). It is the file the driver sends from the track.
+   */
+  return sharp(sheet).resize({ width: CARD_WIDTH }).png({ palette: true, quality: 90, effort: 4 }).toBuffer();
+}
+
+/** The same sheet framed as a 1080 × 1920 story page, or `null` exactly when the plain one is. */
+export async function renderSetupSheetStory(params: {
+  userId: string;
+  setupSnapshotId: string;
+  heading: SheetStoryHeading;
+}): Promise<Buffer | null> {
+  const sheet = await rasterSetupSheet(params);
+  if (!sheet) return null;
+  try {
+    return await composeSheetStory(sheet, params.heading);
+  } catch {
+    return null;
+  }
+}
+
+/** The filled sheet's first page at raster size (A4 → 1190 × 1683), or `null`. */
+async function rasterSetupSheet(params: { userId: string; setupSnapshotId: string }): Promise<Buffer | null> {
   const ensured = await ensureRenderedSetupSnapshotPdf({
     userId: params.userId,
     setupSnapshotId: params.setupSnapshotId,
@@ -63,18 +94,7 @@ export async function renderSetupSheetImage(params: {
      * automatically (Xray's comments line) gets its text burnt in at the wrong size. So the live
      * file is the better source as well as the simpler one.
      */
-    const sheet = await renderPdfFirstPageToPng(pdf, { withFormValues: true });
-    /*
-     * One predictable width for every chassis, and a smaller file over a club's wifi.
-     *
-     * A 256-colour PNG: a sheet is black line art with values in one or two inks, which a palette
-     * holds without visible loss, and it lands at ~0.33 MB where full colour was ~0.76 MB
-     * (A800RR, 2026-09-25). It is the file the driver sends from the track.
-     */
-    return await sharp(sheet)
-      .resize({ width: CARD_WIDTH })
-      .png({ palette: true, quality: 90, effort: 4 })
-      .toBuffer();
+    return await renderPdfFirstPageToPng(pdf, { withFormValues: true });
   } catch {
     // An unreadable render is the same answer as no render: there is no sheet to send.
     return null;

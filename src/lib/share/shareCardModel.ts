@@ -1,28 +1,26 @@
 /**
  * What goes on a shared picture — decided here, drawn elsewhere.
  *
- * Pure on purpose: no React, no `server-only`, no Prisma. The renderer
- * (`renderRunCard.tsx`) turns this into pixels and nothing else; every question of *what* a
- * driver is about to publish is answered in this file, where it can be unit-tested without a
- * font, a browser, or a database (`npm run test:share`).
+ * Pure on purpose: no React, no `server-only`, no Prisma. The renderers turn this into pixels and
+ * nothing else; every question of *what* a driver is about to publish is answered in this file,
+ * where it can be unit-tested without a font, a browser, or a database (`npm run test:share`).
  *
- * The card IS the expanded session view minus the video panel (founder ruling 2026-08-13, the
- * share redesign). There is no longer a headline/full split: the driver picks a STYLE —
+ * Three STYLES (founder rulings 2026-08-13 and 2026-09-25):
  *
- *   hero   — leads with the best lap, for a story or a group chat thumbnail.
- *   report — leads with session identity, for the team chat.
+ *   story  — the 9:16 picture for an Instagram / Facebook story (`renderStoryCard.tsx`). A fixed
+ *            layout: best lap, three figures, the trace. The section chips do not apply to it.
+ *   hero   — the long picture, best lap first (`renderReportCard.tsx`).
+ *   report — the long picture, session identity first, for the team chat.
  *
- * — and ticks which blocks travel. Nothing overrides anything: a chip is the only thing that
- * turns a block on or off, which was the whole complaint about the old modes (they silently
- * reset the section flags underneath the driver).
+ * On the long picture the driver ticks which blocks travel. Nothing overrides anything: a chip is
+ * the only thing that turns a block on or off, which was the whole complaint about the old modes
+ * (they silently reset the section flags underneath the driver).
  *
  * Some things are never chip-controlled and must survive every combination: best lap, avg top 5,
  * avg top 10, laps & stint, track, date, driver name, and the JRC mark.
  *
- * It also owns the card's HEIGHT. Satori lays out into a fixed box and clips whatever
- * overflows, so the height has to be known before a single pixel is drawn — see
- * `estimateCardHeight`. Every measurement in here is in final image pixels at
- * {@link CARD_WIDTH}, which is why the numbers look large.
+ * Heights are NOT decided here any more. The long picture is laid out tall and cut where its
+ * content ends (`renderReportCard.tsx`); the story is a fixed frame that sizes its own headlines.
  */
 
 import {
@@ -56,29 +54,38 @@ import type { UnitSystem } from "@/lib/units/unitSystem";
 
 /** Final image width. Everything below is measured against it. */
 export const CARD_WIDTH = 1080;
-const PAD = 56;
-const INNER = CARD_WIDTH - PAD * 2;
 
-/** Lap chips per row. Shared with the renderer so the height estimate can't disagree with it. */
-export const LAP_CHIPS_PER_ROW = 6;
+/** Where a trace is drawn, in picture pixels: its box and the room kept for its axis labels. */
+export type ShareTraceBox = {
+  width: number;
+  height: number;
+  padLeft: number;
+  padRight: number;
+  padTop: number;
+  padBottom: number;
+};
 
-/** The trace's own box, in card pixels. Mirrors `LapTimeGraph`'s geometry at 2.9× scale. */
-export const TRACE = {
-  width: INNER,
-  height: 300,
-  padLeft: 72,
-  padRight: 20,
-  padTop: 24,
-  padBottom: 44,
-} as const;
+/**
+ * The long picture's trace box: the width of the report card's content (1080 less the page's
+ * 44px gutters, the card's 2px edges and its 38px padding), so `renderReportCard` draws it 1:1.
+ */
+export const TRACE: ShareTraceBox = {
+  width: 912,
+  height: 330,
+  padLeft: 96,
+  padRight: 14,
+  padTop: 22,
+  padBottom: 60,
+};
 
 /** Clean-pace ceiling, copied from `LapTimeGraph`: laps slower than best × this clamp to the top. */
 const CLAMP_FACTOR = 1.15;
 
-export type ShareCardStyle = "hero" | "report";
+export type ShareCardStyle = "story" | "hero" | "report";
 
+/** A bare or unknown value is `hero`, as it has been since the first share card. */
 export function parseCardStyle(raw: string | null | undefined): ShareCardStyle {
-  return raw === "report" ? "report" : "hero";
+  return raw === "report" || raw === "story" ? raw : "hero";
 }
 
 /**
@@ -174,13 +181,13 @@ export type ShareRunCard = {
   eyebrow: string;
   /** `Qualifier 2` — the session's own name, in the display voice. */
   title: string;
-  /** Hero: the driver, on their own line, big. Null when the run has no owner name. */
+  /** The driver who logged it. Null when the run has no owner name. */
   driverName: string | null;
-  /** Hero: two lines under the driver name. Gated by the `details` chip. */
-  heroLines: string[];
-  /** Report: `track · car · driver`, under the title. */
-  subtitle: string;
-  /** Report: the four-up headline well. Hero: the last three, as a strip. Always present. */
+  /** Where and in what — never chip-controlled, like the driver. */
+  trackName: string | null;
+  carName: string;
+  eventName: string | null;
+  /** Best lap, avg top 5, avg top 10, laps / time. Always present, in every style. */
   tiles: ShareTile[];
   /** Report only, `details` chip: the six session fields. */
   details: ShareWell[];
@@ -191,8 +198,6 @@ export type ShareRunCard = {
   changed: ShareDiffRow[] | null;
   notes: string | null;
   feel: ShareFeel | null;
-  /** Computed last, from everything above. */
-  height: number;
 };
 
 /** The subset of a `Run` the card reads. Mirrors `runDetailSelect` on `/runs/[id]`. */
@@ -241,6 +246,8 @@ export type BuildShareCardParams = {
   previousSetupData?: unknown;
   /** The sharer's units, for the air temperature and the warmers. Metric when omitted. */
   units?: UnitSystem;
+  /** Where the trace will be drawn. The long picture's {@link TRACE} when omitted. */
+  traceBox?: ShareTraceBox;
 };
 
 const MEETING_LABELS: Record<string, string> = {
@@ -296,7 +303,8 @@ function tirePrepLines(run: ShareRunInput, units: UnitSystem): string[] {
 function traceFromLaps(
   rows: LapRow[],
   best: Set<number>,
-  miss: Set<number>
+  miss: Set<number>,
+  box: ShareTraceBox
 ): ShareTrace | null {
   if (rows.length < 3) return null;
   const included = rows.filter((r) => r.isIncluded !== false).map((r) => r.lapTimeSeconds);
@@ -318,14 +326,14 @@ function traceFromLaps(
   const lo = min - padding;
   const hi = max + padding;
 
-  const innerWidth = TRACE.width - TRACE.padLeft - TRACE.padRight;
-  const innerHeight = TRACE.height - TRACE.padTop - TRACE.padBottom;
+  const innerWidth = box.width - box.padLeft - box.padRight;
+  const innerHeight = box.height - box.padTop - box.padBottom;
   const n = rows.length;
   const round = (v: number) => Math.round(v * 10) / 10;
   const xAt = (i: number) =>
-    round(TRACE.padLeft + (n === 1 ? innerWidth / 2 : (i / (n - 1)) * innerWidth));
+    round(box.padLeft + (n === 1 ? innerWidth / 2 : (i / (n - 1)) * innerWidth));
   const yAt = (v: number) =>
-    round(TRACE.padTop + ((hi - Math.min(v, hi)) / (hi - lo)) * innerHeight);
+    round(box.padTop + ((hi - Math.min(v, hi)) / (hi - lo)) * innerHeight);
 
   const plotted = rows
     .map((r, i) => ({ r, i }))
@@ -346,11 +354,12 @@ function traceFromLaps(
     label: tick.toFixed(1),
   }));
 
-  // Every third lap, plus the last one, so the axis never ends on a bare tick.
+  // Every third lap, plus the last one, so the axis never ends on a bare tick. A regular label
+  // that lands right beside the last one gives way to it: 20 laps put "19" and "20" in one slot.
   const step = Math.max(1, Math.ceil(n / 8));
   const xLabels = rows
     .map((r, i) => ({ r, i }))
-    .filter(({ i }) => i % step === 0 || i === n - 1)
+    .filter(({ i }) => i === n - 1 || (i % step === 0 && n - 1 - i >= Math.ceil(step / 2)))
     .map(({ r, i }) => ({ x: xAt(i), label: String(r.lapNumber) }));
 
   return {
@@ -456,14 +465,6 @@ export function buildShareRunCard(params: BuildShareCardParams): ShareRunCard {
     { label: "Laps / time", value: lapsTime, mono: true },
   ];
 
-  // Hero: two ink-2 lines under the driver's name, the session's identity in prose.
-  const heroLines = sections.details
-    ? ([[title, eventName].filter(Boolean).join(" · "), [trackName, carName].filter(Boolean).join(" · ")]
-        .filter((l) => l.length > 0) as string[])
-    : [];
-
-  const subtitle = [trackName, carName, driverName].filter(Boolean).join(" · ");
-
   const details: ShareWell[] =
     report && sections.details
       ? [
@@ -524,7 +525,9 @@ export function buildShareRunCard(params: BuildShareCardParams): ShareRunCard {
         }))
       : null;
 
-  const trace = sections.graph ? traceFromLaps(lapRows, bestNumbers, missNumbers) : null;
+  const trace = sections.graph
+    ? traceFromLaps(lapRows, bestNumbers, missNumbers, params.traceBox ?? TRACE)
+    : null;
 
   const changed =
     sections.setup && params.previousSetupData != null
@@ -546,8 +549,9 @@ export function buildShareRunCard(params: BuildShareCardParams): ShareRunCard {
     eyebrow: eventName ?? "",
     title,
     driverName,
-    heroLines,
-    subtitle,
+    trackName,
+    carName,
+    eventName,
     tiles,
     details,
     lapWells,
@@ -556,9 +560,7 @@ export function buildShareRunCard(params: BuildShareCardParams): ShareRunCard {
     changed: changed && changed.length > 0 ? changed : null,
     notes,
     feel,
-    height: 0,
   };
-  card.height = estimateCardHeight(card);
   return card;
 }
 
@@ -575,178 +577,7 @@ export function runIsShareable(run: { lapTimes: unknown; lapSession?: unknown },
   return primaryLapRowsFromRun(run).length > 0;
 }
 
-// ---------------------------------------------------------------------------
-// Height
-// ---------------------------------------------------------------------------
-
-/*
- * Block heights in final pixels. These MUST track `renderRunCard.tsx` — a change to a font
- * size or a padding there without a change here means the card silently clips its own footer.
- * `npm run test:share` pins the arithmetic; only a rendered card proves the constants.
- */
-const H = {
-  /** Report masthead: 44px padding, a 44px mark, 44px padding, 1px rule. */
-  masthead: 133,
-  /** Report title block: 48 top pad + 22 eyebrow + 16 + title + 18 rule + 16 + subtitle lines. */
-  reportTitleTop: 48 + 22 + 16,
-  reportTitleLine: 84,
-  reportTitleRule: 18,
-  reportSubtitleTop: 16,
-  reportSubtitleLine: 42,
-  /** Report headline well: 40 margin + its 1px frame + 24px padding either side of a 92px cell. */
-  reportHeadline: 40 + 2 + 48 + 92,
-
-  /** Hero block: 56 pad, masthead 52, 60 gap, 145 figure, 16 + 6 cut, 40 + name, lines, 56 pad. */
-  heroTop: 56 + 52 + 60,
-  heroFigure: 145,
-  heroCut: 22,
-  heroNameTop: 40,
-  heroNameLine: 60,
-  heroLine: 46,
-  heroBottom: 56,
-  /** Hero's 3-up strip: 64px of padding around a 104px cell, plus the 1px rule under it. */
-  heroStrip: 64 + 104 + 1,
-
-  /** A section heading: 48 top padding + 30 tick + 20 margin. */
-  section: 98,
-  /** One instrument-well row: 18 pad + 37 value + 18 pad + 1px seam. */
-  wellRow: 74,
-  /** Tire prep spends a second mono line. */
-  wellRowExtra: 34,
-  /** One lap-chip row at 23px/1.35 with the well's 8px row gap. */
-  lapRow: 39,
-  /** The lap well's own 20/16 padding, plus its 18px top margin. */
-  lapsPad: 58,
-  /** The trace SVG plus its 22px top margin and the legend under it. */
-  trace: 22 + TRACE.height,
-  legend: 8 + 20,
-  /** Setup diff: a 48px header band, then one row each. */
-  diffHead: 48,
-  diffRow: 62,
-  /** Notes at 30px/1.6. */
-  notesLine: 48,
-  /** Feel: the rating label, then the band blocks and their captions (72 + 8 + 27). */
-  feelLabel: 29,
-  feelBands: 18 + 107,
-  /** The corner-balance panel: 36 margin + 26 top padding + its own border. */
-  feelPanelTop: 36 + 26 + 1,
-  /** Each instrument inside it is labelled: a 29px line and 16px of air. */
-  feelPanelLabel: 29 + 16,
-  /** Its header band: a 24px line inside 14px of padding, plus the rule under it. */
-  feelBalanceHead: 24 + 28 + 1,
-  /** One phase: a reserved 24px word, 8px, a 31px staircase, 28px of padding, and the 1px seam. */
-  feelBalanceRow: 24 + 8 + 31 + 28 + 1,
-  /** The gap between the balance instrument and the notable tiles. */
-  feelPanelGap: 28,
-  /** A notable tile: 29px label, 16px, a 22px staircase, 40px of padding, 2px border, 12px gutter. */
-  feelNotableRow: 29 + 16 + 22 + 40 + 2 + 12,
-  feelPanelBottom: 26 + 1,
-  /** Footer: 48 margin, 1px rule, 44 + 38 + 44. */
-  footer: 175,
-  /*
-   * Wrapping is estimated from average glyph width, so a long word can push one line further than
-   * predicted. Slack absorbs that; without it the overflow lands on the footer.
-   *
-   * 44px is deliberately a hair more than one wrapped line of the largest wrapping text on the
-   * card (the 30px notes and subtitle, 42–48px a line). `scripts/dev-share-card-fit.ts` measures
-   * what every block really costs; with these constants it reports 16–34px of spare ground, so
-   * the slack is the only thing standing between a mis-predicted line and a lost footer.
-   */
-  slack: 44,
-} as const;
-
-/** Rough line count for text laid out at `fontSize` across `width`. */
-export function wrappedLines(text: string, fontSize: number, width: number): number {
-  if (!text) return 0;
-  const perLine = Math.max(1, Math.floor(width / (fontSize * 0.52)));
-  let lines = 0;
-  for (const paragraph of text.split("\n")) {
-    lines += Math.max(1, Math.ceil(paragraph.length / perLine));
-  }
-  return lines;
-}
-
-/**
- * The lap chips and the trace, without any section heading of their own.
- *
- * They share one block because that is how the renderer draws them: in Report they sit under the
- * `Laptimes` heading with the nine figures, in Hero under a single heading of their own. The
- * legend belongs to the pair, so it is counted once when either is present.
- */
-function lapBlockHeight(card: ShareRunCard): number {
-  let h = 0;
-  if (card.laps) {
-    h += Math.ceil(card.laps.length / LAP_CHIPS_PER_ROW) * H.lapRow + H.lapsPad;
-  }
-  if (card.trace) h += H.trace;
-  if (card.laps || card.trace) h += H.legend;
-  return h;
-}
-
-/** Everything below the lap block, in the order the renderer draws it. Shared by both styles. */
-function sharedSectionsHeight(card: ShareRunCard): number {
-  let h = 0;
-
-  if (card.changed) h += H.section + H.diffHead + card.changed.length * H.diffRow;
-
-  if (card.notes) h += H.section + wrappedLines(card.notes, 30, INNER) * H.notesLine;
-
-  if (card.feel) {
-    h += H.section + H.feelLabel + H.feelBands;
-    const hasBalance = card.feel.balance != null;
-    const hasNotables = card.feel.notables.length > 0;
-    if (hasBalance || hasNotables) {
-      h += H.feelPanelTop + H.feelPanelBottom;
-      if (hasBalance) {
-        h +=
-          H.feelPanelLabel + H.feelBalanceHead + card.feel.balance!.length * H.feelBalanceRow + 2;
-      }
-      if (hasNotables) {
-        h +=
-          (hasBalance ? H.feelPanelGap : 0) +
-          H.feelPanelLabel +
-          Math.ceil(card.feel.notables.length / 2) * H.feelNotableRow;
-      }
-    }
-  }
-
-  return h;
-}
-
-export function estimateCardHeight(card: ShareRunCard): number {
-  let h = 0;
-
-  if (card.style === "report") {
-    h += H.masthead;
-    h += H.reportTitleTop;
-    h += wrappedLines(card.title, 76, INNER) * H.reportTitleLine;
-    h += H.reportTitleRule;
-    h += card.subtitle
-      ? H.reportSubtitleTop + wrappedLines(card.subtitle, 30, INNER) * H.reportSubtitleLine
-      : 0;
-    h += H.reportHeadline;
-    if (card.details.length > 0) {
-      const rows = Math.ceil(card.details.length / 2);
-      h += H.section + rows * H.wellRow + H.wellRowExtra;
-    }
-    // `Laptimes` always shows the nine figures, and carries the chips and trace under its heading.
-    h += H.section + Math.ceil(card.lapWells.length / 3) * H.wellRow + lapBlockHeight(card);
-  } else {
-    h += H.heroTop;
-    h += H.heroFigure;
-    h += H.heroCut;
-    h += card.driverName ? H.heroNameTop + H.heroNameLine : 0;
-    h += card.heroLines.reduce(
-      (acc, line) => acc + wrappedLines(line, 32, INNER) * H.heroLine,
-      card.heroLines.length > 0 ? 12 : 0
-    );
-    h += H.heroBottom;
-    h += H.heroStrip;
-    // One heading over the chips and the trace, whichever of them is on.
-    if (card.laps || card.trace) h += H.section + lapBlockHeight(card);
-  }
-
-  h += sharedSectionsHeight(card);
-
-  return h + H.footer + H.slack;
+/** Laps to draw: the story leads with a best lap, so a run without any is not offered one. */
+export function runHasLaps(run: { lapTimes: unknown; lapSession?: unknown }): boolean {
+  return primaryLapRowsFromRun(run).length > 0;
 }

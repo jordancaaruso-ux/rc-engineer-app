@@ -27,15 +27,15 @@ import { useUnits } from "@/components/providers/UnitsProvider";
  * The preview is an `<img>` pointed straight at the render route, so what you look at is the
  * file that gets sent, byte for byte. Nothing is composed in the browser; there is no second
  * implementation of the card to drift. That is also why the preview is a horizontal pager rather
- * than a stack: page 2 is the setup sheet, a genuinely separate file, and the sliver of it peeking
- * at the right edge is what tells the driver a second picture exists.
+ * than a stack: page 2 is the setup sheet, a genuinely separate file.
  *
  * Same bottom-sheet construction as `PickerSheet`: portalled to `<body>` (this mounts inside
  * cards, and a transformed ancestor turns `fixed` into `absolute`), body scroll locked while open.
  *
- * Redesigned 2026-08-13. The Headline / Full mode chips are gone: they silently reset the section
- * flags underneath the driver, which was the actual complaint. Now nothing overrides anything —
- * a style picker on top, one flat row of chips below, and every chip means only itself.
+ * Redesigned 2026-08-13 (no mode chips overriding the section chips), and again 2026-09-25: the
+ * pictures are paper now, and STORY — one 9:16 picture for Instagram and Facebook — comes first.
+ * A story is a fixed layout, so the section chips step aside while it is chosen; its preview shows
+ * both pictures whole, side by side, because a story is judged as a whole frame.
  */
 
 const SECTION_LABELS: Record<ShareSectionKey, string> = {
@@ -51,20 +51,22 @@ const SECTION_LABELS: Record<ShareSectionKey, string> = {
 const SECTION_ORDER: ShareSectionKey[] = ["details", "laps", "graph", "setup", "notes", "feel"];
 
 const STYLE_OPTIONS = [
+  { value: "story" as const, label: "Story" },
   { value: "hero" as const, label: "Lead with the lap" },
   { value: "report" as const, label: "Full report" },
 ];
 
 /**
  * Remembered per device, not per share (founder lean 2026-08-13). A driver who always sends the
- * full report should not re-tick six chips every Sunday.
+ * full report should not re-tick six chips every Sunday. A device with nothing remembered starts
+ * on Story, the reason most drivers open this sheet.
  */
 const PREFS_KEY = "jrc.share.card.v1";
 
 type ShareCardPrefs = { style: ShareCardStyle; sections: ShareSections };
 
 function readPrefs(): ShareCardPrefs {
-  const fallback: ShareCardPrefs = { style: "hero", sections: allSectionsOn() };
+  const fallback: ShareCardPrefs = { style: "story", sections: allSectionsOn() };
   if (typeof window === "undefined") return fallback;
   try {
     const raw = window.localStorage.getItem(PREFS_KEY);
@@ -100,6 +102,7 @@ export function ShareRunSheet({
   runId,
   runLabel,
   setupSnapshotId,
+  hasLaps,
 }: {
   open: boolean;
   onClose: () => void;
@@ -108,12 +111,15 @@ export function ShareRunSheet({
   runLabel: string;
   /** Null when this run has no setup to attach. */
   setupSnapshotId: string | null;
+  /** A story leads with the best lap, so a run with no laps is not offered one. */
+  hasLaps: boolean;
 }) {
-  const [cardStyle, setCardStyle] = useState<ShareCardStyle>("hero");
+  const [cardStyle, setCardStyle] = useState<ShareCardStyle>("story");
   const [sections, setSections] = useState<ShareSections>(allSectionsOn);
   const units = useUnits();
   const [includeSetup, setIncludeSetup] = useState<boolean>(Boolean(setupSnapshotId));
   const [previewLoading, setPreviewLoading] = useState(true);
+  const [setupLoading, setSetupLoading] = useState(true);
   const [page, setPage] = useState(0);
   /**
    * Not every chassis has a sheet the app can draw, and the route 404s when it can't. Left alone
@@ -127,17 +133,22 @@ export function ShareRunSheet({
   const { share, prefetch, preparing, state, error, skipped, reset } = useShareFiles();
   const pagerRef = useRef<HTMLDivElement | null>(null);
 
+  const styleOptions = useMemo(
+    () => (hasLaps ? STYLE_OPTIONS : STYLE_OPTIONS.filter((o) => o.value !== "story")),
+    [hasLaps]
+  );
+
   // Every open starts from the driver's last choice, not a hard-coded default.
   useEffect(() => {
     if (!open) return;
     const prefs = readPrefs();
-    setCardStyle(prefs.style);
+    setCardStyle(prefs.style === "story" && !hasLaps ? "hero" : prefs.style);
     setSections(prefs.sections);
     setIncludeSetup(Boolean(setupSnapshotId));
     setPage(0);
     setSetupPreviewFailed(false);
     reset();
-  }, [open, setupSnapshotId, reset]);
+  }, [open, setupSnapshotId, hasLaps, reset]);
 
   useEffect(() => {
     if (!open) return;
@@ -153,18 +164,22 @@ export function ShareRunSheet({
     };
   }, [open, onClose]);
 
+  const story = cardStyle === "story";
+
   const wantedUrl = useMemo(() => {
     const query = new URLSearchParams({ style: cardStyle });
-    const list = serializeSections(sections);
+    // A story ignores the chips, so leaving them out keeps one address — and one cached picture —
+    // per story however the long picture's chips are set.
+    const list = story ? "" : serializeSections(sections);
     if (list) query.set("sections", list);
     // In the URL, not only read on the server: the picture is cached for five minutes by its
     // address, and a flip of the units switch has to draw a new one.
     query.set("units", units);
     return `/api/runs/${encodeURIComponent(runId)}/share-card?${query.toString()}`;
-  }, [runId, cardStyle, sections, units]);
+  }, [runId, cardStyle, story, sections, units]);
 
   /*
-   * Every chip redraws a 1080px picture server-side, so a driver walking the row would queue six
+   * Every chip redraws the picture server-side, so a driver walking the row would queue six
    * renders and watch the last one land. 150ms of quiet is enough to make a burst of taps cost one.
    */
   const [cardUrl, setCardUrl] = useState(wantedUrl);
@@ -186,21 +201,28 @@ export function ShareRunSheet({
 
   const slug = runLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "run";
   const setupImageUrl = setupSnapshotId
-    ? `/api/setup-snapshots/${encodeURIComponent(setupSnapshotId)}/share-image`
+    ? story
+      ? `/api/setup-snapshots/${encodeURIComponent(setupSnapshotId)}/share-image?format=story&run=${encodeURIComponent(runId)}`
+      : `/api/setup-snapshots/${encodeURIComponent(setupSnapshotId)}/share-image`
     : null;
 
+  useEffect(() => {
+    setSetupLoading(true);
+    setSetupPreviewFailed(false);
+  }, [setupImageUrl]);
+
   const targets: ShareTarget[] = useMemo(() => {
-    const list: ShareTarget[] = [{ url: cardUrl, filename: `${slug}.png` }];
+    const list: ShareTarget[] = [{ url: cardUrl, filename: `${slug}${story ? "-story" : ""}.png` }];
     if (includeSetup && setupImageUrl) {
       list.push({
         url: setupImageUrl,
-        filename: `${slug}-setup.png`,
+        filename: `${slug}-setup${story ? "-story" : ""}.png`,
         // Not every chassis has a sheet the app can draw; losing the attachment must not lose the run.
         optional: true,
       });
     }
     return list;
-  }, [cardUrl, includeSetup, setupImageUrl, slug]);
+  }, [cardUrl, includeSetup, setupImageUrl, slug, story]);
 
   /*
    * Draw the pictures before the driver asks for them.
@@ -223,9 +245,10 @@ export function ShareRunSheet({
 
   const onPagerScroll = useCallback(() => {
     const el = pagerRef.current;
-    if (!el) return;
+    const first = el?.firstElementChild as HTMLElement | null;
+    if (!el || !first) return;
     // Page width plus the 10px gutter — whichever page owns the left edge is the one showing.
-    const next = Math.round(el.scrollLeft / 335);
+    const next = Math.round(el.scrollLeft / (first.offsetWidth + 10));
     setPage((p) => (p === next ? p : next));
   }, []);
 
@@ -249,6 +272,15 @@ export function ShareRunSheet({
   // Counts what will actually arrive. Saying "2 pictures" beside a page reading "no sheet to draw"
   // is the sheet arguing with itself, so a known-undrawable sheet is not counted.
   const sendLabel = targets.length > 1 && !setupPreviewFailed ? "Share 2 pictures" : "Share picture";
+
+  /*
+   * Page sizes. A story page is the whole 9:16 frame at the preview's height, and two of them sit
+   * side by side at 390px. A long picture is a strip, so its page shows the top and scrolls under
+   * the fade; its sheet page shows the WHOLE sheet — "it only loads half the sheet" (founder,
+   * 2026-09-25) was a 236px window over a portrait page.
+   */
+  const frameH = story ? 300 : 236;
+  const pageClass = story ? "h-[280px] w-[157.5px]" : "h-fit w-[325px]";
 
   return createPortal(
     <div
@@ -293,29 +325,37 @@ export function ShareRunSheet({
 
         <div className="px-4 pb-2.5">
           <SegmentedControl
-            options={STYLE_OPTIONS}
+            options={styleOptions}
             value={cardStyle}
             onChange={setCardStyle}
-            ariaLabel="Card style"
-            segmentClassName="!px-3 !py-[9px] !text-[13.5px] tracking-[-0.02em]"
+            ariaLabel="Picture style"
+            // Sized to their words: three equal segments cut "Lead with the lap" in two at 390px.
+            segmentClassName="!basis-auto !px-2.5 !py-[9px] !text-[13.5px] tracking-[-0.02em]"
           />
         </div>
 
         {/* The preview IS the file. Page 2 is a second file, so it is a page, not a caption. */}
         <div className="px-4 pb-3">
-          <div className="relative h-[236px] overflow-hidden rounded-xl border border-border bg-surface-runna-deep">
+          <div
+            className="relative overflow-hidden rounded-xl border border-border bg-surface-runna-deep"
+            style={{ height: frameH }}
+          >
             <div
               ref={pagerRef}
               onScroll={onPagerScroll}
-              className="flex h-full snap-x snap-mandatory gap-2.5 overflow-x-auto overscroll-x-contain p-2.5 pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className={cn(
+                "flex h-full snap-x snap-mandatory gap-2.5 overflow-x-auto overscroll-x-contain p-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+                story ? "justify-center" : "pb-0"
+              )}
             >
-              <div className="h-fit w-[325px] shrink-0 snap-start overflow-hidden rounded-lg border border-border">
+              <div className={cn("shrink-0 snap-start overflow-hidden rounded-lg border border-border", pageClass)}>
                 {/* eslint-disable-next-line @next/next/no-img-element -- a PNG route, not an app asset */}
                 <img
                   src={cardUrl}
                   alt="Preview of the picture that will be shared"
                   className={cn(
                     "block w-full transition-opacity",
+                    story && "h-full object-contain",
                     previewLoading ? "opacity-0" : "opacity-100"
                   )}
                   onLoad={() => setPreviewLoading(false)}
@@ -323,7 +363,12 @@ export function ShareRunSheet({
                 />
               </div>
               {includeSetup && setupImageUrl ? (
-                <div className="h-full w-[325px] shrink-0 snap-start overflow-hidden rounded-lg border border-border">
+                <div
+                  className={cn(
+                    "relative flex shrink-0 snap-start items-start justify-center overflow-hidden rounded-lg border border-border bg-card",
+                    story ? pageClass : "h-full w-[325px]"
+                  )}
+                >
                   {setupPreviewFailed ? (
                     <div className="flex h-full flex-col items-center justify-center gap-1 px-6 pb-6 text-center">
                       <p className="text-[12.5px] font-semibold text-muted-foreground">
@@ -334,26 +379,48 @@ export function ShareRunSheet({
                       </p>
                     </div>
                   ) : (
-                    // eslint-disable-next-line @next/next/no-img-element -- a PNG route, not an app asset
-                    <img
-                      src={setupImageUrl}
-                      alt="Preview of your setup sheet, which sends as a second picture"
-                      className="block w-full"
-                      onError={() => setSetupPreviewFailed(true)}
-                    />
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- a PNG route, not an app asset */}
+                      <img
+                        src={setupImageUrl}
+                        alt="Preview of your setup sheet, which sends as a second picture"
+                        className={cn(
+                          "block h-full w-auto max-w-full object-contain transition-opacity",
+                          setupLoading ? "opacity-0" : "opacity-100"
+                        )}
+                        onLoad={() => setSetupLoading(false)}
+                        onError={() => {
+                          setSetupLoading(false);
+                          setSetupPreviewFailed(true);
+                        }}
+                      />
+                      {setupLoading ? (
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                          <Spinner />
+                        </div>
+                      ) : null}
+                    </>
                   )}
                 </div>
               ) : null}
             </div>
 
             {previewLoading ? (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div
+                className={cn(
+                  "pointer-events-none absolute inset-y-0 left-0 flex items-center justify-center",
+                  // Over the run picture's page only — the sheet's page carries its own spinner.
+                  story && pageCount > 1 ? "right-1/2" : "right-0"
+                )}
+              >
                 <Spinner />
               </div>
             ) : null}
 
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-b from-transparent to-[rgb(var(--color-surface-runna-deep))]" />
-            {pageCount > 1 ? (
+            {story ? null : (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-b from-transparent to-[rgb(var(--color-surface-runna-deep))]" />
+            )}
+            {pageCount > 1 && !story ? (
               <div className="pointer-events-none absolute inset-x-0 bottom-2.5 flex justify-center gap-1.5">
                 {Array.from({ length: pageCount }).map((_, i) => (
                   <span
@@ -370,27 +437,31 @@ export function ShareRunSheet({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <div className="flex items-center justify-between px-4 pb-1.5">
-            <span className="text-[12px] font-semibold text-muted-foreground">In the picture</span>
-            <button
-              type="button"
-              onClick={everything}
-              className="tap-active text-[12px] font-semibold text-faint transition-colors hover:text-foreground"
-            >
-              Everything
-            </button>
-          </div>
+          {story ? null : (
+            <div className="flex items-center justify-between px-4 pb-1.5">
+              <span className="text-[12px] font-semibold text-muted-foreground">In the picture</span>
+              <button
+                type="button"
+                onClick={everything}
+                className="tap-active text-[12px] font-semibold text-faint transition-colors hover:text-foreground"
+              >
+                Everything
+              </button>
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-1.5 px-4 pb-3.5" role="group" aria-label="What to include">
-            {SECTION_ORDER.map((key) => (
-              <Chip
-                key={key}
-                active={sections[key]}
-                onClick={() => setSections((s) => ({ ...s, [key]: !s[key] }))}
-              >
-                {SECTION_LABELS[key]}
-              </Chip>
-            ))}
+            {story
+              ? null
+              : SECTION_ORDER.map((key) => (
+                  <Chip
+                    key={key}
+                    active={sections[key]}
+                    onClick={() => setSections((s) => ({ ...s, [key]: !s[key] }))}
+                  >
+                    {SECTION_LABELS[key]}
+                  </Chip>
+                ))}
             {setupSnapshotId ? (
               <Chip active={includeSetup} onClick={() => setIncludeSetup((v) => !v)}>
                 Setup sheet

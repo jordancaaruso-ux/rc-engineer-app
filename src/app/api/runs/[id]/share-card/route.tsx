@@ -5,13 +5,20 @@ import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { formatRunDateTime } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
-import { buildShareRunCard, parseCardStyle, parseSectionsParam } from "@/lib/share/shareCardModel";
-import { renderRunCard } from "@/lib/share/renderRunCard";
+import {
+  buildShareRunCard,
+  parseCardStyle,
+  parseSectionsParam,
+  type ShareSections,
+} from "@/lib/share/shareCardModel";
+import { renderReportPng } from "@/lib/share/renderReportCard";
+import { renderStoryPng, STORY_TRACE, type StoryVariant } from "@/lib/share/renderStoryCard";
+import { formatShareDateStamp } from "@/lib/share/shareDate";
 import { parseUnitSystem } from "@/lib/units/unitSystem";
 import { unitSystemForRequest } from "@/lib/units/unitSystemServer";
 
 /**
- * The run picture, as a PNG.
+ * The run picture, as a PNG: `?style=story` is the 9:16 story, `hero` / `report` the long one.
  *
  * GET, not POST, on purpose. Demo accounts are blocked from every mutating route by the
  * read-only chokepoint in `middleware.ts`, and a demo user sharing a branded card is free
@@ -27,6 +34,22 @@ import { unitSystemForRequest } from "@/lib/units/unitSystemServer";
 export const runtime = "nodejs";
 
 type Params = { params: Promise<{ id: string }> };
+
+/** The story layout drivers get. The founder picks from A/B/C (bench, 2026-09-25). */
+const STORY_VARIANT: StoryVariant = "poster";
+
+/**
+ * The story is a fixed layout: its figures are the tiles, and of the chip-controlled blocks it
+ * draws only the trace. Asking for nothing else also skips the previous run's setup lookup.
+ */
+const STORY_SECTIONS: ShareSections = {
+  details: false,
+  laps: false,
+  graph: true,
+  setup: false,
+  notes: false,
+  feel: false,
+};
 
 const shareRunSelect = {
   id: true,
@@ -80,7 +103,8 @@ export async function GET(request: Request, { params }: Params) {
   const { id } = await params;
   const { searchParams } = new URL(request.url);
   const style = parseCardStyle(searchParams.get("style"));
-  const sections = parseSectionsParam(searchParams.get("sections"));
+  const story = style === "story";
+  const sections = story ? STORY_SECTIONS : parseSectionsParam(searchParams.get("sections"));
   // The share sheet sends the unit it is showing; a bare URL gets the driver's own.
   const units = parseUnitSystem(searchParams.get("units")) ?? (await unitSystemForRequest(userId));
 
@@ -116,27 +140,22 @@ export async function GET(request: Request, { params }: Params) {
     style,
     sections,
     dateTimeLabel: formatRunDateTime(instant, timeZone),
-    // The Hero masthead's stamp: `SAT 8 AUG 2026`. Formatted here, where the zone is known.
     dateStamp: formatShareDateStamp(instant, timeZone),
     driverName: run.user?.name ?? null,
     setupData: run.setupSnapshot?.data,
     previousSetupData,
     units,
+    traceBox: story ? STORY_TRACE : undefined,
   });
 
-  return await renderRunCard(card);
-}
-
-/** `SAT 8 AUG 2026` — the Hero masthead stamp, in the viewer's zone like every other date here. */
-function formatShareDateStamp(instant: Date, timeZone: string | undefined): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone,
-  })
-    .format(instant)
-    .replace(/,/g, "")
-    .toUpperCase();
+  const png = story ? await renderStoryPng(card, STORY_VARIANT) : await renderReportPng(card);
+  return new Response(new Uint8Array(png), {
+    headers: {
+      "Content-Type": "image/png",
+      "Content-Length": String(png.length),
+      // The picture is a snapshot of a saved run; it only changes when the run does. Also what lets
+      // the sheet's blob prefetch reuse the render the preview `<img>` already paid for.
+      "Cache-Control": "private, max-age=300",
+    },
+  });
 }

@@ -72,7 +72,10 @@ const nextConfig = {
     // the list and the route shipped without a canvas. Prod 2026-08-13, third time in this family:
     // "Cannot load @napi-rs/canvas … ReferenceError: DOMMatrix is not defined". Local `next build`
     // cannot catch it — check the route's own `.nft.json` after building.
-    "/api/setup-snapshots/**": RASTER_NATIVE_FILES,
+    //
+    // The sheet's story page (2026-09-25) draws its heading with satori, so the share fonts ride
+    // along too — read with `readFileSync`, invisible to the tracer exactly like `/api/runs/**`.
+    "/api/setup-snapshots/**": [...RASTER_NATIVE_FILES, "./src/lib/share/fonts/*.ttf"],
     // The in-app PDF viewer (View original file, View as PDF, the run's PDF review) draws each page
     // with `pdfServerRaster` too, and was the one rasterizing prefix never listed: its `.nft.json`
     // held no canvas, no worker and no fonts (2026-09-24 launch audit) — the same shape as the
@@ -93,7 +96,7 @@ const nextConfig = {
       "./node_modules/pdfjs-dist/standard_fonts/**/*",
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
     ],
-    // The run card's own fonts (Sora / JetBrains Mono / Space Grotesk). `shareFonts.ts` reads them
+    // The run card's own fonts (Sora, four weights). `shareFonts.ts` reads them
     // with `readFileSync`, which the tracer cannot follow — same failure mode as the rasterizers
     // above, and it would only show up on Vercel. Satori cannot use the app's `next/font` woff2.
     "/api/runs/**": ["./src/lib/share/fonts/*.ttf"],

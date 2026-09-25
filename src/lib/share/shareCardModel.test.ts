@@ -3,12 +3,11 @@ import test from "node:test";
 import {
   allSectionsOn,
   buildShareRunCard,
-  estimateCardHeight,
   parseCardStyle,
   parseSectionsParam,
+  runHasLaps,
   runIsShareable,
   serializeSections,
-  wrappedLines,
   type ShareCardStyle,
   type ShareRunInput,
   type ShareSections,
@@ -18,9 +17,7 @@ import {
  * What a driver is about to publish, pinned.
  *
  * Every case here is about *what goes on the picture*, not what it looks like — the layout is
- * only ever proved by looking at a rendered card. The height assertions are the exception: they
- * exist because satori clips overflow silently, so a card that grows without its estimate
- * growing loses its own footer with no error anywhere.
+ * only ever proved by looking at a rendered card (`npm run share:shots`).
  */
 
 const LAPS = [
@@ -108,18 +105,12 @@ test("the always-on set survives every chip being off", () => {
   }
 });
 
-test("the track is on the picture in both styles, whatever is off", () => {
-  assert.match(build("report", { details: false }).subtitle, /Barton Park/);
-  assert.match(
-    buildShareRunCard({
-      run: run(),
-      style: "hero",
-      sections: { ...allSectionsOn(), details: false },
-      dateTimeLabel: "9 Aug 2026, 10:42",
-      driverName: "Jordan Caruso",
-    }).subtitle,
-    /Barton Park/
-  );
+test("the track and car are on the picture in every style, whatever is off", () => {
+  for (const style of ["story", "hero", "report"] as const) {
+    const card = build(style, { details: false });
+    assert.equal(card.trackName, "Barton Park Raceway", `${style}: the track stays`);
+    assert.equal(card.carName, "Awesomatix A800RR", `${style}: the car stays`);
+  }
 });
 
 // --------------------------------------------------------------------------
@@ -144,19 +135,17 @@ test("the nine lap figures are not chip-controlled — only Session details is",
   assert.equal(card.lapWells.length, 9, "Laptimes always travels on a report");
 });
 
-test("hero carries no wells; its identity is the two lines under the driver", () => {
-  const card = build("hero");
-  assert.equal(card.details.length, 0);
-  assert.equal(card.lapWells.length, 0);
-  assert.equal(card.heroLines.length, 2);
-  assert.match(card.heroLines[0]!, /Q2 · Round 4/);
-  assert.match(card.heroLines[1]!, /Barton Park Raceway · Awesomatix A800RR/);
+test("hero and story carry no wells — the figures they lead with are the tiles", () => {
+  for (const style of ["hero", "story"] as const) {
+    const card = build(style);
+    assert.equal(card.details.length, 0, `${style}: no session details`);
+    assert.equal(card.lapWells.length, 0, `${style}: no lap wells`);
+    assert.equal(card.tiles[0]!.value, "15.114", `${style}: best lap first`);
+  }
 });
 
-test("turning Session details off drops the hero's lines, not its lap", () => {
-  const card = build("hero", { details: false });
-  assert.deepEqual(card.heroLines, []);
-  assert.equal(card.tiles[0]!.value, "15.114");
+test("the event travels on its own, for the layouts that set it apart", () => {
+  assert.equal(build("story").eventName, "Round 4");
 });
 
 // --------------------------------------------------------------------------
@@ -375,11 +364,17 @@ test("an unknown section name is ignored, not an error", () => {
   });
 });
 
-test("the style defaults to hero and only 'report' moves it", () => {
+test("the style defaults to hero and only 'report' or 'story' moves it", () => {
   assert.equal(parseCardStyle(null), "hero");
   assert.equal(parseCardStyle("nonsense"), "hero");
   assert.equal(parseCardStyle("hero"), "hero");
   assert.equal(parseCardStyle("report"), "report");
+  assert.equal(parseCardStyle("story"), "story");
+});
+
+test("a run with laps can be a story; one without cannot", () => {
+  assert.equal(runHasLaps({ lapTimes: LAPS }), true);
+  assert.equal(runHasLaps({ lapTimes: [] }), false);
 });
 
 test("everything on is everything on", () => {
@@ -393,75 +388,3 @@ test("everything on is everything on", () => {
   });
 });
 
-// --------------------------------------------------------------------------
-// Height — satori clips, so an under-estimate eats the footer
-// --------------------------------------------------------------------------
-
-test("every section that is added makes the card taller", () => {
-  const bare: ShareSections = {
-    details: false,
-    laps: false,
-    graph: false,
-    setup: false,
-    notes: false,
-    feel: false,
-  };
-  const base = buildShareRunCard({
-    run: run(),
-    style: "hero",
-    sections: bare,
-    dateTimeLabel: "9 Aug 2026, 10:42",
-  }).height;
-
-  for (const key of ["laps", "graph", "notes", "feel"] as const) {
-    const withOne = buildShareRunCard({
-      run: run(),
-      style: "hero",
-      sections: { ...bare, [key]: true },
-      dateTimeLabel: "9 Aug 2026, 10:42",
-    }).height;
-    assert.ok(withOne > base, `${key} takes room on the card`);
-  }
-
-  const all = build("hero").height;
-  assert.ok(all > base, "and everything together is taller than any one of them");
-});
-
-test("a report is taller than a hero of the same run — it says more", () => {
-  assert.ok(build("report").height > build("hero").height);
-});
-
-test("longer notes make the card taller, so the text can't run off the bottom", () => {
-  const short = build("report").height;
-  const long = buildShareRunCard({
-    run: run({ notes: "x ".repeat(600) }),
-    style: "report",
-    sections: allSectionsOn(),
-    dateTimeLabel: "9 Aug 2026, 10:42",
-  }).height;
-  assert.ok(long > short + 400, `expected a lot more room, got ${long - short}px`);
-});
-
-test("more laps make the card taller — every lap chip has to fit", () => {
-  const short = build("report").height;
-  const long = buildShareRunCard({
-    run: run({ lapTimes: [...LAPS, ...LAPS] }),
-    style: "report",
-    sections: allSectionsOn(),
-    dateTimeLabel: "9 Aug 2026, 10:42",
-  }).height;
-  assert.ok(long > short, "38 laps take more chip rows than 19");
-});
-
-test("the height is the estimator's, not something the builder invented", () => {
-  for (const style of ["hero", "report"] as const) {
-    const card = build(style);
-    assert.equal(card.height, estimateCardHeight(card));
-  }
-});
-
-test("wrapping counts a hard newline as its own line", () => {
-  assert.equal(wrappedLines("", 30, 900), 0);
-  assert.equal(wrappedLines("short", 30, 900), 1);
-  assert.equal(wrappedLines("a\nb\nc", 30, 900), 3);
-});
