@@ -13,7 +13,7 @@ import {
   stripeConfigured,
   type PricePlanWithAmount,
 } from "@/lib/stripe";
-import { tierLabel } from "@/lib/brand/brandNames";
+import { TIER_LABELS, tierLabel } from "@/lib/brand/brandNames";
 import { formatRunDateOnly } from "@/lib/formatDate";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import {
@@ -22,8 +22,13 @@ import {
   type CurrentPlan,
   type MemberPlan,
 } from "@/components/billing/BillingClient";
+import { FoundingBand } from "@/components/billing/FoundingBand";
 import { ShellPlanNotice } from "@/components/billing/ShellPlanNotice";
+import { CardPanel } from "@/components/ui/CardPanel";
+import { Eyebrow, PanelTitle } from "@/components/ui/panel";
 import { isNativeShellRequest } from "@/lib/nativeShellServer";
+import { getFoundingOfferView, isFoundingSeatPrice } from "@/lib/billing/foundingOffer";
+import { formatFoundingAmount } from "@/lib/billing/foundingOfferLogic";
 
 export const metadata = { title: "Subscription" };
 
@@ -147,15 +152,47 @@ export default async function BillingPage({
   // A locked door names the plan it sells (`?plan=standard`); the phone opens with it picked.
   const planParam = Array.isArray(params.plan) ? params.plan[0] : params.plan;
 
+  // The standard header, not a bare <h1>: on a phone the title has to clear the corner pills, and
+  // the bare heading sat under the JRC mark (2026-09-05 pre-release walk).
+  const header = (
+    <header className="page-header">
+      <div className="min-w-0">
+        <h1 className="page-title">Subscription</h1>
+      </div>
+    </header>
+  );
+
+  // A founding member holds Race Engineer for the life of the app. Nothing to switch, and no
+  // portal: its Cancel would end the seat, and a founder has no card or renewal to manage.
+  if (sub && isFoundingSeatPrice(sub.priceId) && isActiveSubscriptionStatus(sub.status)) {
+    const receipt = await founderReceipt(sub.stripeSubscriptionId, timeZone);
+    const line = ["Founding member", receipt.paid ? `${receipt.paid} once` : null, receipt.on]
+      .filter(Boolean)
+      .join(" · ");
+    return (
+      <>
+        {header}
+        <section className="page-body">
+          <CardPanel contentClassName="p-4 lg:p-5">
+            <Eyebrow>Your plan</Eyebrow>
+            <PanelTitle>{TIER_LABELS.pro}</PanelTitle>
+            <p className="mt-1 text-[13px] tabular-nums text-muted-foreground">{line}</p>
+            <p className="mt-0.5 text-[13px] text-muted-foreground">
+              Yours for the life of the app. Nothing renews.
+            </p>
+          </CardPanel>
+        </section>
+      </>
+    );
+  }
+
+  // Founding seats (1 to 31 October 2026) are sold here too, to anyone who pays for their own
+  // access; an admin's free access has nothing to replace.
+  const founding = mode === "view" ? null : await getFoundingOfferView();
+
   return (
     <>
-      {/* The standard header, not a bare <h1>: on a phone the title has to clear the corner
-          pills, and the bare heading sat under the JRC mark (2026-09-05 pre-release walk). */}
-      <header className="page-header">
-        <div className="min-w-0">
-          <h1 className="page-title">Subscription</h1>
-        </div>
-      </header>
+      {header}
       <section className="page-body">
         <BillingClient
           plans={plans}
@@ -166,7 +203,27 @@ export default async function BillingPage({
           justChanged={changed === "1"}
           initialPlan={planParam ? asPaidTier(planParam) : null}
         />
+        {founding ? <FoundingBand offer={founding} variant="paper" /> : null}
       </section>
     </>
   );
+}
+
+/** What a founder paid and when, off the seat subscription Stripe holds. Best-effort. */
+async function founderReceipt(
+  stripeSubscriptionId: string,
+  timeZone: Awaited<ReturnType<typeof getExplicitTimeZoneForRunFormatting>>
+): Promise<{ paid: string | null; on: string | null }> {
+  if (!stripeConfigured()) return { paid: null, on: null };
+  try {
+    const seat = await getStripe().subscriptions.retrieve(stripeSubscriptionId);
+    const cents = Number(seat.metadata?.paid_cents);
+    return {
+      paid: Number.isFinite(cents) && cents > 0 ? formatFoundingAmount(cents) : null,
+      on: seat.created ? formatRunDateOnly(new Date(seat.created * 1000), timeZone) : null,
+    };
+  } catch (error) {
+    console.error(`[billing] could not load the founding seat ${stripeSubscriptionId}`, error);
+    return { paid: null, on: null };
+  }
 }

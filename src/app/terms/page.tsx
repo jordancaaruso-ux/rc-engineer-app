@@ -1,15 +1,24 @@
 import Link from "next/link";
 import { LEGAL_CONTACT_EMAIL, LEGAL_LAST_UPDATED, LEGAL_OPERATOR } from "@/lib/legal/legalMeta";
-import { PRODUCT_NAME } from "@/lib/brand/brandNames";
+import { PRODUCT_NAME, TIER_LABELS } from "@/lib/brand/brandNames";
 
 export const metadata = {
   title: `Terms — ${PRODUCT_NAME}`,
   description: `Terms of use for ${PRODUCT_NAME}`,
 };
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  id,
+  children,
+}: {
+  title: string;
+  /** An anchor other pages link to, e.g. the founding band's "Terms" (`/terms#founding`). */
+  id?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="mt-8">
+    <section id={id} className="mt-8 scroll-mt-6">
       <h2 className="text-base font-semibold">{title}</h2>
       <div className="mt-2 space-y-3 text-muted-foreground">{children}</div>
     </section>
@@ -25,25 +34,56 @@ export default function TermsPage() {
         you agree to them. If you do not agree, do not use the service.
       </p>
 
-      <Section title="Early access">
+      <Section title="The service">
         <p>
-          This is early-access software under active development. Features may change, move, or be
-          removed, and the service may be unavailable at times. It is provided free of charge for
-          now; paid plans may be introduced later, and we will tell you before anything you rely on
-          starts costing money.
+          {PRODUCT_NAME} is under active development. Features may change, move, or be removed, and
+          the service may be unavailable at times.
         </p>
       </Section>
 
       <Section title="Your account">
         <p>
-          Access is by invitation or a shared access code. Keep your access code and your email
-          inbox secure — anyone with access to your inbox can sign in as you. You are responsible
-          for activity on your account. Do not share an account with someone else; ask for a code
-          for them instead.
+          You get an account by buying a plan on our website, or by signing up in the{" "}
+          {PRODUCT_NAME} app. Keep your email inbox secure: anyone with access to it can sign in as
+          you. You are responsible for activity on your account. An account is for one person, so
+          do not share it.
         </p>
         <p>
           You must be at least 13 years old to use the service, and old enough to agree to these
           terms where you live.
+        </p>
+      </Section>
+
+      <Section title="Plans, payment and refunds">
+        <p>
+          Plans are sold on our website and billed in Australian dollars through Stripe, our payment
+          provider. Monthly and yearly plans renew automatically until you cancel. You can change or
+          cancel your plan from the Subscription page, and a cancelled plan stays active until the
+          end of the period you have paid for.
+        </p>
+        <p>
+          If you are not happy, ask within 14 days of your first payment and we will refund it in
+          full. Each plan has usage limits, such as the number of Engineer questions, shown on the
+          plans page. If a price changes, we will tell you before the new price applies to you.
+        </p>
+      </Section>
+
+      <Section title="Founding member seats" id="founding">
+        <p>
+          From 1 to 31 October 2026 we sell a limited number of founding member seats, in batches
+          at the prices shown on our website. A seat is a single payment. It gives you {TIER_LABELS.pro},
+          including what {TIER_LABELS.pro} gains over time, for as long as we operate {PRODUCT_NAME}.
+          Nothing renews, and there is nothing more to pay for it.
+        </p>
+        <p>
+          A seat does not include products or add-ons we sell separately. {TIER_LABELS.pro}&apos;s usage
+          limits apply, including its Engineer questions each month. A seat belongs to the account
+          that bought it and cannot be transferred or resold.
+        </p>
+        <p>
+          The 14-day refund applies, and a refunded seat ends. If we stop operating {PRODUCT_NAME},
+          seats end with it: we will give reasonable notice and a chance to export your data, as
+          described under Ending your use, and no further refund is due.
         </p>
       </Section>
 

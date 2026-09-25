@@ -185,6 +185,7 @@
     "test:entitlement": "npx tsx src/lib/entitlementLogic.test.ts && npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx src/lib/entitlement.test.ts",
     "test:run-window": "npx tsx --test src/lib/runs/runWindowExtension.test.ts && npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx src/lib/runs/runWindow.test.ts",
     "test:paid-signup": "npx tsx src/lib/billing/paidSignupLogic.test.ts",
+    "test:founding": "npx tsx src/lib/billing/foundingOfferLogic.test.ts && npx tsx src/lib/stripeSubscriptionSync.test.ts",
     "test:demo": "npx tsx src/lib/demo/demoAccess.test.ts",
     "test:demo-tour": "npx tsx --test src/lib/demo/tourSteps.test.ts",
     "test:track-access": "npx tsx --test src/lib/tracks/trackAccess.test.ts",

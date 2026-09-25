@@ -1,0 +1,102 @@
+/**
+ * Founding member seats in Stripe (docs/MONETISATION_NORTH_STAR.md, "Founding seats"), shared by
+ * `stripe-setup-prices.ts` (test) and `launch-live-stripe.ts` (live). Idempotent: the product is
+ * matched by metadata, prices by lookup key, so re-running reuses what exists.
+ *
+ * One product, three prices:
+ *   - one-off payments for each batch ($399, $499 AUD), amounts read from FOUNDING_BATCHES so
+ *     the page, the checkout and Stripe can't disagree;
+ *   - a $0 yearly price: the webhook puts each founder on a subscription to it, and that
+ *     subscription is the seat every other surface reads.
+ *
+ * The product's metadata.app is `rc-engineer-founding` on purpose. Both setup scripts find the
+ * three plan products by `metadata.app = rc-engineer` plus tier, and this product also carries
+ * tier `pro` (so the seat resolves to Race Engineer); with the plain app stamp it would be
+ * mistaken for Race Engineer's own product. It is also never added to the portal's plan-switch
+ * list: a founder has nothing to switch to.
+ */
+import type Stripe from "stripe";
+// Relative, not `@/`: this runs under tsx outside the Next build. Both modules are pure.
+import { PRODUCT_NAME } from "../src/lib/brand/brandNames";
+import { FOUNDING_BATCHES } from "../src/lib/billing/foundingOfferLogic";
+
+const FOUNDING_APP = "rc-engineer-founding";
+
+type FoundingPriceDef = {
+  envVar: string;
+  lookupKey: string;
+  unitAmount: number;
+  /** Set for the $0 seat price only; the batch prices are one-off. */
+  interval?: "year";
+};
+
+const PRICES: FoundingPriceDef[] = [
+  ...FOUNDING_BATCHES.map((b) => ({
+    envVar: `STRIPE_PRICE_FOUNDING_${b.batch}`,
+    lookupKey: `rc_engineer_founding_batch_${b.batch}`,
+    unitAmount: b.amountCents,
+  })),
+  {
+    envVar: "STRIPE_PRICE_FOUNDING_SEAT",
+    lookupKey: "rc_engineer_founding_seat",
+    unitAmount: 0,
+    interval: "year",
+  },
+];
+
+async function ensureFoundingProduct(stripe: Stripe): Promise<string> {
+  const name = `${PRODUCT_NAME} — Founding member`;
+  const found = await stripe.products.search({
+    query: `active:'true' AND metadata['app']:'${FOUNDING_APP}'`,
+  });
+  const existing = found.data[0];
+  if (existing) {
+    if (existing.name !== name) await stripe.products.update(existing.id, { name });
+    return existing.id;
+  }
+  const created = await stripe.products.create({
+    name,
+    description: "Race Engineer for the life of the app. One payment, nothing renews.",
+    metadata: { app: FOUNDING_APP, tier: "pro" },
+  });
+  return created.id;
+}
+
+async function ensureFoundingPrice(
+  stripe: Stripe,
+  productId: string,
+  def: FoundingPriceDef,
+): Promise<string> {
+  const existing = await stripe.prices.list({ lookup_keys: [def.lookupKey], limit: 1 });
+  const current = existing.data[0];
+  const sameShape =
+    current &&
+    current.unit_amount === def.unitAmount &&
+    (current.recurring?.interval ?? undefined) === def.interval;
+  if (current && sameShape) return current.id;
+  const price = await stripe.prices.create({
+    product: productId,
+    currency: "aud",
+    unit_amount: def.unitAmount,
+    ...(def.interval ? { recurring: { interval: def.interval } } : {}),
+    lookup_key: def.lookupKey,
+    ...(current ? { transfer_lookup_key: true } : {}),
+    metadata: { app: FOUNDING_APP },
+  });
+  return price.id;
+}
+
+/** Make (or find) the founding product and its prices; returns the env lines to paste. */
+export async function ensureFoundingSeats(stripe: Stripe): Promise<string[]> {
+  const productId = await ensureFoundingProduct(stripe);
+  const lines: string[] = [];
+  for (const def of PRICES) {
+    const priceId = await ensureFoundingPrice(stripe, productId, def);
+    const what = def.interval
+      ? `$0 AUD/${def.interval} (the seat)`
+      : `$${(def.unitAmount / 100).toFixed(2)} AUD once`;
+    console.log(`${PRODUCT_NAME} — Founding member — ${what}: ${priceId}`);
+    lines.push(`${def.envVar}=${priceId}`);
+  }
+  return lines;
+}

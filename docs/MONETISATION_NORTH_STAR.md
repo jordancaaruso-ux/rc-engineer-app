@@ -24,6 +24,7 @@ sees once inside) — this doc governs how anyone *gets* an account at all.
 | **Front door** | **Small landing page** (what it is, three value points, pricing) → **Try the demo** / **Get started**. Built last — its buttons need somewhere real to go. |
 | **Existing testers** | **Comp'd via 100%-off promo codes through the same checkout** — one provisioning path for everyone, comps can later expire or convert without code changes. `allow_promotion_codes` is already on. Consequence: the existing *grandfather* branch in `entitlement.ts` should retire once codes go out (see hazard below). |
 | **Build order** | Paid door + enforcement first (all verifiable in Stripe test mode with `BILLING_ENFORCED` dark) → demo → landing page → flip. |
+| **Founding seats** (2026-09-25) | **A one-off payment for Race Engineer for the life of the app**, on sale 1 to 31 October 2026 (Sydney): 25 seats at $399, then 25 at $499, both batches announced up front. Covers whatever Race Engineer becomes, never add-ons sold separately; the 100-questions cap stays. No seat numbers for now (founder: "if someone is #1 days after release they know no one did it"). Terms say "for as long as we operate" the app, so closing it owes no refund. See [Founding seats](#founding-seats--2026-09-25). |
 
 ## The provisioning inversion
 
@@ -195,6 +196,73 @@ Vercel Cron request — no cookie, `Bearer $CRON_SECRET` — got a 401 before re
 Exempted now; each cron route still checks the secret itself. This also unblocks
 `watch-results`, which has never fired in production.
 
+## Founding seats — 2026-09-25
+
+Founder call after a discussion of RC Paddock's lifetime offer (€139, "61% off" a struck €360 that is
+five years of their €72 yearly plan, first 100 buyers). Ours has the same shape: a seat costs about two
+years of Race Engineer's yearly price. The struck-through comparison on our band is labelled ("5 years
+of Race Engineer $999.50", read live from the yearly price ×5), never a bare "was" price: the ACCC took
+Kogan to court over a fake discount, and Kogan paid a $350,000 penalty in 2021.
+
+**The seat is a $0 Stripe subscription, so nothing else had to learn about it.** Checkout is a one-off
+payment (`mode: "payment"`, so Stripe's page says "$399" and nothing that looks like it renews). Once
+it clears, the webhook creates a subscription to a **$0 yearly price** on the "Founding member" product,
+whose `metadata.tier` is `pro`. That subscription is the seat: it writes the member's one
+`Subscription` row like any plan, so sign-in, entitlement, the run window, teams and the Engineer caps
+all read a founder as Race Engineer with no special case.
+
+| Piece | Where |
+|---|---|
+| Rules: dates (Sydney), batches, count threshold, wording | `src/lib/billing/foundingOfferLogic.ts` (+ test, `npm run test:founding`) |
+| Env, live seat count, the band's view | `src/lib/billing/foundingOffer.ts` |
+| Checkout (public; signed-in members from /billing) | `/api/billing/founding-checkout` |
+| What is on sale, for the static landing page | `/api/billing/founding-status` |
+| Seat made on payment, ended on a full refund | `src/app/api/stripe/webhook/route.ts` (`fulfilFoundingSeat`, `endSeatOnRefund`) |
+| Band on /join and /billing; founder view on /billing | `FoundingBand.tsx`, `src/app/billing/page.tsx` |
+| Stripe product + prices, test and live | `scripts/stripeFoundingSetup.ts`, via both setup scripts (`--founding-only`) |
+
+**Env.** `STRIPE_PRICE_FOUNDING_1`, `STRIPE_PRICE_FOUNDING_2` (one-off $399/$499) and
+`STRIPE_PRICE_FOUNDING_SEAT` ($0/year). Until all three are set, the offer shows nowhere and the
+checkout refuses. `FOUNDING_OFFER_OFF=1` is the kill switch. The dates live in code, so the band
+appears at midnight 1 October and disappears at the end of 31 October by itself. A dev server (never a
+deployed build) honours `FOUNDING_OFFER_TEST_NOW` and `FOUNDING_OFFER_TEST_BATCH_SEATS` for driving it.
+
+**Seat count.** Live seats = `Subscription` rows on the seat price with status active/trialing. The
+batch on sale is decided by the checkout route from that count; two buyers racing for the last seat of a
+batch both pay the lower price and both are honoured. The count prints only when fewer than ten remain.
+
+**What the webhook guarantees** (all driven in Stripe test mode 2026-09-25):
+- A stranger's payment makes the account from the checkout email, exactly like a plan, and emails the
+  sign-in code. A signed-in member buys from /billing on their own customer.
+- The plan the buyer had stops renewing (`cancel_at_period_end`; an unpaid one ends now). Its id is
+  stored on the seat as `metadata.replaces`.
+- **A full refund** (`charge.refunded`, found by the seat's `founding_payment_intent`) cancels the
+  seat, which frees it for sale, and if the replaced plan has not run out it renews again and the
+  account points back at it. A partial refund keeps the seat. Refunds stay a dashboard click.
+- **A second seat for the same person** is refunded in full automatically, before the account's
+  customer link moves.
+- `keepStoredSubscription` (`stripeSubscriptionSync.ts`): a live seat is only changed by events about
+  that seat, and an ended or unpaid subscription never overwrites a different live one.
+
+**Founders get no portal.** The portal's Cancel would end the seat and there is no card or renewal to
+manage, so /billing shows a founder panel ("Founding member · $399 once · date") with no plan buttons,
+and `/api/billing/portal` answers 409 for a seat holder. Promo codes are off on the founding
+checkout: the testers' 100%-off-forever comp coupon would make a seat free.
+
+**The founding product's `metadata.app` is `rc-engineer-founding`, not `rc-engineer`.** Both setup
+scripts find the plan products by app + tier; with the plain stamp, the founding product (tier `pro`)
+would be taken for Race Engineer's and renamed. It is also never added to the portal's switch list.
+
+**Found while building it (fixed in the same change): the double charge.** A member who was signed out
+and bought again from /join got a second Stripe customer; `provisionPaidUser` re-pointed the account
+at it, and the old plan kept billing with nothing in the app pointing at it. The plan checkout now reads
+the account's plan before anything moves, stores it on the new subscription as `replaces`, and stops
+it. A founder who buys a plan that way keeps the seat; the new plan stops renewing.
+
+**Live setup (not done as of 2026-09-25):** `npm run stripe:launch-live -- --founding-only` makes the
+live product and prices and adds `charge.refunded` + `checkout.session.async_payment_succeeded` to the
+live webhook endpoint; paste the three env lines into Vercel Production; deploy.
+
 ## Hazards
 
 - **Grandfather vs comp codes.** Every current `AuthAllowedEmail` row resolves to free Pro forever
@@ -222,6 +290,7 @@ Exempted now; each cron route still checks the secret itself. This also unblocks
 | **5** | Launch prep: grandfather retired to admins-only, price script → $27.99 (immutable-price replacement w/ lookup-key transfer), `payment_method_collection: if_required` for $0 comps, JRC-TESTER 100% code driven end-to-end in test mode ($0 checkout, no card → webhook → active sub) | ✅ **LAUNCHED 2026-08-01: BILLING_ENFORCED=1 live at www.jrcdynamics.com.** Live Stripe (acct "JRC Dynamics", $14.99/149.90 · $27.99/279.90 AUD), webhook enabled, 8 single-use comp codes minted — testers redeem post-flip at /billing (no card at $0). **Canonical domain: www.jrcdynamics.com** (founder skipped the app. subdomain 2026-08-01; AUTH_URL/NEXT_PUBLIC_APP_URL/webhook all point at www, app. removed from the project). Still pending: Google OAuth origins for the domain; prod `SIGNUP_ACCESS_CODE` now redundant (grants sign-in only, paywall still applies). |
 
 | **6** | Reprice + rename: Notebook $9.99 (1 q/day) · Race Engineer $19.99 (100 q/month), annual $99.90 / $199.90; `TIER_LABELS`; `resolveTierForPriceId` product-metadata fallback | ✅ **LIVE 2026-08-06.** Deployed the tier-resolution fix FIRST, then created the live prices, then moved the four Vercel `STRIPE_PRICE_*` vars and redeployed — that order is mandatory (see hazard above). Live products renamed to "JRC Trackside — Notebook" / "— Race Engineer". Old prices left active, so all 9 existing subscriptions keep their signed-up rate; verified against live Stripe that both superseded price ids still resolve via `product.metadata.tier` (5 on the old $279.90 annual → `pro`, 3 on the old $14.99 monthly → `standard`). `/join` and `/welcome` both serving the new figures, zero stale strings. No new comp codes minted (`--comp-codes=0`). |
+| **7** | Founding seats + the double-charge fix + terms rewrite (payments, refunds, founding seats; the old "free for now / invite only" text is gone) | Built and driven in Stripe test mode 2026-09-25 (stranger, member from /billing, refunds, second seat, founder buying a plan, second batch, sold out, before/after the dates). Live Stripe setup + Vercel env + deploy owed. |
 
 Update this table as work lands — a spec is intent, not shipped code (`docs/NOT_YET_BUILT.md`).
 

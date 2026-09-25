@@ -14,6 +14,7 @@ import Stripe from "stripe";
 // Relative, not `@/` — this runs under tsx outside the Next build, so no path aliases.
 // Both modules are pure by design, which is what makes them importable here.
 import { PRODUCT_NAME, TIER_LABELS } from "../src/lib/brand/brandNames";
+import { ensureFoundingSeats } from "./stripeFoundingSetup";
 
 const key = process.env.STRIPE_SECRET_KEY;
 if (!key) {
@@ -161,6 +162,15 @@ async function ensurePortalPlanSwitching(
 }
 
 async function main() {
+  // Founding seats (docs/MONETISATION_NORTH_STAR.md): their own product and prices, never in the
+  // portal's plan-switch list. `--founding-only` makes just those and touches nothing else.
+  const foundingLines = await ensureFoundingSeats(stripe);
+  if (process.argv.includes("--founding-only")) {
+    console.log("\n--- paste into .env.local ---");
+    console.log(foundingLines.map((l) => l.replace("=", '="') + '"').join("\n"));
+    return;
+  }
+
   const envLines: string[] = [];
   const portalEntries: Array<{ product: string; prices: string[] }> = [];
   for (const tier of TIERS) {
@@ -177,7 +187,7 @@ async function main() {
   }
   await ensurePortalPlanSwitching(portalEntries);
   console.log("\n--- paste into .env.local ---");
-  console.log(envLines.join("\n"));
+  console.log([...envLines, ...foundingLines.map((l) => l.replace("=", '="') + '"')].join("\n"));
 }
 
 main().catch((err) => {

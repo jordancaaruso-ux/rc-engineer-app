@@ -14,6 +14,9 @@
  *   - "Founders comp" 100%-off-forever coupon + N single-use promo codes (JRC-XXXXXX) — one per
  *     tester so a comp can be revoked individually by cancelling that subscription
  *   - webhook endpoint at <origin>/api/stripe/webhook with exactly the events the route handles
+ *     (an existing endpoint gains any event it is missing)
+ *   - founding member seats: their own product, the two batch prices and the $0 seat price
+ *     (scripts/stripeFoundingSetup.ts); `--founding-only` does just that plus the webhook events
  *   - prints the complete Vercel env block to paste (price ids + whsec)
  */
 import { randomBytes } from "node:crypto";
@@ -21,6 +24,7 @@ import Stripe from "stripe";
 // Relative, not `@/` — this runs under tsx outside the Next build, so no path aliases.
 // brandNames is a pure module by design, which is exactly what makes it importable here.
 import { PRODUCT_NAME, TIER_LABELS } from "../src/lib/brand/brandNames";
+import { ensureFoundingSeats } from "./stripeFoundingSetup";
 
 const args = process.argv.slice(2);
 const argValue = (name: string) =>
@@ -81,6 +85,9 @@ const WEBHOOK_EVENTS: Stripe.WebhookEndpointCreateParams.EnabledEvent[] = [
   "customer.subscription.deleted",
   "invoice.paid",
   "invoice.payment_failed",
+  // Founding seats (2026-09-25): a full refund ends the seat; a slow bank payment fulfils late.
+  "charge.refunded",
+  "checkout.session.async_payment_succeeded",
 ];
 
 async function ensureProduct(tier: string, name: string): Promise<string> {
@@ -178,6 +185,17 @@ async function ensureWebhook(): Promise<{ url: string; secret: string | null }> 
   const endpoints = await stripe.webhookEndpoints.list({ limit: 30 });
   const found = endpoints.data.find((e) => e.url === url);
   if (found) {
+    // An endpoint made before the route learned a new event (founding seats added
+    // `charge.refunded` and `checkout.session.async_payment_succeeded`, 2026-09-25) would never
+    // receive it; add whatever is missing, keeping everything it already has.
+    const has = new Set<string>(found.enabled_events);
+    const missing = has.has("*") ? [] : WEBHOOK_EVENTS.filter((e) => !has.has(e));
+    if (missing.length > 0) {
+      await stripe.webhookEndpoints.update(found.id, {
+        enabled_events: [...found.enabled_events, ...missing] as Stripe.WebhookEndpointUpdateParams.EnabledEvent[],
+      });
+      console.log(`Webhook ${found.id}: now also receives ${missing.join(", ")}`);
+    }
     // The signing secret is only revealed at creation. Keep the endpoint; tell the operator.
     return { url, secret: found.secret ?? null };
   }
@@ -192,7 +210,18 @@ async function ensureWebhook(): Promise<{ url: string; secret: string | null }> 
 async function main() {
   console.log(`LIVE mode against ${origin}\n`);
 
-  const envLines: string[] = [];
+  // Founding seats (docs/MONETISATION_NORTH_STAR.md, 2026-09-25). `--founding-only` makes the
+  // founding product and prices and brings the webhook's events up to date, and nothing else:
+  // no plan prices, no portal, no coupons.
+  const foundingLines = await ensureFoundingSeats(stripe);
+  if (args.includes("--founding-only")) {
+    await ensureWebhook();
+    console.log(`\n--- Vercel env (Production) — add these three ---`);
+    console.log(foundingLines.join("\n"));
+    return;
+  }
+
+  const envLines: string[] = [...foundingLines];
   const portalEntries: Array<{ product: string; prices: string[] }> = [];
   for (const tier of TIERS) {
     const productId = await ensureProduct(tier.tier, tier.productName);

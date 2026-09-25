@@ -7,6 +7,7 @@ import {
   PRO_ENGINEER_MONTHLY_QUESTIONS,
 } from "@/lib/aiUsage/budgets";
 import { STARTER_RUN_WINDOW } from "@/lib/entitlementLogic";
+import { FOUNDING_OFFER, formatFoundingAmount } from "@/lib/billing/foundingOfferLogic";
 import { EnterSignInCode } from "@/app/login/verify-request/EnterSignInCode";
 
 export const metadata = { title: "Check your email" };
@@ -14,8 +15,10 @@ export const metadata = { title: "Check your email" };
 /** What the customer just bought, resolved from the Stripe session — best-effort. */
 type PaidPlan = {
   label: string;
-  amount: string | null;
-  interval: "month" | "year";
+  /** "Billed" for a plan, "Paid" for a founding seat. */
+  billedLabel: string;
+  /** "$9.99 / month", or "$399 once" for a founding seat. */
+  billed: string;
   /** The one number worth confirming: Engineer questions for Race Engineer, runs kept otherwise. */
   detail: { label: string; value: string };
 };
@@ -60,19 +63,31 @@ export default async function JoinSuccessPage({
         payerEmail = session.customer_details?.email?.trim().toLowerCase() ?? null;
 
         const priceId = session.line_items?.data[0]?.price?.id ?? null;
-        if (priceId) {
+        if (session.metadata?.offer === FOUNDING_OFFER) {
+          // A founding seat: one payment, Race Engineer for the life of the app.
+          paidPlan = {
+            label: `${TIER_LABELS.pro} · Founding member`,
+            billedLabel: "Paid",
+            billed:
+              session.amount_total != null
+                ? `${formatFoundingAmount(session.amount_total)} once`
+                : "Once",
+            detail: { label: "Engineer questions", value: `${PRO_ENGINEER_MONTHLY_QUESTIONS} a month` },
+          };
+        } else if (priceId) {
           const plan = (await getPricePlansWithAmounts()).find((p) => p.priceId === priceId);
           if (plan && plan.tier !== "none") {
+            const amount =
+              plan.unitAmount != null && plan.currency
+                ? new Intl.NumberFormat("en-AU", {
+                    style: "currency",
+                    currency: plan.currency.toUpperCase(),
+                  }).format(plan.unitAmount / 100)
+                : null;
             paidPlan = {
               label: TIER_LABELS[plan.tier],
-              amount:
-                plan.unitAmount != null && plan.currency
-                  ? new Intl.NumberFormat("en-AU", {
-                      style: "currency",
-                      currency: plan.currency.toUpperCase(),
-                    }).format(plan.unitAmount / 100)
-                  : null,
-              interval: plan.interval,
+              billedLabel: "Billed",
+              billed: `${amount ?? "—"} / ${plan.interval}`,
               detail:
                 plan.tier === "pro"
                   ? { label: "Engineer questions", value: `${PRO_ENGINEER_MONTHLY_QUESTIONS} a month` }
@@ -128,10 +143,8 @@ export default async function JoinSuccessPage({
                 <dd className="font-semibold text-foreground">{paidPlan.label}</dd>
               </div>
               <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-faint">Billed</dt>
-                <dd className="fig-stat font-semibold text-foreground">
-                  {paidPlan.amount ?? "—"} / {paidPlan.interval}
-                </dd>
+                <dt className="text-faint">{paidPlan.billedLabel}</dt>
+                <dd className="fig-stat font-semibold text-foreground">{paidPlan.billed}</dd>
               </div>
               <div className="flex items-baseline justify-between gap-3">
                 <dt className="text-faint">{paidPlan.detail.label}</dt>

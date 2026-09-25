@@ -169,7 +169,8 @@ Hard-denied outright: `npm run build`, `db:push`, `db:seed`, `db:migrate:deploy`
 **Edge → middleware.** `src/middleware.ts` runs on the edge using the Prisma-free
 `src/auth.config.ts`. It gates everything except: `/login/*`, `/privacy`, `/terms`,
 `/api/health/*` (incl. `/api/health/version`), `/api/stripe/webhook`, `/join/*`,
-`/api/billing/public-checkout`, `/welcome`, `/landing/*`, `/demo`. Unauthenticated APIs get
+`/api/billing/public-checkout`, `/api/billing/founding-checkout`, `/api/billing/founding-status`,
+`/welcome`, `/landing/*`, `/demo`. Unauthenticated APIs get
 **401 JSON**; unauthenticated pages redirect to `/login?from=…`, except `/` which redirects to
 `/welcome` (a stranger gets the pitch, not a sign-in form).
 
@@ -379,7 +380,8 @@ Grouped by what they serve:
   invites, feed, comments).
 - **Auth & billing (~12)** — `auth/[...nextauth]`, `verify-code`, `redeem-access-code`, `demo`,
   `dev-new-user`, `account`, `logout`, `config-hint`; `billing/checkout`, `portal`,
-  `public-checkout`, `stripe/webhook`.
+  `public-checkout`, `founding-checkout`, `founding-status` (founding seats, October 2026),
+  `stripe/webhook`.
 - **Platform (~20)** — `push/*` (web + native), `perf/beacon`, `weather`, `me/time-zone`,
   `profile-image`, `onboarding`, `new-run/bootstrap`, `video-analysis/*`, `videos/*`,
   `settings/*`, `mylaps/*` (OAuth connect/callback/link), `health/openai`, `_debug/*`,

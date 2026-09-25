@@ -10,9 +10,11 @@ import { PRODUCT_NAME, TIER_LABELS } from "@/lib/brand/brandNames";
 import type { PaidTier } from "@/lib/entitlementLogic";
 import { isDemoIdentity } from "@/lib/demo/demoAccess";
 import { JoinPlansClient, type JoinPlan } from "@/components/billing/JoinPlansClient";
+import { FoundingBand } from "@/components/billing/FoundingBand";
 import { ShellPlanNotice } from "@/components/billing/ShellPlanNotice";
 import { isNativeShellRequest } from "@/lib/nativeShellServer";
 import { normalizeSignupEmail } from "@/lib/billing/paidSignupLogic";
+import { getFoundingOfferView } from "@/lib/billing/foundingOffer";
 
 export const metadata = { title: `Join ${PRODUCT_NAME}` };
 
@@ -113,7 +115,8 @@ export default async function JoinPage({
 
   const demoReady = Boolean(process.env.DEMO_USER_ID);
 
-  const plans = await getPricePlansWithAmounts();
+  // Founding seats (1 to 31 October 2026): a band under the plans while any are on sale.
+  const [plans, founding] = await Promise.all([getPricePlansWithAmounts(), getFoundingOfferView()]);
   const joinPlans: JoinPlan[] = plans
     .filter((p): p is typeof p & { tier: PaidTier } => p.tier !== "none")
     .map((p) => ({
@@ -185,6 +188,15 @@ export default async function JoinPage({
           ) : (
             <JoinPlansClient plans={joinPlans} prefillEmail={prefillEmail} fromApp={fromApp} />
           )}
+
+          {founding ? (
+            <FoundingBand
+              offer={founding}
+              variant="door"
+              prefillEmail={prefillEmail}
+              fromApp={fromApp}
+            />
+          ) : null}
 
           <div className="flex flex-col gap-2 pt-1 text-center md:max-w-[64ch]">
             <p className="text-[12px] leading-relaxed text-faint">

@@ -76,6 +76,11 @@ export default auth((req) => {
   if (pathname === "/api/billing/public-checkout") {
     return NextResponse.next();
   }
+  // Founding seats (docs/MONETISATION_NORTH_STAR.md): their checkout is public for the same
+  // reason, and the static landing page reads what is on sale from the status route.
+  if (pathname === "/api/billing/founding-checkout" || pathname === "/api/billing/founding-status") {
+    return NextResponse.next();
+  }
   // The landing page's static assets. NOT optional: the matcher at the bottom of this file only
   // exempts image extensions, so `support.js` and the walkthrough `.mp4` would be redirected to
   // /login for exactly the signed-out visitors the page exists for — it would boot to a blank

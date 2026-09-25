@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import { getPricePlans, getStripe, stripeConfigured } from "@/lib/stripe";
+import { holdsFoundingSeat } from "@/lib/billing/foundingOffer";
 
 /**
  * Open the Stripe Billing Portal — the whole manage / cancel / update-card / switch-tier surface,
@@ -28,6 +29,15 @@ export async function POST(request: Request): Promise<Response> {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!user.stripeCustomerId) {
     return NextResponse.json({ error: "No billing account" }, { status: 400 });
+  }
+  // A founding seat has no card, renewal or plan to manage, and the portal's Cancel would end it
+  // (docs/MONETISATION_NORTH_STAR.md, "Founding seats"). The Subscription page shows founders no
+  // portal button; this closes the door for a direct call too.
+  if (await holdsFoundingSeat(user.id)) {
+    return NextResponse.json(
+      { error: "A founding seat has nothing to manage. Email us if you need anything." },
+      { status: 409 },
+    );
   }
 
   const origin =

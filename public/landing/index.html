@@ -706,6 +706,22 @@
           <a href="/join" style="margin-top:auto;padding-top:1.5rem"><span style="display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;padding:0.8rem 1.4rem;border-radius:9px;background:#FFD60A;border:1px solid #FFD60A;color:#171614;transition:transform .2s ease,box-shadow .3s ease" style-hover="transform:translateY(-1px);box-shadow:0 8px 26px rgba(255,214,10,0.2)">Get started</span></a>
         </div>
       </div>
+      <!-- Founding seats (1 to 31 October 2026). Hidden unless /api/billing/founding-status
+           answers with an offer: this static page can't know the batch on sale or when seats run
+           out. Filled by initFounding / paintFounding in the component below. -->
+      <div id="jrcFounding" data-card="founding" style="display:none;margin-top:1.25rem;border-radius:16px;padding:clamp(1.25rem,2.6vw,1.9rem) clamp(1.5rem,3vw,2.25rem);flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1.25rem 2.5rem">
+        <div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0;flex:1 1 320px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:#FFD60A">Founding member</span>
+          <span style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:1.35rem">Race Engineer, for the life of the app.</span>
+          <span id="jrcFoundingSeats" style="font-size:0.95rem;color:#AFAFA6"></span>
+          <span style="font-size:0.85rem;color:#78786F">One payment, nothing renews. Full refund in the first 14 days.</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-start;gap:0.65rem;flex:0 0 auto">
+          <span id="jrcFoundingCompare" style="font-size:0.85rem;color:#78786F"><span id="jrcFoundingCompareLabel"></span> <s id="jrcFoundingCompareAmount"></s></span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:clamp(1.9rem,3.4vw,2.6rem);letter-spacing:-0.03em;color:#EDE8DF;line-height:1.1"><span id="jrcFoundingPrice"></span> <small style="font-family:'Sora',sans-serif;font-size:12px;letter-spacing:0;color:#78786F">AUD, once</small></span>
+          <a href="/join#founding"><span style="display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;padding:0.8rem 1.4rem;border-radius:9px;background:#FFD60A;border:1px solid #FFD60A;color:#171614;transition:transform .2s ease,box-shadow .3s ease" style-hover="transform:translateY(-1px);box-shadow:0 8px 26px rgba(255,214,10,0.2)">Get a founding seat</span></a>
+        </div>
+      </div>
       <p data-rv data-rv-delay="240" style="margin-top:1.75rem;max-width:44rem;font-size:0.95rem;color:#78786F;text-wrap:pretty;opacity:0;transform:translateY(22px);transition:opacity .8s cubic-bezier(.2,.6,.2,1),transform .8s cubic-bezier(.2,.6,.2,1)">Race Engineer costs less than a set of tyres, and the questions are yours to spend how you like &mdash; all in one weekend, if that&rsquo;s when you need them. Annual gets two months free on Notebook and Race Engineer &mdash; $99.90 and $199.90. Not for you? Full refund in the first 14 days, no questions.</p>
     </div>
   </section>
@@ -754,13 +770,14 @@ class Component extends DCLogic {
       this.initShots();
       this.initHeroCards();
       this.initFounderDraw();
+      this.initFounding();
       this.fitHero();
     });
   }
 
   componentDidUpdate() {
     this.applyTexture(); this.applyCards();
-    this.paintReveal(); this.paintBars(); this.paintCounts(); this.paintLaps(); this.drawFounder();
+    this.paintReveal(); this.paintBars(); this.paintCounts(); this.paintLaps(); this.drawFounder(); this.paintFounding();
   }
 
   componentWillUnmount() {
@@ -973,6 +990,33 @@ class Component extends DCLogic {
       el.style.webkitBackdropFilter = "none";
       el.style.border = "1px solid " + (el.getAttribute("data-card") === "pro" ? "rgba(255,214,10,0.4)" : "#33322E");
     });
+  }
+
+  /* ── founding seats (1 to 31 October 2026) ────────── */
+  /* The app decides what is on sale (batch, price, seats left, open or not); this page only asks,
+     and stays hidden unless an offer comes back. The seats line arrives already worded, so the app's
+     band and this one can never say different things. */
+  initFounding() {
+    fetch("/api/billing/founding-status", { cache: "no-store" })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { this.founding = (d && d.offer) || null; this.paintFounding(); })
+      .catch(() => {});
+  }
+
+  paintFounding() {
+    const box = this.one("jrcFounding");
+    if (!box) return;
+    const o = this.founding;
+    if (!o) { box.style.display = "none"; return; }
+    box.style.display = "flex";
+    const set = (id, text) => { const el = this.one(id); if (el) el.textContent = text; };
+    set("jrcFoundingPrice", o.amount || "");
+    set("jrcFoundingSeats", o.seatsLine || "");
+    const cmp = this.one("jrcFoundingCompare");
+    const hasCompare = Boolean(o.compareLabel && o.compareAmount);
+    if (cmp) cmp.style.display = hasCompare ? "" : "none";
+    set("jrcFoundingCompareLabel", hasCompare ? o.compareLabel : "");
+    set("jrcFoundingCompareAmount", hasCompare ? o.compareAmount : "");
   }
 
   /* ── reveals ───────────────────────────────────────── */
