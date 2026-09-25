@@ -2,11 +2,16 @@
  * Turn two independent naming passes into one shippable answer.
  *
  *   npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx \
- *     scripts/setup-extract-eval/sheet-assemble.ts --work=<sheetDir> [--min-confidence=0.8]
+ *     scripts/setup-extract-eval/sheet-assemble.ts --work=<sheetDir> [--min-confidence=0.8] [--one-pass]
  *
  * A name is kept only when both passes said the same thing (or close enough) AND both were
  * confident. That rule measured 98-100% right on the two hand-named sheets, and everything it
  * rejects stays unnamed rather than wrong.
+ *
+ * --one-pass (2026-09-25): only pass A exists; a name is kept when A alone clears the bar. Replaying
+ * five keyed sheets, one pass at 0.8 kept about as many names as two passes, with 1-2 more wrong
+ * (all on the TLR 22X, whose PDF misnames boxes); one pass at 0.9 kept ~70% as many and none wrong.
+ * So: 0.8 on sheets a person checks, 0.9 on sheets nobody checks. A cross-car link ships only at 0.9.
  *
  * Writes result-a.json, result-b.json, ready.json (the kept names) and review.json (every box with
  * both passes' answers, for the review page).
@@ -136,6 +141,7 @@ async function main() {
   const order = manifest.fields.map((f) => f.name);
 
   const a = await run(dir, sheet, "a", order);
+  if (process.argv.includes("--one-pass")) return onePass(dir, sheet.name, a.result, order, minConf);
   const b = await run(dir, sheet, "b", order);
 
   const fieldsA = a.result.draftedSchema.fields as V2Field[];
@@ -196,6 +202,48 @@ async function main() {
   console.log(`  disagree                                      ${tally.disagree}  ${pct(tally.disagree)}`);
   console.log(`  agreed but not confident                      ${tally.lowConfidence}  ${pct(tally.lowConfidence)}`);
   if (tally.onlyOnePass) console.log(`  only one pass named it                        ${tally.onlyOnePass}`);
+}
+
+/** One naming pass: keep a name when pass A alone clears the bar. Same files and row shape as two passes. */
+function onePass(dir: string, car: string, result: V2Result, order: string[], minConf: number) {
+  const LINK_BAR = Math.max(minConf, 0.9);
+  const fields = result.draftedSchema.fields as V2Field[];
+  const byPdf = new Map<string, V2Field>();
+  for (const f of fields) for (const n of f.pdfFieldNames) if (!byPdf.has(n)) byPdf.set(n, f);
+  const rows: Array<Record<string, unknown>> = [];
+  const tally = { ready: 0, disagree: 0, lowConfidence: 0, onlyOnePass: 0 };
+  const seen = new Set<string>();
+  for (const name of order) {
+    const fa = byPdf.get(name);
+    const key = fa?.key ?? name;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (!fa) { tally.onlyOnePass++; rows.push({ pdfName: name, key, verdict: "unnamed", a: null, b: null }); continue; }
+    const ready = fa.confidence >= minConf;
+    if (ready) tally.ready++; else tally.lowConfidence++;
+    rows.push({
+      pdfName: name, key, verdict: ready ? "ready" : "low-confidence", agreement: "one-pass",
+      a: fa.displayLabel, b: null, confA: fa.confidence, confB: null,
+      printedLabel: fa.printedLabel, section: fa.section,
+      chosen: ready ? fa.displayLabel : null,
+      universalParameterId: ready && fa.confidence >= LINK_BAR ? fa.universalParameterId ?? null : null,
+      options: fa.options ?? null,
+    });
+  }
+  const readyRows = new Map(rows.filter((r) => r.verdict === "ready").map((r) => [r.key as string, r]));
+  const readyFields = fields.filter((f) => readyRows.has(f.key)).map((f) => {
+    const out = { ...f } as V2Field;
+    const id = readyRows.get(f.key)!.universalParameterId as string | null;
+    if (id) out.universalParameterId = id; else delete out.universalParameterId;
+    return out;
+  });
+  writeFileSync(join(dir, "ready.json"), JSON.stringify({ ...result, draftedSchema: { ...result.draftedSchema, fields: readyFields } }, null, 1));
+  writeFileSync(join(dir, "review.json"), JSON.stringify({ car, boxes: rows.length, tally, minConfidence: minConf, onePass: true, rows }, null, 1));
+  const pct = (n: number) => `${((n / rows.length) * 100).toFixed(0)}%`;
+  console.log(`\n${car}: ${rows.length} boxes (one pass)`);
+  console.log(`  ready (pass A >= ${minConf})   ${tally.ready}  ${pct(tally.ready)}`);
+  console.log(`  not confident enough          ${tally.lowConfidence}  ${pct(tally.lowConfidence)}`);
+  if (tally.onlyOnePass) console.log(`  not named at all              ${tally.onlyOnePass}`);
 }
 
 main();

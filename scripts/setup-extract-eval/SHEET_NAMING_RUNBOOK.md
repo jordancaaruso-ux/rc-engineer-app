@@ -7,6 +7,30 @@ marked ready. Everything else stays unnamed rather than wrong.
 
 Nothing here touches the app or the database. Results land in a work folder as files.
 
+## The fast recipe (2026-09-25): one pass, lean layout — use this
+
+Same v3 method below, three changes, measured on two fresh sheets:
+
+1. **One naming pass, not two.** Replaying five keyed sheets, the second pass bought almost nothing
+   (one pass at 0.8: +20-30 names, +1-2 wrong, all on the TLR 22X whose PDF misnames boxes). Name with
+   PASS `a` only and assemble with `--one-pass`: `--min-confidence=0.8` on sheets a person will check,
+   `0.9` on sheets nobody checks (0.9 had zero wrong on all five).
+2. **Lean layout helper.** After prep, `node scripts/setup-extract-eval/sheet-tiles.cjs <dir>` cuts
+   overlapping close-up tiles (fine grid, every box outlined with its PDF name) and `boxes.txt`; then
+   agent type `sheet-layout` (Read + Write, `.claude/agents/sheet-layout.md`) runs `LAYOUT-TASK.md`
+   without scripts or crops of its own. Agent types load only after a session restart; until then
+   `sheet-namer` works if the prompt says the task writes two files.
+3. **Namers read their three files in one step** (`BLOCK-NAMING-TASK.md` says so): ~4 steps, not ~6.
+
+Measured: **Schumacher Mi10 end to end 2.9M raw, ~30 min** (layout 0.8M / 24 min, 17 namers 2.1M /
+6 min), 134 of 146 named, all 83 checked against Jordan's hand names right. **X4'25 naming 3.3M /
+11 min** (old layout), 131 of 173 named, all 72 checked against the hand-made X4'26 right. Before:
+X4'24 13.4M, ~1.5 h. The layout (~24 min) is now the slow step: run several sheets' layouts at once.
+**Orchestrator cost is real:** the main session spent 12.2M over those two sheets (more than the
+helpers) because every helper's finish re-read a long conversation. Run big batches from a fresh or
+compacted session, and launch naming in blocking waves (`run_in_background: false`, up to 20 per
+message) so a wave reports once.
+
 ## The method (v3, 2026-09-23): name whole drawings, not single boxes
 
 Earlier versions cropped each box around itself. On sheets whose boxes print only "SHIMS" or "mm",

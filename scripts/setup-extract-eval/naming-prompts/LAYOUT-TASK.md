@@ -3,13 +3,21 @@
 You are given a CAR NAME and a WORK FOLDER. Other helpers will name the boxes block by block from
 high-resolution pictures of each block; your job decides what those blocks are and briefs them.
 
-Read, in the work folder:
+Read, in the work folder, in TWO steps (each step = several Read calls in one message):
+
+Step 1, together:
 - `page-grid.jpg` — the whole sheet with a blue dashed grid every 0.1 of the page, `x=0.1 … 0.9`
   along the top and bottom, `y=0.1 … 0.9` down both sides. x grows right, y grows DOWN.
 - `page-grid-boxes.jpg` — the same, with every fillable box outlined in pink.
+- `boxes.txt` — every fillable box: its PDF field name, kind and centre on the page.
+- `tiles/index.txt` — the close-up tiles and the part of the page each one covers.
 
-READ coordinates off the grid rather than estimating. You may read `page.png` (full resolution) when
-small print is unclear. Be economical: a handful of crops at most.
+Step 2, together: every tile in `tiles/` (`r1c1.jpg`, `r1c2.jpg`, …). Each is a part of the page at
+full resolution with a fine grid every 0.01 (labelled every 0.05) and every fillable box outlined in
+pink with its PDF field name. Neighbouring tiles overlap, so a drawing cut by one tile's edge is whole
+in the next. The whole pictures are too small to read fine print; the tiles are not.
+
+READ coordinates off the grids rather than estimating. Do not open anything else.
 
 Write TWO files in the work folder.
 
