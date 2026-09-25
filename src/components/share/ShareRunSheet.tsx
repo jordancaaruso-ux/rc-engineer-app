@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, Share2, X } from "lucide-react";
+import { Check, ImagePlus, Share2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEnterExit } from "@/components/ui/Collapse";
 import { chipToggleClass } from "@/components/ui/chipToggle";
@@ -18,6 +18,13 @@ import {
   type ShareSectionKey,
   type ShareSections,
 } from "@/lib/share/shareCardModel";
+import {
+  DEFAULT_STORY_LOOK,
+  parseStoryFrame,
+  parseStoryLook,
+  type StoryFrame,
+  type StoryLook,
+} from "@/lib/share/storyModel";
 import { useShareFiles, type ShareTarget } from "@/components/share/useShareFiles";
 import { useUnits } from "@/components/providers/UnitsProvider";
 
@@ -32,10 +39,15 @@ import { useUnits } from "@/components/providers/UnitsProvider";
  * Same bottom-sheet construction as `PickerSheet`: portalled to `<body>` (this mounts inside
  * cards, and a transformed ancestor turns `fixed` into `absolute`), body scroll locked while open.
  *
- * Redesigned 2026-08-13 (no mode chips overriding the section chips), and again 2026-09-25: the
- * pictures are paper now, and STORY — one 9:16 picture for Instagram and Facebook — comes first.
+ * Redesigned 2026-08-13 (no mode chips overriding the section chips), and again 2026-09-25 after
+ * three rounds of founder interview: STORY comes first and has four LOOKS the driver picks between
+ * (Big numbers is the default), a size (9:16 story or 4:5 post) and an optional photo of their own.
  * A story is a fixed layout, so the section chips step aside while it is chosen; its preview shows
- * both pictures whole, side by side, because a story is judged as a whole frame.
+ * both pictures whole, side by side, because a story is judged as a whole frame. The two long
+ * styles stay as the plain info card for a mate or the team chat.
+ *
+ * The photo never leaves this sheet except inside a redraw: it is shrunk here, POSTed with every
+ * story render, and dropped when the sheet closes. The server keeps nothing.
  */
 
 const SECTION_LABELS: Record<ShareSectionKey, string> = {
@@ -56,6 +68,42 @@ const STYLE_OPTIONS = [
   { value: "report" as const, label: "Full report" },
 ];
 
+/** The looks in the order drivers see them; the letters are the interview's names for them. */
+const LOOK_OPTIONS: { value: StoryLook; label: string }[] = [
+  { value: "C", label: "Big numbers" },
+  { value: "A", label: "Glass" },
+  { value: "B", label: "Poster" },
+  { value: "D", label: "Dark" },
+];
+
+const FRAME_OPTIONS = [
+  { value: "story" as const, label: "Story size" },
+  { value: "post" as const, label: "Post size" },
+];
+
+/** The longest edge a photo is sent at: plenty for a 1080-wide picture, small enough to upload fast. */
+const PHOTO_EDGE = 1600;
+
+/** Shrink a phone photo before it travels. The browser has already turned the camera's rotation upright. */
+async function shrinkPhoto(file: File): Promise<Blob> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const scale = Math.min(1, PHOTO_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("photo"))), "image/jpeg", 0.86)
+    );
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 /**
  * Remembered per device, not per share (founder lean 2026-08-13). A driver who always sends the
  * full report should not re-tick six chips every Sunday. A device with nothing remembered starts
@@ -63,17 +111,19 @@ const STYLE_OPTIONS = [
  */
 const PREFS_KEY = "jrc.share.card.v1";
 
-type ShareCardPrefs = { style: ShareCardStyle; sections: ShareSections };
+type ShareCardPrefs = { style: ShareCardStyle; sections: ShareSections; look: StoryLook; frame: StoryFrame };
 
 function readPrefs(): ShareCardPrefs {
-  const fallback: ShareCardPrefs = { style: "story", sections: allSectionsOn() };
+  const fallback: ShareCardPrefs = { style: "story", sections: allSectionsOn(), look: DEFAULT_STORY_LOOK, frame: "story" };
   if (typeof window === "undefined") return fallback;
   try {
     const raw = window.localStorage.getItem(PREFS_KEY);
     if (!raw) return fallback;
-    const parsed = JSON.parse(raw) as { style?: unknown; sections?: unknown };
+    const parsed = JSON.parse(raw) as { style?: unknown; sections?: unknown; look?: unknown; frame?: unknown };
     return {
       style: parseCardStyle(typeof parsed.style === "string" ? parsed.style : null),
+      look: parseStoryLook(typeof parsed.look === "string" ? parsed.look : null),
+      frame: parseStoryFrame(typeof parsed.frame === "string" ? parsed.frame : null),
       // Round-tripped through the same parser the route uses, so an unknown name is ignored
       // rather than throwing — a stale key from an older build must never break the sheet.
       sections:
@@ -89,7 +139,12 @@ function writePrefs(prefs: ShareCardPrefs): void {
   try {
     window.localStorage.setItem(
       PREFS_KEY,
-      JSON.stringify({ style: prefs.style, sections: serializeSections(prefs.sections) })
+      JSON.stringify({
+        style: prefs.style,
+        sections: serializeSections(prefs.sections),
+        look: prefs.look,
+        frame: prefs.frame,
+      })
     );
   } catch {
     // A private-mode browser with no storage quota is not a reason to fail a share.
@@ -116,6 +171,14 @@ export function ShareRunSheet({
 }) {
   const [cardStyle, setCardStyle] = useState<ShareCardStyle>("story");
   const [sections, setSections] = useState<ShareSections>(allSectionsOn);
+  const [look, setLook] = useState<StoryLook>(DEFAULT_STORY_LOOK);
+  const [frame, setFrame] = useState<StoryFrame>("story");
+  /** The driver's photo, already shrunk. Lives only as long as the sheet is open. */
+  const [photo, setPhoto] = useState<Blob | null>(null);
+  /** The story drawn WITH the photo, as an object URL — POSTed, so it has no address of its own. */
+  const [photoCardUrl, setPhotoCardUrl] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
   const units = useUnits();
   const [includeSetup, setIncludeSetup] = useState<boolean>(Boolean(setupSnapshotId));
   const [previewLoading, setPreviewLoading] = useState(true);
@@ -144,6 +207,10 @@ export function ShareRunSheet({
     const prefs = readPrefs();
     setCardStyle(prefs.style === "story" && !hasLaps ? "hero" : prefs.style);
     setSections(prefs.sections);
+    setLook(prefs.look);
+    setFrame(prefs.frame);
+    setPhoto(null);
+    setPhotoError(null);
     setIncludeSetup(Boolean(setupSnapshotId));
     setPage(0);
     setSetupPreviewFailed(false);
@@ -168,15 +235,20 @@ export function ShareRunSheet({
 
   const wantedUrl = useMemo(() => {
     const query = new URLSearchParams({ style: cardStyle });
-    // A story ignores the chips, so leaving them out keeps one address — and one cached picture —
-    // per story however the long picture's chips are set.
-    const list = story ? "" : serializeSections(sections);
-    if (list) query.set("sections", list);
-    // In the URL, not only read on the server: the picture is cached for five minutes by its
-    // address, and a flip of the units switch has to draw a new one.
-    query.set("units", units);
+    if (story) {
+      // A story ignores the chips and the units (it prints no temperature), so its address is
+      // just the look and the size — one cached picture per combination.
+      query.set("look", look);
+      query.set("frame", frame);
+    } else {
+      const list = serializeSections(sections);
+      if (list) query.set("sections", list);
+      // In the URL, not only read on the server: the picture is cached for five minutes by its
+      // address, and a flip of the units switch has to draw a new one.
+      query.set("units", units);
+    }
     return `/api/runs/${encodeURIComponent(runId)}/share-card?${query.toString()}`;
-  }, [runId, cardStyle, story, sections, units]);
+  }, [runId, cardStyle, story, sections, units, look, frame]);
 
   /*
    * Every chip redraws the picture server-side, so a driver walking the row would queue six
@@ -193,11 +265,63 @@ export function ShareRunSheet({
     setPreviewLoading(true);
   }, [cardUrl]);
 
+  /*
+   * With a photo, the story is drawn by POST (the photo rides along) and shown from a blob. A newer
+   * look or size supersedes an older request rather than racing it.
+   */
+  const withPhoto = story && photo != null;
+  useEffect(() => {
+    if (!open || !withPhoto || !photo) {
+      setPhotoCardUrl(null);
+      return;
+    }
+    const controller = new AbortController();
+    let objectUrl: string | null = null;
+    setPreviewLoading(true);
+    setPhotoError(null);
+    const body = new FormData();
+    body.append("photo", photo, "photo.jpg");
+    fetch(cardUrl, { method: "POST", body, signal: controller.signal })
+      .then(async (res) => {
+        if (!res.ok) {
+          const message = await res
+            .json()
+            .then((j: { error?: string }) => j.error)
+            .catch(() => null);
+          throw new Error(message || "Couldn't draw it with that photo");
+        }
+        objectUrl = URL.createObjectURL(await res.blob());
+        setPhotoCardUrl(objectUrl);
+      })
+      .catch((e: unknown) => {
+        if (controller.signal.aborted) return;
+        setPhotoError(e instanceof Error ? e.message : "Couldn't draw it with that photo");
+        setPhoto(null);
+        setPreviewLoading(false);
+      });
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [open, withPhoto, photo, cardUrl]);
+
+  const previewSrc = withPhoto ? photoCardUrl : cardUrl;
+
+  async function onPhotoPicked(file: File | undefined) {
+    if (!file) return;
+    setPhotoError(null);
+    try {
+      setPhoto(await shrinkPhoto(file));
+    } catch {
+      setPhotoError("Couldn't open that photo");
+    }
+  }
+
   // Persist what the driver settled on, not every intermediate tap.
   useEffect(() => {
     if (!open) return;
-    writePrefs({ style: cardStyle, sections });
-  }, [open, cardStyle, sections]);
+    writePrefs({ style: cardStyle, sections, look, frame });
+  }, [open, cardStyle, sections, look, frame]);
 
   const slug = runLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "run";
   const setupImageUrl = setupSnapshotId
@@ -212,7 +336,10 @@ export function ShareRunSheet({
   }, [setupImageUrl]);
 
   const targets: ShareTarget[] = useMemo(() => {
-    const list: ShareTarget[] = [{ url: cardUrl, filename: `${slug}${story ? "-story" : ""}.png` }];
+    if (!previewSrc) return [];
+    const list: ShareTarget[] = [
+      { url: previewSrc, filename: story ? `${slug}-${frame}.jpg` : `${slug}.png` },
+    ];
     if (includeSetup && setupImageUrl) {
       list.push({
         url: setupImageUrl,
@@ -222,7 +349,7 @@ export function ShareRunSheet({
       });
     }
     return list;
-  }, [cardUrl, includeSetup, setupImageUrl, slug, story]);
+  }, [previewSrc, includeSetup, setupImageUrl, slug, story, frame]);
 
   /*
    * Draw the pictures before the driver asks for them.
@@ -237,7 +364,7 @@ export function ShareRunSheet({
    * would race the same render twice and pay for both.
    */
   useEffect(() => {
-    if (!open || previewLoading) return;
+    if (!open || previewLoading || targets.length === 0) return;
     void prefetch(targets);
   }, [open, previewLoading, targets, prefetch]);
 
@@ -268,7 +395,7 @@ export function ShareRunSheet({
    * Including `previewLoading` also makes the button honest, since it can no longer send a picture
    * the driver has not been shown.
    */
-  const busy = state === "working" || preparing || previewLoading;
+  const busy = state === "working" || preparing || previewLoading || targets.length === 0;
   // Counts what will actually arrive. Saying "2 pictures" beside a page reading "no sheet to draw"
   // is the sheet arguing with itself, so a known-undrawable sheet is not counted.
   const sendLabel = targets.length > 1 && !setupPreviewFailed ? "Share 2 pictures" : "Share picture";
@@ -280,7 +407,8 @@ export function ShareRunSheet({
    * 2026-09-25) was a 236px window over a portrait page.
    */
   const frameH = story ? 300 : 236;
-  const pageClass = story ? "h-[280px] w-[157.5px]" : "h-fit w-[325px]";
+  const pageClass = !story ? "h-fit w-[325px]" : frame === "post" ? "h-[280px] w-[224px]" : "h-[280px] w-[157.5px]";
+  const sheetPageClass = "h-[280px] w-[157.5px]";
 
   return createPortal(
     <div
@@ -349,24 +477,26 @@ export function ShareRunSheet({
               )}
             >
               <div className={cn("shrink-0 snap-start overflow-hidden rounded-lg border border-border", pageClass)}>
-                {/* eslint-disable-next-line @next/next/no-img-element -- a PNG route, not an app asset */}
-                <img
-                  src={cardUrl}
-                  alt="Preview of the picture that will be shared"
-                  className={cn(
-                    "block w-full transition-opacity",
-                    story && "h-full object-contain",
-                    previewLoading ? "opacity-0" : "opacity-100"
-                  )}
-                  onLoad={() => setPreviewLoading(false)}
-                  onError={() => setPreviewLoading(false)}
-                />
+                {previewSrc ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- a picture route, not an app asset
+                  <img
+                    src={previewSrc}
+                    alt="Preview of the picture that will be shared"
+                    className={cn(
+                      "block w-full transition-opacity",
+                      story && "h-full object-contain",
+                      previewLoading ? "opacity-0" : "opacity-100"
+                    )}
+                    onLoad={() => setPreviewLoading(false)}
+                    onError={() => setPreviewLoading(false)}
+                  />
+                ) : null}
               </div>
               {includeSetup && setupImageUrl ? (
                 <div
                   className={cn(
                     "relative flex shrink-0 snap-start items-start justify-center overflow-hidden rounded-lg border border-border bg-card",
-                    story ? pageClass : "h-full w-[325px]"
+                    story ? sheetPageClass : "h-full w-[325px]"
                   )}
                 >
                   {setupPreviewFailed ? (
@@ -449,6 +579,59 @@ export function ShareRunSheet({
               </button>
             </div>
           )}
+
+          {story ? (
+            <div className="flex flex-col gap-2.5 px-4 pb-2.5">
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label="Look">
+                {LOOK_OPTIONS.map((o) => (
+                  <Chip key={o.value} active={look === o.value} onClick={() => setLook(o.value)}>
+                    {o.label}
+                  </Chip>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <SegmentedControl
+                  options={FRAME_OPTIONS}
+                  value={frame}
+                  onChange={setFrame}
+                  ariaLabel="Size"
+                  className="w-[196px] shrink-0"
+                  segmentClassName="!py-[7px] !text-[12.5px]"
+                />
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    void onPhotoPicked(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
+                {photo ? (
+                  <div className="flex items-center gap-1">
+                    <Chip active onClick={() => photoInputRef.current?.click()}>
+                      Your photo
+                    </Chip>
+                    <button
+                      type="button"
+                      onClick={() => setPhoto(null)}
+                      aria-label="Remove photo"
+                      className="tap-active flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"
+                    >
+                      <X className="size-4" strokeWidth={2} aria-hidden />
+                    </button>
+                  </div>
+                ) : (
+                  <Chip active={false} onClick={() => photoInputRef.current?.click()}>
+                    <ImagePlus className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />
+                    Add a photo
+                  </Chip>
+                )}
+              </div>
+              {photoError ? <p className="text-[12px] text-destructive">{photoError}</p> : null}
+            </div>
+          ) : null}
 
           <div className="flex flex-wrap gap-1.5 px-4 pb-3.5" role="group" aria-label="What to include">
             {story

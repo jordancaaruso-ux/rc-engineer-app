@@ -9,18 +9,24 @@ import {
   buildShareRunCard,
   parseCardStyle,
   parseSectionsParam,
-  type ShareSections,
 } from "@/lib/share/shareCardModel";
 import { renderReportPng } from "@/lib/share/renderReportCard";
-import { renderStoryPng, STORY_TRACE, type StoryVariant } from "@/lib/share/renderStoryCard";
+import { renderStoryLook } from "@/lib/share/storyLooks";
+import { buildStoryData, parseStoryFrame, parseStoryLook } from "@/lib/share/storyModel";
+import { raceFieldSummaryForRun } from "@/lib/share/paceVsField";
 import { formatShareDateStamp } from "@/lib/share/shareDate";
 import { parseUnitSystem } from "@/lib/units/unitSystem";
 import { unitSystemForRequest } from "@/lib/units/unitSystemServer";
 
 /**
- * The run picture, as a PNG: `?style=story` is the 9:16 story, `hero` / `report` the long one.
+ * The run picture. `?style=story` is a story look as a JPEG (`look=A|B|C|D`, `frame=story|post`);
+ * `hero` / `report` are the long paper info card, as a PNG.
  *
- * GET, not POST, on purpose. Demo accounts are blocked from every mutating route by the
+ * POST draws the same story with the driver's own photo in it (multipart field `photo`). The
+ * photo is used for this one picture and never stored: the share sheet keeps it and sends it with
+ * every redraw. Demo accounts cannot POST (see below), so the demo shares the designed backdrops.
+ *
+ * GET, not POST, for everything else on purpose. Demo accounts are blocked from every mutating route by the
  * read-only chokepoint in `middleware.ts`, and a demo user sharing a branded card is free
  * advertising — so the whole path has to be readable. It also means the client can point an
  * `<img>` straight at this URL for the share sheet's live preview.
@@ -35,21 +41,8 @@ export const runtime = "nodejs";
 
 type Params = { params: Promise<{ id: string }> };
 
-/** The story layout drivers get. The founder picks from A/B/C (bench, 2026-09-25). */
-const STORY_VARIANT: StoryVariant = "poster";
-
-/**
- * The story is a fixed layout: its figures are the tiles, and of the chip-controlled blocks it
- * draws only the trace. Asking for nothing else also skips the previous run's setup lookup.
- */
-const STORY_SECTIONS: ShareSections = {
-  details: false,
-  laps: false,
-  graph: true,
-  setup: false,
-  notes: false,
-  feel: false,
-};
+/** A phone photo, downscaled by the sheet to ~1600px; anything past this is not a photo we asked for. */
+const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 
 const shareRunSelect = {
   id: true,
@@ -91,9 +84,32 @@ const shareRunSelect = {
   event: { select: { name: true } },
   user: { select: { name: true } },
   setupSnapshot: { select: { id: true, data: true } },
+  // The name the timing sheet printed, for a story whose driver never saved a name.
+  importedLapSets: { where: { isPrimaryUser: true }, select: { driverName: true }, take: 1 },
 } as const;
 
 export async function GET(request: Request, { params }: Params) {
+  return draw(request, params, null);
+}
+
+export async function POST(request: Request, { params }: Params) {
+  let photo: Buffer | null = null;
+  try {
+    const form = await request.formData();
+    const file = form.get("photo");
+    if (file instanceof Blob && file.size > 0) {
+      if (file.size > MAX_PHOTO_BYTES) {
+        return NextResponse.json({ error: "That photo is too big. Try a smaller one." }, { status: 413 });
+      }
+      photo = Buffer.from(await file.arrayBuffer());
+    }
+  } catch {
+    return NextResponse.json({ error: "Couldn't read that photo" }, { status: 400 });
+  }
+  return draw(request, params, photo);
+}
+
+async function draw(request: Request, params: Params["params"], photo: Buffer | null) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   }
@@ -104,12 +120,48 @@ export async function GET(request: Request, { params }: Params) {
   const { searchParams } = new URL(request.url);
   const style = parseCardStyle(searchParams.get("style"));
   const story = style === "story";
-  const sections = story ? STORY_SECTIONS : parseSectionsParam(searchParams.get("sections"));
-  // The share sheet sends the unit it is showing; a bare URL gets the driver's own.
-  const units = parseUnitSystem(searchParams.get("units")) ?? (await unitSystemForRequest(userId));
 
   const run = await prisma.run.findFirst({ where: { id, userId }, select: shareRunSelect });
   if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const timeZone = await getExplicitTimeZoneForRunFormatting();
+  const instant = resolveRunDisplayInstant(run);
+  const dateStamp = formatShareDateStamp(instant, timeZone);
+
+  if (story) {
+    const field = await raceFieldSummaryForRun(userId, run.id, run);
+    const data = buildStoryData({
+      run,
+      dateStamp,
+      accountName: run.user?.name ?? null,
+      field,
+      timingName: run.importedLapSets[0]?.driverName ?? null,
+    });
+    let jpeg: Buffer;
+    try {
+      jpeg = await renderStoryLook(data, {
+        look: parseStoryLook(searchParams.get("look")),
+        frame: parseStoryFrame(searchParams.get("frame")),
+        photo,
+      });
+    } catch (e) {
+      // A file that says image/* but isn't one: sharp throws on decode. Say so rather than 500.
+      if (photo) return NextResponse.json({ error: "Couldn't use that photo. Try another." }, { status: 400 });
+      throw e;
+    }
+    return new Response(new Uint8Array(jpeg), {
+      headers: {
+        "Content-Type": "image/jpeg",
+        "Content-Length": String(jpeg.length),
+        // A photo story is drawn per request and must not sit in a cache under a shared address.
+        "Cache-Control": photo ? "no-store" : "private, max-age=300",
+      },
+    });
+  }
+
+  const sections = parseSectionsParam(searchParams.get("sections"));
+  // The share sheet sends the unit it is showing; a bare URL gets the driver's own.
+  const units = parseUnitSystem(searchParams.get("units")) ?? (await unitSystemForRequest(userId));
 
   /*
    * "Changed since last run" is the diff against the previous run on the SAME car, which is what
@@ -132,23 +184,19 @@ export async function GET(request: Request, { params }: Params) {
     previousSetupData = previous?.setupSnapshot?.data ?? undefined;
   }
 
-  const timeZone = await getExplicitTimeZoneForRunFormatting();
-  const instant = resolveRunDisplayInstant(run);
-
   const card = buildShareRunCard({
     run,
     style,
     sections,
     dateTimeLabel: formatRunDateTime(instant, timeZone),
-    dateStamp: formatShareDateStamp(instant, timeZone),
+    dateStamp,
     driverName: run.user?.name ?? null,
     setupData: run.setupSnapshot?.data,
     previousSetupData,
     units,
-    traceBox: story ? STORY_TRACE : undefined,
   });
 
-  const png = story ? await renderStoryPng(card, STORY_VARIANT) : await renderReportPng(card);
+  const png = await renderReportPng(card);
   return new Response(new Uint8Array(png), {
     headers: {
       "Content-Type": "image/png",

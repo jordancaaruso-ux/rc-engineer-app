@@ -7,8 +7,8 @@
  *
  * Three STYLES (founder rulings 2026-08-13 and 2026-09-25):
  *
- *   story  — the 9:16 picture for an Instagram / Facebook story (`renderStoryCard.tsx`). A fixed
- *            layout: best lap, three figures, the trace. The section chips do not apply to it.
+ *   story  — the 9:16 story / 4:5 post, drawn from `storyModel.ts` by `storyLooks.tsx` in the look
+ *            the driver picks. The section chips do not apply to it; this model only parses the name.
  *   hero   — the long picture, best lap first (`renderReportCard.tsx`).
  *   report — the long picture, session identity first, for the team chat.
  *

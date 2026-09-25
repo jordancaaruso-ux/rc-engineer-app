@@ -1,9 +1,9 @@
 import "server-only";
 
-import { shareCardFonts } from "@/lib/share/shareFonts";
+import { shareCardFonts, type FontWeight } from "@/lib/share/shareFonts";
 
 /**
- * How wide a line of Sora is, read from the font's own advance widths.
+ * How wide a line of Sora (or Barlow Condensed) is, read from the font's own advance widths.
  *
  * Satori lays out into a fixed box and clips what overflows, and it has no API that reports where
  * text ended up. A picture with a fixed size (the 9:16 story) therefore has to choose each
@@ -15,7 +15,7 @@ import { shareCardFonts } from "@/lib/share/shareFonts";
 type Weight = 400 | 500 | 600 | 700;
 type Metrics = { upm: number; advance: (codePoint: number) => number };
 
-const byWeight = new Map<Weight, Metrics>();
+const byFace = new Map<string, Metrics>();
 
 /** The two TrueType tables a width needs: `cmap` (format 4) to find the glyph, `hmtx` for its advance. */
 function parseMetrics(buf: Buffer): Metrics {
@@ -71,20 +71,26 @@ function parseMetrics(buf: Buffer): Metrics {
   };
 }
 
-function metrics(weight: Weight): Metrics {
-  let m = byWeight.get(weight);
+function metrics(family: string, weight: FontWeight): Metrics {
+  const key = `${family}:${weight}`;
+  let m = byFace.get(key);
   if (!m) {
-    const font = shareCardFonts().find((f) => f.name === "Sora" && f.weight === weight);
-    if (!font) throw new Error(`Sora ${weight} is not bundled`);
+    const font = shareCardFonts().find((f) => f.name === family && f.weight === weight);
+    if (!font) throw new Error(`${family} ${weight} is not bundled`);
     m = parseMetrics(font.data);
-    byWeight.set(weight, m);
+    byFace.set(key, m);
   }
   return m;
 }
 
 /** Width in px of `text` set in Sora at `fontSize`, with CSS `letter-spacing` in px. */
 export function soraWidth(text: string, fontSize: number, weight: Weight, letterSpacing = 0): number {
-  const m = metrics(weight);
+  return textWidth("Sora", text, fontSize, weight, letterSpacing);
+}
+
+/** Width in px of `text` in any bundled face. */
+export function textWidth(family: string, text: string, fontSize: number, weight: FontWeight, letterSpacing = 0): number {
+  const m = metrics(family, weight);
   let units = 0;
   let count = 0;
   for (const ch of text) {
@@ -103,7 +109,17 @@ export function fitSoraSize(
   width: number,
   opts: { max: number; min: number; weight: Weight; letterSpacingEm?: number }
 ): number {
-  const perPx = soraWidth(text, 1, opts.weight, opts.letterSpacingEm ?? 0);
+  return fitTextSize("Sora", text, width, opts);
+}
+
+/** {@link fitSoraSize} for any bundled face. */
+export function fitTextSize(
+  family: string,
+  text: string,
+  width: number,
+  opts: { max: number; min: number; weight: FontWeight; letterSpacingEm?: number }
+): number {
+  const perPx = textWidth(family, text, 1, opts.weight, opts.letterSpacingEm ?? 0);
   if (perPx <= 0) return opts.max;
   return Math.max(opts.min, Math.min(opts.max, Math.floor(width / perPx)));
 }

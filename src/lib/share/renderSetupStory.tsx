@@ -2,14 +2,18 @@ import "server-only";
 
 import satori from "satori";
 import sharp from "sharp";
-import { shareCardFonts } from "@/lib/share/shareFonts";
-import { fitSoraSize } from "@/lib/share/textMeasure";
-import { CARD_SHADOW, Lockup, P, ShadowStrip, TitleRule, col, eyebrow, sora } from "@/lib/share/paperParts";
-import { STORY_HEIGHT, STORY_WIDTH } from "@/lib/share/renderStoryCard";
+import { FONT_STORY, shareCardFonts } from "@/lib/share/shareFonts";
+import { fitTextSize } from "@/lib/share/textMeasure";
+import { CARD_SHADOW, P, ShadowStrip, col } from "@/lib/share/paperParts";
+import { StoryLogo } from "@/lib/share/storyLooks";
+
+const STORY_WIDTH = 1080;
+const STORY_HEIGHT = 1920;
 
 /**
  * The setup sheet as a story page: the driver's own sheet, untouched, sitting on the app's paper at
- * 9:16 with the car and the day above it (founder, 2026-09-25: "sheet on a story page").
+ * 9:16 with the car and the day above it (founder, 2026-09-25: "sheet on a story page"). The heading
+ * is set in the story looks' condensed capitals ("match the font style of the other ones").
  *
  * The sheet itself is never redrawn: satori draws the page around an empty card, and the sheet's
  * own raster is composited into that card by sharp at exact pixels. So what sits in the frame is
@@ -49,21 +53,38 @@ export async function composeSheetStory(sheetPng: Buffer, heading: SheetStoryHea
   const cardY = Math.round(SHEET_TOP + (SHEET_BOTTOM - SHEET_TOP - cardH) / 2);
 
   const titleW = STORY_WIDTH - (cardX + 8) * 2;
-  const titleSize = fitSoraSize(heading.carName, titleW, { max: 76, min: 46, weight: 700, letterSpacingEm: -0.02 });
-  const details = heading.details.filter(Boolean).join(" · ");
-  const detailSize = fitSoraSize(details, titleW, { max: 32, min: 24, weight: 500 });
+  const carName = heading.carName.toUpperCase();
+  const titleSize = fitTextSize(FONT_STORY, carName, titleW, { max: 118, min: 60, weight: 800 });
+  const details = heading.details.filter(Boolean).join(" · ").toUpperCase();
+  const detailSize = fitTextSize(FONT_STORY, details, titleW, { max: 30, min: 22, weight: 600, letterSpacingEm: 0.12 });
+  const caps = (size: number, color: string, tracking: number) => ({
+    display: "flex",
+    fontFamily: FONT_STORY,
+    fontWeight: 600,
+    fontSize: size,
+    color,
+    lineHeight: 1,
+    letterSpacing: Math.round(size * tracking),
+  });
 
   const svg = await satori(
     <div style={{ ...col, position: "relative", width: STORY_WIDTH, height: STORY_HEIGHT, backgroundColor: P.ground }}>
-      <div style={{ ...col, position: "absolute", left: cardX + 8, top: 196, width: titleW }}>
-        <div style={eyebrow(27)}>{["Setup sheet", heading.dateCaps].filter(Boolean).join(" · ")}</div>
-        <div style={{ ...sora(titleSize, 700, P.ink, 1.1), letterSpacing: -titleSize * 0.02, marginTop: 10 }}>
-          {heading.carName}
+      <div style={{ ...col, position: "absolute", left: cardX + 8, top: 206, width: titleW }}>
+        <div style={caps(27, P.mut, 0.2)}>{["Setup sheet", heading.dateCaps].filter(Boolean).join(" · ").toUpperCase()}</div>
+        <div
+          style={{
+            display: "flex",
+            fontFamily: FONT_STORY,
+            fontWeight: 800,
+            fontSize: titleSize,
+            color: P.ink,
+            lineHeight: 0.9,
+            marginTop: 14,
+          }}
+        >
+          {carName}
         </div>
-        <div style={{ display: "flex", marginTop: 16 }}>
-          <TitleRule width={titleW} thickness={4} sectorAt={0} />
-        </div>
-        {details ? <div style={{ ...sora(detailSize, 500, P.mut, 1.3), marginTop: 18 }}>{details}</div> : null}
+        {details ? <div style={{ ...caps(detailSize, P.mut, 0.12), marginTop: 16 }}>{details}</div> : null}
       </div>
 
       <ShadowStrip width={cardW} radius={28} shadow={CARD_SHADOW} left={cardX} bottom={STORY_HEIGHT - cardY - cardH} />
@@ -82,7 +103,7 @@ export async function composeSheetStory(sheetPng: Buffer, heading: SheetStoryHea
       />
 
       <div style={{ display: "flex", position: "absolute", left: 0, top: SHEET_BOTTOM + 20, width: STORY_WIDTH, justifyContent: "center" }}>
-        <Lockup tile={40} text={24} />
+        <StoryLogo color={P.ink} tile={40} text={24} />
       </div>
     </div>,
     { width: STORY_WIDTH, height: STORY_HEIGHT, fonts: shareCardFonts() }
