@@ -9,6 +9,7 @@ import {
   tireAgeHint,
   tireAgeReadout,
   tireAgeReadoutLine,
+  tireRunNumber,
   TIRE_COUNT_CHIPS,
 } from "@/lib/tires/tireAgeReadout";
 import type { LastRunTires, TireStintValue } from "@/lib/tires/tireStintValue";
@@ -123,4 +124,12 @@ test("one end of a front/rear car reads on one line, and a carried count says so
     tireAgeReadoutLine("carried", v(3, false)),
     "Carried on · Age unknown · 3 runs since you got them"
   );
+});
+
+test("a one-tire car's run box names the run this will be, and never guesses one", () => {
+  assert.equal(tireRunNumber(null, v(0)), null, "no answer yet: no number");
+  assert.equal(tireRunNumber("assumedFresh", v(0)), "1", "new tires: this is run 1");
+  assert.equal(tireRunNumber("carried", v(2, true, "stint-1")), "3");
+  assert.equal(tireRunNumber("manual", v(12)), "13", "past the chip row still counts");
+  assert.equal(tireRunNumber("manual", v(3, false)), "?", "unknown age has no run number");
 });

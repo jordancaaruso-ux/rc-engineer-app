@@ -7,10 +7,12 @@
  * half-answered: a compound is either picked, or nothing is.
  *
  * That makes the carry-over silent, which is the one thing the previous design
- * refused to do. The mitigation is the answer line (`tireAgeReadoutLine`), which
- * opens "Carried on ·" when the number came from the last run. A wrong guess is
- * then one tap to fix, which is cheaper than the question it replaced. (Until
- * 2026-09-26 a separate grey line, `tireAgeHint`, said it on one-tire cars.)
+ * refused to do. On one end of a front/rear car the mitigation is the answer line
+ * (`tireAgeReadoutLine`), which opens "Carried on ·" when the number came from the
+ * last run. A one-tire car shows only the run number now (`tireRunNumber`, founder
+ * pick 2026-09-26), so nothing there says a count was carried; its grey hint line
+ * (`tireAgeHint`) went the same day. A wrong guess is still one tap to fix, which
+ * is cheaper than the question it replaced.
  *
  * The count row is always on screen for the same reason: it is both the display
  * of the guess and the correction for it.
@@ -62,11 +64,11 @@ export function tireAgeReadout(source: TireAgeSource, value: TireStintValue): Ti
 }
 
 /**
- * The same answer as `tireAgeReadout`, on one line — first for a front/rear car, where two of the
- * big "On the car now" boxes stacked on a phone would push the rear tire off the screen (founder
- * call 2026-09-19), and since 2026-09-26 for every car (founder pick: the big box was the only one
- * of its kind in the app). A carried count says so in the line itself, because the separate hint
- * line is gone too. Null while no tire is picked: the dimmed chips already say that.
+ * The same answer as `tireAgeReadout`, on one line — for one end of a front/rear car, where two of
+ * the big "On the car now" boxes stacked on a phone would push the rear tire off the screen
+ * (founder call 2026-09-19). A carried count says so in the line itself, because the separate hint
+ * line is gone too. Null while no tire is picked: the dimmed chips already say that. A one-tire
+ * car answers with `tireRunNumber` instead.
  */
 export function tireAgeReadoutLine(source: TireAgeSource, value: TireStintValue): string | null {
   if (source === null) return null;
@@ -83,10 +85,23 @@ export function tireAgeReadoutLine(source: TireAgeSource, value: TireStintValue)
 }
 
 /**
+ * Which run this will be on the set, for the small "Run 4" box beside a one-tire car's compound
+ * (founder pick "H", 2026-09-26: "on the left have the selector, then a small box on the right
+ * indicating which run this is"). It replaced the big "On the car now" box: the lit chip already
+ * says how many runs are on the set. Null until there is an answer; "?" after Not sure, because a
+ * set of unknown age has no run number either.
+ */
+export function tireRunNumber(source: TireAgeSource, value: TireStintValue): string | null {
+  if (source === null) return null;
+  if (!value.ageKnown) return "?";
+  return String(value.runsCompleted + 1);
+}
+
+/**
  * The line that sat under the chips on a one-tire car until 2026-09-26 (founder: remove it). Says
  * where the count came from so a carried number is never mistaken for one the driver entered —
  * and says nothing once they have corrected it, because then they already know. Nothing on the
- * log-run form shows it now; `tireAgeReadoutLine` carries the "Carried on" part.
+ * log-run form shows it now; a front/rear end's `tireAgeReadoutLine` carries the "Carried on" part.
  */
 export function tireAgeHint(source: TireAgeSource, last: LastRunTires | null): string | null {
   if (source === "carried") {
